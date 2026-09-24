@@ -6,8 +6,11 @@ import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
 import { UnauthorizedError, ValidationError } from '@/lib/modules/pedidos/domain/errors'
 import { createQuoteOrderCost, type QuoteOrderCostDeps } from '@/lib/modules/pedidos/domain/quote-order-cost'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
+import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
+import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -22,7 +25,8 @@ const BATCH = {
   productId: 'p-1',
   unitId: 'u-1',
   lot: '1',
-  stock: 100,
+  stock: '100',
+  available: '100',
   unitCost: '10.0000',
   purchaseDate: '2026-01-01',
 }
@@ -61,22 +65,28 @@ function crearDobles() {
   return dobles()
 }
 
+const ORDER_ID = '11111111-1111-4111-8111-111111111111'
+
+function filaExistente(): OrderRow {
+  return {
+    id: ORDER_ID,
+    number: { year: 2026, sequence: 7 },
+    recipeId: RECIPE_ID,
+    quantity: '10.0000',
+    priority: 'BAJA',
+    status: 'PENDIENTE',
+    cancellationReason: null,
+    ingredientsCost: null,
+    createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+    createdBy: 'admin-0',
+    updatedBy: 'admin-0',
+    presentationId: PRESENTATION_ID,
+  }
+}
+
 describe('R1: el mismo resultado que recibirian orders.create y orders.updateAlive', () => {
   it('con importe: la cotizacion coincide con el ingredientsCost del alta y de la edicion', async () => {
-    const orders = {
-      create: vi.fn(async (...args: unknown[]) => {
-        void args
-        return { id: 'o-1', number: { year: 2026, sequence: 1 } }
-      }),
-      updateAlive: vi.fn(async (...args: unknown[]) => {
-        void args
-      }),
-      findAliveById: vi.fn(),
-      listAlive: vi.fn(),
-      cancelAlive: vi.fn(),
-      softDeleteAlive: vi.fn(),
-    }
-
     const d = crearDobles()
     const presentations: PresentationCatalog = {
       findRefs: vi.fn(async () => [{ id: PRESENTATION_ID, name: 'Presentacion de prueba' }]),
@@ -87,8 +97,11 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       findRefsIncludingDeleted: vi.fn(async () => [{ id: RECIPE_ID, isDeleted: false }]),
     } as unknown as RecipeCatalog
 
+    const create = vi.fn(async () => filaExistente())
+    const { unitOfWork: unitOfWorkDeAlta } = fakeUnitOfWork({ orders: { create, setReservedAt: vi.fn(async () => undefined) } })
+
     const alta = createCreateOrder({
-      orders: orders as never,
+      unitOfWork: unitOfWorkDeAlta,
       recipes: recipesConVigencia,
       products: d.products,
       units: d.units,
@@ -99,28 +112,40 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       { recipeId: RECIPE_ID, quantity: '4.0000', presentationId: PRESENTATION_ID },
       actorCon('pedidos.modificar'),
     )
-    const ingredientsCostDelAlta = orders.create.mock.calls[0]?.[4] as string | null
+    const ingredientsCostDelAlta = (create.mock.calls[0] as unknown as readonly unknown[])[4] as string | null
+
+    const filaVista = filaExistente()
+    const orders = {
+      findAliveById: vi.fn(async () => filaVista),
+    } as unknown as OrderRepository
+    const updateAlive = vi.fn(async () => 'ok' as const)
+    const { unitOfWork: unitOfWorkDeEdicion } = fakeUnitOfWork({
+      orders: {
+        lockAliveById: vi.fn(async () => ({ ...filaVista, reservedAt: null })),
+        updateAlive,
+        setReservedAt: vi.fn(async () => undefined),
+      },
+    })
 
     const edicion = createUpdateOrder({
-      orders: orders as never,
+      orders,
+      unitOfWork: unitOfWorkDeEdicion,
       recipes: recipesConVigencia,
       products: d.products,
       units: d.units,
       presentations,
       now: () => new Date('2026-05-01T00:00:00.000Z'),
     })
-    orders.findAliveById.mockResolvedValue({ id: 'o-1', status: 'PENDIENTE' })
     await edicion(
-      'o-1',
+      ORDER_ID,
       {
         recipeId: RECIPE_ID,
         quantity: '4.0000',
         presentationId: PRESENTATION_ID,
-        status: 'PENDIENTE',
       },
       actorCon('pedidos.modificar'),
     )
-    const ingredientsCostDeLaEdicion = orders.updateAlive.mock.calls[0]?.[4] as string | null
+    const ingredientsCostDeLaEdicion = (updateAlive.mock.calls[0] as unknown as readonly unknown[])[4] as string | null
 
     const cotizar = createQuoteOrderCost(depsDe(d))
     const cotizacion = await cotizar(
@@ -241,7 +266,7 @@ describe('R6: receta inexistente o ajena da sin importe', () => {
     )
     expect(resultado.ingredientsCost).toBeNull()
     expect(d.recipes.findExecutionContentById).toHaveBeenCalledWith(RECIPE_ID, COMPANY_ID)
-    expect(d.products.findCostingBatches).toHaveBeenCalledWith([], COMPANY_ID)
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith([], COMPANY_ID, { excludeOrderId: undefined })
     expect(d.products.findRefs).toHaveBeenCalledWith([], COMPANY_ID)
   })
 })
@@ -255,8 +280,43 @@ describe('R7: la empresa sale del actor, y una entrada con companyId de otra emp
       actorCon('pedidos.modificar'),
     )
     expect(d.recipes.findExecutionContentById).toHaveBeenCalledWith(RECIPE_ID, COMPANY_ID)
-    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID)
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: undefined })
     expect(d.products.findRefs).toHaveBeenCalledWith(['p-1'], COMPANY_ID)
     expect(d.units.findRefs).toHaveBeenCalledWith(['u-1'], COMPANY_ID)
+  })
+})
+
+describe('R8: `orderId` opcional en la entrada llega a `findCostingBatches` como `excludeOrderId` (R65)', () => {
+  const OTHER_ORDER_ID = '99999999-9999-4999-8999-999999999999'
+
+  it('sin `orderId` en la entrada, `excludeOrderId` es `undefined` -alta, sin pedido que excluir-', async () => {
+    const d = crearDobles()
+    const cotizar = createQuoteOrderCost(depsDe(d))
+    await cotizar({ recipeId: RECIPE_ID, quantity: '4.0000' }, actorCon('pedidos.modificar'))
+
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: undefined })
+  })
+
+  it('con `orderId` en la entrada -edicion-, se reenvia tal cual como `excludeOrderId`, sin leer el pedido', async () => {
+    const d = crearDobles()
+    const cotizar = createQuoteOrderCost(depsDe(d))
+    await cotizar(
+      { recipeId: RECIPE_ID, quantity: '4.0000', orderId: OTHER_ORDER_ID },
+      actorCon('pedidos.modificar'),
+    )
+
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: OTHER_ORDER_ID })
+  })
+
+  it('un `orderId` que no es UUID rechaza con ValidationError, como el resto de la entrada', async () => {
+    const d = crearDobles()
+    const cotizar = createQuoteOrderCost(depsDe(d))
+    await expect(
+      cotizar(
+        { recipeId: RECIPE_ID, quantity: '4.0000', orderId: 'no-es-un-uuid' },
+        actorCon('pedidos.modificar'),
+      ),
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(d.products.findCostingBatches).not.toHaveBeenCalled()
   })
 })

@@ -1,7 +1,7 @@
 // Test de fuente: quien escribe la fecha de terminado y el estado del pedido, y el alcance del
 // esquema y las dependencias. Mismo patron que `tests/unit/identity/roles/empacador-rol.test.ts`
 // (barrido de `lib/**` sobre el fuente sin comentarios) y `tests/unit/identity/qc78-alcance.test.ts`
-// (diff contra la base de fusion con `origin/dev`).
+// (lectura de un commit fijo de la historia; aqui, el merge con el que el cambio entro en dev).
 
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -80,9 +80,9 @@ export function stripComments(source: string): string {
 /**
  * Extrae, del fuente ya sin comentarios, el texto balanceado en llaves de cada bloque que sigue
  * a la palabra `data:` -la forma exacta en que Prisma recibe lo que escribe en `create`,
- * `update`, `updateMany`, `createMany` y `upsert` en este repo (comprobado: `createOrder` usa
- * SQL crudo con `VALUES (...)`, sin `data:`, asi que no aparece aqui y no hace falta excluirlo
- * a mano).
+ * `update`, `updateMany`, `createMany` y `upsert` en este repo (comprobado: `insertAliveOrder`
+ * usa SQL crudo con `VALUES (...)`, sin `data:`, asi que no aparece aqui y no hace falta
+ * excluirlo a mano).
  */
 export function extractDataBlocks(source: string): readonly string[] {
   const codigo = stripComments(source);
@@ -123,38 +123,73 @@ function findDataBlockMatches(
     .filter((hallazgo) => hallazgo.bloques.length > 0);
 }
 
-const ORDER_CATALOG_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts';
 const ORDER_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts';
 
-describe('R5 — finishedAt/finished_at solo se escribe en transitionAliveOrder', () => {
-  it('ningun bloque `data:` de lib/** fuera de order-catalog-prisma.ts nombra finishedAt/finished_at', () => {
+/**
+ * Nombre -> cuerpo de cada `function` de nivel superior del fuente dado. Mismo criterio de corte
+ * que ya usa este archivo para insertAliveOrder/updateAliveOrder/cancelAliveOrder: el cuerpo
+ * termina en el primer `\n}` -una linea que es solo la llave de cierre, la de nivel superior con
+ * el formato de dos espacios de este repo-.
+ */
+function funcionesDeOrderPrisma(fuente: string): ReadonlyMap<string, string> {
+  const funciones = new Map<string, string>();
+  const declaracion = /^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(/gm;
+  for (const match of fuente.matchAll(declaracion)) {
+    const nombre = match[1];
+    if (nombre === undefined) continue;
+    const finFuncion = fuente.indexOf('\n}', match.index);
+    funciones.set(nombre, fuente.slice(match.index, finFuncion === -1 ? undefined : finFuncion));
+  }
+  return funciones;
+}
+
+/** Nombres, ordenados, de las funciones cuyo cuerpo tiene al menos un bloque `data:` con la
+ *  clave `status:` -a mano, sea literal o variable-. */
+function funcionesConStatusEnData(fuente: string): string[] {
+  const nombres: string[] = [];
+  for (const [nombre, cuerpo] of funcionesDeOrderPrisma(fuente)) {
+    if (extractDataBlocks(cuerpo).some((block) => /\bstatus\s*:/.test(block))) nombres.push(nombre);
+  }
+  return nombres.sort();
+}
+
+describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus', () => {
+  // `setStatus` de `OrderWriteRepository` -implementada como `setAliveOrderStatus` en
+  // order-prisma.ts- escribe `finishedAt` en el mismo `UPDATE` que mueve a ENTREGADO, para que
+  // el estado y la fecha de terminado queden atomicos con el consumo. `transitionAliveOrder`
+  // (order-catalog-prisma.ts), que llevaba su propio `data:` con finishedAt y se habia quedado
+  // sin llamantes, se retiro: ya no queda ningun bloque `data:` de ese archivo.
+  it('ningun bloque `data:` de lib/** fuera de order-prisma.ts nombra finishedAt/finished_at', () => {
     const conLaColumna = findDataBlockMatches(repoRoot, (block) => /finishedAt|finished_at/.test(block));
+    const rutas = conLaColumna.map((hallazgo) => hallazgo.ruta).sort();
 
     expect(
-      conLaColumna.map((hallazgo) => hallazgo.ruta),
-      conLaColumna.length === 1 && conLaColumna[0]?.ruta === ORDER_CATALOG_PRISMA
+      rutas,
+      rutas.length === 1 && rutas[0] === ORDER_PRISMA
         ? undefined
-        : 'finishedAt/finished_at solo puede escribirse en el `data:` de transitionAliveOrder ' +
-            `(${ORDER_CATALOG_PRISMA}). Se encontro tambien en, o en un numero distinto de bloques ` +
-            `de ese archivo: ${JSON.stringify(conLaColumna)}.`,
-    ).toEqual([ORDER_CATALOG_PRISMA]);
+        : 'finishedAt/finished_at solo puede escribirse en `data:` de order-prisma.ts ' +
+            `(setAliveOrderStatus). Se encontro en: ${JSON.stringify(conLaColumna)}.`,
+    ).toEqual([ORDER_PRISMA]);
   });
 
-  it('order-catalog-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt (el de transitionAliveOrder)', () => {
-    const fuente = readFileSync(join(repoRoot, ORDER_CATALOG_PRISMA), 'utf8');
+  it('order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt (el de setAliveOrderStatus)', () => {
+    const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
     const bloques = extractDataBlocks(fuente).filter((block) => /finishedAt/.test(block));
 
     expect(bloques).toHaveLength(1);
     expect(bloques[0]).toMatch(/status\s*:\s*to\b/);
   });
 
-  it('las escrituras conocidas que R5 nombra -create, updateAliveOrder, cancelAliveOrder, softDeleteAliveOrder- no llevan finishedAt', () => {
+  it('las escrituras conocidas que R5 nombra -insertAliveOrder, updateAliveOrder, cancelAliveOrder, softDeleteAliveOrder- no llevan finishedAt', () => {
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
-    const bloques = extractDataBlocks(fuente);
-
-    expect(bloques.length).toBeGreaterThan(0);
-    for (const bloque of bloques) {
-      expect(bloque).not.toMatch(/finishedAt|finished_at/);
+    for (const nombre of ['insertAliveOrder', 'updateAliveOrder', 'cancelAliveOrder', 'softDeleteAliveOrder']) {
+      const inicio = fuente.indexOf(`async function ${nombre}`);
+      expect(inicio, `no existe ${nombre} en ${ORDER_PRISMA}`).toBeGreaterThanOrEqual(0);
+      const finFuncion = fuente.indexOf('\n}', inicio);
+      const cuerpo = fuente.slice(inicio, finFuncion);
+      for (const bloque of extractDataBlocks(cuerpo)) {
+        expect(bloque, `${nombre} no debe escribir finishedAt`).not.toMatch(/finishedAt|finished_at/);
+      }
     }
   });
 
@@ -175,11 +210,11 @@ describe('R5 — finishedAt/finished_at solo se escribe en transitionAliveOrder'
   });
 });
 
-describe('R10 — EN_CURSO/ENTREGADO solo los escribe transitionAliveOrder; updateAliveOrder ya no escribe status', () => {
+describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus; updateAliveOrder ya no escribe status', () => {
   it('ningun bloque `data:` de lib/** fija status a mano en EN_CURSO ni ENTREGADO', () => {
     // El patron busca `status: 'EN_CURSO'` o `status: 'ENTREGADO'` como VALOR escrito, no
     // cualquier mencion del literal: `...(to === 'ENTREGADO' ? { finishedAt: now } : {})` de
-    // transitionAliveOrder es una COMPARACION dentro del mismo bloque `data:`, no una escritura
+    // setAliveOrderStatus es una COMPARACION dentro del mismo bloque `data:`, no una escritura
     // de `status` a mano, y no debe disparar esta regla (el caso simetrico, mas abajo, lo fija).
     const conElLiteral = findDataBlockMatches(repoRoot, (block) =>
       /\bstatus\s*:\s*['"`](EN_CURSO|ENTREGADO)['"`]/.test(block),
@@ -190,18 +225,35 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe transitionAliveOrder; upda
       conElLiteral.length === 0
         ? undefined
         : 'Ningun `data:` de lib/** debe fijar EN_CURSO/ENTREGADO como literal: ' +
-            'transitionAliveOrder los recibe parametrizados (`status: to`), nunca a mano. ' +
+            'setAliveOrderStatus los recibe parametrizados (`status: to`), nunca a mano. ' +
             `Se encontro en: ${JSON.stringify(conElLiteral)}.`,
     ).toEqual([]);
   });
 
-  it('transitionAliveOrder (order-catalog-prisma.ts) es el unico bloque `data:` de ese archivo que fija `status`', () => {
-    const fuente = readFileSync(join(repoRoot, ORDER_CATALOG_PRISMA), 'utf8');
-    const bloques = extractDataBlocks(fuente);
-    const conStatus = bloques.filter((block) => /\bstatus\s*:/.test(block));
+  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es setAliveOrderStatus y cancelAliveOrder', () => {
+    const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
 
-    expect(conStatus).toHaveLength(1);
-    expect(conStatus[0]).toMatch(/status\s*:\s*to\b/);
+    expect(funcionesConStatusEnData(fuente)).toEqual(['cancelAliveOrder', 'setAliveOrderStatus']);
+  });
+
+  it('dispara con una escritura nueva `status: <variable>` en otra funcion de order-prisma.ts', () => {
+    const sintetico = [
+      'async function setAliveOrderStatus(to) {',
+      '  return tx.order.updateMany({ where: { id }, data: { status: to } });',
+      '}',
+      '',
+      'export async function cancelAliveOrder(reason) {',
+      "  return tx.order.updateMany({ where: { id }, data: { status: 'CANCELADO' } });",
+      '}',
+      '',
+      'async function otraEscrituraColada(nuevoEstado) {',
+      '  return tx.order.updateMany({ where: { id }, data: { status: nuevoEstado } });',
+      '}',
+    ].join('\n');
+
+    expect(funcionesConStatusEnData(sintetico)).toEqual(
+      ['cancelAliveOrder', 'otraEscrituraColada', 'setAliveOrderStatus'].sort(),
+    );
   });
 
   it('updateAliveOrder ya no escribe status: su bloque `data:` en order-prisma.ts no lleva la clave', () => {
@@ -261,12 +313,12 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe transitionAliveOrder; upda
 });
 
 // -------------------------------------------------------------------------------------------
-// El catalogo sigue en 16 permisos
+// El catalogo sigue en 18 permisos
 // -------------------------------------------------------------------------------------------
 
-describe('R16 — el catalogo de permisos sigue en dieciseis codigos', () => {
-  it('PERMISSIONS tiene exactamente 16 entradas', () => {
-    expect(PERMISSIONS).toHaveLength(16);
+describe('R16 — el catalogo de permisos sigue en dieciocho codigos', () => {
+  it('PERMISSIONS tiene exactamente 18 entradas', () => {
+    expect(PERMISSIONS).toHaveLength(18);
   });
 
   it('PERMISSIONS no repite ningun codigo', () => {
@@ -276,91 +328,81 @@ describe('R16 — el catalogo de permisos sigue en dieciseis codigos', () => {
 });
 
 // -------------------------------------------------------------------------------------------
-// Sin dependencias nuevas ni tablas nuevas, comparado contra origin/dev
+// Sin dependencias nuevas ni tablas nuevas en el merge que trajo el cambio a dev
 // -------------------------------------------------------------------------------------------
 
 function git(comando: string): string {
   return execSync(comando, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 }
 
-/** El `package.json` de la base de fusion con `origin/dev`, o `null` si no se puede leer sin red. */
-function packageJsonDeDev(): { dependencies: Record<string, string>; devDependencies: Record<string, string> } | null {
-  try {
-    const base = git('git merge-base origin/dev HEAD').trim();
-    const contenido = git(`git show ${base}:package.json`);
-    return JSON.parse(contenido) as {
-      dependencies: Record<string, string>;
-      devDependencies: Record<string, string>;
-    };
-  } catch {
-    return null;
-  }
+// Comparar con `origin/dev` castigaba a cualquier rama posterior que anadiera una dependencia
+// aprobada. Lo que se protege es un hecho historico: el merge con el que este cambio entro en dev
+// no anadio dependencias ni modelos. Por eso se compara ese merge con su primer padre. (2026-09-24)
+const MERGE_DE_ENTRADA = '51f2d1013f33a3fde50594ac0dde7ec7b7535938';
+
+type PackageJson = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+
+function packageJsonEn(commit: string): PackageJson {
+  return JSON.parse(git(`git show ${commit}:package.json`)) as PackageJson;
 }
 
-function paquetesDe(pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }): Set<string> {
+function paquetesDe(pkg: PackageJson): Set<string> {
   return new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})]);
 }
 
-describe('R29 — package.json sin dependencias nuevas respecto a origin/dev', () => {
-  it('ningun paquete de dependencies/devDependencies actual falta en la base de fusion con origin/dev', () => {
-    const deDev = packageJsonDeDev();
-    if (deDev === null) {
-      // «No puedo mirar» no es un verde silencioso: se reporta y se detiene el caso, sin fingir
-      // que la comparacion se hizo.
+describe('R29 — package.json sin dependencias nuevas en el merge que trajo el cambio a dev', () => {
+  it('el merge de entrada no declara ningun paquete que no tuviera ya su primer padre', () => {
+    let antes: Set<string>;
+    let despues: Set<string>;
+    try {
+      antes = paquetesDe(packageJsonEn(`${MERGE_DE_ENTRADA}~1`));
+      despues = paquetesDe(packageJsonEn(MERGE_DE_ENTRADA));
+    } catch (error) {
+      // «No puedo mirar» no es un verde silencioso: se reporta y se detiene el caso.
       throw new Error(
-        'No se pudo leer package.json de la base de fusion con origin/dev ' +
-          '(`git merge-base origin/dev HEAD` + `git show <base>:package.json`), asi que R29 ' +
-          'no se ha comprobado en este caso.',
+        `No se pudo leer package.json de ${MERGE_DE_ENTRADA} ni de su primer padre, asi que R29 ` +
+          `no se ha comprobado en este caso. Causa: ${String(error)}`,
       );
     }
 
-    const actual = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-
-    const nuevos = [...paquetesDe(actual)].filter((nombre) => !paquetesDe(deDev).has(nombre)).sort();
+    const nuevos = [...despues].filter((nombre) => !antes.has(nombre)).sort();
 
     expect(
       nuevos,
       nuevos.length === 0
         ? undefined
-        : `Esta ficha no debe anadir dependencias (R29). Nuevas respecto a origin/dev: ${nuevos.join(', ')}.`,
+        : `El merge ${MERGE_DE_ENTRADA} no debia anadir dependencias (R29). Nuevas: ${nuevos.join(', ')}.`,
     ).toEqual([]);
   });
 });
 
-describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la columna de R1', () => {
-  /** Nombres de `model X {` del esquema, en el texto dado. */
-  function modelosDe(schema: string): string[] {
-    return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
-  }
+/** Nombres de `model X {` del esquema, en el texto dado. */
+function modelosDe(schema: string): string[] {
+  return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
+}
 
-  it('los modelos de db/schema.prisma son los mismos que en la base de fusion con origin/dev', () => {
-    let modelosDev: string[];
+describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la columna de R1', () => {
+  it('los modelos de db/schema.prisma en el merge de QC-145 (PR #112) son los mismos que en su primer padre', () => {
+    let modelosPadre: string[];
+    let modelosMerge: string[];
     try {
-      const base = git('git merge-base origin/dev HEAD').trim();
-      modelosDev = modelosDe(git(`git show ${base}:db/schema.prisma`));
+      modelosPadre = modelosDe(git(`git show ${MERGE_DE_ENTRADA}~1:db/schema.prisma`));
+      modelosMerge = modelosDe(git(`git show ${MERGE_DE_ENTRADA}:db/schema.prisma`));
     } catch (error) {
       throw new Error(
-        'No se pudo leer db/schema.prisma de la base de fusion con origin/dev, asi que la ' +
-          `parte de esquema de R29 no se ha comprobado en este caso. Causa: ${String(error)}`,
+        `No se pudo leer db/schema.prisma en ${MERGE_DE_ENTRADA} ni en su padre (clon superficial ` +
+          `sin ese commit), asi que la parte de esquema de R29 no se ha comprobado en este ` +
+          `caso. Causa: ${String(error)}`,
       );
     }
 
-    const modelosActuales = modelosDe(readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8'));
-
-    expect(modelosActuales).toEqual(modelosDev);
+    expect(modelosMerge).toEqual(modelosPadre);
   });
 
-  it('dispara con un esquema sintetico que gana un modelo respecto del de referencia', () => {
-    function modelosDe(schema: string): string[] {
-      return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
-    }
+  it('dispara con un esquema sintetico que gana un modelo respecto de su padre', () => {
+    const padre = 'model Order {\n  id String\n}\n';
+    const conModeloNuevo = padre + '\nmodel OrderFinishedLog {\n  id String\n}\n';
 
-    const referencia = 'model Order {\n  id String\n}\n';
-    const conModeloNuevo = referencia + '\nmodel OrderFinishedLog {\n  id String\n}\n';
-
-    expect(modelosDe(conModeloNuevo)).not.toEqual(modelosDe(referencia));
+    expect(modelosDe(conModeloNuevo)).not.toEqual(modelosDe(padre));
   });
 });

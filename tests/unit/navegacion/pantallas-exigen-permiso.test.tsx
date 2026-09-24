@@ -41,8 +41,9 @@ import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
  * ruido ajeno: las listas de estas pantallas viven bajo `<Suspense>` en componentes de servidor
  * hijos, que el render de jsdom no ejecuta. Lo que se ve en pantalla ya lo cubren
  * `tests/unit/inventario/product-page.test.tsx`, `tests/unit/recetas-ui/recipe-page.test.tsx`,
- * `tests/unit/proveedores-ui/supplier-page.test.tsx` y sus hermanos, que montan la pantalla dentro
- * del layout privado. Aquí se afirma el CORTE, y el corte ocurre antes de que haya árbol.
+ * `tests/unit/proveedores-ui/supplier-showcase-page.test.tsx` y sus hermanos, que montan la
+ * pantalla dentro del layout privado. Aquí se afirma el CORTE, y el corte ocurre antes de que haya
+ * árbol.
  *
  * El archivo es `.tsx` para caer en el proyecto `ui` de `vitest.config.mts` (jsdom), que es el que
  * incluye `tests/**\/*.test.tsx`: los módulos de página arrastran componentes de cliente en su

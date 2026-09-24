@@ -30,6 +30,7 @@ import { toOrderRow } from '@/lib/modules/pedidos/adapters/driven/persistence/or
 import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
 import { createGetOrder, toOrderView } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
@@ -166,7 +167,6 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
 
   it('la ficha, el resumen de la lista y el alta no la llevan, aunque el puerto la devolviera', async () => {
     const orders = {
-      create: vi.fn(async () => filaConEmpresa()),
       findAliveById: vi.fn(async () => filaConEmpresa()),
       listAlive: vi.fn(async () => ({
         items: [filaConEmpresa()],
@@ -176,6 +176,9 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
         totalPages: 1,
       })),
     } as unknown as OrderRepository
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create: vi.fn(async () => filaConEmpresa()), setReservedAt: vi.fn(async () => undefined) },
+    })
     const recipes = {
       findRefsIncludingDeleted: vi.fn(async () => [
         { id: RECETA, name: 'Acido citrico 50%', isDeleted: false },
@@ -207,7 +210,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       presentations,
       log: { ignoredFields: vi.fn() },
     })({ page: 1 }, ACTOR)
-    const alta = await createCreateOrder({ orders, recipes, products, units, presentations })(
+    const alta = await createCreateOrder({ recipes, products, units, presentations, unitOfWork })(
       { recipeId: RECETA, quantity: '10.0000', presentationId: PRESENTACION },
       ACTOR,
     )

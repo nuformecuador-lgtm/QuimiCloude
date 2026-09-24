@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
+import { compareQuantities } from './decimal-quantity';
 import { BatchNotFoundError, ValidationError } from './errors';
 import { MOVEMENT_REASONS } from './movement-reason';
 
@@ -12,17 +13,23 @@ export type AdjustBatchStockDeps = {
   readonly now?: () => Date;
 };
 
+/** Decimal con signo, hasta diez enteros y cuatro decimales. */
+const DELTA_PATTERN = /^-?\d{1,10}(\.\d{1,4})?$/;
+
 /**
- * El ajuste es la cantidad que suma o resta, nunca el total nuevo: el cero no mueve nada y un
- * decimal no es una existencia. `strictObject` para que un campo de mas se rechace en vez de
- * ignorarse en silencio.
+ * El ajuste es la cantidad que suma o resta, nunca el total nuevo: el cero no mueve nada.
+ * `strictObject` para que un campo de mas se rechace en vez de ignorarse en silencio.
  */
 const adjustBatchStockSchema = z.strictObject({
   batchId: z.string().uuid(),
   delta: z
-    .number()
-    .int()
-    .refine((value) => value !== 0),
+    .string()
+    .trim()
+    .regex(DELTA_PATTERN)
+    // Sin `DELTA_PATTERN.test` aqui, `compareQuantities` recibiria una cadena que el `regex` ya
+    // rechazo y lanzaria en vez de sumar un issue: zod sigue evaluando este `refine` aunque el
+    // paso anterior haya fallado.
+    .refine((value) => !DELTA_PATTERN.test(value) || compareQuantities(value, '0') !== 0),
   reason: z.enum(MOVEMENT_REASONS),
 });
 
@@ -41,13 +48,16 @@ export type AdjustBatchStockInput = z.infer<typeof adjustBatchStockSchema>;
  */
 export function createAdjustBatchStock(
   deps: AdjustBatchStockDeps,
-): (input: unknown, actor: Actor | null | undefined) => Promise<{ stock: number }> {
+): (
+  input: unknown,
+  actor: Actor | null | undefined,
+) => Promise<{ stock: string; reserved: string; overReserved: boolean }> {
   const now = deps.now ?? (() => new Date());
 
   return async function adjustBatchStock(
     input: unknown,
     actor: Actor | null | undefined,
-  ): Promise<{ stock: number }> {
+  ): Promise<{ stock: string; reserved: string; overReserved: boolean }> {
     requirePermission(actor, 'inventario.modificar');
 
     const parsed = adjustBatchStockSchema.safeParse(input);

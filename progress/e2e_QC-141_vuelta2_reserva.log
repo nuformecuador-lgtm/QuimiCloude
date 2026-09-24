@@ -1,0 +1,217 @@
+[WebServer] 
+[WebServer] > quimicloude@0.1.0 dev C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido
+[WebServer] > next dev "--port" "3117"
+[WebServer] 
+[WebServer] ▲ Next.js 16.3.0 (Turbopack)
+[WebServer] - Local:         http://localhost:3117
+[WebServer] - Network:       http://172.29.16.1:3117
+[WebServer] - Environments: .env
+[WebServer] ✓ Ready in 2.0s
+[WebServer] ✓ Running next.config.ts took 120ms
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[WebServer] 
+[WebServer]  GET / 200 in 2.8s (next.js: 2.1s, proxy.ts: 298ms, application-code: 424ms)
+
+Running 2 tests using 2 workers
+
+[WebServer]  GET /login 200 in 1086ms (next.js: 398ms, proxy.ts: 13ms, application-code: 676ms)
+[WebServer]  GET /login 200 in 591ms (next.js: 360ms, proxy.ts: 24ms, application-code: 207ms)
+[WebServer]  GET /dashboard 200 in 424ms (next.js: 157ms, proxy.ts: 21ms, application-code: 246ms)
+[WebServer]  POST /login 200 in 2.2s (next.js: 13ms, proxy.ts: 15ms, application-code: 2.2s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 596ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /dashboard 200 in 202ms (next.js: 11ms, proxy.ts: 12ms, application-code: 179ms)
+[WebServer]  POST /login 200 in 964ms (next.js: 13ms, proxy.ts: 42ms, application-code: 909ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 493ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.4s (next.js: 297ms, proxy.ts: 16ms, application-code: 3.1s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.3s (next.js: 46ms, proxy.ts: 637ms, application-code: 1618ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 81ms (next.js: 13ms, proxy.ts: 12ms, application-code: 56ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_receta"}) in 27ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 81ms (next.js: 11ms, proxy.ts: 10ms, application-code: 61ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 46ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 70ms (next.js: 8ms, proxy.ts: 7ms, application-code: 55ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 37ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 63ms (next.js: 9ms, proxy.ts: 9ms, application-code: 45ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_presentacion"}) in 28ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 56ms (next.js: 10ms, proxy.ts: 10ms, application-code: 36ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_93456dd760a045bda03ce62254c3a0b0_receta"}) in 20ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 164ms (next.js: 6ms, proxy.ts: 8ms, application-code: 150ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 134ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 73ms (next.js: 9ms, proxy.ts: 9ms, application-code: 55ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 35ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 482ms (next.js: 11ms, proxy.ts: 8ms, application-code: 463ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1212ms (next.js: 7ms, proxy.ts: 8ms, application-code: 1197ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 198ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 461ms (next.js: 34ms, proxy.ts: 400ms, application-code: 28ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 712ms (next.js: 46ms, proxy.ts: 399ms, application-code: 266ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 212ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_producto 200 in 1506ms (next.js: 84ms, proxy.ts: 7ms, application-code: 1414ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 273ms (next.js: 44ms, proxy.ts: 19ms, application-code: 209ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_93456dd760a045bda03ce62254c3a0b0_presentacion"}) in 126ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1447ms (next.js: 7ms, proxy.ts: 6ms, application-code: 1434ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 721ms (next.js: 41ms, proxy.ts: 639ms, application-code: 40ms)
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1558ms (next.js: 6ms, proxy.ts: 6ms, application-code: 1546ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1107ms (next.js: 29ms, proxy.ts: 640ms, application-code: 438ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 424ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 681ms (next.js: 463ms, proxy.ts: 112ms, application-code: 106ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 56ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 62ms (next.js: 13ms, proxy.ts: 12ms, application-code: 36ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1558ms (next.js: 681ms, proxy.ts: 19ms, application-code: 858ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 73ms (next.js: 12ms, proxy.ts: 12ms, application-code: 49ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_receta"}) in 29ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 64ms (next.js: 10ms, proxy.ts: 8ms, application-code: 47ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 28ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 66ms (next.js: 16ms, proxy.ts: 9ms, application-code: 41ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 26ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 99ms (next.js: 29ms, proxy.ts: 18ms, application-code: 51ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_presentacion"}) in 30ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 57ms (next.js: 10ms, proxy.ts: 13ms, application-code: 34ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 19ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 66ms (next.js: 9ms, proxy.ts: 9ms, application-code: 49ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 34ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_93456dd760a045bda03ce62254c3a0b0_producto 200 in 1199ms (next.js: 9ms, proxy.ts: 10ms, application-code: 1180ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1161ms (next.js: 873ms, proxy.ts: 64ms, application-code: 224ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 187ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 434ms (next.js: 27ms, proxy.ts: 14ms, application-code: 393ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1754ms (next.js: 57ms, proxy.ts: 650ms, application-code: 1047ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 195ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer] ⨯ uncaughtException: Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer] ⨯ uncaughtException:  Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.5s (next.js: 7ms, proxy.ts: 7ms, application-code: 2.5s)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_producto 200 in 1981ms (next.js: 76ms, proxy.ts: 649ms, application-code: 1256ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.3s (next.js: 9ms, proxy.ts: 8ms, application-code: 3.3s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.6s (next.js: 1005ms, proxy.ts: 76ms, application-code: 2.5s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 601ms (next.js: 43ms, proxy.ts: 524ms, application-code: 34ms)
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 832ms (next.js: 58ms, proxy.ts: 520ms, application-code: 255ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 219ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1521ms (next.js: 10ms, proxy.ts: 7ms, application-code: 1503ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 86ms (next.js: 28ms, proxy.ts: 13ms, application-code: 45ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 28ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 60ms (next.js: 6ms, proxy.ts: 7ms, application-code: 47ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 31ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 72ms (next.js: 9ms, proxy.ts: 8ms, application-code: 55ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 31ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 49ms (next.js: 9ms, proxy.ts: 8ms, application-code: 32ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 70ms (next.js: 8ms, proxy.ts: 16ms, application-code: 46ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 22ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 152ms (next.js: 9ms, proxy.ts: 7ms, application-code: 136ms)
+[WebServer]   └─ ƒ cancelOrderAction({"status":"idle"}, {}) in 122ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 453ms (next.js: 12ms, proxy.ts: 9ms, application-code: 433ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 42ms (next.js: 6ms, proxy.ts: 6ms, application-code: 30ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_93456dd760a045bda03ce62254c3a0b0_receta"}) in 16ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_producto 200 in 895ms (next.js: 6ms, proxy.ts: 8ms, application-code: 881ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 421ms (next.js: 31ms, proxy.ts: 299ms, application-code: 91ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 69ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1151ms (next.js: 52ms, proxy.ts: 12ms, application-code: 1087ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 205ms (next.js: 35ms, proxy.ts: 18ms, application-code: 151ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 126ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 87ms (next.js: 16ms, proxy.ts: 10ms, application-code: 62ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_93456dd760a045bda03ce62254c3a0b0_presentacion"}) in 35ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 38ms (next.js: 6ms, proxy.ts: 5ms, application-code: 26ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 15ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 64ms (next.js: 9ms, proxy.ts: 9ms, application-code: 46ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 26ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 54ms (next.js: 8ms, proxy.ts: 8ms, application-code: 38ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 25ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 47ms (next.js: 6ms, proxy.ts: 7ms, application-code: 35ms)
+[WebServer]   └─ ƒ getRecipeAction("272b7164-e6d9-4b83-85e1-5db4c32863f4") in 23ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 74ms (next.js: 6ms, proxy.ts: 10ms, application-code: 58ms)
+[WebServer]   └─ ƒ updateOrderAction("ceab9c85-194f-40f1-b741-22809f7a9b86", {"status":"idle"}, {}) in 48ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 258ms (next.js: 5ms, proxy.ts: 5ms, application-code: 248ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1172ms (next.js: 7ms, proxy.ts: 10ms, application-code: 1155ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1163ms (next.js: 835ms, proxy.ts: 27ms, application-code: 301ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 276ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET',
+[WebServer]   digest: '2830014120'
+[WebServer] }
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_producto 200 in 1259ms (next.js: 15ms, proxy.ts: 9ms, application-code: 1234ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1331ms (next.js: 708ms, proxy.ts: 91ms, application-code: 532ms)
+[WebServer]  GET /login 200 in 147ms (next.js: 5ms, proxy.ts: 7ms, application-code: 135ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 42ms (next.js: 8ms, proxy.ts: 9ms, application-code: 24ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_93456dd760a045bda03ce62254c3a0b0_producto 200 in 1009ms (next.js: 10ms, proxy.ts: 18ms, application-code: 981ms)
+[WebServer]  GET /asignacion 200 in 530ms (next.js: 101ms, proxy.ts: 8ms, application-code: 420ms)
+[WebServer]  POST /login 200 in 1483ms (next.js: 426ms, proxy.ts: 9ms, application-code: 1048ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 436ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1717ms (next.js: 26ms, proxy.ts: 7ms, application-code: 1684ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1274ms (next.js: 5ms, proxy.ts: 6ms, application-code: 1263ms)
+[WebServer]  GET /asignacion/ceab9c85-194f-40f1-b741-22809f7a9b86 200 in 2.5s (next.js: 2.2s, proxy.ts: 16ms, application-code: 240ms)
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 51ms (next.js: 12ms, proxy.ts: 8ms, application-code: 31ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 53ms (next.js: 6ms, proxy.ts: 9ms, application-code: 38ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 24ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 43ms (next.js: 4ms, proxy.ts: 5ms, application-code: 33ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 19ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 39ms (next.js: 7ms, proxy.ts: 7ms, application-code: 26ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 15ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 83ms (next.js: 9ms, proxy.ts: 7ms, application-code: 67ms)
+[WebServer]   └─ ƒ cancelOrderAction({"status":"idle"}, {}) in 56ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 234ms (next.js: 6ms, proxy.ts: 5ms, application-code: 222ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_93456dd760a045bda03ce62254c3a0b0_producto 200 in 630ms (next.js: 5ms, proxy.ts: 5ms, application-code: 620ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1188ms (next.js: 5ms, proxy.ts: 4ms, application-code: 1179ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 42ms (next.js: 6ms, proxy.ts: 7ms, application-code: 29ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 64ms (next.js: 6ms, proxy.ts: 8ms, application-code: 49ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 37ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 80ms (next.js: 5ms, proxy.ts: 5ms, application-code: 70ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 19ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 52ms (next.js: 11ms, proxy.ts: 8ms, application-code: 33ms)
+[WebServer]   └─ ƒ getRecipeAction("9fc0fc50-5964-4184-ba58-7e8b2ea4f790") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /asignacion?entregado=2026-0000002 200 in 183ms (next.js: 5ms, proxy.ts: 5ms, application-code: 173ms)
+[WebServer]  POST /asignacion/ceab9c85-194f-40f1-b741-22809f7a9b86 200 in 353ms (next.js: 29ms, proxy.ts: 9ms, application-code: 315ms)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 110ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_producto 200 in 886ms (next.js: 5ms, proxy.ts: 5ms, application-code: 875ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 160ms (next.js: 41ms, proxy.ts: 16ms, application-code: 103ms)
+[WebServer]   └─ ƒ updateOrderAction("32c485d9-ee2f-4dc0-9de4-3ffc6925cf9a", {"status":"idle"}, {}) in 86ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_producto 200 in 267ms (next.js: 45ms, proxy.ts: 125ms, application-code: 97ms)
+[WebServer]   └─ ƒ listProductBatchesAction("e42f29ae-4ad4-4a6f-aa60-60ba88168298") in 71ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 526ms (next.js: 9ms, proxy.ts: 7ms, application-code: 510ms)
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_785c22125c0e42deaade1a5fe66cdb64_producto 200 in 79ms (next.js: 9ms, proxy.ts: 9ms, application-code: 61ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("224b963d-9b5e-47f2-94a8-c6369e46aa2a") in 46ms lib/modules/inventario/adapters/driving/batch-actions.ts
+  ✓  2 [chromium] › e2e\reserva-de-material.spec.ts:465:7 › reserva de material del pedido › R48 - dos pedidos compiten por el mismo lote, cancelar libera, reeditar vuelve a apartar y entregar consume (56.2s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1449ms (next.js: 6ms, proxy.ts: 5ms, application-code: 1437ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_93456dd760a045bda03ce62254c3a0b0_producto 200 in 743ms (next.js: 7ms, proxy.ts: 7ms, application-code: 729ms)
+[WebServer]  GET /login 200 in 133ms (next.js: 9ms, proxy.ts: 6ms, application-code: 119ms)
+[WebServer]  GET /asignacion 200 in 149ms (next.js: 5ms, proxy.ts: 6ms, application-code: 139ms)
+[WebServer]  POST /login 200 in 288ms (next.js: 6ms, proxy.ts: 6ms, application-code: 276ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 115ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion/32c485d9-ee2f-4dc0-9de4-3ffc6925cf9a 200 in 166ms (next.js: 20ms, proxy.ts: 6ms, application-code: 140ms)
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  GET /asignacion?entregado=2026-0000002 200 in 124ms (next.js: 5ms, proxy.ts: 5ms, application-code: 114ms)
+[WebServer]  POST /asignacion/32c485d9-ee2f-4dc0-9de4-3ffc6925cf9a 200 in 224ms (next.js: 21ms, proxy.ts: 8ms, application-code: 195ms)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 53ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_93456dd760a045bda03ce62254c3a0b0_producto 200 in 645ms (next.js: 6ms, proxy.ts: 6ms, application-code: 634ms)
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_93456dd760a045bda03ce62254c3a0b0_producto 200 in 52ms (next.js: 7ms, proxy.ts: 9ms, application-code: 36ms)
+[WebServer]   └─ ƒ listProductBatchesAction("a62ec94e-e62e-4dd6-ab4b-c3acd568d28f") in 23ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_93456dd760a045bda03ce62254c3a0b0_producto 200 in 58ms (next.js: 9ms, proxy.ts: 14ms, application-code: 34ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("3fa46497-4702-401a-ba00-80a8f71ed2ac") in 25ms lib/modules/inventario/adapters/driving/batch-actions.ts
+  ✓  1 [webkit] › e2e\reserva-de-material.spec.ts:465:7 › reserva de material del pedido › R48 - dos pedidos compiten por el mismo lote, cancelar libera, reeditar vuelve a apartar y entregar consume (1.2m)
+
+  2 passed (1.4m)
+exit=0

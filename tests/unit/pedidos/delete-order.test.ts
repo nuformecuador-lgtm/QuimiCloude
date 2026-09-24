@@ -15,8 +15,11 @@ import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import {
   NotDeletableError,
   OrderNotFoundError,
+  UnauthorizedError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
+
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
@@ -53,8 +56,8 @@ function fila(status: OrderStatus): OrderRow {
 }
 
 function dobles(opciones: { fila?: OrderRow | null; borrado?: 'ok' | 'not_found' } = {}) {
-  const findAliveById = vi.fn(async () => (opciones.fila === undefined ? null : opciones.fila))
-  const softDeleteAlive = vi.fn(async () => opciones.borrado ?? 'ok')
+  const filaVista = opciones.fila === undefined ? null : opciones.fila
+  const findAliveById = vi.fn(async () => filaVista)
 
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -62,15 +65,21 @@ function dobles(opciones: { fila?: OrderRow | null; borrado?: 'ok' | 'not_found'
     })
 
   const orders = {
-    create: explota('orders.create'),
     findAliveById,
     listAlive: explota('orders.listAlive'),
-    updateAlive: explota('orders.updateAlive'),
-    cancelAlive: explota('orders.cancelAlive'),
-    softDeleteAlive,
   } as unknown as OrderRepository
 
-  return { orders, now: () => AHORA, findAliveById, softDeleteAlive }
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
+  const softDeleteAlive = vi.fn(async () => opciones.borrado ?? 'ok')
+  const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => { void [id, reservedAt] })
+  const releaseForOrder = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
+
+  const { unitOfWork } = fakeUnitOfWork({
+    orders: { lockAliveById, softDeleteAlive, setReservedAt },
+    reservations: { releaseForOrder },
+  })
+
+  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, softDeleteAlive, setReservedAt, releaseForOrder }
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -145,5 +154,58 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     await createDeleteOrder(d)(ORDER_ID, ADMIN)
 
     expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('QC-141 T9 — borrar libera (R19, R41, N5)', () => {
+  it('el orden real es lockAliveById -> releaseForOrder(release) -> setReservedAt(null) -> softDeleteAlive', async () => {
+    const d = dobles({ fila: fila('PENDIENTE') })
+    const orden: string[] = []
+    d.lockAliveById.mockImplementation(async () => {
+      orden.push('orders.lockAliveById')
+      return { ...fila('PENDIENTE'), reservedAt: null }
+    })
+    d.softDeleteAlive.mockImplementation(async () => {
+      orden.push('orders.softDeleteAlive')
+      return 'ok' as const
+    })
+    d.releaseForOrder.mockImplementation(async () => {
+      orden.push('reservations.releaseForOrder')
+    })
+    d.setReservedAt.mockImplementation(async () => {
+      orden.push('orders.setReservedAt')
+    })
+
+    await createDeleteOrder(d)(ORDER_ID, ADMIN)
+
+    expect(orden).toEqual([
+      'orders.lockAliveById',
+      'reservations.releaseForOrder',
+      'orders.setReservedAt',
+      'orders.softDeleteAlive',
+    ])
+    expect(d.releaseForOrder.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
+    expect(d.setReservedAt.mock.calls[0]?.[1]).toBeNull()
+  })
+
+  it('R41: el permiso se exige ANTES de abrir la unidad de trabajo', async () => {
+    const findAliveById = vi.fn(() => {
+      throw new Error('orders.findAliveById no deberia llamarse sin permiso')
+    })
+    const unitOfWork = {
+      run: vi.fn(() => {
+        throw new Error('unitOfWork.run no deberia llamarse sin permiso')
+      }),
+    }
+    const deleteOrder = createDeleteOrder({
+      orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
+      unitOfWork: unitOfWork as unknown as ReturnType<typeof dobles>['unitOfWork'],
+      now: () => AHORA,
+    })
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: ADMIN.companyId, permissions: ['pedidos.consultar'] }
+
+    await expect(deleteOrder(ORDER_ID, SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError)
+    expect(findAliveById).not.toHaveBeenCalled()
+    expect(unitOfWork.run).not.toHaveBeenCalled()
   })
 })

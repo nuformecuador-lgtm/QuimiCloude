@@ -8,7 +8,11 @@ import type {
 } from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
 import type { IssueUploadLinksResult } from '@/lib/modules/documentos/adapters/driving/document-upload-actions';
 import type { CatalogLineListResult } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
-import type { SupplierQueryResult } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
+import type {
+  CreateSupplierFormState,
+  SupplierMutationFormState,
+  SupplierQueryResult,
+} from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 
@@ -17,6 +21,9 @@ const {
   usePathnameMock,
   routerMock,
   getSupplierActionMock,
+  createSupplierActionMock,
+  updateSupplierActionMock,
+  deleteSupplierActionMock,
   listCatalogLinesActionMock,
   listUnitsActionMock,
   listPresentationsActionMock,
@@ -35,6 +42,18 @@ const {
     prefetch: vi.fn<(href: string) => void>(),
   },
   getSupplierActionMock: vi.fn<(id: string) => Promise<SupplierQueryResult>>(),
+  createSupplierActionMock:
+    vi.fn<(prev: CreateSupplierFormState, data: FormData) => Promise<CreateSupplierFormState>>(),
+  updateSupplierActionMock:
+    vi.fn<
+      (
+        id: string,
+        prev: SupplierMutationFormState,
+        data: FormData,
+      ) => Promise<SupplierMutationFormState>
+    >(),
+  deleteSupplierActionMock:
+    vi.fn<(prev: SupplierMutationFormState, data: FormData) => Promise<SupplierMutationFormState>>(),
   listCatalogLinesActionMock:
     vi.fn<(supplierId: string, query: unknown) => Promise<CatalogLineListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
@@ -58,6 +77,9 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
   getSupplierAction: getSupplierActionMock,
+  createSupplierAction: createSupplierActionMock,
+  updateSupplierAction: updateSupplierActionMock,
+  deleteSupplierAction: deleteSupplierActionMock,
 }));
 
 // Las tres de escritura se declaran aunque este archivo no las ejercite: un doble parcial rompe

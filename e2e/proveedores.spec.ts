@@ -64,7 +64,6 @@ import {
   ROLE_OPERADOR,
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
@@ -86,9 +85,6 @@ const RUN_ID = randomUUID().replace(/-/g, '');
  */
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
-/** Tamano de pagina maximo que ofrece la pantalla: menos paginas que recorrer al buscar la fila. */
-const LIST_PAGE_SIZE = '25';
-
 type Credentials = { readonly username: string; readonly password: string };
 
 const adminUser: Credentials = {
@@ -104,10 +100,6 @@ const operatorUser: Credentials = {
 /** Nombres de lo que el recorrido del Administrador da de alta POR LA UI. */
 const supplierName = `${FIXTURE_PREFIX}proveedor_${RUN_ID}`;
 const catalogLineName = `${FIXTURE_PREFIX}linea_${RUN_ID}`;
-
-// Solo difieren en la letra: su orden relativo delata el sentido del orden por nombre.
-const orderSupplierAName = `${FIXTURE_PREFIX}orden_a_${RUN_ID}`;
-const orderSupplierBName = `${FIXTURE_PREFIX}orden_b_${RUN_ID}`;
 
 /** Presentacion que el recorrido crea EN LINEA solo si la base no ofrece ninguna utilizable. */
 const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
@@ -228,28 +220,28 @@ async function choosePresentation(page: Page): Promise<string> {
   return wanted;
 }
 
+/** Nombre del parametro de la URL con el que el filtro de proveedor se sincroniza. */
+const SUPPLIER_SEARCH_PARAM = 'supplier';
+
 /**
- * Recorre las paginas de la lista hasta encontrar la fila pedida: sin buscar, un proveedor recien
- * creado puede caer en cualquier pagina. Nunca mira «la primera fila» ni el total, que otra
- * ejecucion puede estar moviendo.
+ * Escribe el nombre en el filtro de proveedor y devuelve su fila: la vista no pagina por numero,
+ * asi que sin filtrar un proveedor recien creado podria quedar fuera de la primera tanda cargada.
+ * Se reintenta porque lo escrito antes de hidratar no emite la busqueda, y WebKit hidrata tarde.
  */
 async function findSupplierRow(page: Page, name: string): Promise<Locator> {
-  const row = page.locator('[data-testid^="data-table-row-"]').filter({ hasText: name });
-  const next = page.getByTestId('data-table-next');
+  const row = page.locator('[data-testid^="supplier-showcase-row-"]').filter({ hasText: name });
+  const filter = page.getByTestId('supplier-showcase-supplier-filter');
 
-  for (;;) {
-    if ((await row.count()) > 0) return row;
-    if ((await next.count()) === 0 || (await next.isDisabled())) return row;
+  await expect(async () => {
+    await filter.fill('');
+    await filter.fill(name);
+    await page.waitForURL((url) => url.searchParams.get(SUPPLIER_SEARCH_PARAM) === name, {
+      timeout: 15_000,
+    });
+  }).toPass({ timeout: 120_000 });
 
-    const before = new URL(page.url()).searchParams.get('page');
-    await next.click();
-    await page.waitForFunction(
-      (previous) => new URL(window.location.href).searchParams.get('page') !== previous,
-      before,
-      { timeout: 60_000 },
-    );
-    await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
-  }
+  await expect(row).toBeVisible({ timeout: 60_000 });
+  return row;
 }
 
 /** Lo mismo, pero sobre la lista del catalogo de la pagina de detalle. */
@@ -307,7 +299,6 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
-  const fixtureCompanyId = companyId;
 
   await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);
@@ -320,17 +311,6 @@ test.beforeAll(async () => {
     select: { name: true },
   });
   reusablePresentationName = existing?.name ?? null;
-
-  // Con Prisma y no por la UI: el alta por pantalla ya la recorre el primer caso. El telefono lo
-  // exige la restriccion `suppliers_contact_required`.
-  await prisma.supplier.createMany({
-    data: [orderSupplierAName, orderSupplierBName].map((name) => ({
-      name,
-      nameNormalized: normalizeSupplierName(name),
-      phone: supplierPhone,
-      companyId: fixtureCompanyId,
-    })),
-  });
 });
 
 test.afterAll(async () => {
@@ -346,7 +326,7 @@ test.afterAll(async () => {
   } finally {
     try {
       await prisma.supplier.deleteMany({
-        where: { name: { in: [supplierName, orderSupplierAName, orderSupplierBName] } },
+        where: { name: supplierName },
       });
     } finally {
       try {
@@ -384,7 +364,7 @@ test.describe('proveedores', () => {
 
     // --- 1. La pantalla se sirve a un Administrador (R52, la mitad que deja pasar). La URL sale
     // de la constante, nunca de un literal (R2).
-    await page.goto(`${SUPPLIERS_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+    await page.goto(SUPPLIERS_ROUTE);
     await expect(page.getByTestId('proveedores-title')).toBeVisible({ timeout: 60_000 });
 
     // --- 2. El alta ocurre en un panel lateral, SIN cambiar de URL (R26). El control de crear
@@ -406,7 +386,8 @@ test.describe('proveedores', () => {
     await expect(page.getByTestId('supplier-sheet')).toHaveCount(0, { timeout: 60_000 });
     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
 
-    // --- 6. Y el proveedor esta en la lista sin que el usuario recargue nada (R33).
+    // --- 6. Y el proveedor esta en la vista sin que el usuario recargue nada, buscado por el
+    // filtro de proveedor; sale aunque todavia no tenga ninguna linea de catalogo.
     const supplierRow = await findSupplierRow(page, supplierName);
     await expect(supplierRow.first()).toBeVisible({ timeout: 60_000 });
 
@@ -472,66 +453,6 @@ test.describe('proveedores', () => {
     ).toBe(1);
   });
 
-  test('busca los proveedores propios por su nombre y los ordena por nombre descendente (R26)', async ({
-    page,
-  }) => {
-    // Mismos valores que exporta `supplier-list-params.ts`; ningun E2E importa de `app/`.
-    const PAGE_SIZE_PARAM = 'pageSize';
-    const SEARCH_PARAM = 'q';
-    const SORT_PARAM = 'sort';
-    const NAME_COLUMN_ID = 'name';
-    const NAME_DESC = `${NAME_COLUMN_ID}:desc`;
-
-    await loginAndLand(page, adminUser);
-    await page.goto(`${SUPPLIERS_ROUTE}?${PAGE_SIZE_PARAM}=${LIST_PAGE_SIZE}`);
-    await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
-
-    const nameCells = page.getByTestId('data-table-cell-name');
-    const rowOf = (name: string) =>
-      page
-        .locator('[data-testid^="data-table-row-"]')
-        .filter({ has: nameCells.filter({ hasText: name }) });
-    const ownOrderNames = async () =>
-      (await nameCells.allTextContents())
-        .map((text) => text.trim())
-        .filter((text) => text === orderSupplierAName || text === orderSupplierBName);
-
-    // Se reintenta porque lo escrito antes de hidratar no emite la busqueda, y WebKit hidrata tarde.
-    const search = page.getByTestId('data-table-search');
-    await expect(async () => {
-      await search.fill('');
-      await search.fill(RUN_ID);
-      await page.waitForURL((url) => url.searchParams.get(SEARCH_PARAM) === RUN_ID, {
-        timeout: 15_000,
-      });
-    }).toPass({ timeout: 120_000 });
-
-    await expect(rowOf(orderSupplierAName)).toBeVisible({ timeout: 60_000 });
-    await expect(rowOf(orderSupplierBName)).toBeVisible({ timeout: 60_000 });
-    await expect(rowOf(orderSupplierAName).getByTestId('supplier-detail-link')).toBeVisible();
-    await expect
-      .poll(ownOrderNames, { timeout: 60_000 })
-      .toEqual([orderSupplierAName, orderSupplierBName]);
-
-    await page.getByTestId(`data-table-header-menu-${NAME_COLUMN_ID}`).click();
-    await page.getByTestId(`data-table-sort-desc-${NAME_COLUMN_ID}`).click();
-    await page.waitForURL(
-      (url) =>
-        url.searchParams.get(SORT_PARAM) === NAME_DESC &&
-        url.searchParams.get(SEARCH_PARAM) === RUN_ID,
-      { timeout: 60_000 },
-    );
-    await expect(page.getByTestId(`data-table-head-${NAME_COLUMN_ID}`)).toHaveAttribute(
-      'aria-sort',
-      'descending',
-      { timeout: 60_000 },
-    );
-
-    await expect
-      .poll(ownOrderNames, { timeout: 60_000 })
-      .toEqual([orderSupplierBName, orderSupplierAName]);
-  });
-
   test('un usuario sin proveedores.consultar recibe 404 dentro del layout privado y no ve ningun dato de proveedores (R52)', async ({
     page,
   }) => {
@@ -559,9 +480,8 @@ test.describe('proveedores', () => {
     await expect(page.getByTestId('private-not-found')).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId('proveedores-title')).toHaveCount(0);
-    await expect(page.getByTestId('supplier-table')).toHaveCount(0);
-    await expect(page.locator('[data-testid^="data-table-row-"]')).toHaveCount(0);
-    await expect(page.getByTestId('supplier-list')).toHaveCount(0);
+    await expect(page.getByTestId('supplier-showcase-list')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="supplier-showcase-row-"]')).toHaveCount(0);
     await expect(page.getByTestId('supplier-list-empty')).toHaveCount(0);
   });
 });

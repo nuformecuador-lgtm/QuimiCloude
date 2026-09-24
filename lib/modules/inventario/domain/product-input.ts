@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { compareQuantities } from './decimal-quantity';
 import { PRODUCT_TYPES, PRODUCT_TYPE_VALUES } from './product-type';
 
 /**
@@ -20,7 +21,14 @@ import { PRODUCT_TYPES, PRODUCT_TYPE_VALUES } from './product-type';
  */
 const productNameSchema = z.string().trim().min(1).max(120);
 
-const nonNegativeIntSchema = z.number().int().min(0);
+/**
+ * Duplicado a proposito del de `product-batch-input.ts`: de otro campo del mismo modulo solo se
+ * comparte por el dominio, no por una constante compartida entre archivos que no la exportan.
+ */
+const QTY_ALERT_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
+
+/** Decimal de hasta diez enteros y cuatro decimales, sin signo: el cero es una alerta valida. */
+const qtyAlertSchema = z.string().trim().regex(QTY_ALERT_PATTERN);
 
 /** Tipo de producto: opcional, por defecto PRODUCT. */
 const productTypeSchema = z
@@ -54,7 +62,7 @@ const productTypeSchema = z
 export const productFieldsShape = {
   name: productNameSchema,
   type: productTypeSchema,
-  qtyAlert: nonNegativeIntSchema,
+  qtyAlert: qtyAlertSchema,
 } as const;
 
 /**
@@ -79,7 +87,11 @@ const amountSchema = z
   .refine((value) => !ZERO_PATTERN.test(value));
 
 const presentationIdSchema = z.string().uuid();
-const stockSchema = z.number().int().min(0);
+
+/** La existencia es del lote que se crea, no del producto: el alta la declara por su cuenta.
+ *  Decimal de hasta diez enteros y cuatro decimales, sin signo: el cero es una existencia
+ *  valida, la negativa no tiene forma que acepte el patron. */
+const stockSchema = z.string().trim().regex(DECIMAL_PATTERN);
 
 export const PRODUCT_BATCH_LOT_MAX_LENGTH = 60;
 
@@ -122,7 +134,7 @@ function esImporteAceptado(amount: unknown): boolean {
 }
 
 const MESSAGE_SIN_COSTO = 'Indica el costo unitario o el costo total.';
-const MESSAGE_EXISTENCIA = 'Indica una existencia de 1 o mas para derivar el costo del total.';
+const MESSAGE_EXISTENCIA = 'Indica una existencia mayor que 0 para derivar el costo del total.';
 const MESSAGE_TOTAL_INSUFICIENTE =
   'El costo total es demasiado bajo para esa existencia: el costo unitario quedaria en 0.';
 
@@ -138,11 +150,11 @@ const batchFieldsCommon = {
 
 /**
  * Regla cruzada del par de costos, compartida por los tres tipos de alta con lote.
- * Un `unitCost` malformado o un `stock` no entero ya lo rechaza cada subesquema: aqui solo
- * se exige que venga al menos un costo y que un total derivado no quede en cero.
+ * Un `unitCost` malformado o un `stock` sin forma decimal ya lo rechaza cada subesquema: aqui
+ * solo se exige que venga al menos un costo y que un total derivado no quede en cero.
  */
 function exigirCostoDelLote(
-  value: { readonly unitCost?: string | null; readonly totalCost?: string | null; readonly stock: number },
+  value: { readonly unitCost?: string | null; readonly totalCost?: string | null; readonly stock: string },
   ctx: z.RefinementCtx,
 ): void {
   const unitCost = value.unitCost ?? null;
@@ -150,7 +162,7 @@ function exigirCostoDelLote(
 
   if ((unitCost !== null && !esImporteAceptado(unitCost)) ||
       (totalCost !== null && !esImporteAceptado(totalCost)) ||
-      !Number.isInteger(value.stock)) {
+      !DECIMAL_PATTERN.test(value.stock)) {
     return;
   }
 
@@ -163,7 +175,7 @@ function exigirCostoDelLote(
   if (unitCost !== null) return;
   if (totalCost === null) return;
 
-  if (value.stock < 1) {
+  if (compareQuantities(value.stock, '0') <= 0) {
     ctx.addIssue({ code: 'custom', message: MESSAGE_EXISTENCIA, path: ['stock'] });
     return;
   }
@@ -226,7 +238,7 @@ const updateUnion = z.discriminatedUnion('type', [
   z.strictObject({
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.PRODUCT),
-    qtyAlert: nonNegativeIntSchema,
+    qtyAlert: qtyAlertSchema,
   }),
   z.strictObject({
     name: productNameSchema,
@@ -235,7 +247,7 @@ const updateUnion = z.discriminatedUnion('type', [
   z.strictObject({
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.PACKAGING),
-    qtyAlert: nonNegativeIntSchema,
+    qtyAlert: qtyAlertSchema,
   }),
 ]);
 

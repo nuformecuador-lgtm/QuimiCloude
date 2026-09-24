@@ -1,0 +1,932 @@
+[WebServer] 
+[WebServer] > quimicloude@0.1.0 dev C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido
+[WebServer] > next dev "--port" "3117"
+[WebServer] 
+[WebServer] ▲ Next.js 16.3.0 (Turbopack)
+[WebServer] - Local:         http://localhost:3117
+[WebServer] - Network:       http://172.29.16.1:3117
+[WebServer] - Environments: .env
+[WebServer] ✓ Ready in 772ms
+[WebServer] ✓ Running next.config.ts took 60ms
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[WebServer] 
+[WebServer]  GET / 200 in 3.8s (next.js: 2.6s, proxy.ts: 393ms, application-code: 828ms)
+
+Running 40 tests using 6 workers
+
+[WebServer]  GET /login 200 in 1323ms (next.js: 508ms, proxy.ts: 21ms, application-code: 794ms)
+[WebServer]  GET /login 200 in 733ms (next.js: 259ms, proxy.ts: 32ms, application-code: 443ms)
+[WebServer]  GET /login 200 in 733ms (next.js: 261ms, proxy.ts: 34ms, application-code: 438ms)
+[WebServer]  GET /login 200 in 732ms (next.js: 261ms, proxy.ts: 38ms, application-code: 433ms)
+[WebServer]  GET /login 200 in 730ms (next.js: 261ms, proxy.ts: 42ms, application-code: 427ms)
+[WebServer]  GET /login 200 in 729ms (next.js: 254ms, proxy.ts: 52ms, application-code: 423ms)
+[WebServer]  GET /dashboard 200 in 4.0s (next.js: 572ms, proxy.ts: 92ms, application-code: 3.3s)
+[WebServer]  GET /dashboard 200 in 4.0s (next.js: 479ms, proxy.ts: 105ms, application-code: 3.4s)
+[WebServer]  GET /dashboard 200 in 4.0s (next.js: 324ms, proxy.ts: 92ms, application-code: 3.6s)
+[WebServer]  POST /login 200 in 8.1s (next.js: 699ms, proxy.ts: 172ms, application-code: 7.3s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1725ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 10.6s (next.js: 269ms, proxy.ts: 54ms, application-code: 10.3s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1753ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 8.2s (next.js: 426ms, proxy.ts: 150ms, application-code: 7.6s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1702ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion 200 in 5.3s (next.js: 915ms, proxy.ts: 91ms, application-code: 4.3s)
+[WebServer]  GET /asignacion 200 in 5.3s (next.js: 1251ms, proxy.ts: 87ms, application-code: 3.9s)
+[WebServer]  GET /asignacion 200 in 5.2s (next.js: 1104ms, proxy.ts: 38ms, application-code: 4.1s)
+[WebServer]  POST /login 200 in 9.3s (next.js: 747ms, proxy.ts: 176ms, application-code: 8.4s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1760ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 9.4s (next.js: 820ms, proxy.ts: 165ms, application-code: 8.4s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1790ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 9.4s (next.js: 483ms, proxy.ts: 161ms, application-code: 8.7s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1753ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_cae43c34144e4b42984c7b45c0042b91_pd 200 in 4.6s (next.js: 322ms, proxy.ts: 116ms, application-code: 4.2s)
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_f937067a8f724bfea8852297baa11c17_pd 200 in 4.7s (next.js: 314ms, proxy.ts: 77ms, application-code: 4.3s)
+[WebServer]  GET /asignacion/35b7a953-e3a6-4dd2-a269-fd2a20a5554f 404 in 4.7s (next.js: 3.1s, proxy.ts: 74ms, application-code: 1542ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_d9f43f743f0f42f3962df92c245285bb_pd 200 in 4.6s (next.js: 371ms, proxy.ts: 103ms, application-code: 4.2s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓   4 [chromium] › e2e\ejecucion-receta.spec.ts:481:7 › la ejecucion de la receta de un pedido asignado › R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404 (32.4s)
+[WebServer]  GET /asignacion/338f6c23-bc56-4b42-922a-7dc7b944c107 200 in 1602ms (next.js: 417ms, proxy.ts: 73ms, application-code: 1112ms)
+[WebServer]  GET /asignacion/f872cf01-bb88-44e1-88d2-34a5923464f3 200 in 1778ms (next.js: 402ms, proxy.ts: 95ms, application-code: 1281ms)
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_cae43c34144e4b42984c7b45c0042b91_pd 200 in 856ms (next.js: 392ms, proxy.ts: 97ms, application-code: 367ms)
+[WebServer]   └─ ƒ listProductBatchesAction("54e81827-5804-4681-bb37-4eb3d9f81f69") in 186ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_f937067a8f724bfea8852297baa11c17_pd 200 in 992ms (next.js: 155ms, proxy.ts: 326ms, application-code: 512ms)
+[WebServer]   └─ ƒ listProductBatchesAction("67e43859-3332-4d79-9fdb-5f3e09893988") in 130ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_d9f43f743f0f42f3962df92c245285bb_pd 200 in 812ms (next.js: 95ms, proxy.ts: 213ms, application-code: 504ms)
+[WebServer]   └─ ƒ listProductBatchesAction("069058d1-2d7c-4271-a450-2fb6b8c72c26") in 307ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /login 200 in 497ms (next.js: 94ms, proxy.ts: 31ms, application-code: 372ms)
+[WebServer]  GET /asignacion/f872cf01-bb88-44e1-88d2-34a5923464f3 200 in 1398ms (next.js: 200ms, proxy.ts: 218ms, application-code: 981ms)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_cae43c34144e4b42984c7b45c0042b91_pd 200 in 798ms (next.js: 125ms, proxy.ts: 46ms, application-code: 627ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("7c77c451-1acb-482e-8d46-e4b7e5e5f064") in 342ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_f937067a8f724bfea8852297baa11c17_pd 200 in 878ms (next.js: 155ms, proxy.ts: 64ms, application-code: 659ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("307c55c0-b6c0-486a-96bf-95618b67262a") in 354ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+  ✓   1 [chromium] › e2e\ajuste-de-inventario.spec.ts:463:7 › ajuste de existencia de un lote › quien solo tiene inventario.consultar ve el panel y el historial, pero el control de ajuste no existe en el DOM (36.1s)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_d9f43f743f0f42f3962df92c245285bb_pd 200 in 592ms (next.js: 206ms, proxy.ts: 101ms, application-code: 284ms)
+[WebServer]   └─ ƒ adjustBatchStockAction({"status":"idle"}, {}) in 216ms lib/modules/inventario/adapters/driving/batch-actions.ts
+  ✓   6 [chromium] › e2e\ejecucion-receta.spec.ts:499:7 › la ejecucion de la receta de un pedido asignado › R9 - recargar la pantalla de un pedido ya EN_CURSO la vuelve a mostrar sin error y sin mover el estado (35.8s)
+  ✓   2 [chromium] › e2e\ajuste-de-inventario.spec.ts:420:7 › ajuste de existencia de un lote › un ajuste que dejaria la existencia bajo cero se rechaza y no deja rastro (37.2s)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_f937067a8f724bfea8852297baa11c17_pd 200 in 567ms (next.js: 15ms, proxy.ts: 204ms, application-code: 348ms)
+[WebServer]   └─ ƒ adjustBatchStockAction({"status":"idle"}, {}) in 89ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /login 200 in 740ms (next.js: 28ms, proxy.ts: 13ms, application-code: 699ms)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_f937067a8f724bfea8852297baa11c17_pd 200 in 590ms (next.js: 83ms, proxy.ts: 66ms, application-code: 441ms)
+[WebServer]   └─ ƒ listProductBatchesAction("67e43859-3332-4d79-9fdb-5f3e09893988") in 288ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /login 200 in 737ms (next.js: 42ms, proxy.ts: 43ms, application-code: 652ms)
+[WebServer]  GET /dashboard 200 in 995ms (next.js: 38ms, proxy.ts: 22ms, application-code: 934ms)
+[WebServer]  POST /login 200 in 1612ms (next.js: 21ms, proxy.ts: 12ms, application-code: 1579ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 279ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer] [browser] Encountered two children with the same key, `1`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  GET /login 200 in 666ms (next.js: 73ms, proxy.ts: 49ms, application-code: 544ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_f937067a8f724bfea8852297baa11c17_pd 200 in 1791ms (next.js: 119ms, proxy.ts: 65ms, application-code: 1607ms)
+[WebServer]  GET /pedidos 200 in 5.0s (next.js: 382ms, proxy.ts: 168ms, application-code: 4.5s)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_f937067a8f724bfea8852297baa11c17_pd 200 in 4.0s (next.js: 650ms, proxy.ts: 1490ms, application-code: 1814ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("307c55c0-b6c0-486a-96bf-95618b67262a") in 1490ms lib/modules/inventario/adapters/driving/batch-actions.ts
+  ✓   3 [chromium] › e2e\ajuste-de-inventario.spec.ts:334:7 › ajuste de existencia de un lote › un ajuste con motivo cambia la cantidad del lote y queda su asiento junto al de alta, en Postgres (45.4s)
+[WebServer]  GET /dashboard 200 in 1365ms (next.js: 82ms, proxy.ts: 185ms, application-code: 1097ms)
+[WebServer]  GET /login 200 in 937ms (next.js: 272ms, proxy.ts: 26ms, application-code: 638ms)
+[WebServer]  GET /dashboard 200 in 1264ms (next.js: 81ms, proxy.ts: 71ms, application-code: 1112ms)
+[WebServer]  POST /login 200 in 2.5s (next.js: 139ms, proxy.ts: 83ms, application-code: 2.3s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 579ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /dashboard 200 in 1271ms (next.js: 90ms, proxy.ts: 145ms, application-code: 1036ms)
+[WebServer]  POST /login 200 in 2.2s (next.js: 57ms, proxy.ts: 30ms, application-code: 2.1s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 523ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 2.2s (next.js: 73ms, proxy.ts: 72ms, application-code: 2.1s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 401ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos 200 in 528ms (next.js: 81ms, proxy.ts: 71ms, application-code: 376ms)
+[WebServer]   └─ ƒ getRecipeAction("d59a6d58-316f-4f78-95dd-8901ed3e69e5") in 217ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /asignacion?entregado=2026-0842880 200 in 1780ms (next.js: 174ms, proxy.ts: 152ms, application-code: 1453ms)
+[WebServer]  POST /asignacion/338f6c23-bc56-4b42-922a-7dc7b944c107 200 in 4.5s (next.js: 476ms, proxy.ts: 130ms, application-code: 3.9s)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 1374ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+  ✓   5 [chromium] › e2e\ejecucion-receta.spec.ts:431:7 › la ejecucion de la receta de un pedido asignado › R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base, recorre los pasos hasta Finalizar y el pedido queda ENTREGADO en base (48.5s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 1714ms (next.js: 372ms, proxy.ts: 122ms, application-code: 1221ms)
+[WebServer]   └─ ƒ getRecipeAction("d59a6d58-316f-4f78-95dd-8901ed3e69e5") in 603ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos 200 in 3.3s (next.js: 203ms, proxy.ts: 147ms, application-code: 2.9s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 1936ms (next.js: 390ms, proxy.ts: 412ms, application-code: 1135ms)
+[WebServer]   └─ ƒ getRecipeAction("c2ba3f08-7609-4d05-9150-e4c9dce07b93") in 669ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 4.2s (next.js: 315ms, proxy.ts: 49ms, application-code: 3.8s)
+[WebServer]  GET /login 200 in 2.2s (next.js: 131ms, proxy.ts: 95ms, application-code: 1952ms)
+[WebServer]  GET /pedidos 200 in 3.2s (next.js: 668ms, proxy.ts: 253ms, application-code: 2.3s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 603ms (next.js: 236ms, proxy.ts: 289ms, application-code: 79ms)
+[WebServer]  GET /pedidos 200 in 2.6s (next.js: 501ms, proxy.ts: 131ms, application-code: 1991ms)
+  ✓   7 [chromium] › e2e\pedidos-busqueda.spec.ts:246:7 › busqueda en la pantalla de pedidos › escribir un termino recorta la lista a lo que devuelve la consulta, y la URL lleva `q` (R25 a) (18.7s)
+[WebServer]  GET /dashboard 200 in 549ms (next.js: 84ms, proxy.ts: 30ms, application-code: 436ms)
+[WebServer]  POST /login 200 in 1169ms (next.js: 71ms, proxy.ts: 33ms, application-code: 1066ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 288ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /login 200 in 1336ms (next.js: 99ms, proxy.ts: 23ms, application-code: 1214ms)
+[WebServer]  POST /pedidos 200 in 941ms (next.js: 55ms, proxy.ts: 191ms, application-code: 695ms)
+[WebServer]   └─ ƒ getRecipeAction("b4388128-eba8-4912-8057-afd46bd9403d") in 546ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 935ms (next.js: 85ms, proxy.ts: 186ms, application-code: 664ms)
+[WebServer]   └─ ƒ getRecipeAction("b98fa808-536f-4376-847f-540b9d4b3aa5") in 526ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 932ms (next.js: 116ms, proxy.ts: 183ms, application-code: 632ms)
+[WebServer]   └─ ƒ getRecipeAction("a8a091c4-12ed-4bac-9ff0-52b5d4bfc52f") in 511ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 838ms (next.js: 519ms, proxy.ts: 131ms, application-code: 187ms)
+[WebServer]   └─ ƒ getRecipeAction("b4388128-eba8-4912-8057-afd46bd9403d") in 82ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 848ms (next.js: 469ms, proxy.ts: 134ms, application-code: 245ms)
+[WebServer]   └─ ƒ getRecipeAction("b98fa808-536f-4376-847f-540b9d4b3aa5") in 137ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 883ms (next.js: 561ms, proxy.ts: 132ms, application-code: 189ms)
+[WebServer]   └─ ƒ getRecipeAction("a8a091c4-12ed-4bac-9ff0-52b5d4bfc52f") in 93ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /dashboard 200 in 1960ms (next.js: 234ms, proxy.ts: 268ms, application-code: 1458ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 1126ms (next.js: 107ms, proxy.ts: 31ms, application-code: 987ms)
+[WebServer]   └─ ƒ getRecipeAction("1fad396f-2ca5-4d5d-9c28-f1eb49d8f2b7") in 551ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 3.1s (next.js: 112ms, proxy.ts: 101ms, application-code: 2.9s)
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 3.1s (next.js: 167ms, proxy.ts: 127ms, application-code: 2.8s)
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=sosa 200 in 3.1s (next.js: 76ms, proxy.ts: 113ms, application-code: 2.9s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 1550ms (next.js: 122ms, proxy.ts: 29ms, application-code: 1399ms)
+[WebServer]   └─ ƒ getRecipeAction("30d89ff3-c92b-4576-8ca6-1934c7a9bbc4") in 568ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 1549ms (next.js: 540ms, proxy.ts: 35ms, application-code: 974ms)
+[WebServer]   └─ ƒ getRecipeAction("573849c3-7a87-4d44-8768-675039b192c5") in 145ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /login 200 in 3.9s (next.js: 143ms, proxy.ts: 43ms, application-code: 3.7s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 703ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /pedidos 200 in 2.2s (next.js: 56ms, proxy.ts: 34ms, application-code: 2.1s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 1840ms (next.js: 580ms, proxy.ts: 226ms, application-code: 1034ms)
+[WebServer]   └─ ƒ getRecipeAction("a3203c2c-7cbe-49cf-80ef-09ef1a69c329") in 315ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 1791ms (next.js: 237ms, proxy.ts: 606ms, application-code: 949ms)
+[WebServer]   └─ ƒ getRecipeAction("9c9fbaf3-de35-4146-b1d5-f656d22f36af") in 247ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 1752ms (next.js: 278ms, proxy.ts: 429ms, application-code: 1045ms)
+[WebServer]   └─ ƒ getRecipeAction("cc2bc9a7-6343-4d0e-92dd-3880c74b016c") in 366ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 823ms (next.js: 382ms, proxy.ts: 153ms, application-code: 288ms)
+[WebServer]   └─ ƒ getRecipeAction("a3203c2c-7cbe-49cf-80ef-09ef1a69c329") in 172ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 770ms (next.js: 259ms, proxy.ts: 218ms, application-code: 293ms)
+[WebServer]   └─ ƒ getRecipeAction("cc2bc9a7-6343-4d0e-92dd-3880c74b016c") in 113ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 818ms (next.js: 309ms, proxy.ts: 218ms, application-code: 291ms)
+[WebServer]   └─ ƒ getRecipeAction("9c9fbaf3-de35-4146-b1d5-f656d22f36af") in 98ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10 200 in 2.6s (next.js: 289ms, proxy.ts: 104ms, application-code: 2.2s)
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 646ms (next.js: 126ms, proxy.ts: 50ms, application-code: 470ms)
+[WebServer]   └─ ƒ getRecipeAction("a3203c2c-7cbe-49cf-80ef-09ef1a69c329") in 258ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=2&pageSize=10&q=sosa 200 in 2.5s (next.js: 356ms, proxy.ts: 101ms, application-code: 2.0s)
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=sosa 200 in 2.5s (next.js: 291ms, proxy.ts: 105ms, application-code: 2.1s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 846ms (next.js: 165ms, proxy.ts: 114ms, application-code: 568ms)
+[WebServer]   └─ ƒ getRecipeAction("cc2bc9a7-6343-4d0e-92dd-3880c74b016c") in 176ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 1026ms (next.js: 172ms, proxy.ts: 115ms, application-code: 740ms)
+[WebServer]   └─ ƒ getRecipeAction("9c9fbaf3-de35-4146-b1d5-f656d22f36af") in 162ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET',
+[WebServer]   digest: '2830014120'
+[WebServer] }
+  ✓   8 [chromium] › e2e\pedidos-busqueda.spec.ts:271:7 › busqueda en la pantalla de pedidos › un termino sin coincidencias muestra el estado propio dentro de la tabla, y limpiar devuelve todo (R25 c) (24.3s)
+  ✓  10 [chromium] › e2e\pedidos-busqueda.spec.ts:361:7 › busqueda en la pantalla de pedidos › Atras entre dos terminos distintos deja la caja con el termino de la URL (R27) (24.2s)
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET',
+[WebServer]   digest: '2830014120'
+[WebServer] }
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 2.4s (next.js: 923ms, proxy.ts: 356ms, application-code: 1094ms)
+[WebServer]   └─ ƒ getRecipeAction("9c9fbaf3-de35-4146-b1d5-f656d22f36af") in 179ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos 200 in 2.9s (next.js: 119ms, proxy.ts: 153ms, application-code: 2.7s)
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 1139ms (next.js: 249ms, proxy.ts: 679ms, application-code: 211ms)
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  POST /pedidos 200 in 1421ms (next.js: 286ms, proxy.ts: 193ms, application-code: 942ms)
+[WebServer]   └─ ƒ getRecipeAction("0f7663cc-0ca9-4b8c-bfc7-b11cfe60796f") in 560ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=2&pageSize=10&q=sosa 200 in 2.6s (next.js: 124ms, proxy.ts: 145ms, application-code: 2.3s)
+[WebServer]  GET /login 200 in 2.2s (next.js: 252ms, proxy.ts: 576ms, application-code: 1366ms)
+[WebServer]  GET /login 200 in 1663ms (next.js: 256ms, proxy.ts: 94ms, application-code: 1313ms)
+[WebServer]  GET /dashboard 200 in 2.8s (next.js: 742ms, proxy.ts: 187ms, application-code: 1825ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 2.1s (next.js: 248ms, proxy.ts: 60ms, application-code: 1810ms)
+[WebServer]   └─ ƒ getRecipeAction("0f7663cc-0ca9-4b8c-bfc7-b11cfe60796f") in 170ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /login 200 in 6.2s (next.js: 254ms, proxy.ts: 24ms, application-code: 5.9s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1268ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 4.0s (next.js: 600ms, proxy.ts: 85ms, application-code: 3.3s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 1992ms (next.js: 177ms, proxy.ts: 1385ms, application-code: 430ms)
+[WebServer]   └─ ƒ getRecipeAction("bb6f24b6-1b74-49cc-b269-2f02fed7efe5") in 242ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 808ms (next.js: 206ms, proxy.ts: 58ms, application-code: 544ms)
+[WebServer]   └─ ƒ getRecipeAction("9c9fbaf3-de35-4146-b1d5-f656d22f36af") in 260ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer] ⨯ uncaughtException: Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer] ⨯ uncaughtException:  Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 920ms (next.js: 304ms, proxy.ts: 58ms, application-code: 557ms)
+[WebServer]   └─ ƒ getRecipeAction("ea96f3ba-5e59-47b0-be53-4054a5c11a67") in 255ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  GET /dashboard 200 in 1436ms (next.js: 103ms, proxy.ts: 113ms, application-code: 1220ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 2.3s (next.js: 333ms, proxy.ts: 205ms, application-code: 1722ms)
+[WebServer]   └─ ƒ getRecipeAction("ea96f3ba-5e59-47b0-be53-4054a5c11a67") in 426ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 1926ms (next.js: 1194ms, proxy.ts: 322ms, application-code: 410ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc151_e2e_cae0ce3767ed407f87f732090df00b89_receta"}) in 144ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos 200 in 2.8s (next.js: 282ms, proxy.ts: 191ms, application-code: 2.3s)
+[WebServer]  GET /pedidos?page=1&pageSize=10 200 in 5.4s (next.js: 169ms, proxy.ts: 206ms, application-code: 5.0s)
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 2.5s (next.js: 97ms, proxy.ts: 77ms, application-code: 2.3s)
+[WebServer]   └─ ƒ getRecipeAction("ea96f3ba-5e59-47b0-be53-4054a5c11a67") in 377ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 859ms (next.js: 498ms, proxy.ts: 318ms, application-code: 43ms)
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+  ✓  11 [chromium] › e2e\pedidos-busqueda.spec.ts:397:7 › busqueda en la pantalla de pedidos › Atras despues de Limpiar deja la caja y la lista con el termino de antes de limpiar (R27) (28.0s)
+[WebServer]  POST /pedidos 200 in 3.1s (next.js: 509ms, proxy.ts: 1389ms, application-code: 1182ms)
+[WebServer]   └─ ƒ getRecipeAction("28efaefb-5b10-42ef-893c-eec6b42a2483") in 435ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=2&pageSize=10&q=sosa 200 in 4.0s (next.js: 233ms, proxy.ts: 48ms, application-code: 3.7s)
+  ✓   9 [chromium] › e2e\pedidos-busqueda.spec.ts:294:7 › busqueda en la pantalla de pedidos › el termino sobrevive a cambiar de pagina, al panel lateral, a recargar y a Atras (R25 d, R9, R26) (37.9s)
+[WebServer]  POST /pedidos 200 in 1049ms (next.js: 237ms, proxy.ts: 229ms, application-code: 582ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"5000","recipeId":"28efaefb-5b10-42ef-893c-eec6b42a2483"}) in 362ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /asignacion 200 in 1280ms (next.js: 31ms, proxy.ts: 38ms, application-code: 1211ms)
+[WebServer]  GET /asignacion 200 in 1350ms (next.js: 112ms, proxy.ts: 31ms, application-code: 1207ms)
+[WebServer]  GET /login 200 in 723ms (next.js: 35ms, proxy.ts: 13ms, application-code: 675ms)
+[WebServer]  POST /login 200 in 2.7s (next.js: 431ms, proxy.ts: 55ms, application-code: 2.2s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 533ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 2.6s (next.js: 361ms, proxy.ts: 308ms, application-code: 1976ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 291ms lib/modules/identity/adapters/driving/login-action.ts
+  ✓  14 [chromium] › e2e\pedidos-terminados.spec.ts:442:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › el Operador aterriza en «Mis asignados» y no ve ninguna pestaña ni las otras vistas (R28) (14.7s)
+[WebServer]  POST /pedidos 200 in 1131ms (next.js: 185ms, proxy.ts: 121ms, application-code: 825ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"5001","recipeId":"28efaefb-5b10-42ef-893c-eec6b42a2483"}) in 619ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /login 200 in 1100ms (next.js: 272ms, proxy.ts: 84ms, application-code: 745ms)
+[WebServer]  POST /pedidos 200 in 637ms (next.js: 132ms, proxy.ts: 138ms, application-code: 368ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc151_e2e_905a0b9c31fa4b559f88d8bb92eff92d_r59_receta"}) in 167ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 1354ms (next.js: 269ms, proxy.ts: 199ms, application-code: 886ms)
+[WebServer]   └─ ƒ getRecipeAction("624daae4-da32-4d52-bb25-8688f2b93d46") in 457ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 1247ms (next.js: 289ms, proxy.ts: 129ms, application-code: 829ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"20000","recipeId":"28efaefb-5b10-42ef-893c-eec6b42a2483"}) in 640ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /login 200 in 959ms (next.js: 262ms, proxy.ts: 34ms, application-code: 663ms)
+[WebServer]  GET /asignacion?vista=terminados 200 in 1777ms (next.js: 339ms, proxy.ts: 206ms, application-code: 1233ms)
+[WebServer]  POST /pedidos 200 in 571ms (next.js: 65ms, proxy.ts: 108ms, application-code: 398ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"30","recipeId":"624daae4-da32-4d52-bb25-8688f2b93d46"}) in 287ms lib/modules/pedidos/adapters/driving/order-actions.ts
+  ✓  13 [chromium] › e2e\pedidos-cotizacion.spec.ts:447:7 › cotizacion del coste en el pedido (QC-151) › R59: el promedio simple de todos los lotes con disponible cotiza el ejemplo de D22 (27.2s)
+  ✓  15 [chromium] › e2e\pedidos-terminados.spec.ts:458:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › el Empacador ve «Terminados» con el pedido ajeno, su fecha y sus responsables, el «sin fecha» al final, y no ve «Todos» (R28, R30) (18.2s)
+[WebServer]  POST /pedidos 200 in 814ms (next.js: 114ms, proxy.ts: 63ms, application-code: 637ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"5001","recipeId":"28efaefb-5b10-42ef-893c-eec6b42a2483"}) in 484ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /dashboard 200 in 765ms (next.js: 98ms, proxy.ts: 56ms, application-code: 612ms)
+[WebServer]  POST /login 200 in 1653ms (next.js: 58ms, proxy.ts: 31ms, application-code: 1564ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 345ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos 200 in 676ms (next.js: 101ms, proxy.ts: 69ms, application-code: 507ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 319ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  GET /dashboard 200 in 1332ms (next.js: 80ms, proxy.ts: 27ms, application-code: 1224ms)
+[WebServer]  GET /login 200 in 1090ms (next.js: 225ms, proxy.ts: 15ms, application-code: 851ms)
+[WebServer]  POST /login 200 in 2.4s (next.js: 173ms, proxy.ts: 27ms, application-code: 2.2s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 398ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos 200 in 786ms (next.js: 254ms, proxy.ts: 84ms, application-code: 448ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc151_e2e_cae0ce3767ed407f87f732090df00b89_presentacion"}) in 211ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  GET /login 200 in 968ms (next.js: 76ms, proxy.ts: 58ms, application-code: 833ms)
+[WebServer]  GET /dashboard 200 in 2.2s (next.js: 128ms, proxy.ts: 124ms, application-code: 1920ms)
+[WebServer]  GET /asignacion 200 in 2.1s (next.js: 254ms, proxy.ts: 96ms, application-code: 1778ms)
+[WebServer]  POST /login 200 in 3.4s (next.js: 61ms, proxy.ts: 48ms, application-code: 3.3s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 616ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos 200 in 4.0s (next.js: 119ms, proxy.ts: 137ms, application-code: 3.8s)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 3186ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.9s (next.js: 172ms, proxy.ts: 123ms, application-code: 3.6s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.5s (next.js: 280ms, proxy.ts: 82ms, application-code: 3.2s)
+[WebServer]  GET /pedidos 200 in 5.0s (next.js: 391ms, proxy.ts: 438ms, application-code: 4.2s)
+[WebServer]  POST /pedidos 200 in 267ms (next.js: 117ms, proxy.ts: 100ms, application-code: 50ms)
+[WebServer]  GET /asignacion?page=1&pageSize=10&vista=todos&status=ENTREGADO 200 in 1204ms (next.js: 187ms, proxy.ts: 45ms, application-code: 972ms)
+[WebServer]  GET /dashboard 200 in 975ms (next.js: 231ms, proxy.ts: 127ms, application-code: 616ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 494ms (next.js: 53ms, proxy.ts: 49ms, application-code: 392ms)
+[WebServer]   └─ ƒ getRecipeAction("e6604f8b-8c22-428f-9ea4-5eeff983e979") in 125ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /login 200 in 2.0s (next.js: 74ms, proxy.ts: 137ms, application-code: 1816ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 372ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion 200 in 1776ms (next.js: 77ms, proxy.ts: 66ms, application-code: 1633ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 851ms (next.js: 376ms, proxy.ts: 118ms, application-code: 357ms)
+[WebServer]   └─ ƒ getRecipeAction("e6604f8b-8c22-428f-9ea4-5eeff983e979") in 228ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /login 200 in 3.0s (next.js: 107ms, proxy.ts: 52ms, application-code: 2.8s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 613ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 731ms (next.js: 336ms, proxy.ts: 103ms, application-code: 292ms)
+[WebServer]  GET /asignacion/983f08b1-fa97-4000-949e-13388659da85 200 in 1250ms (next.js: 232ms, proxy.ts: 98ms, application-code: 920ms)
+  ✘  12 [chromium] › e2e\pedidos-cotizacion.spec.ts:373:7 › cotizacion del coste en el pedido (QC-151) › el bloque de coste cotiza con cada cantidad, guarda el mismo importe y lo reabre sin teclear nada (45.3s)
+  ✓  17 [chromium] › e2e\pedidos-terminados.spec.ts:621:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › en «Pedidos», el panel de edicion del Administrador no ofrece estado y el selector de responsables no ofrece a otro Administrador (R7, R32) (20.2s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 824ms (next.js: 139ms, proxy.ts: 102ms, application-code: 583ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc35_e2e_receta_3877a68bdbdf41baabd23635d717a4f4"}) in 226ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos 404 in 2.4s (next.js: 102ms, proxy.ts: 67ms, application-code: 2.3s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.5s (next.js: 258ms, proxy.ts: 142ms, application-code: 2.1s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1265ms (next.js: 108ms, proxy.ts: 859ms, application-code: 298ms)
+[WebServer]   └─ ƒ getRecipeAction("e6390355-0715-4053-a616-06aeace8f944") in 114ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 275ms (next.js: 46ms, proxy.ts: 35ms, application-code: 194ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 104ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 136ms (next.js: 34ms, proxy.ts: 27ms, application-code: 75ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc35_e2e_presentacion_3877a68bdbdf41baabd23635d717a4f4"}) in 38ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+  ✓  16 [chromium] › e2e\pedidos-terminados.spec.ts:525:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › el Administrador ve solo «Todos» con los cuatro estados; filtrar por Entregado trae la fecha y el orden de terminados; sin entrada a ejecucion; `/asignacion/<id>` de un pedido no asignado dice "no encontrado" (R28, R35) (24.4s)
+  ✓  19 [chromium] › e2e\pedidos.spec.ts:494:7 › pantalla de pedidos › un usuario sin pedidos.consultar recibe 404 dentro del layout privado y no ve ningun dato de pedidos (R49) (17.8s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 122ms (next.js: 16ms, proxy.ts: 15ms, application-code: 91ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 71ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /login 200 in 882ms (next.js: 21ms, proxy.ts: 9ms, application-code: 852ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 721ms (next.js: 241ms, proxy.ts: 22ms, application-code: 458ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"12.5","recipeId":"e6390355-0715-4053-a616-06aeace8f944"}) in 325ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /login 200 in 809ms (next.js: 38ms, proxy.ts: 27ms, application-code: 744ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 501ms (next.js: 66ms, proxy.ts: 283ms, application-code: 152ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_83c01080b57f48e0970c829469fd666e_receta"}) in 81ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1287ms (next.js: 54ms, proxy.ts: 97ms, application-code: 1136ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 68ms (next.js: 12ms, proxy.ts: 9ms, application-code: 46ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 27ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 71ms (next.js: 14ms, proxy.ts: 9ms, application-code: 48ms)
+[WebServer]   └─ ƒ getRecipeAction("e6390355-0715-4053-a616-06aeace8f944") in 22ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 230ms (next.js: 49ms, proxy.ts: 14ms, application-code: 167ms)
+[WebServer]   └─ ƒ getRecipeAction("e6390355-0715-4053-a616-06aeace8f944") in 69ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 199ms (next.js: 93ms, proxy.ts: 32ms, application-code: 74ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 32ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 126ms (next.js: 13ms, proxy.ts: 12ms, application-code: 102ms)
+[WebServer]   └─ ƒ cancelOrderAction({"status":"idle"}, {}) in 64ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 201ms (next.js: 35ms, proxy.ts: 22ms, application-code: 144ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_83c01080b57f48e0970c829469fd666e_presentacion"}) in 72ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 629ms (next.js: 60ms, proxy.ts: 58ms, application-code: 511ms)
+  ✓  18 [chromium] › e2e\pedidos.spec.ts:369:7 › pantalla de pedidos › el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48, R29) (25.9s)
+[WebServer]  GET /login 200 in 583ms (next.js: 8ms, proxy.ts: 9ms, application-code: 566ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1262ms (next.js: 42ms, proxy.ts: 122ms, application-code: 1097ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 918ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /dashboard 200 in 638ms (next.js: 29ms, proxy.ts: 31ms, application-code: 579ms)
+[WebServer]  GET /login 200 in 448ms (next.js: 148ms, proxy.ts: 16ms, application-code: 284ms)
+[WebServer]  GET /dashboard 200 in 661ms (next.js: 76ms, proxy.ts: 101ms, application-code: 484ms)
+[WebServer]  POST /login 200 in 1402ms (next.js: 55ms, proxy.ts: 42ms, application-code: 1305ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 474ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 1194ms (next.js: 34ms, proxy.ts: 9ms, application-code: 1151ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 292ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 361ms (next.js: 23ms, proxy.ts: 32ms, application-code: 306ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"1500","recipeId":"a068822c-bcb7-4db6-8d5e-3bf73be33a27"}) in 183ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 608ms (next.js: 50ms, proxy.ts: 24ms, application-code: 534ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1169ms (next.js: 11ms, proxy.ts: 13ms, application-code: 1144ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 170ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1146ms (next.js: 199ms, proxy.ts: 856ms, application-code: 92ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_83c01080b57f48e0970c829469fd666e_producto 200 in 3.5s (next.js: 41ms, proxy.ts: 36ms, application-code: 3.5s)
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_771b005b89334855b7b51c9a45ea595c_pd 200 in 3.7s (next.js: 883ms, proxy.ts: 63ms, application-code: 2.8s)
+[WebServer]  GET /login 200 in 2.2s (next.js: 554ms, proxy.ts: 327ms, application-code: 1326ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_a9bbd70fb4524635809a9aacb8f7efb7_pd 200 in 3.5s (next.js: 272ms, proxy.ts: 348ms, application-code: 2.8s)
+[WebServer]  GET /asignacion 200 in 1491ms (next.js: 120ms, proxy.ts: 111ms, application-code: 1261ms)
+[WebServer]  GET /asignacion 200 in 1443ms (next.js: 194ms, proxy.ts: 51ms, application-code: 1199ms)
+[WebServer]  POST /login 200 in 4.3s (next.js: 213ms, proxy.ts: 322ms, application-code: 3.8s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 2000ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 3.9s (next.js: 674ms, proxy.ts: 51ms, application-code: 3.2s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1423ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.5s (next.js: 169ms, proxy.ts: 62ms, application-code: 3.3s)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_a9bbd70fb4524635809a9aacb8f7efb7_pd 200 in 1525ms (next.js: 164ms, proxy.ts: 44ms, application-code: 1317ms)
+[WebServer]   └─ ƒ listProductBatchesAction("ea9a9c02-4b30-40f4-b5b9-06e2a25ab50e") in 1129ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_771b005b89334855b7b51c9a45ea595c_pd 200 in 1530ms (next.js: 147ms, proxy.ts: 47ms, application-code: 1336ms)
+[WebServer]   └─ ƒ listProductBatchesAction("de1b6b4b-4096-4354-81a8-ca5335cb7723") in 1164ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_f294f4bf094649528975d626d024e32f_pd 200 in 2.5s (next.js: 82ms, proxy.ts: 805ms, application-code: 1593ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1687ms (next.js: 731ms, proxy.ts: 713ms, application-code: 243ms)
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.7s (next.js: 76ms, proxy.ts: 49ms, application-code: 2.6s)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_771b005b89334855b7b51c9a45ea595c_pd 200 in 1787ms (next.js: 303ms, proxy.ts: 688ms, application-code: 795ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("56766b79-37ce-4821-9994-8a70d1c6b8d1") in 593ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /dashboard 200 in 887ms (next.js: 120ms, proxy.ts: 67ms, application-code: 700ms)
+[WebServer]  GET /asignacion/663fbeec-0028-41c6-8a6b-02e99ce8c6e5 200 in 2.5s (next.js: 808ms, proxy.ts: 688ms, application-code: 1044ms)
+[WebServer]  POST /login 200 in 3.4s (next.js: 1369ms, proxy.ts: 33ms, application-code: 2.0s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 683ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_a9bbd70fb4524635809a9aacb8f7efb7_pd 200 in 685ms (next.js: 222ms, proxy.ts: 85ms, application-code: 378ms)
+[WebServer]   └─ ƒ adjustBatchStockAction({"status":"idle"}, {}) in 273ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 426ms (next.js: 124ms, proxy.ts: 31ms, application-code: 271ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 161ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 352ms (next.js: 116ms, proxy.ts: 21ms, application-code: 215ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 194ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+  ✓  22 [webkit] › e2e\ajuste-de-inventario.spec.ts:420:7 › ajuste de existencia de un lote › un ajuste que dejaria la existencia bajo cero se rechaza y no deja rastro (20.4s)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_f294f4bf094649528975d626d024e32f_pd 200 in 125ms (next.js: 26ms, proxy.ts: 17ms, application-code: 82ms)
+[WebServer]   └─ ƒ listProductBatchesAction("cbcd5b8c-a9d2-4f87-805d-263a46b6eba3") in 34ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 115ms (next.js: 31ms, proxy.ts: 17ms, application-code: 67ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_83c01080b57f48e0970c829469fd666e_receta"}) in 23ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /asignacion/bfd89d14-62d5-4f08-90f3-ee44efdf3997 404 in 361ms (next.js: 40ms, proxy.ts: 17ms, application-code: 304ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 136ms (next.js: 17ms, proxy.ts: 11ms, application-code: 108ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 49ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 98ms (next.js: 24ms, proxy.ts: 11ms, application-code: 63ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 33ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 83ms (next.js: 29ms, proxy.ts: 10ms, application-code: 44ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_83c01080b57f48e0970c829469fd666e_presentacion"}) in 15ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_f294f4bf094649528975d626d024e32f_pd 200 in 118ms (next.js: 14ms, proxy.ts: 10ms, application-code: 95ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("d043639c-544b-4728-b64e-69f0dada9d86") in 67ms lib/modules/inventario/adapters/driving/batch-actions.ts
+  ✓  25 [webkit] › e2e\ejecucion-receta.spec.ts:481:7 › la ejecucion de la receta de un pedido asignado › R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404 (14.4s)
+[WebServer]  GET /login 200 in 255ms (next.js: 8ms, proxy.ts: 9ms, application-code: 238ms)
+  ✓  23 [webkit] › e2e\ajuste-de-inventario.spec.ts:463:7 › ajuste de existencia de un lote › quien solo tiene inventario.consultar ve el panel y el historial, pero el control de ajuste no existe en el DOM (19.7s)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_771b005b89334855b7b51c9a45ea595c_pd 200 in 205ms (next.js: 26ms, proxy.ts: 14ms, application-code: 166ms)
+[WebServer]   └─ ƒ adjustBatchStockAction({"status":"idle"}, {}) in 113ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_771b005b89334855b7b51c9a45ea595c_pd 200 in 556ms (next.js: 65ms, proxy.ts: 41ms, application-code: 451ms)
+[WebServer]   └─ ƒ listProductBatchesAction("de1b6b4b-4096-4354-81a8-ca5335cb7723") in 355ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /login 200 in 304ms (next.js: 43ms, proxy.ts: 23ms, application-code: 239ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 945ms (next.js: 42ms, proxy.ts: 64ms, application-code: 839ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 804ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc92_e2e_771b005b89334855b7b51c9a45ea595c_pd 200 in 1025ms (next.js: 81ms, proxy.ts: 23ms, application-code: 920ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 307ms (next.js: 45ms, proxy.ts: 61ms, application-code: 201ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"1500","recipeId":"a068822c-bcb7-4db6-8d5e-3bf73be33a27"}) in 87ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /login 200 in 851ms (next.js: 275ms, proxy.ts: 13ms, application-code: 562ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1465ms (next.js: 87ms, proxy.ts: 36ms, application-code: 1342ms)
+[WebServer]  GET /asignacion 200 in 451ms (next.js: 40ms, proxy.ts: 21ms, application-code: 391ms)
+[WebServer]  POST /login 200 in 826ms (next.js: 19ms, proxy.ts: 24ms, application-code: 783ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 268ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer] [browser] Encountered two children with the same key, `1`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1317ms (next.js: 52ms, proxy.ts: 27ms, application-code: 1237ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 182ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET',
+[WebServer]   digest: '2830014120'
+[WebServer] }
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_83c01080b57f48e0970c829469fd666e_producto 200 in 1842ms (next.js: 76ms, proxy.ts: 23ms, application-code: 1743ms)
+[WebServer]  POST /inventario?pageSize=25&q=qc92_e2e_771b005b89334855b7b51c9a45ea595c_pd 200 in 580ms (next.js: 97ms, proxy.ts: 76ms, application-code: 406ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("56766b79-37ce-4821-9994-8a70d1c6b8d1") in 323ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /dashboard 200 in 517ms (next.js: 173ms, proxy.ts: 36ms, application-code: 308ms)
+[WebServer]  POST /login 200 in 1522ms (next.js: 73ms, proxy.ts: 411ms, application-code: 1037ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 465ms lib/modules/identity/adapters/driving/login-action.ts
+  ✓  21 [webkit] › e2e\ajuste-de-inventario.spec.ts:334:7 › ajuste de existencia de un lote › un ajuste con motivo cambia la cantidad del lote y queda su asiento junto al de alta, en Postgres (29.7s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.5s (next.js: 58ms, proxy.ts: 188ms, application-code: 3.2s)
+[WebServer]  GET /login 200 in 1770ms (next.js: 116ms, proxy.ts: 17ms, application-code: 1636ms)
+[WebServer]  GET /pedidos 200 in 2.5s (next.js: 109ms, proxy.ts: 590ms, application-code: 1797ms)
+[WebServer]  GET /dashboard 200 in 3.3s (next.js: 48ms, proxy.ts: 1340ms, application-code: 1908ms)
+[WebServer]  POST /login 200 in 4.0s (next.js: 12ms, proxy.ts: 8ms, application-code: 3.9s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 396ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion/1a46b2e2-4aba-40c7-b002-acac87dc4e40 200 in 3.0s (next.js: 1004ms, proxy.ts: 593ms, application-code: 1364ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1293ms (next.js: 144ms, proxy.ts: 33ms, application-code: 1116ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 1041ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1872ms (next.js: 59ms, proxy.ts: 55ms, application-code: 1758ms)
+[WebServer]  GET /asignacion?entregado=2026-0875545 200 in 893ms (next.js: 83ms, proxy.ts: 37ms, application-code: 773ms)
+[WebServer]  POST /asignacion/663fbeec-0028-41c6-8a6b-02e99ce8c6e5 200 in 3.3s (next.js: 544ms, proxy.ts: 84ms, application-code: 2.7s)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 1773ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+  ✓  24 [webkit] › e2e\ejecucion-receta.spec.ts:431:7 › la ejecucion de la receta de un pedido asignado › R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base, recorre los pasos hasta Finalizar y el pedido queda ENTREGADO en base (32.0s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.3s (next.js: 69ms, proxy.ts: 51ms, application-code: 3.2s)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 2231ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /asignacion/1a46b2e2-4aba-40c7-b002-acac87dc4e40 200 in 4.0s (next.js: 54ms, proxy.ts: 13ms, application-code: 3.9s)
+[WebServer]  POST /pedidos 200 in 2.2s (next.js: 867ms, proxy.ts: 113ms, application-code: 1248ms)
+[WebServer]   └─ ƒ getRecipeAction("7a598325-d3c7-45db-a1bf-68ef308b1275") in 573ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos 200 in 4.1s (next.js: 79ms, proxy.ts: 92ms, application-code: 3.9s)
+[WebServer]  GET /login 200 in 2.0s (next.js: 403ms, proxy.ts: 102ms, application-code: 1517ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1594ms (next.js: 229ms, proxy.ts: 600ms, application-code: 765ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 386ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 1061ms (next.js: 350ms, proxy.ts: 112ms, application-code: 599ms)
+[WebServer]   └─ ƒ getRecipeAction("7a598325-d3c7-45db-a1bf-68ef308b1275") in 202ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 647ms (next.js: 93ms, proxy.ts: 204ms, application-code: 351ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 226ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 3.5s (next.js: 890ms, proxy.ts: 98ms, application-code: 2.5s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 535ms (next.js: 206ms, proxy.ts: 54ms, application-code: 276ms)
+[WebServer]   └─ ƒ getRecipeAction("f1f00eff-86f8-4aca-bf31-4b2b1bfe2715") in 111ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /dashboard 200 in 1211ms (next.js: 155ms, proxy.ts: 72ms, application-code: 984ms)
+  ✓  26 [webkit] › e2e\ejecucion-receta.spec.ts:499:7 › la ejecucion de la receta de un pedido asignado › R9 - recargar la pantalla de un pedido ya EN_CURSO la vuelve a mostrar sin error y sin mover el estado (18.6s)
+[WebServer]  POST /login 200 in 3.9s (next.js: 868ms, proxy.ts: 35ms, application-code: 3.0s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1176ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 504ms (next.js: 134ms, proxy.ts: 56ms, application-code: 314ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 181ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 467ms (next.js: 111ms, proxy.ts: 145ms, application-code: 211ms)
+[WebServer]   └─ ƒ getRecipeAction("b5dc44ea-ecff-49ef-a268-6fce51d10dcb") in 114ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 261ms (next.js: 85ms, proxy.ts: 70ms, application-code: 105ms)
+[WebServer]   └─ ƒ getRecipeAction("b5dc44ea-ecff-49ef-a268-6fce51d10dcb") in 51ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 477ms (next.js: 69ms, proxy.ts: 36ms, application-code: 372ms)
+[WebServer]   └─ ƒ cancelOrderAction({"status":"idle"}, {}) in 307ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 231ms (next.js: 57ms, proxy.ts: 22ms, application-code: 152ms)
+[WebServer]   └─ ƒ getRecipeAction("b5dc44ea-ecff-49ef-a268-6fce51d10dcb") in 40ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+  ✓  27 [webkit] › e2e\pedidos-busqueda.spec.ts:246:7 › busqueda en la pantalla de pedidos › escribir un termino recorta la lista a lo que devuelve la consulta, y la URL lleva `q` (R25 a) (18.3s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 576ms (next.js: 24ms, proxy.ts: 40ms, application-code: 512ms)
+[WebServer]  GET /login 200 in 201ms (next.js: 8ms, proxy.ts: 6ms, application-code: 186ms)
+[WebServer]  POST /pedidos 200 in 2.4s (next.js: 744ms, proxy.ts: 99ms, application-code: 1530ms)
+[WebServer]   └─ ƒ getRecipeAction("a9e9dff8-d1c5-4364-9b7f-3ed138360367") in 825ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_83c01080b57f48e0970c829469fd666e_producto 200 in 2.7s (next.js: 29ms, proxy.ts: 19ms, application-code: 2.7s)
+[WebServer]  GET /login 200 in 2.0s (next.js: 134ms, proxy.ts: 251ms, application-code: 1656ms)
+[WebServer]  GET /pedidos 200 in 2.8s (next.js: 755ms, proxy.ts: 90ms, application-code: 2.0s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 606ms (next.js: 111ms, proxy.ts: 87ms, application-code: 408ms)
+[WebServer]   └─ ƒ getRecipeAction("a9e9dff8-d1c5-4364-9b7f-3ed138360367") in 226ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 3.0s (next.js: 790ms, proxy.ts: 266ms, application-code: 1909ms)
+[WebServer]  GET /dashboard 200 in 1188ms (next.js: 111ms, proxy.ts: 44ms, application-code: 1033ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 749ms (next.js: 158ms, proxy.ts: 70ms, application-code: 522ms)
+[WebServer]   └─ ƒ getRecipeAction("f6c6742b-6d49-4efb-934f-9614758026ab") in 243ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /login 200 in 4.5s (next.js: 125ms, proxy.ts: 254ms, application-code: 4.2s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1214ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 1848ms (next.js: 232ms, proxy.ts: 60ms, application-code: 1556ms)
+[WebServer]   └─ ƒ getRecipeAction("c08d688b-9f24-44da-9094-d9433d50f294") in 1129ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.5s (next.js: 202ms, proxy.ts: 135ms, application-code: 2.2s)
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 615ms (next.js: 242ms, proxy.ts: 47ms, application-code: 326ms)
+[WebServer]   └─ ƒ getRecipeAction("c08d688b-9f24-44da-9094-d9433d50f294") in 225ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10 200 in 1497ms (next.js: 380ms, proxy.ts: 56ms, application-code: 1061ms)
+[WebServer]  GET /dashboard 200 in 779ms (next.js: 277ms, proxy.ts: 72ms, application-code: 429ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 230ms (next.js: 87ms, proxy.ts: 33ms, application-code: 110ms)
+[WebServer]   └─ ƒ getRecipeAction("c08d688b-9f24-44da-9094-d9433d50f294") in 46ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /login 200 in 2.2s (next.js: 129ms, proxy.ts: 593ms, application-code: 1481ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 570ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 207ms (next.js: 19ms, proxy.ts: 55ms, application-code: 132ms)
+[WebServer]   └─ ƒ getRecipeAction("c08d688b-9f24-44da-9094-d9433d50f294") in 52ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 164ms (next.js: 54ms, proxy.ts: 47ms, application-code: 63ms)
+[WebServer]   └─ ƒ getRecipeAction("c08d688b-9f24-44da-9094-d9433d50f294") in 37ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 95ms (next.js: 34ms, proxy.ts: 12ms, application-code: 49ms)
+[WebServer]   └─ ƒ getRecipeAction("c08d688b-9f24-44da-9094-d9433d50f294") in 21ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 262ms (next.js: 15ms, proxy.ts: 11ms, application-code: 236ms)
+[WebServer]   └─ ƒ getRecipeAction("c08d688b-9f24-44da-9094-d9433d50f294") in 67ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 344ms (next.js: 69ms, proxy.ts: 18ms, application-code: 258ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 139ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 280ms (next.js: 63ms, proxy.ts: 32ms, application-code: 186ms)
+[WebServer]   └─ ƒ getRecipeAction("a9e9dff8-d1c5-4364-9b7f-3ed138360367") in 113ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 306ms (next.js: 91ms, proxy.ts: 33ms, application-code: 182ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 95ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 315ms (next.js: 72ms, proxy.ts: 22ms, application-code: 221ms)
+[WebServer]   └─ ƒ getRecipeAction("a9e9dff8-d1c5-4364-9b7f-3ed138360367") in 77ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 318ms (next.js: 14ms, proxy.ts: 12ms, application-code: 292ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 147ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+  ✓  28 [webkit] › e2e\pedidos-busqueda.spec.ts:271:7 › busqueda en la pantalla de pedidos › un termino sin coincidencias muestra el estado propio dentro de la tabla, y limpiar devuelve todo (R25 c) (27.3s)
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 1333ms (next.js: 153ms, proxy.ts: 59ms, application-code: 1120ms)
+[WebServer]   └─ ƒ getRecipeAction("f6c6742b-6d49-4efb-934f-9614758026ab") in 931ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 1622ms (next.js: 70ms, proxy.ts: 57ms, application-code: 1494ms)
+[WebServer]   └─ ƒ getRecipeAction("1b6ef433-0015-4f40-a2bf-c33a094376af") in 332ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1710ms (next.js: 117ms, proxy.ts: 73ms, application-code: 1520ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 1134ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos 200 in 4.0s (next.js: 195ms, proxy.ts: 52ms, application-code: 3.8s)
+[WebServer]  GET /login 200 in 2.8s (next.js: 826ms, proxy.ts: 452ms, application-code: 1485ms)
+[WebServer]  GET /pedidos 200 in 3.3s (next.js: 314ms, proxy.ts: 189ms, application-code: 2.8s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 1321ms (next.js: 679ms, proxy.ts: 225ms, application-code: 416ms)
+[WebServer]   └─ ƒ getRecipeAction("1b6ef433-0015-4f40-a2bf-c33a094376af") in 220ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=sosa 200 in 3.8s (next.js: 654ms, proxy.ts: 213ms, application-code: 3.0s)
+[WebServer]  GET /dashboard 200 in 1794ms (next.js: 646ms, proxy.ts: 166ms, application-code: 981ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.5s (next.js: 564ms, proxy.ts: 103ms, application-code: 2.9s)
+[WebServer]   └─ ƒ updateOrderAction("50dbaf6b-f1e2-47e8-8f6d-7ae870719fa9", {"status":"idle"}, {}) in 2689ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 594ms (next.js: 170ms, proxy.ts: 67ms, application-code: 358ms)
+[WebServer]   └─ ƒ getRecipeAction("4ee181f2-a2fa-4618-aa75-a94d5b04f014") in 175ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /login 200 in 4.9s (next.js: 930ms, proxy.ts: 70ms, application-code: 3.9s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 856ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 731ms (next.js: 101ms, proxy.ts: 68ms, application-code: 562ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 241ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 326ms (next.js: 69ms, proxy.ts: 80ms, application-code: 177ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 136ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 230ms (next.js: 44ms, proxy.ts: 26ms, application-code: 160ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 49ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1252ms (next.js: 125ms, proxy.ts: 57ms, application-code: 1070ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 117ms (next.js: 38ms, proxy.ts: 17ms, application-code: 62ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 32ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 78ms (next.js: 30ms, proxy.ts: 8ms, application-code: 40ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 15ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 104ms (next.js: 15ms, proxy.ts: 22ms, application-code: 67ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 30ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 88ms (next.js: 19ms, proxy.ts: 11ms, application-code: 57ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 34ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 83ms (next.js: 21ms, proxy.ts: 13ms, application-code: 49ms)
+[WebServer]   └─ ƒ getRecipeAction("1b6ef433-0015-4f40-a2bf-c33a094376af") in 18ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 124ms (next.js: 20ms, proxy.ts: 8ms, application-code: 96ms)
+[WebServer]   └─ ƒ getRecipeAction("1b6ef433-0015-4f40-a2bf-c33a094376af") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 3.4s (next.js: 1530ms, proxy.ts: 43ms, application-code: 1821ms)
+[WebServer]   └─ ƒ getRecipeAction("93857f14-0329-4ffd-9941-fadd70447f06") in 411ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 2.8s (next.js: 241ms, proxy.ts: 765ms, application-code: 1804ms)
+[WebServer]   └─ ƒ getRecipeAction("f330b146-2f4f-4dd8-a1fe-8378c29aaef3") in 1074ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.9s (next.js: 48ms, proxy.ts: 11ms, application-code: 3.8s)
+[WebServer]  GET /pedidos 200 in 3.3s (next.js: 260ms, proxy.ts: 758ms, application-code: 2.3s)
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 1877ms (next.js: 450ms, proxy.ts: 855ms, application-code: 572ms)
+[WebServer]   └─ ƒ getRecipeAction("4ee181f2-a2fa-4618-aa75-a94d5b04f014") in 232ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 876ms (next.js: 188ms, proxy.ts: 132ms, application-code: 556ms)
+[WebServer]   └─ ƒ getRecipeAction("93857f14-0329-4ffd-9941-fadd70447f06") in 213ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 757ms (next.js: 167ms, proxy.ts: 138ms, application-code: 452ms)
+[WebServer]   └─ ƒ getRecipeAction("f330b146-2f4f-4dd8-a1fe-8378c29aaef3") in 244ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=2&pageSize=10&q=sosa 200 in 4.7s (next.js: 1561ms, proxy.ts: 45ms, application-code: 3.1s)
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 660ms (next.js: 181ms, proxy.ts: 60ms, application-code: 419ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 207ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 4.1s (next.js: 302ms, proxy.ts: 763ms, application-code: 3.0s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 735ms (next.js: 161ms, proxy.ts: 76ms, application-code: 498ms)
+[WebServer]   └─ ƒ getRecipeAction("35eee9b4-e9ae-47b4-9659-b4868e7a4c00") in 182ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 3.5s (next.js: 531ms, proxy.ts: 114ms, application-code: 2.9s)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 836ms (next.js: 177ms, proxy.ts: 86ms, application-code: 574ms)
+[WebServer]   └─ ƒ getRecipeAction("2a3f797f-168f-4cdd-b321-46722864345c") in 199ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /dashboard 200 in 1581ms (next.js: 180ms, proxy.ts: 99ms, application-code: 1303ms)
+[WebServer]  POST /login 200 in 5.4s (next.js: 271ms, proxy.ts: 43ms, application-code: 5.1s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1616ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 2.3s (next.js: 333ms, proxy.ts: 146ms, application-code: 1775ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 1142ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.2s (next.js: 309ms, proxy.ts: 144ms, application-code: 1765ms)
+[WebServer]   └─ ƒ getRecipeAction("a068822c-bcb7-4db6-8d5e-3bf73be33a27") in 1518ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 2.2s (next.js: 358ms, proxy.ts: 125ms, application-code: 1718ms)
+[WebServer]   └─ ƒ getRecipeAction("e0acd680-4d81-429d-bf27-25650278e2e7") in 1442ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=qc122_e2e_sin_coincidencias 200 in 2.4s (next.js: 1028ms, proxy.ts: 246ms, application-code: 1133ms)
+[WebServer]   └─ ƒ getRecipeAction("13c131b7-d04b-4e2d-a16a-4778be4c8f35") in 617ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_83c01080b57f48e0970c829469fd666e_producto 200 in 3.2s (next.js: 245ms, proxy.ts: 57ms, application-code: 2.9s)
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 1042ms (next.js: 309ms, proxy.ts: 70ms, application-code: 663ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 399ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 620ms (next.js: 182ms, proxy.ts: 74ms, application-code: 363ms)
+[WebServer]   └─ ƒ getRecipeAction("e0acd680-4d81-429d-bf27-25650278e2e7") in 203ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 619ms (next.js: 144ms, proxy.ts: 136ms, application-code: 339ms)
+[WebServer]   └─ ƒ getRecipeAction("13c131b7-d04b-4e2d-a16a-4778be4c8f35") in 208ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 474ms (next.js: 139ms, proxy.ts: 85ms, application-code: 250ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 117ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=1&pageSize=10&q=sosa 200 in 2.2s (next.js: 221ms, proxy.ts: 515ms, application-code: 1432ms)
+[WebServer]  GET /pedidos?page=1&pageSize=10 200 in 1722ms (next.js: 282ms, proxy.ts: 53ms, application-code: 1387ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 327ms (next.js: 52ms, proxy.ts: 51ms, application-code: 224ms)
+[WebServer]   └─ ƒ getRecipeAction("e0acd680-4d81-429d-bf27-25650278e2e7") in 115ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 290ms (next.js: 109ms, proxy.ts: 35ms, application-code: 147ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 67ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 312ms (next.js: 81ms, proxy.ts: 39ms, application-code: 193ms)
+[WebServer]   └─ ƒ getRecipeAction("13c131b7-d04b-4e2d-a16a-4778be4c8f35") in 101ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 489ms (next.js: 73ms, proxy.ts: 18ms, application-code: 398ms)
+[WebServer]   └─ ƒ getRecipeAction("e0acd680-4d81-429d-bf27-25650278e2e7") in 47ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 477ms (next.js: 123ms, proxy.ts: 56ms, application-code: 298ms)
+[WebServer]   └─ ƒ getRecipeAction("13c131b7-d04b-4e2d-a16a-4778be4c8f35") in 217ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 482ms (next.js: 101ms, proxy.ts: 57ms, application-code: 324ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 247ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /login 200 in 502ms (next.js: 26ms, proxy.ts: 18ms, application-code: 457ms)
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 413ms (next.js: 29ms, proxy.ts: 49ms, application-code: 335ms)
+[WebServer]   └─ ƒ getRecipeAction("e0acd680-4d81-429d-bf27-25650278e2e7") in 93ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 436ms (next.js: 43ms, proxy.ts: 60ms, application-code: 333ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 172ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 430ms (next.js: 61ms, proxy.ts: 55ms, application-code: 315ms)
+[WebServer]   └─ ƒ getRecipeAction("13c131b7-d04b-4e2d-a16a-4778be4c8f35") in 153ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 486ms (next.js: 88ms, proxy.ts: 50ms, application-code: 347ms)
+[WebServer]   └─ ƒ getRecipeAction("e0acd680-4d81-429d-bf27-25650278e2e7") in 169ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 432ms (next.js: 89ms, proxy.ts: 79ms, application-code: 264ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 157ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 439ms (next.js: 153ms, proxy.ts: 77ms, application-code: 210ms)
+[WebServer]   └─ ƒ getRecipeAction("13c131b7-d04b-4e2d-a16a-4778be4c8f35") in 92ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=2&pageSize=10&q=sosa 200 in 779ms (next.js: 153ms, proxy.ts: 33ms, application-code: 594ms)
+[WebServer]   └─ ƒ getRecipeAction("90af1331-fa9c-4975-89fa-6ce9555e2af7") in 289ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=sosa 200 in 810ms (next.js: 116ms, proxy.ts: 30ms, application-code: 665ms)
+[WebServer]   └─ ƒ getRecipeAction("e0acd680-4d81-429d-bf27-25650278e2e7") in 208ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+  ✓  31 [webkit] › e2e\pedidos-busqueda.spec.ts:397:7 › busqueda en la pantalla de pedidos › Atras despues de Limpiar deja la caja y la lista con el termino de antes de limpiar (R27) (27.6s)
+[WebServer]  POST /pedidos?page=1&pageSize=10 200 in 1537ms (next.js: 161ms, proxy.ts: 72ms, application-code: 1304ms)
+[WebServer]   └─ ƒ getRecipeAction("13c131b7-d04b-4e2d-a16a-4778be4c8f35") in 284ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer] ⨯ uncaughtException: Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer] ⨯ uncaughtException:  Error: aborted
+[WebServer]     at ignore-listed frames {
+[WebServer]   code: 'ECONNRESET'
+[WebServer] }
+[WebServer]  POST /pedidos?page=1&pageSize=10&q=acido+citrico 200 in 1205ms (next.js: 335ms, proxy.ts: 746ms, application-code: 124ms)
+  ✓  30 [webkit] › e2e\pedidos-busqueda.spec.ts:361:7 › busqueda en la pantalla de pedidos › Atras entre dos terminos distintos deja la caja con el termino de la URL (R27) (32.9s)
+[WebServer]  GET /pedidos 200 in 3.2s (next.js: 265ms, proxy.ts: 37ms, application-code: 2.9s)
+[WebServer]  POST /pedidos 200 in 1653ms (next.js: 755ms, proxy.ts: 63ms, application-code: 836ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc151_e2e_48d5926a3dfd4fe4880520fed4fd31e9_receta"}) in 240ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?page=2&pageSize=10&q=sosa 200 in 3.2s (next.js: 891ms, proxy.ts: 112ms, application-code: 2.2s)
+[WebServer]  GET /login 200 in 1072ms (next.js: 447ms, proxy.ts: 20ms, application-code: 605ms)
+[WebServer]  GET /login 200 in 713ms (next.js: 151ms, proxy.ts: 100ms, application-code: 462ms)
+[WebServer]  GET /asignacion 200 in 2.5s (next.js: 187ms, proxy.ts: 657ms, application-code: 1694ms)
+[WebServer]  POST /login 200 in 4.6s (next.js: 153ms, proxy.ts: 51ms, application-code: 4.4s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1364ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /dashboard 200 in 503ms (next.js: 51ms, proxy.ts: 29ms, application-code: 423ms)
+[WebServer]  POST /pedidos 200 in 668ms (next.js: 164ms, proxy.ts: 75ms, application-code: 430ms)
+[WebServer]   └─ ƒ getRecipeAction("05a93c06-fafe-4a25-b1d5-29cbc9e39cca") in 222ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 1548ms (next.js: 179ms, proxy.ts: 23ms, application-code: 1346ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"5000","recipeId":"05a93c06-fafe-4a25-b1d5-29cbc9e39cca"}) in 1190ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?page=2&pageSize=10&q=sosa 200 in 1798ms (next.js: 206ms, proxy.ts: 40ms, application-code: 1552ms)
+[WebServer]  GET /asignacion/50dbaf6b-f1e2-47e8-8f6d-7ae870719fa9 200 in 2.1s (next.js: 199ms, proxy.ts: 56ms, application-code: 1881ms)
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  POST /pedidos 200 in 578ms (next.js: 219ms, proxy.ts: 44ms, application-code: 316ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"5001","recipeId":"05a93c06-fafe-4a25-b1d5-29cbc9e39cca"}) in 238ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /asignacion 200 in 653ms (next.js: 44ms, proxy.ts: 29ms, application-code: 581ms)
+[WebServer]  POST /login 200 in 1337ms (next.js: 102ms, proxy.ts: 11ms, application-code: 1224ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 330ms lib/modules/identity/adapters/driving/login-action.ts
+  ✓  29 [webkit] › e2e\pedidos-busqueda.spec.ts:294:7 › busqueda en la pantalla de pedidos › el termino sobrevive a cambiar de pagina, al panel lateral, a recargar y a Atras (R25 d, R9, R26) (46.4s)
+[WebServer]  POST /pedidos 200 in 427ms (next.js: 71ms, proxy.ts: 25ms, application-code: 331ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc151_e2e_613756304c044cc8ac981b717c071540_r59_receta"}) in 143ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /asignacion 200 in 573ms (next.js: 71ms, proxy.ts: 27ms, application-code: 475ms)
+[WebServer]  POST /pedidos 200 in 224ms (next.js: 108ms, proxy.ts: 12ms, application-code: 104ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"20000","recipeId":"05a93c06-fafe-4a25-b1d5-29cbc9e39cca"}) in 67ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /login 200 in 1108ms (next.js: 85ms, proxy.ts: 16ms, application-code: 1007ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 345ms lib/modules/identity/adapters/driving/login-action.ts
+  ✓  34 [webkit] › e2e\pedidos-terminados.spec.ts:442:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › el Operador aterriza en «Mis asignados» y no ve ninguna pestaña ni las otras vistas (R28) (8.0s)
+[WebServer]  POST /pedidos 200 in 74ms (next.js: 9ms, proxy.ts: 10ms, application-code: 55ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"5001","recipeId":"05a93c06-fafe-4a25-b1d5-29cbc9e39cca"}) in 38ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /login 200 in 277ms (next.js: 8ms, proxy.ts: 9ms, application-code: 260ms)
+[WebServer]  POST /pedidos 200 in 204ms (next.js: 18ms, proxy.ts: 90ms, application-code: 96ms)
+[WebServer]   └─ ƒ getRecipeAction("380eb79a-3b23-42eb-b69e-9c027cc96569") in 50ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos 200 in 185ms (next.js: 43ms, proxy.ts: 10ms, application-code: 132ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"30","recipeId":"380eb79a-3b23-42eb-b69e-9c027cc96569"}) in 113ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos 200 in 106ms (next.js: 29ms, proxy.ts: 21ms, application-code: 56ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 24ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+  ✓  33 [webkit] › e2e\pedidos-cotizacion.spec.ts:447:7 › cotizacion del coste en el pedido (QC-151) › R59: el promedio simple de todos los lotes con disponible cotiza el ejemplo de D22 (28.2s)
+[WebServer]  POST /pedidos 200 in 381ms (next.js: 60ms, proxy.ts: 84ms, application-code: 237ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc151_e2e_48d5926a3dfd4fe4880520fed4fd31e9_presentacion"}) in 120ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  GET /asignacion?vista=terminados 200 in 477ms (next.js: 19ms, proxy.ts: 12ms, application-code: 446ms)
+[WebServer]  GET /login 200 in 218ms (next.js: 14ms, proxy.ts: 12ms, application-code: 192ms)
+[WebServer]  GET /login 200 in 819ms (next.js: 235ms, proxy.ts: 10ms, application-code: 573ms)
+  ✓  35 [webkit] › e2e\pedidos-terminados.spec.ts:458:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › el Empacador ve «Terminados» con el pedido ajeno, su fecha y sus responsables, el «sin fecha» al final, y no ve «Todos» (R28, R30) (11.0s)
+[WebServer]  GET /dashboard 200 in 500ms (next.js: 73ms, proxy.ts: 136ms, application-code: 292ms)
+[WebServer]  POST /login 200 in 1333ms (next.js: 23ms, proxy.ts: 36ms, application-code: 1274ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 508ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion?entregado=2026-0000002 200 in 1030ms (next.js: 105ms, proxy.ts: 203ms, application-code: 722ms)
+[WebServer]  POST /asignacion/50dbaf6b-f1e2-47e8-8f6d-7ae870719fa9 200 in 1763ms (next.js: 46ms, proxy.ts: 11ms, application-code: 1706ms)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 250ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_83c01080b57f48e0970c829469fd666e_producto 200 in 2.7s (next.js: 78ms, proxy.ts: 45ms, application-code: 2.6s)
+[WebServer]  POST /pedidos 200 in 3.0s (next.js: 92ms, proxy.ts: 58ms, application-code: 2.8s)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 2582ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /login 200 in 1698ms (next.js: 61ms, proxy.ts: 427ms, application-code: 1210ms)
+[WebServer]  GET /asignacion 200 in 1442ms (next.js: 247ms, proxy.ts: 30ms, application-code: 1166ms)
+[WebServer]  GET /dashboard 200 in 1546ms (next.js: 182ms, proxy.ts: 212ms, application-code: 1153ms)
+[WebServer]  POST /login 200 in 3.2s (next.js: 146ms, proxy.ts: 12ms, application-code: 3.1s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1346ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_83c01080b57f48e0970c829469fd666e_producto 200 in 915ms (next.js: 98ms, proxy.ts: 185ms, application-code: 632ms)
+[WebServer]   └─ ƒ listProductBatchesAction("3d426d79-e113-43cc-b372-839c1f17e4dc") in 424ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  GET /dashboard 200 in 945ms (next.js: 99ms, proxy.ts: 160ms, application-code: 686ms)
+[WebServer]  GET /pedidos 200 in 1848ms (next.js: 121ms, proxy.ts: 66ms, application-code: 1662ms)
+[WebServer]  POST /login 200 in 1798ms (next.js: 57ms, proxy.ts: 31ms, application-code: 1711ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 610ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_83c01080b57f48e0970c829469fd666e_producto 200 in 334ms (next.js: 59ms, proxy.ts: 51ms, application-code: 224ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("17bbb135-6a68-41c2-8098-480a1ad8b5b2") in 137ms lib/modules/inventario/adapters/driving/batch-actions.ts
+  ✓  20 [chromium] › e2e\reserva-de-material.spec.ts:465:7 › reserva de material del pedido › R48 - dos pedidos compiten por el mismo lote, cancelar libera, reeditar vuelve a apartar y entregar consume (1.8m)
+  ✘  32 [webkit] › e2e\pedidos-cotizacion.spec.ts:373:7 › cotizacion del coste en el pedido (QC-151) › el bloque de coste cotiza con cada cantidad, guarda el mismo importe y lo reabre sin teclear nada (48.8s)
+[WebServer]  POST /pedidos 200 in 1879ms (next.js: 108ms, proxy.ts: 901ms, application-code: 870ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 5.1s (next.js: 9ms, proxy.ts: 12ms, application-code: 5.1s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 4.6s (next.js: 136ms, proxy.ts: 898ms, application-code: 3.6s)
+[WebServer]  GET /login 200 in 1859ms (next.js: 118ms, proxy.ts: 1006ms, application-code: 735ms)
+[WebServer]  GET /asignacion?page=1&pageSize=10&vista=todos&status=ENTREGADO 200 in 3.9s (next.js: 963ms, proxy.ts: 33ms, application-code: 2.9s)
+[WebServer]  GET /asignacion 200 in 1096ms (next.js: 89ms, proxy.ts: 131ms, application-code: 876ms)
+[WebServer]  POST /login 200 in 5.3s (next.js: 91ms, proxy.ts: 879ms, application-code: 4.4s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 2955ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion/e4082da9-768e-4f00-8436-31e84a3519be 200 in 403ms (next.js: 52ms, proxy.ts: 8ms, application-code: 343ms)
+[WebServer]  GET /pedidos 404 in 553ms (next.js: 38ms, proxy.ts: 18ms, application-code: 496ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 366ms (next.js: 108ms, proxy.ts: 74ms, application-code: 184ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 60ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 307ms (next.js: 25ms, proxy.ts: 28ms, application-code: 255ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 110ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 500ms (next.js: 81ms, proxy.ts: 66ms, application-code: 353ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 87ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+  ✓  36 [webkit] › e2e\pedidos-terminados.spec.ts:525:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › el Administrador ve solo «Todos» con los cuatro estados; filtrar por Entregado trae la fecha y el orden de terminados; sin entrada a ejecucion; `/asignacion/<id>` de un pedido no asignado dice "no encontrado" (R28, R35) (19.0s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 285ms (next.js: 10ms, proxy.ts: 12ms, application-code: 262ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 57ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /dashboard 200 in 267ms (next.js: 26ms, proxy.ts: 26ms, application-code: 215ms)
+[WebServer]  POST /login 200 in 694ms (next.js: 77ms, proxy.ts: 16ms, application-code: 601ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 251ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 139ms (next.js: 42ms, proxy.ts: 11ms, application-code: 86ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 46ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 203ms (next.js: 71ms, proxy.ts: 20ms, application-code: 112ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 71ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 118ms (next.js: 14ms, proxy.ts: 11ms, application-code: 93ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 49ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 118ms (next.js: 12ms, proxy.ts: 25ms, application-code: 81ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc35_e2e_receta_156c9a5926bc4db48bb868bf9f8f98e6"}) in 45ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 90ms (next.js: 9ms, proxy.ts: 14ms, application-code: 66ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 36ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 74ms (next.js: 15ms, proxy.ts: 11ms, application-code: 48ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 23ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+  ✓  39 [webkit] › e2e\pedidos.spec.ts:494:7 › pantalla de pedidos › un usuario sin pedidos.consultar recibe 404 dentro del layout privado y no ve ningun dato de pedidos (R49) (15.1s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 71ms (next.js: 8ms, proxy.ts: 10ms, application-code: 52ms)
+[WebServer]   └─ ƒ getRecipeAction("1b1ddd3f-b734-45b5-a5e0-a8cfaaf586f5") in 30ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 56ms (next.js: 9ms, proxy.ts: 10ms, application-code: 37ms)
+[WebServer]   └─ ƒ getRecipeAction("9ab8da32-dccb-48c3-91e0-d944b573a691") in 20ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 1500ms (next.js: 10ms, proxy.ts: 7ms, application-code: 1483ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 857ms (next.js: 62ms, proxy.ts: 675ms, application-code: 120ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 61ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 107ms (next.js: 39ms, proxy.ts: 20ms, application-code: 48ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc35_e2e_presentacion_156c9a5926bc4db48bb868bf9f8f98e6"}) in 26ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+  ✓  37 [webkit] › e2e\pedidos-terminados.spec.ts:621:7 › QC-145 — los tres roles en /asignacion y el cierre de /pedidos › en «Pedidos», el panel de edicion del Administrador no ofrece estado y el selector de responsables no ofrece a otro Administrador (R7, R32) (21.3s)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 35ms (next.js: 6ms, proxy.ts: 7ms, application-code: 23ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"12.5","recipeId":"9ab8da32-dccb-48c3-91e0-d944b573a691"}) in 13ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 84ms (next.js: 7ms, proxy.ts: 7ms, application-code: 70ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 55ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 47ms (next.js: 7ms, proxy.ts: 5ms, application-code: 35ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_19a072be273743429f771bc1039e2eb3_receta"}) in 25ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 315ms (next.js: 12ms, proxy.ts: 10ms, application-code: 293ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 52ms (next.js: 7ms, proxy.ts: 10ms, application-code: 36ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 49ms (next.js: 8ms, proxy.ts: 7ms, application-code: 34ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 23ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 52ms (next.js: 8ms, proxy.ts: 10ms, application-code: 34ms)
+[WebServer]   └─ ƒ getRecipeAction("9ab8da32-dccb-48c3-91e0-d944b573a691") in 23ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 31ms (next.js: 6ms, proxy.ts: 5ms, application-code: 21ms)
+[WebServer]   └─ ƒ getRecipeAction("9ab8da32-dccb-48c3-91e0-d944b573a691") in 11ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 46ms (next.js: 7ms, proxy.ts: 7ms, application-code: 32ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_19a072be273743429f771bc1039e2eb3_presentacion"}) in 19ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 71ms (next.js: 7ms, proxy.ts: 9ms, application-code: 55ms)
+[WebServer]   └─ ƒ cancelOrderAction({"status":"idle"}, {}) in 42ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 426ms (next.js: 7ms, proxy.ts: 7ms, application-code: 412ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 98ms (next.js: 10ms, proxy.ts: 25ms, application-code: 62ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"1500","recipeId":"182374f0-bb33-4604-a8d1-fbc93e2ccdce"}) in 45ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 114ms (next.js: 10ms, proxy.ts: 9ms, application-code: 96ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 81ms lib/modules/pedidos/adapters/driving/order-actions.ts
+  ✓  38 [webkit] › e2e\pedidos.spec.ts:369:7 › pantalla de pedidos › el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48, R29) (26.7s)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 282ms (next.js: 6ms, proxy.ts: 6ms, application-code: 269ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 32ms (next.js: 4ms, proxy.ts: 4ms, application-code: 24ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 16ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 36ms (next.js: 4ms, proxy.ts: 4ms, application-code: 28ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 20ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_19a072be273743429f771bc1039e2eb3_producto 200 in 649ms (next.js: 5ms, proxy.ts: 3ms, application-code: 640ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 893ms (next.js: 5ms, proxy.ts: 6ms, application-code: 882ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 883ms (next.js: 5ms, proxy.ts: 5ms, application-code: 874ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 41ms (next.js: 6ms, proxy.ts: 12ms, application-code: 23ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 13ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 37ms (next.js: 4ms, proxy.ts: 5ms, application-code: 28ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 19ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 39ms (next.js: 4ms, proxy.ts: 4ms, application-code: 30ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc141_e2e_19a072be273743429f771bc1039e2eb3_receta"}) in 22ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 39ms (next.js: 7ms, proxy.ts: 6ms, application-code: 26ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 17ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 47ms (next.js: 7ms, proxy.ts: 9ms, application-code: 31ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25}) in 17ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 34ms (next.js: 6ms, proxy.ts: 6ms, application-code: 22ms)
+[WebServer]   └─ ƒ listPresentationsAction({"page":1,"pageSize":25,"search":"qc141_e2e_19a072be273743429f771bc1039e2eb3_presentacion"}) in 15ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 57ms (next.js: 6ms, proxy.ts: 5ms, application-code: 46ms)
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"1500","recipeId":"182374f0-bb33-4604-a8d1-fbc93e2ccdce"}) in 36ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 90ms (next.js: 6ms, proxy.ts: 6ms, application-code: 78ms)
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 67ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 262ms (next.js: 9ms, proxy.ts: 8ms, application-code: 245ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 41ms (next.js: 5ms, proxy.ts: 8ms, application-code: 28ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 19ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 23ms (next.js: 5ms, proxy.ts: 4ms, application-code: 14ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_19a072be273743429f771bc1039e2eb3_producto 200 in 560ms (next.js: 5ms, proxy.ts: 6ms, application-code: 549ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 861ms (next.js: 7ms, proxy.ts: 7ms, application-code: 847ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 883ms (next.js: 4ms, proxy.ts: 4ms, application-code: 876ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 41ms (next.js: 7ms, proxy.ts: 5ms, application-code: 29ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 19ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 31ms (next.js: 5ms, proxy.ts: 4ms, application-code: 22ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 13ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 33ms (next.js: 5ms, proxy.ts: 5ms, application-code: 23ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 14ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 55ms (next.js: 10ms, proxy.ts: 7ms, application-code: 39ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 24ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 48ms (next.js: 5ms, proxy.ts: 5ms, application-code: 38ms)
+[WebServer]   └─ ƒ cancelOrderAction({"status":"idle"}, {}) in 30ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 220ms (next.js: 5ms, proxy.ts: 4ms, application-code: 211ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_19a072be273743429f771bc1039e2eb3_producto 200 in 529ms (next.js: 4ms, proxy.ts: 4ms, application-code: 521ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 888ms (next.js: 4ms, proxy.ts: 4ms, application-code: 881ms)
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 32ms (next.js: 6ms, proxy.ts: 6ms, application-code: 20ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 12ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 43ms (next.js: 5ms, proxy.ts: 5ms, application-code: 33ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 18ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 36ms (next.js: 4ms, proxy.ts: 6ms, application-code: 26ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 18ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 41ms (next.js: 5ms, proxy.ts: 4ms, application-code: 32ms)
+[WebServer]   └─ ƒ getRecipeAction("182374f0-bb33-4604-a8d1-fbc93e2ccdce") in 22ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 59ms (next.js: 4ms, proxy.ts: 5ms, application-code: 49ms)
+[WebServer]   └─ ƒ updateOrderAction("f89da359-9434-4542-b90d-4b21e8f69dae", {"status":"idle"}, {}) in 41ms lib/modules/pedidos/adapters/driving/order-actions.ts
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 204ms (next.js: 5ms, proxy.ts: 4ms, application-code: 194ms)
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 786ms (next.js: 5ms, proxy.ts: 4ms, application-code: 778ms)
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_19a072be273743429f771bc1039e2eb3_producto 200 in 576ms (next.js: 5ms, proxy.ts: 4ms, application-code: 567ms)
+[WebServer]  GET /login 200 in 93ms (next.js: 5ms, proxy.ts: 5ms, application-code: 83ms)
+[WebServer]  GET /asignacion 200 in 119ms (next.js: 5ms, proxy.ts: 4ms, application-code: 110ms)
+[WebServer]  POST /login 200 in 270ms (next.js: 5ms, proxy.ts: 4ms, application-code: 261ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 123ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion/f89da359-9434-4542-b90d-4b21e8f69dae 200 in 138ms (next.js: 23ms, proxy.ts: 5ms, application-code: 110ms)
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer] [browser] Encountered two children with the same key, `0`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[WebServer]  GET /asignacion?entregado=2026-0000002 200 in 130ms (next.js: 5ms, proxy.ts: 5ms, application-code: 120ms)
+[WebServer]  POST /asignacion/f89da359-9434-4542-b90d-4b21e8f69dae 200 in 225ms (next.js: 17ms, proxy.ts: 5ms, application-code: 203ms)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 60ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+[WebServer]  GET /inventario?pageSize=25&q=qc141_e2e_19a072be273743429f771bc1039e2eb3_producto 200 in 564ms (next.js: 4ms, proxy.ts: 5ms, application-code: 555ms)
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_19a072be273743429f771bc1039e2eb3_producto 200 in 45ms (next.js: 4ms, proxy.ts: 6ms, application-code: 36ms)
+[WebServer]   └─ ƒ listProductBatchesAction("a3b110e0-1400-4f6a-a369-78f9c02b6837") in 28ms lib/modules/inventario/adapters/driving/batch-actions.ts
+[WebServer]  POST /inventario?pageSize=25&q=qc141_e2e_19a072be273743429f771bc1039e2eb3_producto 200 in 50ms (next.js: 5ms, proxy.ts: 6ms, application-code: 39ms)
+[WebServer]   └─ ƒ listBatchMovementsAction("7b758f02-5769-4217-8fcd-711097bcdce4") in 28ms lib/modules/inventario/adapters/driving/batch-actions.ts
+  ✓  40 [webkit] › e2e\reserva-de-material.spec.ts:465:7 › reserva de material del pedido › R48 - dos pedidos compiten por el mismo lote, cancelar libera, reeditar vuelve a apartar y entregar consume (49.4s)
+
+
+  1) [chromium] › e2e\pedidos-cotizacion.spec.ts:373:7 › cotizacion del coste en el pedido (QC-151) › el bloque de coste cotiza con cada cantidad, guarda el mismo importe y lo reabre sin teclear nada 
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.order.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\e2e\pedidos-cotizacion.spec.ts:346:24
+
+      343 // `FIXTURE_PREFIX`-: `fullyParallel` reparte los tests de este archivo en workers distintos, cada
+      344 // uno con su propio `RUN_ID`. Casi todas las tablas de esta ficha llevan `company_id`.
+      345 const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    → 346   () => prisma.order.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      344 |   // uno con su propio `RUN_ID`. Casi todas las tablas de esta ficha llevan `company_id`.
+      345 |   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    > 346 |     () => prisma.order.deleteMany({ where: { companyId } }),
+          |                        ^
+      347 |     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
+      348 |     () => prisma.productBatch.deleteMany({ where: { companyId } }),
+      349 |     () => prisma.product.deleteMany({ where: { companyId } }),
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\e2e\pedidos-cotizacion.spec.ts:346:24
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\e2e\pedidos-cotizacion.spec.ts:358:7
+
+    Error Context: test-results\pedidos-cotizacion-cotizac-a0e9c--lo-reabre-sin-teclear-nada-chromium\error-context.md
+
+  2) [webkit] › e2e\pedidos-cotizacion.spec.ts:373:7 › cotizacion del coste en el pedido (QC-151) › el bloque de coste cotiza con cada cantidad, guarda el mismo importe y lo reabre sin teclear nada 
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.order.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\e2e\pedidos-cotizacion.spec.ts:346:24
+
+      343 // `FIXTURE_PREFIX`-: `fullyParallel` reparte los tests de este archivo en workers distintos, cada
+      344 // uno con su propio `RUN_ID`. Casi todas las tablas de esta ficha llevan `company_id`.
+      345 const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    → 346   () => prisma.order.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      344 |   // uno con su propio `RUN_ID`. Casi todas las tablas de esta ficha llevan `company_id`.
+      345 |   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    > 346 |     () => prisma.order.deleteMany({ where: { companyId } }),
+          |                        ^
+      347 |     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
+      348 |     () => prisma.productBatch.deleteMany({ where: { companyId } }),
+      349 |     () => prisma.product.deleteMany({ where: { companyId } }),
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\e2e\pedidos-cotizacion.spec.ts:346:24
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-141-reserva-de-material-del-pedido\e2e\pedidos-cotizacion.spec.ts:358:7
+
+    Error Context: test-results\pedidos-cotizacion-cotizac-a0e9c--lo-reabre-sin-teclear-nada-webkit\error-context.md
+
+  2 failed
+    [chromium] › e2e\pedidos-cotizacion.spec.ts:373:7 › cotizacion del coste en el pedido (QC-151) › el bloque de coste cotiza con cada cantidad, guarda el mismo importe y lo reabre sin teclear nada 
+    [webkit] › e2e\pedidos-cotizacion.spec.ts:373:7 › cotizacion del coste en el pedido (QC-151) › el bloque de coste cotiza con cada cantidad, guarda el mismo importe y lo reabre sin teclear nada 
+  38 passed (4.3m)
+exit=1

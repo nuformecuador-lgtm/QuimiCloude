@@ -40,6 +40,7 @@ const {
   routerMock,
   listOrdersActionMock,
   getOrderActionMock,
+  listOrderCoverageActionMock,
   listRecipesActionMock,
   listUnitsActionMock,
   listResponsiblesForOrdersActionMock,
@@ -96,6 +97,12 @@ const {
   getOrderActionMock: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse desde la lista');
   }),
+  // Se sustituye por la MISMA razon que la lista: sin doble, `listOrderCoverageAction`
+  // intentaria leer la cookie de sesion real.
+  listOrderCoverageActionMock: vi.fn(async () => ({
+    status: 'success' as const,
+    data: [] as readonly { orderId: string; coverage: 'full' | 'partial' | 'none' }[],
+  })),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -106,6 +113,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   listOrdersAction: listOrdersActionMock,
   getOrderAction: getOrderActionMock,
+  listOrderCoverageAction: listOrderCoverageActionMock,
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -555,6 +563,104 @@ describe('QC-102 — si el lote falla, la lista NO se cae (R20)', () => {
 
       // Y el estado de error de la pantalla NO se monta: el error, el vacio y el esqueleto
       // siguen siendo los de la LISTA DE PEDIDOS.
+      expect(screen.queryByTestId(testId.error)).toBeNull();
+      expect(screen.queryByTestId(testId.vacio)).toBeNull();
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------------------------
+// El lote de cobertura se compone AQUI, mismo patron que el de responsables.
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
+  it('pide el lote UNA sola vez por pagina, con los ids de la pagina y en una sola llamada', async () => {
+    listOrdersActionMock.mockResolvedValue(
+      pagina([pedido(), pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' })]),
+    );
+
+    render(await OrderListSection({ params: parametros() }));
+
+    // UNA, no una por fila: son dos pedidos y sigue siendo una sola invocacion.
+    expect(listOrderCoverageActionMock).toHaveBeenCalledTimes(1);
+    expect(listOrderCoverageActionMock).toHaveBeenCalledWith([pedido().id, OTRO_PEDIDO]);
+  });
+
+  it('sigue siendo UNA por render aunque cambie la pagina (R35)', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()], { page: 2, totalPages: 3 }));
+
+    render(await OrderListSection({ params: parametros({ page: 2 }) }));
+
+    expect(listOrderCoverageActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('la llamada del lote va DESPUES de la de la lista: sus ids salen de ella', async () => {
+    const orden: string[] = [];
+    listOrdersActionMock.mockImplementation(async () => {
+      orden.push('pedidos');
+      return pagina([pedido()]);
+    });
+    listOrderCoverageActionMock.mockImplementation(async () => {
+      orden.push('cobertura');
+      return { status: 'success' as const, data: [] };
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(orden).toEqual(['pedidos', 'cobertura']);
+  });
+
+  it('cada fila recibe la suya, ya repartida en el SERVIDOR: «Apartado», «Sin apartar» y «Sin cobertura completa» (R35)', async () => {
+    const COMPLETO = '55555555-5555-4555-8555-555555555555';
+    const PARCIAL = '66666666-6666-4666-8666-666666666666';
+    listOrdersActionMock.mockResolvedValue(
+      pagina([
+        pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' }),
+        pedido({ id: COMPLETO, numberText: 'PED-2026-0003' }),
+        pedido({ id: PARCIAL, numberText: 'PED-2026-0004' }),
+      ]),
+    );
+    listOrderCoverageActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        { orderId: OTRO_PEDIDO, coverage: 'none' },
+        { orderId: COMPLETO, coverage: 'full' },
+        { orderId: PARCIAL, coverage: 'partial' },
+      ],
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    const etiquetas = screen.getAllByTestId('order-coverage').map((nodo) => nodo.getAttribute('data-coverage'));
+    expect(etiquetas.sort()).toEqual(['full', 'none', 'partial']);
+  });
+
+  it('sin ningun pedido no se pregunta por cobertura de nadie', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
+    expect(listOrderCoverageActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-141 — si el lote de cobertura falla, la lista NO se cae (R20, R35)', () => {
+  it.each(['unauthorized', 'invalid_input', 'unexpected'] as const)(
+    'con el lote en `%s` se siguen pintando los pedidos y la columna de cobertura queda sin resolver',
+    async (code) => {
+      listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+      listOrderCoverageActionMock.mockResolvedValue({
+        status: 'error',
+        code,
+        message: 'No se pudo leer la cobertura.',
+      } as never);
+
+      render(await OrderListSection({ params: parametros() }));
+
+      expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      expect(screen.getByTestId('order-missing-coverage')).toBeInTheDocument();
       expect(screen.queryByTestId(testId.error)).toBeNull();
       expect(screen.queryByTestId(testId.vacio)).toBeNull();
     },

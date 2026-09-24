@@ -173,6 +173,8 @@ export const E2E_ESPERADOS = [
   // ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'recetas-porcentaje.spec.ts',
   'recetas.spec.ts',
+  // Alta con el mismo patron que las demas: no toca el identificador de peticion.
+  'reserva-de-material.spec.ts',
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
@@ -303,9 +305,20 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: anula `product_batches.presentation_id` y `unit_cost` (solo MACHINE los
   // omite en el borde); no toca el identificador de peticion.
   '20260923140000_product_batch_nullable_machine',
+  // Ninguna de las dos toca el identificador de peticion: una anade un valor a un enum, la otra
+  // cambia el tipo de columnas de existencia y crea el libro de reservas.
+  '20260923150000_inventory_movement_kind_consumption',
+  '20260923150100_reservations_and_decimal_stock',
+  // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
+  // peticion.
+  '20260923150200_reserve_existing_orders',
+  // Con el mismo patron que las anteriores: la migracion que crea la tabla `customers` y los
+  // permisos de `clientes` no persiste el identificador de peticion ni lo menciona; se nombra
+  // aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260924120000_customers',
   // Igual patron: agrega `material` y `measurements` a las lineas del catalogo de proveedor;
   // no toca el identificador de peticion.
-  '20260923180000_supplier_catalog_line_material_and_measurements',
+  '20260924180000_supplier_catalog_line_material_and_measurements',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -357,13 +370,16 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-09-21 entro `sharp` -la libreria que recorta del PNG de una pagina la region que la IA
 // senala como imagen-, tambien con los cuatro checks, con aprobacion humana en la puerta F1.4 y con
 // su fila en `docs/dependencias.md`: de 35 a 36 con esa misma aprobacion.
+// El 2026-09-23 entro `react-intersection-observer` -el hook que detecta cuando el final de una
+// lista entra en pantalla-, tambien con los cuatro checks, con aprobacion humana en la puerta F1.4
+// y con su fila en `docs/dependencias.md`: de 36 a 37 con esa misma aprobacion.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 36
+export const DEPENDENCIAS_ESPERADAS = 37
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

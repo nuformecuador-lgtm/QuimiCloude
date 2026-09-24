@@ -242,9 +242,19 @@ function funcionesQueEscribenLotes(fuente: string): string[] {
   return [...nombres].sort();
 }
 
+/**
+ * `consumeBatchStock` es la UNICA excepcion a proposito. Una entrega puede consumir de VARIOS
+ * lotes del MISMO producto, y `consumeForOrder` -en `reservation-prisma.ts`, driven del mismo
+ * modulo- recalcula una vez por producto DESPUES de todos los decrementos, no una vez por lote:
+ * sumar `product_batches` de nuevo en cada iteracion seria trabajo repetido para el mismo
+ * resultado. El recalculo sigue pasando, en la misma transaccion: solo se mueve de sitio.
+ */
+const EXCEPCIONES_SIN_RECALCULO = new Set(['consumeBatchStock']);
+
 /** De las que escriben lotes, las que NO llaman a `recalculateProductStock` en su propio cuerpo. */
 function funcionesSinRecalculo(fuente: string): string[] {
   return funcionesQueEscribenLotes(fuente).filter((nombre) => {
+    if (EXCEPCIONES_SIN_RECALCULO.has(nombre)) return false;
     const cuerpo = cuerpoDeFuncion(fuente, nombre);
     return cuerpo === null || !/recalculateProductStock\s*\(/.test(cuerpo);
   });
@@ -255,7 +265,7 @@ function funcionesSinRecalculo(fuente: string): string[] {
 // -------------------------------------------------------------------------------------------
 
 const PRODUCT_PRISMA = 'lib/modules/inventario/adapters/driven/persistence/product-prisma.ts';
-const CAMINOS_ESPERADOS = ['addBatchToAlive', 'adjustBatchStock', 'createWithFirstBatch'];
+const CAMINOS_ESPERADOS = ['addBatchToAlive', 'adjustBatchStock', 'consumeBatchStock', 'createWithFirstBatch'];
 const CENSO_ESPERADO = CAMINOS_ESPERADOS.map((nombre) => `${PRODUCT_PRISMA}::${nombre}`).sort();
 
 describe('QC-121 R29 — toda escritura exportada de product_batches recalcula products.stock', () => {
@@ -269,29 +279,37 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
       .filter((linea) => linea !== '')
       .join('\n');
 
-  /** Los tres caminos fabricados; `sinRecalculoEn` deja ese uno sin la llamada. */
-  const fuenteTresCaminos = (sinRecalculoEn: string | null): string =>
+  /** Los cuatro caminos fabricados; `sinRecalculoEn` deja ese uno sin la llamada.
+   *  `consumeBatchStock` nace SIN recalculo -es la excepcion-, salvo que se pida a el
+   *  explicitamente. */
+  const fuenteCuatroCaminos = (sinRecalculoEn: string | null): string =>
     [
       construirCamino('createWithFirstBatch', 'create', sinRecalculoEn !== 'createWithFirstBatch'),
       construirCamino('addBatchToAlive', 'create', sinRecalculoEn !== 'addBatchToAlive'),
       construirCamino('adjustBatchStock', 'update', sinRecalculoEn !== 'adjustBatchStock'),
+      construirCamino('consumeBatchStock', 'updateMany', sinRecalculoEn === 'consumeBatchStock'),
     ].join('\n\n');
 
-  it('verde: los tres caminos fabricados, cada uno con su recalculo', () => {
-    const fuente = fuenteTresCaminos(null);
+  it('verde: los cuatro caminos fabricados, cada uno con su recalculo (o su excepcion)', () => {
+    const fuente = fuenteCuatroCaminos(null);
     expect(funcionesQueEscribenLotes(fuente)).toEqual(CAMINOS_ESPERADOS.slice().sort());
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
   });
 
-  for (const nombre of CAMINOS_ESPERADOS) {
+  for (const nombre of CAMINOS_ESPERADOS.filter((n) => !EXCEPCIONES_SIN_RECALCULO.has(n))) {
     it(`rojo: ${nombre} sin su recalculo queda marcado`, () => {
-      const fuente = fuenteTresCaminos(nombre);
+      const fuente = fuenteCuatroCaminos(nombre);
       expect(funcionesSinRecalculo(fuente)).toEqual([nombre]);
     });
   }
 
-  it('rojo: un cuarto camino fabricado sin recalculo tambien queda marcado', () => {
-    const fuente = `${fuenteTresCaminos(null)}\n\n${construirCamino('rogueWrite', 'create', false)}`;
+  it('verde: consumeBatchStock SIN recalculo en su cuerpo no queda marcado -es la excepcion-', () => {
+    const fuente = fuenteCuatroCaminos('consumeBatchStock');
+    expect(funcionesSinRecalculo(fuente)).toEqual([]);
+  });
+
+  it('rojo: un quinto camino fabricado sin recalculo tambien queda marcado', () => {
+    const fuente = `${fuenteCuatroCaminos(null)}\n\n${construirCamino('rogueWrite', 'create', false)}`;
     expect(funcionesSinRecalculo(fuente)).toEqual(['rogueWrite']);
   });
 
@@ -301,7 +319,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
   });
 
-  it('el censo real bajo lib/ es exactamente esos tres caminos, ni uno mas', () => {
+  it('el censo real bajo lib/ es exactamente esos cuatro caminos, ni uno mas', () => {
     const archivos = archivosBajoCarpeta('lib');
     expect(archivos.length).toBeGreaterThan(50);
 
@@ -312,6 +330,100 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
 
     const sinRecalculo = archivos.flatMap((archivo) =>
       funcionesSinRecalculo(leer(archivo)).map((nombre) => `${archivo}::${nombre}`),
+    );
+    expect(sinRecalculo).toEqual([]);
+  });
+});
+
+// -------------------------------------------------------------------------------------------
+// Quien llama a consumeBatchStock llama tambien a recalculateProductStock
+// -------------------------------------------------------------------------------------------
+
+type FuncionDeNivelSuperior = { readonly nombre: string; readonly cuerpo: string };
+
+/**
+ * Toda funcion declarada con `function` en el nivel superior del archivo -exportada o no,
+ * sincrona o `async`-. Un metodo dentro del objeto que ella devuelve (como `consumeForOrder`
+ * dentro de `createMaterialReservations`) queda dentro de SU cuerpo, asi que no hace falta
+ * detectarlo aparte: `EXCEPCIONES_SIN_RECALCULO` (mas arriba) traslada la garantia de
+ * `consumeBatchStock` a quien la envuelve, "en su cuerpo o en el de la funcion que la envuelve
+ * dentro del mismo archivo".
+ */
+function funcionesDeNivelSuperior(fuente: string): FuncionDeNivelSuperior[] {
+  const codigo = stripComments(fuente);
+  const funciones: FuncionDeNivelSuperior[] = [];
+  const patronEncabezado = /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g;
+  let encabezado: RegExpExecArray | null;
+  while ((encabezado = patronEncabezado.exec(codigo)) !== null) {
+    const antes = codigo.slice(0, encabezado.index);
+    const profundidadAntes = (antes.match(/\{/g)?.length ?? 0) - (antes.match(/\}/g)?.length ?? 0);
+    if (profundidadAntes !== 0) continue; // solo funciones del nivel superior del archivo
+
+    const aperturaParametros = codigo.indexOf('(', encabezado.index);
+    const cierreParametros = cierreDeParametros(codigo, aperturaParametros);
+    if (cierreParametros === -1) continue;
+    const llave = llaveDeCuerpoTrasParametros(codigo, cierreParametros);
+    if (llave === -1) continue;
+    let profundidad = 0;
+    let fin = -1;
+    for (let i = llave; i < codigo.length; i += 1) {
+      if (codigo[i] === '{') profundidad += 1;
+      if (codigo[i] === '}') {
+        profundidad -= 1;
+        if (profundidad === 0) {
+          fin = i;
+          break;
+        }
+      }
+    }
+    if (fin === -1) continue;
+    funciones.push({ nombre: encabezado[1], cuerpo: codigo.slice(llave, fin + 1) });
+  }
+  return funciones;
+}
+
+/** Las funciones de nivel superior cuyo cuerpo llama a `consumeBatchStock` sin llamar tambien,
+ *  en el mismo cuerpo, a `recalculateProductStock`. */
+function funcionesQueConsumenSinRecalculo(fuente: string): string[] {
+  return funcionesDeNivelSuperior(fuente)
+    .filter((funcion) => /consumeBatchStock\s*\(/.test(funcion.cuerpo))
+    .filter((funcion) => !/recalculateProductStock\s*\(/.test(funcion.cuerpo))
+    .map((funcion) => funcion.nombre);
+}
+
+describe('QC-121 R28 — quien llama a consumeBatchStock recalcula products.stock', () => {
+  it('rojo (R28): una funcion fabricada que consume sin recalcular queda marcada', () => {
+    const fuente = [
+      'export async function fakeConsumerSinRecalculo(db) {',
+      '  await consumeBatchStock(db, { batchId, quantity }, now, scope);',
+      '}',
+    ].join('\n');
+    expect(funcionesQueConsumenSinRecalculo(fuente)).toEqual(['fakeConsumerSinRecalculo']);
+  });
+
+  it('verde (R28): una funcion fabricada que consume y recalcula no queda marcada', () => {
+    const fuente = [
+      'export async function fakeConsumerConRecalculo(db) {',
+      '  await consumeBatchStock(db, { batchId, quantity }, now, scope);',
+      '  await recalculateProductStock(db, productId, scope);',
+      '}',
+    ].join('\n');
+    expect(funcionesQueConsumenSinRecalculo(fuente)).toEqual([]);
+  });
+
+  it('verde (R28): ninguna funcion real de lib/ que llama a consumeBatchStock queda sin su recalculo', () => {
+    const archivos = archivosBajoCarpeta('lib');
+    expect(archivos.length).toBeGreaterThan(50);
+
+    const llamantes = archivos.flatMap((archivo) =>
+      funcionesDeNivelSuperior(leer(archivo))
+        .filter((funcion) => /consumeBatchStock\s*\(/.test(funcion.cuerpo))
+        .map((funcion) => `${archivo}::${funcion.nombre}`),
+    );
+    expect(llamantes.length).toBeGreaterThan(0); // el detector encuentra a los llamantes reales
+
+    const sinRecalculo = archivos.flatMap((archivo) =>
+      funcionesQueConsumenSinRecalculo(leer(archivo)).map((nombre) => `${archivo}::${nombre}`),
     );
     expect(sinRecalculo).toEqual([]);
   });

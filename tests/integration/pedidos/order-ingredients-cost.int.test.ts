@@ -33,15 +33,15 @@ import {
   createWithFirstBatch,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 import {
-  cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
-  softDeleteAliveOrder,
-  updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
+import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
 import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma'
 import {
+  createRecipeExecutionReader,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -64,6 +64,7 @@ import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { RecipeScope } from '@/lib/modules/recetas/domain/recipe-scope'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
@@ -83,12 +84,22 @@ function normalizeForTest(name: string): string {
 // ---------------------------------------------------------------------------
 
 const orders: OrderRepository = {
-  create: createOrder,
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
-  updateAlive: updateAliveOrder,
-  cancelAlive: cancelAliveOrder,
-  softDeleteAlive: softDeleteAliveOrder,
+}
+
+// Mismo cableado que `lib/composition` para `orderUnitOfWork`: abre la transaccion compartida
+// con `inventario` y ata, sobre el MISMO `tx`, la escritura de `pedidos` y las reservas.
+const unitOfWork: OrderUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) => {
+      const scope: OrderTransactionScope = {
+        orders: createOrderWriteRepository(tx),
+        reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
+      }
+      return work(scope)
+    }),
 }
 
 const recipes: RecipeCatalog = {
@@ -220,7 +231,7 @@ function actorDe(empresa: Empresa): Actor {
 function newBatch(empresa: Empresa, overrides: Partial<NewProductBatch> = {}): NewProductBatch {
   return {
     presentationId: empresa.presentationId,
-    stock: 10,
+    stock: '10',
     unitCost: '5.0000',
     lot: null,
     purchaseDate: '2026-01-01',
@@ -280,8 +291,15 @@ function borrarReceta(recipeId: string): Promise<unknown> {
   return prisma.recipe.deleteMany({ where: { id: recipeId } })
 }
 
-function borrarPedido(orderId: string): Promise<unknown> {
-  return prisma.order.deleteMany({ where: { id: orderId } })
+/**
+ * El alta y la edicion de este archivo pasan por la reserva real -el mismo `unitOfWork` que
+ * `lib/composition`-, asi que cada pedido puede haber dejado asientos en
+ * `reservation_movements`. `reservation_movements_order_id_fkey` es `RESTRICT`: hay que
+ * borrarlos antes que el pedido, igual que `inventory_movements` antes que el lote.
+ */
+async function borrarPedido(orderId: string): Promise<void> {
+  await prisma.reservationMovement.deleteMany({ where: { orderId } })
+  await prisma.order.deleteMany({ where: { id: orderId } })
 }
 
 /** Coste de la columna, leido con `::text` para no perder ni un decimal ni confundir `NULL`
@@ -312,12 +330,12 @@ async function fotoDeInventario(
 
 describe('el alta lo deja guardado en la fila (R10)', () => {
   it('calcula el coste con los lotes vigentes y lo persiste en `ingredients_cost`', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-01T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
@@ -334,14 +352,14 @@ describe('el alta lo deja guardado en la fila (R10)', () => {
 
 describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
   it('recalcula con los lotes de hoy, y deja el importe en NULL cuando ya no cubre', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
       const now = () => new Date('2026-05-02T12:00:00.000Z')
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, now })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
 
       const creado = await alta({ recipeId, quantity: '4.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
@@ -368,12 +386,12 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
 
 describe('comprar un lote despues no cambia el importe de un pedido ya creado (R12)', () => {
   it('un lote nuevo del mismo producto deja el importe guardado intacto', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-03T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-03T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
@@ -382,7 +400,7 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
       // leer, este lote lo cambiaria de inmediato.
       await addBatchToAlive(
         productId,
-        newBatch(A, { stock: 5000, unitCost: '0.5000', purchaseDate: '2026-05-04' }),
+        newBatch(A, { stock: '5000', unitCost: '0.5000', purchaseDate: '2026-05-04' }),
         new Date('2026-05-04T12:00:00.000Z'),
         { companyId: A.companyId },
       )
@@ -399,12 +417,12 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
 
 describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
   it('con `ingredients_cost` en NULL por fuera de la aplicacion, leerlo no lo recalcula', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-05T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-05T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
@@ -438,7 +456,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
 
 describe('un lote de otra empresa no entra en el calculo (R21)', () => {
   it('`findCostingBatches` con el ambito de otra empresa no devuelve el lote, ni por identificador', async () => {
-    const { productId } = await crearProductoConLote(Q, { stock: 999, unitCost: '1000.0000' })
+    const { productId } = await crearProductoConLote(Q, { stock: '999', unitCost: '1000.0000' })
 
     try {
       // Con el AMBITO correcto (Q), el lote SI aparece: control positivo.
@@ -457,12 +475,12 @@ describe('un lote de otra empresa no entra en el calculo (R21)', () => {
 
 describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21)', () => {
   it('la ficha de un pedido de A pedida desde Q es null, y desde A trae el importe', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-06T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-06T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
@@ -481,7 +499,7 @@ describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21
 
 describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R22)', () => {
   it('`product_batches` e `inventory_movements` de la empresa son byte a byte iguales', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
@@ -489,8 +507,8 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       const antesDeAlta = await fotoDeInventario(A)
 
       const now = () => new Date('2026-05-07T12:00:00.000Z')
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, now })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
 
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
@@ -513,16 +531,221 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
   })
 })
 
-describe('el pedido queda creado con el importe en blanco y la base no lanza 22003 (R24)', () => {
-  it('un coste que desborda `Decimal(14,4)` no aborta el alta', async () => {
-    // Un lote al maximo de `Decimal(14,4)`: la linea necesita exactamente ese stock, asi que
-    // el importe es `necesaria * unit_cost`, muy por encima de lo que la columna admite.
-    const { productId } = await crearProductoConLote(A, { stock: 100, unitCost: '9999999999.9999' })
+describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular hasta cubrir (R59, R60, R64)', () => {
+  it('30 con A 20@10, B 20@12, C 50@15 -> 370.0000; la reserva sigue tomando solo A y B, nada de C', async () => {
+    const { productId, batchId: idA } = await crearProductoConLote(A, {
+      stock: '20',
+      unitCost: '10.0000',
+      lot: `A-${token()}`,
+      purchaseDate: '2026-01-01',
+    })
+    const loteB = await addBatchToAlive(
+      productId,
+      newBatch(A, { stock: '20', unitCost: '12.0000', lot: `B-${token()}`, purchaseDate: '2026-01-02' }),
+      new Date('2026-01-02T00:00:00.000Z'),
+      { companyId: A.companyId },
+    )
+    const loteC = await addBatchToAlive(
+      productId,
+      newBatch(A, { stock: '50', unitCost: '15.0000', lot: `C-${token()}`, purchaseDate: '2026-01-03' }),
+      new Date('2026-01-03T00:00:00.000Z'),
+      { companyId: A.companyId },
+    )
+    if (loteB === null || loteC === null) throw new Error('no se pudo sembrar B o C')
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-08T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-09T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '30.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      orderId = creado.id
+
+      // promedio simple (10 + 12 + 15) / 3 = 12,333333333333; * 30 = 369,99999999999 -> 370,0000.
+      expect(await ingredientsCostCrudo(orderId)).toBe('370.0000')
+
+      const reservas = await prisma.reservationMovement.findMany({
+        where: { orderId },
+        select: { batchId: true, quantity: true },
+      })
+      const porLote = new Map(reservas.map((row) => [row.batchId, row.quantity.toFixed(4)]))
+      expect(porLote.get(idA)).toBe('20.0000')
+      expect(porLote.get(loteB.batchId)).toBe('10.0000')
+      expect(porLote.has(loteC.batchId)).toBe(false)
+    } finally {
+      if (orderId !== null) await borrarPedido(orderId)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+
+  it('un lote apartado entero por OTRO pedido queda fuera del promedio de este (R60)', async () => {
+    const { productId } = await crearProductoConLote(A, {
+      stock: '10',
+      unitCost: '3.0000',
+      lot: `V-${token()}`,
+      purchaseDate: '2026-01-01',
+    })
+    const loteNuevo = await addBatchToAlive(
+      productId,
+      newBatch(A, { stock: '10', unitCost: '9.0000', lot: `N-${token()}`, purchaseDate: '2026-01-02' }),
+      new Date('2026-01-02T00:00:00.000Z'),
+      { companyId: A.companyId },
+    )
+    if (loteNuevo === null) throw new Error('no se pudo sembrar el lote nuevo')
+    const recipeId = await crearReceta(A, productId)
+    let ordenQueApartaTodo: string | null = null
+    let ordenBajoPrueba: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-10T12:00:00.000Z') })
+
+      // El primer pedido necesita exactamente lo del lote mas antiguo: lo aparta entero, y ese
+      // lote queda con disponible cero para cualquier OTRO pedido.
+      const primero = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      ordenQueApartaTodo = primero.id
+      // Al crearse, los dos lotes siguen enteros: promedio (3+9)/2=6; 10 * 6 = 60.
+      expect(await ingredientsCostCrudo(ordenQueApartaTodo)).toBe('60.0000')
+
+      const segundo = await alta({ recipeId, quantity: '5.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      ordenBajoPrueba = segundo.id
+
+      // Si el lote agotado entrara en el promedio, saldria (3+9)/2=6 -> 30.0000. Al quedar fuera,
+      // el promedio es solo el del lote nuevo: 5 * 9.0000 = 45.0000.
+      expect(await ingredientsCostCrudo(ordenBajoPrueba)).toBe('45.0000')
+
+      const reservasDelSegundo = await prisma.reservationMovement.findMany({
+        where: { orderId: ordenBajoPrueba },
+        select: { batchId: true },
+      })
+      expect(reservasDelSegundo.map((row) => row.batchId)).toEqual([loteNuevo.batchId])
+    } finally {
+      if (ordenBajoPrueba !== null) await borrarPedido(ordenBajoPrueba)
+      if (ordenQueApartaTodo !== null) await borrarPedido(ordenQueApartaTodo)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+
+  it('disponible insuficiente aunque la existencia TOTAL alcance deja el pedido sin importe (R61)', async () => {
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '4.0000', purchaseDate: '2026-01-01' })
+    const recipeId = await crearReceta(A, productId)
+    let ordenQueAparta: string | null = null
+    let ordenBajoPrueba: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-11T12:00:00.000Z') })
+
+      // Aparta 8 de los 10: quedan solo 2 disponibles, aunque la existencia total siga siendo 10.
+      const primero = await alta({ recipeId, quantity: '8.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      ordenQueAparta = primero.id
+
+      const segundo = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      ordenBajoPrueba = segundo.id
+
+      expect(await ingredientsCostCrudo(ordenBajoPrueba)).toBeNull()
+    } finally {
+      if (ordenBajoPrueba !== null) await borrarPedido(ordenBajoPrueba)
+      if (ordenQueAparta !== null) await borrarPedido(ordenQueAparta)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+
+  it('un lote de maquina sin presentacion ni coste, con disponible, no contamina el promedio (R66)', async () => {
+    const { productId, batchId: idConCoste } = await crearProductoConLote(A, {
+      stock: '10',
+      unitCost: '5.0000',
+      lot: `X-${token()}`,
+      purchaseDate: '2026-01-01',
+    })
+    const loteMaquina = await addBatchToAlive(
+      productId,
+      newBatch(A, {
+        presentationId: null,
+        unitCost: null,
+        stock: '1000',
+        lot: `M-${token()}`,
+        purchaseDate: '2026-01-02',
+      }),
+      new Date('2026-01-02T00:00:00.000Z'),
+      { companyId: A.companyId },
+    )
+    if (loteMaquina === null) throw new Error('no se pudo sembrar el lote de maquina')
+    const recipeId = await crearReceta(A, productId)
+    let orderId: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-12T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      orderId = creado.id
+
+      // Si el lote de maquina entrara en el promedio, sobraria disponible de sobra (10 + 1000) y
+      // el coste promediaria dos costes distintos. Al quedar fuera de `findCostingBatches`, el
+      // importe sale solo del lote con coste: 10 * 5.0000 = 50.0000.
+      expect(await ingredientsCostCrudo(orderId)).toBe('50.0000')
+
+      const reservas = await prisma.reservationMovement.findMany({
+        where: { orderId },
+        select: { batchId: true },
+      })
+      expect(reservas.map((row) => row.batchId)).toEqual([idConCoste])
+    } finally {
+      if (orderId !== null) await borrarPedido(orderId)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+
+  it('un lote de maquina sin presentacion ni coste, aunque cubriria por si solo, no cuenta en la cobertura (R66)', async () => {
+    const { productId } = await crearProductoConLote(A, {
+      stock: '3',
+      unitCost: '5.0000',
+      lot: `X-${token()}`,
+      purchaseDate: '2026-01-01',
+    })
+    const loteMaquina = await addBatchToAlive(
+      productId,
+      newBatch(A, {
+        presentationId: null,
+        unitCost: null,
+        stock: '1000',
+        lot: `M-${token()}`,
+        purchaseDate: '2026-01-02',
+      }),
+      new Date('2026-01-02T00:00:00.000Z'),
+      { companyId: A.companyId },
+    )
+    if (loteMaquina === null) throw new Error('no se pudo sembrar el lote de maquina')
+    const recipeId = await crearReceta(A, productId)
+    let orderId: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-13T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      orderId = creado.id
+
+      // El lote de maquina, sin coste, tiene disponible de sobra (1000) para cubrir la necesidad
+      // de 10 el solo, pero `findCostingBatches` lo deja fuera: el unico disponible que cuenta es
+      // el del lote con coste (3), que no alcanza -> sin importe.
+      expect(await ingredientsCostCrudo(orderId)).toBeNull()
+    } finally {
+      if (orderId !== null) await borrarPedido(orderId)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+})
+
+describe('el pedido queda creado con el importe en blanco y la base no lanza 22003 (R24)', () => {
+  it('un coste que desborda `Decimal(14,4)` no aborta el alta', async () => {
+    // Un lote al maximo de `Decimal(14,4)`: la linea necesita exactamente ese stock, asi que
+    // el importe es `necesaria * unit_cost`, muy por encima de lo que la columna admite.
+    const { productId } = await crearProductoConLote(A, { stock: '100', unitCost: '9999999999.9999' })
+    const recipeId = await crearReceta(A, productId)
+    let orderId: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-08T12:00:00.000Z') })
 
       // necesaria = 100 * 100 % = 100, cubierta EXACTAMENTE por el lote (stock 100).
       // importe = 100 * 9999999999.9999 = 999999999999.9900, muy por encima de 9999999999.9999.

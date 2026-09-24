@@ -127,14 +127,14 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los DIECISIETE campos de `Order`, con la columna en ingles que le toca. Empezaron en catorce,
- *  luego quince con `cancellationReason`; el 2026-09-07 una decision humana quito
- *  `unit_id` y `unit_price` de la tabla
- *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Luego se
- *  anadio `company_id`, obligatoria, y volvieron a ser catorce. `ingredientsCost` opcional las
- *  lleva a quince. `presentationId` opcional las lleva a dieciseis. `finishedAt` opcional las
- *  lleva a diecisiete. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone
- *  este test rojo. */
+/** Los DIECIOCHO campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
+ *  quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id` y
+ *  `unit_price` de la tabla
+ *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
+ *  se anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las
+ *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete y `finishedAt` a
+ *  dieciocho. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
+ *  test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -151,6 +151,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
   ['ingredientsCost', 'ingredients_cost'],
+  ['reservedAt', 'reserved_at'],
   ['presentationId', 'presentation_id'], // el envase en que se entrega, opcional
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
 ]
@@ -213,9 +214,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
   })
 
   it('Order no declara cliente, destinatario ni ninguna columna equivalente', () => {
-    // R3 y decision cerrada 8: no hay cliente ni destinatario, y es DELIBERADO. Tampoco se crea
-    // catalogo de clientes. Anadirlo despues obliga a decidir que cliente llevaban los pedidos
-    // ya cargados, y ese coste esta asumido y anotado.
+    // R3 y decision cerrada 8: no hay cliente ni destinatario en Order, y es DELIBERADO;
+    // sigue vigente hasta QC-156. La prohibicion de un catalogo de clientes que este mismo
+    // caso incluia queda derogada solo para Customer/customers por el modulo Clientes
+    // (QC-152/QC-153, 2026-09-24); el resto de nombres de catalogo sigue prohibido.
     const CLIENTE = /client|customer|cliente|recipient|destinatar|buyer|receiver|contact|party/i
     const sospechosos = order.fields
       .filter((candidate) => CLIENTE.test(candidate.name))
@@ -225,10 +227,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
-    for (const forbidden of ['Customer', 'Client', 'Recipient', 'Buyer']) {
+    for (const forbidden of ['Client', 'Recipient', 'Buyer']) {
       expect(modelNames, `el modelo ${forbidden} no debe existir`).not.toContain(forbidden)
     }
-    expect(schema).not.toMatch(/@@map\("(customers|clients|recipients)"\)/)
+    expect(schema).not.toMatch(/@@map\("(clients|recipients)"\)/)
   })
 
   it('Order no declara ninguna fecha de solicitud aparte de createdAt', () => {
@@ -238,7 +240,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((candidate) => candidate.type === 'DateTime')
       .map((candidate) => candidate.name)
       .sort()
-    expect(fechas).toEqual(['createdAt', 'deletedAt', 'finishedAt', 'updatedAt'])
+    expect(fechas).toEqual(['createdAt', 'deletedAt', 'finishedAt', 'reservedAt', 'updatedAt'])
 
     for (const forbidden of [
       'requestedAt',

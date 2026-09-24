@@ -26,6 +26,11 @@ export type OrderCostQuote = { readonly ingredientsCost: string | null };
  * misma cantidad, y con el `companyId` que llega SIEMPRE del actor de la sesion, nunca de la
  * entrada.
  *
+ * `data.orderId` solo lo envia el formulario de EDICION: hace que lo que ese pedido ya tiene
+ * apartado cuente como disponible para el mismo, igual que hace `updateOrder` al guardar. No
+ * abre ninguna lectura del pedido: es una cadena opaca que solo usa `findCostingBatches` para
+ * no restar lo que ese pedido aparto.
+ *
  * No se comprueba que la receta exista ni que este viva: una receta inexistente o ajena da
  * «sin importe», igual que una receta dada de baja se cotiza sin rechazarla.
  */
@@ -49,6 +54,7 @@ export function createQuoteOrderCost(
       data.recipeId,
       data.quantity,
       actor.companyId,
+      { orderId: data.orderId },
     );
 
     return { ingredientsCost };

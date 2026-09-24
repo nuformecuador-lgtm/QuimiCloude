@@ -18,8 +18,9 @@
  *    delante lo que otra ejecucion viva acaba de crear;
  *  - `afterAll` borra siempre, aunque el test reviente, **por el `companyId` EXACTO de este
  *    worker** -nunca por el prefijo, porque `fullyParallel` reparte los tests en workers distintos,
- *    cada uno con su propio `RUN_ID`-, en el orden que imponen las FK RESTRICT: pedidos -> receta
- *    (sus lineas van en cascada) -> lote -> producto -> presentacion -> usuario -> empresa.
+ *    cada uno con su propio `RUN_ID`-, en el orden que imponen las FK RESTRICT: apartados (el pedido
+ *    guardado los deja en `reservation_movements` e `inventory_movements`) -> pedidos -> receta (sus
+ *    lineas van en cascada) -> lote -> producto -> presentacion -> usuario -> empresa.
  *
  * SEMBRADO SIN PASAR POR LA PANTALLA (`e2e/ajuste-de-inventario.spec.ts`,
  * `e2e/recetas-porcentaje.spec.ts`): el producto CON unidad, su presentacion y su lote se crean con
@@ -43,6 +44,10 @@
  * mano con los mismos numeros del fixture -no hay funcion de dominio que exportar para eso sin
  * arrastrar un componente de UI-, y el guion (`—`), que es el marcador de ausencia de la pantalla
  * (`order-columns.tsx`) y no copy de negocio.
+ *
+ * UN SEGUNDO INGREDIENTE Y RECETA: tres lotes con disponible completo y coste distinto, en una
+ * receta al 100 % para que la cantidad tecleada sea la cantidad necesaria sin pasar por un
+ * porcentaje intermedio.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -103,12 +108,32 @@ const QUANTITY_C = '20000'; // 2000 L requeridos > 1000 L de existencia
 /** Marcador de ausencia de la pantalla, no copy de negocio (`order-columns.tsx`). */
 const MISSING_VALUE_MARK = '—';
 
+/**
+ * El ingrediente para el promedio de coste: tres lotes con disponible completo y coste distinto,
+ * en una receta propia al 100 % para que la cantidad del pedido sea la cantidad necesaria tal
+ * cual.
+ */
+const costProductName = `${SHARED_TOKEN}_r59_ingrediente`;
+const costPresentationName = `${SHARED_TOKEN}_r59_presentacion`;
+const costRecipeName = `${SHARED_TOKEN}_r59_receta`;
+
+/** Los tres lotes de la cotizacion por promedio, con fecha de compra distinta: A la mas antigua. */
+const COST_BATCH_A = { stock: '20', unitCost: '10.0000', lotSuffix: 'A' } as const;
+const COST_BATCH_B = { stock: '20', unitCost: '12.0000', lotSuffix: 'B' } as const;
+const COST_BATCH_C = { stock: '50', unitCost: '15.0000', lotSuffix: 'C' } as const;
+
+/** 30 x (10 + 12 + 15) / 3 = 370,0000, sin ponderar por la cantidad de ningun lote. */
+const COST_QUANTITY = '30';
+const COST_AMOUNT = '$ 370.00';
+
 let companyId: string;
 let adminUserId: string;
 let unitId: string;
 let productId: string;
 let presentationId: string;
 let recipeId: string;
+let costProductId: string;
+let costRecipeId: string;
 
 async function createUserWithRole(user: Credentials, roleName: string): Promise<string> {
   const role = await prisma.role.findUnique({ where: { name: roleName }, select: { id: true } });
@@ -174,14 +199,16 @@ function rowByNumber(page: Page, numberText: string): Locator {
 test.beforeAll(async () => {
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
 
-  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: pedidos -> recetas (sus
-  // lineas van en cascada) -> lotes -> productos -> presentaciones -> usuarios -> empresas.
+  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: apartados -> pedidos ->
+  // recetas (sus lineas van en cascada) -> lotes -> productos -> presentaciones -> usuarios -> empresas.
   const orphanCompanies = await prisma.company.findMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
     select: { id: true },
   });
   const orphanCompanyIds = orphanCompanies.map((company) => company.id);
   if (orphanCompanyIds.length > 0) {
+    await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -261,6 +288,57 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+
+  const costPresentation = await prisma.presentation.create({
+    data: {
+      name: costPresentationName,
+      nameNormalized: normalizePresentationName(costPresentationName),
+      unitId,
+      companyId,
+    },
+    select: { id: true },
+  });
+
+  costProductId = (
+    await prisma.product.create({
+      data: {
+        name: costProductName,
+        nameNormalized: normalizeProductName(costProductName),
+        unitId,
+        stock: '90', // 20 + 20 + 50: la suma de los tres lotes de abajo.
+        companyId,
+      },
+      select: { id: true },
+    })
+  ).id;
+
+  // Fechas de compra distintas: el promedio usa TODOS los disponibles, sin importar el orden en
+  // que el apartado los recorra.
+  await prisma.productBatch.createMany({
+    data: [COST_BATCH_A, COST_BATCH_B, COST_BATCH_C].map((batch, index) => ({
+      productId: costProductId,
+      presentationId: costPresentation.id,
+      companyId,
+      stock: batch.stock,
+      unitCost: batch.unitCost,
+      lot: `E2E-QC151-R59-${batch.lotSuffix}-${RUN_ID}`,
+      purchaseDate: new Date(Date.UTC(2026, 0, index + 1)),
+      createdBy: adminUserId,
+    })),
+  });
+
+  costRecipeId = (
+    await prisma.recipe.create({
+      data: {
+        name: costRecipeName,
+        nameNormalized: normalizeRecipeName(costRecipeName),
+        createdBy: adminUserId,
+        companyId,
+        lines: { create: [{ productId: costProductId, percentage: '100.00' }] },
+      },
+      select: { id: true },
+    })
+  ).id;
 });
 
 test.afterAll(async () => {
@@ -268,6 +346,8 @@ test.afterAll(async () => {
   // `FIXTURE_PREFIX`-: `fullyParallel` reparte los tests de este archivo en workers distintos, cada
   // uno con su propio `RUN_ID`. Casi todas las tablas de esta ficha llevan `company_id`.
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    () => prisma.reservationMovement.deleteMany({ where: { companyId } }),
+    () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
     () => prisma.order.deleteMany({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
@@ -365,6 +445,34 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await row.getByTestId('order-action-edit').click();
     await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('order-cost-quote-value')).toHaveText(AMOUNT_B, {
+      timeout: 60_000,
+    });
+  });
+
+  test('R59: el promedio simple de todos los lotes con disponible cotiza el ejemplo de D22', async ({
+    page,
+  }) => {
+    await loginAndLand(page, adminUser);
+
+    await page.goto(ORDERS_ROUTE);
+    await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
+
+    await page.getByTestId('order-create-open').first().click();
+    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+
+    const picker = page.getByTestId('recipe-picker');
+    await picker.click();
+    await picker.fill(costRecipeName);
+    const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: costRecipeName });
+    await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
+    await recipeOption.click();
+    await expect(page.getByTestId('recipe-picker-value')).toHaveValue(costRecipeId);
+
+    // Receta al 100 %: la cantidad tecleada ES la cantidad necesaria. Los tres lotes A (20 a 10),
+    // B (20 a 12) y C (50 a 15) entran ENTEROS en el promedio, se necesiten o no para cubrir los
+    // 30 pedidos: (10 + 12 + 15) / 3 x 30 = 370,0000.
+    await page.getByTestId('order-field-quantity').fill(COST_QUANTITY);
+    await expect(page.getByTestId('order-cost-quote-value')).toHaveText(COST_AMOUNT, {
       timeout: 60_000,
     });
   });

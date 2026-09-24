@@ -9,6 +9,8 @@ import { buttonVariants } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
+import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
@@ -114,6 +116,11 @@ export type OrderTableProps = {
   /** QC-102 R27, R28 — catalogos y `canWrite` del panel, tambien de paso. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
+   * La cobertura de la pagina, **ya repartida por fila en el SERVIDOR**: mismo patron que
+   * `responsiblesByOrder`. La tabla solo lo atraviesa hasta la celda.
+   */
+  readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
+  /**
    * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
    * DENTRO de la tabla, con la caja montada, en vez del vacio de `order-list-empty.tsx`.
    */
@@ -128,6 +135,7 @@ export function OrderTable({
   units,
   responsiblesByOrder,
   responsiblesCatalog,
+  coverageByOrder,
   noMatches,
 }: OrderTableProps) {
   const router = useRouter();
@@ -163,8 +171,9 @@ export function OrderTable({
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
-    () => buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog }),
-    [recipes, units, responsiblesByOrder, responsiblesCatalog],
+    () =>
+      buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder }),
+    [recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder],
   );
 
   /*

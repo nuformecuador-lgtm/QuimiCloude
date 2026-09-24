@@ -30,7 +30,6 @@ import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
@@ -50,7 +49,10 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany,
-    transitionAliveById: transitionAliveOrder,
+    // Este archivo prueba `listCompanyOrders`, que nunca transiciona un pedido.
+    transitionAliveById: async () => {
+      throw new Error('listCompanyOrders no ejecuta ninguna transicion');
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 

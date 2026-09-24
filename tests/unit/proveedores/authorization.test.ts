@@ -1,4 +1,4 @@
-// QC-74 T12 — Autorizacion POR PERMISO de los NUEVE casos de uso de `proveedores`
+// Autorizacion POR PERMISO de los ONCE casos de uso de `proveedores`
 // (R12, R13, R14, R15, R16, R17, R18).
 //
 // `docs/architecture.md > Acceso a datos y autorizacion` es explicito: Prisma se conecta
@@ -30,6 +30,8 @@ import { createDeleteSupplier } from '@/lib/modules/proveedores/domain/delete-su
 import { ProveedoresError, UnauthorizedError } from '@/lib/modules/proveedores/domain/errors'
 import { createGetSupplier } from '@/lib/modules/proveedores/domain/get-supplier'
 import { createListCatalogLines } from '@/lib/modules/proveedores/domain/list-catalog-lines'
+import { createListShowcaseLines } from '@/lib/modules/proveedores/domain/list-showcase-lines'
+import { createListSupplierShowcase } from '@/lib/modules/proveedores/domain/list-supplier-showcase'
 import { createListSuppliers } from '@/lib/modules/proveedores/domain/list-suppliers'
 import { createUpdateCatalogLine } from '@/lib/modules/proveedores/domain/update-catalog-line'
 import { createUpdateSupplier } from '@/lib/modules/proveedores/domain/update-supplier'
@@ -98,6 +100,7 @@ function dobles() {
     updateAlive: explota('suppliers.updateAlive'),
     softDeleteAlive: explota('suppliers.softDeleteAlive'),
     listAlive: explota('suppliers.listAlive'),
+    listShowcaseAlive: explota('suppliers.listShowcaseAlive'),
   }
   const catalog = {
     create: explota('catalog.create'),
@@ -220,6 +223,24 @@ const CASOS_DE_USO: readonly Caso[] = [
     ejecutarConBasura: (d, actor) =>
       createListCatalogLines({ catalog: d.catalog, log: d.log })(SUPPLIER_ID, BASURA, actor),
   },
+  {
+    nombre: 'listSupplierShowcase',
+    archivo: 'list-supplier-showcase.ts',
+    permiso: CONSULTAR,
+    ejecutar: (d, actor) =>
+      createListSupplierShowcase({ suppliers: d.suppliers })({ page: 1 }, actor),
+    ejecutarConBasura: (d, actor) =>
+      createListSupplierShowcase({ suppliers: d.suppliers })(BASURA, actor),
+  },
+  {
+    nombre: 'listShowcaseLines',
+    archivo: 'list-showcase-lines.ts',
+    permiso: CONSULTAR,
+    ejecutar: (d, actor) =>
+      createListShowcaseLines({ catalog: d.catalog })(SUPPLIER_ID, { page: 2 }, actor),
+    ejecutarConBasura: (d, actor) =>
+      createListShowcaseLines({ catalog: d.catalog })(SUPPLIER_ID, BASURA, actor),
+  },
 ]
 
 /** Actor con exactamente los permisos que se le den; sin nombre de rol (R18). */
@@ -288,10 +309,10 @@ async function esperarQueLlegueAlPuerto(caso: Caso, actor: Actor): Promise<void>
   expect((resultado as Error).message).toMatch(/no debe llamarse sin autorizacion/)
 }
 
-describe('autorizacion por permiso de los nueve casos de uso de proveedores (QC-74 T12)', () => {
-  it('los nueve casos de uso estan cubiertos por esta tabla', () => {
-    // Guardia de la propia guardia: si alguien anade un decimo caso de uso al dominio y no
-    // lo mete en `CASOS_DE_USO`, este test cae. Sin esto, la cobertura «de los nueve» seria
+describe('autorizacion por permiso de los once casos de uso de proveedores (QC-74 T12)', () => {
+  it('los once casos de uso estan cubiertos por esta tabla', () => {
+    // Guardia de la propia guardia: si alguien anade un caso de uso mas al dominio y no
+    // lo mete en `CASOS_DE_USO`, este test cae. Sin esto, la cobertura «de todos» seria
     // una promesa del comentario de cabecera y no una afirmacion ejecutable.
     //
     // QC-57 anadio `domain/list-query.ts`, que empieza por `list-` y NO es un caso de uso: es
@@ -299,7 +320,7 @@ describe('autorizacion por permiso de los nueve casos de uso de proveedores (QC-
     // actor y sin ningun puerto que tocar, asi que no tiene autorizacion que validar. Se
     // excluye por nombre, y no relajando el patron, para que la guardia siga cayendo con un
     // caso de uso nuevo de verdad. Si algun dia deja de ser una excepcion, el aserto de
-    // `toHaveLength(9)` lo dira.
+    // `toHaveLength(11)` lo dira.
     const NO_SON_CASOS_DE_USO: readonly string[] = ['list-query.ts']
 
     const factoriasEnElDominio = readdirSync(join(moduloDir, 'domain'))
@@ -310,15 +331,21 @@ describe('autorizacion por permiso de los nueve casos de uso de proveedores (QC-
       )
       .sort()
     expect(factoriasEnElDominio).toEqual([...CASOS_DE_USO].map((c) => c.archivo).sort())
-    expect(CASOS_DE_USO).toHaveLength(9)
+    expect(CASOS_DE_USO).toHaveLength(11)
 
-    // Y la tabla R16 esta completa por los dos lados: tres lecturas y seis escrituras, y los
-    // dos codigos existen en el catalogo REAL de `identity`, no en una copia escrita a mano.
+    // Y la tabla de permisos esta completa por los dos lados: cinco lecturas y seis escrituras, y
+    // los dos codigos existen en el catalogo REAL de `identity`, no en una copia escrita a mano.
     expect(
       CASOS_DE_USO.filter((c) => c.permiso === CONSULTAR)
         .map((c) => c.nombre)
         .sort(),
-    ).toEqual(['getSupplier', 'listCatalogLines', 'listSuppliers'])
+    ).toEqual([
+      'getSupplier',
+      'listCatalogLines',
+      'listShowcaseLines',
+      'listSupplierShowcase',
+      'listSuppliers',
+    ])
     expect(
       CASOS_DE_USO.filter((c) => c.permiso === MODIFICAR)
         .map((c) => c.nombre)
@@ -454,9 +481,9 @@ describe('autorizacion por permiso de los nueve casos de uso de proveedores (QC-
     // `ValidationError` y sabria algo del sistema sin tener permiso para preguntarlo. Aqui la
     // entrada es basura Y el actor no tiene permiso: lo que sale es `unauthorized`, y ningun
     // puerto se toca. Mutacion que lo pone rojo: mover `requirePermission` debajo del
-    // `safeParse` en cualquiera de los seis casos que validan.
+    // `safeParse` en cualquiera de los ocho casos que validan.
     const conZod = CASOS_DE_USO.filter((c) => c.ejecutarConBasura !== undefined)
-    expect(conZod).toHaveLength(6)
+    expect(conZod).toHaveLength(8)
 
     for (const caso of conZod) {
       await esperarRechazoSinTocarNada(

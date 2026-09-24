@@ -60,8 +60,11 @@ export function createStartAssignedOrder(
         );
         if (result === 'ok') break;
         if (result === 'not_found') throw new OrderNotFoundError();
-        // 'stale': alguien lo movio entre la lectura y esta llamada. Se relee y se sigue: dos
-        // responsables entrando a la vez es un caso esperado, no un error visible.
+        // El resto solo puede ser 'stale': `insufficient_material` y `recipe_without_lines`
+        // vienen del consumo que `transitionAliveById` hace hacia `ENTREGADO`, y este destino
+        // es siempre `EN_CURSO`. Alguien movio el pedido entre la lectura y esta llamada; se
+        // relee y se sigue -dos responsables entrando a la vez es un caso esperado, no un error
+        // visible-.
         order = await deps.orders.findAliveById(orderId, actor.companyId);
         if (order === null) throw new OrderNotFoundError();
       }

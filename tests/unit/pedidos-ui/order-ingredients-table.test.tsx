@@ -10,6 +10,7 @@ import {
   ORDER_INGREDIENTS_TABLE_TESTID,
   OrderIngredientsTable,
 } from '@/app/(private)/pedidos/components';
+import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 
@@ -23,7 +24,7 @@ const LINEA: RecipeLineView = {
   productName: 'Hipoclorito',
   percentage: '10.00',
   productUnitId: 'u-litro',
-  productStock: 15,
+  productStock: '15.0000',
 };
 
 afterEach(() => {
@@ -62,7 +63,9 @@ describe('R17 — la cantidad requerida y el restante escalan con la cantidad de
 
     const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
-    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('15');
+    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
+      formatDecimalDisplay(LINEA.productStock ?? ''),
+    );
     expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('20');
 
     const restante = within(tabla).getByTestId('order-ingredient-remaining');

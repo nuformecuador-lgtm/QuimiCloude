@@ -22,17 +22,20 @@ type ProductCostFieldsProps = {
   readonly totalCostError?: string;
 };
 
+/** La misma cantidad que valida el esquema del lote: decimal sin signo, hasta 4 decimales. */
+const QUANTITY_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
+
 /**
  * Del DOM y no de un estado, a proposito: la existencia sigue sin controlar, como los otros seis
  * campos del panel. Controlarla para que este par la viera de rebote arrastraria el patron del
  * formulario entero detras de una conveniencia de dos campos.
  */
-function readQuantity(input: HTMLInputElement): number | null {
+function readQuantity(input: HTMLInputElement): string | null {
   const field = input.form?.elements.namedItem(COST_QUANTITY_FIELD);
   if (!(field instanceof HTMLInputElement)) return null;
 
   const raw = field.value.trim();
-  return /^\d+$/.test(raw) ? Number(raw) : null;
+  return QUANTITY_PATTERN.test(raw) ? raw : null;
 }
 
 /**

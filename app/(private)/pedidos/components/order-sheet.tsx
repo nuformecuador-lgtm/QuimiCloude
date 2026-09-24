@@ -11,6 +11,8 @@ import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
@@ -82,6 +84,12 @@ export type OrderSheetProps = {
   /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
+   * La cobertura que la fila ya trajo. `undefined` cuando el lote fallo o el pedido es de alta
+   * (no tiene id todavia): la hoja se degrada al marcador de ausencia, mismo criterio que
+   * `responsibles`.
+   */
+  readonly coverage?: OrderCoverage;
+  /**
    * QC-102 R23, R24 — EN QUE SECCION abre. **Es el mismo panel**: esta prop no crea otro, solo
    * decide a donde va el foco. Por defecto, el formulario de siempre.
    */
@@ -96,6 +104,7 @@ export function OrderSheet({
   onOpenChange,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  coverage,
   section = 'form',
 }: OrderSheetProps) {
   const [selfOpen, setSelfOpen] = useState(false);
@@ -150,6 +159,7 @@ export function OrderSheet({
         onSaved={handleSaved}
         responsibles={responsibles}
         responsiblesCatalog={responsiblesCatalog}
+        coverage={coverage}
         section={section}
       />
     </Sheet>
@@ -164,6 +174,8 @@ export type OrderRowSheetActionsProps = {
   readonly responsibles?: readonly OrderResponsible[];
   /** QC-102 R27, R28 — catalogos y `canWrite`, compuestos una vez en el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /** La cobertura de ESTA fila, ya traida por el lote de la seccion. */
+  readonly coverage?: OrderCoverage;
 };
 
 /**
@@ -189,6 +201,7 @@ export function OrderRowSheetActions({
   units,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  coverage,
 }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -221,6 +234,7 @@ export function OrderRowSheetActions({
         onOpenChange={setEditOpen}
         responsibles={responsibles}
         responsiblesCatalog={responsiblesCatalog}
+        coverage={coverage}
         section={section}
       />
       {cancelOpen ? (
@@ -241,6 +255,8 @@ export type OrderRowResponsiblesProps = {
   /** Los responsables de ESTA fila, del lote que la seccion pidio una sola vez (R16, R26). */
   readonly responsibles: readonly OrderResponsible[];
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /** La cobertura de ESTA fila: el panel es el mismo, se abra por donde se abra. */
+  readonly coverage?: OrderCoverage;
 };
 
 /**
@@ -266,6 +282,7 @@ export function OrderRowResponsibles({
   units,
   responsibles,
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  coverage,
 }: OrderRowResponsiblesProps) {
   const [open, setOpen] = useState(false);
 
@@ -281,6 +298,7 @@ export function OrderRowResponsibles({
           onOpenChange={setOpen}
           responsibles={responsibles}
           responsiblesCatalog={responsiblesCatalog}
+          coverage={coverage}
           section="responsibles"
         />
       ) : null}

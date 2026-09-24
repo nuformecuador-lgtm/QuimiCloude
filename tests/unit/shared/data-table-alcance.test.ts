@@ -439,32 +439,47 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // conociendo su identificador-. Se TENSA el centinela de dieciseis a DIECISIETE; la lista sigue
   // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
   //
-  // 2026-09-23: entra `e2e/pedidos-terminados.spec.ts`, y no afloja la lista. No estrena pantalla
-  // de tabla propia: recorre la nueva pantalla de asignacion, que monta la tabla compartida para
-  // sus listas de asignados y terminados, y localiza `data-table-row-<id>` y las celdas de
-  // pedido y responsables. Se TENSA el centinela de diecisiete a DIECIOCHO; la lista sigue
-  // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  // 2026-09-23: entra `e2e/reserva-de-material.spec.ts`, y no afloja la lista. No estrena
+  // pantalla: recorre las de pedidos e inventario, las dos ya en esta lista. Su recorrido crea dos
+  // pedidos que compiten por el mismo lote, cancela, reedita y entrega, y localiza
+  // `data-table-row-<id>`, `data-table-cell-orderNumber`, `data-table-next` y las filas de
+  // inventario por `product-stock` porque lo que afirma -lo apartado, lo disponible y la cobertura
+  // de cada pedido- se lee de las dos listas que monta la tabla compartida. Se TENSA el centinela
+  // de diecisiete a DIECIOCHO; la lista sigue CERRADA, y un spec mas que referencie `data-table`
+  // vuelve a ponerla en rojo.
+  //
+  // 2026-09-23: entra tambien `e2e/pedidos-terminados.spec.ts`, y no afloja la lista. No estrena
+  // pantalla de tabla propia: recorre la nueva pantalla de asignacion, que monta la tabla
+  // compartida para sus listas de asignados y terminados, y localiza `data-table-row-<id>` y las
+  // celdas de pedido y responsables. Se TENSA el centinela de dieciocho a DIECINUEVE; la lista
+  // sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
   //
   // 2026-09-23 (QC-122, busqueda-y-total-en-la-pantalla-de-pedidos, R25/R9/R26/R27): entra la
-  // DECIMONOVENA entrada, `e2e/pedidos-busqueda.spec.ts`, y no afloja la lista. No estrena
+  // VIGESIMA entrada, `e2e/pedidos-busqueda.spec.ts`, y no afloja la lista. No estrena
   // pantalla: recorre la de pedidos, ya en esta lista, y localiza `data-table-search` y
   // `data-table-cell-orderNumber` porque lo que afirma es la caja de busqueda compartida y las
-  // filas que devuelve. Se TENSA el centinela de dieciocho a DIECINUEVE; la lista sigue CERRADA,
+  // filas que devuelve. Se TENSA el centinela de diecinueve a VEINTE; la lista sigue CERRADA,
   // y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
   //
-  // 2026-09-23 (QC-151, cotizacion-del-coste-en-el-pedido, R11): entra la VIGESIMA entrada,
+  // 2026-09-23 (QC-151, cotizacion-del-coste-en-el-pedido, R11): entra la VIGESIMOPRIMERA entrada,
   // `e2e/pedidos-cotizacion.spec.ts`, y no afloja la lista. No estrena pantalla: recorre la de
   // pedidos, ya en esta lista, y localiza `data-table-row-<id>` y `data-table-cell-orderNumber`
   // porque lo que afirma es la fila del pedido recien creado, localizada por su correlativo, para
   // reabrir su edicion y comprobar que el coste se reabre sin teclear nada. Se TENSA el centinela
-  // de diecinueve a VEINTE; la lista sigue CERRADA, y un spec mas que referencie `data-table`
+  // de veinte a VEINTIUNO; la lista sigue CERRADA, y un spec mas que referencie `data-table`
   // vuelve a ponerla en rojo.
-  // 2026-09-23 (QC-158, catalogo-desde-pdf, R38): entra la VIGESIMOPRIMERA entrada,
-  // `e2e/catalogo-desde-pdf.spec.ts`, y no afloja la lista. No estrena pantalla: recorre el
-  // catalogo de un proveedor, ya en esta lista, y localiza `data-table-row-<id>` y
-  // `data-table-cell-cost` porque lo que afirma es la fila de la linea recien importada y su
-  // costo, tras confirmar la revision. Se TENSA el centinela de veinte a VEINTIUNO; la lista
-  // sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // 2026-09-23: SALE `e2e/aislamiento-proveedores.spec.ts`. La pantalla que recorre dejo de montar
+  // la tabla compartida: ahora es una lista con carga perezosa que localiza sus filas por
+  // `supplier-showcase-row-<id>` y el nombre por el enlace de detalle, no por celdas de
+  // `data-table`. El centinela AFLOJA por primera vez, de VEINTIUNO a VEINTE, porque la unica
+  // razon de que este spec estuviera aqui ya no existe; sigue siendo una lista cerrada y un spec
+  // mas que referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // 2026-09-24: entra `e2e/catalogo-desde-pdf.spec.ts` (importacion de catalogo desde PDF). No
+  // estrena pantalla: recorre el catalogo del detalle de un proveedor y localiza
+  // `data-table-row-<id>` y `data-table-cell-cost` para afirmar el costo de la linea importada. El
+  // centinela vuelve de VEINTE a VEINTIUNO; la lista sigue CERRADA.
   it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintiuno', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
@@ -475,7 +490,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos veinte E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos veintiuno E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -484,12 +499,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/aislamiento-inventario.spec.ts',
       // Las filas servidas de la lista de pedidos con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-pedidos.spec.ts',
-      // Las filas servidas de la lista de proveedores con sesion en una empresa: ver la nota de
-      // arriba. Recorre la pantalla de proveedores, que ya consumia la tabla compartida.
-      'e2e/aislamiento-proveedores.spec.ts',
       // Las filas servidas de la lista de recetas con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-recetas.spec.ts',
-      // La VIGESIMOPRIMERA la trae QC-158 el 2026-09-23 (R38): ver la nota de arriba. Va antes
+      // Ver la nota de arriba (2026-09-24). Va antes
       // que `e2e/ejecucion-receta.spec.ts` porque la lista esta ORDENADA y 'c' precede a 'e'.
       'e2e/catalogo-desde-pdf.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
@@ -503,10 +515,10 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/login.spec.ts',
       // Ver la nota de arriba. Va antes que `pedidos-busqueda` porque la lista esta ORDENADA.
       'e2e/pedidos-asignados.spec.ts',
-      // La DECIMONOVENA la trae QC-122 el 2026-09-23: ver la nota de arriba. Va antes que
+      // La VIGESIMA la trae QC-122 el 2026-09-23: ver la nota de arriba. Va antes que
       // `pedidos-cotizacion` porque la lista esta ORDENADA y 'b' precede a 'c'.
       'e2e/pedidos-busqueda.spec.ts',
-      // La VIGESIMA la trae QC-151 el 2026-09-23 (R11): ver la nota de arriba. Va antes que
+      // La VIGESIMOPRIMERA la trae QC-151 el 2026-09-23 (R11): ver la nota de arriba. Va antes que
       // `pedidos-responsables` porque la lista esta ORDENADA y 'c' precede a 'r'.
       'e2e/pedidos-cotizacion.spec.ts',
       // La NOVENA la trae QC-102 el 2026-09-13 (T16, R37): ver la nota de arriba. Va antes que
@@ -524,6 +536,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // '-' precede a '.', igual que en pedidos.
       'e2e/recetas-pasos.spec.ts',
       'e2e/recetas.spec.ts',
+      // La DECIMOCTAVA entra el 2026-09-23: ver la nota de arriba. Llega a la tabla por las listas
+      // de pedidos e inventario, que ya la consumian.
+      'e2e/reserva-de-material.spec.ts',
       // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
       // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).
       'e2e/unidades.spec.ts',

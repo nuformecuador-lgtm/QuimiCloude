@@ -7,8 +7,10 @@ import {
 } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
 import {
   AsignacionesError,
+  MaterialShortageError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
+  RecipeWithoutLinesError,
   UnauthorizedError,
 } from '@/lib/modules/asignaciones/domain/errors';
 
@@ -38,7 +40,13 @@ type Dobles = {
 
 function montar(options?: {
   readonly ordenDeEstados?: readonly OrderStatus[];
-  readonly transitionResults?: readonly ('ok' | 'not_found' | 'stale')[];
+  readonly transitionResults?: readonly (
+    | 'ok'
+    | 'not_found'
+    | 'stale'
+    | 'insufficient_material'
+    | 'recipe_without_lines'
+  )[];
   readonly ids?: readonly string[];
 }): Dobles {
   const estados = [...(options?.ordenDeEstados ?? ['EN_CURSO'])];
@@ -195,6 +203,34 @@ describe('finishAssignedOrder — R14: ENTREGADO y CANCELADO no admiten un segun
       OrderCancelledNotAssignableError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+});
+
+describe('finishAssignedOrder — QC-141: el Finalizar traduce lo que devuelve el consumo', () => {
+  it('R27, R30, R31: `insufficient_material` se traduce a MaterialShortageError, sin reintentar', async () => {
+    const { deps, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      transitionResults: ['insufficient_material'],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      MaterialShortageError,
+    );
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R50: `recipe_without_lines` se traduce a RecipeWithoutLinesError, sin reintentar', async () => {
+    const { deps, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      transitionResults: ['recipe_without_lines'],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      RecipeWithoutLinesError,
+    );
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
   });
 });
 

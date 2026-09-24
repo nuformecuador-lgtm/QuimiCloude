@@ -5,7 +5,7 @@
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
 
 /**
- * El catalogo cerrado: dieciseis permisos, ni uno mas ni uno menos. El codigo tiene la forma
+ * El catalogo cerrado: dieciocho permisos, ni uno mas ni uno menos. El codigo tiene la forma
  * `<modulo>.<accion>`, con modulo y accion en
  * español y en minusculas, siguiendo los nombres de modulo del repositorio (R1). Un modulo con
  * escritura declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un
@@ -37,6 +37,11 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
  * terminados de la empresa sin filtro por usuario. Cambia el recuento y, como `usuarios`, su
  * modulo no es una carpeta de `lib/modules/`. Declara solo `consultar` porque no tiene escritura.
  * Lo reciben el Administrador y el Empacador; el Operador no.
+ *
+ * **Quinta enmienda al catalogo cerrado**: suma `clientes.consultar` y `clientes.modificar`, ver y
+ * mantener los clientes de la empresa. Cambia el recuento; como `asignaciones`, su modulo si es una
+ * carpeta de `lib/modules/`, y declara las dos acciones porque tiene escritura. Solo los recibe el
+ * Administrador.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -138,6 +143,18 @@ export const PERMISSIONS = [
     action: 'consultar',
     description: 'Consultar todos los pedidos terminados de la empresa.',
   },
+  {
+    code: 'clientes.consultar',
+    module: 'clientes',
+    action: 'consultar',
+    description: 'Consultar los clientes de la empresa.',
+  },
+  {
+    code: 'clientes.modificar',
+    module: 'clientes',
+    action: 'modificar',
+    description: 'Crear, editar y borrar clientes de la empresa.',
+  },
 ] as const;
 
 /**
@@ -176,6 +193,8 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'asignaciones.consultar',
     'asignaciones.modificar',
     'terminados.consultar',
+    'clientes.consultar',
+    'clientes.modificar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar'],

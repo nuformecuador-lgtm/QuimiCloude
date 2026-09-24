@@ -33,7 +33,7 @@ const AHORA = new Date('2026-09-02T10:00:00.000Z');
  *  sigue obligatorio desde la decision del humano del 2026-09-03. */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  qtyAlert: 0,
+  qtyAlert: '0',
 };
 
 /** QC-90 (R1): el ALTA siempre crea su primer lote, asi que su entrada valida minima lleva
@@ -42,7 +42,7 @@ const PRODUCTO_VALIDO = {
  *  `create-product.test.ts`. */
 const ALTA_VALIDA = {
   ...PRODUCTO_VALIDO,
-  stock: 0,
+  stock: '0',
   presentationId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
 };
@@ -51,7 +51,7 @@ const VISTA_PRODUCTO: ProductView = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stock: 0,
+  stock: '0.0000',
   unitId: null,
   qtyAlert: null,
   type: PRODUCT_TYPES.PRODUCT,

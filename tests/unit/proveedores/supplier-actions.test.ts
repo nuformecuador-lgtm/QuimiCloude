@@ -20,7 +20,9 @@ import {
   createSupplierAction,
   deleteSupplierAction,
   getSupplierAction,
+  listShowcaseLinesAction,
   listSuppliersAction,
+  listSupplierShowcaseAction,
   updateSupplierAction,
   type CreateSupplierFormState,
   type SupplierMutationFormState,
@@ -53,6 +55,8 @@ const {
   updateCatalogLineMock,
   deleteCatalogLineMock,
   listCatalogLinesMock,
+  listSupplierShowcaseMock,
+  listShowcaseLinesMock,
   getSessionUserMock,
   getSessionContextMock,
 } = vi.hoisted(() => ({
@@ -65,6 +69,8 @@ const {
   updateCatalogLineMock: vi.fn(),
   deleteCatalogLineMock: vi.fn(),
   listCatalogLinesMock: vi.fn(),
+  listSupplierShowcaseMock: vi.fn(),
+  listShowcaseLinesMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
 }))
@@ -90,6 +96,8 @@ vi.mock('@/lib/composition', () => ({
     updateCatalogLine: updateCatalogLineMock,
     deleteCatalogLine: deleteCatalogLineMock,
     listCatalogLines: listCatalogLinesMock,
+    listSupplierShowcase: listSupplierShowcaseMock,
+    listShowcaseLines: listShowcaseLinesMock,
   },
 }))
 
@@ -652,5 +660,78 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
         mouth: '24 mm',
       },
     })
+  })
+})
+
+describe('las dos Server Actions de la vista de catalogo visual', () => {
+  it('listSupplierShowcaseAction: exito, y el actor sale de la sesion como las demas', async () => {
+    const PAGINA = { items: [], page: 1, hasMore: false }
+    listSupplierShowcaseMock.mockResolvedValue(PAGINA)
+
+    const resultado = await listSupplierShowcaseAction({ page: 1 })
+
+    expect(resultado).toEqual({ status: 'success', data: PAGINA })
+    expect(listSupplierShowcaseMock.mock.calls[0]?.[0]).toEqual({ page: 1 })
+    expect(listSupplierShowcaseMock.mock.calls[0]?.[1]).toEqual({
+      id: 'user-admin-1',
+      companyId: ADMIN_SESSION_CONTEXT.companyId,
+      permissions: ['proveedores.consultar', 'proveedores.modificar'],
+    })
+  })
+
+  it('listSupplierShowcaseAction: sin sesion, el actor que baja es null y el error es unauthorized', async () => {
+    getSessionUserMock.mockResolvedValue(null)
+    listSupplierShowcaseMock.mockRejectedValue(new UnauthorizedError())
+
+    const resultado = await listSupplierShowcaseAction({ page: 1 })
+
+    expect(listSupplierShowcaseMock.mock.calls[0]?.[1]).toBeNull()
+    expect(resultado).toEqual({ status: 'error', code: 'unauthorized', message: expect.any(String) })
+  })
+
+  it('listShowcaseLinesAction: exito con supplierId y query tipados', async () => {
+    const PAGINA = { items: [], page: 2, hasMore: false }
+    listShowcaseLinesMock.mockResolvedValue(PAGINA)
+
+    const resultado = await listShowcaseLinesAction(SUPPLIER_ID, { page: 2 })
+
+    expect(resultado).toEqual({ status: 'success', data: PAGINA })
+    expect(listShowcaseLinesMock.mock.calls[0]?.[0]).toBe(SUPPLIER_ID)
+    expect(listShowcaseLinesMock.mock.calls[0]?.[1]).toEqual({ page: 2 })
+  })
+
+  it('listShowcaseLinesAction: supplier_not_found se traduce con su code estable', async () => {
+    listShowcaseLinesMock.mockRejectedValue(new SupplierNotFoundError())
+
+    const resultado = await listShowcaseLinesAction(SUPPLIER_ID, { page: 2 })
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'supplier_not_found',
+      message: errorMessage('supplier_not_found'),
+    })
+  })
+
+  it('listShowcaseLinesAction: un fallo ajeno se traduce a unexpected, sin el detalle', async () => {
+    listShowcaseLinesMock.mockRejectedValue(new Error('connection terminated unexpectedly'))
+
+    const resultado = await listShowcaseLinesAction(SUPPLIER_ID, { page: 2 })
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'unexpected',
+      message: errorMessage('unexpected'),
+      reference: REQUEST_ID_DE_PRUEBA,
+    })
+    expect(JSON.stringify(resultado)).not.toContain('connection terminated unexpectedly')
+  })
+
+  it('las dos son consultas: reciben argumentos tipados, nunca FormData', () => {
+    expect(listSupplierShowcaseAction.length).toBe(1)
+    expect(listShowcaseLinesAction.length).toBe(2)
+
+    const fuente = readSource('supplier-actions.ts')
+    expect(fuente).toContain('listSupplierShowcaseAction(query: unknown)')
+    expect(fuente).toMatch(/listShowcaseLinesAction\(\s*supplierId: string,\s*query: unknown,\s*\)/)
   })
 })
