@@ -383,7 +383,7 @@ expect(
 expect(
   migracionesPosterioresDependientes,
   'se esperaba encontrar la migracion de productos terminados como dependiente',
-).toContain('20260924130100_finished_products_and_content_copies');
+).toContain('20260924190100_finished_products_and_content_copies');
 
 const SENTENCIAS_DE_DEPENDIENTES_POSTERIORES = migracionesPosterioresDependientes.flatMap((nombre) =>
   sentenciasSql(readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8')),
