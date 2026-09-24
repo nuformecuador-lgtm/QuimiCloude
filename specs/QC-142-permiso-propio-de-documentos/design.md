@@ -228,9 +228,17 @@ Se amplía `e2e/documentos.spec.ts`; no nace archivo nuevo (la lista cerrada de 
 - R19: el caso existente (`sube tres PDFs ... (R20)` de QC-107) no cambia de cuerpo; su comentario
   de las líneas 133-135 pasa a decir que el Administrador sembrado lleva `documentos.modificar`.
 - R20, caso nuevo: en `beforeAll` se crea, con el prefijo `qc107_e2e_` y el `RUN_ID` del worker,
-  un **rol efímero** con exactamente `proveedores.consultar` y `proveedores.modificar`
-  (`prisma.role.create` con `permissions: { create: [...] }`, precedente de rol efímero:
-  `e2e/inventario.spec.ts:437`) y un usuario activo de ese rol en la **misma** empresa del worker.
+  un **rol efímero** con exactamente `proveedores.consultar`, `proveedores.modificar` y
+  `unidades.consultar`, y **sin** `documentos.modificar` (`prisma.role.create` con
+  `permissions: { create: [...] }`, precedente de rol efímero: `e2e/inventario.spec.ts:437`) y un
+  usuario activo de ese rol en la **misma** empresa del worker. *Enmienda del 2026-09-24,
+  decisión del leader:* `unidades.consultar` entra porque la página de detalle de proveedor pide
+  también la lista de unidades y, si falla, pinta el error en toda la página sin montar la subida
+  (`app/(private)/proveedores/[id]/page.tsx:85, 98-107`; `list-units.ts:108` exige
+  `unidades.consultar`). Sin él el caso no llegaría nunca a `documentos`. Lo que R20 prueba no
+  cambia: la página carga y la subida la rechaza el permiso de documentos. Antes de afirmar el
+  rechazo, el test afirma que la página montó el componente de subida, para que no pase en verde
+  por la razón equivocada.
   El test inicia sesión con él, abre el detalle del proveedor, elige un PDF, pulsa subir y afirma:
   `document-upload-error` visible con `data-code="unauthorized"`; el contador de `PUT`
   interceptados en 0; y `prisma.documentBatch.count({ where: { companyId } })` en 0 tras el
