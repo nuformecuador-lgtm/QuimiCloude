@@ -285,3 +285,9 @@ se reordenó nada). Efecto sobre los requisitos, **sin renumerar**:
 con las propuestas de `spec_author`: son las filas **D20** (pedido sin copia → contenido vigente, o
 rechazo) y **D21** (coste del lote: el importe guardado, o recalculado al Finalizar antes de consumir).
 R42 y R44 dejan de ser provisionales. No queda ninguna pregunta abierta.
+
+**D22 — 2026-09-24, en F2.1 (T7).** Pregunta surgida al implementar: el nombre «receta · presentación»
+de R11 puede llegar a 183 caracteres (120 + 3 + 60) y el tope del nombre de producto es 120. **El
+humano decidió subir el tope del nombre de TODO producto a 200 caracteres.** Sin migración (la
+columna es `text`); cambia solo la validación de entrada del nombre de producto, en alta y edición,
+para cualquier tipo. El nombre del producto terminado se guarda completo, sin recortar.
