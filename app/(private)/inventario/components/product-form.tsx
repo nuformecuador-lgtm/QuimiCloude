@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import {
   SheetClose,
   SheetContent,
@@ -16,6 +17,7 @@ import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/mo
 import {
   createProductSchema,
   updateProductSchema,
+  MANUAL_PRODUCT_TYPE_VALUES,
   PRODUCT_TYPES,
   type ProductView,
   type ProductType,
@@ -115,6 +117,20 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
 
 /** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
 const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario o el costo total; basta con uno.';
+
+/** Los unicos tipos que el select ofrece: un producto terminado no nace a mano. */
+const TYPE_OPTION_LABELS: Record<(typeof MANUAL_PRODUCT_TYPE_VALUES)[number], string> = {
+  [PRODUCT_TYPES.PRODUCT]: 'Producto',
+  [PRODUCT_TYPES.MACHINE]: 'Instrumento',
+  [PRODUCT_TYPES.PACKAGING]: 'Envase',
+};
+const TYPE_OPTIONS = MANUAL_PRODUCT_TYPE_VALUES.map((type) => ({
+  value: type,
+  label: TYPE_OPTION_LABELS[type],
+}));
+
+/** Etiqueta del tipo cuando se edita un producto terminado: solo se muestra, no se elige. */
+const FINISHED_PRODUCT_LABEL = 'Producto terminado';
 
 const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
@@ -578,24 +594,42 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       )}
 
       {/*
-        Tipo de producto (select). Determina que campos se muestran en el formulario.
-        Por defecto: Producto. Instrumento oculta: alerta, presentacion, costos, lote y
-        caducidad -solo quedan existencia y fecha de compra-. Envase oculta: fecha de
-        expiracion.
+        Tipo de producto. Un producto terminado no se elige a mano (R3): el select solo ofrece
+        MANUAL_PRODUCT_TYPE_VALUES. Al editar uno, el tipo se muestra fijo y viaja en un campo
+        oculto -sigue siendo FINISHED_PRODUCT-, en vez de un select que nunca podria ofrecerlo.
+
+        Para el resto, el select determina que campos se muestran en el formulario. Por
+        defecto: Producto. Instrumento oculta: alerta, presentacion, costos, lote y caducidad
+        -solo quedan existencia y fecha de compra-. Envase oculta: fecha de expiracion.
       */}
-      <SharedSelect
-        name="type"
-        label={FIELD_LABELS.type}
-        required
-        defaultValue={initialValue('type', template?.type ?? product?.type ?? PRODUCT_TYPES.PRODUCT)}
-        error={fieldErrors.type}
-        options={[
-          { value: PRODUCT_TYPES.PRODUCT, label: 'Producto' },
-          { value: PRODUCT_TYPES.MACHINE, label: 'Instrumento' },
-          { value: PRODUCT_TYPES.PACKAGING, label: 'Envase' },
-        ]}
-        onChange={(value) => setProductType(value as ProductType)}
-      />
+      {isEdit && productType === PRODUCT_TYPES.FINISHED_PRODUCT ? (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`${fieldId}-type`}>{FIELD_LABELS.type}</Label>
+          <p
+            id={`${fieldId}-type`}
+            className="flex min-h-11 items-center rounded-md border px-3 text-base text-muted-foreground"
+            data-testid="product-field-type-readonly"
+          >
+            {FINISHED_PRODUCT_LABEL}
+          </p>
+          <input
+            type="hidden"
+            name="type"
+            value={PRODUCT_TYPES.FINISHED_PRODUCT}
+            data-testid="product-hidden-type"
+          />
+        </div>
+      ) : (
+        <SharedSelect
+          name="type"
+          label={FIELD_LABELS.type}
+          required
+          defaultValue={initialValue('type', template?.type ?? product?.type ?? PRODUCT_TYPES.PRODUCT)}
+          error={fieldErrors.type}
+          options={TYPE_OPTIONS}
+          onChange={(value) => setProductType(value as ProductType)}
+        />
+      )}
 
       {/*
         Presentacion (obligatoria en el alta, 2026-09-10). La presentacion es del LOTE, no del
