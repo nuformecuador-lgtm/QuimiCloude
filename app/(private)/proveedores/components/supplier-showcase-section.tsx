@@ -21,12 +21,8 @@ function hasActiveFilters(filters: ShowcaseFilters): boolean {
 }
 
 /**
- * Pide la tanda inicial y despacha entre los cuatro estados de la vista: error, vacío (sin ningún
- * proveedor y sin filtro), sin resultados (con filtro activo y ninguna coincidencia) o la lista.
- *
- * El `key` de `SupplierShowcaseList` se recalcula en cada render de este componente de servidor:
- * cuando un alta hace `router.refresh()`, React ve una `key` nueva y remonta la lista desde la
- * primera tanda en vez de conservar lo que ya tenía acumulado.
+ * Pide la tanda inicial y despacha entre error, vacío, sin resultados o la lista. La `key` de
+ * `SupplierShowcaseList` cambia en cada render para remontarla desde la primera tanda.
  */
 export async function SupplierShowcaseSection({ filters }: SupplierShowcaseSectionProps) {
   const result = await listSupplierShowcaseAction({

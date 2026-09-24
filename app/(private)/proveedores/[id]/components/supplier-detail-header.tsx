@@ -6,30 +6,13 @@ import { DeleteSupplierDialog } from './delete-supplier-dialog';
 
 /**
  * Datos de contacto del proveedor en su pagina de detalle, con sus controles de edicion y baja.
- *
- * **Sin `'use client'`**: no tiene estado ni manejadores propios. Recibe el proveedor por props
- * desde la pagina, que es quien llama a `getSupplierAction`: este componente no consulta nada, no
- * importa `lib/composition` ni el cliente de base de datos, y no decide ningun permiso. Los dos
- * controles montados si son de cliente, pero eso lo declaran ellos mismos.
- *
- * Solo nombre, telefono y correo. `createdBy`/`updatedBy` no se pintan: son identificadores y
- * resolverlos a nombres exigiria consumir el contrato de `identity`. El `id` tampoco se pinta: ya
- * esta en la URL y no dice nada al usuario.
- *
- * Cada dato tiene su `data-testid` estable, de modo que el test lo localiza sin depender del texto
- * visible de la etiqueta.
+ * Sin `'use client'`: recibe el proveedor por props y no consulta nada por su cuenta.
  */
 export function SupplierDetailHeader({ supplier }: { readonly supplier: SupplierView }) {
   return (
     <header className="flex flex-col gap-2" data-testid="supplier-detail">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {/*
-          `min-w-0` y `break-words`: un nombre de proveedor sin espacios es una unica palabra
-          larga, y por defecto un hijo de un contenedor flex no encoge por debajo de su ancho
-          intrinseco. Sin esto el nombre desborda el flex horizontalmente y arrastra el ancho de
-          la pagina entera con el, lo que en un navegador movil hace que TODO el documento se
-          alargue -incluido el panel lateral fijo de abajo, cuyo pie queda fuera de la pantalla-.
-        */}
+        {/* `min-w-0` deja encoger al nombre por debajo de su ancho intrinseco dentro del flex. */}
         <h1
           className="min-w-0 flex-1 break-words text-2xl font-semibold"
           data-testid="supplier-detail-name"

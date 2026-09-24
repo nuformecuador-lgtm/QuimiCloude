@@ -15,12 +15,9 @@ import {
 } from './supplier-showcase-params';
 
 /**
- * Los dos filtros del catalogo visual de proveedores: producto y proveedor.
- *
- * Cambiar cualquiera de los dos navega a la URL nueva con `router.replace` dentro de una
- * transicion, con el mismo rebote que la busqueda global de la tabla compartida: sin eso, cada
- * tecla dispararia una navegacion. «Limpiar» vacia los dos y navega de inmediato, sin esperar al
- * rebote.
+ * Los dos filtros del catalogo visual de proveedores: producto y proveedor. Cambiar cualquiera
+ * navega con `router.replace` tras el mismo rebote que la busqueda global de la tabla compartida.
+ * «Limpiar» navega de inmediato, sin esperar al rebote.
  */
 
 const TOUCH_TARGET = 'min-h-11';

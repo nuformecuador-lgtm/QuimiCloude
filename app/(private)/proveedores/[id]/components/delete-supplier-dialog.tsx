@@ -33,17 +33,9 @@ const DELETE_SUCCESS = 'Proveedor dado de baja.';
 const INITIAL_STATE: SupplierMutationFormState = { status: 'idle' };
 
 /**
- * Confirmacion de la baja de un proveedor, montada en la cabecera de su detalle.
- *
- * El dialogo nombra al proveedor y avisa de que sus lineas de catalogo se dan de baja con el: la
- * baja arrastra el catalogo entero en una sola transaccion y no hay forma de restaurarlo, asi que
- * se le dice al usuario en vez de prometerle una vuelta atras que no existe. Ese aviso tiene su
- * propio `data-testid` (`delete-supplier-cascade`) para que un test lo localice sin depender de
- * su copy.
- *
- * Con exito refrescar este mismo detalle mostraria «no encontrado» -el proveedor ya no existe-,
- * asi que en vez de refrescar se navega a la lista y se avisa por toast sobre la region que el
- * layout privado ya monta. Con error el dialogo sigue abierto con el mensaje a la vista.
+ * Confirmacion de la baja de un proveedor, montada en la cabecera de su detalle. Avisa del
+ * arrastre de su catalogo. Con exito navega a la lista en vez de refrescar este mismo detalle,
+ * que mostraria «no encontrado»; con error el dialogo sigue abierto con el mensaje a la vista.
  */
 export function DeleteSupplierDialog({ supplier }: { readonly supplier: SupplierView }) {
   const [requestedOpen, setRequestedOpen] = useState(false);

@@ -3,7 +3,6 @@
 import { useInView } from 'react-intersection-observer';
 
 type ShowcaseLoadTriggerProps = {
-  /** Se llama cuando el centinela entra en vista. */
   readonly onVisible: () => void;
   /** Deja de observar mientras la lista no quiere disparar otra carga (vuelo en curso o aviso de fallo). */
   readonly disabled?: boolean;
