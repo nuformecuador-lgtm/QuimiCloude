@@ -7,7 +7,7 @@ import type { OrderWriteRepository } from './order-write-repository';
  * Lo que ve el trabajo que corre DENTRO de la transaccion compartida: el repositorio de
  * escritura de `pedidos`, las reservas de `inventario` y el lector de contenido de receta, los
  * tres atados al MISMO cliente transaccional. Ninguno abre su propia transaccion ni pide una
- * segunda conexion mientras esta se mantiene abierta (`design.md > 5.2.2`).
+ * segunda conexion mientras esta se mantiene abierta.
  */
 export type OrderTransactionScope = {
   readonly orders: OrderWriteRepository;

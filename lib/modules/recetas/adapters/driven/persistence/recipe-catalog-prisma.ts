@@ -158,9 +158,9 @@ export async function findRecipeExecutionContentById(
 }
 
 /**
- * Fabrica sobre cliente (`design.md > 5.2.2`, m7): construye el lector de contenido de receta
- * sobre el cliente que se le pase -el `tx` de una transaccion compartida con otro modulo, por
- * ejemplo-, mismo patron que `createOrderWriteRepository` y `createMaterialReservations`.
+ * Fabrica sobre cliente: construye el lector de contenido de receta sobre el cliente que se le
+ * pase -el `tx` de una transaccion compartida con otro modulo, por ejemplo-, mismo patron que
+ * `createOrderWriteRepository` y `createMaterialReservations`.
  */
 export function createRecipeExecutionReader(tx: PrismaLike = prisma): Pick<RecipeCatalog, 'findExecutionContentById'> {
   return {

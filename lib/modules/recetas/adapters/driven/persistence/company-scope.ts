@@ -2,9 +2,8 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 import type { RecipeScope } from '../../../domain/recipe-scope';
 
-/** Cliente global o el transaccional que abra quien llama (`design.md > 5.2.2`, m7): el tipo
- *  que comparten los adaptadores del modulo que aceptan un `tx`, para no repetir la union en
- *  cada uno de ellos. */
+/** Cliente global o el transaccional que abra quien llama: el tipo que comparten los
+ *  adaptadores del modulo que aceptan un `tx`, para no repetir la union en cada uno de ellos. */
 export type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 /**
