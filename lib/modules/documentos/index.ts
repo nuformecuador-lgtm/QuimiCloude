@@ -20,7 +20,7 @@
 // El actor entra por PARAMETRO en cada caso de uso: el dominio no lee sesion, cookie ni cabecera.
 // `requirePermission` se publica porque es la definicion UNICA de como este modulo exige un
 // permiso, no para que la repita nadie. El CODIGO del permiso se queda dentro del modulo.
-export { requirePermission, type Actor } from './domain/actor';
+export { canUploadDocuments, requirePermission, type Actor } from './domain/actor';
 
 // La jerarquia de errores con `code` estable del catalogo unico: quien traduzca decide POR el
 // `code` —nunca por el texto del mensaje— y reconoce el caso con un solo `instanceof` sobre la

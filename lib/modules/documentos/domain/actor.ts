@@ -4,7 +4,7 @@
 //
 // Se importa por el BARREL, NUNCA por ruta profunda (`docs/architecture.md > La regla de
 // dependencias`): de otro modulo solo se consume su contrato.
-import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
+import { assertPermission, type PermissionBearer, type PermissionCode } from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
@@ -56,4 +56,20 @@ export function requirePermission(
   permission: PermissionCode,
 ): asserts actor is Actor {
   assertPermission(actor, permission, () => new UnauthorizedError());
+}
+
+/** Error centinela, privado: assertPermission exige una fabrica pero esto nunca lanza afuera. */
+const DENEGADO = new Error('documentos: permiso de subida ausente');
+
+/**
+ * No lanza: decide que se muestra, no autoriza. El corte real sigue en requirePermission de cada
+ * caso de uso de subida, y usar la misma constante impide que el boton y el caso de uso diverjan.
+ */
+export function canUploadDocuments(actor: PermissionBearer | null | undefined): boolean {
+  try {
+    assertPermission(actor, DOCUMENT_UPLOAD_PERMISSION, () => DENEGADO);
+    return true;
+  } catch {
+    return false;
+  }
 }

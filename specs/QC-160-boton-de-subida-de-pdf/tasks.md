@@ -47,11 +47,11 @@
 
 ### T1 — Predicado `canUploadDocuments` en el módulo `documentos`
 
-- [ ] `canUploadDocuments(actor: PermissionBearer | null | undefined): boolean` en
+- [x] `canUploadDocuments(actor: PermissionBearer | null | undefined): boolean` en
   `domain/actor.ts`, delegando en `assertPermission` con `DOCUMENT_UPLOAD_PERMISSION`. No lanza.
-- [ ] Publicarlo por el barrel del módulo.
-- [ ] `EXPORTACIONES_DE_EJECUCION` gana `canUploadDocuments`.
-- [ ] Test nuevo (R12): `true` solo con `documentos.modificar`. `false` con `proveedores.modificar`,
+- [x] Publicarlo por el barrel del módulo.
+- [x] `EXPORTACIONES_DE_EJECUCION` gana `canUploadDocuments`.
+- [x] Test nuevo (R12): `true` solo con `documentos.modificar`. `false` con `proveedores.modificar`,
   `documentos.consultar`, `recetas.modificar`, `[]`, `null` y `undefined`. No lanza en ningún caso. El
   literal `'documentos.modificar'` aparece una sola vez bajo `lib/modules/documentos`.
 - **Archivos:** `lib/modules/documentos/domain/actor.ts`, `lib/modules/documentos/index.ts`,
