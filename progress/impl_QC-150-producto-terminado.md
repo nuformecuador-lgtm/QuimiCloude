@@ -140,3 +140,51 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   productos terminados. Falta su test de UI (encargado a frontend_dev).
 - Tests: 10 unit → 240; 8 integración → 107; `order-ingredients-cost` 13/13; `vitest run guard`
   49 archivos → 619 pasados, 9 skipped. Typecheck limpio; lint 0 errores.
+
+## R30 y R33 (`880beb5f`, `eebc80d1`, frontend_dev) · T10 cerrada
+
+- R30: sin cambio de producción; `tests/unit/recetas-ui/recipe-lines-no-finished-product.test.tsx` (nuevo).
+- R33 (parte de T11): `app/(private)/inventario/components/adjust-batch-dialog.tsx` (prop `productType`,
+  texto «Solo se admiten ajustes que restan.») y `product-table.tsx` (pasa el tipo);
+  `tests/unit/inventario/adjust-batch-dialog.test.tsx`.
+- Tests: recetas-ui 3 archivos → 11; inventario (diálogo, panel, `product-page` con viewport) 3
+  archivos → 104. Typecheck limpio.
+
+## Estado al parar (2026-09-24)
+
+- Cerradas: **T0, T1, T2, T4, T5, T6, T10, T14** (T3 cancelada en el spec).
+- **T7 bloqueada por C12** (largo del nombre, decisión humana). En cascada: T8, T9, T11 (queda R25;
+  R33 ya hecho), T12 y T13.
+- Verificación final del implementer sobre `HEAD`: `pnpm run typecheck` limpio; `pnpm run lint` 0 errores,
+  2 avisos preexistentes en `tests/unit/pedidos/order-service.test.ts`. El gate lo corre el leader.
+
+## Mapa R<n> → test (parcial)
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/inventario/schema/finished-product-enum-values-migration.test.ts` › R1 |
+| R2 | `tests/unit/inventario/product-batch-input.test.ts` › R2; `tests/unit/inventario/product-service.test.ts` › R2 |
+| R3 | `tests/unit/inventario/product-page.test.tsx` › R3 (4 casos) |
+| R4 | `tests/unit/inventario/product-service.test.ts` › R4; `tests/integration/inventario/product-type-lock.int.test.ts` › R4 |
+| R5 | `tests/unit/inventario/product-prisma.test.ts` › R5; `tests/unit/inventario/product-page.test.tsx` › R5 (2 casos) |
+| R6 | `tests/unit/inventario/presentation-input.test.ts` › R6; `tests/integration/inventario/presentation-content.int.test.ts` › R6; schema de T2 (inventario) › R6 |
+| R7 | `tests/unit/inventario/presentation-input.test.ts` › los seis rechazos (R7) |
+| R8 | `tests/unit/configuracion-ui/presentation-sheet.test.tsx` › R8 (7 casos); `presentation-columns.test.tsx` › R8 |
+| R9 | `tests/unit/{inventario,pedidos}/schema/finished-products-and-content-copies-migration.test.ts` › R6/R9 |
+| R10, R11, R13, R16-R18, R20, R22-R24, R26, R27, R35, R37, R44 | **pendientes** (T7, T8, T9, T12) |
+| R12, R14, R19 | `tests/unit/inventario/finished-goods.test.ts` › R12 (3), R14 (2), R19 — integración en T7/T8 pendiente |
+| R15 | derogado |
+| R21 | schema de T2 (inventario) › R21 — integración en T7/T8 pendiente |
+| R25 | **pendiente** (T11, depende de T7) |
+| R28 | `tests/unit/inventario/create-product.test.ts` › R28; `tests/integration/inventario/finished-product-prohibitions.int.test.ts` › R28 |
+| R29 | `tests/unit/recetas/recipe-service.test.ts` › R29 |
+| R30 | `tests/unit/recetas-ui/recipe-lines-no-finished-product.test.tsx` › R30 |
+| R31, R32 | `tests/unit/inventario/{adjust-batch-stock,adjust-batch-stock-prisma}.test.ts`; `finished-product-prohibitions.int.test.ts` › R31, R32 |
+| R33 | `tests/unit/inventario/adjust-batch-dialog.test.tsx` › R33 |
+| R34 | schema de T2 (inventario y pedidos) › R34 |
+| R36 | schema de T1 y T2 › R36; guarda probada contra Postgres real |
+| R38, R39 | `tests/unit/pedidos/{create-order,update-order}.test.ts`; `tests/integration/pedidos/order-content-copy.int.test.ts` |
+| R40 | `tests/integration/inventario/presentation-content.int.test.ts` › R40; `order-content-copy.int.test.ts` › R40 |
+| R41 | `tests/unit/inventario/finished-goods.test.ts` › R41 — integración en T7 pendiente |
+| R42 | `finished-goods.test.ts` › R42 (2); `tests/unit/pedidos/{order-cost,resolve-ingredients-cost}.test.ts` — Finalizar en T8 pendiente |
+| R43 | `tests/unit/pedidos/order-cost.test.ts` › R43 — Finalizar en T8 pendiente |

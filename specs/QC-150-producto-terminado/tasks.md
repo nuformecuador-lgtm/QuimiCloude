@@ -231,7 +231,7 @@ Archivos: `lib/modules/pedidos/domain/update-order.ts` (el ámbito sin `finished
 **Si QC-145 ya está en `dev`** y la edición no llega a `ENTREGADO`, el test fija que la transición no
 se ofrece, y R27 queda cubierto por ese test.
 
-## T10 — Prohibiciones `[depende de T6]` `[P con T7-T9, T14]`
+## [x] T10 — Prohibiciones `[depende de T6]` `[P con T7-T9, T14]`
 
 Archivos: `lib/modules/inventario/domain/{create-product,adjust-batch-stock}.ts`,
 `.../ports/product-repository.ts`, `.../persistence/product-prisma.ts`
