@@ -229,7 +229,7 @@ Archivos: `e2e/catalogo-desde-pdf.spec.ts` (nuevo),
 **Hecho cuando:** `pnpm run e2e -- catalogo-desde-pdf` y `-- documentos` verdes en Chromium y WebKit
 sobre `QuimiCloude_QC158`, **una E2E a la vez en la máquina**; `guard-e2e-landing` verde.
 
-## T16 — Alcance y limpieza `[depende de T15]`
+## [x] T16 — Alcance y limpieza `[depende de T15]`
 
 Archivos: `tests/unit/documentos/qc158-alcance.test.ts` (nuevo).
 
