@@ -239,25 +239,39 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   const orphanCompanyIds = orphanCompanies.map((company) => company.id);
+
+  // Una receta huerfana puede venir por su propio nombre (edad de la receta) o por colgar de
+  // una empresa ya huerfana: los productos terminados de esa empresa restringen su borrado, asi
+  // que ambos conjuntos se juntan ANTES de tocar `productBatch`/`product` de mas abajo.
+  const orphanRecipesByName = await prisma.recipe.findMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+    select: { id: true },
+  });
+  const orphanRecipesByCompany =
+    orphanCompanyIds.length > 0
+      ? await prisma.recipe.findMany({
+          where: { companyId: { in: orphanCompanyIds } },
+          select: { id: true },
+        })
+      : [];
+  const orphanRecipeIds = Array.from(
+    new Set([...orphanRecipesByName, ...orphanRecipesByCompany].map((recipe) => recipe.id)),
+  );
+
   if (orphanCompanyIds.length > 0) {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
+    // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
-  const orphanRecipes = await prisma.recipe.findMany({
-    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
-    select: { id: true },
-  });
-  const orphanRecipeIds = orphanRecipes.map((recipe) => recipe.id);
   if (orphanRecipeIds.length > 0) {
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
-    // Un producto terminado huerfano, de una corrida cortada por memoria, tambien restringe el
-    // borrado de la receta: sus movimientos y lotes primero, luego el producto, y solo entonces
-    // la receta.
+    // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
+    // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
+    // se borra DESPUES, cuando la receta ya cayo y se llevo sus lineas por cascada.
     const orphanFinishedProducts = await prisma.product.findMany({
       where: { recipeId: { in: orphanRecipeIds } },
       select: { id: true },
@@ -271,6 +285,10 @@ test.beforeAll(async () => {
       await prisma.product.deleteMany({ where: { id: { in: orphanFinishedProductIds } } });
     }
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
+  }
+  if (orphanCompanyIds.length > 0) {
+    await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   await prisma.user.deleteMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -395,6 +413,7 @@ test.afterAll(async () => {
   // Por los identificadores de ESTE worker, nunca por `FIXTURE_PREFIX`: el otro proyecto
   // (Chromium/WebKit) sigue corriendo. Cada paso corre aunque falle el anterior.
   const scopedCompanyId = companyId;
+  const scopedRecipeId = recipeId;
   // Uno de los casos entrega el pedido, y entregar consume: deja filas en `reservation_movements` e
   // `inventory_movements` que hay que borrar antes que el pedido y el lote (FK RESTRICT).
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
@@ -414,18 +433,25 @@ test.afterAll(async () => {
       scopedCompanyId
         ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
-    // El producto terminado que Finalizar da de alta (`products.recipe_id`) RESTRINGE el borrado
-    // de la receta: sus lotes y movimientos ya se fueron arriba, asi que aqui solo falta el
-    // producto en si, antes de poder borrar la receta.
+    // Todos los lotes primero, del producto de la receta y del terminado que Finalizar da de
+    // alta: `product_batches.product_id` -> `products` RESTRINGE, y a esta altura ya no queda
+    // ningun movimiento que restrinja el borrado del lote.
     () =>
       scopedCompanyId
         ? prisma.productBatch.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
+    // El producto terminado que Finalizar da de alta (`products.recipe_id`) RESTRINGE el borrado
+    // de la receta: se borra el terminado ANTES de la receta, y el producto de la formula
+    // DESPUES -`recipe_lines.product_id` lo restringe hasta que la receta cae por cascada.
+    () =>
+      scopedRecipeId
+        ? prisma.product.deleteMany({ where: { recipeId: scopedRecipeId } })
+        : Promise.resolve(),
+    () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     () =>
       scopedCompanyId
         ? prisma.product.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
-    () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     () =>
       scopedCompanyId
         ? prisma.presentation.deleteMany({ where: { companyId: scopedCompanyId } })
