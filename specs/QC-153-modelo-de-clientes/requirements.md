@@ -167,28 +167,15 @@ que la hace testeable en **esta** ficha. Ninguna queda sin `R<n>` (regla 4 de `C
 | 5 | Tres fichas como Proveedores: QC-153 modelo, QC-154 CRUD, QC-155 pantalla | R19, R20, R26 |
 | 6 | Pedido ↔ cliente no entra (QC-156) | R27 |
 | 7 | E2E en la pantalla (QC-155); modelo y CRUD con unitarios e integración | R28 |
-| Pregunta abierta 1 (resuelta abajo por precedente) | Largos y formato de teléfono y correo | R5, R6 |
+| F1.4 (2026-09-24) | Largos y formato: columnas de texto sin longitud ni formato; valores en QC-154 | R5, R6 |
+| F1.4 (2026-09-24) | Auditoría `created_by`/`updated_by` con FK simples a `users` | R12, R13 |
+| F1.4 (2026-09-24) | Descripciones exactas de los dos permisos | R21 |
 | — (regla 7 de `CLAUDE.md`) | Ninguna librería nueva | R29 |
 | — (migración reversible, `docs/architecture.md`) | `down.sql` que deja el estado exacto anterior | R18 |
 
 ## Preguntas abiertas
 
-1. ~~**Largo máximo de cada campo y validación de formato del correo y del teléfono.**~~ **RESUELTA
-   POR PRECEDENTE para este modelo (spec_author, 2026-09-24).** El precedente de proveedores la cierra
-   en lo que toca a la base: los largos **no** van en la columna sino en la validación de aplicación
-   (`lib/modules/proveedores/domain/supplier-input.ts:5-13`, y QC-42 R5 / decisión 15), y **no** hay
-   validación de formato ni del correo ni del teléfono (`supplier-input.ts:46-52`; QC-42 R6 /
-   decisión 9). `identity` hace lo mismo con los datos de una persona
-   (`lib/modules/identity/domain/user-input.ts:31-34`: «la base tiene estas columnas como `TEXT` sin
-   restricción»). De ahí R5 y R6. Los **valores** los fija QC-154, y el precedente ya da tres:
-   **teléfono 40** y **correo 160** (`supplier-input.ts:15-16` y `user-input.ts:46-47`, que
-   coinciden), y **nombres y apellidos 80** cada uno (`user-input.ts:45`, `USER_NAME_MAX_LENGTH`,
-   que ya se aplica a `firstNames` y `lastNames` en `user-input.ts:77-78`).
-2. **Largo máximo de la ciudad y de la dirección.** **Sigue abierta y no bloquea este modelo** (R5:
-   la columna no limita). Ningún módulo del repositorio guarda una ciudad ni una dirección, así que
-   no hay precedente que copiar. Posición por defecto que se propone para QC-154: **ciudad 80**
-   (misma cota que un nombre de persona) y **dirección 200**. La cierra el humano en F1.4 de esta
-   ficha o en la de QC-154.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -201,3 +188,21 @@ que la hace testeable en **esta** ficha. Ninguna queda sin `R<n>` (regla 4 de `C
 | 2026-09-23 | ¿Cómo se reparte el módulo? | Tres fichas como Proveedores (QC-42/43/44): **QC-153** modelo, **QC-154** CRUD, **QC-155** pantalla, en la épica nueva **QC-152 Clientes**. |
 | 2026-09-23 | ¿Pedido ↔ cliente? | **No entra** en el módulo base: ficha aparte **QC-156** (bloqueada por QC-154). |
 | 2026-09-23 | ¿E2E? | **Sí**, en la pantalla (**QC-155**), por tocar permisos (`CHECKPOINTS.md`). El modelo y el CRUD se verifican con tests unitarios y de integración. |
+| 2026-09-24 (F1.4) | ¿Las FK de auditoría también son compuestas con la empresa? | **No.** `created_by` y `updated_by` llevan **FK simples** a `users(id)`, con borrado restringido, como todas las tablas con auditoría del repositorio. La «FK compuesta» de la decisión anterior es la clave candidata `(company_id, id)` de R10. |
+| 2026-09-24 (F1.4) | Descripciones de los permisos | `clientes.consultar`: «Consultar los clientes de la empresa.»; `clientes.modificar`: «Crear, editar y borrar clientes de la empresa.» |
+| 2026-09-24 (F1.4) | Largos máximos y formato | En la base, las seis columnas son **texto sin longitud y sin comprobación de formato** (precedente de proveedores e `identity`). Los largos los aplica **QC-154** en la validación: nombres 80, apellidos 80, teléfono 40, correo 160, **ciudad 80**, **dirección 200**. Sin validación de formato del correo ni del teléfono. |
+
+## Nota F1.4 (2026-09-24)
+
+El humano **aprobó el spec** y aceptó tal cual las tres propuestas de `spec_author`, que pasan a las
+tres últimas filas de «Decisiones cerradas»:
+
+1. **Auditoría con FK simples.**
+2. **Las dos descripciones de los permisos.**
+3. **Ciudad 80 y dirección 200.**
+
+La pregunta abierta 1 ya estaba resuelta por precedente:
+- `lib/modules/proveedores/domain/supplier-input.ts:5-13, 15-16, 46-52`;
+- `lib/modules/identity/domain/user-input.ts:31-34, 45-47, 77-78`.
+
+Con esto no queda ninguna pregunta abierta. Los requisitos no se renumeran.

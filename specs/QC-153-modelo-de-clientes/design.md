@@ -249,9 +249,9 @@ armazón (§4) y las dos entradas del catálogo (§3).
   código `^[a-z]+\.[a-z]+$` y acción `consultar`/`modificar` (`tests/unit/identity/permissions.test.ts:82-88`),
   módulo con escritura con **exactamente** `consultar` y `modificar` (`:107-113`), y
   `@@unique([module, action])` (`db/schema.prisma:58`) sin choque.
-- Las **descripciones son propuesta de este spec** (la decisión no las fija): siguen el patrón de
-  `usuarios.consultar` («…de la empresa.») y de `proveedores.modificar` («Crear, editar y borrar…»).
-  «Borrar» es la baja lógica, como en las demás. Se aprueban con el spec.
+- Las **descripciones las aprobó el humano en F1.4 (2026-09-24)** tal cual se propusieron: siguen el
+  patrón de `usuarios.consultar` («…de la empresa.») y de `proveedores.modificar` («Crear, editar y
+  borrar…»). «Borrar» es la baja lógica, como en las demás.
 
 ### 3.2 La lista del Administrador
 
@@ -326,10 +326,10 @@ export type Customer = {
 
 ## 5. La pregunta abierta 1 y su respuesta
 
-Resuelta por precedente en `requirements.md > Preguntas abiertas` con archivo:línea. Para este diseño
-la consecuencia es: **columnas `TEXT` sin longitud y sin CHECK de formato** (R5, R6). Los valores
-(teléfono 40, correo 160, nombres y apellidos 80) son de QC-154; ciudad y dirección quedan abiertas con
-propuesta (80 y 200).
+Cerrada en F1.4 (2026-09-24; `requirements.md > Nota F1.4` y «Decisiones cerradas»). Para este
+diseño la consecuencia es: **columnas `TEXT` sin longitud y sin CHECK de formato** (R5, R6). Los
+valores los aplica QC-154 en la validación: nombres 80, apellidos 80, teléfono 40, correo 160,
+ciudad 80 y dirección 200.
 
 ---
 
@@ -443,9 +443,8 @@ acepta `packer-role-migration.int.test.ts`. Si aparece un bloqueo, se declara el
    con auditoría la usa (`suppliers`, `recipes`, `orders`, `product_batches` llevan FK simple a
    `users(id)`); las compuestas hacia `users` solo existen donde la persona **es** el dato de negocio
    (`order_assignments`, `work_group_members`). La decisión 4 pide «FK compuesta» heredada de QC-59, y
-   QC-59 la puso en la relación padre-hijo, que aquí es la clave candidata de R10. **Si el humano lee
-   la decisión como que incluye la auditoría, es un cambio de dos líneas en SQL y un caso de test: se
-   confirma en F1.4.**
+   QC-59 la puso en la relación padre-hijo, que aquí es la clave candidata de R10. **Confirmado por el
+   humano en F1.4 (2026-09-24): FK simples en la auditoría.**
 3. **No crear todavía `lib/modules/clientes/`**, dejando solo el `/// @module clientes`. La guardia de
    arquitectura no comprueba que la carpeta del dueño exista, así que pasaría. Se descarta porque
    declararía un dueño inexistente y contradice el precedente de QC-42 R23 (el módulo nace con su
