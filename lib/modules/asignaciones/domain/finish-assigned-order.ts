@@ -7,6 +7,7 @@ import {
   NoWholePackageError,
   OrderNotFoundError,
   PresentationWithoutContentError,
+  RecipeNotFoundError,
   RecipeWithoutLinesError,
   ValidationError,
 } from './errors';
@@ -44,9 +45,9 @@ export type FinishAssignedOrderResult = {
  * `transitionAliveById` consume el material y da de alta el lote de producto terminado por
  * dentro: `'insufficient_material'` se traduce a `MaterialShortageError`,
  * `'recipe_without_lines'` a `RecipeWithoutLinesError`, `'presentation_without_content'` a
- * `PresentationWithoutContentError` y `'no_whole_package'` a `NoWholePackageError`, las cuatro
- * propias de este modulo para que el adaptador driving las traduzca con su propio
- * `instanceof`.
+ * `PresentationWithoutContentError`, `'no_whole_package'` a `NoWholePackageError` y
+ * `'recipe_not_found'` a `RecipeNotFoundError`, las cinco propias de este modulo para que el
+ * adaptador driving las traduzca con su propio `instanceof`.
  */
 export function createFinishAssignedOrder(
   deps: FinishAssignedOrderDeps,
@@ -103,6 +104,7 @@ export function createFinishAssignedOrder(
       if (result === 'recipe_without_lines') throw new RecipeWithoutLinesError();
       if (result === 'presentation_without_content') throw new PresentationWithoutContentError();
       if (result === 'no_whole_package') throw new NoWholePackageError();
+      if (result === 'recipe_not_found') throw new RecipeNotFoundError();
       // 'stale': alguien lo movio entre la lectura y esta llamada. Se relee y se reintenta
       // contra el estado real. ('ok' en cadena no ocurre aqui: el destino siempre es
       // `ENTREGADO`, que solo devuelve el `'ok'` con `finishedGoods`.)

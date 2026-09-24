@@ -98,9 +98,9 @@ export interface OrderCatalog {
    *
    * Yendo a `'ENTREGADO'`, la misma llamada da tambien de alta el lote de producto terminado
    * de la combinacion del pedido: el exito lleva `finishedGoods` con lo que entro;
-   * `'presentation_without_content'` y `'no_whole_package'` deshacen la operacion
-   * entera igual que los dos casos de arriba. El `'ok'` sin `finishedGoods` sigue siendo el
-   * unico resultado posible cuando `to` no es `'ENTREGADO'`.
+   * `'presentation_without_content'`, `'no_whole_package'` y `'recipe_not_found'` deshacen la
+   * operacion entera igual que los dos casos de arriba. El `'ok'` sin `finishedGoods` sigue
+   * siendo el unico resultado posible cuando `to` no es `'ENTREGADO'`.
    */
   transitionAliveById(
     id: string,
@@ -118,6 +118,7 @@ export interface OrderCatalog {
     | 'recipe_without_lines'
     | 'presentation_without_content'
     | 'no_whole_package'
+    | 'recipe_not_found'
   >;
 }
 

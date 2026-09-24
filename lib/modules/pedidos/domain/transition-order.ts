@@ -6,7 +6,13 @@
 // combinacion, todo en la MISMA transaccion. `asignaciones` solo conoce la firma del
 // puerto, nunca este archivo.
 
-import { InsufficientMaterialError, NoWholePackageError, PresentationWithoutContentError, RecipeWithoutLinesError } from './errors';
+import {
+  InsufficientMaterialError,
+  NoWholePackageError,
+  PresentationWithoutContentError,
+  RecipeNotFoundError,
+  RecipeWithoutLinesError,
+} from './errors';
 import { buildRequirement } from './order-requirement';
 import { assertTransition } from './order-transitions';
 import { resolveLotIngredientsCost } from './resolve-ingredients-cost';
@@ -123,6 +129,9 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           if (finishedGoodsOutcome.kind === 'no_whole_package') {
             throw new NoWholePackageError();
           }
+          if (finishedGoodsOutcome.kind === 'recipe_not_found') {
+            throw new RecipeNotFoundError();
+          }
 
           await scope.orders.setReservedAt(id, null, { companyId });
           return {
@@ -141,6 +150,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
       if (err instanceof RecipeWithoutLinesError) return 'recipe_without_lines';
       if (err instanceof PresentationWithoutContentError) return 'presentation_without_content';
       if (err instanceof NoWholePackageError) return 'no_whole_package';
+      if (err instanceof RecipeNotFoundError) return 'recipe_not_found';
       if (err instanceof StatusChangeAfterConsumptionFailedError) return err.outcome;
       throw err;
     }

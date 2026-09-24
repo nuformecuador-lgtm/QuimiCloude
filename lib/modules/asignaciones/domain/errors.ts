@@ -196,6 +196,17 @@ export class NoWholePackageError extends AsignacionesError {
   }
 }
 
+/** El Finalizar de la planta intento entregar y `pedidos` respondio `'recipe_not_found'` -la
+ *  receta del pedido no existe para esa empresa-. Mismo `code` que `RecipeNotFoundError` de
+ *  `pedidos`. */
+export class RecipeNotFoundError extends AsignacionesError {
+  readonly code = 'recipe_not_found';
+
+  constructor(diagnostic?: string) {
+    super('recipe_not_found', diagnostic);
+  }
+}
+
 /**
  * La persona existe y su cuenta esta activa, pero supervisa los pedidos de toda la empresa: no
  * se le puede asignar la responsabilidad de ejecutar uno. Se distingue de
