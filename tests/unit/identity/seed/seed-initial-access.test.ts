@@ -207,8 +207,8 @@ function asignacionesDelSeed(rolesPorNombre: ReadonlyMap<string, string>): Reado
   return pares;
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar: veintidos (Administrador 18 +
- *  Operador 2 + Empacador 2). Se deriva de `SEED_ROLE_PERMISSIONS`, no se escribe a mano. */
+/** Numero total de asignaciones que el seed tiene que dejar. Se deriva de
+ *  `SEED_ROLE_PERMISSIONS`, no se escribe a mano. */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,

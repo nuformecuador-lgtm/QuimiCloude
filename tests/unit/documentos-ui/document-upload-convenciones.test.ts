@@ -191,7 +191,7 @@ describe('lo que la pieza de subida NO trae', () => {
     const quePareceDeSubida = codigos.filter((codigo) => /documento|subir|carga/i.test(codigo));
     expect(quePareceDeSubida.sort()).toEqual(['documentos.consultar', 'documentos.modificar']);
 
-    // Lo que el modulo exige es un codigo QUE YA EXISTIA, no uno inventado para esta ficha.
+    // Lo que el modulo exige es un codigo que vive en el catalogo, no un string suelto sin registrar.
     expect(codigos).toContain(DOCUMENT_UPLOAD_PERMISSION);
 
     // El componente no nombra ningun permiso: quien autoriza es el caso de uso.

@@ -13,9 +13,9 @@
  * todas las asignaciones a esos dos codigos, dejando el resto de la instalacion (Administrador,
  * Operador, Empacador y cualquier rol efimero de otro test) intacto.
  *
- * ROLES EFIMEROS — para R6/R7 se crean, dentro del `tx`, un rol con `proveedores.modificar` y
- * otro sin el: la migracion resuelve la herencia por PERMISO, nunca por nombre de rol, y estos
- * dos roles no existen en ningun seed.
+ * ROLES EFIMEROS — se crean, dentro del `tx`, un rol con `proveedores.modificar` y otro sin el:
+ * la migracion resuelve la herencia por PERMISO, nunca por nombre de rol, y estos dos roles no
+ * existen en ningun seed.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

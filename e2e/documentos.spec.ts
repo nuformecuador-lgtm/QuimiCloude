@@ -70,7 +70,7 @@ const adminUser: Credentials = {
   password: `Qc107-Admin-${RUN_ID.slice(0, 12)}`,
 };
 
-/** Prefijo del rol efimero de R20 (QC-142). El barrido de huerfanos lo busca por este. */
+/** Prefijo del rol efimero sin permiso de subida. El barrido de huerfanos lo busca por este. */
 const ROLE_NAME_PREFIX = `${FIXTURE_PREFIX}rol_`;
 
 /**
@@ -135,7 +135,7 @@ test.beforeAll(async () => {
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
 
-  // Roles efimeros huerfanos (QC-142 R20). El rol nace unos segundos ANTES que su usuario, asi que
+  // Roles efimeros huerfanos. El rol nace unos segundos ANTES que su usuario, asi que
   // se decide primero QUE roles se van y se arrastran sus usuarios aunque sean recientes; si no,
   // `role_permissions` -> `role` (`onDelete: Restrict`) tumbaria este `beforeAll`.
   const orphanRoleIds = (
@@ -170,7 +170,8 @@ test.beforeAll(async () => {
 
   // El rol tiene que llamarse EXACTAMENTE asi: lo siembra `pnpm run db:seed` y lleva
   // `proveedores.consultar` —que abre la pantalla— y `documentos.modificar` —que el caso de uso de
-  // la subida exige—. Un rol efimero no probaria el permiso de verdad.
+  // la subida exige—. Este caso usa el rol real del Administrador porque es a el a quien la
+  // migracion asigna esos permisos; el caso sin permiso, mas abajo, si usa un rol efimero.
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },
     select: { id: true },
@@ -217,7 +218,7 @@ test.beforeAll(async () => {
   });
   supplierId = supplier.id;
 
-  // Rol efimero de R20 (QC-142): `proveedores.consultar`, `proveedores.modificar` y
+  // Rol efimero sin permiso de subida: `proveedores.consultar`, `proveedores.modificar` y
   // `unidades.consultar` (la pantalla de detalle tambien lista unidades y sin el permiso pinta el
   // error de la pagina entera antes de montar la subida), sin `documentos.modificar`. Precedente de
   // rol efimero: `e2e/inventario.spec.ts`.

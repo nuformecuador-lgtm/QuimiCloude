@@ -70,14 +70,14 @@ const DOCUMENTOS_MODIFICAR = PERMISSIONS.find((permission) => permission.code ==
 
 // --- Predicados puros ----------------------------------------------------------------------
 
-/** ¿El UP son EXACTAMENTE tres `INSERT` y nada mas (R11)? */
+/** ¿El UP son EXACTAMENTE tres `INSERT` y nada mas? */
 export function upIsExactlyThreeInserts(sql: string): boolean {
   const todas = statements(sql)
   if (todas.length !== 3) return false
   return todas.every((statement) => /^INSERT INTO/i.test(statement))
 }
 
-/** ¿Los TRES `INSERT` llevan `ON CONFLICT ... DO NOTHING`? Es lo que hace idempotente el UP (R9). */
+/** ¿Los TRES `INSERT` llevan `ON CONFLICT ... DO NOTHING`? Es lo que hace idempotente el UP. */
 export function everyInsertIgnoresConflicts(sql: string): boolean {
   const inserts = statements(sql).filter((statement) => /^INSERT INTO/i.test(statement))
   if (inserts.length !== 3) return false
@@ -155,7 +155,7 @@ export function onlyTheAdministratorInsertMentionsConsultar(sql: string): boolea
 /**
  * Las sentencias de ESQUEMA del SQL: esta migracion solo inserta FILAS, asi que un `ALTER`, un
  * `CREATE` o un `DROP` -de tabla, de indice, de restriccion o de tipo- no tienen nada que hacer
- * aqui (R11).
+ * aqui.
  */
 export function schemaStatements(sql: string): readonly string[] {
   return statements(sql).filter((statement) =>
@@ -165,7 +165,7 @@ export function schemaStatements(sql: string): readonly string[] {
   )
 }
 
-/** ¿El DOWN son EXACTAMENTE dos `DELETE`, las asignaciones antes que el catalogo (R10)? */
+/** ¿El DOWN son EXACTAMENTE dos `DELETE`, las asignaciones antes que el catalogo? */
 export function downDeletesAssignmentsBeforeCatalog(sql: string): boolean {
   const sentencias = statements(sql)
   if (sentencias.length !== 2) return false
