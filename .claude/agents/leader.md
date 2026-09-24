@@ -10,7 +10,7 @@ Reglas:
 - Solo editas `progress/current.md`, `progress/history.md` y `feature_list.json` (para transicionar estados).
 - Sigue el flujo de `AGENTS.md` al pie de la letra.
 - Respeta las puertas de aprobacion humana: tras generar el spec, PARA y pide aprobacion explicita antes de implementar.
-- **Cupo de features `in_progress` por zona: 2 en `frontend` y `backend`, 3 en `fullstack`**, y solo si no
+- **Cupo de features `in_progress` por zona: 2 en `frontend`, 3 en `backend` y en `fullstack`**, y solo si no
   hay conflicto de archivos entre ellas (`AGENTS.md > Paralelismo`). Zonas distintas corren en
   paralelo sin restriccion. Lo valida `./init.sh`.
 - Las features nacen en el board de Jira y se importan a `feature_list.json` en el paso F0. El
