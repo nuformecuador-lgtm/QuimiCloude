@@ -201,6 +201,11 @@
       "desde": "2026-09-23"
     },
     {
+      "archivo": "pedidos/order-content-copy.int.test.ts",
+      "motivo": "QC-150 T14: ejercita el flujo REAL de alta y edicion ('createCreateOrder'/'createUpdateOrder') cableado a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades' -el mismo conjunto que 'lib/composition' ata-, y 'withOrderTransaction' abre ademas SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no lo envolveria. Una empresa efimera (randomUUID) nace en 'beforeAll' y muere en 'afterAll'; cada caso siembra su propia receta y presentacion (sin producto ni lote: ningun caso ejercita el coste) y las borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
+    },
+    {
       "archivo": "pedidos/order-cost-quote.int.test.ts",
       "motivo": "QC-151 T7: ejercita 'pedidos.quoteOrderCost' junto con 'createCreateOrder', los dos cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', que hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra su propio producto/lote/receta y los borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"

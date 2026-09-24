@@ -52,6 +52,7 @@ function fila(status: OrderStatus): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: null,
+    presentationContent: null,
   }
 }
 

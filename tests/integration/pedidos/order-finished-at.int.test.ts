@@ -143,6 +143,7 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     priority: 'MEDIA',
     status: 'PENDIENTE',
     presentationId,
+    presentationContent: null,
     ...overrides,
   }
 }
@@ -272,6 +273,7 @@ describe('R5, R9 — editar y cancelar no tocan finished_at', () => {
         quantity: '20.0000',
         priority: 'ALTA',
         presentationId,
+        presentationContent: null,
       }
       const resultado = await updateAliveOrder(id, edit, actorId, instant(20), null, scope())
       expect(resultado).toBe('ok')

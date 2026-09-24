@@ -126,7 +126,7 @@ function ambito(fixture: Fixture): OrderScope {
 }
 
 function pedidoNuevo(presentationId: string): NewOrder {
-  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId };
+  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
 }
 
 /** El ano sale del MISMO `now` que se escribe en `created_at`, como en el caso de uso: lo exige el

@@ -82,6 +82,7 @@ function filaExistente(): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: PRESENTATION_ID,
+    presentationContent: null,
   }
 }
 

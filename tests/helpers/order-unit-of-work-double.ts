@@ -123,6 +123,7 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: '66666666-6666-4666-8666-666666666666',
+    presentationContent: '1.0000',
     reservedAt: new Date('2026-01-02T03:04:05.000Z'),
     ...overrides,
   };

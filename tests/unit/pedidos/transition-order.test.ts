@@ -33,6 +33,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: null,
+    presentationContent: null,
     reservedAt: null,
     ...overrides,
   };

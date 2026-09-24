@@ -223,7 +223,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
 }
 
 function nuevoPedido(recipeId: string, presentationId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status, presentationId };
+  return { recipeId, quantity, priority: 'BAJA', status, presentationId, presentationContent: null };
 }
 
 type ReservaResumen = { readonly kind: string; readonly quantity: string; readonly createdBy: string | null };

@@ -58,6 +58,7 @@ function filaExistente(): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: PRESENTACION_DE_A,
+    presentationContent: '1.0000',
   };
 }
 
@@ -116,10 +117,13 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
   return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
 }
 
-/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A. */
-function catalogoDePresentaciones(): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
+/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
+ *  contenido que le pase el test -`null` por defecto (R39: sin copia si no lo tiene). */
+function catalogoDePresentaciones(
+  content: string | null = null,
+): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
   const findRefs = vi.fn(async (ids: readonly string[]) =>
-    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L' }] : [],
+    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L', content }] : [],
   );
   return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
@@ -332,7 +336,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
       const pres = catalogoDePresentaciones();
       const OTRA_PRESENTACION = '99999999-9999-4999-8999-999999999999';
       pres.findRefs.mockImplementation(async (ids: readonly string[]) =>
-        ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L' }] : [],
+        ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L', content: '2.0000' }] : [],
       );
       const updateOrder = createUpdateOrder({
         orders: repo.orders,
@@ -408,6 +412,78 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     expect(codigo).toBe('recipe_not_found');
     expect(pres.findRefs).not.toHaveBeenCalled();
     expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
+
+  it('R39: cambiar de presentacion sustituye la copia por el contenido nuevo', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const OTRA_PRESENTACION = '99999999-9999-4999-8999-999999999999';
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: {
+        findRefs: vi.fn(async (ids: readonly string[]) =>
+          ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L', content: '7.0000' }] : [],
+        ),
+      } as unknown as PresentationCatalog,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationId: OTRA_PRESENTACION },
+      ACTOR_A,
+    );
+
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
+    expect(dataEscrita.presentationContent).toBe('7.0000');
+  });
+
+  it('R39: no cambiar de presentacion conserva la copia de la fila leida', async () => {
+    const cat = catalogoDeRecetas();
+    // La fila leida trae `presentationContent: '1.0000'` (`filaExistente`); la presentacion
+    // vigente contesta OTRO contenido, y aun asi la copia NO se toca porque el id no cambia.
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('9.0000').presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
+
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
+    expect(dataEscrita.presentationContent).toBe('1.0000');
+  });
+
+  it('R39: editar cantidad, prioridad o receta sin cambiar presentacion no toca la copia', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('9.0000').presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { recipeId: RECETA_DE_A, quantity: '99.0000', priority: 'CRITICA', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
+
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
+    expect(dataEscrita.presentationContent).toBe('1.0000');
   });
 });
 

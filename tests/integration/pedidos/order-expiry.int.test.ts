@@ -217,7 +217,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
 }
 
 function nuevoPedido(recipeId: string, presentationId: string, quantity: string): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', presentationId };
+  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
 }
 
 /** Crea un pedido reservado y lo hace CADUCADO a proposito: `reserved_at` pasa a un instante
