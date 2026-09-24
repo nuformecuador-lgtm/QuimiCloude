@@ -15,7 +15,7 @@
  */
 
 import type { ListQueryable } from './list-query';
-import { PRODUCT_TYPE_VALUES } from './product-type';
+import { MANUAL_PRODUCT_TYPE_VALUES, PRODUCT_TYPE_VALUES } from './product-type';
 
 export const PRODUCT_QUERYABLE: ListQueryable = {
   sortable: ['name', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
@@ -28,4 +28,4 @@ export const PRODUCT_QUERYABLE: ListQueryable = {
   searchable: true,
 } as const satisfies ListQueryable & { filterable: { type: 'select' } };
 
-export { PRODUCT_TYPE_VALUES };
+export { PRODUCT_TYPE_VALUES, MANUAL_PRODUCT_TYPE_VALUES };

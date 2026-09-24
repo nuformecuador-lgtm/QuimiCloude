@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { compareQuantities } from './decimal-quantity';
-import { PRODUCT_TYPES, PRODUCT_TYPE_VALUES } from './product-type';
+import { MANUAL_PRODUCT_TYPE_VALUES, PRODUCT_TYPES } from './product-type';
 
 /**
  * Esquema de entrada del producto (`design.md > 6.1`). Validacion de borde (R28): nada
@@ -30,9 +30,9 @@ const QTY_ALERT_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
 /** Decimal de hasta diez enteros y cuatro decimales, sin signo: el cero es una alerta valida. */
 const qtyAlertSchema = z.string().trim().regex(QTY_ALERT_PATTERN);
 
-/** Tipo de producto: opcional, por defecto PRODUCT. */
+/** Tipo de producto: opcional, por defecto PRODUCT. `FINISHED_PRODUCT` no se puede elegir a mano. */
 const productTypeSchema = z
-  .enum(PRODUCT_TYPE_VALUES)
+  .enum(MANUAL_PRODUCT_TYPE_VALUES)
   .optional()
   .default(PRODUCT_TYPES.PRODUCT);
 
@@ -247,6 +247,13 @@ const updateUnion = z.discriminatedUnion('type', [
   z.strictObject({
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.PACKAGING),
+    qtyAlert: qtyAlertSchema,
+  }),
+  // Un producto terminado no nace de este esquema (R2, R3): esta rama solo deja pasar la
+  // forma, para que rechazar un cambio de tipo sea cosa del caso de uso (R4), no de zod.
+  z.strictObject({
+    name: productNameSchema,
+    type: z.literal(PRODUCT_TYPES.FINISHED_PRODUCT),
     qtyAlert: qtyAlertSchema,
   }),
 ]);
