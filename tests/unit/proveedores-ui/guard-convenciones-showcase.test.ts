@@ -88,6 +88,33 @@ const MERGE_BASE = (() => {
   return sha.length > 0 ? sha : null;
 })();
 
+/**
+ * `true` cuando `origin/dev..HEAD` trae al menos un commit propio. Una vez mergeada esta rama,
+ * `dev` corre esta misma guardia con el diff vacio: sin esta comprobacion, R29 y D20 pasarian en
+ * verde sin haber mirado nada (mismo patron que `tests/unit/identity/qc78-alcance.test.ts` y
+ * `tests/unit/proveedores-ui/guard-convenciones-proveedores.test.ts`).
+ */
+const RANGO_TIENE_COMMITS_PROPIOS = (() => {
+  if (MERGE_BASE === null) return false;
+  const salida = git(['rev-list', '--count', 'origin/dev..HEAD']);
+  return Number((salida ?? '0').trim()) > 0;
+})();
+
+function nadaQueMirar(ctx: Pick<import('vitest').TestContext, 'skip'>): boolean {
+  if (MERGE_BASE === null) {
+    ctx.skip('no se pudo calcular el merge-base con origin/dev: este caso NO ha comprobado nada.');
+    return true;
+  }
+  if (!RANGO_TIENE_COMMITS_PROPIOS) {
+    ctx.skip(
+      'origin/dev..HEAD no tiene ningun commit propio (ya mergeada, o corriendo sobre dev): ' +
+        'este caso NO ha comprobado nada.',
+    );
+    return true;
+  }
+  return false;
+}
+
 describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
   it('R18: react-intersection-observer solo la importa showcase-load-trigger.tsx', () => {
     const importadores = FUENTES_DE_PRODUCCION.filter((archivo) =>
@@ -145,10 +172,7 @@ describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
   });
 
   it('R29: el diff de la rama contra origin/dev no añade ningun archivo bajo db/', (ctx) => {
-    if (MERGE_BASE === null) {
-      ctx.skip('no se pudo calcular el merge-base con origin/dev: este caso NO ha comprobado nada.');
-      return;
-    }
+    if (nadaQueMirar(ctx)) return;
 
     // Dos fuentes, como en `guard-convenciones-proveedores.test.ts`: los archivos ya COMMITEADOS
     // desde el merge-base (`git diff`) y los del ARBOL DE TRABAJO todavia sin commitear (`git
@@ -178,10 +202,7 @@ describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
   });
 
   it('D20: components/shared/entity-image.tsx no aparece en el diff de la rama', (ctx) => {
-    if (MERGE_BASE === null) {
-      ctx.skip('no se pudo calcular el merge-base con origin/dev: este caso NO ha comprobado nada.');
-      return;
-    }
+    if (nadaQueMirar(ctx)) return;
 
     const ARCHIVO = 'components/shared/entity-image.tsx';
     const salida = git(['diff', '--name-only', MERGE_BASE, '--', ARCHIVO]);
