@@ -103,6 +103,33 @@ describe('R4 — sin permiso o sin actor, los dos casos de uso rechazan antes de
       ).rejects.toBeInstanceOf(UnauthorizedError);
       expect(catalog.listBySupplierAlive).toHaveBeenCalledTimes(0);
     });
+
+    it(`listSupplierShowcase rechaza ${etiqueta} con UnauthorizedError aunque la entrada tambien sea invalida (page: 0)`, async () => {
+      const { suppliers, listSupplierShowcase } = montarShowcase();
+
+      await expect(listSupplierShowcase({ page: 0 }, actor)).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
+      expect(suppliers.listShowcaseAlive).toHaveBeenCalledTimes(0);
+    });
+
+    it(`listShowcaseLines rechaza ${etiqueta} con UnauthorizedError aunque la entrada tambien sea invalida (page: 1)`, async () => {
+      const { catalog, listShowcaseLines } = montarLineas();
+
+      await expect(
+        listShowcaseLines(SUPPLIER_ID, { page: 1 }, actor),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(catalog.listBySupplierAlive).toHaveBeenCalledTimes(0);
+    });
+
+    it(`listShowcaseLines rechaza ${etiqueta} con UnauthorizedError aunque productSearch tambien exceda los 120 caracteres`, async () => {
+      const { catalog, listShowcaseLines } = montarLineas();
+
+      await expect(
+        listShowcaseLines(SUPPLIER_ID, { page: 2, productSearch: 'a'.repeat(121) }, actor),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(catalog.listBySupplierAlive).toHaveBeenCalledTimes(0);
+    });
   }
 });
 
