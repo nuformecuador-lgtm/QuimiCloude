@@ -535,6 +535,87 @@ describe('QC-145 R6 — la edicion no mueve el estado', () => {
   });
 });
 
+describe('QC-150 — la edicion no da de alta producto terminado', () => {
+  it('R27: un status ENTREGADO en la entrada de un pedido EN_CURSO no lo deja ENTREGADO y no llama a scope.finishedGoods', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioConEstado('EN_CURSO');
+    const receiveFromOrder = vi.fn();
+    const { unitOfWork, finishedGoods } = fakeUnitOfWork({
+      orders: { lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt },
+      reservations: { syncForOrder: repo.syncForOrder, consumeForOrder: repo.consumeForOrder },
+      finishedGoods: { receiveFromOrder },
+    });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' },
+      ACTOR_A,
+    );
+
+    expect(repo.updateAlive).toHaveBeenCalledTimes(1);
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(dataEscrita).not.toHaveProperty('status');
+    expect(finishedGoods.receiveFromOrder).not.toHaveBeenCalled();
+  });
+
+  it('R27: scope.finishedGoods.receiveFromOrder nunca se llama en una edicion, ni siquiera con status ENTREGADO en la entrada', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      // `fakeUnitOfWork` por defecto (helper compartido) explota si algo llama a
+      // `finishedGoods.receiveFromOrder`: que la edicion termine sin lanzar demuestra que no lo hizo.
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await expect(
+      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A),
+    ).resolves.toBeUndefined();
+  });
+
+  it('R27: un pedido ya ENTREGADO rechaza la edicion con invalid_transition -la transicion a ENTREGADO no se ofrece- y no llama a scope.finishedGoods', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioConEstado('ENTREGADO');
+    const receiveFromOrder = vi.fn();
+    const { unitOfWork, finishedGoods } = fakeUnitOfWork({
+      orders: { lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt },
+      reservations: { syncForOrder: repo.syncForOrder, consumeForOrder: repo.consumeForOrder },
+      finishedGoods: { receiveFromOrder },
+    });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A }, ACTOR_A),
+    );
+
+    expect(codigo).toBe('invalid_transition');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+    expect(finishedGoods.receiveFromOrder).not.toHaveBeenCalled();
+  });
+});
+
 describe('QC-145 R8 — un pedido ENTREGADO o CANCELADO rechaza toda edicion, sin escribir', () => {
   it('ENTREGADO y CANCELADO -> `invalid_transition`, aunque la entrada no traiga ningun `status`', async () => {
     for (const status of ['ENTREGADO', 'CANCELADO'] as const) {

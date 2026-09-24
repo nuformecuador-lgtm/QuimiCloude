@@ -34,7 +34,7 @@ import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { createCreateOrder, createTransitionOrder } from '@/lib/modules/pedidos';
+import { createCreateOrder, createTransitionOrder, createUpdateOrder } from '@/lib/modules/pedidos';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
 import { UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
 
@@ -90,6 +90,7 @@ const units: UnitCatalog = {
 };
 
 const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); } }, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
 
 const orderCatalog: OrderCatalog = {
   findAliveById: async (id, companyId) => {
@@ -333,6 +334,56 @@ describe('R18, R20 — sin contenido, el Finalizar rechaza sin cambiar nada', ()
       expect(row.reservedAt).not.toBeNull();
       expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('100.0000');
       expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).toBeNull();
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+});
+
+describe('R27 — la edicion en Pedidos no da de alta producto terminado', () => {
+  it('R27: editar un pedido EN_CURSO por el caso de uso real de edicion no crea producto, lote ni asiento, y el pedido sigue sin ENTREGADO', async () => {
+    const fixture = await crearFixture('1.0000');
+    const { productId, batchId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture, `Desengrasante ${token()}`);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+
+      const aEnCurso = await orderCatalog.transitionAliveById(
+        creado.id,
+        fixture.companyId,
+        'PENDIENTE',
+        'EN_CURSO',
+        fixture.actorId,
+        new Date(),
+      );
+      expect(aEnCurso).toBe('ok');
+
+      // `updateOrderSchema` no declara `status`: `z.object` lo descarta en el borde, asi que
+      // esta entrada nunca podria mover el pedido a `ENTREGADO` aunque el dato viaje aqui.
+      await updateOrder(
+        creado.id,
+        { recipeId, quantity: '20.0000', presentationId: fixture.presentationId, status: 'ENTREGADO' },
+        actorDe(fixture),
+      );
+
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
+      expect(row.status).toBe('EN_CURSO');
+      expect(row.quantity.toFixed(4)).toBe('20.0000');
+
+      expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).toBeNull();
+      const loteConContenido = await prisma.productBatch.findFirst({
+        where: { product: { companyId: fixture.companyId }, packageContent: { not: null } },
+        select: { id: true },
+      });
+      expect(loteConContenido).toBeNull();
+      const asientoDeProduccion = await prisma.inventoryMovement.findFirst({
+        where: { orderId: creado.id, kind: 'production' },
+        select: { id: true },
+      });
+      expect(asientoDeProduccion).toBeNull();
+      expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('100.0000');
     } finally {
       await borrarFixture(fixture, [productId]);
     }
