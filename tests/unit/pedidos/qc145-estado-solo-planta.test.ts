@@ -1,7 +1,7 @@
 // Test de fuente: quien escribe la fecha de terminado y el estado del pedido, y el alcance del
 // esquema y las dependencias. Mismo patron que `tests/unit/identity/roles/empacador-rol.test.ts`
 // (barrido de `lib/**` sobre el fuente sin comentarios) y `tests/unit/identity/qc78-alcance.test.ts`
-// (diff contra la base de fusion con `origin/dev`).
+// (lectura de un commit fijo de la historia; aqui, el merge con el que el cambio entro en dev).
 
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -328,18 +328,17 @@ describe('R16 — el catalogo de permisos sigue en dieciocho codigos', () => {
 });
 
 // -------------------------------------------------------------------------------------------
-// Sin dependencias nuevas ni tablas nuevas, comparado contra origin/dev
+// Sin dependencias nuevas ni tablas nuevas en el merge que trajo el cambio a dev
 // -------------------------------------------------------------------------------------------
 
 function git(comando: string): string {
   return execSync(comando, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 }
 
-// Comparar el `package.json` actual con `origin/dev` castigaba a cualquier rama posterior que
-// anadiera una dependencia aprobada. Lo que se protege es un hecho historico: el merge con el que
-// este cambio entro en dev no anadio dependencias. Por eso se compara ese merge con su primer padre.
-// (2026-09-24)
-const MERGE_DE_ENTRADA = '51f2d101';
+// Comparar con `origin/dev` castigaba a cualquier rama posterior que anadiera una dependencia
+// aprobada. Lo que se protege es un hecho historico: el merge con el que este cambio entro en dev
+// no anadio dependencias ni modelos. Por eso se compara ese merge con su primer padre. (2026-09-24)
+const MERGE_DE_ENTRADA = '51f2d1013f33a3fde50594ac0dde7ec7b7535938';
 
 type PackageJson = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
 
@@ -377,9 +376,6 @@ describe('R29 — package.json sin dependencias nuevas en el merge que trajo el 
   });
 });
 
-// Commit de merge del PR #112 en origin/dev. Fijo, no depende de fichas posteriores.
-const MERGE_QC145 = '51f2d1013f33a3fde50594ac0dde7ec7b7535938';
-
 /** Nombres de `model X {` del esquema, en el texto dado. */
 function modelosDe(schema: string): string[] {
   return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
@@ -390,11 +386,11 @@ describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la co
     let modelosPadre: string[];
     let modelosMerge: string[];
     try {
-      modelosPadre = modelosDe(git(`git show ${MERGE_QC145}~1:db/schema.prisma`));
-      modelosMerge = modelosDe(git(`git show ${MERGE_QC145}:db/schema.prisma`));
+      modelosPadre = modelosDe(git(`git show ${MERGE_DE_ENTRADA}~1:db/schema.prisma`));
+      modelosMerge = modelosDe(git(`git show ${MERGE_DE_ENTRADA}:db/schema.prisma`));
     } catch (error) {
       throw new Error(
-        `No se pudo leer db/schema.prisma en ${MERGE_QC145} ni en su padre (clon superficial ` +
+        `No se pudo leer db/schema.prisma en ${MERGE_DE_ENTRADA} ni en su padre (clon superficial ` +
           `sin ese commit), asi que la parte de esquema de R29 no se ha comprobado en este ` +
           `caso. Causa: ${String(error)}`,
       );
