@@ -982,15 +982,6 @@ export async function receiveFinishedGoods(
 ): Promise<FinishedGoodsOutcome> {
   const { companyId } = companyScopeColumns(scope);
 
-  // `recipes` es de otro modulo (`recetas`): sin FK compuesta, nada impide que quien llama pase
-  // el id de una receta de otra empresa junto con una presentacion de esta. Se comprueba aqui,
-  // antes de cualquier escritura, con la misma consulta cruda que usa el resto del archivo para
-  // leer tablas ajenas por id.
-  const recipeRows = await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
-    SELECT "id" FROM "recipes" WHERE "id" = ${input.recipeId}::uuid AND "company_id" = ${companyId}::uuid
-  `);
-  if (recipeRows[0] === undefined) return { kind: 'recipe_not_found' };
-
   const presentationRows = await tx.$queryRaw<ReadonlyArray<PresentationForShareRow>>(Prisma.sql`
     SELECT "name", "unit_id" AS "unitId", "content"::text AS "content"
       FROM "presentations"

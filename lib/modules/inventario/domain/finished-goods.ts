@@ -92,8 +92,7 @@ export function planFinishedGoods(input: {
 export type FinishedGoodsOutcome =
   | { readonly kind: 'received'; readonly productId: ProductId; readonly productName: string; readonly packages: string }
   | { readonly kind: 'presentation_without_content' }
-  | { readonly kind: 'no_whole_package' }
-  | { readonly kind: 'recipe_not_found' };
+  | { readonly kind: 'no_whole_package' };
 
 /** Servicio que `inventario` ofrece a `pedidos` para el Finalizar: da de alta el producto
  *  terminado de una combinacion (si no existia), su lote y su asiento, y recalcula la

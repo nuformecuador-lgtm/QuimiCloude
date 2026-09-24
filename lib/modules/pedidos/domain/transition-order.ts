@@ -75,6 +75,13 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           // vigente- lo rechaza mas abajo `finishedGoods.receiveFromOrder`.
           if (locked.presentationId === null) throw new PresentationWithoutContentError();
 
+          // Receta de la empresa del pedido, ANTES de consumir: sin FK compuesta hacia
+          // `recipes`, nada impide un `recipeId` de otra empresa. `findRefsIncludingDeleted`
+          // filtra por empresa e incluye recetas dadas de baja: una receta borrada despues de
+          // crear el pedido no rechaza, solo una ajena o inexistente.
+          const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([locked.recipeId], companyId);
+          if (recipeRef === undefined) throw new RecipeNotFoundError();
+
           // Coste del lote, ANTES de consumir: el importe guardado se usa tal cual,
           // y solo se recalcula si es nulo. Despues de consumir, los lotes ya habrian bajado.
           const lotCost =
@@ -109,12 +116,11 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           const result = await scope.orders.setStatus(id, from, to, actorId, now, { companyId });
           if (result !== 'ok') throw new StatusChangeAfterConsumptionFailedError(result);
 
-          const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([locked.recipeId], companyId);
           const finishedGoodsOutcome = await scope.finishedGoods.receiveFromOrder({
             orderId: id,
             companyId,
             recipeId: locked.recipeId,
-            recipeName: recipeRef?.name ?? '',
+            recipeName: recipeRef.name,
             presentationId: locked.presentationId,
             orderQuantity: locked.quantity,
             orderContent: locked.presentationContent,
@@ -128,9 +134,6 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           }
           if (finishedGoodsOutcome.kind === 'no_whole_package') {
             throw new NoWholePackageError();
-          }
-          if (finishedGoodsOutcome.kind === 'recipe_not_found') {
-            throw new RecipeNotFoundError();
           }
 
           await scope.orders.setReservedAt(id, null, { companyId });
