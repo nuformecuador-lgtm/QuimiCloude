@@ -54,6 +54,15 @@ function readFormString(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
+/** QC-150 (R6, R8): vaciar el campo -cadena vacia o ausente- se lee como `undefined`, que
+ *  `presentationContentSchema.nullish()` deja pasar y que el caso de uso convierte en `null`.
+ *  Mismo camino que `readOptionalFormString` de `supplier-catalog-actions.ts`. */
+function readOptionalFormString(formData: FormData, name: string): string | undefined {
+  const value = formData.get(name);
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  return value;
+}
+
 /** El traductor UNICO (R10), parametrizado por la base de este modulo. Ver `product-actions.ts`. */
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
 
@@ -88,6 +97,7 @@ export async function createPresentationAction(
   const candidate = {
     name: readFormString(formData, 'name'),
     unitId: readFormString(formData, 'unitId'),
+    content: readOptionalFormString(formData, 'content'),
   };
   const actor = await currentActor();
 
@@ -111,6 +121,7 @@ export async function updatePresentationAction(
   const candidate = {
     name: readFormString(formData, 'name'),
     unitId: readFormString(formData, 'unitId'),
+    content: readOptionalFormString(formData, 'content'),
   };
   const actor = await currentActor();
 

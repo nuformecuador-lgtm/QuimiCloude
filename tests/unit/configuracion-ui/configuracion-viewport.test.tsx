@@ -160,6 +160,7 @@ const PRESENTACION: PresentationView = {
   name: 'Bidón 20 L',
   nameNormalized: 'bidon 20 l',
   unitId: 'unit-kg',
+  content: null,
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
 };
@@ -169,6 +170,7 @@ const PRESENTACION_LARGA: PresentationView = {
   name: 'Tambor metálico de 200 litros con tapa desmontable y aro de cierre reforzado',
   nameNormalized: 'tambor metalico de 200 litros con tapa desmontable y aro de cierre reforzado',
   unitId: 'unit-l',
+  content: null,
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
 };

@@ -318,6 +318,7 @@ function paginaDePresentaciones(
         // QC-80 (R1): la presentacion declara unidad OBLIGATORIA. Aqui es solo relleno del
         // contrato -esta pantalla no la pinta-, con un uuid fijo para que el doble sea estable.
         unitId: UNIDAD_DE_LA_PRESENTACION,
+        content: null,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       })),

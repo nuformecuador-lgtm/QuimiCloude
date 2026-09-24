@@ -53,6 +53,7 @@ export function createCreatePresentation(
         name: parsed.data.name,
         nameNormalized,
         unitId: parsed.data.unitId,
+        content: parsed.data.content ?? null,
       },
       { companyId: actor.companyId },
     );

@@ -94,6 +94,7 @@ describe('toPresentationView — mapeo de fila a contrato (R15)', () => {
     name: 'Bidon 20 L',
     nameNormalized: 'bidon20l',
     unitId: '11111111-1111-4111-8111-111111111111',
+    content: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-02T00:00:00.000Z'),
   };
@@ -109,6 +110,7 @@ describe('toPresentationView — mapeo de fila a contrato (R15)', () => {
       name: 'Bidon 20 L',
       nameNormalized: 'bidon20l',
       unitId: '11111111-1111-4111-8111-111111111111',
+      content: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-02T00:00:00.000Z'),
     });
@@ -118,5 +120,13 @@ describe('toPresentationView — mapeo de fila a contrato (R15)', () => {
     // Se afirma como DATO, no como texto del archivo: si alguien quita la columna del select,
     // `toPresentationView` recibiria una fila sin `unitId` y el contrato mentiria.
     expect(presentationSelect.unitId).toBe(true);
+  });
+
+  // QC-150 (R6, R8): ampliacion nombrada del contrato -`PresentationView` gana `content`-.
+  it('el select pide la columna content, y el contenido se formatea con los 4 decimales de DECIMAL(14,4) (R6, R8)', () => {
+    expect(presentationSelect.content).toBe(true);
+    expect(
+      toPresentationView({ ...fila, content: new Prisma.Decimal('50.5') }).content,
+    ).toBe('50.5000');
   });
 });

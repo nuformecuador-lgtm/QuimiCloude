@@ -211,6 +211,7 @@ function montar() {
             name: fila.name,
             nameNormalized: fila.name.toLowerCase(),
             unitId: UNIDAD,
+            content: null,
             createdAt: AHORA,
             updatedAt: AHORA,
           })),

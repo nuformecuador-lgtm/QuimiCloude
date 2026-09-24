@@ -16,6 +16,8 @@ export type PresentationData = {
   readonly name: string;
   readonly nameNormalized: string;
   readonly unitId: string;
+  /** QC-150 (R6, R40): opcional y anulable, y SIEMPRE se reescribe -no hay edicion parcial-. */
+  readonly content: string | null;
 };
 
 /**

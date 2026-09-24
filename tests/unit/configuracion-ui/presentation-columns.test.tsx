@@ -86,6 +86,7 @@ function presentacion(overrides: Partial<PresentationView> = {}): PresentationVi
     name: 'Bidón 20 L',
     nameNormalized: 'bidon 20 l',
     unitId: UNIDAD_ACTUAL,
+    content: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-02-20T10:00:00.000Z'),
     ...overrides,

@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '../../../domain/inventory-scope';
@@ -19,11 +21,12 @@ import { presentationCompanyScope } from './company-scope';
 type PresentationCatalogRow = {
   readonly id: string;
   readonly name: string;
+  readonly content: Prisma.Decimal | null;
 };
 
 /** Fila de Prisma -> `PresentationRef` del contrato publico. Funcion pura, testeable sin base. */
 export function toPresentationRef(row: PresentationCatalogRow): PresentationRef {
-  return { id: row.id, name: row.name };
+  return { id: row.id, name: row.name, content: row.content === null ? null : row.content.toFixed(4) };
 }
 
 /**
@@ -40,7 +43,7 @@ async function findScopedPresentations(
     where: {
       AND: [presentationCompanyScope(scope), { id: { in: [...ids] } }],
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, content: true },
   });
 }
 

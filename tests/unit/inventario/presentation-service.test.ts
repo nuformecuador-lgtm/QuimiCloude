@@ -50,11 +50,15 @@ const SIN_PERMISO: Actor = { id: 'actor-sin-permiso', companyId: EMPRESA, permis
 const UNIDAD = '11111111-1111-4111-8111-111111111111';
 const OTRA_UNIDAD = '22222222-2222-4222-8222-222222222222';
 
+/** QC-150 (R6): ampliacion nombrada del contrato -`PresentationView` gana `content`-, aqui
+ *  `null` porque los casos de este archivo no lo ejercitan; el contenido lo cubre
+ *  `presentation-input.test.ts` (R6, R7, R40). */
 const PRESENTACION: PresentationView = {
   id: 'presentacion-1',
   name: 'Bidon 20 L',
   nameNormalized: 'bidon20l',
   unitId: UNIDAD,
+  content: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -107,11 +111,12 @@ describe('create-presentation', () => {
         name: 'Bidon 20 L',
         nameNormalized: normalizePresentationName('Bidon 20 L'),
         unitId: UNIDAD,
+        content: null,
       },
       { companyId: EMPRESA },
     );
     expect(create).toHaveBeenCalledWith(
-      { name: 'Bidon 20 L', nameNormalized: 'bidon20l', unitId: UNIDAD },
+      { name: 'Bidon 20 L', nameNormalized: 'bidon20l', unitId: UNIDAD, content: null },
       { companyId: EMPRESA },
     );
 
@@ -128,6 +133,7 @@ describe('create-presentation', () => {
         name: 'Bidon 20 Litros',
         nameNormalized: normalizePresentationName('Bidon 20 Litros'),
         unitId: UNIDAD,
+        content: null,
       },
       { companyId: EMPRESA },
     );
@@ -250,6 +256,7 @@ describe('update-presentation', () => {
         name: PRESENTACION.name,
         nameNormalized: PRESENTACION.nameNormalized,
         unitId: OTRA_UNIDAD,
+        content: null,
       },
       { companyId: EMPRESA },
     );

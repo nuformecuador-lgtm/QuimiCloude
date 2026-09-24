@@ -271,6 +271,7 @@ function paginaDePresentaciones(): PresentationListResult {
           // QC-80 (R15): `PresentationView` declara su unidad. Un uuid cualquiera: esta
           // pantalla no la pinta -la unidad de la LINEA de catalogo es propia (R26)-.
           unitId: '11111111-1111-4111-8111-111111111111',
+          content: null,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
           updatedAt: new Date('2026-01-01T00:00:00.000Z'),
         },

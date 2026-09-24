@@ -23,6 +23,21 @@ const presentationNameSchema = z
   });
 
 /**
+ * Contenido del envase (R6, R7): decimal plano, hasta diez enteros y cuatro decimales, como
+ * `costSchema` de `catalog-line-input.ts`. Opcional y anulable -`nullish()`-: una presentacion
+ * puede no declararlo, y vaciar el campo se traduce a `null`, no a un `0` que fuera el `CHECK`
+ * de la base rechazaria igual (`content > 0`).
+ */
+const CONTENT_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
+const CONTENT_ZERO_PATTERN = /^0+(\.0*)?$/;
+
+const presentationContentSchema = z
+  .string()
+  .regex(CONTENT_PATTERN)
+  .refine((value) => !CONTENT_ZERO_PATTERN.test(value))
+  .nullish();
+
+/**
  * QC-80 (R10): la unidad de la presentacion es OBLIGATORIA, sin `default` y sin `nullish`.
  * La columna `presentations.unit_id` es `NOT NULL`: un esquema que aceptara la ausencia
  * estaria prometiendo un estado que la base rechaza. `uuid()` porque lo que viaja es el
@@ -53,6 +68,7 @@ const presentationUnitIdSchema = z.string().uuid();
 export const createPresentationSchema = z.strictObject({
   name: presentationNameSchema,
   unitId: presentationUnitIdSchema,
+  content: presentationContentSchema,
 });
 
 /** Reemplazo completo, igual que el producto (§ 11.7). QC-80 (R12): la edicion reemplaza

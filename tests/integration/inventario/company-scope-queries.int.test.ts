@@ -527,7 +527,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await replacePresentation(
       ajena,
-      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema },
+      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema, content: null },
       ambitoDe(A),
     );
 
@@ -541,7 +541,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await replacePresentation(
       propia,
-      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema },
+      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema, content: null },
       ambitoDe(B),
     );
 
@@ -655,8 +655,8 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
     const name = `${MARCA} Bidon doble ${token().slice(0, 8)}`;
     const normalizado = normalizePresentationName(name);
 
-    const enA = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema }, ambitoDe(A));
-    const enB = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema }, ambitoDe(B));
+    const enA = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema, content: null }, ambitoDe(A));
+    const enB = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema, content: null }, ambitoDe(B));
 
     expect(enA).not.toBe('duplicate');
     expect(enB).not.toBe('duplicate');

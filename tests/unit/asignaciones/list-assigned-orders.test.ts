@@ -61,7 +61,7 @@ function persona(id: string): PersonRef {
 const PRESENTACION = uuid('7');
 
 function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
-  return { id: PRESENTACION, name: 'Bidon 20L', ...overrides };
+  return { id: PRESENTACION, name: 'Bidon 20L', content: null, ...overrides };
 }
 
 function filaSuelta(orderId: string, userId: string): OrderAssignmentRowWithOrder {
