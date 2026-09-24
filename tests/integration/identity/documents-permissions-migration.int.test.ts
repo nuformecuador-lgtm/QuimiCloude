@@ -148,6 +148,17 @@ async function filasDe(tx: Prisma.TransactionClient, roleName: string) {
   });
 }
 
+/** Estado completo de las tres tablas que la migracion toca, en un orden estable para comparar. */
+async function fullSnapshot(tx: Prisma.TransactionClient) {
+  return {
+    permissions: await tx.permission.findMany({ orderBy: { code: 'asc' } }),
+    rolePermissions: await tx.rolePermission.findMany({
+      orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }],
+    }),
+    roles: await tx.role.findMany({ orderBy: { id: 'asc' } }),
+  };
+}
+
 /**
  * Un rol efimero, sin usuarios, con exactamente los codigos que se le pasen. Ninguno existe en
  * ningun seed: la herencia se resuelve por PERMISO y este rol lo demuestra.
@@ -312,6 +323,9 @@ describe('migracion documents_permissions contra Postgres real', () => {
     await inRolledBackTransaction(async (tx) => {
       // La base local ya trae el seed corrido: NO se borra nada aqui, se aplica directo.
       const administradorAntes = await filasDe(tx, ROLE_ADMINISTRADOR);
+      const codigosAntes = administradorAntes.map((fila) => fila.permissionCode);
+      expect(codigosAntes).toContain(DOCUMENTOS_CONSULTAR);
+      expect(codigosAntes).toContain(DOCUMENTOS_MODIFICAR);
 
       await expect(applyStatements(tx, UP_STATEMENTS)).resolves.not.toThrow();
 
@@ -324,6 +338,8 @@ describe('migracion documents_permissions contra Postgres real', () => {
     await inRolledBackTransaction(async (tx) => {
       await eraseFeatureRows(tx);
       const conProveedoresModificar = await createEphemeralRole(tx, [PROVEEDORES_MODIFICAR]);
+      const antesDelUp = await fullSnapshot(tx);
+
       await applyStatements(tx, UP_STATEMENTS);
 
       const asignadosAntes = await tx.rolePermission.findMany({ where: { roleId: conProveedoresModificar } });
@@ -360,6 +376,10 @@ describe('migracion documents_permissions contra Postgres real', () => {
       // El Operador y el Empacador, intactos.
       expect(await filasDe(tx, ROLE_OPERADOR)).toEqual(operadorAntes);
       expect(await filasDe(tx, ROLE_EMPACADOR)).toEqual(empacadorAntes);
+
+      // Y las tres tablas completas, identicas a como estaban justo antes de aplicar el UP.
+      const despuesDelDown = await fullSnapshot(tx);
+      expect(despuesDelDown).toEqual(antesDelUp);
     });
   });
 });
