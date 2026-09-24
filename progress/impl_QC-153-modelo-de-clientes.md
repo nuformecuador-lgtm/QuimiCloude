@@ -55,6 +55,21 @@ y `guard-rls-force.test.ts`: 27 tests verdes.
 puro), `ports/.gitkeep`, `adapters/.gitkeep`. `typecheck` en verde;
 `guard-arquitectura-modulos.test.ts`: 62 tests verdes.
 
+## T5 — `tests/unit/identity/permissions.test.ts`
+
+`CODIGOS_DEL_REQUISITO`, `MODULOS` y `MODULOS_CON_ESCRITURA` ampliados con `clientes`/los dos
+codigos; recuentos subidos a 18; caso «QC-144 R5» reescrito con slicing por indice de
+`terminados.consultar` para que no rompa por el orden con los dos codigos nuevos detras (sigue
+afirmando exactamente lo mismo: previo + terminados.consultar + lo que venga despues); casos
+nuevos R21 (catalogo con los dos codigos exactos y catalogo = previo + los dos), R22
+(Administrador con los dos; Operador y Empacador intactos, sin `clientes.*`) y R25 (parrafo de
+la enmienda: ≤5 lineas, contiene "enmienda", nombra los dos codigos, sin citas). El detector de
+citas sintetico ya existente (linea ~168) sigue mordiendo un JSDoc con `QC-144`.
+
+Verificado con T4 revertido en local (sin commitear, restaurado byte a byte despues): 10 de 31
+casos caen, incluidos los tres de R21/R22 nuevos y los que ya afirmaban el recuento/lista del
+Administrador. Con T4 en su sitio: 31/31 verdes.
+
 ## Verificación T0
 
 ```

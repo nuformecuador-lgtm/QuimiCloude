@@ -73,7 +73,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       de la lista del Administrador, la frase del recuento y el párrafo de enmienda
       (`design.md > 3`). **Hecho cuando:** `typecheck` pasa y `guard-permisos-sembrados` solo está
       rojo por su número (lo sube T6). *Independiente de T1–T3; en la misma tanda que T5–T7.*
-- [ ] **T5.** [P] `tests/unit/identity/permissions.test.ts`: las ampliaciones de `design.md > 6.1`,
+- [x] **T5.** [P] `tests/unit/identity/permissions.test.ts`: las ampliaciones de `design.md > 6.1`,
       reescritura del caso «QC-144 R5» para que siga afirmando lo mismo sin romperse por orden, y los
       casos nuevos de R21, R22 y R25 (con su caso sintético que el detector de citas sí caza).
       **Hecho cuando:** el archivo está verde y, con T4 revertido en local, los casos de R21/R22/R25
