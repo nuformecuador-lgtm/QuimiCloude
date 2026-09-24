@@ -365,6 +365,60 @@ describe('R18, R20 — sin contenido, el Finalizar rechaza sin cambiar nada', ()
   });
 });
 
+describe('R23, D24 — receta de otra empresa', () => {
+  it('R23, D24 — un pedido de la empresa B con su presentación y el recipeId de la empresa A se rechaza con recipe_not_found y no escribe nada en ninguna empresa', async () => {
+    const fixtureA = await crearFixture('1.0000');
+    const fixtureB = await crearFixture('1.0000');
+    const recipeIdDeA = await crearReceta(fixtureA);
+
+    const now = new Date();
+    const orderB = await prisma.order.create({
+      data: {
+        orderYear: now.getUTCFullYear(),
+        orderSequence: 1,
+        recipeId: recipeIdDeA,
+        quantity: '10.0000',
+        companyId: fixtureB.companyId,
+        presentationId: fixtureB.presentationId,
+        presentationContent: '1.0000',
+        createdAt: now,
+      },
+      select: { id: true },
+    });
+
+    const contarTodo = () =>
+      Promise.all([
+        prisma.product.count({ where: { companyId: { in: [fixtureA.companyId, fixtureB.companyId] } } }),
+        prisma.productBatch.count({ where: { companyId: { in: [fixtureA.companyId, fixtureB.companyId] } } }),
+        prisma.inventoryMovement.count({ where: { companyId: { in: [fixtureA.companyId, fixtureB.companyId] } } }),
+      ]);
+
+    try {
+      const antes = await contarTodo();
+
+      const resultado = await orderCatalog.transitionAliveById(
+        orderB.id,
+        fixtureB.companyId,
+        'PENDIENTE',
+        'ENTREGADO',
+        fixtureB.actorId,
+        new Date(),
+      );
+
+      expect(resultado).toBe('recipe_not_found');
+
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: orderB.id }, select: { status: true } });
+      expect(row.status).toBe('PENDIENTE');
+
+      const despues = await contarTodo();
+      expect(despues).toEqual(antes);
+    } finally {
+      await borrarFixture(fixtureB, []);
+      await borrarFixture(fixtureA, []);
+    }
+  });
+});
+
 describe('R27 — la edicion en Pedidos no da de alta producto terminado', () => {
   it('R27: editar un pedido EN_CURSO por el caso de uso real de edicion no crea producto, lote ni asiento, y el pedido sigue sin ENTREGADO', async () => {
     const fixture = await crearFixture('1.0000');

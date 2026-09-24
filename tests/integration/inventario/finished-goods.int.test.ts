@@ -492,50 +492,6 @@ describe('receiveFinishedGoods — R23 — acceso cruzado: presentacion de otra 
   });
 });
 
-describe('receiveFinishedGoods — R23, D24: acceso cruzado, receta de otra empresa', () => {
-  it('R23, D24 — la empresa B con su propia presentacion y el recipeId de la empresa A no escribe nada en ninguna de las dos', async () => {
-    const empresaA = await nuevaEmpresa();
-    const empresaB = await nuevaEmpresa();
-    const unitB = await sembrarUnidad();
-    const presentationB = await sembrarPresentacion(empresaB.companyId, unitB, { content: '1', name: 'Solo de B' });
-    const recipeA = await sembrarReceta(empresaA.companyId, 'Receta de A');
-    const orderB = await sembrarPedido(empresaB.companyId, recipeA, presentationB, null);
-
-    const contarTodo = () =>
-      Promise.all([
-        prisma.product.count({ where: { companyId: { in: [empresaA.companyId, empresaB.companyId] } } }),
-        prisma.productBatch.count({ where: { companyId: { in: [empresaA.companyId, empresaB.companyId] } } }),
-        prisma.inventoryMovement.count({ where: { companyId: { in: [empresaA.companyId, empresaB.companyId] } } }),
-      ]);
-
-    try {
-      const antes = await contarTodo();
-
-      const outcome = await recibir(empresaB.companyId, {
-        orderId: orderB,
-        recipeId: recipeA,
-        recipeName: 'Receta de A',
-        presentationId: presentationB,
-        orderQuantity: '10',
-        orderContent: '1',
-        lotCost: '10',
-        actorId: empresaB.userId,
-        now: new Date(),
-      });
-
-      expect(outcome).toEqual({ kind: 'recipe_not_found' });
-
-      const despues = await contarTodo();
-      expect(despues).toEqual(antes);
-    } finally {
-      await prisma.order.deleteMany({ where: { id: orderB } });
-      await prisma.recipe.deleteMany({ where: { id: recipeA } });
-      await prisma.presentation.deleteMany({ where: { id: presentationB } });
-      await prisma.unit.deleteMany({ where: { id: unitB } });
-    }
-  });
-});
-
 describe('receiveFinishedGoods — R35: producto dado de baja', () => {
   it('un pedido de la misma combinacion tras la baja crea un producto nuevo', async () => {
     const empresa = await nuevaEmpresa();

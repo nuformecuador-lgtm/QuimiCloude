@@ -382,13 +382,13 @@ describe('createTransitionOrder', () => {
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
-  it('D24: recipe_not_found del alta de inventario deshace la transaccion entera', async () => {
+  it('D24: sin receta de la empresa en el catalogo global, rechaza ANTES de consumir y no escribe nada', async () => {
     const { recipes: scopeRecipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
     const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
     const setStatus = vi.fn(async () => 'ok' as const);
     const setReservedAt = vi.fn();
-    const receiveFromOrder = vi.fn(async () => ({ kind: 'recipe_not_found' as const }));
+    const receiveFromOrder = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
       reservations: { consumeForOrder },
@@ -396,13 +396,16 @@ describe('createTransitionOrder', () => {
       finishedGoods: { receiveFromOrder },
     });
     const { recipes, products, units } = catalogosGlobales();
+    (recipes.findRefsIncludingDeleted as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
     await expect(
       transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
     ).resolves.toBe('recipe_not_found');
 
-    expect(setReservedAt).not.toHaveBeenCalled();
+    expect(consumeForOrder).not.toHaveBeenCalled();
+    expect(receiveFromOrder).not.toHaveBeenCalled();
+    expect(setStatus).not.toHaveBeenCalled();
   });
 
   it('R30, R31, R51: material insuficiente deshace la transaccion entera', async () => {
