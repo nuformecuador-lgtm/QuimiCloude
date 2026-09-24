@@ -2,14 +2,21 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { identity } from '@/lib/composition';
 import { canModifyAssignments } from '@/lib/modules/asignaciones';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
-import { listResponsiblesForOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
-import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
+import {
+  listResponsibleCandidatesAction,
+  listResponsiblesForOrdersAction,
+} from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
-import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import {
+  listOrderCoverageAction,
+  listOrdersAction,
+} from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { OrderListEmpty } from './order-list-empty';
 import {
@@ -157,35 +164,62 @@ async function loadResponsibles(
   return byOrder;
 }
 
+// ---------------------------------------------------------------------------------------------
+// La cobertura de la PAGINA, compuesta AQUI, mismo patron que los responsables.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * La cobertura de los pedidos de ESTA pagina, en **UNA sola** llamada.
+ *
+ * **Ni una consulta por fila**: el argumento es el array entero de identificadores de la pagina,
+ * mismo criterio que `loadResponsibles`.
+ *
+ * **Si falla, DEGRADA** (mismo criterio que `loadResponsibles`): devuelve el reparto vacio y la
+ * columna se pinta sin resolver -marcador de ausencia-, sin tumbar la lista.
+ */
+async function loadCoverage(
+  orderIds: readonly string[],
+): Promise<Readonly<Record<string, OrderCoverage>>> {
+  const result = await listOrderCoverageAction(orderIds);
+
+  if (result.status === 'error') return {};
+
+  const byOrder: Record<string, OrderCoverage> = {};
+  for (const entry of result.data) {
+    byOrder[entry.orderId] = entry.coverage;
+  }
+  return byOrder;
+}
+
 /**
  * Los dos catalogos que el panel ofrece para asignar, **por props** (R27) y **solo si el actor
  * puede escribir**: sin `asignaciones.modificar` no se monta ningun control de escritura, asi que
  * pedirlos seria trabajo tirado.
  *
- * **Degrada como `loadFormCatalogs`** (`design.md > 0` H1): `listUsersAction` y
- * `listWorkGroupsAction` exigen `usuarios.consultar`, que la decision cerrada 2 no nombra. Quien
- * tenga `asignaciones.modificar` sin ese permiso ve el panel con los catalogos **vacios** y su
- * texto de lista vacia; no se inventa ningun permiso nuevo (R15) y no se tumba la lista.
+ * **Personas**: `listResponsibleCandidatesAction` ya exige `asignaciones.modificar` -la misma
+ * condicion con la que este panel se monta- y devuelve solo a quien puede ser responsable, asi
+ * que aqui no hace falta pedir nada por `usuarios.consultar` ni filtrar nada mas. Si falla,
+ * degrada a lista vacia igual que los grupos.
  *
- * El tamano es `MAX_PAGE_SIZE`, el tope que los propios casos de uso imponen: el buscador filtra
- * sobre lo que ya llego (R27).
+ * **Grupos**: siguen saliendo de `listWorkGroupsAction`, que exige `usuarios.consultar`; sin ese
+ * permiso el panel ofrece personas pero ningun grupo, en vez de tumbar la lista.
+ *
+ * El tamano de grupos es `MAX_PAGE_SIZE`, el tope que el propio caso de uso impone: el buscador
+ * filtra sobre lo que ya llego.
  */
 async function loadResponsiblesCatalog(): Promise<OrderResponsiblesCatalog> {
   const canWrite = await canModifyResponsibles();
 
   if (!canWrite) return EMPTY_RESPONSIBLES_CATALOG;
 
-  const [users, groups] = await Promise.all([
-    listUsersAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+  const [candidates, groups] = await Promise.all([
+    listResponsibleCandidatesAction(),
     listWorkGroupsAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
   ]);
 
   return {
     canWrite,
-    people:
-      users.status === 'success'
-        ? users.data.items.map((user) => ({ id: user.id, displayName: user.displayName }))
-        : [],
+    people: candidates.status === 'success' ? candidates.data : [],
     workGroups:
       groups.status === 'success'
         ? groups.data.items.map((group) => ({ id: group.id, name: group.name }))
@@ -203,7 +237,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   const { items, page: currentPage, totalPages } = result.data;
   const { recipes, units } = await loadFormCatalogs();
 
-  if (items.length === 0) {
+  if (items.length === 0 && params.search === '') {
     // El slot de «crear el primer pedido» (R21) lo llena `<OrderSheet />` (T10) como `children`:
     // es la unica accion util cuando no hay ni un pedido, y bajando el disparador desde aqui el
     // estado vacio no tiene que conocer el panel lateral ni convertirse en modulo de cliente.
@@ -220,18 +254,40 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
     );
   }
 
-  /*
-    QC-102 R16 — La SEGUNDA llamada, seguida y con los ids de ESTA pagina. Va DESPUES de
-    `listOrdersAction` porque los identificadores salen de su resultado: es una dependencia real,
-    no una secuencia por descuido. Y va despues del estado VACIO porque con cero pedidos no hay
-    nada que preguntar. Se emite **UNA vez por render**, nunca una por fila.
+  if (items.length === 0) {
+    // Con termino vigente y cero filas el vacio es «sin coincidencias», no «no hay pedidos»: se
+    // pinta DENTRO de la tabla, con la caja montada, y sin pedir responsables (no hay filas a las
+    // que repartirlos).
+    return (
+      <div className="flex flex-col gap-4" data-testid="order-list">
+        <div className="flex justify-end">
+          <OrderSheet recipes={recipes} units={units} />
+        </div>
+        <OrderTable
+          orders={items}
+          params={params}
+          totalPages={totalPages}
+          recipes={recipes}
+          units={units}
+          noMatches={{ clearHref: orderListHref({ ...params, search: '', page: FIRST_PAGE }) }}
+        />
+      </div>
+    );
+  }
 
-    Las dos lecturas de aqui si van en paralelo entre si: el catalogo del panel no depende del
-    lote, y esperarlas en fila solo sumaria latencia.
+  /*
+    Los TRES lotes de la pagina, seguidos y con los ids de ESTA pagina. Van DESPUES de
+    `listOrdersAction` porque los identificadores salen de su resultado: es una dependencia real,
+    no una secuencia por descuido. Y van despues del estado VACIO porque con cero pedidos no hay
+    nada que preguntar. Cada uno se emite **UNA vez por render**, nunca una por fila.
+
+    Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
+    en fila solo sumaria latencia.
   */
-  const [responsiblesByOrder, responsiblesCatalog] = await Promise.all([
+  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder] = await Promise.all([
     loadResponsibles(items.map((order) => order.id)),
     loadResponsiblesCatalog(),
+    loadCoverage(items.map((order) => order.id)),
   ]);
 
   return (
@@ -258,6 +314,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         units={units}
         responsiblesByOrder={responsiblesByOrder}
         responsiblesCatalog={responsiblesCatalog}
+        coverageByOrder={coverageByOrder}
       />
     </div>
   );

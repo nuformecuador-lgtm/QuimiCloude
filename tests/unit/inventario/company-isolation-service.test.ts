@@ -15,6 +15,7 @@
 // aserciones caerian. Lo que este archivo NO puede demostrar es que el SQL filtre: eso es
 // `tests/integration/inventario/company-scope-queries.int.test.ts` (T13).
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
@@ -62,13 +63,13 @@ const PRESENTACION_DE_A = 'presentation-de-a';
 
 const ALTA_VALIDA = {
   name: 'Acido sulfurico',
-  stock: 10,
-  qtyAlert: 2,
+  stock: '10',
+  qtyAlert: '2',
   presentationId: PRESENTACION,
   unitCost: '10.0000',
 };
 
-const EDICION_VALIDA = { name: 'Acido sulfurico', qtyAlert: 2 };
+const EDICION_VALIDA = { name: 'Acido sulfurico', qtyAlert: '2' };
 const PRESENTACION_VALIDA = { name: 'Bidon 20 L', unitId: UNIDAD };
 
 const AHORA = new Date('2026-09-11T10:00:00.000Z');
@@ -78,10 +79,10 @@ function vista(id: string, name: string): ProductView {
     id,
     name,
     imagePath: null,
-    stock: 0,
+    stock: '0.0000',
     unitId: null,
-    qtyAlert: 2,
-    type: 'PRODUCT' as const,
+    qtyAlert: '2.0000',
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: AHORA,
     updatedAt: AHORA,
   };

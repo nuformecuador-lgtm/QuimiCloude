@@ -16,6 +16,7 @@ import {
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
+import type { ProductType } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /**
@@ -43,9 +44,9 @@ export const PRODUCT_NAME_FIELD = 'name';
 export type ProductNameOption = {
   readonly id: string;
   readonly name: string;
-  readonly qtyAlert: number | null;
+  readonly qtyAlert: string | null;
   /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
-  readonly type: 'PRODUCT' | 'MACHINE' | 'PACKAGING';
+  readonly type: ProductType;
   /**
    * Presentacion del producto elegido, para que el alta la autocomplete (2026-09-10).
    *

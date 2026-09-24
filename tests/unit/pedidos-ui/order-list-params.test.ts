@@ -14,19 +14,27 @@ import {
   CREATED_AT_COLUMN_ID,
   CREATED_FROM_PARAM,
   CREATED_TO_PARAM,
+  ORDER_SEARCH_MAX_LENGTH,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
   PRIORITY_COLUMN_ID,
   PRIORITY_PARAM,
+  SEARCH_PARAM,
   SORT_PARAM,
   STATUS_COLUMN_ID,
   STATUS_PARAM,
   buildOrderListQuery,
   orderListHref,
   parseOrderListParams,
+  withSearchResetsPage,
 } from '@/app/(private)/pedidos/components';
 import { PAGE_SIZE_OPTIONS, type DataTableParams } from '@/components/shared/data-table';
-import { ORDER_PRIORITY_VALUES, ORDER_QUERYABLE, ORDER_STATUS_VALUES } from '@/lib/modules/pedidos';
+import {
+  ORDER_PRIORITY_VALUES,
+  ORDER_QUERYABLE,
+  ORDER_STATUS_VALUES,
+  createListQuerySchema,
+} from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
@@ -183,6 +191,16 @@ describe('la URL es la unica verdad del estado de lista: ida y vuelta (R15)', ()
         search: '',
       },
     ],
+    [
+      'con un termino de busqueda (R5)',
+      {
+        page: 3,
+        pageSize: DEFAULT_PAGE_SIZE,
+        sort: { columnId: ordenable, direction: 'asc' },
+        filters: {},
+        search: 'acido citrico',
+      },
+    ],
   ];
 
   it.each(casos)('parse(build(params)) devuelve params: %s', (_nombre, params) => {
@@ -200,41 +218,88 @@ describe('la URL es la unica verdad del estado de lista: ida y vuelta (R15)', ()
   });
 });
 
-// Nota fechada 2026-09-18 (QC-68): `ORDER_QUERYABLE.searchable` paso a `true` (R11), asi que el
-// primer caso de este bloque cambia de valor. Los otros dos NO se borran: siguen vigilando que
-// esta pantalla, en concreto, no lea ni emita `search` -su motivo ya no es que el contrato lo
-// prohiba, sino que la caja de busqueda todavia no esta construida aqui (R16)-.
-describe('la pantalla todavia no busca, aunque el contrato ya lo permita (R16)', () => {
-  it('el contrato de pedidos ya declara searchable: true (R11)', () => {
+describe('el termino de busqueda vive en `q` (R4, R5, R6, R7)', () => {
+  it('el contrato de pedidos declara searchable: true', () => {
     expect(ORDER_QUERYABLE.searchable).toBe(true);
   });
 
-  it('un `search` en la URL se IGNORA: la consulta sale siempre con busqueda vacia (R16)', () => {
+  it('lee `q` con espacios al principio y al final y los retira (R4)', () => {
+    const params = parseOrderListParams({ [SEARCH_PARAM]: '  acido citrico  ' });
+
+    expect(params.search).toBe('acido citrico');
+  });
+
+  it('sin `q`, con `q` vacio o con `q` de solo espacios, la busqueda queda vacia (R6)', () => {
+    for (const crudo of [undefined, '', '   ']) {
+      const searchParams = crudo === undefined ? {} : { [SEARCH_PARAM]: crudo };
+      expect(parseOrderListParams(searchParams).search).toBe('');
+    }
+  });
+
+  it('un `search` en la URL se IGNORA: solo `q` alimenta la busqueda (R5)', () => {
     const params = parseOrderListParams({
       search: 'acido citrico',
-      q: 'acido citrico',
       [PAGE_PARAM]: '2',
     });
 
     expect(params.search).toBe('');
-    // Y no se cuela como filtro por la puerta de atras.
     expect(params.filters).toEqual({});
   });
 
-  it('buildOrderListQuery NUNCA emite un parametro `search`, ni siquiera vacio (R16)', () => {
+  it('un termino mas largo que el tope se recorta, sin lanzar (R7)', () => {
+    const excedido = 'a'.repeat(ORDER_SEARCH_MAX_LENGTH + 1);
+
+    const params = parseOrderListParams({ [SEARCH_PARAM]: excedido });
+
+    expect(params.search).toHaveLength(ORDER_SEARCH_MAX_LENGTH);
+    expect(params.search).toBe('a'.repeat(ORDER_SEARCH_MAX_LENGTH));
+  });
+
+  it('el tope de esta pantalla esta atado al del dominio: acepta 120 y rechaza 121', () => {
+    const esquema = createListQuerySchema();
+
+    expect(esquema.safeParse({ search: 'a'.repeat(ORDER_SEARCH_MAX_LENGTH) }).success).toBe(true);
+    expect(esquema.safeParse({ search: 'a'.repeat(ORDER_SEARCH_MAX_LENGTH + 1) }).success).toBe(
+      false,
+    );
+  });
+
+  it('buildOrderListQuery escribe `q` solo cuando el termino no esta vacio, y nunca `search`', () => {
     const conBusqueda: DataTableParams = {
       page: PRIMERA_PAGINA,
       pageSize: DEFAULT_PAGE_SIZE,
       sort: null,
       filters: {},
-      search: 'esto no debe viajar',
+      search: 'acido citrico',
     };
 
     const url = new URLSearchParams(buildOrderListQuery(conBusqueda));
-
+    expect(url.get(SEARCH_PARAM)).toBe('acido citrico');
     expect(url.has('search')).toBe(false);
-    expect(buildOrderListQuery(conBusqueda)).not.toContain('esto');
-    // Y al volver a leerla, la busqueda se ha perdido: la URL es la unica verdad.
-    expect(parseOrderListParams(Object.fromEntries(url.entries())).search).toBe('');
+
+    const sinBusqueda: DataTableParams = { ...conBusqueda, search: '' };
+    expect(new URLSearchParams(buildOrderListQuery(sinBusqueda)).has(SEARCH_PARAM)).toBe(false);
+  });
+});
+
+describe('withSearchResetsPage reinicia la pagina solo si el termino cambia (R2)', () => {
+  const base: DataTableParams = {
+    page: 3,
+    pageSize: DEFAULT_PAGE_SIZE,
+    sort: null,
+    filters: {},
+    search: 'sosa',
+  };
+
+  it('un termino distinto vuelve a la primera pagina', () => {
+    const siguiente: DataTableParams = { ...base, search: 'acido' };
+
+    expect(withSearchResetsPage(base, siguiente)).toEqual({ ...siguiente, page: PRIMERA_PAGINA });
+  });
+
+  it('el mismo termino no toca la pagina que ya trae el cambio', () => {
+    const siguiente: DataTableParams = { ...base, page: 5, sort: { columnId: 'createdAt', direction: 'asc' } };
+
+    expect(withSearchResetsPage(base, siguiente)).toEqual(siguiente);
   });
 });

@@ -4685,3 +4685,73 @@ podar.
   arreglo va en `fix/rojos-de-cd7f07a6`, PR aparte.
 - **Misma sesión: QC-130 cancelada** al acotarla: QC-121 y QC-147 ya cerraron la premisa (unidades sin base
   común en el coste del pedido).
+
+## 2026-09-23 — QC-145-pedidos-terminados-en-asignacion
+
+- **Qué:** `/asignacion` reparte vistas por permiso. El Operador ve «Mis asignados»; el Empacador
+  (`terminados.consultar`) suma «Terminados»; el Administrador (`pedidos.consultar`) ve solo «Todos»,
+  filtrable por estado. Nace `orders.finished_at`, escrita en la misma operación del Finalizar;
+  «Terminados» se ordena por ella con los «sin fecha» al final. La edición en Pedidos deja de mover
+  el estado (solo la planta), y quien tiene `pedidos.consultar` ya no puede ser responsable.
+- **PR #112**, merge `51f2d101`. Spec R1–R37, D1–D18, T1–T17, tres vueltas de spec para cerrar sus
+  preguntas. Review: rechazado por 1 mayor (comentarios que citaban requisitos), aprobado en la
+  segunda con 1 menor abierto. E2E con los tres roles 8/8 en Chromium y WebKit. `./init.sh` completo
+  verde (640/640) antes de abrir el PR.
+- **Base propia desde el primer paso** (`QuimiCloude_QC145`): la lección de QC-147 se aplicó.
+- **Cierra también QC-121** en disco: mergeada en el PR #102 y nunca cerrada, seguía ocupando el cupo
+  `fullstack` y habría dejado `dev` en rojo. Le faltan su resumen aquí y desmontar su worktree.
+- **Rojo de dev al baseline:** `guard-arquitectura-modulos` por `a01c90cb` (import profundo en
+  `product-actions.ts`). Sigue rojo en `dev` al cerrar.
+- **Corrige un test mal planteado de QC-147** que comparaba su migración con la ÚLTIMA del repo y se
+  rompía con cualquier migración posterior.
+- **La máquina se quedó sin memoria dos veces** y cortó gates en segundo plano. Un gate a la vez y sin
+  servidores ni E2E de otras sesiones en paralelo.
+- **Queda abierto:** el menor m4 (constantes muertas en `order-form.tsx` que exige
+  `guard-pantalla-pedidos-se-amplia`); el flake de `user-table` ya tiene ficha (QC-126); el commit
+  `c16d8172` quedó sin Co-Authored-By.
+
+## 2026-09-23 — QC-107-componente-de-carga-de-archivos
+
+- **Qué:** componente de subida de PDFs, varios a la vez (hasta 10 por tanda), con el modo de conversión
+  por prop y el estado de cada archivo (en cola, procesando, listo, error con motivo) leído de la cola de
+  QC-111. Incluye su recorrido E2E y arregla los dos defectos que ese E2E destapó.
+- **PR #103**, merge `be5c75c0`, mergeado el 2026-09-22. Bitácora y review en
+  `progress/impl_QC-107-componente-de-carga-de-archivos.md` y `progress/review_QC-107-componente-de-carga-de-archivos.md`.
+- **Cierre tardío:** el PR se mergeó el 2026-09-22 y la ficha siguió `in_progress` hasta el 2026-09-23,
+  ocupando cupo de `frontend`. La cerró el leader de QC-145 al verificar el merge.
+
+## 2026-09-23 — QC-122-busqueda-y-total-en-la-pantalla-de-pedidos
+
+- **Qué:** `/pedidos` gana la **caja de búsqueda por nombre de receta** (consulta de QC-68). El término vive en
+  `?q=` (paginación, panel lateral, recarga y Atrás); lista anterior atenuada mientras carga; «sin
+  coincidencias» dentro de la tabla con «Limpiar la búsqueda»; **R27**: la caja se sincroniza con la URL al
+  pulsar Atrás entre dos términos, arreglado en `order-table.tsx` sin tocar `components/shared`.
+- **PR #113**, merge `57527a0b`. Spec R1–R27 (R17–R24 y R25 b retirados), T1–T7. E2E 5/5 en Chromium y WebKit.
+- **Cambio de alcance en F1.4:** el importe no va en el listado; es una cotización en el formulario → nace
+  **QC-151**. Review: vuelta 1 rechazada (B1 Limpiar+Atrás, B2 test de R12, B3 WebKit), vuelta 2 OK.
+- **Rojo ajeno del gate** (`guard-arquitectura-modulos`, de `a01c90cb` subido directo a `dev`): arreglado en
+  el **PR #114** (`a63c6640`). **Queda**: proveedores e inventario tienen el mismo fallo de la caja con
+  Atrás (sin ficha); `pnpm run e2e -- <archivo>` no filtra en Git Bash (hay que usar `pnpm exec playwright
+  test`), mejora al arnés pendiente de `/afinar-regla`.
+
+## 2026-09-23 — QC-151-cotizacion-del-coste-en-el-pedido
+
+- **Qué:** el formulario de pedido (alta y edición) muestra una **cotización del coste de ingredientes** en vivo
+  (`$ 1,234,567.50`, valor exacto en el `title`), con un caso de uso nuevo de solo lectura que reutiliza
+  `resolveIngredientsCost` (QC-123) bajo `pedidos.modificar`. Se recotiza 500 ms tras la última tecla y al cambiar
+  la receta; al guardar se recalcula. **R23**: arreglo de `recipe-picker.tsx` (elegir otra receta retiraba la
+  elección), ampliación aprobada por el humano.
+- **PR #115**, merge `6ec67aab`. Spec R1–R23, T1–T8. Nació al acotar QC-122 (el importe no va en el listado).
+- Review: vuelta 1 rechazada (comentarios de producción citando la ficha), vuelta 2 OK. Dos merges con `dev`
+  (QC-145; QC-122 + #114). **Excepción humana al paralelismo**: arrancó solapando con QC-141 en
+  `lib/composition/index.ts`, `lib/modules/pedidos/index.ts` y `order-form.tsx`: **QC-141 resolverá el conflicto al
+  mergear**.
+
+## 2026-09-22 — QC-110-recorte-de-imagenes-del-pdf (cerrada en disco el 2026-09-23)
+
+- **Qué:** dentro del trabajo de la cola, Gemini devuelve las coordenadas de las imágenes de cada página y
+  otra librería las recorta y las sube a un bucket propio de Supabase Storage (QC-110).
+- **PR #105**, merge `efd8f06d` el 2026-09-22. El detalle (spec, review y gate) está en su spec, en su bitácora
+  y en el PR.
+- **Cierre tardío:** el PR se mergeó el 2026-09-22 pero la ficha seguía `in_progress` y la tarjeta *En curso*.
+  El leader lo detectó y lo cerró el 2026-09-23, sin volver a verificar nada.

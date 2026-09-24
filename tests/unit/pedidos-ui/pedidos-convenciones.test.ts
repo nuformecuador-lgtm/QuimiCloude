@@ -78,6 +78,7 @@ const ACCIONES = {
     'updateOrderAction',
     'cancelOrderAction',
     'deleteOrderAction',
+    'quoteOrderCostAction',
   ],
   '@/lib/modules/recetas/adapters/driving/recipe-actions': ['listRecipesAction'],
   '@/lib/modules/unidades/adapters/driving/unit-actions': ['listUnitsAction'],

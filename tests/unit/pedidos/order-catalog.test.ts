@@ -22,20 +22,32 @@ import { fileURLToPath } from 'node:url'
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { InvalidTransitionError } from '@/lib/modules/pedidos'
 import type { OrderAssignmentTarget } from '@/lib/modules/pedidos'
 
 /** Doble del cliente Prisma. */
 const findFirst = vi.fn()
 const updateMany = vi.fn()
-vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { order: { findFirst, updateMany } } }))
+const findMany = vi.fn()
+const count = vi.fn()
+vi.mock('@/lib/shared/db/prisma', () => ({
+  prisma: { order: { findFirst, updateMany, findMany, count } },
+}))
 
 const {
   findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
   toAssignedOrderSummary,
   toOrderAssignmentTarget,
-  transitionAliveOrder,
 } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma')
+
+// `transitionAliveOrder` se retiro -sin llamantes
+// desde que `createTransitionOrder` cablea el Finalizar sobre la unidad de trabajo-, y con ella
+// su `describe` de aqui abajo. El `UPDATE` condicional que movia `status` (y `finishedAt` a
+// ENTREGADO) sigue vivo en `setAliveOrderStatus`, tras `createOrderWriteRepository(tx).setStatus`.
+const { createOrderWriteRepository } = await import(
+  '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+)
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -108,6 +120,8 @@ function baseConUnPedidoVivoYUnoDeBaja(): void {
 beforeEach(() => {
   findFirst.mockReset()
   updateMany.mockReset()
+  findMany.mockReset()
+  count.mockReset()
 })
 
 describe('contrato OrderCatalog', () => {
@@ -172,7 +186,7 @@ describe('toOrderAssignmentTarget', () => {
   })
 })
 
-describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion', () => {
+describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion y la fecha de terminado', () => {
   it('R27: copia presentationId tal cual, con y sin presentacion', () => {
     const conPresentacion = toAssignedOrderSummary({
       id: 'o-1',
@@ -183,6 +197,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion'
       priority: 'MEDIA',
       status: 'PENDIENTE',
       presentationId: 'p-1',
+      finishedAt: null,
     })
     expect(conPresentacion.presentationId).toBe('p-1')
 
@@ -195,8 +210,38 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion'
       priority: 'MEDIA',
       status: 'PENDIENTE',
       presentationId: null,
+      finishedAt: null,
     })
     expect(sinPresentacion.presentationId).toBeNull()
+  })
+
+  it('R20: copia finishedAt tal cual, con y sin fecha', () => {
+    const fecha = new Date('2026-09-23T10:00:00.000Z')
+    const conFecha = toAssignedOrderSummary({
+      id: 'o-3',
+      orderYear: 2026,
+      orderSequence: 9,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'ENTREGADO',
+      presentationId: null,
+      finishedAt: fecha,
+    })
+    expect(conFecha.finishedAt).toBe(fecha)
+
+    const sinFecha = toAssignedOrderSummary({
+      id: 'o-4',
+      orderYear: 2026,
+      orderSequence: 10,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'ENTREGADO',
+      presentationId: null,
+      finishedAt: null,
+    })
+    expect(sinFecha.finishedAt).toBeNull()
   })
 })
 
@@ -267,17 +312,18 @@ describe('el cambio es ADITIVO: pedidos no gano ningun caso de uso ni perdio nad
   })
 })
 
-describe('transitionAliveOrder', () => {
+describe('setAliveOrderStatus (createOrderWriteRepository(tx).setStatus), el camino vivo tras retirar transitionAliveOrder (Tm2)', () => {
   const AHORA = new Date('2026-09-17T12:00:00Z')
+  const setStatus = createOrderWriteRepository().setStatus
 
   it('T1(a) - mueve PENDIENTE->EN_CURSO y EN_CURSO->ENTREGADO', async () => {
     updateMany.mockResolvedValue({ count: 1 })
 
     await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      setStatus('o-1', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('ok')
     await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      setStatus('o-1', 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('ok')
 
     expect(updateMany).toHaveBeenCalledTimes(2)
@@ -292,20 +338,35 @@ describe('transitionAliveOrder', () => {
     })
   })
 
-  it('T1(b) - ENTREGADO->EN_CURSO lanza InvalidTransitionError SIN escribir', async () => {
-    await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'ENTREGADO', 'EN_CURSO', 'actor-1', AHORA),
-    ).rejects.toBeInstanceOf(InvalidTransitionError)
+  it('R3 - a ENTREGADO lleva finishedAt en el mismo data; a EN_CURSO no', async () => {
+    updateMany.mockResolvedValue({ count: 1 })
 
-    expect(updateMany).not.toHaveBeenCalled()
+    await setStatus('o-1', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA })
+    await setStatus('o-1', 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA, { companyId: EMPRESA })
+
+    const [aEnCurso, aEntregado] = updateMany.mock.calls
+    expect(aEnCurso?.[0]?.data).not.toHaveProperty('finishedAt')
+    expect(aEntregado?.[0]?.data).toEqual({
+      status: 'ENTREGADO',
+      updatedAt: AHORA,
+      updatedBy: 'actor-1',
+      finishedAt: AHORA,
+    })
   })
+
+  // El caso de `transitionAliveOrder` (ENTREGADO->EN_CURSO lanza `InvalidTransitionError` SIN
+  // escribir) no tiene equivalente AQUI: `setAliveOrderStatus` corre DENTRO de
+  // `unitOfWork.run`, sobre la fila que ya bloqueo `lockAliveById`, y la transicion la valida
+  // `assertTransition` en el dominio ANTES de llegar aqui (`transition-order.ts`), no el
+  // adaptador. Esa comprobacion -que una transicion ilegal no abre la unidad de trabajo ni
+  // escribe- la prueba `tests/unit/pedidos/transition-order.test.ts`.
 
   it('T1(c) - devuelve not_found cuando el pedido es de otra empresa', async () => {
     updateMany.mockResolvedValue({ count: 0 })
     findFirst.mockResolvedValue(null)
 
     await expect(
-      transitionAliveOrder('o-ajeno', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      setStatus('o-ajeno', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('not_found')
   })
 
@@ -314,7 +375,76 @@ describe('transitionAliveOrder', () => {
     findFirst.mockResolvedValue({ id: 'o-1', status: 'EN_CURSO' })
 
     await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      setStatus('o-1', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('stale')
+  })
+})
+
+describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
+  beforeEach(() => {
+    findMany.mockResolvedValue([])
+    count.mockResolvedValue(0)
+  })
+
+  it('el WHERE acota por empresa y estado, SIN filtro de ids (R17, R22)', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    const llamada = findMany.mock.calls[0]?.[0]
+    expect(llamada.where).toEqual({
+      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null }],
+    })
+    expect(llamada.where).not.toHaveProperty('id')
+    expect(JSON.stringify(llamada.where)).not.toContain('"id"')
+  })
+
+  it('con `work_queue`, el ORDER BY es IDENTICO al de listAliveSummariesByIds', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE', 'EN_CURSO'], 'work_queue', 1)
+    const deTodaLaEmpresa = findMany.mock.calls[0]?.[0]?.orderBy
+
+    findMany.mockClear()
+    await listAliveOrderSummariesByIds(EMPRESA, ['o-1'], ['PENDIENTE', 'EN_CURSO'], 1)
+    const porIds = findMany.mock.calls[0]?.[0]?.orderBy
+
+    expect(deTodaLaEmpresa).toEqual(porIds)
+    expect(deTodaLaEmpresa).toEqual([
+      { priority: 'desc' },
+      { createdAt: 'asc' },
+      { orderYear: 'asc' },
+      { orderSequence: 'asc' },
+      { id: 'asc' },
+    ])
+  })
+
+  it('con `finished_recent_first`, ordena por finishedAt DESC con nulls "last" explicito y desempata por numero DESC (R20, D14)', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    const orderBy = findMany.mock.calls[0]?.[0]?.orderBy
+    expect(orderBy).toEqual([
+      { finishedAt: { sort: 'desc', nulls: 'last' } },
+      { orderYear: 'desc' },
+      { orderSequence: 'desc' },
+      { id: 'asc' },
+    ])
+  })
+
+  it('el resumen paginado incluye finishedAt (R20, R21, R31)', async () => {
+    findMany.mockResolvedValue([
+      {
+        id: 'o-1',
+        orderYear: 2026,
+        orderSequence: 1,
+        recipeId: 'r-1',
+        quantity: { toFixed: () => '10.0000' },
+        priority: 'MEDIA',
+        status: 'ENTREGADO',
+        presentationId: null,
+        finishedAt: new Date('2026-09-23T10:00:00.000Z'),
+      },
+    ])
+    count.mockResolvedValue(1)
+
+    const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    expect(pagina.items[0]?.finishedAt).toEqual(new Date('2026-09-23T10:00:00.000Z'))
   })
 })

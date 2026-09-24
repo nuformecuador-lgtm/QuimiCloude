@@ -120,6 +120,12 @@ del dominio.
    hoy por defecto y **nunca futura**. `expiry_date` **sigue siendo opcional**. Esto **no cierra
    la pregunta**: lo que sigue abierto es el resto, que nada consume todavia el lote ni el
    vencimiento. Detalle en `specs/QC-81-lote-y-fecha-de-compra/requirements.md`.
+   **Avanza el 2026-09-22 (QC-141, implementada el 2026-09-23): primer consumidor del lote.** La
+   reserva de material de un pedido elige **de que lote sale** lo que se despacha: los mas
+   antiguos por fecha de compra, desempatando por numero de lote -el mismo orden que el coste de
+   QC-123-, y entregar lo consume como salida real. El vencimiento **sigue sin consumidor** y la
+   pregunta **sigue abierta** en esa mitad. La existencia pasa de entera a **decimal** en la misma ficha. Detalle en
+   `specs/QC-141-reserva-de-material-del-pedido/requirements.md`.
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
@@ -463,6 +469,16 @@ el service ya deniega. La invalidacion inmediata es QC-23.
 | Webhook de un tercero | Route Handler (`app/api/`) |
 | API publica para terceros | Route Handler (`app/api/`) |
 | Cron interno | Route Handler (`app/api/`) |
+
+El primer cron interno es la caducidad de pedidos de QC-141: `app/api/cron/caducar-pedidos`,
+declarado en `vercel.json` con una sola ejecucion diaria. `/api/**` no pasa por la sesion, asi
+que la unica puerta es el secreto: la ruta exige `Authorization: Bearer <CRON_SECRET>` y responde
+401 si no casa y 500 si la variable no esta definida, sin leer nada en ninguno de los dos casos.
+`CRON_SECRET` tiene que existir en el proyecto de Vercel (Vercel solo manda la cabecera cuando la
+variable existe) y esta documentada en `.env.example`. El proceso no actua en nombre de ninguna
+empresa, pero **tampoco lee varias a la vez**: recorre las empresas y busca los candidatos de cada
+una por separado, de modo que la regla de ambito de empresa de las consultas se cumple sin
+excepciones.
 
 ## Migraciones up/down
 

@@ -1,4 +1,3 @@
-import type { InventoryMovementView } from '../domain/inventory-movement';
 import type { InventoryScope } from '../domain/inventory-scope';
 import type { ListQuery } from '../domain/list-query';
 import type { MovementReason } from '../domain/movement-reason';
@@ -6,6 +5,7 @@ import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
 import type { NewProduct, ProductView } from '../domain/product-view';
+import type { BatchHistoryEntry } from '../domain/reservation';
 
 /**
  * Puerto de acceso a datos de producto (`design.md > 7`). El sufijo `Alive` en los
@@ -70,6 +70,9 @@ export interface ProductRepository {
    * encontrar la presentacion, igual que si `presentationId` fuera invalido por cualquier otro
    * motivo-.
    *
+   * `presentationId` puede ser `null` (solo MACHINE, 2026-09-23): entonces no hay unidad que
+   * comparar y el adaptador busca un vivo con el mismo nombre y `unit_id` NULL.
+   *
    * QC-49 (R18): mira UNICAMENTE los productos vivos DE LA EMPRESA del ambito. Si el unico
    * homonimo vivo es de otra empresa, este metodo devuelve `null` y el alta crea un producto
    * nuevo en la empresa de quien pide, en vez de colgarle el lote al producto ajeno.
@@ -83,7 +86,7 @@ export interface ProductRepository {
    */
   findAliveIdByNameInPresentationUnit(
     name: string,
-    presentationId: string,
+    presentationId: string | null,
     scope: InventoryScope,
   ): Promise<string | null>;
 
@@ -147,16 +150,20 @@ export interface ProductRepository {
    * igual que el resto del puerto-. Un `stock` que quedaria negativo se rechaza antes de
    * escribir nada; el adaptador decide como lo comunica.
    *
+   * Tambien devuelve `reserved` -lo que los pedidos vivos tienen apartado en el lote tras el
+   * ajuste- y `overReserved` -si ese apartado supera la existencia nueva-: un ajuste a la
+   * baja se acepta igual, y esto es lo que permite avisar sin convertirlo en un error.
+   *
    * La empresa no viaja en ningun tipo de entrada, igual que en `NewProduct` y `NewProductBatch`.
    */
   adjustBatchStock(
     batchId: string,
-    delta: number,
+    delta: string,
     reason: MovementReason,
     actorId: string,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ stock: number } | null>;
+  ): Promise<{ stock: string; reserved: string; overReserved: boolean } | null>;
 
   /**
    * Todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es
@@ -169,12 +176,18 @@ export interface ProductRepository {
   ): Promise<readonly ProductBatchView[]>;
 
   /**
-   * El historial de asientos de un lote, del mas reciente al mas antiguo. `null` cuando el
-   * lote no existe o es de otra empresa; un lote vivo sin ningun asiento -anterior al libro-
-   * devuelve un array vacio, que no es lo mismo que `null`.
+   * El historial de asientos de un lote, del mas reciente al mas antiguo: une `inventory_movements`
+   * y `reservation_movements` en un `BatchHistoryEntry` por asiento. `null` cuando el lote no
+   * existe o es de otra empresa; un lote vivo sin ningun asiento -anterior al libro- devuelve un
+   * array vacio, que no es lo mismo que `null`.
+   *
+   * `orderNumberText` y `authorName` llegan como el IDENTIFICADOR crudo de la fila -el pedido y
+   * quien escribio el asiento-, igual que `authorName` en `InventoryMovementView`: resolverlos a
+   * texto mostrable es del caso de uso (`list-batch-movements.ts`), que es quien conoce los
+   * directorios de `pedidos` e `identity`.
    */
   findBatchMovements(
     batchId: string,
     scope: InventoryScope,
-  ): Promise<readonly InventoryMovementView[] | null>;
+  ): Promise<readonly BatchHistoryEntry[] | null>;
 }

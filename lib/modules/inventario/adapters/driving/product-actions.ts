@@ -2,14 +2,14 @@
 
 import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
+import { InventarioError, PRODUCT_TYPES, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Aqui no se repite `requirePermission`: es la primera linea de cada caso de uso.
 
 export type CreateProductFormState =
   | { status: 'idle' }
-  | { status: 'success'; id: string; lot: string }
+  | { status: 'success'; id: string; lot?: string }
   | ErrorState;
 
 export type ProductMutationFormState =
@@ -27,7 +27,7 @@ export type ProductListResult =
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
 
-const NUMERIC_FIELD_ERROR = 'Uno o mas campos numericos no son un numero valido.';
+const NUMERIC_FIELD_ERROR = 'Uno o mas campos numericos no son un decimal valido.';
 const MISSING_ID_ERROR = 'Falta el identificador del producto.';
 
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
@@ -46,16 +46,17 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
   return value;
 }
 
-/** El patron va antes de la conversion: sin el, `'1e3'` o `'0x10'` pasarian como enteros validos. */
-function readOptionalFormInt(
+/** El patron va antes de pasarlo al caso de uso: sin el, `'1e3'` pasaria como decimal valido.
+ *  Sin signo: ni la existencia del lote ni la alerta de cantidad aceptan un negativo. */
+function readOptionalFormDecimal(
   formData: FormData,
   name: string,
-): number | undefined | typeof INVALID_NUMBER {
+): string | undefined | typeof INVALID_NUMBER {
   const value = formData.get(name);
   if (typeof value !== 'string' || value.trim() === '') return undefined;
   const trimmed = value.trim();
-  if (!/^-?\d+$/.test(trimmed)) return INVALID_NUMBER;
-  return Number(trimmed);
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return INVALID_NUMBER;
+  return trimmed;
 }
 
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
@@ -80,8 +81,8 @@ async function currentActor(): Promise<Actor | null> {
 }
 
 function buildProductFields(formData: FormData): Record<string, unknown> | typeof INVALID_NUMBER {
-  const qtyAlert = readOptionalFormInt(formData, 'qtyAlert');
-  const type = readOptionalFormString(formData, 'type');
+  const qtyAlert = readOptionalFormDecimal(formData, 'qtyAlert');
+  const type = readOptionalFormString(formData, 'type') ?? PRODUCT_TYPES.PRODUCT;
 
   if (qtyAlert === INVALID_NUMBER) {
     return INVALID_NUMBER;
@@ -95,32 +96,62 @@ function buildProductFields(formData: FormData): Record<string, unknown> | typeo
 }
 
 /**
- * Alta y edicion no comparten constructor: el esquema de edicion es `strictObject` sin campos de
- * lote, y cualquiera de ellos haria fallar la edicion con `invalid_input`. Importes y fechas pasan
- * como la cadena escrita; vacios llegan `undefined`, porque el esquema los acepta ausentes y `''`
- * seria invalido. La existencia solo se lee aqui: va al lote, no al producto.
+ * Construye el candidato segun el tipo de producto.
+ * El esquema es una union discriminada, asi que solo se pasan los campos relevantes.
+ * Los tres tipos crean lote; MACHINE omite `qtyAlert` y solo lleva stock + purchaseDate
+ * (el formulario no pinta presentacion ni costos para Instrumento).
  */
 function buildCreateProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
-  const fields = buildProductFields(formData);
-  if (fields === INVALID_NUMBER) return INVALID_NUMBER;
+  const type = readOptionalFormString(formData, 'type') || PRODUCT_TYPES.PRODUCT;
+  const name = readFormString(formData, 'name');
 
-  const stock = readOptionalFormInt(formData, 'stock');
+  const stock = readOptionalFormDecimal(formData, 'stock');
   if (stock === INVALID_NUMBER) return INVALID_NUMBER;
 
-  return {
-    ...fields,
+  // Instrumento: solo existencia y fecha de compra entre los campos del lote.
+  if (type === PRODUCT_TYPES.MACHINE) {
+    return {
+      name,
+      type: PRODUCT_TYPES.MACHINE,
+      stock,
+      purchaseDate: readOptionalFormString(formData, 'purchaseDate'),
+    };
+  }
+
+  const candidate = {
+    name,
+    type,
     stock,
     presentationId: readOptionalFormString(formData, 'presentationId'),
     unitCost: readOptionalFormString(formData, 'unitCost'),
     totalCost: readOptionalFormString(formData, 'totalCost'),
     lot: readOptionalFormString(formData, 'lot'),
-    expiryDate: readOptionalFormString(formData, 'expiryDate'),
     purchaseDate: readOptionalFormString(formData, 'purchaseDate'),
-  };
+  } as Record<string, unknown>;
+
+  // PACKAGING no tiene expiryDate
+  if (type !== PRODUCT_TYPES.PACKAGING) {
+    candidate.expiryDate = readOptionalFormString(formData, 'expiryDate');
+  }
+
+  const qtyAlert = readOptionalFormDecimal(formData, 'qtyAlert');
+  if (qtyAlert === INVALID_NUMBER) return INVALID_NUMBER;
+  candidate.qtyAlert = qtyAlert;
+
+  return candidate;
 }
 
 function buildUpdateProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
-  return buildProductFields(formData);
+  const fields = buildProductFields(formData);
+  if (fields === INVALID_NUMBER) return INVALID_NUMBER;
+
+  const type = (fields.type as string) ?? PRODUCT_TYPES.PRODUCT;
+  // MACHINE: sin qtyAlert en el FormData; la clave no viaja (strictObject rechazaría un valor
+  // presente con el esquema de Instrumento, que no la declara).
+  if (type === PRODUCT_TYPES.MACHINE) {
+    return { name: fields.name, type: PRODUCT_TYPES.MACHINE };
+  }
+  return fields;
 }
 
 export async function createProductAction(
@@ -137,8 +168,6 @@ export async function createProductAction(
   const actor = await currentActor();
 
   try {
-    // Si el nombre ya existia, `id` es el del producto que ya estaba. `lot` es el TEXTO que
-    // quedo escrito en el primer lote, generado o tecleado a mano.
     const { id, lot } = await inventario.createProduct(candidate, actor);
     return { status: 'success', id, lot };
   } catch (error) {

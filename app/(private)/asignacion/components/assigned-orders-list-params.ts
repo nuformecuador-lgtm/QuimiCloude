@@ -1,6 +1,13 @@
 import { PAGE_SIZE_OPTIONS, type DataTableParams } from '@/components/shared/data-table';
+import type { AssignmentViewKind } from '@/lib/modules/asignaciones';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
+
+import { VIEW_PARAM } from './assignment-view-params';
+
+// Reexportado para que `assigned-orders-list-section.tsx` no necesite importar el barrel del
+// modulo: ese archivo solo puede llegar a la accion por su ruta exacta (guardia de contrato).
+export type { AssignmentViewKind };
 
 export const PAGE_PARAM = 'page';
 export const PAGE_SIZE_PARAM = 'pageSize';
@@ -61,8 +68,15 @@ export function buildAssignedOrdersListQuery(params: DataTableParams): string {
   return query.toString();
 }
 
-export function assignedOrdersListHref(params: DataTableParams): string {
-  return `${ASSIGNED_ORDERS_ROUTE}?${buildAssignedOrdersListQuery(params)}`;
+/**
+ * `vista` es OPCIONAL: cuando la pantalla solo tiene una vista no hay pestañas ni parametro que
+ * conservar. Cuando ofrece mas de una, quien construye el `href` pasa la vigente para que paginar
+ * «Mis asignados» no vuelva a la vista por defecto.
+ */
+export function assignedOrdersListHref(params: DataTableParams, vista?: AssignmentViewKind): string {
+  const query = new URLSearchParams(buildAssignedOrdersListQuery(params));
+  if (vista !== undefined) query.set(VIEW_PARAM, vista);
+  return `${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`;
 }
 
 /** Solo `page` y `pageSize`: el esquema del dominio es estricto y rechazaria una clave de mas. */

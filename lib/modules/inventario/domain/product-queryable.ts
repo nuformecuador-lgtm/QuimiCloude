@@ -15,7 +15,7 @@
  */
 
 import type { ListQueryable } from './list-query';
-import type { ProductType } from './product-view';
+import { PRODUCT_TYPE_VALUES } from './product-type';
 
 export const PRODUCT_QUERYABLE: ListQueryable = {
   sortable: ['name', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
@@ -28,4 +28,4 @@ export const PRODUCT_QUERYABLE: ListQueryable = {
   searchable: true,
 } as const satisfies ListQueryable & { filterable: { type: 'select' } };
 
-export const PRODUCT_TYPE_VALUES: readonly ProductType[] = ['PRODUCT', 'MACHINE', 'PACKAGING'] as const;
+export { PRODUCT_TYPE_VALUES };

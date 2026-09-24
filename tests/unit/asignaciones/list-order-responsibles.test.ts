@@ -117,7 +117,7 @@ function filaDeGrupo(userId: string, workGroupName = NOMBRE_CONGELADO): Assignme
 }
 
 function persona(id: string, displayName: string, isActive = true): PersonRef {
-  return { id, displayName, isActive };
+  return { id, displayName, isActive, permissions: [] };
 }
 
 describe('QC-87 — consultar los responsables de un pedido', () => {

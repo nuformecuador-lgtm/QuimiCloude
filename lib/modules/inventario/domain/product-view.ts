@@ -1,5 +1,7 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
+import type { ProductType } from './product-type';
+
 /**
  * Contratos de entrada y salida de producto (`design.md > 6.1`, `> 3`). Viven en
  * `domain/` -no en `ports/`- porque describen el QUE se dice, no el COMO se habla con el
@@ -7,8 +9,7 @@ import type { UnitId } from '@/lib/modules/unidades';
  * (solo reexporta de `./domain`).
  */
 
-/** Tipo de producto: PRODUCT, MACHINE o PACKAGING. */
-export type ProductType = 'PRODUCT' | 'MACHINE' | 'PACKAGING';
+export type { ProductType } from './product-type';
 
 /**
  * Datos de negocio de un producto, ya validados por `product-input.ts` (`design.md >
@@ -23,7 +24,7 @@ export type ProductType = 'PRODUCT' | 'MACHINE' | 'PACKAGING';
  */
 export type NewProduct = {
   readonly name: string;
-  readonly qtyAlert?: number | null;
+  readonly qtyAlert?: string | null;
   readonly type?: ProductType;
 };
 
@@ -47,13 +48,19 @@ export type ProductView = {
    * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
-  /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto. */
-  readonly stock: number;
+  /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto,
+   *  con sus cuatro decimales. */
+  readonly stock: string;
   /** Unidad guardada en `products.unit_id`, o `null` si el producto todavia no tiene lotes. */
   readonly unitId: UnitId | null;
-  readonly qtyAlert: number | null;
+  readonly qtyAlert: string | null;
   /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
   readonly type: ProductType;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  /** Suma de lo apartado en los lotes vivos del producto. Opcional: solo lo rellena
+   *  `listAliveProducts`, con una consulta agregada por pagina; las demas lecturas no la traen. */
+  readonly reserved?: string;
+  /** Suma de lo disponible en los lotes vivos del producto. Misma condicion que `reserved`. */
+  readonly available?: string;
 };

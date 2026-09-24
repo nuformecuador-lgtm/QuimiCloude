@@ -496,6 +496,10 @@ describe('el pedido como fila completa', () => {
       'created_at',
       'created_by',
       'deleted_at',
+      // `finished_at` es el instante en que el pedido paso a ENTREGADO al finalizarlo en
+      // planta: no es un total, un subtotal, un impuesto ni un cliente. Entre `deleted_at` e
+      // `id` por el mismo `sort()` lexicografico ('d' < 'f' < 'i').
+      'finished_at',
       'id',
       // `ingredients_cost` es el COSTE DE LOS INGREDIENTES, leido de los lotes vigentes al
       // guardar: no es un precio de venta, ni un total, ni un subtotal, ni un impuesto. Entre
@@ -510,6 +514,9 @@ describe('el pedido como fila completa', () => {
       'priority',
       'quantity',
       'recipe_id',
+      // `reserved_at`: el instante desde el que cuenta la caducidad de la reserva, o `null` si
+      // el pedido no tiene material apartado.
+      'reserved_at',
       'status',
       'updated_at',
       'updated_by',

@@ -175,10 +175,9 @@ vi.mock('@/lib/composition', () => ({
 // ejercita, y sin el doble la importacion del barrel arrastraria `@/lib/composition` entero.
 // **El guion de este archivo no cambia**: solo se anade el doble que faltaba.
 // QC-102 T11 — El barrel arrastra ahora `order-list-section.tsx`, que compone el LOTE de
-// responsables y resuelve `canWrite` leyendo la sesion. Con el llegan dos bordes mas de
-// `identity` —`user-actions.ts` y `work-group-actions.ts`—, que leen `observabilidad` de
-// `@/lib/composition` **al cargarse**, y el doble de composicion de este archivo declara solo
-// `identity`.
+// responsables y resuelve `canWrite` leyendo la sesion. Con el llega otro borde mas de
+// `identity` —`work-group-actions.ts`—, que lee `observabilidad` de `@/lib/composition` **al
+// cargarse**, y el doble de composicion de este archivo declara solo `identity`.
 //
 // **No es un cambio de guion**: no toca ni un `it(...)`, ni un selector, ni una asercion. Es el
 // mismo aislamiento de bordes que este archivo ya hace con `pedidos`, `recetas` y `asignaciones`,
@@ -186,13 +185,6 @@ vi.mock('@/lib/composition', () => ({
 // usuarios ni grupos.
 // La pagina vacia se construye DENTRO de cada factoria: `vi.mock` se iza por encima de los
 // `const` del modulo, y una constante compartida aqui arriba seria una trampa de zona muerta.
-vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => ({
-  listUsersAction: vi.fn(async () => ({
-    status: 'success' as const,
-    data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
-  })),
-}));
-
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
   listWorkGroupsAction: vi.fn(async () => ({
     status: 'success' as const,
@@ -214,6 +206,8 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', 
     // no afirman nada sobre responsables, y con el lote vacio la columna pinta su marcador de
     // ausencia sin cambiar una sola asercion de aqui.
     listResponsiblesForOrdersAction: vi.fn(async () => ({ status: 'success', data: [] })),
+    // El catalogo de personas del panel sale de esta accion.
+    listResponsibleCandidatesAction: vi.fn(async () => ({ status: 'success', data: [] })),
   };
 });
 
@@ -232,6 +226,13 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   getOrderAction: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse: la fila ya trae el pedido entero');
   }),
+  // Mismo criterio que `listResponsiblesForOrdersAction` justo arriba -la seccion de lista SI la
+  // invoca, una vez por pagina- con el lote vacio: este archivo mide viewport, no afirma sobre
+  // cobertura.
+  listOrderCoverageAction: vi.fn(async () => ({ status: 'success', data: [] })),
+  quoteOrderCostAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -592,7 +593,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // Primera mitad: la CONFIGURACION. Si una columna declarase `size`, la libreria si tendria un
     // ancho que imponer, y los 150 px por defecto dejarian de ser inertes.
     const columnas = buildOrderColumns({ recipes: RECETAS, units: [] });
-    expect(columnas).toHaveLength(10);
+    expect(columnas).toHaveLength(11);
 
     for (const columna of columnas) {
       for (const clave of ['size', 'width', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {

@@ -30,7 +30,7 @@ export {
 } from './domain/list-query';
 export { PRESENTATION_QUERYABLE } from './domain/presentation-queryable';
 export { PRODUCT_QUERYABLE, PRODUCT_TYPE_VALUES } from './domain/product-queryable';
-export { type ProductType } from './domain/product-view';
+export { PRODUCT_TYPES, type ProductType } from './domain/product-type';
 export { normalizePresentationName } from './domain/presentation-name';
 export { normalizeProductName } from './domain/product-name';
 export {
@@ -83,7 +83,37 @@ export {
   type ListBatchMovementsDeps,
 } from './domain/list-batch-movements';
 
+export {
+  addQuantities,
+  subtractQuantities,
+  compareQuantities,
+  minQuantity,
+  ceilToScale4,
+} from './domain/decimal-quantity';
+export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
+
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
 export type { PresentationCatalog, PresentationId, PresentationRef } from './domain/presentation-catalog';
+
+// La reserva de material: tipos y las dos interfaces que consume o implementa quien llama
+// desde fuera de `inventario`. La implementacion (Prisma, la transaccion) vive en los
+// adaptadores driven de este modulo y se cablea en `lib/composition`.
+export type {
+  ReservationRequirementLine,
+  ReservationOutcome,
+  ConsumptionOutcome,
+  OrderCoverage,
+  MaterialReservations,
+  ReservationQueries,
+  OrderNumberDirectory,
+  BatchHistoryEntry,
+} from './domain/reservation';
+export { planReservation } from './domain/plan-reservation';
+export type {
+  ReservationCandidateBatch,
+  PlanReservationInput,
+  ReservationAllocation,
+  ReservationPlan,
+} from './domain/plan-reservation';

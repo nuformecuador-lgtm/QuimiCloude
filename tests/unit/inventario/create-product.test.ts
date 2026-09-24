@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import type { Mock } from 'vitest';
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import {
@@ -36,8 +37,8 @@ const PRESENTACION = '11111111-1111-4111-8111-111111111111';
 
 const ALTA_VALIDA = {
   name: 'Acido sulfurico',
-  stock: 4,
-  qtyAlert: 1,
+  stock: '4',
+  qtyAlert: '1',
   presentationId: PRESENTACION,
   unitCost: '12.5000',
 };
@@ -165,14 +166,14 @@ describe('R24 — la entrada invalida se rechaza sin tocar el puerto', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    const sinExistencia = { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: 0 };
+    const sinExistencia = { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: '0' };
     await expect(createProduct(sinExistencia, ADMIN)).rejects.toBeInstanceOf(ValidationError);
 
     const totalInsuficiente = {
       ...ALTA_VALIDA,
       unitCost: undefined,
       totalCost: '0.0001',
-      stock: 5,
+      stock: '5',
     };
     await expect(createProduct(totalInsuficiente, ADMIN)).rejects.toBeInstanceOf(ValidationError);
 
@@ -251,9 +252,9 @@ describe('R15, R16, R21 — producto nuevo', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await createProduct({ ...ALTA_VALIDA, stock: 7 }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '7' }, ADMIN);
 
-    expect(loteCreado(products).stock).toBe(7);
+    expect(loteCreado(products).stock).toBe('7');
     expect(Object.keys(productoCreado(products))).not.toContain('stock');
   });
 
@@ -263,9 +264,118 @@ describe('R15, R16, R21 — producto nuevo', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await createProduct(ALTA_VALIDA, ADMIN);
-    await createProduct({ ...ALTA_VALIDA, stock: 0 }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '0' }, ADMIN);
 
     expect(products.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('MACHINE — crea producto con primer lote, sin qtyAlert', () => {
+  // Fechas locales al bloque: las de QC-81 estan mas abajo y un `const` no se usa antes de
+  // declararse.
+  const AHORA_MQ = new Date('2026-09-10T10:00:00.000Z');
+  const MANANA_MQ = '2026-09-11';
+  const SEMANA_PASADA_MQ = '2026-09-03';
+  // El formulario de Instrumento solo pinta stock y purchaseDate (2026-09-23):
+  // presentationId y unitCost son anulables unicamente para MACHINE.
+  const ALTA_INSTRUMENTO = {
+    name: 'Instrumento de laboratorio',
+    type: PRODUCT_TYPES.MACHINE,
+    stock: '2',
+  };
+
+  it('crea producto y lote en una sola operacion, con purchaseDate en el lote', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    const resultado = await createProduct(
+      { ...ALTA_INSTRUMENTO, purchaseDate: SEMANA_PASADA_MQ },
+      ADMIN,
+    );
+
+    expect(products.create).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
+    expect(productoCreado(products)).toEqual({
+      name: 'Instrumento de laboratorio',
+      type: PRODUCT_TYPES.MACHINE,
+    });
+    expect(Object.keys(productoCreado(products))).not.toContain('qtyAlert');
+    expect(loteCreado(products)).toMatchObject({
+      stock: '2',
+      presentationId: null,
+      unitCost: null,
+      purchaseDate: SEMANA_PASADA_MQ,
+    });
+    expect(resultado).toEqual({ id: 'producto-nuevo-1', lot: '1' });
+    // Sin presentacion: la busqueda de homonimo recibe `null` (no hay unidad que comparar).
+    expect(products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledWith(
+      'Instrumento de laboratorio',
+      null,
+      { companyId: EMPRESA },
+    );
+  });
+
+  it('sin purchaseDate resuelve HOY en el lote, no en el producto', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await createProduct(ALTA_INSTRUMENTO, ADMIN);
+
+    expect(loteCreado(products).purchaseDate).toBe('2026-09-10');
+    expect(productoCreado(products)).toEqual({
+      name: 'Instrumento de laboratorio',
+      type: PRODUCT_TYPES.MACHINE,
+    });
+  });
+
+  it('acepta expiryDate opcional y la guarda en el lote', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await createProduct({ ...ALTA_INSTRUMENTO, expiryDate: '2027-12-31' }, ADMIN);
+
+    expect(loteCreado(products).expiryDate).toBe('2027-12-31');
+  });
+
+  it('acepta presentationId y unitCost opcionales si el llamante los manda', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await createProduct(
+      { ...ALTA_INSTRUMENTO, presentationId: PRESENTACION, unitCost: '1500.0000' },
+      ADMIN,
+    );
+
+    expect(loteCreado(products)).toMatchObject({
+      presentationId: PRESENTACION,
+      unitCost: '1500.0000',
+    });
+    expect(products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledWith(
+      'Instrumento de laboratorio',
+      PRESENTACION,
+      { companyId: EMPRESA },
+    );
+  });
+
+  it('rechaza una fecha de compra futura sin tocar el puerto', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await expect(
+      createProduct({ ...ALTA_INSTRUMENTO, purchaseDate: MANANA_MQ }, ADMIN),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(products.create).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+
+  it('rechaza qtyAlert en el alta de un instrumento', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await expect(
+      createProduct({ ...ALTA_INSTRUMENTO, qtyAlert: 3 }, ADMIN),
+    ).rejects.toBeInstanceOf(ValidationError);
+    afirmarPuertoIntacto(products);
   });
 });
 
@@ -276,10 +386,10 @@ describe('R3 — existencia cero', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await createProduct({ ...ALTA_VALIDA, stock: 0 }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '0' }, ADMIN);
 
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
-    expect(loteCreado(products).stock).toBe(0);
+    expect(loteCreado(products).stock).toBe('0');
   });
 });
 
@@ -298,7 +408,7 @@ describe('R6, R7, R10 — el costo que se guarda', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await createProduct(
-      { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: 3 },
+      { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: '3' },
       ADMIN,
     );
 
@@ -313,7 +423,7 @@ describe('R6, R7, R10 — el costo que se guarda', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await createProduct(
-      { ...ALTA_VALIDA, unitCost: '12.5000', totalCost: '999999', stock: 4 },
+      { ...ALTA_VALIDA, unitCost: '12.5000', totalCost: '999999', stock: '4' },
       ADMIN,
     );
 
@@ -423,7 +533,7 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     // Lo que no viaja al puerto no se puede escribir por accidente.
     const { products, createProduct } = montarConExistente();
 
-    await createProduct({ ...ALTA_VALIDA, stock: 999, qtyAlert: 888, name: 'Otro nombre' }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '999', qtyAlert: '888', name: 'Otro nombre' }, ADMIN);
 
     const llamada = products.addBatchToAlive.mock.calls[0];
     expect(llamada).toHaveLength(4);

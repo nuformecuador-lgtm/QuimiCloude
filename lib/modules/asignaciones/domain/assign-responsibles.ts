@@ -46,12 +46,14 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { requirePermission, type Actor } from './actor';
 import { assignResponsiblesSchema } from './assignment-input';
 import {
+  UserCannotBeResponsibleError,
   UserNotAssignableError,
   UserNotFoundError,
   ValidationError,
   WorkGroupNotFoundError,
 } from './errors';
 import { assertOrderAcceptsWrites } from './order-state';
+import { canBeResponsible } from './responsible-eligibility';
 
 import type { NewAssignment, OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
@@ -117,6 +119,9 @@ export function createAssignResponsibles(
       // propio y distinto de `user_not_found`: lo que no admite es que se le asigne trabajo HOY.
       // Quien decide que es «activo» es `identity` (R21); aqui solo se lee el booleano.
       if (!person.isActive) throw new UserNotAssignableError();
+      // Supervisa los pedidos de toda la empresa: no se le puede asignar la responsabilidad de
+      // ejecutar uno. Rechazo ENTERO, igual que los dos anteriores.
+      if (!canBeResponsible(person)) throw new UserCannotBeResponsibleError();
     }
 
     // 5. R25, R6: el grupo que no existe, el dado de baja y el de otra empresa, el mismo error.
@@ -124,6 +129,19 @@ export function createAssignResponsibles(
       if (snapshot === null) throw new WorkGroupNotFoundError();
       return snapshot;
     });
+
+    // Quien supervisa los pedidos de toda la empresa se omite EN SILENCIO de los grupos,
+    // igual que a un miembro inactivo, sin rechazar la operacion. Una sola llamada con la union de
+    // todos los miembros activos, no una por grupo.
+    const memberIds = new Set<string>();
+    for (const snapshot of resolved) {
+      for (const userId of snapshot.activeMemberIds) memberIds.add(userId);
+    }
+    const members =
+      memberIds.size > 0 ? await deps.people.findAliveRefsInCompany(companyId, [...memberIds], now) : [];
+    const eligibleMemberIds = new Set(
+      members.filter((person) => canBeResponsible(person)).map((person) => person.id),
+    );
 
     // 6. R24 — COMPOSICION DETERMINISTA. El orden esta DOCUMENTADO y es este:
     //      (a) las personas sueltas, EN EL ORDEN RECIBIDO;
@@ -148,6 +166,8 @@ export function createAssignResponsibles(
       // aporta cero filas y **no** es un error: la operacion termina con exito.
       for (const userId of snapshot.activeMemberIds) {
         if (rows.has(userId)) continue;
+        // Se omite en silencio, igual que a un inactivo; el resto del grupo se asigna.
+        if (!eligibleMemberIds.has(userId)) continue;
         // R19, R28: la referencia al grupo y el NOMBRE QUE EL GRUPO TENIA EN ESE INSTANTE viajan
         // en la MISMA escritura que crea la fila. No se recalcula, no se refresca y no se relee:
         // renombrar el grupo despues no cambia ninguna fila ya creada (R36).

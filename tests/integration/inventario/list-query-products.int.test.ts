@@ -225,7 +225,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     );
 
     expect(pagina.total).toBe(4);
-    expect(pagina.items.every((p) => (p.qtyAlert ?? 0) >= 9)).toBe(true);
+    expect(pagina.items.every((p) => Number(p.qtyAlert ?? '0') >= 9)).toBe(true);
   });
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
@@ -250,13 +250,13 @@ describe('el listado vuelve a ordenar y a filtrar por existencia guardada (R15)'
       consulta({ pageSize: 25, search: PREFIJO, sort: { columnId: 'stock', direction: 'asc' } }),
       ambito(),
     );
-    expect(asc.items.map((p) => p.stock)).toEqual([10, 20, 30, 40]);
+    expect(asc.items.map((p) => Number(p.stock))).toEqual([10, 20, 30, 40]);
 
     const desc = await listAliveProducts(
       consulta({ pageSize: 25, search: PREFIJO, sort: { columnId: 'stock', direction: 'desc' } }),
       ambito(),
     );
-    expect(desc.items.map((p) => p.stock)).toEqual([40, 30, 20, 10]);
+    expect(desc.items.map((p) => Number(p.stock))).toEqual([40, 30, 20, 10]);
   });
 
   it('filtra por un rango de existencia, en los dos extremos inclusivos', async () => {
@@ -269,7 +269,7 @@ describe('el listado vuelve a ordenar y a filtrar por existencia guardada (R15)'
       ambito(),
     );
 
-    expect(pagina.items.map((p) => p.stock).sort((a, b) => a - b)).toEqual([20, 30]);
+    expect(pagina.items.map((p) => Number(p.stock)).sort((a, b) => a - b)).toEqual([20, 30]);
     expect(pagina.total).toBe(2);
   });
 });
@@ -455,7 +455,7 @@ describe('el mismo nombre en dos unidades distintas son dos productos, cada uno 
 
     expect(pagina.items).toHaveLength(1);
     expect(pagina.items[0]?.unitId).toBeNull();
-    expect(pagina.items[0]?.stock).toBe(0);
+    expect(pagina.items[0]?.stock).toBe('0.0000');
   });
 });
 
@@ -484,8 +484,8 @@ describe('la existencia guardada distingue dos unidades por dos productos (R15)'
 
     expect(pagina.items).toHaveLength(2);
     const porUnidad = new Map(pagina.items.map((p) => [p.unitId, p]));
-    expect(porUnidad.get(unidadA)?.stock).toBe(10);
-    expect(porUnidad.get(unidadB)?.stock).toBe(20);
+    expect(porUnidad.get(unidadA)?.stock).toBe('10.0000');
+    expect(porUnidad.get(unidadB)?.stock).toBe('20.0000');
   });
 });
 
@@ -514,6 +514,6 @@ describe('el listado sirve la existencia guardada tal cual, haya lotes vencidos 
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
     expect(pagina.items).toHaveLength(1);
-    expect(pagina.items[0]?.stock).toBe(15);
+    expect(pagina.items[0]?.stock).toBe('15.0000');
   });
 });

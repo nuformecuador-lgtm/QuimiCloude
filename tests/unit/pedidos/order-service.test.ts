@@ -13,8 +13,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
 import {
-  DuplicateOrderNumberError,
   InvalidTransitionError,
+  DuplicateOrderNumberError,
   OrderNotFoundError,
   RecipeNotFoundError,
   ValidationError,
@@ -23,9 +23,9 @@ import {
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
-import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -86,24 +86,28 @@ type Dobles = {
   readonly products: ProductCatalog
   readonly units: UnitCatalog
   readonly presentations: PresentationCatalog
+  readonly unitOfWork: ReturnType<typeof fakeUnitOfWork>['unitOfWork']
   readonly now: () => Date
 }
 
 function dobles(opciones: {
   fila?: OrderRow | null
   recetas?: readonly RecipeRef[]
-  alta?: OrderRow | 'duplicate_number'
+  alta?: OrderRow
   edicion?: 'ok' | 'not_found'
   presentaciones?: readonly { readonly id: string; readonly name: string }[]
 }): Dobles & {
   readonly create: ReturnType<typeof vi.fn>
   readonly findAliveById: ReturnType<typeof vi.fn>
+  readonly lockAliveById: ReturnType<typeof vi.fn>
   readonly updateAlive: ReturnType<typeof vi.fn>
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>
   readonly findPresentationRefs: ReturnType<typeof vi.fn>
 } {
   const create = vi.fn(async () => opciones.alta ?? fila())
-  const findAliveById = vi.fn(async () => opciones.fila ?? null)
+  const filaVista = opciones.fila === undefined ? null : opciones.fila
+  const findAliveById = vi.fn(async () => filaVista)
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
   const updateAlive = vi.fn(async () => opciones.edicion ?? 'ok')
   const findRefsIncludingDeleted = vi.fn(async () => opciones.recetas ?? [RECETA_VIVA])
   const findPresentationRefs = vi.fn(
@@ -127,13 +131,16 @@ function dobles(opciones: {
     })
 
   const orders = {
-    create,
     findAliveById,
     listAlive: explota('orders.listAlive'),
-    updateAlive,
-    cancelAlive: explota('orders.cancelAlive'),
-    softDeleteAlive: explota('orders.softDeleteAlive'),
   } as unknown as OrderRepository
+
+  const setReservedAt = vi.fn(async () => undefined)
+  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
+  const { unitOfWork } = fakeUnitOfWork({
+    orders: { lockAliveById, create, updateAlive, setReservedAt },
+    reservations: { syncForOrder },
+  })
 
   return {
     orders,
@@ -144,9 +151,11 @@ function dobles(opciones: {
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
+    unitOfWork,
     now: () => AHORA,
     create,
     findAliveById,
+    lockAliveById,
     updateAlive,
     findRefsIncludingDeleted,
     findPresentationRefs,
@@ -270,18 +279,10 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     ).rejects.toBeInstanceOf(ValidationError)
   })
 
-  it('traduce el duplicado del correlativo a su error de dominio propio', async () => {
-    // El `23505` del indice unico llega como resultado DISCRIMINADO, no como excepcion de
-    // Prisma (`design.md > 4.2`).
-    const d = dobles({ alta: 'duplicate_number' })
-
-    expect(await codigoDelFallo(() => createCreateOrder(d)(ENTRADA_ALTA, ADMIN))).toBe(
-      'duplicate_number',
-    )
-    await expect(createCreateOrder(d)(ENTRADA_ALTA, ADMIN)).rejects.toBeInstanceOf(
-      DuplicateOrderNumberError,
-    )
-  })
+  // El `23505` del correlativo ya NO se traduce aqui. `OrderWriteRepository.create` lo deja
+  // SUBIR, y quien reintenta con una transaccion nueva es `OrderUnitOfWork`; agotados los tres
+  // intentos, la excepcion de Prisma sube sin traducir. Lo prueba
+  // `tests/integration/pedidos/order-unit-of-work.int.test.ts`, contra Postgres real.
 })
 
 describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
@@ -363,12 +364,8 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       totalPages: 1,
     }))
     const orders = {
-      create: vi.fn(),
       findAliveById: vi.fn(),
       listAlive,
-      updateAlive: vi.fn(),
-      cancelAlive: vi.fn(),
-      softDeleteAlive: vi.fn(),
     } as unknown as OrderRepository
     const findRefsIncludingDeleted = vi.fn(async () => [RECETA_VIVA])
     const findIdsMatchingName = vi.fn(async (): Promise<readonly string[] | null> => null)
@@ -385,13 +382,19 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
   })
 })
 
-describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
-  const EDICION = { ...ENTRADA_ALTA, priority: 'ALTA', status: 'EN_CURSO' }
+describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', () => {
+  const EDICION = { ...ENTRADA_ALTA, priority: 'ALTA' }
 
-  it('reemplaza el conjunto completo y registra al actor como autor de la modificacion (R20, R6)', async () => {
+  // ENMIENDA. Antes, la edicion escribia el `status` de la entrada y `assertTransition` comparaba
+  // `row.status` contra `data.status`: una edicion podia mover el pedido hacia delante. Ahora la
+  // edicion NUNCA mueve el estado: `updateOrderSchema` ya no declara `status` -lo descarta como
+  // cualquier clave desconocida- y la guardia compara `row.status` contra si mismo, asi que solo
+  // importa si el pedido YA es final.
+
+  it('reemplaza el conjunto completo y registra al actor como autor de la modificacion (R20); un `status` en la entrada se descarta (R6)', async () => {
     const d = dobles({ fila: fila() })
 
-    await createUpdateOrder(d)(ORDER_ID, EDICION, ADMIN)
+    await createUpdateOrder(d)(ORDER_ID, { ...EDICION, status: 'EN_CURSO' }, ADMIN)
 
     expect(d.updateAlive).toHaveBeenCalledTimes(1)
     const [id, data, actorId, instante] = d.updateAlive.mock.calls[0] as [
@@ -405,7 +408,6 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
       recipeId: RECIPE_ID,
       quantity: '10.0000',
       priority: 'ALTA',
-      status: 'EN_CURSO',
       presentationId: PRESENTATION_ID,
     })
     expect(actorId).toBe(ADMIN.id)
@@ -413,14 +415,15 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
     // El autor de la CREACION no viaja en la edicion: no esta en `data` y el puerto solo
     // recibe un `actorId`, que el adaptador escribe en `updated_by` (R6).
     expect(Object.keys(data)).not.toContain('createdBy')
+    expect(Object.keys(data)).not.toContain('status')
   })
 
-  it('un pedido ENTREGADO no admite NINGUNA edicion, ni la que solo cambia la prioridad (R21)', async () => {
+  it('un pedido ENTREGADO no admite NINGUNA edicion, ni la que solo cambia la prioridad (R8, R21)', async () => {
     const d = dobles({ fila: fila({ status: 'ENTREGADO' }) })
 
-    // Misma receta, misma cantidad, mismo estado: solo sube la prioridad. Igual se rechaza.
+    // Misma receta, misma cantidad: solo sube la prioridad. Igual se rechaza.
     const codigo = await codigoDelFallo(() =>
-      createUpdateOrder(d)(ORDER_ID, { ...ENTRADA_ALTA, priority: 'CRITICA', status: 'ENTREGADO' }, ADMIN),
+      createUpdateOrder(d)(ORDER_ID, { ...ENTRADA_ALTA, priority: 'CRITICA' }, ADMIN),
     )
 
     expect(codigo).toBe('invalid_transition')
@@ -429,7 +432,7 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
     expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
   })
 
-  it('un pedido CANCELADO tampoco admite edicion (R21)', async () => {
+  it('un pedido CANCELADO tampoco admite edicion (R8, R21)', async () => {
     const d = dobles({ fila: fila({ status: 'CANCELADO', cancellationReason: 'anulado' }) })
 
     expect(await codigoDelFallo(() => createUpdateOrder(d)(ORDER_ID, EDICION, ADMIN))).toBe(
@@ -438,47 +441,22 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
     expect(d.updateAlive).not.toHaveBeenCalled()
   })
 
-  it('acepta las tres transiciones hacia delante y quedarse igual (R22)', async () => {
-    const validas: readonly (readonly [OrderStatus, string])[] = [
-      ['PENDIENTE', 'PENDIENTE'],
-      ['PENDIENTE', 'EN_CURSO'],
-      ['PENDIENTE', 'ENTREGADO'],
-      ['EN_CURSO', 'EN_CURSO'],
-      ['EN_CURSO', 'ENTREGADO'],
-    ]
-
-    for (const [desde, hacia] of validas) {
+  it('un pedido PENDIENTE o EN_CURSO admite la edicion, y su estado no cambia (R9, R22)', async () => {
+    for (const desde of ['PENDIENTE', 'EN_CURSO'] as const) {
       const d = dobles({ fila: fila({ status: desde }) })
-      await createUpdateOrder(d)(ORDER_ID, { ...ENTRADA_ALTA, status: hacia }, ADMIN)
-      expect(d.updateAlive, `${desde} -> ${hacia}`).toHaveBeenCalledTimes(1)
+      await createUpdateOrder(d)(ORDER_ID, EDICION, ADMIN)
+      expect(d.updateAlive, desde).toHaveBeenCalledTimes(1)
+      const [, data] = d.updateAlive.mock.calls[0] as [string, Record<string, unknown>]
+      expect(data, desde).not.toHaveProperty('status')
     }
   })
 
-  it('rechaza el retroceso sin modificar ninguna fila (R22)', async () => {
-    const d = dobles({ fila: fila({ status: 'EN_CURSO' }) })
-
-    expect(
-      await codigoDelFallo(() =>
-        createUpdateOrder(d)(ORDER_ID, { ...ENTRADA_ALTA, status: 'PENDIENTE' }, ADMIN),
-      ),
-    ).toBe('invalid_transition')
-    expect(d.updateAlive).not.toHaveBeenCalled()
-    await expect(
-      createUpdateOrder(d)(ORDER_ID, { ...ENTRADA_ALTA, status: 'PENDIENTE' }, ADMIN),
-    ).rejects.toBeInstanceOf(InvalidTransitionError)
-  })
-
-  it('la edicion no puede cancelar: CANCELADO muere en el borde (R24)', async () => {
-    const d = dobles({ fila: fila() })
-
-    expect(
-      await codigoDelFallo(() =>
-        createUpdateOrder(d)(ORDER_ID, { ...ENTRADA_ALTA, status: 'CANCELADO' }, ADMIN),
-      ),
-    ).toBe('invalid_input')
-    // Ni siquiera se leyo la fila: el esquema lo rechazo antes.
-    expect(d.findAliveById).not.toHaveBeenCalled()
-    expect(d.updateAlive).not.toHaveBeenCalled()
+  it('un `status` en la entrada nunca decide el resultado: solo importa el estado que YA tenia la fila (R6)', async () => {
+    for (const statusPedido of ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO']) {
+      const d = dobles({ fila: fila({ status: 'PENDIENTE' }) })
+      await createUpdateOrder(d)(ORDER_ID, { ...EDICION, status: statusPedido }, ADMIN)
+      expect(d.updateAlive, `status pedido=${statusPedido}`).toHaveBeenCalledTimes(1)
+    }
   })
 
   it('la edicion tampoco acepta un motivo: el campo no existe en su esquema (R24, R26)', async () => {

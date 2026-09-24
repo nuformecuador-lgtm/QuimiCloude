@@ -98,18 +98,36 @@ describe(`${migrationName}/migration.sql`, () => {
       expect(/"recipes"/i.test(statement), statement).toBe(false)
     }
   })
+})
 
-  it('el timestamp es posterior al de la ultima migracion conocida', () => {
+describe('el nombre de la migracion es posterior a las que necesita para aplicar', () => {
+  it('R8: <ts>_recipe_lines_percentage es estrictamente mayor que recipes_and_recipe_lines y units_catalog', () => {
     const match = /^(\d{14})_/.exec(migrationName)
     expect(match).not.toBeNull()
     const timestamp = match?.[1] as string
-    const others = readdirSync(migrationsDir).filter(
-      (name) => /^\d{14}_/.test(name) && name !== migrationName,
-    )
-    for (const other of others) {
-      const otherTimestamp = (/^(\d{14})_/.exec(other)?.[1]) as string
-      expect(timestamp > otherTimestamp, `${migrationName} debe ser posterior a ${other}`).toBe(true)
+
+    // Depende de `recipe_lines` misma (recipes_and_recipe_lines: crea la tabla,
+    // `recipe_lines_quantity_positive`) y de `unit_id` (units_catalog: columna, FK e indice).
+    // No de "la ultima migracion que exista": eso envejeceria con cualquier migracion futura
+    // de cualquier otra ficha.
+    const dependencySuffixes = ['_recipes_and_recipe_lines', '_units_catalog']
+    for (const suffix of dependencySuffixes) {
+      const candidates = readdirSync(migrationsDir).filter((name) => name.endsWith(suffix))
+      expect(candidates, `debe existir exactamente una migracion terminada en "${suffix}"`).toHaveLength(1)
+      const dependencyTimestamp = (/^(\d{14})_/.exec(candidates[0] as string)?.[1]) as string
+      expect(timestamp > dependencyTimestamp, `${migrationName} debe ser posterior a ${candidates[0]}`).toBe(true)
     }
+  })
+
+  it('el timestamp es posterior al de la ultima migracion que existia cuando esta nacio', () => {
+    // Compara con un nombre fijo, no con "la ultima del repo": esa ultima cambia con cada
+    // migracion posterior y rompia este caso sin que esta migracion tuviera nada que ver.
+    const ultimaAlNacer = '20260922150000_product_type_enum'
+    const match = /^(\d{14})_/.exec(migrationName)
+    expect(match).not.toBeNull()
+    const timestamp = match?.[1] as string
+    const otherTimestamp = (/^(\d{14})_/.exec(ultimaAlNacer)?.[1]) as string
+    expect(timestamp > otherTimestamp, `${migrationName} debe ser posterior a ${ultimaAlNacer}`).toBe(true)
   })
 })
 

@@ -24,12 +24,13 @@ import { normalizePresentationName } from '@/lib/modules/inventario';
 import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { ListQuery } from '@/lib/modules/pedidos/domain/list-query';
@@ -175,15 +176,16 @@ function pedidoNuevo(overrides: Partial<NewOrder> & { readonly presentationId: s
 
 /** Alta por el adaptador REAL: la transaccion, el lock y el `max()+1` son los de produccion. */
 async function alta(empresa: Empresa): Promise<OrderRow> {
-  const resultado = await createOrder(
-    pedidoNuevo({ presentationId: empresa.presentationId }),
-    ANO,
-    empresa.userId,
-    new Date(),
-    null,
-    ambitoDe(empresa),
+  const resultado = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(
+      pedidoNuevo({ presentationId: empresa.presentationId }),
+      ANO,
+      empresa.userId,
+      new Date(),
+      null,
+      ambitoDe(empresa),
+    ),
   );
-  if (resultado === 'duplicate_number') throw new Error('el alta devolvio duplicate_number');
   empresa.pedidos.push(resultado.id);
   return resultado;
 }
@@ -449,12 +451,15 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
 
   it('control positivo: el mismo updateAlive, desde B, SI escribe', async () => {
     // Sin este caso, un `updateMany` que nunca actualizara dejaria verde el anterior.
+    // ENMIENDA: `updateAliveOrder` ya no escribe `status` -el pedido se queda en `PENDIENTE`, con
+    // el que nacio en la siembra-, asi que lo que demuestra el escrito es la prioridad y la
+    // cantidad, no el estado.
     const propio = B.pedidos[1] ?? '';
     const antes = await foto(propio);
 
     const resultado = await updateAliveOrder(
       propio,
-      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', status: 'EN_CURSO', presentationId: B.presentationId }),
+      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', presentationId: B.presentationId }),
       B.userId,
       new Date(),
       null,
@@ -464,7 +469,8 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
     expect(resultado).toBe('ok');
     expect(await foto(propio)).not.toBe(antes);
     const fila = await prisma.order.findUniqueOrThrow({ where: { id: propio } });
-    expect(fila.status).toBe('EN_CURSO');
+    expect(fila.status).toBe('PENDIENTE');
+    expect(fila.priority).toBe('CRITICA');
     expect(fila.companyId).toBe(B.companyId);
   });
 

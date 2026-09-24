@@ -22,6 +22,13 @@
  * `tests/integration/proveedores/supplier-crud.int.test.ts`: cada caso crea sus datos y LOS
  * BORRA EL MISMO, por su `id` exacto, en un bloque `finally`.
  *
+ * `createOrder` -que llevaba su propio bucle de reintento sobre el cliente global- se retiro; el
+ * alta de siembra de este archivo pasa por
+ * `withOrderTransaction` + `createOrderWriteRepository`, el mismo par que ata `OrderUnitOfWork`
+ * en `lib/composition`. Las funciones REALES que este archivo ejercita son ahora esas dos, mas
+ * `findAliveOrderById`, `listAliveOrders`, `updateAliveOrder`, `cancelAliveOrder` y
+ * `softDeleteAliveOrder`.
+ *
  * HIGIENE, y es critica: los tests de `tests/integration/` corren EN SERIE contra UNA base
  * compartida (`vitest.config.mts`, `fileParallelism: false`) y algun archivo afirma sobre el
  * estado global de una tabla. Una fila —o una secuencia— olvidada aqui pone rojo un test ajeno
@@ -52,12 +59,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { listAliveOrderSummariesByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
@@ -257,11 +265,9 @@ async function altaReal(
   now: Date,
   overrides: Partial<NewOrder> = {},
 ): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), year, actorId, now, null, scope())
-  // Un `'duplicate_number'` aqui no es el caso bajo prueba: seria una secuencia sucia de una
-  // corrida anterior, y hay que verlo como fallo del test, no confundirlo con el pedido.
-  expect(resultado).not.toBe('duplicate_number')
-  const fila = resultado as OrderRow
+  const fila = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(baseOrder(overrides), year, actorId, now, null, scope()),
+  )
   creados.push(fila.id)
   return fila
 }
@@ -642,13 +648,18 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       const despues = instantIn(YEAR_DISCRIMINANTES, 3, 13)
 
       // VIVO -> 'ok', y la edicion escribe de verdad.
+      //
+      // ENMIENDA: `editado` sigue llevando `status` porque `baseOrder` devuelve un `NewOrder`
+      // completo -el mismo helper del alta-, pero `updateAliveOrder` ya no lo lee (`OrderEdit` no
+      // tiene el campo): la fila se queda en el estado con el que nacio, `PENDIENTE`, aunque
+      // `editado.status` pida `EN_CURSO`.
       const editado = baseOrder({ quantity: '99.0000', priority: 'CRITICA', status: 'EN_CURSO' })
       expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
       const relectura = await findAliveOrderById(pedido.id, scope())
       expect(relectura?.quantity).toBe('99.0000')
       expect(relectura?.priority).toBe('CRITICA')
-      expect(relectura?.status).toBe('EN_CURSO')
-      // R6: la edicion NO toca el autor ni el instante de la creacion.
+      expect(relectura?.status).toBe('PENDIENTE')
+      // La edicion NO toca el autor ni el instante de la creacion.
       expect(relectura?.createdBy).toBe(actorId)
       expect(relectura?.createdAt.toISOString()).toBe(now.toISOString())
       expect(relectura?.updatedAt.toISOString()).toBe(despues.toISOString())
@@ -667,7 +678,7 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       // Y ninguna de las tres llamadas rechazadas escribio nada: la fila borrada sigue con lo
       // que tenia, no con lo que pedia el `editado` de despues.
       const cruda = await prisma.order.findUnique({ where: { id: pedido.id } })
-      expect(cruda?.status).toBe('EN_CURSO')
+      expect(cruda?.status).toBe('PENDIENTE')
       expect(cruda?.cancellationReason).toBeNull()
     } finally {
       await limpiar(creados)

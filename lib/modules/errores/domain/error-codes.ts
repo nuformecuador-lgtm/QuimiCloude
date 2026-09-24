@@ -13,6 +13,7 @@
  * **Novena enmienda, el 2026-09-18**: `presentation_unit_locked`.
  * Aprobada por el humano el 2026-09-18.
  * **Decima enmienda, el 2026-09-22 (fix directo)**: `action_not_allowed`.
+ * **Decimoprimera enmienda, el 2026-09-23**: `insufficient_material`, `recipe_without_lines`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -79,6 +80,15 @@ export const ERROR_CODES = [
   // tiene permiso; lo que la regla de negocio rechaza es la ACCION pedida (por ejemplo, asignar el
   // rol de administrador, que no se concede por esta via).
   'action_not_allowed',
+  // Distinto de `unexpected`: la entrada y el estado son correctos, lo que falta es material en
+  // inventario para entregar el pedido.
+  'insufficient_material',
+  // Distinto de `insufficient_material`: no falta existencia, falta la formula con la que
+  // calcularla -la receta del pedido no tiene ninguna linea-.
+  'recipe_without_lines',
+  // Distinto de `user_not_assignable`: la cuenta esta activa. Lo que impide asignar a esta persona
+  // como responsable es que supervisa los pedidos de toda la empresa.
+  'user_cannot_be_responsible',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

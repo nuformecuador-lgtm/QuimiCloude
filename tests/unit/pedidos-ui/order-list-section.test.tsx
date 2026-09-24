@@ -13,7 +13,12 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OrderListSection, OrderListSkeleton } from '@/app/(private)/pedidos/components';
+import {
+  ORDER_LIST_CLEAR_SEARCH_TESTID,
+  ORDER_LIST_NO_MATCHES_TESTID,
+  OrderListSection,
+  OrderListSkeleton,
+} from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderListResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
@@ -35,12 +40,13 @@ const {
   routerMock,
   listOrdersActionMock,
   getOrderActionMock,
+  listOrderCoverageActionMock,
   listRecipesActionMock,
   listUnitsActionMock,
   listResponsiblesForOrdersActionMock,
   listOrderResponsiblesActionMock,
+  listResponsibleCandidatesActionMock,
   getSessionUserMock,
-  listUsersActionMock,
   listWorkGroupsActionMock,
 } = vi.hoisted(() => ({
   // QC-102 T11: la SEGUNDA llamada de la seccion, el lote de responsables de la pagina. Es el
@@ -60,9 +66,11 @@ const {
     id: '55555555-5555-4555-8555-555555555555',
     permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
   })),
-  listUsersActionMock: vi.fn(async () => ({
+  // El catalogo de personas del panel sale de esta accion, que ya filtra por
+  // `asignaciones.modificar` y por elegibilidad.
+  listResponsibleCandidatesActionMock: vi.fn(async () => ({
     status: 'success' as const,
-    data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+    data: [] as readonly { id: string; displayName: string }[],
   })),
   listWorkGroupsActionMock: vi.fn(async () => ({
     status: 'success' as const,
@@ -89,6 +97,12 @@ const {
   getOrderActionMock: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse desde la lista');
   }),
+  // Se sustituye por la MISMA razon que la lista: sin doble, `listOrderCoverageAction`
+  // intentaria leer la cookie de sesion real.
+  listOrderCoverageActionMock: vi.fn(async () => ({
+    status: 'success' as const,
+    data: [] as readonly { orderId: string; coverage: 'full' | 'partial' | 'none' }[],
+  })),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -99,6 +113,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   listOrdersAction: listOrdersActionMock,
   getOrderAction: getOrderActionMock,
+  listOrderCoverageAction: listOrderCoverageActionMock,
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -143,6 +158,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => ({
   listResponsiblesForOrdersAction: listResponsiblesForOrdersActionMock,
   listOrderResponsiblesAction: listOrderResponsiblesActionMock,
+  listResponsibleCandidatesAction: listResponsibleCandidatesActionMock,
   assignResponsiblesAction: vi.fn(),
   unassignResponsibleAction: vi.fn(),
   removeWorkGroupFromOrderAction: vi.fn(),
@@ -152,10 +168,6 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', 
 // las suites de `configuracion-ui`.
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock },
-}));
-
-vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => ({
-  listUsersAction: listUsersActionMock,
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
@@ -299,6 +311,69 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
   });
 });
 
+describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, R15, R16)', () => {
+  it('con termino y cero filas pinta "sin coincidencias" dentro de la tabla, y NO el vacio de siempre', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros({ search: 'sin-coincidencias' }) }));
+
+    const tabla = screen.getByTestId('order-table');
+    expect(within(tabla).getByTestId(ORDER_LIST_NO_MATCHES_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.vacio)).toBeNull();
+    expect(within(tabla).getByTestId('data-table-search')).toHaveValue('sin-coincidencias');
+  });
+
+  it('con termino y cero filas no se pide el lote de responsables: no hay filas a las que repartirlo', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros({ search: 'sin-coincidencias' }) }));
+
+    expect(listResponsiblesForOrdersActionMock).not.toHaveBeenCalled();
+  });
+
+  it('«Limpiar la busqueda» enlaza sin `q`, con la primera pagina, y conserva tamano, orden y filtros (R15)', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(
+      await OrderListSection({
+        params: parametros({
+          search: 'sin-coincidencias',
+          page: 3,
+          pageSize: MAX_PAGE_SIZE,
+          sort: { columnId: 'createdAt', direction: 'asc' },
+          filters: {
+            status: { kind: 'select', values: ['CANCELADO'] },
+            priority: { kind: 'select', values: ['ALTA'] },
+            createdAt: { kind: 'dateRange', from: '2026-01-01', to: '2026-01-31' },
+          },
+        }),
+      }),
+    );
+
+    const enlace = new URL(
+      screen.getByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID).getAttribute('href') as string,
+      'http://localhost',
+    );
+    expect(enlace.searchParams.has('q')).toBe(false);
+    expect(enlace.searchParams.get('page')).toBe('1');
+    expect(enlace.searchParams.get('pageSize')).toBe(String(MAX_PAGE_SIZE));
+    expect(enlace.searchParams.get('sort')).toBe('createdAt:asc');
+    expect(enlace.searchParams.get('status')).toBe('CANCELADO');
+    expect(enlace.searchParams.get('priority')).toBe('ALTA');
+    expect(enlace.searchParams.get('createdFrom')).toBe('2026-01-01');
+    expect(enlace.searchParams.get('createdTo')).toBe('2026-01-31');
+  });
+
+  it('sin termino y cero filas sigue siendo el vacio de siempre, sin "Limpiar la busqueda" (R16)', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID)).toBeNull();
+  });
+});
+
 describe('la pagina que se quedo atras vuelve a la primera (R21)', () => {
   it('con la pagina vacia y page > 1 se ofrece el enlace a la primera, derivado de ORDERS_ROUTE (R2)', async () => {
     listOrdersActionMock.mockResolvedValue(pagina([], { page: 4, totalPages: 2 }));
@@ -341,7 +416,7 @@ describe('una sola llamada de lectura por pantalla (R7, R41)', () => {
     render(await OrderListSection({ params }));
 
     expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
-    // Campo a campo la misma forma que `ListQuery`: sin claves de mas, `search` siempre vacio.
+    // Campo a campo la misma forma que `ListQuery`: sin claves de mas.
     expect(listOrdersActionMock).toHaveBeenCalledWith(params);
     expect(Object.keys(listOrdersActionMock.mock.calls[0][0] as object).sort()).toEqual([
       'filters',
@@ -495,6 +570,104 @@ describe('QC-102 — si el lote falla, la lista NO se cae (R20)', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
+// El lote de cobertura se compone AQUI, mismo patron que el de responsables.
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
+  it('pide el lote UNA sola vez por pagina, con los ids de la pagina y en una sola llamada', async () => {
+    listOrdersActionMock.mockResolvedValue(
+      pagina([pedido(), pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' })]),
+    );
+
+    render(await OrderListSection({ params: parametros() }));
+
+    // UNA, no una por fila: son dos pedidos y sigue siendo una sola invocacion.
+    expect(listOrderCoverageActionMock).toHaveBeenCalledTimes(1);
+    expect(listOrderCoverageActionMock).toHaveBeenCalledWith([pedido().id, OTRO_PEDIDO]);
+  });
+
+  it('sigue siendo UNA por render aunque cambie la pagina (R35)', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()], { page: 2, totalPages: 3 }));
+
+    render(await OrderListSection({ params: parametros({ page: 2 }) }));
+
+    expect(listOrderCoverageActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('la llamada del lote va DESPUES de la de la lista: sus ids salen de ella', async () => {
+    const orden: string[] = [];
+    listOrdersActionMock.mockImplementation(async () => {
+      orden.push('pedidos');
+      return pagina([pedido()]);
+    });
+    listOrderCoverageActionMock.mockImplementation(async () => {
+      orden.push('cobertura');
+      return { status: 'success' as const, data: [] };
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(orden).toEqual(['pedidos', 'cobertura']);
+  });
+
+  it('cada fila recibe la suya, ya repartida en el SERVIDOR: «Apartado», «Sin apartar» y «Sin cobertura completa» (R35)', async () => {
+    const COMPLETO = '55555555-5555-4555-8555-555555555555';
+    const PARCIAL = '66666666-6666-4666-8666-666666666666';
+    listOrdersActionMock.mockResolvedValue(
+      pagina([
+        pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' }),
+        pedido({ id: COMPLETO, numberText: 'PED-2026-0003' }),
+        pedido({ id: PARCIAL, numberText: 'PED-2026-0004' }),
+      ]),
+    );
+    listOrderCoverageActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        { orderId: OTRO_PEDIDO, coverage: 'none' },
+        { orderId: COMPLETO, coverage: 'full' },
+        { orderId: PARCIAL, coverage: 'partial' },
+      ],
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    const etiquetas = screen.getAllByTestId('order-coverage').map((nodo) => nodo.getAttribute('data-coverage'));
+    expect(etiquetas.sort()).toEqual(['full', 'none', 'partial']);
+  });
+
+  it('sin ningun pedido no se pregunta por cobertura de nadie', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
+    expect(listOrderCoverageActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-141 — si el lote de cobertura falla, la lista NO se cae (R20, R35)', () => {
+  it.each(['unauthorized', 'invalid_input', 'unexpected'] as const)(
+    'con el lote en `%s` se siguen pintando los pedidos y la columna de cobertura queda sin resolver',
+    async (code) => {
+      listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+      listOrderCoverageActionMock.mockResolvedValue({
+        status: 'error',
+        code,
+        message: 'No se pudo leer la cobertura.',
+      } as never);
+
+      render(await OrderListSection({ params: parametros() }));
+
+      expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      expect(screen.getByTestId('order-missing-coverage')).toBeInTheDocument();
+      expect(screen.queryByTestId(testId.error)).toBeNull();
+      expect(screen.queryByTestId(testId.vacio)).toBeNull();
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------------------------
 // QC-102 T15 — `canWrite` baja por props desde el servidor: R28 (la mitad de pantalla).
 // ---------------------------------------------------------------------------------------------
 
@@ -504,7 +677,7 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
 
     render(await OrderListSection({ params: parametros() }));
 
-    expect(listUsersActionMock).toHaveBeenCalledTimes(1);
+    expect(listResponsibleCandidatesActionMock).toHaveBeenCalledTimes(1);
     expect(listWorkGroupsActionMock).toHaveBeenCalledTimes(1);
   });
 
@@ -517,19 +690,68 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
 
     render(await OrderListSection({ params: parametros() }));
 
-    expect(listUsersActionMock).not.toHaveBeenCalled();
+    expect(listResponsibleCandidatesActionMock).not.toHaveBeenCalled();
     expect(listWorkGroupsActionMock).not.toHaveBeenCalled();
     // Y la lista se pinta igual: el permiso de escritura no condiciona la LECTURA.
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
   });
 
   it('si un catalogo falla, el panel se degrada y la lista NO se tumba (H1)', async () => {
-    listUsersActionMock.mockResolvedValue({
+    listResponsibleCandidatesActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
       message: 'No tienes permiso para consultar usuarios.',
     } as never);
     listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.error)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// El catalogo de personas ya no depende de `usuarios.consultar`.
+//
+// Antes el catalogo salia de `listUsersAction`, que exige `usuarios.consultar` y se degradaba a
+// lista vacia sin ese permiso. Ahora la fuente es `listResponsibleCandidatesAction`, que solo
+// exige `asignaciones.modificar` -el mismo permiso con el que ya se decide si el panel de
+// escritura existe- y excluye ya a quien tiene `pedidos.consultar`. Reescribir la vieja prueba de
+// degradacion por `usuarios.consultar` sin dejar rastro simularia un permiso que esta pantalla ya
+// no consulta.
+// ---------------------------------------------------------------------------------------------
+describe('QC-145 — el catalogo de personas sale de listResponsibleCandidatesAction (R32)', () => {
+  it('las personas del panel llegan de la accion nueva, no de listUsersAction', async () => {
+    // `getSessionUserMock` queda con permisos limitados tras el test anterior de "sin el
+    // permiso"; aqui hace falta `canWrite`, asi que se repone.
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+    listResponsibleCandidatesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [{ id: '0000000c-0000-4000-8000-00000000000c', displayName: 'Rosa Vidal' }],
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(listResponsibleCandidatesActionMock).toHaveBeenCalledTimes(1);
+    expect(listResponsibleCandidatesActionMock).toHaveBeenCalledWith();
+  });
+
+  it('si la accion nueva falla, el panel degrada personas a vacio y la lista sigue en pie', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+    listResponsibleCandidatesActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No tienes permiso para asignar responsables.',
+    } as never);
 
     render(await OrderListSection({ params: parametros() }));
 

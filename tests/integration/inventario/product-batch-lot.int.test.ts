@@ -193,7 +193,7 @@ function newProduct(overrides: Partial<NewProduct> = {}): NewProduct {
 function newBatch(fixture: Fixture, overrides: Partial<NewProductBatch> = {}): NewProductBatch {
   return {
     presentationId: fixture.presentationId,
-    stock: 3,
+    stock: '3',
     unitCost: '2.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -725,8 +725,8 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
       const sinFecha = await altaDeProducto(
         {
           name: `Producto ${token()}`,
-          stock: 2,
-          qtyAlert: 1,
+          stock: '2',
+          qtyAlert: '1',
           presentationId: fixture.presentationId,
           unitCost: '1.5000',
         },
@@ -737,8 +737,8 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
       const conFecha = await altaDeProducto(
         {
           name: `Producto ${token()}`,
-          stock: 2,
-          qtyAlert: 1,
+          stock: '2',
+          qtyAlert: '1',
           presentationId: fixture.presentationId,
           unitCost: '1.5000',
           purchaseDate: '2026-02-14',
@@ -779,8 +779,8 @@ describe('R34, R35, R36: el lote tecleado de solo digitos no llega a 60 y el gen
         altaDeProducto(
           {
             name: `Producto ${token()}`,
-            stock: 2,
-            qtyAlert: 1,
+            stock: '2',
+            qtyAlert: '1',
             presentationId: fixture.presentationId,
             unitCost: '1.5000',
             ...(lot === undefined ? {} : { lot }),

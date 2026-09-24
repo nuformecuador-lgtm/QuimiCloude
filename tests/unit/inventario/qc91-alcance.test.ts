@@ -236,7 +236,12 @@ export function sumaPropia(cuerpo: string): string[] {
 export function escrituraDestructivaDeLotes(fuente: string): string[] {
   const codigo = stripComments(fuente);
   const hallazgos: string[] = [];
-  if (/\.productBatch\.(?:delete|deleteMany|updateMany|upsert)\s*\(/.test(codigo)) {
+  // `updateMany` YA NO ESTA AQUI: `consumeBatchStock` la usa a proposito -el decremento
+  // CONDICIONAL del consumo (`stock >= cantidad` en el `where`), que solo puede tocar CERO o UNA
+  // fila porque el `where` ya trae el identificador unico-. Que solo viva en esa funcion lo vigila
+  // `llamaAUpdateManyFueraDe`, no este detector: `delete`, `deleteMany` y `upsert` no tienen ningun
+  // uso legitimo sobre un lote y siguen prohibidos en TODO el archivo.
+  if (/\.productBatch\.(?:delete|deleteMany|upsert)\s*\(/.test(codigo)) {
     hallazgos.push('llama a un metodo de escritura destructiva sobre productBatch');
   }
   if (/DELETE\s+FROM\s+"?product_batches"?/i.test(codigo)) {
@@ -249,15 +254,26 @@ export function escrituraDestructivaDeLotes(fuente: string): string[] {
 }
 
 /**
- * `true` si `.productBatch.update(` aparece en algun lugar del archivo QUE NO sea el cuerpo de
+ * `true` si `.productBatch.<metodo>(` aparece en algun lugar del archivo QUE NO sea el cuerpo de
  * `nombreFuncionPermitida`. Aisla ese cuerpo con `cuerpoDeFuncion` y busca en el resto, para que
- * un `update` movido a otra funcion -o uno nuevo, en cualquier sitio distinto- siga dando rojo.
+ * una llamada movida a otra funcion -o una nueva, en cualquier sitio distinto- siga dando rojo.
  */
-export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+function llamaAMetodoFueraDe(fuente: string, metodo: string, nombreFuncionPermitida: string): boolean {
   const codigo = stripComments(fuente);
   const cuerpoPermitido = cuerpoDeFuncion(fuente, nombreFuncionPermitida);
   const resto = cuerpoPermitido === null ? codigo : codigo.replace(stripComments(cuerpoPermitido), '');
-  return /\.productBatch\.update\s*\(/.test(resto);
+  return new RegExp(`\\.productBatch\\.${metodo}\\s*\\(`).test(resto);
+}
+
+/** El `update` (singular) del ajuste: sigue viviendo SOLO en `adjustBatchStock`. */
+export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+  return llamaAMetodoFueraDe(fuente, 'update', nombreFuncionPermitida);
+}
+
+/** El `updateMany` del decremento condicional del consumo: sigue viviendo SOLO en
+ *  `consumeBatchStock`. */
+export function llamaAUpdateManyFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+  return llamaAMetodoFueraDe(fuente, 'updateMany', nombreFuncionPermitida);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -265,14 +281,18 @@ export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: stri
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numero propio', () => {
-  it('R1: recalculateProductStock arma la existencia desde los lotes con singleUnitStock', () => {
+  it('R1 (QC-141 R6): recalculateProductStock suma los lotes en SQL, no en JavaScript', () => {
+    // La suma de `singleUnitStock` paso de JS a un `SELECT sum(...)` que hace Postgres en
+    // `numeric`: pasar un `Decimal` por `number` antes de sumar es justo el redondeo binario que
+    // se quiere evitar. El `SUM` en SQL crudo ya no es un hallazgo aqui, es la forma nueva.
     const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'recalculateProductStock');
     expect(
       cuerpo,
       'recalculateProductStock no existe con esa forma: el sujeto de esta prueba cambio',
     ).not.toBeNull();
-    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(true);
-    expect(sumaPropia(cuerpo as string)).toEqual([]);
+    expect(cuerpo as string).toMatch(/SELECT\s+sum\(/i);
+    expect(cuerpo as string).toMatch(/"product_batches"/);
+    expect(cuerpo as string).not.toMatch(/singleUnitStock\s*\(/);
   });
 
   it('R1: toProductView ya no deriva nada de los lotes: lee la columna guardada tal cual', () => {
@@ -367,9 +387,10 @@ describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la exi
     const cuerpo = cuerpoDeConst(leer(PRODUCT_INPUT), 'productFieldsShape');
     expect(cuerpo, 'productFieldsShape no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
     expect(mencionaStock(cuerpo as string)).toBe(false);
-    // updateProductSchema reutiliza createProductSchema (misma forma, sin stock): reemplazo
-    // completo con los mismos campos para las dos operaciones (R9).
-    expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = createProductSchema/);
+    // updateProductSchema ya NO es un alias de createProductSchema: es una union discriminada
+    // por `type` que NO conoce el lote (R9, R26). El alta es la union con lote.
+    expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = withDefaultType\(updateUnion\)/);
+    expect(leer(PRODUCT_INPUT)).toMatch(/export const createProductSchema = withDefaultType\(createUnion\)/);
   });
 
   it('R14: PRODUCT_SELECT trae products.stock y products.unit_id, sin catalogo de lotes', () => {
@@ -444,10 +465,11 @@ describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la exi
 // tener un `update` -esta guardia no fija ese estado-, solo que si hay uno en el archivo, no
 // puede estar en ningun otro sitio.
 describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ninguna fila de lote', () => {
-  it('R21: product_batches.stock sigue intacto en el esquema', () => {
+  it('R21: product_batches.stock sigue siendo la existencia del lote, ahora decimal(14,4)', () => {
     const cuerpo = cuerpoDeModelo(leer(SCHEMA), 'ProductBatch');
     expect(cuerpo, 'el modelo ProductBatch no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(cuerpo).toMatch(/\bstock\s+Int\b/);
+    expect(cuerpo).toMatch(/\bstock\s+Decimal\b/);
+    expect(cuerpo).toMatch(/@db\.Decimal\(14,\s*4\)/);
   });
 
   it('R21: product-prisma.ts no borra, reemplaza en bloque ni multiplica filas de product_batches', () => {
@@ -463,6 +485,11 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
     const fuente = leer(PRODUCT_PRISMA);
     expect(fuente).toMatch(/tx\.productBatch\.create\s*\(/);
     expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+  });
+
+  it('R21, R30: el unico updateMany vive en consumeBatchStock -el decremento condicional del consumo-', () => {
+    const fuente = leer(PRODUCT_PRISMA);
+    expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
   });
 
   it('R21: el detector de escrituras destructivas muerde con fuentes fabricadas y no con una limpia', () => {
@@ -536,6 +563,50 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
       expect(
         escrituraDestructivaDeLotes('await tx.$executeRaw`DELETE FROM "product_batches" WHERE id = ${id}`;'),
       ).not.toEqual([]);
+    });
+  });
+
+  describe('llamaAUpdateManyFueraDe — el updateMany de consumeBatchStock queda aislado del resto (R30)', () => {
+    it('R30: un updateMany DENTRO de consumeBatchStock no cuenta como hallazgo', () => {
+      const fuente = [
+        'export function otraCosa() {',
+        '  return 1;',
+        '}',
+        'export async function consumeBatchStock(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
+
+    it('R30: el MISMO updateMany movido a OTRA funcion si cuenta como hallazgo', () => {
+      const fuente = [
+        'export async function consumeBatchStock(batchId) {',
+        '  return 1;',
+        '}',
+        'export function otraFuncion() {',
+        '  return tx.productBatch.updateMany({ where: { id: 1 } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(true);
+    });
+
+    it('R30: sin ningun updateMany en el archivo, no hay hallazgo', () => {
+      const fuente = 'export async function consumeBatchStock() { return 1; }';
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
+
+    it('R30: el update de adjustBatchStock no se confunde con un updateMany de consumeBatchStock', () => {
+      const fuente = [
+        'export async function adjustBatchStock(batchId) {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+        'export async function consumeBatchStock(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
     });
   });
 });

@@ -20,6 +20,7 @@ import {
 } from '@/components/shared/unexpected-error-notice';
 import { UNEXPECTED_ERROR_CODE, errorMessage } from '@/lib/modules/errores';
 import {
+  EMPTY_CELL,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
@@ -31,7 +32,7 @@ import {
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
-import type { ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 import type {
   CreateProductFormState,
   ProductListResult,
@@ -271,10 +272,10 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
     imagePath: null,
-    stock: 0,
+    stock: '0',
     unitId: null,
-    qtyAlert: 5,
-    type: 'PRODUCT' as const,
+    qtyAlert: '5',
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     ...overrides,
@@ -418,6 +419,15 @@ async function elegirPresentacion(user: ReturnType<typeof setupUser>, nombre = P
 }
 
 /**
+ * Elige un tipo en el selector compartido del formulario. El `data-testid` vive en el root de
+ * Base UI Select, no en el nodo `role=combobox`, asi que el trigger se localiza por su Label.
+ */
+async function elegirTipo(user: ReturnType<typeof setupUser>, nombre: string) {
+  await user.click(screen.getByLabelText('Tipo'));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: nombre })));
+}
+
+/**
  * Rellena el formulario abierto. En el ALTA cubre ademas lo minimo del primer lote -presentacion
  * y costo-, que desde el 2026-09-10 son obligatorios; en la EDICION esos campos no existen y el
  * helper no los toca.
@@ -532,6 +542,8 @@ describe('pantalla de productos — lista', () => {
       'name',
       'stock',
       'qtyAlert',
+      'reserved',
+      'available',
       'actions',
     ]);
   });
@@ -624,9 +636,9 @@ describe('pantalla de productos — lista', () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
-        producto({ id: crypto.randomUUID(), stock: 2, unitId: UNIDAD_A, qtyAlert: 5 }),
-        producto({ id: crypto.randomUUID(), stock: 5, unitId: UNIDAD_A, qtyAlert: 5 }),
-        producto({ id: crypto.randomUUID(), stock: 9, unitId: UNIDAD_A, qtyAlert: 5 }),
+        producto({ id: crypto.randomUUID(), stock: '2', unitId: UNIDAD_A, qtyAlert: '5' }),
+        producto({ id: crypto.randomUUID(), stock: '5', unitId: UNIDAD_A, qtyAlert: '5' }),
+        producto({ id: crypto.randomUUID(), stock: '9', unitId: UNIDAD_A, qtyAlert: '5' }),
       ]),
     );
 
@@ -648,7 +660,7 @@ describe('pantalla de productos — lista', () => {
 
   it('R17 — un producto sin lotes y con alerta de cantidad configurada se marca en alerta', async () => {
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ id: crypto.randomUUID(), stock: 0, unitId: null, qtyAlert: 5 })]),
+      paginaDeProductos([producto({ id: crypto.randomUUID(), stock: '0', unitId: null, qtyAlert: '5' })]),
     );
 
     await renderPantalla();
@@ -660,8 +672,8 @@ describe('pantalla de productos — lista', () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
-        producto({ id: crypto.randomUUID(), stock: 0, unitId: UNIDAD_A, qtyAlert: null }),
-        producto({ id: crypto.randomUUID(), stock: 0, unitId: null, qtyAlert: null }),
+        producto({ id: crypto.randomUUID(), stock: '0', unitId: UNIDAD_A, qtyAlert: null }),
+        producto({ id: crypto.randomUUID(), stock: '0', unitId: null, qtyAlert: null }),
       ]),
     );
 
@@ -704,7 +716,7 @@ describe('pantalla de productos — lista', () => {
     const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
     listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ stock: 15, unitId: UNIDAD_KG.id })]),
+      paginaDeProductos([producto({ stock: '15', unitId: UNIDAD_KG.id })]),
     );
 
     await renderPantalla();
@@ -714,7 +726,7 @@ describe('pantalla de productos — lista', () => {
 
   it('R16 — un producto sin unidad muestra su existencia como 0', async () => {
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ stock: 0, unitId: null })]),
+      paginaDeProductos([producto({ stock: '0', unitId: null })]),
     );
 
     await renderPantalla();
@@ -725,12 +737,91 @@ describe('pantalla de productos — lista', () => {
   it('sin catalogo de unidades, la celda pinta la cantidad sin etiqueta', async () => {
     listUnitsActionMock.mockResolvedValue(errorInesperado());
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ stock: 10, unitId: crypto.randomUUID() })]),
+      paginaDeProductos([producto({ stock: '10', unitId: crypto.randomUUID() })]),
     );
 
     await renderPantalla();
 
     expect(screen.getByTestId('product-stock')).toHaveTextContent('10');
+  });
+
+  it('R6 — la existencia se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({ id: crypto.randomUUID(), stock: '0.0001', unitId: null }),
+        producto({ id: crypto.randomUUID(), stock: '1.5', unitId: null }),
+        producto({ id: crypto.randomUUID(), stock: '12345.6789', unitId: null }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    const [celda1, celda2, celda3] = screen.getAllByTestId('product-stock');
+
+    expect(celda1).toHaveTextContent('0');
+    expect(celda1).toHaveAttribute('title', '0.0001');
+    expect(celda1).toHaveAttribute('aria-label', '0.0001');
+
+    expect(celda2).toHaveTextContent('1.5');
+    expect(celda2).not.toHaveAttribute('title');
+    expect(celda2).toHaveAttribute('aria-label', '1.5');
+
+    expect(celda3).toHaveTextContent('12345.68');
+    expect(celda3).toHaveAttribute('title', '12345.6789');
+    expect(celda3).toHaveAttribute('aria-label', '12345.6789');
+  });
+
+  it('R6 — la alerta de cantidad se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ id: crypto.randomUUID(), qtyAlert: '12345.6789' })]),
+    );
+
+    await renderPantalla();
+
+    const celda = screen.getByTestId('product-qty-alert');
+    expect(celda).toHaveTextContent('12345.68');
+    expect(celda).toHaveAttribute('title', '12345.6789');
+    expect(celda).toHaveAttribute('aria-label', '12345.6789');
+  });
+
+  it('R36 — muestra lo reservado y lo disponible del producto junto a su unidad, con la cifra exacta', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({
+          stock: '15',
+          unitId: UNIDAD_KG.id,
+          reserved: '3.5001',
+          available: '11.4999',
+        }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    const reservado = screen.getByTestId('product-reserved');
+    expect(reservado).toHaveTextContent('3.5 kg');
+    expect(reservado).toHaveAttribute('title', '3.5001');
+    expect(reservado).toHaveAttribute('aria-label', '3.5001 kg');
+
+    const disponible = screen.getByTestId('product-available');
+    expect(disponible).toHaveTextContent('11.5 kg');
+    expect(disponible).toHaveAttribute('title', '11.4999');
+    expect(disponible).toHaveAttribute('aria-label', '11.4999 kg');
+  });
+
+  it('R36 — sin lo reservado ni lo disponible (fuera del listado paginado), pinta el marcador neutro', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ reserved: undefined, available: undefined })]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('data-table-cell-reserved')).toHaveTextContent(EMPTY_CELL);
+    expect(screen.getByTestId('data-table-cell-available')).toHaveTextContent(EMPTY_CELL);
+    expect(screen.queryByTestId('product-reserved')).toBeNull();
+    expect(screen.queryByTestId('product-available')).toBeNull();
   });
 
   it('el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro', async () => {
@@ -1044,9 +1135,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const FUERA_DEL_PRODUCTO = ['cost', 'minPurchase', 'deliveryTime', 'stock'] as const;
 
     for (const [campo, valor] of Object.entries(precargado)) {
-      expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(
-        campo === 'name' ? valor : Number(valor),
-      );
+      expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(valor);
     }
 
     // Ninguno de los cuatro tiene control, ni visible ni oculto.
@@ -1104,7 +1193,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
     // Y no se pierde lo escrito: ni lo que provoco el rechazo ni el resto.
     expect(screen.getByTestId('product-field-name')).toHaveValue(nombreLargo);
-    expect(screen.getByTestId('product-field-stock')).toHaveValue(Number(ALTA_VALIDA.stock));
+    expect(screen.getByTestId('product-field-stock')).toHaveValue(ALTA_VALIDA.stock);
   });
 
   it('un guardado rechazado por la operacion muestra el error del formulario y conserva lo escrito', async () => {
@@ -1137,7 +1226,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(toastExito).not.toHaveBeenCalled();
     expect(routerMock.refresh).not.toHaveBeenCalled();
     expect(screen.getByTestId('product-field-name')).toHaveValue(ALTA_VALIDA.name);
-    expect(screen.getByTestId('product-field-stock')).toHaveValue(Number(ALTA_VALIDA.stock));
+    expect(screen.getByTestId('product-field-stock')).toHaveValue(ALTA_VALIDA.stock);
   });
 
   it('un guardado con exito cierra el panel, avisa por toast y refresca la lista', async () => {
@@ -1260,7 +1349,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // es el inventario actual del producto nuevo, que escribe el usuario. (La presentacion ya no
     // es del producto: se mudo a `product_batches`.)
     const user = setupUser();
-    const existente = producto({ name: 'Sosa cáustica perlas', qtyAlert: 7 });
+    const existente = producto({ name: 'Sosa cáustica perlas', qtyAlert: '7' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([existente]));
 
     await renderPantalla();
@@ -1655,6 +1744,112 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.queryByTestId('product-batch-date-value')).toBeNull();
   });
 
+  it('al elegir Instrumento se muestra solo existencia y fecha de compra del lote', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await elegirTipo(user, 'Instrumento');
+
+    // MACHINE (Instrumento): solo stock y purchaseDate entre los campos del lote (2026-09-23).
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    expect(screen.queryByTestId('product-field-lot')).toBeNull();
+    expect(screen.queryByTestId('product-field-qtyAlert')).toBeNull();
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+    // Los costos van juntos en ProductCostFields: sin testid propio, se comprueba por su label.
+    expect(screen.queryByLabelText('Costo unitario')).toBeNull();
+    expect(screen.queryByLabelText('Costo total')).toBeNull();
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Instrumento');
+  });
+
+  it('al elegir Envase se oculta la fecha de expiracion y se mantiene el resto del lote', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
+
+    await elegirTipo(user, 'Envase');
+
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Envase');
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-lot')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+  });
+
+  it('cambiar de tipo en el alta alterna los campos sin cerrar el panel', async () => {
+    // Producto -> Instrumento -> Envase -> Producto: cada salto tiene que reevaluar
+    // shouldShowField con el tipo recien elegido, no con el del montaje.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // PRODUCT: alerta, presentacion, costos, lote y expiracion a la vista.
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
+
+    await elegirTipo(user, 'Instrumento');
+    expect(screen.queryByTestId('product-field-qtyAlert')).toBeNull();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+
+    await elegirTipo(user, 'Envase');
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+
+    await elegirTipo(user, 'Producto');
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Producto');
+    expect(screen.getByTestId(testId.formulario)).toBeInTheDocument();
+  });
+
+  it('cerrar y reabrir el panel vuelve a Producto: el selector no recuerda el ultimo tipo', async () => {
+    // El bug: `ProductForm` se quedaba montado como hijo del Sheet mientras `SharedSelect`
+    // -dentro del portal- se desmontaba y volvia al default PRODUCT. El estado `productType`
+    // sobrevivia, el selector mostraba Producto y los campos del formulario seguian siendo
+    // los de Instrumento. Remontar el form al abrir (`open ? <ProductForm/> : null`) es el fix.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await elegirTipo(user, 'Instrumento');
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+    expect(screen.queryByTestId('product-field-qtyAlert')).toBeNull();
+
+    await user.click(screen.getByTestId(testId.cancelarFormulario));
+    await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
+
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // Selector y campos coinciden otra vez en PRODUCT.
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Producto');
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-lot')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:
@@ -1739,16 +1934,20 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.queryByTestId('product-field-unitId')).toBeNull();
     expect(formulario.textContent).not.toContain('Unidad');
 
-    // El unico combobox del formulario es el nombre, que paso a ser un autocomplete de texto
-    // libre que busca productos existentes. La presentacion ya no esta -se mudo a
-    // `product_batches` el 2026-09-09-, asi que no hay selector de presentacion.
-    // Los comboboxes del formulario son dos: el nombre -autocomplete de texto libre que busca
-    // productos existentes- y la presentacion, que volvio al alta el 2026-09-10 como campo del
-    // primer LOTE (no del producto). Ninguno de los dos es una unidad.
+    // Los comboboxes del formulario son tres: el nombre -autocomplete de texto libre que busca
+    // productos existentes-, la presentacion -que volvio al alta el 2026-09-10 como campo del
+    // primer LOTE, no del producto- y el TIPO de producto, que esta ficha anadio. Ninguno de los
+    // tres es una unidad: el tercero se identifica por su propia etiqueta ("Tipo"), no por
+    // descarte de un conteo que cualquiera podria leer como magico.
     const combos = within(formulario).getAllByRole('combobox');
-    expect(combos).toHaveLength(2);
+    expect(combos).toHaveLength(3);
     expect(combos).toContain(screen.getByTestId('product-field-name'));
+    // El trigger del tipo se localiza por su Label (htmlFor), no por data-testid: el atributo
+    // vive en el root de Base UI Select, que no es el nodo role=combobox.
+    expect(combos).toContain(screen.getByLabelText('Tipo'));
     expect(combos).toContain(screen.getByTestId('presentation-select'));
+    const selectorDeTipo = screen.getByLabelText('Tipo');
+    expect(combos).toContain(selectorDeTipo);
 
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));

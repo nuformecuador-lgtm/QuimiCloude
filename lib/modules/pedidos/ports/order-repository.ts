@@ -1,67 +1,28 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { OrderScope } from '../domain/order-scope';
-import type { NewOrder, OrderRow } from '../domain/order-view';
+import type { OrderRow } from '../domain/order-view';
 
 /**
- * Puerto de acceso a datos del pedido (`design.md > 7.4`). Seis metodos, uno por caso de uso.
+ * Puerto de LECTURA del pedido. La escritura vive en `OrderWriteRepository`
+ * (`ports/order-write-repository.ts`), dentro de la transaccion compartida con `inventario`:
+ * crear, editar, cancelar y borrar leen aqui la fila previa y escriben alli. Este puerto ya NO
+ * declara `create`, `updateAlive`, `cancelAlive` ni `softDeleteAlive` -se movio a sus llamantes
+ * a la unidad de trabajo-, para no dejar dos caminos de escritura del mismo pedido.
  *
  * El sufijo `Alive` NO es adorno: el filtro `deleted_at IS NULL` es responsabilidad de ESTE
  * puerto y de su adaptador, no del dominio (R40), asi que ningun caso de uso puede olvidarlo.
  * No hay ninguna operacion de restaurar ni ningun listado de borrados (R31): lo que no se
  * puede expresar no se puede hacer por descuido.
  *
- * `NewOrder` no tiene `cancellationReason` y su `status` es `EditableOrderStatus`, asi que
- * `create` y `updateAlive` no pueden ni siquiera EXPRESAR una cancelacion. `cancelAlive` es el
- * UNICO metodo con `reason` y por tanto el unico capaz de escribir el estado cancelado: la
- * prohibicion de R24 llega hasta el tipo (`design.md > 8`).
- *
- * Los resultados son DISCRIMINADOS, nunca excepciones de Prisma: el adaptador traduce el
- * `23505` del indice del correlativo a `'duplicate_number'`, el `23503` a un error de
- * referencia y el `23514` segun el nombre de la restriccion. El dominio no ve jamas un
- * SQLSTATE.
- *
- * La comprobacion de ESTADO (R21, R22, R28, R32) NO vive aqui ni en el `where` del `UPDATE`,
- * sino en el caso de uso, sobre el `OrderRow` que acaba de leer con `findAliveById`: si viviera
- * en el `where`, «no existe» y «esta entregado» devolverian lo mismo y el usuario recibiria
- * `not_found` ante un pedido que esta viendo en pantalla.
- *
- * Los seis metodos exigen `scope: OrderScope` al final de la firma: una llamada que lo omita no
+ * Los dos metodos exigen `scope: OrderScope` al final de la firma: una llamada que lo omita no
  * compila. Una IMPLEMENTACION que lo omita si compila (TypeScript acepta una funcion de menor
  * aridad), y eso lo vigila `tests/guards/guard-ambito-empresa-pedidos.test.ts`.
  *
- * «De otra empresa» vuelve como `null` o `'not_found'`, igual que «no existe»: distinguirlos
- * seria un oraculo de existencia sobre datos ajenos. La empresa no viaja en `NewOrder`: lo que no
- * esta en el tipo no se puede escribir por accidente.
+ * «De otra empresa» vuelve como `null`, igual que «no existe»: distinguirlos seria un oraculo de
+ * existencia sobre datos ajenos.
  */
 export interface OrderRepository {
-  /**
-   * Alta (R8, R10, R11). El ano y `created_at` salen del MISMO instante `now`, y la POSICION
-   * la entrega la secuencia de la base dentro del propio `INSERT` (`design.md > 4.2`): asi el
-   * `CHECK orders_order_year_matches_created_at` de QC-33 R41 nunca puede rechazar un alta
-   * legitima. `actorId` es el de la sesion y se escribe en los DOS autores (R6).
-   *
-   * `'duplicate_number'` = el indice unico del correlativo rechazo la pareja (ano, posicion).
-   * En operacion normal no ocurre; existe para que un duplicado insertado por otra via no
-   * llegue como excepcion sin traducir.
-   */
-  /**
-   * `ingredientsCost`: coste calculado de los ingredientes de la receta, ya redondeado a la
-   * escala de la columna, o `null` cuando no se pudo costear. Viaja como PARAMETRO APARTE y
-   * no dentro de `NewOrder` porque no es un dato de entrada del usuario: lo calcula el caso de
-   * uso a partir de lecturas de otro modulo, y `NewOrder` solo debe poder expresar lo que se
-   * teclea. `null` no es `0`: cero seria un importe real, y aqui el significado es «no se pudo
-   * calcular», que es un caso distinto.
-   */
-  create(
-    data: NewOrder,
-    year: number,
-    actorId: string,
-    now: Date,
-    ingredientsCost: string | null,
-    scope: OrderScope,
-  ): Promise<OrderRow | 'duplicate_number'>;
-
   /** `null` = no existe, ya esta borrado, o es de OTRA empresa: para el dominio son el mismo
    *  caso. */
   findAliveById(id: string, scope: OrderScope): Promise<OrderRow | null>;
@@ -97,35 +58,4 @@ export interface OrderRepository {
     recipeIds: readonly string[] | null,
     scope: OrderScope,
   ): Promise<Page<OrderRow>>;
-
-  /** Edicion como REEMPLAZO COMPLETO. No puede escribir `CANCELADO` ni motivo.
-   *
-   *  `ingredientsCost`: mismo criterio que en `create` -parametro aparte, `null` distinto de
-   *  `0`-. La edicion lo SUSTITUYE por completo, incluso a `null`: no hay fusion con el valor
-   *  anterior. */
-  updateAlive(
-    id: string,
-    data: NewOrder,
-    actorId: string,
-    now: Date,
-    ingredientsCost: string | null,
-    scope: OrderScope,
-  ): Promise<'ok' | 'not_found'>;
-
-  /** UNICO camino hacia `CANCELADO` y hacia el motivo (R26, R28, R29). */
-  cancelAlive(
-    id: string,
-    reason: string,
-    actorId: string,
-    now: Date,
-    scope: OrderScope,
-  ): Promise<'ok' | 'not_found'>;
-
-  /** Borrado LOGICO (R31): marca `deleted_at`, jamas borra la fila ni libera el correlativo. */
-  softDeleteAlive(
-    id: string,
-    actorId: string,
-    now: Date,
-    scope: OrderScope,
-  ): Promise<'ok' | 'not_found'>;
 }

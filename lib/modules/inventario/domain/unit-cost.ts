@@ -1,5 +1,5 @@
 /**
- * Derivacion del costo unitario a partir del costo total (R7, R9; `design.md > 5`).
+ * Derivacion del costo unitario a partir del costo total.
  *
  * Esta es la UNICA operacion aritmetica sobre un importe en todo el repo: el resto de los
  * importes viajan como cadena decimal y la aritmetica la hace Postgres. Por eso se hace con
@@ -7,10 +7,9 @@
  * nueva: `design.md > 5` evaluo la libreria de decimales y la descarto con argumento, y
  * `package.json` no cambia en QC-90.
  *
- * El importe NO se convierte a binario de coma flotante en ningun punto (R4,
- * `docs/architecture.md > Anti-patrones`): entra como cadena, se escala a entero exacto y
- * sale como cadena. `stock` si es `number`, y puede serlo sin riesgo: es un entero de
- * `z.number().int()`, no un importe.
+ * Ni el importe ni la existencia se convierten a binario de coma flotante en ningun punto
+ * (`docs/architecture.md > Anti-patrones`): los dos entran como cadena, se escalan a
+ * entero exacto y el resultado sale como cadena.
  */
 
 /** Decimales de `decimal(14,4)`: la escala con la que se guarda `product_batches.unit_cost`. */
@@ -65,22 +64,25 @@ function divideRoundingHalfUp(dividend: bigint, divisor: bigint): bigint {
 }
 
 /**
- * Costo unitario = costo total / existencia, redondeado a 4 decimales (R7).
+ * Costo unitario = costo total / existencia decimal, redondeado a 4 decimales mitad arriba.
+ * El cociente se escala UNA vez de mas -`total x 10^4 / existencia`- para que el
+ * resultado quede en la misma escala que `fromScaledInteger` espera, sin pasar por division
+ * de coma flotante.
  *
  * Devuelve `null` cuando la division NO da un costo guardable:
  *  - el resultado redondea a `0.0000` (R9): la columna tiene `CHECK (unit_cost > 0)` y el
  *    esquema convierte ese `null` en un rechazo colgado del campo del costo total;
- *  - la existencia no es un entero de 1 o mas (R8, que el esquema rechaza antes, senalando
- *    el campo de la existencia);
+ *  - la existencia es cero o no tiene la forma de `decimal(14,4)`;
  *  - el importe no tiene la forma de `decimal(14,4)` (R4, ya rechazado por el patron).
  */
-export function deriveUnitCost(totalCost: string, stock: number): string | null {
-  if (!Number.isInteger(stock) || stock < 1) return null;
+export function deriveUnitCost(totalCost: string, stock: string): string | null {
+  const scaledStock = toScaledInteger(stock);
+  if (scaledStock === null || scaledStock === ZERO) return null;
 
   const scaledTotal = toScaledInteger(totalCost);
   if (scaledTotal === null) return null;
 
-  const scaledUnitCost = divideRoundingHalfUp(scaledTotal, BigInt(stock));
+  const scaledUnitCost = divideRoundingHalfUp(scaledTotal * SCALE_FACTOR, scaledStock);
   if (scaledUnitCost === ZERO) return null;
 
   return fromScaledInteger(scaledUnitCost);

@@ -17,6 +17,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { PERMISSIONS, type PeopleDirectory, type PermissionCode } from '@/lib/modules/identity';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { canAdjustBatchStock } from '@/lib/modules/inventario/domain/actor';
 import { createAdjustBatchStock } from '@/lib/modules/inventario/domain/adjust-batch-stock';
@@ -36,7 +37,8 @@ import { createListProductBatches } from '@/lib/modules/inventario/domain/list-p
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario/domain/product-batch-input';
-import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
+import { createProductSchema, updateProductSchema } from '@/lib/modules/inventario/domain/product-input';
+import type { OrderNumberDirectory } from '@/lib/modules/inventario/domain/reservation';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
@@ -73,14 +75,14 @@ function actorCon(...permissions: readonly PermissionCode[]): Actor {
  *  `product_batches` (2026-09-09). */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  qtyAlert: 0,
+  qtyAlert: '0',
 };
 
 /** QC-90 (R1): el ALTA ya no acepta un producto pelado -siempre crea su primer lote-, asi
  *  que el fixture del alta lleva ademas la existencia del lote, presentacion y costo. */
 const PRODUCTO_VALIDO_CON_LOTE = {
   ...PRODUCTO_VALIDO,
-  stock: 0,
+  stock: '0',
   presentationId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
 };
@@ -97,7 +99,7 @@ const PRESENTACION_VALIDA = {
  *  conjunto cerrado; el `batchId` es un uuid cualquiera porque aqui no hay base. */
 const AJUSTE_VALIDO = {
   batchId: '22222222-2222-4222-8222-222222222222',
-  delta: 2,
+  delta: '2',
   reason: 'merma',
 };
 
@@ -177,6 +179,7 @@ function directorioQueFalla(): PeopleDirectory {
     findRefsIncludingDeletedInCompany: vi.fn<PeopleDirectory['findRefsIncludingDeletedInCompany']>(
       explota,
     ),
+    listAliveInCompany: vi.fn<PeopleDirectory['listAliveInCompany']>(explota),
   };
 }
 
@@ -185,7 +188,18 @@ type Repos = {
   readonly presentations: PresentationRepository;
   readonly log: ListQueryLog;
   readonly people: PeopleDirectory;
+  readonly orders: OrderNumberDirectory;
 };
+
+/** El hueco que `inventario` declara para el numero visible de un pedido: sin permiso el
+ *  historial no puede haber llegado a preguntar por ninguno. */
+function directorioDePedidosQueFalla(): OrderNumberDirectory {
+  return {
+    findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(() => {
+      throw new Error('el directorio de pedidos no debe ser llamado');
+    }),
+  };
+}
 
 function montarReposQueFallan(): Repos {
   return {
@@ -193,6 +207,7 @@ function montarReposQueFallan(): Repos {
     presentations: repositorioPresentacionQueFalla(),
     log: logQueFalla(),
     people: directorioQueFalla(),
+    orders: directorioDePedidosQueFalla(),
   };
 }
 
@@ -200,10 +215,10 @@ const PRODUCTO_EN_BASE = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stock: 0,
+  stock: '0.0000',
   unitId: null,
-  qtyAlert: 0,
-  type: 'PRODUCT' as const,
+  qtyAlert: '0.0000',
+  type: PRODUCT_TYPES.PRODUCT,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -236,7 +251,11 @@ function montarReposPermisivos(): Repos {
         batchId: 'lote-1',
         lot: '1',
       })),
-      adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({ stock: 1 })),
+      adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({
+        stock: '1.0000',
+        reserved: '0.0000',
+        overReserved: false,
+      })),
       findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
       findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => []),
     },
@@ -253,6 +272,10 @@ function montarReposPermisivos(): Repos {
       findRefsIncludingDeletedInCompany: vi.fn<
         PeopleDirectory['findRefsIncludingDeletedInCompany']
       >(async () => []),
+      listAliveInCompany: vi.fn<PeopleDirectory['listAliveInCompany']>(async () => []),
+    },
+    orders: {
+      findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(async () => new Map()),
     },
   };
 }
@@ -283,6 +306,8 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     // QC-92: sin permiso tampoco se pregunta por el nombre del autor de ningun asiento.
     () => expect(repos.people.findAliveRefsInCompany).not.toHaveBeenCalled(),
     () => expect(repos.people.findRefsIncludingDeletedInCompany).not.toHaveBeenCalled(),
+    // Sin permiso tampoco se pregunta el numero visible de ningun pedido.
+    () => expect(repos.orders.findNumberTexts).not.toHaveBeenCalled(),
   ];
 }
 
@@ -404,7 +429,11 @@ const CASOS_DE_USO: ReadonlyArray<{
     nombre: 'list-batch-movements',
     permiso: CONSULTAR,
     invocar: (repos, actor) =>
-      createListBatchMovements({ products: repos.products, people: repos.people })('lote-1', actor),
+      createListBatchMovements({
+        products: repos.products,
+        people: repos.people,
+        orders: repos.orders,
+      })('lote-1', actor),
     invocarConEntradaInvalida: null,
   },
 ];
@@ -481,13 +510,14 @@ describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => 
     expect(codigos).toContain(MODIFICAR);
   });
 
-  it('PRODUCTO_VALIDO pasa createProductSchema y ENTRADA_INVALIDA no', () => {
+  it('PRODUCTO_VALIDO pasa updateProductSchema, PRODUCTO_VALIDO_CON_LOTE pasa createProductSchema, y ENTRADA_INVALIDA no', () => {
     // QC-52 R25: si el fixture dejara de ser entrada valida -y con `strictObject` basta un
     // campo de mas-, los rechazos de abajo seguirian rojos por `ValidationError` y este
-    // archivo dejaria de medir el permiso. El segundo `expect` ancla lo simetrico: la
-    // entrada invalida tiene que ser invalida de verdad para que R12 signifique algo.
-    expect(createProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
+    // archivo dejaria de medir el permiso.
+    expect(updateProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
+    expect(createProductSchema.safeParse(PRODUCTO_VALIDO_CON_LOTE).success).toBe(true);
     expect(createProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
+    expect(updateProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
     // QC-90: el fixture del ALTA se ancla contra SU esquema, que es otro. Si dejara de ser
     // entrada valida, la mitad de la concesion se pondria verde por el motivo equivocado.
     expect(createProductWithFirstBatchSchema.safeParse(PRODUCTO_VALIDO_CON_LOTE).success).toBe(

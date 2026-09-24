@@ -277,8 +277,8 @@ describe('R28 — ni el alta ni la edicion de una presentacion mueven ninguna ex
 
     const loteDespues = await prisma.productBatch.findUniqueOrThrow({ where: { id: loteId } });
     expect(loteDespues).toEqual(loteAntes);
-    expect(loteDespues.stock).toBe(17);
-    expect(loteDespues.unitCost.toFixed(4)).toBe('123.4500');
+    expect(loteDespues.stock.toFixed(4)).toBe('17.0000');
+    expect(loteDespues.unitCost?.toFixed(4)).toBe('123.4500');
     expect(loteDespues.presentationId).toBe(presentationId);
 
     expect(await prisma.productBatch.count({ where: { productId } })).toBe(lotesAntes);

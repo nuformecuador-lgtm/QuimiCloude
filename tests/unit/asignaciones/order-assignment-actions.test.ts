@@ -29,6 +29,7 @@ import {
   OrderAssignmentNotFoundError,
   OrderDeliveredFrozenError,
   UnauthorizedError,
+  UserCannotBeResponsibleError,
   ValidationError,
   createAssignResponsibles,
   createListOrderResponsibles,
@@ -39,7 +40,10 @@ import {
 import {
   assignResponsiblesAction,
   listAssignedOrdersAction,
+  listCompanyOrdersAction,
+  listFinishedOrdersAction,
   listOrderResponsiblesAction,
+  listResponsibleCandidatesAction,
   listResponsiblesForOrdersAction,
   removeWorkGroupFromOrderAction,
   unassignResponsibleAction,
@@ -59,6 +63,9 @@ const {
   listOrderResponsiblesMock,
   listResponsiblesForOrdersMock,
   listAssignedOrdersMock,
+  listFinishedOrdersMock,
+  listCompanyOrdersMock,
+  listResponsibleCandidatesMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
@@ -68,6 +75,9 @@ const {
   listOrderResponsiblesMock: vi.fn(),
   listResponsiblesForOrdersMock: vi.fn(),
   listAssignedOrdersMock: vi.fn(),
+  listFinishedOrdersMock: vi.fn(),
+  listCompanyOrdersMock: vi.fn(),
+  listResponsibleCandidatesMock: vi.fn(),
 }));
 
 // QC-71 (R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera del
@@ -91,6 +101,9 @@ vi.mock('@/lib/composition', () => ({
     listOrderResponsibles: listOrderResponsiblesMock,
     listResponsiblesForOrders: listResponsiblesForOrdersMock,
     listAssignedOrders: listAssignedOrdersMock,
+    listFinishedOrders: listFinishedOrdersMock,
+    listCompanyOrders: listCompanyOrdersMock,
+    listResponsibleCandidates: listResponsibleCandidatesMock,
   },
 }));
 
@@ -808,5 +821,151 @@ describe('QC-88 T9 — listAssignedOrdersAction', () => {
   it('no se reexporta desde el barrel del modulo: `app/**` la importa por su ruta exacta', async () => {
     const contrato = await import('@/lib/modules/asignaciones');
     expect((contrato as Record<string, unknown>).listAssignedOrdersAction).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Las TRES acciones nuevas: mismo cuerpo tonto que `listAssignedOrdersAction`, asi que se prueba
+// lo mismo y no mas: delegan con el actor de la sesion, devuelven la salida TAL CUAL bajo `data`
+// y traducen el error por su `code`.
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-145 T11 — listFinishedOrdersAction', () => {
+  it('recibe la entrada CRUDA y delega en el caso de uso con el actor de la sesion', async () => {
+    const pagina = { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 };
+    listFinishedOrdersMock.mockResolvedValue(pagina);
+
+    const resultado = await listFinishedOrdersAction({ page: 1 });
+
+    expect(listFinishedOrdersAction).toHaveLength(1);
+    expect(listFinishedOrdersMock).toHaveBeenCalledWith(ACTOR_ESPERADO, { page: 1 });
+    expect(resultado).toEqual({ status: 'success', data: pagina });
+  });
+
+  it('traduce el error por su CODE aunque se mute el texto del mensaje', async () => {
+    const error = new ValidationError();
+    Object.defineProperty(error, 'message', { value: 'un texto que nadie debe mirar' });
+    listFinishedOrdersMock.mockRejectedValue(error);
+
+    const resultado = await listFinishedOrdersAction({ page: 0 });
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    expect(JSON.stringify(resultado)).not.toContain('un texto que nadie debe mirar');
+  });
+
+  it('sin sesion el actor es null y el caso de uso rechaza (unauthorized)', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    listFinishedOrdersMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await listFinishedOrdersAction({ page: 1 });
+
+    expect(listFinishedOrdersMock.mock.calls[0]?.[0]).toBeNull();
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+  });
+});
+
+describe('QC-145 T11 — listCompanyOrdersAction', () => {
+  it('recibe la entrada CRUDA -incluidos los `statuses`- y delega con el actor de la sesion', async () => {
+    const pagina = { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 };
+    listCompanyOrdersMock.mockResolvedValue(pagina);
+
+    const resultado = await listCompanyOrdersAction({ page: 1, statuses: ['ENTREGADO'] });
+
+    expect(listCompanyOrdersAction).toHaveLength(1);
+    expect(listCompanyOrdersMock).toHaveBeenCalledWith(ACTOR_ESPERADO, {
+      page: 1,
+      statuses: ['ENTREGADO'],
+    });
+    expect(resultado).toEqual({ status: 'success', data: pagina });
+  });
+
+  it('traduce el error por su CODE aunque se mute el texto del mensaje', async () => {
+    const error = new ValidationError();
+    Object.defineProperty(error, 'message', { value: 'un texto que nadie debe mirar' });
+    listCompanyOrdersMock.mockRejectedValue(error);
+
+    const resultado = await listCompanyOrdersAction({ statuses: [] });
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    expect(JSON.stringify(resultado)).not.toContain('un texto que nadie debe mirar');
+  });
+
+  it('sin sesion el actor es null y el caso de uso rechaza (unauthorized)', async () => {
+    getSessionContextMock.mockResolvedValue(null);
+    listCompanyOrdersMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await listCompanyOrdersAction({ page: 1 });
+
+    expect(listCompanyOrdersMock.mock.calls[0]?.[0]).toBeNull();
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+  });
+});
+
+describe('QC-145 T11 — listResponsibleCandidatesAction', () => {
+  it('no acepta ningun argumento: aridad CERO', async () => {
+    listResponsibleCandidatesMock.mockResolvedValue([]);
+
+    expect(listResponsibleCandidatesAction).toHaveLength(0);
+
+    await listResponsibleCandidatesAction();
+
+    expect(listResponsibleCandidatesMock).toHaveBeenCalledWith(ACTOR_ESPERADO, {});
+  });
+
+  it('devuelve la lista TAL CUAL bajo `data`; la lista vacia es un exito, no un error', async () => {
+    listResponsibleCandidatesMock.mockResolvedValue([]);
+
+    expect(await listResponsibleCandidatesAction()).toEqual({ status: 'success', data: [] });
+
+    const candidatos = [{ id: USER_ID, displayName: 'Ana Perez' }];
+    listResponsibleCandidatesMock.mockResolvedValue(candidatos);
+
+    expect(await listResponsibleCandidatesAction()).toEqual({ status: 'success', data: candidatos });
+  });
+
+  it('traduce el error por su CODE aunque se mute el texto del mensaje', async () => {
+    const error = new UnauthorizedError();
+    Object.defineProperty(error, 'message', { value: 'un texto que nadie debe mirar' });
+    listResponsibleCandidatesMock.mockRejectedValue(error);
+
+    const resultado = await listResponsibleCandidatesAction();
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    expect(JSON.stringify(resultado)).not.toContain('un texto que nadie debe mirar');
+  });
+
+  it('sin sesion el actor es null y el caso de uso rechaza (unauthorized)', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    getSessionContextMock.mockResolvedValue(null);
+    listResponsibleCandidatesMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await listResponsibleCandidatesAction();
+
+    expect(listResponsibleCandidatesMock.mock.calls[0]?.[0]).toBeNull();
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// `user_cannot_be_responsible` sale traducido por su `code`, igual que cualquier otro error del
+// catalogo: esta capa no lo reconoce por su texto ni por ningun `if` especial.
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-145 R33 — assignResponsiblesAction traduce user_cannot_be_responsible por su code', () => {
+  it('una persona con `pedidos.consultar` sale con su propio code, sin filtrar el texto', async () => {
+    const error = new UserCannotBeResponsibleError();
+    Object.defineProperty(error, 'message', { value: 'un texto que nadie debe mirar' });
+    assignResponsiblesMock.mockRejectedValue(error);
+
+    const resultado = await assignResponsiblesAction(
+      { status: 'idle' },
+      formDataCon([
+        ['orderId', ORDER_ID],
+        ['userIds', USER_ID],
+      ]),
+    );
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'user_cannot_be_responsible' });
+    expect(JSON.stringify(resultado)).not.toContain('un texto que nadie debe mirar');
   });
 });

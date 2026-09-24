@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductTable } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
-import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
@@ -59,10 +59,10 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: 'product-9',
     name: 'Acido citrico',
     imagePath: null,
-    stock: 0,
+    stock: '0',
     unitId: null,
     qtyAlert: null,
-    type: 'PRODUCT' as const,
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     ...overrides,
@@ -73,7 +73,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
   return {
     id: 'batch-1',
     lot: 'L-001',
-    stock: 12,
+    stock: '12',
     unitId: 'unit-kg',
     purchaseDate: '2026-03-05',
     expiryDate: null,
@@ -98,7 +98,7 @@ afterEach(() => {
 
 describe('la fila abre el panel de lotes DEL producto (R22)', () => {
   it('pide los lotes de ese producto y pinta lote, cantidad con unidad y fecha', async () => {
-    const batches = [lote({ id: 'b1', lot: 'L-001', stock: 12, purchaseDate: '2026-03-05' })];
+    const batches = [lote({ id: 'b1', lot: 'L-001', stock: '12', purchaseDate: '2026-03-05' })];
     listProductBatchesActionMock.mockResolvedValue({ status: 'success', data: batches });
 
     render(
