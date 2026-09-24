@@ -341,7 +341,14 @@ import {
   removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
 import { uploadCrop } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
+import { cropStorageMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-memory';
+import {
+  createCropSignedReadUrl,
+  listCrops,
+} from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase';
+import { cropCatalogMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-memory';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { CropCatalog } from '@/lib/modules/documentos/ports/crop-catalog';
 import type { CropStorage } from '@/lib/modules/documentos/ports/crop-storage';
 import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
@@ -1314,7 +1321,28 @@ const queueSignature: QueueSignature = queueSignatureQstash;
 const imageCropper: ImageCropper = { crop: cropImage };
 
 /** Bucket PROPIO de estos recortes, distinto del de `documentStorage` de arriba. */
-const cropStorage: CropStorage = { upload: uploadCrop };
+const cropStorage: CropStorage = {
+  upload: (path, png) =>
+    documentsE2EDoublesEnabled() ? cropStorageMemory.upload(path, png) : uploadCrop(path, png),
+};
+
+/**
+ * `CropCatalog`, la lectura de esos mismos recortes para mostrarlos en la revision. Mismo criterio
+ * de bifurcacion que `cropStorage`: se consulta la variable EN CADA LLAMADA.
+ *
+ * Exportado ya para que la fachada de `documentos` pueda inyectarlo sin volver a tocar este
+ * bloque; todavia no lo usa ningun caso de uso construido en este archivo.
+ */
+export const cropCatalog: CropCatalog = {
+  list: (companyId, documentFileId) =>
+    documentsE2EDoublesEnabled()
+      ? cropCatalogMemory.list(companyId, documentFileId)
+      : listCrops(companyId, documentFileId),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    documentsE2EDoublesEnabled()
+      ? cropCatalogMemory.createSignedReadUrl(path, expiresInSeconds)
+      : createCropSignedReadUrl(path, expiresInSeconds),
+};
 
 /** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
 const cropRegionLog: CropRegionLog = createCropRegionLogConsole();
