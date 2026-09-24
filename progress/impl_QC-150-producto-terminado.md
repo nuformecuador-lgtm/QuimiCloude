@@ -388,3 +388,19 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Corrida 4, solo R29 en webkit (`scratchpad/qc150-e2e-v4-r29.log`, implementer): **1 passed**
   (19,1 s). Rojo de carga, no de la rama. Puerto 3117 libre antes y después de cada corrida.
 - **T12 cerrada.** T13 queda a falta del `./init.sh` completo del leader.
+
+## Vuelta 4 (2026-09-24): censos cerrados del `./init.sh` completo del leader en `5082deac`
+
+- Leader: 9545 verdes y 4 rojos nuevos, todos listas cerradas que la rama amplía. Ampliadas con su
+  motivo, en el estilo de cada archivo, y sin aflojar la igualdad exacta (backend_dev, un commit por archivo):
+  - `tests/guards/guard-identificador-de-request.test.ts` (`ded1ba24`): `producto-terminado.spec.ts`
+    en `E2E_ESPERADOS`. El test sustituto que exige la guardia
+    (`tests/unit/identity/route-guard-request-id.test.ts`) ya existía y no cambia.
+  - `tests/unit/inventario/scope.test.ts` (`1129f9ae`): cuarto spec que casa con el patrón de
+    catálogo; no es una segunda pantalla de catálogo.
+  - `tests/unit/shared/data-table-alcance.test.ts` (`b9429079`): de 21 a 22 E2E con data-table.
+  - `tests/unit/recetas-ui/recipe-route-contract.test.ts` (`090a2a92`): `DELIVERED_ORDER_PACKAGES_PARAM`
+    y `DELIVERED_ORDER_PRODUCT_PARAM`.
+- Verificación, solo esos 4 archivos: **4 archivos, 67 pasados, 2 skipped** (ninguno añadido por la
+  rama); eslint limpio.
+- T13 sigue a falta de un `./init.sh` completo verde del leader.
