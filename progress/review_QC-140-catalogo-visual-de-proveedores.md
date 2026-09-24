@@ -105,3 +105,99 @@ por obsoleto, que el test o la bitácora digan por qué, caso a caso.
 Para volver a revisión: arreglar M1 con un test que se ponga rojo con la clase actual, y restituir
 la cobertura de M2 (o justificar caso a caso lo que se da por obsoleto). Después, `./init.sh
 --rapido` en verde. T14 y T15 siguen su curso: revisión humana y `./init.sh` completo.
+
+---
+
+## Revisión 2 (2026-09-24)
+
+> HEAD `143db4aa` (merge de `origin/dev` sobre `25c63fc4`). Revisado solo lo que cambió desde
+> `33f1e9eb`. No corrí la suite, `init.sh` ni los E2E. Corrí los 8 archivos de test que cambian en
+> la vuelta: `qc145-estado-solo-planta`, `supplier-sheet`, `supplier-detail-page`,
+> `supplier-showcase-filters`, `guard-convenciones-showcase`, `showcase-service`,
+> `supplier-showcase-page` y `supplier-showcase-params`. Resultado: **127 passed, 0 skipped, 0
+> rojos**. R29 y D20 de la guardia se ejecutan y no se saltan.
+
+### Mayores de la revisión 1
+
+- **M1: cerrado.** `FIELD_TEXT` pasa a `text-base md:text-base` (`f7fd9cef`). `tailwind-merge`
+  descarta así el `md:text-sm` del `Input`. El test exige `\bmd:text-base\b`, que la clase vieja
+  no tenía, así que habría caído con ella: el anti-placebo es inmediato.
+- **M2: cerrado.** Comparé caso por caso con `origin/dev:tests/unit/proveedores-ui/supplier-page.test.tsx`:
+  - Los cuatro casos del diálogo en `supplier-detail-page.test.tsx` son copias fieles, con el
+    doble que lanza si se llama, el mensaje con el nombre, `delete-supplier-cascade`, cancelar,
+    `role="alert"` y los dos casos del identificador de QC-71. Donde el original afirmaba que no
+    se llamaba a `refresh`, ahora se afirma que no se llama a `replace`, que es lo correcto tras D19.
+  - En `tests/unit/shared/supplier-sheet.test.tsx`, montado sobre el componente compartido:
+    - «precarga y reemplazo completo», «validación previa con el mismo esquema» y
+      «`supplier_not_found` con vuelta a la lista» son fieles.
+    - «nombre duplicado» conserva lo esencial, pero pierde dos aserciones (menor R2-2).
+    - «viewport» conserva los campos a `md:text-base` y los botones a 44 px. Pierde la parte de
+      las acciones de fila, que es obsoleta porque las filas ya no tienen acciones.
+  - Los demás casos del archivo borrado siguen cubiertos: «guardado con éxito» por R36 y R38,
+    «una sola región de avisos» por `guard-herencia-armazon-privado` y «unauthorized en el
+    formulario» por el caso QC-71 de la vista. Una excepción: el «id oculto» de la confirmación
+    de baja (menor R2-2).
+
+### Menores de la revisión 1
+
+| # | Estado |
+|---|---|
+| 1 comentarios largos | Cerrado. Los bloques de producción que la rama añade quedan en 1-4 líneas, sin citas |
+| 2 `appendWithoutDuplicates` duplicada | Cerrado. Queda una sola, en `supplier-showcase-params.ts`, con su test |
+| 3 foco en R32 | Cerrado. Hay un caso que afirma `document.activeElement` durante una suspensión real. El árbol es sintético, pero se complementa con el caso que mira el orden en `page.tsx` |
+| 4 R21 y orden en integración | Cerrado según la bitácora (`41b442e1`). No lo reejecuté porque usa base |
+| 5 orden permiso → validación en R4 | Cerrado. Hay 6 casos nuevos en `showcase-service.test.ts` |
+| 6 guardias mudas tras el merge | Cerrado. Sin commits propios hacen `ctx.skip()` en voz alta, igual que `guard-convenciones-proveedores` |
+| 7 fila de dependencias | Cerrado |
+| 8 bitácora, `aislamiento.json` y «unidad» | Cerrado |
+| 9 cita a un test borrado y `firstPageHref` | Cerrado. La prop se retiró junto con sus comentarios con citas |
+| 10 T14 | Sigue abierta: la revisión en dispositivos es humana |
+
+### Centinela R29 de QC-145 (`bb01139e`)
+
+- Ahora compara `51f2d101` (el merge del PR #112 de QC-145) con su primer padre, que es
+  exactamente lo que QC-145 aportó. Comprobé `git log -1 51f2d101`: el padre 1 es `f54225c5` y el
+  padre 2 es `ea8bb980`.
+- Recalculé yo mismo con `git show`: `51f2d101` contra `~1` no da ningún paquete nuevo, y
+  `6cdb5491` contra `~1` da `react-intersection-observer`. El anti-placebo que describe la
+  bitácora se reproduce.
+- Si falta el commit (por ejemplo, en un clon superficial), el caso lanza error en vez de pasar en
+  verde. No va al baseline.
+- No esconde nada: la regla de QC-145 era «esta ficha no añade dependencias», y ese hecho es
+  histórico y fijo. Pedir que ninguna rama posterior añada dependencias no era su alcance.
+- El merge `143db4aa` trajo de `dev` la misma idea para la parte de esquema (`MERGE_QC145`, de
+  QC-153). Las dos mitades quedan coherentes.
+
+### Hallazgos nuevos
+
+**Mayores:** ninguno.
+
+**Menores:**
+
+- **R2-1: comentarios en tests nuevos que citan R o D.** La regla de `docs/conventions.md`
+  también rige los comentarios de tests: `R<n>` solo va en el nombre del caso. Estas líneas la
+  incumplen. Son tests, no producción, así que no bloquea:
+  - `supplier-showcase.int.test.ts`: «…el test de orden (R31)…» y «"cargar mas" con productSearch activo (R21)».
+  - `guard-convenciones-showcase.test.ts`: «…R29 y D20 pasarian en verde…».
+  - `supplier-showcase-page.test.tsx`: «…mientras otra parte del arbol esta en vuelo (R32)».
+
+  En producción, las líneas nuevas no llevan ninguna cita.
+- **R2-2: tres aserciones de los casos recuperados sin sucesor.**
+  - «al confirmar invoca la baja con el id oculto»: nadie afirma `formData.get('id') === supplier.id`.
+    El E2E de aislamiento lo roza, pero no lo afirma en unitario.
+  - En «nombre duplicado» se perdieron el enlace `aria-describedby` del campo al error y que el
+    panel no refresca.
+  - Nadie comprueba ya en los dos anchos el área táctil de los controles de editar y dar de baja,
+    ahora en la cabecera del detalle.
+- **R2-3: `qc145-estado-solo-planta.test.ts`.** La cabecera de sección (línea 331, «comparado
+  contra origin/dev») y la línea 4 siguen hablando de `origin/dev`. Además, tras el merge conviven
+  dos constantes para el mismo commit: `MERGE_DE_ENTRADA = '51f2d101'` y `MERGE_QC145` con el SHA
+  completo.
+- **R2-4: T14 abierta** hasta la revisión humana en Safari iOS y Chrome Android reales, y T15
+  abierta hasta el `./init.sh` completo del leader. Condicionan el `done`, no son defectos del
+  código.
+
+### Veredicto de la revisión 2
+
+**OK (aprobado)**: 0 mayores y 4 menores. El `done` queda condicionado a que el `./init.sh`
+completo del leader salga en verde (con R51 como rojo heredado de `dev`) y a T14.

@@ -241,7 +241,7 @@
   - Hecho: las tres plataformas anotadas; si alguna falla, se para y se sube al leader.
   - Depende de: T8, T11.
 
-- [ ] **T15 — Cierre.** Mapa `R<n> -> test` completo (R1-R41) en
+- [x] **T15 — Cierre.** Mapa `R<n> -> test` completo (R1-R41) en
   `progress/impl_QC-140-catalogo-visual-de-proveedores.md`; `./init.sh` completo en verde.
   - Hecho: ningún requisito sin test y el gate completo en verde.
   - Depende de: T5, T12, T13, T14.
