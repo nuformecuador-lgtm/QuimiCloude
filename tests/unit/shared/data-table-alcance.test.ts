@@ -459,7 +459,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // reabrir su edicion y comprobar que el coste se reabre sin teclear nada. Se TENSA el centinela
   // de diecinueve a VEINTE; la lista sigue CERRADA, y un spec mas que referencie `data-table`
   // vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veinte', () => {
+  // 2026-09-23 (QC-158, catalogo-desde-pdf, R38): entra la VIGESIMOPRIMERA entrada,
+  // `e2e/catalogo-desde-pdf.spec.ts`, y no afloja la lista. No estrena pantalla: recorre el
+  // catalogo de un proveedor, ya en esta lista, y localiza `data-table-row-<id>` y
+  // `data-table-cell-cost` porque lo que afirma es la fila de la linea recien importada y su
+  // costo, tras confirmar la revision. Se TENSA el centinela de veinte a VEINTIUNO; la lista
+  // sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintiuno', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -483,6 +489,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/aislamiento-proveedores.spec.ts',
       // Las filas servidas de la lista de recetas con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-recetas.spec.ts',
+      // La VIGESIMOPRIMERA la trae QC-158 el 2026-09-23 (R38): ver la nota de arriba. Va antes
+      // que `e2e/ejecucion-receta.spec.ts` porque la lista esta ORDENADA y 'c' precede a 'e'.
+      'e2e/catalogo-desde-pdf.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
       // tabla por la lista de pedidos asignados, que ya la consumia.
       'e2e/ejecucion-receta.spec.ts',
