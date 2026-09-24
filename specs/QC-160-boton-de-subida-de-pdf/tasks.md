@@ -97,13 +97,13 @@
 
 ### T4 [P] — Montaje en `/proveedores/[id]`
 
-- [ ] Quitar el `<DocumentUpload strategy="catalogo" />` montado a la vista.
-- [ ] Después de `requirePagePermission('proveedores.consultar')` y de las lecturas de siempre,
+- [x] Quitar el `<DocumentUpload strategy="catalogo" />` montado a la vista.
+- [x] Después de `requirePagePermission('proveedores.consultar')` y de las lecturas de siempre,
   `canUploadDocuments(await identity.getSessionUser())`. Solo en la rama de éxito, y solo si es `true`,
   `DocumentUploadDialog strategy="catalogo"` entre la cabecera y el catálogo (`design.md > 6.1`).
   `SupplierDetailHeader` no se toca.
-- [ ] Limpiar los comentarios de las líneas que se tocan en `page.tsx` (sin arrastrar el resto).
-- [ ] Reescribir los dos casos de `supplier-detail-upload.test.tsx` según `design.md > 9.2`: botón con
+- [x] Limpiar los comentarios de las líneas que se tocan en `page.tsx` (sin arrastrar el resto).
+- [x] Reescribir los dos casos de `supplier-detail-upload.test.tsx` según `design.md > 9.2`: botón con
   permiso y encolado `catalogo` (R1, R5, R10); sin `documentos.modificar` no hay botón ni subida (R11);
   proveedor inexistente sin botón (R7); el botón va después de la cabecera y antes del catálogo (R22).
 - **Archivos:** `app/(private)/proveedores/[id]/page.tsx`,
