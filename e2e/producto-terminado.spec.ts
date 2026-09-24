@@ -545,6 +545,9 @@ test.describe('producto terminado', () => {
       data: { orderId: order.id, userId: operatorUserId!, companyId: companyId! },
     });
 
+    // Documento neutro antes de limpiar cookies: la pagina de Pedidos sigue viva y su propia
+    // revalidacion podria navegar a /login sola, chocando con el goto de loginAndLand.
+    await page.goto('about:blank');
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -589,6 +592,8 @@ test.describe('producto terminado', () => {
 
     // --- 5. Inventario, pestana «Producto terminado»: el producto con su lote de 50 y «50
     // envases».
+    // Mismo motivo: neutralizar la pagina antes de borrar cookies para evitar la navegacion cruzada.
+    await page.goto('about:blank');
     await page.context().clearCookies();
     await loginAndLand(page, adminUser);
 
