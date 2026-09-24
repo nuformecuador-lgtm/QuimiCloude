@@ -110,8 +110,14 @@ Ninguna va al baseline:**
 - `tests/unit/shared/migracion-listas-alcance.test.ts`: sale la fila de proveedores, cuyos tests se
   borran con la lista paginada, y `e2e/proveedores.spec.ts` deja de figurar entre los E2E con
   búsqueda.
-- `tests/unit/shared/data-table-alcance.test.ts`: la lista cerrada de E2E pasa de 18 a 17, porque
-  `aislamiento-proveedores` ya no monta la tabla compartida.
+- `tests/unit/shared/data-table-alcance.test.ts`: sale `aislamiento-proveedores`, que ya no monta la
+  tabla compartida. Tras el merge de `origin/dev` (`33f1e9eb`), la lista cerrada pasa de
+  **veintiuno a veinte**. La primera versión de esta bitácora decía «de 18 a 17», que era la cuenta
+  anterior al merge.
+- `tests/unit/pedidos/qc145-estado-solo-planta.test.ts` (`bb01139e`): el caso R29 comparaba
+  `package.json` con `origin/dev`, así que se ponía rojo con cualquier dependencia aprobada que
+  llegara después. Ahora compara el merge por el que entró en `dev` (`51f2d101`) con su primer
+  padre. El anti-placebo apuntándolo a `6cdb5491` cae con `react-intersection-observer`.
 
 ## Mapa R<n> -> test (R1-R41)
 
@@ -287,3 +293,46 @@ código.
    convertir un rechazo de transporte en el aviso con «Reintentar».
 7. **Comentarios**: `d0c76395` quitó las citas. Sobre el diff de `app lib components hooks
    middleware.ts db tests e2e`, el grep de citas en comentarios da vacío.
+
+---
+
+## Vuelta 2 (2026-09-24): review rechazada con 2 mayores y 10 menores
+
+La review está en `progress/review_QC-140-catalogo-visual-de-proveedores.md` y se commitea con esta
+bitácora. Antes de la vuelta, la rama ya estaba sincronizada con `origin/dev` (merge `33f1e9eb`,
+con las tres migraciones nuevas aplicadas a `QuimiCloude_QC140`).
+
+| Hallazgo | Estado | Commit |
+|---|---|---|
+| **M1**: los filtros bajaban a 14 px desde 768 px | **Cerrado.** Ahora usan `text-base md:text-base`. El test de R39 exige `md:text-base` y cae con la clase vieja (anti-placebo) | `f7fd9cef` |
+| **M2**: se perdió la cobertura del diálogo de baja y del panel | **Cerrado.** Se recuperaron los 9 casos de `origin/dev:tests/unit/proveedores-ui/supplier-page.test.tsx` y ninguno se da por obsoleto. Los 4 del diálogo están en `supplier-detail-page.test.tsx`, montados desde la cabecera del detalle. Los 5 del panel están en `tests/unit/shared/supplier-sheet.test.tsx`: precarga y `FormData`, nombre duplicado, `supplier_not_found`, validación previa y viewport angosto y ancho. `migracion-listas-alcance` no necesita fila nueva porque ya no escanea archivos de proveedores | `23021950` |
+| m1: comentarios de más de 5 líneas | **Cerrado.** Se acortaron en `lib/` y en `app/`, y se quitó el de `onVisible`, que repetía el código | `7cb3d762`, `069c7256`, `fdf331ae` |
+| m2: `appendWithoutDuplicates` duplicada | **Cerrado.** Queda una sola en `supplier-showcase-params.ts`, con su test | `fdf331ae` |
+| m3: R32 no comprobaba el foco | **Cerrado.** Un caso enfoca el filtro, navega mientras una sección hermana se suspende de verdad y afirma `document.activeElement` | `5e7094c7` |
+| m4: R21 sin «cargar más» filtrado contra Postgres, y la siembra en orden alfabético | **Cerrado.** Hay un caso R21/R17 que encadena la tanda filtrada con las páginas 2 y 3. La siembra ahora inserta en un orden distinto del alfabético | `41b442e1` |
+| m5: R4 no fijaba el orden permiso → validación | **Cerrado.** Hay 6 casos con entrada inválida y sin permiso (o actor nulo) en los dos casos de uso. Anti-placebo: al mover el permiso detrás de la validación caen 2 casos en `listSupplierShowcase` y 5 en `listShowcaseLines` | `1f5acd09` |
+| m6: las guardias R29 y D20 quedaban en verde silencioso tras el merge | **Cerrado.** Sin base o sin commits propios hacen `ctx.skip()` con un mensaje explícito. En esta rama se ejecutan los 6 casos (comprobado en modo verbose) | `aea3c2a7`, `ff844e2b` |
+| m7: la fila de `docs/dependencias.md` atribuía la librería al carrusel | **Cerrado** | `d4e82cbf` |
+| m8: bitácora inexacta (cuenta del centinela, «unidad» sembrada) | **Cerrado.** Se corrigieron la bitácora, `aislamiento.json` y la cabecera del test de integración | este commit, `41b442e1` |
+| m9: una cita a un test borrado y la prop `firstPageHref` sin consumidor | **Cerrado.** Se corrigió la cita en `pantallas-exigen-permiso.test.tsx` y se retiró la prop, tras comprobar con grep que nadie la pasa | `aaab2e84` |
+| m10: T14 pendiente de dispositivos reales | **Sigue abierta**: la hace el humano | — |
+
+Fuera de la review, `bb01139e` corrige el centinela R29 de pedidos, el único rojo nuevo del gate
+completo (ver *Enmiendas*).
+
+### Verificación de la vuelta 2 (salidas reales, recortadas)
+
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: 0 errores. Quedan 2 avisos en `tests/unit/pedidos/order-service.test.ts`, que
+  viene tal cual de `origin/dev`.
+- `pnpm exec vitest run tests/unit/proveedores-ui tests/unit/proveedores tests/unit/shared tests/unit/navegacion/pantallas-exigen-permiso.test.tsx tests/unit/documentos-ui tests/guards`:
+  **114 archivos, 1365 passed, 11 skipped, 0 rojos**.
+- Integración `supplier-showcase.int.test.ts`: **11 passed**, sobre una base efímera copiada de
+  `qct_tpl_51f079471849` (la plantilla ya incluye las migraciones del merge).
+- E2E en Chromium contra `QuimiCloude_QC140`, `--workers=1`
+  (`proveedores.spec.ts` + `aislamiento-proveedores.spec.ts`): **2 passed, 1 failed**. El rojo es
+  R51 (`12.3456` frente a `12.35`), heredado de `dev` por decisión del humano. El 3117 quedó libre.
+- No corrí `./init.sh` ni la suite completa.
+
+**Tasks:** T0-T13 `[x]`. T14 queda abierta hasta la revisión en Safari iOS y Chrome Android reales,
+que hace el humano. T15 queda abierta hasta el `./init.sh` completo del leader.
