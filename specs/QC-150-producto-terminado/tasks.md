@@ -100,7 +100,7 @@ Archivos: `lib/modules/inventario/domain/{presentation-input,presentation-view,p
 - R40: cambiar el contenido se acepta aunque la presentación tenga pedidos o lotes.
 - `findRefs` devuelve `content`.
 
-## T5 — Cálculos puros `[depende de T0]` `[P con T1-T4]`
+## [x] T5 — Cálculos puros `[depende de T0]` `[P con T1-T4]`
 
 Archivos: `lib/modules/inventario/domain/finished-goods.ts` (nuevo), `lib/modules/inventario/index.ts`,
 `lib/modules/pedidos/domain/{order-cost,resolve-ingredients-cost}.ts`,

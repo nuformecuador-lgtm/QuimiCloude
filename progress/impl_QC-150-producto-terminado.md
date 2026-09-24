@@ -27,3 +27,16 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
     así que el lote a coste cero de R42 no se podría escribir; T2 lo acota al lote de producción.
   - C6: QC-145 ya retiró la edición a `ENTREGADO`; R27 se cubre con la cláusula de T9.
 - Gate `./init.sh --rapido`: lo corre el leader.
+
+## T5 — Cálculos puros (`6c422930`, backend_dev)
+
+- Nuevos: `lib/modules/inventario/domain/finished-goods.ts`, `tests/unit/inventario/finished-goods.test.ts`.
+- Modificados: `lib/modules/inventario/index.ts` (exporta `planFinishedGoods` y `FinishedGoodsPlan`),
+  `lib/modules/pedidos/domain/order-cost.ts` (`calculateLotIngredientsCost`),
+  `lib/modules/pedidos/domain/resolve-ingredients-cost.ts` (`resolveLotIngredientsCost`, lecturas
+  compartidas en `loadCostInput`), `tests/unit/pedidos/{order-cost,resolve-ingredients-cost}.test.ts`.
+- Formato: cantidades, contenido y coste unitario en `d.dddd`; `packages` como entero plano.
+  Desbordamiento en `calculateLotIngredientsCost` → `Error` genérico, que la acción traduce a `unexpected`.
+- Tests: 6 archivos / 75 tests verdes (`finished-goods`, `order-cost`, `resolve-ingredients-cost`,
+  `inventario/module-contract`, `decimal-quantity`, `unit-cost`). `vitest related` de los 4 archivos
+  de `lib`: 231 archivos, 3569 pasados, 6 skipped, 0 fallos. Typecheck limpio; lint 0 errores.
