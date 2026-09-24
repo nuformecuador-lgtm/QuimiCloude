@@ -10,17 +10,18 @@
  * apartar y comprueba, con el cliente global, que no quedo ni el pedido ni la reserva. El caso del
  * reintento reutiliza el trigger determinista de `order-duplicate-number.int.test.ts` -sin el no
  * hay forma de provocar el choque del correlativo sin una carrera de verdad- para demostrar que
- * `withOrderTransaction` reintenta la unidad ENTERA hasta el mismo tope que `createOrder`.
+ * `withOrderTransaction` reintenta la unidad ENTERA y, agotados los intentos, traduce el choque a
+ * `DuplicateOrderNumberError`.
  */
 import { randomUUID } from 'node:crypto';
 
-import { Prisma } from '@prisma/client';
 import { Client, DatabaseError } from 'pg';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
+import { DuplicateOrderNumberError } from '@/lib/modules/pedidos/domain/errors';
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
@@ -229,7 +230,7 @@ describe('R15 — un fallo forzado despues de apartar no deja escrito ni el pedi
 });
 
 describe('el reintento del correlativo (sin carrera artificial, con el trigger determinista de order-duplicate-number)', () => {
-  it('withOrderTransaction reintenta la unidad completa hasta el mismo tope que createOrder, y no deja nada escrito si los tres chocan', async () => {
+  it('withOrderTransaction reintenta la unidad completa y, agotados los 3 intentos, lanza DuplicateOrderNumberError sin dejar nada escrito', async () => {
     const fixture = await createFixture();
     const now = new Date();
 
@@ -286,8 +287,7 @@ describe('el reintento del correlativo (sin carrera artificial, con el trigger d
         () => null,
         (error: unknown) => error,
       );
-      expect(rechazo).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
-      expect((rechazo as Prisma.PrismaClientKnownRequestError).meta).toMatchObject({ code: '23505' });
+      expect(rechazo).toBeInstanceOf(DuplicateOrderNumberError);
 
       // Tres transacciones: la unidad entera se reintento, no solo el `INSERT`.
       expect(spy).toHaveBeenCalledTimes(3);

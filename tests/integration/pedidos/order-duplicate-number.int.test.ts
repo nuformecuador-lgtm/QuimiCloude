@@ -1,9 +1,7 @@
 /**
  * El choque del correlativo, AUTENTICO y contra Postgres real, a traves de
  * `withOrderTransaction` + `createOrderWriteRepository` -el mismo par que ata `OrderUnitOfWork`
- * en `lib/composition`, y el UNICO camino de alta desde que Tm2 (QC-141, `design.md > 5.3`
- * enmendado) retiro `createOrder`, que llevaba su propio bucle de reintento y traducia el
- * choque agotado a `'duplicate_number'`.
+ * en `lib/composition`, y el UNICO camino de alta desde que Tm2 retiro `createOrder`.
  *
  * Por que un trigger: con el lock de aviso el choque no se puede provocar por carrera, y un error
  * fabricado a mano no dice nada de la forma que tiene de verdad. Un trigger `BEFORE INSERT`,
@@ -11,11 +9,10 @@
  * `INSERT` del adaptador choca contra `orders_company_year_sequence_key` en los TRES intentos, y
  * el `23505` que vuelve es el que produce el motor, con el mensaje en el idioma del servidor.
  *
- * El reintento sigue siendo el mismo -tres transacciones nuevas, una por intento-, pero ya NO
- * traduce a una cadena: `withOrderTransaction` reintenta y, agotados los intentos, deja SUBIR el
- * `23505` sin traducir (`isDuplicateOrderNumber`/`CREATE_ORDER_MAX_ATTEMPTS` de `order-prisma.ts`
- * son los mismos que usaba `createOrder`). Lo que este archivo prueba sigue siendo R15 del
- * correlativo: tres intentos, ni uno mas, y ningun duplicado llega a escribirse.
+ * `withOrderTransaction` reintenta la unidad entera -tres transacciones nuevas, una por
+ * intento- y, agotados los tres, traduce el choque agotado a `DuplicateOrderNumberError`. Este
+ * archivo prueba R15 del correlativo: tres intentos, ni uno mas, ningun duplicado llega a
+ * escribirse y no queda ningun apartado de material.
  *
  * Aislamiento por COMMIT: `withOrderTransaction` abre su propia `prisma.$transaction` con el
  * cliente global. El trigger y su funcion llevan un nombre unico, solo actuan sobre la empresa
@@ -23,12 +20,12 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { Prisma } from '@prisma/client';
 import { Client, DatabaseError } from 'pg';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName } from '@/lib/modules/inventario';
+import { DuplicateOrderNumberError } from '@/lib/modules/pedidos/domain/errors';
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -147,23 +144,13 @@ function altaDe(fixture: Fixture): Promise<OrderRow> {
   );
 }
 
-/** SQLSTATE de un error de Prisma, leido del campo ESTRUCTURADO -nunca del texto del mensaje,
- *  que en esta maquina responde en espanol-. Mismo criterio que `order-prisma.ts`. */
-function sqlStateOf(error: unknown): string | null {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return null;
-  const meta: unknown = error.meta;
-  if (typeof meta !== 'object' || meta === null || !('code' in meta)) return null;
-  const code: unknown = (meta as { code: unknown }).code;
-  return typeof code === 'string' ? code : null;
-}
-
 afterAll(async () => {
   await prisma.recipe.deleteMany({ where: { id: recetaId } });
   await prisma.$disconnect();
 });
 
-describe('un 23505 real del correlativo agota los tres intentos y sube sin traducir', () => {
-  it('con el correlativo ocupado en los tres intentos rechaza con el 23505 del motor, tras 3 transacciones, sin escribir un duplicado', async () => {
+describe('un 23505 real del correlativo agota los tres intentos y se traduce a duplicate_number', () => {
+  it('con el correlativo ocupado en los tres intentos devuelve DuplicateOrderNumberError, tras 3 transacciones, sin escribir un duplicado ni un apartado', async () => {
     const fixture = await createFixture();
     // La receta es de la MISMA empresa que la del fixture: QC-50 hizo `recipes.company_id`
     // obligatoria.
@@ -218,12 +205,14 @@ describe('un 23505 real del correlativo agota los tres intentos y sube sin tradu
         (error: unknown) => error,
       );
 
-      expect(rechazo, 'el alta con el correlativo ocupado en los tres intentos tenia que rechazar').not.toBeNull();
-      expect(sqlStateOf(rechazo)).toBe('23505');
+      expect(rechazo).toBeInstanceOf(DuplicateOrderNumberError);
+      expect((rechazo as DuplicateOrderNumberError).code).toBe('duplicate_number');
       expect(spy).toHaveBeenCalledTimes(3);
 
       const guardados = await prisma.order.count({ where: { companyId: fixture.companyId } });
       expect(guardados).toBe(1);
+      const apartados = await prisma.reservationMovement.count({ where: { companyId: fixture.companyId } });
+      expect(apartados).toBe(0);
     } finally {
       spy?.mockRestore();
       await admin.query(`DROP TRIGGER IF EXISTS "${trigger}" ON public.orders`).catch(() => undefined);
