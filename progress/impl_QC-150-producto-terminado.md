@@ -540,3 +540,16 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Verificación: typecheck sale con 0; lint 0 errores; `vitest run tests/guards` 43 archivos → 560
   pasados, 5 skipped. En serie, los 7 archivos con conflicto, `company-scope.int` y los 3 de esquema de
   la ficha, todos verdes.
+
+### F2.3, gate completo del leader en `3f590fb6`: 1 rojo ajeno de 10007
+
+- **Arreglo de deuda ajena, para decirlo en el PR** (`338b6678`): `tests/unit/documentos/qc158-alcance.test.ts`,
+  R36a de QC-158, exigía que el diff de la rama en curso trajera algo bajo
+  `specs/QC-158-catalogo-desde-pdf/`, y fallaba en cualquier otra rama. Es el mismo defecto que la
+  guardia de QC-140. Mismo patrón: esa aserción pasa a un caso propio que mira solo los commits
+  firmados `tipo(QC-158)` del rango más el árbol sin commitear, y sin ninguno hace `ctx.skip` con
+  motivo. Lo que no depende de la rama sigue corriendo siempre: nada versionado bajo
+  `borradores-de-prompts/`, R36b, R36c, los detectores y la precondición de rama. R36d ya se saltaba
+  bien y no se tocó.
+- Verificación: el archivo da 8 pasados y 3 skipped con motivo; `tests/guards` 560 pasados, 5
+  skipped; eslint limpio; typecheck sale con 0.
