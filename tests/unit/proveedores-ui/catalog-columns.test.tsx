@@ -119,7 +119,9 @@ describe('catalogo del proveedor — celdas de material y medidas (R28)', () => 
       }),
     ]);
 
-    expect(await screen.findByTestId('data-table-cell-measurements')).toHaveTextContent('Ø 10 mm');
+    expect((await screen.findByTestId('data-table-cell-measurements')).textContent?.trim()).toBe(
+      'Ø 10 mm',
+    );
   });
 
   it('con solo el alto, la celda pinta unicamente esa medida', async () => {
@@ -129,7 +131,7 @@ describe('catalogo del proveedor — celdas de material y medidas (R28)', () => 
       }),
     ]);
 
-    expect(await screen.findByTestId('data-table-cell-measurements')).toHaveTextContent(
+    expect((await screen.findByTestId('data-table-cell-measurements')).textContent?.trim()).toBe(
       'alto 20 cm',
     );
   });
@@ -137,7 +139,7 @@ describe('catalogo del proveedor — celdas de material y medidas (R28)', () => 
   it('con solo la boca, la celda pinta unicamente ese texto', async () => {
     montar([linea({ measurements: { diameter: null, height: null, mouth: '28/410' } })]);
 
-    expect(await screen.findByTestId('data-table-cell-measurements')).toHaveTextContent(
+    expect((await screen.findByTestId('data-table-cell-measurements')).textContent?.trim()).toBe(
       'boca 28/410',
     );
   });

@@ -257,3 +257,11 @@ arriba no se toca.
 | 2026-09-23 | `[F5]` Volver a revisar más tarde | **Pantalla propia** `/proveedores/[id]/importar/[documentoId]`; sin proveedor en la tanda y sin lista de pendientes. (R1, R32) |
 | 2026-09-23 | `[F6]` Permiso para crear presentación | Crear presentación exige **también `inventario.modificar`**. (R33) |
 | 2026-09-23 | `[F7]` Qué es «precio» | **Solo `cost`**. (R15) |
+
+### Nota fechada — 2026-09-24, decisión humana durante la implementación
+
+Se añade sin tocar R38 ni las tablas de arriba (detalle en `design.md > 16`).
+
+| Fecha | Pregunta | Decisión |
+|---|---|---|
+| 2026-09-24 | ¿Cómo comprueba R38 la imagen de la línea nueva, si la pantalla del catálogo aún no sabe pintar la clave del recorte? | R38 comprueba la imagen **solo en la base**; pintarla con URL firmada es de **QC-140**. Material, medidas, presentación y costo se comprueban en la base y en la pantalla. |
