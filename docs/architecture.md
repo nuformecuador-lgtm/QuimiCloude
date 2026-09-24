@@ -100,6 +100,13 @@ del dominio.
    (`ProductRef.unitId`), no una columna de la propia linea. El producto sigue apuntando al
    catalogo de unidades sin cambios. Detalle en
    `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`.
+   **REABIERTA EN PARTE el 2026-09-24 (QC-164, `pending`): el pedido vuelve a tener unidad.**
+   QC-147 lo dejo sin unidad; QC-164 le devuelve una del catalogo, y el consumo pasa a ser
+   cantidad x % **convertida** a la unidad del insumo con los factores de QC-76 cuando comparten
+   familia. Entre familias distintas (L frente a kg) se mantiene la aproximacion **sin densidad**
+   que QC-147 acepto (1 L ~ 1 kg): la densidad por producto queda descartada por ahora. De paso,
+   **QC-150** (spec_ready) da a la presentacion su contenido numerico en su propia unidad.
+   Detalle en `specs/QC-164-unidad-del-pedido/requirements.md`.
 2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
    suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
    guarda totales es de las migraciones mas dolorosas que existen.
