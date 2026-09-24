@@ -161,17 +161,17 @@
 
 ### T7 — E2E de documentos (R16-R19)
 
-- [ ] Ajustar el caso de QC-107 (R16): comprobar que se ve el botón y la subida está oculta
+- [x] Ajustar el caso de QC-107 (R16): comprobar que se ve el botón y la subida está oculta
   (`toBeHidden`), pulsar `document-upload-open` y seguir el recorrido. La afirmación de base de datos
   pasa a «una tanda **nueva** con estrategia `catalogo`», contando antes y después por empresa y
   estrategia.
-- [ ] Caso nuevo de fórmulas (R17): `goto(FORMULAS_ROUTE)`, abrir, dos PDFs
+- [x] Caso nuevo de fórmulas (R17): `goto(FORMULAS_ROUTE)`, abrir, dos PDFs
   `qc107_e2e_formula_<n>_<RUN_ID>.pdf`, esperar `done` en las dos filas, una tanda nueva `formula` con
   dos archivos `done` y dos `PUT` interceptados.
-- [ ] Ajustar el caso de QC-142 sin `documentos.modificar` (R18, D11):
+- [x] Ajustar el caso de QC-142 sin `documentos.modificar` (R18, D11):
   `document-upload-open` y `document-upload` con `toHaveCount(0)`, cero `PUT` y el mismo conteo de
   tandas antes y después. El nombre lleva `R18` y conserva la referencia a QC-142 R20.
-- [ ] Sin cambios en `playwright.config.ts` ni en los dobles (R19). Ningún archivo E2E nuevo.
+- [x] Sin cambios en `playwright.config.ts` ni en los dobles (R19). Ningún archivo E2E nuevo.
 - **Archivos:** `e2e/documentos.spec.ts`.
 - **Depende de:** T4, T5.
 - **Hecho cuando:** `pnpm run e2e -- documentos` verde en Chromium y WebKit contra
