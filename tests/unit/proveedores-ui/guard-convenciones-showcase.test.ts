@@ -99,12 +99,19 @@ const MARCA_DE_LA_FEATURE = 'QC-140';
  * `guard-convenciones-proveedores.test.ts` para el mismo problema.
  */
 function archivosDeQC140(): readonly string[] | null {
-  const salidaLog = git(['log', '--no-merges', '--format=%H', `--grep=${MARCA_DE_LA_FEATURE}`, 'origin/dev..HEAD']);
+  // `--grep` casa con cualquier mensaje que MENCIONE la marca, no solo con quien la firma: un
+  // commit de otra ficha que la nombre de pasada (p.ej. en su cuerpo) tambien entraria. Se filtra
+  // en JS sobre el asunto (`%s`) exigiendo que empiece `tipo(QC-140)`, la forma en que esta
+  // feature firma sus propios commits.
+  const salidaLog = git(['log', '--no-merges', '--format=%H%x09%s', 'origin/dev..HEAD']);
   if (salidaLog === null) return null;
+  const ASUNTO_FIRMADO = new RegExp(`^\\w+\\(${MARCA_DE_LA_FEATURE}\\)`);
   const commits = salidaLog
     .split('\n')
     .map((linea) => linea.trim())
-    .filter((linea) => linea.length > 0);
+    .filter((linea) => linea.length > 0)
+    .filter((linea) => ASUNTO_FIRMADO.test(linea.split('\t')[1] ?? ''))
+    .map((linea) => linea.split('\t')[0]);
   if (commits.length === 0) return null;
 
   const tocados = new Set<string>();
