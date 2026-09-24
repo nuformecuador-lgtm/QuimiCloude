@@ -40,7 +40,7 @@ function catalogoDeRecetas(content: RecipeExecutionContent | null = contenido())
 }
 
 function catalogoDeProductos(
-  refs: readonly ProductRef[] = [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+  refs: readonly ProductRef[] = [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
   batches: readonly CostingBatch[] = [],
 ) {
   const findRefs = vi.fn(async () => refs);
@@ -79,7 +79,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '50.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -118,7 +118,7 @@ describe('resolveIngredientsCost', () => {
   it('existencia insuficiente devuelve sin importe (R16)', async () => {
     const cat = catalogoDeRecetas();
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '1.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -160,7 +160,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: GRAMO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: GRAMO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ unitId: KILOGRAMO.id, stock: '2.0000', unitCost: '5.0000' })],
     );
     const uni = catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILOGRAMO.id, KILOGRAMO]]));
@@ -189,6 +189,7 @@ describe('resolveIngredientsCost', () => {
       name: `producto ${i}`,
       unitId: LITRO.id,
       stockByUnit: [],
+      type: 'PRODUCT' as const,
     }));
     const batches = Array.from({ length: 4 }, (_, i) =>
       lote({ productId: `${PRODUCT_A}-${i}`, stock: '1000.0000', unitCost: '1.0000' }),
@@ -210,7 +211,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '1000.0000', unitCost: '1.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -226,7 +227,7 @@ describe('resolveIngredientsCost', () => {
 
   it('sin `options.orderId` pide los lotes sin excluir ningun pedido; con el, lo reenvia como `excludeOrderId` (R65)', async () => {
     const cat = catalogoDeRecetas();
-    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }], [lote()]);
+    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }], [lote()]);
     const uni = catalogoDeUnidades();
 
     await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
@@ -255,7 +256,7 @@ describe('resolveLotIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '50.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -275,7 +276,7 @@ describe('resolveLotIngredientsCost', () => {
   it('un insumo sin existencia disponible cuenta cero y el resultado nunca es nulo (R42)', async () => {
     const cat = catalogoDeRecetas();
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '1.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -313,7 +314,7 @@ describe('resolveLotIngredientsCost', () => {
 
   it('reenvia options.orderId a findCostingBatches como excludeOrderId (C5: el pedido a finalizar cuenta su propio apartado como disponible)', async () => {
     const cat = catalogoDeRecetas();
-    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }], [lote()]);
+    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }], [lote()]);
     const uni = catalogoDeUnidades();
 
     await resolveLotIngredientsCost(

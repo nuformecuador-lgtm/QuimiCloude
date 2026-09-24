@@ -6,6 +6,7 @@ import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ProductId, ProductRef } from '../../../domain/product-catalog';
 import type { CostingBatch } from '../../../domain/costing-batch';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
+import type { ProductType } from '../../../domain/product-type';
 
 import { batchCompanyScope, productCompanyScope } from './company-scope';
 import { findReservedAndAvailableByBatch } from './reservation-prisma';
@@ -31,6 +32,7 @@ type ProductCatalogRow = {
   readonly name: string;
   readonly unitId: string | null;
   readonly stockByUnit: readonly ProductStockByUnit[];
+  readonly type: ProductType;
 };
 
 /** Fila de Prisma -> `ProductRef` del contrato publico. Funcion pura, testeable sin base. */
@@ -40,15 +42,17 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
     name: row.name,
     unitId: row.unitId,
     stockByUnit: row.stockByUnit,
+    type: row.type,
   };
 }
 
-/** Fila cruda que devuelve la consulta: existencia y unidad guardadas, ya en `products`. */
+/** Fila cruda que devuelve la consulta: existencia, unidad y tipo guardados, ya en `products`. */
 type ProductStockRow = {
   readonly id: string;
   readonly name: string;
   readonly stock: string;
   readonly unitId: string | null;
+  readonly type: ProductType;
 };
 
 /**
@@ -64,9 +68,9 @@ async function findAliveProducts(
     where: {
       AND: [productCompanyScope(scope), { id: { in: [...ids] }, deletedAt: null }],
     },
-    select: { id: true, name: true, stock: true, unitId: true },
+    select: { id: true, name: true, stock: true, unitId: true, type: true },
   });
-  return rows.map((row) => ({ ...row, stock: row.stock.toFixed(4) }));
+  return rows.map((row) => ({ ...row, stock: row.stock.toFixed(4), type: row.type as ProductType }));
 }
 
 export async function findProductRefs(
@@ -83,6 +87,7 @@ export async function findProductRefs(
       name: row.name,
       unitId: row.unitId,
       stockByUnit: row.unitId === null ? [] : [{ unitId: row.unitId, quantity: row.stock }],
+      type: row.type,
     }),
   );
 }

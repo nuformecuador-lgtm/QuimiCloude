@@ -27,33 +27,46 @@ const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { product: { findMany } } }));
 
 describe('toProductRef', () => {
-  it('mapea id, name, unitId y stockByUnit tal cual', () => {
+  it('mapea id, name, unitId, stockByUnit y type tal cual', () => {
     const ref = toProductRef({
       id: 'p-1',
       name: 'Acido sulfurico',
       unitId: 'kg',
       stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
+      type: 'PRODUCT',
     });
     expect(ref).toEqual({
       id: 'p-1',
       name: 'Acido sulfurico',
       unitId: 'kg',
       stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
+      type: 'PRODUCT',
     });
   });
 
   it('sin lotes, stockByUnit es un array vacio', () => {
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [], type: 'PRODUCT' });
     expect(ref.stockByUnit).toEqual([]);
   });
 
   it('la referencia publica NO lleva existencia total del producto (R11)', () => {
     // R11 — `products.stock` ya no existe: la existencia sale UNICAMENTE de `stockByUnit`, que
     // agrupa por unidad (R5) y no es lo mismo que el producto declarando SU unidad.
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
-    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit', 'unitId']);
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [], type: 'PRODUCT' });
+    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit', 'type', 'unitId']);
     expect(Object.keys(ref)).not.toContain('stock');
     expect(Object.keys(ref)).not.toContain('latestBatchUnitId');
+  });
+
+  it('R5 (QC-150) — un producto terminado se mapea con su tipo', () => {
+    const ref = toProductRef({
+      id: 'p-1',
+      name: 'Desengrasante · Botella 1L',
+      unitId: 'l',
+      stockByUnit: [{ unitId: 'l', quantity: '50.0000' }],
+      type: 'FINISHED_PRODUCT',
+    });
+    expect(ref.type).toBe('FINISHED_PRODUCT');
   });
 });
 
@@ -63,7 +76,7 @@ describe('R14 — findRefs lee la existencia y la unidad de las columnas del pro
   });
 
   it('con unidad guardada, unitId y stockByUnit traen esa unidad', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(12), unitId: 'kg' }]);
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(12), unitId: 'kg', type: 'PRODUCT' }]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
@@ -72,7 +85,7 @@ describe('R14 — findRefs lee la existencia y la unidad de las columnas del pro
   });
 
   it('sin unidad guardada (sin lotes), unitId es null y stockByUnit es un array vacio', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null, type: 'PRODUCT' }]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
@@ -135,7 +148,7 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
     // despues: devuelve tal cual lo que el `where` (ya acotado) dejo pasar. Si `findMany`
     // filtro por empresa, un producto ajeno simplemente no aparece en la fila -mismo camino que
     // un id que no existe, sin distincion posible para quien pregunta.
-    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
+    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null, type: 'PRODUCT' }]);
 
     const refs = await findProductRefs(['p-propio', 'p-de-otra-empresa'], 'empresa-1');
 

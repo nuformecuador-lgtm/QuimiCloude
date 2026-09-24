@@ -38,6 +38,7 @@ const REF_NUEVO: ProductRef = {
   name: 'Sosa caustica',
   unitId: null,
   stockByUnit: [],
+  type: 'PRODUCT',
 };
 
 function filaConLineaVieja(): RecipeRow {
@@ -164,7 +165,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
     const products: ProductCatalog = {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         REF_NUEVO,
-        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null, stockByUnit: [] },
+        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null, stockByUnit: [], type: 'PRODUCT' },
       ]),
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');

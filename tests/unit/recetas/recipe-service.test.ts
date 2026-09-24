@@ -67,6 +67,7 @@ const PRODUCTO_REF: ProductRef = {
   name: 'Acido sulfurico',
   unitId: UNIT_ID,
   stockByUnit: [{ unitId: UNIT_ID, quantity: '3.0000' }],
+  type: 'PRODUCT',
 };
 
 function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepository {
@@ -193,7 +194,7 @@ describe('R11 — la edicion recibe la lista final completa', () => {
     // La segunda linea es "nueva": hace falta que el catalogo la reconozca para pasar.
     (products.findRefs as ReturnType<typeof vi.fn>).mockResolvedValue([
       PRODUCTO_REF,
-      { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+      { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null, stockByUnit: [], type: 'PRODUCT' },
     ]);
 
     await updateRecipe('receta-1', nuevaListaCompleta, ADMIN);
@@ -363,6 +364,7 @@ describe('R14, R24 — existencia del insumo en SU PROPIA unidad', () => {
       name: 'Acido sulfurico',
       unitId: UNIT_ID,
       stockByUnit: [{ unitId: UNIT_ID, quantity: '15.0000' }],
+      type: 'PRODUCT',
     });
 
     const detalle = await getRecipe('receta-1', ADMIN);
@@ -374,7 +376,7 @@ describe('R14, R24 — existencia del insumo en SU PROPIA unidad', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo({
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
-        { id: LINEA_VALIDA.productId, name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+        { id: LINEA_VALIDA.productId, name: 'Sosa caustica', unitId: null, stockByUnit: [], type: 'PRODUCT' },
       ]),
     });
     const images = montarAlmacenamiento();
@@ -477,7 +479,7 @@ describe('R4 — guarda y relee cada porcentaje con el mismo valor enviado', () 
     const products = montarCatalogo({
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         PRODUCTO_REF,
-        { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+        { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null, stockByUnit: [], type: 'PRODUCT' },
       ]),
     });
     const images = montarAlmacenamiento();
