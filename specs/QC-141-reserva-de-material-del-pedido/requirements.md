@@ -5,7 +5,7 @@
 > y la decisión del humano registrada en la fila **D22**: el coste de ingredientes del pedido
 > —cotización de QC-151 e importe guardado de QC-123— pasa a ser, por ingrediente, **cantidad
 > necesaria × promedio simple del coste unitario de todos los lotes con disponible > 0**. Nacen
-> **R59 a R66** (sección L); R65 y R66 cuelgan de las preguntas abiertas **8** y **9**, nuevas. Se
+> **R59 a R66** (sección L); R65 y R66 salen de las preguntas **8** y **9**, resueltas por el humano el mismo día. Se
 > corrige la cabecera de «Preguntas abiertas», que daba la 7 por abierta (m-V2-4). Ningún requisito
 > anterior cambia de texto.
 
@@ -364,12 +364,12 @@ la edición el nuevo importe DEBE sustituir al guardado, también cuando pasa a 
 (R8), ni escribir ningún apartado, liberación o movimiento de inventario: con los datos de R59, el
 pedido aparta 20 L de A y 10 L de B, y su importe sigue siendo el promedio de A, B y C `[D22]` `[D4]`.
 
-**R65.** *(Pregunta 8, pendiente de aprobación; opción recomendada.)* CUANDO se calcule el coste de
+**R65.** *(Pregunta 8, resuelta por el humano el 2026-09-23: opción recomendada.)* CUANDO se calcule el coste de
 un pedido que ya existe —su edición y la cotización del formulario de edición—, el sistema DEBE
 contar como disponible de cada lote, además del disponible general, lo que ese mismo pedido tiene
 apartado en él `[D22]`.
 
-**R66.** *(Pregunta 9, pendiente de aprobación; opción recomendada.)* El sistema NO DEBE incluir en
+**R66.** *(Pregunta 9, resuelta por el humano el 2026-09-23: opción recomendada.)* El sistema NO DEBE incluir en
 el promedio de R59 ni en la suma de R61 un lote sin coste unitario o sin presentación `[D22]`.
 
 ## Preguntas abiertas
@@ -378,7 +378,7 @@ el promedio de R59 ni en la suma de R61 un lote sin coste unitario o sin present
 > opciones recomendadas de `design.md > 0.1`, aprobadas en F1.4 el 2026-09-22; la 6 con E1 y E2,
 > aprobadas el 2026-09-23 (D21). Se conservan como registro. ~~La **7** es nueva y sigue abierta.~~
 > *(Enmendado el 2026-09-23 (review 2), m-V2-4.)* La **7** también está **resuelta** (opción (b),
-> el mismo día; ver su texto). **Abiertas: la 8 y la 9**, nuevas con D22.
+> el mismo día; ver su texto). **Ninguna abierta**: la 8 y la 9, nuevas con D22, también quedaron resueltas el mismo día.
 
 1. **Pedido que nunca se cubre.** Con «todo o nada», un pedido que no alcanza no aparta nada, así
    que no tiene reserva que caduque. ¿Se cancela también a los 15 días de creado, o espera

@@ -426,3 +426,113 @@ Con `daa400c5` desaparece también el rojo heredado de `guard-arquitectura-modul
 Resolver V2-B1 a V2-B4, volver a correr `./init.sh --rapido` después de cada una, y al final
 `./init.sh` completo y los E2E sobre la rama ya mergeada con el `origin/dev` actual. Marcar Tm1 y
 TC.
+
+---
+
+# Vuelta 3 (F2.2): 2026-09-24
+
+> HEAD `2c88dbd0`, contra el merge-base con `origin/dev` `f1530835` (`origin/dev` no avanzó: sigue en
+> `f1530835`). El reviewer no editó código ni hizo commit. No corrió la suite completa ni los E2E; se
+> toman de `progress/init_QC-141_vuelta3.log` y `progress/e2e_QC-141_vuelta3.log`.
+
+## Veredicto: **OK**
+
+No hay bloqueantes. V2-B1 a V2-B4 están resueltos y m-V2-1 a m-V2-5 también (m-V2-4 a medias, ver m-V3-1). D22 y R59–R66 están implementados como decidió el humano, y la reserva no cambió. La trazabilidad R1–R66 está completa, con R29 retirado. Quedan 3 menores (m-V3-1 a m-V3-3), que no bloquean.
+
+## Lo que corrió el reviewer
+
+| Comando | Resultado |
+|---|---|
+| `git fetch origin dev` y `git merge-base HEAD origin/dev` | `origin/dev` = `f1530835` = merge-base: no avanzó, así que **no hay conflictos posibles** con `dev` |
+| `vitest run` sobre `order-cost`, `quote-order-cost`, `resolve-ingredients-cost`, `transition-order`, `qc145-estado-solo-planta`, `guard-ambito-empresa-pedidos`, `order-form-quote` y `product-catalog-costing` | 8 archivos, **139 pasan** y 0 fallan |
+| `vitest run` (`.int`, base efímera) sobre `order-ingredients-cost`, `order-cost-quote` y `order-duplicate-number` | 3 archivos, **20 pasan** y 0 fallan |
+| Barrido de citas en las líneas `+` de producción de toda la rama | 0 |
+| Logs de `./init.sh` completo y de los E2E | `== init OK ==`: 669 archivos, `baseline-rojos.json` vacío. E2E: 40 pasan, `exit=0` |
+
+## 1. Hallazgos de la vuelta 2
+
+| Hallazgo | Estado |
+|---|---|
+| V2-B1 | **Resuelto.** Las ocho líneas están limpias. El barrido del reviewer sobre todas las líneas `+` de `git diff f1530835 HEAD -- lib app db components hooks middleware.ts scripts vercel.json` (R<n>, QC-<n>, `design.md`/`requirements.md`/`tasks.md`, «decisión cerrada», D<n>, B<n>, m<n>, V2-, T<n>, «review») da **0 líneas** |
+| V2-B2 | **Resuelto.** `modelosEsperados()` hace la unión sin duplicar. Dos casos con fuente fabricada: la base ya trae `ReservationMovement` (verde) y aparece un modelo no declarado (rojo) |
+| V2-B3 | **Resuelto.** `withOrderTransaction` lanza `DuplicateOrderNumberError` al agotar los `CREATE_ORDER_MAX_ATTEMPTS`. Cualquier otro error sube sin reintento. `order-duplicate-number.int` afirma `toBeInstanceOf(DuplicateOrderNumberError)`, `.code === 'duplicate_number'`, 3 `$transaction`, 1 fila guardada y 0 apartados. Conserva el control del `23505` real contra `orders_company_year_sequence_key` |
+| V2-B4 | **Resuelto.** Se mergeó `origin/dev` `f1530835` (`9c82ab22`). `origin/dev` **no avanzó** desde entonces (`git fetch`: sigue en `f1530835`, que es el merge-base). La cotización de QC-151 usa D22 (sección 2) |
+| m-V2-1 | **Resuelto.** No quedan menciones a `transitionAliveOrder` ni a «mismo tope que `createOrder`». `MaterialShortageError` ya no habla de la edición |
+| m-V2-2 | **Resuelto.** Si `setStatus` no da `ok` después de consumir, se lanza `StatusChangeAfterConsumptionFailedError`: la unidad se deshace y hacia fuera sale `not_found` o `stale`. Lo cubre el unit «R51: setStatus devuelve stale tras consumir y la unidad se deshace» |
+| m-V2-3 | **Resuelto.** `aliasDePrisma` reconoce varios especificadores, las comillas dobles y `import * as`. En el archivo exento se prohíbe `tx.<algo>`. Hay cuatro anti-placebos nuevos |
+| m-V2-4 | **Resuelto a medias.** `requirements.md` todavía se contradice con las preguntas 8 y 9 → m-V3-1 |
+| m-V2-5 | **Resuelto.** Lista exacta `['cancelAliveOrder', 'setAliveOrderStatus']` y un anti-placebo con `status: <variable>` en otra función |
+
+## 2. D22 y R59–R66 en el código
+
+- [x] **Sin ponderar, sin orden, todos los lotes.** `calculateLineCost` (`order-cost.ts:117-168`) ya no ordena: se retiraron `compareBatches` y `compareLots`. Tampoco corta al cubrir (se quitó el `break`). Suma el disponible de todos los lotes del producto y hace `averageInternal` sobre todos los costes unitarios, sin pesos. Con 30 × (10+12+15)/3 da `369.99999999999` a escala 12, que redondea a `370.0000`.
+- [x] **Excluye el disponible 0.** El adaptador filtra `available > 0` (`product-catalog-prisma.ts:181-183`) y el dominio vuelve a saltarse los `<= 0` (`order-cost.ts:131`).
+- [x] **Excluye los lotes sin coste o sin presentación (R66).** `findAliveBatchesWithStock` mantiene `presentationId`/`unitCost` `not null`, así que tampoco entran en la suma de cobertura.
+- [x] **Un solo agregado del disponible.** `findCostingBatches` usa `findReservedAndAvailableByBatch`, el mismo que el listado de lotes y la cobertura. Las dos consultas filtran por `companyId`.
+- [x] **R65.** Con `excludeOrderId` se añade `NOT: { orderId }` (`order_id` es `NOT NULL`, así que no se cuelan filas nulas). `updateOrder` pasa `{ orderId: id }`. La cotización de edición envía `orderId` (`quoteOrderCostSchema`, uuid opcional, y el `companyId` sale del actor). El alta no lo envía.
+- [x] **R62.** El alta, la edición y la cotización llaman a la misma `resolveIngredientsCost`.
+- [x] **La reserva no cambió (R64).** `syncForOrder`/`consumeForOrder` no están en el diff de la vuelta 3. Las demás llamadas a `findReservedAndAvailableByBatch` (`product-prisma.ts:768` y `reservation-prisma.ts:477`) no pasan la opción nueva. El comparador de lotes de la reserva sigue igual.
+
+## 3. Tests de QC-123 y QC-151 que cambian
+
+**`tests/unit/pedidos/order-cost.test.ts` (QC-123), frente a `f1530835`.** Hay 5 casos cuyo esperado cambia, y en todos el cambio es justo el que exige D22:
+| Caso en `dev` | En la rama | Juicio |
+|---|---|---|
+| «usa solo lotes con existencia, del más antiguo al más nuevo, hasta cubrir» (500) | «…promedia TODOS los lotes con disponible…» con los mismos lotes: (10+999)/2 × 50 = 25225 | Es lo que exige D22. El ejemplo de D22 (370) va en un caso aparte |
+| «desempata por número de lote…» (10000) | Los mismos dos lotes en los dos órdenes dan 7500 | Es lo que exige D22 (R60, que no depende del orden) |
+| «el lote 9 se usa antes que el 10» y «desempate por texto» (50 y 50) | Un solo caso: numérico y de texto dan los dos 2522,5 | Es lo que exige D22 |
+| «la fecha de vencimiento no altera el orden ni la selección» (500) | Permutación de dos lotes: da 1000 en los dos órdenes | Es lo que exige D22 y sigue probando QC-123 R4. Cambian los datos, no la propiedad |
+
+Además:
+- Los casos de «sin importe», redondeo, conversión, desbordamiento y cadena decimal conservan su esperado. Solo pasa `stock` de número a cadena, y en «no cubre» y «cubre exactamente» se añade `available` distinto de `stock`, lo que los refuerza.
+- Las etiquetas `(R15)`/`(R16)` pasan a `R59`/`R61`/`R63`. No se pierde trazabilidad: en QC-123, R15 es «no por `asignaciones`» y R16 es «sin moneda», así que esas etiquetas ya no apuntaban al requisito que decían.
+- **Una desviación de la bitácora (m-V3-2):** «promedia los costes unitarios de los lotes usados sin ponderar (R15)» (90@10, 10@100 → 5500) **no se conservó**, aunque la bitácora dice que sí («se conserva numéricamente»). Lo sustituye «R60: no pondera el promedio…» (1@10, 99@1000 → 25250), que prueba la misma propiedad con otros datos. No se pierde cobertura. Pero con D22 ese caso seguía siendo válido tal cual (los dos lotes cubren 100 exactos → 5500), así que quitarlo va más allá de lo que D22 exige, y la bitácora no lo cuenta bien.
+
+**QC-151.** Son `quote-order-cost.test.ts`, `order-cost-quote.int.test.ts` y `order-form-quote.test.tsx`:
+- Número de `expect(`: pasan de 29, 9 y 38 a 33, 15 y 41.
+- Número de casos: pasan de 9, 4 y 13 a 12, 6 y 15.
+- Las líneas que se quitan son del cableado: los adaptadores retirados (`createOrder`, `transitionAliveOrder`), el doble `orders` y `stock` numérico.
+- Los dos `toHaveBeenCalledWith(…, COMPANY_ID)` siguen, ahora con `{ excludeOrderId: … }`. Las comparaciones de la cotización con el alta y con la edición (`mock.calls[0][4]`) se mantienen.
+- **No se perdió ninguna aserción.**
+
+## 4. `order-duplicate-number.int`
+
+- [x] Vuelve a afirmar `duplicate_number`: `DuplicateOrderNumberError` con `.code === 'duplicate_number'`, 3 transacciones, 1 fila y 0 apartados. Ver V2-B3 en la sección 1.
+
+## 5. Comentarios
+
+- [x] 0 citas en las líneas de producción que la rama añade o modifica (ver V2-B1). Las citas que quedan en los tests (nombres de caso con `R<n>`, `data-table-alcance`, que es preexistente) no son hallazgo, porque la regla solo se aplica a producción.
+
+## 6. Trazabilidad R1–R66
+
+- [x] R1–R58: igual que en la vuelta 2. R29 sigue **retirado** (D21). Se añaden R15 (`DuplicateOrderNumberError` en los dos `.int`) y R51 (el unit que da stale después de consumir).
+- [x] R59: el unit (370), el `.int` (370 guardado) y el E2E `pedidos-cotizacion` «R59…» en Chromium y WebKit.
+- [x] R60: los units de no ponderar, no ordenar, todos los lotes y disponible 0; `product-catalog-costing`; el `.int` del lote apartado por otro pedido.
+- [x] R61: los units de «no cubre» y «cubre exactamente» con `available` ≠ `stock`, y el `.int` de disponible insuficiente con la existencia total de sobra.
+- [x] R62: `order-cost-quote.int` (cotización = alta, con importe y sin importe) y `quote-order-cost`.
+- [x] R63: los units de cadena decimal y desbordamiento, y el `.int` R11 de la edición a nulo.
+- [x] R64: `.int`. Aparta 20 de A, 10 de B y nada de C, y el importe queda en 370.
+- [x] R65: los units de alta, edición y resolve, `product-catalog-costing`, `order-cost-quote.int` (lo propio, más el `orderId` de otra empresa sin efecto) y `order-form-quote` (la edición envía el `orderId` y el alta no).
+- [x] R66: dos `.int` (no contamina el promedio y no cuenta en la cobertura) y `product-catalog-costing`.
+- [x] `tasks.md`: sin tareas `[ ]`.
+
+## Hallazgos de la vuelta 3
+
+### BLOQUEANTES
+
+Ninguno.
+
+### Menores
+
+- **m-V3-1: `requirements.md` no refleja que se respondieron las preguntas 8 y 9.** `b148045a` solo cambió los títulos de las preguntas, pero:
+  - R65 (línea 367) y R66 (línea 372) siguen diciendo «*(Pregunta 8/9, pendiente de aprobación; opción recomendada.)*»;
+  - la cabecera de «Preguntas abiertas» (línea 381) dice «**Abiertas: la 8 y la 9**»;
+  - la cabecera de la enmienda (línea 8) dice que R65 y R66 «cuelgan de las preguntas abiertas».
+
+  Es la misma clase de desfase que m-V2-4. Se arregla con el `spec_author` o el leader; no es código.
+- **m-V3-2: la bitácora (TD22) dice que «promedia los costes unitarios de los lotes usados sin ponderar» «se conserva numéricamente», y no es así.** El caso de `dev` (90@10 y 10@100 → 5500) desapareció de `order-cost.test.ts`. Lo sustituye «R60: no pondera…» con otros datos (→ 25250). No se pierde cobertura, porque la propiedad sigue probada. Pero con D22 el caso viejo seguía siendo válido tal cual, así que quitarlo va más allá de lo que D22 exige. Hay que corregir la nota del PR, o reponer el caso original junto al nuevo.
+- **m-V3-3: dos numeraciones mezcladas en `order-cost.test.ts`.** Casi todos los casos citan requisitos de QC-141 (`R59`–`R63`), pero «…la fecha de vencimiento… (R4)» cita el R4 de **QC-123**, sin decirlo. Un lector del mapa lo tomaría por el R4 de QC-141. Conviene escribir «QC-123 R4».
+
+### Qué hace falta
+
+Nada bloquea el PR. Conviene cerrar m-V3-1 y m-V3-2 antes de abrirlo, porque tocan el spec y la nota del PR.
