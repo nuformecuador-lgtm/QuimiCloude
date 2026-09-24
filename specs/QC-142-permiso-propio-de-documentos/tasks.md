@@ -155,10 +155,10 @@
 
 ### T11 — Cierre
 
-- [ ] `progress/impl_QC-142-permiso-propio-de-documentos.md` con el mapa `R<n> -> test` de
+- [x] `progress/impl_QC-142-permiso-propio-de-documentos.md` con el mapa `R<n> -> test` de
   `design.md > 7` (R1-R21, ninguno sin test).
-- [ ] `./init.sh` completo en verde, con la base `QuimiCloude_QC142`.
-- [ ] Sin cambios en `package.json`, `pnpm-lock.yaml`, `db/schema.prisma` ni `docs/dependencias.md`
+- [x] `./init.sh` completo en verde, con la base `QuimiCloude_QC142`.
+- [x] Sin cambios en `package.json`, `pnpm-lock.yaml`, `db/schema.prisma` ni `docs/dependencias.md`
   (R21): `git diff --stat dev...HEAD` no los lista.
 - **Archivos:** `progress/impl_QC-142-permiso-propio-de-documentos.md`.
 - **Depende de:** T1-T10.

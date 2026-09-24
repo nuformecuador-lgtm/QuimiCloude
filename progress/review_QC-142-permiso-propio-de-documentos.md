@@ -167,3 +167,87 @@ caso pasaría en verde sin mirar nada.
 
 1. Arreglar M1 como se indica arriba.
 2. De paso, recomendados: m1, m2 y m5.
+
+---
+
+## Revisión 2 (2026-09-24)
+
+> Delta revisado: `ace494d6..8d96f824` (de `e4417e4c` a `1a46fbbe`, más el merge de `origin/dev`,
+> que no trae conflictos ni migraciones). No corrí ni la suite, ni la integración, ni el E2E, ni
+> `./init.sh`: los corre el leader.
+
+### Veredicto: **APROBADO** — 0 mayores, 2 menores nuevos
+
+Queda condicionado a que el `./init.sh` completo del leader termine en verde. T11 se cierra con él.
+
+### Verificación ejecutable
+
+- `vitest run` sobre los 8 archivos que toca el delta: `catalogo-sin-total-fijo`, `permissions`,
+  `seed-initial-access`, `authorization`, `schema/documents-permissions-migration`,
+  `document-upload-convenciones`, `guard-convenciones-showcase` y `guard-aislamiento-integracion`.
+  Resultado: **123 pasan, 0 fallan**.
+- Probé yo mismo el predicado nuevo. Transpilé `sinComentarios` y `totalesFijosDelCatalogoEn` del
+  archivo real y los pasé por las versiones de `origin/dev` de los ocho sitios:
+  - `guard-permisos-sembrados` (la aserción multilínea) → **dispara** `PERMISSIONS.length`;
+  - `qc145-estado-solo-planta` (el glob `/**` dentro de un string) → **dispara**
+    `PERMISSIONS) + toHaveLength(`;
+  - `identity-seed.int` y `seed-initial-access` → disparan también en `antes.permisos`,
+    `antes.asignaciones` y `codigosDelAdministrador` (ampliación de m1);
+  - `authorization`, `permissions` y `qc75` → no disparan, que es lo esperado según la
+    justificación de m1.
+
+### Cierre de los hallazgos de la revisión 1
+
+| Hallazgo | Estado |
+|---|---|
+| **M1** | **Cerrado.** El scanner de `typescript` (ya era devDependency, no hay dependencia nueva) deja de confundir un `/**` dentro de un string con un comentario. Los espacios se colapsan antes de probar los patrones, así que ahora se ven las aserciones multilínea. Están los dos casos sintéticos con el texto exacto de dev, y el barrido tiene ancla: más de 0 archivos, uno de ellos conocido, y `readdirSync` ya no se traga los errores |
+| m1 | **Justificado.** No se amplía a `codigos)`, `new Set(codigos).size)` ni `catalogo)`, porque esos identificadores se reutilizan con totales de otros catálogos y darían falsos positivos. Lo acepto |
+| m2 | Cerrado. Los tres comentarios falsos están corregidos |
+| m3 | Cerrado en lo que señalé. Pero el delta **introduce citas nuevas** → r2-m1 |
+| m4 | Cerrado. La cabecera de `migration.sql` baja a 4 líneas; el párrafo del ordinal pasa a una frase corta; el JSDoc está recompuesto. Las líneas de producción añadidas o modificadas no citan ficha, R, D ni `design.md` |
+| m5 | Cerrado: usa `ROLE_EMPACADOR` y ancla que la lista de fuentes no está vacía |
+| m6 | Cerrado. R10 compara `permissions`, `role_permissions` y `roles` completas, con la foto tomada después de preparar el escenario y antes del UP (línea 341) y comparada tras el DOWN. «R9 UP tras seed» ancla el estado previo |
+| m7 | Cerrado: `PERMISOS_PREVIOS`, con sus tres campos copiados a mano, sin total |
+| m8 | Cerrado: casos de R13 sobre «base sembrada salvo `documentos.*`», en unit y en integración |
+| m9 | Cerrado: la bitácora es coherente con `tasks.md`. T11 sigue `[ ]` hasta el gate del leader |
+
+### El arreglo del R29 de QC-140 (`e476cfd1`)
+
+**No esconde nada.**
+- El guard viejo comparaba `origin/dev..HEAD`, y por eso cualquier rama posterior que añadiera
+  algo en `db/` lo ponía en rojo. Esta rama lo pone en rojo con su propia migración, legítima.
+- Ahora compara el merge de entrada de QC-140 (`a738d81f`, PR #118) contra su primer padre
+  (`cf99cc2b`), que es exactamente lo que ese PR aportó a dev. Lo comprobé a mano: el diff
+  `--diff-filter=A` bajo `db/` sale vacío, y `components/shared/entity-image.tsx` no aparece. El
+  guard afirma algo que es verdad.
+- El anti-placebo `ffabc3af` sí añade archivos bajo `db/` (`schema.prisma`, `migration_lock.toml`
+  y otros).
+- Si el commit no está en el clon, el test falla con un error explícito; no se salta en silencio.
+- Los precedentes `bb01139e` y `7cd534e8` existen y siguen el mismo patrón.
+- Se pierde la comprobación del árbol de trabajo sin commitear, que solo tenía sentido mientras
+  QC-140 estaba en curso.
+
+### Hallazgos nuevos (menores)
+
+- **r2-m1 — Citas nuevas en comentarios de test** (`docs/conventions.md > Comentarios`; en tests,
+  `R<n>` solo en el nombre del caso):
+  - `catalogo-sin-total-fijo.test.ts`: «R3 en origin/dev, sitio #1…» y «…sitio #9…»;
+  - `permissions.test.ts`: el JSDoc de `PERMISOS_PREVIOS` cita «QC-142 R2»;
+  - `guard-convenciones-showcase.test.ts`: «Lo que R29 y D20 protegen…», con fecha incluida.
+  
+  No afecta a producción.
+- **r2-m2 — Límites conocidos del predicado de R3**, que no bloquean:
+  - la ventana `.{0,300}?` cruza sentencias, así que `expect(PERMISSIONS.length).toBeGreaterThan(0);
+    expect(otra).toBe(3);` dispara. Es un falso positivo, pero falla en rojo (lado seguro) y hoy
+    el barrido está limpio;
+  - el scanner corre sin contexto sintáctico y no re-escanea los literales regex, así que un regex
+    con `\/\/` ciega el resto de su línea.
+
+  Conviene dejarlo dicho junto al predicado, o acotar la ventana a la sentencia.
+
+### Observación
+
+El delta cambia el comentario de `migration.sql` y con él su checksum. Solo lo había aplicado la
+base propia `QuimiCloude_QC142`, y `prisma migrate status` sigue al día según la bitácora. Si la
+plantilla de integración `qct_tpl_*` se reutilizara con el checksum viejo, lo delatará el
+`./init.sh` del leader.
