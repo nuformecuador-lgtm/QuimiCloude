@@ -1,6 +1,6 @@
-// T4 (QC-158) — los dos casos de uso de la importacion por identidad en `proveedores`
-// (`design.md > 5.2`, `> 8`). Cubre R31 (permiso como primera operacion, sin tocar el
-// puerto) y la validacion de forma con los esquemas de T3.
+// Los dos casos de uso de la importacion por identidad en `proveedores`
+// El permiso va como primera operacion, sin tocar el
+// puerto, y la forma se valida con los esquemas de campo del alta.
 //
 // Mismo patron que `authorization.test.ts`: los puertos son dobles que EXPLOTAN si alguien
 // los llama, para que un actor no autorizado no pueda «pasar» por casualidad.

@@ -589,7 +589,7 @@ function constraintsBefore(tabla: string, exclude: string): ReadonlyMap<string, 
     .map((entry) => entry.name)
     .sort()
   // Solo las ANTERIORES a esta migracion: las posteriores (p. ej. la de material y medidas de
-  // la linea, QC-158) no son «lo que ya estaba escrito» cuando esta se aplico.
+  // la linea) no son «lo que ya estaba escrito» cuando esta se aplico.
   const propia = todas.findIndex((name) => name.endsWith(exclude))
   const dirs = propia === -1 ? todas : todas.slice(0, propia)
 

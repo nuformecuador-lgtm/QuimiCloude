@@ -340,7 +340,7 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
       expect(
         createCatalogLineSchema.safeParse({ ...ALTA_VALIDA, material: 'a'.repeat(121) }).success,
       ).toBe(false)
-      // R35: nunca un numero.
+      // Nunca un numero.
       expect(createCatalogLineSchema.safeParse({ ...ALTA_VALIDA, material: 7 }).success).toBe(false)
     })
 
@@ -368,7 +368,7 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
           `diameter.value ${value} debe caer`,
         ).toBe(false)
       }
-      // R35: un numero JSON en vez de cadena tambien cae.
+      // Un numero JSON en vez de cadena tambien cae.
       expect(
         createCatalogLineSchema.safeParse({
           ...ALTA_VALIDA,

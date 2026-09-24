@@ -1,4 +1,4 @@
-// Limites de FORMA de QC-158 R36: el texto del prompt de catalogo no viaja en ningun archivo
+// Limites de FORMA: el texto del prompt de catalogo no viaja en ningun archivo
 // versionado, nadie fuera del adaptador de entorno lo lee, y el guion del doble de IA es JSON
 // puro -sin margen para llevar instrucciones-. Los de diff se miden contra la base de fusion con
 // `origin/dev` (o `dev`); si git no responde, el caso de borradores cae a listar TODO lo

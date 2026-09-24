@@ -4,7 +4,7 @@
 // sobre el texto SQL, aplicado al archivo REAL (pasa) y a una copia MUTADA EN MEMORIA (falla). El
 // archivo en disco no se toca nunca.
 //
-// Cubre R30: el `down.sql` revierte EXACTAMENTE las dos columnas y los dos CHECK que agrega el
+// El `down.sql` revierte EXACTAMENTE las dos columnas y los dos CHECK que agrega el
 // `migration.sql`, ni una restriccion de mas ni de menos.
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -66,7 +66,7 @@ const downSource = readFileSync(join(migrationDir, 'down.sql'), 'utf8');
 const up = statements(upSource);
 const down = statements(downSource);
 
-/** R30. ¿El UP agrega exactamente las dos columnas anulables, sin `DEFAULT`? */
+/** ¿El UP agrega exactamente las dos columnas anulables, sin `DEFAULT`? */
 function addsBothNullableColumns(sql: string): boolean {
   const source = statements(sql);
   const material = source.some((statement) =>
@@ -78,7 +78,7 @@ function addsBothNullableColumns(sql: string): boolean {
   return material && measurements;
 }
 
-/** R30. ¿El UP agrega el CHECK de `material` no-en-blanco y el de `measurements` objeto-o-nulo? */
+/** ¿El UP agrega el CHECK de `material` no-en-blanco y el de `measurements` objeto-o-nulo? */
 function addsBothChecks(sql: string): boolean {
   const source = statements(sql);
   const materialCheck = source.some(
@@ -96,7 +96,7 @@ function addsBothChecks(sql: string): boolean {
   return materialCheck && measurementsCheck;
 }
 
-/** R30. El DOWN quita los DOS CHECK antes que las DOS columnas, todo con `IF EXISTS`. */
+/** El DOWN quita los DOS CHECK antes que las DOS columnas, todo con `IF EXISTS`. */
 function dropsChecksBeforeColumnsWithIfExists(sql: string): boolean {
   const source = statements(sql);
   const dropMeasurementsCheck = source.findIndex((statement) =>
@@ -126,7 +126,7 @@ function dropsChecksBeforeColumnsWithIfExists(sql: string): boolean {
   );
 }
 
-/** R30. El DOWN no toca ninguna restriccion ni columna que el UP de esta ficha no haya creado. */
+/** El DOWN no toca ninguna restriccion ni columna que el UP de esta ficha no haya creado. */
 function downTouchesOnlyItsOwnFourNames(sql: string): boolean {
   const source = statements(sql);
   const nombresPropios = new Set([

@@ -213,7 +213,7 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
         // `Prisma.SupplierCatalogLineWhereInput`, asi que necesitan el tipo del cliente. La
         // lista sigue siendo EXACTA: un cuarto archivo con Prisma cae aqui igual.
         'lib/modules/proveedores/adapters/driven/persistence/company-scope.ts',
-        // QC-158 T4: la importacion por identidad escribe con `$queryRaw`/`Prisma.sql`, que
+        // La importacion por identidad escribe con `$queryRaw`/`Prisma.sql`, que
         // exige el mismo tipo del cliente.
         'lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-import-prisma.ts',
       ]
@@ -265,7 +265,7 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       // lista EXACTA, que es lo que la hace falsable: un cuarto puerto cae aqui igual.
     ).toEqual([
       'ports/list-query-log.ts',
-      // QC-158 T4: puerto NUEVO de la importacion por identidad; el de siempre
+      // Puerto NUEVO de la importacion por identidad; el de siempre
       // (`supplier-catalog-repository.ts`) no se toca.
       'ports/supplier-catalog-import-repository.ts',
       'ports/supplier-catalog-repository.ts',
@@ -286,7 +286,7 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       // envolturas salen de aqui y ningun adaptador arma la condicion por su cuenta.
       'adapters/driven/persistence/company-scope.ts',
       'adapters/driven/persistence/list-query-sql.ts',
-      // QC-158 T4: adaptador NUEVO de la importacion por identidad, con su propia transaccion
+      // Adaptador NUEVO de la importacion por identidad, con su propia transaccion
       // y su propio `SELECT` del proveedor vivo; no comparte codigo de escritura con el de
       // siempre.
       'adapters/driven/persistence/supplier-catalog-import-prisma.ts',
@@ -605,7 +605,7 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
       'cost',
       'minPurchase',
       'deliveryTime',
-      // QC-158 (R27): dos columnas mas, opcionales y sin ninguna relacion Prisma.
+      // Dos columnas mas, opcionales y sin ninguna relacion Prisma.
       'material',
       'measurements',
       // La empresa de la linea, escalar y obligatoria: es lo que acota cada consulta y lo
