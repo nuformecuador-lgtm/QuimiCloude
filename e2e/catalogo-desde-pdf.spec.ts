@@ -85,6 +85,16 @@ const pdfBytes = Buffer.from('%PDF-1.4\n%%EOF\n', 'ascii');
 /** Costo VIEJO de la linea viva, sembrado distinto del nuevo que trae el documento. */
 const oldChangesCost = '500.0000';
 
+/**
+ * Material sembrado en la linea viva de la fila «cambia», distinto de null. El guion trae
+ * `material: null` para esa fila: si la actualizacion de costo llegara a pisarlo, esta constante
+ * quedaria en `null` en vez de este valor y la afirmacion de R15 lo detectaria.
+ */
+const existingMaterial = 'vidrio';
+
+/** Texto exacto de las medidas de la fila «nueva», con los mismos decimales que trae el guion. */
+const newLineMeasurementsText = 'Ø 7.5000 cm · alto 12.0000 cm · boca 28/410';
+
 /** El material corregido en la revision de la fila «nueva». */
 const correctedMaterial = `${FIXTURE_PREFIX}material_${RUN_ID.slice(0, 8)}`;
 
@@ -200,6 +210,7 @@ test.beforeAll(async () => {
       presentationId: presentation.id,
       unitId: systemUnitId,
       cost: oldChangesCost,
+      material: existingMaterial,
       companyId: company.id,
     },
   });
@@ -272,7 +283,8 @@ test.describe('catalogo-desde-pdf', () => {
   }) => {
     const supplier = supplierId;
     const company = companyId;
-    if (supplier === null || company === null) {
+    const unit = systemUnitId;
+    if (supplier === null || company === null || unit === null) {
       throw new Error('el fixture no esta completo: fallo el beforeAll');
     }
 
@@ -364,7 +376,7 @@ test.describe('catalogo-desde-pdf', () => {
     // la leida, asi que no viene preseleccionada y el revisor elige entre las visibles.
     const presentationKey = normalizePresentationName(CANNED_CATALOG_NEW_PRESENTATION);
     await page.getByTestId(`new-presentation-unit-select-${presentationKey}`).click();
-    await page.getByTestId(`new-presentation-unit-option-${presentationKey}`).first().click();
+    await page.getByTestId(`new-presentation-unit-option-${presentationKey}-${unit}`).click();
 
     // --- 9. Confirmar.
     await expect(page.getByTestId('catalog-import-confirm')).toBeEnabled({ timeout: 30_000 });
@@ -388,10 +400,22 @@ test.describe('catalogo-desde-pdf', () => {
     const newRow = await findCatalogRow(page, CANNED_CATALOG_NEW_LINE_NAME);
     await expect(newRow.first()).toBeVisible({ timeout: 60_000 });
     await expect(newRow.first().getByTestId('data-table-cell-cost')).toHaveText('120.5');
+    await expect(newRow.first().getByTestId('data-table-cell-material')).toHaveText(
+      correctedMaterial,
+    );
+    await expect(newRow.first().getByTestId('data-table-cell-measurements')).toHaveText(
+      newLineMeasurementsText,
+    );
+    await expect(newRow.first().getByTestId('data-table-cell-presentationId')).toHaveText(
+      CANNED_CATALOG_NEW_PRESENTATION,
+    );
 
     const changedRow = await findCatalogRow(page, CANNED_CATALOG_CHANGES_LINE_NAME);
     await expect(changedRow.first()).toBeVisible({ timeout: 60_000 });
     await expect(changedRow.first().getByTestId('data-table-cell-cost')).toHaveText('999');
+    await expect(changedRow.first().getByTestId('data-table-cell-material')).toHaveText(
+      existingMaterial,
+    );
 
     // --- 12. Y en la base, de verdad: el costo actualizado de la linea viva (solo el costo)...
     const changedLine = await prisma.supplierCatalogLine.findFirst({
@@ -400,7 +424,9 @@ test.describe('catalogo-desde-pdf', () => {
     expect(changedLine, 'la linea viva deberia seguir existiendo, actualizada').not.toBeNull();
     expect(changedLine?.cost.toFixed(4)).toBe(CANNED_CATALOG_CHANGES_NEW_COST);
     expect(changedLine?.presentationId, 'R15: la presentacion no cambia').not.toBeNull();
-    expect(changedLine?.material, 'R15: el material no lo toca la actualizacion de costo').toBeNull();
+    expect(changedLine?.material, 'R15: el material no lo toca la actualizacion de costo').toBe(
+      existingMaterial,
+    );
 
     // ...la linea nueva con material, medidas e imagen...
     const newLine = await prisma.supplierCatalogLine.findFirst({
@@ -421,7 +447,9 @@ test.describe('catalogo-desde-pdf', () => {
       where: { companyId: company, name: CANNED_CATALOG_NEW_PRESENTATION },
     });
     expect(newPresentation, 'R17: la presentacion nueva deberia haberse creado').not.toBeNull();
-    expect(newPresentation?.unitId).not.toBeNull();
+    expect(newPresentation?.unitId, 'la unidad elegida a mano es la sembrada, no cualquiera').toBe(
+      unit,
+    );
     expect(newLine?.presentationId).toBe(newPresentation?.id);
     expect(newLine?.unitId).toBe(newPresentation?.unitId);
   });
