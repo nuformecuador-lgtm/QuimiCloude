@@ -225,6 +225,31 @@ async function crearLineaCompleta(recipeId: string, productId: string): Promise<
   await prisma.recipeLine.create({ data: { recipeId, productId, percentage: '100.00' } });
 }
 
+async function crearLinea(recipeId: string, productId: string, percentage: string): Promise<void> {
+  await prisma.recipeLine.create({ data: { recipeId, productId, percentage } });
+}
+
+/** Ingrediente MACHINE con lote de stock pero sin costo (`unit_cost` nulo): admitido desde
+ *  `20260923140000_product_batch_nullable_machine`. Con presentacion -a diferencia del alta
+ *  sin envase- para que `planReservation` le resuelva unidad y lo trate como material real. */
+async function crearMaquinaSinCosto(fixture: Fixture, stock: string): Promise<{ productId: string }> {
+  const created = await createWithFirstBatch(
+    { name: `Maquina ${token()}`, type: 'MACHINE' },
+    {
+      presentationId: fixture.presentationId,
+      stock,
+      unitCost: null,
+      lot: null,
+      purchaseDate: '2026-09-01',
+      expiryDate: null,
+      createdBy: fixture.actorId,
+    },
+    new Date(),
+    { companyId: fixture.companyId },
+  );
+  return { productId: created.id };
+}
+
 async function crearProductoConLote(fixture: Fixture, stock: string, unitCost = '2.5000'): Promise<{ productId: string; batchId: string }> {
   const created = await createWithFirstBatch(
     { name: `Producto ${token()}` },
@@ -591,6 +616,36 @@ describe('R42, R43 — el coste del lote', () => {
       expect(despues.ingredientsCost).toBeNull();
     } finally {
       await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R42: un ingrediente con material pero sin costo cuenta cero, y el pedido sigue sin importe guardado (R43)', async () => {
+    const fixture = await crearFixture('1.0000');
+    const { productId: productoConCosto } = await crearProductoConLote(fixture, '100', '5.0000');
+    const { productId: maquinaSinCosto } = await crearMaquinaSinCosto(fixture, '50');
+    const recipeId = await crearReceta(fixture);
+    await crearLinea(recipeId, productoConCosto, '60.00');
+    await crearLinea(recipeId, maquinaSinCosto, '40.00');
+
+    try {
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
+      // El ingrediente MACHINE sin costo invalida el importe del pedido entero (R43: sigue nulo).
+      expect(antes.ingredientsCost).toBeNull();
+
+      const resultado = await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'ENTREGADO', fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: { packages: '10' } });
+
+      const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
+      const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
+      // Solo el ingrediente con costo cuenta: 60% de 10 x 5.0000 = 30.0000, entre 10 (cantidad
+      // que entra) = 3.0000. El de la maquina sin costo aporta cero (R42).
+      expect(lote.unitCost?.toFixed(4)).toBe('3.0000');
+
+      const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
+      expect(despues.ingredientsCost).toBeNull();
+    } finally {
+      await borrarFixture(fixture, [productoConCosto, maquinaSinCosto]);
     }
   });
 });
