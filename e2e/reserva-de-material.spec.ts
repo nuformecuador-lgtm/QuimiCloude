@@ -14,8 +14,8 @@
  * nunca por posicion.
  *
  * EL PASO FINAL ENTREGA B POR EL FINALIZAR DE LA PLANTA (asignar, iniciar y finalizar), no por la
- * edicion en Pedidos: tras QC-145 la edicion ya no mueve el estado (`design.md > 12`, enmienda
- * «2026-09-23 (review)»). El patron -y sus selectores/`data-testid`- es el mismo que
+ * edicion en Pedidos: la edicion ya no mueve el estado del pedido. El patron -y sus
+ * selectores/`data-testid`- es el mismo que
  * `e2e/ejecucion-receta.spec.ts`: quien entra a `/asignacion` y finaliza necesita
  * `asignaciones.consultar` SIN `pedidos.consultar` -con `pedidos.consultar` la pantalla muestra
  * «Todos», que no tiene columna «Entrar»-, asi que este recorrido crea tambien un Operador real
@@ -562,7 +562,7 @@ test.describe('reserva de material del pedido', () => {
     await expect(productRow.getByTestId('product-available')).toContainText('500');
 
     // --- 6. Entregar B por el Finalizar de la planta: la edicion en Pedidos ya no mueve el
-    // estado (QC-145). Se asigna B al Operador por Prisma -mismo patron que
+    // estado. Se asigna B al Operador por Prisma -mismo patron que
     // `e2e/ejecucion-receta.spec.ts`, la asignacion no es lo que este recorrido demuestra-, y de
     // ahi en mas el actor cambia al Operador: con `pedidos.consultar` -como el admin de arriba-
     // `/asignacion` fuerza la vista «Todos», sin columna «Entrar» ni Finalizar.

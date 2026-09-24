@@ -439,17 +439,17 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // conociendo su identificador-. Se TENSA el centinela de dieciseis a DIECISIETE; la lista sigue
   // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
   //
-  // 2026-09-23: entra `e2e/reserva-de-material.spec.ts` (QC-141, R48), y no afloja la lista. No
-  // estrena pantalla: recorre las de pedidos e inventario, las dos ya en esta lista desde QC-35 y
-  // QC-49. Su recorrido crea dos pedidos que compiten por el mismo lote, cancela, reedita y entrega,
-  // y localiza `data-table-row-<id>`, `data-table-cell-orderNumber`, `data-table-next` y las filas de
-  // inventario por `product-stock` porque lo que afirma -lo apartado, lo disponible y la cobertura de
-  // cada pedido- se lee de las dos listas que monta la tabla compartida. Se TENSA el centinela de
-  // diecisiete a DIECIOCHO; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve
-  // a ponerla en rojo.
+  // 2026-09-23: entra `e2e/reserva-de-material.spec.ts`, y no afloja la lista. No estrena
+  // pantalla: recorre las de pedidos e inventario, las dos ya en esta lista. Su recorrido crea dos
+  // pedidos que compiten por el mismo lote, cancela, reedita y entrega, y localiza
+  // `data-table-row-<id>`, `data-table-cell-orderNumber`, `data-table-next` y las filas de
+  // inventario por `product-stock` porque lo que afirma -lo apartado, lo disponible y la cobertura
+  // de cada pedido- se lee de las dos listas que monta la tabla compartida. Se TENSA el centinela
+  // de diecisiete a DIECIOCHO; la lista sigue CERRADA, y un spec mas que referencie `data-table`
+  // vuelve a ponerla en rojo.
   //
-  // 2026-09-23: entra tambien `e2e/pedidos-terminados.spec.ts` (QC-145), y no afloja la lista. No
-  // estrena pantalla de tabla propia: recorre la nueva pantalla de asignacion, que monta la tabla
+  // 2026-09-23: entra tambien `e2e/pedidos-terminados.spec.ts`, y no afloja la lista. No estrena
+  // pantalla de tabla propia: recorre la nueva pantalla de asignacion, que monta la tabla
   // compartida para sus listas de asignados y terminados, y localiza `data-table-row-<id>` y las
   // celdas de pedido y responsables. Se TENSA el centinela de dieciocho a DIECINUEVE; la lista
   // sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
@@ -524,8 +524,8 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // '-' precede a '.', igual que en pedidos.
       'e2e/recetas-pasos.spec.ts',
       'e2e/recetas.spec.ts',
-      // La DECIMOCTAVA la trae QC-141 el 2026-09-23 (R48): ver la nota de arriba. Llega a la tabla
-      // por las listas de pedidos e inventario, que ya la consumian.
+      // La DECIMOCTAVA entra el 2026-09-23: ver la nota de arriba. Llega a la tabla por las listas
+      // de pedidos e inventario, que ya la consumian.
       'e2e/reserva-de-material.spec.ts',
       // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
       // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).

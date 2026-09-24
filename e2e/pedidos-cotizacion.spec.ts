@@ -44,9 +44,9 @@
  * arrastrar un componente de UI-, y el guion (`—`), que es el marcador de ausencia de la pantalla
  * (`order-columns.tsx`) y no copy de negocio.
  *
- * UN SEGUNDO INGREDIENTE Y RECETA, propios de R59: tres lotes con disponible completo y coste
- * distinto (el ejemplo de D22), en una receta al 100 % para que la cantidad tecleada sea la
- * cantidad necesaria sin pasar por un porcentaje intermedio.
+ * UN SEGUNDO INGREDIENTE Y RECETA: tres lotes con disponible completo y coste distinto, en una
+ * receta al 100 % para que la cantidad tecleada sea la cantidad necesaria sin pasar por un
+ * porcentaje intermedio.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -108,7 +108,7 @@ const QUANTITY_C = '20000'; // 2000 L requeridos > 1000 L de existencia
 const MISSING_VALUE_MARK = '—';
 
 /**
- * El ingrediente del ejemplo de D22 (R59): tres lotes con disponible completo y coste distinto,
+ * El ingrediente para el promedio de coste: tres lotes con disponible completo y coste distinto,
  * en una receta propia al 100 % para que la cantidad del pedido sea la cantidad necesaria tal
  * cual.
  */
@@ -116,7 +116,7 @@ const costProductName = `${SHARED_TOKEN}_r59_ingrediente`;
 const costPresentationName = `${SHARED_TOKEN}_r59_presentacion`;
 const costRecipeName = `${SHARED_TOKEN}_r59_receta`;
 
-/** Los tres lotes del ejemplo de D22, con fecha de compra distinta: A la mas antigua. */
+/** Los tres lotes de la cotizacion por promedio, con fecha de compra distinta: A la mas antigua. */
 const COST_BATCH_A = { stock: '20', unitCost: '10.0000', lotSuffix: 'A' } as const;
 const COST_BATCH_B = { stock: '20', unitCost: '12.0000', lotSuffix: 'B' } as const;
 const COST_BATCH_C = { stock: '50', unitCost: '15.0000', lotSuffix: 'C' } as const;
@@ -309,8 +309,8 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  // Fechas de compra distintas -R59 promedia TODOS los disponibles, sin importar el orden en que
-  // el apartado los recorra-.
+  // Fechas de compra distintas: el promedio usa TODOS los disponibles, sin importar el orden en
+  // que el apartado los recorra.
   await prisma.productBatch.createMany({
     data: [COST_BATCH_A, COST_BATCH_B, COST_BATCH_C].map((batch, index) => ({
       productId: costProductId,

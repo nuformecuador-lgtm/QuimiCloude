@@ -490,8 +490,8 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
 
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
     // El valor del control se lee como CADENA a proposito: `toHaveValue` sobre un control
-    // numerico devuelve `valueAsNumber`, que es justo la conversion que R39 no admite como
-    // prueba. Lo que importa es que el DOM siga guardando la cadena tal cual.
+    // numerico devuelve `valueAsNumber`, y esa conversion perderia la precision decimal que aqui
+    // se quiere comprobar. Lo que importa es que el DOM siga guardando la cadena tal cual.
     expect(cantidad().value).toBe(elPedido.quantity);
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
@@ -524,7 +524,7 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
   });
 
   it('«recipe_not_found» se pinta junto al SELECTOR DE RECETA, no en la region del formulario', async () => {
-    // R34 — se decide por el `code` estable, nunca por el texto del mensaje.
+    // Se decide por el `code` estable, nunca por el texto del mensaje.
     const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -535,9 +535,9 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    // Las tres condiciones del DOM, en la misma espera (QC-58, T11): el mensaje, la ausencia de
-    // aviso de formulario y el `aria-invalid` cambian en la misma interaccion pero no tienen por
-    // que caer en el mismo commit.
+    // Las tres condiciones del DOM en la misma espera: el mensaje, la ausencia de aviso de
+    // formulario y el `aria-invalid` cambian en la misma interaccion pero no tienen por que caer
+    // en el mismo commit.
     await waitFor(() => {
       expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument();
       expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
@@ -568,8 +568,8 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
   });
 
   it('un codigo que no senala campo va a la region de aviso del formulario y no pierde lo escrito', async () => {
-    // R34 — `duplicate_number`, `not_found` y `unauthorized` no identifican campo. Y un rechazo
-    // NO cierra el panel ni vacia el formulario.
+    // `duplicate_number`, `not_found` y `unauthorized` no identifican campo. Y un rechazo NO
+    // cierra el panel ni vacia el formulario.
     const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -586,17 +586,16 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
     const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
     expect(region).toHaveAttribute('role', 'alert');
     expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('duplicate_number');
-    // Lo escrito sigue ahi (R34): React 19 resetea los campos no controlados al completarse la
-    // action, asi que el estado de fallo los devuelve por `defaultValue`. Al pinchar Guardar el
-    // campo perdió el foco antes del submit, asi que el valor devuelto es el COLOCADO a dos
-    // decimales (enmienda del 2026-09-09 a R39).
+    // Lo escrito sigue ahi: React 19 resetea los campos no controlados al completarse la action,
+    // asi que el estado de fallo los devuelve por `defaultValue`. Al pinchar Guardar el campo
+    // perdió el foco antes del submit, asi que el valor devuelto es el COLOCADO a dos decimales.
     expect(cantidad().value).toBe('7.78');
     expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('una cantidad que el ESQUEMA del contrato rechaza no llega a la operacion', async () => {
-    // R33 — la validacion previa usa el mismo esquema que valida el servidor: no hay segunda copia
-    // de la regla «la cantidad es mayor que cero».
+    // La validacion previa usa el mismo esquema que valida el servidor: no hay segunda copia de
+    // la regla «la cantidad es mayor que cero».
     const user = setupUser();
     renderFormulario(pedido({ quantity: '0' }));
 
@@ -608,8 +607,8 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
   });
 
   it('valida con los esquemas del contrato y sin ninguna libreria de formularios', () => {
-    // R33 — guardia de FUENTE: los esquemas salen del barrel de `pedidos` (client-safe) y las
-    // actions, de su ruta exacta. (Los paquetes descartados no se nombran aqui a proposito.)
+    // Guardia de FUENTE: los esquemas salen del barrel de `pedidos` (client-safe) y las actions,
+    // de su ruta exacta. (Los paquetes descartados no se nombran aqui a proposito.)
     const fuente = readFileSync('app/(private)/pedidos/components/order-form.tsx', 'utf8');
 
     expect(fuente).toContain("createOrderSchema");
