@@ -865,10 +865,14 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
     // El DOWN borra EXACTAMENTE los codigos que el UP escribio, ni uno mas: el catalogo vuelve a
     // las trece entradas de QC-66. El numero no esta escrito a mano contra el SQL: sale de
     // `PERMISSIONS` menos lo que el DOWN se lleva y menos lo que sumaron las fichas posteriores.
-    const CODIGOS_DE_FICHAS_POSTERIORES = ['terminados.consultar']
+    const CODIGOS_DE_FICHAS_POSTERIORES = [
+      'terminados.consultar',
+      'clientes.consultar',
+      'clientes.modificar',
+    ]
     const borrados = boundedDeletesIn(downSource).map((borrado) => borrado.codigos)
     expect(borrados[0]).toEqual(CODIGOS_DE_LA_FICHA)
-    expect(PERMISSIONS.length).toBe(16)
+    expect(PERMISSIONS.length).toBe(18)
     expect(
       PERMISSIONS.length - CODIGOS_DE_LA_FICHA.length - CODIGOS_DE_FICHAS_POSTERIORES.length,
     ).toBe(13)
