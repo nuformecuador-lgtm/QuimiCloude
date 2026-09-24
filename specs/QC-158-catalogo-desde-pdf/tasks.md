@@ -67,7 +67,7 @@ Archivos: `lib/modules/proveedores/domain/{catalog-line-input,catalog-line-view,
 únicos, boca ≤ 40, material ≤ 120); alta y edición existentes siguen verdes; el listado devuelve los
 dos campos.
 
-## T4 — Importación por identidad en `proveedores` `[depende de T3]` `[F7]`
+## [x] T4 — Importación por identidad en `proveedores` `[depende de T3]` `[F7]`
 
 Archivos: `lib/modules/proveedores/ports/supplier-catalog-import-repository.ts` (nuevo),
 `lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-import-prisma.ts` (nuevo),
@@ -164,7 +164,7 @@ presentación nueva ⇒ `unauthorized` antes de escribir nada); integración par
 creada queda, segunda confirmación la reutiliza), **R22** y **R34** (archivo, recortes, proveedor y
 unidad de otra empresa).
 
-## T11 — Material y medidas en la pantalla del catálogo `[depende de T3]` `[P con T8-T10]` `[F2]`
+## [x] T11 — Material y medidas en la pantalla del catálogo `[depende de T3]` `[P con T8-T10]` `[F2]`
 
 Archivos: `app/(private)/proveedores/[id]/components/{catalog-line-form,catalog-columns,catalog-columns-skeleton}.tsx|ts`,
 `lib/modules/proveedores/adapters/driving/supplier-catalog-actions.ts`,
