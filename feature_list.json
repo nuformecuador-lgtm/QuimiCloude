@@ -2147,11 +2147,11 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "permiso-propio-de-documentos",
-      "description": "El modulo documentos deja de pedir prestado proveedores.modificar y pasa a tener permiso propio. Con eso, la subida de PDFs se puede montar tambien en la pantalla de formulas.\n\nNACE EL 2026-09-21, del humano, durante la implementacion de QC-107: es su pregunta abierta 1, cerrada.\n\nCUARTA ENMIENDA AL CATALOGO CERRADO DE QC-74: entran documentos.consultar y documentos.modificar, y el catalogo pasa de QUINCE a DIECISIETE. Exige MIGRACION y seed -no hay via de aplicacion que lo edite, QC-74 R5-, el precedente es QC-86, y hay TRES sitios que afirman «quince» a mano.\n\nENTRA TAMBIEN el montaje de la subida en formulas, que es la T12 / R18 de QC-107, diferida aqui con destinatario escrito.\n\nBLOQUEADA POR QC-107.\n\nABIERTO, se acota con /afinar-feature: que rol ademas del Administrador los recibe, y si quien ya tiene proveedores.modificar hereda documentos.modificar en la migracion.",
+      "description": "El modulo documentos deja de pedir prestado proveedores.modificar y pasa a tener permiso propio. Con eso, QC-160 puede montar la subida de PDFs tambien en formulas.\n\nNACE EL 2026-09-21, del humano, durante la implementacion de QC-107: es su pregunta abierta 1, cerrada.\n\nCUARTA ENMIENDA AL CATALOGO CERRADO DE QC-74: entran documentos.consultar y documentos.modificar, y el catalogo pasa de QUINCE a DIECISIETE. Exige MIGRACION y seed -no hay via de aplicacion que lo edite, QC-74 R5-, el precedente es QC-86, y hay TRES sitios que afirman «quince» a mano.\n\nEL MONTAJE EN FORMULAS SALE DE ESTA FICHA el 2026-09-24 (/afinar-feature) y se va a QC-160, que lo monta detras de un boton junto con el de proveedores: esta ficha queda solo backend.\n\nBLOQUEADA POR QC-107.\n\nABIERTO, se acota con /afinar-feature: que rol ademas del Administrador los recibe, y si quien ya tiene proveedores.modificar hereda documentos.modificar en la migracion.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
-      "zone": "fullstack",
+      "zone": "backend",
       "branch": "feature/QC-142-permiso-propio-de-documentos",
       "depends_on": [
         "QC-107"
@@ -2412,6 +2412,85 @@
         "QC-142"
       ],
       "description": "Lo que la IA lee de un PDF de formula (procesado por TEXTO) se convierte en una RECETA (nombre, ingredientes en porcentaje, pasos) tras una revision humana. NACE el 2026-09-23 al acotar la lectura de PDF con IA junto con QC-158. Ya decidido: revision antes de guardar; ingredientes en porcentaje (QC-147, QC-157). Se acota con /afinar-feature (ingrediente que no existe como producto, receta que ya existe, pasos). BLOQUEADA POR QC-142."
+    },
+    {
+      "key": "QC-160",
+      "id": 160,
+      "epic": "QC-105",
+      "epic_name": "Documentos e IA",
+      "name": "boton-de-subida-de-pdf",
+      "description": "La subida de PDFs (componente de QC-107) deja de estar siempre visible: un BOTON la abre en una VENTANA EMERGENTE (dialogo), con el estado por archivo dentro. Solo PDF, que el componente ya cumple. DONDE: /proveedores/[id] (estrategia catalogo; hoy montada a la vista) y el LISTADO de formulas /produccion/formulas (estrategia formula; montaje NUEVO, traido de QC-142). ACOTADA el 2026-09-24 con /afinar-feature: quien ve el boton es quien tiene el permiso que exige la subida (QC-142). E2E: SI, se ajusta el de QC-107 y se suma formulas, con IA y cola simuladas. NO ENTRA: el permiso propio (QC-142), receta desde PDF (QC-159), catalogo desde PDF (QC-158), la logica del componente (QC-107). BLOQUEADA POR QC-142.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-160-boton-de-subida-de-pdf",
+      "depends_on": [
+        "QC-142"
+      ],
+      "spec_path": "specs/QC-160-boton-de-subida-de-pdf"
+    },
+    {
+      "key": "QC-161",
+      "id": 161,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "rol-maestro",
+      "description": "Nace el rol MAESTRO (dueno de la plataforma, por encima de las empresas) y con el empresas.consultar y empresas.modificar (modificar cubre alta, edicion y baja): una enmienda mas al catalogo cerrado de QC-74. El Maestro recibe SOLO esos dos; Administrador, Operador y Empacador no cambian. EL MAESTRO NO PERTENECE A NINGUNA EMPRESA: users.company_id sigue obligatoria para todos menos para el (enmienda a QC-47). EL PRIMER MAESTRO lo crea el seed, igual que el Administrador inicial: usuario, contrasena y correo desde .env (QC-6). NUNCA aparece en el selector de roles y el servidor rechaza asignarlo. ACOTADA el 2026-09-24 con /afinar-feature. ABIERTO: como inicia sesion el Maestro sin empresa (QC-48/QC-61), aqui o en QC-162. NO ENTRA: la gestion de empresas (QC-162). CHOCA en el catalogo de permisos con QC-153 y QC-142: recuento contra dev al implementar.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-161-rol-maestro",
+      "depends_on": [],
+      "spec_path": "specs/QC-161-rol-maestro"
+    },
+    {
+      "key": "QC-162",
+      "id": 162,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "gestion-de-empresas",
+      "description": "El Maestro ve todas las empresas de la plataforma y las da de alta, edita y da de baja: operaciones de servidor y su pantalla. Exige empresas.consultar / empresas.modificar (QC-161). Se acota con /afinar-feature. ABIERTO: como cruza el Maestro el aislamiento por empresa (QC-48/QC-61; el usuario pertenece a UNA empresa, QC-47); en que ruta vive la pantalla; que pasa con los usuarios de una empresa dada de baja. BLOQUEADA POR QC-161.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-162-gestion-de-empresas",
+      "depends_on": [
+        "QC-161"
+      ],
+      "spec_path": "specs/QC-162-gestion-de-empresas"
+    },
+    {
+      "key": "QC-163",
+      "id": 163,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "contenido-de-la-presentacion-duplicada",
+      "description": "CANCELADA el 2026-09-24: duplicada, creada por error al acotar. El contenido de la presentacion ya esta en QC-150 (R6-R8), que absorbio QC-130. La unidad del pedido sigue en QC-164.",
+      "status": "cancelled",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-163-contenido-de-la-presentacion-duplicada",
+      "depends_on": [],
+      "spec_path": "specs/QC-163-contenido-de-la-presentacion-duplicada"
+    },
+    {
+      "key": "QC-164",
+      "id": 164,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "unidad-del-pedido",
+      "description": "El pedido vuelve a tener UNIDAD junto a la cantidad (100 L de X receta). REABRE a sabiendas QC-147. Todo el catalogo de unidades de la empresa. CONSUMO: cantidad x %; misma familia que el insumo se CONVIERTE exacto (QC-76); otra familia, APROXIMACION sin densidad de QC-147 (1 L ~ 1 kg). Pedidos existentes sin unidad (guion); obligatoria al crear y editar (patron QC-146). Afecta costo (QC-151), tabla de ingredientes, ejecucion (QC-63/QC-147) reserva (QC-141) y los envases enteros de QC-150 (cantidad / contenido), que tendran que convertir. ACOTADA el 2026-09-24 con /afinar-feature. E2E: SI. NO ENTRA: densidad por producto; contenido de la presentacion (ya en QC-150).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-164-unidad-del-pedido",
+      "depends_on": [],
+      "spec_path": "specs/QC-164-unidad-del-pedido"
     }
   ]
 }
