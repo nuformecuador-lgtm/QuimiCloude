@@ -180,6 +180,16 @@ export const E2E_ESPERADOS = [
   // accion del identificador de peticion: el spec no lee ni afirma nada sobre el identificador
   // ni sobre `reference`, asi que el diferimiento sigue INTACTO.
   'pedidos-terminados.spec.ts',
+  // Alta el 2026-09-24 (QC-150 R37) por el MISMO motivo y en el MISMO sitio que las demas: esta
+  // lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. El recorrido que ejercita: dar contenido a una
+  // presentacion, crear y asignar un pedido con ella, finalizarlo en `/asignacion/[id]` y ver en
+  // Inventario el producto terminado nacer con su lote, su cantidad y sus envases; y que el lote
+  // sigue diciendo los mismos envases al cambiar despues el contenido de la presentacion. NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'producto-terminado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
