@@ -74,16 +74,16 @@
 
 ### T3 — `DocumentUploadDialog` y sus textos
 
-- [ ] Componente según `design.md > 3.1`: `DialogTrigger` con `document-upload-open`, `DialogContent`
+- [x] Componente según `design.md > 3.1`: `DialogTrigger` con `document-upload-open`, `DialogContent`
   con `document-upload-dialog`, `showCloseButton={false}`, `sm:max-w-lg max-h-[85dvh] overflow-y-auto`,
   `DialogClose` propio `document-upload-close` con `min-h-11 min-w-11`, y `DocumentUpload` dentro con la
   `strategy` recibida, y `keepMounted` (R21).
-- [ ] Textos en `labels.ts` (`OPEN_LABEL`, `DIALOG_TITLE`, `CLOSE_LABEL`, `dialogDescription(max)`),
+- [x] Textos en `labels.ts` (`OPEN_LABEL`, `DIALOG_TITLE`, `CLOSE_LABEL`, `dialogDescription(max)`),
   con el tope importado del contrato. Exportar el componente, su tipo de props y los test ids nuevos por
   el barrel.
-- [ ] Ningún archivo de la carpeta nombra `permission`, `permiso` ni `roleName`, ni escribe
+- [x] Ningún archivo de la carpeta nombra `permission`, `permiso` ni `roleName`, ni escribe
   `'catalogo'` o `'formula'`.
-- [ ] Test nuevo con los casos de `design.md > 9.1` para R1, R2, R3, R4, R8, R13, R15, R21 y el texto
+- [x] Test nuevo con los casos de `design.md > 9.1` para R1, R2, R3, R4, R8, R13, R15, R21 y el texto
   «Subir PDFs» de R22.
 - **Archivos:** `components/shared/document-upload/document-upload-dialog.tsx` (nuevo),
   `components/shared/document-upload/labels.ts`, `components/shared/document-upload/index.ts`,
