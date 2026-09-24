@@ -506,3 +506,29 @@ producción comunes conocidos), QC-150 y QC-151 (no medidos aquí; el leader los
 | R36 | `tests/unit/documentos/qc158-alcance.test.ts`: ningún archivo del diff está bajo `borradores-de-prompts/`, ninguno lee `CATALOG_PROMPT` fuera de `strategy-prompt-env.ts`, y el texto de guion del doble es **solo JSON** (se parsea entero), así que no puede llevar instrucciones — mismo enfoque «por forma» que QC-129 usó para su R9 (`QC-129 design.md:288`), sin copiar el texto para compararlo |
 | R37 | `catalog-import-review.test.tsx` (clases de tamaño) + pasada manual en WebKit del E2E |
 | R38 | `e2e/catalogo-desde-pdf.spec.ts` (Chromium y WebKit) |
+
+## 16. Notas fechadas de la implementación
+
+### 2026-09-24 — La acción valida la forma antes que la sesión (enmienda `> 6.2`)
+
+`catalog-import-actions.ts` rechaza con `invalid_input` una entrada que no encaja en el esquema
+**antes** de resolver el actor, como hacen `recipe-actions.ts` y `order-actions.ts`, y no como
+`document-batch-actions.ts`, que `> 6.2` citaba como patrón. Consecuencia: un visitante sin sesión
+que envía una entrada rota recibe `invalid_input` en vez de `unauthorized`. **R31 no cambia**: el
+permiso sigue siendo la primera operación del caso de uso, antes de leer el archivo, los recortes o
+el catálogo, y con una entrada válida sin permiso la respuesta es `unauthorized` sin tocar ningún
+puerto. Validar la forma no lee ni revela ningún dato de la empresa.
+
+### 2026-09-24 — Motivo por fila: en la pantalla, no en el error del servidor (R18, R20)
+
+La confirmación rechaza con el `ValidationError` (`invalid_input`) que ya existía, y el motivo por
+fila («fila 3: presentación nueva sin unidad») viaja solo en el diagnóstico de servidor. No se amplió
+el contrato de errores (`lib/modules/errores` sin códigos ni campos públicos nuevos, `> 5.1`). Lo que
+exigen R18 y R20 —decir qué filas impiden confirmar— lo cumple la **pantalla**: valida en el cliente
+con la misma clasificación que devolvió el servidor y nombra las filas incompletas o duplicadas, las
+identidades repetidas y las presentaciones nuevas sin unidad; mientras haya alguna, «Confirmar» queda
+deshabilitado. Si aun así el servidor rechaza (porque el catálogo cambió entre la vista previa y la
+confirmación), la pantalla muestra el mensaje y vuelve a pedir la vista previa para refrescar las
+clases. La imagen ajena (R26) solo se alcanza manipulando la petición: la pantalla solo ofrece
+recortes del propio archivo. Si algún día hace falta el motivo estructurado en la respuesta, es un
+cambio del contrato de `errores` y necesita su propia decisión.
