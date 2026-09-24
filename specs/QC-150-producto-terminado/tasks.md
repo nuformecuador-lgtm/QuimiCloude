@@ -192,7 +192,7 @@ Archivos: `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
 El censo de la guardia del libro pasa con `receiveFinishedGoods` y se pone rojo con un camino
 fabricado sin asiento.
 
-## T8 — Engancharlo al Finalizar `[depende de T7, T14]`
+## [x] T8 — Engancharlo al Finalizar `[depende de T7, T14]`
 
 Archivos: `lib/modules/pedidos/ports/order-unit-of-work.ts`,
 `lib/modules/pedidos/domain/{transition-order,order-catalog,errors}.ts`,

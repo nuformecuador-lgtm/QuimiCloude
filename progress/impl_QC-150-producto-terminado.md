@@ -281,3 +281,82 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Incidente sin pérdida: frontend_dev hizo `reset --hard HEAD~1` sobre su propio commit
   (`5790736e`), que había arrastrado los archivos de T9 sin commitear, y lo rehízo como `2bbdf3e8`
   sin ellos. Comprobado con el reflog: no se perdió ningún commit.
+
+## T8 UI, fixtures E2E y T12 (`9e4e4e73`, `2bbdf3e8`, `ae9208d2`, frontend_dev) · T8 cerrada
+
+- UI: `app/(private)/asignacion/components/{assigned-order-delivered-notice.tsx,index.ts}`,
+  `app/(private)/asignacion/page.tsx` (lee `entregado_envases`/`entregado_producto`).
+  `order-execution-screen.tsx` sin cambios: ya pinta el mensaje del catálogo para cualquier código.
+- Tests: `tests/unit/asignaciones-ui/{assigned-orders-delivered-notice,order-execution-screen}.test.tsx`;
+  `tests/unit/asignaciones*` 39 archivos → 616 pasados.
+- **Fixtures E2E con contenido sembrado** (lo pide T8): `e2e/ejecucion-receta.spec.ts` (contenido `1`
+  en la presentación, y el pedido sembrado gana `presentationId` y `presentationContent`) y
+  `e2e/reserva-de-material.spec.ts` (contenido `1`; el pedido lo crea la UI, que ya copia).
+  `pedidos-asignados` y `pedidos-terminados` siembran `ENTREGADO` por Prisma y no pasan por Finalizar.
+- **T12**: `e2e/producto-terminado.spec.ts` (R37), el recorrido de `design.md > 8` entero. Se lista con
+  `playwright test --list` (chromium y webkit). **No se ha corrido**: lo corre el leader con
+  `pnpm exec playwright test e2e/producto-terminado.spec.ts e2e/ejecucion-receta.spec.ts e2e/reserva-de-material.spec.ts`
+  contra `QuimiCloude_QC150`. T12 queda sin marcar hasta verlo verde.
+
+## T13 — Documentación y trazabilidad
+
+- `docs/architecture.md` (`840ce301`): la pregunta 2 del dominio gana el párrafo de la entrada por
+  producción y el cuarto tipo de producto.
+- `docs/dependencias.md`, `package.json` y `pnpm-lock.yaml` sin cambios en la rama.
+- Ningún `it.todo` ni `skip` en los archivos nuevos de la ficha.
+- Base propia `QuimiCloude_QC150` anotada arriba para borrarla al cerrar.
+- Sin marcar: su criterio exige `./init.sh` completo verde, que corre el leader.
+
+## Estado final de esta vuelta (2026-09-24)
+
+- Cerradas: **T0, T1, T2, T4, T5, T6, T7, T8, T9, T10, T11, T14** (T3 cancelada).
+- Pendientes del gate del leader: **T12** (E2E) y **T13** (`./init.sh` completo).
+- `HEAD`: `pnpm run typecheck` sale con 0; `pnpm run lint` 0 errores, 2 avisos preexistentes en
+  `tests/unit/pedidos/order-service.test.ts`. Árbol limpio.
+
+## Mapa R<n> → test (final; sustituye al parcial de arriba)
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/inventario/schema/finished-product-enum-values-migration.test.ts` › R1 |
+| R2 | `tests/unit/inventario/product-batch-input.test.ts` › R2; `tests/unit/inventario/product-service.test.ts` › R2 |
+| R3 | `tests/unit/inventario/product-page.test.tsx` › R3 (4 casos) |
+| R4 | `tests/unit/inventario/product-service.test.ts` › R4; `tests/integration/inventario/product-type-lock.int.test.ts` › R4 |
+| R5 | `tests/unit/inventario/product-prisma.test.ts` › R5; `tests/unit/inventario/product-page.test.tsx` › R5 |
+| R6 | `tests/unit/inventario/presentation-input.test.ts` › R6; `tests/integration/inventario/presentation-content.int.test.ts` › R6; `tests/unit/inventario/schema/finished-products-and-content-copies-migration.test.ts` › R6 |
+| R7 | `tests/unit/inventario/presentation-input.test.ts` › seis rechazos (R7) |
+| R8 | `tests/unit/configuracion-ui/presentation-sheet.test.tsx` › R8; `presentation-columns.test.tsx` › R8 |
+| R9 | `tests/unit/{inventario,pedidos}/schema/finished-products-and-content-copies-migration.test.ts` › R6/R9 |
+| R10 | `tests/unit/pedidos/transition-order.test.ts` › R10, R41; `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` (producto nuevo al Finalizar) |
+| R11 | `tests/integration/inventario/finished-goods.int.test.ts` › R11… (nace) y reutilización; `e2e/producto-terminado.spec.ts` |
+| R12 | `tests/unit/inventario/finished-goods.test.ts` › R12 (3 casos) |
+| R13 | `finished-goods.int.test.ts` › caso R11, R13, R16, R17, R41, R43 |
+| R14 | `tests/unit/inventario/finished-goods.test.ts` › R14 (2 casos) |
+| R15 | derogado (D13) |
+| R16, R17 | `finished-goods.int.test.ts` › caso R11, R13, R16, R17, R41, R43 |
+| R18 | `transition-order.test.ts` › R18; `finish-with-finished-goods.int.test.ts` (sin copia ni contenido); `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` › R18, R19 |
+| R19 | `finished-goods.test.ts` › R19; `transition-order.test.ts` › R19, R20; `order-execution-screen.test.tsx` › R18, R19 |
+| R20 | `transition-order.test.ts` › R18, R20 y R19, R20; `finish-with-finished-goods.int.test.ts` (fallo forzado tras el lote) |
+| R21 | `finished-goods.int.test.ts` › segunda llamada con el mismo pedido; `finish-with-finished-goods.int.test.ts` › dos Finalizar seguidos y a la vez; schema de T2 › R21 |
+| R22 | `finished-goods.int.test.ts` › dos conexiones reales |
+| R23 | `finished-goods.int.test.ts` › dos empresas |
+| R24 | `tests/unit/asignaciones/finish-assigned-order.test.ts` › R24; `order-execution-actions.test.ts`; `finish-with-finished-goods.int.test.ts` › R24; `tests/unit/asignaciones-ui/assigned-orders-delivered-notice.test.tsx` › R24 |
+| R25 | `tests/unit/inventario/product-batches-panel.test.tsx` › R25 (4 casos) |
+| R26 | `finish-assigned-order.test.ts` (permiso antes de leer); `finish-with-finished-goods.int.test.ts` › R26 |
+| R27 | `tests/unit/pedidos/update-order.test.ts` › R27 (3); `finish-with-finished-goods.int.test.ts` › R27 |
+| R28 | `tests/unit/inventario/create-product.test.ts` › R28; `tests/integration/inventario/finished-product-prohibitions.int.test.ts` › R28 |
+| R29 | `tests/unit/recetas/recipe-service.test.ts` › R29 |
+| R30 | `tests/unit/recetas-ui/recipe-lines-no-finished-product.test.tsx` › R30 |
+| R31, R32 | `tests/unit/inventario/{adjust-batch-stock,adjust-batch-stock-prisma}.test.ts`; `finished-product-prohibitions.int.test.ts` › R31, R32 |
+| R33 | `tests/unit/inventario/adjust-batch-dialog.test.tsx` › R33 |
+| R34 | schema de T2 (inventario y pedidos) › R34 |
+| R35 | `finished-goods.int.test.ts` › tras la baja nace uno nuevo |
+| R36 | schema de T1 y T2 › R36 |
+| R37 | `e2e/producto-terminado.spec.ts` › R37 (**sin correr**) |
+| R38, R39 | `tests/unit/pedidos/{create-order,update-order}.test.ts`; `tests/integration/pedidos/order-content-copy.int.test.ts` |
+| R40 | `presentation-content.int.test.ts` › R40; `order-content-copy.int.test.ts` › R40 |
+| R41 | `finished-goods.test.ts` › R41; `finished-goods.int.test.ts` (el lote guarda su contenido) |
+| R42 | `finished-goods.test.ts` › R42; `tests/unit/pedidos/{order-cost,resolve-ingredients-cost}.test.ts`; `transition-order.test.ts` › R42 (guardado y nulo); `finish-with-finished-goods.int.test.ts` (importe guardado y nulo) |
+| R43 | `order-cost.test.ts` › R43; `finished-goods-prisma.test.ts` (coste cero, nunca sin `unit_cost`); `transition-order.test.ts` › R42, R43; `finish-with-finished-goods.int.test.ts` (el pedido sigue con importe nulo) |
+| R44 | `finished-goods.int.test.ts` › sin copia usa el vigente / sin copia ni contenido rechaza |
+| D22 | `tests/unit/inventario/product-input.test.ts` › D22 (200/201 y 183 en alta y edición); `product-service.test.ts` › D22; `tests/integration/inventario/product-batch-write.int.test.ts` › D22; `finished-goods.int.test.ts` (nombre compuesto de 183) |
