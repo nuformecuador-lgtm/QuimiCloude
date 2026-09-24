@@ -140,14 +140,14 @@
 
 ### T6 — Guardias de montaje y de convenciones
 
-- [ ] En `document-upload-convenciones.test.ts`, según `design.md > 9.2`: la lista de páginas que
+- [x] En `document-upload-convenciones.test.ts`, según `design.md > 9.2`: la lista de páginas que
   montan la pieza pasa a ser exactamente la de fórmulas y la de detalle de proveedor (R7); el caso
   «ninguna pantalla de fórmulas la monta» se sustituye por «solo el listado la monta, y ninguna fuente
   de fórmulas nombra `proveedores.*`»; casos nuevos para R12 (ninguna página escribe
   `documentos.modificar`, las dos llaman a `canUploadDocuments`, la carpeta no nombra permisos) y R20
   (el manifiesto no gana dependencias, y la carpeta importa el diálogo solo de `@/components/ui/dialog`).
   Cada regla nueva, con su caso sintético que la hace fallar.
-- [ ] **Solo si** T0 vio en rojo en `dev` la aserción del catálogo con `/documento/i` (riesgo 13.2),
+- [x] **Solo si** T0 vio en rojo en `dev` la aserción del catálogo con `/documento/i` (riesgo 13.2),
   arreglarla aquí y dejarlo escrito en `progress/impl_…`. Si está verde, no se toca: el arreglo le toca
   al implementer de QC-142.
 - **Archivos:** `tests/unit/documentos-ui/document-upload-convenciones.test.ts`.
