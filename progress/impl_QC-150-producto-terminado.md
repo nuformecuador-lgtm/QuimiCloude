@@ -91,3 +91,11 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   que `PACKAGING`); la edición nunca escribió ni tipo ni unidad y sigue igual. El spec no dice nada
   más de la edición de un producto terminado.
 - Tests: 71 archivos (inventario, errores y 5 guardias) → 1169 pasados, 5 skipped; integración 3/3.
+
+## T4 — UI (`5a8d0074`, frontend_dev) · T4 cerrada
+
+- Modificados: `app/(private)/configuracion/presentaciones/components/{presentation-form,presentation-columns,presentation-row-actions,presentation-list-skeleton,index}.tsx|ts`
+  (los tres últimos, una línea cada uno: la precarga en edición y el conteo de columnas del esqueleto).
+- Tests: `tests/unit/configuracion-ui/{presentation-columns,presentation-sheet}.test.tsx`.
+- Tests: 6 archivos de presentaciones → 95/95; 6 guardias → 75/75;
+  `configuracion-viewport.test.tsx` 16/16 (lo corrió el implementer).

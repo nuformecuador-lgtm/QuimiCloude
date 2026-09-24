@@ -83,7 +83,7 @@ Archivos: `db/migrations/<ts+1>_finished_products_and_content_copies/{migration.
 El humano eligió copiar el contenido en vez de bloquearlo. Sin código. Su lugar lo ocupan la
 columna de T2 y T14.
 
-## T4 — Contenido de la presentación en el dominio y la pantalla `[depende de T2]` `[P con T5]`
+## [x] T4 — Contenido de la presentación en el dominio y la pantalla `[depende de T2]` `[P con T5]`
 
 Archivos: `lib/modules/inventario/domain/{presentation-input,presentation-view,presentation-catalog}.ts`,
 `.../adapters/driven/persistence/{presentation-prisma,presentation-catalog-prisma}.ts`,
