@@ -60,3 +60,15 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   Plantilla regenerada (50 migraciones).
 - Tests: `vitest run tests/unit/inventario tests/unit/pedidos tests/guards` → 175 archivos, 2540
   pasados, 13 skipped, 0 rojos. Typecheck limpio; lint 0 errores.
+
+## T4 — Contenido de la presentación, backend (`e39c54e6`, backend_dev)
+
+- Modificados: `lib/modules/inventario/domain/{presentation-input,presentation-view,presentation-catalog,create-presentation,update-presentation}.ts`,
+  `lib/modules/inventario/ports/presentation-repository.ts`,
+  `lib/modules/inventario/adapters/driven/persistence/{presentation-prisma,presentation-catalog-prisma}.ts`,
+  `lib/modules/inventario/adapters/driving/presentation-actions.ts`.
+- Tests nuevos o ampliados: `tests/unit/inventario/{presentation-input,presentation-prisma,presentation-catalog}.test.ts`,
+  `tests/integration/inventario/presentation-content.int.test.ts` (declarado `commit` en
+  `aislamiento.json`). Fixtures de 20 tests ajenos ampliados solo con `content` por tipos.
+- Tests: 21 archivos afectados → 414/414; integración nueva 3/3; guardias de aislamiento y de ámbito
+  de inventario 32/32. Typecheck limpio; lint 0 errores.
