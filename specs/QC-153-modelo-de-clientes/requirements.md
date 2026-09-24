@@ -15,13 +15,180 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es la **capa de persistencia** de QuimiCloude
+—el esquema Prisma (`db/schema.prisma`) más la base Postgres con la migración de esta ficha
+aplicada—, **el armazón del módulo `clientes`**, y el **catálogo cerrado de permisos con su seed**
+(`lib/modules/identity/domain/permissions.ts` y la migración que lo lleva a una instalación ya
+sembrada). No hay caso de uso, ni service, ni Server Action, ni pantalla en esta ficha (decisiones
+«¿Cómo se reparte el módulo?» y «¿Quién puede?»: el service que valida los permisos es **QC-154**).
+Mismo encuadre que **QC-42** (modelo de proveedores) y, para la enmienda del catálogo, que **QC-144**.
+
+### Datos del cliente
+
+**R1.** El sistema DEBE persistir, para cada cliente, un identificador propio, estable y no derivado
+de sus datos de negocio, más sus **nombres** y sus **apellidos** en dos datos separados, su
+**ciudad**, su **teléfono**, su **correo** y su **dirección**.
+
+**R2.** SI se intenta persistir o modificar un cliente sin nombres, sin apellidos o sin ciudad,
+ENTONCES el sistema DEBE rechazar la operación **en la propia base de datos** y no crear ni modificar
+ninguna fila.
+
+**R3.** El sistema DEBE aceptar un cliente al que le falte cualquier combinación de teléfono, correo y
+dirección —incluidos los tres a la vez—, conservando cada dato ausente como **ausencia de valor**, y
+NO DEBE exigir que exista al menos uno de ellos.
+
+**R4.** El sistema NO DEBE almacenar para el cliente ningún dato de negocio distinto de los seis de R1:
+ni NIT, ni documento de identidad, ni persona de contacto.
+
+**R5.** El sistema NO DEBE limitar en la columna la longitud de ninguno de los seis datos de R1, y NO
+DEBE rechazar un cliente por la longitud de ninguno: los largos máximos son validación de aplicación
+y pertenecen a **QC-154**.
+
+**R6.** El sistema NO DEBE exigir en la base ningún formato del teléfono ni del correo: DEBE aceptar
+como correo cualquier texto, incluido uno sin forma de correo, y como teléfono cualquier texto.
+
+### Duplicados
+
+**R7.** El sistema DEBE aceptar dos clientes vivos de la misma empresa con exactamente los mismos seis
+datos de R1, y NO DEBE declarar ningún índice único ni restricción de unicidad sobre los datos de
+negocio del cliente.
+
+### Empresa
+
+**R8.** SI se intenta persistir un cliente sin empresa, o con una empresa que no existe, ENTONCES el
+sistema DEBE rechazar la operación **en la propia base de datos** y no crear ninguna fila.
+
+**R9.** SI se intenta eliminar físicamente una empresa que tiene al menos un cliente, vivo o dado de
+baja, ENTONCES el sistema DEBE rechazar el borrado.
+
+**R10.** El sistema DEBE ofrecer la pareja (empresa, identificador) del cliente como **clave única
+referenciable**, de modo que una fila de otra tabla que apunte a un cliente declarando una empresa
+distinta de la de ese cliente sea **rechazada por la propia base de datos**.
+
+**R11.** El sistema DEBE declarar la referencia del cliente a su empresa y las dos referencias de
+auditoría al usuario como **campos escalares sin relación de Prisma**, de modo que **ninguna consulta
+del cliente Prisma pueda atravesar** desde un cliente hasta una empresa o un usuario —ni por
+`include`, ni por `select`, ni por filtro anidado—; y DEBE mantener aun así las tres restricciones de
+clave foránea **reales en la base de datos**.
+
+### Auditoría, borrado y marcas de tiempo
+
+**R12.** El sistema DEBE registrar, para cada cliente, qué usuario lo creó y qué usuario lo modificó
+por última vez **cuando ese usuario exista**; DEBE aceptar un cliente sin ninguno de los dos,
+conservándolos como ausencia de valor; y SI se intenta registrar como autor un usuario inexistente,
+ENTONCES DEBE rechazar la operación.
+
+**R13.** SI se intenta eliminar físicamente un usuario que figura como creador o como último
+modificador de algún cliente, ENTONCES el sistema DEBE rechazar el borrado, y NO DEBE convertir esa
+autoría en ausencia de valor.
+
+**R14.** CUANDO se da de baja un cliente, el sistema DEBE conservar su fila completa y registrar el
+instante de la baja, sin eliminar ninguno de sus datos; y NO DEBE mantener ningún otro indicador de
+estado activo o inactivo del cliente.
+
+**R15.** El sistema DEBE registrar, para cada cliente, el instante de creación y el instante de la
+última modificación, y DEBE actualizar el segundo cada vez que la fila cambia.
+
+### Esquema, seguridad y migración
+
+**R16.** El sistema DEBE nombrar en **inglés** y en `snake_case` la tabla, las columnas, los índices y
+las restricciones que crea esta ficha, y la tabla DEBE llamarse `customers`.
+
+**R17.** El sistema DEBE tener `ROW LEVEL SECURITY` activado **y forzado** (`FORCE ROW LEVEL
+SECURITY`) en la tabla de clientes, sin ninguna policy.
+
+**R18.** CUANDO se revierte la migración de esta ficha, el sistema DEBE quedar exactamente en el
+estado previo a aplicarla: sin la tabla de clientes ni ninguno de sus índices y restricciones, sin
+los dos permisos nuevos ni ninguna de sus asignaciones —las haya puesto la migración o no—, y con el
+resto de permisos, roles y asignaciones intactos.
+
+### Módulo
+
+**R19.** El sistema DEBE declarar `clientes` como módulo propietario del modelo de cliente, y ningún
+módulo distinto de `clientes` DEBE consultarlo con el cliente Prisma.
+
+**R20.** El módulo `clientes` DEBE nacer con la forma hexagonal del repositorio: un contrato público
+(`index.ts`) que solo reexporta símbolos de su propio `domain/`, las carpetas `domain/`, `ports/` y
+`adapters/` como únicas carpetas del módulo, y ningún `'use server'` alcanzable desde ese contrato.
+
+### Permisos (enmienda al catálogo cerrado)
+
+**R21.** El catálogo de permisos DEBE contener `clientes.consultar` (módulo `clientes`, acción
+`consultar`) y `clientes.modificar` (módulo `clientes`, acción `modificar`), cada uno con descripción
+no vacía; y DEBE ser **exactamente el catálogo previo a esta ficha más esos dos**, sin añadir, quitar
+ni renombrar ningún otro código.
+
+**R22.** El seed DEBE asignar `clientes.consultar` y `clientes.modificar` al **Administrador**, escritos
+uno a uno, y NO DEBE asignarlos a ningún otro rol: el Operador y el Empacador DEBEN conservar
+exactamente los permisos que tenían antes de esta ficha.
+
+**R23.** CUANDO se aplica la migración de esta ficha sobre una instalación ya sembrada, el sistema
+DEBE crear los dos permisos y asignarlos al Administrador, sin asignarlos a ningún otro rol y sin
+modificar ningún otro permiso ni ninguna otra asignación.
+
+**R24.** SI al aplicar la migración los dos permisos o sus asignaciones al Administrador ya existen
+—porque el seed los creó antes—, ENTONCES el sistema NO DEBE fallar, NO DEBE duplicar ninguna fila y
+NO DEBE reescribir las que ya había.
+
+**R25.** El fuente del catálogo de permisos DEBE documentar la enmienda en un párrafo de como mucho
+cinco líneas que contenga la palabra «enmienda» y nombre los dos códigos nuevos, y ni ese párrafo ni
+la primera frase del catálogo (la del recuento) DEBEN citar una ficha, un requisito, `design.md` ni
+una «decisión cerrada».
+
+### Límite de alcance
+
+**R26.** El sistema NO DEBE incluir en esta ficha ninguna operación de alta, consulta, edición o baja
+de clientes, ni ningún caso de uso, puerto con métodos, adaptador, Server Action, ruta, pantalla o
+entrada de menú que las exponga; y ningún archivo de producción distinto del catálogo de permisos
+DEBE nombrar `clientes.consultar` ni `clientes.modificar`.
+
+**R27.** El sistema NO DEBE modificar en esta ficha la tabla de pedidos ni ninguna otra tabla
+existente: la migración NO DEBE añadir, quitar ni cambiar ninguna columna, índice ni restricción de
+otra tabla, y lo único que escribe fuera de `customers` son filas del catálogo de permisos y de sus
+asignaciones.
+
+**R28.** El sistema NO DEBE añadir en esta ficha ningún test E2E: no hay flujo navegable que visitar,
+y cada requisito se verifica con tests unitarios, estáticos o de integración.
+
+**R29.** El sistema NO DEBE incorporar ninguna dependencia de terceros nueva para cumplir los
+requisitos anteriores.
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, en el orden en que está escrita, con el requisito
+que la hace testeable en **esta** ficha. Ninguna queda sin `R<n>` (regla 4 de `CLAUDE.md`).
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| 1 | Nombres y apellidos separados y obligatorios, ciudad obligatoria; teléfono, correo y dirección opcionales; sin NIT ni persona de contacto | R1, R2, R3, R4 |
+| 2 | Nada es único: se admiten duplicados | R7 |
+| 3 | `clientes.consultar` y `clientes.modificar`, solo Administrador en el seed; enmienda al catálogo (precedente QC-144); autorización en el service | R21, R22, R23, R24, R25; el service es de QC-154 y aquí se prueba su ausencia: R26 |
+| 4 | Borrado lógico con auditoría y fechas; identificadores en inglés; empresa desde el primer día con `company_id` y FK compuesta | R8, R9, R10, R11, R12, R13, R14, R15, R16, R17 |
+| 5 | Tres fichas como Proveedores: QC-153 modelo, QC-154 CRUD, QC-155 pantalla | R19, R20, R26 |
+| 6 | Pedido ↔ cliente no entra (QC-156) | R27 |
+| 7 | E2E en la pantalla (QC-155); modelo y CRUD con unitarios e integración | R28 |
+| Pregunta abierta 1 (resuelta abajo por precedente) | Largos y formato de teléfono y correo | R5, R6 |
+| — (regla 7 de `CLAUDE.md`) | Ninguna librería nueva | R29 |
+| — (migración reversible, `docs/architecture.md`) | `down.sql` que deja el estado exacto anterior | R18 |
 
 ## Preguntas abiertas
 
-1. **Largo máximo de cada campo y validación de formato del correo y del teléfono.** No se preguntó; el
-   precedente es proveedores (`Supplier`: `phone` y `email` opcionales). `spec_author` lo toma de ahí
-   y lo dice, o lo lleva a F1.4 si el precedente no lo cierra.
+1. ~~**Largo máximo de cada campo y validación de formato del correo y del teléfono.**~~ **RESUELTA
+   POR PRECEDENTE para este modelo (spec_author, 2026-09-24).** El precedente de proveedores la cierra
+   en lo que toca a la base: los largos **no** van en la columna sino en la validación de aplicación
+   (`lib/modules/proveedores/domain/supplier-input.ts:5-13`, y QC-42 R5 / decisión 15), y **no** hay
+   validación de formato ni del correo ni del teléfono (`supplier-input.ts:46-52`; QC-42 R6 /
+   decisión 9). `identity` hace lo mismo con los datos de una persona
+   (`lib/modules/identity/domain/user-input.ts:31-34`: «la base tiene estas columnas como `TEXT` sin
+   restricción»). De ahí R5 y R6. Los **valores** los fija QC-154, y el precedente ya da tres:
+   **teléfono 40** y **correo 160** (`supplier-input.ts:15-16` y `user-input.ts:46-47`, que
+   coinciden), y **nombres y apellidos 80** cada uno (`user-input.ts:45`, `USER_NAME_MAX_LENGTH`,
+   que ya se aplica a `firstNames` y `lastNames` en `user-input.ts:77-78`).
+2. **Largo máximo de la ciudad y de la dirección.** **Sigue abierta y no bloquea este modelo** (R5:
+   la columna no limita). Ningún módulo del repositorio guarda una ciudad ni una dirección, así que
+   no hay precedente que copiar. Posición por defecto que se propone para QC-154: **ciudad 80**
+   (misma cota que un nombre de persona) y **dirección 200**. La cierra el humano en F1.4 de esta
+   ficha o en la de QC-154.
 
 ## Decisiones cerradas (no reabrir)
 
