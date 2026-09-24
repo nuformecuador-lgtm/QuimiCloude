@@ -360,3 +360,18 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 | R43 | `order-cost.test.ts` › R43; `finished-goods-prisma.test.ts` (coste cero, nunca sin `unit_cost`); `transition-order.test.ts` › R42, R43; `finish-with-finished-goods.int.test.ts` (el pedido sigue con importe nulo) |
 | R44 | `finished-goods.int.test.ts` › sin copia usa el vigente / sin copia ni contenido rechaza |
 | D22 | `tests/unit/inventario/product-input.test.ts` › D22 (200/201 y 183 en alta y edición); `product-service.test.ts` › D22; `tests/integration/inventario/product-batch-write.int.test.ts` › D22; `finished-goods.int.test.ts` (nombre compuesto de 183) |
+
+## Vuelta 3 (2026-09-24): rojos del E2E del leader en `e5a4311f`
+
+- Leader: 6 rojos (3 specs × chromium/webkit) contra `QuimiCloude_QC150`.
+- **Limpieza por FK** (`243b32f0`, `45a8ed51`, `ca20b97a`, frontend_dev): `e2e/{ejecucion-receta,reserva-de-material,producto-terminado}.spec.ts`
+  borran primero movimientos y lotes de la empresa, luego el producto terminado (por `recipeId`),
+  la receta y el resto de productos (el de fórmula sigue atado por `recipe_lines` hasta que cae la
+  receta). La limpieza de huérfanos de `beforeAll` sigue el mismo orden, filtrando por prefijo y
+  empresa sembrados.
+- **R38 en el E2E**: `presentationContent` se compara por valor (`Decimal.equals`), no como texto.
+- Corrida 2 (`scratchpad/qc150-e2e-v2.log`): **8 passed, 2 failed**. `ejecucion-receta` 4/4 y
+  `reserva-de-material` 2/2 verdes en los dos navegadores. `producto-terminado` (R37) rojo en los dos por
+  otra causa, que antes quedaba tapada: tras Finalizar, la fila del producto terminado no aparece en
+  Inventario (pestaña «Producto terminado» con búsqueda) en 60 s, aunque el producto existe en base.
+  En diagnóstico. Puerto 3117 libre antes y después.
