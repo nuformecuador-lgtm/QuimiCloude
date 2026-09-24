@@ -99,3 +99,11 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Tests: `tests/unit/configuracion-ui/{presentation-columns,presentation-sheet}.test.tsx`.
 - Tests: 6 archivos de presentaciones → 95/95; 6 guardias → 75/75;
   `configuracion-viewport.test.tsx` 16/16 (lo corrió el implementer).
+
+## T6 — UI (`45f2ca6c`, frontend_dev) · T6 cerrada
+
+- Modificado: `app/(private)/inventario/components/product-form.tsx` (opciones de
+  `MANUAL_PRODUCT_TYPE_VALUES`; un producto terminado muestra su tipo de solo lectura y lo reenvía en
+  un campo oculto). `product-type-tabs.tsx` no necesitó más que la etiqueta del backend.
+- Tests: `tests/unit/inventario/product-page.test.tsx` → 76/76, incluido el de viewport de
+  inventario; contratos de módulo `recetas` y `unidades` (fijan `ProductRef`) 13/13.

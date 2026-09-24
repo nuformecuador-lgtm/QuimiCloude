@@ -122,7 +122,7 @@ Archivos: `lib/modules/inventario/domain/finished-goods.ts` (nuevo), `lib/module
 
 Además, ninguno de los dos archivos contiene `Number(`, `parseFloat` ni `toFixed` sobre cantidades.
 
-## T6 — Tipo de producto: alta, edición, listado y catálogo de errores `[depende de T1]` `[P con T4, T5]`
+## [x] T6 — Tipo de producto: alta, edición, listado y catálogo de errores `[depende de T1]` `[P con T4, T5]`
 
 Archivos: `lib/modules/inventario/domain/{product-queryable,product-input,product-batch-input,update-product,product-catalog,product-view,errors}.ts`,
 `.../ports/product-repository.ts`, `.../persistence/{product-prisma,product-catalog-prisma}.ts`,
