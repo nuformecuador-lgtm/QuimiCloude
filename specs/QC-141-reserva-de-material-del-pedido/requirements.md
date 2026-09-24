@@ -405,7 +405,7 @@ el promedio de R59 ni en la suma de R61 un lote sin coste unitario o sin present
    misma fecha—, o **(b)** aceptar que con ciclo no se garantiza la paridad y dejarlo escrito. Ver
    `design.md > 4.3.1`. *(Nota del review 2: con D22 el coste ya no recorre los lotes en orden, así
    que el efecto de (a) sobre el coste que se cita aquí desaparece; la resolución (b) no cambia.)*
-8. **(Review 2, 2026-09-23. ABIERTA.) ¿El coste de un pedido que ya existe cuenta lo que él mismo
+8. **(Review 2, 2026-09-23. RESUELTA el mismo día por el humano: SÍ cuenta —R65 queda firme como está—.) ¿El coste de un pedido que ya existe cuenta lo que él mismo
    tiene apartado?** D22 fija «disponible = total − reservado». En una **edición**, lo reservado
    incluye lo que aparta el propio pedido: si no se le devuelve, un pedido que se edita sin cambiar
    nada puede ver salir de su promedio el lote que él mismo apartó entero, o quedarse «sin importe»
@@ -413,7 +413,7 @@ el promedio de R59 ni en la suma de R61 un lote sin coste unitario o sin present
    se guardaría al crear el mismo pedido de cero. **Opción recomendada:** contarlo como disponible
    para ese pedido, igual que R12 hace con la reserva (R65). **Alternativa:** disponible general sin
    excepción. Al crear no hay diferencia: el pedido aún no ha apartado nada. Ver `design.md > 6.6`.
-9. **(Review 2, 2026-09-23. ABIERTA.) Lotes sin coste unitario o sin presentación.** D22 dice «TODOS
+9. **(Review 2, 2026-09-23. RESUELTA el mismo día por el humano: se SIGUEN EXCLUYENDO del promedio y de la cobertura —R66 queda firme como está—.) Lotes sin coste unitario o sin presentación.** D22 dice «TODOS
    los lotes del producto con disponible > 0». Desde `a01c90cb` (`dev`) un lote de máquina puede no
    tener `unit_cost` ni presentación, y el cálculo vigente los **excluye** del costeo
    (`product-catalog-prisma.ts:136-138`, `findAliveBatchesWithStock`): no tienen coste que promediar.
