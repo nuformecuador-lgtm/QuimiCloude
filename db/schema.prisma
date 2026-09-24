@@ -710,3 +710,29 @@ model DocumentFile {
   @@index([companyId], map: "document_files_company_id_idx")
   @@map("document_files")
 }
+
+/// Nada es unico: dos clientes pueden repetir todos sus datos, asi que no hay columna normalizada ni
+/// indice unico de negocio. `companyId`, `createdBy` y `updatedBy` van sin `@relation` para que un
+/// `include` no cruce a otro modulo; sus FK estan escritas a mano y son drift. `customers_company_id_id_key`
+/// es la clave candidata para las FK compuestas de las tablas que apunten a un cliente.
+/// @module clientes
+model Customer {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstNames String    @map("first_names")
+  lastNames  String    @map("last_names")
+  city       String
+  phone      String?
+  email      String?
+  address    String?
+  companyId  String    @map("company_id") @db.Uuid
+  createdBy  String?   @map("created_by") @db.Uuid
+  updatedBy  String?   @map("updated_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([companyId, id], map: "customers_company_id_id_key")
+  @@index([createdBy], map: "customers_created_by_idx")
+  @@index([updatedBy], map: "customers_updated_by_idx")
+  @@map("customers")
+}

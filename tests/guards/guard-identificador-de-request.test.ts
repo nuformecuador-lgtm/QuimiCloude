@@ -303,6 +303,10 @@ export const MIGRACIONES_ESPERADAS = [
   // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
   // peticion.
   '20260923150200_reserve_existing_orders',
+  // Con el mismo patron que las anteriores: la migracion que crea la tabla `customers` y los
+  // permisos de `clientes` no persiste el identificador de peticion ni lo menciona; se nombra
+  // aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260924120000_customers',
 ] as const
 
 export function hallazgosDeMigraciones(
