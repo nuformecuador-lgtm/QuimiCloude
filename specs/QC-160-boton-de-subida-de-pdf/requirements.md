@@ -17,15 +17,109 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Cada requisito cita entre corchetes la fila de «Decisiones cerradas» que cubre: `[D1]` es la primera
+> fila de la tabla (¿Cómo aparece?) y `[D7]` la última (¿Librería nueva?). «La subida» es el componente
+> de QC-107 entero: selector de archivos, subir, quitar la selección, lista de archivos con su estado y
+> mensajes de error. «El botón» es el control que abre la ventana. «El permiso de subida» es
+> `documentos.modificar`, el que exigen los casos de uso de subida desde QC-142.
+>
+> **Falta un requisito a propósito**: el comportamiento al cerrar la ventana a mitad de tanda depende
+> de la pregunta abierta 1. `design.md > 5` deja escritos los dos textos candidatos (R21-A y R21-B);
+> el que el humano elija entra aquí como R21 al aprobar el spec.
+
+### El botón y la ventana
+
+- **R1** [D1, D2] — MIENTRAS la ventana está cerrada, la pantalla de detalle de un proveedor y el
+  listado de fórmulas NO DEBEN mostrar ningún control de la subida; de la subida solo DEBE verse el
+  botón.
+- **R2** [D1] — CUANDO el usuario pulsa el botón, el sistema DEBE abrir una ventana emergente modal,
+  con título accesible, que contiene la subida completa.
+- **R3** [D1] — CUANDO el usuario cierra la ventana con su control de cerrar o con la tecla Escape, el
+  sistema DEBE ocultarla y dejar la pantalla sin ningún control de la subida a la vista, igual que
+  antes de abrirla.
+- **R4** [D1] — CUANDO la ventana se cierra, el foco DEBE volver al botón que la abrió.
+
+### Dónde
+
+- **R5** [D2] — CUANDO se sube una tanda desde la ventana de la pantalla de detalle de un proveedor, el
+  sistema DEBE encolarla con la estrategia `catalogo`.
+- **R6** [D2, D3] — CUANDO se sube una tanda desde la ventana del listado de fórmulas, el sistema DEBE
+  encolarla con la estrategia `formula`.
+- **R7** [D2, D3] — El botón y la subida NO DEBEN aparecer en ninguna otra pantalla: ni en el alta ni en
+  la edición de una fórmula, ni en el listado de proveedores, ni en el detalle de un proveedor que no
+  existe o cuya carga falló.
+
+### Qué sube (heredado de QC-107)
+
+- **R8** [D4] — Dentro de la ventana, la subida DEBE admitir solo archivos PDF, hasta el máximo por
+  tanda que publica el módulo `documentos`, rechazar una selección que lo supere y mostrar el estado de
+  cada archivo, igual que el componente de QC-107 montado a la vista.
+- **R9** [D4] — Esta feature NO DEBE cambiar el comportamiento del componente de subida ni el de las
+  acciones del módulo `documentos`: las pruebas del componente de QC-107 DEBEN seguir pasando sin
+  modificar sus casos.
+
+### Quién ve el botón
+
+- **R10** [D5] — SI el usuario de la sesión tiene el permiso de subida y el permiso de consulta de la
+  pantalla, ENTONCES la pantalla DEBE mostrar el botón.
+- **R11** [D5] — SI el usuario de la sesión no tiene el permiso de subida, aunque tenga
+  `proveedores.modificar`, `recetas.modificar` o `documentos.consultar`, ENTONCES ni el botón ni la
+  subida DEBEN existir en el HTML servido.
+- **R12** [D5] — La decisión de mostrar el botón DEBE tomarse en el servidor, por código de permiso y
+  nunca por nombre de rol, con el mismo código que exigen los casos de uso de subida y sin escribir ese
+  código fuera del módulo `documentos`; ningún componente de cliente DEBE recibir la lista de permisos
+  del usuario.
+- **R13** [D5] — SI una acción de subida responde «no autorizado» con la ventana abierta (por ejemplo,
+  porque el permiso se retiró después de pintar la pantalla), ENTONCES la ventana DEBE mostrar el error
+  de autorización del componente y NO DEBE dar la tanda por encolada.
+- **R14** [D5] — Cada pantalla DEBE seguir exigiendo su propio permiso de consulta
+  (`proveedores.consultar`, `recetas.consultar`) antes de cualquier lectura, incluida la que decide si
+  se muestra el botón.
+
+### Plataformas
+
+- **R15** [D1] — El botón y el control de cerrar DEBEN tener un área táctil de al menos 44x44 px, y la
+  ventana DEBE caber en el alto visible de un móvil desplazando su contenido por dentro cuando la lista
+  de archivos no quepa.
+
+### Recorrido completo
+
+- **R16** [D6] — CUANDO un Administrador sembrado abre la ventana en el detalle de un proveedor y sube
+  tres PDFs, el sistema DEBE llevar cada archivo hasta el estado terminado y persistir una tanda con
+  estrategia `catalogo`; antes de pulsar el botón, la subida NO DEBE estar visible.
+- **R17** [D3, D6] — CUANDO un Administrador sembrado abre la ventana en el listado de fórmulas y sube
+  dos PDFs, el sistema DEBE llevar cada archivo hasta el estado terminado y persistir una tanda con
+  estrategia `formula`.
+- **R18** [D5, D6] — CUANDO un usuario cuyo rol tiene `proveedores.consultar` y `proveedores.modificar`
+  pero no `documentos.modificar` abre el detalle de un proveedor de su empresa, el sistema NO DEBE
+  mostrarle el botón ni la subida, NO DEBE enviar ningún archivo al almacenamiento y NO DEBE persistir
+  ninguna tanda nueva en esa empresa.
+- **R19** [D6] — Los recorridos de R16, R17 y R18 DEBEN correr sin red: IA, cola y almacenamiento con
+  los dobles existentes del módulo, y el único tráfico que sale del navegador, la subida al enlace
+  firmado, interceptado por el propio recorrido.
+
+### Sin dependencias
+
+- **R20** [D7] — Esta feature NO DEBE añadir ninguna dependencia al manifiesto del proyecto, y la
+  ventana DEBE construirse con la primitiva de diálogo que ya existe en el repositorio, sin crear otra.
 
 ## Preguntas abiertas
 
 1. **Cerrar la ventana a mitad de tanda.** No está decidido qué pasa si se cierra con archivos en cola o
    procesando: ¿se avisa?, ¿al reabrir se ve la tanda en curso o una vacía? El procesamiento sigue en el
    servidor de todas formas (QC-111).
+   _Recomendación de spec_author: sin aviso y conservando la tanda al reabrir (R21-A). Lo razono en
+   `design.md > 5` junto con lo que cambiaría con la otra opción (R21-B)._
 2. **Choque con QC-158.** QC-158 (`in_progress`) también toca `/proveedores/[id]`. El orden no está
    decidido: lo mira el leader en F1.0/F2.0 por la regla de paralelismo.
+3. **Dónde va el botón y qué dice.** Ninguna decisión lo fija. `design.md > 6` propone: en el detalle de
+   proveedor, entre la cabecera y el catálogo; en fórmulas, en la fila del título junto a «Nueva
+   fórmula»; texto «Subir PDFs». Queda aprobado con el spec salvo que el humano diga otra cosa.
+4. **El caso E2E de QC-142 sin `documentos.modificar`.** Hoy ese usuario llega a la subida, pulsa subir
+   y ve el error de autorización. Con esta feature ya no ve el botón, así que el caso tiene que
+   cambiar su cuerpo. Propuesta (`design.md > 9.3`): que pase a afirmar R18 de esta ficha. «No puede
+   subir» se sigue cumpliendo, que es lo que fijó QC-142 en su D7, y el rechazo del service queda
+   probado en los unit de QC-142. Hay que confirmarlo porque el test es de otra ficha.
 
 ## Decisiones cerradas (no reabrir)
 
