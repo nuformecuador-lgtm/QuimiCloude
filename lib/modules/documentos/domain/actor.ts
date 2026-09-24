@@ -30,16 +30,12 @@ export type Actor = {
 };
 
 /**
- * El codigo del permiso de escritura de este modulo, escrito UNA sola vez y DENTRO del dominio.
+ * El permiso de escritura propio de este modulo, escrito UNA sola vez y DENTRO del dominio.
  *
  * El tipo `PermissionCode` es union de literales del catalogo de `identity`: un codigo inventado
- * aqui NO COMPILA. Se reutiliza un codigo QUE YA EXISTE en vez de abrir uno nuevo —el catalogo es
- * cerrado y no se amplia—, y se elige el de escritura de proveedores porque lo que se sube son
- * catalogos de precios y formulas de un proveedor. En el sembrado vigente de roles ese codigo lo
- * tiene unicamente el rol administrador, que es el efecto buscado; la decision se toma por PERMISO
- * y jamas comparando el nombre del rol.
+ * aqui NO COMPILA. La decision se toma por PERMISO y jamas comparando el nombre del rol.
  */
-export const DOCUMENT_UPLOAD_PERMISSION: PermissionCode = 'proveedores.modificar';
+export const DOCUMENT_UPLOAD_PERMISSION: PermissionCode = 'documentos.modificar';
 
 /**
  * Primera linea de cada caso de uso: ANTES de validar la entrada y ANTES de tocar ningun puerto.
