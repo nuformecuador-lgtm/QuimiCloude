@@ -450,3 +450,29 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   › «R29: el diff de la rama contra origin/dev no añade ningun archivo bajo db/» (QC-140, llegó con el
   merge). Compara la rama en curso contra `origin/dev`, así que se pone rojo en **cualquier** rama que
   añada una migración mientras tenga commits propios. No se toca: su alcance es de QC-140.
+
+## Vuelta 6 (2026-09-24): decisiones humanas sobre m9 y la guardia de QC-140
+
+- **D24** (m9), registrada en `requirements.md`. `receiveFinishedGoods` (`product-prisma.ts`) comprueba,
+  como primer paso y antes de leer la presentación, que la receta sea de la empresa (`SELECT` sobre
+  `recipes` filtrado por `company_id`, en la misma transacción). Si no lo es, devuelve
+  `{ kind: 'recipe_not_found' }` sin escribir nada. `pedidos` lo convierte en su `RecipeNotFoundError`
+  y `asignaciones` gana la suya; las dos llevan el código **existente** `recipe_not_found`, así que
+  no se amplía el catálogo (`ee008498`).
+  - Tests (`584cb77c`): `tests/integration/inventario/finished-goods.int.test.ts` › «R23, D24 — la
+    empresa B con su propia presentacion y el recipeId de la empresa A no escribe nada en ninguna de
+    las dos»; `tests/unit/inventario/finished-goods-prisma.test.ts` › «sin fila de receta de la
+    empresa: rechaza sin escribir nada…»; `tests/unit/pedidos/transition-order.test.ts` › «D24:
+    recipe_not_found del alta de inventario deshace la transaccion entera».
+- **Arreglo de deuda ajena, para decirlo en el PR** (`ae5597ce`):
+  `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`, casos R29 (nada bajo `db/`) y D20
+  (`entity-image.tsx` intocado), de QC-140. Comparaban todo el diff de la rama en curso contra
+  `origin/dev`, así que se ponían rojos en cualquier rama con migraciones. Ahora miran solo los
+  archivos de los commits firmados `QC-140` del rango, más el árbol sin commitear, el mismo patrón que
+  `guard-convenciones-proveedores.test.ts`. Sin commits de QC-140 en el rango (ya mergeada), hacen
+  `ctx.skip` con motivo, en vez de pasar en verde sin mirar. En la rama de QC-140 siguen mordiendo
+  igual.
+- Tests, en serie: `finished-goods.int` 11, `finished-goods-prisma` 7, `transition-order` 15,
+  `finish-assigned-order` 17 (sin cambios), `guard-convenciones-showcase` 4 pasados y 2 skipped con
+  motivo; guardias de módulos, ámbito de inventario y de pedidos, catálogo de errores y libro: 174/174.
+  Typecheck y lint salen con 0. No se repitió el E2E: el Finalizar feliz no cambia.
