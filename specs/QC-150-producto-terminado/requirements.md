@@ -291,3 +291,9 @@ de R11 puede llegar a 183 caracteres (120 + 3 + 60) y el tope del nombre de prod
 humano decidió subir el tope del nombre de TODO producto a 200 caracteres.** Sin migración (la
 columna es `text`); cambia solo la validación de entrada del nombre de producto, en alta y edición,
 para cualquier tipo. El nombre del producto terminado se guarda completo, sin recortar.
+
+**D23 — 2026-09-24, en F2.2 (menor m1 del review).** Pregunta surgida al revisar: la edición de un
+producto terminado admite nombre y alerta de cantidad, y el spec no decía nada. **El humano lo
+confirmó:** un producto terminado se puede editar como un envase: su nombre y su alerta de
+cantidad. Su identidad sigue siendo receta + presentación, así que un renombrado no crea un producto
+nuevo en los siguientes Finalizar.
