@@ -128,6 +128,134 @@ terminar. **15/15 tests verdes.**
 - `git diff --name-only origin/dev...HEAD` coincide exactamente con la lista de archivos que
   `tasks.md` declara tocar (más `specs/` y `progress/`); ningún archivo de `e2e/`.
 
+## T8 — `tests/unit/clientes/schema/customers-schema.test.ts`
+
+Lee `db/schema.prisma` como texto (patron de `proveedores-schema.test.ts`). Cubre R1, R3, R4, R5,
+R7, R11, R15, R16, R19 y ata el tipo `Customer` del armazon a los campos del modelo con
+`satisfies Record<keyof Customer, true>` mas un `toEqual` contra el censo real. Cada detector
+lleva su mutacion en memoria (`@relation` en `companyId`, `@unique` en `email`, un campo de mas/
+de menos en el tipo, `VARCHAR` en vez de `TEXT`). **9 tests, verdes.**
+
+## T9 — `tests/unit/clientes/schema/customers-migration.test.ts`
+
+Lee el SQL de `migration.sql`/`down.sql` como sentencias (patron de `proveedores-migration.test.ts`).
+Cubre R1-R7, R10, R12, R13, R17, R18, R22-R24, R27 y la cabecera sin citas a fichas/requisitos/
+`design.md`/«decision cerrada». Los literales de permiso se comparan contra `PERMISSIONS`
+importado de `@/lib/modules/identity`. Cada predicado obligatorio tiene su mutacion en memoria
+(VARCHAR en vez de TEXT, un segundo indice unico, RESTRICT->SET NULL, FORCE quitado,
+Administrador->Operador, un ALTER ajeno a `orders`, CASCADE en el DROP). **9 tests, verdes.**
+
+## T10 — `tests/unit/clientes/scope.test.ts`
+
+Cubre R20 (forma hexagonal: `index.ts` solo reexporta de `./domain`, unicas carpetas
+`domain/ports/adapters`, `ports/`/`adapters/` vacias salvo `.gitkeep`, nada declara
+`'use server'`), R26 (barrido de `lib/`, `app/`, `components/`, `hooks/`, `middleware.ts`: el
+literal `clientes.consultar`/`clientes.modificar` solo en `permissions.ts`, `adapters/driving/`
+vacio), R28 (ningun `e2e/*` nombra clientes) y R29 (`package.json` sin claves nuevas contra el
+merge-base con `origin/dev`, saltando explicitamente si el rango no existe). **9 tests, verdes.**
+
+## T11 — `tests/integration/clientes/customers-constraints.int.test.ts`
+
+En transaccion revertida (`inRolledBackTransaction` + `SAVEPOINT`, patron de
+`proveedores-constraints.int.test.ts`) contra `QuimiCloude_QC153`. Cubre R2, R3, R5-R17: los
+`23502`/`23503` de los tres obligatorios y de las tres FK, los duplicados de R7, la clave
+candidata `(company_id, id)` de R10 probada con una tabla hija creada dentro de la propia
+transaccion (no `TEMP TABLE`: Postgres no permite que una temporal referencie una tabla
+permanente, `42P16`; una tabla normal se deshace igual con el `ROLLBACK`), la baja logica de
+R14, `updated_at` de R15, el censo de columnas de R16 y `pg_class`/`pg_policies` de R17. Alta de
+`clientes/customers-constraints.int.test.ts` y `clientes/customers-migration.int.test.ts` en
+`tests/integration/aislamiento.json` (`transaccion`). **16 tests, verdes.**
+
+## T12 — `tests/integration/clientes/customers-migration.int.test.ts`
+
+SQL leido de `migration.sql`/`down.sql` (patron de `identity/packer-role-migration.int.test.ts`),
+en transaccion revertida. Cubre R18 (DOWN deja sin tabla, sin los dos permisos ni asignaciones,
+resto de `permissions`/`role_permissions` intacto), R23 (DOWN y luego UP: tabla recreada, los dos
+permisos asignados solo al Administrador, resto identico) y R24 (permisos y asignacion sembrados
+a mano antes del UP: no falla, no duplica, `updated_at` sin reescribir). Caso sintetico adicional
+que exige `tasks.md`: un `down.sql` con el `DELETE` de `role_permissions` quitado, corrido de
+verdad contra la base dentro de su propia transaccion revertida, cae por la FK RESTRICT de
+`role_permissions_permission_code_fkey`. **4 tests, verdes.** Ningun bloqueo con otro archivo de
+integracion: no hizo falta pasar nada a `commit`.
+
+## Mapa R1–R29 → test
+
+| Requisito | Test | Caso |
+|---|---|---|
+| R1 | `customers-schema.test.ts` | «declara id uuid propio mas los seis datos de R1, y ninguno mas (R1, R4)» |
+| R1 | `customers-migration.test.ts` | «las columnas de texto son TEXT sin longitud…» |
+| R1 | `customers-constraints.int.test.ts` | «crea un cliente con los seis datos de R1 y lo relee sin perdida» |
+| R2 | `customers-constraints.int.test.ts` | «rechaza con 23502 un cliente sin nombres, sin apellidos o sin ciudad…» |
+| R3 | `customers-schema.test.ts` | «nombres, apellidos y ciudad son obligatorios; telefono, correo y direccion son opcionales por separado (R3)» |
+| R3 | `customers-migration.test.ts` | «la migracion no declara ningun CHECK» |
+| R3 | `customers-constraints.int.test.ts` | «acepta cualquier combinacion de telefono, correo y direccion ausentes, incluidos los tres (R3)» |
+| R4 | `customers-schema.test.ts` | «declara id uuid propio mas los seis datos de R1, y ninguno mas (R1, R4)» |
+| R5 | `customers-schema.test.ts` | «los seis datos de negocio son String sin @db.VarChar ni ningun otro tipo nativo (R5)» |
+| R5 | `customers-migration.test.ts` | «las columnas de texto son TEXT sin longitud…» |
+| R5 | `customers-constraints.int.test.ts` | «acepta textos de 10000 caracteres sin rechazo por longitud (R5)» |
+| R6 | `customers-migration.test.ts` | «la migracion no declara ningun CHECK» |
+| R6 | `customers-constraints.int.test.ts` | «acepta un correo sin forma de correo y un telefono con cualquier texto (R6)» |
+| R7 | `customers-schema.test.ts` | «ningun campo lleva @unique y el unico @@unique es la clave candidata (empresa, id) (R7)» |
+| R7 | `customers-migration.test.ts` | «el unico indice unico es la clave candidata (company_id, id)» |
+| R7 | `customers-constraints.int.test.ts` | «acepta dos clientes vivos de la misma empresa con exactamente los mismos seis datos» |
+| R8 | `customers-migration.test.ts` | «las tres FK son RESTRICT y ninguna es SET NULL» |
+| R8 | `customers-constraints.int.test.ts` | «rechaza un cliente sin empresa (23502) y con una empresa inexistente (23503)» |
+| R9 | `customers-constraints.int.test.ts` | «rechaza el borrado fisico de una empresa que tiene al menos un cliente, incluso dado de baja (R9)» |
+| R10 | `customers-migration.test.ts` | «el unico indice unico es la clave candidata (company_id, id)» |
+| R10 | `customers-constraints.int.test.ts` | «la clave candidata (company_id, id) rechaza a un hijo que declara otra empresa (R10)» |
+| R11 | `customers-schema.test.ts` | «companyId, createdBy y updatedBy son escalares uuid SIN @relation (R11)» |
+| R11 | `customers-constraints.int.test.ts` | «las tres FK existen en pg_constraint, y el cliente Prisma no expone relacion navegable» |
+| R12 | `customers-migration.test.ts` | «las tres FK son RESTRICT y ninguna es SET NULL» |
+| R12 | `customers-constraints.int.test.ts` | «acepta un cliente sin autor, registra autor y editor, y rechaza un autor inexistente (23503)» |
+| R13 | `customers-migration.test.ts` | «las tres FK son RESTRICT y ninguna es SET NULL» |
+| R13 | `customers-constraints.int.test.ts` | «rechaza el borrado fisico de un usuario que figura como creador o editor de un cliente (R13)» |
+| R14 | `customers-constraints.int.test.ts` | «la baja conserva la fila completa y marca deleted_at, sin ninguna otra columna de estado (R14)» |
+| R15 | `customers-schema.test.ts` | «declara createdAt y updatedAt, y el segundo se actualiza solo (R15)» |
+| R15 | `customers-constraints.int.test.ts` | «updated_at crece tras un update, y created_at no cambia (R15)» |
+| R16 | `customers-schema.test.ts` | «mapea a snake_case en ingles, y la tabla se llama customers (R16)» |
+| R16 | `customers-constraints.int.test.ts` | «la tabla y sus columnas estan en snake_case ingles (R16)» |
+| R17 | `customers-migration.test.ts` | «customers queda con ENABLE y FORCE, y no hay ningun CREATE POLICY» |
+| R17 | `customers-constraints.int.test.ts` | «RLS activada y forzada, sin ninguna policy (R17)» |
+| R18 | `customers-migration.test.ts` | «dos DELETE acotados a los dos codigos, en ese orden, y un unico DROP TABLE sin CASCADE (R18)» |
+| R18 | `customers-migration.int.test.ts` | «R18: el DOWN deja sin tabla, sin los dos permisos ni sus asignaciones, y el resto del catalogo intacto» y «R18 (sensibilidad): un down.sql sintetico sin el DELETE de role_permissions cae por la FK RESTRICT» |
+| R19 | `customers-schema.test.ts` | «declara /// @module clientes, y ningun otro modelo lo reclama (R19)» |
+| R20 | `scope.test.ts` | los cuatro casos de `describe('R20 — el modulo clientes nace con la forma hexagonal')` |
+| R21 | `tests/unit/identity/permissions.test.ts` | casos de R21 (T5) |
+| R22 | `customers-migration.test.ts` | «la asignacion es solo al Administrador, con ON CONFLICT DO NOTHING…» |
+| R22 | `tests/unit/identity/permissions.test.ts` | casos de R22 (T5) |
+| R23 | `customers-migration.test.ts` | «los literales de permiso son iguales a las entradas de PERMISSIONS importadas» |
+| R23 | `customers-migration.int.test.ts` | «R23: DOWN y luego UP recrean la tabla y los dos permisos, asignados SOLO al Administrador, y el resto identico» |
+| R24 | `customers-migration.test.ts` | «la asignacion es solo al Administrador, con ON CONFLICT DO NOTHING…» |
+| R24 | `customers-migration.int.test.ts` | «R24: si el seed ya creo los dos permisos y su asignacion, el UP no falla, no duplica y no reescribe updated_at» |
+| R25 | `tests/unit/identity/permissions.test.ts` | caso de R25 (T5) |
+| R26 | `scope.test.ts` | los tres casos de `describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha')` |
+| R27 | `customers-migration.test.ts` | «no hay ningun ALTER/DROP/CREATE INDEX sobre otra tabla ni mencion de orders (R27)» |
+| R28 | `scope.test.ts` | «ningun archivo de e2e/ menciona clientes» |
+| R29 | `scope.test.ts` | «package.json no gano ninguna clave de dependencia contra el merge-base con origin/dev» |
+
+Los `R<n>` de T5–T7 (R21, R22, R25 en `permissions.test.ts`; recuentos en las ocho guardias/tests
+de T6; `identity-seed.int.test.ts` en T7) ya estaban mapeados en sus secciones respectivas de
+arriba.
+
+## Verificación T8–T12
+
+- `pnpm run typecheck`: sin salida, exit 0.
+- `pnpm run lint`: sin salida, exit 0 (tras corregir un `no-unused-vars` en el caso de
+  sensibilidad de tipo de `customers-schema.test.ts`).
+- `pnpm exec vitest run tests/unit/clientes/schema/customers-schema.test.ts
+  tests/unit/clientes/schema/customers-migration.test.ts tests/unit/clientes/scope.test.ts`:
+  **Test Files 3 passed (3) · Tests 30 passed (30)**.
+- `pnpm exec vitest run tests/integration/clientes/customers-constraints.int.test.ts
+  tests/integration/clientes/customers-migration.int.test.ts` (con `DATABASE_URL`/`DIRECT_URL`
+  de `QuimiCloude_QC153` exportadas; corrida sobre la base efimera del `globalSetup`):
+  **Test Files 2 passed (2) · Tests 20 passed (20)**.
+- `pnpm exec vitest run tests/guards/guard-aislamiento-integracion.test.ts`: **6 tests, verdes.**
+- `pnpm exec vitest related --run` sobre los tres archivos unitarios: **3 passed, 30 tests
+  passed** (mismo resultado que la corrida directa: el grafo no relaciona nada mas fuera de
+  ellos mismos y de sus imports).
+- Hallazgo fuera de alcance de `qc145-estado-solo-planta.test.ts` (ya reportado en T0–T7): sigue
+  presente y sigue sin tocarse; no esta en la lista de archivos que esta tanda declara tocar.
+
 ## Verificación T0
 
 ```
