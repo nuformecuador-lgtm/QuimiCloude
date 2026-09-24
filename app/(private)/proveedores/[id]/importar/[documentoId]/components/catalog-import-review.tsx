@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
@@ -219,6 +219,9 @@ export function CatalogImportReview({ supplierId, documentFileId, units, preview
   const [confirmError, setConfirmError] = useState<ErrorState | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isReclassifying, startReclassify] = useTransition();
+  // Cuenta la reclasificacion mas reciente: si dos se disparan seguidas, la respuesta de la
+  // primera puede llegar despues y no debe pisar lo que ya trajo la segunda.
+  const reclassifySeqRef = useRef(0);
 
   const groups = useMemo(() => computeNewPresentationGroups(rows), [rows]);
   // La sugerencia de unidad: sin eleccion propia, la unica coincidencia exacta por nombre o
@@ -269,12 +272,14 @@ export function CatalogImportReview({ supplierId, documentFileId, units, preview
   }
 
   function reclassify(currentRows: readonly RowFormState[]) {
+    const requestId = ++reclassifySeqRef.current;
     startReclassify(async () => {
       const result = await previewCatalogImportAction({
         supplierId,
         documentFileId,
         lines: currentRows.map(toReviewedLineInput),
       });
+      if (requestId !== reclassifySeqRef.current) return;
       if (result.status === 'success') applyPreview(result.data);
     });
   }

@@ -75,7 +75,7 @@ export function NewPresentationUnits({ groups, units, selections, onChange }: Ne
                   <SelectItem
                     key={unit.id}
                     value={unit.id}
-                    data-testid={`new-presentation-unit-option-${group.key}`}
+                    data-testid={`new-presentation-unit-option-${group.key}-${unit.id}`}
                   >
                     {unitLabel(unit)}
                   </SelectItem>

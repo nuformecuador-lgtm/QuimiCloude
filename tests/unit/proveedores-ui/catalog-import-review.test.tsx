@@ -195,6 +195,56 @@ describe('reclasificar al perder el foco bloquea Confirmar mientras esta en vuel
   });
 });
 
+describe('reclasificaciones sucesivas no se pisan entre si (R10)', () => {
+  it('una respuesta vieja que resuelve DESPUES de una mas nueva no la sobrescribe', async () => {
+    const user = setupUser();
+    montar(preview([fila({ kind: 'nueva', presentationId: 'presentacion-1' })]));
+
+    let resolverPrimera: (value: PreviewCatalogImportResult) => void = () => {};
+    let resolverSegunda: (value: PreviewCatalogImportResult) => void = () => {};
+    previewCatalogImportActionMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolverPrimera = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolverSegunda = resolve;
+          }),
+      );
+
+    const nombre = screen.getByTestId('catalog-import-row-name-0');
+    await user.click(nombre);
+    await user.tab(); // pierde el foco del nombre: dispara la primera reclasificacion
+    await user.tab(); // pierde el foco de la presentacion: dispara la segunda, antes de que resuelva la primera
+
+    // La reclasificacion MAS NUEVA resuelve primero, y trae la fila sin problemas.
+    resolverSegunda({
+      status: 'success',
+      data: preview([fila({ kind: 'nueva', presentationId: 'presentacion-1', invalidFields: [] })]),
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('catalog-import-row-kind-0')).toHaveTextContent('Nueva'),
+    );
+    expect(screen.queryByTestId('catalog-import-row-invalid-fields-0')).toBeNull();
+
+    // La respuesta VIEJA llega tarde y traia otra clasificacion: no puede pisar lo que ya
+    // trajo la mas nueva.
+    resolverPrimera({
+      status: 'success',
+      data: preview([fila({ kind: 'incompleta', invalidFields: ['cost'] })]),
+    });
+    // Deja que la microtarea de la resolucion vieja termine de correr.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.getByTestId('catalog-import-row-kind-0')).toHaveTextContent('Nueva');
+    expect(screen.queryByTestId('catalog-import-row-invalid-fields-0')).toBeNull();
+  });
+});
+
 describe('incluir/excluir y exclusion por defecto (R11)', () => {
   it('«incompleta» y «duplicada» arrancan excluidas; el resto, incluidas', () => {
     montar(
@@ -269,6 +319,17 @@ describe('«cambia» y «sin cambios» solo dejan editar el costo (R12)', () => 
       expect(screen.getByTestId(testId).tagName, testId).toBe('INPUT');
     }
   });
+
+  it('un campo de solo lectura sigue accesible por su nombre (a11y)', () => {
+    montar(
+      preview([
+        fila({ kind: 'cambia', presentationId: 'presentacion-1', currentCost: '120.0000', newCost: '150.0000', cost: '150.0000' }),
+      ]),
+    );
+
+    const campo = screen.getByTestId('catalog-import-row-material-0');
+    expect(campo).toHaveAccessibleName('Material');
+  });
 });
 
 describe('motivos por fila que bloquean confirmar (R18, R20)', () => {
@@ -331,7 +392,8 @@ describe('motivos por fila que bloquean confirmar (R18, R20)', () => {
 
     const selector = screen.getByTestId(/^new-presentation-unit-select-/);
     await user.click(selector);
-    await user.click(await esperarInteractiva(screen.getAllByTestId(/^new-presentation-unit-option-/)[0] as HTMLElement));
+    const opcion = screen.getByTestId(new RegExp(`^new-presentation-unit-option-.*-${UNIDAD_KG.id}$`));
+    await user.click(await esperarInteractiva(opcion));
 
     await waitFor(() => expect(screen.getByTestId('catalog-import-confirm')).toBeEnabled());
     expect(screen.queryByTestId('catalog-import-confirm-reasons')).toBeNull();

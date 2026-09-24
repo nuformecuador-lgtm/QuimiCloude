@@ -262,28 +262,39 @@ type RowFieldProps = {
 
 /** Un campo de texto de la fila: editable o de solo lectura, segun la clase. */
 function RowField({ label, value, readOnly, onChange, onBlur, inputMode, pattern, type, testId }: RowFieldProps) {
-  const inputId = useId();
+  const fieldId = useId();
+
+  if (readOnly) {
+    return (
+      <div className="flex flex-col gap-2">
+        <span id={`${fieldId}-label`} className="text-sm font-medium">
+          {label}
+        </span>
+        <p
+          aria-labelledby={`${fieldId}-label`}
+          className={`${TOUCH_TARGET} ${FIELD_TEXT} flex items-center`}
+          data-testid={testId}
+        >
+          {value === '' ? '—' : value}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>{label}</Label>
-      {readOnly ? (
-        <p className={`${TOUCH_TARGET} ${FIELD_TEXT} flex items-center`} data-testid={testId}>
-          {value === '' ? '—' : value}
-        </p>
-      ) : (
-        <Input
-          id={inputId}
-          value={value}
-          onChange={(event) => onChange?.(event.target.value)}
-          onBlur={onBlur}
-          type={type ?? 'text'}
-          inputMode={inputMode}
-          pattern={pattern}
-          className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-          data-testid={testId}
-        />
-      )}
+      <Label htmlFor={fieldId}>{label}</Label>
+      <Input
+        id={fieldId}
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
+        onBlur={onBlur}
+        type={type ?? 'text'}
+        inputMode={inputMode}
+        pattern={pattern}
+        className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+        data-testid={testId}
+      />
     </div>
   );
 }

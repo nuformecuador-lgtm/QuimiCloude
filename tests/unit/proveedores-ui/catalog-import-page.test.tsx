@@ -209,7 +209,7 @@ describe('el documento que no se pudo interpretar o no esta disponible (R3, R6)'
 });
 
 describe('el proveedor de la ruta no existe (R4)', () => {
-  it('presenta `supplier_not_found`, sin pedir la vista previa ni mostrar ninguna fila', async () => {
+  it('presenta `supplier_not_found` y descarta la vista previa pedida en paralelo, sin mostrar ninguna fila', async () => {
     getSupplierActionMock.mockResolvedValue({
       status: 'error',
       code: 'supplier_not_found',
@@ -218,6 +218,9 @@ describe('el proveedor de la ruta no existe (R4)', () => {
 
     await renderPantalla();
 
+    // La pagina pide las tres cosas en paralelo (`Promise.all`): la vista previa SI se pide,
+    // pero su resultado se descarta en cuanto el proveedor no existe.
+    expect(previewCatalogImportActionMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('catalog-import-error')).toBeInTheDocument();
     expect(screen.getByTestId('catalog-import-error-code')).toHaveTextContent('supplier_not_found');
     expect(screen.queryByTestId('catalog-import-review')).toBeNull();
