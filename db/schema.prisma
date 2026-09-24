@@ -340,6 +340,7 @@ enum InventoryMovementKind {
   opening
   adjustment
   consumption
+  production
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
@@ -413,6 +414,7 @@ enum ProductType {
   PRODUCT
   MACHINE
   PACKAGING
+  FINISHED_PRODUCT
 }
 /// `recipes_company_name_unique` (empresa, nombre) es PARCIAL por `deleted_at IS NULL` y por
 /// eso no se declara `@@unique` aqui: Prisma no modela indices parciales. Ese mismo indice
