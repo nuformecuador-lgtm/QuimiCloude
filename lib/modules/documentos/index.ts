@@ -184,3 +184,7 @@ export {
 // La confirmacion, publicada por el mismo motivo y con el mismo `CatalogImportDeps`: quien
 // cablea los dos casos de uso (`lib/composition`) los nombra una sola vez.
 export { createConfirmCatalogImport, type CatalogImportSummary } from './domain/confirm-catalog-import';
+
+// La sugerencia de unidad por nombre o simbolo normalizado, funcion pura sin fabrica porque no
+// tiene dependencias que inyectar.
+export { suggestUnitId } from './domain/suggest-unit';

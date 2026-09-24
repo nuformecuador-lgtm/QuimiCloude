@@ -331,6 +331,7 @@ const EXPORTACIONES_DE_EJECUCION = [
   'previewCatalogImportInputSchema',
   'createPreviewCatalogImport',
   'createConfirmCatalogImport',
+  'suggestUnitId',
 ] as const;
 
 /** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
