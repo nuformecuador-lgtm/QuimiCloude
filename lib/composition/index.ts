@@ -160,7 +160,7 @@ import {
   createUpdateCatalogLine,
   createUpdateSupplier,
 } from '@/lib/modules/proveedores';
-// La importacion por identidad de un catalogo (T14, `design.md > 12`). El adaptador y el puerto son
+// La importacion por identidad de un catalogo. El adaptador y el puerto son
 // de uso EXCLUSIVO de esta operacion -por eso no se cablean junto al resto de `proveedores`, mas
 // abajo- y quien los necesita es solo `documentos`, en su propio bloque, al final de este archivo.
 import {
@@ -1399,8 +1399,7 @@ const processingConfig: ProcessingConfig = {
 };
 
 // ---------------------------------------------------------------------------------------
-// `documentos` — la vista previa y la confirmacion de una importacion de catalogo (T14,
-// `design.md > 12`).
+// `documentos` — la vista previa y la confirmacion de una importacion de catalogo.
 //
 // `SupplierCatalogImportRepository` cableado con el adaptador driven DE PROVEEDORES: las dos
 // operaciones son de uso EXCLUSIVO de esta importacion (findAliveByIdentity/importLines viven en
