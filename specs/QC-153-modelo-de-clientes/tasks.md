@@ -105,7 +105,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       transacción revertida: R2, R3, R5–R17. Alta en `tests/integration/aislamiento.json`
       (`transaccion`). **Hecho cuando:** verde contra la base efímera y `guard-aislamiento-integracion`
       verde. *Depende de T2.*
-- [ ] **T12.** `tests/integration/clientes/customers-migration.int.test.ts` (`design.md > 7`), con el
+- [x] **T12.** `tests/integration/clientes/customers-migration.int.test.ts` (`design.md > 7`), con el
       SQL leído del archivo y en transacción revertida: R18, R23, R24. Alta en
       `aislamiento.json`. **Hecho cuando:** verde, y un `down.sql` sintético sin el `DELETE` de
       `role_permissions` lo pone rojo por la FK `RESTRICT`. Si aparece un bloqueo con otro archivo de
