@@ -38,6 +38,12 @@
 > **Lo marcado con ⚑** depende de un punto que **no sale de la acotación** y queda señalado para
 > F1.4 en `design.md > 12`. El requisito está escrito con la propuesta; si el humano la cambia, se
 > reescribe ese requisito y nada más.
+>
+> **Revisión del 2026-09-24** (F1.2 contra el `dev` de ese día; detalle en `design.md > Revisión
+> 2026-09-24`). Se ajustaron **R24, R27, R29 y R37** sin tocar lo decidido: el camino de
+> cancelación de `pedidos` ahora libera el material apartado y el de entrega lo consume, y los dos
+> abren su propia transacción. Lo marcado con **⚑P1** y **⚑P2** depende de las preguntas abiertas
+> nuevas de abajo.
 
 ### Qué se anota
 
@@ -129,7 +135,11 @@ está mostrando, en **la misma operación**. `[D5] [D6] [D11]`
 
 **R24.** SI falla cualquiera de las dos escrituras de arrancar, finalizar o cancelar, ENTONCES **NO
 DEBE quedar ninguna**: ni la anotación sin el cambio del pedido ni el cambio del pedido sin la
-anotación, y la pantalla DEBE mostrar el error. `[D11]`
+anotación, y la pantalla DEBE mostrar el error. «El cambio del pedido» incluye todo lo que `pedidos`
+escribe en esa misma operación: al finalizar, el consumo del material y la fecha de terminado; al
+cancelar, la liberación del material apartado. SI `pedidos` rechaza la entrega (material
+insuficiente o receta sin líneas), ENTONCES **NO DEBE** quedar la anotación de finalizar ni nada de
+esa operación. `[D11]`
 
 **R25.** ⚑ CUANDO el pedido queda `CANCELADO` desde la pantalla, el sistema DEBE devolver a quien la
 usa a la lista de pedidos asignados mostrando una **confirmación visible** de la cancelación. `[D6]`
@@ -142,9 +152,10 @@ de tocar ninguna dependencia. SI el actor está ausente, no trae permisos, los t
 ese código, ENTONCES el caso de uso DEBE rechazar con su error de autorización **sin haber llamado a
 ninguna dependencia**. `[D7]`
 
-**R27.** **Cualquier responsable asignado** al pedido DEBE poder cancelarlo desde la pantalla, no solo
-quien lo arrancó. SI el pedido no está asignado a quien pide, o es de otra empresa, ENTONCES el caso de
-uso DEBE rechazar con **la misma respuesta que si no existiera**, sin escribir nada. `[D7] [D15]`
+**R27.** ⚑P2 **Cualquier responsable asignado** al pedido DEBE poder cancelarlo desde la pantalla, no
+solo quien lo arrancó, sea cual sea su rol. SI el pedido no está asignado a quien pide, o es de otra
+empresa, ENTONCES el caso de uso DEBE rechazar con **la misma respuesta que si no existiera**, sin
+escribir nada. `[D7] [D15]`
 
 **R28.** La empresa de cada anotación DEBE salir **del actor** y **nunca de la entrada**, y toda
 lectura del registro DEBE filtrar por la empresa del actor. `[D15]`
@@ -153,8 +164,11 @@ lectura del registro DEBE filtrar por la empresa del actor. `[D15]`
 `asignaciones` **NO DEBE** escribir el estado ni el motivo del pedido y **NO DEBE** contener ninguna
 lista propia de estados cancelables. `pedidos` DEBE decidir si el pedido es cancelable con **la misma
 definición** que usa su caso de uso de cancelación, y DEBE existir **un solo camino de escritura**
-del estado `CANCELADO` con su motivo. SI `pedidos` declara el pedido no cancelable, ENTONCES el sistema
-DEBE responder `not_cancellable` sin escribir nada. `[D6] [D7]`
+del estado `CANCELADO` con su motivo. ⚑P1 La cancelación desde la pantalla DEBE hacer en el pedido
+**exactamente lo mismo** que hace el caso de uso de cancelación de `pedidos`, **incluida la liberación
+de todo el material apartado** del pedido, con quien cancela como autor. SI `pedidos` declara el
+pedido no cancelable, ENTONCES el sistema DEBE responder `not_cancellable` sin escribir nada. `[D6]
+[D7]`
 
 **R30.** El conjunto de permisos que el seed asigna a cada rol DEBE quedar **sin cambios**: el
 Operador DEBE poder cancelar desde la pantalla **sin** `pedidos.modificar` y **sin**
@@ -187,7 +201,9 @@ teclado**. `[D5] [D6]`
 **R37.** ⚑ El asistente de pasos compartido DEBE poder **empezar en una posición dada** y **avisar de
 cada cambio de paso** recibiendo ambas cosas **por props**, sin leer datos, sin importar
 `lib/composition`, Server Actions ni `next/navigation`, y sin cambiar su comportamiento cuando esas
-props no se le pasan. Esto **enmienda QC-63 R18**, que prohibía modificar sus archivos. `[D5] [D12]`
+props no se le pasan —ni en `mode="lectura"` ni en `mode="ejecucion"`—. Esto **enmienda QC-63
+R18**, que prohibía modificar sus archivos (QC-125 ya la tensó a una lista cerrada que admite solo
+`step-reader.tsx`). `[D5] [D12]`
 
 **R38.** La reentrada en un pedido `EN_CURSO` DEBE dejar rastro de **quién entró y cuándo** (la
 anotación de retomar). Esto **enmienda QC-63 R10**, que prohibía guardarlo. Los tests de QC-63 que
@@ -227,7 +243,36 @@ motivo**, y el pedido queda **`CANCELADO` con ese motivo**. `[D17]`
 
 ## Preguntas abiertas
 
-Ninguna.
+_Abiertas en la revisión F1.2 del 2026-09-24. Ninguna reabre una decisión cerrada: son hechos del
+código que no existían el 2026-09-18 y que la decisión no pudo tener en cuenta._
+
+**P1 — ¿Cancelar desde la pantalla libera todo el material apartado? (afecta a R29 ⚑P1 y a
+`[D6]`).** Medido en `dev`: desde QC-141, el camino único de cancelación
+(`pedidos/domain/cancel-order.ts`) ya no es solo «escribir `CANCELADO` y el motivo». En la misma
+transacción bloquea el pedido, lo cancela, **libera todo lo apartado** (`releaseForOrder`, motivo
+`release`, con quien cancela como autor) y pone `reserved_at` a `NULL`. `[D6]` pide cancelar «por el
+camino único»; seguirlo al pie de la letra devuelve a existencia **todo** el material del pedido. Pero
+un pedido `EN_CURSO` puede estar a medias en planta: el operario puede haber pesado o mezclado ya
+parte del material, y ese material no vuelve al estante. Opciones:
+- **(a) Liberar todo, igual que la oficina.** Es el camino único sin excepción y no toca `pedidos` ni
+  `inventario` más allá de reutilizar su cuerpo de cancelación. Lo gastado de verdad se da de baja
+  después con un ajuste que resta (QC-92). **Recomendada**: es lo que `[D6]` dice y no inventa
+  semántica de inventario en esta ficha.
+- (b) Consumir en vez de liberar, o liberar solo una parte. Exige un segundo camino de cancelación en
+  `pedidos` y saber cuánto se gastó, dato que nadie registra (lo marcado en los pasos no se guarda).
+  Contradice `[D6]` y sería otra ficha.
+- (c) No dejar cancelar desde la pantalla un pedido con material apartado. Contradice `[D6]`.
+Si se elige (a), R29 queda como está y se quita el ⚑P1. Si se elige otra, se reescribe R29 y el spec
+vuelve a F1.4.
+
+**P2 — ¿El Empacador, si es responsable asignado, también cancela desde la pantalla? (afecta a R27
+⚑P2 y a `[D7]`).** Medido en `dev`: el rol Empacador nació con QC-144 (migración
+`20260922120000_packer_role`), **después** de `[D7]`. Tiene `asignaciones.consultar` y no tiene
+`pedidos.consultar`, así que puede quedar como responsable, y QC-144 R12 ya le deja abrir la pantalla
+y Finalizar. `[D7]` dice «cualquier responsable asignado, con `asignaciones.consultar`», y eso le
+incluye. **Recomendación: sí**, como dice `[D7]` al pie de la letra; no cuesta código, porque el caso
+de uso no mira el rol. Si el humano no lo quiere, sería excluirle por permiso, y el permiso no
+cambia (R30), así que tendría que ser otra ficha.
 
 ## Decisiones cerradas (no reabrir)
 

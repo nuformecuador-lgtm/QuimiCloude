@@ -1,33 +1,104 @@
 # QC-82 — registro-de-ejecucion-de-receta · design.md
 
-> Verificado contra el disco de esta rama (`feature/QC-82-registro-de-ejecucion-de-receta`, base
-> `4c057594`), no contra lo que la ficha daba por supuesto. Lo que no sale de la acotación no se
-> rellena: está en `## 12. Puntos para F1.4`, y los requisitos que dependen de ellos van marcados ⚑.
+> Escrito el 2026-09-18 contra la base `4c057594` y **revisado el 2026-09-24** contra `dev` tras el
+> merge `9634f6ae` (la rama iba 813 commits por detrás). Lo que no sale de la acotación no se
+> rellena: está en `## 12. Puntos para F1.4` y en `requirements.md > Preguntas abiertas`, y los
+> requisitos que dependen de ellos van marcados ⚑.
+
+## Revisión 2026-09-24 — qué cambió y por qué
+
+Nada de lo que decidió el humano cambia. Cambia **cómo** se construye, porque el código de `dev`
+ya no es el del 2026-09-18. Punto por punto:
+
+1. **`pedidos` abre ya su propia transacción, y la comparte con `inventario`** (QC-141). Existe el
+   puerto `OrderUnitOfWork` (`pedidos/ports/order-unit-of-work.ts`), que abre `withOrderTransaction`
+   (`order-unit-of-work-prisma.ts`, `maxWait` 10 s, `timeout` 30 s) y cablea `lib/composition`.
+   `OrderCatalog.transitionAliveById` **ya no es una función del adaptador**: es
+   `createTransitionOrder({ unitOfWork: orderUnitOfWork })`, un caso de uso de dominio que bloquea
+   el pedido con `FOR UPDATE`, y hacia `ENTREGADO` consume el material y escribe `finished_at`
+   (QC-145) en la misma transacción. **El plan viejo ya no sirve**: añadir `db` a las funciones del
+   catálogo y atarlas con `orderCatalogOn(db)` no alcanza a `transitionAliveById`, y llamar a
+   `orderUnitOfWork` dentro de otra transacción abriría **una segunda** transacción en otra conexión,
+   que no es «la misma operación». Solución nueva en `## 4`: una **unidad de trabajo unida**, que no
+   abre nada y reutiliza la transacción de la ejecución, construida con **el mismo** constructor de
+   ámbito que la de `pedidos`. Y una regla que la hace segura: **dentro de la transacción de ejecución,
+   todo desenlace distinto de `'ok'` aborta la transacción entera**.
+2. **Cancelar ya no es una sola sentencia.** `cancel-order.ts` bloquea el pedido, comprueba otra vez
+   que sea cancelable **bajo el candado**, escribe `CANCELADO` y el motivo (`cancelAlive`, único
+   método que puede), **libera el material apartado** (`releaseForOrder`) y pone `reserved_at` a
+   `NULL`, todo en `OrderUnitOfWork`. Consecuencias: (a) **`order-prisma.ts` y
+   `order-catalog-prisma.ts` salen del diff**: `cancelAliveOrder` no necesita `from` ni `db`, porque
+   la comprobación bajo el candado ya impide cancelar un pedido que otro acaba de entregar. T4
+   desaparece. (b) El cuerpo de la cancelación se extrae **una vez** y lo usan `cancelOrder` y la
+   cancelación desde la pantalla (`## 5`). (c) **Pregunta abierta P1**: seguir el camino único libera
+   **todo** el material, también el que el operario ya pudo gastar.
+3. **La cancelación no entra en `OrderCatalog`, sino en un contrato propio, `OrderCancellation`.**
+   `OrderCatalog` tiene hoy **11 dobles** en tests que se romperían al compilar, y el `orderCatalog`
+   global de la composición tendría que cablear un `cancelAliveById` que nadie llama: `asignaciones`
+   solo cancela dentro de la transacción de ejecución. Alternativa descartada en `## 10.6`.
+4. **Finalizar puede fallar por material** (QC-141): `transitionAliveById` devuelve
+   `'insufficient_material'` o `'recipe_without_lines'`, y `finish-assigned-order.ts` ya los traduce a
+   `MaterialShortageError` y `RecipeWithoutLinesError`. R24 lo nombra ahora: si la entrega se rechaza,
+   no queda ni la anotación ni el consumo.
+5. **`StepReader` ya no es el del 2026-09-18.** Tiene `minStepSeconds` (QC-125) y `mode`
+   (`'lectura' | 'ejecucion'`, enmienda fuera de SDD del 2026-09-21); la pantalla lo monta con
+   `mode="ejecucion"` y 5 s de espera. El test del R18 de QC-63 **ya lo tensó QC-125** a una lista
+   cerrada que admite `step-reader.tsx`: esta ficha **no tiene que tensarlo**, solo no tocar otro
+   archivo de la carpeta.
+6. **La migración colisionaba.** `20260918120000_order_execution_entries` tenía el mismo timestamp que
+   `20260918120000_inventory_movement_kind_enum_and_reason_catalog` y quedaba **detrás** de 13
+   migraciones ya en `dev`. La última de `dev` hoy es `20260924120000_customers`: la de esta ficha
+   lleva un timestamp **posterior**, fijado al crearla y recomprobado antes del PR (`## 2.2`).
+7. **Listas cerradas y archivos nuevos que el spec viejo no veía**: `recipe-route-contract.test.ts`
+   (exportaciones exactas de `lib/shared/routes.ts`), `empacador-authorization.test.ts` y dos
+   integraciones que construyen `start`/`finish` con sus deps, el mock del módulo de acciones del test
+   de la pantalla, y las limpiezas de E2E e integración que borran pedidos después de abrir la pantalla
+   (la FK `RESTRICT` nueva las haría fallar). Tabla en `## 7`.
+8. **El punto 8 viejo de F1.4 (tensar `TOCA_LA_BASE` para ver `db.`) ya no aplica**: ninguna función
+   del catálogo gana parámetro. En su lugar, `guard-ambito-empresa-pedidos` gana **un caso** que vigila
+   el contrato nuevo y los dos cableados sobre la transacción unida (`## 7`). Es la misma figura que
+   el humano ratificó: tensar, nunca aflojar.
+9. **El cruce de F2.0 cambia de socios.** QC-68 y QC-92 están `done` y su código está en `dev`: el
+   cruce que dejó el F2.0 esperando **ya no existe**. Los socios nuevos son **QC-150**
+   (`producto-terminado`, `fullstack`, `in_progress`), que mete un lote de producto terminado en el
+   Finalizar, es decir, en `transition-order.ts`, en el ámbito de `OrderUnitOfWork` y quizá en
+   `finish-assigned-order.ts`; y **QC-153** (`modelo-de-clientes`, `backend`, `in_progress`), por
+   `db/schema.prisma` y las migraciones. Detalle en `## 11`.
+10. **`/asignacion` tiene vistas por permiso** (QC-145). El aviso de cancelado va donde el de
+    entrega, **encima** de las pestañas, así que se ve en cualquier vista. Quien tiene
+    `pedidos.consultar` ya no puede ser responsable (`user_cannot_be_responsible`): el E2E asigna al
+    Operador, que no lo tiene, y comprueba el motivo leyendo la base.
+11. **Base propia.** Migración, integración y E2E contra `QuimiCloude_QC82`, nunca contra la del
+    `.env`. Y una sola E2E a la vez en la máquina (`tasks.md`, cabecera).
+12. **La pantalla** muestra hoy «% · cantidad» por línea (QC-147) y ya no tiene factor de escala. No
+    afecta a esta ficha: el registro no guarda nada de las líneas.
 
 ## 0. Lo que ya existe y NO se construye aquí
 
 | Pieza | Dónde | Qué aporta a esta ficha |
 | --- | --- | --- |
-| Pantalla de ejecución | `app/(private)/asignacion/[id]/` (`page.tsx`, `order-execution-screen.tsx`) | `page.tsx` abre con `requirePagePermission('asignaciones.consultar')` y llama a `startAssignedOrderAction(id)`, que transiciona y lee en una sola llamada. Avanzar y retroceder son **solo de cliente**: hoy no llaman al servidor. |
-| Asistente de pasos | `components/shared/step-reader/step-reader.tsx` | Props `steps`, `onFinish`, `title`. Estado en memoria: `index` empieza en `0`, y no expone ningún aviso de cambio de paso. **No se puede cumplir R13/R17/R18 sin tocarlo** (`## 6.1`). |
-| Tres casos de uso de ejecución | `lib/modules/asignaciones/domain/{get-assigned-order-execution,start-assigned-order,finish-assigned-order}.ts` | Orden fijo: `requirePermission(actor, 'asignaciones.consultar')` → `zod` → `listOrderIdsByUserInCompany` (no es tuyo = no existe) → `findAliveById(orderId, actor.companyId)`. `start` tolera `'stale'` releyendo. Se **reutiliza el patrón** en los dos casos de uso nuevos. |
+| Pantalla de ejecución | `app/(private)/asignacion/[id]/` (`page.tsx`, `components/order-execution-screen.tsx`) | `page.tsx` abre con `requirePagePermission('asignaciones.consultar')` y llama a `startAssignedOrderAction(id)`, que transiciona y lee en una sola llamada. Monta `StepReader` con `mode="ejecucion"` y `minStepSeconds={5}`. Avanzar y retroceder son **solo de cliente**. Finalizar es un `<form>` con `orderId` oculto. |
+| Asistente de pasos | `components/shared/step-reader/step-reader.tsx` | Props `steps`, `onFinish`, `title`, `minStepSeconds`, `mode`. `index` empieza en `0`; no expone ningún aviso de cambio de paso. **R13, R17 y R18 no se cumplen sin tocarlo** (`## 6.1`). |
+| Casos de uso de ejecución | `asignaciones/domain/{get-assigned-order-execution,start-assigned-order,finish-assigned-order}.ts` | Orden fijo: `requirePermission(actor, 'asignaciones.consultar')` → `zod` → `listOrderIdsByUserInCompany` (no es tuyo = no existe) → `findAliveById(orderId, actor.companyId)`. `start` tolera `'stale'` releyendo. `finish` lee el número **antes** de escribir y traduce `insufficient_material` y `recipe_without_lines`. Se **reutiliza el patrón**. |
 | Estados que congelan | `asignaciones/domain/order-state.ts` → `assertOrderAcceptsWrites` | `ENTREGADO` → `order_delivered_frozen`, `CANCELADO` → `order_cancelled_not_assignable`. |
-| Servicio de `pedidos` para otros módulos | `pedidos/domain/order-catalog.ts` (`OrderCatalog`), implementado en `pedidos/adapters/driven/persistence/order-catalog-prisma.ts` | `findAliveById`, `listAliveSummariesByIds`, `transitionAliveById` (con `from` en el `WHERE` y `'ok' \| 'not_found' \| 'stale'`). Las tres funciones usan el `prisma` **global**. |
-| Cancelación | `pedidos/domain/cancel-order.ts` (`CANCELABLES = ['PENDIENTE','EN_CURSO']`, **no exportada**) → `OrderRepository.cancelAlive` → `cancelAliveOrder` en `order-prisma.ts` | Único método que escribe `CANCELADO` y el motivo **en la misma sentencia**. Hoy **no** filtra por estado en el `WHERE` (confía en la lectura previa del caso de uso). Exige `pedidos.modificar`. |
-| Regla del motivo | `pedidos/domain/order-input.ts` → `cancelOrderSchema` (recorte, 1..500), **publicado** en el barril | La misma regla se reutiliza aquí (R10). La UI de `pedidos` ya la importa desde cliente (`cancel-order-dialog.tsx`). |
+| Contrato de `pedidos` para otros módulos | `pedidos/domain/order-catalog.ts` (`OrderCatalog`: `findAliveById`, `listAliveSummariesByIds`, `listAliveSummariesInCompany`, `transitionAliveById`) | Las tres lecturas son funciones de `order-catalog-prisma.ts` sobre el `prisma` global. `transitionAliveById` es `createTransitionOrder` (`pedidos/domain/transition-order.ts`) sobre `OrderUnitOfWork`. |
+| Unidad de trabajo de `pedidos` | `pedidos/ports/order-unit-of-work.ts` (`OrderUnitOfWork`, `OrderTransactionScope` = `orders` + `reservations` + `recipes`), `order-unit-of-work-prisma.ts` (`withOrderTransaction`) y su cableado en `lib/composition/index.ts` (`orderUnitOfWork`) | La composición construye el ámbito con **el mismo `tx`** para los tres. **Es lo que esta ficha reutiliza** para meter la anotación en la misma transacción (`## 4`). |
+| Cancelación | `pedidos/domain/cancel-order.ts` (`CANCELABLES = ['PENDIENTE','EN_CURSO']`, **no exportada**) | Dentro de `OrderUnitOfWork`: `lockAliveById` → re-comprobación bajo el candado → `cancelAlive` → `releaseForOrder` (`reason: 'release'`) → `setReservedAt(null)`. Exige `pedidos.modificar`. `cancelAlive` (`OrderWriteRepository`, `cancelAliveOrder` en `order-prisma.ts`) es el **único** método que escribe `CANCELADO` y el motivo; lo usan `cancelOrder` y la caducidad diaria. |
+| Regla del motivo | `pedidos/domain/order-input.ts` → `cancelOrderSchema` (recorte, 1..500), **publicado** en el barril | Se reutiliza aquí (R10). La UI de `pedidos` ya la importa desde cliente. |
 | `CHECK` precedente | `orders_cancellation_reason_matches_status`: `("status"::text = 'CANCELADO') = ("cancellation_reason" IS NOT NULL)` | Forma literal del `CHECK` de R8 (`[D4]`). |
-| Claves candidatas para FK compuestas | `orders_id_company_id_key` (QC-60), `users_id_company_id_key` (QC-83) | Permiten que la empresa de la anotación sea la del pedido y la de la persona **por construcción** (R7). |
-| Transacción con cliente inyectable | `createOrderAssignmentRepository(db = prisma)` en `asignaciones` | Fábrica que acepta el cliente transaccional. Su cabecera ya anticipa «el día que la operación gane una segunda escritura». |
-| Confirmación al volver a la lista | `DELIVERED_ORDER_PARAM` (`lib/shared/routes.ts`) + `AssignedOrderDeliveredNotice` | Molde de R25 ⚑. |
-| Catálogo de errores | `lib/modules/errores/domain/error-catalog.ts` | Ya trae `not_cancellable`, `order_not_found`, `invalid_input`, `unauthorized`, `order_delivered_frozen`, `order_cancelled_not_assignable`. **Ningún código nuevo.** |
+| Claves candidatas para FK compuestas | `orders_id_company_id_key` (QC-60), `users_id_company_id_key` (QC-83) | La empresa de la anotación es la del pedido y la de la persona **por construcción** (R7). |
+| Repositorio con cliente inyectable | `createOrderAssignmentRepository(db = prisma)`, `createOrderWriteRepository(tx = prisma)` | Molde de la fábrica del registro. |
+| Confirmación al volver a la lista | `DELIVERED_ORDER_PARAM` (`lib/shared/routes.ts`) + `AssignedOrderDeliveredNotice`, pintado en `app/(private)/asignacion/page.tsx` encima de las pestañas | Molde de R25 ⚑. |
+| Catálogo de errores | `lib/modules/errores/domain/error-catalog.ts` | Ya trae `not_cancellable`, `order_not_found`, `invalid_input`, `unauthorized`, `order_delivered_frozen`, `order_cancelled_not_assignable`, `insufficient_material`, `recipe_without_lines`. **Ningún código nuevo.** |
 
 ## 1. La forma de la solución, en una frase
 
-Una tabla nueva **del módulo `asignaciones`** con una fila por gesto, dos casos de uso nuevos
-(`cancelAssignedOrder`, `recordStepMove`) y dos ampliados (`start`, `finish`), un **puerto de
-transacción** que `lib/composition` cablea para que la anotación de `asignaciones` y el cambio de
-estado de `pedidos` compartan **la misma transacción de base de datos** sin que ningún módulo toque
-las tablas del otro, y una pantalla que monta `StepReader` con dos props opcionales nuevas.
+Una tabla nueva **del módulo `asignaciones`** con una fila por gesto; dos casos de uso nuevos
+(`cancelAssignedOrder`, `recordStepMove`) y dos ampliados (`start`, `finish`); un **puerto de
+transacción** de `asignaciones` que `lib/composition` cablea para que la anotación y el cambio de
+`pedidos` (con lo que `pedidos` escriba en `inventario`) compartan **una sola transacción de base de
+datos**, sin que ningún módulo toque las tablas de otro; y una pantalla que monta `StepReader` con
+dos props opcionales nuevas.
 
 ## 2. Modelo de datos
 
@@ -36,75 +107,66 @@ las tablas del otro, y una pantalla que monta `StepReader` con dos props opciona
 | Columna | Tipo | Nulo | Por qué |
 | --- | --- | --- | --- |
 | `id` | `UUID` PK, `gen_random_uuid()` | no | Convención del repo. |
-| `company_id` | `UUID` | no | Columna propia de empresa (`[D15]`, R7). |
+| `company_id` | `UUID` | no | Columna propia de empresa (`[D15]`, R7). Cumple también `guard-empresa-en-esquema`. |
 | `order_id` | `UUID` | no | El pedido es obligatorio (`[D14]`, R6). |
 | `user_id` | `UUID` | no | Quién (R2). |
-| `action` | enum `OrderExecutionAction` | no | `START`, `RESUME`, `ADVANCE`, `GO_BACK`, `CANCEL`, `FINISH`: **seis y ninguno más** (`[D1]` enmendada por `[D12]`, R1). Un enum de Postgres hace que la base rechace un séptimo valor. |
+| `action` | enum `OrderExecutionAction` | no | `START`, `RESUME`, `ADVANCE`, `GO_BACK`, `CANCEL`, `FINISH`: **seis y ninguno más** (`[D1]` enmendada por `[D12]`, R1). |
 | `step_position` | `INTEGER` | **sí** ⚑ | La posición, desde 1 (`[D9]`, R4). `NULL` solo si la receta no tiene pasos (R5 ⚑). |
 | `reason` | `TEXT` | sí | El motivo; sin longitud en la columna, igual que `orders.cancellation_reason`: el tope vive en `cancelOrderSchema` (R10). |
-| `occurred_at` | `TIMESTAMPTZ(6)` | no, **sin default** | El único instante (`[D10]`, R3). Sin default para que nadie pueda olvidarse de pasarlo: lo pone el caso de uso con el **mismo `now`** que sella el cambio del pedido, así el instante de la anotación y el `updated_at` del pedido coinciden. |
+| `occurred_at` | `TIMESTAMPTZ(6)` | no, **sin default** | El único instante (`[D10]`, R3). Lo pone el caso de uso con el **mismo `now`** que pasa a `pedidos`, así coincide con el `updated_at` del pedido (y con `finished_at` al finalizar). |
 
-**No hay `created_at`, `updated_at` ni `deleted_at`.** `[D10]` fija una sola columna de tiempo, y
-`[D13]` dice que nada se edita ni se borra desde esta ficha: una columna de edición o de baja sería
-infraestructura para algo prohibido. La purga física es de **QC-124**.
+**No hay `created_at`, `updated_at` ni `deleted_at`**: `[D10]` fija una sola columna de tiempo y
+`[D13]` prohíbe editar o borrar. La purga física es de **QC-124**.
 
 **Restricciones escritas a mano** (Prisma no modela `CHECK` ni FK compuestas sin `@relation`):
 
 ```sql
--- R8: el motivo existe si y solo si la accion es cancelar. Forma literal del CHECK de QC-34.
 ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_reason_matches_action"
   CHECK (("action"::text = 'CANCEL') = ("reason" IS NOT NULL));
 
--- R5: posicion desde 1 cuando existe.
 ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_step_position_positive"
   CHECK ("step_position" IS NULL OR "step_position" >= 1);
 
--- R6, R7: pedido de la MISMA empresa, por construccion.
 ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_order_id_company_id_fkey"
   FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- R7: persona de la MISMA empresa, por construccion.
 ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_user_id_company_id_fkey"
   FOREIGN KEY ("user_id", "company_id") REFERENCES "users"("id", "company_id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 ```
 
 `RESTRICT` en las dos: `orders` y `users` tienen borrado lógico, así que un `DELETE` físico sobre
-ellos es una anomalía y tiene que ser ruidosa, igual que en `order_assignments`. **QC-124** borrará
-filas de **esta** tabla, no de las padres, así que el `RESTRICT` no le estorba.
+ellos es una anomalía y tiene que ser ruidosa, igual que en `order_assignments`. **Efecto que el spec
+viejo no contaba:** todo test o E2E que abra la pantalla (y por tanto anote) y después borre pedidos
+físicamente en su limpieza **fallará** hasta que borre antes las anotaciones de esa empresa (`## 7`).
 
 **Índices:**
 
-- `order_execution_entries_order_id_occurred_at_idx` sobre `("order_id", "occurred_at" DESC)`: la
-  consulta caliente es «la última posición anotada de este pedido» (R13), que corre en **cada**
-  apertura de la pantalla. Sirve también la comprobación del `RESTRICT` hacia `orders` y la futura
-  purga por pedido de QC-124.
+- `order_execution_entries_order_id_occurred_at_idx` sobre `("order_id", "occurred_at" DESC)`: «la
+  última posición anotada de este pedido» (R13), en **cada** apertura de la pantalla.
 - `order_execution_entries_user_id_idx` sobre `("user_id")`: la comprobación del `RESTRICT` hacia
-  `users`, mismo motivo que `order_assignments_user_id_idx`.
-- **Sin índice por `company_id`**: nadie consulta el registro por empresa sola; la empresa va en el
-  filtro junto al pedido.
+  `users`.
+- **Sin índice por `company_id`**: nadie consulta el registro por empresa sola.
 
-**RLS** activada y forzada, **sin policies**, **al final** de la migración (R32): la lección de
-QC-32/QC-74/QC-83 que ya documenta la migración de `order_assignments`.
+**RLS** activada y forzada, **sin policies**, **al final** de la migración (R32).
 
-**Identificadores** (R33, `[D16]`): todo en inglés y `snake_case`; los valores del enum, en
-mayúsculas como `OrderStatus`/`OrderPriority`.
+**Identificadores** (R33, `[D16]`): inglés y `snake_case`; los valores del enum, en mayúsculas.
 
 ### 2.2 La migración
 
-`db/migrations/20260918120000_order_execution_entries/` con `migration.sql` y `down.sql`.
+`db/migrations/<AAAAMMDDhhmmss>_order_execution_entries/` con `migration.sql` y `down.sql`. El
+timestamp **tiene que ser mayor que el de la última migración de `dev`** (hoy
+`20260924120000_customers`): lo pone `db:migrate:create` al crearla, y antes del PR se comprueba otra
+vez contra `origin/dev`; si `dev` trajo una posterior, se renombra la carpeta.
 
 - **UP**, en este orden: `CREATE TYPE "OrderExecutionAction"` → `CREATE TABLE` → los dos índices →
   los dos `CHECK` → las dos FK → `ENABLE` + `FORCE ROW LEVEL SECURITY`.
-- **Drift de Prisma**: `migrate dev --create-only` va a emitir `DROP CONSTRAINT` sobre las FK y
-  `CHECK` escritos a mano de otras tablas (`orders`, `order_assignments`, `products`, …) y `DROP
-  INDEX` de los índices de QC-57. **Se borran a mano del SQL generado**, como hicieron todas las
-  migraciones desde QC-20. La migración **no ejecuta ningún DDL sobre ninguna tabla preexistente** y
-  **no inserta permisos** (R30).
+- **Drift de Prisma**: `migrate dev --create-only` emitirá `DROP CONSTRAINT`/`DROP INDEX` sobre lo
+  escrito a mano en otras tablas. **Se borra a mano del SQL generado.** La migración **no ejecuta
+  ningún DDL sobre una tabla preexistente** y **no inserta permisos** (R30).
 - **DOWN**: `DROP TABLE "order_execution_entries";` (sin `CASCADE`) y `DROP TYPE
-  "OrderExecutionAction";`. Nada más: ninguna tabla preexistente aparece en una línea ejecutable. Se
-  lleva las anotaciones escritas después del UP, que es lo normal al revertir un `CREATE TABLE`.
+  "OrderExecutionAction";`.
 - La plantilla de integración (QC-77) se reconstruye sola: su nombre lleva la huella de las
   migraciones.
 
@@ -125,14 +187,20 @@ type Base = {
   readonly occurredAt: Date;
 };
 
-/** El motivo existe en el TIPO si y solo si la accion es cancelar: R8 tambien en compilacion. */
 export type NewExecutionEntry =
   | (Base & { readonly action: Exclude<ExecutionAction, 'cancel'> })
   | (Base & { readonly action: 'cancel'; readonly reason: string });
 ```
 
-El cruce `'go_back'` ↔ `GO_BACK` lo hace el adaptador, a mano y en un solo sitio, con un mapa total
-(`satisfies Record<ExecutionAction, …>`), como `order-state.ts` hace con `OrderStatus`.
+El cruce `'go_back'` ↔ `GO_BACK` lo hace el adaptador, con un mapa total (`satisfies
+Record<ExecutionAction, …>`).
+
+En el mismo archivo, **`ExecutionAbortedError`**: una clase **interna** del dominio (`extends Error`,
+no `AsignacionesError`, no se publica en el barril) que lleva el desenlace de `pedidos` que abortó la
+transacción. La lanza el trabajo de dentro de `transaction.run` y la atrapa el propio caso de uso
+**nada más salir** de `run`, para traducirla. Precedente exacto:
+`StatusChangeAfterConsumptionFailedError` de `pedidos/domain/transition-order.ts`. Nunca llega al
+adaptador driving.
 
 ### 3.2 Los dos puertos nuevos (`ports/`)
 
@@ -145,15 +213,16 @@ export interface ExecutionLogRepository {
 }
 ```
 
-**Sin `update`, sin `delete`** (R31, `[D13]`): lo que el puerto no expresa no se hace por descuido.
-`companyId` primero, como en `OrderAssignmentRepository`. «La última» = `ORDER BY occurred_at DESC,
-id DESC LIMIT 1` sobre las filas con `step_position IS NOT NULL`; el desempate por `id` no tiene
-significado y solo hace la lectura determinista (ver `## 13`, riesgo 2).
+**Sin `update`, sin `delete`** (R31). «La última» = `ORDER BY occurred_at DESC, id DESC LIMIT 1`
+sobre las filas con `step_position IS NOT NULL`.
 
 ```ts
 // ports/execution-transaction.ts
+import type { OrderCancellation, OrderCatalog } from '@/lib/modules/pedidos';
+
 export type ExecutionWriters = {
-  readonly orders: OrderCatalog;          // contrato publico de `pedidos`
+  /** Solo las dos escrituras de `pedidos`: dentro de la transaccion no se lee nada mas. */
+  readonly orders: Pick<OrderCatalog, 'transitionAliveById'> & OrderCancellation;
   readonly log: ExecutionLogRepository;
 };
 export interface ExecutionTransaction {
@@ -161,105 +230,125 @@ export interface ExecutionTransaction {
 }
 ```
 
-`run` promete una cosa y solo una: **lo que `work` escriba por `writers` se confirma entero o no se
-confirma nada**. El dominio no sabe que por debajo hay Prisma ni `$transaction` (`## 4`).
+`run` promete **una** cosa: lo que `work` escriba por `writers` —incluido lo que `pedidos` escriba en
+`inventario` por dentro— **se confirma entero o no se confirma nada**, y se deshace entero **si `work`
+lanza**. Por eso la regla de `## 4`: el trabajo **lanza** ante cualquier desenlace que no sea `'ok'`.
 
 ### 3.3 Los casos de uso
 
-Todos con el mismo prólogo que ya tienen los tres de QC-63 (R26, R27, R28):
-`requirePermission(actor, 'asignaciones.consultar')` en la **primera línea** → `zod` strict →
-`listOrderIdsByUserInCompany(actor.companyId, actor.id)` (no es tuyo ⇒ `OrderNotFoundError`) →
-`orders.findAliveById(orderId, actor.companyId)` (`null` ⇒ `OrderNotFoundError`).
+Todos con el prólogo de QC-63 (R26, R27, R28): `requirePermission(actor, 'asignaciones.consultar')` en
+la **primera línea** → `zod` strict → `listOrderIdsByUserInCompany(actor.companyId, actor.id)` (no es
+tuyo ⇒ `OrderNotFoundError`) → `orders.findAliveById(orderId, actor.companyId)` (`null` ⇒
+`OrderNotFoundError`). Las lecturas van **fuera** de la transacción, sobre el `OrderCatalog` global.
 
 | Caso de uso | Entrada (`zod` strict) | Qué escribe | Cómo |
 | --- | --- | --- | --- |
-| `startAssignedOrder` (**ampliado**) | `{ orderId }` (sin cambios) | `PENDIENTE`: transición + `start` | **En `transaction.run`**: `orders.transitionAliveById(…, 'PENDIENTE', 'EN_CURSO', …)`; solo si `'ok'`, `log.append(start)`. `'stale'` sale del `run` sin escribir nada y el bucle relee **fuera** de la transacción, como hoy. |
-| | | `EN_CURSO`: solo `resume` | `log.findLastStepPosition` → posición (o 1, R14 ⚑) → `log.append(resume)`. Una sola sentencia, no necesita transacción. **Si falla, lanza** y la pantalla no abre (R15 ⚑). |
-| `finishAssignedOrder` (**ampliado**) | `{ orderId, stepPosition }` | transición a `ENTREGADO` + `finish` | En `transaction.run`, mismo esquema que `start`. |
-| `cancelAssignedOrder` (**nuevo**) | `{ orderId, stepPosition, reason }` — `reason` con `cancelOrderSchema.shape.reason` del barril de `pedidos` (R10) | `CANCELADO` + motivo en el pedido + `cancel` con el mismo motivo | En `transaction.run`: `orders.cancelAliveById(orderId, companyId, from, reason, actor.id, now)`; solo si `'ok'`, `log.append({ action: 'cancel', reason, … })`. `'not_cancellable'` ⇒ `NotCancellableError`; `'stale'` ⇒ relee y reintenta como `finish`. Devuelve `{ numberText }` leído **antes** de escribir, para R25 ⚑. |
-| `recordStepMove` (**nuevo**) | `{ orderId, direction: 'advance' \| 'go_back', stepPosition }` | `advance` / `go_back` | Solo si el pedido está `EN_CURSO` (R20); si no, lanza sin escribir (`assertOrderAcceptsWrites` para los cerrados, `OrderNotFoundError` para `PENDIENTE`). Un solo `log.append`: **sin** transacción, porque no hay segunda escritura. |
+| `startAssignedOrder` (**ampliado**) | `{ orderId }` (sin cambios) | `PENDIENTE`: transición + `start` | Lee la vista **antes** de escribir (mismas consultas que hoy, en otro orden) para saber si hay pasos (R5). En `transaction.run`: `orders.transitionAliveById(…, 'PENDIENTE', 'EN_CURSO', …)`; si no es `'ok'`, lanza `ExecutionAbortedError`; si lo es, `log.append(start)`. Fuera: `'stale'` ⇒ relee y sigue (R16); `'not_found'` ⇒ `OrderNotFoundError`. |
+| | | `EN_CURSO`: solo `resume` | `log.findLastStepPosition` → posición (o 1, R14 ⚑) → `log.append(resume)`, fuera de transacción (una sola sentencia). **Si falla, lanza** y la pantalla no abre (R15 ⚑). |
+| `finishAssignedOrder` (**ampliado**) | `{ orderId, stepPosition }` | transición a `ENTREGADO` (con el consumo y `finished_at` que `pedidos` hace por dentro) + `finish` | En `transaction.run`, mismo esquema. Fuera, igual que hoy: `'stale'` ⇒ relee y reintenta; `'insufficient_material'` ⇒ `MaterialShortageError`; `'recipe_without_lines'` ⇒ `RecipeWithoutLinesError`; `'not_found'` ⇒ `OrderNotFoundError`. |
+| `cancelAssignedOrder` (**nuevo**) | `{ orderId, stepPosition, reason }` — `reason` con `cancelOrderSchema.shape.reason` del barril de `pedidos` (R10) | `CANCELADO` + motivo + liberación del material (⚑P1) + `cancel` con el mismo motivo | Lee el número **antes** de escribir (como `finish`), para R25 ⚑. En `transaction.run`: `orders.cancelAliveById(orderId, companyId, reason, actor.id, now)`; si no es `'ok'`, lanza `ExecutionAbortedError`; si lo es, `log.append({ action: 'cancel', reason, … })`. Fuera: `'not_cancellable'` ⇒ `NotCancellableError`; `'not_found'` ⇒ `OrderNotFoundError`. Sin `'stale'`: la comprobación va bajo el candado. |
+| `recordStepMove` (**nuevo**) | `{ orderId, direction: 'advance' \| 'go_back', stepPosition }` | `advance` / `go_back` | Solo si el pedido está `EN_CURSO` (R20); si no, lanza sin escribir (`assertOrderAcceptsWrites` para los cerrados, `OrderNotFoundError` para `PENDIENTE`). Un solo `log.append`: **sin** transacción. |
 
-**`stepPosition`**: `z.number().int().min(1).nullable()`. El servidor **no** la contrasta con los
-pasos de la receta: leer la receta en cada Siguiente costaría una consulta por clic para proteger una
-cifra que `[D9]` ya acepta que puede quedar desalineada.
+**Deps nuevas:** `start` y `finish` ganan `log` y `transaction`; `cancelAssignedOrder` recibe
+`assignments`, `orders` (`OrderCatalog`, para leer), `transaction` y `now`; `recordStepMove` recibe
+`assignments`, `orders`, `log` y `now`.
+
+**`stepPosition`**: `z.number().int().min(1).nullable()` (en `FormData`, `z.coerce` o conversión
+explícita en el adaptador driving). El servidor **no** la contrasta con la receta (`## 13`, riesgo 5).
 
 **Qué posición lleva cada acción** (R12–R22): `start` → 1; `resume` → la última anotada (o 1);
-`advance`/`go_back` → la del paso **al que se llega**, que es lo que hace cierto el E2E de `[D17]`
-(abrir = 1, avanzar = 2, avanzar = 3, recargar ⇒ 3); `finish` → la del último paso; `cancel` → la del
+`advance`/`go_back` → la del paso **al que se llega**; `finish` → la del último paso; `cancel` → la del
 paso que se está mostrando. Con una receta sin pasos, `null` en todas (R5 ⚑).
 
-**Lo que devuelve `startAssignedOrder`**: `AssignedOrderExecutionView` gana **un** campo,
-`resumeStepPosition: number | null`, que la pantalla pasa al asistente. `get-assigned-order-execution`
-no cambia de firma: el campo lo rellena `start`, que es el único que lo sabe.
+**Lo que devuelve `startAssignedOrder`**: `StartedOrderExecution = AssignedOrderExecutionView & {
+readonly resumeStepPosition: number | null }`, tipo nuevo en `assigned-order-execution-view.ts`.
+`AssignedOrderExecutionView` y `getAssignedOrderExecution` **no cambian**: el campo lo sabe solo
+`start`. La vista se devuelve con `status: 'EN_CURSO'`.
 
-**R16 sin código extra**: dos aperturas simultáneas de un `PENDIENTE` compiten por el `UPDATE ...
-WHERE status = 'PENDIENTE'`. La segunda espera al bloqueo de fila, ve `count = 0`, recibe `'stale'`,
-su transacción **no ha escrito nada**, relee `EN_CURSO` y cae en la rama de retomar.
+**R16 sin código extra**: dos aperturas simultáneas de un `PENDIENTE` compiten por
+`lockAliveById … FOR UPDATE` dentro de `createTransitionOrder`. La segunda espera al candado, ve
+`EN_CURSO`, devuelve `'stale'`, su trabajo lanza `ExecutionAbortedError`, su transacción **se deshace
+sin haber escrito nada**, relee `EN_CURSO` y cae en la rama de retomar.
 
 ### 3.4 Errores
 
-`errors.ts` gana **una** clase: `NotCancellableError` con `code = 'not_cancellable'`, código que **ya
-existe** en el catálogo («El pedido no se puede cancelar en su estado actual.») y que ya usa `pedidos`
-para el mismo caso. Mismo criterio que `order_not_found`: mismo caso, mismo código, misma frase.
-**Ningún código nuevo en el catálogo.**
+`errors.ts` gana **una** clase: `NotCancellableError` con `code = 'not_cancellable'`, que ya existe en
+el catálogo y que ya usa `pedidos` para el mismo caso. **Ningún código nuevo.**
 
 ## 4. La misma operación entre dos módulos (R24)
 
-**El problema.** Arrancar, finalizar y cancelar escriben en dos tablas de **dos módulos**:
-`orders` (de `pedidos`) y `order_execution_entries` (de `asignaciones`). La arquitectura prohíbe que
-un adaptador de un módulo toque el modelo del otro (`guard-arquitectura-modulos`), que un driven
-importe el driven de otro módulo, y que `lib/composition` importe el cliente Prisma
-(`guard-arquitectura-modulos`, regla R17: «importa el cliente Prisma compartido fuera de un adaptador
-driven»).
+**El problema.** Arrancar, finalizar y cancelar escriben en tablas de **tres módulos**: `orders`
+(`pedidos`), las reservas y los movimientos (`inventario`, lo escribe `pedidos` por su unidad de
+trabajo) y `order_execution_entries` (`asignaciones`). Ningún adaptador toca el modelo de otro
+módulo, ningún driven importa el driven de otro, y `lib/composition` no importa el cliente Prisma
+(`guard-arquitectura-modulos`). Y desde QC-141 `pedidos` **abre su propia transacción** para esas
+operaciones.
 
-**La solución: un puerto de transacción del dominio, abierto por un driven y cableado en la
-composición.**
+**La solución: una transacción que abre `asignaciones`, a la que `pedidos` se une sin abrir otra.**
 
 ```
 asignaciones/domain (caso de uso)
-   └─ transaction.run(async ({ orders, log }) => { ... })       <- solo conoce los puertos
+   └─ transaction.run(async ({ orders, log }) => {
+        const outcome = await orders.transitionAliveById(...)      // o orders.cancelAliveById(...)
+        if (outcome !== 'ok') throw new ExecutionAbortedError(outcome)   // deshace TODO lo de dentro
+        await log.append(...)
+      })
+
 lib/composition
-   └─ executionTransaction.run = (work) =>
-        withExecutionTransaction((db) =>                          <- driven de asignaciones
-          work({ orders: orderCatalogOn(db),                      <- driven de pedidos
-                 log: createExecutionLogRepository(db) }))        <- driven de asignaciones
+   ├─ orderTransactionScopeOn(tx): OrderTransactionScope     <- UN constructor del ambito, dos usos
+   ├─ orderUnitOfWork   = { run: (work) => withOrderTransaction((tx) => work(orderTransactionScopeOn(tx))) }
+   ├─ joinOrderUnitOfWork(tx) = { run: (work) => work(orderTransactionScopeOn(tx)) }   <- no abre nada
+   └─ executionTransaction = { run: (work) => withExecutionTransaction((tx) => work({
+          orders: {
+            transitionAliveById: createTransitionOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
+            cancelAliveById:     createCancelAliveOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
+          },
+          log: createExecutionLogRepository(tx),
+        })) }
+
 asignaciones/adapters/driven/persistence/execution-transaction-prisma.ts
-   └─ withExecutionTransaction(work) = prisma.$transaction(work)  <- el unico que abre la transaccion
+   └─ withExecutionTransaction(run) = prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 })
 ```
 
-- **Quién abre la transacción**: un adaptador driven de `asignaciones`, el único sitio del módulo que
-  puede tocar el cliente Prisma. No sabe nada de `pedidos`: entrega el cliente transaccional al
-  `work` que le pasen.
-- **Quién ata las dos mitades**: `lib/composition`, el único archivo que puede importar drivens de
-  los dos módulos. No importa el cliente Prisma: solo recibe `db` como parámetro de una función, y su
-  tipo sale del de `withExecutionTransaction`, sin importar `@prisma/client`.
-- **Qué gana `pedidos`**: sus cuatro funciones de catálogo aceptan un último parámetro opcional
-  `db: PrismaLike = prisma` (mismo patrón que `createOrderAssignmentRepository`), y el adaptador
-  exporta `orderCatalogOn(db): OrderCatalog`, que las ata a ese cliente. El `orderCatalog` global de
-  la composición **no cambia de forma**: sigue atando cada método a su función con nombre, que es lo
-  que `guard-ambito-empresa-pedidos` exige leer.
-- **El dominio no se entera**: recibe `ExecutionWriters`, dos interfaces que ya conoce.
+- **Quién abre la transacción**: un driven de `asignaciones`, con los mismos `maxWait`/`timeout` que
+  `withOrderTransaction` (Finalizar consume material dentro). No sabe nada de `pedidos`.
+- **Quién ata las partes**: `lib/composition`. `orderTransactionScopeOn` es la extracción del cuerpo
+  que hoy construye el ámbito **en línea** dentro de `orderUnitOfWork`: la unidad normal y la unida
+  lo construyen **con la misma función**, así que lo que `pedidos` gane en su ámbito (por ejemplo, lo
+  que meta QC-150 en el Finalizar) llega a las dos sin que nadie tenga que acordarse. El tipo de `tx`
+  sale de `withOrderTransaction` (`Parameters<…>`), sin importar `@prisma/client`.
+- **`pedidos` no cambia de adaptadores.** `createTransitionOrder` y `createCancelAliveOrder` reciben un
+  `OrderUnitOfWork`; que su `run` abra o se una es cosa de la composición.
+- **La regla que lo hace seguro.** La unidad unida **no confirma ni deshace**: si
+  `createTransitionOrder` convierte por dentro un fallo en resultado (`'insufficient_material'`,
+  `'recipe_without_lines'`, o el `'stale'` tras haber consumido), lo ya escrito seguiría vivo en la
+  transacción de fuera. Por eso **el trabajo de `asignaciones` lanza ante todo desenlace distinto de
+  `'ok'`**, y `withExecutionTransaction` deshace todo. Es lo que T19 comprueba contra Postgres.
+- **El dominio no se entera**: recibe `ExecutionWriters`, tres métodos de interfaces que ya conoce.
 
 ## 5. `pedidos`: cancelar por encargo, por el camino único (R29)
 
-1. **La lista de cancelables sale de `cancel-order.ts`** a un archivo de dominio propio,
-   `pedidos/domain/order-cancellation.ts`, que exporta `isCancellableStatus(status)`.
-   `cancel-order.ts` la usa en vez de su constante local: **una** definición, dos consumidores
-   (`cancelOrder` y el catálogo). No se publica en el barril: `asignaciones` no la necesita, pregunta.
-2. **`OrderCatalog` gana `cancelAliveById(id, companyId, from, reason, actorId, now)`** →
-   `'ok' | 'not_found' | 'stale' | 'not_cancellable'`. Devuelve un **resultado**, no lanza un error de
-   `pedidos`: el traductor de la acción de `asignaciones` solo reconoce `AsignacionesError`, y un
-   `PedidosError` saldría como error inesperado.
-3. **Implementación** (`order-catalog-prisma.ts` → `cancelAliveOrderTarget`): si
-   `!isCancellableStatus(from)` ⇒ `'not_cancellable'` sin tocar la base; si no, **delega en
-   `cancelAliveOrder`** de `order-prisma.ts` (driven → driven del **mismo** módulo, permitido), que
-   sigue siendo **la única función que escribe `CANCELADO` y el motivo**. Si devuelve `'not_found'`,
-   relee con `findAliveOrderTargetById` para separar `'not_found'` de `'stale'`, como hace
-   `transitionAliveOrder`.
-4. **`cancelAliveOrder` gana un último parámetro opcional** `options?: { from?: OrderStatus; db?:
-   PrismaLike }`. Sin él, su comportamiento es **idéntico** al de hoy (los tests de QC-34 no cambian);
-   con `from`, el `WHERE` filtra además por `status = from`, que es lo que impide que una cancelación
-   que llegue tarde cancele un pedido que otro responsable acaba de entregar.
+1. **`pedidos/domain/order-cancellation.ts` (nuevo)** exporta:
+   - `isCancellableStatus(status)`: mapa **total** sobre `OrderStatus` (`satisfies Record<OrderStatus,
+     boolean>`); sustituye a `CANCELABLES` de `cancel-order.ts`. **Una** definición.
+   - `cancelInsideTransaction(scope: OrderTransactionScope, input: { id, reason, actorId, now,
+     companyId })` → `'ok' | 'not_found' | 'not_cancellable'`: el cuerpo que hoy vive dentro del `run`
+     de `cancel-order.ts`, **sin cambiar nada**: `lockAliveById` → `isCancellableStatus` sobre la fila
+     bloqueada → `cancelAlive` → `releaseForOrder` (`reason: 'release'`, autor `actorId`) →
+     `setReservedAt(null)`.
+   - El tipo `OrderCancellation = { cancelAliveById(id: string, companyId: string, reason: string,
+     actorId: string, now: Date): Promise<'ok' | 'not_found' | 'not_cancellable'> }` y
+     `createCancelAliveOrder({ unitOfWork }): OrderCancellation['cancelAliveById']`, que abre
+     `unitOfWork.run` y llama a `cancelInsideTransaction`. Mismo papel que `createTransitionOrder`.
+2. **`cancel-order.ts`** usa `isCancellableStatus` en su comprobación previa y
+   `cancelInsideTransaction` dentro de su `run`, traduciendo `'not_cancellable'` a
+   `NotCancellableError` y `'not_found'` a `OrderNotFoundError` como hoy. Su comportamiento observable
+   no cambia: sus tests siguen verdes **sin tocarlos**.
+3. **Barril**: `createCancelAliveOrder`, `CancelAliveOrderDeps` y el tipo `OrderCancellation`.
+   `isCancellableStatus` y `cancelInsideTransaction` **no** se publican.
+4. **Vocabulario vigilado**: `tests/unit/pedidos/module-contract.test.ts` prohíbe en todo archivo de
+   `pedidos` (comentarios incluidos) palabras como `transition`, `transicion…`, `nextStatus` o
+   `allowedStatus…`. Los archivos nuevos o tocados de `pedidos` no las usan.
 5. **El seed no cambia** (R30): el Operador no gana `pedidos.modificar`, y `cancelOrder` sigue
    exigiéndolo para la pantalla de pedidos.
 
@@ -269,275 +358,255 @@ asignaciones/adapters/driven/persistence/execution-transaction-prisma.ts
 
 ```ts
 export type StepReaderProps = {
-  readonly steps: readonly RecipeStepDocument[];
-  readonly onFinish: () => void;
-  readonly title?: string;
+  // … las cinco de hoy: steps, onFinish, title, minStepSeconds, mode
   readonly initialStepPosition?: number;                 // desde 1; se recorta a [1, steps.length]
   readonly onStepChange?: (change: { direction: 'advance' | 'go_back'; position: number }) => void;
 };
 ```
 
-- Sin las dos props nuevas, **el comportamiento es el de hoy**: el formulario de recetas (QC-64) no
-  se entera.
-- Sigue recibiendo todo por props: **no** importa `lib/composition`, Server Actions ni
-  `next/navigation` (QC-64 R20 intacta, y su test de fuente sigue verde).
-- El recorte a `[1, steps.length]` es R14 ⚑: una posición anotada que ya no existe en la receta
-  editada abre en el último paso, sin error. Hoy ya hace `Math.min(index, steps.length - 1)`.
-- `onStepChange` se llama **después** de cambiar el índice, y solo si el índice cambió (Anterior en
-  el paso 1 no avisa).
+- Sin las dos props nuevas, **el comportamiento es el de hoy** en los dos `mode`.
+- Sigue recibiendo todo por props (QC-64 R20 intacta).
+- `initialStepPosition` fija el estado **inicial** de `index`; el efecto de foco de `'ejecucion'` sigue
+  saltándose el montaje, así que empezar en el paso 3 no roba el foco. La espera mínima arranca en el
+  paso de entrada como en cualquier llegada.
+- El recorte a `[1, steps.length]` es R14 ⚑.
+- `onStepChange` se llama **después** de cambiar el índice, y solo si cambió.
+- Solo cambia `step-reader.tsx`: es lo que admite hoy la lista cerrada del test R18 de QC-63.
 
 ### 6.2 `order-execution-screen.tsx`
 
-- Pasa `initialStepPosition={execution.resumeStepPosition ?? 1}` y guarda la posición actual en estado
-  para enviarla con Finalizar y con Cancelar.
+- Recibe `StartedOrderExecution`; pasa `initialStepPosition={execution.resumeStepPosition ?? 1}` y
+  guarda la posición actual en estado para Finalizar y Cancelar.
 - **Avanzar y retroceder no esperan a nadie** (R19): en `onStepChange` encola
-  `recordStepMoveAction(...)` en una **cadena de promesas** de la pantalla y **no** espera su
-  resultado para pintar. Cada eslabón atrapa su propio fallo y lo descarta: ni error visible, ni
-  reintento, ni bloqueo de la cadena. La cadena existe para que las anotaciones **lleguen en el orden
-  de los clics**: sin ella, dos Siguiente seguidos podrían escribirse al revés y R13 volvería a un
-  paso equivocado sin que nadie lo notara.
-- **Finalizar** sigue siendo el formulario de hoy con un campo oculto más, `stepPosition`.
-- **Cancelar**: botón «Cancelar pedido» visible en todos los pasos, que abre
-  `order-cancel-dialog.tsx` (`AlertDialog` + `Textarea` de shadcn/ui, ya en el repo). El motivo se
-  valida en cliente con `cancelOrderSchema` del barril de `pedidos` —la misma regla, no una copia— y
-  otra vez en el servidor. Confirmar envía `cancelAssignedOrderAction` con `orderId`, `stepPosition`
-  y `reason`.
+  `recordStepMoveAction(...)` en una **cadena de promesas** y **no** espera su resultado para pintar.
+  Cada eslabón atrapa y descarta su fallo. La cadena existe para que las anotaciones **lleguen en el
+  orden de los clics** (`## 10.9`).
+- **Finalizar** gana un campo oculto `stepPosition`.
+- **Cancelar**: botón «Cancelar pedido» visible en todos los pasos, que abre `order-cancel-dialog.tsx`
+  (`AlertDialog` + `Textarea` de shadcn/ui, ya en el repo). El motivo se valida en cliente con
+  `cancelOrderSchema` del barril de `pedidos` y otra vez en el servidor. Confirmar envía
+  `cancelAssignedOrderAction` con `orderId`, `stepPosition` y `reason`. El botón no va dentro de la
+  barra fija de `StepReader` (que no se toca por esto).
 
 ### 6.3 Server Actions (`asignaciones/adapters/driving/order-execution-actions.ts`)
 
-Van **en el mismo archivo** que las dos de QC-63, a propósito: el censo de
-`tests/unit/identity/session-once-per-request-actions.test.ts` es **por archivo** y ya lo cubre;
-un archivo nuevo con `currentActor` lo pondría rojo.
+Van **en el mismo archivo** que las dos de QC-63: el censo de
+`tests/unit/identity/session-once-per-request-actions.test.ts` es **por archivo** y ya lo cubre.
 
 | Acción | Entrada | Salida |
 | --- | --- | --- |
-| `startAssignedOrderAction` | sin cambios | la vista, ahora con `resumeStepPosition` |
+| `startAssignedOrderAction` | sin cambios | `StartedOrderExecution` |
 | `finishAssignedOrderAction` | `FormData` + `stepPosition` | sin cambios (redirige) |
 | `cancelAssignedOrderAction` (**nueva**) | `FormData` con `orderId`, `stepPosition`, `reason` | `ErrorState`, o redirige a `` `${ASSIGNED_ORDERS_ROUTE}?${CANCELLED_ORDER_PARAM}=<numero>` `` (R25 ⚑) |
 | `recordStepMoveAction` (**nueva**) | `{ orderId, direction, stepPosition }` | `{ status: 'success' } \| ErrorState`; la pantalla lo ignora |
 
-La capa driving no decide nada: actor de las dos caras de la sesión con `runInRequestScope`,
-traducción por `code`. Igual que hoy.
-
 ### 6.4 La confirmación en la lista (R25 ⚑)
 
-`lib/shared/routes.ts` gana `CANCELLED_ORDER_PARAM` (nombre de parámetro de consulta, no una ruta,
-mismo caso que `DELIVERED_ORDER_PARAM`). `app/(private)/asignacion/page.tsx` pinta
-`AssignedOrderCancelledNotice` («Pedido 2026-0000007 cancelado», `role="status"`), hermano de la
-confirmación de entrega. Es tocar otra vez la lista de QC-88: **enmienda declarada**, la misma figura
-que QC-63 usó.
+`lib/shared/routes.ts` gana `CANCELLED_ORDER_PARAM` (nombre de parámetro de consulta). La lista
+cerrada de `tests/unit/recetas-ui/recipe-route-contract.test.ts` gana esa entrada, con nota fechada,
+como hizo `DELIVERED_ORDER_PARAM`; el valor no puede aludir al asistente (el mismo test lo barre).
+`app/(private)/asignacion/page.tsx` pinta `AssignedOrderCancelledNotice` junto al aviso de entrega,
+**encima de las pestañas de vista** (QC-145), así que se ve sea cual sea la vista.
 
 ## 7. Guardias y listas cerradas: qué se toca y qué muerde después
 
-Lo que los precedentes subestimaron, archivo por archivo. «Ahora» = se pone rojo en esta rama en
-cuanto el código aparece; «tras el commit» = solo muerde cuando la rama tiene diff contra `origin/dev`.
-
 | Guardia / lista | Qué exige | Qué pasa aquí | Cuándo |
 | --- | --- | --- | --- |
-| `tests/guards/guard-ambito-empresa-pedidos.test.ts` | Cada método de `OrderCatalog` cableado en `const orderCatalog: OrderCatalog = {…}` a una `function` con nombre que declare `companyId: string` y lo lleve a `./company-scope`; toda función que «toca la base» (`/\b(?:prisma\|tx)\s*\./`) lo declara. | `cancelAliveById` se cablea a `cancelAliveOrderTarget` (consume vía `findAliveOrderTargetById(…, companyId, db)`). **Y la guardia se TENSA**: con `db.order.…` su regex dejaría de ver las consultas del catálogo y saldría **verde sin mirar**. Se añade `db` a `TOCA_LA_BASE`, con nota fechada y **prueba por mutación** (quitar el ámbito de una función con `db.` ⇒ rojo). | Ahora |
-| `tests/unit/asignaciones/module-contract.test.ts` → `CASOS_DE_USO_QC63` | Lista **cerrada** de archivos que pueden nombrar `'asignaciones.consultar'`. | `cancel-assigned-order.ts` y `record-step-move.ts` lo nombran en su primera línea ⇒ **rojo**. Se añaden a la lista (crece, no se afloja), con nota fechada. | Ahora |
-| `tests/unit/asignaciones/module-contract.test.ts` (b) | El cliente Prisma solo en `adapters/driven/persistence/`. | Los dos drivens nuevos viven ahí. Verde. | — |
+| `tests/guards/guard-ambito-empresa-pedidos.test.ts` | Cada método de `OrderCatalog` cableado en `const orderCatalog`; `transitionAliveById` exactamente a `createTransitionOrder({ unitOfWork: orderUnitOfWork })` (`METODOS_DELEGADOS_EN_DOMINIO`); barrido sin excepciones de toda función de persistencia que toque la base. | `orderCatalog` **no cambia**, así que lo existente sigue verde. **Se tensa con un caso nuevo**: `OrderCancellation.cancelAliveById` declara `companyId: string`; `cancelInsideTransaction` lleva `{ companyId }` a `lockAliveById` y `cancelAlive`; y en `lib/composition` toda llamada a `createTransitionOrder(` o `createCancelAliveOrder(` recibe `unitOfWork: orderUnitOfWork` o `unitOfWork: joinOrderUnitOfWork(tx)` y nada más. Con **mutación** que lo pone rojo. | Ahora |
+| `tests/unit/pedidos/module-contract.test.ts` | Vocabulario de transiciones prohibido en `pedidos`; quién consume `assertTransition`. | Los archivos nuevos de `pedidos` no usan ese vocabulario ni `assertTransition`. Verde. | Ahora, si se hace mal |
+| `tests/unit/pedidos/authorization.test.ts` (`SIETE_ARCHIVOS`) | Los siete casos de uso de `pedidos` exigen solo `pedidos.consultar`/`pedidos.modificar`. | `cancel-order.ts` sigue exigiendo `pedidos.modificar`; `order-cancellation.ts` no exige nada (como `transition-order.ts`). Verde. | — |
+| `tests/unit/asignaciones/module-contract.test.ts` → `CASOS_DE_USO_QC63` | Lista **cerrada** de archivos que pueden nombrar `'asignaciones.consultar'`. | `cancel-assigned-order.ts` y `record-step-move.ts` ⇒ **rojo**. Se añaden a la lista (crece, no se afloja), con nota fechada. | Ahora |
 | `tests/guards/guard-arquitectura-modulos.test.ts` | `@module` en cada modelo; `prisma.<modelo>` solo en su dueño; composición sin cliente Prisma; driven sin driven ajeno. | `OrderExecutionEntry` con `/// @module asignaciones`. La composición no importa `@/lib/shared/db/prisma` (`## 4`). | Ahora, si se hace mal |
-| `tests/guards/guard-rls-force.test.ts` | Toda tabla creada en `db/migrations/**` con `ENABLE` + `FORCE`. | Barrido automático. Verde si la migración cierra con las dos. | Ahora |
-| `tests/guards/guard-catalogo-de-errores.test.ts` | Códigos del catálogo cerrado, sin mensaje por parámetro. | `NotCancellableError` reutiliza `not_cancellable`. | Ahora, si se hace mal |
-| `tests/unit/identity/session-once-per-request-actions.test.ts` | Censo **por archivo** de acciones con `currentActor`. | Las acciones nuevas van al archivo ya censado (`## 6.3`). Si alguien las saca a otro archivo ⇒ rojo. | Ahora |
-| `tests/unit/asignaciones/order-execution-actions.test.ts` | Afirma las acciones de QC-63. | Crece con las dos nuevas. | Ahora |
-| `tests/unit/asignaciones/start-assigned-order.test.ts`, `finish-assigned-order.test.ts` | QC-63 R9/R10 («EN_CURSO no escribe nada») y R16 (la entrada de `finish` es solo `orderId`). | Los `deps` ganan `log` y `transaction` ⇒ no compilan hasta actualizarlos. R9 **sigue siendo cierta sobre el pedido** (`transitionAliveById` no se llama); lo que cambia es que se anota retomar (R38). R16: la entrada gana `stepPosition`, que **no** es dato de marcado. Se **tensan** con nota fechada. | Ahora |
-| `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` → caso R18 de QC-63 | `git diff --name-only <merge-base> -- components/shared/step-reader` vacío. | Rojo **en cuanto se commitee** el cambio de `StepReader` (R37 ⚑). Se tensa: afirma que el diff toca **solo** `step-reader.tsx`, que las props nuevas son opcionales y que el test de fuente de QC-64 sigue verde. | **Tras el commit** |
-| `tests/unit/recetas-ui/step-reader.test.tsx` | Comportamiento de QC-64. | No cambia: sin las props nuevas todo es igual. Se **añaden** casos para las nuevas. | — |
-| `tests/integration/aislamiento.json` + `guard-aislamiento-integracion` | Cada `*.int.test.ts` nuevo, declarado. | `order-execution-entries-constraints.int.test.ts` → `transaccion`. `execution-atomicity.int.test.ts` → **`commit`** con `motivo` y `desde`: `withExecutionTransaction` abre su propia transacción con el cliente global, y envolverla en la del test sería un aislamiento de mentira. | Ahora |
-| `tests/unit/pedidos/order-view.test.ts` | `OrderRepository` tiene seis métodos y `cancelAlive` es el único con `reason`. | `OrderRepository` **no cambia de forma** (el parámetro nuevo es de la función del adaptador, no del puerto). Verde. | — |
-| `tests/unit/pedidos/*` y `tests/integration/pedidos/*` sobre `cancelAliveOrder` | Firma y semántica de hoy. | El parámetro es opcional y sin él nada cambia. Verde. | — |
-| `e2e/ejecucion-receta.spec.ts` | Camino feliz de QC-63. | Debería seguir verde; si la pantalla gana el botón de cancelar en la misma fila, revisar selectores. | Solo al correr Playwright |
+| `tests/guards/guard-empresa-en-esquema.test.ts` | Todo modelo con `company_id` o en `EXENTAS`. | Tiene `company_id`. Verde. | — |
+| `tests/guards/guard-rls-force.test.ts` | Toda tabla creada con `ENABLE` + `FORCE`. | Verde si la migración cierra con las dos. | Ahora |
+| `tests/guards/guard-catalogo-de-errores.test.ts` | Códigos del catálogo cerrado, sin mensaje por parámetro. | `NotCancellableError` reutiliza `not_cancellable`. `ExecutionAbortedError` no es de la jerarquía de errores del módulo (precedente de `transition-order.ts`). | Ahora, si se hace mal |
+| `tests/unit/identity/session-once-per-request-actions.test.ts` | Censo **por archivo** de acciones con `currentActor`. | Las acciones nuevas van al archivo ya censado. | Ahora |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | Exportaciones **exactas** de `lib/shared/routes.ts`. | `CANCELLED_ORDER_PARAM` ⇒ **rojo**. Se añade con nota fechada. | Ahora |
+| `tests/unit/asignaciones/start-assigned-order.test.ts`, `finish-assigned-order.test.ts` | QC-63 R9/R10 y R16. | Deps nuevas; R9 **sigue cierta sobre el pedido**, y se anota retomar (R38); R16: la entrada gana `stepPosition`. Se **tensan** con nota fechada. | Ahora |
+| `tests/unit/asignaciones/empacador-authorization.test.ts` | QC-144 R12: el Empacador concede en `start` y `finish`. | Construye `start`/`finish` con sus deps ⇒ no compila hasta darle `log` y `transaction` (dobles). Sus aserciones no cambian. | Ahora |
+| `tests/integration/asignaciones/responsible-eligibility.int.test.ts`, `finished-orders.int.test.ts` | Modo `transaccion`: todo corre en la transacción del test y `$transaction` **no** viaja por el proxy (`prisma-tx-holder.ts`). | Construyen `start`/`finish` ⇒ necesitan `log` (el adaptador real sobre el `tx` del test) y un `transaction` de test cuyo `run` llame a `work` con los escritores atados a ese mismo `tx`, **sin** `withExecutionTransaction`. Así siguen dentro del `ROLLBACK` del test. | Ahora |
+| `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` | Mock del módulo de acciones con solo `finishAssignedOrderAction`; caso R18 de QC-63 (lista cerrada). | El mock gana `recordStepMoveAction` y `cancelAssignedOrderAction`; el fixture gana `resumeStepPosition`. El caso R18 **no se toca**: ya admite `step-reader.tsx`. | Ahora |
+| `tests/unit/recetas-ui/step-reader.test.tsx` | Comportamiento de QC-64/QC-125. | No cambia. Se **añaden** casos. | — |
+| `tests/integration/aislamiento.json` + `guard-aislamiento-integracion` | Cada `*.int.test.ts` nuevo, declarado. | `order-execution-entries-constraints.int.test.ts` → `transaccion`. `execution-atomicity.int.test.ts` → **`commit`** con `motivo` y `desde`: `withExecutionTransaction` abre su propia transacción. | Ahora |
+| Limpiezas que borran pedidos (`order.deleteMany`) en E2E e integración `commit` | Borran pedidos físicamente al terminar. | Las que abren la pantalla de ejecución anotan, y la FK `RESTRICT` rompe su limpieza ⇒ borran antes `orderExecutionEntry` de su empresa. Candidatas medidas: `e2e/ejecucion-receta.spec.ts`, `e2e/reserva-de-material.spec.ts`, `e2e/recetas-porcentaje.spec.ts`, `e2e/pedidos-terminados.spec.ts`, `e2e/pedidos-asignados.spec.ts` (y `e2e/recetas-pasos.spec.ts` si abre la pantalla). Se confirma una a una. | Al correr E2E |
+| `e2e/ejecucion-receta.spec.ts` | Camino feliz de QC-63. | Debería seguir verde salvo la limpieza; revisar selectores si el botón de cancelar cae cerca. | Al correr Playwright |
 
 ## 8. Multiplataforma (R36)
 
 Botón de cancelar y botones del diálogo con `min-h-11 min-w-11`; `Textarea` con `text-base` (16 px);
-el motivo del rechazo como texto en el DOM, nunca `title`; todo alcanzable con teclado (el
-`AlertDialog` de Radix atrapa el foco y cierra con Escape). **Ninguna excepción de escritorio**: se
-usa en planta, en móvil o tablet.
+el motivo del rechazo como texto en el DOM, nunca `title`; todo alcanzable con teclado. **Ninguna
+excepción de escritorio**: se usa en planta, en móvil o tablet.
 
 ## 9. Dependencias de terceros
 
-**Ninguna** (`[D18]`, R35). `AlertDialog`, `Textarea` y `Button` son de shadcn/ui y ya están en
-`components/ui/`; la validación es `zod`; la transacción es `prisma.$transaction`, ya usado en nueve
-adaptadores driven. `docs/dependencias.md` no cambia.
+**Ninguna** (`[D18]`, R35). `AlertDialog`, `Textarea` y `Button` ya están en `components/ui/`; la
+validación es `zod`; la transacción es `prisma.$transaction`, ya usado en diez adaptadores driven.
+`docs/dependencias.md` no cambia.
 
 ## 10. Alternativas descartadas
 
-**10.1 — Abrir la transacción en `lib/composition` con `prisma.$transaction`. DESCARTADA.**
-Es lo más corto, y la composición ya ata las dos mitades. Pero `guard-arquitectura-modulos` prohíbe a
-`lib/composition` importar el cliente Prisma compartido (su regla R17), y la cabecera de
-`orderAssignmentRepository` en la composición ya dejó escrito que abrir una transacción ahí «sería
-meter una decisión de ejecución en el punto de composición». Se abre en un driven y la composición
-solo reparte el cliente.
+**10.1 — Abrir la transacción en `lib/composition` con `prisma.$transaction`.** La composición no
+puede importar el cliente Prisma (`guard-arquitectura-modulos`). Se abre en un driven.
 
-**10.2 — Que `pedidos` escriba también la anotación. DESCARTADA.**
-Resolvería la atomicidad dentro de un solo módulo, pero `pedidos` pasaría a saber de pasos,
-posiciones y retomar, que son de la ejecución, y la tabla tendría el dueño equivocado. Es el
-«repositorio compartido entre módulos» que `docs/architecture.md > Dominio` n.º 2 prohíbe, con otro
-nombre.
+**10.2 — Que `pedidos` escriba también la anotación.** `pedidos` pasaría a saber de pasos y de
+retomar, y la tabla tendría el dueño equivocado.
 
-**10.3 — Escribir en dos pasos y compensar si falla el segundo (saga). DESCARTADA.**
-No es «o las dos o ninguna»: entre las dos escrituras un fallo de proceso deja una sin la otra, y la
-compensación consiste en **borrar o editar** una anotación o **deshacer** un estado del pedido; lo
-primero lo prohíbe `[D13]` y lo segundo lo prohíbe la matriz de transiciones (`EN_CURSO` no vuelve a
-`PENDIENTE`, `CANCELADO` no sale).
+**10.3 — Escribir en dos pasos y compensar (saga).** La compensación sería borrar una anotación
+(`[D13]` lo prohíbe) o deshacer un estado (la matriz de transiciones lo prohíbe).
 
-**10.4 — Un trigger de Postgres que anote al cambiar `orders.status`. DESCARTADA.**
-El trigger no sabe la posición del paso, no distingue arrancar de un cambio hecho a mano desde la
-pantalla de pedidos, y metería lógica de negocio en la base, donde ningún test de dominio la ve.
+**10.4 — Un trigger que anote al cambiar `orders.status`.** No sabe la posición ni distingue arrancar
+de un cambio desde la oficina.
 
-**10.5 — Filtrar solo en la base (`INSERT ... SELECT ... WHERE status = …`) sin transacción. DESCARTADA.**
-Una sentencia de `asignaciones` que lea `orders` es exactamente el `prisma.order` fuera de su módulo
-que la guardia prohíbe.
+**10.5 — Llamar al `orderUnitOfWork` global dentro de la transacción de ejecución. DESCARTADA (nueva
+el 2026-09-24).** Es lo más corto —ningún cableado nuevo—, pero `withOrderTransaction` abre **otra**
+transacción en **otra** conexión: la anotación y el cambio del pedido se confirmarían por separado,
+que es justo lo que R24 prohíbe, y con el pedido bloqueado por la de dentro mientras la de fuera
+espera se arriesga un bloqueo mutuo bajo el pooler.
 
-**10.6 — Que `cancelAliveById` escriba `CANCELADO` con su propio `updateMany`. DESCARTADA.**
-Tendría `from` en el `WHERE` sin tocar `order-prisma.ts` —menos solape con QC-68—, pero habría **dos**
-sentencias capaces de escribir `CANCELADO` y el motivo, y `[D6]` pide el camino único. Se paga el
-parámetro opcional en `cancelAliveOrder`.
+**10.6 — Meter `cancelAliveById` en `OrderCatalog`. DESCARTADA (nueva el 2026-09-24).** Era el plan
+del 2026-09-18. Hoy `OrderCatalog` tiene 11 dobles en tests que dejarían de compilar, y el
+`orderCatalog` global tendría que cablear un método que nadie llama fuera de la transacción de
+ejecución. Un contrato propio y estrecho, `OrderCancellation`, dice lo mismo sin cableado muerto.
 
-**10.7 — Recuperar el paso en el cliente (`localStorage`). DESCARTADA.**
-`[D12]` dice «el último paso anotado **de ese pedido**», no de ese navegador: otro responsable en otra
-tablet tiene que volver al mismo sitio. Y QC-64 R19 prohíbe guardar estado del asistente en el
-navegador.
+**10.7 — Savepoints (`SAVEPOINT` crudo) para que la unidad unida pueda deshacer lo suyo.**
+**DESCARTADA (nueva el 2026-09-24).** Resolvería los resultados que `createTransitionOrder` convierte
+en valores, pero mete SQL crudo de control de transacciones en la composición o en un driven, y
+Prisma no los modela. Abortar la transacción entera ante todo desenlace no `'ok'` es más simple y
+cumple R24 igual.
 
-**10.8 — Montar `StepReader` sin tocarlo, con `key` y clics simulados. DESCARTADA.**
-No se puede empezar en el paso 3 sin marcar los pasos 1 y 2, que el asistente bloquea sin escape
-(QC-63 `[D4]`); y leer el cambio de paso del DOM sería acoplarse a sus `data-testid`. Las dos props
-opcionales son lo mínimo, y es R37 ⚑.
+**10.8 — `cancelAliveById` con su propio `updateMany`.** Habría **dos** sentencias capaces de escribir
+`CANCELADO` y el motivo, y **no liberaría el material**: `[D6]` pide el camino único.
 
-**10.9 — Mandar avanzar/retroceder sin cadena, en paralelo. DESCARTADA.**
-Dos Siguiente seguidos pueden llegar al revés; la última anotación sería la del paso 2 y la recarga
-volvería atrás sin motivo. La cadena cuesta unas líneas y no bloquea la pantalla.
+**10.9 — Recuperar el paso en el cliente (`localStorage`).** `[D12]` dice «el último paso anotado **de
+ese pedido**», no de ese navegador; y QC-64 R19 prohíbe guardar estado del asistente en el navegador.
+
+**10.10 — Montar `StepReader` sin tocarlo, con `key` y clics simulados.** No se puede empezar en el
+paso 3 sin marcar los pasos 1 y 2 y esperar sus 5 s.
+
+**10.11 — Mandar avanzar/retroceder sin cadena, en paralelo.** Dos Siguiente seguidos pueden llegar
+al revés y la recarga volvería atrás.
 
 ## 11. Archivos que la feature va a tocar
 
-> **Para F1.4 — cruce con QC-68 (`pedidos`, `in_progress`, zona `backend`) y QC-92 (`inventario`,
-> `pending`, zona `fullstack`).** Esta lista es la que hay que cruzar con las ramas vivas, no con sus
-> specs. Solapes esperables, dichos antes de mirar:
-> - **QC-68** («búsqueda y total en el listado de pedidos»): lo probable es que toque
->   `order-prisma.ts` (listado) y quizá `order-catalog.ts`/`index.ts` de `pedidos`. Aquí se tocan
->   `order-prisma.ts` **solo en `cancelAliveOrder`**, `order-catalog.ts`, `order-catalog-prisma.ts`,
->   `cancel-order.ts` y se crea `order-cancellation.ts`. **Riesgo real de solape en
->   `order-prisma.ts`**; si QC-68 lo toca, se decide el orden de merge.
-> - **QC-92** («ajuste de inventario»): aquí no se toca ningún archivo de `inventario`. El único punto
->   común previsible es `lib/composition/index.ts` y `db/schema.prisma` + una migración nueva
->   (archivos calientes, bloques distintos).
+> **Para F2.0 — cruce con las ramas vivas (medido el 2026-09-24).** QC-68 y QC-92 están `done`: su
+> cruce ya no aplica. Socios nuevos:
+> - **QC-150** (`producto-terminado`, `fullstack`, `in_progress`): mete un lote de producto terminado
+>   en el Finalizar de `/asignacion/[id]`. Solape probable en `pedidos/domain/transition-order.ts` (no
+>   lo toca esta ficha), `pedidos/ports/order-unit-of-work.ts` y **`lib/composition/index.ts`**, en el
+>   bloque de `orderUnitOfWork`, que esta ficha refactoriza a `orderTransactionScopeOn`. Quizá en
+>   `finish-assigned-order.ts` (error nuevo). **Riesgo real**: se decide el orden de merge; quien vaya
+>   segundo mete su pieza en `orderTransactionScopeOn`.
+> - **QC-153** (`modelo-de-clientes`, `backend`, `in_progress`): `db/schema.prisma` y una migración
+>   nueva. Bloques distintos; lo único que obliga es el orden de timestamps (`## 2.2`).
 
 **Nuevos**
 
 | Archivo | Qué |
 | --- | --- |
-| `db/migrations/20260918120000_order_execution_entries/migration.sql` | UP (`## 2.2`) |
-| `db/migrations/20260918120000_order_execution_entries/down.sql` | DOWN |
-| `lib/modules/asignaciones/domain/execution-entry.ts` | Tipos de la anotación |
+| `db/migrations/<AAAAMMDDhhmmss>_order_execution_entries/migration.sql` | UP (`## 2.2`) |
+| `db/migrations/<AAAAMMDDhhmmss>_order_execution_entries/down.sql` | DOWN |
+| `lib/modules/asignaciones/domain/execution-entry.ts` | Tipos de la anotación y `ExecutionAbortedError` |
 | `lib/modules/asignaciones/domain/cancel-assigned-order.ts` | Caso de uso de cancelar |
 | `lib/modules/asignaciones/domain/record-step-move.ts` | Caso de uso de avanzar/retroceder |
 | `lib/modules/asignaciones/ports/execution-log-repository.ts` | Puerto del registro |
 | `lib/modules/asignaciones/ports/execution-transaction.ts` | Puerto de transacción |
 | `lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma.ts` | Adaptador del registro (fábrica con `db`) |
 | `lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma.ts` | `withExecutionTransaction` |
-| `lib/modules/pedidos/domain/order-cancellation.ts` | `isCancellableStatus` |
+| `lib/modules/pedidos/domain/order-cancellation.ts` | `isCancellableStatus`, `cancelInsideTransaction`, `OrderCancellation`, `createCancelAliveOrder` |
 | `app/(private)/asignacion/[id]/components/order-cancel-dialog.tsx` | Diálogo del motivo |
 | `app/(private)/asignacion/components/assigned-order-cancelled-notice.tsx` | Confirmación en la lista (R25 ⚑) |
 | `tests/unit/asignaciones/schema/order-execution-entries-migration.test.ts` | R1, R3, R5–R8, R32–R34 sobre el SQL |
-| `tests/unit/asignaciones/execution-log-repository.test.ts` | R31 (forma del puerto) |
+| `tests/unit/asignaciones/execution-log-repository.test.ts` | R8 (tipos), R31 (forma del puerto) |
 | `tests/unit/asignaciones/cancel-assigned-order.test.ts` | R9, R10, R22–R24, R26–R30 |
 | `tests/unit/asignaciones/record-step-move.test.ts` | R17, R18, R20, R26–R28 |
-| `tests/unit/pedidos/order-cancellation.test.ts` | R29 (una definición, dos consumidores) |
-| `tests/unit/pedidos/order-catalog-cancel.test.ts` | R29 (`cancelAliveById`) |
+| `tests/unit/pedidos/order-cancellation.test.ts` | R29 (una definición, un cuerpo, dos consumidores) |
 | `tests/unit/asignaciones-ui/order-cancel-dialog.test.tsx` | R9, R11, R22, R36 |
 | `tests/unit/asignaciones-ui/order-execution-step-log.test.tsx` | R13, R14, R17–R19 en la pantalla |
 | `tests/unit/asignaciones-ui/assigned-orders-cancelled-notice.test.tsx` | R25 |
 | `tests/integration/asignaciones/order-execution-entries-constraints.int.test.ts` | R1, R5–R8, R32 contra Postgres |
-| `tests/integration/asignaciones/execution-atomicity.int.test.ts` | R16, R24, R29 contra Postgres |
+| `tests/integration/asignaciones/execution-atomicity.int.test.ts` | R16, R20, R23, R24, R29 contra Postgres |
 | `e2e/registro-ejecucion.spec.ts` | R39, R40 |
 
 **Modificados**
 
 | Archivo | Qué cambia | Riesgo |
 | --- | --- | --- |
-| `db/schema.prisma` | `+ enum OrderExecutionAction`, `+ model OrderExecutionEntry` (al final) | Medio: caliente |
+| `db/schema.prisma` | `+ enum OrderExecutionAction`, `+ model OrderExecutionEntry` (al final) | Medio: caliente (QC-153) |
 | `lib/modules/asignaciones/domain/start-assigned-order.ts` | `start`/`resume` + transacción | Medio |
-| `lib/modules/asignaciones/domain/finish-assigned-order.ts` | `stepPosition` + `finish` en transacción | Bajo |
-| `lib/modules/asignaciones/domain/assigned-order-execution-view.ts` | `+ resumeStepPosition` | Bajo |
+| `lib/modules/asignaciones/domain/finish-assigned-order.ts` | `stepPosition` + `finish` en transacción | Medio: posible solape con QC-150 |
+| `lib/modules/asignaciones/domain/assigned-order-execution-view.ts` | `+ StartedOrderExecution` | Bajo |
 | `lib/modules/asignaciones/domain/errors.ts` | `+ NotCancellableError` | Bajo |
 | `lib/modules/asignaciones/index.ts` | `+` factories nuevas, `*Deps`, tipos | Bajo |
 | `lib/modules/asignaciones/adapters/driving/order-execution-actions.ts` | `+` dos acciones; `finish` lee `stepPosition` | Bajo |
-| `lib/modules/pedidos/domain/order-catalog.ts` | `+ cancelAliveById` | Bajo |
-| `lib/modules/pedidos/domain/cancel-order.ts` | usa `isCancellableStatus` | Bajo |
-| `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts` | `db` opcional, `cancelAliveOrderTarget`, `orderCatalogOn` | Medio |
-| `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` | **solo `cancelAliveOrder`**: `options?: { from, db }` | **Medio: posible solape con QC-68** |
-| `lib/composition/index.ts` | `orderCatalog.cancelAliveById`, repositorio del registro, `executionTransaction`, fachada | **Medio: archivo caliente** |
+| `lib/modules/pedidos/domain/cancel-order.ts` | usa `isCancellableStatus` y `cancelInsideTransaction` | Bajo |
+| `lib/modules/pedidos/index.ts` | `+ createCancelAliveOrder`, `CancelAliveOrderDeps`, `OrderCancellation` | Bajo |
+| `lib/composition/index.ts` | `orderTransactionScopeOn`, `joinOrderUnitOfWork`, `executionLogRepository`, `executionTransaction`, fachada | **Alto: archivo caliente y solape con QC-150** |
 | `lib/shared/routes.ts` | `+ CANCELLED_ORDER_PARAM` (R25 ⚑) | Bajo |
-| `components/shared/step-reader/step-reader.tsx` | dos props opcionales (R37 ⚑) | Medio: compartido con QC-64 |
+| `components/shared/step-reader/step-reader.tsx` | dos props opcionales (R37 ⚑) | Medio: compartido con QC-64/QC-125 |
 | `app/(private)/asignacion/[id]/components/order-execution-screen.tsx` | posición, cadena, botón de cancelar | Medio |
 | `app/(private)/asignacion/[id]/components/index.ts` | `+ OrderCancelDialog` | Bajo |
-| `app/(private)/asignacion/page.tsx` | pinta la confirmación de cancelado (R25 ⚑) | **Medio: es de QC-88** |
+| `app/(private)/asignacion/page.tsx` | pinta la confirmación de cancelado (R25 ⚑) | Medio |
 | `app/(private)/asignacion/components/index.ts` | `+ AssignedOrderCancelledNotice` | Bajo |
-| `tests/guards/guard-ambito-empresa-pedidos.test.ts` | `TOCA_LA_BASE` ve `db.`; **tensada** | Medio |
+| `tests/guards/guard-ambito-empresa-pedidos.test.ts` | caso nuevo, **tensada** | Medio |
 | `tests/unit/asignaciones/module-contract.test.ts` | `CASOS_DE_USO_QC63` crece | Bajo |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | `+ CANCELLED_ORDER_PARAM` en la lista exacta | Bajo |
 | `tests/unit/asignaciones/start-assigned-order.test.ts` | deps nuevas; R9 tensado | Bajo |
 | `tests/unit/asignaciones/finish-assigned-order.test.ts` | deps nuevas; R16 tensado | Bajo |
+| `tests/unit/asignaciones/empacador-authorization.test.ts` | deps nuevas, sin cambiar aserciones | Bajo |
 | `tests/unit/asignaciones/order-execution-actions.test.ts` | acciones nuevas | Bajo |
-| `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` | caso R18 de QC-63 tensado | Medio |
+| `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` | mock y fixture (el caso R18 no se toca) | Bajo |
 | `tests/unit/recetas-ui/step-reader.test.tsx` | casos nuevos para las props | Bajo |
-| `tests/integration/pedidos/order-repository.int.test.ts` | `+` caso de `cancelAliveOrder` con `from` (sin él, los casos de hoy no cambian) | Bajo |
+| `tests/integration/asignaciones/responsible-eligibility.int.test.ts`, `finished-orders.int.test.ts` | deps nuevas atadas al `tx` del test | Bajo |
 | `tests/integration/aislamiento.json` | dos entradas | Bajo |
+| E2E cuya limpieza borra pedidos tras abrir la pantalla (`## 7`) | borrar antes las anotaciones | Bajo |
 | `specs/QC-63-ejecutar-receta-operador/requirements.md` | nota fechada al pie: R10 y R18 enmendadas por QC-82 R37/R38 | Bajo |
 
-**Sin tocar, a propósito:** `lib/modules/identity/domain/permissions.ts` y el seed (R30),
-`lib/modules/pedidos/domain/order-transitions.ts`, `lib/modules/asignaciones/domain/order-state.ts`,
-`lib/modules/pedidos/ports/order-repository.ts` (el puerto no cambia de forma),
-`lib/modules/errores/**` (ningún código nuevo), `app/(private)/pedidos/**`, `lib/modules/inventario/**`,
-`package.json`.
+**Sin tocar, a propósito:** `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` y
+`order-catalog-prisma.ts` (novedad de esta revisión), `lib/modules/pedidos/domain/order-catalog.ts`,
+`transition-order.ts`, `order-transitions.ts`, `pedidos/ports/**`, `lib/modules/identity/**` y el seed
+(R30), `lib/modules/asignaciones/domain/order-state.ts`, `get-assigned-order-execution.ts`,
+`lib/modules/inventario/**`, `lib/modules/errores/**`, `app/(private)/pedidos/**`, `package.json`.
 
 ## 12. Puntos para F1.4 — no salen de la acotación
 
-Cada uno tiene una propuesta escrita en los requisitos marcados ⚑. **Ninguno se implementa sin que
-el humano lo ratifique o lo cambie.**
+Ratificados con el spec el 2026-09-18. La revisión del 2026-09-24 **no** los reabre; anota solo lo
+que el código de hoy cambia de ellos.
 
-1. **Enmendar QC-63 R18: `StepReader` gana dos props opcionales (R37).** `[D5]` y `[D12]` lo hacen
-   inevitable (`## 10.8`), pero QC-63 escribió «NO DEBE modificar ninguno de sus archivos» y tiene un
-   test de diff que se pondrá rojo tras el commit. Es la misma figura que QC-63 usó con QC-88: enmienda
-   declarada, test tensado con nota fechada.
-2. **Receta sin pasos (R5).** `StepReader` enseña un estado vacío sin Siguiente ni Finalizar. Se
-   propone `step_position` **anulable** solo para ese caso. Alternativa: prohibir `NULL` y anotar 1
-   aunque no exista el paso 1.
-3. **Si falla anotar retomar, ¿no se abre la pantalla? (R15).** `[D11]` pone retomar en el grupo de
-   «la misma operación», pero retomar no cambia nada del pedido. La propuesta es la lectura estricta:
-   sin anotación, no se abre. La otra lectura —abrir igual y perder la anotación— es la de avanzar.
-4. **Pedido `EN_CURSO` sin ninguna anotación (R14, primera mitad).** Existe hoy: todo pedido que QC-63
-   puso `EN_CURSO` antes de esta ficha, o que la oficina movió a mano. Propuesta: empezar en el paso 1.
-5. **Posición anotada mayor que los pasos de la receta editada (R14, segunda mitad).** Propuesta:
-   abrir en el último paso, sin error. Es la consecuencia de `[D9]`, pero el cómo no está decidido.
-6. **Confirmación visible al cancelar (R25).** `[D6]` pide el botón y el motivo, no qué pasa después.
-   Propuesta: volver a la lista con «Pedido X cancelado», gemela de la de entrega. Obliga a tocar otra
-   vez `app/(private)/asignacion/page.tsx` (de QC-88) y `lib/shared/routes.ts`. Alternativa: volver
-   a la lista sin confirmación.
-7. **Cancelaciones y entregas hechas desde la pantalla de pedidos (QC-35, oficina).** No se anotan:
-   la acotación habla de la pantalla de ejecución y la ficha dice que la conecta a ella. Si el humano
-   quiere que también se anoten, es otra ficha (tocaría `pedidos` y su pantalla).
-8. **Tensar `guard-ambito-empresa-pedidos`** para que vea `db.` además de `prisma.` y `tx.` (`## 7`).
-   No es opcional si el catálogo pasa a aceptar el cliente por parámetro —sin esto la guardia queda
-   ciega—, pero es tocar una guardia y se dice.
+1. **Enmendar QC-63 R18: `StepReader` gana dos props opcionales (R37).** _Revisión_: QC-125 ya tensó
+   el test a lista cerrada con `step-reader.tsx` dentro; esta ficha no toca el test.
+2. **Receta sin pasos (R5)**: `step_position` anulable solo para ese caso.
+3. **Si falla anotar retomar, no se abre la pantalla (R15).**
+4. **Pedido `EN_CURSO` sin anotaciones (R14)**: empieza en el paso 1.
+5. **Posición anotada mayor que los pasos de hoy (R14)**: abre en el último, sin error.
+6. **Confirmación visible al cancelar (R25).** _Revisión_: ahora obliga además a tocar
+   `recipe-route-contract.test.ts`.
+7. **Cancelaciones y entregas hechas desde la oficina no se anotan.** _Revisión_: desde QC-145 la
+   oficina ya no entrega editando; solo cancela (y la caducidad diaria cancela `PENDIENTE`). Ninguna
+   de las dos se anota.
+8. **Tensar `guard-ambito-empresa-pedidos`.** _Revisión_: ya no es ver `db.` en `TOCA_LA_BASE`
+   (ninguna función gana ese parámetro), sino el caso nuevo de `## 7`. Misma figura: la guardia
+   crece, no se afloja.
+
+Y dos preguntas **nuevas**, en `requirements.md > Preguntas abiertas`: **P1** (liberar todo el material
+al cancelar desde la pantalla) y **P2** (el Empacador responsable también cancela).
 
 ## 13. Riesgos
 
-1. **Solape con QC-68 en `order-prisma.ts`** (`## 11`). Mitigación: el cambio se limita a la firma y
-   al `where` de `cancelAliveOrder`.
-2. **Orden de las anotaciones en el mismo instante.** `occurred_at` sale del reloj del servidor con
-   precisión de milisegundo; la cadena de la pantalla serializa las de un mismo navegador. Dos
-   responsables en dos tablets moviendo el mismo pedido en el mismo milisegundo desempatan por `id`,
-   sin significado. Es la consecuencia que `[D12]` ya acepta («puede volver a un paso anterior al
-   real»).
-3. **Cada petición de la página anota un retomar.** La página es un `GET` con efecto desde QC-63; ahora
-   además escribe una fila. El `<Link>` de la lista a una ruta dinámica no pide el RSC de la página al
-   prefetchear, así que no debería anotar al pasar el ratón; **no está verificado** en este repo y lo
-   comprueba el E2E (tras abrir y recargar una vez: una sola fila de retomar).
-4. **Transacciones interactivas sobre el pooler** (`DATABASE_URL` en modo transacción). Ya las usan
-   nueve adaptadores driven; no es nuevo, pero sí la primera que cruza dos módulos.
-5. **La posición no se valida contra la receta** (`## 3.3`): una petición forjada puede anotar la
-   posición 999. Al retomar se recorta al último paso (punto 5 de `## 12`). Se acepta por el mismo
-   motivo que `[D9]`.
+1. **Solape con QC-150 en `lib/composition/index.ts`** y en el Finalizar (`## 11`). Mitigación: el
+   constructor único del ámbito; se decide el orden de merge en F2.0.
+2. **Orden de las anotaciones en el mismo instante.** Dos responsables en el mismo milisegundo
+   desempatan por `id`, sin significado. `[D12]` ya lo acepta.
+3. **Cada petición de la página anota un retomar.** No está verificado que el prefetch del `<Link>` no
+   pida el RSC; lo comprueba el E2E (abrir y recargar una vez: una sola fila de retomar).
+4. **Transacciones interactivas sobre el pooler.** Ya las usan diez adaptadores y la de `pedidos` con
+   `inventario`; esta es la primera que cruza **tres** módulos (`asignaciones`, `pedidos`,
+   `inventario`) y la de Finalizar es la más larga. Mismos `maxWait`/`timeout` que la de `pedidos`.
+5. **La posición no se valida contra la receta**: una petición forjada puede anotar 999. Al retomar se
+   recorta al último paso. Se acepta por el mismo motivo que `[D9]`.
+6. **`recordStepMove` comprueba `EN_CURSO` y luego escribe, sin candado.** Un avanzar que llegue en el
+   mismo instante en que otro responsable finaliza puede quedar anotado justo después del
+   `ENTREGADO`. Es una fila de más en un registro que `[D11]` ya declara con pérdidas; bloquear el
+   pedido en cada clic costaría una transacción por Siguiente.
+7. **Una unidad de trabajo unida usada fuera de una transacción** escribiría sin atomicidad. Solo la
+   construye `lib/composition`, y solo dentro de `withExecutionTransaction`; lo vigila el caso nuevo
+   de `guard-ambito-empresa-pedidos` (`## 7`).
