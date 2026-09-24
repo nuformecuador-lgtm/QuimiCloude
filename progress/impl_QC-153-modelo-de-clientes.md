@@ -99,6 +99,16 @@ de `guard-arquitectura-modulos.test.ts` en `tests/baseline-rojos.json`. No está
 lo dejo señalado para que el leader/reviewer decida si entra en `baseline-rojos.json` o se
 corrige la guardia (acotarla al propio diff de QC-145 en vez de al merge-base actual).
 
+## T7 — `tests/integration/identity/identity-seed.int.test.ts`
+
+Numeros y comentarios de `design.md > 6.1` actualizados: 16→18 permisos, 20→22 asignaciones,
+en los comentarios derivados, el titulo del caso 10 y las aserciones de los casos 10 y 12.
+
+Verificado contra `QuimiCloude_QC153` (`DATABASE_URL`/`DIRECT_URL` exportadas): la corrida de
+integracion construyo su plantilla propia (`qct_tpl_1e52306aa6a0`, 46 migraciones incluida
+`20260924120000_customers`) y una base efimera (`qct_qc153_a65926a5_mufj77v3_j44`), borrada al
+terminar. **15/15 tests verdes.**
+
 ## Verificación T0
 
 ```

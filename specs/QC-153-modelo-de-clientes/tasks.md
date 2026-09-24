@@ -83,7 +83,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       `qc145-estado-solo-planta`, `order-assignments-migration`, `grupos/scope`, `roles/scope`,
       `seed-initial-access`. Números **subidos**, listas **ampliadas**; nada relajado.
       **Hecho cuando:** `./init.sh --rapido` verde. *Depende de T4.*
-- [ ] **T7.** [P] `tests/integration/identity/identity-seed.int.test.ts`: números y comentarios de las
+- [x] **T7.** [P] `tests/integration/identity/identity-seed.int.test.ts`: números y comentarios de las
       líneas de `design.md > 6.1`. **Hecho cuando:** el archivo pasa contra la base efímera.
       *Depende de T2 y T4.*
 
