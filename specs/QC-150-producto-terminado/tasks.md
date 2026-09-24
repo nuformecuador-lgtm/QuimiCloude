@@ -277,7 +277,7 @@ Archivos: `e2e/producto-terminado.spec.ts` (nuevo) y, si hace falta, su fixture.
 **Hecho cuando:** `pnpm run e2e -- producto-terminado` está verde en local y en el gate completo
 (R37).
 
-## T13 — Documentación y trazabilidad `[depende de T1-T12, T14]`
+## [x] T13 — Documentación y trazabilidad `[depende de T1-T12, T14]`
 
 Archivos: `docs/architecture.md` (pregunta 2 del dominio: el lote tiene ya una **entrada** por
 producción; tipos de producto), `progress/impl_QC-150-producto-terminado.md` (mapa
