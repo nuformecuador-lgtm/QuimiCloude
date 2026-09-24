@@ -76,8 +76,8 @@ export const CODIGOS_QC74 = [
   'clientes.modificar',
 ] as const;
 
-/** Los siete modulos de negocio del ERP. Eran cinco hasta que QC-86 sumo `asignaciones`; esta
- *  ficha suma `clientes`. */
+/** Los siete modulos de negocio del ERP. Eran cinco hasta que se sumo `asignaciones`, y ahora se
+ *  suma `clientes`. */
 export const MODULOS_DE_NEGOCIO = [
   'inventario',
   'recetas',
@@ -144,11 +144,11 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
 
   it('los modulos son exactamente los siete de negocio mas dashboard y usuarios', () => {
     const modulos = [...new Set(catalogo.map((permiso) => permiso.module))].sort();
-    // `unidades` ya esta entre los de negocio, `asignaciones` entro ahi con QC-86 y `clientes`
-    // con esta ficha; el catalogo suma `dashboard`, que es una pantalla y no un modulo del ERP
-    // (QC-74 R4: solo `consultar`), `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los
-    // usuarios viven dentro de `identity`-, y `terminados`, que tampoco es carpeta de
-    // `lib/modules/`: la misma enmienda que ya se hizo con `usuarios`.
+    // `unidades`, `asignaciones` y `clientes` ya estan entre los de negocio; el catalogo suma
+    // `dashboard`, que es una pantalla y no un modulo del ERP (solo lleva `consultar`),
+    // `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
+    // `identity`-, y `terminados`, que tampoco es carpeta de `lib/modules/`: la misma enmienda
+    // que ya se hizo con `usuarios`.
     const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios', 'terminados'])].sort();
     expect(modulos).toEqual(esperados);
     expect(modulos).toContain('unidades');

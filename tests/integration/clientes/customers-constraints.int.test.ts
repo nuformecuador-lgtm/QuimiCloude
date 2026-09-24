@@ -1,6 +1,6 @@
 /**
- * Tests de integracion de QC-153 (modelo-de-clientes) contra una base Postgres REAL, con la
- * migracion `20260924120000_customers` aplicada.
+ * Tests de integracion del modelo Customer contra una base Postgres REAL, con la migracion
+ * `20260924120000_customers` aplicada.
  *
  * AISLAMIENTO — cada `it` corre dentro de `prisma.$transaction` interactiva y termina lanzando
  * `RollbackSignal`, que hace que Prisma emita `ROLLBACK`. Toda operacion que se espera que falle
@@ -11,8 +11,6 @@
  * SQL CRUDO — toda operacion que se espera que la base rechace, o que omite una columna
  * obligatoria, va con `$executeRaw`: la API tipada no deja ni compilar una omision, y solo el
  * crudo propaga el SQLSTATE en `meta.code`.
- *
- * Cubre R2, R3, R5-R17.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -462,6 +460,16 @@ describe('escalares sin @relation, pero con FK reales (R11)', () => {
       // solo el escalar `companyId`.
       expect('company' in created).toBe(false)
       expect('createdByUser' in created).toBe(false)
+
+      // Y no es solo que `create` no la devuelva: el cliente Prisma generado no conoce NINGUNA
+      // relacion que atravesar. Pedir un `include` de un nombre plausible ('company') falla en
+      // tiempo de ejecucion porque el campo no existe en el modelo, no porque se omitiera.
+      await expect(
+        tx.customer.findUnique({
+          where: { id: created.id },
+          include: { company: true } as never,
+        }),
+      ).rejects.toThrow(/Unknown (field|argument)/i)
     })
   })
 })
@@ -533,6 +541,33 @@ describe('auditoria (R12, R13)', () => {
         select: { createdBy: true },
       })
       expect(customer.createdBy).toBe(autor)
+    })
+  })
+
+  it('rechaza el borrado fisico de un usuario que SOLO figura como editor, sin haber creado el cliente (R13)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const companyId = await createCompany(tx)
+      const autor = await createUser(tx, companyId)
+      const soloEditor = await createUser(tx, companyId)
+      const cliente = await tx.customer.create({
+        data: { firstNames: 'Con', lastNames: 'Autor', city: 'Cali', companyId, createdBy: autor },
+        select: { id: true },
+      })
+      await tx.customer.update({ where: { id: cliente.id }, data: { updatedBy: soloEditor } })
+
+      const sqlState = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "users" WHERE "id" = ${asUuid(soloEditor)}`,
+        'borrado de un usuario que figura solo como editor de un cliente',
+      )
+      expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
+
+      const customer = await tx.customer.findUniqueOrThrow({
+        where: { id: cliente.id },
+        select: { createdBy: true, updatedBy: true },
+      })
+      expect(customer.createdBy).toBe(autor)
+      expect(customer.updatedBy).toBe(soloEditor)
     })
   })
 })

@@ -64,7 +64,7 @@ afirmando exactamente lo mismo: previo + terminados.consultar + lo que venga des
 nuevos R21 (catalogo con los dos codigos exactos y catalogo = previo + los dos), R22
 (Administrador con los dos; Operador y Empacador intactos, sin `clientes.*`) y R25 (parrafo de
 la enmienda: ≤5 lineas, contiene "enmienda", nombra los dos codigos, sin citas). El detector de
-citas sintetico ya existente (linea ~168) sigue mordiendo un JSDoc con `QC-144`.
+citas sintetico ya existente sigue mordiendo un JSDoc con `QC-144`.
 
 Verificado con T4 revertido en local (sin commitear, restaurado byte a byte despues): 10 de 31
 casos caen, incluidos los tres de R21/R22 nuevos y los que ya afirmaban el recuento/lista del
@@ -87,18 +87,6 @@ comentario derivado y aserciones: 16→18 permisos, 20→22 asignaciones).
 
 Verificado: los 8 archivos de arriba, 145 tests pasan (12 skip, no relacionados).
 
-**Hallazgo fuera del alcance de esta ficha (no arreglado, reportado):**
-`tests/unit/pedidos/qc145-estado-solo-planta.test.ts`, describe `R29 — el esquema no gana
-modelos ni tablas: el unico cambio es la columna de R1`, caso `los modelos de db/schema.prisma
-son los mismos que en la base de fusion con origin/dev`. Ese caso compara los modelos de
-`db/schema.prisma` en HEAD contra los de `git merge-base origin/dev HEAD`, sin acotarse al
-diff propio de esa ficha (QC-145): cualquier ficha posterior que añada un modelo Prisma —que es
-justo lo que R1 de esta ficha exige (`Customer`)— lo pone en rojo, igual que la deuda ya anotada
-de `guard-arquitectura-modulos.test.ts` en `tests/baseline-rojos.json`. No está en el alcance de
-`design.md > 6.1` ni en los archivos que `tasks.md` declara tocar, así que no lo he modificado:
-lo dejo señalado para que el leader/reviewer decida si entra en `baseline-rojos.json` o se
-corrige la guardia (acotarla al propio diff de QC-145 en vez de al merge-base actual).
-
 ## T7 — `tests/integration/identity/identity-seed.int.test.ts`
 
 Numeros y comentarios de `design.md > 6.1` actualizados: 16→18 permisos, 20→22 asignaciones,
@@ -108,25 +96,6 @@ Verificado contra `QuimiCloude_QC153` (`DATABASE_URL`/`DIRECT_URL` exportadas): 
 integracion construyo su plantilla propia (`qct_tpl_1e52306aa6a0`, 46 migraciones incluida
 `20260924120000_customers`) y una base efimera (`qct_qc153_a65926a5_mufj77v3_j44`), borrada al
 terminar. **15/15 tests verdes.**
-
-## Verificación final (T0–T7)
-
-- `pnpm run typecheck`: sin salida, exit 0.
-- `pnpm run lint`: sin salida, exit 0.
-- `pnpm prisma validate`: `The schema at db\schema.prisma is valid 🚀`.
-- `pnpm exec vitest related --run db/schema.prisma lib/modules/clientes/domain/customer.ts
-  lib/modules/clientes/index.ts lib/modules/identity/domain/permissions.ts`: `permissions.ts`
-  se importa desde casi todo el dominio de negocio, así que el grafo relacionó **374 archivos /
-  5576 tests**. Resultado: **1 fallo, 5555 pasan, 20 skip**. El único fallo es el hallazgo
-  fuera de alcance ya descrito (`qc145-estado-solo-planta.test.ts`, R29 modelos vs
-  merge-base). Ninguna otra regresión.
-- Los archivos de guardia y tests concretos que las tasks nombran, corridos uno a uno
-  (`guard-identificador-de-request`, `guard-rls-force`, `guard-empresa-en-esquema`,
-  `guard-arquitectura-modulos`, `guard-permisos-sembrados`, `guard-nav-permisos-declarados`,
-  y los ocho de T6), todos verdes salvo el hallazgo ya anotado.
-- `identity-seed.int.test.ts` contra `QuimiCloude_QC153`: **15/15 verdes**.
-- `git diff --name-only origin/dev...HEAD` coincide exactamente con la lista de archivos que
-  `tasks.md` declara tocar (más `specs/` y `progress/`); ningún archivo de `e2e/`.
 
 ## T8 — `tests/unit/clientes/schema/customers-schema.test.ts`
 
@@ -152,7 +121,8 @@ Cubre R20 (forma hexagonal: `index.ts` solo reexporta de `./domain`, unicas carp
 `'use server'`), R26 (barrido de `lib/`, `app/`, `components/`, `hooks/`, `middleware.ts`: el
 literal `clientes.consultar`/`clientes.modificar` solo en `permissions.ts`, `adapters/driving/`
 vacio), R28 (ningun `e2e/*` nombra clientes) y R29 (`package.json` sin claves nuevas contra el
-merge-base con `origin/dev`, saltando explicitamente si el rango no existe). **9 tests, verdes.**
+merge-base con `origin/dev`). Tras el review, ver «Menores del review» abajo para los casos de
+sensibilidad reescritos.
 
 ## T11 — `tests/integration/clientes/customers-constraints.int.test.ts`
 
@@ -164,7 +134,8 @@ transaccion (no `TEMP TABLE`: Postgres no permite que una temporal referencie un
 permanente, `42P16`; una tabla normal se deshace igual con el `ROLLBACK`), la baja logica de
 R14, `updated_at` de R15, el censo de columnas de R16 y `pg_class`/`pg_policies` de R17. Alta de
 `clientes/customers-constraints.int.test.ts` y `clientes/customers-migration.int.test.ts` en
-`tests/integration/aislamiento.json` (`transaccion`). **16 tests, verdes.**
+`tests/integration/aislamiento.json` (`transaccion`). **16 tests, verdes** (18 tras el review,
+ver abajo).
 
 ## T12 — `tests/integration/clientes/customers-migration.int.test.ts`
 
@@ -175,8 +146,174 @@ permisos asignados solo al Administrador, resto identico) y R24 (permisos y asig
 a mano antes del UP: no falla, no duplica, `updated_at` sin reescribir). Caso sintetico adicional
 que exige `tasks.md`: un `down.sql` con el `DELETE` de `role_permissions` quitado, corrido de
 verdad contra la base dentro de su propia transaccion revertida, cae por la FK RESTRICT de
-`role_permissions_permission_code_fkey`. **4 tests, verdes.** Ningun bloqueo con otro archivo de
-integracion: no hizo falta pasar nada a `commit`.
+`role_permissions_permission_code_fkey`. **4 tests, verdes** (5 tras el review, ver abajo).
+Ningun bloqueo con otro archivo de integracion: no hizo falta pasar nada a `commit`.
+
+## Verificación T0–T12
+
+- `pnpm run typecheck`: sin salida, exit 0.
+- `pnpm run lint`: sin salida, exit 0 (2 warnings preexistentes en
+  `tests/unit/pedidos/order-service.test.ts`, no relacionados con esta ficha).
+- `pnpm prisma validate`: `The schema at db\schema.prisma is valid 🚀`.
+- `pnpm exec vitest related --run` sobre `db/schema.prisma`, `lib/modules/clientes/domain/customer.ts`,
+  `lib/modules/clientes/index.ts` y `lib/modules/identity/domain/permissions.ts`: el grafo
+  relaciono 374 archivos / 5576 tests. Tras la decision humana del guardian de QC-145 (ver abajo),
+  todo verde.
+- `identity-seed.int.test.ts` contra `QuimiCloude_QC153`: 15/15 verdes.
+- Los archivos de guardia y tests concretos que las tasks nombran, corridos uno a uno
+  (`guard-identificador-de-request`, `guard-rls-force`, `guard-empresa-en-esquema`,
+  `guard-arquitectura-modulos`, `guard-permisos-sembrados`, `guard-nav-permisos-declarados`,
+  y los ocho de T6), todos verdes.
+- `git diff --name-only origin/dev...HEAD` coincide exactamente con la lista de archivos que
+  `tasks.md` declara tocar (más `specs/` y `progress/`); ningún archivo de `e2e/`.
+
+## Decision humana 2026-09-24: guardian de modelos de QC-145 fijado a su propio merge
+
+El caso `R29 — el esquema no gana modelos ni tablas`, «los modelos de db/schema.prisma son los
+mismos que en la base de fusion con origin/dev», comparaba HEAD contra `git merge-base origin/dev
+HEAD`, asi que cualquier ficha posterior que anadiera un modelo (esta ficha, con `Customer`) lo
+ponia en rojo. Se reescribio para comparar los modelos del propio merge de la ficha anterior
+(PR #112) contra su primer padre, sin depender de fichas posteriores.
+
+- SHA del merge (PR #112) usado, fijo como constante `MERGE_QC145`:
+  `51f2d1013f33a3fde50594ac0dde7ec7b7535938` (confirmado con
+  `git log --merges --grep="#112" origin/dev --oneline`).
+- Verificado a mano: `git show 51f2d1013f33a3fde50594ac0dde7ec7b7535938~1:db/schema.prisma`
+  vs `git show 51f2d1013f33a3fde50594ac0dde7ec7b7535938:db/schema.prisma` difieren solo en la
+  columna `finishedAt` de `Order`; la lista de `model X {` es identica en ambos.
+- La excepcion previa (`ReservationMovement` en `ESPERADOS_DE_ESTA_RAMA`) se QUITO: ya no hace
+  falta, porque la comparacion ya no llega hasta el punto en que `origin/dev` incluye ese modelo.
+- Hallazgo tecnico: `execSync` en Windows corre por `cmd.exe`, donde `^` es caracter de escape;
+  `${MERGE_QC145}^1` se corrompia a un SHA con un caracter de mas. Se uso `${MERGE_QC145}~1`
+  (equivalente para primer padre) en su lugar.
+- Caso sintetico «dispara con un esquema sintetico que gana un modelo respecto de su padre»
+  reescrito para ejercitar la misma funcion `modelosDe` que usa el caso real (antes tenia su
+  propia copia local de la funcion).
+- Sin red: si el commit no existe (clon superficial), el caso lanza `throw new Error(...)` con
+  el motivo, nunca se salta.
+
+## Decision humana 2026-09-24: pedidos-schema, derogacion parcial
+
+`tests/unit/pedidos/schema/pedidos-schema.test.ts`, caso «Order no declara cliente, destinatario
+ni ninguna columna equivalente», prohibia dos cosas: (a) campos de cliente/destinatario en
+`Order`, y (b) un catalogo de clientes (modelos `Customer`/`Client`/`Recipient`/`Buyer` y sus
+`@@map`). Decision humana: (b) queda derogada solo para `Customer`/`customers` por el modulo
+Clientes; (a) sigue vigente hasta la ficha del CRUD.
+
+Cambios:
+- Se retiro `Customer` de la lista `forbidden` de modelos y `customers` del regex `@@map`
+  prohibido en ese caso. `Client`, `Recipient`, `Buyer`, `clients` y `recipients` se mantienen.
+- Se reescribio el comentario del caso para reflejar la derogacion parcial y su fecha (el humano
+  pidio conservar la cita a las tres fichas en ese comentario especifico).
+- Se anadio nota fechada 2026-09-24 en `specs/QC-153-modelo-de-clientes/design.md` §6.1.
+- La aseveracion (a) sobre los campos de `Order` no se toco.
+
+## Menores del review
+
+Review en `progress/review_QC-153-modelo-de-clientes.md`, veredicto OK con 9 menores. El menor 9
+(commitear el cambio de `pedidos-schema.test.ts`) ya estaba resuelto en `e7f5e9b1` antes de esta
+tanda. El menor 1 (T13) lo marca el leader tras el gate completo. Los menores 2, 3, 4, 5, 6, 7 y 8
+se cierran en esta tanda:
+
+- **Menor 7 (recuentos desfasados).** `tests/unit/identity/roles/scope.test.ts` (JSDoc de
+  `PERMISOS_ESPERADOS`) y `tests/unit/identity/permissions.test.ts:239` seguian diciendo
+  «dieciseis» con la constante ya en 18. Reescritos para terminar en «dieciocho». Barrido con
+  grep de `dieciseis`/`\b16\b` sobre todos los archivos del diff: el resto de coincidencias son
+  historicas (progresion diez→...→dieciocho, correcta) o numeros ajenos al catalogo de permisos
+  (version de Next, «Caso 16», campos de `Order`).
+
+- **Menor 4 (R29 de `scope.test.ts` en silencio).** `mergeBaseConDev()` y la lectura de
+  `package.json` en la base ya no devuelven `null` para saltar en silencio: lanzan `Error` con el
+  motivo. El caso ya no tiene un `return` que lo deje pasar en verde por vacio.
+
+- **Menor 3 (casos «que muerden» tautologicos).** Se extrajo el predicado real a una funcion y se
+  aplico dos veces (al dato real y a la mutacion), en vez de comprobar solo que el texto mutado
+  contiene lo que se le puso:
+  - `customers-schema.test.ts`: `noLlevaUnique()` y `llevaRelation()`, usadas tanto en la
+    afirmacion real como en la mutacion de `@unique`/`@relation`.
+  - `customers-migration.test.ts`: `esColumnaTextoLibre()` (VARCHAR), `mencionaOtroRol()`
+    (Administrador→Operador) y `llevaCascade()` (DROP), cada una aplicada al SQL real y a la
+    version mutada.
+  - `scope.test.ts` (clientes): `carpetasDe()` se aplica a un directorio temporal real
+    (`mkdtempSync`) con una carpeta ajena de verdad, no a un array retocado en memoria; el caso
+    de «literal fabricado» ahora escribe un archivo real bajo `lib/modules/clientes/` y corre el
+    mismo detector `detectarLiteralesDePermiso()` que usa el caso real, en vez de solo probar la
+    regex contra un string suelto.
+
+- **Menor 5 (R28, solo nombres de archivo).** Se anadio un segundo caso que lee el CONTENIDO de
+  `e2e/**` buscando marcadores propios del modulo (`customers`, `/clientes`, `clientes.consultar`,
+  `clientes.modificar`, `'Clientes'`/`"Clientes"`), no la palabra suelta «cliente»: esa palabra es
+  ambigua en este repo («componente de CLIENTE», «el cliente insertara la fila») y un grep
+  ingenuo del contenido dispararia con casi cualquier spec E2E existente. Los dos casos (nombre de
+  archivo + contenido) pasan limpios: ningun E2E de esta ficha.
+
+- **Menor 6 (coberturas de integracion parciales).**
+  - **R11**: se anadio un `include: { company: true }` contra el cliente Prisma real, que
+    RECHAZA en tiempo de ejecucion («Unknown field»): demuestra que no hay relacion que
+    atravesar, no solo que `create` no la devuelve.
+  - **R13**: se anadio un caso que borra a un usuario que SOLO figura como `updatedBy` (nunca
+    como `createdBy`) y comprueba el mismo 23503.
+  - **R18**: se anadio un caso que asigna `clientes.consultar` a un rol distinto del
+    Administrador (fuera de banda) antes del DOWN, y comprueba que el DOWN lo borra igual: un
+    DELETE acotado por rol pasaria los casos previos sin morder esto, porque la base efimera solo
+    tenia asignaciones del Administrador.
+
+- **Menor 2 (comentarios de test que citan ficha/requisito/design.md).** Reescritas sin cita, con
+  `R<n>` solo en nombres de caso:
+  - Cabeceras de los cinco archivos nuevos (`customers-schema.test.ts`, `customers-migration.test.ts`,
+    `customers-constraints.int.test.ts`, `customers-migration.int.test.ts`, `scope.test.ts`):
+    quitadas las referencias a `T8`/`T9`/`T10`/`T12`, a la ficha entre parentesis y a «Cubre R...».
+  - `qc145-estado-solo-planta.test.ts`: la linea «Commit de merge del PR #112 (QC-145)» perdio la
+    cita a la ficha (el numero de PR se conserva: no es una cita a ficha/requisito).
+  - `qc75-convenciones.test.ts`: las dos lineas tocadas que citaban la ficha anterior por numero
+    se reescribieron sin el numero, conservando el hecho («ya estaba entre los de negocio»,
+    «esta guardia lo comprueba igual»).
+  - `guard-nav-permisos-declarados.test.ts`: el parrafo tocado que decia «Eran diez en QC-74...»
+    se reescribio sin la cita («El catalogo empezo en diez y fue subiendo...»).
+  - Revisado con `git diff origin/dev...HEAD -- tests/` filtrando lineas añadidas que citan
+    `QC-\d+`/`design\.md`/`decisi[oó]n cerrada`: las que quedan son (a) la excepcion de
+    `pedidos-schema.test.ts` que el humano pidio conservar, y (b) nombres de caso (`it(...)`),
+    que la convencion permite.
+  - Revisado tambien `tests/unit/identity/permissions.test.ts`: las clausulas que esta rama
+    realmente añadio a los tres JSDoc (`CODIGOS_DEL_REQUISITO`, `MODULOS`, `MODULOS_CON_ESCRITURA`)
+    ya no citaban ficha alguna; las citas a `QC-74`/`QC-38`/`QC-66`/`QC-86` que quedan en esos
+    bloques son texto preexistente sin tocar por este diff, fuera del alcance de esta limpieza.
+  - Sobre "el mensaje de fallo de R26 que menciona QC-154" (excepcion nombrada en el pedido): no
+    existe tal mensaje en el codigo actual (solo aparece como nota en `tasks.md`/`design.md`, que
+    no son comentarios de test); no habia nada que dejar ni que tocar.
+
+## Verificación de las menores (esta tanda)
+
+```
+pnpm run typecheck
+  (sin salida, exit 0)
+
+pnpm run lint
+  2 warnings preexistentes en tests/unit/pedidos/order-service.test.ts (no relacionadas con
+  este cambio), 0 errores.
+
+pnpm exec vitest related --run <los 10 archivos tocados por las menores>
+  Test Files  10 passed (10)
+       Tests  140 passed | 7 skipped (147)
+
+pnpm exec vitest run <los mismos 10 archivos> --reporter=verbose
+  (con DATABASE_URL/DIRECT_URL de QuimiCloude_QC153 exportadas)
+  Test Files  10 passed (10)
+       Tests  140 passed | 7 skipped (147)
+
+pnpm exec vitest run tests/unit/clientes tests/integration/clientes tests/unit/identity tests/guards
+  (sanidad adicional, no pedida pero barata)
+  Test Files  141 passed (141)
+       Tests  2309 passed | 36 skipped (2345)
+```
+
+Los 10 archivos de la lista: `tests/unit/clientes/schema/customers-schema.test.ts`,
+`tests/unit/clientes/schema/customers-migration.test.ts`, `tests/unit/clientes/scope.test.ts`,
+`tests/integration/clientes/customers-constraints.int.test.ts`,
+`tests/integration/clientes/customers-migration.int.test.ts`,
+`tests/unit/identity/permissions.test.ts`, `tests/unit/identity/roles/scope.test.ts`,
+`tests/guards/guard-nav-permisos-declarados.test.ts`, `tests/unit/navegacion/qc75-convenciones.test.ts`,
+`tests/unit/pedidos/qc145-estado-solo-planta.test.ts`.
 
 ## Mapa R1–R29 → test
 
@@ -204,11 +341,11 @@ integracion: no hizo falta pasar nada a `commit`.
 | R10 | `customers-migration.test.ts` | «el unico indice unico es la clave candidata (company_id, id)» |
 | R10 | `customers-constraints.int.test.ts` | «la clave candidata (company_id, id) rechaza a un hijo que declara otra empresa (R10)» |
 | R11 | `customers-schema.test.ts` | «companyId, createdBy y updatedBy son escalares uuid SIN @relation (R11)» |
-| R11 | `customers-constraints.int.test.ts` | «las tres FK existen en pg_constraint, y el cliente Prisma no expone relacion navegable» |
+| R11 | `customers-constraints.int.test.ts` | «las tres FK existen en pg_constraint, y el cliente Prisma no expone relacion navegable» (incluye el `include` que rechaza en runtime) |
 | R12 | `customers-migration.test.ts` | «las tres FK son RESTRICT y ninguna es SET NULL» |
 | R12 | `customers-constraints.int.test.ts` | «acepta un cliente sin autor, registra autor y editor, y rechaza un autor inexistente (23503)» |
 | R13 | `customers-migration.test.ts` | «las tres FK son RESTRICT y ninguna es SET NULL» |
-| R13 | `customers-constraints.int.test.ts` | «rechaza el borrado fisico de un usuario que figura como creador o editor de un cliente (R13)» |
+| R13 | `customers-constraints.int.test.ts` | «rechaza el borrado fisico de un usuario que figura como creador o editor de un cliente (R13)» y «rechaza el borrado fisico de un usuario que SOLO figura como editor, sin haber creado el cliente (R13)» |
 | R14 | `customers-constraints.int.test.ts` | «la baja conserva la fila completa y marca deleted_at, sin ninguna otra columna de estado (R14)» |
 | R15 | `customers-schema.test.ts` | «declara createdAt y updatedAt, y el segundo se actualiza solo (R15)» |
 | R15 | `customers-constraints.int.test.ts` | «updated_at crece tras un update, y created_at no cambia (R15)» |
@@ -217,144 +354,22 @@ integracion: no hizo falta pasar nada a `commit`.
 | R17 | `customers-migration.test.ts` | «customers queda con ENABLE y FORCE, y no hay ningun CREATE POLICY» |
 | R17 | `customers-constraints.int.test.ts` | «RLS activada y forzada, sin ninguna policy (R17)» |
 | R18 | `customers-migration.test.ts` | «dos DELETE acotados a los dos codigos, en ese orden, y un unico DROP TABLE sin CASCADE (R18)» |
-| R18 | `customers-migration.int.test.ts` | «R18: el DOWN deja sin tabla, sin los dos permisos ni sus asignaciones, y el resto del catalogo intacto» y «R18 (sensibilidad): un down.sql sintetico sin el DELETE de role_permissions cae por la FK RESTRICT» |
+| R18 | `customers-migration.int.test.ts` | «R18: el DOWN deja sin tabla, sin los dos permisos ni sus asignaciones, y el resto del catalogo intacto», «R18: el DOWN borra las asignaciones de CUALQUIER rol, no solo las que puso esta migracion» y «R18 (sensibilidad): un down.sql sintetico sin el DELETE de role_permissions cae por la FK RESTRICT» |
 | R19 | `customers-schema.test.ts` | «declara /// @module clientes, y ningun otro modelo lo reclama (R19)» |
-| R20 | `scope.test.ts` | los cuatro casos de `describe('R20 — el modulo clientes nace con la forma hexagonal')` |
-| R21 | `tests/unit/identity/permissions.test.ts` | casos de R21 (T5) |
+| R20 | `scope.test.ts` | los cuatro casos de `describe('R20 — el modulo clientes nace con la forma hexagonal')`: «index.ts existe y solo reexporta simbolos de ./domain», «las unicas carpetas del modulo son domain, ports y adapters», «ports y adapters estan vacios salvo su .gitkeep…», «ningun archivo alcanzable desde el contrato declara 'use server'» |
+| R21 | `permissions.test.ts` | «R21: el catalogo contiene clientes.consultar y clientes.modificar con su modulo, accion y descripcion exactos» y «R21: el catalogo es el previo mas los dos codigos de clientes, ningun otro codigo cambia» |
 | R22 | `customers-migration.test.ts` | «la asignacion es solo al Administrador, con ON CONFLICT DO NOTHING…» |
-| R22 | `tests/unit/identity/permissions.test.ts` | casos de R22 (T5) |
+| R22 | `permissions.test.ts` | «R22: el Administrador incluye clientes.consultar y clientes.modificar, escritos uno a uno» y «R22: el Operador y el Empacador conservan exactamente los permisos que tenian, sin clientes.*» |
 | R23 | `customers-migration.test.ts` | «los literales de permiso son iguales a las entradas de PERMISSIONS importadas» |
 | R23 | `customers-migration.int.test.ts` | «R23: DOWN y luego UP recrean la tabla y los dos permisos, asignados SOLO al Administrador, y el resto identico» |
 | R24 | `customers-migration.test.ts` | «la asignacion es solo al Administrador, con ON CONFLICT DO NOTHING…» |
 | R24 | `customers-migration.int.test.ts` | «R24: si el seed ya creo los dos permisos y su asignacion, el UP no falla, no duplica y no reescribe updated_at» |
-| R25 | `tests/unit/identity/permissions.test.ts` | caso de R25 (T5) |
-| R26 | `scope.test.ts` | los tres casos de `describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha')` |
+| R25 | `permissions.test.ts` | «R25: la enmienda de clientes.consultar/clientes.modificar en el fuente no cita ficha ni requisito» |
+| R26 | `scope.test.ts` | los tres casos de `describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha')`: «el literal de los dos permisos solo aparece en permissions.ts», «adapters/driving/ esta vacio…», «la regla de literales dispara con un archivo fabricado que si nombra el permiso» |
 | R27 | `customers-migration.test.ts` | «no hay ningun ALTER/DROP/CREATE INDEX sobre otra tabla ni mencion de orders (R27)» |
-| R28 | `scope.test.ts` | «ningun archivo de e2e/ menciona clientes» |
+| R28 | `scope.test.ts` | «ningun nombre de archivo de e2e/ menciona clientes» y «ningun contenido de e2e/ nombra la tabla, el permiso o la ruta de clientes» |
 | R29 | `scope.test.ts` | «package.json no gano ninguna clave de dependencia contra el merge-base con origin/dev» |
 
 Los `R<n>` de T5–T7 (R21, R22, R25 en `permissions.test.ts`; recuentos en las ocho guardias/tests
 de T6; `identity-seed.int.test.ts` en T7) ya estaban mapeados en sus secciones respectivas de
 arriba.
-
-## Verificación T8–T12
-
-- `pnpm run typecheck`: sin salida, exit 0.
-- `pnpm run lint`: sin salida, exit 0 (tras corregir un `no-unused-vars` en el caso de
-  sensibilidad de tipo de `customers-schema.test.ts`).
-- `pnpm exec vitest run tests/unit/clientes/schema/customers-schema.test.ts
-  tests/unit/clientes/schema/customers-migration.test.ts tests/unit/clientes/scope.test.ts`:
-  **Test Files 3 passed (3) · Tests 30 passed (30)**.
-- `pnpm exec vitest run tests/integration/clientes/customers-constraints.int.test.ts
-  tests/integration/clientes/customers-migration.int.test.ts` (con `DATABASE_URL`/`DIRECT_URL`
-  de `QuimiCloude_QC153` exportadas; corrida sobre la base efimera del `globalSetup`):
-  **Test Files 2 passed (2) · Tests 20 passed (20)**.
-- `pnpm exec vitest run tests/guards/guard-aislamiento-integracion.test.ts`: **6 tests, verdes.**
-- `pnpm exec vitest related --run` sobre los tres archivos unitarios: **3 passed, 30 tests
-  passed** (mismo resultado que la corrida directa: el grafo no relaciona nada mas fuera de
-  ellos mismos y de sus imports).
-- Hallazgo fuera de alcance de `qc145-estado-solo-planta.test.ts` (ya reportado en T0–T7): sigue
-  presente y sigue sin tocarse; no esta en la lista de archivos que esta tanda declara tocar.
-
-## Verificación T0
-
-```
-pnpm run db:test template
-  test-db: plantilla reutilizada: qct_tpl_664cc76c19c8 (las migraciones no han cambiado)
-  ✓ plantilla de esta rama: qct_tpl_664cc76c19c8 (45 migraciones)
-
-pnpm run db:test status  (DATABASE_URL/DIRECT_URL -> QuimiCloude_QC153)
-  ✓ base de desarrollo «QuimiCloude_QC153» al dia: 45 migracion(es) aplicada(s)
-```
-
-## Decision humana 2026-09-24: guardian de modelos de QC-145 fijado a su propio merge
-
-El caso rojo (`R29 — el esquema no gana modelos ni tablas`, «los modelos de db/schema.prisma
-son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de
-QC-141») comparaba HEAD contra `git merge-base origin/dev HEAD`, asi que cualquier ficha
-posterior que anadiera un modelo (esta ficha, con `Customer`) lo ponia en rojo. Se reescribio
-para comparar los modelos del propio merge de QC-145 (PR #112) contra su primer padre, sin
-depender de fichas posteriores.
-
-- SHA del merge de QC-145 (PR #112) usado, fijo como constante `MERGE_QC145`:
-  `51f2d1013f33a3fde50594ac0dde7ec7b7535938` (confirmado con
-  `git log --merges --grep="#112" origin/dev --oneline`).
-- Verificado a mano: `git show 51f2d1013f33a3fde50594ac0dde7ec7b7535938~1:db/schema.prisma`
-  vs `git show 51f2d1013f33a3fde50594ac0dde7ec7b7535938:db/schema.prisma` difieren solo en la
-  columna `finishedAt` de `Order`; la lista de `model X {` es identica en ambos.
-- La excepcion de QC-141 (`ReservationMovement` en `ESPERADOS_DE_ESTA_RAMA`) se QUITO: ya no
-  hace falta, porque la comparacion ya no llega hasta el punto en que `origin/dev` incluye
-  QC-141. `ReservationMovement` no aparece en ninguno de los dos lados de la comparacion
-  contra el merge de QC-145.
-- Hallazgo tecnico: `execSync` en Windows corre por `cmd.exe`, donde `^` es caracter de escape;
-  `${MERGE_QC145}^1` se corrompia a un SHA con un caracter de mas. Se uso `${MERGE_QC145}~1`
-  (equivalente para primer padre) en su lugar.
-- Caso sintetico «dispara con un esquema sintetico que gana un modelo respecto de su padre»
-  reescrito para ejercitar la misma funcion `modelosDe` que usa el caso real (antes tenia su
-  propia copia local de la funcion).
-- Sin red: si el commit no existe (clon superficial), el caso lanza `throw new Error(...)` con
-  el motivo, nunca se salta.
-
-Salida real de los comandos pedidos:
-
-```
-pnpm exec vitest run tests/unit/pedidos/qc145-estado-solo-planta.test.ts
-  Test Files  1 passed (1)
-       Tests  18 passed (18)
-
-pnpm exec vitest related --run tests/unit/pedidos/qc145-estado-solo-planta.test.ts
-  Test Files  1 passed (1)
-       Tests  18 passed (18)
-
-pnpm run typecheck
-  (sin salida, exit 0)
-
-pnpm run lint
-  2 warnings preexistentes en tests/unit/pedidos/order-service.test.ts (no relacionadas con
-  este cambio), 0 errores.
-```
-
-## Sincronizacion con origin/dev (implementer, 2026-09-24)
-
-- Merge de `origin/dev` (`08935782`, incluye QC-141) en `6261e981`. Unico conflicto:
-  `MIGRACIONES_ESPERADAS` en `tests/guards/guard-identificador-de-request.test.ts`; se conservan las
-  tres migraciones de QC-141 (`20260923150000..150200`) y `20260924120000_customers` al final.
-- `package.json` sin cambios en el tramo: no hizo falta `pnpm install`.
-- `db:migrate` sobre `QuimiCloude_QC153`: aplicadas las tres de QC-141; `db:test status` -> «al dia: 49 migracion(es)».
-- `pnpm run typecheck`: limpio. `pnpm run lint`: 0 errores, 2 warnings en `tests/unit/pedidos/order-service.test.ts` (vienen de dev, no de esta rama).
-- Archivos de la ficha + censos tocados (19 archivos, integracion incluida contra base efimera):
-  `Test Files 1 failed | 18 passed (19)`, `Tests 1 failed | 264 passed | 12 skipped (277)`.
-  El unico rojo: `tests/unit/pedidos/qc145-estado-solo-planta.test.ts` > «los modelos de db/schema.prisma
-  son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de QC-141». No esta
-  en `tests/baseline-rojos.json`. Lo pone rojo el modelo `Customer` (R1). QC-141 resolvio el mismo choque
-  anadiendo su modelo como excepcion nombrada en ese caso; aqui NO se ha tocado: pendiente de decision.
-- Gate completo (`./init.sh`) NO corrido: lo corre el leader.
-
-## Decision humana 2026-09-24: pedidos-schema, derogacion parcial
-
-`tests/unit/pedidos/schema/pedidos-schema.test.ts`, caso «Order no declara cliente, destinatario
-ni ninguna columna equivalente», prohibia dos cosas: (a) campos de cliente/destinatario en `Order`,
-y (b) un catalogo de clientes (modelos `Customer`/`Client`/`Recipient`/`Buyer` y sus `@@map`).
-Decision humana: (b) queda derogada solo para `Customer`/`customers` por el modulo Clientes
-(QC-152/QC-153, 2026-09-24); (a) sigue vigente hasta QC-156.
-
-Cambios:
-- Se retiro `Customer` de la lista `forbidden` de modelos y `customers` del regex `@@map`
-  prohibido en ese caso. `Client`, `Recipient`, `Buyer`, `clients` y `recipients` se mantienen.
-- Se reescribio el comentario del caso para reflejar la derogacion parcial y su fecha.
-- Se anadio nota fechada 2026-09-24 en `specs/QC-153-modelo-de-clientes/design.md` §6.1.
-- La aseveracion (a) sobre los campos de `Order` no se toco.
-
-Salida real:
-```
-pnpm exec vitest run tests/unit/pedidos/schema/pedidos-schema.test.ts
-  Test Files  1 passed (1)
-       Tests  28 passed (28)
-
-pnpm run typecheck
-  (sin salida, exit 0)
-
-pnpm run lint
-  2 warnings preexistentes en tests/unit/pedidos/order-service.test.ts (no relacionadas con
-  este cambio), 0 errores.
-```

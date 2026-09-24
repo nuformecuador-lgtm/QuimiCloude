@@ -382,7 +382,7 @@ describe('R29 — package.json sin dependencias nuevas respecto a origin/dev', (
   });
 });
 
-// Commit de merge del PR #112 (QC-145) en origin/dev. Fijo, no depende de fichas posteriores.
+// Commit de merge del PR #112 en origin/dev. Fijo, no depende de fichas posteriores.
 const MERGE_QC145 = '51f2d1013f33a3fde50594ac0dde7ec7b7535938';
 
 /** Nombres de `model X {` del esquema, en el texto dado. */

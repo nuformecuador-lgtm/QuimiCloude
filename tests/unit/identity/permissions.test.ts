@@ -236,7 +236,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('R8: no hay comodin ni regla implicita en el conjunto del Administrador', () => {
-    // La decision 2 del humano (2026-09-07) prohibe el comodin: los dieciseis van escritos uno a uno.
+    // La decision 2 del humano (2026-09-07) prohibe el comodin: los dieciocho van escritos uno a uno.
     // Este caso vigila las dos formas en las que un comodin se colaria por la puerta de atras.
     for (const codigo of SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []) {
       // 1. Ningun codigo asignado es un comodin ni lo contiene ('*', 'inventario.*', 'todo'...).

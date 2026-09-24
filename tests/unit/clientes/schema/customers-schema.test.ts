@@ -1,8 +1,8 @@
-// T8 — Contrato estatico de `db/schema.prisma` (QC-153: modelo-de-clientes).
+// Contrato estatico de `db/schema.prisma` para el modelo Customer.
 //
 // Lee el schema como TEXTO, igual que `tests/unit/proveedores/schema/proveedores-schema.test.ts`:
-// lo que se vigila aqui es la DECLARACION, no el cliente generado. Cubre R1, R3, R4, R5, R7, R11,
-// R15, R16, R19, y ata el tipo `Customer` del armazon a los campos del modelo.
+// lo que se vigila aqui es la DECLARACION, no el cliente generado. Ata el tipo `Customer` del
+// armazon a los campos del modelo.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -152,11 +152,17 @@ describe('db/schema.prisma — modelo Customer', () => {
     }
   })
 
+  /** El predicado real que R7 exige: nada de mirar el texto sintetico por fuera de esta funcion. */
+  function noLlevaUnique(attributes: string): boolean {
+    return !/@unique/.test(attributes)
+  }
+
   it('ningun campo lleva @unique y el unico @@unique es la clave candidata (empresa, id) (R7)', () => {
     for (const name of ['firstNames', 'lastNames', 'city', 'phone', 'email', 'address']) {
-      expect(field(customer, name).attributes, `${name} no puede llevar @unique`).not.toMatch(
-        /@unique/,
-      )
+      expect(
+        noLlevaUnique(field(customer, name).attributes),
+        `${name} no puede llevar @unique`,
+      ).toBe(true)
     }
     const uniques = customer.body
       .split('\n')
@@ -164,12 +170,16 @@ describe('db/schema.prisma — modelo Customer', () => {
       .filter((line) => line.startsWith('@@unique('))
     expect(uniques).toEqual(['@@unique([companyId, id], map: "customers_company_id_id_key")'])
 
-    // Sensibilidad OBLIGATORIA: un `@unique` puesto en `email` tiene que tumbar la primera
-    // afirmacion de este caso.
+    // Sensibilidad: la MISMA funcion que aprueba arriba tiene que reprobar un `@unique` en `email`.
     const mutado = `${field(customer, 'email').attributes} @unique`
     expect(mutado, 'la mutacion no se aplico').not.toBe(field(customer, 'email').attributes)
-    expect(mutado).toMatch(/@unique/)
+    expect(noLlevaUnique(mutado)).toBe(false)
   })
+
+  /** El predicado real que R11 exige: nada de mirar el texto sintetico por fuera de esta funcion. */
+  function llevaRelation(attributes: string): boolean {
+    return /@relation/.test(attributes)
+  }
 
   it('companyId, createdBy y updatedBy son escalares uuid SIN @relation (R11)', () => {
     for (const [name, column] of [
@@ -181,7 +191,7 @@ describe('db/schema.prisma — modelo Customer', () => {
       expect(candidate.type, `${name} debe ser String`).toBe('String')
       expect(candidate.attributes, `${name} debe ser uuid`).toContain('@db.Uuid')
       expect(candidate.attributes, `${name} debe mapear a ${column}`).toContain(`@map("${column}")`)
-      expect(candidate.attributes, `${name} NO puede llevar @relation`).not.toMatch(/@relation/)
+      expect(llevaRelation(candidate.attributes), `${name} NO puede llevar @relation`).toBe(false)
     }
     expect(field(customer, 'companyId').isOptional).toBe(false)
     expect(field(customer, 'createdBy').isOptional).toBe(true)
@@ -194,13 +204,13 @@ describe('db/schema.prisma — modelo Customer', () => {
         expect(candidate.type, `${candidate.name} no puede apuntar a ${ajeno}`).not.toBe(ajeno)
       }
     }
-    expect(customer.fields.some((candidate) => /@relation/.test(candidate.attributes))).toBe(false)
+    expect(customer.fields.some((candidate) => llevaRelation(candidate.attributes))).toBe(false)
 
-    // Sensibilidad OBLIGATORIA: un `@relation` en `companyId` tiene que tumbar la afirmacion de
-    // arriba. Se muta EN MEMORIA el atributo real, no un texto inventado.
+    // Sensibilidad: la MISMA funcion `llevaRelation` tiene que caer con un `@relation` en
+    // `companyId`. Se muta EN MEMORIA el atributo real, no un texto inventado.
     const mutado = `${field(customer, 'companyId').attributes} @relation(fields: [companyId], references: [id])`
     expect(mutado, 'la mutacion no se aplico').not.toBe(field(customer, 'companyId').attributes)
-    expect(mutado).toMatch(/@relation/)
+    expect(llevaRelation(mutado)).toBe(true)
 
     // Con sus indices: Postgres no indexa el lado hijo de una FK.
     expect(customer.body).toMatch(/@@index\(\[createdBy\],\s*map:\s*"customers_created_by_idx"\)/)

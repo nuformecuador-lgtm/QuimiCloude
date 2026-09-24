@@ -1,4 +1,4 @@
-// T12 — La migracion `db/migrations/20260924120000_customers/` contra Postgres REAL.
+// La migracion `db/migrations/20260924120000_customers/` contra Postgres REAL.
 //
 // AISLAMIENTO — mismo patron que `identity/packer-role-migration.int.test.ts`: cada `it` corre
 // dentro de `prisma.$transaction` interactiva y termina lanzando `RollbackSignal`.
@@ -8,8 +8,6 @@
 // SAVEPOINTS — ninguna operacion de este archivo se espera que falle salvo el caso sintetico de
 // `down.sql` roto, que va aparte y sin transaccion contra la base porque muta el SQL EN MEMORIA,
 // no la base.
-//
-// Cubre R18, R23, R24.
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -146,6 +144,31 @@ describe('migracion customers contra Postgres real', () => {
 
       expect(await permissionsSnapshot(tx)).toEqual(permissionsAntes)
       expect(await rolePermissionsSnapshot(tx)).toEqual(rolePermissionsAntes)
+    })
+  })
+
+  it('R18: el DOWN borra las asignaciones de CUALQUIER rol, no solo las que puso esta migracion', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      // Un DELETE acotado por rol (p. ej. WHERE role = 'Administrador') pasaria el caso anterior
+      // sin morder esto, porque la base efimera solo tiene asignaciones al Administrador. Se
+      // simula una asignacion FUERA de banda a otro rol para que el predicado real -"por codigo
+      // de permiso, sea quien sea el rol"- tenga algo distinto de Administrador que borrar.
+      const operador = await tx.role.findFirstOrThrow({
+        where: { name: 'Operador' },
+        select: { id: true },
+      })
+      await tx.rolePermission.create({
+        data: { roleId: operador.id, permissionCode: CLIENTES_CONSULTAR },
+      })
+      expect(await rolesWithClientesPermission(tx, CLIENTES_CONSULTAR)).toEqual(
+        ['Administrador', 'Operador'].sort(),
+      )
+
+      await applyStatements(tx, DOWN_STATEMENTS)
+
+      expect(
+        await tx.rolePermission.findMany({ where: { permissionCode: { in: CODIGOS_CLIENTES } } }),
+      ).toEqual([])
     })
   })
 

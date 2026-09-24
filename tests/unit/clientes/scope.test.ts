@@ -1,12 +1,21 @@
-// T10 — la guardia de alcance de QC-153 (modelo-de-clientes). Cubre R20, R26, R28, R29.
+// La guardia de alcance del modelo de clientes.
 //
 // Esta ficha es SOLO el modelo, el armazon del modulo y la enmienda al catalogo de permisos: sin
 // caso de uso, sin puerto con metodos, sin adaptador, sin Server Action, sin ruta, sin pantalla y
-// sin E2E. Eso es QC-154 y QC-155. Se censa el ARBOL DE ARCHIVOS y el TEXTO de produccion, no el
+// sin E2E. Eso llega mas adelante. Se censa el ARBOL DE ARCHIVOS y el TEXTO de produccion, no el
 // grafo de imports.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { execSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -52,6 +61,14 @@ function stripComments(source: string): string {
 // R20 — forma hexagonal del armazon
 // ---------------------------------------------------------------------------------------------
 
+/** El predicado real de R20: las carpetas de primer nivel, ordenadas por nombre. */
+function carpetasDe(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+}
+
 describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
   it('index.ts existe y solo reexporta simbolos de ./domain', () => {
     const contrato = join(moduloDir, 'index.ts')
@@ -69,13 +86,21 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
   })
 
   it('las unicas carpetas del modulo son domain, ports y adapters', () => {
-    const entries = readdirSync(moduloDir, { withFileTypes: true })
-    const carpetas = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
-    expect([...carpetas].sort()).toEqual(['adapters', 'domain', 'ports'])
+    expect(carpetasDe(moduloDir)).toEqual(['adapters', 'domain', 'ports'])
 
-    // Sensibilidad: una carpeta ajena tiene que aparecer en el censo real si alguien la crea.
-    const conCarpetaAjena = [...carpetas, 'services']
-    expect([...conCarpetaAjena].sort()).not.toEqual(['adapters', 'domain', 'ports'])
+    // Sensibilidad: la MISMA funcion tiene que detectar una carpeta ajena real en disco, no un
+    // array retocado en memoria.
+    const fixture = mkdtempSync(join(tmpdir(), 'qc153-scope-'))
+    try {
+      for (const nombre of ['adapters', 'domain', 'ports', 'services']) {
+        mkdirSync(join(fixture, nombre))
+      }
+      const conCarpetaAjena = carpetasDe(fixture)
+      expect(conCarpetaAjena).toContain('services')
+      expect(conCarpetaAjena).not.toEqual(['adapters', 'domain', 'ports'])
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
   })
 
   it('ports y adapters estan vacios salvo su .gitkeep: ningun caso de uso, puerto ni adaptador todavia', () => {
@@ -131,14 +156,23 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     return encontrados.sort()
   }
 
-  it('el literal de los dos permisos solo aparece en permissions.ts', () => {
+  const PERMISO_YA_CUBIERTO = 'lib/modules/identity/domain/permissions.ts'
+
+  /** El predicado real de R26: que archivos de produccion, fuera de permissions.ts, nombran los
+   *  dos literales de permiso. Lo usan el caso real y el caso «que muerde». */
+  function detectarLiteralesDePermiso(): string[] {
     const PERMISOS_CLIENTES = /'clientes\.consultar'|'clientes\.modificar'/
     const hallazgos: string[] = []
     for (const relativo of fuentesDeProduccion()) {
-      if (relativo === 'lib/modules/identity/domain/permissions.ts') continue
+      if (relativo === PERMISO_YA_CUBIERTO) continue
       const fuente = stripComments(leer(join(repoRoot, relativo)))
       if (PERMISOS_CLIENTES.test(fuente)) hallazgos.push(relativo)
     }
+    return hallazgos
+  }
+
+  it('el literal de los dos permisos solo aparece en permissions.ts', () => {
+    const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
       `ningun archivo distinto de permissions.ts puede nombrar clientes.consultar/modificar: ${hallazgos.join(', ')}`,
@@ -151,8 +185,15 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
   })
 
   it('la regla de literales dispara con un archivo fabricado que si nombra el permiso', () => {
-    const fabricado = "export const puedeVer = (p: string) => p === 'clientes.consultar'"
-    expect(/'clientes\.consultar'|'clientes\.modificar'/.test(fabricado)).toBe(true)
+    // El MISMO detector que usa el caso real, aplicado a un archivo de produccion de verdad.
+    const relativoFabricado = 'lib/modules/clientes/__sensibilidad_literal__.ts'
+    const rutaFabricada = join(repoRoot, relativoFabricado)
+    writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+    try {
+      expect(detectarLiteralesDePermiso()).toContain(relativoFabricado)
+    } finally {
+      rmSync(rutaFabricada)
+    }
   })
 })
 
@@ -161,12 +202,24 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 // ---------------------------------------------------------------------------------------------
 
 describe('R28 — sin ningun test E2E de clientes', () => {
-  it('ningun archivo de e2e/ menciona clientes', () => {
+  it('ningun nombre de archivo de e2e/ menciona clientes', () => {
     const e2eDir = join(repoRoot, 'e2e')
     const coincidencias = filesIn(e2eDir)
       .map((ruta) => relative(e2eDir, ruta).split(sep).join('/'))
       .filter((relativa) => /cliente/i.test(relativa))
     expect(coincidencias, `spec E2E de clientes inesperado: ${coincidencias.join(', ')}`).toEqual([])
+  })
+
+  // "cliente" a secas es ambiguo en este repo -"componente de CLIENTE", "el cliente insertara la
+  // fila"- asi que el contenido se vigila con marcadores propios del modulo, no con la palabra
+  // suelta: la tabla, los dos codigos de permiso o la ruta.
+  it('ningun contenido de e2e/ nombra la tabla, el permiso o la ruta de clientes', () => {
+    const e2eDir = join(repoRoot, 'e2e')
+    const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
+    const coincidencias = filesIn(e2eDir)
+      .map((ruta) => relative(e2eDir, ruta).split(sep).join('/'))
+      .filter((relativa) => MARCADORES_DE_CLIENTES.test(leer(join(e2eDir, relativa))))
+    expect(coincidencias, `contenido E2E de clientes inesperado: ${coincidencias.join(', ')}`).toEqual([])
   })
 })
 
@@ -188,26 +241,23 @@ describe('R29 — sin dependencias nuevas', () => {
     return despues.filter((nombre) => !previas.has(nombre)).sort()
   }
 
-  function mergeBaseConDev(): string | null {
+  function mergeBaseConDev(): string {
     try {
       return execSync('git merge-base origin/dev HEAD', {
         cwd: repoRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       }).trim()
-    } catch {
-      return null
+    } catch (error) {
+      throw new Error(
+        `no se pudo calcular el merge-base con origin/dev: falta el remoto o el rango. ${String(error)}`,
+      )
     }
   }
 
   it('package.json no gano ninguna clave de dependencia contra el merge-base con origin/dev', () => {
     const base = mergeBaseConDev()
-    if (base === null) {
-      // Sin remoto o sin rango: no hay nada que medir. Saltar explicitamente, no pasar en verde
-      // por vacio (leccion de qc75-convenciones.test.ts).
-      return
-    }
-    let anterior: string | null
+    let anterior: string
     try {
       anterior = execSync(`git show ${base}:package.json`, {
         cwd: repoRoot,
@@ -215,10 +265,9 @@ describe('R29 — sin dependencias nuevas', () => {
         stdio: ['ignore', 'pipe', 'ignore'],
         maxBuffer: 8 * 1024 * 1024,
       })
-    } catch {
-      anterior = null
+    } catch (error) {
+      throw new Error(`no se pudo leer package.json en ${base}: ${String(error)}`)
     }
-    if (anterior === null) return
 
     const antes = nombresDeDependencias(JSON.parse(anterior))
     const actual = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))

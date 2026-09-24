@@ -1,11 +1,9 @@
-// T9 — Contrato estatico del SQL de la migracion `customers` (QC-153: modelo-de-clientes).
+// Contrato estatico del SQL de la migracion `customers`.
 //
 // Lo que se vigila aqui NO esta en `db/schema.prisma`: las tres FK escritas a mano, el CHECK
 // que no debe existir, la asignacion de permisos SOLO al Administrador y la reversion exacta del
 // `down.sql`. Cada afirmacion se escribe como PREDICADO y se aplica dos veces: al SQL real y a
 // una version MUTADA EN MEMORIA (el archivo en disco no se toca).
-//
-// Cubre R1-R7, R10, R12, R13, R17, R18, R22-R24, R27 y la cabecera sin citas.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -88,12 +86,21 @@ describe('migration.sql — cabecera sin citas', () => {
   })
 })
 
+/** El predicado real que R5 exige para una columna: TEXT y sin longitud declarada. */
+function esColumnaTextoLibre(ddl: string, columna: string): boolean {
+  return (
+    new RegExp(`"${columna}" TEXT`, 'i').test(ddl) &&
+    !new RegExp(`"${columna}"\\s+VARCHAR`, 'i').test(ddl) &&
+    !new RegExp(`"${columna}"\\s+CHARACTER\\s+VARYING`, 'i').test(ddl)
+  )
+}
+
 describe('migration.sql — columnas y tipos (R1-R5)', () => {
   it('las columnas de texto son TEXT sin longitud, y solo los tres obligatorios mas company_id son NOT NULL', () => {
     for (const columna of ['first_names', 'last_names', 'city', 'phone', 'email', 'address']) {
-      expect(createCustomers).toMatch(new RegExp(`"${columna}" TEXT`, 'i'))
-      expect(createCustomers).not.toMatch(new RegExp(`"${columna}"\\s+VARCHAR`, 'i'))
-      expect(createCustomers).not.toMatch(new RegExp(`"${columna}"\\s+CHARACTER\\s+VARYING`, 'i'))
+      expect(esColumnaTextoLibre(createCustomers, columna), `${columna} debe ser TEXT sin longitud`).toBe(
+        true,
+      )
     }
     for (const obligatoria of ['first_names', 'last_names', 'city']) {
       expect(createCustomers).toMatch(new RegExp(`"${obligatoria}" TEXT NOT NULL`, 'i'))
@@ -103,10 +110,10 @@ describe('migration.sql — columnas y tipos (R1-R5)', () => {
     }
     expect(createCustomers).toMatch(/"company_id" UUID NOT NULL/i)
 
-    // Sensibilidad OBLIGATORIA: un VARCHAR(80) en vez de TEXT tiene que tumbar la afirmacion.
+    // Sensibilidad: el MISMO predicado tiene que reprobar un VARCHAR(80) en vez de TEXT.
     const mutado = createCustomers.replace('"first_names" TEXT NOT NULL', '"first_names" VARCHAR(80) NOT NULL')
     expect(mutado, 'la mutacion no se aplico').not.toBe(createCustomers)
-    expect(mutado).toMatch(/"first_names"\s+VARCHAR/i)
+    expect(esColumnaTextoLibre(mutado, 'first_names')).toBe(false)
   })
 })
 
@@ -190,6 +197,11 @@ describe('migration.sql — los permisos solo al Administrador (R22-R24)', () =>
     }
   })
 
+  /** El predicado real que R22-R24 exigen: ni Operador ni Empacador aparecen en la sentencia. */
+  function mencionaOtroRol(sql: string): boolean {
+    return /Operador/.test(sql) || /Empacador/.test(sql)
+  }
+
   it('la asignacion es solo al Administrador, con ON CONFLICT DO NOTHING, y no menciona Operador ni Empacador', () => {
     const insertPermissions = findStatement(up, /^INSERT INTO "?permissions"?/i)
     expect(insertPermissions).toMatch(/ON CONFLICT \("?code"?\) DO NOTHING/i)
@@ -197,13 +209,12 @@ describe('migration.sql — los permisos solo al Administrador (R22-R24)', () =>
     const insertRolePermissions = findStatement(up, /^INSERT INTO "?role_permissions"?/i)
     expect(insertRolePermissions).toMatch(/WHERE\s+"?r"?\."?name"?\s*=\s*'Administrador'/i)
     expect(insertRolePermissions).toMatch(/ON CONFLICT \("?role_id"?,\s*"?permission_code"?\) DO NOTHING/i)
-    expect(insertRolePermissions).not.toMatch(/Operador/)
-    expect(insertRolePermissions).not.toMatch(/Empacador/)
+    expect(mencionaOtroRol(insertRolePermissions)).toBe(false)
 
-    // Sensibilidad OBLIGATORIA: 'Administrador' -> 'Operador' tiene que tumbar la afirmacion.
+    // Sensibilidad: el MISMO predicado tiene que reprobar 'Administrador' -> 'Operador'.
     const mutado = insertRolePermissions.replace("'Administrador'", "'Operador'")
     expect(mutado, 'la mutacion no se aplico').not.toBe(insertRolePermissions)
-    expect(mutado).toMatch(/Operador/)
+    expect(mencionaOtroRol(mutado)).toBe(true)
   })
 })
 
@@ -234,6 +245,11 @@ describe('migration.sql — no toca ninguna otra tabla (R27)', () => {
   })
 })
 
+/** El predicado real que R18 exige para el DROP: nada de CASCADE. */
+function llevaCascade(sql: string): boolean {
+  return /CASCADE/i.test(sql)
+}
+
 describe('down.sql — reversion exacta (R18)', () => {
   it('dos DELETE acotados a los dos codigos, en ese orden, y un unico DROP TABLE sin CASCADE', () => {
     expect(down).toHaveLength(3)
@@ -251,13 +267,14 @@ describe('down.sql — reversion exacta (R18)', () => {
     expect(deletePermissions).toMatch(/'clientes\.modificar'/)
 
     expect(dropTable).toMatch(/^DROP TABLE "?customers"?$/i)
-    expect(dropTable).not.toMatch(/CASCADE/i)
+    expect(llevaCascade(dropTable)).toBe(false)
 
     // El orden importa: role_permissions ANTES que permissions, por el RESTRICT de su FK.
     expect(downSource.indexOf('role_permissions')).toBeLessThan(downSource.indexOf('"permissions"'))
 
-    // Sensibilidad OBLIGATORIA: un CASCADE en el DROP tiene que tumbar la afirmacion de arriba.
+    // Sensibilidad: el MISMO predicado tiene que reprobar un CASCADE anadido al DROP.
     const mutado = dropTable.replace(/$/, ' CASCADE')
-    expect(mutado).toMatch(/CASCADE/i)
+    expect(mutado, 'la mutacion no se aplico').not.toBe(dropTable)
+    expect(llevaCascade(mutado)).toBe(true)
   })
 })
