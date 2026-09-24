@@ -217,6 +217,12 @@ function describir(infracciones: readonly Infraccion[]): string {
 // -`asignaciones.consultar`, la misma que exige la lista- porque esta pantalla no anade ninguna
 // escritura propia de `asignaciones`: abrir y finalizar los hace el caso de uso, no un permiso
 // nuevo de pantalla.
+//
+// TENSADA el 2026-09-23 (QC-158 T12): de trece a CATORCE, con
+// `/proveedores/[id]/importar/[documentoId]`, la revision de una importacion de catalogo desde un
+// PDF. Llama a `requirePagePermission` DOS veces -`proveedores.consultar` y
+// `proveedores.modificar`-, mismo patron que `/configuracion/unidades`: revisar y confirmar la
+// importacion son una escritura sobre el catalogo del proveedor, no una lectura sola.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',
@@ -231,10 +237,11 @@ const RUTAS_ESPERADAS_HOY = [
   '/produccion/formulas/nueva',
   '/proveedores',
   '/proveedores/[id]',
+  '/proveedores/[id]/importar/[documentoId]',
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las trece pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las catorce pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);
