@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { updateAliveProduct } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { receiveFinishedGoods, updateAliveProduct } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
@@ -23,21 +23,56 @@ function token(): string {
 }
 
 let empresaDelArchivo: string;
+let actorDelArchivo: string;
+let roleDelArchivo: string;
+let documentTypeDelArchivo: string;
 
 function ambito(): InventoryScope {
   return { companyId: empresaDelArchivo };
 }
 
 beforeAll(async () => {
-  const nombre = `Empresa tipo-bloqueado ${token()}`;
+  const marca = token();
+  const nombre = `Empresa tipo-bloqueado ${marca}`;
   const { id } = await prisma.company.create({
     data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
     select: { id: true },
   });
   empresaDelArchivo = id;
+
+  const documentType = await prisma.documentType.create({
+    data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
+    select: { code: true },
+  });
+  documentTypeDelArchivo = documentType.code;
+  const role = await prisma.role.create({
+    data: { name: `rol-${marca}`, description: 'Rol de prueba' },
+    select: { id: true },
+  });
+  roleDelArchivo = role.id;
+  const user = await prisma.user.create({
+    data: {
+      firstNames: 'Ana Maria',
+      lastNames: 'Perez Gomez',
+      birthDate: new Date('1990-05-17T00:00:00.000Z'),
+      email: `ana.${marca}@quimicloude.test`,
+      phone: '+57 300 111 2233',
+      documentTypeCode: documentType.code,
+      documentNumber: marca.slice(0, 12),
+      username: `ana.${marca}`,
+      passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
+      roleId: role.id,
+      companyId: id,
+    },
+    select: { id: true },
+  });
+  actorDelArchivo = user.id;
 });
 
 afterAll(async () => {
+  await prisma.user.deleteMany({ where: { id: actorDelArchivo } });
+  await prisma.role.deleteMany({ where: { id: roleDelArchivo } });
+  await prisma.documentType.deleteMany({ where: { code: documentTypeDelArchivo } });
   await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
   await prisma.$disconnect();
 });
@@ -51,7 +86,7 @@ async function sembrarUnidad(): Promise<string> {
   return id;
 }
 
-async function sembrarPresentacion(unitId: string): Promise<string> {
+async function sembrarPresentacion(unitId: string, content: string | null = null): Promise<string> {
   const marca = token();
   const { id } = await prisma.presentation.create({
     data: {
@@ -59,6 +94,27 @@ async function sembrarPresentacion(unitId: string): Promise<string> {
       nameNormalized: `presentacion${marca}`,
       unitId,
       companyId: empresaDelArchivo,
+      content,
+    },
+    select: { id: true },
+  });
+  return id;
+}
+
+let sequenceDelArchivo = 1;
+
+async function sembrarPedido(recipeId: string, presentationId: string): Promise<string> {
+  const now = new Date();
+  const { id } = await prisma.order.create({
+    data: {
+      orderYear: now.getUTCFullYear(),
+      orderSequence: sequenceDelArchivo++,
+      recipeId,
+      quantity: '10',
+      companyId: empresaDelArchivo,
+      presentationId,
+      presentationContent: null,
+      createdAt: now,
     },
     select: { id: true },
   });
@@ -152,7 +208,7 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
     }
   });
 
-  it('editar un producto terminado con su mismo tipo si se acepta (nombre, alerta)', async () => {
+  it('D23 — editar un producto terminado con su mismo tipo si se acepta (nombre, alerta)', async () => {
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(unitId);
     const recipeId = await sembrarReceta();
@@ -171,6 +227,85 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
       expect(despues.unitId).toBe(unitId);
     } finally {
       await prisma.product.deleteMany({ where: { id: productId } });
+      await prisma.recipe.deleteMany({ where: { id: recipeId } });
+      await prisma.presentation.deleteMany({ where: { id: presentationId } });
+      await prisma.unit.deleteMany({ where: { id: unitId } });
+    }
+  });
+
+  it('D23 — renombrar un producto terminado y volver a recibir la misma combinacion suma el lote al mismo producto', async () => {
+    const unitId = await sembrarUnidad();
+    const presentationId = await sembrarPresentacion(unitId, '1');
+    const recipeId = await sembrarReceta();
+    const orderId1 = await sembrarPedido(recipeId, presentationId);
+    const orderId2 = await sembrarPedido(recipeId, presentationId);
+    let productId: string | null = null;
+
+    try {
+      const primero = await prisma.$transaction((tx) =>
+        receiveFinishedGoods(
+          tx,
+          {
+            orderId: orderId1,
+            recipeId,
+            recipeName: 'Receta renombrable',
+            presentationId,
+            orderQuantity: '10',
+            orderContent: '1',
+            lotCost: '10',
+            actorId: actorDelArchivo,
+            now: new Date(),
+          },
+          ambito(),
+        ),
+      );
+      if (primero.kind !== 'received') throw new Error('esperaba received');
+      productId = primero.productId;
+
+      const nuevoNombre = `Renombrado ${token()}`;
+      const resultado = await updateAliveProduct(
+        productId,
+        edicion({ name: nuevoNombre, type: 'FINISHED_PRODUCT' }),
+        new Date(),
+        ambito(),
+      );
+      expect(resultado).toBe(true);
+
+      const segundo = await prisma.$transaction((tx) =>
+        receiveFinishedGoods(
+          tx,
+          {
+            orderId: orderId2,
+            recipeId,
+            recipeName: 'Receta renombrable',
+            presentationId,
+            orderQuantity: '5',
+            orderContent: '1',
+            lotCost: '5',
+            actorId: actorDelArchivo,
+            now: new Date(),
+          },
+          ambito(),
+        ),
+      );
+      if (segundo.kind !== 'received') throw new Error('esperaba received');
+      expect(segundo.productId).toBe(productId);
+
+      const vivos = await prisma.product.findMany({
+        where: { companyId: empresaDelArchivo, recipeId, presentationId, type: 'FINISHED_PRODUCT', deletedAt: null },
+      });
+      expect(vivos).toHaveLength(1);
+      expect(vivos[0]!.name).toBe(nuevoNombre);
+
+      const lotes = await prisma.productBatch.findMany({ where: { productId } });
+      expect(lotes).toHaveLength(2);
+    } finally {
+      if (productId !== null) {
+        await prisma.inventoryMovement.deleteMany({ where: { batch: { productId } } });
+        await prisma.productBatch.deleteMany({ where: { productId } });
+        await prisma.product.deleteMany({ where: { id: productId } });
+      }
+      await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
       await prisma.unit.deleteMany({ where: { id: unitId } });
