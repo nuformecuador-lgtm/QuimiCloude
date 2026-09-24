@@ -156,8 +156,7 @@ export class WorkGroupNotFoundError extends AsignacionesError {
 
 /** El Finalizar de la planta intento entregar y `pedidos` respondio `'insufficient_material'`
  *  -ni el lote apartado ni el resto de lotes con disponible alcanzan-. Mismo `code` que
- *  `InsufficientMaterialError` de `pedidos`: es la misma frase para quien la lee, la entregue
- *  desde la edicion o desde la planta. */
+ *  `InsufficientMaterialError` de `pedidos`. */
 export class MaterialShortageError extends AsignacionesError {
   readonly code = 'insufficient_material';
 
