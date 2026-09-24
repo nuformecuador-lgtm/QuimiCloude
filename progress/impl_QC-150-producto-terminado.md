@@ -513,3 +513,30 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   `finished-goods.int` 10, `finish-with-finished-goods.int` 12, guardias de módulos y de ámbito
   125/125, más los 13 archivos de n1 (6 unit, 99 pasados; 6 de integración, todos verdes).
   Typecheck y lint salen con 0. Sin E2E.
+
+## F2.3 (2026-09-24): merge de `origin/dev` antes del PR (QC-153 #117, QC-158 #119)
+
+- Merge `a8aefc16` (backend_dev). 7 conflictos, todos resueltos sin ambigüedad:
+  - `guard-identificador-de-request` (`MIGRACIONES_ESPERADAS` con las de las dos ramas);
+  - tres integraciones de pedidos (imports de las dos ramas);
+  - `quote-order-cost.test.ts` (el doble de `PresentationCatalog` lleva `content` y `findByNormalizedNames`);
+  - `data-table-alcance` (20 → 21 con `catalogo-desde-pdf`, 21 → 22 con `producto-terminado`);
+  - `guard-convenciones-showcase`.
+- **Para el leader, sobre `guard-convenciones-showcase`:** `dev` traía (`b37929e8`) un parche sobre la
+  función vieja `baseDeFusionOMuda`, que comprobaba el nombre de rama `feature/QC-140-`. Esta rama ya la había
+  sustituido entera por el filtro de commits firmados `tipo(QC-140)` más el árbol sin commitear. Se
+  conservó la versión de la rama: la de dev habría dejado `baseDeFusionOMuda` sin llamantes, y el filtro
+  por commits cubre lo mismo sin depender del nombre de la rama. R29 y D20 se saltan con motivo.
+- **Migraciones renombradas otra vez**: `dev` trae `20260924180000_supplier_catalog_line_material_and_measurements`,
+  posterior a las de la ficha. Revertidas en `QuimiCloude_QC150` sin tener que borrar nada;
+  `ff8d1915` las renombra a **`20260924190000_finished_product_enum_values`** y
+  **`20260924190100_finished_products_and_content_copies`**, y actualiza
+  `tests/integration/proveedores/company-scope.int.test.ts` (y el censo de la guardia, ya en el merge). `db:migrate`
+  aplica las tres; `migrate status` al día; cliente, typegen y plantilla (`qct_tpl_a0eeaf1c4c63`, 52)
+  regenerados.
+- `83fb4b84`: `dev` amplió `PresentationCatalog` con `findByNormalizedNames`, y dos integraciones de la
+  ficha que no chocaban dejaban de compilar; completados sus dobles.
+- El merge no toca los E2E de la ficha (solo trae `e2e/catalogo-desde-pdf.spec.ts` de QC-158): sin E2E.
+- Verificación: typecheck sale con 0; lint 0 errores; `vitest run tests/guards` 43 archivos → 560
+  pasados, 5 skipped. En serie, los 7 archivos con conflicto, `company-scope.int` y los 3 de esquema de
+  la ficha, todos verdes.
