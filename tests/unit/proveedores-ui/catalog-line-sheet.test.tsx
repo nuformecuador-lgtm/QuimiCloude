@@ -26,7 +26,11 @@ import type {
   CatalogLineMutationFormState,
   CreateCatalogLineFormState,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
-import type { SupplierQueryResult } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
+import type {
+  CreateSupplierFormState,
+  SupplierMutationFormState,
+  SupplierQueryResult,
+} from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
@@ -57,6 +61,9 @@ const {
   usePathnameMock,
   routerMock,
   getSupplierActionMock,
+  createSupplierActionMock,
+  updateSupplierActionMock,
+  deleteSupplierActionMock,
   listCatalogLinesActionMock,
   createCatalogLineActionMock,
   updateCatalogLineActionMock,
@@ -77,6 +84,18 @@ const {
     prefetch: vi.fn<(href: string) => void>(),
   },
   getSupplierActionMock: vi.fn<(id: string) => Promise<SupplierQueryResult>>(),
+  createSupplierActionMock:
+    vi.fn<(prev: CreateSupplierFormState, data: FormData) => Promise<CreateSupplierFormState>>(),
+  updateSupplierActionMock:
+    vi.fn<
+      (
+        id: string,
+        prev: SupplierMutationFormState,
+        data: FormData,
+      ) => Promise<SupplierMutationFormState>
+    >(),
+  deleteSupplierActionMock:
+    vi.fn<(prev: SupplierMutationFormState, data: FormData) => Promise<SupplierMutationFormState>>(),
   listCatalogLinesActionMock:
     vi.fn<(supplierId: string, query: unknown) => Promise<CatalogLineListResult>>(),
   createCatalogLineActionMock:
@@ -124,6 +143,9 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
   getSupplierAction: getSupplierActionMock,
+  createSupplierAction: createSupplierActionMock,
+  updateSupplierAction: updateSupplierActionMock,
+  deleteSupplierAction: deleteSupplierActionMock,
 }));
 
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions', () => ({

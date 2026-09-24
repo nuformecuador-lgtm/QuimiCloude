@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-140 - F1.0 (2026-09-23)
+
+`zone: fullstack` sin partir, `complexity: high` (ya evaluada al acotar). Dependencias QC-44, QC-52 y QC-57 `done`. Cupo `fullstack` 3 de 3 con QC-141 y QC-151. Worktree desde `origin/dev`. F1.2 lanzado con las 5 preguntas abiertas de la semilla: el humano las deja para F1.4. **Base propia obligatoria en F2** (`QuimiCloude_QC140`).
+
 ### QC-141 cerrada y QC-150 F2.0 (2026-09-24)
 
 **QC-141 `done`** (F2.5): PR #116 mergeado (`08935782`), tarjeta en *Finalizado* y comentada; worktree desregistrado pero la **carpeta `.worktrees/QC-141-...` sigue** (archivo en uso en Windows), borrar a mano; rama local intacta. **Pendiente F2.6**: resumen en `progress/history.md` y poda del baseline de rojos con el proximo gate completo. **QC-140** pasa a `in_progress` en disco: el board la tenia *En curso* y tiene worktree con implementacion (divergencia de F0 no importada). **QC-150 F2.0 hecho**: spec aprobado el 2026-09-23, bloqueo por QC-141 levantado; `in_progress`, *En curso*. Cupo `fullstack` **3 de 3** (QC-140, QC-150, QC-158). QC-164 (`pending`) cambiara los envases de QC-150: va detras.

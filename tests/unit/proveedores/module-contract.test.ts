@@ -383,8 +383,8 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
     // `proveedores` a su adaptador driven. Se afirma en los dos sentidos, y los dos son
     // falsables:
     //
-    //  a) La fachada existe y esta completa: las nueve claves, ni una mas ni una menos.
-    //     Un caso de uso sin cablear -o un decimo colado- cae aqui.
+    //  a) La fachada existe y esta completa: las once claves, ni una mas ni una menos.
+    //     Un caso de uso sin cablear -o uno de mas colado- cae aqui.
     //  b) Nadie MAS instancia esos adaptadores: si un archivo de `app/`, de otro modulo o
     //     un adaptador driving importara `adapters/driven/persistence/*` de `proveedores`,
     //     el cableado habria dejado de ser exclusivo de la composicion.
@@ -420,6 +420,8 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       'deleteSupplier',
       'getSupplier',
       'listCatalogLines',
+      'listShowcaseLines',
+      'listSupplierShowcase',
       'listSuppliers',
       'updateCatalogLine',
       'updateSupplier',

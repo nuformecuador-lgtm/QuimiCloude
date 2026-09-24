@@ -7,10 +7,18 @@ import { normalizeSupplierName } from '../../../domain/supplier-name';
 
 import { catalogLineCompanyScope, companyScopeColumns, supplierCompanyScope } from './company-scope';
 import { dateRangeCondition, normalizedSearchCondition, textCondition } from './list-query-sql';
+import { buildCatalogLineWhere, catalogLineOrderBy } from './supplier-catalog-line-prisma';
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { SupplierScope } from '../../../domain/supplier-scope';
+import {
+  SHOWCASE_LINE_BATCH,
+  SHOWCASE_LINE_SORT,
+  SHOWCASE_SUPPLIER_BATCH,
+  SHOWCASE_SUPPLIER_SORT,
+} from '../../../domain/supplier-showcase';
+import type { ShowcasePage, ShowcaseQuery } from '../../../domain/supplier-showcase';
 import type { NewSupplier, SupplierView } from '../../../domain/supplier-view';
 
 /**
@@ -376,4 +384,68 @@ export async function listAliveSuppliers(
   ]);
 
   return buildPage(rows.map(toSupplierView), total, query.page, limit);
+}
+
+/**
+ * `listShowcaseAlive`: usa `buildCatalogLineWhere`/`catalogLineOrderBy` -las MISMAS
+ * funciones del «cargar mas»- para que la primera tanda de lineas de una fila y su
+ * continuacion nunca discrepen en filtro ni en orden.
+ */
+export async function listShowcaseAliveSuppliers(
+  query: ShowcaseQuery,
+  scope: SupplierScope,
+): Promise<ShowcasePage> {
+  const supplierSearch = normalizedSearchCondition(query.supplierSearch, normalizeSupplierName);
+  const productSearch = normalizedSearchCondition(query.productSearch, normalizeSupplierName);
+
+  const where: Prisma.SupplierWhereInput = {
+    deletedAt: null,
+    ...supplierCompanyScope(scope),
+    ...(supplierSearch === null ? {} : { nameNormalized: supplierSearch }),
+    ...(productSearch === null
+      ? {}
+      : {
+          catalogLines: {
+            some: {
+              deletedAt: null,
+              ...catalogLineCompanyScope(scope),
+              nameNormalized: productSearch,
+            },
+          },
+        }),
+  };
+
+  const rows = await prisma.supplier.findMany({
+    where,
+    select: { id: true, name: true },
+    orderBy: supplierOrderBy(SHOWCASE_SUPPLIER_SORT),
+    skip: (query.page - 1) * SHOWCASE_SUPPLIER_BATCH,
+    take: SHOWCASE_SUPPLIER_BATCH + 1,
+  });
+
+  const hasMore = rows.length > SHOWCASE_SUPPLIER_BATCH;
+  const pageRows = rows.slice(0, SHOWCASE_SUPPLIER_BATCH);
+
+  const items = await Promise.all(
+    pageRows.map(async (supplier) => {
+      const lineQuery: ListQuery = { page: 1, sort: null, filters: {}, search: query.productSearch };
+      const lineWhere = buildCatalogLineWhere(supplier.id, lineQuery, scope);
+
+      const lineRows = await prisma.supplierCatalogLine.findMany({
+        where: lineWhere,
+        select: { id: true, name: true, imagePath: true },
+        orderBy: catalogLineOrderBy(SHOWCASE_LINE_SORT),
+        take: SHOWCASE_LINE_BATCH + 1,
+      });
+
+      return {
+        id: supplier.id,
+        name: supplier.name,
+        lines: lineRows.slice(0, SHOWCASE_LINE_BATCH),
+        hasMoreLines: lineRows.length > SHOWCASE_LINE_BATCH,
+      };
+    }),
+  );
+
+  return { items, page: query.page, hasMore };
 }

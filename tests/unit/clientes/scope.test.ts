@@ -246,37 +246,31 @@ describe('R29 — sin dependencias nuevas', () => {
     return despues.filter((nombre) => !previas.has(nombre)).sort()
   }
 
-  function mergeBaseConDev(): string {
-    try {
-      return execSync('git merge-base origin/dev HEAD', {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim()
-    } catch (error) {
-      throw new Error(
-        `no se pudo calcular el merge-base con origin/dev: falta el remoto o el rango. ${String(error)}`,
-      )
-    }
-  }
+  // Comparar con `origin/dev` castigaba a cualquier rama posterior que anadiera una dependencia
+  // aprobada. Lo que se protege es un hecho historico: el merge con el que el modulo entro en dev no
+  // anadio dependencias. Por eso se compara ese merge con su primer padre. (2026-09-24)
+  const MERGE_DE_ENTRADA = 'cf99cc2b4ae72995a26238b68ce8b89393707f8a'
 
-  it('package.json no gano ninguna clave de dependencia contra el merge-base con origin/dev', () => {
-    const base = mergeBaseConDev()
-    let anterior: string
+  function dependenciasEn(commit: string): string[] {
     try {
-      anterior = execSync(`git show ${base}:package.json`, {
+      const contenido = execSync(`git show ${commit}:package.json`, {
         cwd: repoRoot,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
         maxBuffer: 8 * 1024 * 1024,
       })
+      return nombresDeDependencias(JSON.parse(contenido))
     } catch (error) {
-      throw new Error(`no se pudo leer package.json en ${base}: ${String(error)}`)
+      throw new Error(
+        `no se pudo leer package.json en ${commit} (clon superficial o commit ausente), asi que este ` +
+          `caso no ha comprobado nada. ${String(error)}`,
+      )
     }
+  }
 
-    const antes = nombresDeDependencias(JSON.parse(anterior))
-    const actual = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
-    const despues = nombresDeDependencias(actual)
+  it('el merge de entrada del modulo no anadio ninguna clave de dependencia respecto a su primer padre', () => {
+    const antes = dependenciasEn(`${MERGE_DE_ENTRADA}~1`)
+    const despues = dependenciasEn(MERGE_DE_ENTRADA)
     expect(dependenciasAnadidas(antes, despues)).toEqual([])
   })
 

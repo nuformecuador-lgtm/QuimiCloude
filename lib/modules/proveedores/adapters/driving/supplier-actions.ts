@@ -2,7 +2,14 @@
 
 import { identity, observabilidad, proveedores } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
-import { ProveedoresError, type Actor, type Page, type SupplierView } from '@/lib/modules/proveedores';
+import {
+  ProveedoresError,
+  type Actor,
+  type Page,
+  type ShowcaseLinesPage,
+  type ShowcasePage,
+  type SupplierView,
+} from '@/lib/modules/proveedores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
@@ -64,6 +71,10 @@ export type SupplierQueryResult =
 export type SupplierListResult =
   | { status: 'success'; data: Page<SupplierView> }
   | ErrorState;
+
+export type SupplierShowcaseResult = { status: 'success'; data: ShowcasePage } | ErrorState;
+
+export type ShowcaseLinesResult = { status: 'success'; data: ShowcaseLinesPage } | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
 // exportar funciones async (restriccion real de Next.js). Quien consuma estas actions
@@ -206,6 +217,37 @@ export async function listSuppliersAction(query: unknown): Promise<SupplierListR
 
   try {
     const data = await proveedores.listSuppliers(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/**
+ * Tanda de proveedores de la vista de catalogo visual. Consulta: argumento tipado, no
+ * `FormData`. `query` es `unknown` porque la forma entera vive dentro del caso de uso
+ * (`showcaseQuerySchema`).
+ */
+export async function listSupplierShowcaseAction(query: unknown): Promise<SupplierShowcaseResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await proveedores.listSupplierShowcase(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** «Cargar mas» de una fila de la vista de catalogo visual. */
+export async function listShowcaseLinesAction(
+  supplierId: string,
+  query: unknown,
+): Promise<ShowcaseLinesResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await proveedores.listShowcaseLines(supplierId, query, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
