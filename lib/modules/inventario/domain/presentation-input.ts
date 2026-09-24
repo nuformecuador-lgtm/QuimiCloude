@@ -23,7 +23,7 @@ const presentationNameSchema = z
   });
 
 /**
- * Contenido del envase (R6, R7): decimal plano, hasta diez enteros y cuatro decimales, como
+ * Contenido del envase: decimal plano, hasta diez enteros y cuatro decimales, como
  * `costSchema` de `catalog-line-input.ts`. Opcional y anulable -`nullish()`-: una presentacion
  * puede no declararlo, y vaciar el campo se traduce a `null`, no a un `0` que fuera el `CHECK`
  * de la base rechazaria igual (`content > 0`).

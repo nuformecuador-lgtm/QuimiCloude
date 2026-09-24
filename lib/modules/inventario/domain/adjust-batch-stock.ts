@@ -77,7 +77,6 @@ export function createAdjustBatchStock(
     // El lote ajeno y el inexistente salen por el mismo camino: distinguirlos convertiria esto en
     // un oraculo de existencia sobre los lotes de las demas empresas.
     if (resultado === null) throw new BatchNotFoundError();
-    // R31: suma sobre un lote de producto terminado.
     if (resultado === 'increase_not_allowed') throw new ActionNotAllowedError();
 
     return resultado;

@@ -50,7 +50,7 @@ export interface ProductRepository {
   create(data: NewProduct, now: Date, scope: InventoryScope): Promise<{ id: string }>;
   findAliveById(id: string, scope: InventoryScope): Promise<ProductView | null>;
   /**
-   * `'type_locked'` (R4): la edicion cambiaria el tipo a `FINISHED_PRODUCT`, o cambiaria el de
+   * `'type_locked'`: la edicion cambiaria el tipo a `FINISHED_PRODUCT`, o cambiaria el de
    * un producto terminado a cualquier otro. El adaptador lo decide bajo el mismo bloqueo con el
    * que escribe, para que dos ediciones concurrentes no lo esquiven.
    */
@@ -94,7 +94,7 @@ export interface ProductRepository {
    * ascendente-. Un homonimo vivo en OTRA unidad no cuenta como el mismo producto: nace
    * uno nuevo.
    *
-   * Devuelve tambien el `type` de la fila encontrada (R28): el caso de uso lo necesita para
+   * Devuelve tambien el `type` de la fila encontrada: el caso de uso lo necesita para
    * rechazar el homonimo de un producto terminado sin una segunda consulta.
    */
   findAliveIdByNameInPresentationUnit(
@@ -143,7 +143,7 @@ export interface ProductRepository {
    * Con la misma vara de `createWithFirstBatch`, el `lot` devuelto es el texto que quedo
    * escrito en la fila.
    *
-   * Devuelve `'finished_product'` (R28) cuando, bajo el mismo bloqueo con el que va a escribir,
+   * Devuelve `'finished_product'` cuando, bajo el mismo bloqueo con el que va a escribir,
    * el producto resulta ser `FINISHED_PRODUCT`: cierra la carrera contra un alta manual que
    * empezo a evaluarse antes de que el producto naciera terminado, sin escribir lote ni asiento.
    */
@@ -173,10 +173,10 @@ export interface ProductRepository {
    *
    * La empresa no viaja en ningun tipo de entrada, igual que en `NewProduct` y `NewProductBatch`.
    *
-   * Devuelve `'increase_not_allowed'` (R31) cuando el lote es de un producto terminado y `delta`
+   * Devuelve `'increase_not_allowed'` cuando el lote es de un producto terminado y `delta`
    * es positivo: se decide con el producto ya bloqueado, sin llegar a mover el lote ni a
    * escribir el asiento. Un `delta` negativo sobre un producto terminado sigue las mismas reglas
-   * que cualquier otro lote (R32), incluido el rechazo de una existencia final negativa.
+   * que cualquier otro lote, incluido el rechazo de una existencia final negativa.
    */
   adjustBatchStock(
     batchId: string,

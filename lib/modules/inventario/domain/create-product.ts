@@ -120,7 +120,7 @@ export function createCreateProduct(
     );
 
     if (existente !== null) {
-      // R28: el homonimo vivo es un producto terminado. Se rechaza aqui, antes de tocar el
+      // El homonimo vivo es un producto terminado. Se rechaza aqui, antes de tocar el
       // puerto, y `addBatchToAlive` lo vuelve a comprobar bajo la fila bloqueada para cerrar la
       // carrera con un alta que naciera terminada entre esta lectura y esa escritura.
       if (existente.type === PRODUCT_TYPES.FINISHED_PRODUCT) throw new ActionNotAllowedError();

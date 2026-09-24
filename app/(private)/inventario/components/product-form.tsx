@@ -594,7 +594,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       )}
 
       {/*
-        Tipo de producto. Un producto terminado no se elige a mano (R3): el select solo ofrece
+        Tipo de producto. Un producto terminado no se elige a mano: el select solo ofrece
         MANUAL_PRODUCT_TYPE_VALUES. Al editar uno, el tipo se muestra fijo y viaja en un campo
         oculto -sigue siendo FINISHED_PRODUCT-, en vez de un select que nunca podria ofrecerlo.
 

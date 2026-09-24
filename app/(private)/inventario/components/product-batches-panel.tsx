@@ -95,7 +95,7 @@ function toScaledPackageContent(value: string): bigint | null {
 
 /**
  * Numero de envases del lote -`stock / packageContent`, con el contenido guardado en el lote-,
- * o `null` cuando el lote no es de producto terminado o la division no es entera (R25).
+ * o `null` cuando el lote no es de producto terminado o la division no es entera.
  */
 function packageCountLabel(batch: ProductBatchView): string | null {
   if (batch.packageContent === null) return null;

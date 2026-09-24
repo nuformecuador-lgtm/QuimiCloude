@@ -18,7 +18,7 @@ import type { Page } from '../../../domain/page';
 import type { PresentationView } from '../../../domain/presentation-view';
 import type { PresentationData } from '../../../ports/presentation-repository';
 
-/** QC-150 (R6, R8): `presentations.content` -> cadena decimal, nunca `Prisma.Decimal` fuera del
+/** `presentations.content` -> cadena decimal, nunca `Prisma.Decimal` fuera del
  *  adaptador. Mismo camino que `fromDecimal`/`toDecimalInput` de `supplier-catalog-line-prisma.ts`. */
 function fromContent(value: Prisma.Decimal | null): string | null {
   return value === null ? null : value.toFixed(4);

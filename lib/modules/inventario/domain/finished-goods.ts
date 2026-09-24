@@ -49,7 +49,7 @@ function fromScaledInteger(scaled: bigint): string {
 }
 
 /**
- * Envases enteros y cantidad que entra de un lote de producto terminado (R12, R14, R19, R41).
+ * Envases enteros y cantidad que entra de un lote de producto terminado.
  *
  *  - `packages = floor(orderQuantity / content)`, con enteros escalados: la division de
  *    `BigInt` trunca hacia cero, y los dos operandos son siempre positivos, asi que truncar
@@ -57,7 +57,7 @@ function fromScaledInteger(scaled: bigint): string {
  *  - `quantity = packages * content`, exacta.
  *  - `unitCost = deriveUnitCost(lotCost, quantity)`, HALF_UP a cuatro decimales; cuando
  *    `deriveUnitCost` devuelve `null` -el costo del lote es cero, o el unitario redondea a
- *    cero- el plan entra a costo `'0.0000'` (R42): un lote de produccion es el unico que puede
+ *    cero- el plan entra a costo `'0.0000'`: un lote de produccion es el unico que puede
  *    costar cero.
  */
 export function planFinishedGoods(input: {

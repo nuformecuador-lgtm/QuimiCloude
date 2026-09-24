@@ -48,10 +48,10 @@ export { NAME_COLUMN_ID } from './presentation-list-params';
 /** Id de la columna de acciones de fila. */
 export const ACTIONS_COLUMN_ID = 'actions';
 
-/** Id de la columna de contenido (R8). */
+/** Id de la columna de contenido. */
 export const CONTENT_COLUMN_ID = 'content';
 
-/** Texto de la celda de contenido cuando la presentacion no lo tiene declarado (R8). */
+/** Texto de la celda de contenido cuando la presentacion no lo tiene declarado. */
 export const NO_CONTENT_LABEL = 'Sin contenido';
 
 /**

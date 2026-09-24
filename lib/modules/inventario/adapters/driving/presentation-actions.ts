@@ -54,7 +54,7 @@ function readFormString(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-/** QC-150 (R6, R8): vaciar el campo -cadena vacia o ausente- se lee como `undefined`, que
+/** Vaciar el campo -cadena vacia o ausente- se lee como `undefined`, que
  *  `presentationContentSchema.nullish()` deja pasar y que el caso de uso convierte en `null`.
  *  Mismo camino que `readOptionalFormString` de `supplier-catalog-actions.ts`. */
 function readOptionalFormString(formData: FormData, name: string): string | undefined {

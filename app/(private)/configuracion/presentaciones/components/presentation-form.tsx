@@ -457,7 +457,7 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
           <Label htmlFor={contentId}>{FIELD_LABELS.content}</Label>
           {/*
             `key={initialContent}`: mismo remontaje que el nombre para el campo no controlado.
-            Sin `required`: el contenido es opcional (R6) y vaciarlo es un envio valido.
+            Sin `required`: el contenido es opcional y vaciarlo es un envio valido.
           */}
           <div className="flex items-center gap-2">
             <Input

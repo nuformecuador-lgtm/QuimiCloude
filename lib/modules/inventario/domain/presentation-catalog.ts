@@ -5,7 +5,7 @@ export type PresentationId = string;
 export type PresentationRef = {
   readonly id: PresentationId;
   readonly name: string;
-  /** R38-R40: lo que `pedidos` copia al crear o cambiar de presentacion. `null` = sin declarar. */
+  /** Lo que `pedidos` copia al crear o cambiar de presentacion. `null` = sin declarar. */
   readonly content: string | null;
 };
 

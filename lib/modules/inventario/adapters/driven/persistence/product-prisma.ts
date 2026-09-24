@@ -109,7 +109,7 @@ type ProductTypeRow = { readonly type: ProductType };
  * Bloquea la fila para decidir el tipo antes de escribir, sin dos consultas sueltas que dejen
  * hueco a una carrera: `FOR NO KEY UPDATE` retiene la fila hasta que la transaccion cierra.
  * Devuelve `false` sin fila viva de la empresa, `'type_locked'` si la edicion cambiaria el tipo
- * a o desde `FINISHED_PRODUCT` (R4), y `true` tras escribir. El tipo en si nunca se escribe: la
+ * a o desde `FINISHED_PRODUCT`, y `true` tras escribir. El tipo en si nunca se escribe: la
  * edicion no lo cambia, ni para un producto terminado ni para ningun otro.
  */
 export async function updateAliveProduct(
@@ -724,7 +724,7 @@ export async function addBatchToAlive(
     const alive = rows[0];
     if (alive === undefined) return null;
 
-    // R28: bajo la misma fila bloqueada, cierra la carrera con un alta manual que naciera
+    // Bajo la misma fila bloqueada, cierra la carrera con un alta manual que naciera
     // terminado despues de que `findAliveIdByNameInPresentationUnit` ya lo hubiera leido.
     if (alive.type === PRODUCT_TYPES.FINISHED_PRODUCT) return 'finished_product';
 
@@ -860,7 +860,7 @@ export async function adjustBatchStock(
       const product = rows[0];
       if (product === undefined) return null;
 
-      // R31: un ajuste que suma sobre un producto terminado se rechaza aqui, con la fila ya
+      // Un ajuste que suma sobre un producto terminado se rechaza aqui, con la fila ya
       // bloqueada, antes de tocar el lote o el libro.
       if (product.type === PRODUCT_TYPES.FINISHED_PRODUCT && compareQuantities(delta, '0') > 0) {
         return 'increase_not_allowed';

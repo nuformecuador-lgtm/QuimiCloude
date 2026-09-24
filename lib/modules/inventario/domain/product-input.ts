@@ -249,8 +249,8 @@ const updateUnion = z.discriminatedUnion('type', [
     type: z.literal(PRODUCT_TYPES.PACKAGING),
     qtyAlert: qtyAlertSchema,
   }),
-  // Un producto terminado no nace de este esquema (R2, R3): esta rama solo deja pasar la
-  // forma, para que rechazar un cambio de tipo sea cosa del caso de uso (R4), no de zod.
+  // Un producto terminado no nace de este esquema: esta rama solo deja pasar la
+  // forma, para que rechazar un cambio de tipo sea cosa del caso de uso, no de zod.
   z.strictObject({
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.FINISHED_PRODUCT),
