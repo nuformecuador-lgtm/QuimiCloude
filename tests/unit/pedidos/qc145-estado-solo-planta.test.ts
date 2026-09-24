@@ -125,6 +125,34 @@ function findDataBlockMatches(
 
 const ORDER_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts';
 
+/**
+ * Nombre -> cuerpo de cada `function` de nivel superior del fuente dado. Mismo criterio de corte
+ * que ya usa este archivo para insertAliveOrder/updateAliveOrder/cancelAliveOrder: el cuerpo
+ * termina en el primer `\n}` -una linea que es solo la llave de cierre, la de nivel superior con
+ * el formato de dos espacios de este repo-.
+ */
+function funcionesDeOrderPrisma(fuente: string): ReadonlyMap<string, string> {
+  const funciones = new Map<string, string>();
+  const declaracion = /^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(/gm;
+  for (const match of fuente.matchAll(declaracion)) {
+    const nombre = match[1];
+    if (nombre === undefined) continue;
+    const finFuncion = fuente.indexOf('\n}', match.index);
+    funciones.set(nombre, fuente.slice(match.index, finFuncion === -1 ? undefined : finFuncion));
+  }
+  return funciones;
+}
+
+/** Nombres, ordenados, de las funciones cuyo cuerpo tiene al menos un bloque `data:` con la
+ *  clave `status:` -a mano, sea literal o variable-. */
+function funcionesConStatusEnData(fuente: string): string[] {
+  const nombres: string[] = [];
+  for (const [nombre, cuerpo] of funcionesDeOrderPrisma(fuente)) {
+    if (extractDataBlocks(cuerpo).some((block) => /\bstatus\s*:/.test(block))) nombres.push(nombre);
+  }
+  return nombres.sort();
+}
+
 describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus', () => {
   // Enmendado por QC-141 (design.md > 5.3, review B4, Tm2): `setStatus` de `OrderWriteRepository`
   // -implementada como `setAliveOrderStatus` en order-prisma.ts- escribe `finishedAt` en el
@@ -203,12 +231,30 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus; updat
     ).toEqual([]);
   });
 
-  it('setAliveOrderStatus (order-prisma.ts) es el unico bloque `data:` de ese archivo que fija `status` a `to`', () => {
+  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es setAliveOrderStatus y cancelAliveOrder', () => {
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
-    const bloques = extractDataBlocks(fuente);
-    const conStatusTo = bloques.filter((block) => /\bstatus\s*:\s*to\b/.test(block));
 
-    expect(conStatusTo).toHaveLength(1);
+    expect(funcionesConStatusEnData(fuente)).toEqual(['cancelAliveOrder', 'setAliveOrderStatus']);
+  });
+
+  it('dispara con una escritura nueva `status: <variable>` en otra funcion de order-prisma.ts', () => {
+    const sintetico = [
+      'async function setAliveOrderStatus(to) {',
+      '  return tx.order.updateMany({ where: { id }, data: { status: to } });',
+      '}',
+      '',
+      'export async function cancelAliveOrder(reason) {',
+      "  return tx.order.updateMany({ where: { id }, data: { status: 'CANCELADO' } });",
+      '}',
+      '',
+      'async function otraEscrituraColada(nuevoEstado) {',
+      '  return tx.order.updateMany({ where: { id }, data: { status: nuevoEstado } });',
+      '}',
+    ].join('\n');
+
+    expect(funcionesConStatusEnData(sintetico)).toEqual(
+      ['cancelAliveOrder', 'otraEscrituraColada', 'setAliveOrderStatus'].sort(),
+    );
   });
 
   it('updateAliveOrder ya no escribe status: su bloque `data:` en order-prisma.ts no lleva la clave', () => {
@@ -343,6 +389,16 @@ describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la co
     return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
   }
 
+  /**
+   * Lo esperado: la UNION sin duplicar entre los modelos de la base de fusion y los que anade
+   * esta rama. Una vez que la base de fusion YA trae alguno de `estaRama` (porque ya se mergeo),
+   * sumarlo dos veces romperia el test contra si mismo; la union lo evita sin dejar de exigir el
+   * resto.
+   */
+  function modelosEsperados(modelosDeLaBase: readonly string[], estaRama: readonly string[]): string[] {
+    return [...new Set([...modelosDeLaBase, ...estaRama])].sort();
+  }
+
   it('los modelos de db/schema.prisma son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de QC-141', () => {
     let modelosDev: string[];
     try {
@@ -361,9 +417,21 @@ describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la co
     // esta rama contra dev, y esta rama SI anade una tabla propia (T2, el libro de reservas).
     // `ReservationMovement` es el unico modelo nuevo esperado; cualquier otro sigue siendo R29.
     const ESPERADOS_DE_ESTA_RAMA = ['ReservationMovement'];
-    const modelosDevConLosEsperados = [...modelosDev, ...ESPERADOS_DE_ESTA_RAMA].sort();
 
-    expect(modelosActuales).toEqual(modelosDevConLosEsperados);
+    expect(modelosActuales).toEqual(modelosEsperados(modelosDev, ESPERADOS_DE_ESTA_RAMA));
+  });
+
+  it('R29 (esquema) — con fuente fabricada, si la base de fusion YA tiene el modelo de esta rama, la union no lo duplica', () => {
+    const modelosDev = ['Order', 'ReservationMovement'];
+
+    expect(modelosEsperados(modelosDev, ['ReservationMovement'])).toEqual(['Order', 'ReservationMovement']);
+  });
+
+  it('R29 (esquema) — con fuente fabricada, un modelo nuevo no declarado en esta rama sigue dando rojo', () => {
+    const modelosDev = ['Order'];
+    const modelosActuales = ['Order', 'ReservationMovement', 'OrderFinishedLog'].sort();
+
+    expect(modelosActuales).not.toEqual(modelosEsperados(modelosDev, ['ReservationMovement']));
   });
 
   it('dispara con un esquema sintetico que gana un modelo respecto del de referencia', () => {
