@@ -266,3 +266,18 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   una receta cambiada tras el alta.
 - Tests: `vitest run tests/unit/pedidos tests/unit/asignaciones tests/integration/pedidos
   tests/integration/asignaciones guard` → 191 archivos, 2554 pasados, 12 skipped.
+
+## T9 — R27 (`55575d4a`, backend_dev) · T9 cerrada
+
+- Solo tests; producción ya lo cumplía (QC-145): `updateOrderSchema` no declara `status`,
+  `update-order.ts` hace `assertTransition(row.status, row.status)` y `ENTREGADO` no admite ninguna
+  transición. El formulario de Pedidos ya no pinta el select de estado
+  (`e2e/pedidos-terminados.spec.ts:641` lo afirma).
+- Tests: `tests/unit/pedidos/update-order.test.ts` › R27 (3 casos, incluido el de la cláusula de T9:
+  un pedido `ENTREGADO` rechaza la edición con `invalid_transition`);
+  `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` › R27 (edición real: ni
+  producto, ni lote con `package_content`, ni asiento `production`, ni consumo). 43/43 con la
+  guardia de aislamiento.
+- Incidente sin pérdida: frontend_dev hizo `reset --hard HEAD~1` sobre su propio commit
+  (`5790736e`), que había arrastrado los archivos de T9 sin commitear, y lo rehízo como `2bbdf3e8`
+  sin ellos. Comprobado con el reflog: no se perdió ningún commit.

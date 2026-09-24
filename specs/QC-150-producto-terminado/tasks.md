@@ -221,7 +221,7 @@ Archivos: `lib/modules/pedidos/ports/order-unit-of-work.ts`,
 `e2e/ejecucion-receta.spec.ts` y el E2E de QC-141 siguen verdes **con contenido sembrado en su
 presentación antes de crear el pedido**; si hay que añadirlo al fixture, se dice en la bitácora.
 
-## T9 — La edición en Pedidos no da de alta producto terminado `[depende de T8]` (reescrita el 2026-09-23, D15)
+## [x] T9 — La edición en Pedidos no da de alta producto terminado `[depende de T8]` (reescrita el 2026-09-23, D15)
 
 Archivos: `lib/modules/pedidos/domain/update-order.ts` (el ámbito sin `finishedGoods`,
 `design.md > 4.3`), sus tests.
