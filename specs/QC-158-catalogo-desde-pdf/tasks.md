@@ -14,7 +14,7 @@
 
 ---
 
-## T0 — Medir antes de escribir
+## [x] T0 — Medir antes de escribir
 
 Archivos: `progress/impl_QC-158-catalogo-desde-pdf.md` (bitácora, nueva), `.env` del worktree (no
 versionado).
