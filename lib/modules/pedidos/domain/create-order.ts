@@ -110,6 +110,7 @@ export function createCreateOrder(
 
     // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
     // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
+    // `presentation.content` es lo que se copia en el pedido (R38): `null` si aun no lo tiene.
     const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
     if (presentation === undefined) throw new PresentationNotFoundError();
 
@@ -128,7 +129,7 @@ export function createCreateOrder(
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
     const created = await deps.unitOfWork.run(async (transaction) => {
       const order = await transaction.orders.create(
-        { ...data, status: STATUS_DE_ALTA },
+        { ...data, status: STATUS_DE_ALTA, presentationContent: presentation.content },
         instant.getUTCFullYear(),
         actor.id,
         instant,

@@ -41,6 +41,9 @@ export type NewOrder = {
   readonly status: EditableOrderStatus;
   /** Obligatoria: toda escritura de `NewOrder` la lleva. */
   readonly presentationId: string;
+  /** Copia del contenido de `presentationId` en ese instante (R38, R39). `null` si la
+   *  presentacion no tiene contenido. */
+  readonly presentationContent: string | null;
 };
 
 /**
@@ -77,6 +80,10 @@ export type OrderRow = {
   readonly updatedBy: string | null;
   /** `null` = pedido viejo, sin presentacion. */
   readonly presentationId: string | null;
+  /** Copia del contenido de `presentationId` al crear el pedido o al cambiarle la
+   *  presentacion (R38, R39). `null` = sin copia: presentacion sin contenido entonces, o
+   *  pedido anterior a esta columna. */
+  readonly presentationContent: string | null;
 };
 
 /**

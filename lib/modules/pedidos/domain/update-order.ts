@@ -103,6 +103,11 @@ export function createUpdateOrder(
     const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
     if (presentation === undefined) throw new PresentationNotFoundError();
 
+    // R39: la copia solo se sustituye si la presentacion CAMBIA. Si no cambia, se conserva la
+    // de la fila ya leida -editar cantidad, prioridad o receta no la toca-.
+    const presentationContent =
+      data.presentationId === row.presentationId ? row.presentationContent : presentation.content;
+
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
     // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
     // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
@@ -136,7 +141,14 @@ export function createUpdateOrder(
       const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
       const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 
-      const result = await transaction.orders.updateAlive(id, data, actor.id, instant, ingredientsCost, scope);
+      const result = await transaction.orders.updateAlive(
+        id,
+        { ...data, presentationContent },
+        actor.id,
+        instant,
+        ingredientsCost,
+        scope,
+      );
       if (result === 'not_found') throw new OrderNotFoundError();
 
       const outcome = await transaction.reservations.syncForOrder({
