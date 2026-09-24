@@ -28,7 +28,7 @@
 
 ### QC-152 Clientes - EPICA NUEVA del chat, ACOTADA con `/afinar-feature` (2026-09-23)
 
-Epica **QC-152** y tareas **QC-153** (modelo, backend), **QC-154** (CRUD, backend, bloqueada por 153), **QC-155** (pantalla, frontend, bloqueada por 154) y **QC-156** (pedido con cliente, fullstack, bloqueada por 154, sin sembrar). 153-155 sembradas con 7 decisiones comunes y 1 pregunta abierta (largos y formato de telefono/correo) en `specs/QC-15{3,4,5}-*/requirements.md`. `complexity` pendiente de F1.0. **QC-153 F1.0 hecho el 2026-09-24**: `complexity: medium` (migracion con RLS, FK compuesta y enmienda al catalogo de permisos con seed), worktree montado, cupo `backend` 2 de 2 con QC-131 (humana).
+Epica **QC-152** y tareas **QC-153** (modelo, backend), **QC-154** (CRUD, backend, bloqueada por 153), **QC-155** (pantalla, frontend, bloqueada por 154) y **QC-156** (pedido con cliente, fullstack, bloqueada por 154, sin sembrar). 153-155 sembradas con 7 decisiones comunes y 1 pregunta abierta (largos y formato de telefono/correo) en `specs/QC-15{3,4,5}-*/requirements.md`. `complexity` pendiente de F1.0. **QC-153 F1.0 hecho el 2026-09-24**: `complexity: medium` (migracion con RLS, FK compuesta y enmienda al catalogo de permisos con seed), worktree montado, cupo `backend` 2 de 2 con QC-131 (humana). **F1.2/F1.3 hechos**: R1-R29, T0-T13; tarjeta en *En revision*; **PARADA EN F1.4** (FK de auditoria, descripciones de permisos, largos de ciudad/direccion). Choca con QC-142 en el catalogo de permisos: no en paralelo.
 
 ### QC-151 - CERRADA (2026-09-23)
 
