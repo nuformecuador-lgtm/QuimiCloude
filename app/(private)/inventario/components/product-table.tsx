@@ -108,6 +108,7 @@ function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetP
               <AdjustBatchDialog
                 batch={batch}
                 canAdjust={canAdjust}
+                productType={product.type}
                 onAdjusted={fetchBatches}
               />
             )}

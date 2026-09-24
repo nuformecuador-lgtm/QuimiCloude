@@ -297,6 +297,32 @@ describe('el Operador, que solo tiene inventario.consultar, no encuentra el cont
   });
 });
 
+describe('QC-150 R33 — aviso de solo restar en lotes de producto terminado', () => {
+  it('con productType FINISHED_PRODUCT muestra el texto visible', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust productType="FINISHED_PRODUCT" />);
+
+    const dialogo = await abrirDialogo(user);
+    expect(dialogo).toHaveTextContent('Solo se admiten ajustes que restan.');
+  });
+
+  it('con otro tipo de producto, no aparece', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust productType="PRODUCT" />);
+
+    await abrirDialogo(user);
+    expect(screen.queryByTestId('adjust-batch-finished-product-notice')).toBeNull();
+  });
+
+  it('sin productType, no aparece', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    expect(screen.queryByTestId('adjust-batch-finished-product-notice')).toBeNull();
+  });
+});
+
 describe('multiplataforma (R25)', () => {
   it('el disparador y los campos llevan area tactil, y el campo de cantidad lleva text-base', async () => {
     const user = setupUser();
