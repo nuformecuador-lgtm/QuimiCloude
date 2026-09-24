@@ -204,3 +204,15 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   `lib/shared/{pagination,routes}`, helpers) está en el diff de la rama. **Flake ajeno, el de QC-126**
   (pendiente en el board); no está en `tests/baseline-rojos.json`. No se toca.
 - `scripts/_tmp-guard-check.ts`: no existe en el worktree; nada que borrar.
+
+### D22 y rojo a) (`e32e7547`, `7474b3de`, backend_dev)
+
+- D22: `lib/modules/inventario/domain/product-input.ts` (`productNameSchema` hasta 200) y el mensaje de
+  `app/(private)/inventario/components/product-form.tsx`. Tests: `tests/unit/inventario/{product-input,product-service}.test.ts`,
+  `product-page.test.tsx` (201 rechazado en pantalla), y `tests/integration/inventario/product-batch-write.int.test.ts`
+  › D22 (183 caracteres guardados completos en Postgres).
+- Rojo a): `tests/integration/proveedores/company-scope.int.test.ts` detecta con una regex tolerante
+  al espacio y fija que `20260924120100_finished_products_and_content_copies` es dependiente. 29/29 verde.
+- Tests: `product-input`, `product-service`, `product-page` 107/107; `product-batch-write` 12/12.
+- **Rojo nuevo que no había visto nadie**: `tests/integration/inventario/inventario-constraints.int.test.ts`
+  (3 casos), cuyo censo del esquema real de `products` no incluye lo que añadió T2. Encargado aparte.
