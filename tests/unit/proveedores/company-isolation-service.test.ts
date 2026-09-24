@@ -99,6 +99,8 @@ const CAMPOS_LINEA = {
   cost: '12.5000',
   minPurchase: null,
   deliveryTime: null,
+  material: null,
+  measurements: null,
 };
 
 // --- El almacen en memoria, con dato de LAS DOS empresas ---------------------------------------

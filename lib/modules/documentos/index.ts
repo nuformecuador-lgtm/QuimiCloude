@@ -153,3 +153,38 @@ export {
   type CropCatalogImagesInput,
   type CropCatalogImagesResult,
 } from './domain/crop-catalog-images';
+
+// El esquema del borde de la vista previa y de la confirmacion de una importacion de catalogo, y
+// sus tipos inferidos: una sola definicion de la entrada, reutilizada por las dos Server Actions
+// de importacion.
+export {
+  confirmCatalogImportInputSchema,
+  newPresentationUnitSchema,
+  previewCatalogImportInputSchema,
+  type ConfirmCatalogImportInput,
+  type NewPresentationUnitInput,
+  type PreviewCatalogImportInput,
+  type ReviewedLineInput,
+} from './domain/catalog-import-input';
+
+// La vista previa de una importacion de catalogo, publicada como FABRICA por el mismo motivo que
+// el resto: quien la usa recibe el caso de uso ya construido y nunca ve a sus puertos ni a los
+// casos de uso de `proveedores` e `inventario` que trae inyectados. `CatalogImportDeps` se
+// publica porque la confirmacion (`confirm-catalog-import.ts`) comparte el MISMO tipo, y quien cablea los dos
+// (`lib/composition`) necesita nombrarlo una sola vez.
+export {
+  createPreviewCatalogImport,
+  type CatalogImportDeps,
+  type CatalogImportNewPresentation,
+  type CatalogImportPreview,
+  type CatalogImportPreviewCrop,
+  type CatalogImportPreviewRow,
+} from './domain/preview-catalog-import';
+
+// La confirmacion, publicada por el mismo motivo y con el mismo `CatalogImportDeps`: quien
+// cablea los dos casos de uso (`lib/composition`) los nombra una sola vez.
+export { createConfirmCatalogImport, type CatalogImportSummary } from './domain/confirm-catalog-import';
+
+// La sugerencia de unidad por nombre o simbolo normalizado, funcion pura sin fabrica porque no
+// tiene dependencias que inyectar.
+export { suggestUnitId } from './domain/suggest-unit';

@@ -38,6 +38,7 @@
     "pedidos/pedidos-constraints.int.test.ts",
     "proveedores/catalog-line.int.test.ts",
     "proveedores/company-scope.int.test.ts",
+    "proveedores/material-measurements-migration.int.test.ts",
     "proveedores/proveedores-constraints.int.test.ts",
     "proveedores/supplier-crud.int.test.ts",
     "recetas/company-scope.int.test.ts",
@@ -48,6 +49,21 @@
     "unidades/unidades-constraints.int.test.ts"
   ],
   "commit": [
+    {
+      "archivo": "documentos/catalog-import-isolation.int.test.ts",
+      "motivo": "T10 (QC-158): ejercita `createConfirmCatalogImport` con los adaptadores de Prisma reales de `documentos`, `proveedores`, `inventario` y `unidades` cableados a mano; `createImportCatalogLines` abre SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, y R21 necesita que una presentacion creada por OTRA llamada (a `inventario`, fuera de esa transaccion) sobreviva a un fallo real de la escritura de lineas -envolver la corrida en una transaccion de test con ROLLBACK ocultaria justo eso-. Cada caso fabrica su propia empresa efimera con randomUUID y la limpia en `afterAll`, en el orden que exigen las FK: lineas de catalogo -> archivos y tandas de documento -> proveedores -> presentaciones -> unidades propias -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
+    },
+    {
+      "archivo": "proveedores/catalog-import-upsert.int.test.ts",
+      "motivo": "QC-158 T4: ejercita `upsertCatalogLinesByIdentity` y `findAliveCatalogLinesByIdentities` de `supplier-catalog-import-prisma.ts`; el primero abre SU PROPIA `prisma.$transaction` contra el cliente GLOBAL (el `SELECT ... FOR SHARE` del proveedor y el `INSERT ... ON CONFLICT` por linea), asi que envolver la corrida en una transaccion del test con ROLLBACK seria aislamiento de mentira. Ademas R22 necesita DOS llamadas concurrentes de verdad -incompatible por construccion con una unica transaccion de test-, y R21 necesita ver el estado FINAL tras un rollback real de la transaccion del adaptador. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol y tipo de documento incluidos) y la limpia en un `finally`/`afterAll`, en el orden que exigen las FK: lineas de catalogo -> proveedores -> presentaciones -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
+    },
+    {
+      "archivo": "inventario/presentation-catalog-by-name.int.test.ts",
+      "motivo": "QC-158 T7: ejercita `findPresentationsByNormalizedNames` de `presentation-catalog-prisma.ts`, que usa el cliente Prisma GLOBAL (mismo criterio que `findPresentationRefs` en `company-scope-queries.int.test.ts`), asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso fabrica su empresa y presentaciones efimeras con randomUUID y las limpia en `afterAll` por su id.",
+      "desde": "2026-09-23"
+    },
     {
       "archivo": "documentos/document-batch-claim-concurrency.int.test.ts",
       "motivo": "QC-111 T17: mide la ATOMICIDAD del `UPDATE ... WHERE status='queued' ... RETURNING` de `claim` (`document-batch-repository-prisma.ts`), que llama al cliente Prisma GLOBAL sin abrir su propia transaccion. Envolver la corrida en una transaccion del test con ROLLBACK seria aislamiento de mentira: dentro de una unica transaccion no hay dos conexiones compitiendo por la fila, que es justo lo que R10 exige demostrar con `Promise.all`. Cada caso fabrica su empresa, tanda y archivo efimeros con randomUUID y los borra en un `finally` en el orden que exigen las FK (archivo -> tanda -> empresa); se apoya en que la base de la corrida es suya.",

@@ -53,6 +53,9 @@ function dobleDeRepositorio(guardada: BatchStatus | null) {
     }),
     expireStale,
     readBatch,
+    readFileForReview: vi.fn(async () => {
+      throw new Error('getBatchStatus no lee para revision');
+    }),
   };
   return { repository, expireStale, readBatch };
 }

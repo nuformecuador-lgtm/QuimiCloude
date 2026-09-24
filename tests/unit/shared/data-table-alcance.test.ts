@@ -475,7 +475,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `data-table`. El centinela AFLOJA por primera vez, de VEINTIUNO a VEINTE, porque la unica
   // razon de que este spec estuviera aqui ya no existe; sigue siendo una lista cerrada y un spec
   // mas que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veinte', () => {
+  //
+  // 2026-09-24: entra `e2e/catalogo-desde-pdf.spec.ts` (importacion de catalogo desde PDF). No
+  // estrena pantalla: recorre el catalogo del detalle de un proveedor y localiza
+  // `data-table-row-<id>` y `data-table-cell-cost` para afirmar el costo de la linea importada. El
+  // centinela vuelve de VEINTE a VEINTIUNO; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintiuno', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -485,7 +490,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos veinte E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos veintiuno E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -496,6 +501,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/aislamiento-pedidos.spec.ts',
       // Las filas servidas de la lista de recetas con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-recetas.spec.ts',
+      // Ver la nota de arriba (2026-09-24). Va antes
+      // que `e2e/ejecucion-receta.spec.ts` porque la lista esta ORDENADA y 'c' precede a 'e'.
+      'e2e/catalogo-desde-pdf.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
       // tabla por la lista de pedidos asignados, que ya la consumia.
       'e2e/ejecucion-receta.spec.ts',

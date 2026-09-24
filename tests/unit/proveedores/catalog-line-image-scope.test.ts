@@ -80,11 +80,14 @@ const units: UnitCatalog = {
 };
 
 describe('R32 — `proveedores` sigue SIN puerto de almacenamiento, y esta ficha no le crea uno', () => {
-  it('el censo de `ports/` es exacto: tres puertos, ninguno de imagenes', () => {
+  it('el censo de `ports/` es exacto: cuatro puertos, ninguno de imagenes', () => {
     // Lista CERRADA a proposito: un puerto nuevo de almacenamiento -aunque naciera «solo para
-    // componer la URL»- entra por aqui y este caso lo dice.
+    // componer la URL»- entra por aqui y este caso lo dice. Se anade
+    // `supplier-catalog-import-repository.ts` -la importacion por identidad, sin nada de
+    // imagenes ni de almacenamiento- y el censo sube de tres a cuatro.
     expect(readdirSync(join(moduloDir, 'ports')).sort()).toEqual([
       'list-query-log.ts',
+      'supplier-catalog-import-repository.ts',
       'supplier-catalog-repository.ts',
       'supplier-repository.ts',
     ]);

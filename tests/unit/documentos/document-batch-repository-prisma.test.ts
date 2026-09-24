@@ -10,6 +10,7 @@ const doble = vi.hoisted(() => ({
   documentFileUpdate: vi.fn(),
   documentFileUpdateMany: vi.fn(),
   documentFileFindMany: vi.fn(),
+  documentFileFindFirst: vi.fn(),
   documentBatchFindFirst: vi.fn(),
 }));
 
@@ -21,6 +22,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({
       update: doble.documentFileUpdate,
       updateMany: doble.documentFileUpdateMany,
       findMany: doble.documentFileFindMany,
+      findFirst: doble.documentFileFindFirst,
     },
     documentBatch: {
       findFirst: doble.documentBatchFindFirst,
@@ -35,6 +37,7 @@ const {
   finish,
   expireStale,
   readBatch,
+  readFileForReview,
 } = await import('@/lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma');
 
 const EMPRESA = '11111111-1111-4111-8111-111111111111';
@@ -208,6 +211,49 @@ describe('readBatch — null si no existe o es de otra empresa', () => {
     });
     expect(doble.documentFileFindMany.mock.calls[0]?.[0]).toMatchObject({
       where: { batchId: TANDA, companyId: EMPRESA },
+    });
+  });
+});
+
+describe('readFileForReview — null para otra empresa (R3)', () => {
+  it('R3 — sin archivo visible en la empresa, devuelve null sin consultar la tanda', async () => {
+    doble.documentFileFindFirst.mockResolvedValue(null);
+
+    await expect(readFileForReview(ARCHIVO, EMPRESA)).resolves.toBeNull();
+    expect(doble.documentFileFindFirst).toHaveBeenCalledWith({
+      where: { id: ARCHIVO, companyId: EMPRESA },
+      select: { status: true, extractedText: true, batchId: true },
+    });
+    expect(doble.documentBatchFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('R3 — archivo visible pero tanda de otra empresa, devuelve null', async () => {
+    doble.documentFileFindFirst.mockResolvedValue({
+      status: 'done',
+      extractedText: 'texto',
+      batchId: TANDA,
+    });
+    doble.documentBatchFindFirst.mockResolvedValue(null);
+
+    await expect(readFileForReview(ARCHIVO, EMPRESA)).resolves.toBeNull();
+    expect(doble.documentBatchFindFirst).toHaveBeenCalledWith({
+      where: { id: TANDA, companyId: EMPRESA },
+      select: { strategy: true },
+    });
+  });
+
+  it('con archivo y tanda visibles, devuelve estado, estrategia y texto', async () => {
+    doble.documentFileFindFirst.mockResolvedValue({
+      status: 'done',
+      extractedText: 'texto extraido',
+      batchId: TANDA,
+    });
+    doble.documentBatchFindFirst.mockResolvedValue({ strategy: 'catalogo' });
+
+    await expect(readFileForReview(ARCHIVO, EMPRESA)).resolves.toEqual({
+      status: 'done',
+      strategy: 'catalogo',
+      extractedText: 'texto extraido',
     });
   });
 });

@@ -44,8 +44,12 @@ export {
   createCatalogLineSchema,
   updateCatalogLineSchema,
   CATALOG_LINE_NAME_MAX_LENGTH,
+  CATALOG_LINE_MATERIAL_MAX_LENGTH,
+  CATALOG_LINE_MOUTH_MAX_LENGTH,
   type CreateCatalogLineInput,
   type UpdateCatalogLineInput,
+  type CatalogLineMeasurement,
+  type CatalogLineMeasurements,
 } from './domain/catalog-line-input';
 export { type NewSupplier, type SupplierView } from './domain/supplier-view';
 // QC-52: `CatalogLineTerms` desaparece y lo sustituye `CatalogLineFields`. No es un
@@ -70,6 +74,20 @@ export { createCreateCatalogLine, type CreateCatalogLineDeps } from './domain/cr
 export { createUpdateCatalogLine, type UpdateCatalogLineDeps } from './domain/update-catalog-line';
 export { createDeleteCatalogLine, type DeleteCatalogLineDeps } from './domain/delete-catalog-line';
 export { createListCatalogLines, type ListCatalogLinesDeps } from './domain/list-catalog-lines';
+// La importacion por identidad, que `documentos` orquesta desde su caso de uso de
+// confirmacion. Las dos factories nuevas y sus tipos, nada mas: el puerto que las cablea
+// (`SupplierCatalogImportRepository`) no sale de aqui, igual que ningun otro puerto del
+// modulo -quien lo necesita es `lib/composition`, que importa la implementacion.
+export {
+  createFindCatalogLinesByIdentity,
+  type FindCatalogLinesByIdentityDeps,
+  type AliveCatalogLineByIdentity,
+} from './domain/find-catalog-lines-by-identity';
+export {
+  createImportCatalogLines,
+  type ImportCatalogLinesDeps,
+  type ImportCatalogLinesSummary,
+} from './domain/import-catalog-lines';
 // La vista de catalogo visual: las dos factories, sus tipos `*Deps`, los cinco tipos de
 // salida/entrada y las cuatro constantes de tanda y orden.
 export {

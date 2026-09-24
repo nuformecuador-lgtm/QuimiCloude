@@ -989,6 +989,10 @@ describe('estructura de la linea de catalogo', () => {
         'delivery_time',
         'id',
         'image_path',
+        // Ampliacion nombrada del 2026-09-24: material y medidas de la linea, opcionales, que
+        // trae la importacion de catalogo desde PDF.
+        'material',
+        'measurements',
         'min_purchase',
         'name',
         'name_normalized',
@@ -1412,6 +1416,10 @@ describe('estructura de la linea de catalogo', () => {
       expect(checks.map((c) => c.conname)).toEqual([
         'supplier_catalog_lines_cost_positive',
         'supplier_catalog_lines_delivery_time_non_negative',
+        // Ampliacion nombrada del 2026-09-24: los dos CHECK de material y medidas (material no
+        // en blanco, medidas objeto o nulo). Los tres de arriba siguen intactos.
+        'supplier_catalog_lines_material_check',
+        'supplier_catalog_lines_measurements_check',
         'supplier_catalog_lines_min_purchase_non_negative',
       ])
 

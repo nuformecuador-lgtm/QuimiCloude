@@ -142,6 +142,8 @@ function linea(id: string, name: string, presentationId: string): CatalogLineVie
     cost: '12.5000',
     minPurchase: null,
     deliveryTime: null,
+    material: null,
+    measurements: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: ADMIN.id,
@@ -290,6 +292,8 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       cost: '12.5000',
       minPurchase: '2.5',
       deliveryTime: null,
+      material: null,
+      measurements: null,
     })
 
     // R10: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
@@ -306,6 +310,8 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       cost: '1.0000',
       minPurchase: null,
       deliveryTime: null,
+      material: null,
+      measurements: null,
     })
   })
 
@@ -396,6 +402,8 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       cost: '9.0000',
       minPurchase: '25.0000',
       deliveryTime: 3,
+      material: null,
+      measurements: null,
     })
 
     // R10: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
@@ -412,6 +420,8 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       cost: '9.0000',
       minPurchase: null,
       deliveryTime: null,
+      material: null,
+      measurements: null,
     })
 
     // Intentar cambiar de proveedor es entrada INVALIDA, no un campo ignorado, y no llega

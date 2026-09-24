@@ -73,6 +73,9 @@ function cablearRunDocumentJobReal() {
       throw new Error('run-document-job no caduca nada');
     }),
     readBatch: vi.fn(async () => batch),
+    readFileForReview: vi.fn(async () => {
+      throw new Error('run-document-job no lee para revision');
+    }),
   };
   const remove = vi.fn(async () => {});
   const storage: DocumentStorage = {

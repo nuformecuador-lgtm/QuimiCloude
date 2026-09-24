@@ -61,6 +61,9 @@ function dobleDeRepositorio(strategy: 'catalogo' | 'formula' = 'catalogo') {
       throw new Error('run-document-job no caduca nada');
     }),
     readBatch,
+    readFileForReview: vi.fn(async () => {
+      throw new Error('run-document-job no lee para revision');
+    }),
   };
 
   return { repository, claim, finish, readBatch };

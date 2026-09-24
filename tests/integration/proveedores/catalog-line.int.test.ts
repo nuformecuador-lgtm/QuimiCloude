@@ -50,6 +50,7 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores/domain/supplier
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { CatalogLineFields } from '@/lib/modules/proveedores/domain/catalog-line-view';
 import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
 import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 
@@ -350,6 +351,8 @@ function fields(
     cost: string;
     minPurchase: string | null;
     deliveryTime: number | null;
+    material: string | null;
+    measurements: CatalogLineFields['measurements'];
   }> = {},
 ) {
   return {
@@ -360,6 +363,8 @@ function fields(
     cost: '10.0000',
     minPurchase: null,
     deliveryTime: null,
+    material: null,
+    measurements: null,
     ...overrides,
   };
 }
