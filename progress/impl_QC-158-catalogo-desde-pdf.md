@@ -383,7 +383,7 @@ M tests/unit/shared/data-table-alcance.test.ts
 | R35 | `catalog-extraction.test.ts` (describe R35); `catalog-line-input.test.ts` |
 | R36 | `tests/unit/documentos/qc158-alcance.test.ts` (R36a/b/c); `tests/unit/documentos/ai-reader-canned.test.ts` (los dos textos de guion son JSON puro) |
 | R37 | `catalog-import-review.test.tsx` (R37); `catalog-line-form.test.tsx` (R37); la pasada manual en un móvil real **no se ha hecho**: solo el E2E en WebKit |
-| R38 | `e2e/catalogo-desde-pdf.spec.ts` (Chromium y WebKit) |
+| R38 | `e2e/catalogo-desde-pdf.spec.ts` (Chromium y WebKit): costo, material, medidas y presentación en la base y en la pantalla; la **imagen solo en la base**, por decisión humana del 2026-09-24 (`design.md > 16`), hasta que QC-140 firme la ruta para pintarla |
 
 ## Salida real de las corridas (2026-09-24, tras el merge)
 
@@ -472,3 +472,20 @@ M tests/unit/shared/data-table-alcance.test.ts
 - **La imagen de la línea no se ve en la pantalla del catálogo** (R38 dice «en la base y en la pantalla»): hace falta firmar `imagePath` al pintar, que es trabajo de QC-140 o de una ficha propia. ¿Se acepta que R38 la compruebe solo en la base hasta entonces?
 - `formatMeasurements` pinta los valores tal cual llegan (`7.5000`); `design.md > 6.4` pone de ejemplo `7.5`. Quitar los ceros de relleno es barato si el humano lo quiere.
 - m12: pasada manual en un iPhone o Android real.
+
+## Decisiones humanas del 2026-09-24 (aplicadas)
+
+1. **Imagen en pantalla**: R38 comprueba la imagen **solo en la base** hasta que QC-140 firme la ruta
+   para pintarla. Nota fechada en `design.md > 16` (`a9a2a416`); la fila R38 del mapa, ajustada.
+2. **Medidas sin ceros de relleno**: `formatMeasurements` usa `trimDecimal`
+   (`lib/shared/ui/decimal-display.ts`, sin modificar) y **no redondea** (`7.5550` → `7.555`).
+   `catalog-columns.test.tsx` gana dos casos (7/7). **Muerden**: sin `trimDecimal` los dos nuevos
+   quedan en rojo. El E2E afirma `Ø 7.5 cm · alto 12 cm · boca 28/410`. Commit `121f3bd5`.
+
+Verificación: typecheck limpio; eslint sin salida en lo tocado; `tests/unit/proveedores-ui/` →
+23 archivos, 249 passed y 6 skipped. E2E `catalogo-desde-pdf.spec.ts`: la primera corrida dio **404
+en `/proveedores/[id]/importar/[documentoId]`** en Chromium y WebKit. La causa era la caché de
+Turbopack (`.next`) desfasada: la ruta respondía en 52 ms sin compilar, y los permisos del rol en la
+base eran correctos. Con `.next` borrado: Chromium ✓ (22.3s), WebKit ✓ (18.1s), y una segunda
+pasada con caché caliente, Chromium ✓ (17.9s) y WebKit ✓ (22.8s). **Aviso para el gate**: si el E2E da
+404 en esa ruta, borrar `.next` antes de tomarlo por regresión.
