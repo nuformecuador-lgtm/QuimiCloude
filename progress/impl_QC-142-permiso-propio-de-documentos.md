@@ -169,3 +169,8 @@ La review está en `progress/review_QC-142-permiso-propio-de-documentos.md` (com
 - `pnpm run typecheck`: limpio. `pnpm run lint`: 0 errores (los 2 warnings preexistentes de `order-service.test.ts`).
 - No se corrieron ni `./init.sh` ni la suite completa ni el E2E. El baseline no cambia.
 
+
+## Tras el merge con dev (`55cbf5ae`, entra QC-158)
+
+- `b23b7569`: `tests/unit/documentos/qc158-alcance.test.ts`, bloque R36a. Antes exigía que el diff de la rama trajera `specs/QC-158-…/` y por eso caía en cualquier otra rama. Se parte en dos casos: el de fondo (`git ls-files borradores-de-prompts/` vacío) corre siempre, y el de alcance hace skip en voz alta fuera de la rama de la ficha o sin commits propios. Es el patrón de `baseOSalto`, que el archivo ya usaba en R36d. R36b, R36c y R36d no tenían el defecto. Anti-placebo: con un archivo forzado bajo `borradores-de-prompts/`, el caso de fondo cae; el archivo se retiró sin dejar rastro. Nada va al baseline.
+- Salidas: `qc158-alcance` 8 passed | 3 skipped. `tests/unit/documentos` sin `module-contract`: 627 passed | 29 skipped. `module-contract` corrido solo y en frío: 23/23. `tests/unit/documentos-ui`: 39/39. typecheck limpio; lint con 0 errores (7 warnings preexistentes, fuera del archivo tocado).
