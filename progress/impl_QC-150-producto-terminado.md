@@ -188,3 +188,19 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 | R41 | `tests/unit/inventario/finished-goods.test.ts` › R41 — integración en T7 pendiente |
 | R42 | `finished-goods.test.ts` › R42 (2); `tests/unit/pedidos/{order-cost,resolve-ingredients-cost}.test.ts` — Finalizar en T8 pendiente |
 | R43 | `tests/unit/pedidos/order-cost.test.ts` › R43 — Finalizar en T8 pendiente |
+
+## Vuelta 2 (2026-09-24): D22 y rojos del `--rapido` del leader en `7100b08f`
+
+- **D22** (`edcb8fcc`, humano): tope del nombre de producto a 200. Desbloquea T7.
+- **Rojo a)** `tests/integration/proveedores/company-scope.int.test.ts` (R10 de QC-59, `2BP01` sobre
+  `presentations_company_id_id_key`). Causa: el test detecta las migraciones posteriores que
+  dependen de esa clave buscando el texto exacto `REFERENCES "presentations" ("company_id", "id")`,
+  con espacio, y la migración nueva lo escribe sin espacio: no se detectaba y su `down.sql` no corría
+  antes. Se arregla en el test (detección tolerante al espacio), sin tocar la migración ya aplicada.
+- **Rojo b)** `tests/unit/configuracion-ui/user-table.test.tsx` › «la accion de editar de una fila
+  abre el panel SOBRE ESE usuario (R26)». Aislado **7 corridas: 6 verdes y 1 roja**; la roja coincidió
+  con otro subagente ejecutando tests en paralelo, y en las 4 corridas con captura de log no apareció
+  el error. Ningún archivo que importa el test (`configuracion/usuarios`, `data-table`, `identity`,
+  `lib/shared/{pagination,routes}`, helpers) está en el diff de la rama. **Flake ajeno, el de QC-126**
+  (pendiente en el board); no está en `tests/baseline-rojos.json`. No se toca.
+- `scripts/_tmp-guard-check.ts`: no existe en el worktree; nada que borrar.
