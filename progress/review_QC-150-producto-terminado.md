@@ -179,3 +179,94 @@ El resto de requisitos lo comprobé por nombre de caso contra el mapa final de
 3. B3: renombrar las dos migraciones a prefijos posteriores a los de `dev`; después, `db:rollback` y
    `db:migrate` sobre `QuimiCloude_QC150` y regenerar la plantilla.
 4. Mergear `origin/dev` y correr `./init.sh --rapido`. Antes del PR, `./init.sh` completo.
+
+---
+
+## Vuelta 2 (2026-09-24) — `6576626a..35ec4371`
+
+Diff contra el nuevo merge-base con `origin/dev` (`cdfc6bba`; a `dev` solo le falta `33fab2a6`, de
+bitácora). Los tests se corrieron en serie contra `QuimiCloude_QC150`, todos verdes:
+
+- `transition-order`, `finished-goods-prisma`, `guard-convenciones-showcase`,
+  `guard-arquitectura-modulos` y `guard-ambito-empresa-inventario`: 117/117.
+- `finished-goods.int`, `product-type-lock.int` y `finish-with-finished-goods.int`: 26/26.
+
+`./init.sh` completo y E2E, según el leader.
+
+### Veredicto vuelta 2: **RECHAZADO** (B1-B3 cerrados; un bloqueante nuevo, B4, introducido por el arreglo de m9/D24)
+
+| Hallazgo | Estado |
+|---|---|
+| B1 comentarios de producción con cita | **Cerrado.** 0 líneas añadidas en `app/`, `lib/` o `db/` citan `QC-`, `R<n>`, `D<n>` o `design.md` |
+| B2 acceso cruzado | **Cerrado.** `tests/integration/inventario/finished-goods.int.test.ts:449`: B con la presentación de A da `presentation_without_content`, y los conteos de las dos empresas no cambian |
+| B3 prefijo duplicado | **Cerrado.** Las migraciones pasan a `20260924130000_*` y `20260924130100_*`, posteriores a `20260924120000_customers`. Ninguna referencia al nombre viejo; no se tocó ninguna migración ajena; sin dependencias nuevas (`react-intersection-observer` viene aprobada de `dev`) |
+| m1 → D23 | Cerrado: `product-type-lock.int.test.ts:211,236` |
+| m2 | Cerrado: R42 en integración con `MACHINE` a `unit_cost` nulo |
+| m3 | Aceptada la explicación: los «R25» son de QC-92 y ya estaban en `dev` |
+| m9 → D24 | Cerrado en comportamiento (`finished-goods.int.test.ts:495`), pero **abre B4** |
+
+### B4 — BLOQUEANTE: `inventario` consulta la tabla `recipes`, que es de `recetas`
+
+`lib/modules/inventario/adapters/driven/persistence/product-prisma.ts:989-993` hace
+`SELECT "id" FROM "recipes" WHERE ... "company_id" = ...` con SQL crudo. `Recipe` es
+`/// @module recetas` (`db/schema.prisma:433`).
+
+- **Qué incumple.** `CHECKPOINTS.md > Módulos hexagonales`: «ningún módulo consulta un modelo
+  ajeno». `docs/architecture.md`: «Solo los adaptadores driven del módulo propietario pueden
+  consultar ese modelo». La guardia no lo detecta porque solo busca `prisma.<modelo>`, y el SQL
+  crudo se le escapa. Es el **único** acceso crudo a una tabla de otro módulo en todo `lib/modules`.
+- **El comentario de `:985-988` es falso.** Justifica la consulta con «la misma consulta cruda que
+  usa el resto del archivo para leer tablas ajenas por id», y no existe ningún otro caso.
+- **Qué hace falta.** Mover la comprobación de D24 a quien ya tiene el contrato de `recetas`.
+  `pedidos/domain/transition-order.ts:112` ya llama a
+  `deps.recipes.findRefsIncludingDeleted([locked.recipeId], companyId)`, acotado por empresa, y hoy
+  sigue adelante con `recipeRef?.name ?? ''`. Basta con lanzar `RecipeNotFoundError` si `recipeRef`
+  es `undefined` y quitar la consulta de `inventario`. Si se prefiere que `inventario` se defienda
+  solo, la alternativa es un puerto propio cableado en `lib/composition` con el contrato de
+  `recetas`, nunca SQL sobre su tabla.
+- **Qué pasa con el test de D24.** Si la comprobación sale de `inventario`, el test tiene que subir
+  al nivel del Finalizar, o fijar el rechazo del puerto.
+- **D24 no obliga a este diseño.** Dice «se comprueba en el código», no «en `inventario` leyendo
+  `recipes`».
+
+### Menores de la vuelta 2
+
+- **n1 — m5 no quedó a 0.** La bitácora dice «49 → 0», pero siguen unas 30 líneas de comentario de
+  tests añadidas por la rama que citan fichas o requisitos. Ejemplos:
+  - `tests/integration/inventario/finished-goods.int.test.ts:2,8,9`
+  - `tests/integration/inventario/presentation-content.int.test.ts:2,4,84,108`
+  - `tests/integration/inventario/product-type-lock.int.test.ts:2`
+  - `tests/integration/inventario/finished-product-prohibitions.int.test.ts:2`
+  - `tests/integration/pedidos/finish-with-finished-goods.int.test.ts:2,5`
+  - `tests/integration/pedidos/order-content-copy.int.test.ts:2`
+  - `tests/unit/pedidos/create-order.test.ts:124`, `tests/unit/pedidos/update-order.test.ts:121`,
+    `tests/unit/pedidos/transition-order.test.ts:23`
+  - `tests/unit/inventario/presentation-service.test.ts:53,55`
+  - `tests/unit/asignaciones/finish-assigned-order.test.ts:35`
+  - `tests/helpers/order-unit-of-work-double.ts:70`
+  - `tests/unit/recetas-ui/recipe-lines-no-finished-product.test.tsx:9`
+
+  El filtro que usaron debió de mirar solo las líneas que empiezan por `//` o `*`, no las que
+  abren con `/**`.
+- **n2 — `guard-convenciones-showcase.test.ts`.** El salto es **aceptable** y no debilita la
+  guardia. R29 y D20 protegen el alcance del diff de QC-140, que ya está en `dev`: fuera de su rama no
+  tienen nada que mirar, y `ctx.skip` con motivo es más honesto que un verde vacío. Sigue el mismo
+  patrón que `guard-convenciones-proveedores.test.ts`. Un defecto: `--grep=QC-140` casa con
+  **cualquier** mensaje que nombre la ficha, no solo con los commits firmados `tipo(QC-140)`. En esta
+  rama casa con `ae5597ce fix(QC-150): R29/D20 de QC-140 ...`, así que los casos corren en vez de
+  saltarse (en mi corrida, 0 skipped). Hoy es inocuo porque ese commit solo toca el propio test,
+  pero un commit de otra ficha que mencione QC-140 y añada una migración lo pondría rojo.
+  Recomendado anclar el patrón, p. ej. `--grep=^[a-z]+\(QC-140\)` con `-E`. Además, el archivo gana
+  comentarios que citan QC-140, y es un test de otra ficha tocado desde esta: decirlo en el PR, como
+  ya prevé la bitácora.
+- **n3 — Traducción de `recipe_not_found` sin test unit.** `finish-assigned-order.ts:107` traduce
+  `'recipe_not_found'` a `RecipeNotFoundError`, pero ningún caso de
+  `tests/unit/asignaciones/finish-assigned-order.test.ts` lo prueba. El D24 de `transition-order`
+  cubre el rollback, no esa traducción.
+
+### Qué tiene que volver del implementer
+
+1. B4: quitar la lectura de `recipes` de `inventario` y hacer la comprobación de D24 por el
+   contrato de `recetas` (lo natural es en `transition-order.ts`), ajustando su test.
+2. n1: terminar la limpieza de citas en comentarios de tests.
+3. n2 y n3: opcionales, recomendados.
