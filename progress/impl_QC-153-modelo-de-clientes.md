@@ -266,3 +266,19 @@ pnpm run db:test template
 pnpm run db:test status  (DATABASE_URL/DIRECT_URL -> QuimiCloude_QC153)
   ✓ base de desarrollo «QuimiCloude_QC153» al dia: 45 migracion(es) aplicada(s)
 ```
+
+## Sincronizacion con origin/dev (implementer, 2026-09-24)
+
+- Merge de `origin/dev` (`08935782`, incluye QC-141) en `6261e981`. Unico conflicto:
+  `MIGRACIONES_ESPERADAS` en `tests/guards/guard-identificador-de-request.test.ts`; se conservan las
+  tres migraciones de QC-141 (`20260923150000..150200`) y `20260924120000_customers` al final.
+- `package.json` sin cambios en el tramo: no hizo falta `pnpm install`.
+- `db:migrate` sobre `QuimiCloude_QC153`: aplicadas las tres de QC-141; `db:test status` -> «al dia: 49 migracion(es)».
+- `pnpm run typecheck`: limpio. `pnpm run lint`: 0 errores, 2 warnings en `tests/unit/pedidos/order-service.test.ts` (vienen de dev, no de esta rama).
+- Archivos de la ficha + censos tocados (19 archivos, integracion incluida contra base efimera):
+  `Test Files 1 failed | 18 passed (19)`, `Tests 1 failed | 264 passed | 12 skipped (277)`.
+  El unico rojo: `tests/unit/pedidos/qc145-estado-solo-planta.test.ts` > «los modelos de db/schema.prisma
+  son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de QC-141». No esta
+  en `tests/baseline-rojos.json`. Lo pone rojo el modelo `Customer` (R1). QC-141 resolvio el mismo choque
+  anadiendo su modelo como excepcion nombrada en ese caso; aqui NO se ha tocado: pendiente de decision.
+- Gate completo (`./init.sh`) NO corrido: lo corre el leader.
