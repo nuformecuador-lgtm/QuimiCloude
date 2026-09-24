@@ -306,6 +306,7 @@ describe('R12 — en la edicion, cambiar receta o cantidad recotiza', () => {
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: elPedido.recipeId,
         quantity: '7',
+        orderId: elPedido.id,
       }),
     );
     await waitFor(() =>
@@ -328,6 +329,7 @@ describe('R12 — en la edicion, cambiar receta o cantidad recotiza', () => {
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA2.id,
         quantity: elPedido.quantity,
+        orderId: elPedido.id,
       }),
     );
     await waitFor(() =>
@@ -431,6 +433,7 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA2.id,
         quantity: elPedido.quantity,
+        orderId: elPedido.id,
       }),
     );
     await waitFor(() =>
@@ -495,6 +498,49 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
     const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
     expect(enviado.get('recipeId')).toBe(RECETA2.id);
+  });
+});
+
+describe('R65 — la edicion cuenta lo que el propio pedido tiene apartado', () => {
+  it('la edicion envia el orderId del pedido junto a receta y cantidad (R65)', async () => {
+    const user = setupUser();
+    quoteOrderCostActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ingredientsCost: '20.0000' },
+    });
+    const elPedido = pedido({ ingredientsCost: '40.0000' });
+    renderFormulario(elPedido);
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '7');
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
+        recipeId: elPedido.recipeId,
+        quantity: '7',
+        orderId: elPedido.id,
+      }),
+    );
+  });
+
+  it('el alta no envia orderId, solo receta y cantidad (R65)', async () => {
+    const user = setupUser();
+    quoteOrderCostActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ingredientsCost: '10.0000' },
+    });
+    renderFormulario();
+
+    await rellenarAlta(user);
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
+        recipeId: RECETA.id,
+        quantity: '5',
+      }),
+    );
+    const enviado = quoteOrderCostActionMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(enviado, 'orderId')).toBe(false);
   });
 });
 

@@ -373,8 +373,9 @@ export function OrderForm({
   // 0.13 sin que nadie lo pidiera-.
   const [quantity, setQuantity] = useState(trimDecimal(order?.quantity ?? ''));
 
-  /** Arranca con el importe guardado en la edicion; `null` en el alta. */
-  const quote = useOrderCostQuote(order?.ingredientsCost ?? null);
+  /** Arranca con el importe guardado en la edicion; `null` en el alta. `order.id` solo viaja en la
+   *  edicion, para que la cotizacion cuente como disponible lo que el propio pedido tiene apartado. */
+  const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id);
 
   const recipeName = recipe?.name ?? '';
   const recipeImageUrl = recipe?.imageUrl ?? null;
