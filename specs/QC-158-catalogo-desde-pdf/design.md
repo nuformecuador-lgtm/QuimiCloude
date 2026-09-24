@@ -532,3 +532,21 @@ confirmación), la pantalla muestra el mensaje y vuelve a pedir la vista previa 
 clases. La imagen ajena (R26) solo se alcanza manipulando la petición: la pantalla solo ofrece
 recortes del propio archivo. Si algún día hace falta el motivo estructurado en la respuesta, es un
 cambio del contrato de `errores` y necesita su propia decisión.
+
+### 2026-09-24 — Decisión humana: R38 comprueba la imagen solo en la base
+
+La pantalla del catálogo pinta la imagen de la línea con `EntityImage`, que usa `image_path` tal
+cual como `src`. La imagen importada es la **clave del recorte en su bucket**
+(`<empresa>/<archivo>/<página>-<n>.png`, `> 10.3`), no una URL servible, así que la celda queda en
+«sin imagen» aunque la línea la tenga guardada. Firmar esa ruta para mostrarla es trabajo de
+**QC-140** (catálogo visual), que ya contaba con consumir esta clave. El humano decidió el
+2026-09-24 que, **hasta entonces, el recorrido E2E de R38 compruebe la imagen de la línea nueva solo
+en la base**; material, medidas, presentación y costo sí se comprueban también en pantalla. El texto
+de R38 en `requirements.md` no se toca.
+
+### 2026-09-24 — Decisión humana: medidas sin ceros de relleno en pantalla
+
+La columna **Medidas** (`> 6.4`) pinta cada valor de diámetro y alto sin ceros de relleno
+(«Ø 7.5 cm», no «Ø 7.5000 cm»), con `trimDecimal` de `lib/shared/ui/decimal-display.ts`, que no se
+modifica. **No se redondea**: `formatDecimalDisplay` cortaría a dos decimales y una medida de
+`7.555` se vería distinta de la guardada. El dato de la base no cambia; solo cambia cómo se pinta.
