@@ -44,8 +44,12 @@ export {
   createCatalogLineSchema,
   updateCatalogLineSchema,
   CATALOG_LINE_NAME_MAX_LENGTH,
+  CATALOG_LINE_MATERIAL_MAX_LENGTH,
+  CATALOG_LINE_MOUTH_MAX_LENGTH,
   type CreateCatalogLineInput,
   type UpdateCatalogLineInput,
+  type CatalogLineMeasurement,
+  type CatalogLineMeasurements,
 } from './domain/catalog-line-input';
 export { type NewSupplier, type SupplierView } from './domain/supplier-view';
 // QC-52: `CatalogLineTerms` desaparece y lo sustituye `CatalogLineFields`. No es un

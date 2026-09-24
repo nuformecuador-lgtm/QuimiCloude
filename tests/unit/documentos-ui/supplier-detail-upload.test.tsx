@@ -190,6 +190,8 @@ beforeEach(() => {
           cost: '1234.5678',
           minPurchase: '0.1005',
           deliveryTime: 5,
+          material: null,
+          measurements: null,
           createdAt: new Date('2026-03-01T10:00:00.000Z'),
           updatedAt: new Date('2026-03-05T10:00:00.000Z'),
           createdBy: 'autor',

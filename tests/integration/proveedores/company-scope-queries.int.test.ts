@@ -195,6 +195,8 @@ function camposDeLinea(
     cost: '10.0000',
     minPurchase: null,
     deliveryTime: null,
+    material: null,
+    measurements: null,
     ...overrides,
   };
 }

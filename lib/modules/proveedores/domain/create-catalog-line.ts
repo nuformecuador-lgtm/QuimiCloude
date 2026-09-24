@@ -72,6 +72,8 @@ export function createCreateCatalogLine(
         cost: parsed.data.cost,
         minPurchase: parsed.data.minPurchase ?? null,
         deliveryTime: parsed.data.deliveryTime ?? null,
+        material: parsed.data.material ?? null,
+        measurements: parsed.data.measurements ?? null,
       },
       actor.id,
       now(),

@@ -593,6 +593,9 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
       'cost',
       'minPurchase',
       'deliveryTime',
+      // QC-158 (R27): dos columnas mas, opcionales y sin ninguna relacion Prisma.
+      'material',
+      'measurements',
       // La empresa de la linea, escalar y obligatoria: es lo que acota cada consulta y lo
       // que la clave foranea compuesta obliga a coincidir con la de su proveedor.
       'companyId',
