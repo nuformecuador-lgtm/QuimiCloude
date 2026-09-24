@@ -121,13 +121,13 @@
 
 ### T5 [P] — Montaje en el listado `/produccion/formulas`
 
-- [ ] Después de `requirePagePermission('recetas.consultar')`,
+- [x] Después de `requirePagePermission('recetas.consultar')`,
   `canUploadDocuments(await identity.getSessionUser())`. Si es `true`, `DocumentUploadDialog
   strategy="formula"` en la fila del título, junto a «Nueva fórmula» (`design.md > 6.2`). `nueva/` y
   `[id]/` no se tocan.
-- [ ] Test nuevo de la página (R6, R10, R11, y R22: el botón comparte fila con «Nueva fórmula») según
+- [x] Test nuevo de la página (R6, R10, R11, y R22: el botón comparte fila con «Nueva fórmula») según
   `design.md > 9.1` y `9.2`.
-- [ ] Si `recipe-page.test.tsx` o `pantallas-exigen-permiso.test.tsx` no resuelven el import en jsdom,
+- [x] Si `recipe-page.test.tsx` o `pantallas-exigen-permiso.test.tsx` no resuelven el import en jsdom,
   añadirles **solo** el `vi.mock` de las dos acciones de `documentos`, sin tocar ningún caso (riesgo
   13.3).
 - **Archivos:** `app/(private)/produccion/formulas/page.tsx`,
