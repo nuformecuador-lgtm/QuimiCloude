@@ -8,6 +8,8 @@
 
 import { deriveUnitCost } from './unit-cost';
 
+import type { ProductId } from './product-catalog';
+
 export type FinishedGoodsPlan =
   | {
       readonly kind: 'planned';
@@ -84,4 +86,29 @@ export function planFinishedGoods(input: {
     content: fromScaledInteger(contentScaled),
     unitCost,
   };
+}
+
+/** Lo que `inventario` devuelve al terminar (o rechazar) la entrada de un lote de produccion. */
+export type FinishedGoodsOutcome =
+  | { readonly kind: 'received'; readonly productId: ProductId; readonly productName: string; readonly packages: string }
+  | { readonly kind: 'presentation_without_content' }
+  | { readonly kind: 'no_whole_package' };
+
+/** Servicio que `inventario` ofrece a `pedidos` para el Finalizar: da de alta el producto
+ *  terminado de una combinacion (si no existia), su lote y su asiento, y recalcula la
+ *  existencia. Lo implementa un adaptador driven de `inventario` sobre la transaccion
+ *  compartida y lo cablea `lib/composition`. */
+export interface FinishedGoodsIntake {
+  receiveFromOrder(input: {
+    readonly orderId: string;
+    readonly companyId: string;
+    readonly recipeId: string;
+    readonly recipeName: string;
+    readonly presentationId: string;
+    readonly orderQuantity: string;
+    readonly orderContent: string | null;
+    readonly lotCost: string;
+    readonly actorId: string;
+    readonly now: Date;
+  }): Promise<FinishedGoodsOutcome>;
 }
