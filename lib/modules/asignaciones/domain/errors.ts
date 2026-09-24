@@ -177,7 +177,7 @@ export class RecipeWithoutLinesError extends AsignacionesError {
 
 /** El Finalizar de la planta intento entregar un pedido sin presentacion o sin contenido con
  *  el que calcular los envases del lote de producto terminado. Mismo `code` que
- *  `PresentationWithoutContentError` de `pedidos` (QC-150, R18). */
+ *  `PresentationWithoutContentError` de `pedidos`. */
 export class PresentationWithoutContentError extends AsignacionesError {
   readonly code = 'presentation_without_content';
 
@@ -187,7 +187,7 @@ export class PresentationWithoutContentError extends AsignacionesError {
 }
 
 /** El Finalizar de la planta intento entregar un pedido cuya cantidad no llena ni un envase de
- *  su presentacion. Mismo `code` que `NoWholePackageError` de `pedidos` (QC-150, R19). */
+ *  su presentacion. Mismo `code` que `NoWholePackageError` de `pedidos`. */
 export class NoWholePackageError extends AsignacionesError {
   readonly code = 'no_whole_package';
 

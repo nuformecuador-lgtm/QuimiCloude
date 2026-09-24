@@ -6,9 +6,9 @@ export function assignedOrderDeliveredNoticeText(orderNumber: string): string {
 }
 
 /**
- * QC-150 (R24): cuando el Finalizar trae cuantos envases enteros entraron y el nombre del
- * producto terminado que los recibio, el aviso lo dice; sin esos dos datos -una URL de antes de
- * esta ficha-, se queda con el texto de siempre.
+ * Cuando el Finalizar trae cuantos envases enteros entraron y el nombre del
+ * producto terminado que los recibio, el aviso lo dice; sin esos dos datos -una URL de antes-,
+ * se queda con el texto de siempre.
  */
 export function assignedOrderDeliveredWithPackagesText(
   orderNumber: string,

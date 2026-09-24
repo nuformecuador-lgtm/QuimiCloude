@@ -37,7 +37,7 @@ export type FinishAssignedOrderResult = {
  * solo el identificador del pedido, y nada de lo recorrido en pantalla se persiste.
  *
  * Devuelve el numero visible del pedido para que la lista, al volver, pueda confirmar la
- * entrega, junto con los envases y el producto terminado que recibio el lote (R24). Se lee
+ * entrega, junto con los envases y el producto terminado que recibio el lote. Se lee
  * ANTES de transicionar: una vez `ENTREGADO`, el pedido ya no aparece entre los estados de
  * trabajo que consulta `listAliveSummariesByIds`.
  *
