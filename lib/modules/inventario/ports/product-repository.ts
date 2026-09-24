@@ -4,7 +4,7 @@ import type { MovementReason } from '../domain/movement-reason';
 import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
-import type { NewProduct, ProductView } from '../domain/product-view';
+import type { NewProduct, ProductType, ProductView } from '../domain/product-view';
 import type { BatchHistoryEntry } from '../domain/reservation';
 
 /**
@@ -93,12 +93,15 @@ export interface ProductRepository {
    * adaptador devuelve SIEMPRE el mismo -el mas antiguo, desempatando por identificador
    * ascendente-. Un homonimo vivo en OTRA unidad no cuenta como el mismo producto: nace
    * uno nuevo.
+   *
+   * Devuelve tambien el `type` de la fila encontrada (R28): el caso de uso lo necesita para
+   * rechazar el homonimo de un producto terminado sin una segunda consulta.
    */
   findAliveIdByNameInPresentationUnit(
     name: string,
     presentationId: string | null,
     scope: InventoryScope,
-  ): Promise<string | null>;
+  ): Promise<{ id: string; type: ProductType } | null>;
 
   /**
    * Alta de un producto NUEVO junto con su primer lote, en UNA sola transaccion. Devuelve los
@@ -139,13 +142,17 @@ export interface ProductRepository {
    *
    * Con la misma vara de `createWithFirstBatch`, el `lot` devuelto es el texto que quedo
    * escrito en la fila.
+   *
+   * Devuelve `'finished_product'` (R28) cuando, bajo el mismo bloqueo con el que va a escribir,
+   * el producto resulta ser `FINISHED_PRODUCT`: cierra la carrera contra un alta manual que
+   * empezo a evaluarse antes de que el producto naciera terminado, sin escribir lote ni asiento.
    */
   addBatchToAlive(
     productId: string,
     batch: NewProductBatch,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ batchId: string; lot: string } | null>;
+  ): Promise<{ batchId: string; lot: string } | null | 'finished_product'>;
 
   /**
    * Mueve la existencia de un lote por `delta` (con signo) y deja su asiento en el libro,
@@ -165,6 +172,11 @@ export interface ProductRepository {
    * baja se acepta igual, y esto es lo que permite avisar sin convertirlo en un error.
    *
    * La empresa no viaja en ningun tipo de entrada, igual que en `NewProduct` y `NewProductBatch`.
+   *
+   * Devuelve `'increase_not_allowed'` (R31) cuando el lote es de un producto terminado y `delta`
+   * es positivo: se decide con el producto ya bloqueado, sin llegar a mover el lote ni a
+   * escribir el asiento. Un `delta` negativo sobre un producto terminado sigue las mismas reglas
+   * que cualquier otro lote (R32), incluido el rechazo de una existencia final negativa.
    */
   adjustBatchStock(
     batchId: string,
@@ -173,7 +185,7 @@ export interface ProductRepository {
     actorId: string,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ stock: string; reserved: string; overReserved: boolean } | null>;
+  ): Promise<{ stock: string; reserved: string; overReserved: boolean } | null | 'increase_not_allowed'>;
 
   /**
    * Todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es

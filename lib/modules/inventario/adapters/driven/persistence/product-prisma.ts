@@ -322,7 +322,7 @@ export async function findAliveIdByNameInPresentationUnit(
   name: string,
   presentationId: string | null,
   scope: InventoryScope,
-): Promise<string | null> {
+): Promise<{ id: string; type: ProductType } | null> {
   let unitId: string | null | undefined;
 
   if (presentationId === null) {
@@ -348,9 +348,9 @@ export async function findAliveIdByNameInPresentationUnit(
       ],
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: { id: true },
+    select: { id: true, type: true },
   });
-  return row === null ? null : row.id;
+  return row === null ? null : { id: row.id, type: row.type as ProductType };
 }
 
 /**
@@ -696,7 +696,7 @@ export async function createWithFirstBatch(
   });
 }
 
-type AliveProductRow = { readonly id: string };
+type AliveProductRow = { readonly id: string; readonly type: string };
 
 /** Con `productId` escalar y no como escritura anidada desde `product`, que dispararia el
  *  `@updatedAt` de `products`. */
@@ -705,14 +705,14 @@ export async function addBatchToAlive(
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
-): Promise<{ batchId: string; lot: string } | null> {
+): Promise<{ batchId: string; lot: string } | null | 'finished_product'> {
   const { companyId } = companyScopeColumns(scope);
 
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
     // El borrado logico toma este mismo lock sobre la fila, asi que uno espera al otro. En READ
     // COMMITTED, el SELECT que espera vuelve a evaluar el WHERE y ya no ve la fila borrada.
     const rows = await tx.$queryRaw<ReadonlyArray<AliveProductRow>>(Prisma.sql`
-      SELECT "id"
+      SELECT "id", "type"
         FROM "products"
        WHERE "id" = ${productId}::uuid
          AND "company_id" = ${companyId}::uuid
@@ -721,6 +721,10 @@ export async function addBatchToAlive(
     `);
     const alive = rows[0];
     if (alive === undefined) return null;
+
+    // R28: bajo la misma fila bloqueada, cierra la carrera con un alta manual que naciera
+    // terminado despues de que `findAliveIdByNameInPresentationUnit` ya lo hubiera leido.
+    if (alive.type === PRODUCT_TYPES.FINISHED_PRODUCT) return 'finished_product';
 
     // Despues de la fila: un alta que no va a escribir no pide el lock de aviso. Y con la fila ya
     // tomada arriba, esta funcion pide siempre los dos locks en ese orden: fila y luego aviso.
@@ -814,7 +818,7 @@ function isBatchNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
 
-type AdjustProductRow = { readonly id: string };
+type AdjustProductRow = { readonly id: string; readonly type: string };
 
 /**
  * `stock: { increment: delta } }` es un `UPDATE ... SET stock = stock + $delta` relativo: dos
@@ -836,13 +840,13 @@ export async function adjustBatchStock(
   actorId: string,
   now: Date,
   scope: InventoryScope,
-): Promise<{ stock: string; reserved: string; overReserved: boolean } | null> {
+): Promise<{ stock: string; reserved: string; overReserved: boolean } | null | 'increase_not_allowed'> {
   const { companyId } = companyScopeColumns(scope);
 
   try {
     return await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<ReadonlyArray<AdjustProductRow>>(Prisma.sql`
-        SELECT p."id"
+        SELECT p."id", p."type"
           FROM "products" p
           JOIN "product_batches" b ON b."product_id" = p."id"
          WHERE b."id" = ${batchId}::uuid
@@ -851,6 +855,12 @@ export async function adjustBatchStock(
       `);
       const product = rows[0];
       if (product === undefined) return null;
+
+      // R31: un ajuste que suma sobre un producto terminado se rechaza aqui, con la fila ya
+      // bloqueada, antes de tocar el lote o el libro.
+      if (product.type === PRODUCT_TYPES.FINISHED_PRODUCT && compareQuantities(delta, '0') > 0) {
+        return 'increase_not_allowed';
+      }
 
       const updated = await tx.productBatch.update({
         where: { id: batchId, companyId },

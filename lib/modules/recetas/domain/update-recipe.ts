@@ -1,5 +1,10 @@
 import { requirePermission, type Actor } from './actor';
-import { RecipeDuplicateNameError, RecipeNotFoundError, ValidationError } from './errors';
+import {
+  ActionNotAllowedError,
+  RecipeDuplicateNameError,
+  RecipeNotFoundError,
+  ValidationError,
+} from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
@@ -7,7 +12,7 @@ import type { RecipeScope } from './recipe-scope';
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
 
 /** Advertencia de un borrado de almacenamiento que fallo, con su contexto (R49). */
 export type StorageWarning = {
@@ -91,6 +96,10 @@ export function createUpdateRecipe(
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = idsANuevoValidar.some((productId) => !foundIds.has(productId));
       if (missing) throw new ValidationError();
+
+      // R29: un producto terminado no puede ser ingrediente, tampoco al editar.
+      const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
+      if (finished) throw new ActionNotAllowedError();
     }
 
     // R47 (`design.md > 7.1`, `> 9.3`): los TRES estados de `image`.

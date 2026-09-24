@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { ProductNotFoundError, ValidationError } from './errors';
+import { ActionNotAllowedError, ProductNotFoundError, ValidationError } from './errors';
 import {
   createProductSchema,
   type CreateProductInput,
@@ -120,12 +120,18 @@ export function createCreateProduct(
     );
 
     if (existente !== null) {
+      // R28: el homonimo vivo es un producto terminado. Se rechaza aqui, antes de tocar el
+      // puerto, y `addBatchToAlive` lo vuelve a comprobar bajo la fila bloqueada para cerrar la
+      // carrera con un alta que naciera terminada entre esta lectura y esa escritura.
+      if (existente.type === PRODUCT_TYPES.FINISHED_PRODUCT) throw new ActionNotAllowedError();
+
       // Solo viaja el lote: el nombre, la existencia y la alerta del panel se ignoran en este camino.
-      const agregado = await deps.products.addBatchToAlive(existente, batch, instante, scope);
+      const agregado = await deps.products.addBatchToAlive(existente.id, batch, instante, scope);
 
-      if (agregado === null) throw new ProductNotFoundError(existente);
+      if (agregado === 'finished_product') throw new ActionNotAllowedError();
+      if (agregado === null) throw new ProductNotFoundError(existente.id);
 
-      return { id: existente, lot: agregado.lot };
+      return { id: existente.id, lot: agregado.lot };
     }
 
     // Una sola operacion del puerto para producto y lote, para que el dominio no pueda dejar

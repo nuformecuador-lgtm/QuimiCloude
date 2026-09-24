@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { RecipeDuplicateNameError, ValidationError } from './errors';
+import { ActionNotAllowedError, RecipeDuplicateNameError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
@@ -7,7 +7,7 @@ import type { RecipeScope } from './recipe-scope';
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
 
 export type CreateRecipeDeps = {
   readonly recipes: RecipeRepository;
@@ -54,6 +54,10 @@ export function createCreateRecipe(
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = productIds.some((id) => !foundIds.has(id));
       if (missing) throw new ValidationError();
+
+      // R29: un producto terminado no puede ser ingrediente.
+      const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
+      if (finished) throw new ActionNotAllowedError();
     }
 
     // R21: sin imagen no se toca el almacenamiento en absoluto.

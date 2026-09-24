@@ -9,6 +9,7 @@ export {
   UnauthorizedError,
   RecipeNotFoundError,
   RecipeDuplicateNameError,
+  ActionNotAllowedError,
   ValidationError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
