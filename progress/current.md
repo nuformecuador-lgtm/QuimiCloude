@@ -23,7 +23,7 @@
 
 PR #120, merge `5d3e90d9`. Resumen en `progress/history.md`. Desbloquea QC-160 (spec aprobado), QC-159 y QC-157.
 
-**2026-09-24:** QC-153 (PR #117) y QC-158 (PR #119) cerradas; resumenes en `progress/history.md`. Desbloquea **QC-154** (CRUD de clientes). Pendientes humanos: R37 de QC-158 en movil real; QC-131 (prompt en Vercel y firma).
+**2026-09-24:** QC-153 (PR #117) y QC-158 (PR #119) cerradas; resumenes en `progress/history.md`. Desbloquea **QC-154** (CRUD de clientes): **F1.0 hecho el 2026-09-24**, `complexity: medium`, worktree montado, cupo `backend` 2 de 3. Pendientes humanos: R37 de QC-158 en movil real; QC-131 (prompt en Vercel y firma).
 
 ### QC-168 - NACE y se ACOTA con `/afinar-feature` (2026-09-24)
 
