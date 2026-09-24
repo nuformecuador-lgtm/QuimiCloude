@@ -98,7 +98,7 @@ desconocida, tipo erróneo en un campo deja la línea con ese campo nulo, elemen
 descartado), **R6** (sin objeto, JSON roto, `lines` string ⇒ `ValidationError`), **R35** (`cost:
 1250.5` numérico ⇒ `null`) y **R7** (la función no escribe: es pura, sin dependencias).
 
-## T6 — Clasificar, sugerir unidad y emparejar imagen `[depende de T3, T5]` `[F1]` `[F3]`
+## [x] T6 — Clasificar, sugerir unidad y emparejar imagen `[depende de T3, T5]` `[F1]` `[F3]`
 
 Archivos: `lib/modules/documentos/domain/{classify-catalog-import,suggest-unit,crop-pairing}.ts`
 (nuevos), `lib/modules/documentos/domain/document-path.ts` (`isCropPathOf`),
@@ -123,7 +123,7 @@ Archivos: `lib/modules/inventario/domain/presentation-catalog.ts`,
 otra empresa (**R34**), con lista vacía no consulta; los consumidores actuales de `findRefs` siguen
 verdes.
 
-## T8 — Lectura del archivo y de sus recortes en `documentos` `[depende de T6]`
+## [x] T8 — Lectura del archivo y de sus recortes en `documentos` `[depende de T6]`
 
 Archivos: `lib/modules/documentos/ports/{document-batch-repository,crop-catalog}.ts`,
 `lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma.ts`
