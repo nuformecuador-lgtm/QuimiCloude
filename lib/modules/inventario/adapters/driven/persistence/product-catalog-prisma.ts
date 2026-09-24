@@ -8,6 +8,8 @@ import type { CostingBatch } from '../../../domain/costing-batch';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
 
 import { batchCompanyScope, productCompanyScope } from './company-scope';
+import { findReservedAndAvailableByBatch } from './reservation-prisma';
+import { compareQuantities } from '../../../domain/decimal-quantity';
 
 /**
  * Implementa `ProductCatalog['findRefs']`: el hueco que el contrato publico de `inventario`
@@ -86,6 +88,7 @@ export async function findProductRefs(
 }
 
 const COSTING_BATCH_SELECT = {
+  id: true,
   productId: true,
   lot: true,
   stock: true,
@@ -102,8 +105,10 @@ function toCivilDate(date: Date): string {
 }
 
 /** Fila de Prisma -> `CostingBatch` del contrato publico. Funcion pura, testeable sin base.
- *  Un lote de MACHINE sin presentacion o sin costo no costea: se filtra antes de llegar aqui. */
-export function toCostingBatch(row: CostingBatchRow): CostingBatch {
+ *  Un lote de MACHINE sin presentacion o sin costo no costea: se filtra antes de llegar aqui.
+ *  `available` llega ya calculado -mismo agregado del libro de reservas que usan el listado de
+ *  lotes y la cobertura- porque esta funcion no tiene acceso a `reservation_movements`. */
+export function toCostingBatch(row: CostingBatchRow, available: string): CostingBatch {
   if (row.presentation === null || row.unitCost === null) {
     throw new Error(`toCostingBatch: lote ${row.lot} sin presentacion o sin costo`);
   }
@@ -114,6 +119,7 @@ export function toCostingBatch(row: CostingBatchRow): CostingBatch {
     unitCost: row.unitCost.toFixed(4),
     unitId: row.presentation.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),
+    available,
   };
 }
 
@@ -145,19 +151,34 @@ async function findAliveBatchesWithStock(
 }
 
 /**
- * Implementa `ProductCatalog['findCostingBatches']`: los lotes CON EXISTENCIA de los
+ * Implementa `ProductCatalog['findCostingBatches']`: los lotes CON DISPONIBLE de los
  * productos pedidos, de esa empresa, para que `pedidos` calcule el importe. Una sola
- * consulta para todos los `productId` (el numero de consultas no crece con el numero de
- * ingredientes). NO ordena -el orden es criterio de negocio de quien costea- y NO escribe
- * nada.
+ * consulta de lotes mas una de agregados del libro de reservas para todos los `productId`
+ * (el numero de consultas no crece con el numero de ingredientes). NO ordena -el promedio no
+ * depende del orden- y NO escribe nada.
+ *
+ * El disponible sale de `findReservedAndAvailableByBatch`, EL MISMO agregado que usan el
+ * listado de lotes y la cobertura: no hay una segunda definicion de lo apartado. Con
+ * `excludeOrderId`, lo que ese pedido tiene apartado no se resta.
  */
 export async function findCostingBatches(
   ids: readonly ProductId[],
   companyId: string,
+  options?: { readonly excludeOrderId?: string },
 ): Promise<readonly CostingBatch[]> {
   if (ids.length === 0) return [];
 
   const rows = await findAliveBatchesWithStock(ids, { companyId });
+  if (rows.length === 0) return [];
 
-  return rows.map(toCostingBatch);
+  const aggregates = await findReservedAndAvailableByBatch(
+    prisma,
+    companyId,
+    rows.map((row) => row.id),
+    { excludeOrderId: options?.excludeOrderId },
+  );
+
+  return rows
+    .map((row) => toCostingBatch(row, aggregates.get(row.id)?.available ?? row.stock.toFixed(4)))
+    .filter((batch) => compareQuantities(batch.available, '0.0000') > 0);
 }

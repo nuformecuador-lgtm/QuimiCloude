@@ -418,11 +418,17 @@ export function createReservationQueries(db: PrismaLike = prisma): ReservationQu
   };
 }
 
-/** Agregados por LOTE: existencia, apartado, disponible y si esta sobre-reservado. */
+/** Agregados por LOTE: existencia, apartado, disponible y si esta sobre-reservado.
+ *
+ *  Con `excludeOrderId`, lo apartado por ESE pedido no cuenta en `reserved` -y por tanto
+ *  suma a `available`-: es lo que necesita el coste de un pedido que ya existe para contar su
+ *  propia reserva como disponible para si mismo, sin abrir una segunda definicion del
+ *  apartado. */
 export async function findReservedAndAvailableByBatch(
   db: PrismaLike,
   companyId: string,
   batchIds: readonly string[],
+  options?: { readonly excludeOrderId?: string },
 ): Promise<ReadonlyMap<string, { readonly reserved: string; readonly available: string; readonly overReserved: boolean }>> {
   const result = new Map<string, { reserved: string; available: string; overReserved: boolean }>();
   if (batchIds.length === 0) return result;
@@ -432,7 +438,11 @@ export async function findReservedAndAvailableByBatch(
     select: { id: true, stock: true },
   });
   const rows = await db.reservationMovement.findMany({
-    where: { companyId, batchId: { in: [...batchIds] } },
+    where: {
+      companyId,
+      batchId: { in: [...batchIds] },
+      ...(options?.excludeOrderId !== undefined ? { NOT: { orderId: options.excludeOrderId } } : {}),
+    },
     select: { batchId: true, kind: true, quantity: true },
   });
   const reservedByBatch = netReservedByBatch(rows.map(toLedgerRow));
