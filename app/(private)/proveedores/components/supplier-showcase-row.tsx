@@ -8,6 +8,7 @@ import type { ShowcaseRow as ShowcaseRowData } from '@/lib/modules/proveedores';
 import { supplierDetailRoute } from '@/lib/shared/routes';
 
 import { ShowcaseLineCard } from './showcase-line-card';
+import { appendWithoutDuplicates } from './supplier-showcase-params';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -16,15 +17,6 @@ type SupplierShowcaseRowProps = {
   /** Mismo filtro de producto con el que se pidió la tanda: «cargar más» recorre el mismo conjunto. */
   readonly productSearch: string;
 };
-
-/** Une líneas nuevas sin repetir un `id` ya presente (un reintento tras un fallo parcial podría traerlo). */
-function appendWithoutDuplicates<T extends { readonly id: string }>(
-  current: readonly T[],
-  incoming: readonly T[],
-): readonly T[] {
-  const knownIds = new Set(current.map((line) => line.id));
-  return [...current, ...incoming.filter((line) => !knownIds.has(line.id))];
-}
 
 export function SupplierShowcaseRow({ row, productSearch }: SupplierShowcaseRowProps) {
   const [lines, setLines] = useState(row.lines);

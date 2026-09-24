@@ -7,6 +7,7 @@ export {
   EMPTY_SHOWCASE_FILTERS,
   PRODUCT_SEARCH_PARAM,
   SUPPLIER_SEARCH_PARAM,
+  appendWithoutDuplicates,
   buildShowcaseQuery,
   parseShowcaseParams,
   showcaseHref,

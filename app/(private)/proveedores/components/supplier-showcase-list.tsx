@@ -6,7 +6,7 @@ import { listSupplierShowcaseAction } from '@/lib/modules/proveedores/adapters/d
 import type { ShowcaseRow as ShowcaseRowData } from '@/lib/modules/proveedores';
 
 import { ShowcaseLoadTrigger } from './showcase-load-trigger';
-import type { ShowcaseFilters } from './supplier-showcase-params';
+import { appendWithoutDuplicates, type ShowcaseFilters } from './supplier-showcase-params';
 import { SupplierShowcaseRow } from './supplier-showcase-row';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -21,26 +21,10 @@ type SupplierShowcaseListProps = {
   readonly filters: ShowcaseFilters;
 };
 
-/** Une filas nuevas sin repetir un `id` ya presente (una tanda repetida tras un reintento). */
-function appendWithoutDuplicates<T extends { readonly id: string }>(
-  current: readonly T[],
-  incoming: readonly T[],
-): readonly T[] {
-  const knownIds = new Set(current.map((item) => item.id));
-  return [...current, ...incoming.filter((item) => !knownIds.has(item.id))];
-}
-
 /**
- * Lista con carga perezosa del catálogo visual de proveedores.
- *
- * Acumula las filas ya traídas, descarta cualquier `id` repetido y mantiene un solo vuelo en
- * curso a la vez con una referencia mutable —el estado de React por sí solo no basta, porque dos
- * clics seguidos verían el mismo valor de `loading` antes del primer repintado—. Se detiene en
- * cuanto la última tanda dice que no hay más.
- *
- * Si una tanda falla, el aviso al pie sustituye al centinela: mientras está puesto, no se pide
- * ninguna tanda más, ni por scroll ni por temporizador. «Reintentar» repite exactamente la misma
- * página que falló, y solo la retira si esta vez tiene éxito.
+ * Lista con carga perezosa del catálogo visual de proveedores: acumula filas, descarta `id`
+ * repetidos y mantiene un solo vuelo en curso a la vez. Un fallo cambia el centinela por un
+ * aviso con «Reintentar», que repite la misma página.
  */
 export function SupplierShowcaseList({ initialPage, filters }: SupplierShowcaseListProps) {
   const [rows, setRows] = useState(initialPage.items);

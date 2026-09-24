@@ -1,14 +1,8 @@
 import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
 /**
- * Parser puro de los dos filtros del catalogo visual de proveedores.
- *
- * Solo los DOS terminos de busqueda viven en la URL. La pagina de cada tanda no: la carga
- * perezosa es estado del cliente y siempre arranca desde la primera tanda cuando cambia un
- * filtro, asi que no hay nada de paginacion que este archivo tenga que leer ni escribir.
- *
- * Sin DOM, sin React y sin `next/*`: lo lee el Server Component de la pagina antes de que
- * exista nada de cliente.
+ * Parser puro de los dos filtros del catalogo visual de proveedores. Sin DOM, sin React y sin
+ * `next/*`: lo lee el Server Component de la pagina.
  */
 
 export const SUPPLIER_SEARCH_PARAM = 'supplier';
@@ -55,4 +49,13 @@ export function buildShowcaseQuery(filters: ShowcaseFilters): string {
 export function showcaseHref(filters: ShowcaseFilters): string {
   const query = buildShowcaseQuery(filters);
   return query === '' ? SUPPLIERS_ROUTE : `${SUPPLIERS_ROUTE}?${query}`;
+}
+
+/** Une los elementos nuevos sin repetir un `id` ya presente en `current`. */
+export function appendWithoutDuplicates<T extends { readonly id: string }>(
+  current: readonly T[],
+  incoming: readonly T[],
+): readonly T[] {
+  const knownIds = new Set(current.map((item) => item.id));
+  return [...current, ...incoming.filter((item) => !knownIds.has(item.id))];
 }

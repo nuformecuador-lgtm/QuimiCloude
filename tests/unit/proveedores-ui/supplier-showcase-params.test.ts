@@ -4,6 +4,7 @@ import {
   EMPTY_SHOWCASE_FILTERS,
   PRODUCT_SEARCH_PARAM,
   SUPPLIER_SEARCH_PARAM,
+  appendWithoutDuplicates,
   buildShowcaseQuery,
   parseShowcaseParams,
   showcaseHref,
@@ -61,5 +62,18 @@ describe('parametros del catalogo visual de proveedores', () => {
 
     expect(showcaseHref(filtros)).toBe(`${SUPPLIERS_ROUTE}?${buildShowcaseQuery(filtros)}`);
     expect(showcaseHref(filtros).startsWith(SUPPLIERS_ROUTE)).toBe(true);
+  });
+
+  it('appendWithoutDuplicates conserva el orden y descarta los ids ya presentes', () => {
+    const actual = [{ id: 'a' }, { id: 'b' }];
+    const nueva = [{ id: 'b' }, { id: 'c' }];
+
+    expect(appendWithoutDuplicates(actual, nueva)).toEqual([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+  });
+
+  it('appendWithoutDuplicates con una lista vacia de nuevos devuelve la actual sin tocar', () => {
+    const actual = [{ id: 'a' }];
+
+    expect(appendWithoutDuplicates(actual, [])).toEqual(actual);
   });
 });
