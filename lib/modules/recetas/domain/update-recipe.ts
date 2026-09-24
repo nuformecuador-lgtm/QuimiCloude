@@ -97,7 +97,6 @@ export function createUpdateRecipe(
       const missing = idsANuevoValidar.some((productId) => !foundIds.has(productId));
       if (missing) throw new ValidationError();
 
-      // R29: un producto terminado no puede ser ingrediente, tampoco al editar.
       const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
       if (finished) throw new ActionNotAllowedError();
     }

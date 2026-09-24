@@ -66,7 +66,7 @@ export class RecipeDuplicateNameError extends RecetasError {
   }
 }
 
-/** QC-150 (R29): una linea de la receta senala un producto terminado, que no puede ser
+/** Una linea de la receta senala un producto terminado, que no puede ser
  *  ingrediente. Entrada con forma valida; lo que se rechaza es la accion. */
 export class ActionNotAllowedError extends RecetasError {
   readonly code = 'action_not_allowed';

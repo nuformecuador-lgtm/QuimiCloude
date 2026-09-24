@@ -55,7 +55,6 @@ export function createCreateRecipe(
       const missing = productIds.some((id) => !foundIds.has(id));
       if (missing) throw new ValidationError();
 
-      // R29: un producto terminado no puede ser ingrediente.
       const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
       if (finished) throw new ActionNotAllowedError();
     }
