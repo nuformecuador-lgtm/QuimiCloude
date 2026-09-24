@@ -28,7 +28,7 @@ versionado).
 **Hecho cuando:** la bitácora tiene la base creada, el resultado del E2E con el motivo que imprime el
 servidor y el prefijo elegido.
 
-## T1 — Extraer el JSON de un texto, compartido `[P con T2, T7]`
+## [x] T1 — Extraer el JSON de un texto, compartido `[P con T2, T7]`
 
 Archivos: `lib/modules/documentos/domain/json-in-text.ts` (nuevo),
 `lib/modules/documentos/domain/crop-coordinates.ts`, `tests/unit/documentos/json-in-text.test.ts`.
@@ -86,7 +86,7 @@ escribe» (`updated_at` igual), **R16**, **R21** (fallo forzado en la fila 3 de 
 otra empresa o dado de baja ⇒ `supplier_not_found`, nada escrito); `proveedores/scope.test.ts` verde
 (el módulo sigue sin nombrar `inventario`).
 
-## T5 — Interpretar el texto de la IA `[depende de T1]` `[F4]`
+## [x] T5 — Interpretar el texto de la IA `[depende de T1]` `[F4]`
 
 Archivos: `lib/modules/documentos/domain/catalog-extraction.ts` (nuevo),
 `tests/unit/documentos/catalog-extraction.test.ts`.
