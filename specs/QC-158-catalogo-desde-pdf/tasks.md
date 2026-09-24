@@ -216,7 +216,7 @@ nuevos), `lib/modules/documentos/adapters/driven/ai/ai-reader-canned.ts`,
 `documentos` solo importa barrels de otros módulos) verdes; el doble de IA devuelve coordenadas con el
 prompt de recorte y JSON de catálogo con cualquier otro, y los dos textos se parsean enteros.
 
-## T15 — E2E `[depende de T11-T14]`
+## [x] T15 — E2E `[depende de T11-T14]`
 
 Archivos: `e2e/catalogo-desde-pdf.spec.ts` (nuevo),
 `tests/guards/guard-identificador-de-request.test.ts` (lista de E2E),
