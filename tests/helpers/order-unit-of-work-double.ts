@@ -67,8 +67,9 @@ export function fakeOrderUnitOfWork(scope: OrderTransactionScope): OrderUnitOfWo
   return { run: (work) => work(scope) };
 }
 
-/** Un `FinishedGoodsIntake` que explota si se le llama: solo el Finalizar de QC-150 lo toca, y
- *  quien no espera esa llamada -crear, editar, cancelar, caducar- lo hereda sin personalizarlo.
+/** Un `FinishedGoodsIntake` que explota si se le llama: solo la transicion de Finalizar lo
+ *  toca, y quien no espera esa llamada -crear, editar, cancelar, caducar- lo hereda sin
+ *  personalizarlo.
  *  Quien SI la espera pasa su propio doble por `overrides`. */
 export function fakeFinishedGoodsIntake(
   overrides: Partial<FinishedGoodsIntake> = {},

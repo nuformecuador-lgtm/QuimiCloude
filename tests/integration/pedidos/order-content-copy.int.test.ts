@@ -1,6 +1,6 @@
 /**
- * QC-150 T14 — la copia del contenido de la presentacion en el pedido (R38, R39, R40), con el
- * flujo REAL de alta y edicion (`createCreateOrder`/`createUpdateOrder`) cableado a mano con los
+ * La copia del contenido de la presentacion en el pedido, con el flujo REAL de alta y
+ * edicion (`createCreateOrder`/`createUpdateOrder`) cableado a mano con los
  * adaptadores driven REALES de `pedidos`, `recetas`, `inventario` y `unidades` -el mismo
  * conjunto que `lib/composition` ata, sin pasar por `lib/composition` para no arrastrar el
  * resto de la aplicacion a un test de dominio-.

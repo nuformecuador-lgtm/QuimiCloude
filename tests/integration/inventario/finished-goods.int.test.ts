@@ -1,14 +1,14 @@
 /**
- * QC-150 T7 — `receiveFinishedGoods` contra Postgres real.
+ * `receiveFinishedGoods` contra Postgres real.
  *
  * AISLAMIENTO: `receiveFinishedGoods` recibe el `tx` de quien llama y no abre transaccion
  * propia -a diferencia de `createWithFirstBatch`-, asi que cada caso la envuelve con
  * `prisma.$transaction` sobre el cliente GLOBAL, igual que hara `withOrderTransaction` en
  * produccion. Envolver la corrida ENTERA en una transaccion del test seria aislamiento de
- * mentira: R21 necesita que la escritura CONFIRME para que la segunda llamada choque de
- * verdad contra el indice, y R22 necesita dos conexiones reales a la vez. Cada caso fabrica su
- * propia empresa (y, cuando hace falta, una segunda) con randomUUID y limpia en un `finally` en
- * el orden que exigen las FK: asientos -> lotes -> productos -> pedidos -> receta ->
+ * mentira: la escritura necesita CONFIRMAR para que una segunda llamada choque de verdad
+ * contra el indice, y la prueba de concurrencia necesita dos conexiones reales a la vez. Cada
+ * caso fabrica su propia empresa (y, cuando hace falta, una segunda) con randomUUID y limpia
+ * en un `finally` en el orden que exigen las FK: asientos -> lotes -> productos -> pedidos -> receta ->
  * presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa.
  */
 import { randomUUID } from 'node:crypto';

@@ -1,7 +1,7 @@
 /**
- * QC-150 — el contenido de la presentacion (R6, R8, R40). Adaptador Prisma real: solo la base
- * demuestra que el `CHECK presentations_content_positive` acepta un contenido valido y que
- * cambiarlo no toca ni la copia de un pedido ni el contenido guardado de un lote (R40).
+ * El contenido de la presentacion. Adaptador Prisma real: solo la base demuestra que el
+ * `CHECK presentations_content_positive` acepta un contenido valido y que cambiarlo no toca
+ * ni la copia de un pedido ni el contenido guardado de un lote.
  * Sin transaccion con ROLLBACK, mismo motivo que `presentation-unit.int.test.ts`: cada fila se
  * borra en el `afterAll` por su `id`.
  */
@@ -81,8 +81,8 @@ async function sembrarProducto(unitId: string): Promise<string> {
   return id;
 }
 
-/** `packageContent` es el contenido guardado en el lote (R41); aqui se siembra a mano porque
- *  la escritura real (`receiveFinishedGoods`) es de T7, fuera del alcance de esta task. */
+/** `packageContent` es el contenido guardado en el lote; aqui se siembra a mano porque la
+ *  escritura real (`receiveFinishedGoods`) esta cubierta en su propio archivo de integracion. */
 async function sembrarLote(
   productId: string,
   presentationId: string,
@@ -105,8 +105,8 @@ async function sembrarLote(
   return id;
 }
 
-/** La copia del contenido en el pedido (R38-R40) es de T14, fuera del alcance de esta task:
- *  aqui se siembra a mano la fila de `orders` con su copia ya escrita. */
+/** La copia del contenido en el pedido se escribe en la creacion del pedido, no aqui: esta
+ *  funcion siembra a mano la fila de `orders` con esa copia ya puesta. */
 async function sembrarPedido(presentationId: string, presentationContent: string): Promise<string> {
   const recetaMarca = token();
   const { id: recipeId } = await prisma.recipe.create({

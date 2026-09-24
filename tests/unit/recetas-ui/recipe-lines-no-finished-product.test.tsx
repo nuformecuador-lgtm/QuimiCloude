@@ -6,7 +6,7 @@ import { setupUser } from '../../helpers/user-event';
 import { RecipeLinesField } from '@/app/(private)/produccion/formulas/components';
 
 /**
- * R30: el selector de insumos del formulario de receta no debe ofrecer productos terminados,
+ * El selector de insumos del formulario de receta no debe ofrecer productos terminados,
  * ni en la pestaña de ingredientes ni en la de máquinas.
  */
 

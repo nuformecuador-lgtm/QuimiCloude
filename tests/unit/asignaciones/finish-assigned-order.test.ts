@@ -33,7 +33,7 @@ const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.
 
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
 
-/** El exito por defecto de `transitionAliveById` yendo a `ENTREGADO` (QC-150, R24): un objeto
+/** El exito por defecto de `transitionAliveById` yendo a `ENTREGADO`: un objeto
  *  con el lote de producto terminado que entro, no el literal `'ok'` -ese solo sale de una
  *  transicion que no es `ENTREGADO`, y `finishAssignedOrder` siempre pide esa-. */
 const OK_CON_PRODUCCION = {

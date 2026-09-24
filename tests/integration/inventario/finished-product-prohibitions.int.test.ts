@@ -1,6 +1,7 @@
 /**
- * QC-150 T10 (R28, R31, R32), contra Postgres real: `addBatchToAlive` y `adjustBatchStock` de
- * `product-prisma.ts` usan el cliente Prisma GLOBAL y abren su propia `prisma.$transaction` con
+ * Contra Postgres real: `addBatchToAlive` y `adjustBatchStock` de `product-prisma.ts` rechazan
+ * escribir stock sobre un producto terminado. Ambos usan el cliente Prisma GLOBAL y abren su
+ * propia `prisma.$transaction` con
  * un `FOR NO KEY UPDATE` dentro -mismo criterio que `product-type-lock.int.test.ts`-, asi que una
  * transaccion del test no las envolveria. Cada caso siembra su propia empresa efimera con
  * randomUUID (unidad, presentacion, receta y producto terminado, que exige el CHECK

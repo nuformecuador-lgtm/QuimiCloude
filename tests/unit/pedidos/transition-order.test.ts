@@ -20,7 +20,7 @@ const EMPRESA = 'c-1';
 const AHORA = new Date('2026-09-23T12:00:00Z');
 
 /** Con contenido `1`: quien no lo necesite distinto no repite el calculo de envases en cada
- *  test (R12: un pedido de `10` con contenido `1` da 10 envases exactos). */
+ *  test -un pedido de `10` con contenido `1` da 10 envases exactos-. */
 function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
   return {
     id: 'o-1',

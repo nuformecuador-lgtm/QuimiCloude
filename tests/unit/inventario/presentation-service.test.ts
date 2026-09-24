@@ -50,9 +50,8 @@ const SIN_PERMISO: Actor = { id: 'actor-sin-permiso', companyId: EMPRESA, permis
 const UNIDAD = '11111111-1111-4111-8111-111111111111';
 const OTRA_UNIDAD = '22222222-2222-4222-8222-222222222222';
 
-/** QC-150 (R6): ampliacion nombrada del contrato -`PresentationView` gana `content`-, aqui
- *  `null` porque los casos de este archivo no lo ejercitan; el contenido lo cubre
- *  `presentation-input.test.ts` (R6, R7, R40). */
+/** `PresentationView` gana el campo `content`, aqui `null` porque los casos de este archivo
+ *  no lo ejercitan; el contenido lo cubre `presentation-input.test.ts`. */
 const PRESENTACION: PresentationView = {
   id: 'presentacion-1',
   name: 'Bidon 20 L',

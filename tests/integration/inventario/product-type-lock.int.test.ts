@@ -1,6 +1,6 @@
 /**
- * QC-150 T6 — R4: la edicion nunca cambia el tipo de o hacia `FINISHED_PRODUCT`. Contra Postgres
- * real, con un producto terminado sembrado a mano (con su `recipe_id`/`presentation_id`, que
+ * La edicion nunca cambia el tipo de o hacia `FINISHED_PRODUCT`. Contra Postgres real, con un
+ * producto terminado sembrado a mano (con su `recipe_id`/`presentation_id`, que
  * exige el CHECK `products_finished_identity_matches_type`) para probar el `UPDATE` condicional
  * de `updateAliveProduct` -que ni un mock puede demostrar-.
  *

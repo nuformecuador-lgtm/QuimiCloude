@@ -1,8 +1,8 @@
 /**
- * QC-150 — el Finalizar da de alta el producto terminado, contra Postgres real: el mismo
- * cableado que `order-reservation.int.test.ts` (los adaptadores driven REALES de `pedidos`,
+ * El Finalizar da de alta el producto terminado, contra Postgres real: el mismo cableado
+ * que `order-reservation.int.test.ts` (los adaptadores driven REALES de `pedidos`,
  * `recetas`, `inventario` y `unidades`, sin pasar por `lib/composition`), con `finishAssignedOrder`
- * de `asignaciones` encima para R24 y R26.
+ * de `asignaciones` encima.
  *
  * AISLAMIENTO — mismo criterio que `order-reservation.int.test.ts`: `withOrderTransaction` abre
  * su PROPIA `prisma.$transaction` sobre el cliente global, asi que envolver la corrida en una

@@ -121,7 +121,7 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
 }
 
 /** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
- *  contenido que le pase el test -`null` por defecto (R38: sin copia si no lo tiene). */
+ *  contenido que le pase el test -`null` por defecto, para el caso sin copia-. */
 function catalogoDePresentaciones(
   content: string | null = null,
 ): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
