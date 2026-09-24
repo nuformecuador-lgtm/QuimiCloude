@@ -126,7 +126,7 @@ function toReviewedLineInput(row: RowFormState): ReviewedLineInput {
   };
 }
 
-/** Las presentaciones nuevas que alguna fila INCLUIDA necesita, vistas una sola vez (R18, R19). */
+/** Las presentaciones nuevas que alguna fila INCLUIDA necesita, vistas una sola vez. */
 function computeNewPresentationGroups(rows: readonly RowFormState[]): readonly NewPresentationGroup[] {
   const byKey = new Map<string, { presentation: string; readUnit: string | null; rowNumbers: number[] }>();
 
@@ -147,9 +147,8 @@ function computeNewPresentationGroups(rows: readonly RowFormState[]): readonly N
 }
 
 /**
- * Los motivos que impiden confirmar, para nombrar las filas (R18, R20): el servidor rechaza con
- * `invalid_input` generico y su motivo por fila queda en un diagnostico de solo servidor, asi que
- * esta pantalla tiene que decirlo ANTES de llamar a confirmar.
+ * Los motivos que impiden confirmar, para nombrar las filas: el servidor rechaza con un motivo
+ * generico, asi que esta pantalla tiene que decirlo ANTES de llamar a confirmar.
  */
 function computeConfirmReasons(
   rows: readonly RowFormState[],
@@ -206,15 +205,15 @@ type CatalogImportReviewProps = {
 
 /**
  * La revision de una importacion de catalogo: una tarjeta por linea, reclasificacion al perder el
- * foco de nombre o presentacion (R10), y confirmacion prevalidada en el cliente porque el servidor
- * rechaza con un motivo generico (R18, R20).
+ * foco de nombre o presentacion, y confirmacion prevalidada en el cliente porque el servidor
+ * rechaza con un motivo generico.
  */
 export function CatalogImportReview({ supplierId, documentFileId, units, preview }: CatalogImportReviewProps) {
   const [rows, setRows] = useState<readonly RowFormState[]>(() => preview.rows.map(toRowFormState));
   const [crops, setCrops] = useState<readonly CatalogImportPreviewCrop[]>(preview.crops);
-  // Solo lo que el revisor ELIGE a mano. La sugerencia (R19) se deriva mas abajo y nunca se
-  // guarda aqui: si viviera en este estado, sincronizarla con un efecto seria justamente el
-  // patron que "no necesitas un efecto para esto" desaconseja.
+  // Solo lo que el revisor ELIGE a mano. La sugerencia se deriva mas abajo y nunca se guarda
+  // aqui: si viviera en este estado, sincronizarla con un efecto seria justamente el patron que
+  // "no necesitas un efecto para esto" desaconseja.
   const [unitOverrides, setUnitOverrides] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState<CatalogImportSummaryData | null>(null);
   const [confirmError, setConfirmError] = useState<ErrorState | null>(null);
@@ -222,7 +221,7 @@ export function CatalogImportReview({ supplierId, documentFileId, units, preview
   const [isReclassifying, startReclassify] = useTransition();
 
   const groups = useMemo(() => computeNewPresentationGroups(rows), [rows]);
-  // La sugerencia de unidad (R19): sin eleccion propia, la unica coincidencia exacta por nombre o
+  // La sugerencia de unidad: sin eleccion propia, la unica coincidencia exacta por nombre o
   // simbolo normalizado; vacia si no hay ninguna o hay mas de una.
   const unitSelections = useMemo(() => {
     const selections: Record<string, string> = {};
@@ -306,8 +305,8 @@ export function CatalogImportReview({ supplierId, documentFileId, units, preview
     }
 
     setConfirmError(result);
-    // El servidor no dice que fila fallo (design.md > 6.3): se vuelve a clasificar con lo que hay
-    // para que las tarjetas reflejen lo que el servidor vio de verdad (R14).
+    // El servidor no dice que fila fallo: se vuelve a clasificar con lo que hay para que las
+    // tarjetas reflejen lo que el servidor vio de verdad.
     reclassify(rows);
   }
 

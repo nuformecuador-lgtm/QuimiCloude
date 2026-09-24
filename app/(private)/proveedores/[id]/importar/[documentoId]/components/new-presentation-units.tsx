@@ -9,7 +9,7 @@ import type { UnitRef } from '@/lib/modules/unidades';
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
-/** Una presentacion nueva que alguna fila incluida necesita, vista una sola vez (R18, R19). */
+/** Una presentacion nueva que alguna fila incluida necesita, vista una sola vez. */
 export type NewPresentationGroup = {
   /** Nombre normalizado de la presentacion: identifica el grupo y la seleccion de unidad. */
   readonly key: string;
@@ -23,7 +23,7 @@ export type NewPresentationGroup = {
 
 type NewPresentationUnitsProps = {
   readonly groups: readonly NewPresentationGroup[];
-  /** Todas las unidades visibles para la empresa (R19): ninguna se crea desde aqui. */
+  /** Todas las unidades visibles para la empresa: ninguna se crea desde aqui. */
   readonly units: readonly UnitRef[];
   readonly selections: Readonly<Record<string, string>>;
   readonly onChange: (key: string, unitId: string) => void;
@@ -34,8 +34,8 @@ function unitLabel(unit: UnitRef): string {
 }
 
 /**
- * Una unidad por cada presentacion nueva que alguna fila incluida necesita (R18, R19): sin
- * elegirla, la confirmacion entera queda bloqueada.
+ * Una unidad por cada presentacion nueva que alguna fila incluida necesita: sin elegirla, la
+ * confirmacion entera queda bloqueada.
  *
  * Ninguna unidad viene preseleccionada por defecto: `suggestUnitId` (llamado por quien monta este
  * componente) decide si hay una sola coincidencia, y si no la hay el revisor elige entre TODAS.

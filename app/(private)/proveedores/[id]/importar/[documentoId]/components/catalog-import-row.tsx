@@ -15,7 +15,7 @@ import { CropPicker } from './crop-picker';
 import type { MeasurementUnit, RowFormState } from './catalog-import-review';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
-/** 16 px en TODOS los anchos: por debajo, Safari en iOS hace zoom al enfocar el campo (R37). */
+/** 16 px en TODOS los anchos: por debajo, Safari en iOS hace zoom al enfocar el campo. */
 const FIELD_TEXT = 'text-base md:text-base';
 const DECIMAL_INPUT_PATTERN = '\\d{1,10}(\\.\\d{1,4})?';
 
@@ -24,7 +24,7 @@ const MEASUREMENT_UNIT_OPTIONS = [
   { label: 'cm', value: 'cm' },
 ] as const;
 
-/** Etiqueta legible de cada clase (R9). */
+/** Etiqueta legible de cada clase. */
 export const KIND_LABELS: Record<RowFormState['kind'], string> = {
   nueva: 'Nueva',
   cambia: 'Cambia de costo',
@@ -55,12 +55,12 @@ type CatalogImportRowProps = {
 };
 
 /**
- * Una tarjeta por linea interpretada (R8): no una fila de tabla, porque cada linea tiene hasta
- * once controles y una tabla no cabe en movil.
+ * Una tarjeta por linea interpretada: no una fila de tabla, porque cada linea tiene hasta once
+ * controles y una tabla no cabe en movil.
  *
- * `readOnlyFields` es la unica diferencia de comportamiento entre clases (R11, R12): «cambia» y
- * «sin cambios» solo dejan editar el costo, y el resto de esta tarjeta no cambia de forma sea
- * cual sea la clase.
+ * `readOnlyFields` es la unica diferencia de comportamiento entre clases: «cambia» y «sin
+ * cambios» solo dejan editar el costo, y el resto de esta tarjeta no cambia de forma sea cual sea
+ * la clase.
  */
 export function CatalogImportRow({
   index,
@@ -260,7 +260,7 @@ type RowFieldProps = {
   readonly testId: string;
 };
 
-/** Un campo de texto de la fila: editable o de solo lectura, segun la clase (R11, R12). */
+/** Un campo de texto de la fila: editable o de solo lectura, segun la clase. */
 function RowField({ label, value, readOnly, onChange, onBlur, inputMode, pattern, type, testId }: RowFieldProps) {
   const inputId = useId();
 
@@ -296,7 +296,7 @@ type MeasurementUnitFieldProps = {
   readonly testId: string;
 };
 
-/** La unidad de una medida (diametro o alto): lista cerrada, sin conversion (R12, R27). */
+/** La unidad de una medida (diametro o alto): lista cerrada, sin conversion. */
 function MeasurementUnitField({ label, value, readOnly, onChange, testId }: MeasurementUnitFieldProps) {
   const fieldId = useId();
 

@@ -1,5 +1,4 @@
-// Barrel de los componentes de la revision de importacion de catalogo (R42,
-// `docs/architecture.md > Componentes > Regla: componentes de ruta en components/ con barrel index.ts`).
+// Barrel de los componentes de la revision de importacion de catalogo.
 //
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente, nunca
 // aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.

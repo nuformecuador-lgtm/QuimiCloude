@@ -10,7 +10,7 @@ import type { CatalogImportPreviewCrop } from '@/lib/modules/documentos';
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 type CropPickerProps = {
-  /** Todos los recortes del archivo, sin acotar a los que ya se emparejaron con alguna fila (R24). */
+  /** Todos los recortes del archivo, sin acotar a los que ya se emparejaron con alguna fila. */
   readonly crops: readonly CatalogImportPreviewCrop[];
   readonly selectedPath: string | null;
   readonly onPick: (path: string) => void;
@@ -18,10 +18,10 @@ type CropPickerProps = {
 };
 
 /**
- * Selector de un recorte del archivo para asignarlo a una fila (R24). Vive en un dialogo, no en
+ * Selector de un recorte del archivo para asignarlo a una fila. Vive en un dialogo, no en
  * linea, porque una fila ya tiene once controles y una cuadricula de miniaturas no cabe al lado.
  *
- * Cada opcion es su propio boton, alcanzable sin `hover` y de al menos 44 px (R37).
+ * Cada opcion es su propio boton, alcanzable sin `hover` y de al menos 44 px.
  */
 export function CropPicker({ crops, selectedPath, onPick, triggerTestId }: CropPickerProps) {
   const [open, setOpen] = useState(false);
