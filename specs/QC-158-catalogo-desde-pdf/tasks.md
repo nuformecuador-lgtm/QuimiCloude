@@ -176,7 +176,7 @@ Archivos: `app/(private)/proveedores/[id]/components/{catalog-line-form,catalog-
 **Hecho cuando:** tests verdes para **R28** (se ven y se escriben en alta y edición) y **R29** (editar
 solo el costo de una línea con imagen, material y medidas los conserva); inputs ≥ 16 px.
 
-## T12 — Pantalla de revisión y sus acciones `[depende de T9, T10]` `[F1]` `[F3]` `[F5]`
+## [x] T12 — Pantalla de revisión y sus acciones `[depende de T9, T10]` `[F1]` `[F3]` `[F5]`
 
 Archivos: `lib/shared/routes.ts` (`supplierCatalogImportRoute`),
 `lib/modules/documentos/adapters/driving/catalog-import-actions.ts` (nuevo),
