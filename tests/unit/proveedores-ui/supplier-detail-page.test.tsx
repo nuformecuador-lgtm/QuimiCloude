@@ -971,6 +971,28 @@ describe('pagina de detalle — editar y dar de baja en la cabecera (R38)', () =
     expect(screen.getByTestId(testId.abrirBaja)).toBeInTheDocument();
   });
 
+  it('el nombre del proveedor puede encoger y partirse: no fuerza el ancho de su fila (R38)', async () => {
+    // Un nombre sin espacios es una unica palabra larga. Dentro de un contenedor flex, un hijo
+    // NO encoge por debajo de su ancho intrinseco salvo que declare como hacerlo: sin eso, el
+    // nombre desborda la fila horizontalmente y arrastra consigo el ancho de toda la pagina, lo
+    // que en un navegador movil hace que el panel lateral -fijo, calculado sobre ese ancho
+    // inflado- termine mas alto que la pantalla y su boton de guardar quede fuera de ella.
+    //
+    // Anti-placebo: sin `min-w-0` (o equivalente) este assert falla porque la clase que permite
+    // encoger no esta, y con solo `break-words` sin `min-w-0` seguiria sin encoger por debajo del
+    // ancho intrinseco de la palabra sin romper.
+    getSupplierActionMock.mockResolvedValue({
+      status: 'success',
+      data: proveedor({ name: 'unnombredeproveedorsinespaciosdeliberadamentemuylargoparaforzareldesborde' }),
+    });
+
+    await renderPantalla();
+
+    const nombre = screen.getByTestId(testId.nombre);
+    expect(nombre.className).toContain('min-w-0');
+    expect(nombre.className).toMatch(/break-words|break-all|truncate/);
+  });
+
   it('editar con exito cierra el panel, avisa por toast y refresca el detalle con los datos nuevos', async () => {
     const user = setupUser();
     const original = proveedor({ name: 'Químicos del Norte' });

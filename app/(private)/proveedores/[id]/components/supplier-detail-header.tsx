@@ -23,7 +23,17 @@ export function SupplierDetailHeader({ supplier }: { readonly supplier: Supplier
   return (
     <header className="flex flex-col gap-2" data-testid="supplier-detail">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold" data-testid="supplier-detail-name">
+        {/*
+          `min-w-0` y `break-words`: un nombre de proveedor sin espacios es una unica palabra
+          larga, y por defecto un hijo de un contenedor flex no encoge por debajo de su ancho
+          intrinseco. Sin esto el nombre desborda el flex horizontalmente y arrastra el ancho de
+          la pagina entera con el, lo que en un navegador movil hace que TODO el documento se
+          alargue -incluido el panel lateral fijo de abajo, cuyo pie queda fuera de la pantalla-.
+        */}
+        <h1
+          className="min-w-0 flex-1 break-words text-2xl font-semibold"
+          data-testid="supplier-detail-name"
+        >
           {supplier.name}
         </h1>
         <div className="flex items-center gap-1">
