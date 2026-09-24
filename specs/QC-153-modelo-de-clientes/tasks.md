@@ -41,7 +41,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
 
 ## T0 — Preparación (bloquea todo)
 
-- [ ] **T0.** Base propia: crear `QuimiCloude_QC153`, apuntar el `.env` del worktree a ella, dejarla
+- [x] **T0.** Base propia: crear `QuimiCloude_QC153`, apuntar el `.env` del worktree a ella, dejarla
       migrada y sembrada con la cadena de `dev`, y exportar `DATABASE_URL` en el shell que corre el
       gate. Anotar en `progress/impl_QC-153-modelo-de-clientes.md`: la base usada, la última migración
       de `dev` (de ella sale `<ts>`) y el catálogo de `PERMISSIONS` en `dev` (códigos y número: el
