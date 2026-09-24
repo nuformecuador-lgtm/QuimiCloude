@@ -1,12 +1,7 @@
--- Migracion de DATOS: no crea, altera ni borra ninguna tabla, columna, indice, restriccion, tipo
--- ni politica de RLS; solo escribe filas en `permissions` y `role_permissions`.
---
--- Las tres sentencias son idempotentes por `ON CONFLICT ... DO NOTHING`. La herencia del tercer
--- INSERT resuelve por permiso, no por nombre de rol: cualquier rol con `proveedores.modificar`
--- gana `documentos.modificar`, nunca `documentos.consultar`.
---
--- Escrita a mano porque es migracion de datos y `migrate dev` propondria un reset por el drift
--- conocido de migraciones anteriores.
+-- Migracion de DATOS, escrita a mano: no toca esquema, solo escribe filas en `permissions` y
+-- `role_permissions`. Las tres sentencias son idempotentes por `ON CONFLICT ... DO NOTHING`. La
+-- herencia del tercer INSERT resuelve por permiso, no por nombre de rol: cualquier rol con
+-- `proveedores.modificar` gana `documentos.modificar`, nunca `documentos.consultar`.
 
 INSERT INTO "permissions" ("code", "module", "action", "description", "updated_at") VALUES
   ('documentos.consultar', 'documentos', 'consultar',

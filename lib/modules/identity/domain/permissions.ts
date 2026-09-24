@@ -5,8 +5,7 @@
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
 
 /**
- * El catalogo cerrado: el codigo tiene la forma
- * `<modulo>.<accion>`, con modulo y accion en
+ * El catalogo cerrado: el codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en
  * español y en minusculas, siguiendo los nombres de modulo del repositorio (R1). Un modulo con
  * escritura declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un
  * modulo sin escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva
@@ -43,10 +42,8 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
  * carpeta de `lib/modules/`, y declara las dos acciones porque tiene escritura. Solo los recibe el
  * Administrador.
  *
- * **Sexta enmienda al catalogo cerrado**: suma `documentos.consultar` y `documentos.modificar`,
- * consultar y subir los documentos de la empresa. `documentos` es una carpeta real de
- * `lib/modules/`, y declara las dos acciones porque tiene escritura. Solo los recibe el
- * Administrador.
+ * `documentos` suma `documentos.consultar` y `documentos.modificar`: declara sus dos acciones
+ * porque tiene escritura, y solo las recibe el Administrador.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
