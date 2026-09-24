@@ -14,6 +14,7 @@ import type { Prisma } from '@prisma/client';
 type Row = Record<string, unknown>;
 
 function makeTx(overrides: {
+  readonly recipeRows?: readonly Row[];
   readonly presentationRows: readonly Row[];
   readonly productRows: readonly Row[];
   readonly maxLotRows: readonly Row[];
@@ -21,6 +22,10 @@ function makeTx(overrides: {
   const order: string[] = [];
 
   const queryRawQueue = [
+    async () => {
+      order.push('recipe-of-company');
+      return overrides.recipeRows ?? [{ id: 'recipe-1' }];
+    },
     async () => {
       order.push('presentation-for-share');
       return overrides.presentationRows;
@@ -101,6 +106,7 @@ describe('receiveFinishedGoods — orden de pasos con un tx doblado', () => {
       packages: '50',
     });
     expect(order).toEqual([
+      'recipe-of-company',
       'presentation-for-share',
       'insert-product',
       'product-select',
@@ -110,6 +116,23 @@ describe('receiveFinishedGoods — orden de pasos con un tx doblado', () => {
       'movement-create',
       'recalculate-stock',
     ]);
+  });
+
+  it('sin fila de receta de la empresa: rechaza sin escribir nada, y no llega a leer la presentacion', async () => {
+    const { tx, txDouble, order } = makeTx({
+      recipeRows: [],
+      presentationRows: [{ name: 'Botella 1L', unitId: 'unit-1', content: '1.0000' }],
+      productRows: [{ id: 'product-1', name: 'Desengrasante industrial · Botella 1L' }],
+      maxLotRows: [{ top: null }],
+    });
+
+    const outcome = await receiveFinishedGoods(tx, baseInput(), SCOPE);
+
+    expect(outcome).toEqual({ kind: 'recipe_not_found' });
+    expect(order).toEqual(['recipe-of-company']);
+    expect(txDouble.$executeRaw).not.toHaveBeenCalled();
+    expect(txDouble.productBatch.create).not.toHaveBeenCalled();
+    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
   });
 
   it('sin fila de presentacion: rechaza sin escribir nada', async () => {

@@ -382,6 +382,29 @@ describe('createTransitionOrder', () => {
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
+  it('D24: recipe_not_found del alta de inventario deshace la transaccion entera', async () => {
+    const { recipes: scopeRecipes } = catalogoDeRecetas();
+    const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
+    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const setStatus = vi.fn(async () => 'ok' as const);
+    const setReservedAt = vi.fn();
+    const receiveFromOrder = vi.fn(async () => ({ kind: 'recipe_not_found' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, setStatus, setReservedAt },
+      reservations: { consumeForOrder },
+      recipes: scopeRecipes,
+      finishedGoods: { receiveFromOrder },
+    });
+    const { recipes, products, units } = catalogosGlobales();
+    const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
+
+    await expect(
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+    ).resolves.toBe('recipe_not_found');
+
+    expect(setReservedAt).not.toHaveBeenCalled();
+  });
+
   it('R30, R31, R51: material insuficiente deshace la transaccion entera', async () => {
     const { recipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
