@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PrivateLayout from '@/app/(private)/layout';
 import PedidosPage from '@/app/(private)/pedidos/page';
 import {
+  ORDER_COST_QUOTE_TESTID,
   ORDER_CREATE_OPEN_TESTID,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
@@ -29,6 +30,7 @@ import {
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
   RECIPE_PICKER_TESTID,
+  SEARCH_PARAM,
   SORT_PARAM,
   STATUS_PARAM,
   type RecipePickerPage,
@@ -181,6 +183,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   // invoca, una vez por pagina- con el lote vacio: este archivo no afirma nada sobre cobertura y
   // con el lote vacio la columna pinta su marcador de ausencia.
   listOrderCoverageAction: vi.fn(async () => ({ status: 'success', data: [] })),
+  quoteOrderCostAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -470,11 +475,20 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     expect(screen.getAllByRole('region')).toHaveLength(1);
     expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
 
-    // Tampoco al abrir el panel, que es donde una segunda region se colaria sin que nadie mirase.
+    // Al abrir el panel aparece el bloque de coste del propio formulario (`role="status"`, siempre
+    // montado): se cuenta aparte, y fuera de el sigue habiendo exactamente el mismo aviso de antes
+    // -asi que ningun `<Toaster />` propio de esta pantalla se ha sumado.
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
-    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+    const bloqueDeCoste = document.querySelector(`[data-testid="${ORDER_COST_QUOTE_TESTID}"]`);
+    const avisosFueraDelBloqueDeCoste = Array.from(document.querySelectorAll('[aria-live]')).filter(
+      (nodo) => !bloqueDeCoste?.contains(nodo),
+    );
+
+    expect(screen.getAllByRole('region')).toHaveLength(1);
+    expect(avisosFueraDelBloqueDeCoste).toHaveLength(1);
+    expect(bloqueDeCoste?.querySelectorAll('[aria-live]')).toHaveLength(1);
   });
 
   it('la accion de editar de la fila abre el panel con el pedido precargado', async () => {
@@ -537,5 +551,38 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
     expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('');
     expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
     expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID).textContent).not.toContain(RECETA.name);
+  });
+});
+
+describe('el termino de busqueda sobrevive al panel lateral (R4, R9)', () => {
+  it('con "q" en la URL, la consulta recibe el termino y la caja lo muestra (R4)', async () => {
+    const termino = 'esmalte';
+    await renderPantalla({ [SEARCH_PARAM]: termino });
+
+    const consultaUsada = listOrdersActionMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(consultaUsada).toMatchObject({ search: termino });
+    expect(screen.getByTestId('data-table-search')).toHaveValue(termino);
+  });
+
+  it('abrir y cerrar el panel lateral de una fila no navega y conserva el termino en la caja (R9)', async () => {
+    const user = setupUser();
+    const termino = 'esmalte';
+    await renderPantalla({ [SEARCH_PARAM]: termino });
+
+    expect(screen.getByTestId('data-table-search')).toHaveValue(termino);
+
+    await user.click(screen.getByTestId('order-action-edit'));
+    await screen.findByTestId(ORDER_FORM_TESTID);
+
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+    expect(screen.getByTestId('data-table-search')).toHaveValue(termino);
+
+    await user.click(screen.getByTestId(ORDER_FORM_CANCEL_TESTID));
+    await waitFor(() => expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull());
+
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+    expect(screen.getByTestId('data-table-search')).toHaveValue(termino);
   });
 });

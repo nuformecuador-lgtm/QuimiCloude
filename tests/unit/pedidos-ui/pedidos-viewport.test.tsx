@@ -230,6 +230,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   // invoca, una vez por pagina- con el lote vacio: este archivo mide viewport, no afirma sobre
   // cobertura.
   listOrderCoverageAction: vi.fn(async () => ({ status: 'success', data: [] })),
+  quoteOrderCostAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({

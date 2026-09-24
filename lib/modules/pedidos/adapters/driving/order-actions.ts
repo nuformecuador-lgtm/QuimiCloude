@@ -9,6 +9,7 @@ import {
 import {
   PedidosError,
   type Actor,
+  type OrderCostQuote,
   type OrderSummary,
   type OrderView,
   type Page,
@@ -86,6 +87,12 @@ export type OrderQueryResult =
 
 export type OrderListResult =
   | { status: 'success'; data: Page<OrderSummary> }
+  | ErrorState;
+
+/** La cotizacion de coste no persiste nada, asi que su resultado no necesita un
+ *  estado `idle` -no hay ningun formulario que la dispare-. */
+export type OrderCostQuoteResult =
+  | { status: 'success'; data: OrderCostQuote }
   | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
@@ -317,6 +324,22 @@ export async function listOrderCoverageAction(
   try {
     const coverage = await pedidos.findCoverage(orderIds, actor);
     return { status: 'success', data: [...coverage].map(([orderId, value]) => ({ orderId, coverage: value })) };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/**
+ * Cotizacion del coste de ingredientes. Consulta: argumento tipado, no `FormData` -no
+ * hay formulario que enviar, es un efecto del teclado-. No escribe nada: sin
+ * `revalidatePath`.
+ */
+export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuoteResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.quoteOrderCost(input, actor);
+    return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }

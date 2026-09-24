@@ -189,6 +189,7 @@ import {
   createFindCoverage,
   createGetOrder,
   createListOrders,
+  createQuoteOrderCost,
   createTransitionOrder,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
@@ -1061,6 +1062,11 @@ export const pedidos = {
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   findCoverage: createFindCoverage({ reservations: reservationQueries }),
+  quoteOrderCost: createQuoteOrderCost({
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
   // El proceso diario y su puerta: sin usuario delante, asi que ninguno de los dos recibe actor.
   // El handler los llama en ese orden -primero la puerta- y `lib/composition` no impone el
   // orden por su cuenta.

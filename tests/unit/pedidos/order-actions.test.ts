@@ -37,6 +37,7 @@ import {
   getOrderAction,
   listOrderCoverageAction,
   listOrdersAction,
+  quoteOrderCostAction,
   updateOrderAction,
   type CreateOrderFormState,
   type OrderMutationFormState,
@@ -47,6 +48,7 @@ import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
 import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
+import { createQuoteOrderCost } from '@/lib/modules/pedidos/domain/quote-order-cost'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
@@ -63,6 +65,7 @@ const {
   cancelOrderMock,
   deleteOrderMock,
   findCoverageMock,
+  quoteOrderCostMock,
   getSessionUserMock,
   getSessionContextMock,
 } = vi.hoisted(() => ({
@@ -74,6 +77,7 @@ const {
   deleteOrderMock: vi.fn(),
   // La cobertura de la pagina.
   findCoverageMock: vi.fn(),
+  quoteOrderCostMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
   getSessionContextMock: vi.fn(),
@@ -98,6 +102,7 @@ vi.mock('@/lib/composition', () => ({
     cancelOrder: cancelOrderMock,
     deleteOrder: deleteOrderMock,
     findCoverage: findCoverageMock,
+    quoteOrderCost: quoteOrderCostMock,
   },
 }))
 
@@ -204,7 +209,11 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     await listOrdersAction({ page: 1 })
     expect(listOrdersMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
 
-    expect(getSessionUserMock).toHaveBeenCalledTimes(6)
+    quoteOrderCostMock.mockResolvedValue({ ingredientsCost: null })
+    await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000' })
+    expect(quoteOrderCostMock.mock.calls[0]?.[1]).toEqual(ESPERADO)
+
+    expect(getSessionUserMock).toHaveBeenCalledTimes(7)
 
     // Sin sesion, el actor que baja es `null` -no un objeto inventado, no un `throw` de la
     // action-: quien rechaza es el caso de uso (R3, falla cerrado).
@@ -536,18 +545,63 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     findCoverageMock.mockRejectedValueOnce(ajeno)
     sinDetalle(await listOrderCoverageAction([ORDER_ID]), 'listOrderCoverageAction')
 
-    // Y no hay ni un `catch` que se quede callado: los SIETE `catch` del archivo -uno por
-    // Server Action, incluida `listOrderCoverageAction`- devuelven `toErrorState`, que o
-    // traduce el error de dominio o registra el ajeno y devuelve el codigo generico. Ninguno se
-    // lo traga sin dejar rastro.
+    quoteOrderCostMock.mockRejectedValueOnce(ajeno)
+    sinDetalle(
+      await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000' }),
+      'quoteOrderCostAction',
+    )
+
+    // Y no hay ni un `catch` que se quede callado: los OCHO `catch` del archivo -uno por
+    // Server Action, incluidas `listOrderCoverageAction` y `quoteOrderCostAction`- devuelven
+    // `toErrorState`, que o traduce el error de dominio o registra el ajeno y devuelve el
+    // codigo generico. Ninguno se lo traga sin dejar rastro.
     const source = readActionsSource()
     const catches = source.match(/catch\s*\(/g) ?? []
     const traducciones = source.match(/return toErrorState\(error\)/g) ?? []
     expect(catches.length).toBeGreaterThan(0)
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
-    expect(catches.length).toBe(7)
+    expect(catches.length).toBe(8)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
+  })
+})
+
+describe('QC-151 — quoteOrderCostAction', () => {
+  it('exito devuelve { status: success, data: { ingredientsCost } }', async () => {
+    quoteOrderCostMock.mockResolvedValue({ ingredientsCost: '40.0000' })
+    const result = await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000' })
+    expect(result).toEqual({ status: 'success', data: { ingredientsCost: '40.0000' } })
+  })
+
+  it('sin sesion, el actor null baja al caso de uso y el rechazo vuelve como unauthorized (R3)', async () => {
+    getSessionUserMock.mockResolvedValue(null)
+    quoteOrderCostMock.mockRejectedValueOnce(new UnauthorizedError())
+    const result = await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000' })
+    expect(quoteOrderCostMock.mock.calls[0]?.[1]).toBeNull()
+    expect(result).toEqual({ status: 'error', code: 'unauthorized', message: expect.any(String) })
+  })
+
+  it('entrada invalida rechaza con invalid_input (R5)', async () => {
+    quoteOrderCostMock.mockRejectedValueOnce(new ValidationError())
+    const result = await quoteOrderCostAction({ recipeId: 'no-es-uuid', quantity: '-1' })
+    expect(result).toEqual({ status: 'error', code: 'invalid_input', message: expect.any(String) })
+  })
+
+  it('un error ajeno se devuelve como unexpected, sin detalle', async () => {
+    quoteOrderCostMock.mockRejectedValueOnce(new Error('boom'))
+    const result = await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000' })
+    expect(result).toMatchObject({ status: 'error', code: UNEXPECTED_ERROR_CODE })
+  })
+
+  it('la empresa del actor sale de getSessionContext aunque la entrada traiga otra (R7)', async () => {
+    quoteOrderCostMock.mockResolvedValue({ ingredientsCost: null })
+    const OTRA = '44444444-4444-4444-8444-444444444444'
+    await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000', companyId: OTRA })
+    expect(quoteOrderCostMock.mock.calls[0]?.[1]).toEqual({
+      id: ADMIN_SESSION_USER.id,
+      companyId: SESSION_CONTEXT.companyId,
+      permissions: ADMIN_SESSION_USER.permissions,
+    })
   })
 })
 
@@ -558,7 +612,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
 // Lo que se afirma, y con que precision. La action NO repite `requirePermission` (R5, primer caso
 // de este archivo): con la sesion incompleta baja `null` al caso de uso, y es el caso de uso quien
 // rechaza en su primera linea, antes de tocar ningun puerto. Por eso aqui se prueban DOS cosas:
-//   1. que las seis actions bajan `null` -nunca un actor a medias, con `companyId: undefined` o
+//   1. que las siete actions bajan `null` -nunca un actor a medias, con `companyId: undefined` o
 //      con una empresa inventada- cuando falta CUALQUIERA de las dos caras;
 //   2. la CADENA REAL: action -> caso de uso de verdad -> puertos que EXPLOTAN. Sin contexto, el
 //      estado es `unauthorized` y ningun puerto se toco. Eso es R17 entero -«rechazar la operacion
@@ -566,8 +620,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
 // ---------------------------------------------------------------------------------------
 
 describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta', () => {
-  /** Las seis actions con la posicion del argumento `actor` en la llamada al caso de uso. */
-  const SEIS = [
+  /** Las siete actions con la posicion del argumento `actor` en la llamada al caso de uso. */
+  const SIETE = [
     [
       'createOrderAction',
       createOrderMock,
@@ -594,6 +648,12 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
     ],
     ['getOrderAction', getOrderMock, 1, () => getOrderAction(ORDER_ID)],
     ['listOrdersAction', listOrdersMock, 1, () => listOrdersAction({ page: 1 })],
+    [
+      'quoteOrderCostAction',
+      quoteOrderCostMock,
+      1,
+      () => quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000' }),
+    ],
   ] as const
 
   const SESIONES_INCOMPLETAS = [
@@ -603,11 +663,11 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
   ] as const
 
   for (const [sesion, usuario, contexto] of SESIONES_INCOMPLETAS) {
-    it(`${sesion}: las seis actions bajan actor null, nunca uno a medias`, async () => {
+    it(`${sesion}: las siete actions bajan actor null, nunca uno a medias`, async () => {
       getSessionUserMock.mockResolvedValue(usuario)
       getSessionContextMock.mockResolvedValue(contexto)
 
-      for (const [nombre, mock, posicion, invocar] of SEIS) {
+      for (const [nombre, mock, posicion, invocar] of SIETE) {
         mock.mockRejectedValueOnce(new UnauthorizedError())
         const estado = await invocar()
         expect(mock.mock.calls.at(-1)?.[posicion], `${nombre}: el actor tiene que ser null`).toBeNull()
@@ -615,8 +675,8 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       }
       // Las dos caras se pidieron en CADA invocacion: una action que solo mirara el usuario
       // habria construido un actor sin empresa.
-      expect(getSessionContextMock).toHaveBeenCalledTimes(SEIS.length)
-      expect(getSessionUserMock).toHaveBeenCalledTimes(SEIS.length)
+      expect(getSessionContextMock).toHaveBeenCalledTimes(SIETE.length)
+      expect(getSessionUserMock).toHaveBeenCalledTimes(SIETE.length)
     })
   }
 
@@ -640,7 +700,7 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
     expect(JSON.stringify(createOrderMock.mock.calls[0]?.[0])).not.toContain(OTRA)
   })
 
-  it('CADENA REAL sin contexto de sesion: las seis devuelven unauthorized y NINGUN puerto se toca', async () => {
+  it('CADENA REAL sin contexto de sesion: las siete devuelven unauthorized y NINGUN puerto se toca', async () => {
     const explota = (nombre: string) =>
       vi.fn(() => {
         throw new Error(`el puerto ${nombre} no debe llamarse sin contexto de sesion`)
@@ -681,11 +741,12 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
     updateOrderMock.mockImplementation(createUpdateOrder(deps))
     cancelOrderMock.mockImplementation(createCancelOrder(deps))
     deleteOrderMock.mockImplementation(createDeleteOrder(deps))
+    quoteOrderCostMock.mockImplementation(createQuoteOrderCost(deps))
 
     getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
     getSessionContextMock.mockResolvedValue(null)
 
-    for (const [nombre, , , invocar] of SEIS) {
+    for (const [nombre, , , invocar] of SIETE) {
       expect(await invocar(), nombre).toEqual({
         status: 'error',
         code: 'unauthorized',
@@ -721,14 +782,15 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       cancelOrderMock,
       deleteOrderMock,
       findCoverageMock,
+      quoteOrderCostMock,
     ]) {
       mock.mockReset()
     }
   })
 })
 
-describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambian, mas la de QC-141 T14', () => {
-  it('el modulo exporta las siete actions, con su aridad de siempre', () => {
+describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14 y QC-151 T7', () => {
+  it('el modulo exporta exactamente las ocho actions, con su aridad de siempre', () => {
     const exportadas = Object.entries(orderActions)
       .filter(([, valor]) => typeof valor === 'function')
       .map(([nombre, valor]) => [nombre, (valor as (...args: never[]) => unknown).length] as const)
@@ -742,6 +804,7 @@ describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambia
       // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
       ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
+      ['quoteOrderCostAction', 1],
       ['updateOrderAction', 3],
     ])
   })
@@ -755,6 +818,8 @@ describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambia
       deleteOrderAction: 'prevState: OrderMutationFormState, formData: FormData',
       getOrderAction: 'id: string',
       listOrdersAction: 'query: unknown',
+      listOrderCoverageAction: 'orderIds: readonly string[]',
+      quoteOrderCostAction: 'input: unknown',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {
       const desde = source.indexOf(`export async function ${nombre}(`)

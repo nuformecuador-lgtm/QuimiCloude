@@ -82,12 +82,14 @@ export {
   createOrderSchema,
   updateOrderSchema,
   cancelOrderSchema,
+  quoteOrderCostSchema,
   EDITABLE_STATUS_VALUES,
 } from './domain/order-input';
 export type {
   CreateOrderInput,
   UpdateOrderInput,
   CancelOrderInput,
+  QuoteOrderCostInput,
   EditableOrderStatus,
 } from './domain/order-input';
 
@@ -150,3 +152,6 @@ export type {
   ExpireStaleOrdersResult,
 } from './domain/expire-stale-orders';
 export { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './domain/order-expiry';
+
+export { createQuoteOrderCost } from './domain/quote-order-cost';
+export type { QuoteOrderCostDeps, OrderCostQuote } from './domain/quote-order-cost';

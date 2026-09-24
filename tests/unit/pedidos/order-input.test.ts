@@ -19,6 +19,7 @@ import {
   EDITABLE_STATUS_VALUES,
   cancelOrderSchema,
   createOrderSchema,
+  quoteOrderCostSchema,
   updateOrderSchema,
 } from '@/lib/modules/pedidos/domain/order-input'
 import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
@@ -225,6 +226,37 @@ describe('pedidos — cancelOrderSchema (cancelacion)', () => {
     // R26: `cancelOrder` es el unico camino hacia CANCELADO y no recibe estado de nadie.
     const parsed = cancelOrderSchema.parse({ reason: 'motivo', status: 'PENDIENTE' })
     expect(Object.keys(parsed)).toEqual(['reason'])
+  })
+})
+
+// `quoteOrderCostSchema` es un `pick` de `createOrderSchema` y acepta/rechaza
+// exactamente lo mismo que el alta en `recipeId` y `quantity`, sin declarar nada mas.
+describe('pedidos — quoteOrderCostSchema (cotizacion)', () => {
+  it('acepta y rechaza exactamente lo mismo que createOrderSchema en recipeId y quantity', () => {
+    for (const quantity of [undefined, '0', '0.0000', '-1', '-0.0001', '', 'abc', '0.0001', '12.5000']) {
+      const entrada = { recipeId: RECIPE_ID, quantity }
+      expect(
+        quoteOrderCostSchema.safeParse(entrada).success,
+        `quantity=${String(quantity)}`,
+      ).toBe(createOrderSchema.safeParse({ ...altaValida(), quantity }).success)
+    }
+    for (const recipeId of [undefined, '', 'no-es-uuid', RECIPE_ID]) {
+      const entrada = { recipeId, quantity: '12.5000' }
+      expect(
+        quoteOrderCostSchema.safeParse(entrada).success,
+        `recipeId=${String(recipeId)}`,
+      ).toBe(createOrderSchema.safeParse({ ...altaValida(), recipeId }).success)
+    }
+  })
+
+  it('descarta cualquier clave que no sea recipeId o quantity', () => {
+    const parsed = quoteOrderCostSchema.parse({
+      recipeId: RECIPE_ID,
+      quantity: '12.5000',
+      presentationId: PRESENTATION_ID,
+      companyId: '44444444-4444-4444-8444-444444444444',
+    })
+    expect(Object.keys(parsed).sort()).toEqual(['quantity', 'recipeId'])
   })
 })
 

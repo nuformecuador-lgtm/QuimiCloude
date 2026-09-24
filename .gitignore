@@ -56,3 +56,6 @@ next-env.d.ts
 
 # rastros de las bases efimeras de los tests de integracion (QC-77, tests/helpers/test-database.ts)
 /.qc-test-db/
+
+# Borradores de prompts de IA (QC-131/QC-157). R9 de QC-129: ningun archivo versionado contiene el texto de un prompt.
+/borradores-de-prompts/
