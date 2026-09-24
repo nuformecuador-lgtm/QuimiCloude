@@ -441,3 +441,34 @@ M tests/unit/shared/data-table-alcance.test.ts
 - `db:rollback` elige la última migración por nombre de carpeta, no la última aplicada: tras un merge
   que trae migraciones posteriores sin aplicar, apunta a la equivocada (aquí falló limpio, dentro de
   una transacción). Deuda del arnés.
+
+---
+
+# Vuelta de review (2026-09-24) — `progress/review_QC-158-catalogo-desde-pdf.md`, RECHAZADO 1 + 12
+
+| Hallazgo | Cierre | Commit |
+|---|---|---|
+| B1 (R28, mostrar) | `tests/unit/proveedores-ui/catalog-columns.test.tsx`, 5 casos: texto exacto `Ø 7.5 cm · alto 12 cm · boca 28/410`, tres casos con una sola medida y el caso sin dato (`—`). **Muerde**: cambiar el separador de `formatMeasurements` (`' · '` → `' \| '`) lo pone rojo (`Received: Ø 7.5 cm \| alto 12 cm \| boca 28/410`); restaurado, verde. | `72f76de9` |
+| m1 (R38) | El E2E afirma en pantalla, sobre la fila nueva, `data-table-cell-material`, `data-table-cell-measurements` (`Ø 7.5000 cm · alto 12.0000 cm · boca 28/410`: el guion trae `7.5000`/`12.0000` y el formato no quita ceros) y `data-table-cell-presentationId` (nombre de la presentación creada). **La imagen no se puede afirmar en pantalla**: `EntityImage` usa `imagePath` tal cual como `src` y la clave del bucket no es una URL servible, así que la celda queda en `data-missing="true"` aunque la base la tenga. Es la limitación abierta de `EntityImage` (sin adaptador que firme la ruta), que consume QC-140. La imagen se sigue afirmando en la base. | `4b703324` |
+| m2 | Comentario falso de `cropCatalog` quitado; `cropCatalog` deja de exportarse (nadie fuera de la composición lo importa). | `220a95f0` |
+| m3 | Cabeceras que narraban pasos reducidas a los porqués (≤ 7 líneas) en los seis archivos señalados; solo comentarios. | `220a95f0` |
+| m4, m5 | Notas fechadas en `design.md > 16`. | `822ecaa8` |
+| m6 | La línea viva del E2E se siembra con `material: 'vidrio'` y se afirma intacta en base y en pantalla tras confirmar. El guion no cambia: si el `DO UPDATE` copiara `material`, quedaría `null` y la afirmación caería. | `4b703324` |
+| m7 | El caso R4 de `catalog-import-page.test.tsx` se renombra a lo que afirma, y se añade `previewCatalogImportAction` llamado una vez (se pide en paralelo y se descarta). | `1730fd79` |
+| m8 | `data-testid` único `new-presentation-unit-option-<key>-<unitId>`; el E2E elige la unidad sembrada por su id y afirma en la base que la presentación creada tiene esa unidad. | `1730fd79`, `4b703324` |
+| m9 | Test de otra ficha (`guard-convenciones-showcase.test.ts`): ya declarado en T17; **nombrarlo en la descripción del PR**. | — |
+| m10 | `RowField` en solo lectura: `<span id>` + `<p aria-labelledby>`; test `toHaveAccessibleName('Material')`. | `1730fd79` |
+| m11 | `reclassify` descarta respuestas obsoletas (contador en `useRef`); test con dos reclasificaciones resueltas en orden inverso. **Muerde**: sin la guarda, `Expected: Nueva / Received: Incompleta`. | `1730fd79` |
+| m12 (R37) | Pasada manual en un móvil real: **no hecha**, queda para el humano. `design.md > 15` solo exige WebKit, y está cubierto. | — |
+
+## Verificación de esta vuelta
+- `pnpm run typecheck` limpio; `eslint` sin salida sobre todo lo tocado.
+- `pnpm exec vitest run tests/unit/proveedores-ui/ tests/unit/inventario/scope.test.ts tests/unit/proveedores/scope.test.ts` → 25 archivos, 258 passed, 6 skipped.
+- `pnpm exec vitest run tests/unit/documentos/ tests/unit/proveedores/ tests/guards/ tests/unit/composition/` → 128 archivos, 1497 passed, 31 skipped.
+- `pnpm exec vitest run tests/unit/shared/data-table-alcance.test.ts tests/guards/guard-identificador-de-request.test.ts` → 37 passed, 2 skipped.
+- E2E `catalogo-desde-pdf.spec.ts`, una a la vez con el puerto 3117 libre y contra `QuimiCloude_QC158`: Chromium **1 passed**, WebKit **1 passed**.
+
+## Queda abierto (humano)
+- **La imagen de la línea no se ve en la pantalla del catálogo** (R38 dice «en la base y en la pantalla»): hace falta firmar `imagePath` al pintar, que es trabajo de QC-140 o de una ficha propia. ¿Se acepta que R38 la compruebe solo en la base hasta entonces?
+- `formatMeasurements` pinta los valores tal cual llegan (`7.5000`); `design.md > 6.4` pone de ejemplo `7.5`. Quitar los ceros de relleno es barato si el humano lo quiere.
+- m12: pasada manual en un iPhone o Android real.

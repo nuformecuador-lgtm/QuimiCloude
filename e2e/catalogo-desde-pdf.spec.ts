@@ -88,7 +88,7 @@ const oldChangesCost = '500.0000';
 /**
  * Material sembrado en la linea viva de la fila «cambia», distinto de null. El guion trae
  * `material: null` para esa fila: si la actualizacion de costo llegara a pisarlo, esta constante
- * quedaria en `null` en vez de este valor y la afirmacion de R15 lo detectaria.
+ * quedaria en `null` en vez de este valor y la afirmacion lo detectaria.
  */
 const existingMaterial = 'vidrio';
 
