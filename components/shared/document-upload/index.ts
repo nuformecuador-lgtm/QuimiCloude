@@ -24,6 +24,7 @@ export {
   rowNameTestId,
   rowPhaseTestId,
   rowReasonTestId,
+  rowReviewLinkTestId,
   rowStatusTestId,
   rowTestId,
   type DocumentUploadRowProps,
@@ -32,6 +33,7 @@ export {
 export {
   BROWSER_PHASE_LABELS,
   FILE_STATUS_LABELS,
+  REVIEW_LABEL,
   fileErrorMessage,
   tooManyFilesMessage,
   type BrowserPhase,
