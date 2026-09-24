@@ -107,3 +107,17 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   un campo oculto). `product-type-tabs.tsx` no necesitó más que la etiqueta del backend.
 - Tests: `tests/unit/inventario/product-page.test.tsx` → 76/76, incluido el de viewport de
   inventario; contratos de módulo `recetas` y `unidades` (fijan `ProductRef`) 13/13.
+
+## T14 — Copia del contenido en el pedido (backend_dev) · T14 cerrada
+
+- Modificados: `lib/modules/pedidos/domain/{order-view,create-order,update-order}.ts`,
+  `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (lectura en `ORDER_SELECT`/`toOrderRow`;
+  escritura en `insertAliveOrder` y `updateAliveOrder`). El puerto no cambió de firma: la copia viaja
+  en `NewOrder`/`OrderEdit`.
+- Tests: `tests/unit/pedidos/{create-order,update-order}.test.ts`,
+  `tests/integration/pedidos/order-content-copy.int.test.ts` (nuevo, `commit` en `aislamiento.json`);
+  fixtures de `OrderRow` ampliados en `tests/helpers/order-unit-of-work-double.ts` y en 9 unit + 15
+  integración de pedidos, sin cambiar lo que afirman.
+- Tests: `tests/unit/pedidos` 69 archivos → 1060 pasados, 3 skipped (incluye
+  `guard-ambito-empresa-pedidos`); `tests/integration/pedidos` 19 archivos → 194 pasados;
+  `guard-aislamiento-integracion` 6/6.

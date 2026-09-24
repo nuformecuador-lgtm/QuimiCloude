@@ -145,7 +145,7 @@ Archivos: `lib/modules/inventario/domain/{product-queryable,product-input,produc
 `guard-catalogo-de-errores` sigue verde, y los contratos de módulo que fijan `ProductRef` quedan
 actualizados como ampliación nombrada.
 
-## T14 — Copia del contenido en el pedido `[depende de T2, T4]` `[P con T5-T7]` (nueva, 2026-09-23)
+## [x] T14 — Copia del contenido en el pedido `[depende de T2, T4]` `[P con T5-T7]` (nueva, 2026-09-23)
 
 Archivos: `lib/modules/pedidos/domain/{order-view,create-order,update-order}.ts`,
 `lib/modules/pedidos/ports/order-write-repository.ts` y su adaptador Prisma (el de QC-141),
