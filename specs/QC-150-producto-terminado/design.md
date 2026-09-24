@@ -508,3 +508,25 @@ Cada `R<n>` va en el nombre de su caso; el mapa `R → test` lo escribe el imple
 - **Coste que se acepta**: dos migraciones a mano sobre tablas con drift, dos columnas de copia, una
   FK más hacia otro módulo, un quinto camino en la guardia del libro y un tercer participante en la
   transacción de QC-141.
+
+---
+
+## 10. Contraste con `dev` tras el merge de QC-141 y QC-145 (T0, 2026-09-24)
+
+Leído en la rama tras `git merge origin/dev` (`86e9873a`). Ninguna divergencia cambia un requisito
+salvo la última, que T7 manda subir. Donde este anexo contradice una sección anterior, manda el anexo.
+
+| # | Lo que decía el diseño | Lo que hay en `dev` | Corrección |
+|---|---|---|---|
+| C1 | §2.6: el `CHECK` de `order_id` sin nombre | `inventory_movements_order_id_matches_kind` y `inventory_movements_reason_matches_kind` (`20260923150100_*`); además `inventory_movements_reason_in_catalog` y `_quantity_not_zero`; `order_id` es FK compuesta `(order_id, company_id)`; índice `inventory_movements_order_id_idx` no único | T2 reescribe esos dos nombres; los otros dos no cambian |
+| C2 | §2.5, §4.1: `unit_cost` sigue `NOT NULL`; un lote a coste `0.0000` es posible | `unit_cost` es **anulable** desde `20260923140000_product_batch_nullable_machine`, y sigue en vigor `product_batches_unit_cost_positive CHECK (unit_cost > 0)`: un lote a coste cero (R42) lo violaría | T2 sustituye ese `CHECK` por `unit_cost > 0 OR (unit_cost = 0 AND package_content IS NOT NULL)` (solo el lote de producción puede costar cero) y añade `CHECK (package_content IS NULL OR unit_cost IS NOT NULL)` (R43). El `down.sql` repone el original tras la guarda |
+| C3 | §4.1: `deriveUnitCost('0.0000', q) = '0.0000'` | `deriveUnitCost` devuelve `null` si el resultado redondea a cero o la entrada no es un decimal plano | `planFinishedGoods` devuelve `'0.0000'` cuando el coste del lote es cero o `deriveUnitCost` redondea a cero; valida la entrada antes |
+| C4 | §4.3, §9: `finishedGoods` es el tercer participante del ámbito | `OrderTransactionScope` ya tiene `orders`, `reservations` y `recipes`; `TransitionOrderDeps` solo `unitOfWork`; el ámbito se monta en `lib/composition/index.ts` | `finishedGoods` es el cuarto; `TransitionOrderDeps` gana `recipes`, `products` y `units` |
+| C5 | §4.3 paso 2: `resolveLotIngredientsCost` con receta y cantidad | `resolveIngredientsCost` ya admite `{ orderId }` para contar como disponible lo apartado por el propio pedido; con la regla de promedio de QC-141, un insumo sin disponible suficiente da `null` en su línea | La hermana recibe también `orderId` (el pedido a finalizar tiene su material apartado); la línea que da `null` cuenta cero |
+| C6 | §4.3 (R27): la rama `ENTREGADO` de `update-order.ts` recibe un ámbito sin `finishedGoods` | QC-145 ya retiró la edición a `ENTREGADO`: `OrderEdit = Omit<NewOrder, 'status'>` y el Finalizar es el único camino | Se aplica la cláusula de T9: R27 lo fija un test de que la edición no puede llevar a `ENTREGADO` ni llama a la producción. El `Omit` del ámbito no hace falta |
+| C7 | §4.4 paso 5: `resolveBatchLot` | No existe con ese nombre: es `resolveLot(tx, batch, scope)` (privada, `pg_advisory_xact_lock` + `max(lot)+1`), envuelta por `writeBatchWithLotRetry` sobre su propia transacción | `receiveFinishedGoods` llama a `resolveLot` sobre la transacción del Finalizar; el bloqueo consultivo evita la colisión, así que no se toca el reintento de `withOrderTransaction` |
+| C8 | §4.4 / §4.3: reintento ante `P2002` del número de lote | `withOrderTransaction` reintenta ante **cualquier** `23505` de SQL crudo (`isDuplicateOrderNumber`) y al tercero lanza `DuplicateOrderNumberError` | El lote se inserta con la API tipada (`tx.productBatch.create`, que además es lo que cuenta el censo de la guardia del libro) y el producto con `ON CONFLICT DO NOTHING`, así que ninguno cae en ese reintento |
+| C9 | §4.6 R4, R28, R29, R31: `ActionNotAllowedError` | Solo existe en `identity/domain/errors.ts` | `inventario` y `recetas` declaran la suya con el código `action_not_allowed` |
+| C10 | §4.6 y T6: `PRODUCT_TYPE_VALUES` en `product-queryable.ts` | Se define en `inventario/domain/product-type.ts` y `product-queryable.ts` la reexporta | T6 toca `product-type.ts` |
+| C11 | Números de línea (`create-order.ts:110`, `update-order.ts:92`, `order-cost.ts:122-189`, `product-prisma.ts:736-745`…) | Se movieron; `calculateLineCost` es privada y devuelve `bigint` a escala 12 | Solo orientativo |
+| C12 | §9: el nombre compuesto «receta · presentación» puede pasar de 120 | **Medido**: `recipeNameSchema` 120 + « · » 3 + `presentationNameSchema` 60 = **183 > 120** (`productNameSchema`); la columna `products.name` es `text` sin límite | **Sube al leader** (T7): T7 no empieza hasta que el humano decida |
