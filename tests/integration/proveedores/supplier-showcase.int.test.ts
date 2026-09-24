@@ -9,8 +9,9 @@
  *
  * AISLAMIENTO: `listShowcaseAliveSuppliers` llama al cliente Prisma GLOBAL, no a un `tx`
  * inyectado, asi que una transaccion que se deshace NO lo envuelve. Se crean dos empresas
- * efimeras (con sus proveedores, lineas, presentacion y unidad) y se borran por su id exacto en
- * el `afterAll`, en el orden que exigen las claves foraneas.
+ * efimeras (con sus proveedores, lineas y presentacion propias, reutilizando la unidad de
+ * sistema ya existente) y se borran por su id exacto en el `afterAll`, en el orden que exigen
+ * las claves foraneas.
  *
  * NINGUNA AFIRMACION GLOBAL: cada empresa es efimera (`randomUUID`), asi que una base con mas
  * proveedores cargados de otras corridas no puede volver rojo este archivo.
@@ -123,17 +124,19 @@ beforeAll(async () => {
   presentationA = await crearPresentacion(companyA);
   actorA = { id: 'actor-showcase', companyId: companyA, permissions: ['proveedores.consultar'] };
 
-  // Ocho proveedores VIVOS de la empresa A, en orden alfabetico estable (nombres con el numero
-  // cero-rellenado: la comparacion de texto coincide con el orden numerico).
-  suppliers['01'] = await crearProveedor(companyA, 'Proveedor 01');
-  suppliers['02'] = await crearProveedor(companyA, 'Proveedor 02');
-  suppliers['03'] = await crearProveedor(companyA, 'Proveedor 03');
-  suppliers['04'] = await crearProveedor(companyA, 'Proveedor 04');
-  // '05' se siembra MAS ABAJO, dado de baja: no cuenta entre los ocho vivos.
+  // Ocho proveedores VIVOS de la empresa A (nombres con el numero cero-rellenado: la
+  // comparacion de texto coincide con el orden numerico). Se insertan en un orden DISTINTO
+  // del alfabetico a proposito, para que el test de orden (R31) distinga el orden por nombre
+  // del orden de insercion.
   suppliers['06'] = await crearProveedor(companyA, 'Proveedor 06');
-  suppliers['07'] = await crearProveedor(companyA, 'Proveedor 07');
-  suppliers['08'] = await crearProveedor(companyA, 'Proveedor 08');
+  suppliers['02'] = await crearProveedor(companyA, 'Proveedor 02');
   suppliers['09'] = await crearProveedor(companyA, 'Proveedor 09 Especial');
+  suppliers['01'] = await crearProveedor(companyA, 'Proveedor 01');
+  suppliers['04'] = await crearProveedor(companyA, 'Proveedor 04');
+  suppliers['08'] = await crearProveedor(companyA, 'Proveedor 08');
+  suppliers['03'] = await crearProveedor(companyA, 'Proveedor 03');
+  suppliers['07'] = await crearProveedor(companyA, 'Proveedor 07');
+  // '05' se siembra MAS ABAJO, dado de baja: no cuenta entre los ocho vivos.
 
   // Proveedor 01: dos lineas vivas, una con imagen y otra sin ella (imagePath null).
   await crearLinea(suppliers['01']!, companyA, presentationA, 'Linea 01', {
@@ -165,8 +168,9 @@ beforeAll(async () => {
   // Proveedor 06: una linea que tampoco coincide con el filtro de producto de este archivo.
   await crearLinea(suppliers['06']!, companyA, presentationA, 'Guantes de nitrilo');
 
-  // Proveedor 07: MAS DE 11 lineas (23), para encadenar tanda + dos "cargar mas".
-  for (let i = 1; i <= 23; i += 1) {
+  // Proveedor 07: MAS DE 11 lineas (23), para encadenar tanda + dos "cargar mas". Insertadas en
+  // orden DESCENDENTE -distinto del alfabetico- para que el orden que sale sea el del nombre.
+  for (let i = 23; i >= 1; i -= 1) {
     await crearLinea(
       suppliers['07']!,
       companyA,
@@ -178,6 +182,25 @@ beforeAll(async () => {
   // Proveedor 08: otra linea que coincide con el filtro de producto, en MAYUSCULAS.
   await crearLinea(suppliers['08']!, companyA, presentationA, 'ACIDO SULFURICO');
   await crearLinea(suppliers['08']!, companyA, presentationA, 'Sosa en escamas');
+
+  // Proveedor 10: 25 lineas que coinciden con el filtro de producto "solvente" -mas de dos
+  // tandas de SHOWCASE_LINE_BATCH-, mezcladas con lineas que NO coinciden, para encadenar
+  // "cargar mas" con productSearch activo (R21). Insercion en orden DESCENDENTE y con las que
+  // no coinciden intercaladas, distinto del alfabetico que debe salir.
+  suppliers['10'] = await crearProveedor(companyA, 'Proveedor 10');
+  await crearLinea(suppliers['10']!, companyA, presentationA, 'Otro producto A');
+  for (let i = 25; i >= 1; i -= 1) {
+    await crearLinea(
+      suppliers['10']!,
+      companyA,
+      presentationA,
+      `Solvente ${String(i).padStart(2, '0')}`,
+    );
+    if (i === 13) {
+      await crearLinea(suppliers['10']!, companyA, presentationA, 'Otro producto B');
+    }
+  }
+  await crearLinea(suppliers['10']!, companyA, presentationA, 'Otro producto C');
 
   // Empresa B: un proveedor ajeno, sin lineas, solo para el caso de aislamiento.
   suppliers['ajeno'] = await crearProveedor(companyB, 'Proveedor ajeno');
@@ -213,12 +236,13 @@ describe('proveedores ordenados alfabeticamente, sin huecos ni repetidos al enca
       suppliers['07'],
       suppliers['08'],
       suppliers['09'],
+      suppliers['10'],
     ]);
     expect(pagina2.hasMore).toBe(false);
 
     const idsCombinados = [...pagina1.items, ...pagina2.items].map((row) => row.id);
     expect(new Set(idsCombinados).size).toBe(idsCombinados.length);
-    expect(idsCombinados).toHaveLength(8);
+    expect(idsCombinados).toHaveLength(9);
   });
 });
 
@@ -336,6 +360,56 @@ describe('«cargar mas» encadenado: mismo orden y filtro que la primera tanda, 
     expect(new Set(todas).size).toBe(23);
     expect(todas).toEqual(
       Array.from({ length: 23 }, (_unused, i) => `Linea 07-${String(i + 1).padStart(2, '0')}`),
+    );
+  });
+});
+
+describe('«cargar mas» encadenado con productSearch activo: solo las lineas que coinciden, sin huecos ni repetidos, en orden alfabetico (R21, R17)', () => {
+  it('las 25 lineas de Proveedor 10 que coinciden con "solvente" se recorren enteras en tres tandas, sin las que no coinciden', async () => {
+    const pagina = await proveedores.listSupplierShowcase(
+      { page: 1, productSearch: 'solvente' },
+      actorA,
+    );
+    const filaInicial = pagina.items.find((row: ShowcaseRow) => row.id === suppliers['10']);
+    expect(filaInicial?.lines).toHaveLength(10);
+    expect(filaInicial?.hasMoreLines).toBe(true);
+    expect(filaInicial?.lines.map((line) => line.name)).toEqual(
+      Array.from({ length: 10 }, (_unused, i) => `Solvente ${String(i + 1).padStart(2, '0')}`),
+    );
+
+    const cargarMas2 = await proveedores.listShowcaseLines(
+      suppliers['10']!,
+      { page: 2, productSearch: 'solvente' },
+      actorA,
+    );
+    expect(cargarMas2.items).toHaveLength(10);
+    expect(cargarMas2.hasMore).toBe(true);
+    expect(cargarMas2.items.map((line) => line.name)).toEqual(
+      Array.from({ length: 10 }, (_unused, i) => `Solvente ${String(i + 11).padStart(2, '0')}`),
+    );
+
+    const cargarMas3 = await proveedores.listShowcaseLines(
+      suppliers['10']!,
+      { page: 3, productSearch: 'solvente' },
+      actorA,
+    );
+    expect(cargarMas3.items).toHaveLength(5);
+    expect(cargarMas3.hasMore).toBe(false);
+    expect(cargarMas3.items.map((line) => line.name)).toEqual([
+      'Solvente 21',
+      'Solvente 22',
+      'Solvente 23',
+      'Solvente 24',
+      'Solvente 25',
+    ]);
+
+    const todas = [...filaInicial!.lines, ...cargarMas2.items, ...cargarMas3.items].map(
+      (line) => line.name,
+    );
+    expect(new Set(todas).size).toBe(25);
+    expect(todas.every((name) => name.startsWith('Solvente'))).toBe(true);
+    expect(todas).toEqual(
+      Array.from({ length: 25 }, (_unused, i) => `Solvente ${String(i + 1).padStart(2, '0')}`),
     );
   });
 });

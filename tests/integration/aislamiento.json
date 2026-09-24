@@ -257,7 +257,7 @@
     },
     {
       "archivo": "proveedores/supplier-showcase.int.test.ts",
-      "motivo": "El adaptador 'listShowcaseAliveSuppliers' llama al cliente Prisma GLOBAL, no a un 'tx' inyectado, asi que una transaccion del test no lo envolveria -correria en otra conexion del pool y veria una base vacia-. Encadena tanda inicial, siguiente tanda de proveedores y 'cargar mas' de una fila para demostrar el prefijo exacto sobre el conjunto completo, que solo Postgres puede confirmar. Siembra dos empresas efimeras (randomUUID) con sus proveedores, lineas, presentacion y unidad, y COMMITEA; el afterAll borra lineas, proveedores, presentacion y las dos empresas por su id exacto, en el orden que exigen las claves foraneas. Se apoya en que la base de la corrida es suya.",
+      "motivo": "El adaptador 'listShowcaseAliveSuppliers' llama al cliente Prisma GLOBAL, no a un 'tx' inyectado, asi que una transaccion del test no lo envolveria -correria en otra conexion del pool y veria una base vacia-. Encadena tanda inicial, siguiente tanda de proveedores y 'cargar mas' de una fila para demostrar el prefijo exacto sobre el conjunto completo, que solo Postgres puede confirmar. Siembra dos empresas efimeras (randomUUID) con sus proveedores, lineas y presentacion, reutilizando la unidad de sistema ya existente, y COMMITEA; el afterAll borra lineas, proveedores, presentacion y las dos empresas por su id exacto, en el orden que exigen las claves foraneas. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"
     },
     {
