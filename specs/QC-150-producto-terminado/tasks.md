@@ -48,7 +48,7 @@ Archivos: los que traiga el merge; `specs/QC-150-producto-terminado/design.md` s
 `QuimiCloude_QC150`; cada divergencia con `design.md` anotada y corregida en el diseño (o subida al
 leader si cambia un requisito).
 
-## T1 — Migración: valores de enum `[depende de T0]`
+## [x] T1 — Migración: valores de enum `[depende de T0]`
 
 Archivos: `db/migrations/<ts>_finished_product_enum_values/{migration.sql,down.sql}`,
 `db/schema.prisma` (enums), `tests/unit/inventario/schema/finished-product-enum-values-migration.test.ts`.
@@ -58,7 +58,7 @@ Archivos: `db/migrations/<ts>_finished_product_enum_values/{migration.sql,down.s
 **Hecho cuando:** `db:migrate` y `db:rollback` funcionan sobre `QuimiCloude_QC150`; el test comprueba
 el orden de los dos enums (R1) y la guarda del `down.sql` (R36).
 
-## T2 — Migración: contenido, copias, identidad y libro `[depende de T1]`
+## [x] T2 — Migración: contenido, copias, identidad y libro `[depende de T1]`
 
 Archivos: `db/migrations/<ts+1>_finished_products_and_content_copies/{migration.sql,down.sql}`,
 `db/schema.prisma` (`Presentation.content`, `Product.recipeId`/`presentationId`,

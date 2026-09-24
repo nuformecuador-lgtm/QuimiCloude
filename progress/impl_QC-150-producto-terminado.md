@@ -40,3 +40,23 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Tests: 6 archivos / 75 tests verdes (`finished-goods`, `order-cost`, `resolve-ingredients-cost`,
   `inventario/module-contract`, `decimal-quantity`, `unit-cost`). `vitest related` de los 4 archivos
   de `lib`: 231 archivos, 3569 pasados, 6 skipped, 0 fallos. Typecheck limpio; lint 0 errores.
+
+## T1 y T2 — Migraciones (`cab48edd`, `7f71478e`, backend_dev)
+
+- Nuevos: `db/migrations/20260924120000_finished_product_enum_values/{migration,down}.sql`,
+  `db/migrations/20260924120100_finished_products_and_content_copies/{migration,down}.sql`,
+  `tests/unit/inventario/schema/finished-product-enum-values-migration.test.ts`,
+  `tests/unit/{inventario,pedidos}/schema/finished-products-and-content-copies-migration.test.ts`.
+- Modificados: `db/schema.prisma`. Ampliaciones nombradas de tests que fijaban el esquema anterior:
+  `tests/unit/inventario/schema/inventario-schema.test.ts`,
+  `tests/unit/inventario/schema/inventory-movement-kind-consumption-migration.test.ts` (enum por
+  prefijo), `tests/unit/pedidos/schema/pedidos-schema.test.ts`,
+  `tests/guards/guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS`).
+- C2 aplicado: `product_batches_unit_cost_positive` pasa a `unit_cost > 0 OR (unit_cost = 0 AND
+  package_content IS NOT NULL)` y nace `product_batches_package_content_requires_unit_cost`.
+- Sobre `QuimiCloude_QC150`: `db:migrate` aplica las dos; `db:rollback` revierte T2 y luego T1;
+  `db:migrate` las reaplica limpias. Guarda del `down.sql` de T1 y T2 probada contra Postgres real
+  en transacción con `ROLLBACK`: falla con `23514`. Los 12 `CHECK`/índices nuevos probados igual.
+  Plantilla regenerada (50 migraciones).
+- Tests: `vitest run tests/unit/inventario tests/unit/pedidos tests/guards` → 175 archivos, 2540
+  pasados, 13 skipped, 0 rojos. Typecheck limpio; lint 0 errores.
