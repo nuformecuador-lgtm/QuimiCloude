@@ -121,3 +121,22 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Tests: `tests/unit/pedidos` 69 archivos → 1060 pasados, 3 skipped (incluye
   `guard-ambito-empresa-pedidos`); `tests/integration/pedidos` 19 archivos → 194 pasados;
   `guard-aislamiento-integracion` 6/6.
+
+## T10 — Prohibiciones, backend (`c0fa3445`, `a3fcb844`, backend_dev)
+
+- Modificados: `lib/modules/inventario/ports/product-repository.ts`,
+  `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
+  (`findAliveIdByNameInPresentationUnit` devuelve `{ id, type }`; `addBatchToAlive` devuelve
+  `'finished_product'` leyendo el tipo bajo su `FOR NO KEY UPDATE`; `adjustBatchStock` devuelve
+  `'increase_not_allowed'` antes del `UPDATE`), `lib/modules/inventario/domain/{create-product,adjust-batch-stock}.ts`,
+  `lib/modules/recetas/domain/{errors,create-recipe,update-recipe}.ts`, `lib/modules/recetas/index.ts`
+  (`ActionNotAllowedError` propia). `batch-actions.ts` sin cambios: ya traduce por código.
+- Tests: `tests/unit/inventario/{create-product,adjust-batch-stock,adjust-batch-stock-prisma}.test.ts`,
+  `tests/unit/recetas/recipe-service.test.ts`,
+  `tests/integration/inventario/finished-product-prohibitions.int.test.ts` (nuevo, `commit`),
+  `tests/helpers/product-batch-result.ts` (nuevo); ajustes mecánicos de tipo en 6 integraciones de
+  inventario y en `tests/integration/pedidos/order-ingredients-cost.int.test.ts`.
+- R30: el selector de recetas ya pide un solo tipo (`PRODUCT` o `MACHINE`), así que nunca ofrece
+  productos terminados. Falta su test de UI (encargado a frontend_dev).
+- Tests: 10 unit → 240; 8 integración → 107; `order-ingredients-cost` 13/13; `vitest run guard`
+  49 archivos → 619 pasados, 9 skipped. Typecheck limpio; lint 0 errores.
