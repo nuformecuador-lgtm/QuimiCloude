@@ -17,7 +17,7 @@ BEGIN
   END IF;
 END $$;
 
--- 5. inventory_movements: vuelve al estado de QC-141.
+-- 5. inventory_movements: vuelve al estado anterior a esta migracion.
 DROP INDEX "inventory_movements_one_production_per_order";
 ALTER TABLE "inventory_movements" DROP CONSTRAINT "inventory_movements_production_quantity_positive";
 
@@ -32,7 +32,7 @@ ALTER TABLE "inventory_movements" DROP CONSTRAINT "inventory_movements_order_id_
 ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_order_id_matches_kind"
   CHECK (("kind" = 'consumption') = ("order_id" IS NOT NULL));
 
--- 4. product_batches.package_content y el CHECK de costo, de vuelta al de QC-121.
+-- 4. product_batches.package_content y el CHECK de costo, de vuelta al estado anterior.
 ALTER TABLE "product_batches" DROP CONSTRAINT "product_batches_package_content_requires_unit_cost";
 
 ALTER TABLE "product_batches" DROP CONSTRAINT "product_batches_unit_cost_positive";

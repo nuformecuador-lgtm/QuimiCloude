@@ -204,7 +204,7 @@ export function assignedOrderRoute(id: string): string {
 export const DELIVERED_ORDER_PARAM = 'entregado';
 
 /**
- * QC-150 (R24): junto a `DELIVERED_ORDER_PARAM`, cuantos envases enteros de producto terminado
+ * Junto a `DELIVERED_ORDER_PARAM`, cuantos envases enteros de producto terminado
  * entraron y el nombre del producto que los recibio: `?entregado=<numero>&entregado_envases=
  * <n>&entregado_producto=<nombre>`.
  */

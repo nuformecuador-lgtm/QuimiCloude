@@ -27,7 +27,7 @@ DROP TYPE "ProductType_old";
 ALTER TABLE "products" ALTER COLUMN "type" SET DEFAULT 'PRODUCT';
 
 -- InventoryMovementKind: los dos CHECK que comparan "kind" se sueltan y se reponen alrededor
--- del cambio de tipo, igual que QC-141.
+-- del cambio de tipo porque dependen de la columna que se recrea.
 ALTER TABLE "inventory_movements" DROP CONSTRAINT "inventory_movements_reason_matches_kind";
 ALTER TABLE "inventory_movements" DROP CONSTRAINT "inventory_movements_order_id_matches_kind";
 
