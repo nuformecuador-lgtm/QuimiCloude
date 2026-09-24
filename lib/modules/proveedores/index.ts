@@ -74,3 +74,17 @@ export { createCreateCatalogLine, type CreateCatalogLineDeps } from './domain/cr
 export { createUpdateCatalogLine, type UpdateCatalogLineDeps } from './domain/update-catalog-line';
 export { createDeleteCatalogLine, type DeleteCatalogLineDeps } from './domain/delete-catalog-line';
 export { createListCatalogLines, type ListCatalogLinesDeps } from './domain/list-catalog-lines';
+// La importacion por identidad, que `documentos` orquesta desde su caso de uso de
+// confirmacion. Las dos factories nuevas y sus tipos, nada mas: el puerto que las cablea
+// (`SupplierCatalogImportRepository`) no sale de aqui, igual que ningun otro puerto del
+// modulo -quien lo necesita es `lib/composition`, que importa la implementacion.
+export {
+  createFindCatalogLinesByIdentity,
+  type FindCatalogLinesByIdentityDeps,
+  type AliveCatalogLineByIdentity,
+} from './domain/find-catalog-lines-by-identity';
+export {
+  createImportCatalogLines,
+  type ImportCatalogLinesDeps,
+  type ImportCatalogLinesSummary,
+} from './domain/import-catalog-lines';
