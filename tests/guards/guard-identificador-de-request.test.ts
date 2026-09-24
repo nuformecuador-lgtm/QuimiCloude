@@ -118,14 +118,14 @@ export const E2E_ESPERADOS = [
   // estado. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21
   // sigue INTACTO.
-  // Alta el 2026-09-23 (QC-158) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // Alta el 2026-09-23 por el MISMO motivo y en el MISMO sitio que las demas: la lista
   // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
   // -el archivo se nombra, uno a uno-. Lo que ejercita: sube un PDF de catalogo desde el detalle
   // de un proveedor, abre su revision, corrige una fila, quita una imagen, asigna la unidad de una
   // presentacion nueva y confirma; comprueba en la base el costo actualizado y la linea nueva con
   // material, medidas e imagen, y en pantalla el catalogo del proveedor. NO ejercita el cruce
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
-  // identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
   'catalogo-desde-pdf.spec.ts',
   // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
   // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.

@@ -213,7 +213,7 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
   deliveryTime: '7',
 };
 
-/** Los campos de negocio de la linea, tal como los nombra el contrato (R28, R31). */
+/** Los campos de negocio de la linea, tal como los nombra el contrato. */
 const CAMPOS_DE_NEGOCIO = [
   'name',
   PRESENTATION_FIELD,
@@ -988,7 +988,7 @@ describe('linea de catalogo — exito y plataforma (R33, R34, R48)', () => {
 
 describe('linea de catalogo — los campos declarados (R28, R29)', () => {
   it('el formulario cubre todos los campos de negocio, con la imagen oculta y conservada', async () => {
-    // R28 — material y medidas se ven y se escriben. R29 — la imagen no se pide ni se ofrece
+    // Material y medidas se ven y se escriben. La imagen no se pide ni se ofrece
     // cambiar, pero SI viaja: oculta, con el valor de la linea.
     const user = setupUser();
 

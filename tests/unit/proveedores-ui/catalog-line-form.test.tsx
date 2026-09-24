@@ -18,8 +18,7 @@ import { NARROW_VIEWPORT, WIDE_VIEWPORT, resetViewport, setViewportWidth } from 
 import { PERMISSIONS } from '@/lib/modules/identity';
 
 /**
- * Material y medidas en el formulario de linea de catalogo, y la imagen conservada al editar
- * (R28, R29, R37; `specs/QC-158-catalogo-desde-pdf/tasks.md > T11`).
+ * Material y medidas en el formulario de linea de catalogo, y la imagen conservada al editar.
  *
  * Mismo patron que `catalog-line-sheet.test.tsx`: se monta la pagina de detalle REAL, con las
  * Server Actions mockeadas -son el borde de modulos que esta ficha no abre-.

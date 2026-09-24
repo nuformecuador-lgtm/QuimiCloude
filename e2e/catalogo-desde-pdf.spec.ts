@@ -1,5 +1,5 @@
 /**
- * E2E de la importacion de catalogo desde PDF (QC-158, T15): el recorrido completo de R38 -sube
+ * E2E de la importacion de catalogo desde PDF: el recorrido completo -sube
  * un PDF de catalogo desde el detalle de un proveedor, abre su revision, ve una fila «nueva» y
  * una «cambia» con costo actual y nuevo, corrige un campo, quita una imagen, asigna la unidad de
  * una presentacion nueva, confirma, y comprueba en la base y en la pantalla del catalogo el costo
@@ -82,10 +82,10 @@ const fileName = `${FIXTURE_PREFIX}catalogo_${RUN_ID}.pdf`;
 /** Bytes que sube el navegador. El `PUT` esta interceptado: da igual que contienen. */
 const pdfBytes = Buffer.from('%PDF-1.4\n%%EOF\n', 'ascii');
 
-/** Costo VIEJO de la linea viva, sembrado distinto del nuevo que trae el documento (R9, R15). */
+/** Costo VIEJO de la linea viva, sembrado distinto del nuevo que trae el documento. */
 const oldChangesCost = '500.0000';
 
-/** El material corregido en la revision de la fila «nueva» (R11). */
+/** El material corregido en la revision de la fila «nueva». */
 const correctedMaterial = `${FIXTURE_PREFIX}material_${RUN_ID.slice(0, 8)}`;
 
 let companyId: string | null = null;
@@ -169,7 +169,7 @@ test.beforeAll(async () => {
 
   // Una unidad de SISTEMA (`companyId: null`), sembrada por la migracion `units_catalog` y
   // visible para toda empresa: ninguna casa con `CANNED_CATALOG_NEW_UNIT_READ`
-  // (`guion-e2e-unidad-sin-sembrar`), asi que la presentacion nueva queda sin preseleccion (R19)
+  // (`guion-e2e-unidad-sin-sembrar`), asi que la presentacion nueva queda sin preseleccion
   // y el revisor tiene que elegir a mano entre estas.
   const unit = await prisma.unit.findFirst({ where: { companyId: null }, select: { id: true } });
   if (!unit) {
@@ -179,7 +179,7 @@ test.beforeAll(async () => {
   }
   systemUnitId = unit.id;
 
-  // La presentacion existente de la fila «cambia» (R9, R17), con su unidad.
+  // La presentacion existente de la fila «cambia», con su unidad.
   const presentation = await prisma.presentation.create({
     data: {
       name: CANNED_CATALOG_CHANGES_PRESENTATION,
@@ -190,7 +190,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
-  // La linea viva que el documento «cambia» de costo (R9, R15): el costo sembrado es DISTINTO del
+  // La linea viva que el documento «cambia» de costo: el costo sembrado es DISTINTO del
   // que trae `CANNED_CATALOG_TEXT`.
   await prisma.supplierCatalogLine.create({
     data: {
@@ -328,12 +328,12 @@ test.describe('catalogo-desde-pdf', () => {
     await expect(page.getByTestId('document-upload-error')).toHaveCount(0);
     expect(uploaded, 'el PDF sube sus bytes desde el navegador').toBe(1);
 
-    // --- 4. «Revisar»: solo aparece con el archivo en «listo» (R1).
+    // --- 4. «Revisar»: solo aparece con el archivo en «listo».
     await page.getByTestId('document-upload-row-review-0').click();
     await page.waitForURL((url) => url.pathname.includes('/importar/'), { timeout: 60_000 });
     await expect(page.getByTestId('catalog-import-review')).toBeVisible({ timeout: 60_000 });
 
-    // --- 5. Dos filas: una «nueva» y una «cambia», con su costo actual y el nuevo (R9).
+    // --- 5. Dos filas: una «nueva» y una «cambia», con su costo actual y el nuevo.
     await expect(page.getByTestId('catalog-import-row-kind-0')).toHaveText('Nueva');
     await expect(page.getByTestId('catalog-import-row-kind-1')).toHaveText('Cambia de costo');
     await expect(page.getByTestId('catalog-import-row-current-cost-1')).toContainText(
@@ -343,12 +343,12 @@ test.describe('catalogo-desde-pdf', () => {
       CANNED_CATALOG_CHANGES_NEW_COST,
     );
 
-    // --- 6. Corregir un campo de la fila «nueva» (R11).
+    // --- 6. Corregir un campo de la fila «nueva».
     const materialField = page.getByTestId('catalog-import-row-material-0');
     await materialField.fill(correctedMaterial);
     await expect(materialField).toHaveValue(correctedMaterial);
 
-    // --- 7. Quitar la imagen de la fila «cambia» (R24): la de la fila «nueva» se conserva para
+    // --- 7. Quitar la imagen de la fila «cambia»: la de la fila «nueva» se conserva para
     // que la linea creada termine con imagen.
     await expect(page.getByTestId('catalog-import-row-image-1')).not.toHaveAttribute(
       'data-missing',
@@ -361,7 +361,7 @@ test.describe('catalogo-desde-pdf', () => {
     );
 
     // --- 8. Asignar a mano la unidad de la presentacion nueva: ninguna unidad sembrada casa con
-    // la leida, asi que no viene preseleccionada (R19) y el revisor elige entre las visibles.
+    // la leida, asi que no viene preseleccionada y el revisor elige entre las visibles.
     const presentationKey = normalizePresentationName(CANNED_CATALOG_NEW_PRESENTATION);
     await page.getByTestId(`new-presentation-unit-select-${presentationKey}`).click();
     await page.getByTestId(`new-presentation-unit-option-${presentationKey}`).first().click();
@@ -371,14 +371,14 @@ test.describe('catalogo-desde-pdf', () => {
     await page.getByTestId('catalog-import-confirm').click();
 
     // --- 10. El resumen: una linea creada, una actualizada, ninguna sin cambios y una
-    // presentacion nueva (R23).
+    // presentacion nueva.
     await expect(page.getByTestId('catalog-import-summary')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('catalog-import-summary-created')).toHaveText('1');
     await expect(page.getByTestId('catalog-import-summary-updated')).toHaveText('1');
     await expect(page.getByTestId('catalog-import-summary-unchanged')).toHaveText('0');
     await expect(page.getByTestId('catalog-import-summary-presentations-created')).toHaveText('1');
 
-    // --- 11. Vuelta al detalle del proveedor, donde el catalogo ya se ve actualizado (R23).
+    // --- 11. Vuelta al detalle del proveedor, donde el catalogo ya se ve actualizado.
     await page.getByTestId('catalog-import-summary-back-link').click();
     await page.waitForURL((url) => url.pathname === supplierDetailRoute(supplier), {
       timeout: 60_000,
@@ -393,7 +393,7 @@ test.describe('catalogo-desde-pdf', () => {
     await expect(changedRow.first()).toBeVisible({ timeout: 60_000 });
     await expect(changedRow.first().getByTestId('data-table-cell-cost')).toHaveText('999');
 
-    // --- 12. Y en la base, de verdad: el costo actualizado de la linea viva (solo el costo, R15)...
+    // --- 12. Y en la base, de verdad: el costo actualizado de la linea viva (solo el costo)...
     const changedLine = await prisma.supplierCatalogLine.findFirst({
       where: { companyId: company, name: CANNED_CATALOG_CHANGES_LINE_NAME, deletedAt: null },
     });
@@ -416,7 +416,7 @@ test.describe('catalogo-desde-pdf', () => {
     expect(newLine?.imagePath, 'R16, R24: la linea nueva conserva su imagen').not.toBeNull();
     expect(newLine?.imagePath).toMatch(new RegExp(`^${company}/`));
 
-    // ...y la presentacion creada, con la unidad elegida a mano (R17, R19).
+    // ...y la presentacion creada, con la unidad elegida a mano.
     const newPresentation = await prisma.presentation.findFirst({
       where: { companyId: company, name: CANNED_CATALOG_NEW_PRESENTATION },
     });

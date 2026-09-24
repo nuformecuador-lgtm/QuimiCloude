@@ -1,4 +1,4 @@
-// Confirmacion de una importacion de catalogo (T10): R13, R14, R17, R18, R20, R26. Dobles de todos
+// Confirmacion de una importacion de catalogo. Dobles de todos
 // los puertos y de los casos de uso inyectados de `proveedores` e `inventario`; sin base ni red.
 
 import { describe, expect, it, vi } from 'vitest';
@@ -75,7 +75,7 @@ function dobleDeUnidades(visibles: readonly { id: string; name: string; symbol: 
   };
 }
 
-/** Puerto de escritura que falla si alguien lo llama: sirve para afirmar que R13 no escribe nada. */
+/** Puerto de escritura que falla si alguien lo llama: sirve para afirmar que un caso no escribe nada. */
 function dobleQueFallaSiSeLlama(nombre: string) {
   return vi.fn(async () => {
     throw new Error(`no debia llamarse: ${nombre}`);

@@ -1,18 +1,16 @@
 /**
- * T10 (QC-158) — `createConfirmCatalogImport` contra Postgres real, con los adaptadores de
+ * `createConfirmCatalogImport` contra Postgres real, con los adaptadores de
  * Prisma de `documentos`, `proveedores`, `inventario` y `unidades` cableados a mano -el mismo
- * cableado que hara `lib/composition`, sin pasar por el-. Solo `CropCatalog` va doblado, por lo
- * mismo que ya explica `design.md > 9`: no hay almacenamiento real en el test.
+ * cableado que hara `lib/composition`, sin pasar por el-. Solo `CropCatalog` va doblado, porque
+ * no hay almacenamiento real en el test.
  *
  * `createImportCatalogLines` abre SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, y
- * R21 necesita que la presentacion creada por OTRA llamada (a `inventario`, fuera de esa
- * transaccion) sobreviva a un fallo de la escritura de lineas: envolver la corrida en una
+ * la presentacion creada por OTRA llamada (a `inventario`, fuera de esa
+ * transaccion) necesita sobrevivir a un fallo de la escritura de lineas: envolver la corrida en una
  * transaccion de test con `ROLLBACK` seria un aislamiento de mentira, igual que ya razona
  * `catalog-import-upsert.int.test.ts`. Por eso este archivo COMMITEA: cada caso fabrica su
  * propia empresa efimera y la limpia en un `finally`, en el orden que exigen las FK. Entrada en
  * `tests/integration/aislamiento.json > commit`.
- *
- * Requisitos: R21, R22, R34.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -251,7 +249,7 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
     };
 
     // La presentacion la crea `inventario.createPresentation`, en una llamada aparte de la
-    // escritura de la linea (`design.md > 8`): se envuelve para dejar de baja al proveedor
+    // escritura de la linea: se envuelve para dejar de baja al proveedor
     // JUSTO DESPUES de que esa llamada haya terminado -y antes de escribir la linea-, sin
     // depender de ninguna espera arbitraria.
     let notificarPresentacionCreada: () => void = () => {};

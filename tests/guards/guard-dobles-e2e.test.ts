@@ -35,7 +35,7 @@ const ACTIVADOR_AUTORIZADO = 'playwright.config.ts';
 /** El UNICO archivo que ata puerto -> adaptador, y por tanto el unico que puede elegir un doble. */
 const COMPOSICION = 'lib/composition/index.ts';
 
-/** Los dobles de `design.md > 8`, sin extension: asi valen para el import con alias `@/`. */
+/** Los dobles del modulo `documentos` para el E2E, sin extension: asi valen para el import con alias `@/`. */
 const DOBLES = [
   'lib/modules/documentos/adapters/driven/storage/document-storage-memory',
   'lib/modules/documentos/adapters/driven/queue/processing-queue-inline',

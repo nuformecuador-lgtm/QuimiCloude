@@ -1,4 +1,4 @@
-// Vista previa de una importacion de catalogo (T9): R3, R4, R8, R10, R31. Dobles de todos los
+// Vista previa de una importacion de catalogo. Dobles de todos los
 // puertos y de los casos de uso inyectados de `proveedores` e `inventario`; sin base ni red.
 
 import { describe, expect, it, vi } from 'vitest';
@@ -47,7 +47,7 @@ const ARCHIVO_LISTO: FileForReview = {
   extractedText: JSON_UNA_LINEA_NUEVA,
 };
 
-/** Registro de llamadas COMPARTIDO por todos los dobles de un mismo caso: R31 exige poder
+/** Registro de llamadas COMPARTIDO por todos los dobles de un mismo caso: hace falta poder
  *  afirmar que, sin permiso, la lista queda vacia. */
 type Bitacora = string[];
 
@@ -93,7 +93,7 @@ function dobleDeUnidades() {
   return { findRefs: vi.fn(), findRefsSharingBaseInCompany: vi.fn() };
 }
 
-/** Puerto de ESCRITURA que falla si alguien lo llama: R8 exige que la vista previa no escriba
+/** Puerto de ESCRITURA que falla si alguien lo llama: la vista previa no debe escribir
  *  nada, y este doble convierte cualquier llamada en un test rojo en vez de en un `undefined`
  *  silencioso. */
 function dobleQueFallaSiSeLlama(nombre: string) {

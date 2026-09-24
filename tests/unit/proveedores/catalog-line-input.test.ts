@@ -256,7 +256,7 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
     // nombre y presentacion incluidos: al desaparecer la referencia al articulo del
     // inventario, la identidad de la linea pasa a ser un texto escrito a mano y una errata
     // seria incorregible. Lo UNICO que nunca cambia es el proveedor, y no porque se filtre
-    // sino porque el tipo no lo tiene. `material` y `measurements` se suman con QC-158 (R27).
+    // sino porque el tipo no lo tiene. `material` y `measurements` se suman como ampliacion nombrada.
     expect(Object.keys(updateCatalogLineSchema.shape).sort()).toEqual([
       'cost',
       'deliveryTime',

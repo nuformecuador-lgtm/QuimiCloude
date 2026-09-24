@@ -218,7 +218,7 @@ function describir(infracciones: readonly Infraccion[]): string {
 // escritura propia de `asignaciones`: abrir y finalizar los hace el caso de uso, no un permiso
 // nuevo de pantalla.
 //
-// TENSADA el 2026-09-23 (QC-158 T12): de trece a CATORCE, con
+// TENSADA el 2026-09-23: de trece a CATORCE, con
 // `/proveedores/[id]/importar/[documentoId]`, la revision de una importacion de catalogo desde un
 // PDF. Llama a `requirePagePermission` DOS veces -`proveedores.consultar` y
 // `proveedores.modificar`-, mismo patron que `/configuracion/unidades`: revisar y confirmar la

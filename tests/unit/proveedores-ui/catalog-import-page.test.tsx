@@ -1,5 +1,5 @@
-// QC-158 T12 — La pagina de revision de una importacion de catalogo: su corte por permiso (R32) y
-// sus estados de error sin ninguna fila (R3, R4, R6).
+// La pagina de revision de una importacion de catalogo: su corte por permiso y
+// sus estados de error sin ninguna fila.
 //
 // Mismo patron que `configuracion-ui/unit-page.test.tsx`: se mockea el proveedor de sesion —no
 // `requirePagePermission`—, de modo que el corte se ejecuta de verdad, `assertPermission`
@@ -66,7 +66,7 @@ vi.mock('@/lib/modules/documentos/adapters/driving/catalog-import-actions', () =
   confirmCatalogImportAction: confirmCatalogImportActionMock,
 }));
 
-/** Los DOS permisos que la pantalla exige (R32). */
+/** Los DOS permisos que la pantalla exige. */
 const PERMISOS_DE_LA_PANTALLA = ['proveedores.consultar', 'proveedores.modificar'] as const;
 
 const SUPPLIER_ID = 'PROVEEDOR-ID-NO-VISIBLE';

@@ -1,17 +1,15 @@
 /**
- * T4 (QC-158) — `upsertCatalogLinesByIdentity` y `findAliveCatalogLinesByIdentities` contra
- * una base Postgres REAL (`design.md > 5.2`, `> 8`).
+ * `upsertCatalogLinesByIdentity` y `findAliveCatalogLinesByIdentities` contra
+ * una base Postgres REAL.
  *
  * `upsertCatalogLinesByIdentity` abre SU PROPIA `prisma.$transaction` contra el cliente
  * GLOBAL -el `SELECT ... FOR SHARE` del proveedor y, por cada linea, el `INSERT ... ON
  * CONFLICT`-, asi que envolver la corrida en una transaccion del test con `ROLLBACK` seria
- * un aislamiento de mentira: correria en otra conexion del pool y no veria el fixture. R22
- * ademas necesita DOS llamadas concurrentes de verdad, que es incompatible por construccion
+ * un aislamiento de mentira: correria en otra conexion del pool y no veria el fixture. La
+ * concurrencia ademas necesita DOS llamadas de verdad, que es incompatible por construccion
  * con una unica transaccion de test. Por eso este archivo COMMITEA: cada caso fabrica su
  * propia empresa efimera (`randomUUID`) y la limpia en un `finally`, en el orden que exigen
  * las FK. Entrada en `tests/integration/aislamiento.json > commit`.
- *
- * Requisitos: R4, R15, R16, R21, R22, R34.
  */
 import { randomUUID } from 'node:crypto';
 

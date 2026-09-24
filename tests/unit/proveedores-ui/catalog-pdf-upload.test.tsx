@@ -9,8 +9,7 @@ import type { IssueUploadLinksResult } from '@/lib/modules/documentos/adapters/d
 
 /**
  * El envoltorio de proveedores sobre la pieza compartida de subida: fija la estrategia de
- * catalogo y el href de revision de ESTE proveedor
- * (`specs/QC-158-catalogo-desde-pdf/tasks.md > T13`).
+ * catalogo y el href de revision de ESTE proveedor.
  */
 
 const { issueUploadLinksActionMock, enqueueBatchActionMock, getBatchStatusActionMock } = vi.hoisted(

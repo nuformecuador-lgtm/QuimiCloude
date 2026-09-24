@@ -1,4 +1,4 @@
-// Emparejamiento de recortes y filas por pagina (R25). Dominio puro.
+// Emparejamiento de recortes y filas por pagina. Dominio puro.
 
 import { describe, expect, it } from 'vitest';
 

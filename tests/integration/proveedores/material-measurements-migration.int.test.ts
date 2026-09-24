@@ -1,6 +1,6 @@
 // tests/integration/proveedores/material-measurements-migration.int.test.ts
 /**
- * Migracion `*_supplier_catalog_line_material_and_measurements` contra Postgres REAL (R27).
+ * Migracion `*_supplier_catalog_line_material_and_measurements` contra Postgres REAL.
  *
  * AISLAMIENTO: `transaccion` (censo `tests/integration/aislamiento.json`) — mismo patron que
  * `catalog-line.int.test.ts`: `prisma.$transaction` interactiva que SIEMPRE termina en

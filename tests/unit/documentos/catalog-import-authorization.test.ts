@@ -1,4 +1,4 @@
-// Permiso de la confirmacion de una importacion de catalogo (T10): R31 y R33. Dobles de todos los
+// Permiso de la confirmacion de una importacion de catalogo. Dobles de todos los
 // puertos y de los casos de uso inyectados; sin base ni red.
 
 import { describe, expect, it, vi } from 'vitest';

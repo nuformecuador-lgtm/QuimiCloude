@@ -1,4 +1,4 @@
-// Clasificacion de una importacion de catalogo (R9). Dominio puro: sin dobles, sin red.
+// Clasificacion de una importacion de catalogo. Dominio puro: sin dobles, sin red.
 
 import { describe, expect, it } from 'vitest';
 

@@ -1,6 +1,5 @@
-// QC-158 T12 — La revision de una importacion de catalogo: una tarjeta por linea, su
-// reclasificacion, su prevalidacion en cliente y su resumen. Cubre R8, R9, R10, R11, R12, R18,
-// R19, R20, R23, R24 y R37.
+// La revision de una importacion de catalogo: una tarjeta por linea, su
+// reclasificacion, su prevalidacion en cliente y su resumen.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -171,7 +170,7 @@ describe('reclasificar al perder el foco bloquea Confirmar mientras esta en vuel
   it('deshabilita Confirmar durante la reclasificacion y lo vuelve a habilitar al terminar', async () => {
     const user = setupUser();
     // «nueva»: es la unica clase con el nombre editable, asi que es la unica que puede disparar
-    // la reclasificacion al perder el foco (R12 deja el nombre de solo lectura en las demas).
+    // la reclasificacion al perder el foco (el nombre queda de solo lectura en las demas).
     // `presentationId` resuelto: sin presentacion nueva de por medio, lo unico que bloquea
     // Confirmar durante el intervalo es la reclasificacion en vuelo, que es lo que mide este caso.
     montar(preview([fila({ kind: 'nueva', presentationId: 'presentacion-1' })]));
@@ -282,7 +281,7 @@ describe('motivos por fila que bloquean confirmar (R18, R20)', () => {
       ]),
     );
 
-    // Excluidas por defecto (R11): sin incluirlas, no aportan ningun motivo y Confirmar queda
+    // Excluidas por defecto: sin incluirlas, no aportan ningun motivo y Confirmar queda
     // habilitado -confirmar sin ninguna fila incluida es una entrada valida.
     expect(screen.getByTestId('catalog-import-confirm')).toBeEnabled();
     expect(screen.queryByTestId('catalog-import-confirm-reasons')).toBeNull();

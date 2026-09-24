@@ -1,4 +1,4 @@
-// Sugerencia de unidad de una presentacion nueva (R19). Dominio puro.
+// Sugerencia de unidad de una presentacion nueva. Dominio puro.
 
 import { describe, expect, it } from 'vitest';
 

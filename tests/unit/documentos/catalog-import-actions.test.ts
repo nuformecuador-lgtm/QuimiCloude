@@ -1,4 +1,4 @@
-// Las dos Server Actions de la revision de una importacion de catalogo (T12), probadas contra
+// Las dos Server Actions de la revision de una importacion de catalogo, probadas contra
 // dobles: sin sesion real, sin red y sin base. Lo que se afirma aqui es el REPARTO -la accion NO
 // DECIDE NADA-: resuelve el actor con las dos caras de la sesion, valida con el esquema del
 // contrato, entrega y traduce el error por su `code`.
