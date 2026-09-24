@@ -1,5 +1,12 @@
 # QC-141 — reserva-de-material-del-pedido · tasks.md
 
+> **Enmendado el 2026-09-23 (review 2).** Tras el review de la vuelta 2 (RECHAZADO) y la decisión
+> **D22**, lo cerrado sigue cerrado y **lo pendiente es el bloque «Enmienda del review 2»**, al
+> final: **TR2** (re-sincronizar con `dev`: QC-122, QC-151, `daa400c5`) va primero; después **TD22**
+> (coste por promedio de disponibles), **TV2-B1..TV2-B4** (bloqueantes), **TV2-m1..TV2-m5**
+> (menores) y **TC2** (cierre). Tm1 se marca hecha (la bitácora ya tiene el mapa R1-R58); TC queda
+> absorbida por TC2.
+
 > **Enmendado el 2026-09-23 (review).** Tras el review F2.2 (RECHAZADO) y la decisión D21, T0-T17
 > y TM siguen `[x]`, y **lo pendiente es el bloque «Enmienda del review»**, al final: **TR**
 > (re-sincronizar con `dev`: QC-145 y `a01c90cb`) va primero; después TB1-TB4 (bloqueantes),
@@ -356,7 +363,7 @@ termina en verde.
 
 ---
 
-# Enmienda del review (2026-09-23) — PENDIENTE
+# Enmienda del review (2026-09-23) — cerrada en la vuelta 2, salvo TC (absorbida por TC2)
 
 > Decisión D21 de `requirements.md`; diseño en `design.md > 0.4` y las secciones que allí se citan.
 > Orden: **TR primero**; después, en este orden salvo `[P]`. Cada task cierra con
@@ -475,7 +482,10 @@ y los tests cuyo nombre cite `R29`.
 `setStatus`); integración: una edición no escribe `consumption` ni `consume`; ningún test cita
 `R29`; `R12` verde sin «estado» entre los campos editables; `guard-catalogo-de-errores` verde.
 
-## [ ] Tm1 — Marcas «provisional» (hecho en el spec) y mapa `[depende de TB4]`
+## [x] Tm1 — Marcas «provisional» (hecho en el spec) y mapa `[depende de TB4]`
+
+> **Hecha** (marcada en la enmienda del review 2, m-V2-4): la bitácora tiene «R → test: mapa completo
+> R1–R58» con «R29 — retirado (D21)» y dice que E1, E2 y las preguntas 1-7 están resueltas.
 
 Archivos: `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
 
@@ -566,6 +576,10 @@ sin ciclo); R7, R12, R27 y R31 siguen verdes.
 
 ## [ ] TC — Cierre: E2E, gate completo y trazabilidad `[depende de TR, TB1-TB4, Tm1-Tm7]`
 
+> **Absorbida por TC2** (enmienda del review 2): el rollback y los E2E de la vuelta 2 se hicieron
+> sobre una rama que ya no se integra con `dev`, y el `./init.sh` completo no terminó. Se marca
+> `[x]` junto con TC2, no antes.
+
 Archivos: `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
 
 - **Rollback** de las tres migraciones renumeradas probado en una base efímera, como en TM
@@ -580,3 +594,216 @@ Archivos: `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
 
 **Hecho cuando:** los E2E verdes en los dos navegadores (**R48**), `./init.sh` completo verde, y la
 bitácora con comandos y resultados.
+
+---
+
+# Enmienda del review 2 (2026-09-23) — PENDIENTE
+
+> Review de la vuelta 2 (V2-B1..V2-B4, m-V2-1..m-V2-5) y decisión **D22** de `requirements.md`;
+> diseño en `design.md > 0.5` y las secciones que allí se citan. Orden: **TR2 primero**; después
+> TD22 y las demás en este orden salvo `[P]`. Cada task cierra con `./init.sh --rapido`; TC2 con
+> `./init.sh` completo. Los comentarios de producción no citan fichas, requisitos, `design.md` ni
+> etiquetas de review (`B1`, `m2`…); `R<n>` va en el nombre de los tests.
+> **TD22 no empieza** hasta que el humano responda las preguntas abiertas **8** y **9** (R65, R66);
+> las demás tasks no dependen de ellas.
+
+## [ ] TR2 — Re-sincronizar con `origin/dev` (QC-122, QC-151, `daa400c5`) `[primera de lo pendiente]`
+
+Archivos: todo lo que traiga el merge; los 10 en conflicto según el review:
+`app/(private)/pedidos/components/{order-form,order-table}.tsx`, `lib/composition/index.ts`,
+`lib/modules/pedidos/adapters/driving/order-actions.ts`, `lib/modules/pedidos/index.ts`,
+`tests/integration/aislamiento.json`, `order-form.test.tsx`, `order-sheet.test.tsx`,
+`pedidos-viewport.test.tsx`, `order-actions.test.ts`, `data-table-alcance.test.ts`; y
+`tests/baseline-rojos.json` si `daa400c5` deja fuera el rojo heredado.
+
+1. **Migraciones.** El review dice que `dev` no trae migraciones nuevas. Comprobarlo con
+   `git diff --name-only HEAD...origin/dev -- db/migrations`. **Si trae alguna con prefijo posterior a
+   `20260923150000`**, renumerar las tres nuestras por detrás de la última de `dev` con el
+   procedimiento de TR (pasos 1-2: revertir antes en `QuimiCloude_QC141` en orden `…150200`,
+   `…150100`, `…150000`; **si un `down` falla por los datos de los E2E, PARAR y preguntar al
+   humano**; nunca tocar la base compartida `QuimiCloude`), y actualizar nombres en tests y en
+   `guard-identificador-de-request`. Si no trae ninguna, no se renombra nada.
+2. **`git merge origin/dev`.** Resolución de los conflictos:
+   - `order-form.tsx`: la cotización de QC-151 (recotizar a 500 ms, atenuado, guion sin importe) **y**
+     nuestra columna «restante» sobre el disponible en cadena decimal (R6, N4) y los `aria-label`.
+   - `order-table.tsx`: búsqueda y columnas de QC-122 **y** nuestra etiqueta de cobertura (N6, R35).
+   - `lib/composition/index.ts`, `order-actions.ts`, `pedidos/index.ts`: unión (acción y consulta de
+     cotización de QC-151, búsqueda de QC-122, y nuestro `orderUnitOfWork`, cobertura y caducidad).
+     Anotar en la bitácora el nombre y la ruta reales de la consulta de cotización (lo usa TD22).
+   - `aislamiento.json`: unión de las dos listas.
+   - Tests en conflicto: casos de las dos ramas; fixtures de `dev` con nuestras cantidades en cadena
+     o `Prisma.Decimal`. Ningún caso de ninguna de las dos se borra ni se debilita.
+3. **Base propia al día**: `pnpm run db:migrate` sobre `QuimiCloude_QC141` (a la que apunta el `.env`
+   del worktree), `pnpm exec prisma generate` y regenerar la plantilla de la base de integración.
+4. Con `daa400c5`, `guard-arquitectura-modulos` debe salir verde: si `tests/baseline-rojos.json`
+   sigue listando ese rojo, se retira de ahí.
+
+**Hecho cuando:** merge commiteado sin marcadores; ningún par de directorios de `db/migrations/`
+comparte prefijo y las tres nuestras van por detrás de la última de `dev`; `_prisma_migrations` de
+`QuimiCloude_QC141` al día con los nombres vigentes; `pnpm run typecheck` sin errores;
+`guard-arquitectura-modulos` verde sin baseline; `./init.sh --rapido` verde; la bitácora lista los
+conflictos reales frente a los 10 esperados.
+
+## [ ] TD22 — Coste del pedido por promedio de los lotes con disponible `[depende de TR2 y de las preguntas 8 y 9]`
+
+Archivos (a confirmar en el paso 1): `lib/modules/pedidos/domain/{order-cost,resolve-ingredients-cost,update-order,create-order}.ts`,
+la consulta de cotización de QC-151 y su esquema de entrada, `order-form.tsx` (envía `orderId` en
+edición), `lib/modules/inventario/domain/{costing-batch,product-catalog}.ts`,
+`lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`,
+`lib/composition/index.ts`, `tests/unit/pedidos/order-cost.test.ts`,
+`tests/integration/pedidos/order-ingredients-cost.int.test.ts`,
+`tests/integration/pedidos/order-reservation.int.test.ts`, los tests de QC-151 que afirmen el
+cálculo viejo, `e2e/pedidos-cotizacion.spec.ts`.
+
+1. **Confirmar en el código** (tras TR2) dónde vive el cálculo que comparten la cotización de QC-151 y
+   el importe de QC-123 (`design.md > 6.6`), y anotarlo en la bitácora con `archivo:línea`. Si hay
+   dos cálculos, dejar uno solo antes de cambiarlo (R62).
+2. `CostingBatch.available` y `findCostingBatches(ids, companyId, { excludeOrderId? })` con el
+   agregado del libro de reservas, filtrando por empresa las dos tablas y manteniendo la exclusión de
+   lotes sin presentación o sin coste (según la respuesta a la pregunta 9).
+3. `calculateLineCost`: suma de disponibles para la cobertura, promedio simple de **todos** los lotes
+   con disponible, sin ordenar ni cortar; misma escala interna y un solo redondeo final.
+   `order-cost.ts` deja de importar `compareBatchesOldestFirst`.
+4. `resolveIngredientsCost(..., { orderId? })`; la edición pasa el `id` y la cotización de edición
+   también (según la respuesta a la pregunta 8).
+5. Reescribir los casos de QC-123/QC-151 que afirman «acumula hasta cubrir» o «promedio de los usados»
+   contra R59-R61, con «D22 de QC-141 deroga QC-123 D3/D4» en el nombre, y listarlos en la bitácora
+   para la nota del PR.
+
+**Hecho cuando:** unit verdes para **R59** (el ejemplo de D22 da `370.0000`), **R60** (no ponderado,
+lote no necesario incluido, lote con disponible cero excluido, orden indiferente), **R61** y **R63**;
+integración verde para **R59/R64** (alta de 30 con A/B/C: importe `370.0000`, apartado 20 de A y 10
+de B, nada de C), **R60** (lote apartado entero por otro pedido fuera del promedio), **R61**
+(disponible insuficiente con existencia total suficiente → sin importe), **R62** (cotización y alta
+iguales, y los dos nulos), **R63** (edición recalcula, también a nulo), **R65** y **R66**, y el caso
+de aislamiento con `excludeOrderId` de otra empresa; `guard-ambito-empresa-inventario` y
+`guard-arquitectura-modulos` verdes; `R8`, `R12`, `R16` siguen verdes (la reserva no cambia).
+
+## [ ] TV2-B1 — Comentarios de producción sin citas (V2-B1) `[depende de TR2]` `[P con TD22]`
+
+Archivos: `lib/composition/index.ts` (hoy `:983`),
+`lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (`:543`),
+`lib/modules/pedidos/domain/{create-order,transition-order,update-order}.ts` (`:142`, `:47`, `:132`),
+`lib/modules/pedidos/ports/order-unit-of-work.ts` (`:10`),
+`lib/modules/recetas/adapters/driven/persistence/{company-scope,recipe-catalog-prisma}.ts` (`:5`,
+`:161`). Las líneas son las del review sobre `c13add6a`; tras TR2 pueden moverse.
+
+- Quitar «`design.md > 5.2.2`», «`design.md > 5.3`», «m2», «m7» y dejar el motivo.
+- **Al final de la vuelta** (después de TC2 salvo el `./init.sh` completo, no a mitad), repetir el
+  barrido de TB1 sobre las líneas `+` de `git diff $(git merge-base origin/dev HEAD) HEAD -- lib app
+  db components` buscando en comentarios `R\d+`, `T\w*\d+`, `QC-\d+`, `design.md`,
+  `requirements.md`, `tasks.md` y etiquetas de review (`\bB\d\b`, `\bm\d\b`, `V2-`).
+
+**Hecho cuando:** el barrido final no encuentra ninguna cita en comentarios de producción añadidos
+por la rama, con el comando y su salida en la bitácora.
+
+## [ ] TV2-B2 — `qc145-estado-solo-planta` correcto con QC-141 ya en `dev` (V2-B2) `[depende de TR2]` `[P con TD22]`
+
+Archivos: `tests/unit/.../qc145-estado-solo-planta.test.ts` (hoy `:363-366`).
+
+- El esperado deja de sumar `ESPERADOS_DE_ESTA_RAMA` a mano: es la **unión sin duplicar** de los
+  modelos del merge-base y `['ReservationMovement']` (`design.md > 12`, enmienda del review 2).
+
+**Hecho cuando:** el caso está verde hoy; un caso con fuente fabricada en la que el esquema del
+merge-base **ya** contiene `ReservationMovement` sigue verde (sin duplicado); otro con un modelo
+nuevo no declarado sale en rojo; los nombres de los casos citan el requisito de QC-145 que ya
+citaban.
+
+## [ ] TV2-B3 — El correlativo agotado vuelve a dar `duplicate_number` (V2-B3) `[depende de TR2]` `[P con TD22]`
+
+Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts`,
+`tests/integration/pedidos/order-duplicate-number.int.test.ts`, `tests/unit/pedidos/order-actions.test.ts`
+(solo si hace falta), el test unitario del adaptador si existe.
+
+- `withOrderTransaction` lanza `DuplicateOrderNumberError` cuando el tercer intento vuelve a chocar
+  con `orders_company_year_sequence_key`; otros errores suben igual (`design.md > 5.2.3`).
+- `order-duplicate-number.int` vuelve a afirmar lo que afirmaba en `899c3d22`: comparar con
+  `git show 899c3d22:tests/integration/pedidos/order-duplicate-number.int.test.ts`.
+
+**Hecho cuando:** `order-duplicate-number.int` verde afirmando `DuplicateOrderNumberError` /
+`duplicate_number` tras **3** transacciones, sin fila duplicada y sin apartado escrito; el diff del
+test contra `899c3d22` no quita ninguna aserción (o la bitácora explica cada una); `order-sequence.int`
+y `order-sequence-race.int` siguen verdes (**R15**); `guard-catalogo-de-errores` verde.
+
+## [ ] TV2-B4 — Integración con `dev` y cotización (V2-B4) `[depende de TR2, TD22]`
+
+No es una task de escritura propia: V2-B4 lo cierran **TR2** (merge), **TD22** (D22, R59-R66) y
+**TC2** (E2E y gate sobre la rama mergeada).
+
+**Hecho cuando:** TR2, TD22 y TC2 están `[x]`, y `git merge-tree --write-tree HEAD origin/dev` sobre
+el `origin/dev` del momento del cierre no da conflictos (si `dev` volvió a avanzar, se repite TR2
+antes de TC2).
+
+## [ ] TV2-m1 — Comentarios que ya no son verdad `[depende de TR2]` `[P con TV2-B1]`
+
+Archivos: `order-prisma.ts` (`:615-621`), `order-unit-of-work-prisma.ts` (`:12`),
+`lib/modules/asignaciones/domain/errors.ts` (`:159-160`).
+
+- Describir `setAliveOrderStatus` por lo que hace, sin compararla con `transitionAliveOrder`; quitar
+  «mismo tope que `createOrder`» (decir el tope); «desde la planta», sin «desde la edicion».
+
+**Hecho cuando:** ningún comentario de `lib/**` nombra `transitionAliveOrder` ni `createOrder`, y el
+de `asignaciones/domain/errors.ts` solo habla de la planta; sin citas (TV2-B1).
+
+## [ ] TV2-m2 — `setStatus` distinto de `ok` tras consumir deshace la unidad `[depende de TR2]` `[P con TD22]`
+
+Archivos: `lib/modules/pedidos/domain/transition-order.ts` (`:62-63`),
+`tests/unit/pedidos/transition-order.test.ts`.
+
+- Lanzar dentro de la unidad y devolver el resultado fuera (`design.md > 5.4`, enmienda del review 2).
+
+**Hecho cuando:** unit verde con **R51** en el nombre: `setStatus` doble que devuelve `'stale'` tras
+un consumo `consumed` → la unidad se deshace (el doble de `run` ve la excepción) y el resultado es
+`'stale'`; los casos R27, R30, R31, R50 y R51 siguen verdes.
+
+## [ ] TV2-m3 — Alias y `tx.` en `guard-ambito-empresa-pedidos` `[depende de TR2]` `[P con TV2-m2]`
+
+Archivos: `tests/guards/guard-ambito-empresa-pedidos.test.ts`.
+
+- `aliasDePrisma` reconoce `import { a, prisma as X }`, comillas dobles e
+  `import * as X from '@/lib/shared/db/prisma'`.
+- En el archivo exento, ningún `tx.<modelo>` (`design.md > 12`, enmienda del review 2).
+
+**Hecho cuando:** cuatro anti-placebos nuevos con fuente fabricada, con **R58** en el nombre, salen
+en rojo (varios especificadores, comillas dobles, `import * as`, `tx.order.findMany` en el exento), y
+la guardia está verde sobre el código real.
+
+## [ ] TV2-m4 — Spec al día (m-V2-4) `[hecha en el spec; queda la bitácora]`
+
+Hecho en esta enmienda: `requirements.md` ya no dice que la pregunta 7 siga abierta; el título
+«PENDIENTE» del bloque del review 1 se cambió; Tm1 marcada `[x]`; TC queda absorbida por TC2.
+
+**Hecho cuando:** la bitácora lo registra y TC y TC2 se marcan `[x]` juntas al cerrar.
+
+## [ ] TV2-m5 — Lista exacta de escrituras de `status:` en `order-prisma.ts` `[depende de TR2]` `[P con TV2-m3]`
+
+Archivos: `qc145-estado-solo-planta.test.ts` (caso R10, segundo).
+
+- Fijar la lista exacta de funciones de `order-prisma.ts` con un bloque `status:` (confirmar en el
+  código; hoy `setAliveOrderStatus` con `status: to` y `cancelAlive`) y afirmar que no hay más.
+
+**Hecho cuando:** el caso está verde sobre el código real, y un anti-placebo con una escritura nueva
+`status: <variable>` en otra función de `order-prisma.ts` sale en rojo.
+
+## [ ] TC2 — Cierre: E2E, gate completo y trazabilidad `[depende de TR2, TD22, TV2-B1..TV2-B4, TV2-m1..TV2-m5]`
+
+Archivos: `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
+
+- **Rollback** de las tres migraciones probado en base efímera, como en TC, **solo si TR2 las
+  renumeró**; si no, basta con la prueba de la vuelta 2.
+- **E2E en Chromium y WebKit** sobre la rama mergeada con el `origin/dev` actual:
+  `reserva-de-material`, `ejecucion-receta`, `ajuste-de-inventario`, `pedidos`,
+  `pedidos-terminados`, **`pedidos-busqueda`** y **`pedidos-cotizacion`** (con el caso de D22 de
+  TD22 si se pudo sembrar). **Una sola E2E a la vez en la máquina**; borrar `.next/dev/types` antes
+  del gate si el `next dev` del E2E lo dejó truncado.
+- **`./init.sh` completo** que **termine**, con la máquina liberada; rojos heredados de `dev`, si
+  los hay, declarados según `docs/verification.md`. No relanzarlo sin permiso del humano si lo mata
+  la memoria: parar y avisar.
+- Barrido final de TV2-B1.
+- Mapa **R1-R66** en la bitácora (R29 retirado) y, para el PR, la nota con las guardias de fichas
+  cerradas que cambian lo que afirman (las de TC más `qc145-estado-solo-planta`) y los tests de
+  QC-123/QC-151 reescritos por D22.
+
+**Hecho cuando:** E2E verdes en los dos navegadores (**R48**, y R59 si se sembró), `./init.sh`
+completo verde, mapa R1-R66 completo, TC y TC2 marcadas `[x]`, y la bitácora con comandos y
+resultados.

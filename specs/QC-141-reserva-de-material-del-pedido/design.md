@@ -1,5 +1,14 @@
 # QC-141 — reserva-de-material-del-pedido · design.md
 
+> **Enmendado el 2026-09-23 (review 2).** Tercera enmienda, tras el review de la vuelta 2
+> (RECHAZADO) y la decisión **D22** del humano (coste del pedido por promedio de los lotes con
+> disponible). Resumen en **§0.5**. Secciones nuevas: §5.2.3 (el correlativo agotado vuelve a ser
+> `DuplicateOrderNumberError`, V2-B3), §6.6 (el coste de D22) y §13.11-§13.13. Tocadas: §5.1 (el
+> coste ya no usa el orden de lotes), §5.4 (m-V2-2), §12 y §15. **El código de QC-151 (PR #115) y
+> QC-122 (PR #113) está en `dev` pero no en este worktree**: lo que aquí se dice de él sale del
+> review y de sus specs, y el implementer confirma en el código dónde vive el cálculo compartido
+> (task TD22, paso 1).
+
 > **Enmendado el 2026-09-23 (review).** Segunda enmienda, tras el review F2.2 (RECHAZADO) y la
 > decisión del humano registrada en **D21** (`requirements.md`). Resumen y mapa de lo que cambia en
 > **§0.4**. Secciones tocadas: §0.3 (E1/E2 aprobadas), §4.0, §4.3 (nuevas §4.3.1 y §4.3.2), §5.2,
@@ -116,6 +125,20 @@ Lo que decidió el humano (D21) y dónde se construye:
 | **m5** El SQL de la migración no ordena los lotes como el comparador de TS | La migración usa el mismo comparador por pares | §4.3.1 | R43, R56; pregunta abierta 7 |
 | **m6** `…/down.sql` de la migración que aparta deja el libro incoherente tras uso de la app | El `down` falla si hubo actividad posterior | §4.3.2 | R57 |
 | **m7** La receta se lee con el cliente global dentro de la transacción | La unidad de trabajo ofrece también el lector de recetas sobre `tx` | §5.2.2 | — (no cambia comportamiento observable; test de dobles) |
+
+### 0.5 Enmienda del review 2 (2026-09-23)
+
+| Hallazgo | Qué se hace | Diseño | Requisitos |
+|---|---|---|---|
+| **V2-B1** Ocho comentarios de producción citan `design.md` y etiquetas de review (`m2`, `m7`) | Quitar las citas y dejar el motivo; barrido **al final** de la vuelta | sin cambio de diseño; task TV2-B1 | — (`docs/conventions.md > Comentarios`) |
+| **V2-B2** `qc145-estado-solo-planta.test.ts:363-366` suma `ReservationMovement` a mano: rojo en cuanto QC-141 llegue a `dev` | El esperado es la **unión sin duplicar** de los modelos del merge-base y los de la rama, más un caso con la base que ya contiene el modelo | §12 | — (guardia de QC-145) |
+| **V2-B3** El alta ya no produce `duplicate_number` al agotar los reintentos | `withOrderTransaction` traduce el choque del correlativo agotado a `DuplicateOrderNumberError`; el test vuelve a afirmarlo | §5.2.3 | R15; el comportamiento `duplicate_number` es de la ficha que lo creó y lo vigila `order-duplicate-number.int` |
+| **V2-B4** `dev` avanzó (QC-122, QC-151, `daa400c5`): 10 conflictos; QC-151 cotiza con lotes | Re-sincronizar (TR2) y **D22**: el coste promedia todos los lotes con disponible | §6.6 | R59-R66 |
+| **m-V2-1** Comentarios que ya no son verdad | Reescribirlos | — | — |
+| **m-V2-2** `transition-order.ts:62-63` devuelve sin lanzar si `setStatus` no es `ok` tras consumir | Lanzar para deshacer la unidad | §5.4 | R51 |
+| **m-V2-3** `aliasDePrisma` no ve varios especificadores, comillas dobles ni `import * as`; en el exento no se miran los `tx.` | Ampliar la guardia a esas formas; en el exento, ningún `tx.<modelo>` | §12 | R58 |
+| **m-V2-4** Spec desactualizado | Arreglado en esta enmienda (pregunta 7, «PENDIENTE», Tm1) | — | — |
+| **m-V2-5** `qc145-estado-solo-planta` R10 ya no detecta un `status: <variable>` nuevo en `order-prisma.ts` | Lista **exacta** de bloques con `status:` | §12 | — (guardia de QC-145) |
 
 ---
 
@@ -552,6 +575,11 @@ los lotes y genérico sobre `{ purchaseDate; lot }`. `order-cost.ts` pasa a impo
 de `inventario` (arista `pedidos → inventario` que ya existe). Queda **una** definición del orden
 para el coste y para la reserva, que es lo que pide `[D4]` al heredar QC-123 D3 y D18.
 
+*(Enmendado el 2026-09-23 (review 2).)* Con **D22** el coste deja de recorrer los lotes en orden
+(§6.6): `order-cost.ts` ya no necesita `compareBatchesOldestFirst` y deja de importarlo. El
+comparador sigue publicado en `inventario` y lo usan la reserva (`planReservation`) y la paridad de
+la migración (§4.3.1). `CostingBatch` gana `available` (§6.6).
+
 ### 5.2 La transacción compartida
 
 **El problema.** Crear un pedido y apartar su material escriben tablas de dos módulos, y `R15` pide
@@ -646,6 +674,32 @@ pool pequeño del pooler de Supabase eso es espera o `P2024` bajo carga.
 - Test unitario con dobles: el lector global de recetas falla si se le llama mientras `run` está
   abierto.
 
+#### 5.2.3 El correlativo agotado vuelve a ser `DuplicateOrderNumberError` (enmendado el 2026-09-23 (review 2), V2-B3)
+
+**Qué se rompió.** En `dev` (`899c3d22`), agotados los tres intentos del correlativo, el alta
+devolvía `'duplicate_number'` y `create-order.ts:137` lanzaba `DuplicateOrderNumberError`
+(«Ya existe un pedido con ese numero correlativo.»). En la rama, `withOrderTransaction` relanza el
+`23505` crudo tras el tercer intento y nada lanza ya ese error; el test
+`order-duplicate-number.int` se reescribió para afirmar el `23505` sin traducir.
+
+**Cómo se arregla.** La traducción la hace **el adaptador**, que es quien reconoce el error de
+Prisma:
+
+- `withOrderTransaction` reintenta la unidad entera hasta 3 veces solo si el fallo es el choque
+  con `orders_company_year_sequence_key` (como hoy). Si el **tercero** vuelve a chocar con esa
+  restricción, lanza `DuplicateOrderNumberError` (del dominio de `pedidos`: un driven puede importar
+  el dominio de su propio módulo). Cualquier otro error sigue subiendo tal cual.
+- Solo el alta inserta en `orders`, así que en la práctica solo el alta puede recibirlo; editar,
+  cancelar, borrar, finalizar y caducar no cambian.
+- El catálogo de errores y `order-actions.ts` no cambian: siguen traduciendo
+  `DuplicateOrderNumberError` a `duplicate_number`.
+- `order-duplicate-number.int.test.ts` vuelve a afirmar lo que afirmaba en `dev`: tras 3
+  transacciones, el alta termina en `DuplicateOrderNumberError` / `duplicate_number` y no queda fila
+  duplicada ni apartado escrito. Se compara con la versión del test en `899c3d22` para no debilitar
+  nada.
+
+Alternativa descartada en §13.12.
+
 ### 5.3 `OrderWriteRepository` (puerto nuevo de `pedidos`)
 
 Los métodos que escriben, sobre el cliente que se les da, más un bloqueo de fila:
@@ -709,6 +763,13 @@ destino `ENTREGADO`, hace dentro de **una** unidad de trabajo: `lockAliveById` �
 `finished_at` (§5.3) → `setReservedAt(null)`. Ningún resultado distinto de `'ok'` deja escrito el
 estado, `finished_at` ni el inventario (R51). Con otro destino (`PENDIENTE → EN_CURSO`) no toca la
 reserva ni `finished_at`.
+
+*(Enmendado el 2026-09-23 (review 2), m-V2-2.)* Lo mismo vale **después** de consumir: si
+`setStatus` devuelve algo distinto de `'ok'` (hoy imposible, porque la fila está bloqueada y se
+comprobó `status === from`, pero el tipo lo permite), `createTransitionOrder` **lanza** dentro de la
+unidad para deshacer el consumo y devuelve ese resultado fuera. Nunca hay un `return` desde dentro
+de la unidad con el consumo ya escrito y el estado sin cambiar. Unit con un `setStatus` doble que
+devuelve `'stale'` tras consumir: la unidad se deshace y el resultado es `'stale'`.
 
 ### 5.5 Puertos que `inventario` declara para no importar `pedidos`
 
@@ -823,6 +884,76 @@ uno con él (verde). Mapea a R28.
 
 Lee lo apartado propio por lote e inserta un `release` o `expire` por cada lote con saldo positivo.
 Si no hay saldo, no escribe nada (idempotente, `R25`).
+
+### 6.6 El coste del pedido por promedio de los lotes con disponible (enmendado el 2026-09-23 (review 2), D22)
+
+**Dónde vive hoy** (árbol de esta rama, sin QC-151 ni QC-122):
+
+- `pedidos/domain/order-cost.ts`, `calculateIngredientsCost`: dominio puro. Por ingrediente ordena
+  los lotes con `compareBatchesOldestFirst` (`:116-119`), acumula `stock` hasta cubrir y corta
+  (`:124-155`), y promedia los costes unitarios **de los lotes usados** (`:161-162`). Trabaja a
+  escala interna 12 con `BigInt`, redondea **una vez** el total mitad arriba a 4 decimales
+  (`:187`) y devuelve `null` si no cubre, si no convierte o si desborda.
+- `pedidos/domain/resolve-ingredients-cost.ts`: lee la receta, `ProductCatalog.findCostingBatches`
+  y `findRefs`, y las unidades, y llama a `calculateIngredientsCost`.
+- `inventario/adapters/driven/persistence/product-catalog-prisma.ts:125-163`,
+  `findCostingBatches`: lotes vivos de la empresa con `stock > 0`, **sin** los de máquina sin
+  presentación o sin coste (`:136-138`). No sabe nada de lo apartado.
+- QC-151 (en `dev`) añade, según su spec, una consulta de solo lectura que cotiza con
+  `resolveIngredientsCost` desde el formulario. **A confirmar en el código al mergear** (task TD22,
+  paso 1): que la cotización y el importe guardado llaman a la misma función. Si QC-151 duplicó el
+  cálculo en otro sitio, se reduce a una sola función antes de cambiarla (R62).
+
+**Qué cambia (D22).**
+
+1. **`CostingBatch` gana `available: string`**: `max(stock − apartado, 0)` por lote, cadena de 4
+   decimales. El apartado sale del mismo agregado del libro de reservas que ya usan el listado de
+   lotes y la cobertura (§3.4, §10: `reserve` suma; `release`, `expire` y `consume` restan), sin
+   segunda definición.
+2. **`ProductCatalog.findCostingBatches(ids, companyId, options?: { excludeOrderId?: string })`**:
+   una sola consulta para todos los productos, como hoy, que devuelve solo los lotes con
+   `available > 0`. Con `excludeOrderId` (R65, pregunta 8), lo apartado por ese pedido **no** se
+   resta. Filtra por empresa las dos tablas (`product_batches` y `reservation_movements`), así que
+   un `excludeOrderId` de otra empresa no cambia nada ni filtra datos (`guard-ambito-empresa-inventario`).
+   Mantiene fuera los lotes sin presentación o sin coste (R66, pregunta 9). `inventario` no importa
+   `pedidos`: el identificador del pedido es una cadena opaca, como en `reservation_movements.order_id`.
+3. **`calculateLineCost`** (`order-cost.ts`), por ingrediente:
+   - lotes del producto con `available > 0` (ya filtrados por la consulta; el dominio lo vuelve a
+     comprobar para no depender de ella);
+   - **suma** de los `available` (convertidos a la unidad de la línea con `convertQuantity`, como
+     hoy según QC-123 D19; tras QC-147 la unidad es la del producto y la conversión es la identidad);
+     si la suma es menor que la necesidad → `null` (R61);
+   - **promedio simple** de los costes unitarios (convertidos como hoy) de **todos** esos lotes, sin
+     ordenar y sin cortar (R59, R60);
+   - `necesidad × promedio`, a escala 12, igual que hoy.
+   El total se redondea **una vez**, mitad arriba, a 4 decimales, y el desbordamiento sigue dando
+   `null` (R63). Con el ejemplo de D22: `37 / 3` a escala 12 es `12.333333333333`, por 30 es
+   `369.99999999999`, que redondea a **`370.0000`**. `compareBatchesOldestFirst` deja de importarse
+   aquí.
+4. **`resolveIngredientsCost(..., options?: { orderId?: string })`** pasa `excludeOrderId` a
+   `findCostingBatches`. La **edición** (`update-order.ts`) pasa el `id` del pedido; el **alta** no
+   pasa nada (aún no ha apartado). La **cotización de QC-151** gana en su entrada un `orderId`
+   opcional, que el formulario de **edición** envía y el de alta no; se valida con el mismo esquema
+   que el resto de la entrada y no abre ninguna lectura del pedido.
+5. **Cuándo se calcula dentro del alta y la edición.** Donde se calcule hoy (confirmar en el código),
+   siempre que sea con la misma función. Con R65 el resultado **no depende** de si se calcula antes
+   o después de `syncForOrder` en la misma transacción, porque lo apartado por el propio pedido se
+   devuelve igual; sin R65 sí dependería (se anota como motivo más de la opción recomendada). Si el
+   cálculo queda dentro de `unitOfWork.run`, lee con el cliente de la transacción, con el mismo
+   patrón que §5.2.2.
+6. **Solo lectura** (R64, QC-123 R22): ni apartado, ni liberación, ni movimiento. La reserva sigue
+   con `planReservation` y su orden (R8).
+
+**Lo que queda derogado de QC-123 y hay que tocar en sus tests.** D3 y D4 de QC-123 **para el
+coste** (y con ellos su R3 y su R5; su R25, el desempate, deja de aplicar al coste; su R4, «no se usa
+la fecha de vencimiento», se sigue cumpliendo porque no hay orden). Los casos de
+`tests/unit/pedidos/order-cost.test.ts` y de `tests/integration/pedidos/order-ingredients-cost.int.test.ts`
+(y los de QC-151 que traiga `dev`) que afirman «acumula hasta cubrir» o «promedio de los usados» se
+**reescriben** contra R59-R61, con el motivo en el nombre del caso («D22 de QC-141 deroga QC-123
+D3/D4»). Es cambiar lo que afirman tests de fichas cerradas por una decisión del humano, no
+debilitarlos: va en la nota del PR junto a las guardias de la vuelta 1. T3 decía «`order-cost.test.ts`
+sigue verde sin cambios»: queda superado por D22. **Los specs de QC-123 y QC-151 no se editan desde
+esta ficha** (fuera de su carpeta); si el humano quiere dejar la nota allí, la escribe el leader.
 
 ---
 
@@ -1043,6 +1174,16 @@ La respuesta del ajuste sobre-reservado **no es un error** (`R33`): es un campo 
 | Guardias | `guard-ambito-empresa-pedidos`: exención por nombre con motivo, «solo `$transaction`» en el exento, sin alias, con anti-placebos (R58). `qc121-alcance`: llamante de `consumeBatchStock` recalcula (R28). La comprobación de comentarios de producción (B1) la hace el reviewer; si existe una guardia que la cubra, debe salir verde |
 | Retirados | Los casos cuyo nombre cita `R29` se borran o se reescriben contra R52; el mapa de la bitácora dice «R29 — retirado (D21)» |
 
+*(Enmendado el 2026-09-23 (review 2).)* Cambios sobre las dos tablas de arriba:
+
+| Nivel | Qué |
+|---|---|
+| Unit, puro (`order-cost.test.ts`) | **R59**: el ejemplo de D22 da `370.0000`. **R60**: con disponibles de 1 L a 10 y 99 L a 20 el promedio es 15 (no ponderado); un lote que no hace falta para cubrir entra en el promedio; un lote con `available` `0` no entra aunque tenga `stock`; el resultado no cambia al permutar los lotes. **R61**: suma de disponibles menor que la necesidad → `null`, y exactamente igual → número. **R63**: disponibles y costes con cuatro decimales (`0.5`, `12.3456`) sin pérdida y un solo redondeo final; desbordamiento → `null` |
+| Unit, casos de uso | `update-order`: el cálculo recibe el `id` del pedido (R65); `create-order`: sin `orderId`. `transition-order`: `setStatus` que devuelve `'stale'` tras consumir deshace la unidad (m-V2-2, R51) |
+| Integración (`order-ingredients-cost.int.test.ts`, `order-reservation.int.test.ts`) | **R59/R64**: tres lotes A/B/C del ejemplo, alta de 30 L → importe `370.0000`, apartado 20 de A y 10 de B, ningún asiento de C. **R60**: otro pedido aparta todo A → el importe del siguiente promedia B y C. Lote sobre-reservado → fuera del promedio. **R61**: disponibles que no cubren → importe nulo aunque la existencia total sí cubriría. **R62**: la consulta de cotización de QC-151 y el alta devuelven el mismo valor con los mismos datos, y los dos nulos cuando no cubre. **R63**: editar recalcula y sustituye, también a nulo. **R65**: editar sin cambios un pedido que apartó entero un lote conserva el importe; la cotización de edición con `orderId` coincide. **R66**: un lote de máquina sin coste con disponible no entra ni en el promedio ni en la cobertura. **Aislamiento**: un `excludeOrderId` de otra empresa no cambia el resultado. `order-duplicate-number.int`: `DuplicateOrderNumberError` / `duplicate_number` tras 3 transacciones y sin fila duplicada (V2-B3) |
+| Guardias | `qc145-estado-solo-planta` R29 (esquema): esperado = **unión sin duplicar** de los modelos de `git merge-base origin/dev HEAD` y `['ReservationMovement']`, con un caso de fuente fabricada en el que la base **ya** tiene el modelo y sigue verde (V2-B2). `qc145-estado-solo-planta` R10: la lista **exacta** de funciones de `order-prisma.ts` con un bloque `status:` (hoy `setAliveOrderStatus` con `status: to` y `cancelAlive`; confirmar en el código), y un anti-placebo con una escritura nueva `status: <variable>` que sale en rojo (m-V2-5). `guard-ambito-empresa-pedidos`: `aliasDePrisma` reconoce `import { a, prisma as X }`, comillas dobles e `import * as X from '@/lib/shared/db/prisma'`, con un anti-placebo por forma; en el archivo exento, ningún `tx.<modelo>` (anti-placebo con `tx.order.findMany` dentro del callback) (m-V2-3, R58). `guard-ambito-empresa-inventario` verde con la consulta nueva de §6.6 |
+| E2E | Además de `reserva-de-material`, `ejecucion-receta`, `ajuste-de-inventario`, `pedidos` y `pedidos-terminados`: **`pedidos-busqueda`** (QC-122) y **`pedidos-cotizacion`** (QC-151), en Chromium y WebKit. `pedidos-cotizacion` gana un caso con el ejemplo de D22 (tres lotes, cotización de 30 → `$ 370.00`) si su preparación de datos permite sembrar los tres lotes con coste; si no, se deja escrito por qué y R59 queda cubierto por integración. Si algún valor esperado de ese E2E dependía de «acumular hasta cubrir», se ajusta con el motivo en el nombre |
+
 Cada `R<n>` va en el nombre de su caso; el mapa `R → test` lo escribe el implementer en
 `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
 
@@ -1127,6 +1268,29 @@ Descartada frente al cursor: la lista crece sin tope dentro de una ejecución y 
 y no aprovecha el orden `reserved_at, id` que ya da `orders_expirable_idx`. El cursor da lo mismo
 (ningún pedido se pide dos veces) en espacio constante.
 
+### 13.11 Costear con la existencia total, sin descontar lo apartado (D22)
+
+Dejar `findCostingBatches` como está (`stock > 0`) y cambiar solo el promedio. Descartada: D22
+dice «disponible = total − reservado». Con la existencia total, un lote apartado entero por otro
+pedido seguiría entrando en el promedio y en la cobertura, y la cotización diría «hay material»
+para un pedido que después no aparta: justo el síntoma que originó la ficha.
+
+### 13.12 Traducir el correlativo agotado en `create-order.ts` sobre un resultado tipado (V2-B3)
+
+Que `withOrderTransaction` devuelva `{ kind: 'duplicate_number' }` y `create-order.ts` lance el
+error. Descartada: `withOrderTransaction` es genérica para todas las operaciones de la unidad y su
+tipo de retorno es el del trabajo; añadirle un resultado propio obligaría a todos los llamantes a
+tratar un caso que solo el alta puede producir. Reconocer el choque de Prisma es cosa del adaptador,
+y lanzar el error de dominio desde ahí deja `create-order.ts` como estaba en `dev`.
+
+### 13.13 Calcular el coste de la edición con el disponible general, sin devolver lo propio (pregunta 8)
+
+Es la lectura literal de «disponible = total − reservado». Descartada como recomendación (queda
+como alternativa de la pregunta 8): el importe de una edición dependería de si se calcula antes o
+después de `syncForOrder`, una edición sin cambios podría cambiar el importe o dejarlo en blanco, y
+la cotización de edición no coincidiría con la del alta del mismo pedido. La reserva ya resolvió lo
+mismo así en R12.
+
 ---
 
 ## 14. Dependencias
@@ -1163,6 +1327,17 @@ comparación en tiempo constante es `node:crypto`. Los decimales, `BigInt` (§2.
   registra un baseline de QC-145 con `guard-arquitectura-modulos` en rojo por un import profundo de
   `a01c90cb` en `product-actions`. Si llega con el merge, se trata como rojo heredado según
   `docs/verification.md`, no se arregla aquí sin decirlo, y no cuenta como fallo de esta rama.
+- *(Enmienda del 2026-09-23 (review 2).)* **D22 cambia importes que ya se ven.** Tras QC-122 y
+  QC-151 el importe se pinta; con D22, un pedido editado después del merge puede cambiar de importe
+  sin que cambie nada más (entra un lote más caro en el promedio, o uno sale porque otro pedido lo
+  apartó). Es el efecto de la decisión, no un fallo; los pedidos no editados conservan el importe
+  guardado (QC-123 D8).
+- *(Enmienda del 2026-09-23 (review 2).)* **La cotización pasa a leer el libro de reservas.** Una
+  consulta más pesada en cada recotización (cada ~500 ms al teclear, QC-151). Una sola consulta con
+  agregado por lote, como la del listado de lotes; si se nota, se mide antes del PR.
+- *(Enmienda del 2026-09-23 (review 2).)* **La base propia puede no revertir** (igual que en TR):
+  si TR2 obliga a renumerar, los `down` de §4.1 y §4.2 fallan a propósito con los datos de los E2E.
+  Si fallan, se para y se pregunta.
 - **Paralelismo**: la ficha toca `lib/composition/index.ts`, `db/schema.prisma`,
   `order-prisma.ts`, `product-prisma.ts` y `finish-assigned-order.ts`. Cualquier otra ficha
   `in_progress` sobre esos archivos choca (`AGENTS.md > Paralelismo`).

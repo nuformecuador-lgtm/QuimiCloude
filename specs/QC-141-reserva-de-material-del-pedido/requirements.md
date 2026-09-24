@@ -1,5 +1,14 @@
 # QC-141 — reserva-de-material-del-pedido · requirements.md
 
+> **Enmendado el 2026-09-23 (review 2).** Tercera enmienda, tras el review de la vuelta 2
+> (RECHAZADO, V2-B1..V2-B4 y m-V2-1..m-V2-5 en `progress/review_QC-141-reserva-de-material-del-pedido.md`)
+> y la decisión del humano registrada en la fila **D22**: el coste de ingredientes del pedido
+> —cotización de QC-151 e importe guardado de QC-123— pasa a ser, por ingrediente, **cantidad
+> necesaria × promedio simple del coste unitario de todos los lotes con disponible > 0**. Nacen
+> **R59 a R66** (sección L); R65 y R66 cuelgan de las preguntas abiertas **8** y **9**, nuevas. Se
+> corrige la cabecera de «Preguntas abiertas», que daba la 7 por abierta (m-V2-4). Ningún requisito
+> anterior cambia de texto.
+
 > **Enmendado el 2026-09-23 (review).** Segunda enmienda, decidida por el humano tras el review
 > F2.2 (RECHAZADO, `progress/review_QC-141-reserva-de-material-del-pedido.md`) y registrada en la
 > fila **D21** de la tabla de decisiones. **Solo el Finalizar consume**, y lo hace en la misma
@@ -42,7 +51,8 @@
 > D12 caminos de entrega, D13 concurrencia, D14 existencia del producto, D15 permisos, D16 borrado
 > e identificadores, D17 E2E, D18 sin dependencia nueva, D19 enmienda del 2026-09-23 (fórmula de
 > QC-147), D20 candidatos del proceso diario empresa por empresa, D21 enmienda del review del
-> 2026-09-23 (excepción de la transacción compartida, solo el Finalizar consume, menores).
+> 2026-09-23 (excepción de la transacción compartida, solo el Finalizar consume, menores), D22
+> coste del pedido por promedio de los lotes con disponible (review 2, 2026-09-23).
 >
 > **Vocabulario.** *Pedido vivo*: `PENDIENTE` o `EN_CURSO`, no borrado. *Cantidad necesaria* de un
 > ingrediente: cantidad del pedido × porcentaje de su línea de receta / 100, expresada en la unidad
@@ -314,11 +324,61 @@ cambiar nada `[D10]` `[D16]` `[D21]`.
 y la única operación exenta de ese filtro DEBE ser la apertura de la transacción que comparten
 pedidos e inventario, que no lee ni escribe ninguna tabla `[D15]` `[D21]`.
 
+### L. Coste del pedido por promedio de los lotes con disponible (enmienda del review 2, 2026-09-23)
+
+> **Coste de ingredientes** de un pedido: la cotización en vivo del formulario de alta y de edición
+> (QC-151) y el importe que se guarda al crear y al editar (QC-123). *Disponible* es el del
+> vocabulario de arriba (existencia menos apartado, nunca por debajo de cero). Lo que D22 **no**
+> cambia de QC-123 —«sin importe» con la misma salida en todos sus casos, unidad y conversión según
+> su D19 (tras QC-147, la unidad del producto), `Decimal(14,4)`, se guarda y se recalcula en cada
+> edición, solo lectura, después de exigir `pedidos.modificar`— sigue exigido por los requisitos de
+> QC-123 y QC-151 y no se repite aquí salvo donde D22 lo toca.
+
+**R59.** CUANDO el sistema calcule el coste de ingredientes de un pedido, DEBE calcular el de cada
+ingrediente como su cantidad necesaria multiplicada por el **promedio simple** de los costes
+unitarios de **todos** los lotes de ese producto de la empresa del pedido con disponible mayor que
+cero, se necesiten o no para cubrirlo, y el del pedido como la suma de los de sus ingredientes: con
+una necesidad de 30 L y disponibles A 20 L a 10, B 20 L a 12 y C 50 L a 15, el ingrediente cuesta
+30 × (10 + 12 + 15) / 3 = `370.0000` `[D22]`.
+
+**R60.** El sistema NO DEBE ponderar el promedio de R59 por la cantidad de ningún lote, NO DEBE
+limitarlo a los lotes que harían falta para cubrir la necesidad ni depender de su orden, y NO DEBE
+incluir en él un lote cuyo disponible sea cero —sin existencia, totalmente apartado o
+sobre-reservado— `[D22]`.
+
+**R61.** SI la suma de los disponibles de los lotes de un ingrediente es menor que su cantidad
+necesaria, ENTONCES el pedido DEBE quedar **sin importe**, en la cotización y en lo guardado, con la
+misma salida que los demás casos sin importe de QC-123, sin número parcial y sin `0` `[D22]`.
+
+**R62.** El sistema DEBE obtener la cotización del formulario y el importe que guarda al crear o
+editar con el **mismo** cálculo, de modo que con la misma receta, cantidad, lotes y apartados las
+dos devuelvan el mismo valor o las dos queden sin importe `[D22]`.
+
+**R63.** CUANDO se cree o se edite un pedido, el sistema DEBE calcular su importe con R59 a R61 y
+guardarlo con cuatro decimales, operando existencias, apartados, disponibles y costes como decimales
+exactos sin coma flotante y redondeando una sola vez el total, mitad arriba, al cuarto decimal; en
+la edición el nuevo importe DEBE sustituir al guardado, también cuando pasa a «sin importe» `[D22]`
+`[D5]`.
+
+**R64.** El cálculo del coste NO DEBE cambiar qué lotes aparta la reserva ni cuánto de cada uno
+(R8), ni escribir ningún apartado, liberación o movimiento de inventario: con los datos de R59, el
+pedido aparta 20 L de A y 10 L de B, y su importe sigue siendo el promedio de A, B y C `[D22]` `[D4]`.
+
+**R65.** *(Pregunta 8, pendiente de aprobación; opción recomendada.)* CUANDO se calcule el coste de
+un pedido que ya existe —su edición y la cotización del formulario de edición—, el sistema DEBE
+contar como disponible de cada lote, además del disponible general, lo que ese mismo pedido tiene
+apartado en él `[D22]`.
+
+**R66.** *(Pregunta 9, pendiente de aprobación; opción recomendada.)* El sistema NO DEBE incluir en
+el promedio de R59 ni en la suma de R61 un lote sin coste unitario o sin presentación `[D22]`.
+
 ## Preguntas abiertas
 
 > *(Enmendado el 2026-09-23 (review).)* Las preguntas 1 a 6 están **resueltas**: la 1-5 con las
 > opciones recomendadas de `design.md > 0.1`, aprobadas en F1.4 el 2026-09-22; la 6 con E1 y E2,
-> aprobadas el 2026-09-23 (D21). Se conservan como registro. La **7** es nueva y sigue abierta.
+> aprobadas el 2026-09-23 (D21). Se conservan como registro. ~~La **7** es nueva y sigue abierta.~~
+> *(Enmendado el 2026-09-23 (review 2), m-V2-4.)* La **7** también está **resuelta** (opción (b),
+> el mismo día; ver su texto). **Abiertas: la 8 y la 9**, nuevas con D22.
 
 1. **Pedido que nunca se cubre.** Con «todo o nada», un pedido que no alcanza no aparta nada, así
    que no tiene reserva que caduque. ¿Se cancela también a los 15 días de creado, o espera
@@ -343,7 +403,23 @@ pedidos e inventario, que no lee ni escribe ninguna tabla `[D15]` `[D21]`.
    decidir: **(a)** hacer el orden total en los dos lados —por ejemplo, los lotes de solo dígitos
    antes que los demás, que cambia el orden del **coste** de QC-123 cuando se mezclan tipos en una
    misma fecha—, o **(b)** aceptar que con ciclo no se garantiza la paridad y dejarlo escrito. Ver
-   `design.md > 4.3.1`.
+   `design.md > 4.3.1`. *(Nota del review 2: con D22 el coste ya no recorre los lotes en orden, así
+   que el efecto de (a) sobre el coste que se cita aquí desaparece; la resolución (b) no cambia.)*
+8. **(Review 2, 2026-09-23. ABIERTA.) ¿El coste de un pedido que ya existe cuenta lo que él mismo
+   tiene apartado?** D22 fija «disponible = total − reservado». En una **edición**, lo reservado
+   incluye lo que aparta el propio pedido: si no se le devuelve, un pedido que se edita sin cambiar
+   nada puede ver salir de su promedio el lote que él mismo apartó entero, o quedarse «sin importe»
+   aunque está cubierto por su propia reserva, y la cotización de edición no coincidiría con lo que
+   se guardaría al crear el mismo pedido de cero. **Opción recomendada:** contarlo como disponible
+   para ese pedido, igual que R12 hace con la reserva (R65). **Alternativa:** disponible general sin
+   excepción. Al crear no hay diferencia: el pedido aún no ha apartado nada. Ver `design.md > 6.6`.
+9. **(Review 2, 2026-09-23. ABIERTA.) Lotes sin coste unitario o sin presentación.** D22 dice «TODOS
+   los lotes del producto con disponible > 0». Desde `a01c90cb` (`dev`) un lote de máquina puede no
+   tener `unit_cost` ni presentación, y el cálculo vigente los **excluye** del costeo
+   (`product-catalog-prisma.ts:136-138`, `findAliveBatchesWithStock`): no tienen coste que promediar.
+   **Opción recomendada:** mantener la exclusión, del promedio **y** de la suma que decide si hay
+   cobertura (R66), que es lo que hace hoy el código. **Alternativas:** (a) contar su disponible para
+   la cobertura pero no en el promedio; (b) que un lote así con disponible deje el pedido sin importe.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -370,3 +446,4 @@ pedidos e inventario, que no lee ni escribe ninguna tabla `[D15]` `[D21]`.
 | 2026-09-23 | ¿Qué fórmula usa la reserva tras QC-147? | **Adopta la fórmula de QC-147**: lo que aparta, libera y consume un pedido es **cantidad del pedido × % de la línea / 100**, en la **unidad fija del producto** (QC-121), sin unidad en la línea ni conversión; se retira la regla de «unidad sin base común» de D4 (pregunta N3). Enmienda pedida por el humano. **Pendientes de aprobar** (propuesta en `design.md > 0.3`): **E1** — un producto **sin unidad** (sin lotes) cuenta como **«no alcanza»**, y el pedido no aparta nada (todo o nada); **E2** — un pedido con receta **sin líneas** (todas tras la migración de QC-147) **no aparta** y no da error al crear, editar o migrar, y **su entrega se rechaza** con `recipe_without_lines` si no tiene nada apartado |
 | 2026-09-23 | ¿Cómo encuentra el proceso diario los pedidos caducados? | **Empresa por empresa**, filtrando cada consulta por la empresa, sin excepción en la guardia de ámbito de pedidos (`design.md > 9.1`). Y en el registro de códigos de error **manda la convención de comentarios**: los códigos nuevos no citan la ficha. Decidido por el humano en F2.1 |
 | 2026-09-23 | ¿Cómo se cierra el review F2.2 (RECHAZADO)? | Decidido por el humano. **(1) Excepción con nombre (B3):** `order-unit-of-work-prisma.ts` usa el cliente global de Prisma **solo** para abrir la transacción que comparten pedidos e inventario; queda exento de `guard-ambito-empresa-pedidos` **por nombre de archivo**, con el motivo escrito en la guardia citando esta decisión. Se retira el alias `sharedPrismaClient` y se vuelve a importar como `prisma`: la excepción es visible, no depende de que la guardia no reconozca un alias. **(2) Solo el Finalizar consume (B4):** se retira el consumo al entregar desde la edición en Pedidos (R29), camino que QC-145 ya quitó; el Finalizar consume el material **y** escribe `finished_at` (QC-145) **en la misma transacción**: las dos cosas o ninguna. Ajusta **D12**: el único camino que deja un pedido `ENTREGADO` es el Finalizar. **(3) Menores m1-m7, todos en esta vuelta.** Además, **E1 y E2 (D19) están aprobados desde el 2026-09-23**, y con ellos R9, R49 y R50 |
+| 2026-09-23 | ¿Cómo se calcula el coste de ingredientes del pedido ahora que hay reserva? (review 2) | Decidido por el humano. El coste de ingredientes de un pedido —la **cotización en vivo de QC-151** al crear y el **importe que QC-123 guarda** al crear y editar, que salen del mismo cálculo— pasa a ser, por ingrediente, **cantidad necesaria × promedio simple del coste unitario de TODOS los lotes del producto con disponible > 0** (disponible = total − reservado), se usen o no para cubrir el pedido. Ejemplo aprobado: necesita 30 L; disponible A 20 L a $10, B 20 L a $12, C 50 L a $15 → promedio ($10 + $12 + $15) / 3 = $12,33/L. **Deroga QC-123 D3** («lotes con existencia, más antiguo primero, acumulando hasta cubrir») **y D4** («promedio de los lotes usados») **para el coste**. **Se mantiene** de QC-123: si el disponible total no cubre la necesidad, el pedido queda **sin importe** (D5/D7); conversión y unidad según D19; `Decimal(14,4)`; se guarda y se recalcula en cada edición. **La reserva no cambia**: sigue apartando del disponible, más antiguo primero |
