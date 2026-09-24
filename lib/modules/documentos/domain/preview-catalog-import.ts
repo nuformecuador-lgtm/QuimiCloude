@@ -54,11 +54,11 @@ import {
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** El caso de uso de `proveedores` ya construido, no su fabrica: quien lo cablea es
- *  `lib/composition` (T14), nunca este modulo. */
+ *  `lib/composition`, nunca este modulo. */
 type FindAliveCatalogLinesByIdentity = ReturnType<typeof createFindCatalogLinesByIdentity>;
-/** Idem para la escritura por identidad: `confirm-catalog-import.ts` (T10) es quien la invoca. */
+/** Idem para la escritura por identidad: `confirm-catalog-import.ts` es quien la invoca. */
 type ImportCatalogLines = ReturnType<typeof createImportCatalogLines>;
-/** Idem para el alta de presentacion de `inventario`: tambien de uso exclusivo de T10. */
+/** Idem para el alta de presentacion de `inventario`: tambien de uso exclusivo de la confirmacion. */
 type CreatePresentation = ReturnType<typeof createCreatePresentation>;
 
 /** Dependencias compartidas por la vista previa y la confirmacion: un solo tipo para que no haya
