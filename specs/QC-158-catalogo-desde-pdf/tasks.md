@@ -203,7 +203,7 @@ Archivos: `components/shared/document-upload/{document-upload,document-upload-ro
 (`formula` sin enlace); los tests existentes de `documentos-ui` siguen verdes sin cambios;
 `proveedores/scope.test.ts` verde (`components/` sin archivos que casen `proveedor|supplier`).
 
-## T14 — Cableado y dobles E2E `[depende de T8, T10]` `[F4]`
+## [x] T14 — Cableado y dobles E2E `[depende de T8, T10]` `[F4]`
 
 Archivos: `lib/composition/index.ts` (fachada `documentos`: `previewCatalogImport`,
 `confirmCatalogImport`, `CropCatalog`; `cropStorage` con doble; fachada `proveedores`: los dos casos
