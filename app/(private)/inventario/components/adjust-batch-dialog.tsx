@@ -46,11 +46,35 @@ const CANCEL_LABEL = 'Cancelar';
 const ADJUST_SUCCESS = 'Existencia ajustada.';
 const ZERO_DELTA_MESSAGE = 'La cantidad no puede ser cero.';
 const MISSING_REASON_MESSAGE = 'Elegi un motivo.';
+const OVER_RESERVED_MESSAGE =
+  'El lote queda sobre-reservado: hay pedidos sin cobertura completa.';
 
-/** Mismo patron que la action: el signo se conserva y solo un entero pasa. */
-const INTEGER_PATTERN = /^-?\d+$/;
+/** Mismo patron que la action: el signo se conserva, hasta 4 decimales pasan. */
+const DECIMAL_DELTA_PATTERN = /^-?\d{1,10}(\.\d{1,4})?$/;
+
+/** Cero de cualquier forma decimal: `'0'`, `'0.0'`, `'-0.0000'`... todas son «no cambia nada». */
+const ZERO_DELTA_PATTERN = /^-?0+(\.0+)?$/;
 
 const INITIAL_STATE: AdjustBatchStockFormState = { status: 'idle' };
+
+/**
+ * Deja en el campo solo lo que puede ser un decimal CON SIGNO: digitos, un signo menos al
+ * principio y un punto, hasta 4 decimales -la escala de la columna-. La coma se convierte en
+ * punto en vez de descartarse, igual que en `sanitizeCostInput` (`product-cost-amount.ts`): es el
+ * separador del teclado en castellano y tirarla multiplicaria la cantidad por diez en silencio.
+ */
+function sanitizeDeltaInput(raw: string): string {
+  const negative = raw.trimStart().startsWith('-');
+  const onlyAmountCharacters = raw.replace(/,/g, '.').replace(/[^\d.]/g, '');
+  const [whole = '', ...afterFirstDot] = onlyAmountCharacters.split('.');
+
+  const hasDot = afterFirstDot.length > 0;
+  const head = (whole === '' && hasDot ? '0' : whole).slice(0, 10);
+  const sign = negative ? '-' : '';
+
+  if (!hasDot) return `${sign}${head}`;
+  return `${sign}${head}.${afterFirstDot.join('').slice(0, 4)}`;
+}
 
 export type AdjustBatchDialogProps = {
   readonly batch: ProductBatchView;
@@ -95,11 +119,15 @@ function AdjustBatchDialogContent({
   const [requestedOpen, setRequestedOpen] = useState(false);
   const [zeroError, setZeroError] = useState(false);
   const [reasonError, setReasonError] = useState(false);
+  const [delta, setDelta] = useState('');
   const [state, formAction, isPending] = useActionState(adjustBatchStockAction, INITIAL_STATE);
 
   // El dialogo abierto se DERIVA del pedido del usuario y del resultado de la operacion, igual
   // que en `delete-product-dialog.tsx`: evita el `setState` sincrono dentro de un efecto.
-  const open = requestedOpen && state.status !== 'success';
+  // Sobre-reservado es la unica excepcion: se queda abierto con el aviso a la vista hasta que el
+  // usuario lo cierra a proposito, en vez de desaparecer con el resto del exito.
+  const overReserved = state.status === 'success' && state.overReserved;
+  const open = requestedOpen && (state.status !== 'success' || overReserved);
 
   useEffect(() => {
     if (state.status !== 'success') return;
@@ -112,10 +140,13 @@ function AdjustBatchDialogContent({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const formData = new FormData(event.currentTarget);
-    const delta = formData.get(DELTA_FIELD);
+    const typedDelta = formData.get(DELTA_FIELD);
     const reason = formData.get(REASON_FIELD);
 
-    const isZero = typeof delta === 'string' && INTEGER_PATTERN.test(delta) && Number(delta) === 0;
+    const isZero =
+      typeof typedDelta === 'string' &&
+      DECIMAL_DELTA_PATTERN.test(typedDelta) &&
+      ZERO_DELTA_PATTERN.test(typedDelta);
     const isMissingReason = typeof reason !== 'string' || reason.length === 0;
 
     if (isZero || isMissingReason) {
@@ -136,6 +167,7 @@ function AdjustBatchDialogContent({
         if (next) {
           setZeroError(false);
           setReasonError(false);
+          setDelta('');
         }
       }}
     >
@@ -178,6 +210,16 @@ function AdjustBatchDialogContent({
           </p>
         ) : null}
 
+        {overReserved ? (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            data-testid="adjust-batch-over-reserved"
+          >
+            {OVER_RESERVED_MESSAGE}
+          </p>
+        ) : null}
+
         {error === undefined ? null : (
           <div
             role="alert"
@@ -209,10 +251,11 @@ function AdjustBatchDialogContent({
             <Input
               id={deltaId}
               name={DELTA_FIELD}
-              type="number"
-              step={1}
+              type="text"
               required
-              inputMode="numeric"
+              inputMode="decimal"
+              value={delta}
+              onChange={(event) => setDelta(sanitizeDeltaInput(event.currentTarget.value))}
               className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
               aria-describedby={zeroError ? zeroErrorId : undefined}
               data-testid="adjust-batch-delta"

@@ -277,8 +277,8 @@ model Product {
   nameNormalized String      @map("name_normalized")
   type           ProductType @default(PRODUCT) @map("type")
   unitId         String?     @map("unit_id") @db.Uuid
-  stock          Int         @default(0)
-  qtyAlert       Int?        @map("qty_alert")
+  stock          Decimal     @default(0) @db.Decimal(14, 4)
+  qtyAlert       Decimal?    @map("qty_alert") @db.Decimal(14, 4)
   imagePath      String?     @map("image_path")
   companyId      String      @map("company_id") @db.Uuid
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -305,7 +305,7 @@ model ProductBatch {
   /// Anulable: solo MACHINE (Instrumento) omite presentacion y costo en el borde; PRODUCT y
   /// PACKAGING siguen exigiendolos en `product-input.ts`. La obligatoriedad vive en dominio.
   presentationId String?   @map("presentation_id") @db.Uuid
-  stock          Int
+  stock          Decimal   @db.Decimal(14, 4)
   unitCost       Decimal?  @map("unit_cost") @db.Decimal(14, 4)
   /// Texto exacto, sin normalizar: la unicidad por empresa distingue mayusculas.
   lot            String    @map("lot")
@@ -324,6 +324,7 @@ model ProductBatch {
   movements    InventoryMovement[]
 
   @@unique([companyId, lot], map: "product_batches_company_lot_unique")
+  @@unique([id, companyId], map: "product_batches_id_company_id_key")
   @@index([companyId], map: "product_batches_company_id_idx")
   @@index([productId], map: "product_batches_product_id_idx")
   @@index([presentationId], map: "product_batches_presentation_id_idx")
@@ -338,20 +339,24 @@ model ProductBatch {
 enum InventoryMovementKind {
   opening
   adjustment
+  consumption
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
 /// `companyId` y `createdBy` no llevan `@relation`: `Company` y `User` son de otro modulo, sus
 /// FK estan escritas a mano y son drift. NULL en `createdBy` = no lo hizo una persona. `batchId`
 /// si lleva `@relation`: `ProductBatch` es del mismo modulo. `reason` sigue siendo `TEXT`, con un
-/// CHECK que enumera los motivos; el conjunto vive en una constante del dominio.
+/// CHECK que enumera los motivos; el conjunto vive en una constante del dominio. `orderId` no
+/// lleva `@relation`: `Order` es de otro modulo; su FK compuesta con `companyId` esta escrita a
+/// mano contra `orders_id_company_id_key`, y solo un asiento `consumption` la lleva.
 /// @module inventario
 model InventoryMovement {
   id        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   batchId   String                @map("batch_id") @db.Uuid
   kind      InventoryMovementKind
-  quantity  Int
+  quantity  Decimal               @db.Decimal(14, 4)
   reason    String?
+  orderId   String?               @map("order_id") @db.Uuid
   companyId String                @map("company_id") @db.Uuid
   createdBy String?               @map("created_by") @db.Uuid
   createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -361,7 +366,41 @@ model InventoryMovement {
   @@index([batchId], map: "inventory_movements_batch_id_idx")
   @@index([companyId], map: "inventory_movements_company_id_idx")
   @@index([createdBy], map: "inventory_movements_created_by_idx")
+  @@index([orderId], map: "inventory_movements_order_id_idx")
   @@map("inventory_movements")
+}
+
+/// Libro append-only de lo que un pedido tiene apartado en un lote. Lo apartado en un lote es
+/// la suma con signo: `reserve` suma, los otros tres restan.
+enum ReservationMovementKind {
+  reserve
+  release
+  expire
+  consume
+}
+
+/// Sin `updatedAt` ni `deletedAt`, como `InventoryMovement`: un asiento no se corrige, se
+/// corrige con otro. `orderId`, `batchId`, `companyId` y `createdBy` no llevan `@relation`:
+/// `orderId` es de `pedidos`, `batchId` es una FK COMPUESTA `(batch_id, company_id)` contra
+/// `product_batches_id_company_id_key` que Prisma no modela con un solo campo, y `companyId` y
+/// `createdBy` son de `identity`. Las cuatro FK estan escritas a mano y son drift para Prisma.
+/// `createdBy` NULL = lo hizo el sistema (proceso diario, migracion).
+/// @module inventario
+model ReservationMovement {
+  id        String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String                  @map("company_id") @db.Uuid
+  orderId   String                  @map("order_id") @db.Uuid
+  batchId   String                  @map("batch_id") @db.Uuid
+  kind      ReservationMovementKind
+  quantity  Decimal                 @db.Decimal(14, 4)
+  createdBy String?                 @map("created_by") @db.Uuid
+  createdAt DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([batchId], map: "reservation_movements_batch_id_idx")
+  @@index([orderId], map: "reservation_movements_order_id_idx")
+  @@index([companyId], map: "reservation_movements_company_id_idx")
+  @@index([createdBy], map: "reservation_movements_created_by_idx")
+  @@map("reservation_movements")
 }
 
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
@@ -566,6 +605,10 @@ model Order {
   /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
   /// escribio. NULL = no se pudo calcular; nunca 0.
   ingredientsCost    Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
+  /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
+  /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
+  /// entregar lo vacian.
+  reservedAt         DateTime?     @map("reserved_at") @db.Timestamptz(6)
   /// El envase en que se entrega lo fabricado, del catalogo de `inventario`. NULL en los
   /// pedidos que existian antes de esta columna. Sin `@relation`: es drift, con FK COMPUESTA
   /// `(company_id, presentation_id)` escrita a mano en la migracion.

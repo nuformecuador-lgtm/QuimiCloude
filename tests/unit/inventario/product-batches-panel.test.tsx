@@ -33,7 +33,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
   return {
     id: crypto.randomUUID(),
     lot: 'L-001',
-    stock: 10,
+    stock: '10',
     unitId: crypto.randomUUID(),
     purchaseDate: '2026-03-05',
     expiryDate: null,
@@ -50,9 +50,9 @@ describe('ProductBatchesPanel', () => {
     const kilogramo = unidad({ id: 'unit-kg', name: 'Kilogramo', symbol: 'kg' });
     const litro = unidad({ id: 'unit-l', name: 'Litro', symbol: 'L' });
     const batches: ProductBatchView[] = [
-      lote({ id: 'b1', lot: 'L-001', stock: 10, unitId: 'unit-kg', purchaseDate: '2026-03-05' }),
-      lote({ id: 'b2', lot: 'L-002', stock: 25, unitId: 'unit-l', purchaseDate: '2026-04-10' }),
-      lote({ id: 'b3', lot: 'L-003', stock: 3, unitId: 'unit-kg', purchaseDate: '2026-05-01' }),
+      lote({ id: 'b1', lot: 'L-001', stock: '10', unitId: 'unit-kg', purchaseDate: '2026-03-05' }),
+      lote({ id: 'b2', lot: 'L-002', stock: '25', unitId: 'unit-l', purchaseDate: '2026-04-10' }),
+      lote({ id: 'b3', lot: 'L-003', stock: '3', unitId: 'unit-kg', purchaseDate: '2026-05-01' }),
     ];
 
     render(<ProductBatchesPanel batches={batches} units={[kilogramo, litro]} />);
@@ -74,7 +74,7 @@ describe('ProductBatchesPanel', () => {
   });
 
   it('no convierte: la cantidad pintada es exactamente `batch.stock`, sin catalogo de unidades', () => {
-    const batches: ProductBatchView[] = [lote({ id: 'b1', stock: 7 })];
+    const batches: ProductBatchView[] = [lote({ id: 'b1', stock: '7' })];
 
     render(<ProductBatchesPanel batches={batches} />);
 
@@ -82,11 +82,85 @@ describe('ProductBatchesPanel', () => {
   });
 
   it('unidad desconocida en el catalogo pinta el marcador de vacio', () => {
-    const batches: ProductBatchView[] = [lote({ id: 'b1', stock: 4, unitId: 'unit-desconocida' })];
+    const batches: ProductBatchView[] = [lote({ id: 'b1', stock: '4', unitId: 'unit-desconocida' })];
 
     render(<ProductBatchesPanel batches={batches} units={[unidad({ id: 'unit-kg' })]} />);
 
     expect(screen.getByTestId('product-batch-quantity')).toHaveTextContent('4 —');
+  });
+
+  it('R6 — la cantidad se pinta a dos decimales, con la cifra exacta en el title y el aria-label', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '0.0001' }),
+      lote({ id: 'b2', stock: '1.5' }),
+      lote({ id: 'b3', stock: '12345.6789' }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    const b1 = screen.getByTestId('product-batch-b1').querySelector('[data-testid="product-batch-quantity"]')!;
+    expect(b1).toHaveTextContent('0');
+    expect(b1).toHaveAttribute('title', '0.0001');
+    expect(b1).toHaveAttribute('aria-label', '0.0001');
+
+    const b2 = screen.getByTestId('product-batch-b2').querySelector('[data-testid="product-batch-quantity"]')!;
+    expect(b2).toHaveTextContent('1.5');
+    expect(b2).not.toHaveAttribute('title');
+    expect(b2).toHaveAttribute('aria-label', '1.5');
+
+    const b3 = screen.getByTestId('product-batch-b3').querySelector('[data-testid="product-batch-quantity"]')!;
+    expect(b3).toHaveTextContent('12345.68');
+    expect(b3).toHaveAttribute('title', '12345.6789');
+    expect(b3).toHaveAttribute('aria-label', '12345.6789');
+  });
+
+  it('R37 — pinta el apartado y el disponible de un lote junto a su unidad, con la cifra exacta', () => {
+    const kilogramo = unidad({ id: 'unit-kg', name: 'Kilogramo', symbol: 'kg' });
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '10', unitId: 'unit-kg', reserved: '4.1234', available: '5.8766' }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} units={[kilogramo]} />);
+
+    const apartado = screen.getByTestId('product-batch-reserved');
+    expect(apartado).toHaveTextContent('4.12 kg');
+    expect(apartado).toHaveAttribute('title', '4.1234');
+    expect(apartado).toHaveAttribute('aria-label', '4.1234 kg');
+
+    const disponible = screen.getByTestId('product-batch-available');
+    expect(disponible).toHaveTextContent('5.88 kg');
+    expect(disponible).toHaveAttribute('title', '5.8766');
+    expect(disponible).toHaveAttribute('aria-label', '5.8766 kg');
+  });
+
+  it('sin apartado ni disponible (fuera de `findBatchesOfAliveProduct`), no pinta esas dos celdas', () => {
+    const batches: ProductBatchView[] = [lote({ id: 'b1' })];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.queryByTestId('product-batch-reserved')).toBeNull();
+    expect(screen.queryByTestId('product-batch-available')).toBeNull();
+  });
+
+  it('R34 — un lote sobre-reservado lleva la marca «Sobre-reservado» como texto, no solo como color', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '5', reserved: '8', available: '0', overReserved: true }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    const marca = screen.getByTestId('product-batch-over-reserved');
+    expect(marca).toHaveTextContent('Sobre-reservado');
+  });
+
+  it('R34 — sin sobre-reserva, la marca no aparece', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '10', reserved: '4', available: '6', overReserved: false }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.queryByTestId('product-batch-over-reserved')).toBeNull();
   });
 
   it('lista vacia: texto propio, no una lista vacia indistinguible de un fallo', () => {

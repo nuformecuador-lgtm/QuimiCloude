@@ -2,8 +2,7 @@
 
 import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
-import { PRODUCT_TYPES } from '@/lib/modules/inventario/domain/product-type';
+import { InventarioError, PRODUCT_TYPES, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Aqui no se repite `requirePermission`: es la primera linea de cada caso de uso.
@@ -28,7 +27,7 @@ export type ProductListResult =
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
 
-const NUMERIC_FIELD_ERROR = 'Uno o mas campos numericos no son un numero valido.';
+const NUMERIC_FIELD_ERROR = 'Uno o mas campos numericos no son un decimal valido.';
 const MISSING_ID_ERROR = 'Falta el identificador del producto.';
 
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
@@ -47,16 +46,17 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
   return value;
 }
 
-/** El patron va antes de la conversion: sin el, `'1e3'` o `'0x10'` pasarian como enteros validos. */
-function readOptionalFormInt(
+/** El patron va antes de pasarlo al caso de uso: sin el, `'1e3'` pasaria como decimal valido.
+ *  Sin signo: ni la existencia del lote ni la alerta de cantidad aceptan un negativo. */
+function readOptionalFormDecimal(
   formData: FormData,
   name: string,
-): number | undefined | typeof INVALID_NUMBER {
+): string | undefined | typeof INVALID_NUMBER {
   const value = formData.get(name);
   if (typeof value !== 'string' || value.trim() === '') return undefined;
   const trimmed = value.trim();
-  if (!/^-?\d+$/.test(trimmed)) return INVALID_NUMBER;
-  return Number(trimmed);
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return INVALID_NUMBER;
+  return trimmed;
 }
 
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
@@ -81,7 +81,7 @@ async function currentActor(): Promise<Actor | null> {
 }
 
 function buildProductFields(formData: FormData): Record<string, unknown> | typeof INVALID_NUMBER {
-  const qtyAlert = readOptionalFormInt(formData, 'qtyAlert');
+  const qtyAlert = readOptionalFormDecimal(formData, 'qtyAlert');
   const type = readOptionalFormString(formData, 'type') ?? PRODUCT_TYPES.PRODUCT;
 
   if (qtyAlert === INVALID_NUMBER) {
@@ -105,7 +105,7 @@ function buildCreateProductCandidate(formData: FormData): unknown | typeof INVAL
   const type = readOptionalFormString(formData, 'type') || PRODUCT_TYPES.PRODUCT;
   const name = readFormString(formData, 'name');
 
-  const stock = readOptionalFormInt(formData, 'stock');
+  const stock = readOptionalFormDecimal(formData, 'stock');
   if (stock === INVALID_NUMBER) return INVALID_NUMBER;
 
   // Instrumento: solo existencia y fecha de compra entre los campos del lote.
@@ -134,7 +134,7 @@ function buildCreateProductCandidate(formData: FormData): unknown | typeof INVAL
     candidate.expiryDate = readOptionalFormString(formData, 'expiryDate');
   }
 
-  const qtyAlert = readOptionalFormInt(formData, 'qtyAlert');
+  const qtyAlert = readOptionalFormDecimal(formData, 'qtyAlert');
   if (qtyAlert === INVALID_NUMBER) return INVALID_NUMBER;
   candidate.qtyAlert = qtyAlert;
 

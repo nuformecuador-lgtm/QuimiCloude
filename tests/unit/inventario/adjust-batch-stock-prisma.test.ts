@@ -13,11 +13,13 @@ const doble = vi.hoisted(() => {
   const executeRaw = vi.fn();
   const queryRaw = vi.fn();
   const movementCreate = vi.fn();
+  const reservationMovementFindMany = vi.fn();
   const tx = {
     product: { create: productCreate },
     presentation: { findFirst: presentationFindFirst },
     productBatch: { create: batchCreate, update: batchUpdate, findMany: batchFindMany },
     inventoryMovement: { create: movementCreate },
+    reservationMovement: { findMany: reservationMovementFindMany },
     $executeRaw: executeRaw,
     $queryRaw: queryRaw,
   };
@@ -31,6 +33,7 @@ const doble = vi.hoisted(() => {
     executeRaw,
     queryRaw,
     movementCreate,
+    reservationMovementFindMany,
     transaction: vi.fn(),
   };
 });
@@ -59,7 +62,7 @@ const PRODUCTO: NewProduct = { name: 'Acido citrico' };
 
 const LOTE: NewProductBatch = {
   presentationId: '55555555-5555-4555-8555-555555555555',
-  stock: 10,
+  stock: '10',
   unitCost: '2.5000',
   lot: null,
   purchaseDate: '2026-09-10',
@@ -96,6 +99,7 @@ beforeEach(() => {
   doble.executeRaw.mockResolvedValue(0);
   doblarLecturaDelProducto({ id: PRODUCTO_ID });
   doble.movementCreate.mockResolvedValue({ id: 'movimiento-1' });
+  doble.reservationMovementFindMany.mockResolvedValue([]);
 });
 
 /** El `23514` construido como lo entrega el conector para una restriccion nombrada. */
@@ -129,6 +133,7 @@ describe('R12 — el alta deja su asiento de apertura en la misma transaccion', 
         kind: 'opening',
         quantity: LOTE.stock,
         reason: null,
+        orderId: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,
         createdAt: AHORA,
@@ -153,23 +158,26 @@ describe('R12 — el alta deja su asiento de apertura en la misma transaccion', 
 
 describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas su asiento, en una tx', () => {
   it('R2, R7: un delta positivo suma sobre lo que la base tenga, y el asiento queda como ajuste', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
 
-    await expect(adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
-      stock: 15,
+    await expect(adjustBatchStock(LOTE_ID, '5', 'conteo_fisico', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      stock: '15.0000',
+      reserved: '0.0000',
+      overReserved: false,
     });
 
     expect(doble.batchUpdate).toHaveBeenCalledWith({
       where: { id: LOTE_ID, companyId: EMPRESA },
-      data: { stock: { increment: 5 }, updatedBy: ACTOR_ID, updatedAt: AHORA },
+      data: { stock: { increment: new Prisma.Decimal('5') }, updatedBy: ACTOR_ID, updatedAt: AHORA },
       select: { stock: true },
     });
     expect(doble.movementCreate).toHaveBeenCalledWith({
       data: {
         batchId: LOTE_ID,
         kind: 'adjustment',
-        quantity: 5,
+        quantity: '5',
         reason: 'conteo_fisico',
+        orderId: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,
         createdAt: AHORA,
@@ -178,18 +186,35 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
   });
 
   it('R2, R7: un delta negativo resta sobre lo que la base tenga', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 6 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(6) });
 
-    await expect(adjustBatchStock(LOTE_ID, -4, 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
-      stock: 6,
+    await expect(adjustBatchStock(LOTE_ID, '-4', 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      stock: '6.0000',
+      reserved: '0.0000',
+      overReserved: false,
     });
 
     expect(doble.batchUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ stock: { increment: -4 } }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ stock: { increment: new Prisma.Decimal('-4') } }),
+      }),
     );
     expect(doble.movementCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ quantity: -4, reason: 'merma' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ quantity: '-4', reason: 'merma' }) }),
     );
+  });
+
+  it('R33: un delta que deja el apartado por encima de la existencia nueva marca overReserved', async () => {
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(3) });
+    doble.reservationMovementFindMany.mockResolvedValueOnce([
+      { kind: 'reserve', quantity: new Prisma.Decimal(5) },
+    ]);
+
+    await expect(adjustBatchStock(LOTE_ID, '-7', 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      stock: '3.0000',
+      reserved: '5.0000',
+      overReserved: true,
+    });
   });
 
   it('R18: sin fila que bloquear (lote inexistente o de otra empresa), devuelve null sin llamar a productBatch.update', async () => {
@@ -197,7 +222,7 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
     // siquiera al `update` del lote.
     doblarLecturaDelProducto(null);
 
-    await expect(adjustBatchStock(LOTE_ID, 5, 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toBeNull();
+    await expect(adjustBatchStock(LOTE_ID, '5', 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toBeNull();
 
     expect(doble.batchUpdate).not.toHaveBeenCalled();
     expect(doble.movementCreate).not.toHaveBeenCalled();
@@ -208,23 +233,23 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
     // supone.
     doble.batchUpdate.mockRejectedValueOnce(registroNoEncontrado());
 
-    await expect(adjustBatchStock(LOTE_ID, 5, 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toBeNull();
+    await expect(adjustBatchStock(LOTE_ID, '5', 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toBeNull();
 
     expect(doble.movementCreate).not.toHaveBeenCalled();
   });
 
   it('R6: si el asiento falla, el ajuste entero se rechaza -no queda el ajuste sin su asiento-', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
     const fallo = new Error('la base rechazo el INSERT del asiento');
     doble.movementCreate.mockRejectedValueOnce(fallo);
 
-    await expect(adjustBatchStock(LOTE_ID, 5, 'merma', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(fallo);
+    await expect(adjustBatchStock(LOTE_ID, '5', 'merma', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(fallo);
   });
 
   it('R4: el `23514` de product_batches_stock_non_negative se traduce a BatchStockNegativeError', async () => {
     doble.batchUpdate.mockRejectedValueOnce(violacionDeCheck('product_batches_stock_non_negative'));
 
-    await expect(adjustBatchStock(LOTE_ID, -100, 'merma', ACTOR_ID, AHORA, AMBITO)).rejects.toBeInstanceOf(
+    await expect(adjustBatchStock(LOTE_ID, '-100', 'merma', ACTOR_ID, AHORA, AMBITO)).rejects.toBeInstanceOf(
       BatchStockNegativeError,
     );
 
@@ -235,7 +260,7 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
     const otraViolacion = violacionDeCheck('product_batches_unit_cost_positive');
     doble.batchUpdate.mockRejectedValueOnce(otraViolacion);
 
-    await expect(adjustBatchStock(LOTE_ID, -100, 'merma', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(
+    await expect(adjustBatchStock(LOTE_ID, '-100', 'merma', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(
       otraViolacion,
     );
   });
@@ -243,9 +268,9 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
 
 describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121, R29, R31, R32)', () => {
   it('bloquea la fila del PRODUCTO -no la del lote- antes de tocar nada, con la empresa en el where', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
 
-    await adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
+    await adjustBatchStock(LOTE_ID, '5', 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
 
     const [consulta] = doble.queryRaw.mock.calls[0] as [Prisma.Sql];
     expect(consulta.sql).toContain('FOR NO KEY UPDATE OF p');
@@ -257,22 +282,20 @@ describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121
     );
   });
 
-  it('recalcula DESPUES del asiento, y la unica columna que escribe en products es stock (R32)', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
-    doble.batchFindMany.mockResolvedValueOnce([
-      { stock: 15, presentation: { unitId: '77777777-7777-4777-8777-777777777777' } },
-    ]);
+  it('recalcula DESPUES del asiento, sumando en SQL, y la unica columna que escribe en products es stock (R32)', async () => {
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
 
-    await adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
+    await adjustBatchStock(LOTE_ID, '5', 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
 
-    expect(doble.batchFindMany.mock.invocationCallOrder[0]).toBeGreaterThan(
-      doble.movementCreate.mock.invocationCallOrder[0] as number,
-    );
     const llamadaUpdate = doble.executeRaw.mock.calls.find((llamada) =>
       sqlDe(llamada[0]).includes('UPDATE "products"'),
     );
     if (llamadaUpdate === undefined) throw new Error('no se llamo al UPDATE de stock');
-    expect((llamadaUpdate[0] as Prisma.Sql).values).toEqual([15, PRODUCTO_ID, EMPRESA]);
+    expect(doble.executeRaw.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      doble.movementCreate.mock.invocationCallOrder[0] as number,
+    );
+    expect(sqlDe(llamadaUpdate[0])).toMatch(/SELECT\s+sum\(/i);
+    expect((llamadaUpdate[0] as Prisma.Sql).values).toEqual([PRODUCTO_ID, EMPRESA, PRODUCTO_ID, EMPRESA]);
     expect(sqlDe(llamadaUpdate[0])).not.toContain('name');
     expect(sqlDe(llamadaUpdate[0])).not.toContain('qty_alert');
     expect(sqlDe(llamadaUpdate[0])).not.toContain('unit_id');
@@ -280,11 +303,13 @@ describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121
   });
 
   it('si el recalculo lanza, el ajuste se rechaza en vez de darse por bueno (R29)', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
-    const fallo = new Error('mezcla de unidades');
-    doble.batchFindMany.mockRejectedValueOnce(fallo);
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
+    const fallo = new Error('la base rechazo el UPDATE de stock');
+    // El lock de aviso es el primer `$executeRaw` de `adjustBatchStock` -aqui no hay ninguno,
+    // asi que el recalculo es la primera y unica llamada-.
+    doble.executeRaw.mockRejectedValueOnce(fallo);
 
-    await expect(adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(
+    await expect(adjustBatchStock(LOTE_ID, '5', 'conteo_fisico', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(
       fallo,
     );
 

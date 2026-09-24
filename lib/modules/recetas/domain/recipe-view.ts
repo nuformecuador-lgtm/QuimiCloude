@@ -31,8 +31,8 @@ export type RecipeSummary = {
  *
  * `productUnitId` es la unidad del PRODUCTO, no de la linea: sale de
  * `ProductCatalog.findRefs` y es `null` cuando el insumo no tiene lotes o esta dado de
- * baja. `productStock` es la existencia en esa misma unidad: `null` solo cuando el
- * producto esta dado de baja; `0` cuando esta vivo pero sin unidad resoluble o sin
+ * baja. `productStock` es la existencia en esa misma unidad, en cadena: `null` solo cuando el
+ * producto esta dado de baja; `'0.0000'` cuando esta vivo pero sin unidad resoluble o sin
  * ningun lote en ella, y la cantidad sumada en el resto de los casos.
  */
 export type RecipeLineView = {
@@ -41,7 +41,7 @@ export type RecipeLineView = {
   readonly productName: string | null;
   readonly percentage: string;
   readonly productUnitId: string | null;
-  readonly productStock: number | null;
+  readonly productStock: string | null;
 };
 
 /** Detalle de una receta (D14, R33): el resumen mas los pasos y las lineas completas. */

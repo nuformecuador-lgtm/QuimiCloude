@@ -21,9 +21,12 @@ import type { RecipePickerPage } from './recipe-picker';
 import {
   ORDER_PRIORITY_FILTER_OPTIONS,
   ORDER_STATUS_FILTER_OPTIONS,
+  OrderCoverageBadge,
   OrderPriorityBadge,
   OrderStatusBadge,
 } from './order-status-badge';
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
  * Las DIEZ columnas de la lista de pedidos, declaradas **como datos** (R8-R12, R14, R19, R23,
@@ -83,6 +86,7 @@ export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const QUANTITY_COLUMN_ID = 'quantity';
 export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
+export const COVERAGE_COLUMN_ID = 'coverage';
 /** QC-102 R16 — la columna propia de responsables. */
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
 export const ACTIONS_COLUMN_ID = 'actions';
@@ -141,6 +145,14 @@ export type OrderColumnsDeps = {
   readonly responsiblesByOrder?: Readonly<Record<string, readonly OrderResponsible[]>>;
   /** QC-102 R27, R28 — catalogos y `canWrite` del panel, compuestos una vez en el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /**
+   * La cobertura **ya repartida por fila**, mismo patron que `responsiblesByOrder`: un `Record`
+   * plano, `orderId` → `OrderCoverage`, pedido UNA vez por pagina (`listOrderCoverageAction`).
+   *
+   * Opcional y con `{}` por defecto: si el lote falla, la columna se pinta **sin resolver**
+   * —marcador de ausencia, igual que responsables— y la lista se sigue viendo entera.
+   */
+  readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
 };
 
 /**
@@ -155,6 +167,7 @@ export function buildOrderColumns({
   units,
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  coverageByOrder = {},
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -228,6 +241,23 @@ export function buildOrderColumns({
         order.cancellationReason ?? <MissingValue field={CANCELLATION_REASON_COLUMN_ID} />,
     },
     {
+      id: COVERAGE_COLUMN_ID,
+      label: 'Cobertura',
+      align: 'start',
+      // Sin `sortable`: el orden de la lista lo manda `pedidos` y la cobertura es un dato de
+      // `inventario` que ni siquiera viaja en la fila. Sin `filter`, por el mismo motivo.
+      cell: (order) => {
+        const coverage = coverageByOrder[order.id];
+        // Si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia,
+        // igual que responsables.
+        return coverage === undefined ? (
+          <MissingValue field={COVERAGE_COLUMN_ID} />
+        ) : (
+          <OrderCoverageBadge coverage={coverage} />
+        );
+      },
+    },
+    {
       id: RESPONSIBLES_COLUMN_ID,
       label: 'Responsables',
       align: 'start',
@@ -243,6 +273,8 @@ export function buildOrderColumns({
           // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
+          // El panel es el mismo, se abra por donde se abra.
+          coverage={coverageByOrder[order.id]}
         />
       ),
     },
@@ -262,6 +294,8 @@ export function buildOrderColumns({
           // para esta fila. Sin esto, el panel abriria vacio y tendria que consultar.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
+          // La hoja pinta la cobertura de ESTA fila, ya traida por el lote.
+          coverage={coverageByOrder[order.id]}
         />
       ),
     },

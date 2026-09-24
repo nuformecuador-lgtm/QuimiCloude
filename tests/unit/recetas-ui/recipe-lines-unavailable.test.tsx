@@ -89,6 +89,7 @@ function Harness({
       }}
       units={[]}
       initialProductPage={INITIAL_PRODUCT_PAGE}
+      initialMachinePage={INITIAL_PRODUCT_PAGE}
     />
   );
 }
@@ -146,6 +147,13 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
     await user.click(screen.getByTestId('recipe-line-remove-0'));
 
     expect(screen.queryByTestId(NOTICE_TEST_ID)).not.toBeInTheDocument();
+  });
+
+  it('(f) la línea de baja no deja añadir otra después: su `+` está deshabilitado', () => {
+    render(<Harness initialLines={[unavailableLine('l1'), availableLine('l2', 'Glicerina')]} />);
+
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-line-add-1')).toBeEnabled();
   });
 
   it('(e) el payload enviado sigue conteniendo la línea marcada, intacta (R21, R22)', () => {

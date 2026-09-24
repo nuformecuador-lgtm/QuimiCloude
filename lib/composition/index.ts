@@ -94,10 +94,19 @@ import {
   replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  createMaterialReservations,
+  createReservationQueries,
+} from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type {
+  OrderNumberDirectory,
+  PresentationCatalog,
+  ProductCatalog,
+  ReservationQueries,
+} from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
@@ -179,21 +188,28 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createExpireStaleOrders,
+  createFindCoverage,
   createGetOrder,
   createListOrders,
+  createQuoteOrderCost,
+  createTransitionOrder,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
-  cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
+  findExpirableOrders,
   listAliveOrders,
-  softDeleteAliveOrder,
-  updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
+  createRecipeExecutionReader,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -295,10 +311,10 @@ import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
+import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -697,6 +713,12 @@ const presentationRepository: PresentationRepository = {
   list: listPresentations,
 };
 
+/** `OrderNumberDirectory` cableado con el adaptador driven DE PEDIDOS: `inventario` solo conoce
+ *  el TIPO, para el historial de un lote. Declarado ANTES de la fachada de `inventario` -y no
+ *  junto al resto de lo de `pedidos`, mas abajo- porque `listBatchMovements` lo necesita ya
+ *  cableado: un `const` no existe antes de su linea. */
+const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
+
 /**
  * Fachada del modulo `inventario` ya cableada (T11, `design.md > 3`, `> 7`). Es lo que
  * consumen las Server Actions de T12.
@@ -725,9 +747,12 @@ export const inventario = {
   listProductBatches: createListProductBatches({ products: productRepository }),
   // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
   // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
+  // `orderNumberDirectory`, en cambio, SI esta declarada arriba (a proposito, por la misma
+  // razon): `listBatchMovements` la necesita.
   listBatchMovements: createListBatchMovements({
     products: productRepository,
     people: assignmentDirectoryPrisma,
+    orders: orderNumberDirectory,
   }),
 } as const;
 
@@ -952,14 +977,49 @@ const recipeCatalog: RecipeCatalog = {
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
 const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
+/** Puerto de LECTURA de `pedidos` (`ports/order-repository.ts`): la fila previa de una edicion,
+ *  cancelacion o borrado, y el listado. La escritura ya no vive aqui: se movio entera a
+ *  `orderUnitOfWork`, abajo. */
 const orderRepository: OrderRepository = {
-  create: createOrder,
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
-  updateAlive: updateAliveOrder,
-  cancelAlive: cancelAliveOrder,
-  softDeleteAlive: softDeleteAliveOrder,
 };
+
+/**
+ * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
+ * MISMO `tx`, el repositorio de escritura de `pedidos`, las reservas de `inventario` y el
+ * lector de contenido de receta, para que las tres lecturas y escrituras vean la misma
+ * instantanea sin abrir una segunda conexion mientras esta retiene la suya. Sin `unitCatalog`:
+ * la necesidad ya llega en la unidad del producto, asi que `createMaterialReservations` no
+ * convierte nada.
+ */
+const orderUnitOfWork: OrderUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) => {
+      const scope: OrderTransactionScope = {
+        orders: createOrderWriteRepository(tx),
+        reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
+      };
+      return work(scope);
+    }),
+};
+
+/** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
+ *  `findCoverage` la usa una vez por pagina. */
+const reservationQueries: ReservationQueries = createReservationQueries();
+
+/**
+ * El proceso diario: recorre las empresas de `identity` una por una y,
+ * para cada una, sus candidatos con el `findExpirableOrders` de `pedidos` -ninguna consulta lee
+ * pedidos de mas de una empresa a la vez-.
+ */
+const expireStaleOrders = createExpireStaleOrders({
+  listCompanyIds: listActiveCompanyIds,
+  findExpirable: findExpirableOrders,
+  unitOfWork: orderUnitOfWork,
+  now: () => new Date(),
+});
 
 /**
  * Fachada del modulo `pedidos` ya cableada (T14, `design.md > 9`). Es lo que consumen las
@@ -974,19 +1034,20 @@ const orderRepository: OrderRepository = {
  * usa `toOffsetLimit`/`buildPage` directamente (R37, `design.md > 10`), asi que el dominio
  * no necesita recibirla.
  *
- * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca la receta,
- * y darles catalogos que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders`
- * reciben SOLO el catalogo de recetas, por el mismo motivo: no calculan ningun importe.
- * `createOrder` y `updateOrder` son los dos que si costean, asi que son los dos que reciben
- * tambien `products` y `units`.
+ * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
+ * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
+ * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben SOLO el
+ * catalogo de recetas, por el mismo motivo: no calculan ningun importe ni apartan nada.
+ * `createOrder` y `updateOrder` son los dos que si costean y aparta, asi que son los dos que
+ * reciben tambien `products`, `units` y `unitOfWork`.
  */
 export const pedidos = {
   createOrder: createCreateOrder({
-    orders: orderRepository,
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    unitOfWork: orderUnitOfWork,
   }),
   getOrder: createGetOrder({
     orders: orderRepository,
@@ -1005,9 +1066,21 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    unitOfWork: orderUnitOfWork,
   }),
-  cancelOrder: createCancelOrder({ orders: orderRepository }),
-  deleteOrder: createDeleteOrder({ orders: orderRepository }),
+  cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
+  deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
+  findCoverage: createFindCoverage({ reservations: reservationQueries }),
+  quoteOrderCost: createQuoteOrderCost({
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
+  // El proceso diario y su puerta: sin usuario delante, asi que ninguno de los dos recibe actor.
+  // El handler los llama en ese orden -primero la puerta- y `lib/composition` no impone el
+  // orden por su cuenta.
+  verifyCronSecret,
+  expireStaleOrders,
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1045,14 +1118,18 @@ export const observabilidad = {
 // `prisma.workGroup` por ninguna via.
 // ---------------------------------------------------------------------------------------
 
-/** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
- *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
- *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—. */
+/** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS: mismo patron que `RecipeCatalog`
+ *  arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si el pedido esta VIVO
+ *  y en que ESTADO —ni el numero, ni la receta, ni las cantidades—.
+ *
+ *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
+ *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
+ *  consume el material en la misma transaccion. */
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveById: transitionAliveOrder,
+  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
 };
 
 /**

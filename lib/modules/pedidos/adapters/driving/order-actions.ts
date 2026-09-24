@@ -9,11 +9,16 @@ import {
 import {
   PedidosError,
   type Actor,
+  type OrderCostQuote,
   type OrderSummary,
   type OrderView,
   type Page,
 } from '@/lib/modules/pedidos';
 import { runInRequestScope } from '@/lib/shared/request-scope';
+
+// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
+// existe.
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
  * Server Actions del pedido (T15, R5, R54, R56, `design.md > 9`). Copia en forma de
@@ -82,6 +87,12 @@ export type OrderQueryResult =
 
 export type OrderListResult =
   | { status: 'success'; data: Page<OrderSummary> }
+  | ErrorState;
+
+/** La cotizacion de coste no persiste nada, asi que su resultado no necesita un
+ *  estado `idle` -no hay ningun formulario que la dispare-. */
+export type OrderCostQuoteResult =
+  | { status: 'success'; data: OrderCostQuote }
   | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
@@ -281,6 +292,53 @@ export async function listOrdersAction(query: unknown): Promise<OrderListResult>
 
   try {
     const data = await pedidos.listOrders(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// La cobertura de VARIOS pedidos a la vez, UNA consulta por pagina. Bloque nuevo al final: no
+// reordena ni reformatea nada de arriba.
+// ---------------------------------------------------------------------------------------------
+
+/** Una entrada del array plano: un `Map` no cruza el borde de una Server Action tan bien como un
+ *  array serializable, mismo criterio que `OrderResponsiblesEntry` de `asignaciones`. */
+export type OrderCoverageEntry = { readonly orderId: string; readonly coverage: OrderCoverage };
+
+export type OrderCoverageBatchResult =
+  | { status: 'success'; data: readonly OrderCoverageEntry[] }
+  | ErrorState;
+
+/**
+ * La cobertura de la pagina entera: argumento ya tipado, no `FormData` -no viene de un
+ * `<form>`-. Ningun permiso se comprueba aqui: la frontera es `requirePermission(actor,
+ * 'pedidos.consultar')` en la primera linea del caso de uso.
+ */
+export async function listOrderCoverageAction(
+  orderIds: readonly string[],
+): Promise<OrderCoverageBatchResult> {
+  const actor = await currentActor();
+
+  try {
+    const coverage = await pedidos.findCoverage(orderIds, actor);
+    return { status: 'success', data: [...coverage].map(([orderId, value]) => ({ orderId, coverage: value })) };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/**
+ * Cotizacion del coste de ingredientes. Consulta: argumento tipado, no `FormData` -no
+ * hay formulario que enviar, es un efecto del teclado-. No escribe nada: sin
+ * `revalidatePath`.
+ */
+export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuoteResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.quoteOrderCost(input, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

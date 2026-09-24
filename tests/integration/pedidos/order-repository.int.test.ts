@@ -22,6 +22,13 @@
  * `tests/integration/proveedores/supplier-crud.int.test.ts`: cada caso crea sus datos y LOS
  * BORRA EL MISMO, por su `id` exacto, en un bloque `finally`.
  *
+ * `createOrder` -que llevaba su propio bucle de reintento sobre el cliente global- se retiro; el
+ * alta de siembra de este archivo pasa por
+ * `withOrderTransaction` + `createOrderWriteRepository`, el mismo par que ata `OrderUnitOfWork`
+ * en `lib/composition`. Las funciones REALES que este archivo ejercita son ahora esas dos, mas
+ * `findAliveOrderById`, `listAliveOrders`, `updateAliveOrder`, `cancelAliveOrder` y
+ * `softDeleteAliveOrder`.
+ *
  * HIGIENE, y es critica: los tests de `tests/integration/` corren EN SERIE contra UNA base
  * compartida (`vitest.config.mts`, `fileParallelism: false`) y algun archivo afirma sobre el
  * estado global de una tabla. Una fila —o una secuencia— olvidada aqui pone rojo un test ajeno
@@ -52,12 +59,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { listAliveOrderSummariesByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
@@ -257,11 +265,9 @@ async function altaReal(
   now: Date,
   overrides: Partial<NewOrder> = {},
 ): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), year, actorId, now, null, scope())
-  // Un `'duplicate_number'` aqui no es el caso bajo prueba: seria una secuencia sucia de una
-  // corrida anterior, y hay que verlo como fallo del test, no confundirlo con el pedido.
-  expect(resultado).not.toBe('duplicate_number')
-  const fila = resultado as OrderRow
+  const fila = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(baseOrder(overrides), year, actorId, now, null, scope()),
+  )
   creados.push(fila.id)
   return fila
 }

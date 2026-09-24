@@ -20,6 +20,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { Prisma } from '@prisma/client';
+
 import {
   companyScopeColumns,
   presentationCompanyScope,
@@ -158,8 +160,8 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       id: 'product-1',
       name: 'Bidon 20 L',
       imagePath: null,
-      qtyAlert: 2,
-      stock: 0,
+      qtyAlert: new Prisma.Decimal(2),
+      stock: new Prisma.Decimal(0),
       unitId: null,
       type: PRODUCT_TYPES.PRODUCT,
       createdAt: new Date('2026-09-11T10:00:00.000Z'),

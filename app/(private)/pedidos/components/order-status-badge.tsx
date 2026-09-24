@@ -7,6 +7,8 @@ import {
   type OrderPriority,
   type OrderStatus,
 } from '@/lib/modules/pedidos';
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
  * Estado y prioridad de un pedido como **etiqueta legible** (R8, `design.md > 7`).
@@ -83,6 +85,34 @@ export function OrderPriorityBadge({ priority }: { readonly priority: OrderPrior
   return (
     <Badge variant={PRIORITY_VARIANTS[priority]} data-testid="order-priority" data-priority={priority}>
       {ORDER_PRIORITY_LABELS[priority]}
+    </Badge>
+  );
+}
+
+/**
+ * Exhaustivo por tipo, igual que `ORDER_STATUS_LABELS`: si `inventario` publica un cuarto valor,
+ * este archivo deja de compilar.
+ *
+ * `ENTREGADO` y `CANCELADO` llegan con `coverage: 'none'` y se pintan con la MISMA etiqueta
+ * «Sin apartar», no con un guion: el estado final apaga los controles de escritura, nunca oculta
+ * un dato que sigue siendo consultable.
+ */
+export const ORDER_COVERAGE_LABELS: Readonly<Record<OrderCoverage, string>> = {
+  full: 'Apartado',
+  none: 'Sin apartar',
+  partial: 'Sin cobertura completa',
+};
+
+const COVERAGE_VARIANTS: Readonly<Record<OrderCoverage, 'default' | 'secondary' | 'outline' | 'destructive'>> = {
+  full: 'secondary',
+  none: 'outline',
+  partial: 'destructive',
+};
+
+export function OrderCoverageBadge({ coverage }: { readonly coverage: OrderCoverage }) {
+  return (
+    <Badge variant={COVERAGE_VARIANTS[coverage]} data-testid="order-coverage" data-coverage={coverage}>
+      {ORDER_COVERAGE_LABELS[coverage]}
     </Badge>
   );
 }

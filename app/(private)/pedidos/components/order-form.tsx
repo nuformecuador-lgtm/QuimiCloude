@@ -37,7 +37,10 @@ import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/r
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { UnitView } from '@/lib/modules/unidades';
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
+import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { OrderCostQuote } from './order-cost-quote';
 import { OrderField } from './order-field';
 import { OrderIngredientsTable } from './order-ingredients-table';
 import { OrderRecipeImage } from './order-recipe-image';
@@ -53,7 +56,8 @@ import {
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
 import { isFinalOrderStatus } from './order-row-actions';
-import { ORDER_PRIORITY_LABELS } from './order-status-badge';
+import { ORDER_PRIORITY_LABELS, OrderCoverageBadge } from './order-status-badge';
+import { useOrderCostQuote } from './use-order-cost-quote';
 
 /**
  * QC-102 T14 — EN QUE SECCION abre el panel (R23, R24).
@@ -68,6 +72,9 @@ export type OrderSheetSection = 'form' | 'responsibles';
 
 /** La seccion de responsables, dentro del panel que ya existe. Se localiza por este `data-testid`. */
 export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
+
+/** La etiqueta de cobertura de la hoja. */
+export const ORDER_SHEET_COVERAGE_TESTID = 'order-sheet-coverage';
 
 /**
  * Formulario de alta y edicion de pedido (R26-R30, R33, R34, R39, R45, `design.md > 8`).
@@ -303,6 +310,11 @@ export type OrderFormProps = {
   readonly responsibles?: readonly OrderResponsible[];
   /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /**
+   * La cobertura que **la fila del listado ya trajo**. `undefined` con el lote caido: la hoja no
+   * pinta la etiqueta, igual que `loadResponsiblesCatalog` se degrada sin decir nada.
+   */
+  readonly coverage?: OrderCoverage;
   /** QC-102 R24 — en que seccion abre. Por defecto, el formulario de siempre. */
   readonly section?: OrderSheetSection;
 };
@@ -314,6 +326,7 @@ export function OrderForm({
   onSaved,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  coverage,
   section = 'form',
 }: OrderFormProps) {
   const fieldId = useId();
@@ -359,6 +372,10 @@ export function OrderForm({
   // numero, redondearlo si -una cantidad de 0.1255 reabierta y guardada se convertiria en
   // 0.13 sin que nadie lo pidiera-.
   const [quantity, setQuantity] = useState(trimDecimal(order?.quantity ?? ''));
+
+  /** Arranca con el importe guardado en la edicion; `null` en el alta. `order.id` solo viaja en la
+   *  edicion, para que la cotizacion cuente como disponible lo que el propio pedido tiene apartado. */
+  const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id);
 
   const recipeName = recipe?.name ?? '';
   const recipeImageUrl = recipe?.imageUrl ?? null;
@@ -427,12 +444,14 @@ export function OrderForm({
       setRecipe(null);
       setIngredients([]);
       setIngredientsError(null);
+      quote.onRecipeChange(null, quantity);
       return;
     }
     setRecipe({ id: option.id, name: option.name, imageUrl: option.imageUrl });
     setIngredientsLoading(true);
     setIngredientsError(null);
     loadIngredients(option.id);
+    quote.onRecipeChange(option.id, quantity);
   }
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
@@ -529,6 +548,15 @@ export function OrderForm({
             ? 'Cambia los datos del pedido. Se guardan todos los campos.'
             : 'Completa los datos del pedido. La fecha y el número los pone el sistema.'}
         </SheetDescription>
+        {/*
+          Cobertura SOLO en la edicion: el alta todavia no tiene pedido del que apartar nada.
+          `undefined` (lote caido) no pinta nada, mismo criterio que `loadResponsiblesCatalog`.
+        */}
+        {isEdit && coverage !== undefined ? (
+          <div data-testid={ORDER_SHEET_COVERAGE_TESTID}>
+            <OrderCoverageBadge coverage={coverage} />
+          </div>
+        ) : null}
       </SheetHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -596,9 +624,15 @@ export function OrderForm({
               inputMode="decimal"
               roundDecimals={2}
               defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
-              onValueChange={setQuantity}
+              onValueChange={(value) => {
+                setQuantity(value);
+                quote.onQuantityChange(recipe?.id ?? null, value);
+              }}
               error={fieldErrors.quantity}
             />
+
+            {/* El bloque de coste: fuera de la condicion de receta elegida, para verse con guion sin receta. */}
+            <OrderCostQuote {...quote.state} />
 
             {/*
               Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo

@@ -161,30 +161,21 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
   })
 })
 
-describe('pedidos — el puerto declara los seis metodos de design.md > 7.4', () => {
-  it('un doble que implementa la interfaz completa compila, y cancelAlive es el unico con reason', () => {
+describe('pedidos — el puerto declara los dos metodos de LECTURA de design.md > 5.3', () => {
+  it('un doble que implementa la interfaz completa compila', () => {
     // No se ejecuta ninguna operacion: lo que se comprueba es la FORMA del puerto. Si algun dia
-    // se le anadiera un septimo metodo, este doble dejaria de compilar y habria que decidirlo.
+    // se le anadiera un tercer metodo, este doble dejaria de compilar y habria que decidirlo.
+    // La escritura salio entera hacia `OrderWriteRepository`, dentro de la transaccion
+    // compartida con `inventario`; este puerto ya solo lee.
     const doble: OrderRepository = {
-      create: async () => 'duplicate_number',
       findAliveById: async () => null,
       // `listAlive` devuelve una `Page` ya armada, no `{ rows, total }`: la firma se corrigio
       // el 2026-09-04 (nota al final de `design.md > 7.4`, aprobada por el leader) para que el
       // caso de uso no tenga que calcular el `offset`, que es la reimplementacion que R37
       // prohibe. Quien pagina es el adaptador driven con `lib/shared/pagination`.
       listAlive: async () => ({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 }),
-      updateAlive: async () => 'not_found',
-      cancelAlive: async (_id, reason) => (reason.length > 0 ? 'ok' : 'not_found'),
-      softDeleteAlive: async () => 'ok',
     }
-    expect(Object.keys(doble).sort()).toEqual([
-      'cancelAlive',
-      'create',
-      'findAliveById',
-      'listAlive',
-      'softDeleteAlive',
-      'updateAlive',
-    ])
+    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'listAlive'])
   })
 
   it('no existe ningun metodo de restaurar ni de listar borrados', () => {

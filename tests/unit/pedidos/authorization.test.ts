@@ -1,11 +1,11 @@
-// QC-74 T13 — Autorizacion POR PERMISO de los SEIS casos de uso de `pedidos`
+// Autorizacion POR PERMISO de los SIETE casos de uso de `pedidos`
 // (R12, R13, R14, R15, R16, R17, R18).
 //
 // `docs/architecture.md > Acceso a datos y autorizacion` es explicito: Prisma se conecta como
 // dueno de las tablas y no setea `auth.uid()`, asi que las policies de RLS que QC-33 dejo
 // activadas y FORZADAS en `orders` no filtran NINGUNA consulta de esta app. La frontera real
 // es el caso de uso. Un permiso que solo existiera como policy no estaria implementado, y un
-// `requirePermission` que se saltara UNO de los seis seria justo el agujero que este archivo
+// `requirePermission` que se saltara UNO de los siete seria justo el agujero que este archivo
 // existe para encontrar.
 //
 // POR QUE LOS DOBLES EXPLOTAN. Los DOS puertos -el repositorio de pedidos y el contrato
@@ -34,10 +34,12 @@ import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import { PedidosError, UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
+import { createQuoteOrderCost } from '@/lib/modules/pedidos/domain/quote-order-cost'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -68,13 +70,14 @@ function dobles() {
     })
 
   const orders = {
-    create: explota('orders.create'),
     findAliveById: explota('orders.findAliveById'),
     listAlive: explota('orders.listAlive'),
-    updateAlive: explota('orders.updateAlive'),
-    cancelAlive: explota('orders.cancelAlive'),
-    softDeleteAlive: explota('orders.softDeleteAlive'),
   } as unknown as OrderRepository
+
+  // La unidad de trabajo TAMBIEN explota si se abre sin autorizacion: el permiso se exige
+  // ANTES de abrir la transaccion compartida con `inventario`, y `run` es justo el punto por
+  // el que se abre.
+  const unitOfWork = { run: explota('unitOfWork.run') } as unknown as OrderUnitOfWork
 
   const recipes = {
     findRefsIncludingDeleted: explota('recipes.findRefsIncludingDeleted'),
@@ -112,9 +115,10 @@ function dobles() {
       ...Object.values(units as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(presentations as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      unitOfWork.run as unknown as ReturnType<typeof vi.fn>,
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, products, units, presentations, log, llamadas }
+  return { orders, recipes, products, units, presentations, log, unitOfWork, llamadas }
 }
 
 /** Los dobles de la invocacion en curso. Se renuevan en CADA caso para que el contador de uno
@@ -129,14 +133,15 @@ function depsDeTurno() {
     units: enCurso.units,
     presentations: enCurso.presentations,
     log: enCurso.log,
+    unitOfWork: enCurso.unitOfWork,
   }
 }
 
 type Invocacion = (actor: Actor | null | undefined, entrada?: unknown) => Promise<unknown>
 
-/** Los seis casos de uso con el codigo que EXIGE cada uno (R16). Esta tabla es el dato del que
+/** Los siete casos de uso con el codigo que EXIGE cada uno (R16). Esta tabla es el dato del que
  *  cuelga todo lo demas del archivo: concesion, rechazo y cruzado se derivan de ella. */
-const SEIS: readonly (readonly [string, string, Invocacion])[] = [
+const SIETE: readonly (readonly [string, string, Invocacion])[] = [
   [
     'createOrder',
     MODIFICAR,
@@ -158,12 +163,26 @@ const SEIS: readonly (readonly [string, string, Invocacion])[] = [
     'cancelOrder',
     MODIFICAR,
     (actor, entrada = { reason: 'sin stock' }) =>
-      createCancelOrder({ orders: depsDeTurno().orders })(ORDER_ID, entrada, actor),
+      createCancelOrder({ orders: depsDeTurno().orders, unitOfWork: depsDeTurno().unitOfWork })(
+        ORDER_ID,
+        entrada,
+        actor,
+      ),
   ],
   [
     'deleteOrder',
     MODIFICAR,
-    (actor) => createDeleteOrder({ orders: depsDeTurno().orders })(ORDER_ID, actor),
+    (actor) =>
+      createDeleteOrder({ orders: depsDeTurno().orders, unitOfWork: depsDeTurno().unitOfWork })(
+        ORDER_ID,
+        actor,
+      ),
+  ],
+  [
+    'quoteOrderCost',
+    MODIFICAR,
+    (actor, entrada = { recipeId: RECIPE_ID, quantity: '10.0000' }) =>
+      createQuoteOrderCost(depsDeTurno())(entrada, actor),
   ],
 ]
 
@@ -207,19 +226,20 @@ function esperaRechazo(
 }
 
 describe('QC-74 — cada caso de uso de pedidos exige su permiso exacto (R16, R17)', () => {
-  it('la tabla cubre los seis nombres con su codigo: no se queda corta por un renombrado', () => {
+  it('la tabla cubre los siete nombres con su codigo: no se queda corta por un renombrado', () => {
     // Sin esto, borrar una fila dejaria todos los bucles verdes con cinco.
-    expect(SEIS.map(([nombre, codigo]) => `${nombre}:${codigo}`)).toEqual([
+    expect(SIETE.map(([nombre, codigo]) => `${nombre}:${codigo}`)).toEqual([
       'createOrder:pedidos.modificar',
       'getOrder:pedidos.consultar',
       'listOrders:pedidos.consultar',
       'updateOrder:pedidos.modificar',
       'cancelOrder:pedidos.modificar',
       'deleteOrder:pedidos.modificar',
+      'quoteOrderCost:pedidos.modificar',
     ])
   })
 
-  for (const [nombre, codigo, invocacion] of SEIS) {
+  for (const [nombre, codigo, invocacion] of SIETE) {
     it(`${nombre}: CONCEDE con ${codigo} y llega hasta el puerto`, async () => {
       // R17: con el codigo exigido la operacion NO se detiene en la autorizacion. Los dobles
       // siguen explotando, asi que el error que sale ya no es de permiso: eso demuestra que la
@@ -237,15 +257,16 @@ describe('QC-74 — cada caso de uso de pedidos exige su permiso exacto (R16, R1
 })
 
 describe('QC-74 — pertenencia exacta, sin implicacion entre permisos (R13)', () => {
-  const ESCRITURAS = SEIS.filter(([, codigo]) => codigo === MODIFICAR)
-  const LECTURAS = SEIS.filter(([, codigo]) => codigo === CONSULTAR)
+  const ESCRITURAS = SIETE.filter(([, codigo]) => codigo === MODIFICAR)
+  const LECTURAS = SIETE.filter(([, codigo]) => codigo === CONSULTAR)
 
-  it('hay cuatro escrituras y dos lecturas: el cruzado no corre sobre una lista vacia', () => {
+  it('hay cinco escrituras y dos lecturas: el cruzado no corre sobre una lista vacia', () => {
     expect(ESCRITURAS.map(([nombre]) => nombre)).toEqual([
       'createOrder',
       'updateOrder',
       'cancelOrder',
       'deleteOrder',
+      'quoteOrderCost',
     ])
     expect(LECTURAS.map(([nombre]) => nombre)).toEqual(['getOrder', 'listOrders'])
   })
@@ -264,7 +285,7 @@ describe('QC-74 — pertenencia exacta, sin implicacion entre permisos (R13)', (
     })
   }
 
-  for (const [nombre, codigo, invocacion] of SEIS) {
+  for (const [nombre, codigo, invocacion] of SIETE) {
     it(`${nombre}: ni prefijo, ni sufijo, ni mayusculas, ni otro modulo se cuelan por ${codigo}`, async () => {
       // Sin normalizacion y sin coincidencia parcial: el modulo a secas, el codigo con algo
       // pegado detras, el mismo codigo en mayusculas y el codigo homonimo de otro modulo son
@@ -289,7 +310,7 @@ describe('QC-74 — falla cerrado (R14)', () => {
   ]
 
   for (const [quien, actor] of AUSENTES) {
-    for (const [nombre, , invocacion] of SEIS) {
+    for (const [nombre, , invocacion] of SIETE) {
       it(`${nombre}: ${quien} rechaza y NO toca ningun puerto`, async () => {
         const { error, llamadas } = await ejecutar(invocacion, actor)
         esperaRechazo(error, llamadas, nombre)
@@ -301,7 +322,7 @@ describe('QC-74 — falla cerrado (R14)', () => {
     // La forma llega en tiempo de ejecucion desde el adaptador driving; el tipo no la garantiza
     // si el dato viniera mal. Falla cerrado igual.
     const roto = { id: 'u-roto' } as unknown as Actor
-    for (const [nombre, , invocacion] of SEIS) {
+    for (const [nombre, , invocacion] of SIETE) {
       const { error, llamadas } = await ejecutar(invocacion, roto)
       esperaRechazo(error, llamadas, nombre)
     }
@@ -309,7 +330,7 @@ describe('QC-74 — falla cerrado (R14)', () => {
 })
 
 describe('R12: alta y edicion rechazan sin pedidos.modificar antes del catalogo de presentaciones', () => {
-  const CON_PRESENTACION = SEIS.filter(([nombre]) => ['createOrder', 'updateOrder'].includes(nombre))
+  const CON_PRESENTACION = SIETE.filter(([nombre]) => ['createOrder', 'updateOrder'].includes(nombre))
 
   for (const [nombre, , invocacion] of CON_PRESENTACION) {
     it(`R12: ${nombre} sin pedidos.modificar rechaza con unauthorized y no llama a presentations.findRefs`, async () => {
@@ -323,7 +344,7 @@ describe('R12: alta y edicion rechazan sin pedidos.modificar antes del catalogo 
 describe('QC-74 — la autorizacion va ANTES de la validacion (R12)', () => {
   // Las operaciones que validan entrada con zod. Con entrada invalida Y sin permiso, el error
   // tiene que ser el de PERMISO: si saliera `ValidationError`, zod habria corrido antes.
-  const CON_ENTRADA = SEIS.filter(([nombre]) =>
+  const CON_ENTRADA = SIETE.filter(([nombre]) =>
     ['createOrder', 'listOrders', 'updateOrder', 'cancelOrder'].includes(nombre),
   )
 
@@ -366,13 +387,14 @@ const domainDir = join(
   'domain',
 )
 
-const SEIS_ARCHIVOS = [
+const SIETE_ARCHIVOS = [
   ['create-order.ts', MODIFICAR],
   ['get-order.ts', CONSULTAR],
   ['list-orders.ts', CONSULTAR],
   ['update-order.ts', MODIFICAR],
   ['cancel-order.ts', MODIFICAR],
   ['delete-order.ts', MODIFICAR],
+  ['quote-order-cost.ts', MODIFICAR],
 ] as const
 
 /** Fuente sin comentarios: lo que se vigila es el CODIGO, no la prosa. */
@@ -392,8 +414,8 @@ function cuerpoDelCasoDeUso(fuente: string): string {
   return soloCodigo(fuente).slice(inicio)
 }
 
-describe('QC-74 — requirePermission es la primera linea de los seis, con su codigo (R12, R16)', () => {
-  for (const [archivo, codigo] of SEIS_ARCHIVOS) {
+describe('QC-74 — requirePermission es la primera linea de los siete, con su codigo (R12, R16)', () => {
+  for (const [archivo, codigo] of SIETE_ARCHIVOS) {
     it(`${archivo}: requirePermission(actor, '${codigo}') va antes de zod y de cualquier puerto`, () => {
       const cuerpo = cuerpoDelCasoDeUso(readFileSync(join(domainDir, archivo), 'utf8'))
 
@@ -443,9 +465,9 @@ describe('QC-60 R28 — ningun permiso nuevo: siguen siendo pedidos.consultar y 
     })
   }
 
-  it('los seis casos de uso exigen exactamente esos dos codigos, y ningun otro', () => {
+  it('los siete casos de uso exigen exactamente esos dos codigos, y ningun otro', () => {
     const exigidos = new Set<string>()
-    for (const [archivo] of SEIS_ARCHIVOS) {
+    for (const [archivo] of SIETE_ARCHIVOS) {
       const codigo = soloCodigo(readFileSync(join(domainDir, archivo), 'utf8'))
       for (const match of codigo.matchAll(/requirePermission\(\s*actor\s*,\s*'([^']+)'\s*\)/g)) {
         exigidos.add(match[1] ?? '')
@@ -496,7 +518,7 @@ describe('QC-60 R28 — rechazo POR IGUAL de las cuatro formas de no estar autor
     ],
   ]
 
-  for (const [nombre, , invocacion] of SEIS) {
+  for (const [nombre, , invocacion] of SIETE) {
     it(`${nombre}: las cuatro formas dan el MISMO error, con entrada invalida y sin tocar ningun puerto`, async () => {
       const firmas: string[] = []
       for (const [quien, actor] of NO_AUTORIZADOS) {

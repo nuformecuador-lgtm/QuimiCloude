@@ -128,9 +128,29 @@ export const E2E_ESPERADOS = [
   'login-skin.spec.ts',
   'login.spec.ts',
   'pedidos.spec.ts',
+  // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
+  // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. El recorrido que ejercita: con sesion en una empresa,
+  // escribir un termino en la caja de busqueda de la pantalla de pedidos recorta la lista a lo
+  // que devuelve la consulta y lo lleva a la URL como `q`; un termino sin coincidencias muestra
+  // el estado propio dentro de la tabla y limpiar devuelve todo; y el termino sobrevive a cambiar
+  // de pagina, al panel lateral, a recargar y a «Atras» -incluso entre dos terminos distintos-.
+  // NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'pedidos-busqueda.spec.ts',
   'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
   'pedidos-asignados.spec.ts',
+  // Alta el 2026-09-23 por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el bloque de coste del panel de
+  // pedidos cotiza con cada cantidad tecleada y con el cambio de receta, guarda el mismo importe
+  // que llego a mostrar y lo vuelve a mostrar al reabrir la edicion sin teclear nada; y una
+  // cantidad sin existencia suficiente deja el guion. NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que el diferimiento de la E2E de ese cruce sigue INTACTO.
+  'pedidos-cotizacion.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',
@@ -144,6 +164,8 @@ export const E2E_ESPERADOS = [
   // ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'recetas-porcentaje.spec.ts',
   'recetas.spec.ts',
+  // Alta con el mismo patron que las demas: no toca el identificador de peticion.
+  'reserva-de-material.spec.ts',
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
@@ -274,6 +296,13 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: anula `product_batches.presentation_id` y `unit_cost` (solo MACHINE los
   // omite en el borde); no toca el identificador de peticion.
   '20260923140000_product_batch_nullable_machine',
+  // Ninguna de las dos toca el identificador de peticion: una anade un valor a un enum, la otra
+  // cambia el tipo de columnas de existencia y crea el libro de reservas.
+  '20260923150000_inventory_movement_kind_consumption',
+  '20260923150100_reservations_and_decimal_stock',
+  // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
+  // peticion.
+  '20260923150200_reserve_existing_orders',
 ] as const
 
 export function hallazgosDeMigraciones(

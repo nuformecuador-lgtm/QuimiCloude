@@ -12,7 +12,8 @@ import { randomUUID } from 'node:crypto'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { cancelAliveOrder, createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { cancelAliveOrder, createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { listAliveSummariesInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
@@ -131,8 +132,9 @@ async function seedOrder(e: Empresa, overrides: Partial<NewOrder> = {}): Promise
   const sequence = nextSequence
   nextSequence += 1
   const now = instant(1 + (sequence % 25))
-  const result = await createOrder(baseOrder(e, overrides), YEAR, e.userId, now, null, scopeOf(e))
-  if (result === 'duplicate_number') throw new Error('el alta de siembra choco con un numero duplicado')
+  const result = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(baseOrder(e, overrides), YEAR, e.userId, now, null, scopeOf(e)),
+  )
   return result.id
 }
 

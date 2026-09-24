@@ -226,6 +226,13 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   getOrderAction: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse: la fila ya trae el pedido entero');
   }),
+  // Mismo criterio que `listResponsiblesForOrdersAction` justo arriba -la seccion de lista SI la
+  // invoca, una vez por pagina- con el lote vacio: este archivo mide viewport, no afirma sobre
+  // cobertura.
+  listOrderCoverageAction: vi.fn(async () => ({ status: 'success', data: [] })),
+  quoteOrderCostAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -586,7 +593,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // Primera mitad: la CONFIGURACION. Si una columna declarase `size`, la libreria si tendria un
     // ancho que imponer, y los 150 px por defecto dejarian de ser inertes.
     const columnas = buildOrderColumns({ recipes: RECETAS, units: [] });
-    expect(columnas).toHaveLength(10);
+    expect(columnas).toHaveLength(11);
 
     for (const columna of columnas) {
       for (const clave of ['size', 'width', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {
