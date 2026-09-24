@@ -14,17 +14,11 @@ export type ImportCatalogLinesDeps = {
 export type ImportCatalogLinesSummary = { created: number; updated: number; unchanged: number };
 
 /**
- * Escritura por identidad de una confirmacion de importacion. Cada linea trae los MISMOS
- * nueve campos de negocio que el alta y la edicion manuales -`updateCatalogLineSchema` es
- * exactamente esa forma, sin `supplierId`- y se valida uno a uno ANTES de escribir nada: una
- * sola linea invalida hace que la operacion entera rechace sin tocar el puerto (el modulo que
- * clasifica ya exige esto mismo; aqui se repite la validacion de forma porque este caso de
- * uso es el borde real de la escritura y no puede confiar en lo que le manden).
- *
- * Permiso `proveedores.modificar` como PRIMERA operacion, antes de leer o escribir nada. La
- * atomicidad TODO O NADA y la idempotencia frente a dos confirmaciones simultaneas las
- * garantiza el adaptador, en una sola transaccion con el indice unico parcial como arbitro;
- * este caso de uso no abre ninguna transaccion propia.
+ * Escritura por identidad de una confirmacion de importacion, reutilizando `updateCatalogLineSchema`
+ * -la misma forma que el alta y la edicion manuales, sin `supplierId`- porque este caso de uso es
+ * el borde real de la escritura y no puede confiar en lo que le manden, aunque el clasificador ya
+ * lo haya validado antes. La atomicidad y la idempotencia frente a confirmaciones simultaneas las
+ * garantiza el adaptador; aqui no se abre ninguna transaccion propia.
  */
 export function createImportCatalogLines(
   deps: ImportCatalogLinesDeps,
@@ -44,10 +38,6 @@ export function createImportCatalogLines(
 
     const scope: SupplierScope = { companyId: actor.companyId };
 
-    // Cada linea se valida de forma independiente y ANTES de tocar el puerto: la primera que
-    // no encaje en el esquema hace que la operacion entera rechace sin escribir nada (el
-    // modulo que clasifica ya exige esto mismo; aqui se repite porque este caso de uso es el
-    // borde real de la escritura).
     const fields = lines.map((line) => {
       const parsed = updateCatalogLineSchema.safeParse(line);
       if (!parsed.success) throw new ValidationError();

@@ -1,24 +1,8 @@
 /**
- * La confirmacion de una importacion de catalogo: vuelve a leer el archivo y a resolver
- * presentaciones, lineas vivas y unidades EN EL SERVIDOR -nunca se fia de lo que clasifico el
- * navegador-, rechaza la confirmacion entera si alguna fila incluida no puede escribirse, y solo
- * entonces crea las presentaciones que falten y escribe las lineas.
- *
- * Pasos, en este orden:
- *   1. Permiso, antes de leer nada.
- *   2. Validar la entrada.
- *   3. Leer el archivo (mismo rechazo que la vista previa; la confirmacion no interpreta su
- *      texto, pero exige que el archivo exista y siga siendo de catalogo).
- *   4. Resolver presentaciones por nombre, lineas vivas por identidad y recortes del archivo.
- *   5. Clasificar con lo resuelto, ignorando cualquier clase que traiga la fila.
- *   6. Rechazar la confirmacion entera -sin tocar ningun puerto de escritura- si hay una fila
- *      incompleta o duplicada, una imagen que no es un recorte de este archivo y empresa, o una
- *      presentacion nueva sin unidad elegida y visible para la empresa.
- *   7. Si hace falta crear alguna presentacion, exigir el permiso de inventario ANTES de crear
- *      nada.
- *   8. Crear cada presentacion nueva una sola vez, reutilizando la existente si una alta
- *      concurrente ya la creo.
- *   9. Escribir las lineas, en una sola llamada al puerto de escritura por identidad.
+ * La confirmacion de una importacion de catalogo: reclasifica EN EL SERVIDOR en vez de fiarse de
+ * la clase que trae la fila -el navegador pudo mandar cualquier cosa- y rechaza la confirmacion
+ * entera si una sola fila no puede escribirse, para no dejar una escritura parcial. El permiso de
+ * inventario solo se exige si de verdad hace falta crear una presentacion nueva.
  */
 import { assertPermission } from '@/lib/modules/identity';
 import { normalizePresentationName, PresentationDuplicateNameError } from '@/lib/modules/inventario';

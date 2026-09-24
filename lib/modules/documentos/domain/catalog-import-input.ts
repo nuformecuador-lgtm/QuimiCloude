@@ -1,16 +1,11 @@
 /**
  * El esquema del borde de la vista previa y de la confirmacion de una importacion de catalogo.
  *
- * `lines` es la fila revisada tal como la deja el formulario del navegador, no como la interpreto
- * la IA. A proposito no reutiliza los esquemas de alta/edicion de linea de `proveedores` campo a
- * campo: esos exigen la forma ya valida, y una fila incompleta tiene que poder llegar con un campo
- * vacio o mal escrito para que la clasificacion la marque y la pantalla diga que esta mal -si el
- * borde ya la rechazara, no se sabria cual fila fallo, solo que la peticion entera lo hizo-. La
- * validez de negocio la decide la clasificacion, reutilizando esos mismos esquemas por campo; este
- * archivo solo fija la forma de tipo: cadena o `null`, nunca `number` en costo o medidas, e
- * `imagePath` como cadena o ausente. `presentation` y `name` si son cadena obligatoria -no `null`-:
- * el formulario los manda como texto, vacio si el revisor lo deja en blanco, y una cadena vacia es
- * justo lo que hace que el campo salga invalido al clasificar.
+ * A proposito no reutiliza los esquemas de alta/edicion de `proveedores`: esos exigen la forma ya
+ * valida, y una fila incompleta tiene que poder llegar con un campo vacio para que sea la
+ * clasificacion -no el borde- quien la marque por fila. Por eso aqui todo es cadena o `null`
+ * (nunca `number`), salvo `presentation` y `name`, obligatorios como cadena para que una fila
+ * vacia clasifique como invalida en vez de rechazar la peticion entera.
  */
 import { z } from 'zod';
 

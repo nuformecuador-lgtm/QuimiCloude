@@ -1420,11 +1420,8 @@ const cropStorage: CropStorage = {
 /**
  * `CropCatalog`, la lectura de esos mismos recortes para mostrarlos en la revision. Mismo criterio
  * de bifurcacion que `cropStorage`: se consulta la variable EN CADA LLAMADA.
- *
- * Exportado ya para que la fachada de `documentos` pueda inyectarlo sin volver a tocar este
- * bloque; todavia no lo usa ningun caso de uso construido en este archivo.
  */
-export const cropCatalog: CropCatalog = {
+const cropCatalog: CropCatalog = {
   list: (companyId, documentFileId) =>
     documentsE2EDoublesEnabled()
       ? cropCatalogMemory.list(companyId, documentFileId)

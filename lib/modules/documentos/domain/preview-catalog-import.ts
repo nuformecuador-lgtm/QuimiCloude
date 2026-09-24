@@ -1,27 +1,12 @@
 /**
- * La vista previa de una importacion de catalogo: interpreta (o reclasifica), clasifica cada fila,
- * empareja o respeta su imagen y firma lo que hace falta para mostrar. Nunca escribe nada.
- *
- * Pasos, en este orden -abrir la revision no puede filtrar si un archivo existe, esta en otra
- * empresa o su tanda no es de catalogo, asi que los cuatro casos dan el mismo rechazo-:
- *   1. Permiso, antes de leer nada.
- *   2. Leer el archivo (mismo rechazo si no existe, no esta listo o su tanda no es catalogo).
- *   3. Interpretar el texto de la IA solo si no llegan filas ya revisadas; si llegan, son esas
- *      las que se reclasifican y la interpretacion no se repite.
- *   4. Resolver presentaciones y lineas vivas por identidad, para clasificar y para mostrar el
- *      costo actual de una fila que cambia.
- *   5. Listar y firmar los recortes del archivo, para el selector de imagen.
- *   6. Clasificar y emparejar o respetar la imagen de cada fila: por pagina si no hay filas
- *      editadas; si las hay, la imagen es la que trae la fila solo si es un recorte real de este
- *      archivo y empresa (rechazar la confirmacion por una imagen ajena es cosa de la confirmacion,
- *      no de esta vista previa).
+ * La vista previa de una importacion de catalogo. Nunca escribe nada: rechazar la confirmacion por
+ * una imagen ajena es cosa de la confirmacion, no de esta funcion. Archivo inexistente, de otra
+ * empresa o de otra tanda dan el mismo rechazo, para no filtrar cual de los tres es.
  *
  * `createPresentation` e `importLines` viven en `CatalogImportDeps` porque la confirmacion
- * comparte el mismo tipo de dependencias; esta funcion no los toca.
- *
- * La sugerencia de unidad de una presentacion nueva es una funcion pura aparte que la pantalla
- * llama con la lista de unidades que ya carga; por eso esta vista previa publica el texto de
- * unidad leido, no un identificador ya elegido.
+ * comparte el mismo tipo de dependencias; esta funcion no los toca. La sugerencia de unidad de una
+ * presentacion nueva es una funcion pura aparte que la pantalla llama con la lista de unidades que
+ * ya carga; por eso esta vista previa publica el texto de unidad leido, no un identificador elegido.
  */
 import { requirePermission, DOCUMENT_UPLOAD_PERMISSION, type Actor } from './actor';
 import { extractCatalogFromText, type ExtractedLine } from './catalog-extraction';
@@ -301,7 +286,6 @@ export function createPreviewCatalogImport(
     );
     const cropUrlByPath = new Map(crops.map((crop) => [crop.path, crop.url]));
 
-    // 6. Emparejar por pagina (sin `lines`) o respetar la imagen de la fila (con `lines`).
     const imagePaths: readonly (string | null)[] =
       lines === undefined
         ? pairCropsWithLines(

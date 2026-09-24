@@ -102,20 +102,10 @@ function measurementsParam(value: CatalogLineFields['measurements']): string | n
 }
 
 /**
- * `upsertCostByIdentity`. Una transaccion:
- *
- * 1. `SELECT ... FOR SHARE` del proveedor vivo de la empresa. Sin fila, `'supplier_not_found'`
- *    y la transaccion no escribe nada (una baja concurrente del proveedor, en curso, hace
- *    que esta escritura espere a que termine en vez de correr a la vez).
- * 2. Por cada linea, un `INSERT ... ON CONFLICT (...) WHERE deleted_at IS NULL DO UPDATE`
- *    sobre el mismo indice unico parcial que arbitra el alta manual: sin fila devuelta,
- *    «sin cambios» (mismo costo); con `inserted`, «creada»; si no, «actualizada». El indice
- *    es el UNICO arbitro -no hay ningun `SELECT` previo del que la escritura dependa-, que es
- *    lo que hace que dos confirmaciones simultaneas no dupliquen nada.
- *
- * Si cualquier sentencia de la transaccion lanza -incluida una violacion de restriccion en
- * una fila intermedia-, `prisma.$transaction` deshace TODO lo escrito hasta ese punto: no hay
- * ningun `catch` dentro del bucle que la convierta en un resultado parcial.
+ * `upsertCostByIdentity`. `FOR SHARE` hace que una baja concurrente del proveedor espere a esta
+ * escritura en vez de correr a la vez. El `ON CONFLICT` es el UNICO arbitro -sin ningun `SELECT`
+ * previo del que la escritura dependa-, que es lo que evita que dos confirmaciones simultaneas
+ * dupliquen una linea.
  */
 export async function upsertCatalogLinesByIdentity(
   supplierId: string,

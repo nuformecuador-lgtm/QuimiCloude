@@ -3,17 +3,9 @@
 /**
  * El BORDE de la revision de una importacion de catalogo: dos Server Actions y nada mas.
  *
- * `previewCatalogImportAction` valida su entrada con el esquema del contrato y, si no encaja,
- * responde `invalid_input` SIN resolver actor ni llamar a `documentos.previewCatalogImport` -mismo
- * criterio que `recipe-actions.ts`: la vista previa no escribe nada, asi que rechazar en el borde
- * no adelanta ningun veredicto de autorizacion que le importe a nadie. `confirmCatalogImportAction`
- * hace lo mismo con su propio esquema y, si la confirmacion termina en exito, revalida la pagina
- * del detalle del proveedor -la unica ruta que muestra el catalogo que acaba de cambiar- y devuelve
- * el resumen.
- *
- * El ACTOR sale de las DOS caras de la sesion, en un solo `runInRequestScope` por invocacion, mismo
- * patron que `document-batch-actions.ts`. El error se traduce por su `code` con el traductor unico:
- * ninguna de las dos mira el texto del mensaje.
+ * Las dos rechazan la entrada invalida SIN resolver el actor -mismo criterio que
+ * `recipe-actions.ts`: como ninguna de las dos lee ni escribe nada con una entrada rota, rechazar
+ * en el borde no adelanta ningun veredicto de autorizacion.
  *
  * Este archivo NO se reexporta desde el contrato del modulo: un `'use server'` en su cierre
  * transitivo lo volveria inimportable desde un componente de cliente.
