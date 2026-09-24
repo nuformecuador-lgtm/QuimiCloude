@@ -278,7 +278,13 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // `app/`. Promovido a `components/shared/presentation-unit-select.tsx`, casa con
     // `screenPattern` tambien por la palabra «presentation» y tampoco es una pantalla: solo pinta
     // un `Select` con las unidades que le bajan POR PROPS, sin consultar ninguna operacion.
+    // ACTUALIZADO 2026-09-22 (QC-146, presentacion-del-pedido): un TERCER archivo entra en la
+    // misma exclusion. `order-presentation-label.tsx` casa con `screenPattern` por la palabra
+    // «presentation» en su nombre; no es una pantalla del catalogo, es la marca que pinta el
+    // nombre de la presentacion de un pedido (o «Sin presentacion») a partir de lo que le llega
+    // por props, sin consultar ninguna operacion del catalogo.
     const SELECTORES_PROMOVIDOS = [
+      'shared/order-presentation-label.tsx',
       'shared/presentation-select.tsx',
       'shared/presentation-unit-select.tsx',
     ] as const
@@ -332,10 +338,19 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // de QC-45) con datos de dos empresas. La defensa extra de abajo es la misma que la de las
     // otras exclusiones: el archivo tiene que existir y tiene que llevar la señal de lo que dice
     // ser.
+    // ACTUALIZADO 2026-09-18 (QC-92, ajuste-de-inventario): entra un TERCER nombre,
+    // `ajuste-de-inventario.spec.ts`, en el orden que el matcher devuelve (alfabetico). Casa con
+    // `screenPattern` por la MISMA razon que `aislamiento-inventario.spec.ts`: por la palabra
+    // «inventario» en el nombre del archivo. Y por la MISMA razon que aquel, no es una segunda
+    // pantalla del catalogo: lo que ejercita es el PANEL DE LOTES y el AJUSTE DE EXISTENCIA, que
+    // es la pantalla que esta ficha añade -el alta del catalogo la sigue cubriendo
+    // `inventario.spec.ts` y esta ficha no la toca-. La guardia no se afloja; se le añade un
+    // renglon.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
       E2E_DE_AISLAMIENTO,
+      'ajuste-de-inventario.spec.ts',
       'inventario.spec.ts',
     ])
 

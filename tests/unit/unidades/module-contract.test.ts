@@ -598,30 +598,35 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(columnasDelInsert).toEqual(['name', 'name_normalized', 'symbol', 'updated_at'])
   })
 
-  it('la unidad del producto es la DERIVADA del lote y nunca un texto (QC-32 R19, QC-80 R21/R22)', () => {
-    // R19 de QC-32: donde `inventario` publica la unidad hacia fuera o la recibe del borde, lo
-    // hace con la REFERENCIA al catalogo y con el tipo que publica `@/lib/modules/unidades`
-    // (`design.md > 5.3`). Un campo llamado `unit` de tipo texto seria justo lo que R19 prohibe,
-    // asi que se busca el nombre de campo exacto `unit:` -`unitId:` no lo activa-.
+  it('la unidad del producto es la columna guardada y nunca un texto (QC-32 R19)', () => {
+    // ESTE CASO ESTA AMPLIADO A PROPOSITO.
     //
-    // QC-80 (R21) CAMBIA EL SUJETO, NO LA REGLA: el producto ya no declara unidad en ningun
-    // punto del camino -ni esquema de entrada, ni contrato publico, ni `FormData`-, porque
-    // `products.unit_id` dejo de existir. Lo que queda es la unidad DERIVADA de la presentacion
-    // del lote mas reciente (R22), que sigue siendo una REFERENCIA tipada con `UnitId` y sigue
-    // sin poder ser un texto. Este caso se actualiza en vez de borrarse: la prohibicion del
-    // texto libre es lo que no ha caducado.
+    // QUE AFIRMABA ANTES: que `ProductRef` -lo que otros modulos ven de un producto- se quedaba
+    // SIN unidad de ninguna clase, porque en su momento nadie fuera de `inventario` la
+    // necesitaba.
+    //
+    // QUE AFIRMA AHORA: `ProductRef` SI lleva `unitId`, la unidad guardada del producto, porque
+    // ahora hay consumidores que la necesitan para convertir: el costo de una receta que reparte
+    // sus insumos en porcentaje, la tabla de ingredientes de un pedido y la pantalla de
+    // ejecucion del operario. Lo que la prohibicion original protegia sigue intacto: la unidad
+    // se publica como REFERENCIA al catalogo (`unitId`), nunca como el campo de texto suelto
+    // `unit` que este caso sigue rechazando.
     const CAMPO_UNIT_TEXTO = /\bunit\s*\??\s*:/
 
-    // `ProductRef` -lo que otros modulos ven- se queda SIN unidad de ninguna clase (R21).
+    // `ProductRef` -lo que otros modulos ven- lleva la referencia a la unidad guardada, y nunca
+    // un campo de texto.
     const catalogo = read(join(inventarioDir, 'domain', 'product-catalog.ts'))
-    expect(catalogo, 'ProductRef recupero una unidad que nadie consume').not.toMatch(/unitId/)
-    expect(catalogo, 'ProductRef conserva un campo `unit`').not.toMatch(CAMPO_UNIT_TEXTO)
+    expect(catalogo, 'ProductRef perdio la unidad guardada que sus consumidores necesitan').toMatch(
+      /readonly unitId: string \| null/,
+    )
+    expect(catalogo, 'ProductRef conserva un campo `unit` de texto').not.toMatch(CAMPO_UNIT_TEXTO)
 
-    // `ProductView` lleva la DERIVADA, tipada con `UnitId`; `NewProduct` -lo que se escribe- no
-    // lleva ninguna: la unidad no se envia, se lee.
+    // `ProductView` lleva la unidad guardada, tipada con `UnitId`; `NewProduct` -lo que se
+    // escribe- no lleva ninguna: la unidad no se envia, se lee.
     const vista = read(join(inventarioDir, 'domain', 'product-view.ts'))
-    expect(vista).toMatch(/readonly latestBatchUnitId: UnitId \| null/) // ProductView
-    expect(vista, 'NewProduct volvio a declarar unidad').not.toMatch(/readonly unitId/)
+    expect(vista).toMatch(/readonly unitId: UnitId \| null/) // ProductView, columna guardada
+    const nuevoProducto = vista.slice(vista.indexOf('export type NewProduct'), vista.indexOf('export type ProductView'))
+    expect(nuevoProducto, 'NewProduct volvio a declarar unidad').not.toMatch(/readonly unitId/)
     expect(vista, 'ProductView/NewProduct conservan un campo `unit`').not.toMatch(CAMPO_UNIT_TEXTO)
     expect(vista).toMatch(/from '@\/lib\/modules\/unidades'/)
 

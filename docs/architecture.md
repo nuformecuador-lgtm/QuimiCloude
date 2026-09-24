@@ -27,9 +27,15 @@ consecuencias de arquitectura que no son opinables:
      aislamiento implementado solo como policy **no cuenta como implementado**, igual que
      no cuenta un permiso. La empresa viaja firmada en la sesion (QC-48) y **eso tampoco
      autoriza por si solo**.
-   - **Toda tabla de negocio nueva nace con su columna de empresa.** Las unicas exentas
-     son las del sistema, y son una lista corta y cerrada: `users`, `roles`,
-     `document_types`. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
+   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
+     columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
+     y cerrada de ocho tablas: los catalogos compartidos por todas las empresas
+     (`document_types`, `roles`, `permissions`, `role_permissions`), la propia empresa
+     (`companies`), las que cuelgan de un usuario que ya tiene empresa
+     (`credential_setup_tokens`, `revoked_sessions`) y la que hereda la empresa de su
+     receta (`recipe_lines`). La tabla de usuarios no es exenta: lleva su empresa. La
+     lista la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`, que la guarda
+     con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
      si acaso». Lo que cambio es que multiplicar empresas dejo de ser hipotetico y paso a
      ser backlog; sigue siendo sobre-ingenieria —y el reviewer la rechaza— todo lo que no
@@ -70,10 +76,9 @@ del dominio.
    **texto libre y opcional** en la columna `unit` del producto, asumiendo a conciencia que
    normalizarla despues costaria una limpieza de datos. El 2026-09-02, al acotar QC-32, el
    humano decidio normalizarla: la unidad pasa a ser un **catalogo propio** (modulo `unidades`,
-   tabla `Unit`, nombre unico normalizado y simbolo opcional), y el producto y la linea de
-   receta apuntan a el en vez de guardar texto. Se paga el coste que QC-14 anticipo, con la
-   suerte de que la base todavia esta vacia. Detalle en
-   `specs/QC-32-modelo-unidades/requirements.md`.
+   tabla `Unit`, nombre unico normalizado y simbolo opcional), y el producto apunta a el en vez
+   de guardar texto. Se paga el coste que QC-14 anticipo, con la suerte de que la base todavia
+   esta vacia. Detalle en `specs/QC-32-modelo-unidades/requirements.md`.
    **REABIERTA el 2026-09-07 (QC-76).** Lo que cambia es justo la mitad que QC-14 y QC-32
    daban por cerrada: **si va a haber conversion**. La unidad gana la unidad de la que deriva y
    un **factor decimal exacto de cuatro decimales, mayor que cero** —1 litro = 1000 mililitros—,
@@ -89,6 +94,19 @@ del dominio.
    (`company_id` opcional; sin el, la unidad es de sistema y vale para todas), lo que **absorbio y
    cancelo QC-51**. Detalle y las 30 decisiones cerradas en
    `specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`.
+   **CORREGIDA el 2026-09-22 (QC-147): la linea de receta deja de tener unidad propia.** Pasa a
+   llevar un **porcentaje** (`recipe_lines.percentage`, `DECIMAL(5,2)`, sin `unit_id`) sobre la
+   cantidad del pedido; la unidad que se muestra junto a cada linea es la del producto ingrediente
+   (`ProductRef.unitId`), no una columna de la propia linea. El producto sigue apuntando al
+   catalogo de unidades sin cambios. Detalle en
+   `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`.
+   **REABIERTA EN PARTE el 2026-09-24 (QC-164, `pending`): el pedido vuelve a tener unidad.**
+   QC-147 lo dejo sin unidad; QC-164 le devuelve una del catalogo, y el consumo pasa a ser
+   cantidad x % **convertida** a la unidad del insumo con los factores de QC-76 cuando comparten
+   familia. Entre familias distintas (L frente a kg) se mantiene la aproximacion **sin densidad**
+   que QC-147 acepto (1 L ~ 1 kg): la densidad por producto queda descartada por ahora. De paso,
+   **QC-150** (spec_ready) da a la presentacion su contenido numerico en su propia unidad.
+   Detalle en `specs/QC-164-unidad-del-pedido/requirements.md`.
 2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
    suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
    guarda totales es de las migraciones mas dolorosas que existen.
@@ -109,6 +127,12 @@ del dominio.
    hoy por defecto y **nunca futura**. `expiry_date` **sigue siendo opcional**. Esto **no cierra
    la pregunta**: lo que sigue abierto es el resto, que nada consume todavia el lote ni el
    vencimiento. Detalle en `specs/QC-81-lote-y-fecha-de-compra/requirements.md`.
+   **Avanza el 2026-09-22 (QC-141, implementada el 2026-09-23): primer consumidor del lote.** La
+   reserva de material de un pedido elige **de que lote sale** lo que se despacha: los mas
+   antiguos por fecha de compra, desempatando por numero de lote -el mismo orden que el coste de
+   QC-123-, y entregar lo consume como salida real. El vencimiento **sigue sin consumidor** y la
+   pregunta **sigue abierta** en esa mitad. La existencia pasa de entera a **decimal** en la misma ficha. Detalle en
+   `specs/QC-141-reserva-de-material-del-pedido/requirements.md`.
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
@@ -120,6 +144,20 @@ del dominio.
    **Queda un fleco abierto**: si algun dia hay que exportar esos datos a un contable externo
    no se evaluo, y esta anotado como pregunta abierta en
    `specs/QC-33-modelo-pedidos/requirements.md`.
+   **CORREGIDA el 2026-09-18 (QC-123), y hay que leer este punto con la enmienda delante: las
+   frases de arriba sobre el precio ya NO describen el sistema.** No existe ningun **precio de
+   venta**, ni en el pedido ni en la receta. El precio unitario y la unidad del pedido los
+   **borro QC-35bis el 2026-09-07** (`orders_drop_unit_and_unit_price`), por decision del humano
+   —«un pedido es receta + cantidad»—, y entre esa fecha y el 2026-09-18 este punto siguio
+   diciendo «el precio de venta del pedido nace aqui» sobre columnas que ya no estaban. Lo que
+   **si** existe desde QC-123 es un importe de otra naturaleza: el **coste de los ingredientes**
+   que la receta del pedido consume, leido de los **lotes de inventario con existencia**,
+   promediado por lote usado. Y **se guarda**, al reves de lo que dice la frase original: sus
+   factores —que lotes habia y a que costo— cambian cada dia, asi que calcularlo al leer haria
+   que el importe de un pedido de marzo cambiara solo. Se recalcula **en cada edicion del
+   pedido** y en ningun otro momento. Lo que **sigue en pie**: el ERP no factura ni liquida
+   impuestos, y el dinero va en `decimal(14,4)` y nunca `float`. Detalle en
+   `specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/requirements.md`.
 5. **Moneda por empresa.** QC-14 y QC-42 cerraron que la moneda del costo es **implicita y
    no se guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya no
    vale. Si dos empresas pueden operar en monedas distintas, es columna nueva y conversion
@@ -438,6 +476,16 @@ el service ya deniega. La invalidacion inmediata es QC-23.
 | Webhook de un tercero | Route Handler (`app/api/`) |
 | API publica para terceros | Route Handler (`app/api/`) |
 | Cron interno | Route Handler (`app/api/`) |
+
+El primer cron interno es la caducidad de pedidos de QC-141: `app/api/cron/caducar-pedidos`,
+declarado en `vercel.json` con una sola ejecucion diaria. `/api/**` no pasa por la sesion, asi
+que la unica puerta es el secreto: la ruta exige `Authorization: Bearer <CRON_SECRET>` y responde
+401 si no casa y 500 si la variable no esta definida, sin leer nada en ninguno de los dos casos.
+`CRON_SECRET` tiene que existir en el proyecto de Vercel (Vercel solo manda la cabecera cuando la
+variable existe) y esta documentada en `.env.example`. El proceso no actua en nombre de ninguna
+empresa, pero **tampoco lee varias a la vez**: recorre las empresas y busca los candidatos de cada
+una por separado, de modo que la regla de ambito de empresa de las consultas se cumple sin
+excepciones.
 
 ## Migraciones up/down
 

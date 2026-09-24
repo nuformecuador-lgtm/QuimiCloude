@@ -73,14 +73,12 @@ const ADMIN_PASSWORD = `Qc59-Admin-${RUN_ID.slice(0, 12)}`;
 const SUPPLIER_PHONE = '+573000000000';
 const LINE_COST = '12.3456';
 
-/** El maximo que ofrece la pantalla: menos paginas que recorrer. */
-const LIST_PAGE_SIZE = '25';
-const PAGE_SIZE_PARAM = 'pageSize';
-const SEARCH_PARAM = 'q';
+/** Nombre del parametro de la URL con el que el filtro de proveedor se sincroniza. */
+const SUPPLIER_SEARCH_PARAM = 'supplier';
 
 /** Ningun assert mira copy: solo `data-testid`. */
 const SUPPLIERS_TITLE = 'proveedores-title';
-const NAME_CELL = 'data-table-cell-name';
+const DETAIL_LINK = 'supplier-detail-link';
 const DETAIL_NAME = 'supplier-detail-name';
 const NOT_FOUND = 'supplier-not-found';
 const NOT_FOUND_LINK = 'supplier-not-found-link';
@@ -112,10 +110,7 @@ function exactText(value: string): RegExp {
 }
 
 function listUrl(): string {
-  const query = new URLSearchParams({
-    [PAGE_SIZE_PARAM]: LIST_PAGE_SIZE,
-    [SEARCH_PARAM]: SHARED_TOKEN,
-  });
+  const query = new URLSearchParams({ [SUPPLIER_SEARCH_PARAM]: SHARED_TOKEN });
   return `${SUPPLIERS_ROUTE}?${query.toString()}`;
 }
 
@@ -450,15 +445,17 @@ test.describe('aislamiento por empresa de proveedores', () => {
       'el nombre del proveedor de B no puede viajar en el HTML servido de una sesion de A',
     ).toBe(false);
 
-    await expect(page.locator(`[data-testid="data-table-row-${supplierAId}"]`)).toHaveCount(1, {
-      timeout: 60_000,
-    });
-    await expect(page.locator(`[data-testid="data-table-row-${supplierBId}"]`)).toHaveCount(0);
     await expect(
-      page.getByTestId(NAME_CELL).filter({ hasText: exactText(SUPPLIER_A_NAME) }),
+      page.locator(`[data-testid="supplier-showcase-row-${supplierAId}"]`),
+    ).toHaveCount(1, { timeout: 60_000 });
+    await expect(
+      page.locator(`[data-testid="supplier-showcase-row-${supplierBId}"]`),
+    ).toHaveCount(0);
+    await expect(
+      page.getByTestId(DETAIL_LINK).filter({ hasText: exactText(SUPPLIER_A_NAME) }),
     ).toHaveCount(1);
     await expect(
-      page.getByTestId(NAME_CELL).filter({ hasText: exactText(SUPPLIER_B_NAME) }),
+      page.getByTestId(DETAIL_LINK).filter({ hasText: exactText(SUPPLIER_B_NAME) }),
     ).toHaveCount(0);
 
     // --- 2. La URL del detalle de B conociendo su identificador (R27). Se compara contra la de un
@@ -488,13 +485,11 @@ test.describe('aislamiento por empresa de proveedores', () => {
     await expect(page.getByTestId(DETAIL_NAME)).toHaveText(SUPPLIER_A_NAME, { timeout: 60_000 });
     await expect(page.getByTestId(NOT_FOUND)).toHaveCount(0);
 
-    // --- 3. Baja cruzada conociendo el identificador (R28). El id de B se mete por DOM en el
-    // campo oculto del dialogo del proveedor PROPIO: es el gesto de quien abre las herramientas de
-    // desarrollo, y ejercita la Server Action real sin fabricar ninguna peticion.
-    await page.goto(listUrl());
-    const ownRow = page.locator(`[data-testid="data-table-row-${supplierAId}"]`);
-    await expect(ownRow).toHaveCount(1, { timeout: 60_000 });
-    await ownRow.getByTestId(DELETE_OPEN).click();
+    // --- 3. Baja cruzada conociendo el identificador. El control de baja vive en la cabecera del
+    // propio detalle, donde ya se esta tras el control positivo anterior. El id de B se mete por
+    // DOM en el campo oculto del dialogo del proveedor PROPIO: es el gesto de quien abre las
+    // herramientas de desarrollo, y ejercita la Server Action real sin fabricar ninguna peticion.
+    await page.getByTestId(DELETE_OPEN).click();
     await expect(page.getByTestId(DELETE_DIALOG)).toBeVisible({ timeout: 60_000 });
 
     // Si el campo no trajera de serie el identificador propio, sustituirlo no demostraria nada.
@@ -554,12 +549,13 @@ test.describe('aislamiento por empresa de proveedores', () => {
     // --- 4. Alta en A con el MISMO nombre que el proveedor de B (R14): se completa sin error,
     // porque el nombre es unico por empresa y no global.
     //
-    // Sin `page.goto`: la baja con exito dispara `router.refresh()`, y una navegacion propia
-    // pisaria esa y abortaria el paso. Se espera a que el refresco quite la fila dada de baja.
-    await expect(page.locator(`[data-testid="data-table-row-${supplierAId}"]`)).toHaveCount(0, {
-      timeout: 60_000,
-    });
+    // La baja con exito navega ella misma a la lista: se espera esa navegacion en vez de disparar
+    // una propia, que la pisaria.
+    await page.waitForURL((url) => url.pathname === SUPPLIERS_ROUTE, { timeout: 60_000 });
     await expect(page.getByTestId(SUPPLIERS_TITLE)).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.locator(`[data-testid="supplier-showcase-row-${supplierAId}"]`),
+    ).toHaveCount(0);
 
     await page.getByTestId(CREATE_OPEN).first().click();
     await expect(page.getByTestId(SUPPLIER_SHEET)).toBeVisible({ timeout: 60_000 });
@@ -583,8 +579,8 @@ test.describe('aislamiento por empresa de proveedores', () => {
     ).not.toBe(supplierBId);
 
     await expect(
-      page.getByTestId(NAME_CELL).filter({ hasText: exactText(SUPPLIER_B_NAME) }),
-      'el proveedor recien dado de alta en A deberia verse en la lista de A',
+      page.getByTestId(DETAIL_LINK).filter({ hasText: exactText(SUPPLIER_B_NAME) }),
+      'el proveedor recien dado de alta en A deberia verse en la vista de A',
     ).toHaveCount(1, { timeout: 60_000 });
 
     // Y B no se entera de nada de lo que hizo A: su proveedor y su linea, tal cual.

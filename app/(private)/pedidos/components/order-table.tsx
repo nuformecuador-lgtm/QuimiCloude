@@ -1,16 +1,21 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useTransition } from 'react';
+import { useMemo, useState, useTransition, type MouseEvent } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
+import { buttonVariants } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
+import type { OrderCoverage } from '@/lib/modules/inventario';
+import { cn } from '@/lib/utils';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
-import { orderListHref } from './order-list-params';
+import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
 
 /**
@@ -30,11 +35,9 @@ import type { RecipePickerPage } from './recipe-picker';
  * **El destino sale de `orderListHref`** (R2): ningun archivo de la ruta escribe la URL como
  * literal.
  *
- * **`searchable={false}`** (R20, `design.md > 6.2`): la caja de busqueda **no se monta** —no se
- * pinta inerte ni deshabilitada: no existe en el DOM—. `ORDER_QUERYABLE.searchable` es `false`,
- * asi que una caja aqui mentiria: el termino se omitiria en silencio y la lista devolveria todo
- * como si no se hubiera buscado. `texts.search` se entrega igual porque el contrato de textos lo
- * exige obligatorio y esta ficha no lo toca.
+ * **La caja de busqueda esta montada** (`searchable` por defecto): teclear en ella emite
+ * `onParamsChange`, que pasa por `withSearchResetsPage` antes de navegar, de modo que un termino
+ * nuevo vuelve siempre a la primera pagina.
  *
  * **`status` es SIEMPRE `'idle'`** (alternativa Q, descartada): el error y la lista vacia se
  * pintan fuera de `<DataTable>`, con copy y acciones propias. El «cargando» de R21 ya no viene de
@@ -60,8 +63,7 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay pedidos que mostrar.',
   loading: 'Cargando pedidos…',
   error: 'No se pudo cargar la lista de pedidos.',
-  // Obligatorio en el contrato de textos; con `searchable={false}` no se pinta en ningun sitio.
-  search: 'Buscar',
+  search: 'Buscar por receta',
   filters: 'Filtros',
   columnMenu: 'opciones de la columna',
   previousPage: 'Página anterior',
@@ -78,6 +80,19 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   lastMonth: 'Último mes',
   lastYear: 'Último año',
 };
+
+/** Copy del estado «sin coincidencias», distinto del de «no hay pedidos». */
+export const ORDER_NO_MATCHES_MESSAGE = 'No hay pedidos que coincidan con la búsqueda.';
+
+export const ORDER_LIST_NO_MATCHES_TESTID = 'order-list-no-matches';
+export const ORDER_LIST_CLEAR_SEARCH_TESTID = 'order-list-clear-search';
+
+const CLEAR_SEARCH_LABEL = 'Limpiar la búsqueda';
+
+// Con modificadores o boton central se deja al navegador abrir otra pestaña.
+function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
 
 export type OrderTableProps = {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R13). */
@@ -100,6 +115,16 @@ export type OrderTableProps = {
   readonly responsiblesByOrder?: Readonly<Record<string, readonly OrderResponsible[]>>;
   /** QC-102 R27, R28 — catalogos y `canWrite` del panel, tambien de paso. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /**
+   * La cobertura de la pagina, **ya repartida por fila en el SERVIDOR**: mismo patron que
+   * `responsiblesByOrder`. La tabla solo lo atraviesa hasta la celda.
+   */
+  readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
+  /**
+   * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
+   * DENTRO de la tabla, con la caja montada, en vez del vacio de `order-list-empty.tsx`.
+   */
+  readonly noMatches?: { readonly clearHref: string };
 };
 
 export function OrderTable({
@@ -110,14 +135,45 @@ export function OrderTable({
   units,
   responsiblesByOrder,
   responsiblesCatalog,
+  coverageByOrder,
+  noMatches,
 }: OrderTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  /*
+    `boxEpoch` remonta la caja de busqueda: la instancia de `DataTableSearchField` guarda su
+    borrador una vez al montarse, asi que sin remontarla seguiria mostrando el termino viejo tanto
+    tras «Limpiar» como tras un cambio de `params.search` que no vino de la propia caja (Atras,
+    otro enlace). `clearing` adelanta el vaciado del «Limpiar» mientras esa navegacion todavia esta
+    en vuelo.
+  */
+  const [boxEpoch, setBoxEpoch] = useState(0);
+  const [clearing, setClearing] = useState(false);
+  /*
+    Compara durante el render (no en un efecto) para que el remonte llegue en el mismo commit, sin
+    parpadeo. `pendingSearches` distingue el eco de la propia caja (se descarta, sin remontar) de
+    un cambio externo (remonta).
+  */
+  const [pendingSearches, setPendingSearches] = useState<readonly string[]>([]);
+  const [lastSearch, setLastSearch] = useState(params.search);
+  if (params.search !== lastSearch) {
+    setLastSearch(params.search);
+    const index = pendingSearches.indexOf(params.search);
+    if (index === -1) {
+      setBoxEpoch((epoch) => epoch + 1);
+    } else {
+      setPendingSearches(pendingSearches.slice(index + 1));
+    }
+    // El eco de la limpieza o cualquier otro cambio real de `params.search` ya trae el termino
+    // vigente: `clearing` deja de forzarlo para no pisar un cambio externo posterior (Atras).
+    if (clearing) setClearing(false);
+  }
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
-    () => buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog }),
-    [recipes, units, responsiblesByOrder, responsiblesCatalog],
+    () =>
+      buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder }),
+    [recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder],
   );
 
   /*
@@ -138,6 +194,28 @@ export function OrderTable({
     });
   };
 
+  // Cualquier emision real de la tabla ya trae los `params` del servidor: a partir de ahi dejan
+  // de mandar los que esta funcion adelantaba mientras la navegacion de «Limpiar» volvia.
+  const handleParamsChange = (next: DataTableParams) => {
+    setClearing(false);
+    const target = withSearchResetsPage(params, next);
+    if (target.search !== params.search) {
+      setPendingSearches((pending) => [...pending, target.search]);
+    }
+    navigate(orderListHref(target));
+  };
+
+  const handleClearSearch = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (noMatches === undefined || !isPlainClick(event)) return;
+    event.preventDefault();
+    setPendingSearches((pending) => [...pending, '']);
+    setBoxEpoch((epoch) => epoch + 1);
+    setClearing(true);
+    navigate(noMatches.clearHref);
+  };
+
+  const visibleParams = clearing ? { ...params, search: '', page: FIRST_PAGE } : params;
+
   return (
     <div
       data-testid="order-table"
@@ -155,16 +233,34 @@ export function OrderTable({
         <p className="text-xs text-muted-foreground">{ORDER_TABLE_TEXTS.loading}</p>
       ) : null}
       <DataTable
+        key={boxEpoch}
         tableId={ORDER_TABLE_ID}
         columns={columns}
         rows={orders}
         getRowId={(order) => order.id}
-        params={params}
+        params={visibleParams}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(orderListHref(next))}
+        onParamsChange={handleParamsChange}
         status="idle"
-        texts={ORDER_TABLE_TEXTS}
-        searchable={false}
+        texts={noMatches === undefined ? ORDER_TABLE_TEXTS : { ...ORDER_TABLE_TEXTS, empty: ORDER_NO_MATCHES_MESSAGE }}
+        emptyAction={
+          noMatches === undefined ? undefined : (
+            <div
+              data-testid={ORDER_LIST_NO_MATCHES_TESTID}
+              className="flex flex-wrap items-center justify-center gap-2"
+            >
+              <Link
+                href={noMatches.clearHref}
+                onClick={handleClearSearch}
+                data-slot="button"
+                data-testid={ORDER_LIST_CLEAR_SEARCH_TESTID}
+                className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+              >
+                {CLEAR_SEARCH_LABEL}
+              </Link>
+            </div>
+          )
+        }
         defaultPinnedColumns={ORDER_DEFAULT_PINNED_COLUMNS}
       />
     </div>

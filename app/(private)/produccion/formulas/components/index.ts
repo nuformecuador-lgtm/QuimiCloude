@@ -59,14 +59,14 @@ export {
   type RecipeStepFormValue,
 } from './recipe-form-state';
 export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
-export { UnitPicker, type UnitPickerProps } from './unit-picker';
 export {
-  compareDecimalText,
-  resolveLineUnitId,
-  smallestUnit,
-  unitsOfGroup,
-} from './unit-group';
-export { RecipeLinesField, type RecipeLinesFieldProps } from './recipe-lines-field';
+  RecipeLinesField,
+  clampPercentageToRemaining,
+  referenceAmountForPercentage,
+  sanitizePercentageInput,
+  type RecipeLinesFieldProps,
+  type RecipeMachineFormValue,
+} from './recipe-lines-field';
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';

@@ -1,8 +1,10 @@
 import type { DataTableParams } from '@/components/shared/data-table';
+import { identity } from '@/lib/composition';
+import { canAdjustBatchStock } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { FIRST_PAGE, productListHref } from './product-list-params';
+import { FIRST_PAGE, productListHref, STOCK_COLUMN_ID, QTY_ALERT_COLUMN_ID, TYPE_COLUMN_ID } from './product-list-params';
 import { ProductListEmpty } from './product-list-empty';
 import { ProductListError } from './product-list-error';
 import { ProductSheet } from './product-sheet';
@@ -33,9 +35,11 @@ type ProductListSectionProps = {
  * R15 aparece solo mientras esta consulta esta en vuelo -sin un estado de carga escrito a mano y
  * sin carreras entre peticiones-.
  *
- * **R5**: aqui no se decide nada sobre permisos. No se lee la sesion, no se repite `requireAdmin`
- * y no se ocultan columnas por rol: la autorizacion la aporta el caso de uso, y si responde
- * `unauthorized` se pinta el estado de error **sin un solo dato del catalogo**.
+ * **Aqui no se decide autorizacion.** La sesion se lee solo para preguntar a
+ * `canAdjustBatchStock` si se pinta el control de ajuste -presentacion, no permiso-; no se repite
+ * `requireAdmin` ni se ocultan columnas por rol. La autorizacion sobre los datos la aporta el caso
+ * de uso, y si responde `unauthorized` se pinta el estado de error **sin un solo dato del
+ * catalogo**.
  *
  * **Una lista vacia NO se pinta como tabla sin filas** (R14, R16): son tres situaciones distintas
  * -fallo, catalogo vacio y pagina que se quedo atras tras un borrado- y cada una dice lo suyo.
@@ -48,8 +52,23 @@ export async function ProductListSection({ params, units }: ProductListSectionPr
   }
 
   const { items, page: currentPage, totalPages } = result.data;
+  // Presentacion, no autorizacion: decide si se pinta el control de ajuste.
+  // Quien autoriza de verdad es requirePermission en adjust-batch-stock.ts.
+  const canAdjust = canAdjustBatchStock(await identity.getSessionUser());
 
-  if (items.length === 0) {
+  // Hay filtros activos si: busqueda, tipo, rango stock o rango alerta
+  const hasActiveFilters =
+    (params.search?.trim() ?? '') !== '' ||
+    (params.filters[TYPE_COLUMN_ID]?.kind === 'select' && params.filters[TYPE_COLUMN_ID].values.length > 0) ||
+    (params.filters[STOCK_COLUMN_ID]?.kind === 'numberRange' &&
+      (params.filters[STOCK_COLUMN_ID].min !== null || params.filters[STOCK_COLUMN_ID].max !== null)) ||
+    (params.filters[QTY_ALERT_COLUMN_ID]?.kind === 'numberRange' &&
+      (params.filters[QTY_ALERT_COLUMN_ID].min !== null || params.filters[QTY_ALERT_COLUMN_ID].max !== null));
+
+  // Si no hay items:
+  // - Sin filtros -> catalogo vacio: muestra estado vacio completo con formulario de alta
+  // - Con filtros -> resultado vacio filtrado: muestra la tabla con su estado vacio ("No hay productos que mostrar.")
+  if (items.length === 0 && !hasActiveFilters) {
     return (
       <ProductListEmpty
         firstPageHref={
@@ -74,6 +93,7 @@ export async function ProductListSection({ params, units }: ProductListSectionPr
         params={{ ...params, page: currentPage }}
         totalPages={totalPages}
         units={units}
+        canAdjust={canAdjust}
       />
     </div>
   );

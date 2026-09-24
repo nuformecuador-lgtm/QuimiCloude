@@ -63,6 +63,7 @@ import {
   ROLE_OPERADOR,
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizePresentationName } from '@/lib/modules/inventario';
 import { DEFAULT_ORDER_PRIORITY, formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { normalizeUnitName } from '@/lib/modules/unidades';
@@ -114,6 +115,7 @@ const operatorUser: Credentials = {
 /** Catalogo minimo que el alta necesita (`design.md > 13`), creado como fixture. */
 const recipeName = `${FIXTURE_PREFIX}receta_${RUN_ID}`;
 const unitName = `${FIXTURE_PREFIX}unidad_${RUN_ID}`;
+const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
 
 /** Motivo de la cancelacion. Lleva el `RUN_ID` para que el assert no case con el de otro worker. */
 const cancellationReason = `Cancelado por el E2E ${RUN_ID}`;
@@ -127,6 +129,7 @@ const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
 let companyId: string | null = null;
 let adminUserId: string | null = null;
 let recipeId: string | null = null;
+let presentationId: string | null = null;
 
 async function createUserWithRole(user: Credentials, roleName: string): Promise<string> {
   if (!companyId) {
@@ -194,9 +197,9 @@ function rowByNumber(page: Page, numberText: string): Locator {
 
 /**
  * Recorre las paginas de la lista hasta encontrar la fila del correlativo pedido. Hace falta
- * porque la pantalla NO tiene busqueda (R20, `ORDER_QUERYABLE.searchable` es `false`) y la base
- * es compartida: aunque se pida por fecha descendente, otro worker puede haber empujado la fila
- * a la segunda pagina. De paso ejercita la paginacion de QC-55 en un navegador de verdad.
+ * porque la pantalla todavia no tiene caja de busqueda y la base es compartida: aunque se pida
+ * por fecha descendente, otro worker puede haber empujado la fila a la segunda pagina. De paso
+ * ejercita la paginacion de QC-55 en un navegador de verdad.
  */
 async function findOrderRow(page: Page, numberText: string): Promise<Locator> {
   const next = page.getByTestId('data-table-next');
@@ -238,6 +241,10 @@ test.beforeAll(async () => {
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
   }
   await prisma.recipe.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+  // La presentacion se borra antes que su unidad: su FK hacia `units` la rechaza si no.
+  await prisma.presentation.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
   await prisma.unit.deleteMany({
@@ -287,13 +294,27 @@ test.beforeAll(async () => {
 
   // La unidad de fixture se sigue creando -y borrando- aunque el PEDIDO ya no la use desde el
   // 2026-09-07: el catalogo de unidades sigue existiendo y la limpieza de huerfanos de arriba lo
-  // recorre. Su id ya no hace falta en ninguna asercion, asi que no se guarda.
+  // recorre.
   //
   // SIN simbolo a proposito: asi ninguna otra unidad del entorno comparte su etiqueta.
-  await prisma.unit.create({
+  const unit = await prisma.unit.create({
     data: { name: unitName, nameNormalized: normalizeUnitName(unitName), symbol: null },
     select: { id: true },
   });
+
+  // Presentacion de la MISMA empresa que el Administrador: el selector del panel solo ofrece las
+  // de su propia empresa, y elegir una de otra la dejaria fuera de la busqueda.
+  presentationId = (
+    await prisma.presentation.create({
+      data: {
+        name: presentationName,
+        nameNormalized: normalizePresentationName(presentationName),
+        unitId: unit.id,
+        companyId: empresaDelWorker,
+      },
+      select: { id: true },
+    })
+  ).id;
 });
 
 test.afterAll(async () => {
@@ -317,17 +338,22 @@ test.afterAll(async () => {
       await prisma.recipe.deleteMany({ where: { name: recipeName } });
     } finally {
       try {
-        await prisma.unit.deleteMany({ where: { name: unitName } });
+        // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
+        await prisma.presentation.deleteMany({ where: { name: presentationName } });
       } finally {
         try {
-          await prisma.user.deleteMany({
-            where: { username: { in: [adminUser.username, operatorUser.username] } },
-          });
+          await prisma.unit.deleteMany({ where: { name: unitName } });
         } finally {
           try {
-            await prisma.company.deleteMany({ where: { name: companyName } });
+            await prisma.user.deleteMany({
+              where: { username: { in: [adminUser.username, operatorUser.username] } },
+            });
           } finally {
-            await prisma.$disconnect();
+            try {
+              await prisma.company.deleteMany({ where: { name: companyName } });
+            } finally {
+              await prisma.$disconnect();
+            }
           }
         }
       }
@@ -340,7 +366,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('pantalla de pedidos', () => {
-  test('el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48)', async ({
+  test('el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48, R29)', async ({
     page,
   }) => {
     await loginAndLand(page, adminUser);
@@ -364,6 +390,18 @@ test.describe('pantalla de pedidos', () => {
     await recipeOption.click();
     // Lo que viaja en el `FormData` es el id elegido, no el texto escrito.
     await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
+
+    // --- 3b. Presentacion, tomada del mismo tipo de selector con busqueda: se escribe el nombre
+    // y se elige la opcion que trae el servidor.
+    const presentationPicker = page.getByTestId('presentation-select');
+    await presentationPicker.click();
+    await presentationPicker.fill(presentationName);
+    const presentationOption = page
+      .getByTestId('presentation-option')
+      .filter({ hasText: presentationName });
+    await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
+    await presentationOption.click();
+    await expect(page.getByTestId('presentation-value')).toHaveValue(presentationId ?? '');
 
     // --- 4. Cantidad DECIMAL, escrita como texto (R39). El precio unitario y el selector de
     // unidad salieron del formulario el 2026-09-07 (decision humana).
@@ -393,6 +431,7 @@ test.describe('pantalla de pedidos', () => {
         orderSequence: true,
         priority: true,
         quantity: true,
+        presentationId: true,
       },
     });
     const numberText = formatOrderNumber({
@@ -404,6 +443,9 @@ test.describe('pantalla de pedidos', () => {
     // (R39): ni el formulario ni la pantalla los pasaron por coma flotante.
     expect(created.priority).toBe(DEFAULT_ORDER_PRIORITY);
     expect(Number(created.quantity)).toBe(Number(ORDER_QUANTITY));
+    expect(created.presentationId, 'la fila de la base guarda la presentacion elegida (R29)').toBe(
+      presentationId,
+    );
 
     // --- 10. Y el pedido esta en la lista, localizado POR SU CORRELATIVO (R7, R10).
     const row = await findOrderRow(page, numberText);
@@ -411,6 +453,10 @@ test.describe('pantalla de pedidos', () => {
       timeout: 60_000,
     });
     await expect(row.getByTestId('data-table-cell-recipeName')).toHaveText(recipeName);
+    await expect(
+      row.getByTestId('order-presentation'),
+      'la fila del listado muestra el nombre de la presentacion elegida (R29)',
+    ).toHaveText(presentationName);
 
     // --- 11. Cancelacion con motivo (R37): el dialogo pide el motivo y solo entonces confirma.
     await row.getByTestId('order-action-cancel').click();

@@ -29,6 +29,10 @@ export type OrderAssignmentTarget = {
   readonly status: OrderStatus;
 };
 
+/** El orden de un resumen paginado. `work_queue` es el de la lista de trabajo (prioridad,
+ *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
+export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
+
 export interface OrderCatalog {
   /**
    * `null` = no existe, esta dado de baja, o NO ES DE ESA EMPRESA: para quien pregunta son el
@@ -56,6 +60,21 @@ export interface OrderCatalog {
   ): Promise<Page<AssignedOrderSummary>>;
 
   /**
+   * Como `listAliveSummariesByIds`, pero sin filtro de ids: toda la empresa. `asignaciones` la
+   * usa para «Terminados» y «Todos», que no acotan por quien esta asignado. El `ordering`
+   * decide el `ORDER BY`: `work_queue` es el mismo que `listAliveSummariesByIds`, extraido a
+   * una constante compartida para que no diverjan; `finished_recent_first` ordena por fecha de
+   * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
+   */
+  listAliveSummariesInCompany(
+    companyId: string,
+    statuses: readonly OrderStatus[],
+    ordering: OrderSummaryOrdering,
+    page: number,
+    pageSize?: number,
+  ): Promise<Page<AssignedOrderSummary>>;
+
+  /**
    * Mueve el estado de un pedido vivo de esa empresa, SOLO si `assertTransition(from, to)` lo
    * permite: la comprobacion la hace `pedidos` con su propia matriz, dentro del metodo.
    *
@@ -65,6 +84,10 @@ export interface OrderCatalog {
    * baja o es de otra empresa-; `'stale'` es un caso nuevo: el pedido sigue vivo y es de esa
    * empresa, pero su estado ya no es `from` porque alguien lo movio entre la lectura y esta
    * llamada.
+   *
+   * Si `to` es `'ENTREGADO'`, la misma llamada consume el material apartado:
+   * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
+   * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
    */
   transitionAliveById(
     id: string,
@@ -73,7 +96,7 @@ export interface OrderCatalog {
     to: OrderStatus,
     actorId: string,
     now: Date,
-  ): Promise<'ok' | 'not_found' | 'stale'>;
+  ): Promise<'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines'>;
 }
 
 /**
@@ -88,4 +111,9 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
+  /** `null` = sin presentacion: el contrato que `asignaciones` usa para pintarla. */
+  readonly presentationId: string | null;
+  /** `null` = sin fecha de terminado: un pedido entregado antes de que la columna existiera, o
+   *  uno que no esta ENTREGADO. */
+  readonly finishedAt: Date | null;
 };

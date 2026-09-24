@@ -165,11 +165,12 @@ function expectUnitCatalogIsNotAnEnum(): void {
 /** Los datos de negocio del producto, con su columna en la base. */
 const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['name', 'name'],
+  ['stock', 'stock'],
   ['qtyAlert', 'qty_alert'],
   ['imagePath', 'image_path'],
 ]
 
-const INTEGER_FIELDS = ['qtyAlert'] as const
+const DECIMAL_FIELDS = ['qtyAlert'] as const
 
 /** Opcionales: la ausencia de valor no puede convertirse en cero ni en cadena vacia. */
 const OPTIONAL_FIELDS = ['qtyAlert', 'imagePath'] as const
@@ -231,7 +232,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(field(presentation, 'nameNormalized').attributes).not.toMatch(/@unique/)
   })
 
-  it('el esquema declara exactamente dos modelos nuevos: Presentation y Product', () => {
+  // El censo paso de tres modelos a cuatro con `InventoryMovement` y de cuatro a cinco con
+  // `ReservationMovement`, el libro de lo apartado por pedido.
+  it('el esquema declara exactamente cinco modelos del modulo inventario', () => {
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -243,8 +246,14 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .filter(([, moduleName]) => moduleName === 'inventario')
       .map(([, , modelName]) => modelName)
       .sort()
-    expect(inventarioModels).toEqual(['Presentation', 'Product', 'ProductBatch'])
-    expect(inventarioModels).toHaveLength(3)
+    expect(inventarioModels).toEqual([
+      'InventoryMovement',
+      'Presentation',
+      'Product',
+      'ProductBatch',
+      'ReservationMovement',
+    ])
+    expect(inventarioModels).toHaveLength(5)
 
     for (const owned of ['DocumentType', 'Role', 'User']) {
       expect(modelNames, `el modelo ${owned} no debe desaparecer`).toContain(owned)
@@ -256,17 +265,21 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@@map\("(inventory|inventory_items|stock_items|items)"\)/)
   })
 
-  it('R2, R11: Product ya no declara stock', () => {
-    expect(has(product, 'stock'), 'Product.stock se quito con la migracion (R2, R11)').toBe(false)
-    expect(product.body).not.toMatch(/^\s*stock\s+Int/m)
+  it('QC-121 R8, R12: Product vuelve a declarar stock, guardado por la aplicacion', () => {
+    const stock = field(product, 'stock')
+    expect(stock.type, 'stock es decimal exacto, nunca entero ni coma flotante').toBe('Decimal')
+    expect(stock.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
+    expect(stock.isOptional).toBe(false)
+    expect(stock.attributes).toMatch(/@default\(0\)/)
+    // El indice parcial no lo modela Prisma: vive en la migracion, no aqui (R12).
     expect(product.body).not.toMatch(/products_stock_idx|products_stock_non_negative/)
   })
 
-  it('R7: Product declara sus datos de negocio en una sola tabla, y ya no declara unidad', () => {
+  it('QC-121 R1, R7: Product declara sus datos de negocio en una sola tabla, con su unidad propia', () => {
     for (const [name] of PRODUCT_BUSINESS_FIELDS) {
       expect(has(product, name), `falta el campo Product.${name}`).toBe(true)
     }
-    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(3)
+    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(4)
 
     // Son terminos comerciales del proveedor: se vetan aparte para que no vuelvan por descuido.
     for (const name of ['cost', 'minPurchase', 'deliveryTime']) {
@@ -283,13 +296,16 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .filter((candidate) => !candidate.isList && candidate.type !== 'Presentation')
       .map((candidate) => candidate.name)
       .sort()
-    // `nameNormalized` (forma canonica de `name`) y `companyId` (dueno de la fila) no son datos de
-    // negocio: van aparte para que el censo siga siendo una igualdad exacta.
+    // `nameNormalized` (forma canonica de `name`), `unitId` (referencia a otro modulo) y
+    // `companyId` (dueno de la fila) no son datos de negocio: van aparte para que el censo siga
+    // siendo una igualdad exacta.
     expect(scalarNames).toEqual(
       [
         'id',
         ...PRODUCT_BUSINESS_FIELDS.map(([name]) => name),
         'nameNormalized',
+        'type',
+        'unitId',
         'companyId',
         'createdAt',
         'updatedAt',
@@ -322,17 +338,18 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
     const presentationId = field(productBatch, 'presentationId')
     expect(presentationId.type).toBe('String')
-    expect(presentationId.isOptional).toBe(false)
+    expect(presentationId.isOptional, 'presentation_id es anulable: solo MACHINE la omite (2026-09-23)').toBe(true)
     expect(presentationId.attributes).toContain('@db.Uuid')
     expect(presentationId.attributes).toContain('@map("presentation_id")')
 
     const stock = field(productBatch, 'stock')
-    expect(stock.type).toBe('Int')
+    expect(stock.type).toBe('Decimal')
+    expect(stock.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
     expect(stock.isOptional).toBe(false)
 
     const unitCost = field(productBatch, 'unitCost')
     expect(unitCost.type).toBe('Decimal')
-    expect(unitCost.isOptional).toBe(false)
+    expect(unitCost.isOptional, 'unit_cost es anulable: solo MACHINE la omite (2026-09-23)').toBe(true)
     expect(unitCost.attributes).toContain('@map("unit_cost")')
     expect(unitCost.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
 
@@ -361,8 +378,10 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(productBatch.body).not.toMatch(/\bUser\b/)
 
     // Con Product y Presentation si hay @relation: los tres modelos son de inventario.
+    // `presentationId` es anulable desde 20260923140000 (MACHINE no trae presentacion), asi que
+    // el lado de la relacion es `Presentation?`.
     expect(productBatch.body).toMatch(/product\s+Product\s+@relation\(/)
-    expect(productBatch.body).toMatch(/presentation\s+Presentation\s+@relation\(/)
+    expect(productBatch.body).toMatch(/presentation\s+Presentation\?\s+@relation\(/)
 
     expect(productBatch.body).toContain('@@map("product_batches")')
     expect(productBatch.body).toMatch(/@@index\(\[productId\],\s*map:\s*"product_batches_product_id_idx"\)/)
@@ -379,7 +398,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(candidate.type).toBe('String')
   })
 
-  it('R7: qtyAlert e imagePath son opcionales, y unitId ya no esta entre ellos', () => {
+  it('R7: qtyAlert e imagePath son opcionales', () => {
     // Un `@default` convertiria la ausencia en un valor sin que nadie lo note.
     for (const name of OPTIONAL_FIELDS) {
       const candidate = field(product, name)
@@ -389,8 +408,16 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       )
     }
     expect(OPTIONAL_FIELDS).toHaveLength(2)
-    // `unitId` se afirma aparte para que no vuelva como opcional sin discutirlo.
-    expect(OPTIONAL_FIELDS as readonly string[]).not.toContain('unitId')
+  })
+
+  it('QC-121 R1, R23: unitId es opcional y sin @default: NULL significa producto sin lotes', () => {
+    const unitId = field(product, 'unitId')
+    expect(unitId.type).toBe('String')
+    expect(unitId.isOptional, 'Product.unitId es anulable: sin lotes, sin unidad').toBe(true)
+    expect(unitId.attributes).toContain('@map("unit_id")')
+    expect(unitId.attributes).toContain('@db.Uuid')
+    expect(unitId.attributes).not.toMatch(/@default\(/)
+    expect(unitId.attributes).not.toMatch(/@relation/)
   })
 
   it('imagePath esta declarado en el modelo, es opcional y mapea a image_path', () => {
@@ -404,15 +431,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(imagePath.attributes).not.toMatch(/@db\./)
   })
 
-  it('qtyAlert es Int', () => {
-    for (const name of INTEGER_FIELDS) {
+  it('qtyAlert es Decimal(14,4), como stock', () => {
+    for (const name of DECIMAL_FIELDS) {
       const candidate = field(product, name)
-      expect(candidate.type, `Product.${name} debe ser Int`).toBe('Int')
-      expect(candidate.attributes, `Product.${name} no debe declarar tipo nativo`).not.toMatch(
-        /@db\.(Decimal|Money|Real|DoublePrecision)/,
+      expect(candidate.type, `Product.${name} debe ser Decimal`).toBe('Decimal')
+      expect(candidate.attributes, `Product.${name} debe declarar decimal(14,4)`).toMatch(
+        /@db\.Decimal\(14,\s*4\)/,
       )
     }
-    expect(INTEGER_FIELDS).toHaveLength(1)
+    expect(DECIMAL_FIELDS).toHaveLength(1)
   })
 
   it('en el esquema no hay ningun Float, y el producto ya no declara ningun importe', () => {
@@ -426,15 +453,14 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@db\.(Real|DoublePrecision)/)
   })
 
-  it('R7: Product no declara ninguna unidad, ni por referencia ni como texto', () => {
-    // Ausencia afirmada en positivo: la unidad de un producto se deriva de la presentacion de su
-    // lote mas reciente, y declararla aqui abriria una segunda verdad.
-    expect(has(product, 'unitId'), 'Product.unitId tenia que haber desaparecido (QC-80 R7)').toBe(
-      false,
+  it('QC-121 R1, R2: Product declara su propia unidad, escalar y sin @relation', () => {
+    // Escalar sin `@relation`: `Unit` es del modulo `unidades`, y una relacion dejaria al cliente de
+    // `inventario` atravesarlo con un `include` sin que ninguna guardia lo vea.
+    expect(has(product, 'unitId'), 'Product.unitId vuelve a declararse (QC-121 R1)').toBe(true)
+    expect(has(product, 'unit'), 'Product.unit no se declara: unitId es escalar').toBe(false)
+    expect(product.body, 'unitId es escalar, sin @relation').not.toMatch(
+      /unitId\s+String[^\n]*@relation/,
     )
-    expect(has(product, 'unit'), 'Product.unit no puede resucitar (QC-32 R10)').toBe(false)
-    expect(product.body).not.toMatch(/unit_id/)
-    expect(product.body).not.toMatch(/^\s*unit\s+String/m)
     expect(product.body).not.toMatch(/\bUnit\b/)
 
     expectUnitCatalogIsNotAnEnum()
@@ -465,7 +491,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('no hay ninguna columna derivada de bajo de existencias ni relacion entre qtyAlert y stock', () => {
     // `qtyAlert` solo se almacena: nada de columna calculada ni estado derivado.
     const qtyAlert = field(product, 'qtyAlert')
-    expect(qtyAlert.type).toBe('Int')
+    expect(qtyAlert.type).toBe('Decimal')
     expect(qtyAlert.isOptional).toBe(true)
     expect(qtyAlert.attributes).not.toMatch(/@default\(/)
     // Una columna generada seria justo el derivado prohibido.
@@ -490,15 +516,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(generated.map((candidate) => candidate.name)).toEqual(['id'])
   })
 
-  it('la relacion ProductBatch-Presentation es obligatoria', () => {
+  it('la relacion ProductBatch-Presentation es anulable: MACHINE omite presentacion y costo', () => {
     const presentationId = field(productBatch, 'presentationId')
-    expect(presentationId.isOptional).toBe(false)
+    expect(presentationId.isOptional, 'presentation_id DROP NOT NULL (2026-09-23)').toBe(true)
     expect(presentationId.attributes).toContain('@db.Uuid')
     expect(presentationId.attributes).toContain('@map("presentation_id")')
 
     const relation = field(productBatch, 'presentation')
     expect(relation.type).toBe('Presentation')
-    expect(relation.isOptional).toBe(false)
+    expect(relation.isOptional, 'la FK es anulable junto a su columna').toBe(true)
     expect(relation.isList).toBe(false)
     expect(relation.attributes).toMatch(/@relation\(/)
     expect(relation.attributes).toMatch(/fields:\s*\[presentationId\]/)
@@ -595,11 +621,11 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       (match) => match[1],
     )
     // Igualdad exacta: un indice de mas es una migracion que nadie declaro.
-    expect(indexMaps).toEqual(['products_company_id_idx'])
+    expect(indexMaps).toEqual(['products_company_id_idx', 'products_unit_id_idx'])
     for (const name of indexMaps) {
       expect(name ?? '', `el indice ${name ?? ''} debe ir en snake_case ingles`).toMatch(SNAKE_CASE)
     }
-    expect(product.body, 'products_unit_id_idx se fue con la columna (R7)').not.toMatch(
+    expect(product.body, 'products_unit_id_idx vuelve con la columna (QC-121 R1)').toMatch(
       /products_unit_id_idx/,
     )
 
@@ -612,7 +638,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     }
   })
 
-  it('los tres modelos declaran /// @module inventario', () => {
+  // Un modelo sin `/// @module` es un hallazgo de la guardia de arquitectura, asi que cada uno
+  // se cita por nombre.
+  it('los cinco modelos declaran /// @module inventario', () => {
     // Texto crudo: `stripComments` se lleva justo lo que aqui hay que comprobar.
     const owners = new Map<string, string>()
     for (const match of rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)) {
@@ -623,12 +651,20 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(owners.get('Presentation')).toBe('inventario')
     expect(owners.get('Product')).toBe('inventario')
     expect(owners.get('ProductBatch')).toBe('inventario')
+    expect(owners.get('InventoryMovement')).toBe('inventario')
+    expect(owners.get('ReservationMovement')).toBe('inventario')
 
     const inventarioModels = [...owners.entries()]
       .filter(([, moduleName]) => moduleName === 'inventario')
       .map(([modelName]) => modelName)
       .sort()
-    expect(inventarioModels).toEqual(['Presentation', 'Product', 'ProductBatch'])
+    expect(inventarioModels).toEqual([
+      'InventoryMovement',
+      'Presentation',
+      'Product',
+      'ProductBatch',
+      'ReservationMovement',
+    ])
     expect(owners.get('User')).toBe('identity')
     expect(owners.get('Role')).toBe('identity')
     expect(owners.get('DocumentType')).toBe('identity')
@@ -679,16 +715,22 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     }
     // Si el parseo deja de encontrar factorias, esta guardia no vigilaria nada. La lista se sube a
     // mano cuando se publique una nueva.
+    // 2026-09-18 (QC-92): entran las tres que publica esta ficha -`createAdjustBatchStock` (R1),
+    // `createListProductBatches` (R22) y `createListBatchMovements` (R23)-, y el barrel pasa de
+    // nueve a doce. Sigue siendo igualdad exacta: una factoria de mas o de menos lo pone rojo.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
     ).toEqual([
+      'createAdjustBatchStock',
       'createCreatePresentation',
       'createCreateProduct',
       'createDeletePresentation',
       'createDeleteProduct',
       'createGetProduct',
+      'createListBatchMovements',
       'createListPresentations',
+      'createListProductBatches',
       'createListProducts',
       'createUpdatePresentation',
       'createUpdateProduct',
@@ -813,8 +855,15 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     expect(field(productBatch, 'expiryDate').attributes).toContain('@db.Date')
 
     // Igualdad exacta: una columna de mas es una migracion; si es a proposito, se anota arriba.
+    // 2026-09-18 (QC-92): `InventoryMovement` se excluye como ya se excluian `Product` y
+    // `Presentation`. `movements` es la back-relation del historial de ajustes (R1), no una
+    // columna: no entra en PRODUCT_BATCH_COLUMNS porque en la base no existe. El parser deja
+    // `type` sin los corchetes, asi que el tipo basta para descartarla.
     const escalares = productBatch.fields
-      .filter((candidate) => !['Product', 'Presentation'].includes(candidate.type))
+      .filter(
+        (candidate) =>
+          !['Product', 'Presentation', 'InventoryMovement'].includes(candidate.type),
+      )
       .map((candidate) => candidate.name)
       .sort()
     expect(
@@ -878,15 +927,16 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     expect(presentation.body).not.toMatch(/\bProduct\b\[?\]?\s/)
   })
 
-  it('R28: ProductBatch conserva stock y unitCost con su forma, y esta ficha no los toca', () => {
+  it('R28: ProductBatch conserva unitCost con su forma; stock paso de entero a decimal(14,4)', () => {
     // Se fija la forma de las columnas que guardan valor: un cambio de tipo no altera el censo.
     const stock = field(productBatch, 'stock')
-    expect(stock.type, 'stock sigue siendo Int (entero, sin parte decimal)').toBe('Int')
+    expect(stock.type, 'stock es decimal exacto, nunca entero ni coma flotante').toBe('Decimal')
+    expect(stock.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
     expect(stock.isOptional).toBe(false)
 
     const unitCost = field(productBatch, 'unitCost')
     expect(unitCost.type, 'unit_cost sigue siendo Decimal, nunca Float').toBe('Decimal')
-    expect(unitCost.isOptional).toBe(false)
+    expect(unitCost.isOptional, 'unit_cost es anulable: solo MACHINE la omite (2026-09-23)').toBe(true)
     expect(unitCost.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
     expect(unitCost.attributes).not.toMatch(/@db\.(Real|DoublePrecision|Money)/)
 
@@ -910,7 +960,9 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     ] as const) {
       const ejecutable = sql
         .split('\n')
-        .map((line) => line.replace(/--.*$/, ''))
+        // `\r` de un checkout con CRLF: `.` no lo cruza, asi que sin quitarlo antes el
+        // comentario no se va y la prosa contamina la asercion.
+        .map((line) => line.replace(/\r$/, '').replace(/--.*$/, ''))
         .join('\n')
       expect(ejecutable, `${nombre} no toca product_batches (R28)`).not.toMatch(/product_batches/i)
       expect(ejecutable, `${nombre} no toca ningun importe (R28)`).not.toMatch(
@@ -960,7 +1012,9 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     )
     const ejecutable = up
       .split('\n')
-      .map((line) => line.replace(/--.*$/, ''))
+      // `\r` de un checkout con CRLF: `.` no lo cruza, asi que sin quitarlo antes el
+      // comentario no se va y la prosa contamina la asercion.
+      .map((line) => line.replace(/\r$/, '').replace(/--.*$/, ''))
       .join('\n')
     expect(ejecutable, 'la migracion no anade deleted_at a presentations (R9)').not.toMatch(
       /deleted_at/i,

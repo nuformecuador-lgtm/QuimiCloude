@@ -10,7 +10,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ExecutionLineView } from '@/lib/modules/asignaciones';
+import { formatPercentage } from '@/lib/modules/recetas';
 import { convertQuantity, type UnitRef } from '@/lib/modules/unidades';
+import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 /**
  * Las lineas de la receta, en modo lectura, con selector de unidad de visualizacion.
@@ -19,14 +21,17 @@ import { convertQuantity, type UnitRef } from '@/lib/modules/unidades';
  * unidad ofrecida no compartiera base efectiva, el fallo tiene que verse, no un guion.
  *
  * El cambio de unidad es estado en memoria de cada fila: no viaja a ningun sitio y remontar la
- * lista lo devuelve a la unidad original.
+ * lista lo devuelve a la unidad original. Con `unit === null` no hay unidad resoluble: la fila
+ * no ofrece selector ni simbolo.
  */
 
 export const ORDER_EXECUTION_LINES_TESTID = 'order-execution-lines';
 export const ORDER_EXECUTION_LINE_TESTID = 'order-execution-line';
+export const ORDER_EXECUTION_LINE_PERCENTAGE_TESTID = 'order-execution-line-percentage';
 export const ORDER_EXECUTION_LINE_QUANTITY_TESTID = 'order-execution-line-quantity';
 export const ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID = 'order-execution-line-unit-select';
 export const ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID = 'order-execution-line-unit-option';
+export const ORDER_EXECUTION_LINE_UNIT_TESTID = 'order-execution-line-unit';
 export const PRODUCT_NAME_FALLBACK = 'Producto no disponible';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -42,12 +47,12 @@ type OrderExecutionLineRowProps = {
 };
 
 function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
-  const [selectedUnitId, setSelectedUnitId] = useState(line.unit.id);
+  const [selectedUnitId, setSelectedUnitId] = useState(line.unit?.id ?? null);
 
-  const availableUnits = [line.unit, ...line.alternativeUnits];
+  const availableUnits = line.unit === null ? [] : [line.unit, ...line.alternativeUnits];
   const selectedUnit = availableUnits.find((unit) => unit.id === selectedUnitId) ?? line.unit;
   const displayedQuantity =
-    selectedUnit.id === line.unit.id
+    line.unit === null || selectedUnit === null || selectedUnit.id === line.unit.id
       ? line.quantity
       : convertQuantity(line.quantity, line.unit, selectedUnit);
 
@@ -57,15 +62,28 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
   return (
     <li data-testid={rowTestId} className="flex flex-wrap items-center gap-3 py-2">
       <span className="min-w-0 flex-1 text-base">{productLabel}</span>
+      <span aria-hidden="true" className="text-base text-muted-foreground">
+        {' · '}
+      </span>
+      <span
+        data-testid={`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-${index}`}
+        className="text-base"
+      >
+        {formatPercentage(line.percentage)} %
+      </span>
+      <span aria-hidden="true" className="text-base text-muted-foreground">
+        {' · '}
+      </span>
       <span
         data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
         className="text-base font-medium"
+        title={exactDecimalTitle(displayedQuantity)}
       >
-        {displayedQuantity}
+        {formatDecimalDisplay(displayedQuantity)}
       </span>
-      {line.alternativeUnits.length > 0 ? (
+      {line.unit === null ? null : line.alternativeUnits.length > 0 ? (
         <Select
-          value={selectedUnitId}
+          value={selectedUnitId ?? line.unit.id}
           onValueChange={(next) => {
             if (next !== null) setSelectedUnitId(next);
           }}
@@ -76,7 +94,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
             className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
             data-testid={`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-${index}`}
           >
-            <SelectValue />
+            <SelectValue data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`} />
           </SelectTrigger>
           <SelectContent>
             {availableUnits.map((unit) => (
@@ -91,7 +109,13 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
           </SelectContent>
         </Select>
       ) : (
-        <span className="text-base text-muted-foreground">{unitLabel(line.unit)}</span>
+        <span
+          data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`}
+          className="text-base text-muted-foreground"
+        >
+          {' '}
+          {unitLabel(line.unit)}
+        </span>
       )}
     </li>
   );
@@ -105,7 +129,11 @@ export function OrderExecutionLines({ lines }: OrderExecutionLinesProps) {
   return (
     <ul data-testid={ORDER_EXECUTION_LINES_TESTID} className="flex flex-col divide-y">
       {lines.map((line, index) => (
-        <OrderExecutionLineRow key={`${line.unit.id}-${index}`} line={line} index={index} />
+        <OrderExecutionLineRow
+          key={`${line.unit?.id ?? 'sin-unidad'}-${index}`}
+          line={line}
+          index={index}
+        />
       ))}
     </ul>
   );

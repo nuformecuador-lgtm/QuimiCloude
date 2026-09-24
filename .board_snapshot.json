@@ -1,0 +1,1381 @@
+{
+ "QC-4": {
+  "summary": "Modelo de usuarios y roles",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:modelo-usuarios-y-roles",
+   "zone:backend"
+  ]
+ },
+ "QC-5": {
+  "summary": "Hash y verificacion de contrasena",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:hash-y-verificacion-de-contrasena",
+   "zone:backend"
+  ]
+ },
+ "QC-6": {
+  "summary": "Seed de roles y usuario inicial",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:seed-roles-y-usuario-inicial",
+   "zone:backend"
+  ]
+ },
+ "QC-7": {
+  "summary": "Login con usuario y contrasena",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:login-usuario-y-contrasena",
+   "zone:backend"
+  ]
+ },
+ "QC-8": {
+  "summary": "Sesion actual y logout",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:sesion-actual-y-logout",
+   "zone:backend"
+  ]
+ },
+ "QC-9": {
+  "summary": "Proteccion de rutas privadas",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:proteccion-de-rutas-privadas",
+   "zone:backend"
+  ]
+ },
+ "QC-10": {
+  "summary": "Pantalla de login",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:pantalla-de-login",
+   "zone:frontend"
+  ]
+ },
+ "QC-11": {
+  "summary": "Layout privado con sidebar",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:layout-privado-con-sidebar",
+   "zone:frontend"
+  ]
+ },
+ "QC-12": {
+  "summary": "Dashboard en blanco",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:dashboard-en-blanco",
+   "zone:frontend"
+  ]
+ },
+ "QC-13": {
+  "summary": "Guardia de sesion en navegacion",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:guardia-de-sesion-en-navegacion",
+   "zone:frontend"
+  ]
+ },
+ "QC-14": {
+  "summary": "Modelo de producto",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:modelo-producto",
+   "zone:backend"
+  ]
+ },
+ "QC-15": {
+  "summary": "Arquitectura hexagonal y modulos desacoplados",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:arquitectura-hexagonal-y-modulos",
+   "zone:fullstack"
+  ]
+ },
+ "QC-19": {
+  "summary": "Politica de contrasenas",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:politica-de-contrasenas",
+   "zone:backend"
+  ]
+ },
+ "QC-20": {
+  "summary": "CRUD de productos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:crud-de-productos",
+   "zone:backend"
+  ]
+ },
+ "QC-21": {
+  "summary": "Ayuda visual al escribir una contrasena",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:ayuda-visual-de-contrasena",
+   "zone:frontend"
+  ]
+ },
+ "QC-22": {
+  "summary": "Pantalla de productos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:pantalla-de-productos",
+   "zone:frontend"
+  ]
+ },
+ "QC-23": {
+  "summary": "Registro de sesiones y cierre en todos los dispositivos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:registro-de-sesiones",
+   "zone:backend"
+  ]
+ },
+ "QC-24": {
+  "summary": "Modelo de recetas",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:modelo-recetas",
+   "zone:backend"
+  ]
+ },
+ "QC-25": {
+  "summary": "CRUD de recetas",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:crud-de-recetas",
+   "zone:backend"
+  ]
+ },
+ "QC-26": {
+  "summary": "Pantalla de recetas",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:pantalla-de-recetas",
+   "zone:frontend"
+  ]
+ },
+ "QC-28": {
+  "summary": "Cache de la sesion en Redis, con invalidacion al cambiar",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:cache-de-sesion-en-redis",
+   "zone:backend"
+  ]
+ },
+ "QC-29": {
+  "summary": "Tema claro y oscuro de la aplicación",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:tema-claro-oscuro",
+   "zone:frontend"
+  ]
+ },
+ "QC-30": {
+  "summary": "Rediseño de la pantalla de login",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:rediseno-login",
+   "zone:frontend"
+  ]
+ },
+ "QC-32": {
+  "summary": "Modelo de unidades de medida",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-37",
+  "parent_name": "Catalogos",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:modelo-unidades",
+   "zone:backend"
+  ]
+ },
+ "QC-33": {
+  "summary": "Modelo de pedidos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:modelo-pedidos",
+   "zone:backend"
+  ]
+ },
+ "QC-34": {
+  "summary": "CRUD de pedidos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:crud-de-pedidos",
+   "zone:backend"
+  ]
+ },
+ "QC-35": {
+  "summary": "Pantalla de pedidos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:pantalla-de-pedidos",
+   "zone:frontend"
+  ]
+ },
+ "QC-36": {
+  "summary": "Cambiar mi contrasena",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:cambiar-mi-contrasena",
+   "zone:fullstack"
+  ]
+ },
+ "QC-38": {
+  "summary": "CRUD de unidades",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-37",
+  "parent_name": "Catalogos",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:crud-de-unidades",
+   "zone:backend"
+  ]
+ },
+ "QC-39": {
+  "summary": "Pantalla de unidades",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-37",
+  "parent_name": "Catalogos",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:pantalla-de-unidades",
+   "zone:frontend"
+  ]
+ },
+ "QC-40": {
+  "summary": "Ajustar la barra lateral al diseño aprobado",
+  "status": "Cancelado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:ajuste-sidebar",
+   "zone:frontend"
+  ]
+ },
+ "QC-42": {
+  "summary": "Modelo de proveedores",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-41",
+  "parent_name": "Proveedores",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:modelo-proveedores",
+   "zone:backend"
+  ]
+ },
+ "QC-43": {
+  "summary": "CRUD de proveedores",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-41",
+  "parent_name": "Proveedores",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:crud-de-proveedores",
+   "zone:backend"
+  ]
+ },
+ "QC-44": {
+  "summary": "Pantalla de proveedores",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-41",
+  "parent_name": "Proveedores",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:pantalla-de-proveedores",
+   "zone:frontend"
+  ]
+ },
+ "QC-45": {
+  "summary": "Pantalla de presentaciones",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:pantalla-de-presentaciones",
+   "zone:frontend"
+  ]
+ },
+ "QC-47": {
+  "summary": "Modelo de empresa y pertenencia del usuario",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-46",
+  "parent_name": "Multiempresa",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:modelo-empresa-y-membresias",
+   "zone:backend"
+  ]
+ },
+ "QC-48": {
+  "summary": "Tenant en la sesion",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-46",
+  "parent_name": "Multiempresa",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:tenant-en-la-sesion",
+   "zone:backend"
+  ]
+ },
+ "QC-49": {
+  "summary": "Aislamiento por empresa en inventario",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-46",
+  "parent_name": "Multiempresa",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:aislamiento-por-empresa-en-inventario",
+   "zone:backend"
+  ]
+ },
+ "QC-50": {
+  "summary": "Aislamiento por empresa en recetas",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-46",
+  "parent_name": "Multiempresa",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:aislamiento-por-empresa-en-recetas",
+   "zone:backend"
+  ]
+ },
+ "QC-51": {
+  "summary": "Aislamiento por empresa en unidades",
+  "status": "Cancelado",
+  "type": "Tarea",
+  "parent": "QC-46",
+  "parent_name": "Multiempresa",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:aislamiento-por-empresa-en-unidades",
+   "zone:backend"
+  ]
+ },
+ "QC-52": {
+  "summary": "Separar el catalogo del proveedor del catalogo de productos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:separar-producto-de-catalogo-de-proveedor",
+   "zone:fullstack"
+  ]
+ },
+ "QC-53": {
+  "summary": "Cerrar mis sesiones desde mi cuenta",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:cerrar-mis-sesiones",
+   "zone:frontend"
+  ]
+ },
+ "QC-54": {
+  "summary": "Unificar el nombre del rol Administrador en una sola constante",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:unificar-constante-rol-administrador",
+   "zone:backend"
+  ]
+ },
+ "QC-55": {
+  "summary": "Tabla de datos compartida",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:tabla-de-datos-compartida",
+   "zone:frontend"
+  ]
+ },
+ "QC-56": {
+  "summary": "Migrar las listas de recetas y proveedores a la tabla compartida",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:migrar-listas-a-tabla-compartida",
+   "zone:frontend"
+  ]
+ },
+ "QC-57": {
+  "summary": "Orden y filtro en los listados",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:orden-y-filtro-en-listados",
+   "zone:backend"
+  ]
+ },
+ "QC-58": {
+  "summary": "Los tests de UI se caen por timeout cuando la maquina va cargada",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:timeout-tests-ui-bajo-carga",
+   "zone:frontend"
+  ]
+ },
+ "QC-59": {
+  "summary": "Aislamiento por empresa en proveedores",
+  "status": "En curso",
+  "type": "Tarea",
+  "parent": "QC-41",
+  "parent_name": "Proveedores",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:aislamiento-por-empresa-en-proveedores",
+   "zone:backend"
+  ]
+ },
+ "QC-60": {
+  "summary": "Aislamiento por empresa en pedidos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:aislamiento-por-empresa-en-pedidos",
+   "zone:backend"
+  ]
+ },
+ "QC-61": {
+  "summary": "Guardia de esquema: toda tabla de negocio lleva empresa",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "sdd",
+   "slug:guardia-empresa-en-esquema",
+   "zone:backend"
+  ]
+ },
+ "QC-62": {
+  "summary": "Contrato del paso de receta como documento",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:pasos-de-receta-enriquecidos",
+   "zone:backend"
+  ]
+ },
+ "QC-63": {
+  "summary": "Ejecutar una receta como Operador",
+  "status": "En curso",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:ejecutar-receta-operador",
+   "zone:fullstack"
+  ]
+ },
+ "QC-64": {
+  "summary": "Editor enriquecido y lectura por pasos de la receta",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:editor-y-lectura-de-pasos",
+   "zone:frontend"
+  ]
+ },
+ "QC-65": {
+  "summary": "Estado de cuenta de usuario",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:estado-de-cuenta-de-usuario",
+   "zone:backend"
+  ]
+ },
+ "QC-66": {
+  "summary": "CRUD de usuarios",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:crud-de-usuarios",
+   "zone:backend"
+  ]
+ },
+ "QC-67": {
+  "summary": "Pantalla de usuarios",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:pantalla-de-usuarios",
+   "zone:frontend"
+  ]
+ },
+ "QC-68": {
+  "summary": "Busqueda y total en el listado de pedidos",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:busqueda-y-total-en-el-listado-de-pedidos",
+   "zone:backend"
+  ]
+ },
+ "QC-69": {
+  "summary": "Alta de usuarios",
+  "status": "Cancelado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:alta-de-usuarios",
+   "zone:fullstack"
+  ]
+ },
+ "QC-70": {
+  "summary": "Errores centralizados",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:errores-centralizados",
+   "zone:fullstack"
+  ]
+ },
+ "QC-71": {
+  "summary": "Identificador de peticion en logs y errores",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:identificador-de-request",
+   "zone:fullstack"
+  ]
+ },
+ "QC-72": {
+  "summary": "Internacionalizacion de los textos de la aplicacion",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "sdd",
+   "slug:internacionalizacion-de-textos",
+   "zone:fullstack"
+  ]
+ },
+ "QC-73": {
+  "summary": "Limite de peticiones por origen",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "sdd",
+   "slug:limite-de-peticiones-por-origen",
+   "zone:fullstack"
+  ]
+ },
+ "QC-74": {
+  "summary": "Modelo de permisos por modulo",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:modelo-de-permisos",
+   "zone:backend"
+  ]
+ },
+ "QC-75": {
+  "summary": "Menu y rutas por permiso",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:menu-y-rutas-por-permiso",
+   "zone:fullstack"
+  ]
+ },
+ "QC-76": {
+  "summary": "Equivalencia entre unidades y ambito por empresa",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-37",
+  "parent_name": "Catalogos",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:equivalencia-y-ambito-de-unidades",
+   "zone:backend"
+  ]
+ },
+ "QC-77": {
+  "summary": "Los tests de integracion chocan por filas que deja la corrida anterior",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:aislamiento-de-la-base-en-tests-de-integracion",
+   "zone:backend"
+  ]
+ },
+ "QC-78": {
+  "summary": "El estado de la cuenta manda en el acceso",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:estado-de-cuenta-en-el-acceso",
+   "zone:backend"
+  ]
+ },
+ "QC-79": {
+  "summary": "Alta sin contrasena y enlace para establecerla",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:alta-sin-contrasena-y-enlace",
+   "zone:fullstack"
+  ]
+ },
+ "QC-80": {
+  "summary": "La unidad del producto viene de su presentación",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:unidad-desde-la-presentacion",
+   "zone:fullstack"
+  ]
+ },
+ "QC-81": {
+  "summary": "Lote y fecha de compra del producto",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:lote-y-fecha-de-compra",
+   "zone:backend"
+  ]
+ },
+ "QC-82": {
+  "summary": "Registro de la ejecución de una receta",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:registro-de-ejecucion-de-receta",
+   "zone:backend"
+  ]
+ },
+ "QC-83": {
+  "summary": "Modelo de grupos de trabajo",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:modelo-de-grupos-de-trabajo",
+   "zone:backend"
+  ]
+ },
+ "QC-84": {
+  "summary": "CRUD de grupos de trabajo",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:crud-de-grupos-de-trabajo",
+   "zone:backend"
+  ]
+ },
+ "QC-85": {
+  "summary": "Pantalla de grupos de trabajo",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:pantalla-de-grupos-de-trabajo",
+   "zone:frontend"
+  ]
+ },
+ "QC-86": {
+  "summary": "Modelo de asignacion de pedidos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:modelo-de-asignacion-de-pedidos",
+   "zone:backend"
+  ]
+ },
+ "QC-87": {
+  "summary": "Asignar responsables a un pedido",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:asignar-responsables-a-un-pedido",
+   "zone:backend"
+  ]
+ },
+ "QC-88": {
+  "summary": "Listado de pedidos asignados",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:listado-de-pedidos-asignados",
+   "zone:fullstack"
+  ]
+ },
+ "QC-89": {
+  "summary": "Restablecer la contrasena de otra persona",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:restablecer-contrasena-de-otro",
+   "zone:backend"
+  ]
+ },
+ "QC-90": {
+  "summary": "El alta de producto crea su primer lote",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:alta-del-primer-lote",
+   "zone:fullstack"
+  ]
+ },
+ "QC-91": {
+  "summary": "La existencia del producto se lleva por lote",
+  "status": "En curso",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:existencia-por-lote",
+   "zone:fullstack"
+  ]
+ },
+ "QC-92": {
+  "summary": "Ajuste de inventario",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "sdd",
+   "slug:ajuste-de-inventario",
+   "zone:fullstack"
+  ]
+ },
+ "QC-93": {
+  "summary": "Redefinir a donde aterriza quien no es Administrador",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:aterrizaje-sin-permiso-de-modulo",
+   "zone:fullstack"
+  ]
+ },
+ "QC-94": {
+  "summary": "Consulta de roles",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:consulta-de-roles",
+   "zone:backend"
+  ]
+ },
+ "QC-95": {
+  "summary": "El desbloqueo manual limpia el conteo",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:low",
+   "sdd",
+   "slug:desbloqueo-manual-limpia-el-conteo",
+   "zone:backend"
+  ]
+ },
+ "QC-96": {
+  "summary": "Recuperar una contrasena olvidada",
+  "status": "En revisión",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:recuperar-contrasena-olvidada",
+   "zone:fullstack"
+  ]
+ },
+ "QC-97": {
+  "summary": "Pulido transversal de pantallas privadas y sesion",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "sdd",
+   "slug:pulido-transversal-de-pantallas-privadas",
+   "zone:fullstack"
+  ]
+ },
+ "QC-98": {
+  "summary": "La pantalla de usuarios avisa si el correo no salio y ofrece el reenvio",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:aviso-y-reenvio-del-enlace-en-la-pantalla",
+   "zone:frontend"
+  ]
+ },
+ "QC-99": {
+  "summary": "Las guardias-censo rompen a toda feature posterior",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "sdd",
+   "slug:guardias-censo-rompen-features-posteriores",
+   "zone:backend"
+  ]
+ },
+ "QC-100": {
+  "summary": "Conteo de miembros de un grupo",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:conteo-de-miembros-de-un-grupo",
+   "zone:fullstack"
+  ]
+ },
+ "QC-101": {
+  "summary": "El administrador cierra las sesiones de otro usuario desde la pantalla",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:cierre-de-sesiones-de-otro-desde-la-pantalla",
+   "zone:fullstack"
+  ]
+ },
+ "QC-102": {
+  "summary": "Responsables en la pantalla de pedidos",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-31",
+  "parent_name": "Pedidos",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:responsables-en-la-pantalla-de-pedidos",
+   "zone:fullstack"
+  ]
+ },
+ "QC-103": {
+  "summary": "Lote y fecha de compra en el alta de producto",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:lote-y-fecha-de-compra-en-el-alta",
+   "zone:fullstack"
+  ]
+ },
+ "QC-104": {
+  "summary": "Resolver la sesion una sola vez por peticion",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "complexity:medium",
+   "sdd",
+   "slug:sesion-una-sola-vez-por-peticion",
+   "zone:backend"
+  ]
+ },
+ "QC-106": {
+  "summary": "Endpoint de carga de PDF",
+  "status": "Finalizado",
+  "type": "Tarea",
+  "parent": "QC-105",
+  "parent_name": "Documentos e IA",
+  "labels": [
+   "complexity:high",
+   "sdd",
+   "slug:endpoint-de-carga-de-pdf",
+   "zone:backend"
+  ]
+ },
+ "QC-107": {
+  "summary": "Componente de carga de archivos",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-105",
+  "parent_name": "Documentos e IA",
+  "labels": [
+   "sdd",
+   "slug:componente-de-carga-de-archivos",
+   "zone:frontend"
+  ]
+ },
+ "QC-108": {
+  "summary": "Lectura de PDF con Gemini",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-105",
+  "parent_name": "Documentos e IA",
+  "labels": [
+   "sdd",
+   "slug:lectura-de-pdf-con-gemini",
+   "zone:backend"
+  ]
+ },
+ "QC-109": {
+  "summary": "Procesamiento de PDF por estrategia",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-105",
+  "parent_name": "Documentos e IA",
+  "labels": [
+   "sdd",
+   "slug:procesamiento-de-pdf-por-estrategia",
+   "zone:backend"
+  ]
+ },
+ "QC-110": {
+  "summary": "Recorte de imagenes del PDF",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-105",
+  "parent_name": "Documentos e IA",
+  "labels": [
+   "sdd",
+   "slug:recorte-de-imagenes-del-pdf",
+   "zone:backend"
+  ]
+ },
+ "QC-111": {
+  "summary": "Procesamiento de PDF en cola",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-105",
+  "parent_name": "Documentos e IA",
+  "labels": [
+   "sdd",
+   "slug:procesamiento-de-pdf-en-cola",
+   "zone:backend"
+  ]
+ },
+ "QC-112": {
+  "summary": "La guardia de QC-66 admite el desbloqueo manual de QC-95",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:guardia-qc66-admite-desbloqueo-qc95",
+   "zone:backend"
+  ]
+ },
+ "QC-113": {
+  "summary": "Extraer currentActor() a un único adaptador de identidad",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:extraer-current-actor",
+   "zone:backend"
+  ]
+ },
+ "QC-114": {
+  "summary": "Comprobar la tabla compartida en un iPhone real",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-16",
+  "parent_name": "Plataforma",
+  "labels": [
+   "sdd",
+   "slug:tabla-compartida-en-iphone-real",
+   "zone:frontend"
+  ]
+ },
+ "QC-115": {
+  "summary": "Guardia de comentarios sobre el diff",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": null,
+  "parent_name": null,
+  "labels": [
+   "sdd",
+   "slug:guardia-de-comentarios-sobre-el-diff",
+   "zone:backend"
+  ]
+ },
+ "QC-116": {
+  "summary": "Una sesión abierta en el mismo segundo del sello nace revocada",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:sesion-revocada-en-el-mismo-segundo",
+   "zone:backend"
+  ]
+ },
+ "QC-117": {
+  "summary": "Menores pendientes de la re-review de QC-95",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-17",
+  "parent_name": "Identidad y acceso",
+  "labels": [
+   "sdd",
+   "slug:menores-de-la-re-review-de-qc-95",
+   "zone:backend"
+  ]
+ },
+ "QC-119": {
+  "summary": "Recibir mensajes del webhook de WhatsApp",
+  "status": "Cancelado",
+  "type": "Tarea",
+  "parent": "QC-118",
+  "parent_name": "Canal WhatsApp",
+  "labels": [
+   "sdd",
+   "slug:webhook-whatsapp-recepcion",
+   "zone:backend"
+  ]
+ },
+ "QC-120": {
+  "summary": "Rendimiento de la receta",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-27",
+  "parent_name": "Recetas",
+  "labels": [
+   "sdd",
+   "slug:rendimiento-de-la-receta",
+   "zone:fullstack"
+  ]
+ },
+ "QC-121": {
+  "summary": "La unidad forma parte de la identidad del item",
+  "status": "Por hacer",
+  "type": "Tarea",
+  "parent": "QC-18",
+  "parent_name": "Inventario",
+  "labels": [
+   "sdd",
+   "slug:unidad-como-identidad-del-item",
+   "zone:fullstack"
+  ]
+ }
+}

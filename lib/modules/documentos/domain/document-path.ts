@@ -19,9 +19,25 @@
 /** Extension unica: este bucket solo guarda PDFs. */
 const PDF_EXTENSION = '.pdf';
 
+/** Extension unica del bucket de recortes: cada region se sube como PNG. */
+const CROP_EXTENSION = '.png';
+
 /** Construye la ruta de un archivo nuevo de esa empresa. El nombre lo pone el servidor, no el cliente. */
 export function buildDocumentPath(companyId: string): string {
   return `${companyId}/${crypto.randomUUID()}${PDF_EXTENSION}`;
+}
+
+/**
+ * Construye la ruta de un recorte, agrupado por el archivo del que salio. `index` empieza en 1 y
+ * numera las regiones DENTRO de su pagina, en el orden en que la IA las devolvio.
+ */
+export function buildCropPath(
+  companyId: string,
+  documentFileId: string,
+  pageNumber: number,
+  index: number,
+): string {
+  return `${companyId}/${documentFileId}/${pageNumber}-${index}${CROP_EXTENSION}`;
 }
 
 /**

@@ -4,8 +4,9 @@ import type { ReactNode } from 'react';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
-import type { ProductView } from '@/lib/modules/inventario';
+import { compareQuantities, productDisplayName, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 /**
  * Declaracion de las columnas de la tabla de productos (R6, R7, R8, `design.md > 7`).
@@ -36,26 +37,17 @@ import type { UnitRef } from '@/lib/modules/unidades';
 export const EMPTY_CELL = '—';
 
 /**
- * Campos de `ProductView` que la decision del 2026-09-03 (y la del 2026-09-09) deja FUERA de
- * la tabla: el identificador tecnico y el id de la unidad -un UUID que nadie resuelve a nombre-.
+ * Campos de `ProductView` que quedan FUERA de la tabla como columna propia: el identificador
+ * tecnico, la ruta de la imagen y el id de la unidad -un UUID que esta pantalla no resuelve a
+ * nombre por si solo-. La unidad no desaparece: se pinta junto al nombre (`nameCell`) y junto a
+ * la existencia (`existenceLabel`), resuelta contra el catalogo que recibe la columna.
  *
- * `latestBatchUnitId` esta aqui por una razon posterior, y bajo ese nombre desde QC-80: el merge
- * de QC-32 (`modelo-unidades`) convirtio la unidad en catalogo -asi que `ProductView` dejo de
- * traer el texto `unit` y paso a traer una clave foranea-, y QC-80 (R21, R22) le quito la columna
- * al producto y la dejo DERIVADA de la presentacion de su lote mas reciente. Cambio el nombre y
- * cambio el origen; lo que NO cambio es el motivo de ocultarla: sigue siendo un UUID que esta
- * pantalla no sabe resolver a nombre, y pintarlo seria peor que no mostrar nada.
- *
- * `imagePath` tambien esta fuera, y es el mismo criterio: la RUTA no se pinta como texto. La
- * imagen se ve -es la primera columna desde el 2026-09-07-, pero su columna se llama `image` y
- * pinta una miniatura, no la cadena.
- *
- * La presentacion y la autoria ya no estan en `ProductView` (se mudaron a `product_batches` el
- * 2026-09-09), asi que no hay que ocultarlas: no existen en el tipo.
+ * `imagePath` esta fuera por el mismo criterio: la RUTA no se pinta como texto. La imagen se ve
+ * -es la primera columna-, pero su columna se llama `image` y pinta una miniatura, no la cadena.
  */
 type HiddenProductField =
   | 'id'
-  | 'latestBatchUnitId'
+  | 'unitId'
   | 'imagePath';
 
 /** Id de la columna de la miniatura. No es un campo de `ProductView`: es marcado. */
@@ -93,8 +85,9 @@ export const ACTIONS_COLUMN_LABEL = 'Acciones';
  */
 export const PRODUCT_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_ID];
 
-function formatOptionalInt(value: number | null): string {
-  return value === null ? EMPTY_CELL : String(value);
+/** `null` no tiene cifra exacta que anunciar: el `aria-label` queda sin poner. */
+function decimalAriaLabel(value: string | null): string | undefined {
+  return value === null ? undefined : trimDecimal(value);
 }
 
 /**
@@ -108,30 +101,52 @@ function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined)
 }
 
 /**
- * La existencia esta en alarma cuando la alerta de cantidad SUPERA la del lote mas reciente del
- * producto; las existencias en otras unidades no cuentan. Sin lotes, esa existencia es 0.
+ * La existencia esta en alarma cuando la alerta de cantidad SUPERA la existencia guardada del
+ * producto. Sin lotes, esa existencia es 0 y la alarma sigue funcionando igual.
  *
  * El nombre no es casual: `inventario-schema.test.ts` prohibe `isBelowAlert` y sus hermanos
  * COMO CAMPO DEL ESQUEMA -no puede existir una columna derivada de bajo de existencias-. Aqui es
  * una funcion de presentacion en un archivo de UI, que es justo lo que esa prohibicion deja vivo.
  */
 function isBelowAlert(product: ProductView): boolean {
-  if (typeof product.qtyAlert !== 'number') return false;
-  const existence =
-    product.stockByUnit.find((entry) => entry.unitId === product.latestBatchUnitId)?.quantity ?? 0;
-  return product.qtyAlert > existence;
+  return typeof product.qtyAlert === 'string' && compareQuantities(product.qtyAlert, product.stock) > 0;
 }
 
-/** Cantidad por unidad, unida con « · », o `0` cuando el producto no tiene ningun lote. */
-function existenceLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
-  if (product.stockByUnit.length === 0) return '0';
+/**
+ * Etiqueta de la unidad del producto, o `null` sin unidad o sin catalogo.
+ *
+ * Exportada para que otras pantallas de esta ruta -el panel de lotes, por ejemplo- compongan el
+ * mismo «nombre · unidad» que esta columna, sin duplicar la regla.
+ */
+export function productUnitLabel(
+  product: ProductView,
+  units: readonly UnitRef[] | undefined,
+): string | null {
+  return product.unitId === null ? null : unitLabel(product.unitId, units);
+}
 
-  return product.stockByUnit
-    .map((entry) => {
-      const label = unitLabel(entry.unitId, units);
-      return label === null ? String(entry.quantity) : `${entry.quantity} ${label}`;
-    })
-    .join(' · ');
+/**
+ * Existencia guardada junto a la unidad del producto, o solo el numero sin unidad ni catalogo.
+ *
+ * El numero se pinta a dos decimales (`formatDecimalDisplay`): la celda no es donde se vuelve a
+ * guardar, y cuatro decimales de relleno no informan de nada.
+ */
+function existenceLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
+  const label = productUnitLabel(product, units);
+  const amount = formatDecimalDisplay(product.stock);
+  return label === null ? amount : `${amount} ${label}`;
+}
+
+/** Cifra exacta de la existencia para quien no puede quedarse con el redondeo del pixel. */
+function existenceAriaLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
+  const label = productUnitLabel(product, units);
+  const amount = trimDecimal(product.stock);
+  return label === null ? amount : `${amount} ${label}`;
+}
+
+/** «nombre · unidad», o solo el nombre sin unidad o sin catalogo. */
+function nameCell(product: ProductView, units: readonly UnitRef[] | undefined): string {
+  return productDisplayName(product.name, productUnitLabel(product, units));
 }
 
 /**
@@ -149,8 +164,54 @@ function stockCell(product: ProductView, units: readonly UnitRef[] | undefined):
       data-testid="product-stock"
       data-alert={alerted ? 'true' : undefined}
       className={alerted ? 'font-semibold text-destructive' : undefined}
+      title={exactDecimalTitle(product.stock)}
+      aria-label={existenceAriaLabel(product, units)}
     >
       {existenceLabel(product, units)}
+    </span>
+  );
+}
+
+/** La alerta de cantidad, opcional: sin valor pinta el marcador de vacio, sin `title` ni `aria-label`. */
+function qtyAlertCell(product: ProductView): ReactNode {
+  if (product.qtyAlert === null) return EMPTY_CELL;
+
+  return (
+    <span
+      data-testid="product-qty-alert"
+      title={exactDecimalTitle(product.qtyAlert)}
+      aria-label={decimalAriaLabel(product.qtyAlert)}
+    >
+      {formatDecimalDisplay(product.qtyAlert)}
+    </span>
+  );
+}
+
+/**
+ * Celda de una cantidad agregada (reservado, disponible), junto a la unidad del producto.
+ *
+ * `undefined` pinta el marcador de vacio sin `title` ni `aria-label`: es lo que devuelve toda
+ * lectura que no sea el listado paginado, que es la unica que agrega estas dos columnas.
+ */
+function aggregateQuantityCell(
+  value: string | undefined,
+  testId: string,
+  product: ProductView,
+  units: readonly UnitRef[] | undefined,
+): ReactNode {
+  if (value === undefined) return EMPTY_CELL;
+
+  const label = productUnitLabel(product, units);
+  const amount = formatDecimalDisplay(value);
+  const exact = trimDecimal(value);
+
+  return (
+    <span
+      data-testid={testId}
+      title={exactDecimalTitle(value)}
+      aria-label={label === null ? exact : `${exact} ${label}`}
+    >
+      {label === null ? amount : `${amount} ${label}`}
     </span>
   );
 }
@@ -186,12 +247,14 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       label: 'Nombre',
       align: 'start',
       sortable: true,
-      cell: (product) => product.name,
+      cell: (product) => nameCell(product, units),
     },
     {
-      id: 'stockByUnit',
+      id: 'stock',
       label: 'Existencia',
       align: 'end',
+      sortable: true,
+      filter: { kind: 'numberRange' },
       cell: (product) => stockCell(product, units),
     },
     {
@@ -200,7 +263,20 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (product) => formatOptionalInt(product.qtyAlert),
+      cell: (product) => qtyAlertCell(product),
+    },
+    {
+      id: 'reserved',
+      label: 'Reservado',
+      align: 'end',
+      // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
+      cell: (product) => aggregateQuantityCell(product.reserved, 'product-reserved', product, units),
+    },
+    {
+      id: 'available',
+      label: 'Disponible',
+      align: 'end',
+      cell: (product) => aggregateQuantityCell(product.available, 'product-available', product, units),
     },
     {
       id: ACTIONS_COLUMN_ID,

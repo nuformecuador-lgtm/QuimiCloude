@@ -39,10 +39,11 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 45 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 54 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(46)
-      expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
+      // 54 y no 51: entran `insufficient_material`, `recipe_without_lines` y
+      // `user_cannot_be_responsible`.
+      expect(ERROR_CODES).toHaveLength(54)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -52,7 +53,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 46 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 50 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
@@ -187,6 +188,101 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
     })
   })
 
+  describe('QC-92 R32 — los dos codigos del lote de ajuste tienen codigo y texto propios', () => {
+    it('batch_not_found y batch_stock_negative estan en el catalogo con su clave y su texto exacto', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('batch_not_found')
+      expect(codigos).toContain('batch_stock_negative')
+      expect(ERROR_MESSAGE_KEY.batch_not_found).toBe('errors.batch_not_found')
+      expect(ERROR_MESSAGE_KEY.batch_stock_negative).toBe('errors.batch_stock_negative')
+      expect(errorMessage('batch_not_found')).toBe('El lote solicitado no existe.')
+      expect(errorMessage('batch_stock_negative')).toBe(
+        'El ajuste dejaria la existencia del lote por debajo de cero.',
+      )
+    })
+
+    it('se distinguen entre si y de product_not_found e invalid_input', () => {
+      expect(errorMessage('batch_not_found')).not.toBe(errorMessage('product_not_found'))
+      expect(errorMessage('batch_stock_negative')).not.toBe(errorMessage('invalid_input'))
+      expect(errorMessage('batch_not_found')).not.toBe(errorMessage('batch_stock_negative'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la septima enmienda con su fecha y su aprobacion', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Septima enmienda, el 2026-09-17 (QC-92)**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-17 en la puerta F1.4 de QC-92')
+    })
+  })
+
+  describe('QC-108 R10, R11 — ai_unavailable es la octava enmienda al catalogo cerrado', () => {
+    it('ai_unavailable esta en el catalogo con su clave y su texto propio', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('ai_unavailable')
+      expect(ERROR_MESSAGE_KEY.ai_unavailable).toBe('errors.ai_unavailable')
+      expect(errorMessage('ai_unavailable')).toBe(
+        'La lectura automatica no esta disponible en este momento. Intentalo mas tarde.',
+      )
+    })
+
+    it('R12 — el codigo emitido para el corte del proveedor esta en el catalogo cerrado', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('ai_unavailable')
+      const texto = errorMessage('ai_unavailable')
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('unexpected'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la octava enmienda con su fecha y su aprobacion', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Octava enmienda, el 2026-09-18**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-18')
+    })
+  })
+
+describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catalogo cerrado', () => {
+    it('presentation_unit_locked esta en el catalogo con su clave y su texto propio', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('presentation_unit_locked')
+      expect(ERROR_MESSAGE_KEY.presentation_unit_locked).toBe('errors.presentation_unit_locked')
+      expect(errorMessage('presentation_unit_locked')).toBe(
+        'La presentacion ya tiene lotes y no puede cambiar de unidad.',
+      )
+    })
+
+    it('se distingue de invalid_input y de presentation_in_use', () => {
+      const texto = errorMessage('presentation_unit_locked')
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('presentation_in_use'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la novena enmienda con su fecha y su aprobacion', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Novena enmienda, el 2026-09-18**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-18')
+    })
+  })
+
+  describe('fix directo 2026-09-22 — action_not_allowed es la decima enmienda al catalogo cerrado', () => {
+    it('action_not_allowed esta en el catalogo con su clave y su texto propios', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('action_not_allowed')
+      expect(ERROR_MESSAGE_KEY.action_not_allowed).toBe('errors.action_not_allowed')
+      expect(errorMessage('action_not_allowed')).toBe('La accion no esta permitida.')
+    })
+
+    it('se distingue de unauthorized, de invalid_input y de unexpected', () => {
+      const texto = errorMessage('action_not_allowed')
+      expect(texto).not.toBe(errorMessage('unauthorized'))
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('unexpected'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decima enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decima enmienda, el 2026-09-22 (fix directo)**')
+    })
+  })
+
   describe('R19 — los codigos inequivocos no se renombran', () => {
     it('los trece codigos congelados conservan su valor', () => {
       const codigos: readonly string[] = ERROR_CODES
@@ -246,7 +342,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       }
     })
 
-    it('los siete codigos de la administracion de usuarios SI estan', () => {
+    it('los ocho codigos de la administracion de usuarios SI estan', () => {
       const codigos: readonly string[] = ERROR_CODES
       for (const code of [
         'user_not_found',
@@ -256,6 +352,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
         'role_not_found',
         'self_operation',
         'last_administrator',
+        'action_not_allowed',
       ]) {
         expect(codigos, `falta el codigo de usuarios ${code}`).toContain(code)
       }

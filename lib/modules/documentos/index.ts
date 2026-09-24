@@ -77,3 +77,79 @@ export {
   type PdfOutput,
   type PdfToConvert,
 } from './domain/convert-pdf';
+
+// El plazo de la lectura con IA, en la misma seccion de arriba de los limites: quien decida cuanto
+// esperar antes de dar una lectura por fallida lo lee de aqui, no lo vuelve a escribir.
+export { AI_READ_TIMEOUT_SECONDS } from './domain/limits';
+
+// El esquema del borde de la lectura con IA y su tipo inferido, mismo criterio que el esquema de
+// subida de arriba: una sola definicion de la entrada.
+export { aiReadInputSchema, type AiReadInput } from './domain/ai-read-input';
+
+// El unico codigo nuevo que este modulo aporta al catalogo cerrado: el proveedor de IA no
+// respondio, no estaba disponible o agoto el plazo. Lo reconoce el mismo `instanceof
+// DocumentosError` de siempre.
+export { AiUnavailableError } from './domain/errors';
+
+// La lectura de un PDF con IA, publicada como FABRICA por el mismo motivo que las de arriba: quien
+// la usa recibe el caso de uso ya construido y nunca ve al puerto ni a su adaptador. Atar puerto ->
+// adaptador sigue siendo trabajo exclusivo de `lib/composition`.
+export {
+  createReadPdfWithAi,
+  type AiReadResult,
+  type ReadPdfWithAiDeps,
+} from './domain/read-pdf-with-ai';
+
+// La estrategia de lectura, con su esquema y su tipo: es el borde de la capacidad de abajo, asi que
+// quien la invoque valida con el mismo esquema y no escribe los dos literales a mano.
+export { pdfStrategySchema, type PdfStrategy } from './domain/pdf-strategy';
+
+// El procesamiento por estrategia, tambien como FABRICA. Su puerto de registro y su puerto de
+// prompt NO salen por aqui: los ve solo `lib/composition`, que es quien ata cada uno a su
+// adaptador. El texto del prompt llega por dependencia, desde el entorno.
+export {
+  createProcessPdfByStrategy,
+  type ProcessPdfByStrategyDeps,
+  type ProcessPdfByStrategyInput,
+  type StrategyRunResult,
+} from './domain/process-pdf-by-strategy';
+
+// El esquema del borde de ENCOLAR una tanda y su tipo inferido: mismo criterio que los esquemas de
+// arriba, una sola definicion de la entrada.
+export { enqueueBatchSchema, type EnqueueBatchInput } from './domain/enqueue-input';
+
+// El estado de un archivo y el de una tanda, tal como los ve quien consulta: es lo que devuelve la
+// tercera capacidad de abajo y lo que pintara la pantalla.
+export {
+  type BatchStatus,
+  type DocumentFileStatus,
+  type DocumentFileStatusEntry,
+} from './domain/batch-status';
+
+// El cuerpo que entrega la cola, con su tipo: el Route Handler valida con el MISMO esquema, no con
+// una copia que pudiera diverger.
+export { queueMessageSchema, type QueueMessageBody } from './domain/queue-message';
+
+// Las TRES capacidades del procesamiento en cola, publicadas como FABRICAS por el mismo motivo que
+// las de arriba: quien las usa recibe el caso de uso ya construido y nunca ve a sus puertos.
+// `enqueueBatch` escribe la tanda y publica un mensaje por archivo; `runDocumentJob` es el trabajo
+// que ejecuta el Route Handler por cada mensaje; `getBatchStatus` consulta y caduca. Atar puerto ->
+// adaptador sigue siendo trabajo exclusivo de `lib/composition`.
+export { createEnqueueBatch, type EnqueuedBatch } from './domain/enqueue-batch';
+export {
+  createRunDocumentJob,
+  type RunDocumentJobMessage,
+  type RunDocumentJobResult,
+} from './domain/run-document-job';
+export { createGetBatchStatus } from './domain/get-batch-status';
+
+// El recorte de las imagenes de un catalogo, publicado como FABRICA por el mismo motivo que el
+// resto: quien lo usa recibe el caso de uso ya construido y nunca ve a `ImageCropper` ni a
+// `CropStorage`. Atar esos dos puertos a su implementacion sigue siendo trabajo exclusivo de
+// `lib/composition`.
+export {
+  createCropCatalogImages,
+  type CropCatalogImagesDeps,
+  type CropCatalogImagesInput,
+  type CropCatalogImagesResult,
+} from './domain/crop-catalog-images';

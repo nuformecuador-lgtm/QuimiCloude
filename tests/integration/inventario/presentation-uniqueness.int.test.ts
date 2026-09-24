@@ -130,8 +130,14 @@ async function createBatchFor(
   companyId: string,
   name = `Producto ${token()}`,
 ): Promise<{ productId: string; batchId: string }> {
+  // La unidad de la presentacion: sin ella, `product_batches_check_unit` rechazaria el lote
+  // de mas abajo.
+  const presentation = await tx.presentation.findUniqueOrThrow({
+    where: { id: presentationId },
+    select: { unitId: true },
+  });
   const product = await tx.product.create({
-    data: { name, nameNormalized: normalizeForTest(name), companyId },
+    data: { name, nameNormalized: normalizeForTest(name), unitId: presentation.unitId, companyId },
     select: { id: true },
   });
   const batch = await tx.productBatch.create({

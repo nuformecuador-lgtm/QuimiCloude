@@ -16,7 +16,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
   addBatchToAlive,
   createWithFirstBatch,
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { ValidationError } from '@/lib/modules/inventario/domain/errors';
 import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
@@ -197,8 +197,9 @@ async function createFixture(): Promise<Fixture> {
   return { actorId: userId, presentationId, companyId };
 }
 
-/** En orden de FK: lotes, productos, presentacion, usuario. */
+/** En orden de FK: asientos, lotes, productos, presentacion, usuario. */
 async function dropFixture(fixture: Fixture, productIds: readonly string[]): Promise<void> {
+  await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
@@ -212,7 +213,7 @@ function newProduct(overrides: Partial<NewProduct> = {}): NewProduct {
 function newBatch(fixture: Fixture, overrides: Partial<NewProductBatch> = {}): NewProductBatch {
   return {
     presentationId: fixture.presentationId,
-    stock: 3,
+    stock: '3',
     unitCost: '2.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -260,13 +261,13 @@ describe('R7 (lado base): el costo unitario derivado se guarda con sus 4 decimal
 
     try {
       // `'10' / 3` llena los cuatro decimales con un valor no representable en binario.
-      const derivado = deriveUnitCost('10', 3);
+      const derivado = deriveUnitCost('10', '3');
       expect(derivado).toBe('3.3333');
       if (derivado === null) throw new Error('la derivacion no puede ser nula en este caso');
 
       const creado = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixture, { stock: 3, unitCost: derivado }),
+        newBatch(fixture, { stock: '3', unitCost: derivado }),
         new Date(),
         ambito(fixture),
       );
@@ -372,7 +373,14 @@ describe('R5 (lado base): la base rechaza un costo unitario de 0', () => {
       const presentationId = await createTestPresentation(tx, companyId);
       const name = `Producto ${token()}`;
       const producto = await tx.product.create({
-        data: { name, nameNormalized: normalizeProductName(name), companyId },
+        // La unidad de la presentacion: sin ella, el disparador `product_batches_check_unit`
+        // rechazaria el INSERT antes de llegar al CHECK del costo que este caso mide.
+        data: {
+          name,
+          nameNormalized: normalizeProductName(name),
+          unitId: await unidadDeSistema(tx),
+          companyId,
+        },
         select: { id: true },
       });
 
@@ -428,15 +436,15 @@ describe('R21: producto y primer lote se escriben en una sola transaccion', () =
   });
 });
 
-describe('R18: agregar un lote no toca el producto', () => {
-  it('deja name, qty_alert y updated_at del producto intactos', async () => {
+describe('R18: agregar un lote no toca el producto (QC-121, R2, R9, R11)', () => {
+  it('deja name, qty_alert, unit_id y updated_at intactos, y recalcula stock', async () => {
     const fixture = await createFixture();
     const productIds: string[] = [];
 
     try {
       const primero = await createWithFirstBatch(
-        newProduct({ qtyAlert: 2 }),
-        newBatch(fixture, { stock: 7 }),
+        newProduct({ qtyAlert: '2' }),
+        newBatch(fixture, { stock: '7' }),
         new Date(),
           ambito(fixture),
       );
@@ -446,7 +454,7 @@ describe('R18: agregar un lote no toca el producto', () => {
 
       const agregado = await addBatchToAlive(
         primero.id,
-        newBatch(fixture, { stock: 99, unitCost: '1.0000' }),
+        newBatch(fixture, { stock: '99', unitCost: '1.0000' }),
         new Date(Date.now() + 60_000),
         ambito(fixture),
       );
@@ -454,11 +462,12 @@ describe('R18: agregar un lote no toca el producto', () => {
 
       const despues = await prisma.product.findUniqueOrThrow({ where: { id: primero.id } });
       expect(despues.name).toBe(antes.name);
-      expect(despues.qtyAlert).toBe(antes.qtyAlert);
-      // La fila entera, para cubrir tambien las columnas que se anadan despues.
-      expect(despues).toEqual(antes);
+      expect(despues.qtyAlert?.toFixed(4)).toBe(antes.qtyAlert?.toFixed(4));
+      expect(despues.unitId).toBe(antes.unitId);
       // Agregar un lote no es editar el producto: `updated_at` tampoco se mueve.
       expect(despues.updatedAt.toISOString()).toBe(antes.updatedAt.toISOString());
+      // La unica columna que SI cambia: la suma de los dos lotes (R8, R9).
+      expect(despues.stock.toFixed(4)).toBe((7 + 99).toFixed(4));
 
       const lotes = await prisma.productBatch.count({ where: { productId: primero.id } });
       expect(lotes).toBe(2);
@@ -504,12 +513,16 @@ describe('R20: con homonimos vivos se elige siempre el mismo producto', () => {
       // cualquiera de las dos y la eleccion cambiaria entre corridas.
       const antiguo = new Date('2026-01-01T10:00:00.000Z');
       const reciente = new Date('2026-02-01T10:00:00.000Z');
+      // La misma unidad que la presentacion del fixture: sin ella, ningun homonimo casaria con
+      // la busqueda por nombre Y unidad.
+      const unitId = await unidadDeSistema(prisma);
 
       for (const createdAt of [antiguo, antiguo, reciente]) {
         const fila = await prisma.product.create({
           data: {
             name: nombre,
             nameNormalized: normalizado,
+            unitId,
             createdAt,
             updatedAt: createdAt,
             companyId: fixture.companyId,
@@ -525,10 +538,16 @@ describe('R20: con homonimos vivos se elige siempre el mismo producto', () => {
       });
       const menorId = [...empatados.map((fila) => fila.id)].sort()[0];
 
-      const elegido = await findAliveIdByName(nombre, ambito(fixture));
+      const elegido = await findAliveIdByNameInPresentationUnit(
+        nombre,
+        fixture.presentationId,
+        ambito(fixture),
+      );
       expect(elegido).toBe(menorId);
 
-      expect(await findAliveIdByName(nombre, ambito(fixture))).toBe(elegido);
+      expect(
+        await findAliveIdByNameInPresentationUnit(nombre, fixture.presentationId, ambito(fixture)),
+      ).toBe(elegido);
     } finally {
       await dropFixture(fixture, productIds);
     }
@@ -543,18 +562,23 @@ describe('R19: un nombre que solo coincide con productos borrados no encuentra n
     const productIds: string[] = [];
 
     try {
+      const unitId = await unidadDeSistema(prisma);
       const fila = await prisma.product.create({
-        data: { name: nombre, nameNormalized: normalizado, companyId: fixture.companyId },
+        data: { name: nombre, nameNormalized: normalizado, unitId, companyId: fixture.companyId },
         select: { id: true },
       });
       productIds.push(fila.id);
 
-      expect(await findAliveIdByName(nombre, ambito(fixture))).toBe(fila.id);
+      expect(
+        await findAliveIdByNameInPresentationUnit(nombre, fixture.presentationId, ambito(fixture)),
+      ).toBe(fila.id);
 
       await prisma.product.update({ where: { id: fila.id }, data: { deletedAt: new Date() } });
 
       // Por eso el alta creara un producto nuevo en vez de revivir este.
-      expect(await findAliveIdByName(nombre, ambito(fixture))).toBeNull();
+      expect(
+        await findAliveIdByNameInPresentationUnit(nombre, fixture.presentationId, ambito(fixture)),
+      ).toBeNull();
       const sigue = await prisma.product.findUnique({ where: { id: fila.id } });
       expect(sigue).not.toBeNull();
     } finally {

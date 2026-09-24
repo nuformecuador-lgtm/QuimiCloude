@@ -50,7 +50,10 @@ export {
   OrderAssignmentNotFoundError,
   UserNotFoundError,
   UserNotAssignableError,
+  UserCannotBeResponsibleError,
   WorkGroupNotFoundError,
+  MaterialShortageError,
+  RecipeWithoutLinesError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -142,3 +145,38 @@ export type {
   AssignedOrderExecutionView,
   ExecutionLineView,
 } from './domain/assigned-order-execution-view';
+
+// Que vistas de `/asignacion` puede ver un usuario, solo por permiso. `app/**` compone la
+// pantalla con estas dos funciones y nunca escribe un codigo de permiso por su cuenta.
+export {
+  resolveAssignmentViews,
+  resolveAssignmentView,
+  type AssignmentViewKind,
+} from './domain/assignment-views';
+
+// La vista «Terminados»: los `ENTREGADO` de toda la empresa, sin filtro por usuario.
+export {
+  createListFinishedOrders,
+  type ListFinishedOrdersDeps,
+} from './domain/list-finished-orders';
+export type { FinishedOrderView } from './domain/finished-order-view';
+
+// Quien puede ser responsable de un pedido, por permiso. Se publica para que
+// `list-responsible-candidates.ts` (mismo modulo) y cualquier lector externo apliquen el
+// MISMO criterio que usa `assign-responsibles.ts`.
+export { canBeResponsible } from './domain/responsible-eligibility';
+
+// La vista «Todos»: los pedidos de la empresa en cualquier estado, sin filtro por usuario.
+export {
+  createListCompanyOrders,
+  type ListCompanyOrdersDeps,
+} from './domain/list-company-orders';
+export type { CompanyOrderView } from './domain/company-order-view';
+
+// Los candidatos del selector de responsables.
+export {
+  createListResponsibleCandidates,
+  MAX_CANDIDATES,
+  type ListResponsibleCandidatesDeps,
+  type ResponsibleCandidate,
+} from './domain/list-responsible-candidates';

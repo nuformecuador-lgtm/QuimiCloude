@@ -78,6 +78,7 @@ const ACCIONES = {
     'updateOrderAction',
     'cancelOrderAction',
     'deleteOrderAction',
+    'quoteOrderCostAction',
   ],
   '@/lib/modules/recetas/adapters/driving/recipe-actions': ['listRecipesAction'],
   '@/lib/modules/unidades/adapters/driving/unit-actions': ['listUnitsAction'],
@@ -489,14 +490,38 @@ describe('la pantalla no llama a rutas propias ni las crea (R41)', () => {
     expect(culpables, culpables.join(', ')).toEqual([]);
   });
 
-  it('la feature no crea ningun route handler', () => {
-    // Ni bajo la ruta —donde R1 solo admite `page.tsx`— ni en ningun sitio: la feature entera no
-    // anade `route.ts`. Se comprueba en el arbol y sobre el diff.
+  it('la feature no crea ningun route handler en la superficie de pedidos', () => {
+    // ACOTADO EL 2026-09-18 POR QC-111.
+    //
+    // Este caso hacia DOS afirmaciones. La primera -ningun `route.ts` bajo la ruta de pedidos, donde
+    // R1 solo admite `page.tsx`- es la regla de arquitectura de verdad: una pantalla no se fabrica
+    // rutas propias, y una mutacion desde un componente propio se hace con una Server Action
+    // (`docs/architecture.md > Server Actions vs Route Handlers`). Esa se queda INTACTA.
+    //
+    // La segunda barria TODO `app/` exigiendo cero route handlers en el repositorio entero. Eso
+    // media de mas: afirmaba sobre fichas ajenas lo que solo podia afirmar sobre la suya, asi que la
+    // rompe cualquier feature posterior que anada un route handler LEGITIMO. Es lo que paso con el
+    // webhook de la cola de QC-111, que esa misma tabla de `docs/architecture.md` manda resolver CON
+    // Route Handler por venir de un tercero. Se borra la absoluta; no se pierde ninguna proteccion
+    // sobre pedidos, que es lo unico que este archivo puede prometer.
     const enLaRuta = FUENTES_DE_LA_RUTA.filter((archivo) => /\/route\.tsx?$/.test(archivo));
-    expect(enLaRuta, `route handlers en la ruta: ${enLaRuta.join(', ')}`).toEqual([]);
 
-    const manejadores = fuentesBajo('app').filter((archivo) => /\/route\.tsx?$/.test(archivo));
-    expect(manejadores, `route handlers en app/: ${manejadores.join(', ')}`).toEqual([]);
+    expect(enLaRuta, `route handlers en la ruta: ${enLaRuta.join(', ')}`).toEqual([]);
+  });
+
+  it('y el detector de route handlers MUERDE ante uno en la superficie de pedidos', () => {
+    const conUnoEnPedidos = [
+      `${CARPETA_DE_LA_RUTA}/page.tsx`,
+      `${CARPETA_DE_LA_RUTA}/route.ts`,
+    ].filter((archivo) => /\/route\.tsx?$/.test(archivo));
+
+    expect(conUnoEnPedidos).toEqual([`${CARPETA_DE_LA_RUTA}/route.ts`]);
+
+    const soloPantalla = [`${CARPETA_DE_LA_RUTA}/page.tsx`].filter((archivo) =>
+      /\/route\.tsx?$/.test(archivo),
+    );
+
+    expect(soloPantalla).toEqual([]);
   });
 
   it('y la guardia del fetch FALLA ante una ruta propia, sin morder a una absoluta ajena', () => {

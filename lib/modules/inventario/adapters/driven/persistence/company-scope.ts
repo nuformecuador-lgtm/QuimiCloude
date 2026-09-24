@@ -41,24 +41,31 @@ function companyScope(scope: InventoryScope): { companyId: string } {
  * componga el ambito de la tabla equivocada NO COMPILE, en vez de filtrar por una columna que
  * casualmente se llama igual en otra tabla.
  *
- * NO HAY ENVOLTURA DE LOTE, y es deliberado (decidido el 2026-09-11 al cerrar la revision F2.2).
- * Hubo una -`batchCompanyScope`, `Prisma.ProductBatchWhereInput`- y se BORRO por no tener ningun
- * consumidor de produccion: `product_batches` NO TIENE NINGUNA LECTURA PROPIA en este modulo. Su
- * unica lectura llega por la fila de producto de `addBatchToAlive`, que ya va acotada con
- * `productCompanyScope`, y sus dos escrituras son creaciones, que se acotan con
- * `companyScopeColumns` -otro tipo, `…UncheckedCreateInput`, no un `where`-. Una exportacion que
- * solo usa su propio test no filtra ninguna consulta: parece cobertura y no lo es.
- *
- * El dia que haga falta un `where` de lote -QC-81, con la unicidad `(empresa, lote)`- se
- * reintroduce **con su consumidor en la misma tanda**, delegando en `companyScope` igual que
- * estas dos. Volver a escribirla cuesta tres lineas; dejarla suelta cuesta una afirmacion falsa
- * sobre lo que el modulo filtra.
+ * `batchCompanyScope` y `movementCompanyScope` siguen la misma regla: cada una tiene su propio
+ * consumidor de produccion (`findBatchesOfAliveProduct` y `findBatchMovements`, mas abajo en el
+ * modulo), asi que no son exportaciones que solo use su propio test.
  */
 export function productCompanyScope(scope: InventoryScope): Prisma.ProductWhereInput {
   return companyScope(scope);
 }
 
 export function presentationCompanyScope(scope: InventoryScope): Prisma.PresentationWhereInput {
+  return companyScope(scope);
+}
+
+export function batchCompanyScope(scope: InventoryScope): Prisma.ProductBatchWhereInput {
+  return companyScope(scope);
+}
+
+export function movementCompanyScope(scope: InventoryScope): Prisma.InventoryMovementWhereInput {
+  return companyScope(scope);
+}
+
+/** Misma regla, para `reservation_movements`: su consumidor es `findBatchMovements`, que une los
+ *  dos libros para el historial de un lote. */
+export function reservationMovementCompanyScope(
+  scope: InventoryScope,
+): Prisma.ReservationMovementWhereInput {
   return companyScope(scope);
 }
 
@@ -74,9 +81,7 @@ export function presentationCompanyScope(scope: InventoryScope): Prisma.Presenta
  * exactamente lo que este archivo existe para impedir.
  *
  * DELEGA en `companyScope`, asi que sigue habiendo UNA sola definicion: lo unico que cambia es
- * el tipo con el que se publica. No hay ninguna envoltura por tabla porque la columna se llama
- * igual y es `string` obligatoria en las tres. Esta es, ademas, la unica via por la que el ambito
- * llega a `product_batches`: el lote se ESCRIBE con empresa y no se LEE por su cuenta.
+ * el tipo con el que se publica.
  */
 export function companyScopeColumns(scope: InventoryScope): { readonly companyId: string } {
   return companyScope(scope);

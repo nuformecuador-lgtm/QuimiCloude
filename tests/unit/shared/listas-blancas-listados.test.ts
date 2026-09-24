@@ -76,13 +76,15 @@ describe('listas blancas de los siete listados', () => {
     expect(hallazgos).toEqual([]);
   });
 
-  it('pedidos es el UNICO listado que no busca', () => {
-    // R17 — `orders` no tiene columna `name`. Que sea el unico se afirma recorriendo las siete,
-    // no mirando solo pedidos: asi, si manana otra lista se apagara la busqueda, esto lo dice.
+  it('ninguna de las siete apaga la busqueda (R11)', () => {
+    // Nota fechada 2026-09-18: hasta QC-68 `pedidos` era la unica sin `searchable` y el aserto
+    // decia `['pedidos']`. Desde que `orders` busca por el nombre de su receta, la afirmacion
+    // mas fuerte es la lista vacia: asi, si manana CUALQUIER lista -incluida pedidos- apagara
+    // la busqueda, este caso lo dice. Se sigue recorriendo las siete, no solo pedidos.
     const sinBusqueda = LISTAS.filter(({ queryable }) => !queryable.searchable).map(
       ({ listado }) => listado,
     );
 
-    expect(sinBusqueda).toEqual(['pedidos']);
+    expect(sinBusqueda).toEqual([]);
   });
 });

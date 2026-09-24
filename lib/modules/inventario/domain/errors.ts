@@ -58,6 +58,14 @@ export class PresentationInUseError extends InventarioError {
   }
 }
 
+export class PresentationUnitLockedError extends InventarioError {
+  readonly code = 'presentation_unit_locked';
+
+  constructor(diagnostic?: string) {
+    super('presentation_unit_locked', diagnostic);
+  }
+}
+
 /**
  * Solo para el lote escrito a mano: si choca uno generado, se reintenta. Es un codigo propio y no
  * `ValidationError` porque la entrada tiene forma valida; lo que choca es su valor contra la base.
@@ -67,6 +75,24 @@ export class BatchDuplicateLotError extends InventarioError {
 
   constructor(diagnostic?: string) {
     super('batch_duplicate_lot', diagnostic);
+  }
+}
+
+/** El lote no existe o es de otra empresa: las dos se responden igual. */
+export class BatchNotFoundError extends InventarioError {
+  readonly code = 'batch_not_found';
+
+  constructor(diagnostic?: string) {
+    super('batch_not_found', diagnostic);
+  }
+}
+
+/** El ajuste dejaria la existencia del lote por debajo de cero. */
+export class BatchStockNegativeError extends InventarioError {
+  readonly code = 'batch_stock_negative';
+
+  constructor(diagnostic?: string) {
+    super('batch_stock_negative', diagnostic);
   }
 }
 

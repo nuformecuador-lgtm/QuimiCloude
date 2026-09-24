@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
@@ -16,7 +16,12 @@ import { dateRangeCondition, numberRangeCondition, selectCondition } from './lis
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { OrderScope } from '../../../domain/order-scope';
-import type { NewOrder, OrderRow } from '../../../domain/order-view';
+import type { NewOrder, OrderEdit, OrderRow } from '../../../domain/order-view';
+import type { LockedOrderRow, OrderWriteRepository } from '../../../ports/order-write-repository';
+
+/** Cliente global o el transaccional que abra quien llama: los metodos de mas abajo no
+ *  distinguen, mismo patron que `createOrderAssignmentRepository`. */
+type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 /**
  * Implementa `OrderRepository` (`ports/order-repository.ts`, `design.md > 4.2`, `> 7.4`,
@@ -58,10 +63,12 @@ const ORDER_SELECT = {
   priority: true,
   status: true,
   cancellationReason: true,
+  ingredientsCost: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
   updatedBy: true,
+  presentationId: true,
 } satisfies Prisma.OrderSelect;
 
 type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
@@ -88,10 +95,14 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     priority: row.priority,
     status: row.status,
     cancellationReason: row.cancellationReason,
+    // `null` sigue `null`: nunca se convierte en `'0.0000'`, `fromDecimal` solo se llama si hay
+    // valor.
+    ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
+    presentationId: row.presentationId,
   };
 }
 
@@ -110,8 +121,8 @@ function sqlStateOf(error: unknown): string | null {
 }
 
 /** Duplicado del correlativo: SQLSTATE `23505`, sin leer texto. Es seguro solo porque se usa acotado
- *  al `INSERT` de `createOrder`, que no escribe `id` (lo genera `gen_random_uuid()`): de los unicos
- *  de `orders` solo puede chocar `orders_company_year_sequence_key`. */
+ *  al `INSERT` de `insertAliveOrder`, que no escribe `id` (lo genera `gen_random_uuid()`): de los
+ *  unicos de `orders` solo puede chocar `orders_company_year_sequence_key`. */
 export function isDuplicateOrderNumber(error: unknown): boolean {
   return sqlStateOf(error) === '23505';
 }
@@ -135,107 +146,9 @@ const ORDER_SEQUENCE_LOCK_KEY_PREFIX = 'orders_sequence:';
 
 /** Tres intentos y ni uno mas. El lock hace que el choque sea casi
  *  imposible; el indice unico es la garantia. Reintentar sin techo convertiria un duplicado real
- *  —por ejemplo el que insertara otra via— en un bucle infinito. */
-const CREATE_ORDER_MAX_ATTEMPTS = 3;
-
-/**
- * `create` de `OrderRepository`: SQL crudo en una transaccion, porque el maximo del correlativo
- * tiene que evaluarse DENTRO del `INSERT`, sin ventana entre leerlo y escribirlo. Es la UNICA
- * operacion del modulo que no usa la API tipada.
- *
- * El lock va en una sentencia APARTE y ANTERIOR: en `READ COMMITTED` cada sentencia toma su
- * instantanea al empezar, asi que dentro del `INSERT` la sesion que espera leeria el mismo maximo
- * que la que comitea. Es `xact` y se pide uno solo: se suelta al terminar y no puede interbloquear.
- *
- * El maximo no filtra `deleted_at` ni el estado: un pedido borrado o cancelado conserva su numero,
- * y los huecos existentes se conservan. La empresa del ambito va, parametrizada con `::uuid`, en la
- * columna que se escribe y en el subselect del maximo.
- *
- * UN SOLO RELOJ: `created_at`, `updated_at` y el ANO salen del mismo `now`; con otro reloj, un alta
- * en el cambio de ano violaria `orders_order_year_matches_created_at` con `23514`. `created_by` y
- * `updated_by` llevan el mismo `actorId`, y el `status` va parametrizado porque lo decide el caso
- * de uso.
- *
- * El reintento va FUERA de `prisma.$transaction`: una transaccion abortada por el `23505` no
- * admite ni una sentencia mas. Agotados los intentos, `'duplicate_number'`. Ninguna salida lleva
- * `companyId`.
- */
-export async function createOrder(
-  data: NewOrder,
-  year: number,
-  actorId: string,
-  now: Date,
-  scope: OrderScope,
-): Promise<OrderRow | 'duplicate_number'> {
-  const { companyId } = companyScopeColumns(scope);
-  const lockKey = `${ORDER_SEQUENCE_LOCK_KEY_PREFIX}${companyId}:${String(year)}`;
-
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      const fila = await prisma.$transaction(async (tx) => {
-        // `$executeRaw` y no `$queryRaw`: `pg_advisory_xact_lock` devuelve `void`, y el cliente no
-        // sabe deserializar una columna de ese tipo.
-        await tx.$executeRaw(
-          Prisma.sql`SELECT pg_advisory_xact_lock(${ORDER_SEQUENCE_LOCK_NAMESPACE}::int, hashtext(${lockKey}::text))`,
-        );
-
-        const filas = await tx.$queryRaw<readonly CreatedOrderRow[]>(Prisma.sql`
-          INSERT INTO "orders" (
-            "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
-            "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
-          ) VALUES (
-            ${companyId}::uuid,
-            ${year}::integer,
-            (SELECT COALESCE(max("order_sequence"), 0) + 1
-               FROM "orders"
-              WHERE "company_id" = ${companyId}::uuid
-                AND "order_year" = ${year}::integer),
-            ${data.recipeId}::uuid,
-            ${data.quantity}::numeric,
-            ${data.priority}::"OrderPriority",
-            ${data.status}::"OrderStatus",
-            ${actorId}::uuid,
-            ${actorId}::uuid,
-            ${now}::timestamptz,
-            ${now}::timestamptz
-          )
-          RETURNING "id", "order_year", "order_sequence"
-        `);
-
-        const row = filas[0];
-        if (row === undefined) {
-          // Un `INSERT ... RETURNING` que no devuelve fila no tiene lectura posible: no se
-          // inventa un pedido con id vacio, se propaga con contexto (`docs/conventions.md`).
-          throw new Error('El INSERT de pedido no devolvio ninguna fila.');
-        }
-        return row;
-      });
-
-      // El resto de la fila es exactamente lo que se acaba de escribir, asi que no hace falta
-      // un segundo viaje para leerlo. Los importes se normalizan con la MISMA funcion que usa
-      // la lectura, para que el alta y la consulta no devuelvan dos formatos del mismo numero.
-      return {
-        id: fila.id,
-        number: { year: Number(fila.order_year), sequence: Number(fila.order_sequence) },
-        recipeId: data.recipeId,
-        quantity: fromDecimal(toDecimalInput(data.quantity)),
-        priority: data.priority,
-        status: data.status,
-        // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive`.
-        cancellationReason: null,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: actorId,
-        updatedBy: actorId,
-      };
-    } catch (error) {
-      // Lo que no se sabe traducir se RELANZA: el dominio recibe un resultado DISCRIMINADO, jamas
-      // un SQLSTATE, y aqui no hay ni un `catch` vacio.
-      if (!isDuplicateOrderNumber(error)) throw error;
-      if (attempt >= CREATE_ORDER_MAX_ATTEMPTS) return 'duplicate_number';
-    }
-  }
-}
+ *  —por ejemplo el que insertara otra via— en un bucle infinito. Exportada porque
+ *  `withOrderTransaction` reintenta con el mismo tope. */
+export const CREATE_ORDER_MAX_ATTEMPTS = 3;
 
 /** `findAliveById`: `deleted_at IS NULL` Y EL AMBITO en el `where`, no en un `if` posterior. Un
  *  pedido de otra empresa vuelve como `null`, igual que uno que no existe. Un pedido CANCELADO si
@@ -410,29 +323,39 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
 }
 
 /**
- * `where` UNICO del listado de pedidos: el mismo objeto para el `findMany` y para el `count`
- * (R14). Dos capas, y ninguna sobra:
+ * `where` UNICO del listado de pedidos: el mismo objeto para el `findMany` y para el `count`.
+ * Tres capas, y ninguna sobra:
  *
  *   1. **`deletedAt: null` SIEMPRE** (R7, R40). NO es un filtro opcional y por eso nunca estuvo
  *      en los parametros del listado: `deletedAt` no es consultable en ninguna lista blanca y
  *      `sanitizeListQuery` lo poda ademas por su cuenta. Los CANCELADOS si salen -tienen estado
  *      propio en vez de desaparecer (R25)-; los borrados no salen nunca.
- *   2. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
+ *   2. **`recipeIds`**, cuando la busqueda resolvio un termino: acota a los pedidos de esas
+ *      recetas. `null` significa que no hay busqueda y no acota nada; `[]` significa que ninguna
+ *      receta caso y el `IN` vacio deja la pagina sin filas.
+ *   3. **Los filtros, TODOS a la vez**: un `AND` explicito, de modo que una fila sale solo
  *      si los cumple todos. Estado y prioridad son dos de ellos (R25), ya no dos parametros.
- *
- * NO hay capa de busqueda, y es el requisito: `orders` no tiene columna `name` (R17), asi que
- * la busqueda se omite y se registra en el caso de uso y aqui no llega nada que aplicar.
  */
-export function buildOrderWhere(query: ListQuery, scope: OrderScope): Prisma.OrderWhereInput {
+export function buildOrderWhere(
+  query: ListQuery,
+  recipeIds: readonly string[] | null,
+  scope: OrderScope,
+): Prisma.OrderWhereInput {
   const filters = Object.entries(query.filters)
     .map(([field, value]) => orderFilterWhere(field, value))
     .filter((condition): condition is Prisma.OrderWhereInput => condition !== null);
 
   // El AMBITO va PRIMERO y en su propio termino del `AND`, al lado de `deletedAt: null` y ANTES de
   // los filtros. NUNCA fundido con ellos ni al mismo nivel que un `OR`: un `OR` y el `companyId` en
-  // el mismo objeto dejarian que un filtro AMPLIE lo visible en vez de acotarlo.
+  // el mismo objeto dejarian que un filtro AMPLIE lo visible en vez de acotarlo. `recipeIds` va en
+  // su PROPIO termino del `AND`, entre el borrado y los filtros, por el mismo motivo.
   return {
-    AND: [orderCompanyScope(scope), { deletedAt: null }, ...filters],
+    AND: [
+      orderCompanyScope(scope),
+      { deletedAt: null },
+      ...(recipeIds === null ? [] : [{ recipeId: { in: [...recipeIds] } }]),
+      ...filters,
+    ],
   };
 }
 
@@ -452,13 +375,17 @@ export function buildOrderWhere(query: ListQuery, scope: OrderScope): Prisma.Ord
  *
  * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
  * misma constante, no dos copias parecidas-.
+ *
+ * `recipeIds` es obligatorio, sin valor por defecto: las llamadas que no hablan de busqueda
+ * pasan `null` explicito, que significa «sin busqueda, no acotar nada».
  */
 export async function listAliveOrders(
   query: ListQuery,
+  recipeIds: readonly string[] | null,
   scope: OrderScope,
 ): Promise<Page<OrderRow>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildOrderWhere(query, scope);
+  const where = buildOrderWhere(query, recipeIds, scope);
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
@@ -483,30 +410,36 @@ export async function listAliveOrders(
  * `updateMany` con `deletedAt: null` en el `where` y no `update`: si el pedido no existe o ya
  * esta borrado, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar.
  *
- * `data` NUNCA incluye `createdBy` ni `createdAt` (R6): conservar el autor y el instante de
- * la creacion es la mitad de R6 que solo se puede demostrar aqui. Tampoco incluye
- * `cancellationReason` ni puede escribir la cancelacion: `NewOrder.status` es
- * `EditableOrderStatus` y el `typecheck` es la primera de las cuatro capas de `design.md > 8`.
+ * `data` NUNCA incluye `createdBy` ni `createdAt`: conservar el autor y el instante de
+ * la creacion solo se puede demostrar aqui. Tampoco incluye `status` ni
+ * `cancellationReason`: `OrderEdit` no tiene esos campos, asi que esta sentencia no puede
+ * escribirlos ni por accidente.
  *
  * `updatedAt` se escribe con el `now` INYECTADO y no con el `@updatedAt` de Prisma, para que
  * el reloj sea el mismo que fijo el caso de uso.
+ *
+ * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`: la edicion recalcula, y
+ * el valor nuevo reemplaza al anterior aunque sea `null`.
  */
 export async function updateAliveOrder(
   id: string,
-  data: NewOrder,
+  data: OrderEdit,
   actorId: string,
   now: Date,
+  ingredientsCost: string | null,
   scope: OrderScope,
+  tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
+  const { count } = await tx.order.updateMany({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     data: {
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
-      status: data.status,
+      ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
       updatedAt: now,
       updatedBy: actorId,
+      presentationId: data.presentationId,
     },
   });
   return count === 1 ? 'ok' : 'not_found';
@@ -524,15 +457,19 @@ export async function updateAliveOrder(
  *
  * El AMBITO viaja EN EL `where`, junto a `deletedAt: null`: un pedido de otra empresa no se
  * cancela y sale como `'not_found'`.
+ *
+ * `actorId` admite `null`: la caducidad automatica cancela sin que nadie la haya pedido, y
+ * `updated_by` es nullable exactamente para eso.
  */
 export async function cancelAliveOrder(
   id: string,
   reason: string,
-  actorId: string,
+  actorId: string | null,
   now: Date,
   scope: OrderScope,
+  tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
+  const { count } = await tx.order.updateMany({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     data: {
       status: 'CANCELADO',
@@ -561,10 +498,242 @@ export async function softDeleteAliveOrder(
   actorId: string,
   now: Date,
   scope: OrderScope,
+  tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
+  const { count } = await tx.order.updateMany({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
   });
   return count === 1 ? 'ok' : 'not_found';
+}
+
+/** Fila minima del bloqueo: el identificador para saber que la fila existia, era viva y de esta
+ *  empresa, y `reserved_at` para que quien recomprueba el plazo bajo el candado no pida una
+ *  segunda lectura; el resto de columnas se relee con la API tipada. */
+type LockedOrderIdRow = { readonly id: string; readonly reserved_at: Date | null };
+
+/**
+ * `lockAliveById` de `OrderWriteRepository`: `SELECT ... FOR UPDATE` de un pedido vivo, con el
+ * MISMO filtro que `findAliveOrderById`. Bloqueada la fila, se relee con `findUnique` -ya es de
+ * esta transaccion, no hay una segunda espera- para no repetir a mano `ORDER_SELECT`.
+ */
+async function lockAliveOrderById(
+  id: string,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<LockedOrderRow | null> {
+  const { companyId } = companyScopeColumns(scope);
+  const rows = await tx.$queryRaw<ReadonlyArray<LockedOrderIdRow>>(Prisma.sql`
+    SELECT "id", "reserved_at"
+      FROM "orders"
+     WHERE "id" = ${id}::uuid
+       AND "company_id" = ${companyId}::uuid
+       AND "deleted_at" IS NULL
+       FOR UPDATE
+  `);
+  const alive = rows[0];
+  if (alive === undefined) return null;
+
+  const row = await tx.order.findUnique({ where: { id: alive.id }, select: ORDER_SELECT });
+  return row === null ? null : { ...toOrderRow(row), reservedAt: alive.reserved_at };
+}
+
+/**
+ * `create` de `OrderWriteRepository`: el UNICO `INSERT` de pedido del modulo, con el lock de
+ * aviso del correlativo. Corre sobre el cliente que ya abrio `OrderUnitOfWork`, SIN bucle de
+ * reintento propio -si el correlativo choca aqui la transaccion entera ya quedo abortada, y
+ * quien reintenta con una transaccion NUEVA es `withOrderTransaction`-. El choque se deja SUBIR
+ * tal cual, sin traducir.
+ */
+async function insertAliveOrder(
+  tx: PrismaLike,
+  data: NewOrder,
+  year: number,
+  actorId: string,
+  now: Date,
+  ingredientsCost: string | null,
+  scope: OrderScope,
+): Promise<OrderRow> {
+  const { companyId } = companyScopeColumns(scope);
+  const lockKey = `${ORDER_SEQUENCE_LOCK_KEY_PREFIX}${companyId}:${String(year)}`;
+
+  await tx.$executeRaw(
+    Prisma.sql`SELECT pg_advisory_xact_lock(${ORDER_SEQUENCE_LOCK_NAMESPACE}::int, hashtext(${lockKey}::text))`,
+  );
+
+  const filas = await tx.$queryRaw<readonly CreatedOrderRow[]>(Prisma.sql`
+    INSERT INTO "orders" (
+      "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
+      "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
+      "updated_at", "presentation_id"
+    ) VALUES (
+      ${companyId}::uuid,
+      ${year}::integer,
+      (SELECT COALESCE(max("order_sequence"), 0) + 1
+         FROM "orders"
+        WHERE "company_id" = ${companyId}::uuid
+          AND "order_year" = ${year}::integer),
+      ${data.recipeId}::uuid,
+      ${data.quantity}::numeric,
+      ${data.priority}::"OrderPriority",
+      ${data.status}::"OrderStatus",
+      ${ingredientsCost}::numeric,
+      ${actorId}::uuid,
+      ${actorId}::uuid,
+      ${now}::timestamptz,
+      ${now}::timestamptz,
+      ${data.presentationId}::uuid
+    )
+    RETURNING "id", "order_year", "order_sequence"
+  `);
+
+  const row = filas[0];
+  if (row === undefined) {
+    // Un `INSERT ... RETURNING` que no devuelve fila no tiene lectura posible: no se inventa
+    // un pedido con id vacio, se propaga con contexto (`docs/conventions.md`).
+    throw new Error('El INSERT de pedido no devolvio ninguna fila.');
+  }
+
+  return {
+    id: row.id,
+    number: { year: Number(row.order_year), sequence: Number(row.order_sequence) },
+    recipeId: data.recipeId,
+    quantity: fromDecimal(toDecimalInput(data.quantity)),
+    priority: data.priority,
+    status: data.status,
+    cancellationReason: null,
+    ingredientsCost: ingredientsCost === null ? null : fromDecimal(toDecimalInput(ingredientsCost)),
+    createdAt: now,
+    updatedAt: now,
+    createdBy: actorId,
+    updatedBy: actorId,
+    presentationId: data.presentationId,
+  };
+}
+
+/**
+ * `setStatus` de `OrderWriteRepository`: `UPDATE` condicional `WHERE status = from` sobre el
+ * cliente de la transaccion en curso, sin `assertTransition` -esa comprobacion ya la hizo el
+ * dominio sobre la fila que acaba de bloquear `lockAliveById`-.
+ *
+ * Con destino `ENTREGADO` escribe tambien `finishedAt` en el mismo `UPDATE`, con el mismo `now`
+ * que ya recibe la llamada: el cambio de estado y la fecha de terminado quedan atomicos entre
+ * si. Con cualquier otro destino no toca `finishedAt`.
+ */
+async function setAliveOrderStatus(
+  id: string,
+  from: OrderStatus,
+  to: OrderStatus,
+  actorId: string,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<'ok' | 'not_found' | 'stale'> {
+  const { count } = await tx.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: from }] },
+    data: {
+      status: to,
+      updatedAt: now,
+      updatedBy: actorId,
+      ...(to === 'ENTREGADO' ? { finishedAt: now } : {}),
+    },
+  });
+  if (count === 1) return 'ok';
+
+  const stillAlive = await tx.order.findFirst({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    select: { id: true },
+  });
+  return stillAlive === null ? 'not_found' : 'stale';
+}
+
+/**
+ * `setReservedAt` de `OrderWriteRepository`. `$executeRaw` y no la API tipada: un `update` de
+ * Prisma siempre mueve `updated_at` con `@updatedAt`, y apartar o liberar material no es una
+ * edicion del pedido que el usuario deba ver en esa columna.
+ */
+async function setOrderReservedAt(
+  id: string,
+  reservedAt: Date | null,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "orders"
+       SET "reserved_at" = ${reservedAt}::timestamptz
+     WHERE "id" = ${id}::uuid
+       AND "company_id" = ${companyId}::uuid
+       AND "deleted_at" IS NULL
+  `);
+}
+
+/**
+ * Candidatos a caducar de UNA empresa: `PENDIENTE`, vivos, con la
+ * reserva vencida en el umbral o antes. Usa `orders_expirable_idx` -parcial, sobre
+ * `reserved_at` con `status = 'PENDIENTE' AND deleted_at IS NULL AND reserved_at IS NOT NULL`-,
+ * y el mismo orden que ese indice: `reserved_at, id`, para que dos lotes seguidos avancen sin
+ * saltarse ni repetir un pedido que empata en `reserved_at`.
+ *
+ * `cursor` es el ultimo `(reservedAt, id)` que devolvio el lote anterior: `null` en el primero.
+ * Con cursor, solo se piden filas ESTRICTAMENTE posteriores en ese orden, para que un candidato
+ * que fallo en el lote anterior no vuelva a salir en esta ejecucion.
+ *
+ * `companyId` es un parametro por su cuenta, y no solo lo que trae `scope`: quien recorre las
+ * empresas no tiene un `OrderScope` que construir para el bucle, solo el identificador que le
+ * dio el directorio de empresas. `scope` sigue yendo al final, como el resto del modulo.
+ */
+export async function findExpirableOrders(
+  companyId: string,
+  threshold: Date,
+  cursor: { readonly reservedAt: Date; readonly id: string } | null,
+  limit: number,
+  scope: OrderScope,
+): Promise<readonly { readonly id: string; readonly reservedAt: Date }[]> {
+  const rows = await prisma.order.findMany({
+    where: {
+      AND: [
+        orderCompanyScope(scope),
+        { status: 'PENDIENTE', deletedAt: null, reservedAt: { lte: threshold } },
+        ...(cursor === null
+          ? []
+          : [
+              {
+                OR: [
+                  { reservedAt: { gt: cursor.reservedAt } },
+                  { reservedAt: cursor.reservedAt, id: { gt: cursor.id } },
+                ],
+              },
+            ]),
+      ],
+    },
+    select: { id: true, reservedAt: true },
+    orderBy: [{ reservedAt: 'asc' }, { id: 'asc' }],
+    take: limit,
+  });
+  return rows.map((row) => {
+    if (row.reservedAt === null) {
+      throw new Error('candidato sin reserved_at pese al filtro de la consulta');
+    }
+    return { id: row.id, reservedAt: row.reservedAt };
+  });
+}
+
+/**
+ * Fabrica de `OrderWriteRepository` sobre el cliente que le pasen -global o transaccional-,
+ * mismo patron que `createOrderAssignmentRepository`. Sin argumento habla por el `PrismaClient`
+ * global; `OrderUnitOfWork` la invoca con el `tx` de su transaccion.
+ */
+export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteRepository {
+  return {
+    lockAliveById: (id, scope) => lockAliveOrderById(id, scope, tx),
+    create: (data, year, actorId, now, ingredientsCost, scope) =>
+      insertAliveOrder(tx, data, year, actorId, now, ingredientsCost, scope),
+    updateAlive: (id, data, actorId, now, ingredientsCost, scope) =>
+      updateAliveOrder(id, data, actorId, now, ingredientsCost, scope, tx),
+    cancelAlive: (id, reason, actorId, now, scope) => cancelAliveOrder(id, reason, actorId, now, scope, tx),
+    softDeleteAlive: (id, actorId, now, scope) => softDeleteAliveOrder(id, actorId, now, scope, tx),
+    setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
+    setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
+  };
 }

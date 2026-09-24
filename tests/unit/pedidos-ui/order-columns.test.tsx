@@ -18,13 +18,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ACTIONS_COLUMN_ID,
   CANCELLATION_REASON_COLUMN_ID,
+  COVERAGE_COLUMN_ID,
   CREATED_AT_COLUMN_ID,
   MISSING_VALUE_MARK,
+  ORDER_COVERAGE_LABELS,
   ORDER_DEFAULT_PINNED_COLUMNS,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_LABELS,
   ORDER_SKELETON_COLUMN_COUNT,
   ORDER_STATUS_LABELS,
+  PRESENTATION_NAME_COLUMN_ID,
   PRIORITY_COLUMN_ID,
   QUANTITY_COLUMN_ID,
   RESPONSIBLES_COLUMN_ID,
@@ -77,10 +80,13 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
+    ingredientsCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: null,
+    presentationName: null,
     ...overrides,
   };
 }
@@ -98,21 +104,24 @@ afterEach(() => {
 
 // QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
-// acordada baja a ocho. Sigue siendo cerrada y en el orden de `design.md > 7`.
-describe('las columnas declaradas son exactamente las nueve acordadas (R8)', () => {
-  it('en positivo: los nueve ids, en el orden de `design.md > 7`', () => {
+// acordada baja a ocho. Luego sube a diez con RESPONSABLES y a ONCE con COBERTURA.
+// Sigue siendo cerrada y en un orden acordado.
+describe('las columnas declaradas son exactamente las once acordadas (R8, R20, R35)', () => {
+  it('en positivo: los once ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
+      COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(9);
+    expect(ORDER_COLUMNS).toHaveLength(11);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -154,7 +163,9 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
     expect(noOrdenables).toEqual([
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
+      COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
@@ -286,6 +297,49 @@ describe('la cantidad se pinta REDONDEADA A DOS DECIMALES (enmienda del 2026-09-
     expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '1.0050' })).container.textContent)
       .toBe('1.01');
   });
+
+  it('QC-132 R1: expone el valor exacto en el title cuando difiere del pintado', () => {
+    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '0.1255' }));
+
+    expect(container.textContent).toBe('0.13');
+    expect(container.firstElementChild).toHaveAttribute('title', '0.1255');
+  });
+
+  it('QC-132 R2: sin title cuando el valor pintado coincide con el exacto', () => {
+    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '12.5000' }));
+
+    expect(container.textContent).toBe('12.5');
+    expect(container.querySelector('[title]')).toBeNull();
+  });
+});
+
+describe('R20: la columna Presentación pinta el nombre o Sin presentación', () => {
+  it('con presentación informada se pinta su nombre', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({ presentationId: 'p-1', presentationName: 'Bidón 20L' }),
+    );
+
+    expect(container.textContent).toBe('Bidón 20L');
+  });
+
+  it('sin presentación se pinta «Sin presentación»', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({ presentationId: null, presentationName: null }),
+    );
+
+    expect(container.textContent).toBe('Sin presentación');
+  });
+});
+
+describe('R21: Presentación no ordena ni filtra', () => {
+  it('la columna no declara `sortable` ni `filter`', () => {
+    const columna = ORDER_COLUMNS.find((c) => c.id === PRESENTATION_NAME_COLUMN_ID);
+
+    expect(columna?.sortable).not.toBe(true);
+    expect(columna?.filter).toBeUndefined();
+  });
 });
 
 describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum (R8)', () => {
@@ -313,6 +367,35 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
 // DOM de la celda vive en `order-sheet-responsibles.test.tsx`, que si monta el panel y por eso
 // necesita el router. La declaracion no debe necesitar ninguno de los dos.
 // ---------------------------------------------------------------------------------------------
+
+// QC-123 T9 (R18) — el importe NO se pinta en esta ficha (lo pinta QC-122). En positivo, la
+// lista blanca de ids sigue sin ninguna columna de importe; en negativo, las celdas que SI se
+// pueden pintar sin montar el resto de la pantalla (router, dialogos) no dejan escapar el valor.
+describe('la tabla de pedidos no pinta el importe (R18)', () => {
+  it('la tabla de pedidos no pinta el importe (R18)', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+    expect(ids).not.toContain('ingredientsCost');
+    expect(ids).not.toContain('importe');
+    expect(ids).toHaveLength(11);
+
+    const VALOR_DELATOR = '999999.9999';
+    const order = pedido({ ingredientsCost: VALOR_DELATOR });
+    const idsRenderizablesSinContexto = [
+      ORDER_NUMBER_COLUMN_ID,
+      STATUS_COLUMN_ID,
+      PRIORITY_COLUMN_ID,
+      RECIPE_NAME_COLUMN_ID,
+      QUANTITY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
+      CREATED_AT_COLUMN_ID,
+      CANCELLATION_REASON_COLUMN_ID,
+    ];
+    for (const id of idsRenderizablesSinContexto) {
+      const { container } = pintarCelda(id, order);
+      expect(container.textContent).not.toContain(VALOR_DELATOR);
+    }
+  });
+});
 
 describe('QC-102 — la columna propia de responsables (R16)', () => {
   it('existe una columna `responsibles`, y va antes de las acciones', () => {
@@ -356,5 +439,62 @@ describe('QC-102 — la columna propia de responsables (R16)', () => {
       props: { responsibles: readonly unknown[] };
     };
     expect(otra.props.responsibles).toEqual([]);
+  });
+});
+
+describe('QC-141 T14 — la columna propia de cobertura del material (R35)', () => {
+  it('existe una columna `coverage`, entre el motivo de cancelacion y responsables', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+
+    expect(ids).toContain(COVERAGE_COLUMN_ID);
+    expect(ids.indexOf(CANCELLATION_REASON_COLUMN_ID)).toBeLessThan(ids.indexOf(COVERAGE_COLUMN_ID));
+    expect(ids.indexOf(COVERAGE_COLUMN_ID)).toBeLessThan(ids.indexOf(RESPONSIBLES_COLUMN_ID));
+  });
+
+  it('no ordena, no filtra y se puede fijar como cualquier otra columna de datos', () => {
+    const cobertura = ORDER_COLUMNS.find((column) => column.id === COVERAGE_COLUMN_ID);
+
+    expect(cobertura?.sortable).not.toBe(true);
+    expect(cobertura?.filter).toBeUndefined();
+    expect(cobertura?.pinnable).not.toBe(false);
+  });
+
+  it.each(['full', 'none', 'partial'] as const)(
+    'pinta la etiqueta de N6 para la cobertura `%s` (R35)',
+    (coverage) => {
+      const order = pedido();
+      const columnas = buildOrderColumns({
+        recipes: { items: [], totalPages: 1 },
+        units: [],
+        coverageByOrder: { [order.id]: coverage },
+      });
+      const columna = columnas.find((candidate) => candidate.id === COVERAGE_COLUMN_ID);
+
+      render(<>{columna?.cell(order)}</>);
+
+      const etiqueta = screen.getByTestId('order-coverage');
+      expect(etiqueta).toHaveAttribute('data-coverage', coverage);
+      expect(etiqueta).toHaveTextContent(ORDER_COVERAGE_LABELS[coverage]);
+      expect(screen.queryByTestId(`order-missing-${COVERAGE_COLUMN_ID}`)).toBeNull();
+    },
+  );
+
+  it('los tres textos de N6 son exactamente «Apartado», «Sin apartar» y «Sin cobertura completa» (R35)', () => {
+    expect(ORDER_COVERAGE_LABELS).toEqual({
+      full: 'Apartado',
+      none: 'Sin apartar',
+      partial: 'Sin cobertura completa',
+    });
+  });
+
+  it('sin entrada en el lote —fallo o carga en vuelo— pinta el marcador de ausencia (R20, R35)', () => {
+    // `ORDER_COLUMNS` (arriba del archivo) se construye SIN `coverageByOrder`: es exactamente el
+    // caso del lote caido, mismo criterio que ya usan las celdas de receta y motivo.
+    pintarCelda(COVERAGE_COLUMN_ID, pedido());
+
+    expect(screen.getByTestId(`order-missing-${COVERAGE_COLUMN_ID}`)).toHaveTextContent(
+      MISSING_VALUE_MARK,
+    );
+    expect(screen.queryByTestId('order-coverage')).toBeNull();
   });
 });

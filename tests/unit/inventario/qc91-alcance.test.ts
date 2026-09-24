@@ -110,13 +110,57 @@ export function cuerpoDeConst(fuente: string, nombre: string): string | null {
   return bloqueTrasEncabezado(stripComments(fuente), `export const ${nombre} = {`);
 }
 
-/** El cuerpo de `export [async] function <nombre>(...) { ... }` completo, con balance de llaves. */
+/**
+ * La llave que abre el CUERPO de la funcion, saltando el tipo de retorno: uno como
+ * `Promise<{ stock: number } | null>` trae sus propias llaves y angulos, y la primera `{` tras el
+ * cierre de parametros puede ser una de esas, no la del cuerpo.
+ */
+function llaveDeCuerpoTrasParametros(codigo: string, cierreParametros: number): number {
+  let profundidadAngulos = 0;
+  let profundidadLlavesDeTipo = 0;
+  for (let i = cierreParametros + 1; i < codigo.length; i += 1) {
+    const caracter = codigo[i];
+    if (caracter === '<') {
+      profundidadAngulos += 1;
+    } else if (caracter === '>') {
+      profundidadAngulos = Math.max(0, profundidadAngulos - 1);
+    } else if (caracter === '{') {
+      if (profundidadAngulos === 0 && profundidadLlavesDeTipo === 0) return i;
+      profundidadLlavesDeTipo += 1;
+    } else if (caracter === '}') {
+      profundidadLlavesDeTipo = Math.max(0, profundidadLlavesDeTipo - 1);
+    }
+  }
+  return -1;
+}
+
+/** El indice del `)` que CIERRA la lista de parametros que abre en `aperturaParametros`. */
+function cierreDeParametros(codigo: string, aperturaParametros: number): number {
+  let profundidad = 0;
+  for (let i = aperturaParametros; i < codigo.length; i += 1) {
+    if (codigo[i] === '(') profundidad += 1;
+    if (codigo[i] === ')') {
+      profundidad -= 1;
+      if (profundidad === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * El cuerpo de `[export] [async] function <nombre>(...) { ... }` completo, con balance de
+ * llaves. Los prefijos exportados van primero para que una funcion exportada nunca se corte por
+ * un prefijo mas corto que tambien casa dentro de ella (`function foo(` dentro de `export
+ * function foo(`).
+ */
 export function cuerpoDeFuncion(fuente: string, nombre: string): string | null {
   const codigo = stripComments(fuente);
-  for (const prefijo of ['export async function ', 'export function ']) {
+  for (const prefijo of ['export async function ', 'export function ', 'async function ', 'function ']) {
     const inicio = codigo.indexOf(`${prefijo}${nombre}(`);
     if (inicio === -1) continue;
-    const llave = codigo.indexOf('{', codigo.indexOf(')', inicio));
+    const cierreParametros = cierreDeParametros(codigo, codigo.indexOf('(', inicio));
+    if (cierreParametros === -1) return null;
+    const llave = llaveDeCuerpoTrasParametros(codigo, cierreParametros);
     if (llave === -1) return null;
     let profundidad = 0;
     for (let i = llave; i < codigo.length; i += 1) {
@@ -159,9 +203,16 @@ export function mencionaStock(cuerpo: string): boolean {
   return /\bstock/i.test(cuerpo);
 }
 
-/** La agregacion pasa por lotes con su unidad y por `sumStockByUnit`: es como se deriva del lote. */
+/**
+ * La agregacion pasa por lotes con su unidad y por `sumStockByUnit` o `singleUnitStock` -esta
+ * ultima delega en la primera-: es como se deriva del lote.
+ */
 export function derivaDeLotesConSumStockByUnit(cuerpo: string): boolean {
-  return /\bsumStockByUnit\s*\(/.test(cuerpo) && /\bbatches\b/.test(cuerpo) && /\bunitId\b/.test(cuerpo);
+  return (
+    /\b(?:sumStockByUnit|singleUnitStock)\s*\(/.test(cuerpo) &&
+    /\b(?:batches|productBatch)\b/.test(cuerpo) &&
+    /\bunitId\b/.test(cuerpo)
+  );
 }
 
 /**
@@ -177,11 +228,20 @@ export function sumaPropia(cuerpo: string): string[] {
   return hallazgos;
 }
 
-/** Escrituras que borran o modifican filas de `product_batches`, tipadas o en SQL crudo. */
+/**
+ * Escrituras que borran, reemplazan en bloque o multiplican filas de `product_batches`, tipadas o
+ * en SQL crudo. `update` simple NO esta aqui: tiene su propio detector, `llamaAUpdateFueraDe`, que
+ * lo permite en un unico sitio nombrado.
+ */
 export function escrituraDestructivaDeLotes(fuente: string): string[] {
   const codigo = stripComments(fuente);
   const hallazgos: string[] = [];
-  if (/\.productBatch\.(?:delete|deleteMany|update|updateMany|upsert)\s*\(/.test(codigo)) {
+  // `updateMany` YA NO ESTA AQUI: `consumeBatchStock` la usa a proposito -el decremento
+  // CONDICIONAL del consumo (`stock >= cantidad` en el `where`), que solo puede tocar CERO o UNA
+  // fila porque el `where` ya trae el identificador unico-. Que solo viva en esa funcion lo vigila
+  // `llamaAUpdateManyFueraDe`, no este detector: `delete`, `deleteMany` y `upsert` no tienen ningun
+  // uso legitimo sobre un lote y siguen prohibidos en TODO el archivo.
+  if (/\.productBatch\.(?:delete|deleteMany|upsert)\s*\(/.test(codigo)) {
     hallazgos.push('llama a un metodo de escritura destructiva sobre productBatch');
   }
   if (/DELETE\s+FROM\s+"?product_batches"?/i.test(codigo)) {
@@ -193,22 +253,62 @@ export function escrituraDestructivaDeLotes(fuente: string): string[] {
   return hallazgos;
 }
 
+/**
+ * `true` si `.productBatch.<metodo>(` aparece en algun lugar del archivo QUE NO sea el cuerpo de
+ * `nombreFuncionPermitida`. Aisla ese cuerpo con `cuerpoDeFuncion` y busca en el resto, para que
+ * una llamada movida a otra funcion -o una nueva, en cualquier sitio distinto- siga dando rojo.
+ */
+function llamaAMetodoFueraDe(fuente: string, metodo: string, nombreFuncionPermitida: string): boolean {
+  const codigo = stripComments(fuente);
+  const cuerpoPermitido = cuerpoDeFuncion(fuente, nombreFuncionPermitida);
+  const resto = cuerpoPermitido === null ? codigo : codigo.replace(stripComments(cuerpoPermitido), '');
+  return new RegExp(`\\.productBatch\\.${metodo}\\s*\\(`).test(resto);
+}
+
+/** El `update` (singular) del ajuste: sigue viviendo SOLO en `adjustBatchStock`. */
+export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+  return llamaAMetodoFueraDe(fuente, 'update', nombreFuncionPermitida);
+}
+
+/** El `updateMany` del decremento condicional del consumo: sigue viviendo SOLO en
+ *  `consumeBatchStock`. */
+export function llamaAUpdateManyFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+  return llamaAMetodoFueraDe(fuente, 'updateMany', nombreFuncionPermitida);
+}
+
 // ---------------------------------------------------------------------------------------------
 // R1 — LA EXISTENCIA SE DERIVA DE LOS LOTES; `sumStockByUnit` ES EL UNICO SITIO QUE SUMA
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numero propio', () => {
-  it('R1: product-prisma.ts arma stockByUnit desde los lotes con sumStockByUnit', () => {
+  it('R1 (QC-141 R6): recalculateProductStock suma los lotes en SQL, no en JavaScript', () => {
+    // La suma de `singleUnitStock` paso de JS a un `SELECT sum(...)` que hace Postgres en
+    // `numeric`: pasar un `Decimal` por `number` antes de sumar es justo el redondeo binario que
+    // se quiere evitar. El `SUM` en SQL crudo ya no es un hallazgo aqui, es la forma nueva.
+    const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'recalculateProductStock');
+    expect(
+      cuerpo,
+      'recalculateProductStock no existe con esa forma: el sujeto de esta prueba cambio',
+    ).not.toBeNull();
+    expect(cuerpo as string).toMatch(/SELECT\s+sum\(/i);
+    expect(cuerpo as string).toMatch(/"product_batches"/);
+    expect(cuerpo as string).not.toMatch(/singleUnitStock\s*\(/);
+  });
+
+  it('R1: toProductView ya no deriva nada de los lotes: lee la columna guardada tal cual', () => {
     const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'toProductView');
     expect(cuerpo, 'toProductView no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(true);
+    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(false);
+    expect(cuerpo as string).not.toMatch(/\bbatches\b/);
     expect(sumaPropia(cuerpo as string)).toEqual([]);
   });
 
-  it('R1: product-catalog-prisma.ts arma stockByUnit desde los lotes con sumStockByUnit', () => {
+  it('R14: product-catalog-prisma.ts arma stockByUnit desde la columna guardada, sin volver a sumar lotes', () => {
     const cuerpo = cuerpoDeFuncion(leer(PRODUCT_CATALOG_PRISMA), 'findProductRefs');
     expect(cuerpo, 'findProductRefs no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(true);
+    expect(cuerpo as string).not.toMatch(/sumStockByUnit\s*\(/);
+    expect(cuerpo as string).toMatch(/\bunitId\b/);
+    expect(cuerpo as string).toMatch(/\bstock\b/);
   });
 
   it('R1: los tres escritores de producto no suman por su cuenta', () => {
@@ -248,6 +348,11 @@ describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numer
     expect(derivaDeLotesConSumStockByUnit('sumStockByUnit(row.batches.map((b) => ({ unitId: b.unitId })))')).toBe(
       true,
     );
+    expect(
+      derivaDeLotesConSumStockByUnit(
+        'singleUnitStock(rows.map((row) => ({ unitId: row.presentation.unitId })))\ntx.productBatch.findMany(',
+      ),
+    ).toBe(true);
     expect(derivaDeLotesConSumStockByUnit('const stock = product.stock ?? 0;')).toBe(false);
     expect(derivaDeLotesConSumStockByUnit('sumStockByUnit([])')).toBe(false);
   });
@@ -257,12 +362,12 @@ describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numer
 // R11 — LOS CONTRATOS PUBLICAN LA EXISTENCIA POR UNIDAD, NO UN NUMERO PLANO
 // ---------------------------------------------------------------------------------------------
 
-describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct y el alta no llevan existencia', () => {
-  it('R11: ProductView expone stockByUnit y no un campo stock plano', () => {
+describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la existencia guardada; NewProduct y el alta no llevan existencia', () => {
+  it('R14: ProductView expone stock, la existencia guardada, y no stockByUnit', () => {
     const cuerpo = cuerpoDeTipo(leer(PRODUCT_VIEW), 'ProductView');
     expect(cuerpo, 'ProductView no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(exponeStockPorUnidad(cuerpo as string)).toBe(true);
-    expect(declaraCampoStockPlano(cuerpo as string)).toBe(false);
+    expect(exponeStockPorUnidad(cuerpo as string)).toBe(false);
+    expect(declaraCampoStockPlano(cuerpo as string)).toBe(true);
   });
 
   it('R11: NewProduct no lleva ninguna existencia -ni plana ni por unidad-', () => {
@@ -282,16 +387,17 @@ describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct
     const cuerpo = cuerpoDeConst(leer(PRODUCT_INPUT), 'productFieldsShape');
     expect(cuerpo, 'productFieldsShape no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
     expect(mencionaStock(cuerpo as string)).toBe(false);
-    // updateProductSchema reutiliza createProductSchema (misma forma, sin stock): reemplazo
-    // completo con los mismos campos para las dos operaciones (R9).
-    expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = createProductSchema/);
+    // updateProductSchema ya NO es un alias de createProductSchema: es una union discriminada
+    // por `type` que NO conoce el lote (R9, R26). El alta es la union con lote.
+    expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = withDefaultType\(updateUnion\)/);
+    expect(leer(PRODUCT_INPUT)).toMatch(/export const createProductSchema = withDefaultType\(createUnion\)/);
   });
 
-  it('R11: PRODUCT_SELECT no trae products.stock -solo el catalogo de columnas y los lotes-', () => {
+  it('R14: PRODUCT_SELECT trae products.stock y products.unit_id, sin catalogo de lotes', () => {
     const cuerpo = cuerpoDeConst(leer(PRODUCT_PRISMA), 'PRODUCT_SELECT');
     expect(cuerpo, 'PRODUCT_SELECT no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(declaraCampoStockPlano(cuerpo as string)).toBe(false);
-    expect(cuerpo).toMatch(/\bbatches\s*:/);
+    expect(declaraCampoStockPlano(cuerpo as string)).toBe(true);
+    expect(cuerpo).not.toMatch(/\bbatches\s*:/);
   });
 
   it('R11: los tres escritores de producto no escriben products.stock', () => {
@@ -351,32 +457,49 @@ describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct
 // R21 — EL CALCULO NO BORRA NI MODIFICA NINGUNA FILA DE LOTE
 // ---------------------------------------------------------------------------------------------
 
+// Nota (2026-09-17): esta guardia dejo de exigir CERO llamadas a `productBatch.update` en todo
+// `product-prisma.ts`. Ahora permite exactamente UNA, dentro del cuerpo de `adjustBatchStock`, y
+// sigue prohibiendo: cualquier `update` en cualquier OTRA funcion; `delete`, `deleteMany` y
+// `upsert` sobre `productBatch` en cualquier funcion, incluida `adjustBatchStock`; y cualquier
+// `DELETE`/`UPDATE` crudo sobre la tabla. No se afirma en positivo que `adjustBatchStock` DEBA
+// tener un `update` -esta guardia no fija ese estado-, solo que si hay uno en el archivo, no
+// puede estar en ningun otro sitio.
 describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ninguna fila de lote', () => {
-  it('R21: product_batches.stock sigue intacto en el esquema', () => {
+  it('R21: product_batches.stock sigue siendo la existencia del lote, ahora decimal(14,4)', () => {
     const cuerpo = cuerpoDeModelo(leer(SCHEMA), 'ProductBatch');
     expect(cuerpo, 'el modelo ProductBatch no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(cuerpo).toMatch(/\bstock\s+Int\b/);
+    expect(cuerpo).toMatch(/\bstock\s+Decimal\b/);
+    expect(cuerpo).toMatch(/@db\.Decimal\(14,\s*4\)/);
   });
 
-  it('R21: product-prisma.ts no borra ni modifica filas de product_batches', () => {
+  it('R21: product-prisma.ts no borra, reemplaza en bloque ni multiplica filas de product_batches', () => {
     expect(escrituraDestructivaDeLotes(leer(PRODUCT_PRISMA))).toEqual([]);
   });
 
   it('R21: product-catalog-prisma.ts no borra ni modifica filas de product_batches', () => {
     expect(escrituraDestructivaDeLotes(leer(PRODUCT_CATALOG_PRISMA))).toEqual([]);
+    expect(llamaAUpdateFueraDe(leer(PRODUCT_CATALOG_PRISMA), 'adjustBatchStock')).toBe(false);
   });
 
-  it('R21: el alta y el agregado de lote siguen creando, nunca actualizando ni borrando', () => {
+  it('R21: el alta y el agregado de lote siguen creando; el unico update vive en adjustBatchStock', () => {
     const fuente = leer(PRODUCT_PRISMA);
     expect(fuente).toMatch(/tx\.productBatch\.create\s*\(/);
-    expect(fuente).not.toMatch(/tx\.productBatch\.(?:update|updateMany|delete|deleteMany|upsert)\s*\(/);
+    expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
   });
 
-  it('R21: el detector muerde con fuentes fabricadas y no con una limpia', () => {
-    expect(escrituraDestructivaDeLotes('await tx.productBatch.update({ where, data: { stock: 0 } });')).toEqual([
+  it('R21, R30: el unico updateMany vive en consumeBatchStock -el decremento condicional del consumo-', () => {
+    const fuente = leer(PRODUCT_PRISMA);
+    expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+  });
+
+  it('R21: el detector de escrituras destructivas muerde con fuentes fabricadas y no con una limpia', () => {
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.delete({ where });')).toEqual([
       'llama a un metodo de escritura destructiva sobre productBatch',
     ]);
-    expect(escrituraDestructivaDeLotes('await tx.productBatch.delete({ where });')).toEqual([
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.deleteMany({ where });')).toEqual([
+      'llama a un metodo de escritura destructiva sobre productBatch',
+    ]);
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.upsert({ where, create, update });')).toEqual([
       'llama a un metodo de escritura destructiva sobre productBatch',
     ]);
     expect(
@@ -386,8 +509,105 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
       escrituraDestructivaDeLotes('await tx.$executeRaw`UPDATE "product_batches" SET stock = 0`;'),
     ).toEqual(['UPDATE crudo sobre product_batches']);
     expect(escrituraDestructivaDeLotes('await tx.productBatch.create({ data: {} });')).toEqual([]);
+    // `update` simple ya NO es hallazgo de este detector: lo cubre `llamaAUpdateFueraDe`.
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.update({ where, data: {} });')).toEqual([]);
     // Un comentario que mencione borrar un lote no es codigo que borre un lote.
     expect(escrituraDestructivaDeLotes('// aqui NO se llama a tx.productBatch.delete(...)')).toEqual([]);
+  });
+
+  describe('llamaAUpdateFueraDe — el update de adjustBatchStock queda aislado del resto (R27)', () => {
+    it('R27: un update DENTRO de adjustBatchStock no cuenta como hallazgo', () => {
+      const fuente = [
+        'export function otraCosa() {',
+        '  return 1;',
+        '}',
+        'export async function adjustBatchStock(batchId) {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+    });
+
+    it('R27: el MISMO update movido a OTRA funcion si cuenta como hallazgo', () => {
+      const fuente = [
+        'export async function adjustBatchStock(batchId) {',
+        '  return 1;',
+        '}',
+        'export function otraFuncion() {',
+        '  return tx.productBatch.update({ where: { id: 1 } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(true);
+    });
+
+    it('R27: sin ningun update en el archivo, no hay hallazgo', () => {
+      const fuente = 'export async function adjustBatchStock() { return 1; }';
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+    });
+
+    it('R27: un tipo de retorno con su propia llave -Promise<{ stock: number } | null>- no confunde al cuerpo', () => {
+      const fuente = [
+        'export async function adjustBatchStock(batchId: string): Promise<{ stock: number } | null> {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+        'export function otraFuncion(): void {',
+        '  return undefined;',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+    });
+
+    it('R27: delete, deleteMany y el SQL crudo siguen dando hallazgo pase lo que pase con update', () => {
+      expect(escrituraDestructivaDeLotes('await tx.productBatch.delete({ where });')).not.toEqual([]);
+      expect(escrituraDestructivaDeLotes('await tx.productBatch.deleteMany({ where });')).not.toEqual([]);
+      expect(
+        escrituraDestructivaDeLotes('await tx.$executeRaw`DELETE FROM "product_batches" WHERE id = ${id}`;'),
+      ).not.toEqual([]);
+    });
+  });
+
+  describe('llamaAUpdateManyFueraDe — el updateMany de consumeBatchStock queda aislado del resto (R30)', () => {
+    it('R30: un updateMany DENTRO de consumeBatchStock no cuenta como hallazgo', () => {
+      const fuente = [
+        'export function otraCosa() {',
+        '  return 1;',
+        '}',
+        'export async function consumeBatchStock(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
+
+    it('R30: el MISMO updateMany movido a OTRA funcion si cuenta como hallazgo', () => {
+      const fuente = [
+        'export async function consumeBatchStock(batchId) {',
+        '  return 1;',
+        '}',
+        'export function otraFuncion() {',
+        '  return tx.productBatch.updateMany({ where: { id: 1 } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(true);
+    });
+
+    it('R30: sin ningun updateMany en el archivo, no hay hallazgo', () => {
+      const fuente = 'export async function consumeBatchStock() { return 1; }';
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
+
+    it('R30: el update de adjustBatchStock no se confunde con un updateMany de consumeBatchStock', () => {
+      const fuente = [
+        'export async function adjustBatchStock(batchId) {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+        'export async function consumeBatchStock(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
   });
 });
 

@@ -31,8 +31,9 @@ Verifica:
    stack sin justificación en `design.md`, son BLOQUEANTES
    (`docs/architecture.md > Dependencias de terceros`).
 8. **Aislamiento por empresa:** si el diff añade un modelo a `db/schema.prisma`, debe llevar
-   su columna de empresa salvo que sea una de las tres del sistema (`users`, `roles`,
-   `document_types`). Y si toca consultas de datos de operación, cada una filtra por la
+   su columna de empresa salvo que su tabla este en la lista cerrada de exentas de
+   `docs/architecture.md > Dominio` (la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`;
+   `users` no es exenta). Y si toca consultas de datos de operación, cada una filtra por la
    empresa de quien pide y existe un test que prueba que el acceso cruzado se rechaza.
    Falta cualquiera de las dos: BLOQUEANTE (`docs/architecture.md > Dominio` n.º 1).
 
@@ -55,3 +56,8 @@ Escribe `progress/review_<feature>.md` con:
 
 Si RECHAZADO, sé específico: qué requisito o checkpoint falla y qué falta para
 cumplirlo. No arregles el código tú; eso vuelve al implementer.
+
+**Un rojo del baseline no es un hallazgo.** `./init.sh --rapido` **NO** consulta
+`tests/baseline-rojos.json` —solo lo hace el modo completo—, asi que un archivo con deuda ajena
+ya listada sale rojo ahi igual. Antes de tratarlo como bloqueante, mira si el archivo esta en esa
+lista. El 2026-09-18 costo una vuelta entera y una decision que no existia.

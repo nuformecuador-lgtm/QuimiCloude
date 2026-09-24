@@ -146,7 +146,8 @@ function fuentesDelModulo(): readonly string[] {
 const CARPETAS_PERMITIDAS = ['adapters', 'domain', 'ports'];
 
 /** Paquetes que el contrato no puede arrastrar, ni directa ni transitivamente. */
-const EXTERNOS_PROHIBIDOS = /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*)$/;
+const EXTERNOS_PROHIBIDOS =
+  /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*|@google\/genai)$/;
 
 /** Lo unico que `domain/` y `ports/` pueden importar de fuera del modulo. */
 const PAQUETES_PUROS = ['zod'];
@@ -313,6 +314,18 @@ const EXPORTACIONES_DE_EJECUCION = [
   'createIssueReadLink',
   'createDownloadDocument',
   'createConvertPdfs',
+  'AI_READ_TIMEOUT_SECONDS',
+  'aiReadInputSchema',
+  'AiUnavailableError',
+  'createReadPdfWithAi',
+  'pdfStrategySchema',
+  'createProcessPdfByStrategy',
+  'enqueueBatchSchema',
+  'queueMessageSchema',
+  'createEnqueueBatch',
+  'createRunDocumentJob',
+  'createGetBatchStatus',
+  'createCropCatalogImages',
 ] as const;
 
 /** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
@@ -329,6 +342,24 @@ const EXPORTACIONES_DE_TIPO = [
   'ConvertPdfDeps',
   'PdfOutput',
   'PdfToConvert',
+  'AiReadInput',
+  'AiReadResult',
+  'ReadPdfWithAiDeps',
+  'PdfStrategy',
+  'ProcessPdfByStrategyDeps',
+  'ProcessPdfByStrategyInput',
+  'StrategyRunResult',
+  'EnqueueBatchInput',
+  'BatchStatus',
+  'DocumentFileStatus',
+  'DocumentFileStatusEntry',
+  'QueueMessageBody',
+  'EnqueuedBatch',
+  'RunDocumentJobMessage',
+  'RunDocumentJobResult',
+  'CropCatalogImagesDeps',
+  'CropCatalogImagesInput',
+  'CropCatalogImagesResult',
 ] as const;
 
 /** Nombres exportados SOLO como tipo por un barril, leidos del fuente: `export { type X } from ...`
@@ -371,7 +402,8 @@ export function findFrozenListFindings(
  * de la base, el SDK del almacenamiento y la libreria de conversion. Los tres ultimos viven —y solo
  * pueden vivir— en los adaptadores driven.
  */
-const PAQUETES_DE_SERVIDOR = /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*)$/;
+const PAQUETES_DE_SERVIDOR =
+  /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*|@google\/genai)$/;
 
 /**
  * Los dos paquetes que los casos de abajo necesitan ESCRIBIR dentro de fuentes fabricados, para
@@ -384,6 +416,7 @@ const PAQUETES_DE_SERVIDOR = /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|
  */
 const SDK_DE_ALMACENAMIENTO = '@supabase/storage-js';
 const LIBRERIA_DE_CONVERSION = 'unpdf';
+const LIBRERIA_DE_IA = '@google/genai';
 
 /**
  * Cierre transitivo de imports con el LECTOR INYECTADO: es lo que permite pasar la misma regla por
@@ -552,5 +585,131 @@ describe('documentos — el contrato, congelado (R27, R28)', () => {
         `el contrato arrastra '${LIBRERIA_DE_CONVERSION}'`,
       );
     });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// La lectura de PDF con IA se publica por el MISMO contrato, sin arrastrar al tercero.
+// Bloque NUEVO al final: no reordena ni reescribe nada de arriba, solo amplia lo que ya afirmaba
+// el contrato con los simbolos y el paquete que estrena la lectura por IA.
+// ---------------------------------------------------------------------------------------------
+
+describe('documentos — la lectura con IA se publica sin arrastrar al tercero (QC-108)', () => {
+  it('R1 — el barril publica la factory, sus dependencias, el limite del plazo y el error nuevo', async () => {
+    const contrato = await import('@/lib/modules/documentos');
+    expect(typeof contrato.createReadPdfWithAi).toBe('function');
+    expect(contrato.AI_READ_TIMEOUT_SECONDS).toBe(60);
+    expect(typeof contrato.aiReadInputSchema.parse).toBe('function');
+    expect(new contrato.AiUnavailableError()).toBeInstanceOf(contrato.DocumentosError);
+    expect(new contrato.AiUnavailableError().code).toBe('ai_unavailable');
+  });
+
+  it('R21 — el cierre real del barril no arrastra @google/genai ni ningun otro paquete de plataforma', () => {
+    expect(findContractClosureFindings(BARRIL, barril, lectorDelDisco)).toEqual([]);
+    const { externos } = collectClosureWith(BARRIL, barril, lectorDelDisco);
+    expect(externos.has(LIBRERIA_DE_IA)).toBe(false);
+  });
+
+  it('R21 — la regla MUERDE con @google/genai un salto mas alla, igual que ya muerde con unpdf', () => {
+    const objetivo = `${MODULO}/domain/read-pdf-with-ai.ts`;
+    const lectorMutado = (relBase: string): { relPath: string; content: string } | null => {
+      const leido = lectorDelDisco(relBase);
+      if (leido === null || leido.relPath !== objetivo) return leido;
+      return {
+        relPath: leido.relPath,
+        content: `import { GoogleGenAI } from '${LIBRERIA_DE_IA}';\n${leido.content}`,
+      };
+    };
+    expect(findContractClosureFindings(BARRIL, barril, lectorMutado)).toContainEqual(
+      `el contrato arrastra '${LIBRERIA_DE_IA}'`,
+    );
+  });
+
+  it('R21 — el puerto AiReader y su adaptador @google/genai NO salen por el contrato publico', async () => {
+    const contrato = await import('@/lib/modules/documentos');
+    expect('AiReader' in contrato).toBe(false);
+    expect('readWithGenai' in contrato).toBe(false);
+    const especificadores = extractExportFromSpecifiers(barril);
+    expect(especificadores.some((spec) => resolveSpecifier(BARRIL, spec)?.includes('/ports/'))).toBe(
+      false,
+    );
+    expect(
+      especificadores.some((spec) => resolveSpecifier(BARRIL, spec)?.includes('/adapters/')),
+    ).toBe(false);
+  });
+
+  it('R21 — la regla MUERDE si alguien cuelga el adaptador de IA del barril, aunque el archivo no exista todavia', () => {
+    const RUTA_ADAPTADOR_IA = `${MODULO}/adapters/driven/ai/ai-reader-genai.ts`;
+    const arbol = new Map<string, string>([
+      [BARRIL, "export { readWithGenai } from './adapters/driven/ai/ai-reader-genai';"],
+      [
+        RUTA_ADAPTADOR_IA,
+        [
+          `import { GoogleGenAI } from '${LIBRERIA_DE_IA}';`,
+          'export function readWithGenai() { return new GoogleGenAI({}); }',
+        ].join('\n'),
+      ],
+    ]);
+    const leer = (relBase: string): { relPath: string; content: string } | null => {
+      for (const candidato of [relBase, `${relBase}.ts`, `${relBase}/index.ts`]) {
+        const content = arbol.get(candidato);
+        if (content !== undefined) return { relPath: candidato, content };
+      }
+      return null;
+    };
+
+    const hallazgos = findContractClosureFindings(BARRIL, arbol.get(BARRIL) as string, leer);
+
+    expect(hallazgos).toContainEqual(`el contrato arrastra el adaptador '${RUTA_ADAPTADOR_IA}'`);
+    expect(hallazgos).toContainEqual(`el contrato arrastra '${LIBRERIA_DE_IA}'`);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// El recorte de imagenes se publica por el MISMO contrato, sin arrastrar a `sharp` ni al SDK del
+// almacenamiento. Bloque NUEVO al final: no reordena ni reescribe nada de arriba.
+// ---------------------------------------------------------------------------------------------
+
+describe('documentos — el recorte de imagenes se publica sin arrastrar a sharp (QC-110)', () => {
+  it('R21 — el barril publica la factory del recorte', async () => {
+    const contrato = await import('@/lib/modules/documentos');
+    expect(typeof contrato.createCropCatalogImages).toBe('function');
+  });
+
+  it('R21 — el cierre real del barril no arrastra sharp ni el SDK del almacenamiento', () => {
+    expect(findContractClosureFindings(BARRIL, barril, lectorDelDisco)).toEqual([]);
+    const { externos } = collectClosureWith(BARRIL, barril, lectorDelDisco);
+    expect(externos.has('sharp')).toBe(false);
+    expect(externos.has(SDK_DE_ALMACENAMIENTO)).toBe(false);
+  });
+
+  it('R21 — el puerto ImageCropper, el puerto CropStorage y sus adaptadores NO salen por el contrato publico', async () => {
+    const contrato = await import('@/lib/modules/documentos');
+    expect('ImageCropper' in contrato).toBe(false);
+    expect('CropStorage' in contrato).toBe(false);
+    expect('cropImage' in contrato).toBe(false);
+    expect('uploadCrop' in contrato).toBe(false);
+  });
+
+  it('R21 — la regla MUERDE si alguien cuelga el adaptador de sharp del barril, aunque el archivo no exista todavia', () => {
+    const RUTA_ADAPTADOR_SHARP = `${MODULO}/adapters/driven/image/image-cropper-sharp.ts`;
+    const arbol = new Map<string, string>([
+      [BARRIL, "export { cropImage } from './adapters/driven/image/image-cropper-sharp';"],
+      [
+        RUTA_ADAPTADOR_SHARP,
+        ["import sharp from 'sharp';", 'export function cropImage() { return sharp(); }'].join('\n'),
+      ],
+    ]);
+    const leer = (relBase: string): { relPath: string; content: string } | null => {
+      for (const candidato of [relBase, `${relBase}.ts`, `${relBase}/index.ts`]) {
+        const content = arbol.get(candidato);
+        if (content !== undefined) return { relPath: candidato, content };
+      }
+      return null;
+    };
+
+    const hallazgos = findContractClosureFindings(BARRIL, arbol.get(BARRIL) as string, leer);
+
+    expect(hallazgos).toContainEqual(`el contrato arrastra el adaptador '${RUTA_ADAPTADOR_SHARP}'`);
   });
 });

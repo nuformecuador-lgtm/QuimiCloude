@@ -13,12 +13,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -29,6 +32,7 @@ import {
   listPresentations,
   replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
+import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
@@ -132,6 +136,10 @@ async function sembrarProducto(
     data: {
       name,
       nameNormalized: normalizeProductName(name),
+      // El disparador `product_batches_check_unit` rechaza un lote sobre un producto sin
+      // unidad; `sembrarLote` cuelga lotes sobre estos productos, asi que nacen con la unidad
+      // que comparten todas las presentaciones del fixture.
+      unitId: unidadDeSistema,
       qtyAlert: extras.qtyAlert ?? null,
       companyId: empresa.companyId,
     },
@@ -182,7 +190,7 @@ async function sembrarLote(
 function loteNuevo(empresa: Empresa, presentationId: string): NewProductBatch {
   return {
     presentationId,
-    stock: 2,
+    stock: '2',
     unitCost: '1.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -231,6 +239,7 @@ afterAll(async () => {
   // En el orden que exigen las FK.
   const empresas = [A, B].filter((empresa): empresa is Empresa => empresa !== undefined);
   for (const empresa of empresas) {
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.productBatch.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.product.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.presentation.deleteMany({ where: { companyId: empresa.companyId } });
@@ -406,17 +415,23 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
     );
 
     expect(pagina.total).toBe(3);
-    expect(pagina.items.map((p) => p.qtyAlert)).toEqual([3, 2]);
+    expect(pagina.items.map((p) => p.qtyAlert)).toEqual(['3.0000', '2.0000']);
     for (const ajeno of B.productos) {
       expect(pagina.items.map((p) => p.id)).not.toContain(ajeno);
     }
   });
 
-  it('findAliveIdByName no resuelve el homonimo de otra empresa (R18 por el lado del SQL)', async () => {
-    // Por eso el alta desde A crea un producto nuevo en vez de colgar el lote al de B.
+  it('findAliveIdByNameInPresentationUnit no resuelve el homonimo de otra empresa (R18 por el lado del SQL)', async () => {
+    // Por eso el alta desde A crea un producto nuevo en vez de colgar el lote al de B. La misma
+    // unidad en las dos empresas (`unidadDeSistema`) deja claro que lo que aisla es la empresa
+    // y no la unidad.
     const nombreDeB = `${MARCA} ${SOLO_B} Producto B uno`;
-    expect(await findAliveIdByName(nombreDeB, ambitoDe(A))).toBeNull();
-    expect(await findAliveIdByName(nombreDeB, ambitoDe(B))).toBe(B.productos[0]);
+    expect(
+      await findAliveIdByNameInPresentationUnit(nombreDeB, A.presentaciones[0] ?? '', ambitoDe(A)),
+    ).toBeNull();
+    expect(
+      await findAliveIdByNameInPresentationUnit(nombreDeB, B.presentaciones[0] ?? '', ambitoDe(B)),
+    ).toBe(B.productos[0]);
   });
 });
 
@@ -433,7 +448,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await updateAliveProduct(
       ajeno,
-      { name: 'Nombre inyectado desde A', qtyAlert: 1 },
+      { name: 'Nombre inyectado desde A', qtyAlert: '1' },
       new Date(),
       ambitoDe(A),
     );
@@ -450,7 +465,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await updateAliveProduct(
       propio,
-      { name: nuevoNombre, qtyAlert: 92 },
+      { name: nuevoNombre, qtyAlert: '92' },
       new Date(),
       ambitoDe(B),
     );
@@ -560,12 +575,33 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
   });
 });
 
+describe('R28 (QC-146) — PresentationCatalog.findRefs no devuelve presentaciones de otra empresa', () => {
+  it('pedidas desde A, las propias de A vuelven y la de B —aunque se pida su id— no', async () => {
+    const propia = A.presentaciones[0] ?? '';
+    const ajena = B.presentaciones[0] ?? '';
+
+    const refs = await findPresentationRefs([propia, ajena], A.companyId);
+
+    expect(refs.map((ref) => ref.id)).toEqual([propia]);
+
+    // Control positivo: la misma presentacion de B, pedida con la empresa de B, si vuelve.
+    const desdeB = await findPresentationRefs([ajena], B.companyId);
+    expect(desdeB.map((ref) => ref.id)).toEqual([ajena]);
+  });
+
+  it('un id inexistente y uno de otra empresa se resuelven igual: ninguno vuelve', async () => {
+    const refs = await findPresentationRefs([randomUUID(), B.presentaciones[1] ?? ''], A.companyId);
+
+    expect(refs).toEqual([]);
+  });
+});
+
 describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', () => {
   it('createProduct escribe la empresa del ambito en la columna', async () => {
     // `NewProduct` no declara empresa, asi que la entrada no puede elegirla: falta ver que se
     // escribe la correcta.
     const name = `${MARCA} Alta en A ${token().slice(0, 8)}`;
-    const creado = await createProduct({ name, qtyAlert: 1 }, AHORA, ambitoDe(A));
+    const creado = await createProduct({ name, qtyAlert: '1' }, AHORA, ambitoDe(A));
     A.productos.push(creado.id);
 
     expect(await empresaDelProducto(creado.id)).toBe(A.companyId);
@@ -578,7 +614,7 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
   it('createWithFirstBatch escribe la MISMA empresa en el producto y en su lote', async () => {
     const name = `${MARCA} Alta con lote en A ${token().slice(0, 8)}`;
     const creado = await createWithFirstBatch(
-      { name, qtyAlert: 1 },
+      { name, qtyAlert: '1' },
       loteNuevo(A, A.presentaciones[0] ?? ''),
       AHORA,
       ambitoDe(A),
@@ -640,6 +676,89 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
   });
 });
 
+describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMovements con un id AJENO', () => {
+  /** Todas las columnas del lote: comparar solo `stock` dejaria pasar un `updated_by`/`updated_at`
+   *  movido sin que ningun campo del contrato lo delatara. */
+  async function fotoLote(id: string): Promise<string> {
+    const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id } });
+    return JSON.stringify(fila);
+  }
+
+  it('adjustBatchStock sobre el lote de B desde A devuelve null y NO toca la fila ni escribe asiento', async () => {
+    const ajeno = B.lotes[0] ?? '';
+    const antes = await fotoLote(ajeno);
+    const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: ajeno } });
+
+    const resultado = await adjustBatchStock(ajeno, '1', 'conteo_fisico', A.userId, new Date(), ambitoDe(A));
+
+    expect(resultado).toBeNull();
+    expect(await fotoLote(ajeno)).toBe(antes);
+    expect(await prisma.inventoryMovement.count({ where: { batchId: ajeno } })).toBe(asientosAntes);
+  });
+
+  it('control positivo: el mismo adjustBatchStock, desde B, SI escribe el stock y deja un asiento', async () => {
+    // Sin este caso, un `update` que nunca actualizara -y nunca escribiera asiento- dejaria verde
+    // el cruzado de arriba por vacuidad.
+    const propio = B.lotes[0] ?? '';
+    const antes = await fotoLote(propio);
+    const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: propio } });
+    const delta = 1;
+
+    const resultado = await adjustBatchStock(propio, String(delta), 'conteo_fisico', B.userId, new Date(), ambitoDe(B));
+
+    expect(resultado).toEqual({ stock: (7 + delta).toFixed(4), reserved: '0.0000', overReserved: false });
+    expect(await fotoLote(propio)).not.toBe(antes);
+    const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: propio } });
+    expect(fila.stock.toFixed(4)).toBe((7 + delta).toFixed(4));
+    expect(fila.companyId).toBe(B.companyId);
+
+    const asientosDespues = await prisma.inventoryMovement.findMany({
+      where: { batchId: propio },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(asientosDespues).toHaveLength(asientosAntes + 1);
+    const asiento = asientosDespues[0];
+    expect(asiento?.kind).toBe('adjustment');
+    expect(asiento?.quantity.toFixed(4)).toBe(delta.toFixed(4));
+    expect(asiento?.reason).toBe('conteo_fisico');
+    expect(asiento?.companyId).toBe(B.companyId);
+  });
+
+  it('findBatchesOfAliveProduct del producto de B pedido desde A trae la lista vacia', async () => {
+    const propio = B.productos[0] ?? '';
+
+    const resultado = await findBatchesOfAliveProduct(propio, ambitoDe(A));
+
+    expect(resultado).toEqual([]);
+  });
+
+  it('control positivo: el mismo producto, pedido desde B, trae su lote', async () => {
+    // Sin este caso, un `findMany` que devolviera siempre `[]` dejaria verde el cruzado de arriba.
+    const propio = B.productos[0] ?? '';
+
+    const resultado = await findBatchesOfAliveProduct(propio, ambitoDe(B));
+
+    expect(resultado.map((lote) => lote.id)).toContain(B.lotes[0]);
+  });
+
+  it('findBatchMovements del lote de B pedido desde A es `null`', async () => {
+    const ajeno = B.lotes[0] ?? '';
+
+    expect(await findBatchMovements(ajeno, ambitoDe(A))).toBeNull();
+  });
+
+  it('control positivo: el mismo lote, pedido desde B, no es null y trae el asiento ya escrito', async () => {
+    // Depende a proposito de que el control positivo de `adjustBatchStock`, arriba en este mismo
+    // describe, ya haya dejado un asiento de tipo 'adjustment' para este lote.
+    const propio = B.lotes[0] ?? '';
+
+    const resultado = await findBatchMovements(propio, ambitoDe(B));
+
+    expect(resultado).not.toBeNull();
+    expect(resultado?.some((asiento) => asiento.kind === 'adjustment')).toBe(true);
+  });
+});
+
 async function retrato(empresa: Empresa): Promise<string> {
   const productos = await listAliveProducts(consulta(), ambitoDe(empresa));
   const presentaciones = await listPresentations(consulta(), ambitoDe(empresa));
@@ -647,7 +766,7 @@ async function retrato(empresa: Empresa): Promise<string> {
   const fichaAjena = await findAliveProductById(ajeno.productos[0] ?? '', ambitoDe(empresa));
   const escrituraAjena = await updateAliveProduct(
     ajeno.productos[0] ?? '',
-    { name: 'no deberia escribirse', qtyAlert: 0 },
+    { name: 'no deberia escribirse', qtyAlert: '0' },
     new Date(),
     ambitoDe(empresa),
   );

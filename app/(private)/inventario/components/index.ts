@@ -3,6 +3,8 @@
 //
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
+export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
+export { BatchHistory, movementKindLabel, movementReasonLabel } from './batch-history';
 export { DeleteProductDialog } from './delete-product-dialog';
 // `PresentationSelect` ya no es propio de esta ruta: QC-44 lo promovio a
 // `components/shared/` porque la pantalla de proveedores lo necesita con la MISMA API
@@ -17,6 +19,7 @@ export {
   IMAGE_COLUMN_LABEL,
   PRODUCT_DEFAULT_PINNED_COLUMNS,
   buildProductColumns,
+  productUnitLabel,
   type ProductColumn,
   type ProductColumnId,
   type ProductColumnsDeps,
@@ -36,6 +39,10 @@ export {
   ProductBatchDateField,
 } from './product-batch-date-field';
 export {
+  ProductBatchesPanel,
+  type ProductBatchesPanelProps,
+} from './product-batches-panel';
+export {
   PRODUCT_NAME_FIELD,
   ProductNamePicker,
   type ProductNameOption,
@@ -54,12 +61,18 @@ export {
   SHARED_PAGE_SIZES,
   SORT_PARAM,
   SORT_SEPARATOR,
+  STOCK_COLUMN_ID,
+  STOCK_MAX_PARAM,
+  STOCK_MIN_PARAM,
+  TYPE_COLUMN_ID,
+  TYPE_PARAM,
   buildProductListQuery,
   parseProductListParams,
   productListHref,
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
+export { ProductTypeTabs, type ProductTypeTabsProps } from './product-type-tabs';
 export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';
 export {

@@ -630,9 +630,22 @@ describe('R40 — la unica interfaz de la ficha es la pagina publica', () => {
 // R31 — ni route handler, ni cron, ni cola, ni nada que corra por su cuenta
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * El unico cron real que `lib/composition/index.ts` cablea: el proceso diario de `pedidos` que
+ * caduca pedidos, ajeno del todo al alcance de este archivo (sobre el correo del alta sin contrasena).
+ * `hallazgosDeFondo` no distingue de que ficha es un cron -no tiene por que-, asi que esta linea,
+ * y SOLO esta, se descuenta antes de mirar `CABLEADO`: cualquier otra mencion de fondo en ese
+ * archivo sigue cayendo igual que antes.
+ */
+const IMPORT_DEL_CRON_DE_PEDIDOS_AUTORIZADO =
+  "import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';";
+
 describe('R31 — el unico reintento del correo es el reenvio a mano de R14', () => {
   it.each(ARCHIVOS_DE_LA_FICHA)('%s no arranca ningun trabajo en segundo plano', (ruta) => {
-    const hallazgos = hallazgosDeFondo(leer(ruta));
+    const fuente = leer(ruta);
+    const sinElCronAutorizado =
+      ruta === CABLEADO ? fuente.replace(IMPORT_DEL_CRON_DE_PEDIDOS_AUTORIZADO, '') : fuente;
+    const hallazgos = hallazgosDeFondo(sinElCronAutorizado);
     expect(
       hallazgos,
       `QC-79 R31: \`${ruta}\` mete maquinaria de fondo. El humano dejo la cola de reintentos ` +

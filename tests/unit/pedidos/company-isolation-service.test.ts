@@ -49,7 +49,12 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
+
+import { fakeOrderUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
@@ -69,7 +74,9 @@ const TODOS_LOS_PERMISOS = ['pedidos.consultar', 'pedidos.modificar']
 /** Actor de la empresa A con los dos permisos de `pedidos`. */
 const ACTOR_A: Actor = { id: 'u-a', companyId: EMPRESA_A, permissions: TODOS_LOS_PERMISOS }
 
-const ENTRADA_ALTA = { recipeId: RECETA, quantity: '10.0000' }
+const PRESENTACION = '77777777-7777-4777-8777-777777777777'
+
+const ENTRADA_ALTA = { recipeId: RECETA, quantity: '10.0000', presentationId: PRESENTACION }
 const ENTRADA_EDICION = { ...ENTRADA_ALTA, status: 'EN_CURSO' }
 
 function fila(id: string): OrderRow {
@@ -81,10 +88,12 @@ function fila(id: string): OrderRow {
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
+    ingredientsCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'u-0',
     updatedBy: 'u-0',
+    presentationId: null,
   }
 }
 
@@ -113,47 +122,85 @@ function almacen() {
     return guardado.companyId === scope.companyId ? guardado : null
   }
 
-  const orders = {
-    create: vi.fn(async (_data: unknown, _year: number, _actorId: string, _now: Date, scope: OrderScope) => {
-      altas.push({ companyId: scope.companyId })
-      return fila('13131313-1313-4313-8313-131313131313')
-    }),
-    findAliveById: vi.fn(async (id: string, scope: OrderScope) => {
-      const guardado = visible(id, scope)
-      return guardado === null ? null : { ...guardado.row, status: guardado.status }
-    }),
-    listAlive: vi.fn(async (_query: unknown, scope: OrderScope) => {
-      const items = [...filas.values()]
-        .filter((g) => !g.deleted && g.companyId === scope.companyId)
-        .map((g) => g.row)
-      return { items, total: items.length, page: 1, pageSize: 10, totalPages: 1 }
-    }),
-    updateAlive: vi.fn(async (id: string, _data: unknown, actorId: string, _now: Date, scope: OrderScope) => {
-      const guardado = visible(id, scope)
-      if (guardado === null) return 'not_found' as const
-      guardado.touchedBy = actorId
-      return 'ok' as const
-    }),
-    cancelAlive: vi.fn(async (id: string, _reason: string, actorId: string, _now: Date, scope: OrderScope) => {
-      const guardado = visible(id, scope)
-      if (guardado === null) return 'not_found' as const
-      guardado.status = 'CANCELADO'
-      guardado.touchedBy = actorId
-      return 'ok' as const
-    }),
-    softDeleteAlive: vi.fn(async (id: string, actorId: string, _now: Date, scope: OrderScope) => {
-      const guardado = visible(id, scope)
-      if (guardado === null) return 'not_found' as const
-      guardado.deleted = true
-      guardado.touchedBy = actorId
-      return 'ok' as const
-    }),
-  }
+  // Lectura (`OrderRepository`): sale FUERA de la unidad de trabajo.
+  const findAliveById = vi.fn(async (id: string, scope: OrderScope) => {
+    const guardado = visible(id, scope)
+    return guardado === null ? null : { ...guardado.row, status: guardado.status }
+  })
+  // La aridad refleja la del puerto: el ambito se lee del ultimo argumento.
+  const listAlive = vi.fn(async (_query: unknown, _recipeIds: readonly string[] | null, scope: OrderScope) => {
+    const items = [...filas.values()]
+      .filter((g) => !g.deleted && g.companyId === scope.companyId)
+      .map((g) => g.row)
+    return { items, total: items.length, page: 1, pageSize: 10, totalPages: 1 }
+  })
+  const orders = { findAliveById, listAlive }
+
+  // Escritura (`OrderWriteRepository`): solo dentro de `unitOfWork.run`.
+  const lockAliveById = vi.fn(async (id: string, scope: OrderScope) => {
+    const guardado = visible(id, scope)
+    return guardado === null ? null : { ...guardado.row, status: guardado.status }
+  })
+  const create = vi.fn(async (_data: unknown, _year: number, _actorId: string, _now: Date, _ingredientsCost: string | null, scope: OrderScope) => {
+    altas.push({ companyId: scope.companyId })
+    return fila('13131313-1313-4313-8313-131313131313')
+  })
+  const updateAlive = vi.fn(async (id: string, _data: unknown, actorId: string, _now: Date, _ingredientsCost: string | null, scope: OrderScope) => {
+    const guardado = visible(id, scope)
+    if (guardado === null) return 'not_found' as const
+    guardado.touchedBy = actorId
+    return 'ok' as const
+  })
+  const cancelAlive = vi.fn(async (id: string, _reason: string, actorId: string, _now: Date, scope: OrderScope) => {
+    const guardado = visible(id, scope)
+    if (guardado === null) return 'not_found' as const
+    guardado.status = 'CANCELADO'
+    guardado.touchedBy = actorId
+    return 'ok' as const
+  })
+  const softDeleteAlive = vi.fn(async (id: string, actorId: string, _now: Date, scope: OrderScope) => {
+    const guardado = visible(id, scope)
+    if (guardado === null) return 'not_found' as const
+    guardado.deleted = true
+    guardado.touchedBy = actorId
+    return 'ok' as const
+  })
+  const setReservedAt = vi.fn(async () => undefined)
+  const writeOrders = { lockAliveById, create, updateAlive, cancelAlive, softDeleteAlive, setReservedAt }
+
+  // Reservas de `inventario`: no forman parte de lo que este archivo mide -el ambito de ESE
+  // puerto es otro archivo-, asi que aparta y libera sin tocar el almacen de pedidos.
+  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
+  const releaseForOrder = vi.fn(async () => undefined)
+  const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
+  const reservations = { syncForOrder, releaseForOrder, consumeForOrder }
 
   const recipes = {
     findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) =>
       ids.map((id) => ({ id, name: 'Acido citrico 50%', isDeleted: false })),
     ),
+    // Receta SIN lineas: este archivo prueba el ambito, no el calculo del importe.
+    findExecutionContentById: vi.fn(async (id: string) => ({
+      id,
+      name: 'Acido citrico 50%',
+      isDeleted: false,
+      steps: [],
+      lines: [],
+    })),
+  }
+
+  const unitOfWork = fakeOrderUnitOfWork({
+    orders: writeOrders as unknown as OrderTransactionScope['orders'],
+    reservations: reservations as unknown as OrderTransactionScope['reservations'],
+    recipes: recipes as unknown as OrderTransactionScope['recipes'],
+  })
+  const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
+  const units = {
+    findRefs: vi.fn(async () => []),
+    findRefsSharingBaseInCompany: vi.fn(async () => []),
+  }
+  const presentations = {
+    findRefs: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'Bidon' }))),
   }
   const log = { ignoredFields: vi.fn() }
 
@@ -169,8 +216,15 @@ function almacen() {
 
   return {
     orders: orders as unknown as OrderRepository,
-    espias: orders,
+    unitOfWork,
+    // Los espias del puerto DE PEDIDOS -lectura y escritura-, con nombre, para que
+    // `llamadasAlPuerto` los recorra igual que antes. Los de `reservations` quedan fuera: su
+    // ambito -otro puerto, otro modulo- no es lo que este archivo mide aqui.
+    espias: { findAliveById, listAlive, ...writeOrders },
     recipes: recipes as unknown as RecipeCatalog,
+    products: products as unknown as ProductCatalog,
+    units: units as unknown as UnitCatalog,
+    presentations: presentations as unknown as PresentationCatalog,
     log,
     altas,
     foto,
@@ -183,12 +237,12 @@ type Almacen = ReturnType<typeof almacen>
 function casosDeUso(a: Almacen) {
   const now = () => new Date('2026-09-15T10:00:00.000Z')
   return {
-    createOrder: createCreateOrder({ orders: a.orders, recipes: a.recipes, now }),
-    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes }),
-    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, log: a.log }),
-    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, now }),
-    cancelOrder: createCancelOrder({ orders: a.orders, now }),
-    deleteOrder: createDeleteOrder({ orders: a.orders, now }),
+    createOrder: createCreateOrder({ recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, unitOfWork: a.unitOfWork, now }),
+    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes, presentations: a.presentations }),
+    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, log: a.log }),
+    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, unitOfWork: a.unitOfWork, now }),
+    cancelOrder: createCancelOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
+    deleteOrder: createDeleteOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
   }
 }
 
@@ -238,9 +292,20 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
     await casosDeUso(b).deleteOrder(PEDIDO_DE_A, ACTOR_A)
 
     const llamadas = [...llamadasAlPuerto(a), ...llamadasAlPuerto(b)]
-    // Los seis metodos se ejercitaron: sin esto, un metodo que nadie llamo pasaria el bucle.
+    // Los ocho metodos se ejercitaron: sin esto, un metodo que nadie llamo pasaria el bucle.
+    // `lockAliveById` y `setReservedAt` son nuevos -la escritura vive dentro de
+    // `unitOfWork.run`-, y el ambito les llega igual que a los seis de siempre.
     expect(new Set(llamadas.map(([metodo]) => metodo))).toEqual(
-      new Set(['create', 'findAliveById', 'listAlive', 'updateAlive', 'cancelAlive', 'softDeleteAlive']),
+      new Set([
+        'create',
+        'findAliveById',
+        'listAlive',
+        'lockAliveById',
+        'updateAlive',
+        'cancelAlive',
+        'softDeleteAlive',
+        'setReservedAt',
+      ]),
     )
     for (const [metodo, args] of llamadas) {
       // `toStrictEqual`: ni una clave mas. Un ambito con campos de sobra seria un ambito que
@@ -374,21 +439,45 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
         throw new Error(`${nombre} no debe llamarse sin permiso`)
       })
     const orders = {
-      create: explota('create'),
       findAliveById: explota('findAliveById'),
       listAlive: explota('listAlive'),
-      updateAlive: explota('updateAlive'),
-      cancelAlive: explota('cancelAlive'),
-      softDeleteAlive: explota('softDeleteAlive'),
     }
-    const recipes = { findRefsIncludingDeleted: explota('findRefsIncludingDeleted') }
+    const unitOfWork = { run: explota('unitOfWork.run') }
+    const recipes = {
+      findRefsIncludingDeleted: explota('findRefsIncludingDeleted'),
+      findExecutionContentById: explota('findExecutionContentById'),
+    }
+    const products = {
+      findRefs: explota('products.findRefs'),
+      findCostingBatches: explota('products.findCostingBatches'),
+    }
+    const units = {
+      findRefs: explota('units.findRefs'),
+      findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+    }
+    const presentations = { findRefs: explota('presentations.findRefs') }
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
+      unitOfWork: unitOfWork as unknown as OrderUnitOfWork,
       recipes: recipes as unknown as RecipeCatalog,
+      products: products as unknown as ProductCatalog,
+      units: units as unknown as UnitCatalog,
+      presentations: presentations as unknown as PresentationCatalog,
       log,
     }
-    return { deps, espias: [...Object.values(orders), ...Object.values(recipes), log.ignoredFields] }
+    return {
+      deps,
+      espias: [
+        ...Object.values(orders),
+        unitOfWork.run,
+        ...Object.values(recipes),
+        ...Object.values(products),
+        ...Object.values(units),
+        ...Object.values(presentations),
+        log.ignoredFields,
+      ],
+    }
   }
 
   const SEIS = [
@@ -421,6 +510,55 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       expect(error, nombre).toBeInstanceOf(UnauthorizedError)
     }
     for (const espia of espias) expect(espia).not.toHaveBeenCalled()
+  })
+})
+
+describe('R8: una presentación de otra empresa se rechaza como inexistente', () => {
+  /** Catalogo que solo devuelve la presentacion cuando la empresa pedida coincide con la suya,
+   *  igual que el contrato real de `inventario`. */
+  function presentacionesDe(companyId: string) {
+    return {
+      findRefs: vi.fn(async (ids: readonly string[], solicitante: string) =>
+        solicitante === companyId ? ids.map((id) => ({ id, name: 'Bidon' })) : [],
+      ),
+    } as unknown as PresentationCatalog
+  }
+
+  it('createOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin crear', async () => {
+    const a = almacen()
+    const presentations = presentacionesDe(EMPRESA_B)
+    const createOrder = createCreateOrder({
+      recipes: a.recipes,
+      products: a.products,
+      units: a.units,
+      presentations,
+      unitOfWork: a.unitOfWork,
+      now: () => new Date('2026-09-15T10:00:00.000Z'),
+    })
+
+    const error = await capturar(createOrder(ENTRADA_ALTA, ACTOR_A))
+    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
+    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect(a.espias.create).not.toHaveBeenCalled()
+  })
+
+  it('updateOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin modificar', async () => {
+    const a = almacen()
+    const presentations = presentacionesDe(EMPRESA_B)
+    const updateOrder = createUpdateOrder({
+      orders: a.orders,
+      recipes: a.recipes,
+      products: a.products,
+      units: a.units,
+      presentations,
+      unitOfWork: a.unitOfWork,
+      now: () => new Date('2026-09-15T10:00:00.000Z'),
+    })
+
+    const error = await capturar(updateOrder(PEDIDO_DE_A, ENTRADA_EDICION, ACTOR_A))
+    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
+    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect(a.espias.updateAlive).not.toHaveBeenCalled()
   })
 })
 

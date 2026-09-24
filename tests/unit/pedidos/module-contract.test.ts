@@ -358,6 +358,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // ningun script tocan `orders`.
     const DUENOS_DE_ORDERS = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      // `OrderNumberDirectory` de `inventario` -el numero visible de un pedido para el
+      // historial de un lote-, tercer y ultimo dueno.
+      'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts',
     ]
     expect(todoElCodigo.length).toBeGreaterThan(0)
@@ -470,10 +473,18 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // una lista CERRADA y sigue sin haber nada de Prisma en el dominio ni en los puertos.
     const DUENO_DE_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
     const AMBITO_DE_EMPRESA = 'lib/modules/pedidos/adapters/driven/persistence/company-scope.ts'
-    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, DUENO_DE_PRISMA]
+    // `order-unit-of-work-prisma.ts` importa `@prisma/client` SOLO por el tipo
+    // `Prisma.TransactionClient` -el `tx` que le pasa a `order-prisma.ts` y a `inventario`-, sin
+    // un solo `prisma.<modelo>` propio.
+    const UNIDAD_DE_TRABAJO = 'lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts'
+    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
+    // `order-number-directory-prisma.ts` (`OrderNumberDirectory` de `inventario`) tambien abre
+    // el cliente compartido, sin importar `@prisma/client`.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       DUENO_DE_PRISMA,
+      UNIDAD_DE_TRABAJO,
     ]
     expect(
       pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),
@@ -605,15 +616,22 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     )
 
     // Quien la CONSUME, y nadie mas: cancelar no pasa por aqui -es `cancelOrder` y su propio
-    // `NotCancellableError` (R28)- y borrar tampoco (R32). `order-catalog-prisma.ts` se sumo
-    // como tercer consumidor, DECISION explicita y no descuido: es el unico adaptador con
-    // permiso para escribir `status` fuera de `update-order.ts`, y su escritura tambien pasa
-    // por la misma guardia antes de tocar la fila.
+    // `NotCancellableError`- y borrar tampoco. `transition-order.ts` consume la
+    // guardia: es quien implementa `OrderCatalog.transitionAliveById`, y el Finalizar de la
+    // planta la comprueba antes de abrir la unidad de trabajo. `update-order.ts` la consume
+    // sobre la fila que se acaba de leer -y otra vez sobre la que acaba de bloquear
+    // `lockAliveById`-, pero SOLO para comprobar que el pedido admite seguir en su mismo
+    // estado: la edicion ya no mueve el estado, asi que nunca llama con dos estados distintos.
+    // `order-catalog-prisma.ts` PERDIO
+    // su llamada: `transitionAliveOrder`, la unica que la hacia, se retiro sin llamantes -el
+    // Finalizar consume dentro de `createTransitionOrder`, que YA es quien cablea
+    // `OrderCatalog.transitionAliveById`-, y con ella se fue la ultima razon para que ese
+    // adaptador importara `order-transitions.ts`.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
-      'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
       DUENO,
+      'lib/modules/pedidos/domain/transition-order.ts',
       'lib/modules/pedidos/domain/update-order.ts',
     ])
 
@@ -624,6 +642,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       // `canTransition`, un `nextStatus` o una segunda `stateMachine` siguen cayendo aqui.
       const sinConsumo = read(file)
         .replace(/from\s+'[^']*order-transitions'/g, ' ')
+        // La RUTA del archivo nuevo -`domain/transition-order.ts`, quien tambien consume la
+        // guardia- contiene la palabra "transition" delimitada por el guion, y el criterio de
+        // abajo la leeria como una segunda tabla si no se descuenta aqui igual que la ruta del
+        // dueno.
+        .replace(/from\s+'[^']*transition-order'/g, ' ')
         .replace(/\b(assertTransition|isAllowedTransition)\b/g, ' ')
       expect(sinConsumo, `${etiqueta(file)} declara una transicion de estado`).not.toMatch(PROHIBIDO)
     }
@@ -692,15 +715,20 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // las actions estan en UN solo archivo dentro de `adapters/driving/`, ningun otro archivo
     // del modulo declara `'use server'`, no hay ninguna ruta HTTP ni pantalla de pedidos, y
     // `app/`/`components/` siguen sin conocer el modulo -la pantalla es QC-35 (R57)-.
+    //
+    // El proceso diario suma un SEGUNDO archivo driving: un Route Handler, no una
+    // Server Action -no hay usuario delante, la puerta es un secreto, no una sesion-, por eso
+    // no declara `'use server'` y el `.toEqual` de mas abajo lo sigue dejando fuera.
     const ACTIONS = 'lib/modules/pedidos/adapters/driving/order-actions.ts'
+    const CRON_ROUTE = 'lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts'
     const driving = join(pedidosDir, 'adapters', 'driving')
-    expect(sourcesIn(driving).map(etiqueta)).toEqual([ACTIONS])
+    expect(sourcesIn(driving).map(etiqueta).sort()).toEqual([ACTIONS, CRON_ROUTE].sort())
     expect(readdirSync(driving), 'driving/ conserva un .gitkeep con codigo dentro').not.toContain(
       '.gitkeep',
     )
 
     // El `'use server'` esta en ese archivo y SOLO en ese: ni el dominio, ni los puertos, ni el
-    // adaptador driven pueden declararlo.
+    // adaptador driven, ni el Route Handler del cron pueden declararlo.
     expect(
       pedidosSources.filter((file) => /['"]use server['"]/.test(read(file))).map(etiqueta),
     ).toEqual([ACTIONS])
@@ -742,6 +770,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // por goteo de la pantalla de `pedidos`. Se excluye por PREFIJO DE CARPETA, no por archivo.
     const carpetaAsignacion = join(repoRoot, 'app', '(private)', 'asignacion')
 
+    // El Route Handler del proceso diario consume el driving de `pedidos` por su ruta exacta,
+    // no la pantalla: exclusion NOMBRADA, por ARCHIVO y no por carpeta -no hay ninguna otra
+    // pieza de pedidos ahi que deba colarse igual-.
+    const rutaCronCaducidad = join(repoRoot, 'app', 'api', 'cron', 'caducar-pedidos', 'route.ts')
+
     let consumidoresDeLaPantalla = 0
     for (const file of [
       ...sourcesIn(join(repoRoot, 'app')),
@@ -753,7 +786,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       )
       if (especificadores.length === 0) continue
 
-      const dentroDeOtraPantallaAutorizada = !relative(carpetaAsignacion, file).startsWith(`..${sep}`)
+      const dentroDeOtraPantallaAutorizada =
+        !relative(carpetaAsignacion, file).startsWith(`..${sep}`) || file === rutaCronCaducidad
       if (dentroDeOtraPantallaAutorizada) continue
 
       const dentroDeLaPantalla = !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`)

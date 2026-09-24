@@ -19,6 +19,7 @@ import {
   PresentationDuplicateNameError,
   PresentationInUseError,
   PresentationNotFoundError,
+  PresentationUnitLockedError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/inventario';
@@ -345,6 +346,22 @@ describe('updatePresentationAction', () => {
     );
 
     expect(result).toEqual({ status: 'success' });
+  });
+
+  it('traduce PresentationUnitLockedError a su code estable al cambiar la unidad de una presentacion con lotes (R20, R22)', async () => {
+    updatePresentationMock.mockRejectedValue(new PresentationUnitLockedError());
+
+    const result = await updatePresentationAction(
+      'presentation-1',
+      MUTATION_INITIAL,
+      formDataOf({ name: 'Bidon 20 L', unitId: UNIDAD }),
+    );
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'presentation_unit_locked',
+      message: expect.any(String),
+    });
   });
 });
 

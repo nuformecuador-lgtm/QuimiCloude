@@ -135,19 +135,23 @@ Lo hace cumplir `tests/guards/guard-modelos-de-agentes.test.ts`.
 
 ## Paralelismo
 
-Se permite un maximo de **2 features concurrentes por zona** (`frontend`, `backend`,
-`fullstack`), siempre que no haya conflicto de archivos con las que ya estan `in_progress`.
+Se permite un maximo de **2 features concurrentes en `frontend` y en `backend`, y de 3 en
+`fullstack`**, siempre que no haya conflicto de archivos con las que ya estan `in_progress`.
+El cupo de `fullstack` subio de 2 a 3 el 2026-09-22: las fullstack no se parten (criterio de
+QC-121/QC-145/QC-147) y esa zona era el cuello; el caso que lo destapo fue QC-146, aprobada y
+parada con QC-121 y QC-147 en curso.
 
 | Feature A | Feature B | Paralelo? |
 | --- | --- | --- |
 | `frontend` | `backend` | Si |
 | `frontend` | `frontend` | Si (max 2, validando sin conflicto de archivos) |
 | `backend` | `backend` | Si (max 2, validando sin conflicto de archivos) |
+| `fullstack` | `fullstack` | Si (max 3, validando sin conflicto de archivos) |
 
 ### Validacion de conflicto entre features de la misma zona
 
 Antes de lanzar una feature de zona `Z` cuando ya hay `N` features `in_progress`
-en esa zona (`N < 2`), el leader debe:
+en esa zona (`N` menor que su cupo), el leader debe:
 
 1. Listar los archivos que las features `in_progress` de zona `Z` estan tocando,
    consultando `progress/impl_<feature>.md` de cada una.
@@ -157,7 +161,7 @@ en esa zona (`N < 2`), el leader debe:
    a `done`.
 4. Si no hay interseccion (o la nueva es la primera de su zona), se permite el
    paralelismo.
-5. Si ya hay 2 features `in_progress` en zona `Z`, se espera a que una pase a
+5. Si la zona `Z` ya tiene su cupo lleno de features `in_progress`, se espera a que una pase a
    `done` antes de evaluar la siguiente.
 
 Feature con `depends_on` no arranca hasta que su dependencia este `done`.
@@ -210,11 +214,12 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
    - Agrupa las features `in_progress` por `zone` y cuenta cuantas hay en cada una.
    - Recorre las `pending` (ya evaluadas) en orden de `id` y selecciona la
      **primera** que cumpla **ambas** condiciones:
-     a. Su zona tiene **menos de 2** features `in_progress`.
+     a. Su zona tiene **menos features `in_progress` que su cupo** (2 en `frontend` y
+        `backend`, 3 en `fullstack`).
      b. Pasa la **validacion de conflicto** de archivos (ver `## Paralelismo`):
         ningun archivo de `specs/<feature>/tasks.md` intersecta con los archivos
         que estan tocando las features `in_progress` de la misma zona.
-   - Si la zona ya tiene 2 features `in_progress`, o hay conflicto de archivos,
+   - Si la zona ya tiene su cupo lleno, o hay conflicto de archivos,
      saltea la feature y evalua la siguiente.
    - Si ninguna feature `pending` pasa el filtro, espera a que una feature
      `in_progress` pase a `done` y vuelve a este paso.
@@ -298,8 +303,13 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
     - Si el PR se mergeo con **squash**, GitHub reescribe los commits y la rama nunca
       figura como ancestro de `dev`: ahi va `./scripts/wt.sh done <key>-<slug>
       --assume-merged`, que salta solo esa guarda y mantiene las otras tres.
-12. (F2.6) Añade un resumen a `progress/history.md` (append-only) y limpia la
-    feature de `progress/current.md`.
+12. (F2.6) Añade un resumen a `progress/history.md` (append-only), limpia la
+    feature de `progress/current.md` **y poda el baseline de rojos**: el gate completo
+    termina avisando de las entradas de `tests/baseline-rojos.json` que **ya pasan**, y ese
+    aviso hay que atenderlo aquí —se borra la entrada, o se escribe por qué se queda—. Un
+    baseline que no se poda deja el gate **ciego** sobre esos archivos, que es exactamente
+    lo que su propia nota advierte que no debe pasar. El porqué y el estado, en
+    `docs/verification.md > Rojos heredados`.
 
 ## Regla del gate: quien corre que (2026-08-03)
 

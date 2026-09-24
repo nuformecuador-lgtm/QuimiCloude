@@ -2,21 +2,26 @@
 // el UNICO dueño de lo que tiene cada rol (R8, R9). Este test lee ambos por el barrel, que es como los
 // consume el resto del repo, y comprueba tambien lo que NO debe estar ahi (R6).
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
   PERMISSIONS,
   ROLE_ADMINISTRADOR,
   ROLE_OPERADOR,
+  ROLE_EMPACADOR,
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity'
 
-/** Los quince codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
- *  catalogo cambia, este test tiene que cambiar tambien, que es justamente lo que se quiere.
+/** Los dieciocho codigos, copiados a mano -no derivados del catalogo-: si el catalogo cambia,
+ *  este test tiene que cambiar tambien, que es justamente lo que se quiere.
  *  Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`,
  *  enmendando QC-74 R2; QC-66 sumo los dos de `usuarios` (su R8), enmendando QC-74 R1; QC-86 suma
- *  los dos de `asignaciones` (su R25), volviendo a enmendar QC-74 R2: once, trece y ahora quince
- *  (ver `lib/modules/identity/domain/permissions.ts`). */
+ *  los dos de `asignaciones`, volviendo a enmendar la regla del numero cerrado; la siguiente
+ *  enmienda suma `terminados.consultar`, y la ultima suma los dos de `clientes`: once, trece,
+ *  quince, dieciseis y ahora dieciocho (ver `lib/modules/identity/domain/permissions.ts`). */
 const CODIGOS_DEL_REQUISITO = [
   'dashboard.consultar',
   'inventario.consultar',
@@ -33,6 +38,9 @@ const CODIGOS_DEL_REQUISITO = [
   'usuarios.modificar',
   'asignaciones.consultar',
   'asignaciones.modificar',
+  'terminados.consultar',
+  'clientes.consultar',
+  'clientes.modificar',
 ] as const
 
 /** Los nombres de modulo del repositorio (R1), mas `usuarios`. `usuarios` NO es una carpeta de
@@ -40,7 +48,9 @@ const CODIGOS_DEL_REQUISITO = [
  *  codigo lo lee una persona: es la SEGUNDA enmienda a QC-74 R1, la de la decision cerrada 2 de
  *  QC-66 (su R12), escrita en `lib/modules/identity/domain/permissions.ts`. `asignaciones`, que
  *  entra con QC-86, NO necesita esa enmienda: SI es una carpeta real de `lib/modules/`, asi que
- *  cumple QC-74 R1 al pie de la letra. */
+ *  cumple esa regla al pie de la letra. `terminados`, que entra con la siguiente enmienda, tambien
+ *  necesita la misma: no es una carpeta de `lib/modules/`. `clientes`, que entra con la ultima
+ *  enmienda, SI es una carpeta real de `lib/modules/`. */
 const MODULOS = [
   'inventario',
   'recetas',
@@ -50,13 +60,16 @@ const MODULOS = [
   'dashboard',
   'usuarios',
   'asignaciones',
+  'terminados',
+  'clientes',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). `unidades` paso a tener
  *  escritura con QC-38, asi que ya no esta entre los que solo consultan; `usuarios` nace con
  *  escritura en QC-66 -alta, edicion, borrado y estado de cuenta, todos bajo `usuarios.modificar`-,
  *  y entra aqui por la misma enmienda de la decision 2. `asignaciones` nace con escritura en QC-86
- *  -asignar y desasignar responsables, las dos bajo `asignaciones.modificar`-. */
+ *  -asignar y desasignar responsables, las dos bajo `asignaciones.modificar`-. `clientes` nace con
+ *  escritura en la ultima enmienda -alta, edicion y borrado, todas bajo `clientes.modificar`-. */
 const MODULOS_CON_ESCRITURA = [
   'inventario',
   'recetas',
@@ -65,8 +78,9 @@ const MODULOS_CON_ESCRITURA = [
   'unidades',
   'usuarios',
   'asignaciones',
+  'clientes',
 ]
-const MODULOS_SIN_ESCRITURA = ['dashboard']
+const MODULOS_SIN_ESCRITURA = ['dashboard', 'terminados']
 
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
 
@@ -85,9 +99,9 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     }
   })
 
-  it('R2: contiene exactamente los quince codigos del requisito, ni uno mas ni uno menos', () => {
+  it('R2: contiene exactamente los dieciocho codigos del requisito, ni uno mas ni uno menos', () => {
     expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
-    expect(new Set(codigos).size).toBe(15)
+    expect(new Set(codigos).size).toBe(18)
   })
 
   it('R2: cada entrada trae descripcion no vacia', () => {
@@ -117,15 +131,112 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
       expect(Object.keys(permiso).sort()).toEqual(['action', 'code', 'description', 'module'])
     }
   })
+
+  it('QC-144 R4: el catalogo contiene terminados.consultar con su modulo, accion y descripcion exactos', () => {
+    expect(PERMISSIONS).toContainEqual({
+      code: 'terminados.consultar',
+      module: 'terminados',
+      action: 'consultar',
+      description: 'Consultar todos los pedidos terminados de la empresa.',
+    })
+  })
+
+  it('R21: el catalogo contiene clientes.consultar y clientes.modificar con su modulo, accion y descripcion exactos', () => {
+    expect(PERMISSIONS).toContainEqual({
+      code: 'clientes.consultar',
+      module: 'clientes',
+      action: 'consultar',
+      description: 'Consultar los clientes de la empresa.',
+    })
+    expect(PERMISSIONS).toContainEqual({
+      code: 'clientes.modificar',
+      module: 'clientes',
+      action: 'modificar',
+      description: 'Crear, editar y borrar clientes de la empresa.',
+    })
+  })
+
+  it('R21: el catalogo es el previo mas los dos codigos de clientes, ningun otro codigo cambia', () => {
+    const catalogoPrevio = CODIGOS_DEL_REQUISITO.filter(
+      (codigo) => codigo !== 'clientes.consultar' && codigo !== 'clientes.modificar',
+    )
+
+    expect(codigos).toEqual([...catalogoPrevio, 'clientes.consultar', 'clientes.modificar'])
+  })
+
+  it('QC-144 R5: el catalogo es el previo mas terminados.consultar en su posicion, ningun otro codigo cambia', () => {
+    const indiceDeTerminados = CODIGOS_DEL_REQUISITO.indexOf('terminados.consultar')
+    const catalogoPrevio = CODIGOS_DEL_REQUISITO.slice(0, indiceDeTerminados)
+    const posteriores = CODIGOS_DEL_REQUISITO.slice(indiceDeTerminados + 1)
+
+    expect(codigos).toEqual([...catalogoPrevio, 'terminados.consultar', ...posteriores])
+  })
+
+  it('R6: la enmienda de terminados.consultar en el fuente no cita ficha ni requisito', () => {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    )
+    const citaFichaORequisito = /QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    const parrafos = jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .filter(Boolean)
+    const primeraFrase = (parrafos[0] ?? '').split('.')[0] ?? ''
+    const parrafoDeLaEnmienda = parrafos.find((parrafo) => parrafo.includes('terminados.consultar'))
+
+    expect(parrafoDeLaEnmienda).toBeDefined()
+    const lineas = parrafoDeLaEnmienda!.split('\n')
+    expect(lineas.length).toBeLessThanOrEqual(5)
+    expect(parrafoDeLaEnmienda).toMatch(/enmienda/i)
+    expect(parrafoDeLaEnmienda).toContain('lib/modules/')
+    expect(parrafoDeLaEnmienda).not.toMatch(citaFichaORequisito)
+    expect(primeraFrase).not.toMatch(citaFichaORequisito)
+  })
+
+  it('R25: la enmienda de clientes.consultar/clientes.modificar en el fuente no cita ficha ni requisito', () => {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    )
+    const citaFichaORequisito = /QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    const parrafos = jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .filter(Boolean)
+    const primeraFrase = (parrafos[0] ?? '').split('.')[0] ?? ''
+    const parrafoDeLaEnmienda = parrafos.find((parrafo) => parrafo.includes('clientes.consultar'))
+
+    expect(parrafoDeLaEnmienda).toBeDefined()
+    const lineas = parrafoDeLaEnmienda!.split('\n')
+    expect(lineas.length).toBeLessThanOrEqual(5)
+    expect(parrafoDeLaEnmienda).toMatch(/enmienda/i)
+    expect(parrafoDeLaEnmienda).toContain('clientes.consultar')
+    expect(parrafoDeLaEnmienda).toContain('clientes.modificar')
+    expect(parrafoDeLaEnmienda).not.toMatch(citaFichaORequisito)
+    expect(primeraFrase).not.toMatch(citaFichaORequisito)
+  })
+
+  it('R6: el detector de citas caza un JSDoc sintetico que si nombra una ficha', () => {
+    const citaFichaORequisito = /QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i
+    const parrafoSintetico =
+      ' * Cuarta enmienda al catalogo cerrado (QC-144): suma terminados.consultar en lib/modules/.'
+
+    expect(parrafoSintetico).toMatch(citaFichaORequisito)
+  })
 })
 
 describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
-  it('R8: el Administrador tiene los quince permisos, escritos uno a uno', () => {
+  it('R8: el Administrador tiene los dieciocho permisos, escritos uno a uno', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_REQUISITO])
   })
 
   it('R8: no hay comodin ni regla implicita en el conjunto del Administrador', () => {
-    // La decision 2 del humano (2026-09-07) prohibe el comodin: los quince van escritos uno a uno.
+    // La decision 2 del humano (2026-09-07) prohibe el comodin: los dieciocho van escritos uno a uno.
     // Este caso vigila las dos formas en las que un comodin se colaria por la puerta de atras.
     for (const codigo of SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []) {
       // 1. Ningun codigo asignado es un comodin ni lo contiene ('*', 'inventario.*', 'todo'...).
@@ -187,9 +298,67 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.modificar')
   })
 
+  it('QC-144 R8: el Empacador tiene exactamente asignaciones.consultar y terminados.consultar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+    ])
+  })
+
+  it('QC-144 R8: el Empacador NO recibe inventario.consultar ni asignaciones.modificar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).not.toContain('inventario.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).not.toContain('asignaciones.modificar')
+  })
+
+  it('QC-144 R9: el Administrador incluye terminados.consultar y los dieciocho, uno a uno', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('terminados.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_REQUISITO])
+  })
+
+  it('R22: el Administrador incluye clientes.consultar y clientes.modificar, escritos uno a uno', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('clientes.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('clientes.modificar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_REQUISITO])
+  })
+
+  it('R22: el Operador y el Empacador conservan exactamente los permisos que tenian, sin clientes.*', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('clientes.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('clientes.modificar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).not.toContain('clientes.consultar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).not.toContain('clientes.modificar')
+  })
+
+  it('QC-144 R10: el Operador sigue con exactamente inventario.consultar y asignaciones.consultar, sin terminados.consultar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('terminados.consultar')
+  })
+
+  // QC-123 (R15) — el importe del pedido se protege con `pedidos.consultar`, que ya existe:
+  // la ficha NO suma ningun permiso. Reutiliza `CODIGOS_DEL_REQUISITO` -el mismo catalogo de
+  // arriba, copiado del requisito- en vez de duplicar la verdad en una lista nueva.
+  it('el catalogo sigue teniendo dieciocho permisos (R15, QC-144)', () => {
+    expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
+    expect(codigos).toHaveLength(18)
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
+  })
+
   it('R6: el seed asigna permisos SOLO a roles, sin ninguna clave de empresa', () => {
     expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
-      [ROLE_ADMINISTRADOR, ROLE_OPERADOR].sort(),
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
     )
     for (const asignados of Object.values(SEED_ROLE_PERMISSIONS)) {
       for (const codigo of asignados) {

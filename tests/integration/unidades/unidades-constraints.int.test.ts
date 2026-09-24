@@ -164,11 +164,13 @@ function inventoryCompanyOf(tx: Prisma.TransactionClient): Promise<string> {
 async function createProduct(
   tx: Prisma.TransactionClient,
   name = 'Acido citrico monohidratado',
+  unitId: string | null = null,
 ): Promise<string> {
   const product = await tx.product.create({
     data: {
       name,
       nameNormalized: normalizeProductNameForTest(name),
+      unitId,
       companyId: await inventoryCompanyOf(tx),
     },
     select: { id: true },
@@ -194,66 +196,12 @@ async function createPresentation(
   return presentation.id
 }
 
-/** Via por la que un producto llega a tener unidad: la de la presentacion de su lote mas
- *  reciente. */
-async function createBatch(
-  tx: Prisma.TransactionClient,
-  productId: string,
-  presentationId: string,
-): Promise<string> {
-  const batch = await tx.productBatch.create({
-    data: {
-      productId,
-      presentationId,
-      stock: 1,
-      unitCost: new Prisma.Decimal('1.0000'),
-      // `lot` es unico por empresa.
-      lot: `L-${randomUUID()}`,
-      purchaseDate: new Date('2026-09-01T00:00:00Z'),
-      companyId: await inventoryCompanyOf(tx),
-    },
-    select: { id: true },
-  })
-  return batch.id
-}
-
-/** La MISMA empresa que el andamiaje de inventario de este archivo (`inventoryCompanyOf`): QC-50
- *  hizo `recipes.company_id` obligatoria. */
-async function createRecipe(tx: Prisma.TransactionClient, marker: string): Promise<string> {
-  const recipe = await tx.recipe.create({
-    data: {
-      name: `Receta ${marker}`,
-      nameNormalized: `receta${marker}`,
-      companyId: await inventoryCompanyOf(tx),
-    },
-    select: { id: true },
-  })
-  return recipe.id
-}
-
-async function createLine(
-  tx: Prisma.TransactionClient,
-  recipeId: string,
-  productId: string,
-  unitId: string,
-  quantity = '1.0000',
-): Promise<string> {
-  const line = await tx.recipeLine.create({
-    data: { recipeId, productId, unitId, quantity: new Prisma.Decimal(quantity) },
-    select: { id: true },
-  })
-  return line.id
-}
-
 type WritableColumn =
   | 'id'
   | 'name'
   | 'name_normalized'
   | 'symbol'
   | 'unit_id'
-  | 'recipe_id'
-  | 'product_id'
-  | 'quantity'
   // `factor` sin `unit_id`, o al reves, solo se puede intentar escribir a pelo.
   | 'company_id'
   | 'factor'
@@ -266,7 +214,7 @@ type WritableColumn =
  */
 async function rawInsert(
   tx: Prisma.TransactionClient,
-  table: 'units' | 'products' | 'presentations' | 'recipe_lines',
+  table: 'units' | 'products' | 'presentations',
   columns: Partial<Record<WritableColumn, Prisma.Sql>>,
 ): Promise<number> {
   const entries = Object.entries(columns) as [WritableColumn, Prisma.Sql][]
@@ -544,8 +492,8 @@ describe('la unidad como entidad del catalogo', () => {
   })
 })
 
-describe('el uso de la unidad desde inventario y recetas', () => {
-  it('la unidad la declara la PRESENTACION, obligatoria, y el producto ya no tiene donde declararla (QC-80 R1, R21)', async () => {
+describe('el uso de la unidad desde inventario', () => {
+  it('la unidad la declara la PRESENTACION, obligatoria; el producto la tiene GUARDADA, anulable, y fija (QC-80 R1; QC-121 R1)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const primera = await createUnit(tx, `a${marker}`)
@@ -564,44 +512,20 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       expect(await columnInfo(tx, 'presentations', ['unit_id'])).toEqual([
         { column_name: 'unit_id', data_type: 'uuid', is_nullable: 'NO' },
       ])
-      expect(await columnInfo(tx, 'products', ['unit_id', 'unit'])).toEqual([])
-    })
-  })
-
-  it('rechaza una linea de receta sin unidad con SQLSTATE 23502', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const marker = token()
-      const recipeId = await createRecipe(tx, marker)
-      const productId = await createProduct(tx)
-
-      const sqlState = await expectRejectedByDatabase(
-        tx,
-        () =>
-          rawInsert(tx, 'recipe_lines', {
-            recipe_id: asUuid(recipeId),
-            product_id: asUuid(productId),
-            quantity: Prisma.sql`1.0000`,
-          }),
-        'linea de receta sin unidad',
-      )
-      expect(sqlState).toBe(NOT_NULL_VIOLATION)
-
-      const survivors = await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } })
-      expect(survivors).toEqual([])
-
-      const columns = await columnInfo(tx, 'recipe_lines', ['unit_id', 'unit'])
-      expect(columns).toEqual([
-        { column_name: 'unit_id', data_type: 'uuid', is_nullable: 'NO' },
+      // `products.unit_id` es ANULABLE -un producto sin lotes no tiene de donde sacarla- y
+      // GUARDADA -no se calcula al leer-. Un producto nuevo, sin lotes, todavia no la tiene.
+      expect(await columnInfo(tx, 'products', ['unit_id'])).toEqual([
+        { column_name: 'unit_id', data_type: 'uuid', is_nullable: 'YES' },
       ])
+      const productId = await createProduct(tx)
+      expect((await tx.product.findUniqueOrThrow({ where: { id: productId } })).unitId).toBeNull()
     })
   })
 
-  it('rechaza una presentacion y una linea con unit_id inexistente con SQLSTATE 23503', async () => {
+  it('rechaza una presentacion con unit_id inexistente con SQLSTATE 23503', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
-      const recipeId = await createRecipe(tx, marker)
       const unitId = await createUnit(tx, marker)
-      const productId = await createProduct(tx)
       const presentationId = await createPresentation(tx, marker, unitId)
       const inventada = randomUUID()
 
@@ -616,19 +540,6 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       )
       expect(presentacionConUnidadFantasma).toBe(FOREIGN_KEY_VIOLATION)
 
-      const lineaConUnidadFantasma = await expectRejectedByDatabase(
-        tx,
-        () =>
-          rawInsert(tx, 'recipe_lines', {
-            recipe_id: asUuid(recipeId),
-            product_id: asUuid(productId),
-            quantity: Prisma.sql`1.0000`,
-            unit_id: asUuid(inventada),
-          }),
-        'linea con unit_id inexistente',
-      )
-      expect(lineaConUnidadFantasma).toBe(FOREIGN_KEY_VIOLATION)
-
       const edicionConUnidadFantasma = await expectRejectedByDatabase(
         tx,
         () =>
@@ -642,27 +553,21 @@ describe('el uso de la unidad desde inventario y recetas', () => {
         select: { id: true },
       })
       expect(presentacionesDelIntento).toEqual([])
-      expect(await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } })).toEqual([])
       const presentacion = await tx.presentation.findUniqueOrThrow({
         where: { id: presentationId },
         select: { unitId: true },
       })
       expect(presentacion.unitId).toBe(unitId)
-      expect(await tx.product.findUnique({ where: { id: productId }, select: { id: true } })).not.toBeNull()
     })
   })
 
-  it('rechaza el borrado de una unidad usada por una presentacion y por una linea con SQLSTATE 23503, y permite el de una unidad libre', async () => {
+  it('rechaza el borrado de una unidad usada por una presentacion con SQLSTATE 23503, y permite el de una unidad libre', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const unidadDePresentacion = await createUnit(tx, `p${marker}`)
-      const unidadDeLinea = await createUnit(tx, `l${marker}`)
       const unidadLibre = await createUnit(tx, `x${marker}`, null)
 
       const presentationId = await createPresentation(tx, marker, unidadDePresentacion)
-      const recipeId = await createRecipe(tx, marker)
-      const productoDeLaLinea = await createProduct(tx, 'Insumo de la linea')
-      const lineId = await createLine(tx, recipeId, productoDeLaLinea, unidadDeLinea)
 
       const usadaPorPresentacion = await expectRejectedByDatabase(
         tx,
@@ -671,75 +576,16 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       )
       expect(usadaPorPresentacion).toBe(FOREIGN_KEY_VIOLATION)
 
-      const usadaPorLinea = await expectRejectedByDatabase(
-        tx,
-        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = ${asUuid(unidadDeLinea)}`,
-        'borrado de una unidad usada por una linea de receta',
-      )
-      expect(usadaPorLinea).toBe(FOREIGN_KEY_VIOLATION)
-
       expect(await tx.unit.findUnique({ where: { id: unidadDePresentacion } })).not.toBeNull()
-      expect(await tx.unit.findUnique({ where: { id: unidadDeLinea } })).not.toBeNull()
       const presentacion = await tx.presentation.findUniqueOrThrow({
         where: { id: presentationId },
         select: { unitId: true },
       })
       expect(presentacion.unitId).toBe(unidadDePresentacion)
-      const linea = await tx.recipeLine.findUniqueOrThrow({
-        where: { id: lineId },
-        select: { unitId: true },
-      })
-      expect(linea.unitId).toBe(unidadDeLinea)
 
       // Sin esto, el test pasaria igual con una tabla que no deja borrar nada nunca.
       await tx.unit.delete({ where: { id: unidadLibre } })
       expect(await tx.unit.findUnique({ where: { id: unidadLibre } })).toBeNull()
-    })
-  })
-
-  it('una linea puede usar una unidad distinta de la que su producto DERIVA del lote', async () => {
-    await inRolledBackTransaction(async (tx) => {
-      const marker = token()
-      const unidadDelProducto = await createUnit(tx, `kg${marker}`)
-      const unidadDeLaLinea = await createUnit(tx, `g${marker}`)
-
-      const productId = await createProduct(tx, 'Colorante azul')
-      const presentationId = await createPresentation(tx, marker, unidadDelProducto)
-      await createBatch(tx, productId, presentationId)
-      const recipeId = await createRecipe(tx, marker)
-      const lineId = await createLine(tx, recipeId, productId, unidadDeLaLinea, '0.0100')
-
-      const linea = await tx.recipeLine.findUniqueOrThrow({
-        where: { id: lineId },
-        select: { unitId: true, quantity: true },
-      })
-      const [loteDelProducto] = await tx.productBatch.findMany({
-        where: { productId },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: 1,
-        select: { presentation: { select: { unitId: true } } },
-      })
-      const unidadDerivada = loteDelProducto?.presentation.unitId ?? null
-      expect(unidadDerivada).toBe(unidadDelProducto)
-      expect(linea.unitId).toBe(unidadDeLaLinea)
-      expect(linea.unitId).not.toBe(unidadDerivada)
-      expect(linea.quantity.toString()).toBe('0.01')
-
-      const columns = await tx.$queryRaw<{ column_name: string }[]>`
-        SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = 'units'
-        ORDER BY column_name`
-      expect(columns.map((column) => column.column_name)).toEqual([
-        'company_id',
-        'created_at',
-        'factor',
-        'id',
-        'name',
-        'name_normalized',
-        'symbol',
-        'unit_id',
-        'updated_at',
-      ])
     })
   })
 })
@@ -748,8 +594,6 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
   it('la base rechaza un unit_id inexistente aunque Prisma no declare la relacion', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
-      const recipeId = await createRecipe(tx, marker)
-      const productId = await createProduct(tx)
 
       const unidadFantasmaEnPresentacion = await expectRejectedByDatabase(
         tx,
@@ -761,19 +605,6 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
         'presentacion con unit_id inventado',
       )
       expect(unidadFantasmaEnPresentacion).toBe(FOREIGN_KEY_VIOLATION)
-
-      const unidadFantasmaEnLinea = await expectRejectedByDatabase(
-        tx,
-        () =>
-          rawInsert(tx, 'recipe_lines', {
-            recipe_id: asUuid(recipeId),
-            product_id: asUuid(productId),
-            quantity: Prisma.sql`1.0000`,
-            unit_id: asUuid(randomUUID()),
-          }),
-        'linea con unit_id inventado',
-      )
-      expect(unidadFantasmaEnLinea).toBe(FOREIGN_KEY_VIOLATION)
 
       // Prisma declara `unit_id` sin `@relation`: la integridad la da Postgres.
       // `pg_constraint` abarca toda la base, no un esquema, asi que un esquema espejo con las
@@ -801,7 +632,7 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
           confupdtype: 'c',
         },
         {
-          conname: 'recipe_lines_unit_id_fkey',
+          conname: 'products_unit_id_fkey',
           referencia: 'units',
           confdeltype: 'r',
           confupdtype: 'c',
@@ -1061,8 +892,7 @@ describe('QC-76 — la equivalencia entre unidades', () => {
   it('rechaza el borrado de una unidad de la que deriva otra con SQLSTATE 23503, y permite el de la hija (R8)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
-      // Unidades propias: una del catalogo puede estar usada por recetas, y el borrado saltaria
-      // por `recipe_lines_unit_id_fkey` en vez de por `units_unit_id_fkey`.
+      // Unidades propias, para que el borrado salte por `units_unit_id_fkey` y no por otra FK.
       const madre = await createUnit(tx, `madre${marker}`)
       const hija = await createUnit(tx, `hija${marker}`, symbolFor(`h${marker}`), {
         baseUnitId: madre,
@@ -1409,17 +1239,14 @@ describe('QC-76 — el ambito por empresa', () => {
 })
 
 describe('QC-76 — cambiar la equivalencia de una unidad en uso', () => {
-  it('permite cambiar factor y base con una presentacion y una linea de receta apuntando, sin invalidar nada (R10)', async () => {
+  it('permite cambiar factor y base con una presentacion apuntando, sin invalidar nada (R10)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const enUso = await createUnit(tx, `uso${marker}`)
       const primeraBase = await createUnit(tx, `b1${marker}`)
       const segundaBase = await createUnit(tx, `b2${marker}`)
 
-      const productId = await createProduct(tx, 'Colorante azul')
       const presentationId = await createPresentation(tx, marker, enUso)
-      const recipeId = await createRecipe(tx, marker)
-      const lineId = await createLine(tx, recipeId, productId, enUso, '0.0100')
 
       await tx.unit.update({
         where: { id: enUso },
@@ -1437,19 +1264,13 @@ describe('QC-76 — cambiar la equivalencia de una unidad en uso', () => {
       expect(unit.baseUnitId).toBe(segundaBase)
       expect(unit.factor?.toString()).toBe('0.25')
 
-      // La presentacion y la linea guardan una referencia a la unidad, no una cantidad ya
-      // convertida: no hay nada que invalidar.
+      // La presentacion guarda una referencia a la unidad, no una cantidad ya convertida: no
+      // hay nada que invalidar.
       const presentacion = await tx.presentation.findUniqueOrThrow({
         where: { id: presentationId },
         select: { unitId: true },
       })
       expect(presentacion.unitId).toBe(enUso)
-      const linea = await tx.recipeLine.findUniqueOrThrow({
-        where: { id: lineId },
-        select: { unitId: true, quantity: true },
-      })
-      expect(linea.unitId).toBe(enUso)
-      expect(linea.quantity.toString()).toBe('0.01')
 
       // Quitar la equivalencia tambien es legal si los dos campos se quitan juntos.
       await tx.unit.update({ where: { id: enUso }, data: { baseUnitId: null, factor: null } })

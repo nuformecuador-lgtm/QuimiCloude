@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 
 import { ProductField, ProductForm } from '@/app/(private)/inventario/components';
 import { Sheet } from '@/components/ui/sheet';
-import type { ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
   createProductAction: vi.fn(),
@@ -19,9 +19,10 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
     imagePath: null,
-    stockByUnit: [],
-    qtyAlert: 5,
-    latestBatchUnitId: null,
+    stock: '0',
+    unitId: null,
+    qtyAlert: '5',
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     ...overrides,

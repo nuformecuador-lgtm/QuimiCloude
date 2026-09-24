@@ -21,6 +21,17 @@ vi.mock('@/lib/shared/db/prisma', async () => {
 });
 
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
+import { createListAssignedOrders } from '@/lib/modules/asignaciones/domain/list-assigned-orders';
+import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
+import { ROLE_EMPACADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
+import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import {
+  findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+
+import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 
 import {
   NOW,
@@ -207,6 +218,87 @@ describe('asignaciones · los pedidos de una persona en su empresa (integracion)
 
       // Y la transaccion sigue viva: no se creo nada.
       expect(await fixture.tx.orderAssignment.findMany({ where: { orderId: pedido } })).toEqual([]);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// El caso de uso COMPLETO de `listAssignedOrders`, con un actor cuyos permisos son EXACTAMENTE
+// los del Empacador (`SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, nunca una lista copiada a mano). El
+// dominio ya prueba en unidad que ese conjunto concede; esto prueba, contra Postgres real, que lo
+// que ve es solo lo suyo: su empresa y su responsabilidad.
+// ---------------------------------------------------------------------------------------------
+
+const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
+if (PERMISOS_DEL_EMPACADOR === undefined) {
+  throw new Error('SEED_ROLE_PERMISSIONS no declara al Empacador: este archivo no puede construir su actor');
+}
+
+describe('asignaciones · listAssignedOrders con los permisos del Empacador (integracion, R14)', () => {
+  it('ve solo los pedidos de su empresa en los que es responsable: no los de otro responsable ni los de otra empresa', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const listAssignedOrders = createListAssignedOrders({
+        assignments: createOrderAssignmentRepository(fixture.tx),
+        orders: {
+          findAliveById: findAliveOrderTargetById,
+          listAliveSummariesByIds: listAliveOrderSummariesByIds,
+          listAliveSummariesInCompany: async () => {
+            throw new Error('QC-144: listAssignedOrders no lista toda la empresa')
+          },
+          transitionAliveById: async () => {
+            throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
+          },
+        },
+        recipes: {
+          findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
+          findExecutionContentById: async () => {
+            throw new Error('QC-144: listAssignedOrders no ejecuta ninguna receta');
+          },
+          findIdsMatchingName: async () => {
+            throw new Error('QC-144: listAssignedOrders no busca recetas por nombre');
+          },
+        },
+        presentations: { findRefs: findPresentationRefs },
+        people: assignmentDirectoryPrisma,
+        now: () => NOW,
+      });
+
+      const empacador = await createPerson(fixture, fixture.companyA);
+      const otroResponsableDeLaMismaEmpresa = await createPerson(fixture, fixture.companyA);
+      const responsableDeLaOtraEmpresa = await createPerson(fixture, fixture.companyB);
+
+      const pedidoDelEmpacador = await createOrder(fixture);
+      const pedidoDeOtroResponsable = await createOrder(fixture);
+      const pedidoDeLaOtraEmpresa = await createOrder(fixture, { companyId: fixture.companyB });
+
+      await fixture.useCases.assign(
+        actorOf(fixture.companyA),
+        { orderId: pedidoDelEmpacador, userIds: [empacador], workGroupIds: [] },
+        NOW,
+      );
+      await fixture.useCases.assign(
+        actorOf(fixture.companyA),
+        { orderId: pedidoDeOtroResponsable, userIds: [otroResponsableDeLaMismaEmpresa], workGroupIds: [] },
+        NOW,
+      );
+      await fixture.useCases.assign(
+        actorOf(fixture.companyB),
+        { orderId: pedidoDeLaOtraEmpresa, userIds: [responsableDeLaOtraEmpresa], workGroupIds: [] },
+        NOW,
+      );
+
+      // El actor ES el Empacador: su id es el de la persona asignada, y sus permisos son
+      // EXACTAMENTE los que el seed le declara.
+      const actorEmpacador: Actor = {
+        id: empacador,
+        companyId: fixture.companyA,
+        permissions: PERMISOS_DEL_EMPACADOR,
+      };
+
+      const pagina = await listAssignedOrders(actorEmpacador, { page: 1 });
+
+      expect(pagina.items.map((item) => item.id)).toEqual([pedidoDelEmpacador]);
+      expect(pagina.total).toBe(1);
     });
   });
 });

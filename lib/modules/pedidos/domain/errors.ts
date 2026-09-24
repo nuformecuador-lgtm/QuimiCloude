@@ -88,6 +88,19 @@ export class RecipeNotFoundError extends PedidosError {
  * tendria que seguir mapeando por si acaso-.
  */
 
+/**
+ * La presentacion indicada no existe en el catalogo de la empresa de quien escribe -incluida
+ * una de otra empresa-. Mismo criterio que `RecipeNotFoundError`: `presentation_not_found` es una
+ * entrada COMPARTIDA del catalogo de errores, ya usada por `inventario`.
+ */
+export class PresentationNotFoundError extends PedidosError {
+  readonly code = 'presentation_not_found';
+
+  constructor(diagnostic?: string) {
+    super('presentation_not_found', diagnostic);
+  }
+}
+
 /** R21, R22: la transicion de estado pedida no esta permitida, o se intenta editar un
  *  pedido final (`ENTREGADO` o `CANCELADO`), que no admite ninguna edicion.
  *
@@ -139,5 +152,24 @@ export class ValidationError extends PedidosError {
 
   constructor(diagnostic?: string) {
     super('invalid_input', diagnostic);
+  }
+}
+
+/** Al entregar, ni el lote apartado ni el resto de lotes con disponible alcanzan la cantidad
+ *  que hace falta. La transaccion se deshace entera. */
+export class InsufficientMaterialError extends PedidosError {
+  readonly code = 'insufficient_material';
+
+  constructor(diagnostic?: string) {
+    super('insufficient_material', diagnostic);
+  }
+}
+
+/** Se entrega un pedido sin material apartado cuya receta actual no tiene ninguna linea. */
+export class RecipeWithoutLinesError extends PedidosError {
+  readonly code = 'recipe_without_lines';
+
+  constructor(diagnostic?: string) {
+    super('recipe_without_lines', diagnostic);
   }
 }

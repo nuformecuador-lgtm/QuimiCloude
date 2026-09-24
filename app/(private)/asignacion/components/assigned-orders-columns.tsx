@@ -1,6 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
+import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority } from '@/lib/modules/pedidos';
@@ -36,6 +37,7 @@ export const ASSIGNED_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, stri
 export const ASSIGNED_ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 export const ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const ASSIGNED_ORDER_QUANTITY_COLUMN_ID = 'quantity';
+export const ASSIGNED_ORDER_PRESENTATION_COLUMN_ID = 'presentationName';
 export const ASSIGNED_ORDER_PRIORITY_COLUMN_ID = 'priority';
 export const ASSIGNED_ORDER_STATUS_COLUMN_ID = 'status';
 export const ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
@@ -65,6 +67,12 @@ export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedO
       label: 'Cantidad',
       align: 'end',
       cell: (order) => order.quantity,
+    },
+    {
+      id: ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
+      label: 'Presentación',
+      align: 'start',
+      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
     },
     {
       id: ASSIGNED_ORDER_PRIORITY_COLUMN_ID,

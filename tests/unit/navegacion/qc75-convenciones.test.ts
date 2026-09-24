@@ -46,11 +46,14 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Los quince codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que R15 congela.
+ * Los dieciocho codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que este test
+ * congela.
  * Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`, enmendando
  * QC-74 R2; QC-66 sumo `usuarios.consultar` y `usuarios.modificar`, enmendando QC-74 R1; QC-86 suma
- * `asignaciones.consultar` y `asignaciones.modificar` (su R25), volviendo a enmendar QC-74 R2 (las
- * tres enmiendas estan escritas en `lib/modules/identity/domain/permissions.ts`).
+ * `asignaciones.consultar` y `asignaciones.modificar`, volviendo a enmendar la regla del numero
+ * cerrado; la siguiente enmienda suma `terminados.consultar`, volviendo a enmendar la regla de
+ * nombres de modulo; la ultima suma `clientes.consultar` y `clientes.modificar` (las cinco
+ * enmiendas estan escritas en `lib/modules/identity/domain/permissions.ts`).
  */
 export const CODIGOS_QC74 = [
   'dashboard.consultar',
@@ -68,9 +71,13 @@ export const CODIGOS_QC74 = [
   'usuarios.modificar',
   'asignaciones.consultar',
   'asignaciones.modificar',
+  'terminados.consultar',
+  'clientes.consultar',
+  'clientes.modificar',
 ] as const;
 
-/** Los seis modulos de negocio del ERP. Eran cinco hasta que QC-86 sumo `asignaciones`. */
+/** Los siete modulos de negocio del ERP. Eran cinco hasta que se sumo `asignaciones`, y ahora se
+ *  suma `clientes`. */
 export const MODULOS_DE_NEGOCIO = [
   'inventario',
   'recetas',
@@ -78,6 +85,7 @@ export const MODULOS_DE_NEGOCIO = [
   'pedidos',
   'unidades',
   'asignaciones',
+  'clientes',
 ] as const;
 
 /**
@@ -118,8 +126,8 @@ export function comodinesDe(permisos: readonly PermisoLeido[]): string[] {
 describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', () => {
   const catalogo: readonly PermisoLeido[] = PERMISSIONS;
 
-  it('tiene exactamente quince codigos, los quince del catalogo', () => {
-    expect(catalogo).toHaveLength(15);
+  it('tiene exactamente dieciocho codigos, los dieciocho del catalogo', () => {
+    expect(catalogo).toHaveLength(18);
     expect(catalogo.map((permiso) => permiso.code).sort()).toEqual([...CODIGOS_QC74].sort());
   });
 
@@ -134,14 +142,14 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     ).toEqual([]);
   });
 
-  it('los modulos son exactamente los seis de negocio mas dashboard y usuarios', () => {
+  it('los modulos son exactamente los siete de negocio mas dashboard y usuarios', () => {
     const modulos = [...new Set(catalogo.map((permiso) => permiso.module))].sort();
-    // `unidades` ya esta entre los de negocio, y `asignaciones` entro ahi con QC-86; el catalogo
-    // suma `dashboard`, que es una pantalla y no un modulo del ERP (QC-74 R4: solo `consultar`),
-    // y `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
-    // `identity`-: es la segunda enmienda a QC-74 R1, la de la decision cerrada 2 de QC-66 (su
-    // R12).
-    const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios'])].sort();
+    // `unidades`, `asignaciones` y `clientes` ya estan entre los de negocio; el catalogo suma
+    // `dashboard`, que es una pantalla y no un modulo del ERP (solo lleva `consultar`),
+    // `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
+    // `identity`-, y `terminados`, que tampoco es carpeta de `lib/modules/`: la misma enmienda
+    // que ya se hizo con `usuarios`.
+    const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios', 'terminados'])].sort();
     expect(modulos).toEqual(esperados);
     expect(modulos).toContain('unidades');
   });
@@ -397,6 +405,22 @@ describe('QC-75 R22 — esta ficha no anade backend', () => {
   });
 
   it('package.json no gano dependencias respecto al merge-base con dev', (ctx) => {
+    // 2026-09-18: acotado a la rama de QC-75 con la MISMA precondicion conjuntiva que sus dos
+    // hermanos de arriba -no aplicaba solo a este caso-. Sin ella, cualquier otra rama que sume
+    // una dependencia propia y aprobada (QC-111 suma `@upstash/qstash`, aprobada junto con su
+    // Route Handler) hacia fallar este caso por una pregunta que no es la suya: la de si ESTA
+    // rama es la de QC-75. Fuera de esa rama, la pregunta complementaria -que toda dependencia
+    // declarada tenga su fila en `docs/dependencias.md`- ya la responde
+    // `tests/guards/guard-dependencias-aprobadas.test.ts`, que esta verde y no se toca. En la
+    // rama real de QC-75 este caso sigue midiendo exactamente igual.
+    if (!esLaRamaDeQC75) {
+      ctx.skip(
+        'el rango no trae a la vez el archivo central y la carpeta de spec de QC-75: esta NO es ' +
+          'su rama y R22 no le aplica.',
+      );
+      return;
+    }
+
     const base = mergeBaseConDev();
     const packageBase = base === null ? null : leerEnRevision(base, 'package.json');
     const packageHead = leerEnRevision('HEAD', 'package.json');

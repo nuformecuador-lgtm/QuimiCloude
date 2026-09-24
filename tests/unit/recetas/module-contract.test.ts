@@ -419,17 +419,39 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       'lib/modules/recetas/adapters/driven/persistence/company-scope.ts',
       'lib/modules/recetas/ports/recipe-repository.ts',
     ]
+    // QC-147 (2026-09-22): la linea de receta pasa de cantidad absoluta a PORCENTAJE. Son los
+    // archivos que el diff de esta rama toca bajo `lib/modules/recetas/`, y ninguno mas: la
+    // aritmetica nueva (`domain/recipe-percentage.ts`), el contrato de entrada y la vista de la
+    // linea (`recipe-input.ts`, `recipe-view.ts`), los tres casos de uso que la escriben o la
+    // leen (`create-recipe.ts`, `get-recipe.ts`, `update-recipe.ts`), el catalogo y el puerto
+    // del repositorio (`recipe-catalog.ts`, `ports/recipe-repository.ts`), los dos adaptadores
+    // de persistencia (`recipe-catalog-prisma.ts`, `recipe-prisma.ts`) y el barrel del contrato
+    // publico (`index.ts`, que ya figuraba en `AMPLIACION_QC34` pero cambia de forma otra vez).
+    const CANTIDADES_EN_PORCENTAJE_QC147 = [
+      'lib/modules/recetas/index.ts',
+      'lib/modules/recetas/domain/create-recipe.ts',
+      'lib/modules/recetas/domain/get-recipe.ts',
+      'lib/modules/recetas/domain/recipe-catalog.ts',
+      'lib/modules/recetas/domain/recipe-input.ts',
+      'lib/modules/recetas/domain/recipe-percentage.ts',
+      'lib/modules/recetas/domain/recipe-view.ts',
+      'lib/modules/recetas/domain/update-recipe.ts',
+      'lib/modules/recetas/ports/recipe-repository.ts',
+      'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+    ]
     const AMPLIACIONES_APROBADAS = [
       ...AMPLIACION_QC34,
       ...CAMBIO_DE_FORMA_DEL_PASO_QC62,
       ...AUTORIZACION_POR_PERMISO_QC74,
       ...AISLAMIENTO_POR_EMPRESA_QC50,
+      ...CANTIDADES_EN_PORCENTAJE_QC147,
     ]
     expect(
       diff
         .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
         .filter((ruta) => !AMPLIACIONES_APROBADAS.includes(ruta)),
-      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10), del cambio de forma del paso de QC-62 (T1-T3) y del aislamiento por empresa de QC-50 puede estar en el diff',
+      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10), del cambio de forma del paso de QC-62 (T1-T3), del aislamiento por empresa de QC-50 y de las cantidades en porcentaje de QC-147 puede estar en el diff',
     ).toEqual([])
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se

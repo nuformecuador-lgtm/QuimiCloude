@@ -87,6 +87,18 @@ export const E2E_ESPERADOS = [
   // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
   // `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'aislamiento-recetas.spec.ts',
+  // Alta el 2026-09-18 (QC-92) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el Administrador abre el panel de
+  // lotes de un producto desde el listado de inventario, despliega el historial del lote y ve su
+  // asiento de alta, ajusta la existencia con una cantidad con signo y un motivo del conjunto
+  // cerrado, y ve la cantidad nueva y el asiento nuevo; un ajuste que dejaria la existencia bajo
+  // cero se rechaza en pantalla y no deja rastro en la base; y quien solo tiene
+  // `inventario.consultar` ve el panel y el historial pero el control de ajuste no existe en el
+  // DOM. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
+  // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
+  // R21 sigue INTACTO.
+  'ajuste-de-inventario.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO
@@ -106,6 +118,9 @@ export const E2E_ESPERADOS = [
   // estado. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21
   // sigue INTACTO.
+  // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
+  // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
+  'documentos.spec.ts',
   'ejecucion-receta.spec.ts',
   'errores.spec.ts',
   'grupos-de-trabajo.spec.ts',
@@ -113,18 +128,58 @@ export const E2E_ESPERADOS = [
   'login-skin.spec.ts',
   'login.spec.ts',
   'pedidos.spec.ts',
+  // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
+  // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. El recorrido que ejercita: con sesion en una empresa,
+  // escribir un termino en la caja de busqueda de la pantalla de pedidos recorta la lista a lo
+  // que devuelve la consulta y lo lleva a la URL como `q`; un termino sin coincidencias muestra
+  // el estado propio dentro de la tabla y limpiar devuelve todo; y el termino sobrevive a cambiar
+  // de pagina, al panel lateral, a recargar y a «Atras» -incluso entre dos terminos distintos-.
+  // NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'pedidos-busqueda.spec.ts',
   'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
   'pedidos-asignados.spec.ts',
+  // Alta el 2026-09-23 por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el bloque de coste del panel de
+  // pedidos cotiza con cada cantidad tecleada y con el cambio de receta, guarda el mismo importe
+  // que llego a mostrar y lo vuelve a mostrar al reabrir la edicion sin teclear nada; y una
+  // cantidad sin existencia suficiente deja el guion. NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que el diferimiento de la E2E de ese cruce sigue INTACTO.
+  'pedidos-cotizacion.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',
+  // Alta el 2026-09-22 (QC-147) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita (R22): una receta cuyas lineas
+  // suman 97,50 % no se guarda y con 100,00 % si; una receta sin ninguna linea no se guarda; el
+  // costo de ingredientes de un pedido sale calculado con el porcentaje; y el Operario ve el
+  // porcentaje y la cantidad convertida en la linea de un pedido. NO ejercita el cruce borde ->
+  // accion del identificador de peticion: el spec no lee ni afirma nada sobre el identificador
+  // ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'recetas-porcentaje.spec.ts',
   'recetas.spec.ts',
+  // Alta con el mismo patron que las demas: no toca el identificador de peticion.
+  'reserva-de-material.spec.ts',
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
   'establecer-contrasena.spec.ts',
   'usuarios.spec.ts',
+  // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
+  // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. Lo que ejercita: el recorrido de las vistas de /asignacion por
+  // permiso -Operador, Empacador y Administrador, cada uno con lo que ve y lo que no en
+  // "Mis asignados", "Terminados" y "Todos"- y que el formulario de Pedidos ya no ofrece
+  // cambiar el estado ni al Administrador como responsable. NO ejercita el cruce borde ->
+  // accion del identificador de peticion: el spec no lee ni afirma nada sobre el identificador
+  // ni sobre `reference`, asi que el diferimiento sigue INTACTO.
+  'pedidos-terminados.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -196,6 +251,62 @@ export const MIGRACIONES_ESPERADAS = [
   '20260917120000_drop_product_stock',
   // Misma alta, esta vez para la migracion que da empresa a proveedores y a su catalogo.
   '20260917120000_suppliers_company_scope',
+  // Igual patron: tabla nueva de movimientos de inventario, no toca el identificador de peticion.
+  '20260917130000_inventory_movements',
+  // Alta con el mismo patron que las anteriores: la migracion que crea el indice GIN de
+  // trigramas total sobre recipes.name_normalized, para que la busqueda del listado de
+  // pedidos vea tambien las recetas de baja, no persiste el identificador de peticion ni
+  // lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260917130000_recipes_search_index_including_deleted',
+  // Alta el 2026-09-18 con el mismo patron que las anteriores: la migracion que convierte
+  // `inventory_movements.kind` en enum y acota `reason` a su catalogo no persiste el identificador
+  // de peticion ni lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260918120000_inventory_movement_kind_enum_and_reason_catalog',
+// Alta con el mismo patron que las anteriores: la migracion que devuelve la unidad y la
+  // existencia guardada al producto no persiste el identificador de peticion ni lo menciona; se
+  // nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260918130000_product_unit_and_stored_stock',
+  // Alta el 2026-09-18 (QC-111) con el mismo patron que las anteriores: la migracion que crea las
+  // tablas `document_batches` y `document_files` no persiste el identificador de peticion ni lo
+  // menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260918130000_document_batches_and_files',
+  // Alta el 2026-09-18 (QC-123) con el mismo patron que las anteriores: la migracion que anade
+  // la columna `ingredients_cost` a `orders` no persiste el identificador de peticion ni lo
+  // menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260918130000_orders_add_ingredients_cost',
+  // Con el mismo patron que las anteriores: la migracion que crea el rol Empacador y el permiso
+  // terminados.consultar no persiste el identificador de peticion ni lo menciona; se nombra aqui
+  // a mano y la lista sigue CERRADA para la siguiente.
+  '20260922120000_packer_role',
+  // Igual patron: la columna de presentacion del pedido no toca el identificador de peticion.
+  '20260922130000_orders_presentation',
+  // Con el mismo patron que las anteriores: la migracion que agrega el enum `ProductType` y la
+  // columna `type` a `products` no persiste el identificador de peticion ni lo menciona; se
+  // nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260922150000_product_type_enum',
+  // Alta con el mismo patron que las anteriores: la migracion que cambia `recipe_lines.quantity`
+  // + `unit_id` por `percentage` no persiste el identificador de peticion ni lo menciona; se
+  // nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260922160000_recipe_lines_percentage',
+  // Con el mismo patron que las anteriores: la migracion que agrega la columna `finished_at`
+  // a `orders`, con su CHECK que la exige solo en ENTREGADO y su indice parcial para el
+  // listado de terminados, no persiste el identificador de peticion ni lo menciona; se nombra
+  // aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260923120000_orders_finished_at',
+  // Igual patron: anula `product_batches.presentation_id` y `unit_cost` (solo MACHINE los
+  // omite en el borde); no toca el identificador de peticion.
+  '20260923140000_product_batch_nullable_machine',
+  // Ninguna de las dos toca el identificador de peticion: una anade un valor a un enum, la otra
+  // cambia el tipo de columnas de existencia y crea el libro de reservas.
+  '20260923150000_inventory_movement_kind_consumption',
+  '20260923150100_reservations_and_decimal_stock',
+  // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
+  // peticion.
+  '20260923150200_reserve_existing_orders',
+  // Con el mismo patron que las anteriores: la migracion que crea la tabla `customers` y los
+  // permisos de `clientes` no persiste el identificador de peticion ni lo menciona; se nombra
+  // aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260924120000_customers',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -235,16 +346,28 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
  * Total absoluto del repositorio y no de un cambio: una dependencia aprobada de cualquier otra
  * feature lo rompe y obliga a subirlo. Lo que vigila de verdad es `FRAGMENTOS_PROHIBIDOS`.
  */
-// El manifiesto declara hoy 33 dependencias. Fueron 31 hasta el 2026-09-16, cuando entraron
+// El manifiesto declara hoy 35 dependencias. Fueron 31 hasta el 2026-09-16, cuando entraron
 // `unpdf` y `@napi-rs/canvas` -las dos con los cuatro checks, aprobacion humana y su fila en
-// `docs/dependencias.md`-, y el numero se subio con esa aprobacion.
+// `docs/dependencias.md`-, y el numero se subio con esa aprobacion. El 2026-09-18 entro
+// `@google/genai` -el cliente oficial para leer un PDF con Gemini-, tambien con los cuatro
+// checks, con aprobacion humana en la puerta F1.4 y con su fila en `docs/dependencias.md`: de
+// 33 a 34 con esa misma aprobacion. El mismo 2026-09-18 entro `@upstash/qstash` -el cliente
+// oficial para publicar un trabajo por PDF en la cola y verificar la firma del webhook-, tambien
+// con los cuatro checks, con aprobacion humana en la puerta F1.4 y con su fila en
+// `docs/dependencias.md`: de 34 a 35 con esa misma aprobacion.
+// El 2026-09-21 entro `sharp` -la libreria que recorta del PNG de una pagina la region que la IA
+// senala como imagen-, tambien con los cuatro checks, con aprobacion humana en la puerta F1.4 y con
+// su fila en `docs/dependencias.md`: de 35 a 36 con esa misma aprobacion.
+// El 2026-09-23 entro `react-intersection-observer` -el hook que detecta cuando el final de una
+// lista entra en pantalla-, tambien con los cuatro checks, con aprobacion humana en la puerta F1.4
+// y con su fila en `docs/dependencias.md`: de 36 a 37 con esa misma aprobacion.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 33
+export const DEPENDENCIAS_ESPERADAS = 37
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

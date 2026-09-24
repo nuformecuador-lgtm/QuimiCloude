@@ -1,6 +1,6 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
-import type { ProductStockByUnit } from './product-stock';
+import type { ProductType } from './product-type';
 
 /**
  * Contratos de entrada y salida de producto (`design.md > 6.1`, `> 3`). Viven en
@@ -8,6 +8,8 @@ import type { ProductStockByUnit } from './product-stock';
  * mundo: eso es dominio, y es lo que el contrato publico (`index.ts`) puede reexportar
  * (solo reexporta de `./domain`).
  */
+
+export type { ProductType } from './product-type';
 
 /**
  * Datos de negocio de un producto, ya validados por `product-input.ts` (`design.md >
@@ -18,11 +20,12 @@ import type { ProductStockByUnit } from './product-stock';
  * (`ProductBatch`)-. QC-80 (R21): sin `unitId` -la unidad la declara la PRESENTACION, y la
  * del producto se DERIVA del lote mas reciente; no hay nada que escribir aqui-. La existencia
  * se quito: se escribe unicamente en el lote que crea el alta. Lo que queda es lo que la
- * cosa ES (`name`) y su alerta (`qtyAlert`).
+ * cosa ES (`name`), su alerta (`qtyAlert`) y su tipo (`type`).
  */
 export type NewProduct = {
   readonly name: string;
-  readonly qtyAlert?: number | null;
+  readonly qtyAlert?: string | null;
+  readonly type?: ProductType;
 };
 
 /**
@@ -45,24 +48,19 @@ export type ProductView = {
    * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
-  /** Existencia agregada por unidad: suma el stock de todos los lotes del producto. */
-  readonly stockByUnit: readonly ProductStockByUnit[];
-  readonly qtyAlert: number | null;
-  /**
-   * Unidad DERIVADA del producto: la de la presentacion de su lote MAS RECIENTE -creacion
-   * descendente, desempatando por identificador descendente-, o `null` si el producto todavia
-   * no tiene ningun lote (QC-80, R22, R23).
-   *
-   * SE LLAMA ASI Y NO `unitId` A PROPOSITO. Hasta QC-80 este campo era la columna
-   * `products.unit_id`, que ya no existe; dejarle el nombre viejo con un significado nuevo
-   * habria sido un cambio invisible para el compilador y para quien lee. El nombre dice DE
-   * DONDE sale el dato, y el typecheck obliga a visitar cada consumidor.
-   *
-   * Es un dato de LECTURA: no se envia al dar de alta ni al editar (`NewProduct` no lo lleva),
-   * y no se ordena ni se filtra por el (`PRODUCT_QUERYABLE`), porque no es una columna de
-   * `products` sino el resultado de mirar otro lado.
-   */
-  readonly latestBatchUnitId: UnitId | null;
+  /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto,
+   *  con sus cuatro decimales. */
+  readonly stock: string;
+  /** Unidad guardada en `products.unit_id`, o `null` si el producto todavia no tiene lotes. */
+  readonly unitId: UnitId | null;
+  readonly qtyAlert: string | null;
+  /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
+  readonly type: ProductType;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  /** Suma de lo apartado en los lotes vivos del producto. Opcional: solo lo rellena
+   *  `listAliveProducts`, con una consulta agregada por pagina; las demas lecturas no la traen. */
+  readonly reserved?: string;
+  /** Suma de lo disponible en los lotes vivos del producto. Misma condicion que `reserved`. */
+  readonly available?: string;
 };

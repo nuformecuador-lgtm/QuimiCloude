@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table';
 
 /** Copia a mano el numero de columnas de `buildAssignedOrdersColumns()`; un test ata las dos. */
-export const ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT = 7;
+export const ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT = 8;
 
 export function AssignedOrdersSkeleton({ rows }: { readonly rows: number }) {
   const columns = Array.from({ length: ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT }, (_, index) => index);

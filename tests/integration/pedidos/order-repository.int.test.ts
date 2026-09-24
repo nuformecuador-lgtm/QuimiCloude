@@ -22,6 +22,13 @@
  * `tests/integration/proveedores/supplier-crud.int.test.ts`: cada caso crea sus datos y LOS
  * BORRA EL MISMO, por su `id` exacto, en un bloque `finally`.
  *
+ * `createOrder` -que llevaba su propio bucle de reintento sobre el cliente global- se retiro; el
+ * alta de siembra de este archivo pasa por
+ * `withOrderTransaction` + `createOrderWriteRepository`, el mismo par que ata `OrderUnitOfWork`
+ * en `lib/composition`. Las funciones REALES que este archivo ejercita son ahora esas dos, mas
+ * `findAliveOrderById`, `listAliveOrders`, `updateAliveOrder`, `cancelAliveOrder` y
+ * `softDeleteAliveOrder`.
+ *
  * HIGIENE, y es critica: los tests de `tests/integration/` corren EN SERIE contra UNA base
  * compartida (`vitest.config.mts`, `fileParallelism: false`) y algun archivo afirma sobre el
  * estado global de una tabla. Una fila —o una secuencia— olvidada aqui pone rojo un test ajeno
@@ -47,17 +54,21 @@
  */
 import { randomUUID } from 'node:crypto'
 
+import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
+import { listAliveOrderSummariesByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination'
 
@@ -82,6 +93,7 @@ const YEAR_ORDEN = 2883
 const YEAR_BORRADO = 2884
 const YEAR_FILTROS = 2885
 const YEAR_DISCRIMINANTES = 2886
+const YEAR_CATALOGO = 2887
 
 const TEST_YEARS = [
   YEAR_ALTA,
@@ -90,6 +102,7 @@ const TEST_YEARS = [
   YEAR_BORRADO,
   YEAR_FILTROS,
   YEAR_DISCRIMINANTES,
+  YEAR_CATALOGO,
 ] as const
 
 async function dropTestSequences(): Promise<void> {
@@ -115,6 +128,9 @@ let roleId: string
 let documentTypeCode: string
 /** Empresa efimera del fixture. QC-47 R9 hizo `users.company_id` obligatoria. */
 let companyId: string
+/** QC-146: presentacion de la MISMA empresa, para que `NewOrder.presentationId` (obligatorio)
+ *  tenga una referencia valida en toda alta y edicion de este archivo. */
+let presentationId: string
 
 async function seedFixtures(): Promise<void> {
   const marca = token()
@@ -154,6 +170,18 @@ async function seedFixtures(): Promise<void> {
       select: { id: true },
     })
   ).id
+  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`NewOrder`).
+  presentationId = (
+    await prisma.presentation.create({
+      data: {
+        name: `Bidon ${marca}`,
+        nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+        unitId,
+        companyId,
+      },
+      select: { id: true },
+    })
+  ).id
   // La receta es de la MISMA empresa que el resto del fixture: QC-50 hizo `recipes.company_id`
   // obligatoria.
   recipeId = (
@@ -187,6 +215,10 @@ async function dropFixtures(): Promise<void> {
   await prisma.user.delete({ where: { id: actorId } })
   // La receta TAMBIEN antes que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
   await prisma.recipe.delete({ where: { id: recipeId } })
+  // La presentacion TAMBIEN antes que la empresa, y despues de todo pedido que la use -cada
+  // caso ya borro los suyos en su `finally` (`limpiar`)-: `orders_company_id_presentation_id_fkey`
+  // es `ON DELETE RESTRICT` (QC-146).
+  await prisma.presentation.delete({ where: { id: presentationId } })
   // La empresa DESPUES del usuario y de la receta: `users_company_id_fkey` y
   // `recipes_company_id_fkey` son `ON DELETE RESTRICT` (QC-47 R11, QC-50).
   await prisma.company.delete({ where: { id: companyId } })
@@ -218,6 +250,7 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    presentationId,
     ...overrides,
   }
 }
@@ -232,11 +265,9 @@ async function altaReal(
   now: Date,
   overrides: Partial<NewOrder> = {},
 ): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), year, actorId, now, scope())
-  // Un `'duplicate_number'` aqui no es el caso bajo prueba: seria una secuencia sucia de una
-  // corrida anterior, y hay que verlo como fallo del test, no confundirlo con el pedido.
-  expect(resultado).not.toBe('duplicate_number')
-  const fila = resultado as OrderRow
+  const fila = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(baseOrder(overrides), year, actorId, now, null, scope()),
+  )
   creados.push(fila.id)
   return fila
 }
@@ -256,8 +287,8 @@ async function limpiar(creados: readonly string[]): Promise<void> {
  */
 type FiltrosDePrueba = { readonly status?: OrderStatus; readonly priority?: OrderPriority }
 
-/** Los filtros de prueba + la pagina -> el CONTRATO GENERICO que el adaptador espera. Sin
- *  orden y sin busqueda: es exactamente la lista de siempre (R11, R17). */
+/** Los filtros de prueba + la pagina -> el CONTRATO GENERICO que el adaptador espera. Estas
+ *  llamadas no piden orden ni busqueda: es exactamente la lista de siempre (R11). */
 function consulta(
   filtros: FiltrosDePrueba = {},
   pagina: { readonly page?: number; readonly pageSize?: number } = {},
@@ -285,10 +316,10 @@ function consulta(
  * por este archivo, y cada caso filtra despues por SUS ids.
  */
 async function recorrerTodo(filtros: FiltrosDePrueba = {}): Promise<readonly OrderRow[]> {
-  const primera = await listAliveOrders(consulta(filtros, { pageSize: MAX_PAGE_SIZE }), scope())
+  const primera = await listAliveOrders(consulta(filtros, { pageSize: MAX_PAGE_SIZE }), null, scope())
   const items = [...primera.items]
   for (let page = 2; page <= primera.totalPages; page += 1) {
-    const siguiente = await listAliveOrders(consulta(filtros, { page, pageSize: MAX_PAGE_SIZE }), scope())
+    const siguiente = await listAliveOrders(consulta(filtros, { page, pageSize: MAX_PAGE_SIZE }), null, scope())
     items.push(...siguiente.items)
   }
   return items
@@ -390,7 +421,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       expect(creados).toHaveLength(cuantos)
 
       // (a) `pageSize` OMITIDO -> el defecto, en los elementos Y en la pagina.
-      const porDefecto = await listAliveOrders(consulta(), scope())
+      const porDefecto = await listAliveOrders(consulta(), null, scope())
       const totalVivos = await contarVivos()
       expect(porDefecto.items).toHaveLength(DEFAULT_PAGE_SIZE)
       expect(porDefecto.pageSize).toBe(DEFAULT_PAGE_SIZE)
@@ -404,7 +435,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       // el `query.pageSize`, que es el error contra el que avisa el propio adaptador —con el
       // pedido, `totalPages` mentiria aunque el `LIMIT` de SQL fuera correcto—.
       const pedida = 100
-      const acotada = await listAliveOrders(consulta({}, { pageSize: pedida }), scope())
+      const acotada = await listAliveOrders(consulta({}, { pageSize: pedida }), null, scope())
       expect(acotada.items).toHaveLength(MAX_PAGE_SIZE)
       expect(acotada.pageSize).toBe(MAX_PAGE_SIZE)
       expect(acotada.pageSize).not.toBe(pedida)
@@ -417,7 +448,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       expect(toOffsetLimit(1, undefined).limit).toBe(DEFAULT_PAGE_SIZE)
 
       // La consulta NUNCA sale sin limite superior: ni pidiendo un tamano absurdo.
-      const absurda = await listAliveOrders(consulta({}, { pageSize: 999_999 }), scope())
+      const absurda = await listAliveOrders(consulta({}, { pageSize: 999_999 }), null, scope())
       expect(absurda.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
       expect(absurda.pageSize).toBe(MAX_PAGE_SIZE)
     } finally {
@@ -568,14 +599,14 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
       })
 
       // R34: pagina de DOS sobre seis pedidos propios. El `total` no es 2.
-      const pagina = await listAliveOrders(consulta({}, { pageSize: 2 }), scope())
+      const pagina = await listAliveOrders(consulta({}, { pageSize: 2 }), null, scope())
       expect(pagina.items).toHaveLength(2)
       expect(pagina.total).toBe(await contarVivos())
       expect(pagina.total).toBeGreaterThanOrEqual(creados.length)
       expect(pagina.total).toBeGreaterThan(pagina.items.length)
 
       // R38, filtro suelto por estado.
-      const porEstado = await listAliveOrders(consulta({ status: 'EN_CURSO' }), scope())
+      const porEstado = await listAliveOrders(consulta({ status: 'EN_CURSO' }), null, scope())
       expect(porEstado.total).toBe(await contarVivos({ status: 'EN_CURSO' }))
       expect(porEstado.items.every((row) => row.status === 'EN_CURSO')).toBe(true)
       const mismosEstado = (await recorrerTodo({ status: 'EN_CURSO' })).filter((row) =>
@@ -584,7 +615,7 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
       expect(mismosEstado).toHaveLength(3)
 
       // R38, filtro suelto por prioridad.
-      const porPrioridad = await listAliveOrders(consulta({ priority: 'ALTA' }), scope())
+      const porPrioridad = await listAliveOrders(consulta({ priority: 'ALTA' }), null, scope())
       expect(porPrioridad.total).toBe(await contarVivos({ priority: 'ALTA' }))
       expect(porPrioridad.items.every((row) => row.priority === 'ALTA')).toBe(true)
       const mismosPrioridad = (await recorrerTodo({ priority: 'ALTA' })).filter((row) =>
@@ -594,7 +625,7 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
 
       // R38, los dos COMBINADOS: el `and`, no el `or`.
       const combinado = { status: 'EN_CURSO', priority: 'ALTA' } as const
-      const ambos = await listAliveOrders(consulta(combinado), scope())
+      const ambos = await listAliveOrders(consulta(combinado), null, scope())
       expect(ambos.total).toBe(await contarVivos(combinado))
       const mismosAmbos = (await recorrerTodo(combinado)).filter((row) => creados.includes(row.id))
       expect(mismosAmbos).toHaveLength(2)
@@ -617,33 +648,76 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       const despues = instantIn(YEAR_DISCRIMINANTES, 3, 13)
 
       // VIVO -> 'ok', y la edicion escribe de verdad.
+      //
+      // ENMIENDA: `editado` sigue llevando `status` porque `baseOrder` devuelve un `NewOrder`
+      // completo -el mismo helper del alta-, pero `updateAliveOrder` ya no lo lee (`OrderEdit` no
+      // tiene el campo): la fila se queda en el estado con el que nacio, `PENDIENTE`, aunque
+      // `editado.status` pida `EN_CURSO`.
       const editado = baseOrder({ quantity: '99.0000', priority: 'CRITICA', status: 'EN_CURSO' })
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('ok')
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
       const relectura = await findAliveOrderById(pedido.id, scope())
       expect(relectura?.quantity).toBe('99.0000')
       expect(relectura?.priority).toBe('CRITICA')
-      expect(relectura?.status).toBe('EN_CURSO')
-      // R6: la edicion NO toca el autor ni el instante de la creacion.
+      expect(relectura?.status).toBe('PENDIENTE')
+      // La edicion NO toca el autor ni el instante de la creacion.
       expect(relectura?.createdBy).toBe(actorId)
       expect(relectura?.createdAt.toISOString()).toBe(now.toISOString())
       expect(relectura?.updatedAt.toISOString()).toBe(despues.toISOString())
 
       // INEXISTENTE -> 'not_found' en las tres, sin lanzar.
-      expect(await updateAliveOrder(inexistente, editado, actorId, despues, scope())).toBe('not_found')
+      expect(await updateAliveOrder(inexistente, editado, actorId, despues, null, scope())).toBe('not_found')
       expect(await cancelAliveOrder(inexistente, 'da igual', actorId, despues, scope())).toBe('not_found')
       expect(await softDeleteAliveOrder(inexistente, actorId, despues, scope())).toBe('not_found')
 
       // YA BORRADO -> 'not_found' en las tres. El primer borrado si es 'ok'.
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('not_found')
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('not_found')
       expect(await cancelAliveOrder(pedido.id, 'da igual', actorId, despues, scope())).toBe('not_found')
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('not_found')
 
       // Y ninguna de las tres llamadas rechazadas escribio nada: la fila borrada sigue con lo
       // que tenia, no con lo que pedia el `editado` de despues.
       const cruda = await prisma.order.findUnique({ where: { id: pedido.id } })
-      expect(cruda?.status).toBe('EN_CURSO')
+      expect(cruda?.status).toBe('PENDIENTE')
       expect(cruda?.cancellationReason).toBeNull()
+    } finally {
+      await limpiar(creados)
+    }
+  })
+})
+
+describe('R27 — listAliveOrderSummariesByIds devuelve la presentacion', () => {
+  it('el resumen que pedidos publica a asignaciones lleva presentationId, con y sin presentacion', async () => {
+    const creados: string[] = []
+    try {
+      const now = instantIn(YEAR_CATALOGO, 1, 10)
+      const conPresentacion = await altaReal(creados, YEAR_CATALOGO, now)
+      // Un pedido «viejo» sin presentacion: se inserta con Prisma directo, sin pasar por el
+      // adaptador -que ya la exige siempre- para simular una fila anterior a esta ficha (R2).
+      const filaSinPresentacion = await prisma.order.create({
+        data: {
+          companyId,
+          orderYear: YEAR_CATALOGO,
+          orderSequence: 999,
+          recipeId,
+          quantity: new Prisma.Decimal('10'),
+          createdAt: instantIn(YEAR_CATALOGO, 1, 11),
+        },
+        select: { id: true },
+      })
+      creados.push(filaSinPresentacion.id)
+
+      const pagina = await listAliveOrderSummariesByIds(
+        companyId,
+        [conPresentacion.id, filaSinPresentacion.id],
+        ['PENDIENTE'],
+        1,
+      )
+
+      const resumenConPresentacion = pagina.items.find((item) => item.id === conPresentacion.id)
+      const resumenSinPresentacion = pagina.items.find((item) => item.id === filaSinPresentacion.id)
+      expect(resumenConPresentacion?.presentationId).toBe(presentationId)
+      expect(resumenSinPresentacion?.presentationId).toBeNull()
     } finally {
       await limpiar(creados)
     }

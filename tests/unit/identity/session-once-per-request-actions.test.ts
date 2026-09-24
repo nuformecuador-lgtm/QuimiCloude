@@ -152,6 +152,10 @@ beforeEach(() => {
  * nombre exacto. El censo CRECE, nunca se afloja: sigue comparandose contra el arbol, asi que un
  * archivo futuro que nadie declare aqui pone estos casos en rojo.
  *
+ * **Crecida el 2026-09-18 por QC-92**, que estrena el ajuste de existencias por lote:
+ * `batch-actions.ts` resuelve las dos caras de la sesion y entra en el censo por su nombre exacto.
+ * El censo CRECE, nunca se afloja.
+ *
  * `setCredentialWithLinkAction` NO esta y no es un olvido: es la accion PUBLICA que a proposito
  * no resuelve actor (QC-79 R18), asi que no lee la sesion ninguna vez.
  *
@@ -266,6 +270,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).issueUploadLinksAction({} as never),
   },
   {
+    // Anadida el 2026-09-18 por QC-92: su archivo de `driving/` resuelve las dos caras de la
+    // sesion, asi que el censo tiene que cubrirlo. Se invoca la LECTURA, que es la mas barata.
+    archivo: 'lib/modules/inventario/adapters/driving/batch-actions.ts',
+    nombre: 'listProductBatchesAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/inventario/adapters/driving/batch-actions')
+      ).listProductBatchesAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
+  {
     archivo: 'lib/modules/recetas/adapters/driving/recipe-actions.ts',
     nombre: 'listRecipesAction',
     invocar: async () =>
@@ -295,6 +309,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       (
         await import('@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions')
       ).listCatalogLinesAction('4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742', { page: 1 }),
+  },
+  {
+    // Anadida por QC-111: su archivo de `driving/` resuelve las dos caras de la sesion, asi que el
+    // censo tiene que cubrirlo. Se invoca la consulta, que es la mas barata.
+    archivo: 'lib/modules/documentos/adapters/driving/document-batch-actions.ts',
+    nombre: 'getBatchStatusAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/documentos/adapters/driving/document-batch-actions')
+      ).getBatchStatusAction('4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742'),
   },
 ];
 

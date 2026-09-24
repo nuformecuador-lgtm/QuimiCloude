@@ -127,12 +127,14 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los CATORCE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
- *  QC-33 y quince con `cancellationReason` (QC-34 R48); el 2026-09-07 la decision humana quito
- *  `unit_id` y `unit_price` de la tabla
- *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. QC-60 (R1)
- *  anade `company_id`, obligatoria, y vuelven a ser catorce. La lista sigue siendo cerrada:
- *  anadir o quitar cualquier otra columna pone este test rojo. */
+/** Los DIECIOCHO campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
+ *  quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id` y
+ *  `unit_price` de la tabla
+ *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
+ *  se anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las
+ *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete y `finishedAt` a
+ *  dieciocho. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
+ *  test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -148,6 +150,10 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
+  ['ingredientsCost', 'ingredients_cost'],
+  ['reservedAt', 'reserved_at'],
+  ['presentationId', 'presentation_id'], // el envase en que se entrega, opcional
+  ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -208,9 +214,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
   })
 
   it('Order no declara cliente, destinatario ni ninguna columna equivalente', () => {
-    // R3 y decision cerrada 8: no hay cliente ni destinatario, y es DELIBERADO. Tampoco se crea
-    // catalogo de clientes. Anadirlo despues obliga a decidir que cliente llevaban los pedidos
-    // ya cargados, y ese coste esta asumido y anotado.
+    // R3 y decision cerrada 8: no hay cliente ni destinatario en Order, y es DELIBERADO;
+    // sigue vigente hasta QC-156. La prohibicion de un catalogo de clientes que este mismo
+    // caso incluia queda derogada solo para Customer/customers por el modulo Clientes
+    // (QC-152/QC-153, 2026-09-24); el resto de nombres de catalogo sigue prohibido.
     const CLIENTE = /client|customer|cliente|recipient|destinatar|buyer|receiver|contact|party/i
     const sospechosos = order.fields
       .filter((candidate) => CLIENTE.test(candidate.name))
@@ -220,10 +227,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
-    for (const forbidden of ['Customer', 'Client', 'Recipient', 'Buyer']) {
+    for (const forbidden of ['Client', 'Recipient', 'Buyer']) {
       expect(modelNames, `el modelo ${forbidden} no debe existir`).not.toContain(forbidden)
     }
-    expect(schema).not.toMatch(/@@map\("(customers|clients|recipients)"\)/)
+    expect(schema).not.toMatch(/@@map\("(clients|recipients)"\)/)
   })
 
   it('Order no declara ninguna fecha de solicitud aparte de createdAt', () => {
@@ -233,7 +240,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((candidate) => candidate.type === 'DateTime')
       .map((candidate) => candidate.name)
       .sort()
-    expect(fechas).toEqual(['createdAt', 'deletedAt', 'updatedAt'])
+    expect(fechas).toEqual(['createdAt', 'deletedAt', 'finishedAt', 'reservedAt', 'updatedAt'])
 
     for (const forbidden of [
       'requestedAt',
@@ -292,10 +299,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Y el UNICO decimal que le queda al modelo es la cantidad.
+    // Los DOS unicos decimales del modelo: la cantidad y el importe de ingredientes.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['quantity'])
+    ).toEqual(['ingredientsCost', 'quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -646,12 +653,67 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_recipe_id_idx',
       'orders_created_by_idx',
       'orders_updated_by_idx',
+      'orders_presentation_id_idx',
     ])
+    // `finished_at` no gana `@@index` en el esquema: su indice parcial vive solo en la
+    // migracion, como los de `list_query_indexes`.
     // Los dos unicos, tambien en ingles y `snake_case` (QC-60 sustituye el de QC-33).
     const uniqueMaps = [...order.body.matchAll(/@@unique\([^)]*map:\s*"([^"]+)"/g)].map(
       (match) => match[1],
     )
     expect(uniqueMaps).toEqual(['orders_company_year_sequence_key', 'orders_id_company_id_key'])
     for (const nombre of uniqueMaps) expect(nombre).toMatch(SNAKE_CASE)
+  })
+
+  it('orders gana una columna decimal(14,4) opcional en snake_case y ninguna tabla nueva (R20)', () => {
+    const ingredientsCost = field(order, 'ingredientsCost')
+    expect(ingredientsCost.type).toBe('Decimal')
+    expect(ingredientsCost.isOptional).toBe(true)
+    expect(ingredientsCost.attributes).toContain('@map("ingredients_cost")')
+    expect(ingredientsCost.attributes).toMatch(/@db\.Decimal\(\s*14\s*,\s*4\s*\)/)
+    expect(ingredientsCost.attributes).not.toMatch(/@default\(/)
+
+    // Sigue siendo un solo modelo, dueno de `pedidos`: ninguna tabla nueva nace con la feature.
+    const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
+      .map((match) => match[1])
+      .filter((name): name is string => name !== undefined)
+    const pedidosModels = [...rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)]
+      .filter((match) => match[1] === 'pedidos')
+      .map((match) => match[2])
+      .filter((modelName): modelName is string => modelName !== undefined)
+    expect(pedidosModels).toEqual(['Order'])
+    expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
+  })
+
+  it('presentationId es uuid anulable, sin @relation y con su indice (R1, R2, R5)', () => {
+    const presentationId = field(order, 'presentationId')
+    expect(presentationId.type).toBe('String')
+    expect(presentationId.isOptional).toBe(true)
+    expect(presentationId.attributes).toContain('@db.Uuid')
+    expect(presentationId.attributes).toContain('@map("presentation_id")')
+    expect(presentationId.attributes).not.toMatch(/@default\(/)
+    expect(presentationId.attributes).not.toMatch(/@relation/)
+    expect(order.body).toMatch(
+      /@@index\(\[presentationId\],\s*map:\s*"orders_presentation_id_idx"\)/,
+    )
+  })
+
+  it('finishedAt es timestamptz anulable, sin default y sin indice en el esquema (R1)', () => {
+    const finishedAt = field(order, 'finishedAt')
+    expect(finishedAt.type).toBe('DateTime')
+    expect(finishedAt.isOptional).toBe(true)
+    expect(finishedAt.attributes).toContain('@map("finished_at")')
+    expect(finishedAt.attributes).toContain('@db.Timestamptz(6)')
+    expect(finishedAt.attributes).not.toMatch(/@default\(/)
+    expect(order.body).not.toMatch(/@@index\(\[finishedAt\]/)
+  })
+
+  it('no nace ninguna columna de moneda (R16)', () => {
+    const MONEDA = /currency|moneda|divisa|iso4217/i
+    expect(order.fields.filter((candidate) => MONEDA.test(candidate.name))).toEqual([])
+    expect(schema).not.toMatch(/currency|moneda|divisa/i)
+    for (const forbidden of ['currency', 'currencyCode', 'ingredientsCostCurrency']) {
+      expect(has(order, forbidden), `Order.${forbidden} no debe existir`).toBe(false)
+    }
   })
 })

@@ -111,37 +111,48 @@ describe('contrato de la ruta de proveedores', () => {
     }
   });
 
-  it('R30: la lista no conserva tabla ni barra propias y si su vacio, su error y su esqueleto', () => {
-    // Solo la ruta de LISTA: el catalogo del proveedor vive en `[id]/components/` y tiene su
-    // propio esqueleto sobre la tabla primitiva, que no es de esta lista.
+  it('R30 (QC-140, 2026-09-23): la lista ya no monta la tabla compartida ni paginacion propia, y conserva su vacio, su error y su esqueleto', () => {
+    // La lista paginada sobre tabla compartida da paso al catalogo visual: cada fila es un
+    // proveedor con su carrusel de lineas, sin tabla, sin controles de pagina y sin orden por
+    // columnas. Este caso se reescribe para esa forma nueva en vez de seguir exigiendo
+    // `DataTable`, que la lista ya no usa.
     const nombres = readdirSync(join(RAIZ, COMPONENTES_PATH));
-    const esqueleto = join(COMPONENTES_PATH, 'supplier-table-skeleton.tsx');
-    const tabla = join(COMPONENTES_PATH, 'supplier-table.tsx');
 
-    for (const borrado of ['supplier-list-toolbar.tsx', 'supplier-columns.ts']) {
+    for (const borrado of [
+      'supplier-table.tsx',
+      'supplier-table-skeleton.tsx',
+      'supplier-columns.tsx',
+      'supplier-columns-skeleton.ts',
+      'supplier-list-section.tsx',
+      'supplier-list-params.ts',
+      'supplier-list-toolbar.tsx',
+    ]) {
       expect(nombres, `${COMPONENTES_PATH} no deberia tener ${borrado}`).not.toContain(borrado);
     }
     expect(
       nombres.filter((nombre) => /toolbar|pagination/i.test(nombre)),
-      'la barra y la paginacion las pinta la tabla compartida',
+      'la lista ya no tiene barra ni paginacion, propias ni compartidas',
     ).toEqual([]);
 
+    // El filtro (`supplier-showcase-filters.tsx`) reutiliza legitimamente `SEARCH_DEBOUNCE_MS` del
+    // paquete de la tabla compartida (mismo rebote que su busqueda global); lo que se prohibe es
+    // el COMPONENTE de tabla, no cualquier import de ese paquete.
+    const montaComponenteDeTabla = /\bDataTable\b/;
     const importaTablaPrimitiva = /from\s*['"]@\/components\/ui\/table['"]/;
-    expect(
-      archivosDeLaLista().filter(
-        (archivo) => archivo !== esqueleto && importaTablaPrimitiva.test(leer(archivo)),
-      ),
-      'solo el esqueleto puede seguir montando la tabla primitiva',
-    ).toEqual([]);
+    for (const archivo of archivosDeLaLista()) {
+      const fuente = leer(archivo);
+      expect(fuente, `${archivo} monta el componente DataTable de QC-44`).not.toMatch(montaComponenteDeTabla);
+      expect(fuente, `${archivo} monta la tabla primitiva`).not.toMatch(importaTablaPrimitiva);
+    }
 
     for (const conservado of [
       join(COMPONENTES_PATH, 'supplier-list-empty.tsx'),
       join(COMPONENTES_PATH, 'supplier-list-error.tsx'),
-      esqueleto,
+      join(COMPONENTES_PATH, 'supplier-showcase-skeleton.tsx'),
+      join(COMPONENTES_PATH, 'supplier-showcase-list.tsx'),
+      join(COMPONENTES_PATH, 'supplier-showcase-section.tsx'),
     ]) {
       expect(existsSync(join(RAIZ, conservado)), `falta ${conservado}`).toBe(true);
     }
-
-    expect(leer(tabla)).toMatch(/from\s*['"]@\/components\/shared\/data-table['"]/);
   });
 });

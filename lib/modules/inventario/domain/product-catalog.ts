@@ -1,26 +1,22 @@
 // lib/modules/inventario/domain/product-catalog.ts
 
 import type { ProductStockByUnit } from './product-stock';
+import type { CostingBatch } from './costing-batch';
 
 /** Identificador de un producto visto DESDE FUERA de `inventario`. Es lo unico que otro
  *  modulo guarda de un producto (p. ej. `recipe_lines.product_id`). */
 export type ProductId = string;
 
-/** Lo que otro modulo puede saber de un producto sin tocar su tabla: identidad, nombre y
- *  existencia. Deliberadamente NO expone costo, compra minima ni presentacion: la
+/** Lo que otro modulo puede saber de un producto sin tocar su tabla: identidad, nombre,
+ *  unidad y existencia. Deliberadamente NO expone costo, compra minima ni presentacion: la
  *  presentacion se mudo al lote (`ProductBatch`) el 2026-09-09, y un contrato publico se
  *  amplia cuando alguien lo necesita, no antes.
- *
- *  QC-80 (R21): AQUI VIVIA `unitId`, y se retira SIN SUSTITUTO porque NADIE lo consumia.
- *  `recetas` -el unico llamante de `findRefs`- lo pide para saber si el producto sigue vivo y
- *  para su nombre y su existencia; la unidad de una linea de receta es `recipe_lines.unit_id`,
- *  que es SUYA y no se toca. No se publica en su lugar la unidad derivada del lote
- *  (`ProductView.latestBatchUnitId`): un contrato publico no gana un campo que nadie pide, y
- *  quien lista productos ya lo recibe por `ProductView`.
  */
 export type ProductRef = {
   readonly id: ProductId;
   readonly name: string;
+  /** La unidad del producto; null mientras no tiene ningun lote. */
+  readonly unitId: string | null;
   /** Suma de lotes por unidad; array vacio cuando el producto no tiene ninguno. */
   readonly stockByUnit: readonly ProductStockByUnit[];
 };
@@ -40,4 +36,18 @@ export interface ProductCatalog {
    *  dos lados. Que el ambito viva en la firma es lo que hace que una llamada que lo omita
    *  no compile. */
   findRefs(ids: readonly ProductId[], companyId: string): Promise<readonly ProductRef[]>;
+
+  /** Lotes CON DISPONIBLE (`stock - apartado > 0`) de los productos pedidos, de productos
+   *  vivos y de esa empresa. Un producto sin lotes con disponible simplemente no aparece. NO
+   *  ordena: el promedio de quien costea no depende del orden.
+   *
+   *  Con `excludeOrderId`, lo que ESE pedido tiene apartado no se resta del disponible: es
+   *  para que la edicion y la cotizacion de un pedido que ya existe cuenten su propia reserva
+   *  como disponible para si mismo. Un `excludeOrderId` de otra empresa no cambia nada: las
+   *  dos tablas que agregan el disponible siguen acotadas a `companyId`. */
+  findCostingBatches(
+    ids: readonly ProductId[],
+    companyId: string,
+    options?: { readonly excludeOrderId?: string },
+  ): Promise<readonly CostingBatch[]>;
 }

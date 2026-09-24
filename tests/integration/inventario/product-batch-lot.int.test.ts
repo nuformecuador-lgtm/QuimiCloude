@@ -18,12 +18,15 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { BatchDuplicateLotError, createCreateProduct, ValidationError } from '@/lib/modules/inventario';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -164,6 +167,7 @@ async function createFixture(): Promise<Fixture> {
  * con un nombre irrepetible.
  */
 async function dropFixture(fixture: Fixture): Promise<void> {
+  await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.product.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
@@ -189,7 +193,7 @@ function newProduct(overrides: Partial<NewProduct> = {}): NewProduct {
 function newBatch(fixture: Fixture, overrides: Partial<NewProductBatch> = {}): NewProductBatch {
   return {
     presentationId: fixture.presentationId,
-    stock: 3,
+    stock: '3',
     unitCost: '2.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -671,9 +675,12 @@ const repositorioReal: ProductRepository = {
   updateAlive: updateAliveProduct,
   softDeleteAlive: softDeleteAliveProduct,
   listAlive: listAliveProducts,
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
@@ -718,8 +725,8 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
       const sinFecha = await altaDeProducto(
         {
           name: `Producto ${token()}`,
-          stock: 2,
-          qtyAlert: 1,
+          stock: '2',
+          qtyAlert: '1',
           presentationId: fixture.presentationId,
           unitCost: '1.5000',
         },
@@ -730,8 +737,8 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
       const conFecha = await altaDeProducto(
         {
           name: `Producto ${token()}`,
-          stock: 2,
-          qtyAlert: 1,
+          stock: '2',
+          qtyAlert: '1',
           presentationId: fixture.presentationId,
           unitCost: '1.5000',
           purchaseDate: '2026-02-14',
@@ -757,8 +764,8 @@ async function lotOfProduct(productId: string): Promise<string> {
 
 describe('R34, R35, R36: el lote tecleado de solo digitos no llega a 60 y el generado cabe siempre', () => {
   it('R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, los dos siguientes generados tienen 60 caracteres sin reintento y 60 digitos tecleados dan ValidationError sin filas nuevas', async () => {
-    // Por el caso de uso: el esquema de entrada solo se aplica ahi. `findAliveIdByName` no abre
-    // transaccion, asi que una sola por alta es la escritura sin reintento.
+    // Por el caso de uso: el esquema de entrada solo se aplica ahi. `findAliveIdByNameInPresentationUnit`
+    // no abre transaccion, asi que una sola por alta es la escritura sin reintento.
     const fixture = await createFixture();
     const spy = vi.spyOn(prisma, '$transaction');
     try {
@@ -772,8 +779,8 @@ describe('R34, R35, R36: el lote tecleado de solo digitos no llega a 60 y el gen
         altaDeProducto(
           {
             name: `Producto ${token()}`,
-            stock: 2,
-            qtyAlert: 1,
+            stock: '2',
+            qtyAlert: '1',
             presentationId: fixture.presentationId,
             unitCost: '1.5000',
             ...(lot === undefined ? {} : { lot }),

@@ -10,6 +10,8 @@
 // findProductRefs solo devuelve productos vivos'` -ese es el que muerde si alguien quita un
 // filtro; este archivo, con mocks, no podria detectarlo.
 
+import { Prisma } from '@prisma/client';
+
 import {
   findProductRefs,
   toProductRef,
@@ -25,37 +27,57 @@ const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { product: { findMany } } }));
 
 describe('toProductRef', () => {
-  it('mapea id, name y stockByUnit tal cual', () => {
+  it('mapea id, name, unitId y stockByUnit tal cual', () => {
     const ref = toProductRef({
       id: 'p-1',
       name: 'Acido sulfurico',
-      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
+      unitId: 'kg',
+      stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
     });
     expect(ref).toEqual({
       id: 'p-1',
       name: 'Acido sulfurico',
-      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
+      unitId: 'kg',
+      stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
     });
   });
 
   it('sin lotes, stockByUnit es un array vacio', () => {
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', stockByUnit: [] });
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
     expect(ref.stockByUnit).toEqual([]);
   });
 
-  it('la referencia publica NO lleva unidad propia, ni la vieja ni la derivada (QC-80, R21), ni existencia del producto (QC-91, R11)', () => {
-    // R21 — `ProductRef` es lo que `inventario` publica a OTROS modulos, y `unitId` se retira
-    // de ahi SIN SUSTITUTO: el unico llamante de `findRefs` es `recetas`, que lo pide para
-    // saber si el producto sigue vivo y para su nombre y su existencia. La unidad de una linea
-    // de receta es `recipe_lines.unit_id`, propia de `recetas` y ajena a esta ficha.
-    //
+  it('la referencia publica NO lleva existencia total del producto (R11)', () => {
     // R11 — `products.stock` ya no existe: la existencia sale UNICAMENTE de `stockByUnit`, que
     // agrupa por unidad (R5) y no es lo mismo que el producto declarando SU unidad.
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', stockByUnit: [] });
-    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit']);
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
+    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit', 'unitId']);
     expect(Object.keys(ref)).not.toContain('stock');
-    expect(Object.keys(ref)).not.toContain('unitId');
     expect(Object.keys(ref)).not.toContain('latestBatchUnitId');
+  });
+});
+
+describe('R14 — findRefs lee la existencia y la unidad de las columnas del producto', () => {
+  beforeEach(() => {
+    findMany.mockReset();
+  });
+
+  it('con unidad guardada, unitId y stockByUnit traen esa unidad', async () => {
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(12), unitId: 'kg' }]);
+
+    const [ref] = await findProductRefs(['p-1'], 'empresa-1');
+
+    expect(ref?.unitId).toEqual('kg');
+    expect(ref?.stockByUnit).toEqual([{ unitId: 'kg', quantity: '12.0000' }]);
+  });
+
+  it('sin unidad guardada (sin lotes), unitId es null y stockByUnit es un array vacio', async () => {
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
+
+    const [ref] = await findProductRefs(['p-1'], 'empresa-1');
+
+    expect(ref?.unitId).toBeNull();
+    expect(ref?.stockByUnit).toEqual([]);
   });
 });
 
@@ -113,7 +135,7 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
     // despues: devuelve tal cual lo que el `where` (ya acotado) dejo pasar. Si `findMany`
     // filtro por empresa, un producto ajeno simplemente no aparece en la fila -mismo camino que
     // un id que no existe, sin distincion posible para quien pregunta.
-    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', batches: [] }]);
+    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
 
     const refs = await findProductRefs(['p-propio', 'p-de-otra-empresa'], 'empresa-1');
 

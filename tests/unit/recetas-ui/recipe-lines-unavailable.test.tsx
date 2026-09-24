@@ -55,8 +55,7 @@ function availableLine(key: string, name: string): RecipeLineFormValue {
     key,
     productId: `product-${key}`,
     productName: name,
-    quantity: '1',
-    unitId: 'unit-1',
+    percentage: '10',
     productUnitId: null,
   };
 }
@@ -67,8 +66,7 @@ function unavailableLine(key: string): RecipeLineFormValue {
     key,
     productId: `product-${key}`,
     productName: null,
-    quantity: '2.5000',
-    unitId: 'unit-2',
+    percentage: '25',
     productUnitId: null,
   };
 }
@@ -91,6 +89,7 @@ function Harness({
       }}
       units={[]}
       initialProductPage={INITIAL_PRODUCT_PAGE}
+      initialMachinePage={INITIAL_PRODUCT_PAGE}
     />
   );
 }
@@ -150,6 +149,13 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
     expect(screen.queryByTestId(NOTICE_TEST_ID)).not.toBeInTheDocument();
   });
 
+  it('(f) la línea de baja no deja añadir otra después: su `+` está deshabilitado', () => {
+    render(<Harness initialLines={[unavailableLine('l1'), availableLine('l2', 'Glicerina')]} />);
+
+    expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
+    expect(screen.getByTestId('recipe-line-add-1')).toBeEnabled();
+  });
+
   it('(e) el payload enviado sigue conteniendo la línea marcada, intacta (R21, R22)', () => {
     const markedLine = unavailableLine('l1');
     const lines = [markedLine, availableLine('l2', 'Glicerina')];
@@ -171,8 +177,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
     expect(payload.lines).toHaveLength(2);
     expect(payload.lines[0]).toEqual({
       productId: markedLine.productId,
-      quantity: markedLine.quantity,
-      unitId: markedLine.unitId,
+      percentage: markedLine.percentage,
     });
   });
 });

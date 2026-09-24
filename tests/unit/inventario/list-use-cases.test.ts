@@ -52,9 +52,15 @@ function montarProductos() {
     softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(),
     // QC-90 (T4): el doble cumple el puerto ENTERO. El listado no los usa; estan para que
     // el compilador siga vigilando la forma completa de `ProductRepository`.
-    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(),
+    findAliveIdByNameInPresentationUnit: vi.fn<
+      ProductRepository['findAliveIdByNameInPresentationUnit']
+    >(),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(),
+    // QC-92: mismo criterio, el listado tampoco los usa.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(),
     listAlive,
   } satisfies ProductRepository;
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };
@@ -169,8 +175,7 @@ describe('list-products: el campo no declarado se omite, no rompe y se anota (R5
     expect(log.ignoredFields).toHaveBeenCalledWith('products', ['qtyAlert']);
   });
 
-  it('ordenar o filtrar por existencia se omite y se anota, sin fallar (R8)', async () => {
-    // R8 — `products.stock` ya no existe: ni orden ni filtro por ella pueden llegar al puerto.
+  it('ordenar y filtrar por existencia llega intacto al puerto (R15)', async () => {
     const { products, log, listProducts } = montarProductos();
 
     await listProducts(
@@ -178,9 +183,14 @@ describe('list-products: el campo no declarado se omite, no rompe y se anota (R5
       ADMIN,
     );
 
-    expect(consultaRecibida(products.listAlive.mock.calls).sort).toBeNull();
-    expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual({});
-    expect(log.ignoredFields).toHaveBeenCalledWith('products', ['stock']);
+    expect(consultaRecibida(products.listAlive.mock.calls).sort).toEqual({
+      columnId: 'stock',
+      direction: 'desc',
+    });
+    expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual({
+      stock: { kind: 'numberRange', min: 0, max: 10 },
+    });
+    expect(log.ignoredFields).toHaveBeenCalledWith('products', []);
   });
 
   it('el log recibe NOMBRES de campo y nunca el valor buscado ni el del filtro (R6, PII)', async () => {
@@ -258,9 +268,8 @@ describe('list-products: lo que llega al repositorio (R11, R13, R15, R20, R24, R
     await listProducts(
       {
         filters: {
-          // Los dos filtros son de `PRODUCT_QUERYABLE`. Ninguno es `unitId` (QC-80, R21) ni
-          // `stock` (QC-91, R8): los dos dejaron de estar declarados, asi que un caso de
-          // «llegan intactos» no puede apoyarse en ellos, o mediria la omision en vez del paso.
+          // Los dos filtros son de `PRODUCT_QUERYABLE`. `unitId` no lo es: no hay entrada de
+          // eleccion por unidad en el listado.
           qtyAlert: { kind: 'numberRange', min: null, max: 3 },
           createdAt: { kind: 'dateRange', from: '2026-01-01', to: null },
         },

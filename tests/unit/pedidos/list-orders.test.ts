@@ -26,7 +26,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ValidationError, type PedidosError } from '@/lib/modules/pedidos/domain/errors'
 import { UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
-import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
+import { type GetOrderDeps } from '@/lib/modules/pedidos/domain/get-order'
+import { createListOrders, type ListOrdersDeps } from '@/lib/modules/pedidos/domain/list-orders'
+import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { ListQuery } from '@/lib/modules/pedidos/domain/list-query'
@@ -34,6 +36,7 @@ import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { Page } from '@/lib/modules/pedidos/domain/page'
 import type { ListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
@@ -68,10 +71,12 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
+    ingredientsCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
+    presentationId: null,
     ...overrides,
   }
 }
@@ -83,21 +88,33 @@ function pagina(items: readonly OrderRow[], resto: Partial<Page<OrderRow>> = {})
 function dobles(opciones: {
   pagina?: Page<OrderRow>
   recetas?: readonly RecipeRef[]
+  // QC-68: `null` = «el termino no es una busqueda», que es el comportamiento por defecto de
+  // este doble cuando el caso no necesita otra cosa.
+  idsQueCasan?: readonly string[] | null
+  presentaciones?: readonly PresentationRef[]
 }) {
   // Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- porque lo que este archivo
   // afirma es lo que se LE PASO a cada doble: sin ellos, TypeScript infiere una tupla vacia y
-  // `mock.calls[0][0]` no existe. Ademas los dos catalogos FILTRAN por los ids pedidos, como
-  // hacen los de verdad: un id que no existe simplemente no vuelve.
-  // QC-57 (R25): `listAlive` recibe UN solo parametro -la consulta ya saneada-. `OrderFilters`
-  // desaparecio: el estado y la prioridad son filtros `select` DENTRO de esa consulta.
+  // `mock.calls[0][0]` no existe. Ademas los catalogos FILTRAN por los ids pedidos, como hacen
+  // los de verdad: un id que no existe simplemente no vuelve.
+  // QC-57 (R25): `listAlive` recibe la consulta ya saneada. `OrderFilters` desaparecio: el
+  // estado y la prioridad son filtros `select` DENTRO de esa consulta.
+  // QC-68: `listAlive` gana un segundo parametro, `recipeIds`. Este doble solo LEE el primer
+  // argumento -la consulta-; el segundo se afirma desde `mock.calls`, nunca desde aqui, para no
+  // cambiar su aridad de cara a quien ya lo usa.
   const listAlive = vi.fn(async (query: ListQuery) => {
-    // El doble no usa el argumento; lo DECLARA para que `mock.calls` tenga tipo, y lo que se le
-    // paso se afirma desde el propio caso de test.
     void query
     return opciones.pagina ?? pagina([])
   })
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) =>
     (opciones.recetas ?? REFS_RECETA).filter((ref) => ids.includes(ref.id)),
+  )
+  const findIdsMatchingName = vi.fn(
+    async (search: string, companyId: string): Promise<readonly string[] | null> => {
+      void search
+      void companyId
+      return opciones.idsQueCasan ?? null
+    },
   )
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -113,14 +130,22 @@ function dobles(opciones: {
     softDeleteAlive: explota('orders.softDeleteAlive'),
   } as unknown as OrderRepository
 
+  // R22: una sola llamada al catalogo de presentaciones por pagina, con los ids DEDUPLICADOS.
+  const findRefs = vi.fn(async (ids: readonly string[]) =>
+    (opciones.presentaciones ?? []).filter((ref) => ids.includes(ref.id)),
+  )
+
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
 
   return {
     orders,
-    recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
+    recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
+    presentations: { findRefs } as unknown as PresentationCatalog,
     log,
     listAlive,
     findRefsIncludingDeleted,
+    findIdsMatchingName,
+    findRefs,
   }
 }
 
@@ -129,6 +154,20 @@ function consultaRecibida(recibidas: readonly (readonly [ListQuery])[]): ListQue
   const ultima = recibidas.at(-1)
   if (ultima === undefined) throw new Error('el puerto no fue llamado')
   return ultima[0]
+}
+
+/**
+ * El segundo argumento (`recipeIds`) recibido por `listAlive` en su ultima llamada.
+ *
+ * El doble de `listAlive` declara un solo parametro tipado -`query: ListQuery`- a proposito
+ * (no se le cambia la aridad), pero `vi.fn` registra en `mock.calls` TODOS los argumentos con
+ * los que se le llamo en tiempo de ejecucion, aunque la firma declarada no los tipe. Por eso
+ * este helper recibe el array como `unknown[][]` y lee el indice 1 sin tocar el doble.
+ */
+function recipeIdsRecibidos(recibidas: readonly (readonly unknown[])[]): readonly string[] | null {
+  const ultima = recibidas.at(-1)
+  if (ultima === undefined) throw new Error('el puerto no fue llamado')
+  return ultima[1] as readonly string[] | null
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -181,14 +220,17 @@ describe('listOrders — dos consultas por pagina, tenga 1 fila o 25 (R45)', () 
   })
 
   it('usa la consulta que INCLUYE las dadas de baja, no una de solo vivas (R44)', async () => {
-    // `RecipeCatalog` publica exactamente un metodo, y su nombre es explicito precisamente
-    // para que nadie lo confunda con los `findRefs` de producto y unidad, que solo devuelven
-    // lo vivo.
+    // Nota fechada 2026-09-18: hasta QC-68 `pedidos` solo llamaba a un metodo de `RecipeCatalog`
+    // y este caso lo comprobaba mirando las claves del doble. QC-68 anade `findIdsMatchingName`
+    // -que este caso no ejercita porque no hay busqueda-, asi que la comprobacion se hace sobre
+    // las LLAMADAS, no sobre la forma del doble: sigue siendo `findRefsIncludingDeleted`, nunca
+    // un `findRefs` de solo vivas, y `findIdsMatchingName` no se llama sin termino de busqueda.
     const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]) })
 
     await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(Object.keys(d.recipes)).toEqual(['findRefsIncludingDeleted'])
+    expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
+    expect(d.findIdsMatchingName).not.toHaveBeenCalled()
   })
 })
 
@@ -310,20 +352,47 @@ describe('listOrders — pagina, filtros y validacion (R34, R36, R37, R38, R39)'
     })
   })
 
-  it('la busqueda se OMITE y se registra, y la lista vuelve igual (R17, R39)', async () => {
-    // R17: `orders` es la UNICA de las siete listas sin columna `name`
-    // (`ORDER_QUERYABLE.searchable === false`). La busqueda no falla y no filtra: se omite, se
-    // anota en el log y la consulta devuelve la lista como si no se hubiera buscado.
-    const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]) })
+  // Nota fechada 2026-09-18: hasta QC-68 este caso afirmaba que la busqueda se OMITIA y se
+  // anotaba (R17, R39): `orders` no tenia columna `name` y `searchable` era `false`. Desde
+  // QC-68 `orders` SI busca -no por su propia columna, que sigue sin existir, sino resolviendo
+  // el termino a ids de receta con el catalogo de `recetas` antes de llamar al repositorio-, asi
+  // que la afirmacion cambia: el termino LLEGA al catalogo y los ids que este devuelve LLEGAN al
+  // repositorio, y el log DEJA de anotar `search`.
+  it('el termino de busqueda llega al catalogo de recetas y sus ids llegan al repositorio (R1, R7)', async () => {
+    const idsQueCasan = [RECETA_A]
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]), idsQueCasan })
 
     const salida = await createListOrders(d)({ page: 1, search: 'acido citrico' }, ADMIN)
 
-    expect(consultaRecibida(d.listAlive.mock.calls).search).toBe('')
-    expect(d.log.ignoredFields).toHaveBeenCalledWith('orders', ['search'])
-    // La lista vuelve igual: la busqueda omitida no recorta nada.
+    expect(d.findIdsMatchingName).toHaveBeenCalledWith('acido citrico', ADMIN.companyId)
+    expect(recipeIdsRecibidos(d.listAlive.mock.calls)).toEqual(idsQueCasan)
     expect(salida.items).toHaveLength(1)
+    // El log ya NO anota `search`: sobrevive a la poda, no se omite.
+    expect(d.log.ignoredFields).toHaveBeenCalledWith('orders', [])
+  })
 
-    // Y no hay filtro por el numero correlativo (R39): no esta declarado filtrable.
+  it('con `null` del catalogo (el termino no es una busqueda) la lista vuelve entera y `listAlive` recibe `null` (R9)', async () => {
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]), idsQueCasan: null })
+
+    const salida = await createListOrders(d)({ page: 1, search: '???' }, ADMIN)
+
+    expect(recipeIdsRecibidos(d.listAlive.mock.calls)).toBeNull()
+    expect(salida.items).toHaveLength(1)
+  })
+
+  it('con `[]` del catalogo (ninguna receta casa) el repositorio se llama igual y devuelve pagina vacia (R10)', async () => {
+    const d = dobles({ pagina: pagina([]), idsQueCasan: [] })
+
+    const salida = await createListOrders(d)({ page: 1, search: 'no existe ninguna' }, ADMIN)
+
+    expect(d.listAlive).toHaveBeenCalledTimes(1)
+    expect(recipeIdsRecibidos(d.listAlive.mock.calls)).toEqual([])
+    expect(salida.items).toEqual([])
+  })
+
+  it('no hay filtro por el numero correlativo: se OMITE y se anota (R39)', async () => {
+    // Caso hermano conservado: sin el, esta mitad del contrato generico dejaria de estar
+    // probada en pedidos. `orderNumber` no esta declarado filtrable y sigue omitiendose.
     const porNumero = dobles({ pagina: pagina([]) })
     await createListOrders(porNumero)(
       { page: 1, filters: { orderNumber: { kind: 'text', value: '2026-0000001' } } },
@@ -486,5 +555,190 @@ describe('listOrders — el campo no declarado se omite, no rompe y se anota (QC
       direction: 'desc',
     })
     expect(d.log.ignoredFields).toHaveBeenCalledWith('orders', [])
+  })
+})
+
+// T9 (QC-68) — el numero de INVOCACIONES DE PUERTO por pagina (R8, R9).
+//
+// Esto cuenta llamadas a los dobles, NO consultas SQL. `design.md > 3` cuenta 3 consultas SQL
+// sin busqueda y 4 con ella -el `findMany` y el `count` de `listAlive` viven dentro de UNA sola
+// invocacion de puerto, y un doble no puede verlos por separado-. Lo que este bloque demuestra
+// es que el numero de invocaciones de puerto es 2 sin busqueda (`orders.listAlive` +
+// `recipes.findRefsIncludingDeleted`) y 3 con busqueda (mas `recipes.findIdsMatchingName`), y
+// que ninguno de los dos crece con el numero de filas. Nota fechada 2026-09-17 en
+// `design.md > 3` y correccion fechada en `tasks.md > T9`: las dos cifras son ciertas y miden
+// cosas distintas. El numero de consultas SQL no esta probado por ningun test de este repo.
+describe('listOrders — invocaciones de puerto por pagina, con y sin busqueda (R8, R9)', () => {
+  it('sin busqueda: DOS invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)', async () => {
+    for (const cuantas of [1, 25]) {
+      const filas = Array.from({ length: cuantas }, (_, i) => fila({ id: `o-${i}` }))
+      const d = dobles({ pagina: pagina(filas, { total: cuantas }) })
+
+      await createListOrders(d)({ page: 1 }, ADMIN)
+
+      expect(d.listAlive).toHaveBeenCalledTimes(1)
+      expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
+      expect(d.findIdsMatchingName).not.toHaveBeenCalled()
+    }
+  })
+
+  it('con busqueda: TRES invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)', async () => {
+    for (const cuantas of [1, 25]) {
+      const filas = Array.from({ length: cuantas }, (_, i) => fila({ id: `o-${i}` }))
+      const d = dobles({
+        pagina: pagina(filas, { total: cuantas }),
+        idsQueCasan: [RECETA_A, RECETA_B],
+      })
+
+      await createListOrders(d)({ page: 1, search: 'acido' }, ADMIN)
+
+      expect(d.findIdsMatchingName).toHaveBeenCalledTimes(1)
+      expect(d.listAlive).toHaveBeenCalledTimes(1)
+      expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('con `search` vacio, el catalogo de busqueda NO se llama', async () => {
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]) })
+
+    await createListOrders(d)({ page: 1, search: '' }, ADMIN)
+
+    expect(d.findIdsMatchingName).not.toHaveBeenCalled()
+    expect(recipeIdsRecibidos(d.listAlive.mock.calls)).toBeNull()
+  })
+
+  it('con `null` del catalogo, `listAlive` recibe `null` (R9)', async () => {
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' })]), idsQueCasan: null })
+
+    await createListOrders(d)({ page: 1, search: '???' }, ADMIN)
+
+    expect(d.findIdsMatchingName).toHaveBeenCalledTimes(1)
+    expect(recipeIdsRecibidos(d.listAlive.mock.calls)).toBeNull()
+  })
+})
+
+// QC-123 T7 — las LECTURAS no recalculan (R12). No es solo comportamiento: es que el TIPO de
+// las dependencias no deja ni pedir `products` ni `units`. Las dos comprobaciones de abajo se
+// verifican por caminos distintos y ninguna sustituye a la otra:
+//  (a) TIPO — si `ListOrdersDeps` o `GetOrderDeps` alguna vez ganaran `products` o `units`, las
+//      cuatro constantes de mas abajo dejarian de aceptar `true` y `pnpm run typecheck` se
+//      pondria rojo EN ESTA LINEA, sin tocar el resto del archivo.
+//  (b) COMPORTAMIENTO — un doble que EXPLOTA si algo intenta LEER `products` o `units` de las
+//      deps demuestra que, ademas de no declararlos, el caso de uso nunca los toca en tiempo de
+//      ejecucion.
+describe('listOrders (y getOrder) — las lecturas no recalculan (R12)', () => {
+  it('el listado no recibe catalogo de productos ni de unidades (R12)', async () => {
+    const listadoSinProductos: 'products' extends keyof ListOrdersDeps ? false : true = true
+    const listadoSinUnidades: 'units' extends keyof ListOrdersDeps ? false : true = true
+    const fichaSinProductos: 'products' extends keyof GetOrderDeps ? false : true = true
+    const fichaSinUnidades: 'units' extends keyof GetOrderDeps ? false : true = true
+    expect([listadoSinProductos, listadoSinUnidades, fichaSinProductos, fichaSinUnidades]).toEqual(
+      [true, true, true, true],
+    )
+
+    const d = dobles({
+      pagina: pagina([fila({ id: 'o-1', ingredientsCost: '150.0000' })]),
+    })
+    // El doble real no tiene ni `products` ni `units`; el Proxy ademas hace explicito que
+    // LEERLOS -aunque alguien los colara con un cast- tira el caso de uso abajo.
+    const vigilado = new Proxy(d, {
+      get(target, prop, receiver) {
+        if (prop === 'products' || prop === 'units') {
+          throw new Error(`listOrders no deberia leer '${String(prop)}': las lecturas no recalculan (R12)`)
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    }) as typeof d
+
+    const salida = await createListOrders(vigilado)({ page: 1 }, ADMIN)
+
+    expect(salida.items[0]?.ingredientsCost).toBe('150.0000')
+  })
+})
+
+// QC-123 T9 — el importe no es ordenable ni filtrable (R17): `ORDER_QUERYABLE` no lo declara, y
+// pedirlo como `sort` o como filtro se PODA y se ANOTA sin que la consulta falle -mismo
+// mecanismo que `list-orders.ts:136-138` ya prueban los casos vecinos de `deletedAt` y de un
+// filtro con forma equivocada, aqui aplicado a `ingredientsCost`.
+describe('listOrders — el importe no es consultable (R17)', () => {
+  it('el importe no esta en la lista blanca y pedirlo como orden o filtro se poda y se anota (R17)', async () => {
+    expect(ORDER_QUERYABLE.sortable).not.toContain('ingredientsCost')
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('ingredientsCost')
+
+    const porOrden = dobles({ pagina: pagina([]) })
+    const salidaOrden = await createListOrders(porOrden)(
+      { page: 1, sort: { columnId: 'ingredientsCost', direction: 'desc' } },
+      ADMIN,
+    )
+    // (a) la consulta NO falla
+    expect(salidaOrden.items).toEqual([])
+    // (b) el orden pedido se poda: el puerto recibe `sort: null`
+    expect(porOrden.listAlive).toHaveBeenCalledTimes(1)
+    expect(consultaRecibida(porOrden.listAlive.mock.calls).sort).toBeNull()
+    // (c) y se anota en el log de campos omitidos
+    expect(porOrden.log.ignoredFields).toHaveBeenCalledWith('orders', ['ingredientsCost'])
+
+    const porFiltro = dobles({ pagina: pagina([]) })
+    await createListOrders(porFiltro)(
+      { page: 1, filters: { ingredientsCost: { kind: 'numberRange', min: 100, max: 200 } } },
+      ADMIN,
+    )
+    expect(consultaRecibida(porFiltro.listAlive.mock.calls).filters).toEqual({})
+    expect(porFiltro.log.ignoredFields).toHaveBeenCalledWith('orders', ['ingredientsCost'])
+  })
+})
+
+describe('listOrders — la presentacion del pedido (R21, R22)', () => {
+  const PRESENTACION_A = '77777777-7777-4777-8777-777777777777'
+
+  it('R22: una sola llamada al catalogo de presentaciones por pagina, con alguna presentacion en la pagina', async () => {
+    const filas = [
+      fila({ id: 'o-1', presentationId: PRESENTACION_A }),
+      fila({ id: 'o-2', presentationId: PRESENTACION_A }),
+      fila({ id: 'o-3', presentationId: null }),
+    ]
+    const d = dobles({
+      pagina: pagina(filas, { total: 3 }),
+      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L' }],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.findRefs).toHaveBeenCalledTimes(1)
+    expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A])
+    expect(salida.items[0]?.presentationName).toBe('Bidon 20L')
+    expect(salida.items[1]?.presentationName).toBe('Bidon 20L')
+    expect(salida.items[2]?.presentationName).toBeNull()
+  })
+
+  it('R22: ninguna llamada al catalogo de presentaciones si ningun pedido de la pagina tiene presentacion', async () => {
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' }), fila({ id: 'o-2' })], { total: 2 }) })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.findRefs).not.toHaveBeenCalled()
+    expect(salida.items.every((item) => item.presentationName === null)).toBe(true)
+  })
+
+  it('R21: ordenar o filtrar por presentacion se OMITE y se anota, como cualquier campo no declarado', async () => {
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('presentationName')
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('presentationId')
+    expect(ORDER_QUERYABLE.sortable).not.toContain('presentationName')
+
+    const porOrden = dobles({ pagina: pagina([]) })
+    await createListOrders(porOrden)(
+      { page: 1, sort: { columnId: 'presentationName', direction: 'desc' } },
+      ADMIN,
+    )
+    expect(consultaRecibida(porOrden.listAlive.mock.calls).sort).toBeNull()
+    expect(porOrden.log.ignoredFields).toHaveBeenCalledWith('orders', ['presentationName'])
+
+    const porFiltro = dobles({ pagina: pagina([]) })
+    await createListOrders(porFiltro)(
+      { page: 1, filters: { presentationId: { kind: 'select', values: ['x'] } } },
+      ADMIN,
+    )
+    expect(consultaRecibida(porFiltro.listAlive.mock.calls).filters).toEqual({})
+    expect(porFiltro.log.ignoredFields).toHaveBeenCalledWith('orders', ['presentationId'])
   })
 })

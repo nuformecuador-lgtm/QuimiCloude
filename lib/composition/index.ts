@@ -57,23 +57,32 @@ import type { SessionEraser } from '@/lib/modules/identity/ports/session-eraser'
 import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/session-revocation-repository';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
+  createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
+  createListBatchMovements,
   createListPresentations,
+  createListProductBatches,
   createListProducts,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
-import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import {
+  findCostingBatches,
+  findProductRefs,
+} from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -84,10 +93,20 @@ import {
   listPresentations,
   replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
+import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  createMaterialReservations,
+  createReservationQueries,
+} from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type {
+  OrderNumberDirectory,
+  PresentationCatalog,
+  ProductCatalog,
+  ReservationQueries,
+} from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
@@ -141,7 +160,9 @@ import {
   createDeleteSupplier,
   createGetSupplier,
   createListCatalogLines,
+  createListShowcaseLines,
   createListSuppliers,
+  createListSupplierShowcase,
   createUpdateCatalogLine,
   createUpdateSupplier,
 } from '@/lib/modules/proveedores';
@@ -149,6 +170,7 @@ import {
   createSupplier,
   findAliveSupplierById,
   listAliveSuppliers,
+  listShowcaseAliveSuppliers,
   softDeleteAliveSupplier,
   updateAliveSupplier,
 } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-prisma';
@@ -166,22 +188,30 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createExpireStaleOrders,
+  createFindCoverage,
   createGetOrder,
   createListOrders,
+  createQuoteOrderCost,
+  createTransitionOrder,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
-  cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
+  findExpirableOrders,
   listAliveOrders,
-  softDeleteAliveOrder,
-  updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
+  createRecipeExecutionReader,
   findRecipeExecutionContentById,
+  findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -266,7 +296,10 @@ import {
   createFinishAssignedOrder,
   createGetAssignedOrderExecution,
   createListAssignedOrders,
+  createListCompanyOrders,
+  createListFinishedOrders,
   createListOrderResponsibles,
+  createListResponsibleCandidates,
   createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
@@ -277,32 +310,64 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
-  transitionAliveOrder,
+  listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
+import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
 import {
   createConvertPdfs,
+  createCropCatalogImages,
   createDownloadDocument,
+  createEnqueueBatch,
+  createGetBatchStatus,
   createIssueReadLink,
   createIssueUploadLinks,
+  createProcessPdfByStrategy,
+  createReadPdfWithAi,
+  createRunDocumentJob,
 } from '@/lib/modules/documentos';
+import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
+import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
+import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
+import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
+import { cropImage } from '@/lib/modules/documentos/adapters/driven/image/image-cropper-sharp';
+import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
+import { createCropRegionLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/crop-region-log-console';
 import {
   countPages,
   extractPdfText,
   renderPages,
 } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
+import { documentBatchRepositoryPrisma } from '@/lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma';
+import { createProcessingQueueInline } from '@/lib/modules/documentos/adapters/driven/queue/processing-queue-inline';
+import { processingQueueQstash } from '@/lib/modules/documentos/adapters/driven/queue/processing-queue-qstash';
+import { queueSignatureQstash } from '@/lib/modules/documentos/adapters/driven/queue/queue-signature-qstash';
+import { documentStorageMemory } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-memory';
 import {
   createDocumentSignedReadUrl,
   createDocumentSignedUpload,
   downloadDocument,
+  removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
+import { uploadCrop } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
+import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { CropStorage } from '@/lib/modules/documentos/ports/crop-storage';
+import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
+import type { ImageCropper } from '@/lib/modules/documentos/ports/image-cropper';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
+import type { ProcessingConfig } from '@/lib/modules/documentos/ports/processing-config';
+import type { ProcessingQueue } from '@/lib/modules/documentos/ports/processing-queue';
+import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signature';
+import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
+import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
+import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -633,9 +698,12 @@ const productRepository: ProductRepository = {
   // QC-90 (T7, `design.md > 7`): las tres del alta con su primer lote. Nada mas cambia aqui
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 const presentationRepository: PresentationRepository = {
@@ -644,6 +712,12 @@ const presentationRepository: PresentationRepository = {
   deleteById: deletePresentationById,
   list: listPresentations,
 };
+
+/** `OrderNumberDirectory` cableado con el adaptador driven DE PEDIDOS: `inventario` solo conoce
+ *  el TIPO, para el historial de un lote. Declarado ANTES de la fachada de `inventario` -y no
+ *  junto al resto de lo de `pedidos`, mas abajo- porque `listBatchMovements` lo necesita ya
+ *  cableado: un `const` no existe antes de su linea. */
+const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 /**
  * Fachada del modulo `inventario` ya cableada (T11, `design.md > 3`, `> 7`). Es lo que
@@ -668,6 +742,18 @@ export const inventario = {
     presentations: presentationRepository,
     log: inventarioListQueryLog,
   }),
+  // Claves nuevas al final: ninguna de las de arriba se toca.
+  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  listProductBatches: createListProductBatches({ products: productRepository }),
+  // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
+  // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
+  // `orderNumberDirectory`, en cambio, SI esta declarada arriba (a proposito, por la misma
+  // razon): `listBatchMovements` la necesita.
+  listBatchMovements: createListBatchMovements({
+    products: productRepository,
+    people: assignmentDirectoryPrisma,
+    orders: orderNumberDirectory,
+  }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`
@@ -684,7 +770,9 @@ export const inventario = {
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
-const productCatalog: ProductCatalog = { findRefs: findProductRefs };
+const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+
+const presentationCatalog: PresentationCatalog = { findRefs: findPresentationRefs };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
  *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. `findRefsSharingBaseInCompany`
@@ -733,7 +821,6 @@ export const recetas = {
   createRecipe: createCreateRecipe({
     recipes: recipeRepository,
     products: productCatalog,
-    units: unitCatalog,
     images: recipeImageStorage,
   }),
   getRecipe: createGetRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
@@ -747,7 +834,6 @@ export const recetas = {
   updateRecipe: createUpdateRecipe({
     recipes: recipeRepository,
     products: productCatalog,
-    units: unitCatalog,
     images: recipeImageStorage,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
@@ -776,6 +862,7 @@ const supplierRepository: SupplierRepository = {
   updateAlive: updateAliveSupplier,
   softDeleteAlive: softDeleteAliveSupplier,
   listAlive: listAliveSuppliers,
+  listShowcaseAlive: listShowcaseAliveSuppliers,
 };
 
 const supplierCatalogRepository: SupplierCatalogRepository = {
@@ -820,6 +907,9 @@ export const proveedores = {
     catalog: supplierCatalogRepository,
     log: proveedoresListQueryLog,
   }),
+  // La vista de catalogo visual. Claves nuevas al final: ninguna de las de arriba se toca.
+  listSupplierShowcase: createListSupplierShowcase({ suppliers: supplierRepository }),
+  listShowcaseLines: createListShowcaseLines({ catalog: supplierCatalogRepository }),
 };
 
 // ---------------------------------------------------------------------------------------
@@ -881,19 +971,55 @@ export const unidades = {
 const recipeCatalog: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
+  findIdsMatchingName: findRecipeIdsMatchingName,
 };
 
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
 const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
+/** Puerto de LECTURA de `pedidos` (`ports/order-repository.ts`): la fila previa de una edicion,
+ *  cancelacion o borrado, y el listado. La escritura ya no vive aqui: se movio entera a
+ *  `orderUnitOfWork`, abajo. */
 const orderRepository: OrderRepository = {
-  create: createOrder,
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
-  updateAlive: updateAliveOrder,
-  cancelAlive: cancelAliveOrder,
-  softDeleteAlive: softDeleteAliveOrder,
 };
+
+/**
+ * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
+ * MISMO `tx`, el repositorio de escritura de `pedidos`, las reservas de `inventario` y el
+ * lector de contenido de receta, para que las tres lecturas y escrituras vean la misma
+ * instantanea sin abrir una segunda conexion mientras esta retiene la suya. Sin `unitCatalog`:
+ * la necesidad ya llega en la unidad del producto, asi que `createMaterialReservations` no
+ * convierte nada.
+ */
+const orderUnitOfWork: OrderUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) => {
+      const scope: OrderTransactionScope = {
+        orders: createOrderWriteRepository(tx),
+        reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
+      };
+      return work(scope);
+    }),
+};
+
+/** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
+ *  `findCoverage` la usa una vez por pagina. */
+const reservationQueries: ReservationQueries = createReservationQueries();
+
+/**
+ * El proceso diario: recorre las empresas de `identity` una por una y,
+ * para cada una, sus candidatos con el `findExpirableOrders` de `pedidos` -ninguna consulta lee
+ * pedidos de mas de una empresa a la vez-.
+ */
+const expireStaleOrders = createExpireStaleOrders({
+  listCompanyIds: listActiveCompanyIds,
+  findExpirable: findExpirableOrders,
+  unitOfWork: orderUnitOfWork,
+  now: () => new Date(),
+});
 
 /**
  * Fachada del modulo `pedidos` ya cableada (T14, `design.md > 9`). Es lo que consumen las
@@ -908,21 +1034,53 @@ const orderRepository: OrderRepository = {
  * usa `toOffsetLimit`/`buildPage` directamente (R37, `design.md > 10`), asi que el dominio
  * no necesita recibirla.
  *
- * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca la receta,
- * y darles catalogos que no usan seria cablear una dependencia falsa. Desde el 2026-09-07 los
- * otros cuatro reciben SOLO el catalogo de recetas, por el mismo motivo.
+ * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
+ * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
+ * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben SOLO el
+ * catalogo de recetas, por el mismo motivo: no calculan ningun importe ni apartan nada.
+ * `createOrder` y `updateOrder` son los dos que si costean y aparta, asi que son los dos que
+ * reciben tambien `products`, `units` y `unitOfWork`.
  */
 export const pedidos = {
-  createOrder: createCreateOrder({ orders: orderRepository, recipes: recipeCatalog }),
-  getOrder: createGetOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  createOrder: createCreateOrder({
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+    presentations: presentationCatalog,
+    unitOfWork: orderUnitOfWork,
+  }),
+  getOrder: createGetOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    presentations: presentationCatalog,
+  }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
+    presentations: presentationCatalog,
     log: pedidosListQueryLog,
   }),
-  updateOrder: createUpdateOrder({ orders: orderRepository, recipes: recipeCatalog }),
-  cancelOrder: createCancelOrder({ orders: orderRepository }),
-  deleteOrder: createDeleteOrder({ orders: orderRepository }),
+  updateOrder: createUpdateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+    presentations: presentationCatalog,
+    unitOfWork: orderUnitOfWork,
+  }),
+  cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
+  deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
+  findCoverage: createFindCoverage({ reservations: reservationQueries }),
+  quoteOrderCost: createQuoteOrderCost({
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
+  // El proceso diario y su puerta: sin usuario delante, asi que ninguno de los dos recibe actor.
+  // El handler los llama en ese orden -primero la puerta- y `lib/composition` no impone el
+  // orden por su cuenta.
+  verifyCronSecret,
+  expireStaleOrders,
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -960,13 +1118,18 @@ export const observabilidad = {
 // `prisma.workGroup` por ninguna via.
 // ---------------------------------------------------------------------------------------
 
-/** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
- *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
- *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—. */
+/** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS: mismo patron que `RecipeCatalog`
+ *  arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si el pedido esta VIVO
+ *  y en que ESTADO —ni el numero, ni la receta, ni las cantidades—.
+ *
+ *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
+ *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
+ *  consume el material en la misma transaccion. */
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
-  transitionAliveById: transitionAliveOrder,
+  listAliveSummariesInCompany,
+  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
 };
 
 /**
@@ -1053,6 +1216,7 @@ export const asignaciones = {
     orders: orderCatalog,
     recipes: recipeCatalog,
     people: peopleDirectory,
+    presentations: presentationCatalog,
     now: () => new Date(),
   }),
   // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
@@ -1064,6 +1228,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     units: unitCatalog,
     products: productCatalog,
+    presentations: presentationCatalog,
   }),
   startAssignedOrder: createStartAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1071,11 +1236,35 @@ export const asignaciones = {
     recipes: recipeCatalog,
     units: unitCatalog,
     products: productCatalog,
+    presentations: presentationCatalog,
     now: () => new Date(),
   }),
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
+  // `recipeCatalog`, `presentationCatalog`, `orderAssignmentRepository` y `peopleDirectory` que
+  // el resto del modulo: ningun adaptador nuevo.
+  listFinishedOrders: createListFinishedOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    now: () => new Date(),
+  }),
+  listCompanyOrders: createListCompanyOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    now: () => new Date(),
+  }),
+  listResponsibleCandidates: createListResponsibleCandidates({
+    people: peopleDirectory,
     now: () => new Date(),
   }),
 } as const;
@@ -1096,18 +1285,36 @@ export const asignaciones = {
 // ---------------------------------------------------------------------------------------
 
 /**
- * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus tres
- * funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni una
- * variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada real.
- * Importar este archivo con las variables del Storage vacias sigue funcionando.
- *
- * Ninguna de las tres BORRA, porque el puerto no lo expresa: el borrado del PDF temporal es de otra
- * ficha, y aqui no hay nada que elegir al respecto.
+ * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus
+ * cuatro funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni
+ * una variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada
+ * real. Importar este archivo con las variables del Storage vacias sigue funcionando.
  */
-const documentStorage: DocumentStorage = {
+const documentStorageSupabase: DocumentStorage = {
   createSignedUpload: createDocumentSignedUpload,
   createSignedReadUrl: createDocumentSignedReadUrl,
   download: downloadDocument,
+  remove: removeDocument,
+};
+
+/**
+ * La UNICA bifurcacion por entorno del modulo, repetida para sus tres puertos externos y vigilada
+ * por `tests/guards/guard-dobles-e2e.test.ts`: sin la variable puesta se elige el adaptador REAL,
+ * siempre.
+ *
+ * Se consulta EN CADA LLAMADA, no al construir estas fachadas, por el mismo motivo que el resto de
+ * la configuracion de este archivo: importar `lib/composition` no lee ni una variable de entorno.
+ */
+function selectedDocumentStorage(): DocumentStorage {
+  return documentsE2EDoublesEnabled() ? documentStorageMemory : documentStorageSupabase;
+}
+
+const documentStorage: DocumentStorage = {
+  createSignedUpload: (path) => selectedDocumentStorage().createSignedUpload(path),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    selectedDocumentStorage().createSignedReadUrl(path, expiresInSeconds),
+  download: (path) => selectedDocumentStorage().download(path),
+  remove: (path) => selectedDocumentStorage().remove(path),
 };
 
 /**
@@ -1119,6 +1326,107 @@ const pdfConverter: PdfConverter = {
   countPages,
   extractText: extractPdfText,
   renderPages,
+};
+
+/**
+ * `AiReader` cableado con el adaptador de Gemini. La clave del objeto es la del PUERTO
+ * (`read`) y el valor, la funcion del adaptador (`readWithGenai`) —se llaman distinto a
+ * proposito, igual que `documentStorage` y `pdfConverter` arriba—. Aqui no se invoca nada,
+ * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
+ * toca la red: la suite entera arranca sin claves de IA.
+ */
+const aiReader: AiReader = {
+  read: (request) =>
+    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithGenai(request),
+};
+
+/**
+ * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
+ * estrategia. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverter });
+
+/** `StrategyRunLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
+
+/**
+ * `StrategyPrompt` cableado con el adaptador que lee el texto del entorno. Se REFERENCIA, no
+ * se invoca: construir esta fachada no lee ninguna variable.
+ */
+const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
+
+/**
+ * El procesamiento por estrategia, construido UNA vez: lo usa la fachada de abajo y lo necesita
+ * `runDocumentJob`. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const processPdfByStrategy = createProcessPdfByStrategy({
+  readPdfWithAi,
+  countPages: pdfConverter.countPages,
+  log: strategyRunLog,
+  prompt: strategyPrompt,
+});
+
+// ---------------------------------------------------------------------------------------
+// `documentos` — el procesamiento en cola. Bloque nuevo dentro del mismo modulo, no reordena nada
+// de lo de arriba: la firma, la cola y la persistencia de la tanda se atan aqui y solo aqui.
+//
+// El puerto `QueueSignature` NO envuelve ningun caso de uso: verificar una firma no comprueba
+// permiso ni empresa, y es la unica autorizacion del webhook, asi que se publica tal cual
+// -- mismo criterio que `documentStorage` de arriba, un objeto que cumple el puerto y nada mas.
+// ---------------------------------------------------------------------------------------
+
+const documentBatchRepository: DocumentBatchRepository = documentBatchRepositoryPrisma;
+const queueSignature: QueueSignature = queueSignatureQstash;
+
+// ---------------------------------------------------------------------------------------
+// `documentos` — el recorte de las imagenes de un catalogo.
+// ---------------------------------------------------------------------------------------
+
+/** Se REFERENCIA, no se invoca: cablear esta fachada no toca ningun PNG. */
+const imageCropper: ImageCropper = { crop: cropImage };
+
+/** Bucket PROPIO de estos recortes, distinto del de `documentStorage` de arriba. */
+const cropStorage: CropStorage = { upload: uploadCrop };
+
+/** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const cropRegionLog: CropRegionLog = createCropRegionLogConsole();
+
+/** Reutiliza el MISMO `pdfConverter` y el MISMO `aiReader` que ya cablea el resto del modulo. */
+const cropCatalogImages = createCropCatalogImages({
+  converter: pdfConverter,
+  ai: aiReader,
+  cropper: imageCropper,
+  storage: cropStorage,
+  log: cropRegionLog,
+});
+
+/**
+ * El trabajo de la cola, construido UNA vez: lo publica la fachada y lo necesita la cola en linea,
+ * que lo ejecuta en este mismo proceso en vez de publicar nada. Dos construcciones serian dos
+ * cableados que pueden divergir.
+ */
+const runDocumentJob = createRunDocumentJob({
+  repository: documentBatchRepository,
+  storage: documentStorage,
+  processPdfByStrategy,
+  cropCatalogImages,
+});
+
+const processingQueue: ProcessingQueue = {
+  publish: (message) =>
+    documentsE2EDoublesEnabled()
+      ? createProcessingQueueInline({ run: runDocumentJob }).publish(message)
+      : processingQueueQstash.publish(message),
+};
+
+/**
+ * `ProcessingConfig` cableado con la lectura de entorno, pero DIFERIDA: cada metodo relee al
+ * invocarse, nunca al construir esta fachada, para que importar `lib/composition` sin las
+ * variables de la cola configuradas siga funcionando.
+ */
+const processingConfig: ProcessingConfig = {
+  timeoutSeconds: () => readProcessingConfigFromEnv().timeoutSeconds(),
+  maxRetries: () => readProcessingConfigFromEnv().maxRetries(),
 };
 
 /**
@@ -1135,6 +1443,9 @@ const pdfConverter: PdfConverter = {
  *
  * `convertPdfs` NO recibe actor ni reloj: la frontera de autorizacion es la emision de enlaces, y
  * quien convierte es el trabajo que procesa una tanda ya admitida.
+ *
+ * `runDocumentJob` tampoco recibe actor: no hay usuario delante, y su ambito de empresa sale
+ * del `claim` sobre la propia fila.
  */
 export const documentos = {
   issueUploadLinks: createIssueUploadLinks({
@@ -1152,4 +1463,20 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
+  readPdfWithAi,
+  // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
+  // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
+  // recibe actor, por el mismo motivo que `convertPdfs`.
+  processPdfByStrategy,
+  // Las TRES capacidades nuevas del procesamiento en cola. `enqueueBatch` es la unica que recibe
+  // actor -- lo construye el adaptador driving con las dos caras de la sesion --, y las otras dos
+  // ninguna: `runDocumentJob` porque no hay usuario delante, y `queueSignature` porque verificar
+  // una firma no es un caso de uso del dominio.
+  enqueueBatch: createEnqueueBatch({ repository: documentBatchRepository, queue: processingQueue }),
+  runDocumentJob,
+  getBatchStatus: createGetBatchStatus({
+    repository: documentBatchRepository,
+    config: processingConfig,
+  }),
+  queueSignature,
 } as const;

@@ -1,10 +1,11 @@
 // El adaptador de conversion y el aislamiento de la libreria de PDF.
 //
-// **Ningun caso de este archivo convierte un PDF de verdad**, y no es por comodidad: convertir
-// exigiria meter un PDF binario de muestra en el repositorio, y esta feature no anade ni un archivo
-// binario. Lo que si se verifica aqui es lo que se puede verificar sin uno: que la libreria siga
-// encerrada en un solo archivo, que importar ese archivo no lance, y que la ausencia del par nativo
-// falle con un error que NOMBRE esa causa en vez de disfrazarla de fallo del documento.
+// **No hay ningun archivo binario de muestra en el repositorio**: el PDF que se convierte aqui es
+// un documento minimo de una pagina escrito en ASCII dentro de este mismo archivo. Con el se
+// verifica que las tres operaciones dejen utilizables los bytes que reciben; sin abrir ningun PDF
+// se verifica ademas que la libreria siga encerrada en un solo archivo, que importar ese archivo no
+// lance, y que la ausencia del par nativo falle con un error que NOMBRE esa causa en vez de
+// disfrazarla de fallo del documento.
 //
 // Ningun caso hace red.
 
@@ -14,7 +15,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveRasterizer } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
+import {
+  countPages,
+  extractPdfText,
+  renderPages,
+  resolveRasterizer,
+} from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -168,6 +174,69 @@ describe('documentos — el adaptador de conversion y el aislamiento de su libre
         inicioDeRender,
       );
       expect(caminoDelTexto).not.toMatch(/resolveRasterizer|napi/);
+    });
+  });
+  describe('los bytes que recibe la conversion siguen sirviendo despues (R24)', () => {
+    /**
+     * Un PDF de una pagina, valido y en ASCII: se escribe aqui porque asi no entra ningun binario
+     * al repositorio y cualquiera puede leer que documento se esta abriendo.
+     */
+    function pdfDeUnaPagina(): Uint8Array {
+      return new TextEncoder().encode(
+        [
+          '%PDF-1.4',
+          '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+          '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+          '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj',
+          'trailer<</Root 1 0 R>>',
+        ].join('\n'),
+      );
+    }
+
+    function esperaLosBytesIntactos(bytes: Uint8Array, operacion: string): void {
+      const intactos = pdfDeUnaPagina();
+
+      expect(
+        bytes.length,
+        `${operacion}: los bytes que se le pasaron tienen que seguir estando enteros.`,
+      ).toBe(intactos.length);
+      expect(
+        bytes.buffer.byteLength,
+        `${operacion}: el buffer de quien llama tiene que seguir siendo utilizable.`,
+      ).toBe(intactos.length);
+      expect(Array.from(bytes)).toEqual(Array.from(intactos));
+    }
+
+    it('contar las paginas deja los bytes del PDF intactos (R24)', async () => {
+      const bytes = pdfDeUnaPagina();
+
+      expect(await countPages(bytes)).toBe(1);
+      esperaLosBytesIntactos(bytes, 'contar las paginas');
+    });
+
+    it('extraer el texto deja los bytes del PDF intactos (R24)', async () => {
+      const bytes = pdfDeUnaPagina();
+
+      expect(typeof (await extractPdfText(bytes))).toBe('string');
+      esperaLosBytesIntactos(bytes, 'extraer el texto');
+    });
+
+    it('rasterizar deja los bytes del PDF intactos (R24)', async () => {
+      const bytes = pdfDeUnaPagina();
+
+      expect((await renderPages(bytes, 72)).length).toBe(1);
+      esperaLosBytesIntactos(bytes, 'rasterizar');
+    });
+
+    it('R24 — las tres operaciones encadenadas sobre el MISMO arreglo siguen funcionando', async () => {
+      const bytes = pdfDeUnaPagina();
+
+      await countPages(bytes);
+      await extractPdfText(bytes);
+      await renderPages(bytes, 72);
+
+      expect(await countPages(bytes)).toBe(1);
+      esperaLosBytesIntactos(bytes, 'las tres encadenadas');
     });
   });
 });

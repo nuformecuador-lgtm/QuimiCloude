@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
@@ -9,7 +10,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { RecipeForm, RecipeListError } from '../components';
 
 export const metadata: Metadata = {
-  title: `Nueva receta · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
+  title: `Nueva fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
 
 const FIRST_PAGE = 1;
@@ -40,9 +41,20 @@ const FIRST_PAGE = 1;
 export default async function NuevaRecetaPage() {
   await requirePagePermission('recetas.consultar');
 
-  const [unitsResult, productsResult] = await Promise.all([
+  // El tab de ingredientes pide `PRODUCT` y el de máquinas `MACHINE`: cada primera página
+  // llega ya filtrada por el servidor, igual que las búsquedas del selector.
+  const [unitsResult, productsResult, machinesResult] = await Promise.all([
     listUnitsAction(),
-    listProductsAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+    listProductsAction({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      filters: { type: { kind: 'select', values: [PRODUCT_TYPES.PRODUCT] } },
+    }),
+    listProductsAction({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      filters: { type: { kind: 'select', values: [PRODUCT_TYPES.MACHINE] } },
+    }),
   ]);
 
   if (unitsResult.status === 'error') {
@@ -61,10 +73,18 @@ export default async function NuevaRecetaPage() {
     );
   }
 
+  if (machinesResult.status === 'error') {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+        <RecipeListError error={machinesResult} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <h1 data-testid="recipe-form-title" className="text-2xl font-semibold">
-        Nueva receta
+        Nueva fórmula
       </h1>
       <RecipeForm
         mode="create"
@@ -73,9 +93,17 @@ export default async function NuevaRecetaPage() {
           items: productsResult.data.items.map((item) => ({
             id: item.id,
             name: item.name,
-            unitId: item.latestBatchUnitId,
+            unitId: item.unitId,
           })),
           totalPages: productsResult.data.totalPages,
+        }}
+        initialMachinePage={{
+          items: machinesResult.data.items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            unitId: item.unitId,
+          })),
+          totalPages: machinesResult.data.totalPages,
         }}
       />
     </div>

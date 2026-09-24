@@ -68,10 +68,12 @@ describe('la seccion Configuración existe una sola vez y su item sigue en pie (
     // lleva DOS, porque «Unidades» llego con QC-39 —la decision cerrada de QC-45 lo anunciaba—.
     // Lo que esta task promete y sigue vigente es que la seccion es UNA y que su item **no se
     // sustituyo ni se reordeno**: sigue existiendo y sigue siendo el PRIMERO.
-    // TENSADA de nuevo el 2026-09-11 (QC-67 T2, R2/R39): de DOS a TRES, porque «Usuarios» se da
-    // de alta detras de «Unidades». Lo que esta task promete y sigue vigente es lo mismo: la
-    // seccion es UNA y su item **no se sustituyo ni se reordeno**; sigue siendo el PRIMERO.
-    expect(secciones[0]?.items).toHaveLength(3);
+    // TENSADA el 2026-09-11 (QC-67 T2, R2/R39) a TRES, porque «Usuarios» se dio de alta detras de
+    // «Unidades», y RELAJADA de vuelta a DOS el 2026-09-21: «Usuarios» paso a `NAV_SECTION_OPERATION`
+    // por decision humana (es operacion, no configuracion). Lo que esta task promete y sigue
+    // vigente es lo mismo: la seccion es UNA y su item **no se sustituyo ni se reordeno**; sigue
+    // siendo el PRIMERO.
+    expect(secciones[0]?.items).toHaveLength(2);
     expect((secciones[0]?.items[0] as NavLink | undefined)?.href).toBe(PRESENTATIONS_ROUTE);
   });
 

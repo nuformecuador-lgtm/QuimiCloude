@@ -177,15 +177,14 @@ const UNIT_COLUMNS: ReadonlyArray<readonly [string, string]> = [
 ]
 
 /**
- * Las dos referencias al catalogo que cruzan de modulo y por eso NO llevan `@relation` (R18).
- *
- * ACTUALIZADA EL 2026-09-11 POR QC-80: siguen siendo DOS, pero la primera ya no es `Product`
- * —dejo de declarar unidad (R21)— sino `Presentation`, y alli la unidad es OBLIGATORIA (R1),
- * no opcional. El tercer elemento de cada tupla es justamente eso: si `unitId` es opcional.
+ * Las referencias al catalogo que cruzan de modulo y por eso NO llevan `@relation` (R18).
+ * El tercer elemento de cada tupla dice si `unitId` es opcional.
  */
 const CROSS_MODULE_UNIT_SCALARS: ReadonlyArray<readonly [string, PrismaModel, boolean]> = [
   ['Presentation', presentation, false],
-  ['RecipeLine', recipeLine, false],
+  // ANULABLE, a diferencia de la otra: un producto sin lotes no tiene de donde sacar una
+  // unidad.
+  ['Product', product, true],
 ]
 
 describe('db/schema.prisma — el catalogo de unidades', () => {
@@ -515,25 +514,19 @@ describe('db/schema.prisma — el catalogo de unidades', () => {
 })
 
 describe('db/schema.prisma — la unidad de la presentacion y la de la linea de receta', () => {
-  it('QC-80 R21: Product NO declara unidad, y quien la declara es Presentation (R1)', () => {
-    // ---------------------------------------------------------------------------------
-    // INVERTIDO EL 2026-09-11 POR QC-80 (R21, R1). ANTES este caso afirmaba que
-    // `Product.unitId` era un uuid OPCIONAL con `@map("unit_id")`, su `@db.Uuid` y su indice
-    // `products_unit_id_idx`: era QC-32 R10 y su decision cerrada 7, que convirtieron el
-    // texto libre `products.unit` en una referencia al catalogo. LO DEROGA **R21**: el
-    // producto no declara unidad EN NINGUN PUNTO DEL CAMINO, y la migracion
-    // `20260911120000_presentation_unit` borra la columna, el indice y la FK.
-    //
-    // No se borra el caso porque lo que vigilaba sigue haciendo falta, con OTRO sujeto: la
-    // unidad se declara por REFERENCIA al catalogo y nunca como texto libre. Ahora la declara
-    // `Presentation`, y alli es OBLIGATORIA (**R1**). Afirmar la ausencia en positivo es lo
-    // unico que impide que alguien le devuelva la unidad al producto «por comodidad» y
-    // reabra la doble verdad que **R22** cierra: la unidad de un producto se DERIVA de la
-    // presentacion de su lote MAS RECIENTE, y es «ninguna» si no tiene lotes (**R23**).
-    // ---------------------------------------------------------------------------------
-    expect(has(product, 'unitId'), 'Product.unitId tenia que haberse ido (QC-80 R21)').toBe(false)
-    expect(product.body).not.toMatch(/unit_id/)
-    expect(product.body).not.toMatch(/products_unit_id_idx/)
+  it('QC-121 R1: Product vuelve a declarar unidad, GUARDADA y ANULABLE; Presentation la sigue declarando OBLIGATORIA', () => {
+    // El producto guarda su unidad -fija desde su primer lote, sin recalculo posible por
+    // ningun camino de la aplicacion-, no una derivacion de lectura. Sigue sin `@relation`
+    // -mismo argumento que la de `Presentation`- y ANULABLE: un producto sin lotes no tiene
+    // de donde sacar una unidad.
+    const productUnitId = field(product, 'unitId')
+    expect(productUnitId.type).toBe('String')
+    expect(productUnitId.isOptional).toBe(true)
+    expect(productUnitId.attributes).toContain('@map("unit_id")')
+    expect(productUnitId.attributes).toContain('@db.Uuid')
+    expect(productUnitId.attributes).not.toMatch(/@default\(/)
+    expect(productUnitId.attributes).not.toMatch(/@relation/)
+    expect(product.body).toMatch(/@@index\(\[unitId\],\s*map:\s*"products_unit_id_idx"\)/)
     // Ni la unidad como texto libre vuelve por la puerta de atras (QC-32 R10, que sigue).
     expect(has(product, 'unit')).toBe(false)
     expect(product.body).not.toMatch(/@map\("unit"\)/)
@@ -543,8 +536,8 @@ describe('db/schema.prisma — la unidad de la presentacion y la de la linea de 
     // Ni el objeto de Prisma: el producto no atraviesa a `unidades` de ninguna forma.
     expect(product.body).not.toMatch(/\bUnit\b/)
 
-    // Y el sujeto NUEVO: la unidad la declara la presentacion, obligatoria y sin `@default`
-    // —un default convertiria «no dijo unidad» en «dijo kilogramo» en silencio (R10)—.
+    // Y el sujeto que nunca cambio: la unidad la declara la presentacion, obligatoria y sin `@default`
+    // —un default convertiria «no dijo unidad» en «dijo kilogramo» en silencio—.
     const unitId = field(presentation, 'unitId')
     expect(unitId.type).toBe('String')
     expect(unitId.isOptional).toBe(false)
@@ -561,40 +554,20 @@ describe('db/schema.prisma — la unidad de la presentacion y la de la linea de 
     )
   })
 
-  it('RecipeLine declara unitId uuid OBLIGATORIO y ninguna columna unit de texto', () => {
-    // R11 y decision cerrada 8: la unidad de la linea sigue siendo OBLIGATORIA, como fijo
-    // QC-24. Lo que cambia es la forma —referencia en vez de texto—, no la regla.
-    const unitId = field(recipeLine, 'unitId')
-    expect(unitId.type).toBe('String')
-    expect(unitId.isOptional).toBe(false)
-    expect(unitId.attributes).toContain('@map("unit_id")')
-    expect(unitId.attributes).toContain('@db.Uuid')
-    // Sin `@default`: un default sembraria referencias inventadas y «sin unidad» dejaria de
-    // rechazarse.
-    expect(unitId.attributes).not.toMatch(/@default\(/)
-    expect(recipeLine.body).toMatch(/@@index\(\[unitId\],\s*map:\s*"recipe_lines_unit_id_idx"\)/)
-
+  it('RecipeLine no declara ninguna unidad propia', () => {
+    // La linea de receta expresa su parte como porcentaje: no lleva unidad de medida.
+    expect(has(recipeLine, 'unitId')).toBe(false)
     expect(has(recipeLine, 'unit')).toBe(false)
-    expect(recipeLine.body).not.toMatch(/@map\("unit"\)/)
+    expect(recipeLine.body).not.toMatch(/unit_id/)
     for (const forbidden of ['unit', 'unitName', 'unitText', 'unidad', 'measure', 'uom']) {
       expect(has(recipeLine, forbidden), `RecipeLine.${forbidden} no debe existir`).toBe(false)
     }
   })
 
-  it('las dos unitId son escalares uuid SIN @relation y Unit no tiene campos de vuelta (QC-80 R21, R1)', () => {
-    // R18 y decision cerrada 13: la FK es REAL, pero vive escrita a mano en `migration.sql`
-    // (`design.md` secciones 4.3 y 8.1). Declararla con `@relation` regalaria
-    // `include: { unit: true }` desde `inventario` y desde `recetas`, y NINGUNA guardia lo
-    // detectaria porque un `include` no es un import; ademas obligaria a declarar
+  it('las unitId de Presentation y Product son escalares uuid SIN @relation y Unit no tiene campos de vuelta', () => {
+    // La FK es REAL, pero vive escrita a mano en `migration.sql`. Declararla con `@relation`
+    // regalaria `include: { unit: true }` desde `inventario` y obligaria a declarar
     // colecciones de vuelta DENTRO de `Unit`, que es de otro modulo.
-    //
-    // ACTUALIZADO EL 2026-09-11 POR QC-80. ANTES las dos eran `Product.unitId` (opcional) y
-    // `RecipeLine.unitId`. LO DEROGA **R21** para la primera: el producto dejo de declarar
-    // unidad, y su lugar en este grupo lo ocupa `Presentation.unitId`, OBLIGATORIA (**R1**)
-    // y con su FK `presentations_unit_id_fkey` tambien escrita A MANO en
-    // `db/migrations/20260911120000_presentation_unit/migration.sql`. La REGLA no cambia —el
-    // patron escalar sin `@relation` es lo que sostiene la frontera—; cambia quien la cumple,
-    // y por eso el caso se reescribe en vez de borrarse.
     for (const [modelName, model, isOptional] of CROSS_MODULE_UNIT_SCALARS) {
       const candidate = field(model, 'unitId')
       expect(candidate.type, `${modelName}.unitId debe ser String`).toBe('String')
@@ -656,18 +629,12 @@ describe('db/schema.prisma — la unidad de la presentacion y la de la linea de 
       expect(candidate.attributes, `falta @map en Unit.${candidate.name}`).toMatch(/@map\("/)
     }
 
-    // Los indices que el modelo declara, tambien en ingles. Lista EXACTA: si alguien anade
-    // uno con nombre en espanol, o vuelve a colar un `@@unique`, este caso lo dice.
-    //
-    // ACTUALIZADO EL 2026-09-11 POR QC-80 (R21, R1): de la lista sale
-    // `products_unit_id_idx` —se va con la columna `products.unit_id` que borra
-    // `20260911120000_presentation_unit`— y entra `presentations_unit_id_idx`, el indice del
-    // lado hijo de la FK nueva. Siguen siendo CUATRO y la lista sigue siendo EXACTA: es este
-    // caso quien avisa si alguien anade uno con nombre en espanol o cuela un `@@unique`.
+    // Los indices que el modelo declara, tambien en ingles. Lista EXACTA de CUATRO: si alguien
+    // anade uno con nombre en espanol, o vuelve a colar un `@@unique`, este caso lo dice.
     const indexNames = [
       ...unit.body.matchAll(/@@(?:unique|index)\([^)]*map:\s*"([^"]+)"/g),
       ...presentation.body.matchAll(/@@index\(\[unitId\][^)]*map:\s*"([^"]+)"/g),
-      ...recipeLine.body.matchAll(/@@index\(\[unitId\][^)]*map:\s*"([^"]+)"/g),
+      ...product.body.matchAll(/@@index\(\[unitId\][^)]*map:\s*"([^"]+)"/g),
     ]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -675,10 +642,8 @@ describe('db/schema.prisma — la unidad de la presentacion y la de la linea de 
       'units_company_id_idx',
       'units_unit_id_idx',
       'presentations_unit_id_idx',
-      'recipe_lines_unit_id_idx',
+      'products_unit_id_idx',
     ])
-    // Y `products` no aporta ninguno: no tiene ya ninguna referencia al catalogo (R21).
-    expect(product.body).not.toMatch(/@@index\(\[unitId\]/)
     for (const name of indexNames) expect(name).toMatch(SNAKE_CASE)
   })
 })

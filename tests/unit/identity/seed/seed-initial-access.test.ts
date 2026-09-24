@@ -15,7 +15,7 @@ import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
 import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
+import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import type { CredentialRule } from '@/lib/modules/identity/domain/credential-policy';
 import type { InitialAdminCredentials } from '@/lib/modules/identity/ports/initial-access-credentials';
@@ -207,7 +207,8 @@ function asignacionesDelSeed(rolesPorNombre: ReadonlyMap<string, string>): Reado
   return pares;
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar (hoy: once + una = doce). */
+/** Numero total de asignaciones que el seed tiene que dejar: veintidos (Administrador 18 +
+ *  Operador 2 + Empacador 2). Se deriva de `SEED_ROLE_PERMISSIONS`, no se escribe a mano. */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -249,7 +250,7 @@ describe('seedInitialAccess', () => {
   });
 
   // Caso 1 (R2, R4)
-  it('sobre una base vacia crea los dos roles y el usuario inicial con rol Administrador', async () => {
+  it('sobre una base vacia crea los tres roles y el usuario inicial con rol Administrador', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -258,7 +259,10 @@ describe('seedInitialAccess', () => {
     const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
-    expect(outcome.createdRoles.slice().sort()).toEqual([ROLE_ADMINISTRADOR, ROLE_OPERADOR].sort());
+    // El seed asegura los tres roles de `SEED_ROLES`, no solo los dos historicos.
+    expect(outcome.createdRoles.slice().sort()).toEqual(
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
+    );
     expect(outcome.createdAdmin).toBe(true);
 
     const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
@@ -321,8 +325,9 @@ describe('seedInitialAccess', () => {
     expect(input.passwordHash).not.toBe(CREDENCIAL_DE_PRUEBA);
   });
 
-  // Caso 4 (R2)
-  it('si el rol Operador falta y el Administrador ya existe, crea solo Operador', async () => {
+  // Con tres roles de semilla, faltar el Administrador deja faltando tambien a Operador y
+  // Empacador.
+  it('si el rol Operador falta y el Administrador ya existe, crea Operador y Empacador', async () => {
     const repository = crearRepositorioFalso({
       rolesExistentes: new Map([[ROLE_ADMINISTRADOR, 'rol-admin-existente']]),
       usuariosVivosConAdministrador: 1,
@@ -335,9 +340,11 @@ describe('seedInitialAccess', () => {
 
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
     expect(creacionesDeRol.length).toBeGreaterThan(0);
-    expect(outcome.createdRoles).toEqual([ROLE_OPERADOR]);
-    expect(creacionesDeRol).toHaveLength(1);
-    expect((creacionesDeRol[0]?.args[0] as { name: string }).name).toBe(ROLE_OPERADOR);
+    expect(outcome.createdRoles.slice().sort()).toEqual([ROLE_OPERADOR, ROLE_EMPACADOR].sort());
+    expect(creacionesDeRol).toHaveLength(2);
+    expect(creacionesDeRol.map((llamada) => (llamada.args[0] as { name: string }).name).sort()).toEqual(
+      [ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
+    );
   });
 
   // Caso 5 (R12)
@@ -433,7 +440,7 @@ describe('seedInitialAccess', () => {
   });
 
   // Caso 7b (R13) — por que los pasos 4 y 5 tienen que ir en una transaccion.
-  it('si createInitialAdmin lanza DESPUES de crear los roles, los dos roles ya quedaron creados y el error se propaga', async () => {
+  it('si createInitialAdmin lanza DESPUES de crear los roles, los tres roles ya quedaron creados y el error se propaga', async () => {
     const repository = crearRepositorioFalso();
     const mensajeDeError = 'fallo simulado del alta del usuario inicial';
     repository.createInitialAdmin = async () => {
@@ -450,10 +457,10 @@ describe('seedInitialAccess', () => {
       errorCapturado = error as Error;
     }
 
-    // Primero: que los roles SI se crearon (los dos, exactamente). Ocurrio ANTES de
-    // afirmar cualquier otra cosa, siguiendo el orden de `design.md > 11`.
+    // Primero: que los roles SI se crearon (los tres, exactamente). Ocurrio ANTES de
+    // afirmar cualquier otra cosa, siguiendo el orden en que el dominio los crea.
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
-    expect(creacionesDeRol).toHaveLength(2);
+    expect(creacionesDeRol).toHaveLength(3);
 
     // Luego: que el error se propaga.
     expect(errorCapturado).not.toBeNull();
@@ -690,8 +697,8 @@ describe('seedInitialAccess', () => {
   // «se llamo con nada».
   // ---------------------------------------------------------------------------------
 
-  // Caso 14 (QC-74 R8, R9, R10)
-  it('sobre una base vacia crea los quince permisos del catalogo y las diecisiete asignaciones del seed', async () => {
+  // El catalogo completo y las asignaciones de los tres roles, contra el repositorio falso.
+  it('sobre una base vacia crea los dieciocho permisos del catalogo y las veintidos asignaciones del seed', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -719,7 +726,8 @@ describe('seedInitialAccess', () => {
     );
     expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
 
-    // Luego: las asignaciones, las diecisiete (quince del Administrador + dos del Operador).
+    // Luego: las asignaciones, las veintidos (dieciocho del Administrador + dos del Operador +
+    // dos del Empacador).
     const creacionesDeAsignaciones = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'createRolePermissions',
     );
@@ -728,7 +736,7 @@ describe('seedInitialAccess', () => {
       roleId: string;
       permissionCode: string;
     }[];
-    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(17);
+    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(22);
     expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED);
     expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
@@ -745,7 +753,7 @@ describe('seedInitialAccess', () => {
     const codigosDelAdministrador = paresCreados
       .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
       .map((par) => par.permissionCode);
-    expect(codigosDelAdministrador).toHaveLength(15);
+    expect(codigosDelAdministrador).toHaveLength(18);
     expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
     // QC-74 R9 le daba UNO; QC-86 R26 le suma `asignaciones.consultar` y son DOS, y ni uno mas
     // (QC-86 R27). El orden es el de `SEED_ROLE_PERMISSIONS`, que es como el seed los recorre.
@@ -754,6 +762,13 @@ describe('seedInitialAccess', () => {
         .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
         .map((par) => par.permissionCode),
     ).toEqual(['inventario.consultar', 'asignaciones.consultar']);
+    // El Empacador nace con exactamente sus dos permisos, en el orden de
+    // `SEED_ROLE_PERMISSIONS`.
+    expect(
+      paresCreados
+        .filter((par) => par.roleId === rolesCreados.get(ROLE_EMPACADOR))
+        .map((par) => par.permissionCode),
+    ).toEqual(['asignaciones.consultar', 'terminados.consultar']);
 
     // Y el orden del algoritmo: los roles ANTES que los permisos, y los permisos ANTES
     // que el administrador (`design.md > 3`). Sin ese orden, una asignacion no tendria

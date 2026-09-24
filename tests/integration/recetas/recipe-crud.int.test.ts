@@ -36,13 +36,18 @@ import {
   replaceAliveRecipe,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
+import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
+import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination';
 
 import type { ListQuery } from '@/lib/modules/recetas/domain/list-query';
-import type { NewRecipe } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { NewRecipe, RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeScope } from '@/lib/modules/recetas';
+import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { Actor } from '@/lib/modules/recetas/domain/actor';
 
 /**
  * QC-57: `listAliveRecipes` recibe ahora, ademas de la ventana, el CONTRATO GENERICO de
@@ -263,9 +268,6 @@ async function collectAllRecipes(
 let sharedActorId: string;
 let sharedCompanyId: string;
 let sharedScope: RecipeScope;
-/** Unidad real, sembrada por la migracion `..._units_catalog` (QC-32, R25): `RecipeLine.unitId`
- *  es una FK real a `units`, asi que las lineas de estos tests necesitan un id existente. */
-let sharedUnitId: string;
 
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
@@ -282,7 +284,6 @@ beforeAll(async () => {
   sharedActorId = actor.userId;
   sharedCompanyId = actor.companyId;
   sharedScope = { companyId: sharedCompanyId };
-  sharedUnitId = (await prisma.unit.findFirstOrThrow()).id;
 });
 
 afterAll(async () => {
@@ -306,8 +307,8 @@ describe('R5: alta de una receta con sus lineas', () => {
           { blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Mezclar' }] }] }] },
         ],
         lines: [
-          { productId: productA, quantity: '10.0000', unitId: sharedUnitId },
-          { productId: productB, quantity: '0.5000', unitId: sharedUnitId },
+          { productId: productA, percentage: '70.00' },
+          { productId: productB, percentage: '30.00' },
         ],
       });
 
@@ -329,9 +330,39 @@ describe('R5: alta de una receta con sus lineas', () => {
       ]);
       expect(detail?.lines).toHaveLength(2);
       const byProduct = new Map(detail?.lines.map((line) => [line.productId, line]));
-      expect(byProduct.get(productA)?.quantity).toBe('10.0000');
-      expect(byProduct.get(productA)?.unitId).toBe(sharedUnitId);
-      expect(byProduct.get(productB)?.quantity).toBe('0.5000');
+      expect(byProduct.get(productA)?.percentage).toBe('70.00');
+      expect(byProduct.get(productB)?.percentage).toBe('30.00');
+    } finally {
+      if (recipeId !== null) await prisma.recipe.delete({ where: { id: recipeId } });
+      await deleteTestProduct(prisma, productA);
+      await deleteTestProduct(prisma, productB);
+    }
+  });
+});
+
+describe('R4: guarda y relee cada porcentaje con el mismo valor enviado', () => {
+  it('92,50 % + 7,50 % se guardan y se releen exactos, contra Postgres real', async () => {
+    const productA = await createTestProduct(prisma, 'Insumo al 92,50 %');
+    const productB = await createTestProduct(prisma, 'Insumo al 7,50 %');
+    let recipeId: string | null = null;
+
+    try {
+      const input = baseRecipeInput({
+        lines: [
+          { productId: productA, percentage: '92.50' },
+          { productId: productB, percentage: '7.50' },
+        ],
+      });
+
+      const result = await createRecipe(input, sharedActorId, new Date(), sharedScope);
+      expect(result).not.toBe('duplicate');
+      recipeId = (result as { id: string }).id;
+
+      const detail = await findAliveRecipeById(recipeId, sharedScope);
+      expect(detail?.lines).toHaveLength(2);
+      const byProduct = new Map(detail?.lines.map((line) => [line.productId, line]));
+      expect(byProduct.get(productA)?.percentage).toBe('92.50');
+      expect(byProduct.get(productB)?.percentage).toBe('7.50');
     } finally {
       if (recipeId !== null) await prisma.recipe.delete({ where: { id: recipeId } });
       await deleteTestProduct(prisma, productA);
@@ -380,8 +411,8 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
     try {
       const input = baseRecipeInput({
         lines: [
-          { productId: productA, quantity: '1.0000', unitId: sharedUnitId },
-          { productId: productB, quantity: '2.0000', unitId: sharedUnitId },
+          { productId: productA, percentage: '40.00' },
+          { productId: productB, percentage: '60.00' },
         ],
       });
       const created = await createRecipe(input, sharedActorId, new Date(), sharedScope);
@@ -390,7 +421,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
 
       const result = await replaceAliveRecipe(
         recipeId,
-        { ...input, lines: [{ productId: productA, quantity: '1.0000', unitId: sharedUnitId }] },
+        { ...input, lines: [{ productId: productA, percentage: '100.00' }] },
         sharedActorId,
         new Date(),
         sharedScope,
@@ -421,7 +452,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
       const originalName = `Receta original ${token()}`;
       const input = baseRecipeInput({
         name: originalName,
-        lines: [{ productId: productA, quantity: '1.0000', unitId: sharedUnitId }],
+        lines: [{ productId: productA, percentage: '100.00' }],
       });
       const created = await createRecipe(input, sharedActorId, new Date(), sharedScope);
       expect(created).not.toBe('duplicate');
@@ -434,8 +465,8 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
           ...input,
           name: `Nombre nuevo ${token()}`,
           lines: [
-            { productId: productA, quantity: '9.0000', unitId: sharedUnitId },
-            { productId: fantomProductId, quantity: '1.0000', unitId: sharedUnitId },
+            { productId: productA, percentage: '90.00' },
+            { productId: fantomProductId, percentage: '10.00' },
           ],
         },
         sharedActorId,
@@ -449,8 +480,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
       expect(detail?.name).toBe(originalName);
       expect(detail?.lines).toHaveLength(1);
       expect(detail?.lines[0]?.productId).toBe(productA);
-      expect(detail?.lines[0]?.quantity).toBe('1.0000');
-      expect(detail?.lines[0]?.unitId).toBe(sharedUnitId);
+      expect(detail?.lines[0]?.percentage).toBe('100.00');
 
       const fantomLine = await prisma.recipeLine.findFirst({
         where: { recipeId, productId: fantomProductId },
@@ -590,6 +620,69 @@ describe('R35/R36: borrado logico', () => {
       expect(stillThere).not.toBeNull();
     } finally {
       if (recipeId !== null) await prisma.recipe.delete({ where: { id: recipeId } });
+    }
+  });
+});
+
+/** El repositorio y el catalogo de productos REALES, cableados exactamente como
+ *  `lib/composition`, para ejercitar `createUpdateRecipe` de punta a punta contra Postgres. */
+const realRecipeRepository: RecipeRepository = {
+  create: createRecipe,
+  findAliveById: findAliveRecipeById,
+  listAlive: listAliveRecipes,
+  replaceAlive: replaceAliveRecipe,
+  softDeleteAlive: softDeleteAliveRecipe,
+};
+
+const realProductCatalog: ProductCatalog = {
+  findRefs: findProductRefs,
+  findCostingBatches: () => {
+    throw new Error('recetas no debe costear nada');
+  },
+};
+
+const imagenesMudas: RecipeImageStorage = {
+  upload: () => {
+    throw new Error('este caso no sube ninguna imagen');
+  },
+  remove: async () => undefined,
+  publicUrl: (path) => path,
+};
+
+describe('R23: editar una receta sembrada sin lineas se rechaza', () => {
+  it('rechaza cambiar solo el nombre de una receta viva sin lineas, y el nombre no cambia', async () => {
+    // Receta sembrada DIRECTO por Prisma, sin ninguna linea: exactamente lo que deja la
+    // migracion de esta ficha (R8) sobre las recetas previas.
+    const nombreOriginal = `Sembrada sin lineas ${token()}`;
+    const recipe = await prisma.recipe.create({
+      data: {
+        name: nombreOriginal,
+        nameNormalized: nombreOriginal.toLowerCase().replace(/\s+/gu, ''),
+        companyId: sharedCompanyId,
+      },
+      select: { id: true },
+    });
+
+    try {
+      const actor: Actor = {
+        id: sharedActorId,
+        companyId: sharedCompanyId,
+        permissions: ['recetas.consultar', 'recetas.modificar'],
+      };
+      const updateRecipe = createUpdateRecipe({
+        recipes: realRecipeRepository,
+        products: realProductCatalog,
+        images: imagenesMudas,
+      });
+
+      await expect(
+        updateRecipe(recipe.id, { name: 'Nombre nuevo', description: null, steps: [], lines: [] }, actor),
+      ).rejects.toThrow();
+
+      const sinCambios = await prisma.recipe.findUniqueOrThrow({ where: { id: recipe.id } });
+      expect(sinCambios.name).toBe(nombreOriginal);
+    } finally {
+      await prisma.recipe.delete({ where: { id: recipe.id } });
     }
   });
 });

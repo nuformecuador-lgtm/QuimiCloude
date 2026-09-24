@@ -53,8 +53,8 @@ export { INVENTORY_ROUTE };
  */
 export { FORMULAS_ROUTE };
 
-/** Etiqueta del sidebar para la pantalla de recetas (QC-26, R3). */
-export const RECIPES_LABEL = 'Recetas';
+/** Etiqueta del sidebar para la pantalla de fórmulas (QC-26, R3). */
+export const RECIPES_LABEL = 'Fórmulas';
 
 /**
  * Etiqueta del sidebar para la pantalla de proveedores (QC-44, R4).
@@ -133,6 +133,10 @@ export const NAV_SECTION_CHAIN = 'Cadena';
  * Seccion de configuracion del producto (QC-45, R3). Nacio con **un solo item**,
  * «Presentaciones», y QC-39 le anadio su hermana «Unidades» (QC-39 R9): la seccion NO se crea de
  * nuevo, no se renombra y no se reordena su primer item.
+ *
+ * «Usuarios» ya NO vive aqui: nacio en esta seccion con QC-67 y paso a `NAV_SECTION_OPERATION`
+ * por decision humana del 2026-09-21 (usuarios es operacion, no configuracion). La seccion se
+ * queda con sus dos items originales, Presentaciones y Unidades.
  */
 export const NAV_SECTION_CONFIGURATION = 'Configuración';
 
@@ -352,10 +356,14 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     icon: 'flask-conical',
     section: NAV_SECTION_CONFIGURATION,
   },
-  // QC-67 R2, R3 — TERCER item de la seccion «Configuración», al final del array y sin tocar los
-  // dos que ya vivian dentro: la seccion la creo QC-45, QC-39 le anadio el segundo y esta ficha
-  // solo se da de alta en ella. No se crea una segunda seccion, no se renombra y no se reordena
-  // nada.
+  // QC-67 R2, R3 origino este item dentro de «Configuración», al final del array y sin tocar los
+  // dos que ya vivian dentro de esa seccion. Por decision humana del 2026-09-21 paso a
+  // `NAV_SECTION_OPERATION`: usuarios es operacion de la organizacion, no configuracion del
+  // producto. El objeto NO se movio de sitio en el array a proposito —solo cambio su `section`—:
+  // `groupNavItemsBySection` agrupa por `section` conservando el orden de aparicion, asi que ya
+  // sale dibujado dentro de «Operación», detras de Pedidos; y `firstVisibleNavHref` recorre el
+  // array crudo de arriba abajo, asi que mover el objeto habria cambiado el aterrizaje de quien no
+  // tiene `dashboard.consultar`, algo que el humano no pidio.
   //
   // **El permiso es `usuarios.consultar`, EL MISMO codigo que exige la pantalla** con
   // `requirePagePermission` (`design.md > 3`). Aqui NO aplica la excepcion de QC-45 —que declaro
@@ -366,9 +374,8 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
   // `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`, que LEE el codigo de la fuente de
   // `page.tsx` en vez de repetirlo aqui.
   //
-  // El icono `users` SI es nuevo en `NavIconName` y en `NAV_ICONS`, a diferencia de sus dos
-  // hermanas: ninguno de los ocho existentes habla de personas y los dos de esta seccion (`boxes`,
-  // `flask-conical`) estan tomados. No entra ninguna dependencia: `lucide-react` ya estaba.
+  // El icono `users` SI es nuevo en `NavIconName` y en `NAV_ICONS`: ninguno de los ocho existentes
+  // habla de personas. No entra ninguna dependencia: `lucide-react` ya estaba.
   {
     kind: 'link',
     href: USERS_ROUTE,
@@ -376,7 +383,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     testId: 'nav-usuarios',
     permission: 'usuarios.consultar',
     icon: 'users',
-    section: NAV_SECTION_CONFIGURATION,
+    section: NAV_SECTION_OPERATION,
   },
 ];
 

@@ -51,6 +51,14 @@ export const ERROR_MESSAGE_KEY = {
   order_assignment_not_found: 'errors.order_assignment_not_found',
   user_not_assignable: 'errors.user_not_assignable',
   batch_duplicate_lot: 'errors.batch_duplicate_lot',
+  batch_not_found: 'errors.batch_not_found',
+  batch_stock_negative: 'errors.batch_stock_negative',
+  ai_unavailable: 'errors.ai_unavailable',
+  presentation_unit_locked: 'errors.presentation_unit_locked',
+  action_not_allowed: 'errors.action_not_allowed',
+  insufficient_material: 'errors.insufficient_material',
+  recipe_without_lines: 'errors.recipe_without_lines',
+  user_cannot_be_responsible: 'errors.user_cannot_be_responsible',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -124,4 +132,18 @@ export const ERROR_MESSAGES_ES = {
   'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
   // «En esta empresa» porque el lote es unico por empresa, no en toda la base.
   'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor en esta empresa.',
+  // No distingue «no existe» de «es de otra empresa»: la respuesta es la misma para las dos.
+  'errors.batch_not_found': 'El lote solicitado no existe.',
+  'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',
+  'errors.ai_unavailable':
+    'La lectura automatica no esta disponible en este momento. Intentalo mas tarde.',
+  'errors.presentation_unit_locked':
+    'La presentacion ya tiene lotes y no puede cambiar de unidad.',
+  // No es «no tienes permiso»: la operacion esta autorizada, lo que se rechaza es la accion.
+  'errors.action_not_allowed': 'La accion no esta permitida.',
+  'errors.insufficient_material':
+    'No hay material suficiente en inventario para entregar el pedido.',
+  'errors.recipe_without_lines':
+    'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
+  'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
 } as const satisfies Record<ErrorMessageKey, string>;

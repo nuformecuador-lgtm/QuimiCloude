@@ -1,12 +1,14 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { recipeStepSchema } from '../../../domain/recipe-input';
+import { normalizeRecipeName } from '../../../domain/recipe-name';
 
-import type { RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
+import type { RecipeCatalog, RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
 
-import { recipeCompanyScope } from './company-scope';
+import { recipeCompanyScope, type PrismaLike } from './company-scope';
+import { normalizedSearchCondition } from './list-query-sql';
 
 /**
  * Implementa `RecipeCatalog['findRefsIncludingDeleted']` (`domain/recipe-catalog.ts`,
@@ -59,6 +61,28 @@ export async function findRecipeRefsIncludingDeleted(
 }
 
 /**
+ * Ids de recetas de esa empresa cuyo nombre casa con `search`, INCLUIDAS LAS DADAS DE BAJA:
+ * un pedido conserva su receta aunque la den de baja, y buscar ese nombre tiene que seguir
+ * encontrandolo. `null` cuando el termino no normaliza a nada -no es una busqueda, no hay
+ * nada que filtrar-, distinto de `[]` -ninguna receta casa-.
+ */
+export async function findRecipeIdsMatchingName(
+  search: string,
+  companyId: string,
+): Promise<readonly RecipeId[] | null> {
+  const condition = normalizedSearchCondition(search, normalizeRecipeName);
+  if (condition === null) return null;
+
+  const scope: RecipeScope = { companyId };
+  const rows = await prisma.recipe.findMany({
+    where: { AND: [recipeCompanyScope(scope), { nameNormalized: condition }] },
+    select: { id: true },
+  });
+
+  return rows.map((row) => row.id);
+}
+
+/**
  * Valida cada elemento crudo del `Json` de `steps` contra el esquema del dominio y descarta el
  * que no pasa, conservando el orden -mismo criterio de tolerancia que `recipe-prisma.ts`, pero
  * repetido aqui en vez de importado: este adaptador no toca el repositorio interno de receta.
@@ -81,8 +105,7 @@ type RecipeExecutionContentRow = {
   readonly steps: unknown;
   readonly lines: ReadonlyArray<{
     readonly productId: string;
-    readonly quantity: { toFixed(digits: number): string };
-    readonly unitId: string;
+    readonly percentage: { toFixed(digits: number): string };
   }>;
 };
 
@@ -96,32 +119,51 @@ export function toRecipeExecutionContent(row: RecipeExecutionContentRow): Recipe
     lines: row.lines.map((line) => ({
       productId: line.productId,
       productName: null,
-      quantity: line.quantity.toFixed(4),
-      unitId: line.unitId,
+      percentage: line.percentage.toFixed(2),
     })),
   };
 }
 
 /**
- * Implementa `RecipeCatalog['findExecutionContentById']`. SIN `deleted_at IS NULL` en el
- * `where`, a proposito: una receta dada de baja tiene que poder seguir ejecutandose, y la baja
- * viaja en `isDeleted` -no se deduce por ausencia, como en `findRecipeRefsIncludingDeleted`-.
+ * Implementa `RecipeCatalog['findExecutionContentById']`, sobre el cliente que se le da. SIN
+ * `deleted_at IS NULL` en el `where`, a proposito: una receta dada de baja tiene que poder
+ * seguir ejecutandose, y la baja viaja en `isDeleted` -no se deduce por ausencia, como en
+ * `findRecipeRefsIncludingDeleted`-.
  */
-export async function findRecipeExecutionContentById(
+async function findExecutionContentByIdOn(
+  tx: PrismaLike,
   id: RecipeId,
   companyId: string,
 ): Promise<RecipeExecutionContent | null> {
   const scope: RecipeScope = { companyId };
-  const row = await prisma.recipe.findFirst({
+  const row = await tx.recipe.findFirst({
     where: { AND: [recipeCompanyScope(scope), { id }] },
     select: {
       id: true,
       name: true,
       deletedAt: true,
       steps: true,
-      lines: { select: { productId: true, quantity: true, unitId: true } },
+      lines: { select: { productId: true, percentage: true } },
     },
   });
 
   return row === null ? null : toRecipeExecutionContent(row);
+}
+
+export async function findRecipeExecutionContentById(
+  id: RecipeId,
+  companyId: string,
+): Promise<RecipeExecutionContent | null> {
+  return findExecutionContentByIdOn(prisma, id, companyId);
+}
+
+/**
+ * Fabrica sobre cliente: construye el lector de contenido de receta sobre el cliente que se le
+ * pase -el `tx` de una transaccion compartida con otro modulo, por ejemplo-, mismo patron que
+ * `createOrderWriteRepository` y `createMaterialReservations`.
+ */
+export function createRecipeExecutionReader(tx: PrismaLike = prisma): Pick<RecipeCatalog, 'findExecutionContentById'> {
+  return {
+    findExecutionContentById: (id, companyId) => findExecutionContentByIdOn(tx, id, companyId),
+  };
 }

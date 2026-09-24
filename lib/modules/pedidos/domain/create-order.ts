@@ -1,13 +1,17 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateOrderNumberError, RecipeNotFoundError, ValidationError } from './errors';
+import { PresentationNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
+import { buildRequirement } from './order-requirement';
+import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
-import type { OrderRepository } from '../ports/order-repository';
+import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 
 /**
  * El estado con el que nace un pedido (R9). `DEFAULT_ORDER_STATUS` esta tipado como
@@ -25,12 +29,22 @@ const STATUS_DE_ALTA: EditableOrderStatus = ((status = DEFAULT_ORDER_STATUS) => 
 })();
 
 export type CreateOrderDeps = {
-  readonly orders: OrderRepository;
   /** Contrato PUBLICO de `recetas` (R15, R43): `pedidos` no consulta `prisma.recipe`.
    *
    *  QC-35bis (2026-09-07): era el primero de DOS catalogos. El de `unidades` se fue con la
    *  unidad del pedido, y con el la comprobacion de R16. */
   readonly recipes: RecipeCatalog;
+  /** Contrato PUBLICO de `inventario`: los lotes con existencia con los que se costea. */
+  readonly products: ProductCatalog;
+  /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
+  readonly units: UnitCatalog;
+  /** Contrato PUBLICO de `inventario`: la presentacion que se elige, solo para comprobar que
+   *  existe en la empresa de quien escribe. No se le pasa al coste: la presentacion no cambia
+   *  nada de lo que se calcula. */
+  readonly presentations: PresentationCatalog;
+  /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
+   *  `reserved_at`, las tres o ninguna. */
+  readonly unitOfWork: OrderUnitOfWork;
   /**
    * El reloj entra INYECTADO -mismo patron que `recetas` y `proveedores`- para que el test
    * lo pueda fijar sin tocar el reloj global. Aqui NO se lee `next/headers` ni ninguna
@@ -48,11 +62,12 @@ export type CreatedOrder = {
 };
 
 /**
- * Alta de pedido (R8, R9, R10, R15, R16).
+ * Alta de pedido.
  *
  * `requirePermission(actor, 'pedidos.modificar')` es la PRIMERA linea, antes de `zod` y antes
- * de tocar ningun puerto (QC-74 R12): un actor sin ese permiso no dispara ni la validacion ni
- * una sola lectura, y el test de autorizacion lo demuestra con dobles que fallan si los llaman.
+ * de tocar ningun puerto: un actor sin ese permiso no dispara ni la validacion ni una sola
+ * lectura, ni siquiera abre la transaccion, y el test de autorizacion lo demuestra con
+ * dobles que fallan si los llaman.
  *
  * R6: los DOS autores salen del actor de la sesion, jamas de la entrada -el esquema ni
  * siquiera declara esos campos-. El puerto recibe un solo `actorId` y el adaptador lo
@@ -62,6 +77,10 @@ export type CreatedOrder = {
  * `now()` UNA vez y se pasan los dos derivados del mismo `Date`: si el ano se calculara de
  * otro reloj, un alta a las 23:59:59.999 UTC del 31 de diciembre chocaria contra el `CHECK`
  * `orders_order_year_matches_created_at` de QC-33 R41.
+ *
+ * El choque del correlativo (`orders_company_year_sequence_key`) ya no se traduce aqui: lo
+ * reintenta `OrderUnitOfWork` con una transaccion nueva, y si los tres intentos chocan la
+ * excepcion sube sin traducir.
  */
 export function createCreateOrder(
   deps: CreateOrderDeps,
@@ -89,21 +108,57 @@ export function createCreateOrder(
     const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
 
+    // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
+    // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
+    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
+    if (presentation === undefined) throw new PresentationNotFoundError();
+
+    const ingredientsCost = await resolveIngredientsCost(
+      deps.recipes,
+      deps.products,
+      deps.units,
+      data.recipeId,
+      data.quantity,
+      actor.companyId,
+    );
+
     const instant = now();
 
     // R9: el estado de alta es siempre `PENDIENTE` y lo pone este caso de uso, no la
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
-    const created = await deps.orders.create(
-      { ...data, status: STATUS_DE_ALTA },
-      instant.getUTCFullYear(),
-      actor.id,
-      instant,
-      scope,
-    );
+    const created = await deps.unitOfWork.run(async (transaction) => {
+      const order = await transaction.orders.create(
+        { ...data, status: STATUS_DE_ALTA },
+        instant.getUTCFullYear(),
+        actor.id,
+        instant,
+        ingredientsCost,
+        scope,
+      );
 
-    // El `23505` del indice unico del correlativo llega como resultado DISCRIMINADO -lo
-    // tradujo el adaptador-, nunca como excepcion de Prisma (`design.md > 4.2`).
-    if (created === 'duplicate_number') throw new DuplicateOrderNumberError();
+      // Una receta sin lineas da una necesidad vacia, y `syncForOrder` la sincroniza sin
+      // apartar nada ni fallar. Se lee con `scope.recipes`, sobre el cliente de ESTA
+      // transaccion: pedir una segunda conexion mientras esta retiene la suya desperdiciaria
+      // una conexion del pool.
+      const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
+      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
+
+      const outcome = await transaction.reservations.syncForOrder({
+        orderId: order.id,
+        companyId: actor.companyId,
+        requirement,
+        actorId: actor.id,
+        now: instant,
+      });
+
+      await transaction.orders.setReservedAt(
+        order.id,
+        outcome.kind === 'reserved' ? instant : null,
+        scope,
+      );
+
+      return order;
+    });
 
     return { id: created.id, number: created.number, numberText: formatOrderNumber(created.number) };
   };

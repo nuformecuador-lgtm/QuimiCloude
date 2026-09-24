@@ -16,6 +16,8 @@ import {
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
+import type { ProductType } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /**
@@ -88,20 +90,15 @@ export type ProductPickerOption = {
   readonly id: string;
   readonly name: string;
   /**
-   * Unidad en la que se mide el producto, o `null` si todavia no se puede saber.
+   * Unidad guardada del producto, o `null` si todavia no tiene ninguna.
    *
-   * DE DONDE SALE, desde QC-80 (R22, R23): de `ProductView.latestBatchUnitId`, es decir, de la
-   * presentacion del LOTE MAS RECIENTE del producto. Antes era `products.unit_id`, una columna
-   * que el producto declaraba y que ya NO EXISTE. `null` significa «este producto todavia no
-   * tiene ningun lote», no «no tiene unidad»: con `null`, `unitsOfGroup` devuelve el catalogo
-   * entero y la linea se puede escribir igual (R23), que es lo que permite escribir una receta
-   * antes de comprar el ingrediente.
+   * DE DONDE SALE: de `ProductView.unitId`, la columna propia del producto -fija desde que se
+   * crea, ya no derivada del lote mas reciente-. `null` significa «este producto todavia no
+   * tiene unidad»: con `null`, `unitsOfGroup` devuelve el catalogo entero y la linea se puede
+   * escribir igual, que es lo que permite escribir una receta antes de comprar el ingrediente.
    *
-   * El nombre del campo se queda en `unitId` porque aqui ya es «la unidad de este ingrediente»,
-   * sin mas: quien la consume es la linea de receta, y ninguna de sus reglas cambia.
-   *
-   * Este componente NO la usa para nada -no filtra, no ordena y no la pinta-, solo la entrega
-   * intacta en `onSelect`.
+   * En fórmulas se pinta solo el nombre; la unidad se entrega intacta en `onSelect` para
+   * quien la necesite (el detalle la conserva en `productUnitId`).
    */
   readonly unitId: string | null;
 };
@@ -116,6 +113,15 @@ const FIRST_PAGE = 1;
 const SEARCH_DEBOUNCE_MS = 400;
 /** Alto máximo del desplegable: siempre hay scroll cuando quedan páginas por traer. */
 const MAX_LIST_HEIGHT = 256;
+
+/**
+ * Etiqueta de una opción del selector: solo el nombre. La unidad se retiró en fórmulas por
+ * decisión de producto («Hipoclorito · kg» pasa a «Hipoclorito»); el inventario la sigue
+ * mostrando con `productDisplayName`.
+ */
+function optionLabel(option: ProductPickerOption): string {
+  return option.name;
+}
 
 export type ProductPickerProps = {
   /** Ingrediente ya elegido, o cadena vacía si ninguno. */
@@ -132,6 +138,13 @@ export type ProductPickerProps = {
   readonly initialPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };
   /** Ingredientes ya elegidos en OTRAS líneas: se apartan de la lista. */
   readonly excludedIds?: readonly string[];
+  /** Catálogo de unidades. Se conserva por firma; las opciones se pintan solo con el nombre. */
+  readonly units: readonly UnitRef[];
+  /**
+   * Filtro de tipo aplicado en el SERVIDOR (`filters.type`, `select`): el tab de ingredientes
+   * pide `PRODUCT` y el de máquinas `MACHINE`. Sin el, el selector ofrece todo el catálogo.
+   */
+  readonly productType?: ProductType;
 };
 
 export function ProductPicker({
@@ -143,6 +156,7 @@ export function ProductPicker({
   testId,
   initialPage,
   excludedIds = [],
+  productType,
 }: ProductPickerProps) {
   const errorId = useId();
   const [open, setOpen] = useState(false);
@@ -158,14 +172,23 @@ export function ProductPicker({
     async ({ query, page }: AsyncPageRequest) => {
       const search = query.trim();
 
+      // La página 1 sin búsqueda la trae `initialPage` por props (R49): cada tab recibe la suya
+      // ya filtrada por tipo desde la página del formulario, así que aquí no se filtra nada.
       if (page === FIRST_PAGE && search === '') {
         return { items: initialPage.items, page, totalPages: initialPage.totalPages };
       }
 
-      // Sin término, la consulta es EXACTAMENTE la de siempre: la página completa del catálogo.
-      // La clave `search` se omite por claridad del sitio de llamada, NO porque el esquema fuera
-      // a rechazarla: con el contrato de QC-57 una búsqueda vacía es AUSENCIA de búsqueda (R20).
-      const filtro = search === '' ? {} : { search };
+      // Sin término, la consulta es EXACTAMENTE la de siempre, más el filtro de tipo si el tab
+      // lo declaró. La clave `search` se omite por claridad del sitio de llamada, NO porque el
+      // esquema fuera a rechazarla: con el contrato de QC-57 una búsqueda vacía es AUSENCIA de
+      // búsqueda (R20). El filtro viaja al SERVIDOR (`PRODUCT_QUERYABLE` lo declara `select`);
+      // en cliente no se recorta nada (R28).
+      const filtro = {
+        ...(search === '' ? {} : { search }),
+        ...(productType === undefined
+          ? {}
+          : { filters: { type: { kind: 'select', values: [productType] } } }),
+      };
       const result = await listProductsAction({ page, pageSize: MAX_PAGE_SIZE, ...filtro });
 
       if (result.status === 'error') {
@@ -178,16 +201,13 @@ export function ProductPicker({
         items: result.data.items.map((item) => ({
           id: item.id,
           name: item.name,
-          // QC-80 (R22): la unidad del ingrediente es la DERIVADA del lote mas reciente, no una
-          // columna del producto. El renombrado del contrato es lo que trajo el compilador hasta
-          // esta linea.
-          unitId: item.latestBatchUnitId,
+          unitId: item.unitId,
         })),
         page: result.data.page,
         totalPages: result.data.totalPages,
       };
     },
-    [initialPage],
+    [initialPage, productType],
   );
 
   const { items, isLoading, isLoadingMore, error: loadError, hasMore, loadMore } =
@@ -242,7 +262,7 @@ export function ProductPicker({
       <Autocomplete
         items={selectable}
         mode="none"
-        itemToStringValue={(option: ProductPickerOption) => option.name}
+        itemToStringValue={(option: ProductPickerOption) => optionLabel(option)}
         value={displayValue}
         onValueChange={handleValueChange}
         open={open}
@@ -279,7 +299,7 @@ export function ProductPicker({
                       data-testid={`${testId}-option`}
                       onClick={() => choose(option)}
                     >
-                      <span className="truncate">{option.name}</span>
+                      <span className="truncate">{optionLabel(option)}</span>
                     </AutocompleteItem>
                   )}
                 </AutocompleteList>

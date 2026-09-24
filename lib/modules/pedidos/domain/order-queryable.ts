@@ -1,12 +1,11 @@
 // lib/modules/pedidos/domain/order-queryable.ts
 /**
- * Lista blanca del listado de PEDIDOS (R4, `design.md > 5`). Lo que no este aqui se omite sin
- * romper la consulta (R5).
+ * Lista blanca del listado de PEDIDOS. Lo que no este aqui se omite sin romper la consulta.
  *
- * Es la UNICA de las siete con `searchable: false` (R17): `orders` no tiene columna `name`, asi
- * que la busqueda se omite y se registra como cualquier otro campo no declarado.
+ * `orders` no tiene columna de nombre propia: la busqueda casa por el nombre de la RECETA del
+ * pedido, resuelto en otro modulo y traducido a una lista de ids antes de llegar al `where`.
  *
- * `deletedAt` no esta y no puede estar (R7).
+ * `deletedAt` no esta y no puede estar.
  */
 
 import type { ListQueryable } from './list-query';
@@ -34,5 +33,5 @@ export const ORDER_QUERYABLE: ListQueryable = {
     priority: 'select',
     createdAt: 'dateRange',
   },
-  searchable: false,
+  searchable: true,
 };

@@ -15,6 +15,7 @@
 // aserciones caerian. Lo que este archivo NO puede demostrar es que el SQL filtre: eso es
 // `tests/integration/inventario/company-scope-queries.int.test.ts` (T13).
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
@@ -62,13 +63,13 @@ const PRESENTACION_DE_A = 'presentation-de-a';
 
 const ALTA_VALIDA = {
   name: 'Acido sulfurico',
-  stock: 10,
-  qtyAlert: 2,
+  stock: '10',
+  qtyAlert: '2',
   presentationId: PRESENTACION,
   unitCost: '10.0000',
 };
 
-const EDICION_VALIDA = { name: 'Acido sulfurico', qtyAlert: 2 };
+const EDICION_VALIDA = { name: 'Acido sulfurico', qtyAlert: '2' };
 const PRESENTACION_VALIDA = { name: 'Bidon 20 L', unitId: UNIDAD };
 
 const AHORA = new Date('2026-09-11T10:00:00.000Z');
@@ -78,9 +79,10 @@ function vista(id: string, name: string): ProductView {
     id,
     name,
     imagePath: null,
-    stockByUnit: [],
-    qtyAlert: 2,
-    latestBatchUnitId: null,
+    stock: '0.0000',
+    unitId: null,
+    qtyAlert: '2.0000',
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: AHORA,
     updatedAt: AHORA,
   };
@@ -143,7 +145,12 @@ function montar() {
       ),
     ),
     // R18: solo los homonimos VIVOS de la empresa del ambito. Es el filtro entero de la regla.
-    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async (name, scope) => {
+    // La unidad no la mide este doble -no hay presentaciones que resolver aqui-: el fixture
+    // solo tiene un producto y una unidad, y lo que este archivo cubre es el aislamiento por
+    // empresa, no la busqueda por unidad (eso es `create-product.test.ts`).
+    findAliveIdByNameInPresentationUnit: vi.fn<
+      ProductRepository['findAliveIdByNameInPresentationUnit']
+    >(async (name, _presentationId, scope) => {
       const fila = productos.find(
         (candidata) =>
           candidata.alive &&
@@ -168,6 +175,10 @@ function montar() {
         return { batchId: `batch-de-${productId}`, lot: `lote-de-${productId}` };
       },
     ),
+    // QC-92: sin caso en este archivo -es de otro modulo de reglas-, asi que dobles minimos.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => null),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => null),
   } satisfies ProductRepository;
 
   const presentations = {
@@ -244,7 +255,7 @@ const CASOS_DE_USO: ReadonlyArray<{
   {
     nombre: 'create-product',
     invocar: (m, actor) => m.createProduct(ALTA_VALIDA, actor),
-    puerto: (m) => m.products.findAliveIdByName,
+    puerto: (m) => m.products.findAliveIdByNameInPresentationUnit,
   },
   {
     nombre: 'update-product',
@@ -557,14 +568,17 @@ describe('QC-49 R17 — la empresa de la entrada no se escribe, no cuenta y se r
 describe('QC-49 R18 — el homonimo de otra empresa no existe para quien da de alta', () => {
   it('el alta en B con el nombre de un producto de A crea uno NUEVO en B', async () => {
     // El fixture tiene «Acido sulfurico» VIVO en la empresa A. Quien da de alta desde B escribe
-    // el mismo nombre: si `findAliveIdByName` no estuviera acotado, el caso de uso le colgaria
-    // el lote al producto de A -una escritura en la empresa ajena, por el camino mas tonto-.
+    // el mismo nombre: si `findAliveIdByNameInPresentationUnit` no estuviera acotado, el caso de
+    // uso le colgaria el lote al producto de A -una escritura en la empresa ajena, por el
+    // camino mas tonto-.
     const m = montar();
 
     const resultado = await m.createProduct(ALTA_VALIDA, ACTOR_B);
 
-    expect(m.products.findAliveIdByName).toHaveBeenCalledTimes(1);
-    expect(ambitoRecibido(m.products.findAliveIdByName)).toEqual({ companyId: EMPRESA_B });
+    expect(m.products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledTimes(1);
+    expect(ambitoRecibido(m.products.findAliveIdByNameInPresentationUnit)).toEqual({
+      companyId: EMPRESA_B,
+    });
     expect(m.products.addBatchToAlive).not.toHaveBeenCalled();
     expect(m.products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(resultado.id).not.toBe(PRODUCTO_DE_A);
@@ -580,8 +594,8 @@ describe('QC-49 R18 — el homonimo de otra empresa no existe para quien da de a
 
   it('el mismo alta en A SI encuentra su homonimo y le agrega el lote', async () => {
     // La mitad simetrica, y lo que impide leer el caso de arriba como «el alta nunca reusa».
-    // Si esto no estuviera, un `findAliveIdByName` que devolviera siempre `null` -o sea, el
-    // ambito roto por el otro lado- pasaria el test anterior sin despeinarse.
+    // Si esto no estuviera, un `findAliveIdByNameInPresentationUnit` que devolviera siempre
+    // `null` -o sea, el ambito roto por el otro lado- pasaria el test anterior sin despeinarse.
     const m = montar();
 
     const resultado = await m.createProduct(ALTA_VALIDA, ACTOR_A);

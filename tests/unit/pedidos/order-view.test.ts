@@ -25,6 +25,7 @@ const NEW_ORDER: NewOrder = {
   quantity: '12.5000',
   priority: 'ALTA',
   status: 'EN_CURSO',
+  presentationId: '22222222-2222-4222-8222-222222222222',
 }
 
 /** `true` si el tipo declara esa clave. Se evalua en COMPILACION; el `expect` de abajo solo
@@ -109,7 +110,7 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
     expect(enLaVista).toBe(true)
   })
 
-  it('los filtros del listado son solo estado, prioridad y fecha, y no hay busqueda', () => {
+  it('los filtros del listado son solo estado, prioridad y fecha, y la busqueda ya se abrio (R11)', () => {
     // R38/R39 heredados, dichos sobre la forma NUEVA. QC-57 (R25) borro `OrderFilters`: estado
     // y prioridad dejaron de ser parametros propios del listado y son filtros `select` del
     // contrato generico. Lo que aquel tipo garantizaba lo garantiza ahora la lista blanca, y se
@@ -122,38 +123,59 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
     expect(ORDER_QUERYABLE.filterable.status).toBe('select')
     expect(ORDER_QUERYABLE.filterable.priority).toBe('select')
 
-    // R17: `orders` no tiene columna `name`. Es la UNICA de las siete que no busca.
-    expect(ORDER_QUERYABLE.searchable).toBe(false)
+    // Nota fechada 2026-09-18: `orders` no tiene columna `name` propia, pero desde QC-68 la
+    // busqueda casa por el nombre de la receta del pedido, resuelta antes de llegar al puerto.
+    // Ya no es cierto que sea la unica de las siete que no busca.
+    expect(ORDER_QUERYABLE.searchable).toBe(true)
 
     // Y no hay filtro por el numero correlativo (R39): no esta declarado.
     expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('orderNumber')
   })
 })
 
-describe('pedidos — el puerto declara los seis metodos de design.md > 7.4', () => {
-  it('un doble que implementa la interfaz completa compila, y cancelAlive es el unico con reason', () => {
+describe('pedidos — el coste de ingredientes en la salida', () => {
+  it('la salida del pedido no declara ningun campo de precio de venta (R1)', () => {
+    const precio: Declara<OrderView, 'price'> = false
+    const precioUnitario: Declara<OrderView, 'unitPrice'> = false
+    const precioDeVenta: Declara<OrderView, 'salePrice'> = false
+    const total: Declara<OrderView, 'total'> = false
+    expect([precio, precioUnitario, precioDeVenta, total]).toEqual([false, false, false, false])
+  })
+
+  it('OrderRow y OrderView llevan ingredientsCost', () => {
+    const enLaFila: Declara<OrderRow, 'ingredientsCost'> = true
+    const enLaVista: Declara<OrderView, 'ingredientsCost'> = true
+    expect([enLaFila, enLaVista]).toEqual([true, true])
+  })
+
+  it('ingredientsCost en null no se vuelve "0.0000"', () => {
+    const sinCoste: OrderView['ingredientsCost'] = null
+    expect(sinCoste).toBeNull()
+    expect(sinCoste).not.toBe('0.0000')
+  })
+
+  it('la salida no tiene ningun campo de moneda', () => {
+    const moneda: Declara<OrderView, 'currency'> = false
+    const codigoDeMoneda: Declara<OrderView, 'currencyCode'> = false
+    expect([moneda, codigoDeMoneda]).toEqual([false, false])
+  })
+})
+
+describe('pedidos — el puerto declara los dos metodos de LECTURA de design.md > 5.3', () => {
+  it('un doble que implementa la interfaz completa compila', () => {
     // No se ejecuta ninguna operacion: lo que se comprueba es la FORMA del puerto. Si algun dia
-    // se le anadiera un septimo metodo, este doble dejaria de compilar y habria que decidirlo.
+    // se le anadiera un tercer metodo, este doble dejaria de compilar y habria que decidirlo.
+    // La escritura salio entera hacia `OrderWriteRepository`, dentro de la transaccion
+    // compartida con `inventario`; este puerto ya solo lee.
     const doble: OrderRepository = {
-      create: async () => 'duplicate_number',
       findAliveById: async () => null,
       // `listAlive` devuelve una `Page` ya armada, no `{ rows, total }`: la firma se corrigio
       // el 2026-09-04 (nota al final de `design.md > 7.4`, aprobada por el leader) para que el
       // caso de uso no tenga que calcular el `offset`, que es la reimplementacion que R37
       // prohibe. Quien pagina es el adaptador driven con `lib/shared/pagination`.
       listAlive: async () => ({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 }),
-      updateAlive: async () => 'not_found',
-      cancelAlive: async (_id, reason) => (reason.length > 0 ? 'ok' : 'not_found'),
-      softDeleteAlive: async () => 'ok',
     }
-    expect(Object.keys(doble).sort()).toEqual([
-      'cancelAlive',
-      'create',
-      'findAliveById',
-      'listAlive',
-      'softDeleteAlive',
-      'updateAlive',
-    ])
+    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'listAlive'])
   })
 
   it('no existe ningun metodo de restaurar ni de listar borrados', () => {

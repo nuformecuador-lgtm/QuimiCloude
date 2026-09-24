@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import {
   PresentationDuplicateNameError,
   PresentationNotFoundError,
+  PresentationUnitLockedError,
   ValidationError,
 } from './errors';
 import { updatePresentationSchema } from './presentation-input';
@@ -61,5 +62,6 @@ export function createUpdatePresentation(
     if (result === 'not_found') throw new PresentationNotFoundError();
     if (result === 'duplicate') throw new PresentationDuplicateNameError();
     if (result === 'invalid_unit') throw new ValidationError();
+    if (result === 'unit_locked') throw new PresentationUnitLockedError();
   };
 }

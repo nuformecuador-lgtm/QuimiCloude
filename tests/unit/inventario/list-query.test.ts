@@ -111,9 +111,6 @@ describe('esquema del contrato de lista', () => {
 describe('sanitize contra la lista blanca', () => {
   it('deja intacta una consulta que solo pide campos declarados', () => {
     // R1, R3 — el nombre del campo de la base es el identificador, sin traduccion.
-    // El filtro de ejemplo era `unitId` hasta QC-80, luego `stock`; ahora es `qtyAlert`, porque
-    // `stock` dejo de estar declarado (R8) y un caso de «consulta valida» no puede apoyarse en un
-    // campo que la lista blanca ya no acepta.
     const entrada = query({
       sort: { columnId: 'name', direction: 'asc' },
       filters: { qtyAlert: { kind: 'numberRange', min: 0, max: 10 } },
@@ -164,7 +161,7 @@ describe('sanitize contra la lista blanca', () => {
     // `?filters[unitId]=...` en un marcador tiene que seguir pintando la lista.
     expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('unitId');
     expect(PRODUCT_QUERYABLE.sortable).not.toContain('unitId');
-    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['qtyAlert', 'createdAt']);
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt', 'type']);
 
     const resultado = sanitizeListQuery(
       query({ filters: { unitId: { kind: 'select', values: ['u1'] } } }),
@@ -175,25 +172,23 @@ describe('sanitize contra la lista blanca', () => {
     expect(resultado.ignored).toEqual(['unitId']);
   });
 
-  it('el listado de productos YA NO ofrece ordenar ni filtrar por existencia (R8)', () => {
-    // R8 — `products.stock` dejo de existir; ordenar o filtrar por ella se ignora y la pagina
-    // responde sin fallar, igual que cualquier otro campo no declarado.
-    expect(PRODUCT_QUERYABLE.sortable).not.toContain('stock');
-    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('stock');
+  it('el listado de productos vuelve a ordenar y filtrar por existencia (R15)', () => {
+    expect(PRODUCT_QUERYABLE.sortable).toContain('stock');
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toContain('stock');
 
     const porOrden = sanitizeListQuery(
       query({ sort: { columnId: 'stock', direction: 'desc' } }),
       PRODUCT_QUERYABLE,
     );
-    expect(porOrden.query.sort).toBeNull();
-    expect(porOrden.ignored).toEqual(['stock']);
+    expect(porOrden.query.sort).toEqual({ columnId: 'stock', direction: 'desc' });
+    expect(porOrden.ignored).toEqual([]);
 
     const porFiltro = sanitizeListQuery(
       query({ filters: { stock: { kind: 'numberRange', min: 0, max: 10 } } }),
       PRODUCT_QUERYABLE,
     );
-    expect(porFiltro.query.filters).toEqual({});
-    expect(porFiltro.ignored).toEqual(['stock']);
+    expect(porFiltro.query.filters).toEqual({ stock: { kind: 'numberRange', min: 0, max: 10 } });
+    expect(porFiltro.ignored).toEqual([]);
   });
 
   it('omite un filtro cuya FORMA no es la que el campo declara', () => {

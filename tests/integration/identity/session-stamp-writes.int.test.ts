@@ -150,6 +150,32 @@ async function createUser(
 }
 
 /**
+ * Alta DIRECTA al escenario, saltando el adaptador: solo para los casos que necesitan que la fila
+ * NAZCA como administrador (R38 y QC-95 R3), porque desde el fix directo del 2026-09-22 el
+ * adaptador responde `'action_not_allowed'` a ese rol y estos casos necesitan un administrador de
+ * verdad para que la guardia de R22 tenga algo que abortar.
+ */
+async function createUserRaw(companyId: string, data: NewUser): Promise<string> {
+  const created = await prisma.user.create({
+    data: {
+      firstNames: data.firstNames,
+      lastNames: data.lastNames,
+      birthDate: data.birthDate,
+      email: data.email,
+      phone: data.phone,
+      documentTypeCode: data.documentTypeCode,
+      documentNumber: data.documentNumber,
+      username: data.username,
+      passwordHash: FAKE_CREDENTIAL_HASH.value,
+      roleId: data.roleId,
+      companyId,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
+/**
  * El sello TAL COMO QUEDO EN LA COLUMNA. Se lee con SQL crudo y por su nombre en `snake_case`: lo
  * que esta ficha promete es una columna, no un campo de un tipo de salida.
  */
@@ -324,8 +350,9 @@ describe('QC-23 T14 — el estado de cuenta sube el sello dentro de su propia tr
   it('R38: si la transaccion aborta por `last_administrator`, el sello NO cambio', async () => {
     await withCompany(async (companyId) => {
       // Un unico administrador ACTIVO en la empresa: bloquearlo deja a la empresa sin ninguno, y la
-      // guarda de QC-66 R22 aborta la transaccion ANTES de escribir.
-      const adminId = await createUser(companyId, newUserData({ roleId: administradorRoleId }));
+      // guarda de QC-66 R22 aborta la transaccion ANTES de escribir. Nace DIRECTO en el escenario:
+      // el adaptador ya no concede el rol administrador (fix directo, `action_not_allowed`).
+      const adminId = await createUserRaw(companyId, newUserData({ roleId: administradorRoleId }));
       await prisma.user.update({ where: { id: adminId }, data: { accountStatus: 'active' } });
       const antes = await stampOf(adminId);
 
@@ -385,14 +412,24 @@ describe('QC-23 T14 — el estado de cuenta sube el sello dentro de su propia tr
 describe('QC-23 T14 — el cambio de rol sube el sello dentro de la edicion', () => {
   it('R35: cambiar el rol DE VERDAD sube el sello, en el mismo `UPDATE` que los nueve campos', async () => {
     await withCompany(async (companyId) => {
+      // ENMENDADO por el fix directo (2026-09-22): el adaptador ya no concede el rol administrador,
+      // asi que el cambio DE VERDAD de rol se prueba en la direccion que sigue siendo legal: quien
+      // nacio administrador deja de serlo. Dos administradores ACTIVOS —nacidos directo en el
+      // escenario— porque con uno solo `updateAliveInCompany` responderia `last_administrator` (R22)
+      // y la edicion no llegaria a escribir el sello.
       const data = newUserData();
-      const targetId = await createUser(companyId, data);
+      const targetId = await createUserRaw(companyId, { ...data, roleId: administradorRoleId });
+      await createUserRaw(companyId, { ...newUserData(), roleId: administradorRoleId });
+      await prisma.user.updateMany({
+        where: { companyId },
+        data: { accountStatus: 'active' },
+      });
       const now = instantWithMillis();
 
       const outcome = await updateAliveInCompany(
         companyId,
         targetId,
-        { ...data, roleId: administradorRoleId },
+        { ...data, roleId: operadorRoleId },
         now,
       );
       expect(outcome).toBe('ok');
@@ -442,7 +479,9 @@ describe('QC-23 T14 — el cambio de rol sube el sello dentro de la edicion', ()
       const outcome = await updateAliveInCompany(
         companyId,
         targetId,
-        { ...data, roleId: administradorRoleId },
+        // Una edicion ordinaria —sin pedir el rol administrador—: el objetivo ya no existe, y el
+        // `where` del `UPDATE` responde `'not_found'` sin escribir nada.
+        { ...data, phone: '111111111' },
         instantWithMillis(120_000),
       );
       expect(outcome).toBe('not_found');
@@ -638,7 +677,9 @@ describe('QC-95 — el cambio de estado escribe los contadores de bloqueo en el 
   it('R3: si la transaccion aborta por `last_administrator`, ni el estado ni los tres contadores cambian', async () => {
     await withCompany(async (companyId) => {
       // El UNICO administrador `active` de la empresa: moverlo a `inactive` la dejaria sin ninguno.
-      const adminId = await createUser(companyId, newUserData({ roleId: administradorRoleId }));
+      // Nace DIRECTO en el escenario: el adaptador ya no concede el rol administrador (fix directo,
+      // `action_not_allowed`).
+      const adminId = await createUserRaw(companyId, newUserData({ roleId: administradorRoleId }));
       const sembrado = {
         accountStatus: 'active',
         failedLoginAttempts: 3,

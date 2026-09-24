@@ -58,6 +58,7 @@ function dobleDeAlmacenamiento() {
     createSignedUpload: vi.fn(),
     createSignedReadUrl: vi.fn(),
     download: vi.fn(),
+    remove: vi.fn(),
   };
 }
 
@@ -153,8 +154,8 @@ describe('documentos — autorizacion', () => {
     it('R4 — el codigo exigido YA EXISTE en el catalogo: no se amplia nada', () => {
       const codigos = PERMISSIONS.map((permiso) => permiso.code);
       expect(codigos).toContain(DOCUMENT_UPLOAD_PERMISSION);
-      // Ancla anti-vacuidad: el catalogo sigue siendo el cerrado de quince.
-      expect(codigos).toHaveLength(15);
+      // Ancla anti-vacuidad: el catalogo sigue siendo el cerrado de dieciocho.
+      expect(codigos).toHaveLength(18);
       // Y ninguna entrada nace para este modulo.
       expect(codigos.filter((codigo) => codigo.startsWith('documentos.'))).toEqual([]);
     });

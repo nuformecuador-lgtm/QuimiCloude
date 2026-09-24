@@ -150,6 +150,23 @@ function isUnitCompanyScopeViolation(error: unknown): boolean {
   return `${detalle}\n${bruto}`.includes(UNIT_FOREIGN_COMPANY_VIOLATION);
 }
 
+/** Disparador `BEFORE UPDATE OF unit_id ON presentations`: sale con este nombre cuando la
+ *  presentacion ya tiene algun lote y la unidad enviada es distinta de la actual. */
+const UNIT_LOCKED_BY_BATCHES_TRIGGER = 'presentations_unit_locked_by_batches';
+
+/** Mismo criterio que `isUnitCompanyScopeViolation`: SQLSTATE `23514` mas el nombre del
+ *  disparador que lo lanzo, nunca el codigo a secas. */
+function isUnitLockedViolation(error: unknown): boolean {
+  if (sqlStateOf(error) !== '23514') return false;
+  const meta: unknown = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : null;
+  const detalle =
+    typeof meta === 'object' && meta !== null && 'message' in meta
+      ? String((meta as { message: unknown }).message)
+      : '';
+  const bruto = error instanceof Error ? error.message : '';
+  return `${detalle}\n${bruto}`.includes(UNIT_LOCKED_BY_BATCHES_TRIGGER);
+}
+
 /** QC-80 (R15): `unitId` entra en el `select` porque entra en el contrato de salida. Se
  *  exporta para que su test pueda afirmar la columna como dato y no como texto.
  *  `PRESENTATION_QUERYABLE` **no** gana `unitId`: no se ordena ni se filtra por un uuid que
@@ -223,7 +240,7 @@ export async function replacePresentation(
   id: string,
   data: PresentationData,
   scope: InventoryScope,
-): Promise<'ok' | 'not_found' | 'duplicate' | 'invalid_unit'> {
+): Promise<'ok' | 'not_found' | 'duplicate' | 'invalid_unit' | 'unit_locked'> {
   try {
     const result = await prisma.presentation.updateMany({
       // QC-49 (R16): el AMBITO va en el `where`, no en un `if` sobre una fila leida antes.
@@ -235,6 +252,7 @@ export async function replacePresentation(
     return result.count === 0 ? 'not_found' : 'ok';
   } catch (error) {
     if (isUniqueNameViolation(error)) return 'duplicate';
+    if (isUnitLockedViolation(error)) return 'unit_locked';
     if (isUnitForeignKeyViolation(error)) return 'invalid_unit';
     if (isUnitCompanyScopeViolation(error)) return 'invalid_unit';
     throw error;

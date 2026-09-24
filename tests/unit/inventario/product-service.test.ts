@@ -2,6 +2,7 @@
 // `tasks.md > T6`). Sin base de datos: lo que se prueba aqui es la DECISION que vive en
 // `domain/`, no la implementacion Prisma (esa es T9).
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeleteProduct } from '@/lib/modules/inventario/domain/delete-product';
@@ -32,7 +33,7 @@ const AHORA = new Date('2026-09-02T10:00:00.000Z');
  *  sigue obligatorio desde la decision del humano del 2026-09-03. */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  qtyAlert: 0,
+  qtyAlert: '0',
 };
 
 /** QC-90 (R1): el ALTA siempre crea su primer lote, asi que su entrada valida minima lleva
@@ -41,7 +42,7 @@ const PRODUCTO_VALIDO = {
  *  `create-product.test.ts`. */
 const ALTA_VALIDA = {
   ...PRODUCTO_VALIDO,
-  stock: 0,
+  stock: '0',
   presentationId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
 };
@@ -50,11 +51,10 @@ const VISTA_PRODUCTO: ProductView = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stockByUnit: [],
+  stock: '0.0000',
+  unitId: null,
   qtyAlert: null,
-  // QC-80 (R22): `unitId` dejo de ser un campo del producto; lo que la vista trae es la unidad
-  // DERIVADA del lote mas reciente, `null` mientras no haya ninguno.
-  latestBatchUnitId: null,
+  type: PRODUCT_TYPES.PRODUCT,
   createdAt: AHORA,
   updatedAt: AHORA,
 };
@@ -79,7 +79,9 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
     })),
     // QC-90 (T4): los tres metodos del alta con primer lote. Por defecto NO hay producto
     // vivo homonimo, asi que el alta cae al camino de creacion (R16).
-    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
+    findAliveIdByNameInPresentationUnit: vi.fn<
+      ProductRepository['findAliveIdByNameInPresentationUnit']
+    >(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-1',
       batchId: 'lote-1',
@@ -89,6 +91,10 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
       batchId: 'lote-1',
       lot: '1',
     })),
+    // QC-92: sin caso en este archivo, dobles minimos.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => null),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => null),
     ...overrides,
   };
 }
@@ -120,7 +126,7 @@ describe('R12 — nombres duplicados', () => {
     // al puerto, ninguna rechazada.
     //
     // QC-90 acota lo que este caso mide, y conviene decirlo: quien decide si hay homonimo
-    // es el PUERTO (`findAliveIdByName`), y aqui devuelve `null` -no hay producto vivo con
+    // es el PUERTO (`findAliveIdByNameInPresentationUnit`), y aqui devuelve `null` -no hay producto vivo con
     // ese nombre-. Lo que sigue vigente es que el DOMINIO no rechaza por nombre repetido;
     // con un producto vivo homonimo, el alta agrega lote en vez de crear (R17), y eso se
     // prueba en `create-product.test.ts`.
@@ -193,7 +199,7 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
  *  nombre o escribio un lote pese al rechazo. */
 function afirmarPuertoIntacto(products: ProductRepository): void {
   expect(products.create).not.toHaveBeenCalled();
-  expect(products.findAliveIdByName).not.toHaveBeenCalled();
+  expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
   expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }

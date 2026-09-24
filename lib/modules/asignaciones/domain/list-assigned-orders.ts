@@ -7,16 +7,12 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
+import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
 import { ValidationError } from './errors';
-import { compareResponsibles, toOrigin } from './responsible-order';
 
 import type { AssignedOrderView } from './assigned-order-view';
-import type { OrderResponsible } from './assignment-view';
-import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
 import { formatOrderNumber, type OrderCatalog, type Page } from '@/lib/modules/pedidos';
-import type { PeopleDirectory } from '@/lib/modules/identity';
-import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 /**
  * Duplicados de `lib/shared/pagination.ts` a proposito: el dominio no puede importar
@@ -35,12 +31,8 @@ const listAssignedOrdersSchema = z.strictObject({
   pageSize: z.number().int().min(1).optional(),
 });
 
-export type ListAssignedOrdersDeps = {
-  readonly assignments: OrderAssignmentRepository;
+export type ListAssignedOrdersDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
-  readonly recipes: RecipeCatalog;
-  readonly people: PeopleDirectory;
-  readonly now?: () => Date;
 };
 
 const ESTADOS_DE_TRABAJO = ['PENDIENTE', 'EN_CURSO'] as const;
@@ -89,54 +81,25 @@ export function createListAssignedOrders(
       pageSize,
     );
 
-    // Una sola llamada, tenga la pagina 1 fila o 25.
-    const recipeIds = [...new Set(ordersPage.items.map((row) => row.recipeId))];
-    const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
-    const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
-
-    // Solo los ids DE LA PAGINA, no todos los de la persona.
-    const pageOrderIds = ordersPage.items.map((row) => row.id);
-    const assignmentRows = await deps.assignments.listByOrdersInCompany(
-      actor.companyId,
-      pageOrderIds,
-    );
-
-    const userIds = [...new Set(assignmentRows.map((row) => row.userId))];
-    const peopleRefs =
-      userIds.length === 0
-        ? []
-        : await deps.people.findRefsIncludingDeletedInCompany(
-            actor.companyId,
-            userIds,
-            deps.now?.() ?? new Date(),
-          );
-    const displayNames = new Map(peopleRefs.map((ref) => [ref.id, ref.displayName] as const));
-
-    const responsiblesByOrder = new Map<string, OrderResponsible[]>(
-      pageOrderIds.map((orderId) => [orderId, []]),
-    );
-    for (const row of assignmentRows) {
-      const grupo = responsiblesByOrder.get(row.orderId);
-      if (grupo === undefined) continue;
-      grupo.push({
-        userId: row.userId,
-        displayName: displayNames.get(row.userId) ?? row.userId,
-        origin: toOrigin(row),
-      });
-    }
+    // Una sola llamada por dependencia, tenga la pagina 1 fila o 25.
+    const composed = await composeOrderRows(deps, actor.companyId, ordersPage.items);
 
     // Al actor se le descarta al final, para que el orden del resto no dependa de quien mira.
-    const items: AssignedOrderView[] = ordersPage.items.map((row) => ({
-      id: row.id,
-      numberText: formatOrderNumber(row.number),
-      recipeName: recipeNames.get(row.recipeId) ?? null,
-      quantity: row.quantity,
-      priority: row.priority,
-      status: toWorkingStatus(row.status),
-      otherResponsibles: (responsiblesByOrder.get(row.id) ?? [])
-        .filter((responsible) => responsible.userId !== actor.id)
-        .sort(compareResponsibles),
-    }));
+    const items: AssignedOrderView[] = ordersPage.items.map((row) => {
+      const rowComposed = composed.get(row.id);
+      return {
+        id: row.id,
+        numberText: formatOrderNumber(row.number),
+        recipeName: rowComposed?.recipeName ?? null,
+        quantity: row.quantity,
+        priority: row.priority,
+        status: toWorkingStatus(row.status),
+        otherResponsibles: (rowComposed?.responsibles ?? []).filter(
+          (responsible) => responsible.userId !== actor.id,
+        ),
+        presentationName: rowComposed?.presentationName ?? null,
+      };
+    });
 
     return {
       items,

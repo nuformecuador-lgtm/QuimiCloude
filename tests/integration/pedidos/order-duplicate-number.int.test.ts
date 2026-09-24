@@ -1,5 +1,7 @@
 /**
- * El choque del correlativo, AUTENTICO y contra Postgres real, a traves del adaptador `createOrder`.
+ * El choque del correlativo, AUTENTICO y contra Postgres real, a traves de
+ * `withOrderTransaction` + `createOrderWriteRepository` -el mismo par que ata `OrderUnitOfWork`
+ * en `lib/composition`, y el UNICO camino de alta.
  *
  * Por que un trigger: con el lock de aviso el choque no se puede provocar por carrera, y un error
  * fabricado a mano no dice nada de la forma que tiene de verdad. Un trigger `BEFORE INSERT`,
@@ -7,9 +9,14 @@
  * `INSERT` del adaptador choca contra `orders_company_year_sequence_key` en los TRES intentos, y
  * el `23505` que vuelve es el que produce el motor, con el mensaje en el idioma del servidor.
  *
- * Aislamiento por COMMIT: `createOrder` abre su propia `prisma.$transaction` con el cliente global.
- * El trigger y su funcion llevan un nombre unico, solo actuan sobre la empresa del caso y se borran
- * en el `finally`, antes que el fixture.
+ * `withOrderTransaction` reintenta la unidad entera -tres transacciones nuevas, una por
+ * intento- y, agotados los tres, traduce el choque agotado a `DuplicateOrderNumberError`. Este
+ * archivo prueba el correlativo: tres intentos, ni uno mas, ningun duplicado llega a
+ * escribirse y no queda ningun apartado de material.
+ *
+ * Aislamiento por COMMIT: `withOrderTransaction` abre su propia `prisma.$transaction` con el
+ * cliente global. El trigger y su funcion llevan un nombre unico, solo actuan sobre la empresa
+ * del caso y se borran en el `finally`, antes que el fixture.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -17,7 +24,10 @@ import { Client, DatabaseError } from 'pg';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
-import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { normalizePresentationName } from '@/lib/modules/inventario';
+import { DuplicateOrderNumberError } from '@/lib/modules/pedidos/domain/errors';
+import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewOrder, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
@@ -41,6 +51,9 @@ type Fixture = {
   readonly actorId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+  readonly presentationId: string;
+  readonly unitId: string;
 };
 
 let recetaId: string;
@@ -76,16 +89,33 @@ async function createFixture(): Promise<Fixture> {
     },
     select: { id: true },
   });
+  const unit = await prisma.unit.create({
+    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
+    select: { id: true },
+  });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: `Bidon ${marca}`,
+      nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+      unitId: unit.id,
+      companyId: company.id,
+    },
+    select: { id: true },
+  });
   return {
     companyId: company.id,
     actorId: user.id,
     roleId: role.id,
     documentTypeCode: documentType.code,
+    presentationId: presentation.id,
+    unitId: unit.id,
   };
 }
 
 async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
+  await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
+  await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
   await prisma.role.deleteMany({ where: { id: fixture.roleId } });
   await prisma.documentType.deleteMany({ where: { code: fixture.documentTypeCode } });
@@ -96,15 +126,22 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
-function pedidoNuevo(): NewOrder {
-  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE' };
+function pedidoNuevo(presentationId: string): NewOrder {
+  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId };
 }
 
-function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
+function altaDe(fixture: Fixture): Promise<OrderRow> {
   const now = new Date();
-  return createOrder(pedidoNuevo(), now.getUTCFullYear(), fixture.actorId, now, {
-    companyId: fixture.companyId,
-  });
+  return withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(
+      pedidoNuevo(fixture.presentationId),
+      now.getUTCFullYear(),
+      fixture.actorId,
+      now,
+      null,
+      { companyId: fixture.companyId },
+    ),
+  );
 }
 
 afterAll(async () => {
@@ -112,8 +149,8 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('un 23505 real del correlativo se traduce a duplicate_number', () => {
-  it('con el correlativo ocupado en los tres intentos devuelve duplicate_number, sin lanzar, tras 3 transacciones', async () => {
+describe('un 23505 real del correlativo agota los tres intentos y se traduce a duplicate_number', () => {
+  it('con el correlativo ocupado en los tres intentos devuelve DuplicateOrderNumberError, tras 3 transacciones, sin escribir un duplicado ni un apartado', async () => {
     const fixture = await createFixture();
     // La receta es de la MISMA empresa que la del fixture: QC-50 hizo `recipes.company_id`
     // obligatoria.
@@ -134,7 +171,6 @@ describe('un 23505 real del correlativo se traduce a duplicate_number', () => {
 
       // El numero 1 queda ocupado por un alta normal.
       const primera = await altaDe(fixture);
-      if (primera === 'duplicate_number') throw new Error('el alta semilla no deberia chocar');
       expect(primera.number.sequence).toBe(1);
 
       await admin.query(
@@ -164,13 +200,19 @@ describe('un 23505 real del correlativo se traduce a duplicate_number', () => {
       expect((control as DatabaseError).constraint).toBe('orders_company_year_sequence_key');
 
       spy = vi.spyOn(prisma, '$transaction');
-      const resultado = await altaDe(fixture);
+      const rechazo = await altaDe(fixture).then(
+        () => null,
+        (error: unknown) => error,
+      );
 
-      expect(resultado).toBe('duplicate_number');
+      expect(rechazo).toBeInstanceOf(DuplicateOrderNumberError);
+      expect((rechazo as DuplicateOrderNumberError).code).toBe('duplicate_number');
       expect(spy).toHaveBeenCalledTimes(3);
 
       const guardados = await prisma.order.count({ where: { companyId: fixture.companyId } });
       expect(guardados).toBe(1);
+      const apartados = await prisma.reservationMovement.count({ where: { companyId: fixture.companyId } });
+      expect(apartados).toBe(0);
     } finally {
       spy?.mockRestore();
       await admin.query(`DROP TRIGGER IF EXISTS "${trigger}" ON public.orders`).catch(() => undefined);

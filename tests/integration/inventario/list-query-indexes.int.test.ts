@@ -90,11 +90,16 @@ async function readIndexes(): Promise<Map<string, string>> {
   return new Map(rows.map((row) => [row.indexname, row.indexdef]))
 }
 
-/** Los seis indices de busqueda: GIN de trigramas sobre `name_normalized`. */
+/** Los siete indices de busqueda: GIN de trigramas sobre `name_normalized`.
+ *
+ * `recipes_name_normalized_all_trgm_idx` entro el 2026-09-18 (QC-68): busca recetas por nombre
+ * PARA EL LISTADO DE PEDIDOS, que tiene que encontrar tambien las dadas de baja. Convive con
+ * `recipes_name_normalized_trgm_idx`, el parcial de abajo: los dos sirven a lecturas distintas. */
 const SEARCH_INDEXES = [
   'products_name_normalized_trgm_idx',
   'presentations_name_normalized_trgm_idx',
   'recipes_name_normalized_trgm_idx',
+  'recipes_name_normalized_all_trgm_idx',
   'suppliers_name_normalized_trgm_idx',
   'supplier_catalog_lines_name_normalized_trgm_idx',
   'units_name_normalized_trgm_idx',
@@ -102,12 +107,15 @@ const SEARCH_INDEXES = [
 
 /** Los de las cinco tablas con borrado logico: PARCIALES (R7).
  *
- * `products_stock_idx` estuvo aqui hasta el 2026-09-17: cayo con su columna en
- * `db/migrations/20260917120000_drop_product_stock` (QC-91 R2), y con ella `stock` salio de
- * `PRODUCT_QUERYABLE.sortable`/`.filterable`, asi que ya no hay orden ni filtro que servir. */
+ * `products_stock_idx` cayo el 2026-09-17 con su columna
+ * (`db/migrations/20260917120000_drop_product_stock`, QC-91 R2) y vuelve el 2026-09-18 con la
+ * columna guardada de nuevo, con el mismo nombre y la misma forma
+ * (`db/migrations/20260918130000_product_unit_and_stored_stock`): `stock` vuelve a
+ * `PRODUCT_QUERYABLE.sortable`/`.filterable`. */
 const PARTIAL_INDEXES = [
   'products_name_normalized_trgm_idx',
   'products_name_idx',
+  'products_stock_idx',
   'products_qty_alert_idx',
   'products_created_at_idx',
   'products_updated_at_idx',
@@ -148,7 +156,17 @@ const FULL_INDEXES = [
   'units_updated_at_idx',
 ] as const
 
-const ALL_INDEXES = [...PARTIAL_INDEXES, ...FULL_INDEXES] as const
+/**
+ * `recipes_name_normalized_all_trgm_idx` (QC-68, nota fechada 2026-09-18): va sobre `recipes`,
+ * que SI tiene `deleted_at`, pero es TOTAL a proposito -no cabe en `PARTIAL_INDEXES`, cuyo caso
+ * exige `WHERE (deleted_at IS NULL)`, ni en `FULL_INDEXES`, cuyo motivo escrito es que esas tablas
+ * NO tienen `deleted_at`-. Es total porque la busqueda del listado de pedidos tiene que encontrar
+ * tambien las recetas dadas de baja: un pedido conserva el nombre de su receta aunque la den de
+ * baja, y si la busqueda no la viera, el pedido parecería perdido.
+ */
+const TOTAL_POR_DECISION = ['recipes_name_normalized_all_trgm_idx'] as const
+
+const ALL_INDEXES = [...PARTIAL_INDEXES, ...FULL_INDEXES, ...TOTAL_POR_DECISION] as const
 
 /**
  * Los que YA existian antes de esta migracion. Se afirma que SIGUEN ahi: la mina de esta
@@ -195,13 +213,9 @@ const PRE_EXISTING_INDEXES = [
   // en la misma migracion que creo `product_batches`: la presentacion se mudo al lote, y el
   // lado hijo de la FK ya no es `products` sino `product_batches` (cuyo indice, tambien
   // del lado hijo, esta arriba en `PARTIAL_INDEXES`).
-  // `products_unit_id_idx` salio de esta lista el 2026-09-11 con QC-80, y NO por descuido -que
-  // es justo lo que este caso vigila-: la ficha elimina la columna `products.unit_id` entera
-  // (R7), y Postgres se lleva el indice con ella. El producto deja de declarar unidad y la
-  // deriva de la presentacion de su lote mas reciente (R22). Su RELEVO es
-  // `presentations_unit_id_idx` (R3), que se afirma abajo en su propio caso: si la migracion se
-  // hubiera llevado el de `products` SIN crear el de `presentations`, la FK nueva se quedaria sin
-  // indice y este archivo seguiria siendo quien lo dijera.
+  // `products_unit_id_idx` salio de esta lista el 2026-09-11 con QC-80 -el producto dejaba de
+  // declarar unidad- y vuelve a existir el 2026-09-18, cuando el producto la vuelve a declarar
+  // como columna propia y fija: se afirma en `ALL_INDEXES`, no aqui.
   'supplier_catalog_lines_presentation_id_idx',
   'supplier_catalog_lines_unit_id_idx',
   'orders_recipe_id_idx',
@@ -254,21 +268,23 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('los 33 indices nuevos existen, cada uno con su nombre exacto', async () => {
+  it('los 35 indices nuevos existen, cada uno con su nombre exacto', async () => {
     const indexes = await readIndexes()
-    // 33 desde el 2026-09-17: eran 34 hasta que `products_stock_idx` cayo con su columna
-    // (QC-91 R2), y 35 hasta que `orders_unit_price_idx` cayo con la suya.
-    expect(ALL_INDEXES).toHaveLength(33)
+    // 35 desde el 2026-09-18: `products_stock_idx` vuelve con la columna guardada
+    // (`20260918130000_product_unit_and_stored_stock`). Antes eran 34, desde que
+    // `recipes_name_normalized_all_trgm_idx` sumo uno (QC-68) sobre las 33 que quedaron cuando
+    // `products_stock_idx` cayo con su columna el 2026-09-17 (QC-91 R2).
+    expect(ALL_INDEXES).toHaveLength(35)
     const faltan = ALL_INDEXES.filter((name) => !indexes.has(name))
     expect(faltan, `indices que la base no tiene: ${faltan.join(', ')}`).toEqual([])
   })
 
-  it('R2: products_stock_idx ya no existe', async () => {
+  it('products_stock_idx vuelve a existir', async () => {
     const indexes = await readIndexes()
-    expect(indexes.has('products_stock_idx')).toBe(false)
+    expect(indexes.has('products_stock_idx')).toBe(true)
   })
 
-  it('los seis de busqueda son GIN de trigramas sobre name_normalized', async () => {
+  it('los siete de busqueda son GIN de trigramas sobre name_normalized', async () => {
     // Que existan no basta: un btree con el mismo nombre dejaria la busqueda por subcadena
     // sin indice y en verde. Se lee la DEFINICION, no solo el nombre.
     const indexes = await readIndexes()
@@ -279,6 +295,11 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
       expect(def, `${name} deberia usar gin_trgm_ops`).toContain('gin_trgm_ops')
       expect(def, `${name} deberia ir sobre name_normalized`).toContain('name_normalized')
     }
+
+    // El nuevo (QC-68) es el unico de los siete que NO lleva WHERE: es total a proposito.
+    const total = indexes.get('recipes_name_normalized_all_trgm_idx')
+    expect(total, 'falta recipes_name_normalized_all_trgm_idx').toBeDefined()
+    expect(total, 'deberia ser total: sin WHERE').not.toContain('WHERE')
   })
 
   it('los de las tablas con borrado logico son parciales, con WHERE deleted_at IS NULL', async () => {
@@ -487,7 +508,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreAlta = `Solución Buffer pH 7 ${token()}`
       const created = await createProduct(
         // QC-80 (R21): `NewProduct` ya no lleva unidad; el producto no la declara.
-        { name: nombreAlta, qtyAlert: 1 },
+        { name: nombreAlta, qtyAlert: '1' },
         new Date('2026-01-01T00:00:00Z'),
         ambito(),
       )
@@ -506,7 +527,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreEdicion = `Hipoclorito de sodio 5% ${token()}`
       const ok = await updateAliveProduct(
         created.id,
-        { name: nombreEdicion, qtyAlert: 1 },
+        { name: nombreEdicion, qtyAlert: '1' },
         new Date('2026-01-02T00:00:00Z'),
         ambito(),
       )

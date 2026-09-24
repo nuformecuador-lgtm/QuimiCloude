@@ -10,6 +10,17 @@ const alias = { '@': rootDir }
 
 const exclude = ['node_modules/**', '.next/**', '.worktrees/**', 'dist/**', 'e2e/**']
 
+// Desde Node 22 el proceso trae su propio `localStorage`/`sessionStorage` global
+// (Web Storage), y en Node 26 esta activo por defecto: pisa el que jsdom monta en
+// `window` para este proyecto, así que `window.localStorage.clear()` cae sobre un
+// objeto que no tiene los métodos de Storage. `--no-experimental-webstorage` se lo
+// pide al worker vía `execArgv` (nadie tiene que exportar NODE_OPTIONS a mano). Node
+// < 22 no reconoce el flag y aborta con "bad option": por eso se comprueba antes de
+// pasarlo.
+const workerExecArgv = process.allowedNodeEnvironmentFlags.has('--no-experimental-webstorage')
+  ? ['--no-experimental-webstorage']
+  : []
+
 // Tres entornos, una sola config (decision humana del 2026-08-06, ver
 // `progress/current.md > Conflictos pendientes`). Las features 1 y 7 corrieron en
 // paralelo y cada una monto Vitest por su cuenta: la 1 con `environment: 'node'`
@@ -39,11 +50,12 @@ export default defineConfig({
           name: 'ui',
           environment: 'jsdom',
           globals: true,
-          // Ver `docs/verification.md > Los flakes de saturacion`. 15 s, no los 5 s por
-          // defecto, y POR PROYECTO: `testTimeout` es opcion de proyecto y escribirlo una
-          // sola vez en la raiz seria una apuesta sobre la herencia que sale verde si
-          // pierdes. Lo vigila `tests/guards/guard-teclear-y-plazo.test.ts` (QC-58, R1).
-          testTimeout: 15_000,
+          // Ver `docs/verification.md > Los flakes de saturacion`. 20 s desde el 2026-09-18
+          // -eran 15 s, y tres archivos cayeron por plazo el mismo dia-, y POR PROYECTO:
+          // `testTimeout` es opcion de proyecto y escribirlo solo en la raiz seria una
+          // apuesta sobre la herencia. Lo vigila `tests/guards/guard-teclear-y-plazo.test.ts`.
+          testTimeout: 20_000,
+          execArgv: workerExecArgv,
           setupFiles: ['./tests/setup.ts'],
           include: ['tests/**/*.test.tsx', 'tests/ui/**/*.test.ts'],
           exclude,
@@ -59,7 +71,7 @@ export default defineConfig({
           // (`composition/identity-facade`, que no teclea nada, murio en
           // `await import('@/lib/composition')`). La causa es contencion de CPU y no
           // distingue de proyecto. Ver `docs/verification.md > Los flakes de saturacion`.
-          testTimeout: 15_000,
+          testTimeout: 20_000,
           include: ['tests/**/*.test.ts'],
           exclude: [...exclude, 'tests/ui/**', 'tests/integration/**'],
         },
@@ -72,7 +84,7 @@ export default defineConfig({
           globals: true,
           // Mismo plazo que los otros dos. Ver `docs/verification.md > Los flakes de
           // saturacion` (QC-58, R1).
-          testTimeout: 15_000,
+          testTimeout: 20_000,
           include: ['tests/integration/**/*.test.ts'],
           exclude,
           // QC-77: la base de esta corrida. `_global-setup.ts` corre una vez en el proceso

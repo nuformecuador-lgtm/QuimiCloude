@@ -57,6 +57,16 @@ const recipeIdSchema = z.string().uuid();
 const prioritySchema = z.enum(ORDER_PRIORITY_VALUES);
 
 /**
+ * La presentacion en que se entrega lo fabricado: aqui solo se valida la FORMA -un UUID-. La
+ * EXISTENCIA y que sea de la empresa de quien escribe las comprueba el caso de uso a traves
+ * del contrato publico `@/lib/modules/inventario`, nunca consultando su tabla.
+ *
+ * Obligatoria en el alta y heredada por la edicion: un pedido viejo sin presentacion se edita
+ * enviando una, sin rama especial.
+ */
+const presentationIdSchema = z.string().uuid();
+
+/**
  * Alta (R8, R9). Lo que este esquema NO declara, no puede llegar: no hay `status`, ni
  * `cancellationReason`, ni `orderYear`/`orderSequence`, ni `createdAt`, ni `createdBy` /
  * `updatedBy`. `z.object` DESCARTA las claves desconocidas, asi que un cliente que las envie
@@ -73,6 +83,7 @@ export const createOrderSchema = z.object({
   recipeId: recipeIdSchema,
   quantity: quantitySchema,
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
+  presentationId: presentationIdSchema,
 });
 
 /**
@@ -88,18 +99,15 @@ export const EDITABLE_STATUS_VALUES: readonly EditableOrderStatus[] = ORDER_STAT
 );
 
 /**
- * Edicion: REEMPLAZO COMPLETO del conjunto de datos de negocio (R20), como QC-25 y QC-43. Un
- * parche parcial obligaria a distinguir «campo ausente» de «campo puesto a nulo» y a evaluar
- * la transicion contra un estado a medio llegar. Es la pregunta abierta 5 del spec, con su
- * posicion por defecto escrita y su coste: subir la prioridad obliga a reenviar todo el pedido.
+ * Edicion: REEMPLAZO COMPLETO del conjunto de datos de negocio. Un
+ * parche parcial obligaria a distinguir «campo ausente» de «campo puesto a nulo». El coste:
+ * subir la prioridad obliga a reenviar todo el pedido.
  *
- * `status: 'CANCELADO'` muere AQUI, sin llegar al caso de uso ni al repositorio (R24), y
- * tampoco hay campo `reason`: cancelar es `cancelOrder` y solo el (decision cerrada 7).
+ * La edicion ya no mueve el estado: un `status` que llegue en la entrada muere aqui, como
+ * cualquier otra clave que el esquema no declare -`z.object` la descarta-, el mismo criterio
+ * que el alta. Tampoco hay campo `reason`: cancelar es `cancelOrder` y solo el.
  */
-export const updateOrderSchema = z.object({
-  ...createOrderSchema.shape,
-  status: z.enum(EDITABLE_STATUS_VALUES),
-});
+export const updateOrderSchema = createOrderSchema;
 
 /**
  * Cancelacion (R27). El tope de 500 vive AQUI, en la validacion de aplicacion, y no en el tipo
@@ -134,3 +142,19 @@ export const cancelOrderSchema = z.object({
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
+
+/**
+ * Receta y cantidad, con la MISMA regla que el alta -`pick` hereda la
+ * forma UUID y el patron decimal sin copiarlos-. Un `companyId` en la entrada no llega a
+ * ninguna parte: `z.object` descarta las claves de mas.
+ *
+ * `orderId` es OPCIONAL y solo lo envia el formulario de EDICION: el pedido que ya existe
+ * cuenta lo que el mismo tiene apartado como disponible para si mismo. Esta entrada NO abre
+ * ninguna lectura del pedido: el identificador viaja como cadena opaca hasta
+ * `findCostingBatches`, que lo usa para no restar lo que ese pedido aparto.
+ */
+export const quoteOrderCostSchema = createOrderSchema
+  .pick({ recipeId: true, quantity: true })
+  .extend({ orderId: z.string().uuid().optional() });
+
+export type QuoteOrderCostInput = z.infer<typeof quoteOrderCostSchema>;

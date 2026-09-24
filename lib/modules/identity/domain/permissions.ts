@@ -2,11 +2,11 @@
 // (R8, R9). Hermano exacto de `./roles`: dominio puro, sin Prisma, sin `next/*`, sin `lib/shared`.
 // Vive centralizado en `identity` a proposito (`design.md > 2`): repartirlo por modulo crearia un
 // ciclo entre barriles (`identity -> inventario -> identity`) con constantes en `undefined`.
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from './roles';
+import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
 
 /**
- * El catalogo cerrado: quince permisos, ni uno mas ni uno menos (QC-74 R2, enmendado por QC-38,
- * por QC-66 y por QC-86). El codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en
+ * El catalogo cerrado: dieciocho permisos, ni uno mas ni uno menos. El codigo tiene la forma
+ * `<modulo>.<accion>`, con modulo y accion en
  * español y en minusculas, siguiendo los nombres de modulo del repositorio (R1). Un modulo con
  * escritura declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un
  * modulo sin escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva
@@ -32,6 +32,16 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from './roles';
  * `asignaciones` SI es una carpeta real de `lib/modules/`, asi que estas dos entradas cumplen QC-74
  * R1 al pie de la letra; lo unico que tienen en comun con las de QC-66 es que su permiso vive
  * centralizado aqui, en `identity`, como el de todos los demas modulos.
+ *
+ * **Cuarta enmienda al catalogo cerrado**: suma `terminados.consultar`, ver todos los pedidos
+ * terminados de la empresa sin filtro por usuario. Cambia el recuento y, como `usuarios`, su
+ * modulo no es una carpeta de `lib/modules/`. Declara solo `consultar` porque no tiene escritura.
+ * Lo reciben el Administrador y el Empacador; el Operador no.
+ *
+ * **Quinta enmienda al catalogo cerrado**: suma `clientes.consultar` y `clientes.modificar`, ver y
+ * mantener los clientes de la empresa. Cambia el recuento; como `asignaciones`, su modulo si es una
+ * carpeta de `lib/modules/`, y declara las dos acciones porque tiene escritura. Solo los recibe el
+ * Administrador.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -127,6 +137,24 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Asignar y desasignar responsables de un pedido.',
   },
+  {
+    code: 'terminados.consultar',
+    module: 'terminados',
+    action: 'consultar',
+    description: 'Consultar todos los pedidos terminados de la empresa.',
+  },
+  {
+    code: 'clientes.consultar',
+    module: 'clientes',
+    action: 'consultar',
+    description: 'Consultar los clientes de la empresa.',
+  },
+  {
+    code: 'clientes.modificar',
+    module: 'clientes',
+    action: 'modificar',
+    description: 'Crear, editar y borrar clientes de la empresa.',
+  },
 ] as const;
 
 /**
@@ -143,6 +171,9 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
  * —QC-74 R9 decia «uno»; QC-86 R26 le suma `asignaciones.consultar` y pasan a ser DOS, y ni uno
  * mas: al Operador NO se le da `recetas.consultar` ni ningun otro (QC-86 R27)—. Las claves salen de
  * `./roles`, nunca del literal. Sin empresa: el permiso cuelga del rol y de nada mas (R6).
+ *
+ * El Empacador nace con exactamente `asignaciones.consultar` y `terminados.consultar`, sin
+ * `inventario.consultar` ni `asignaciones.modificar`.
  */
 export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionCode[]>> = {
   [ROLE_ADMINISTRADOR]: [
@@ -161,6 +192,10 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'usuarios.modificar',
     'asignaciones.consultar',
     'asignaciones.modificar',
+    'terminados.consultar',
+    'clientes.consultar',
+    'clientes.modificar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
+  [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar'],
 };

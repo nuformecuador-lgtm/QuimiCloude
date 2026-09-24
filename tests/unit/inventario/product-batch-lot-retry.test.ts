@@ -7,20 +7,28 @@ import { Prisma } from '@prisma/client';
 
 const doble = vi.hoisted(() => {
   const productCreate = vi.fn();
+  const presentationFindFirst = vi.fn();
   const batchCreate = vi.fn();
+  const batchFindMany = vi.fn();
+  const movementCreate = vi.fn();
   const executeRaw = vi.fn();
   const queryRaw = vi.fn();
   // Sin `product.findFirst`: si el alta volviera a leer el producto sin lock, fallaria aqui.
   const tx = {
     product: { create: productCreate },
-    productBatch: { create: batchCreate },
+    presentation: { findFirst: presentationFindFirst },
+    productBatch: { create: batchCreate, findMany: batchFindMany },
+    inventoryMovement: { create: movementCreate },
     $executeRaw: executeRaw,
     $queryRaw: queryRaw,
   };
   return {
     tx,
     productCreate,
+    presentationFindFirst,
     batchCreate,
+    batchFindMany,
+    movementCreate,
     executeRaw,
     queryRaw,
     transaction: vi.fn(),
@@ -49,10 +57,11 @@ const PRODUCTO_ID = '33333333-3333-4333-8333-333333333333';
 const LOTE_ID = '44444444-4444-4444-8444-444444444444';
 
 const PRODUCTO: NewProduct = { name: 'Acido citrico' };
+const UNIDAD_ID = '77777777-7777-4777-8777-777777777777';
 
 const LOTE_GENERADO: NewProductBatch = {
   presentationId: '55555555-5555-4555-8555-555555555555',
-  stock: 10,
+  stock: '10',
   unitCost: '2.5000',
   lot: null,
   purchaseDate: '2026-09-10',
@@ -87,7 +96,12 @@ beforeEach(() => {
     async (run: (client: typeof doble.tx) => Promise<unknown>) => run(doble.tx),
   );
   doble.productCreate.mockResolvedValue({ id: PRODUCTO_ID });
+  doble.presentationFindFirst.mockResolvedValue({ unitId: UNIDAD_ID });
   doble.batchCreate.mockResolvedValue({ id: LOTE_ID });
+  // Vacio por defecto: el VALOR que recalcula no es lo que miden estos casos, que son de
+  // reintento y de traduccion de errores. `product-stock.int.test.ts` mide la suma real.
+  doble.batchFindMany.mockResolvedValue([]);
+  doble.movementCreate.mockResolvedValue({ id: 'movimiento-1' });
   doble.executeRaw.mockResolvedValue(0);
   doble.queryRaw.mockResolvedValue([{ top: '41' }]);
 });
@@ -146,6 +160,65 @@ describe('createWithFirstBatch devuelve el lote escrito cuando R12 lo pide', () 
   });
 });
 
+describe('createWithFirstBatch — unidad del producto y recalculo (QC-121, R1, R9)', () => {
+  it('lee la unidad de la presentacion con el ambito de empresa y la escribe en el producto', async () => {
+    await createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO);
+
+    expect(doble.presentationFindFirst).toHaveBeenCalledTimes(1);
+    const [criterio] = doble.presentationFindFirst.mock.calls[0] as [{ where: unknown }];
+    expect(JSON.stringify(criterio.where)).toContain(LOTE_GENERADO.presentationId);
+    expect(JSON.stringify(criterio.where)).toContain(EMPRESA);
+
+    const [datos] = doble.productCreate.mock.calls[0] as [{ data: { unitId: unknown } }];
+    expect(datos.data.unitId).toBe(UNIDAD_ID);
+  });
+
+  it('sin presentacion de la empresa, aborta con ValidationError SIN crear el producto ni el lote', async () => {
+    doble.presentationFindFirst.mockResolvedValue(null);
+
+    const error: unknown = await createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(doble.productCreate).not.toHaveBeenCalled();
+    expect(doble.batchCreate).not.toHaveBeenCalled();
+  });
+
+  it('recalcula stock DESPUES del asiento del lote, sumando en SQL sobre los lotes del producto', async () => {
+    await createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO);
+
+    const llamadaUpdate = doble.executeRaw.mock.calls.find((llamada) =>
+      sqlDe(llamada[0]).includes('UPDATE "products"'),
+    );
+    if (llamadaUpdate === undefined) throw new Error('no se llamo al UPDATE de stock');
+    expect(doble.executeRaw.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      doble.movementCreate.mock.invocationCallOrder[0],
+    );
+    expect(sqlDe(llamadaUpdate[0])).toMatch(/SELECT\s+sum\(/i);
+    expect((llamadaUpdate[0] as Prisma.Sql).values).toEqual([PRODUCTO_ID, EMPRESA, PRODUCTO_ID, EMPRESA]);
+    // Ninguna otra columna del producto: ni nombre, ni alerta, ni unidad, ni fecha de
+    // modificacion (R9, R11 heredado del alta).
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('name');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('qty_alert');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('updated_at');
+  });
+
+  it('si el recalculo lanza, no queda ni el producto ni el lote (R9)', async () => {
+    const fallo = new Error('la base rechazo el UPDATE de stock');
+    // El unico `$executeRaw` de este camino, antes del recalculo, es el lock de aviso del
+    // correlativo: la segunda llamada es la que recalcula.
+    doble.executeRaw.mockResolvedValueOnce(0).mockRejectedValueOnce(fallo);
+
+    await expect(createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO)).rejects.toBe(fallo);
+
+    // La transaccion entera se deshace: el doble no modela el ROLLBACK, pero lo que aqui se
+    // mide es que el error del recalculo NO se atrapa ni se sustituye por otro resultado.
+    expect(doble.batchCreate).toHaveBeenCalledTimes(1);
+    expect(doble.movementCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('createWithFirstBatch — lote GENERADO que choca: reintento acotado (R15)', () => {
   it('reintenta en una transaccion nueva, con maximo nuevo, y a la segunda escribe', async () => {
     doble.queryRaw.mockResolvedValueOnce([{ top: '41' }]).mockResolvedValueOnce([{ top: '42' }]);
@@ -158,8 +231,10 @@ describe('createWithFirstBatch — lote GENERADO que choca: reintento acotado (R
     });
 
     expect(doble.transaction).toHaveBeenCalledTimes(2);
-    // Cada intento vuelve a pedir el lock y a leer el maximo: no reusa el numero del intento abortado.
-    expect(doble.executeRaw).toHaveBeenCalledTimes(2);
+    // Cada intento vuelve a pedir el lock y a leer el maximo: no reusa el numero del intento
+    // abortado. El intento que SI escribe ademas recalcula `stock` con otro `$executeRaw`: dos
+    // locks (uno por intento) mas un recalculo (solo el intento que llega a escribir el lote).
+    expect(doble.executeRaw).toHaveBeenCalledTimes(3);
     expect(doble.queryRaw).toHaveBeenCalledTimes(2);
     expect(loteEscrito(0)).toBe('42');
     expect(loteEscrito(1)).toBe('43');
@@ -271,6 +346,47 @@ describe('addBatchToAlive devuelve el lote escrito cuando R13 lo pide', () => {
       batchId: LOTE_ID,
       lot: 'ACME-2026-07',
     });
+  });
+});
+
+describe('addBatchToAlive — no toca el producto salvo su stock recalculado (QC-121, R2, R9, R11)', () => {
+  beforeEach(() => {
+    doblarLecturas({ id: PRODUCTO_ID }, ['41']);
+  });
+
+  it('no llama a presentation.findFirst ni a ninguna escritura del producto: solo el lote y el recalculo', async () => {
+    await addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO);
+
+    // La unidad ya la fijo el alta que creo el producto: agregar un lote no vuelve a leerla.
+    expect(doble.presentationFindFirst).not.toHaveBeenCalled();
+    expect(doble.productCreate).not.toHaveBeenCalled();
+
+    expect(doble.executeRaw.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      doble.movementCreate.mock.invocationCallOrder[0],
+    );
+    const llamadaUpdate = doble.executeRaw.mock.calls.find((llamada) =>
+      sqlDe(llamada[0]).includes('UPDATE "products"'),
+    );
+    if (llamadaUpdate === undefined) throw new Error('no se llamo al UPDATE de stock');
+    expect(sqlDe(llamadaUpdate[0])).toMatch(/SELECT\s+sum\(/i);
+    // La UNICA columna que el recalculo toca es `stock`: nada de nombre, alerta, unidad ni
+    // fecha de modificacion.
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('name');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('qty_alert');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('unit_id');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('updated_at');
+  });
+
+  it('si el recalculo lanza, el resultado se rechaza en vez de darse por bueno (R9)', async () => {
+    const fallo = new Error('la base rechazo el UPDATE de stock');
+    // El unico `$executeRaw` de este camino, antes del recalculo, es el lock de aviso del
+    // correlativo: la segunda llamada es la que recalcula.
+    doble.executeRaw.mockResolvedValueOnce(0).mockRejectedValueOnce(fallo);
+
+    await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).rejects.toBe(fallo);
+
+    expect(doble.batchCreate).toHaveBeenCalledTimes(1);
+    expect(doble.movementCreate).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -39,7 +39,7 @@ export default async function FormulasPage({
           data-testid="recipe-create-open"
           className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
         >
-          Nueva receta
+          Nueva fórmula
         </Link>
       </div>
       {/* Sin `key`: remontar el límite en cada consulta borraría el foco del campo de búsqueda. */}

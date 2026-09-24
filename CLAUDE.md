@@ -17,8 +17,8 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
 
 ## Reglas no negociables
 
-1. **Máximo 2 features `in_progress` por zona.** Cada `zone` (`frontend`, `backend`,
-   `fullstack`) admite hasta **2** features en `in_progress` a la vez en
+1. **Cupo de features `in_progress` por zona: 2 en `frontend` y `backend`, 3 en `fullstack`.**
+   Cada `zone` admite hasta ese cupo de features en `in_progress` a la vez en
    `feature_list.json`, siempre sin conflicto de archivos entre ellas (ver
    `AGENTS.md > Paralelismo`). Distintas zonas corren en paralelo sin restricción
    entre sí. `./init.sh` lo valida (`scripts/validate-features.mjs`). La regla también se

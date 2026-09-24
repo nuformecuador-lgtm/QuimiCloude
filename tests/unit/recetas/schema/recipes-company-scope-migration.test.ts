@@ -829,10 +829,14 @@ describe('QC-50 — lo que ya estaba escrito y esta migracion no toca', () => {
     const checksDeLineas = [...restriccionesPreviasDeRecipeLines.entries()]
       .filter(([, statement]) => /\bCHECK\s*\(/i.test(statement))
       .map(([nombre]) => nombre)
-    expect(checksDeLineas).toEqual(['recipe_lines_quantity_positive'])
+    // Una migracion posterior sustituyo el nombre del CHECK; esta migracion sigue sin tocarlo,
+    // asi que lo que debe verse aqui es el nombre vivo actual, no el historico.
+    expect(checksDeLineas).toEqual(['recipe_lines_percentage_range'])
     expect([...restriccionesPreviasDeRecipeLines.keys()]).toContain('recipe_lines_recipe_id_fkey')
     expect([...restriccionesPreviasDeRecipeLines.keys()]).toContain('recipe_lines_product_id_fkey')
-    expect([...restriccionesPreviasDeRecipeLines.keys()]).toContain('recipe_lines_unit_id_fkey')
+    // Una migracion posterior quito la unidad de la linea junto con su FK; ya no hay
+    // "recipe_lines_unit_id_fkey" que siga vivo.
+    expect([...restriccionesPreviasDeRecipeLines.keys()]).not.toContain('recipe_lines_unit_id_fkey')
   })
 
   it('ni el UP ni el DOWN de esta ficha nombran ninguna de esas restricciones previas', () => {

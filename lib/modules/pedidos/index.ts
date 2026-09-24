@@ -25,6 +25,7 @@ export type {
   OrderAssignmentTarget,
   OrderCatalog,
   AssignedOrderSummary,
+  OrderSummaryOrdering,
 } from './domain/order-catalog';
 
 // ---------------------------------------------------------------------------------------
@@ -60,11 +61,14 @@ export {
   UnauthorizedError,
   OrderNotFoundError,
   RecipeNotFoundError,
+  PresentationNotFoundError,
   InvalidTransitionError,
   NotCancellableError,
   NotDeletableError,
   DuplicateOrderNumberError,
   ValidationError,
+  InsufficientMaterialError,
+  RecipeWithoutLinesError,
 } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los
@@ -78,12 +82,14 @@ export {
   createOrderSchema,
   updateOrderSchema,
   cancelOrderSchema,
+  quoteOrderCostSchema,
   EDITABLE_STATUS_VALUES,
 } from './domain/order-input';
 export type {
   CreateOrderInput,
   UpdateOrderInput,
   CancelOrderInput,
+  QuoteOrderCostInput,
   EditableOrderStatus,
 } from './domain/order-input';
 
@@ -92,8 +98,9 @@ export type {
 export { assertTransition, isAllowedTransition } from './domain/order-transitions';
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
- *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio. */
-export type { NewOrder, OrderRow, OrderView, OrderSummary } from './domain/order-view';
+ *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
+ *  `OrderEdit` es lo que acepta `updateAlive`, sin `status`. */
+export type { NewOrder, OrderEdit, OrderRow, OrderView, OrderSummary } from './domain/order-view';
 
 /** QC-57 (R25, R31): el contrato generico de consulta de lista y la lista blanca de pedidos.
  *  `listOrdersSchema`, `ListOrdersInput` y `OrderFilters` se fueron con el: el listado de
@@ -125,3 +132,26 @@ export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';
 export { createDeleteOrder } from './domain/delete-order';
 export type { DeleteOrderDeps } from './domain/delete-order';
+
+/** Implementa `OrderCatalog['transitionAliveById']`: mueve el pedido de estado y, si el
+ *  destino es `ENTREGADO`, consume el material en la misma transaccion. `lib/composition`
+ *  la cablea en el lugar de la funcion cruda del driven. */
+export { createTransitionOrder } from './domain/transition-order';
+export type { TransitionOrderDeps } from './domain/transition-order';
+
+/** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
+ *  cobertura completa» sin N+1. */
+export { createFindCoverage, MAX_ORDERS_PER_COVERAGE_BATCH } from './domain/find-coverage';
+export type { FindCoverageDeps } from './domain/find-coverage';
+
+/** El proceso diario que caduca la reserva de los pedidos `PENDIENTE`. */
+export { createExpireStaleOrders } from './domain/expire-stale-orders';
+export type {
+  ExpiredOrderFailure,
+  ExpireStaleOrdersDeps,
+  ExpireStaleOrdersResult,
+} from './domain/expire-stale-orders';
+export { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './domain/order-expiry';
+
+export { createQuoteOrderCost } from './domain/quote-order-cost';
+export type { QuoteOrderCostDeps, OrderCostQuote } from './domain/quote-order-cost';
