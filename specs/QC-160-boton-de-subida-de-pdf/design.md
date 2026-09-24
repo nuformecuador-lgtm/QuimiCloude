@@ -155,6 +155,13 @@ Composición:
 - Escape y el foco de vuelta al disparador (R3, R4) los da Base UI por defecto. Solo se prueban.
 - `keepMounted` mantiene la tanda viva al cerrar la ventana (D8, R21; sección 5).
 
+> **Nota 2026-09-24 (D9, choque con QC-158 resuelto al sincronizar; decisión del leader, opción A).**
+> QC-158 montó en `/proveedores/[id]` el envoltorio `CatalogPdfUpload`
+> (`[id]/components/catalog-pdf-upload.tsx`), que pasa a `DocumentUpload` la prop
+> `reviewHrefFor` (el acceso «Revisar» de cada fila lista). Por eso `DocumentUploadDialogProps` gana
+> `readonly reviewHrefFor?: (documentFileId: string) => string`, opcional, que se pasa tal cual a
+> `DocumentUpload`. El diálogo sigue sin saber nada de permisos ni de rutas.
+
 ### 3.2 Textos (`labels.ts`, se amplía)
 
 `OPEN_LABEL = 'Subir PDFs'`, `DIALOG_TITLE = 'Subir PDFs'`, `CLOSE_LABEL = 'Cerrar'` y
@@ -251,6 +258,17 @@ y R17 no cierra la ventana a mitad de tanda; R21 lo prueba el unit del diálogo.
   dentro de `SupplierDetailHeader`, para no tocar un componente de ruta que QC-158 puede estar cambiando
   (D9).
 - Solo en la rama de éxito. Con proveedor inexistente o error de carga no se monta (R7).
+
+> **Nota 2026-09-24 (D9, decisión del leader, opción A).** En `dev`, `page.tsx` ya no monta
+> `<DocumentUpload strategy="catalogo" />`: monta `<CatalogPdfUpload supplierId={…} />` (QC-158).
+> El montaje en proveedores pasa por ese envoltorio. `CatalogPdfUpload` renderiza
+> `<DocumentUploadDialog strategy="catalogo" reviewHrefFor={…} />` y la página monta
+> `{canUpload ? <CatalogPdfUpload supplierId={…} /> : null}` entre `SupplierDetailHeader` y el
+> `<Suspense>` del catálogo. «Revisar» sigue disponible dentro de la ventana, y lo afirma
+> `tests/unit/proveedores-ui/catalog-pdf-upload.test.tsx`, enmendado con su motivo escrito en el test.
+> Fórmulas no cambia (6.2). En la guardia de convenciones, los puntos de montaje de la pieza pasan a
+> ser `formulas/page.tsx` y `catalog-pdf-upload.tsx`. La regla «llaman a `canUploadDocuments`» se
+> afirma sobre las dos páginas.
 
 ### 6.2 `/produccion/formulas`
 

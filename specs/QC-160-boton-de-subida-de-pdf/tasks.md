@@ -34,7 +34,7 @@
 - [x] Comprobar si `tests/unit/documentos-ui/document-upload-convenciones.test.ts` está verde en `dev`.
   Lo normal es que sí: el arreglo de la línea del catálogo con `/documento/i` es del implementer de
   QC-142. **Solo si sigue en rojo** se anota para T6 (riesgo 13.2).
-- [ ] **Choque con QC-158 (D9)** — BLOQUEADA 2026-09-24: QC-158 cambió el montaje de `page.tsx` (ver `progress/impl_QC-160-boton-de-subida-de-pdf.md`).: al sincronizar con `dev`, comparar los archivos que QC-158 ha
+- [x] **Choque con QC-158 (D9)** — coincidía: QC-158 cambió el montaje de `page.tsx` (`CatalogPdfUpload`). Resuelto el 2026-09-24 por el leader con la opción A (notas en `design.md > 3.1` y `6.1`).: al sincronizar con `dev`, comparar los archivos que QC-158 ha
   cambiado (en `dev` o en su rama) con los de esta ficha: `app/(private)/proveedores/[id]/page.tsx`,
   `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`, `lib/modules/documentos/domain/actor.ts`,
   `lib/modules/documentos/index.ts` y `tests/unit/documentos/module-contract.test.ts`. Si alguno
@@ -108,6 +108,13 @@
   proveedor inexistente sin botón (R7); el botón va después de la cabecera y antes del catálogo (R22).
 - **Archivos:** `app/(private)/proveedores/[id]/page.tsx`,
   `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`.
+- **Nota 2026-09-24 (D9, decisión del leader).** El montaje pasa por `CatalogPdfUpload`. T4 toca
+  además `app/(private)/proveedores/[id]/components/catalog-pdf-upload.tsx`, que renderiza
+  `DocumentUploadDialog strategy="catalogo" reviewHrefFor={…}`, y la página monta
+  `{canUpload ? <CatalogPdfUpload … /> : null}` entre la cabecera y el catálogo. Se enmienda
+  `tests/unit/proveedores-ui/catalog-pdf-upload.test.tsx` (de QC-158), con el motivo escrito en el
+  test y sin baseline, para abrir la ventana antes de buscar «Revisar». Se añade un caso `R22`: «Revisar»
+  sigue disponible dentro de la ventana. T3 añade `reviewHrefFor?` a `DocumentUploadDialogProps`.
 - **Depende de:** T1, T3.
 - **Hecho cuando:** los dos tests verdes, `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`
   verde sin cambios (R14) y `tests/unit/identity/session-once-per-request-render.test.tsx` verde.
@@ -144,6 +151,11 @@
   arreglarla aquí y dejarlo escrito en `progress/impl_…`. Si está verde, no se toca: el arreglo le toca
   al implementer de QC-142.
 - **Archivos:** `tests/unit/documentos-ui/document-upload-convenciones.test.ts`.
+- **Nota 2026-09-24 (D9, decisión del leader).** La lista de puntos de montaje de la pieza pasa a
+  ser exactamente `app/(private)/produccion/formulas/page.tsx` y
+  `app/(private)/proveedores/[id]/components/catalog-pdf-upload.tsx`. «Llaman a
+  `canUploadDocuments`» se afirma sobre las dos páginas (`formulas/page.tsx` y
+  `proveedores/[id]/page.tsx`).
 - **Depende de:** T4, T5.
 - **Hecho cuando:** verde sobre el árbol real, y cada caso sintético nuevo se pone rojo.
 

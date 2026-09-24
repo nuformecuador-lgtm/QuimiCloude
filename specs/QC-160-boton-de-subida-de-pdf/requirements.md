@@ -113,6 +113,10 @@
   proveedor, después de la cabecera del proveedor y antes del catálogo; y en el listado de fórmulas,
   en la misma fila que el enlace «Nueva fórmula».
 
+  > **Nota 2026-09-24 (D9, decisión del leader).** En el detalle de proveedor, el acceso «Revisar»
+  > de QC-158 en una fila lista sigue disponible **dentro de la ventana**. Lo cubre
+  > `tests/unit/proveedores-ui/catalog-pdf-upload.test.tsx` con un caso que lleva `R22` en el nombre.
+
 ## Preguntas abiertas
 
 Ninguna.
