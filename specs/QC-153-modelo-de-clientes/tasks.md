@@ -51,7 +51,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
 
 ## T1–T3 — Esquema, migración y armazón
 
-- [ ] **T1.** `db/schema.prisma`: modelo `Customer` al final, tal cual `design.md > 2.1`.
+- [x] **T1.** `db/schema.prisma`: modelo `Customer` al final, tal cual `design.md > 2.1`.
       `pnpm prisma generate`. **Hecho cuando:** `pnpm prisma validate` pasa, `typecheck` pasa y
       `guard-empresa-en-esquema` y `guard-arquitectura-modulos` (bloque 10) siguen verdes.
       *Depende de T0.*
