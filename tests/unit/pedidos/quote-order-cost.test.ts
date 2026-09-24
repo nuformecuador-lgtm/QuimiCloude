@@ -26,6 +26,7 @@ const BATCH = {
   unitId: 'u-1',
   lot: '1',
   stock: '100',
+  available: '100',
   unitCost: '10.0000',
   purchaseDate: '2026-01-01',
 }
@@ -264,7 +265,7 @@ describe('R6: receta inexistente o ajena da sin importe', () => {
     )
     expect(resultado.ingredientsCost).toBeNull()
     expect(d.recipes.findExecutionContentById).toHaveBeenCalledWith(RECIPE_ID, COMPANY_ID)
-    expect(d.products.findCostingBatches).toHaveBeenCalledWith([], COMPANY_ID)
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith([], COMPANY_ID, { excludeOrderId: undefined })
     expect(d.products.findRefs).toHaveBeenCalledWith([], COMPANY_ID)
   })
 })
@@ -278,8 +279,43 @@ describe('R7: la empresa sale del actor, y una entrada con companyId de otra emp
       actorCon('pedidos.modificar'),
     )
     expect(d.recipes.findExecutionContentById).toHaveBeenCalledWith(RECIPE_ID, COMPANY_ID)
-    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID)
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: undefined })
     expect(d.products.findRefs).toHaveBeenCalledWith(['p-1'], COMPANY_ID)
     expect(d.units.findRefs).toHaveBeenCalledWith(['u-1'], COMPANY_ID)
+  })
+})
+
+describe('R8: `orderId` opcional en la entrada llega a `findCostingBatches` como `excludeOrderId` (R65)', () => {
+  const OTHER_ORDER_ID = '99999999-9999-4999-8999-999999999999'
+
+  it('sin `orderId` en la entrada, `excludeOrderId` es `undefined` -alta, sin pedido que excluir-', async () => {
+    const d = crearDobles()
+    const cotizar = createQuoteOrderCost(depsDe(d))
+    await cotizar({ recipeId: RECIPE_ID, quantity: '4.0000' }, actorCon('pedidos.modificar'))
+
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: undefined })
+  })
+
+  it('con `orderId` en la entrada -edicion-, se reenvia tal cual como `excludeOrderId`, sin leer el pedido', async () => {
+    const d = crearDobles()
+    const cotizar = createQuoteOrderCost(depsDe(d))
+    await cotizar(
+      { recipeId: RECIPE_ID, quantity: '4.0000', orderId: OTHER_ORDER_ID },
+      actorCon('pedidos.modificar'),
+    )
+
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: OTHER_ORDER_ID })
+  })
+
+  it('un `orderId` que no es UUID rechaza con ValidationError, como el resto de la entrada', async () => {
+    const d = crearDobles()
+    const cotizar = createQuoteOrderCost(depsDe(d))
+    await expect(
+      cotizar(
+        { recipeId: RECIPE_ID, quantity: '4.0000', orderId: 'no-es-un-uuid' },
+        actorCon('pedidos.modificar'),
+      ),
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(d.products.findCostingBatches).not.toHaveBeenCalled()
   })
 })

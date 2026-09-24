@@ -328,13 +328,15 @@ function lineaDeReceta(overrides: Partial<RecipeExecutionLine> = {}): RecipeExec
 }
 
 function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
+  const stock = overrides.stock ?? '100';
   return {
     productId: PRODUCTO_X,
     lot: '1',
-    stock: '100',
+    stock,
     unitCost: '3.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
+    available: stock,
     ...overrides,
   };
 }
@@ -461,6 +463,28 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.create).toHaveBeenCalledTimes(1);
     expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBeNull();
+  });
+
+  it('el alta no excluye ningun pedido del disponible: todavia no aparto nada (R65)', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
+    const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: prod.products,
+      units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder(
+      { recipeId: RECETA_DE_A, quantity: '20.0000', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
+
+    expect(prod.findCostingBatches).toHaveBeenCalledWith([PRODUCTO_X], EMPRESA_A, { excludeOrderId: undefined });
   });
 });
 

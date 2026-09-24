@@ -6,8 +6,13 @@
 // Cada linea trae un porcentaje, no una cantidad: la necesaria sale de
 // `consumedQuantity(orderQuantity, percentage)`. La mayoria de los casos usan `percentage:
 // '100.00'` y ponen la cantidad necesaria directamente en `orderQuantity` -asi el escenario
-// (orden de lotes, promedio, redondeo, conversion) queda igual de legible que con una cantidad
-// literal-; los que ejercitan la multiplicacion en si usan un porcentaje real.
+// (promedio, redondeo, conversion) queda igual de legible que con una cantidad literal-; los
+// que ejercitan la multiplicacion en si usan un porcentaje real.
+//
+// El coste ya NO acumula lotes hasta cubrir ni promedia solo los usados: promedia TODOS los
+// lotes con disponible mayor que cero, se necesiten o no para cubrir, sin ordenarlos ni
+// cortar. `CostingBatch.available` es el campo que gobierna la cobertura y el promedio;
+// `stock` queda solo de referencia.
 
 import { describe, expect, it } from 'vitest';
 
@@ -39,14 +44,19 @@ function linea(overrides: Partial<RecipeCostLine> = {}): RecipeCostLine {
   return { productId: PRODUCT_A, percentage: '100.00', unitId: LITRO.id, ...overrides };
 }
 
+/** `available` por defecto es el mismo `stock`, como un lote sin nada apartado. Un test que
+ *  quiera un lote parcial o totalmente reservado pasa `available` explicito, distinto de
+ *  `stock`. */
 function lote(overrides: Partial<CostingBatch> = {}): CostingBatch {
+  const stock = overrides.stock ?? '1';
   return {
     productId: PRODUCT_A,
     lot: '1',
-    stock: '1',
+    stock,
     unitCost: '1.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
+    available: stock,
     ...overrides,
   };
 }
@@ -62,7 +72,7 @@ function input(overrides: Partial<CostInput> = {}): CostInput {
 }
 
 describe('calculateIngredientsCost', () => {
-  it('pedido 200, 10 % de un insumo en L con un lote de 50 L a 2,0000 -> 40,0000 (R13, R15)', () => {
+  it('pedido 200, 10 % de un insumo en L con un lote de 50 L a 2,0000 -> 40,0000 (R59)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '200.0000',
@@ -76,7 +86,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBe('40.0000');
   });
 
-  it('el importe sale del coste de los lotes y no de ningun precio (R15)', () => {
+  it('el importe sale del coste de los lotes y no de ningun precio (R59)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '200.0000',
@@ -90,74 +100,127 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBe('60.0000');
   });
 
-  it('usa solo lotes con existencia, del mas antiguo al mas nuevo, hasta cubrir (R15)', () => {
+  it('el ejemplo de D22 -necesidad 30, disponibles A 20@10, B 20@12, C 50@15- da 370,0000 (R59)', () => {
+    const resultado = calculateIngredientsCost(
+      input({
+        orderQuantity: '30.0000',
+        batches: [
+          lote({ lot: 'A', purchaseDate: '2026-01-01', stock: '20', unitCost: '10.0000' }),
+          lote({ lot: 'B', purchaseDate: '2026-01-05', stock: '20', unitCost: '12.0000' }),
+          lote({ lot: 'C', purchaseDate: '2026-01-10', stock: '50', unitCost: '15.0000' }),
+        ],
+        units: unitsMap(LITRO),
+      }),
+    );
+
+    // promedio simple (10 + 12 + 15) / 3 = 12,333333333333; * 30 = 369,99999999999 -> 370,0000.
+    expect(resultado).toBe('370.0000');
+  });
+
+  it('D22 de QC-141 deroga QC-123 D3/D4: promedia TODOS los lotes con disponible, no solo los que harian falta para cubrir (R59, R60)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '50.0000',
         batches: [
+          // Este lote solo ya cubre la necesidad de 50: con la regla vieja, el segundo no se
+          // habria tocado y el coste habria salido de 10,0000 en solitario (500,0000).
           lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '10.0000' }),
-          // Mas nuevo y con existencia de sobra: no debe tocarse porque el primero ya cubre.
           lote({ lot: '2', purchaseDate: '2026-02-01', stock: '1000', unitCost: '999.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
     );
 
-    expect(resultado).toBe('500.0000');
+    // promedio simple, sin ponderar por cantidad: (10 + 999) / 2 = 504,5; * 50 = 25225.
+    expect(resultado).toBe('25225.0000');
   });
 
-  it('desempata por numero de lote cuando la fecha de compra empata (R15)', () => {
+  it('D22 de QC-141 deroga QC-123 D3/D4: el orden de los lotes -y su desempate por numero de lote- ya no afecta el coste (R60)', () => {
+    const batchesEnUnOrden = [
+      lote({ lot: '2', purchaseDate: '2026-01-01', stock: '50', unitCost: '100.0000' }),
+      lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '200.0000' }),
+    ];
+    const batchesEnElOrdenContrario = [...batchesEnUnOrden].reverse();
+
+    const resultadoA = calculateIngredientsCost(
+      input({ orderQuantity: '50.0000', batches: batchesEnUnOrden, units: unitsMap(LITRO) }),
+    );
+    const resultadoB = calculateIngredientsCost(
+      input({ orderQuantity: '50.0000', batches: batchesEnElOrdenContrario, units: unitsMap(LITRO) }),
+    );
+
+    // Los dos lotes cubren la necesidad juntos (100 disponible >= 50): promedio (100+200)/2=150,
+    // sin importar cual vaya primero en el array. Con la regla vieja el lote '1' habria cubierto
+    // el solo y el resultado habria dependido del desempate.
+    expect(resultadoA).toBe('7500.0000');
+    expect(resultadoB).toBe('7500.0000');
+  });
+
+  it('D22 de QC-141 deroga QC-123 D3/D4: numeros de lote numericos y de texto en la misma fecha dan el mismo coste (R60)', () => {
+    const resultadoNumerico = calculateIngredientsCost(
+      input({
+        orderQuantity: '5.0000',
+        batches: [
+          lote({ lot: '10', purchaseDate: '2026-01-01', stock: '100', unitCost: '999.0000' }),
+          lote({ lot: '9', purchaseDate: '2026-01-01', stock: '5', unitCost: '10.0000' }),
+        ],
+        units: unitsMap(LITRO),
+      }),
+    );
+    const resultadoTexto = calculateIngredientsCost(
+      input({
+        orderQuantity: '5.0000',
+        batches: [
+          lote({ lot: 'A9', purchaseDate: '2026-01-01', stock: '100', unitCost: '999.0000' }),
+          lote({ lot: 'A10', purchaseDate: '2026-01-01', stock: '5', unitCost: '10.0000' }),
+        ],
+        units: unitsMap(LITRO),
+      }),
+    );
+
+    // Con la regla vieja, '9' habria ido antes que '10' pero 'A10' antes que 'A9' (desempate por
+    // texto), dando resultados distintos entre los dos casos. Sin ese desempate interviniendo:
+    // el promedio de los dos (999 + 10) / 2 = 504,5 es el mismo en los dos casos; * 5 = 2522,5.
+    expect(resultadoNumerico).toBe('2522.5000');
+    expect(resultadoTexto).toBe('2522.5000');
+  });
+
+  it('R60: no pondera el promedio por la cantidad de ningun lote', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '50.0000',
         batches: [
-          lote({ lot: '2', purchaseDate: '2026-01-01', stock: '50', unitCost: '100.0000' }),
-          lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '200.0000' }),
+          lote({ lot: '1', stock: '1', unitCost: '10.0000' }),
+          lote({ lot: '2', stock: '99', unitCost: '1000.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
     );
 
-    // El lote '1' cubre la necesidad el solo: si el desempate fallara, se usaria el '2'.
-    expect(resultado).toBe('10000.0000');
+    // Promedio simple (10 + 1000) / 2 = 505; el ponderado por cantidad (1*10+99*1000)/100 = 990.1
+    // seria otro numero.
+    expect(resultado).toBe('25250.0000');
   });
 
-  it('la fecha de vencimiento no altera el orden ni la seleccion (R15)', () => {
-    // `CostingBatch` no declara fecha de vencimiento: el orden solo puede salir de
-    // `purchaseDate` y del numero de lote. Aqui el array llega en el orden CONTRARIO al de
-    // compra -como si alguien lo hubiera ordenado por una vencimiento imaginaria-, y aun asi
-    // el lote mas antiguo se sigue usando primero.
+  it('R60: no incluye en el promedio ni en la cobertura un lote con disponible cero', () => {
     const resultado = calculateIngredientsCost(
       input({
-        orderQuantity: '50.0000',
+        orderQuantity: '10.0000',
         batches: [
-          lote({ lot: '2', purchaseDate: '2026-02-01', stock: '1000', unitCost: '999.0000' }),
-          lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '10.0000' }),
+          // Existencia alta pero apartada entera por otro pedido: disponible cero.
+          lote({ lot: '1', stock: '1000', unitCost: '1.0000', available: '0.0000' }),
+          lote({ lot: '2', stock: '10', unitCost: '5.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
     );
 
-    expect(resultado).toBe('500.0000');
+    // Si el lote agotado entrara en el promedio saldria (1+5)/2=3, coste 30,0000. Al excluirlo
+    // el promedio es 5,0000 en solitario: 10 * 5 = 50.
+    expect(resultado).toBe('50.0000');
   });
 
-  it('promedia los costes unitarios de los lotes usados sin ponderar (R15)', () => {
-    const resultado = calculateIngredientsCost(
-      input({
-        orderQuantity: '100.0000',
-        batches: [
-          lote({ lot: '1', purchaseDate: '2026-01-01', stock: '90', unitCost: '10.0000' }),
-          lote({ lot: '2', purchaseDate: '2026-02-01', stock: '10', unitCost: '100.0000' }),
-        ],
-        units: unitsMap(LITRO),
-      }),
-    );
-
-    // Promedio simple (10 + 100) / 2 = 55, y no el ponderado (90*10+10*100)/100 = 19.
-    expect(resultado).toBe('5500.0000');
-  });
-
-  it('convierte la existencia y el coste cuando las unidades comparten base (R15)', () => {
+  it('convierte la existencia disponible y el coste cuando las unidades comparten base (R59)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '1500.0000',
@@ -171,7 +234,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBe('7.5000');
   });
 
-  it('un ingrediente con unidad sin base comun no tiene coste (R16)', () => {
+  it('un ingrediente con unidad sin base comun no tiene coste (R61)', () => {
     const resultado = calculateIngredientsCost(
       input({
         lines: [linea({ unitId: LITRO.id })],
@@ -183,11 +246,12 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBeNull();
   });
 
-  it('devuelve sin importe si la existencia no cubre (R16)', () => {
+  it('devuelve sin importe si el disponible no cubre por menos de lo necesario (R61)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '10.0000',
-        batches: [lote({ stock: '5' })],
+        // Existencia de sobra, pero casi todo apartado por otros pedidos: disponible 9,9999.
+        batches: [lote({ stock: '20', available: '9.9999', unitCost: '4.0000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -195,7 +259,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBeNull();
   });
 
-  it('devuelve sin importe si un ingrediente no se puede convertir (R16)', () => {
+  it('devuelve sin importe si un ingrediente no se puede convertir (R61)', () => {
     const resultado = calculateIngredientsCost(
       input({
         lines: [linea({ unitId: LITRO.id })],
@@ -207,13 +271,13 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBeNull();
   });
 
-  it('devuelve sin importe si la receta no tiene lineas (R16)', () => {
+  it('devuelve sin importe si la receta no tiene lineas (R61)', () => {
     const resultado = calculateIngredientsCost(input({ lines: [] }));
 
     expect(resultado).toBeNull();
   });
 
-  it('una linea con unidad desconocida (unitId null) devuelve sin importe (R16)', () => {
+  it('una linea con unidad desconocida (unitId null) devuelve sin importe (R61)', () => {
     const resultado = calculateIngredientsCost(
       input({
         lines: [linea({ unitId: null })],
@@ -225,7 +289,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBeNull();
   });
 
-  it('nunca devuelve cero ni un importe parcial (R16)', () => {
+  it('nunca devuelve cero ni un importe parcial (R61)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '10.0000',
@@ -236,7 +300,7 @@ describe('calculateIngredientsCost', () => {
         batches: [
           // El primer ingrediente se cubre sin problema...
           lote({ productId: PRODUCT_A, stock: '10', unitCost: '100.0000' }),
-          // ...pero el segundo no tiene existencia suficiente: el importe entero se pierde.
+          // ...pero el segundo no tiene disponible suficiente: el importe entero se pierde.
           lote({ productId: PRODUCT_B, stock: '1', unitCost: '1.0000' }),
         ],
         units: unitsMap(LITRO),
@@ -248,8 +312,8 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).not.toBe('1000.0000');
   });
 
-  it('los caminos sin importe del calculo devuelven exactamente la misma salida (R16)', () => {
-    const existenciaInsuficiente = calculateIngredientsCost(
+  it('los caminos sin importe del calculo devuelven exactamente la misma salida (R61, R63)', () => {
+    const disponibleInsuficiente = calculateIngredientsCost(
       input({ orderQuantity: '10.0000', batches: [lote({ stock: '5' })], units: unitsMap(LITRO) }),
     );
     const unidadIncompatible = calculateIngredientsCost(
@@ -271,7 +335,7 @@ describe('calculateIngredientsCost', () => {
       }),
     );
 
-    expect([existenciaInsuficiente, unidadIncompatible, unidadDesconocida, recetaSinLineas, desbordamiento]).toEqual([
+    expect([disponibleInsuficiente, unidadIncompatible, unidadDesconocida, recetaSinLineas, desbordamiento]).toEqual([
       null,
       null,
       null,
@@ -280,7 +344,7 @@ describe('calculateIngredientsCost', () => {
     ]);
   });
 
-  it('el importe viaja como cadena decimal de cuatro decimales y nunca como numero (R15)', () => {
+  it('el importe viaja como cadena decimal de cuatro decimales y nunca como numero (R59, R63)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '3.0000',
@@ -294,7 +358,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBe('7.5000');
   });
 
-  it('un importe que no cabe en decimal(14,4) sale sin numero, indistinguible de los otros casos (R16)', () => {
+  it('un importe que no cabe en decimal(14,4) sale sin numero, indistinguible de los otros casos (R63)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '1.0000',
@@ -306,39 +370,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBeNull();
   });
 
-  it('con la misma fecha de compra el lote 9 se usa antes que el 10 (R15)', () => {
-    const resultado = calculateIngredientsCost(
-      input({
-        orderQuantity: '5.0000',
-        batches: [
-          lote({ lot: '10', purchaseDate: '2026-01-01', stock: '100', unitCost: '999.0000' }),
-          lote({ lot: '9', purchaseDate: '2026-01-01', stock: '5', unitCost: '10.0000' }),
-        ],
-        units: unitsMap(LITRO),
-      }),
-    );
-
-    // Si el orden fuera de texto, '10' iria antes que '9' y el resultado saldria de 999.0000.
-    expect(resultado).toBe('50.0000');
-  });
-
-  it('si un numero de lote no es solo digitos el desempate es por texto (R15)', () => {
-    const resultado = calculateIngredientsCost(
-      input({
-        orderQuantity: '5.0000',
-        batches: [
-          lote({ lot: 'A9', purchaseDate: '2026-01-01', stock: '100', unitCost: '999.0000' }),
-          lote({ lot: 'A10', purchaseDate: '2026-01-01', stock: '5', unitCost: '10.0000' }),
-        ],
-        units: unitsMap(LITRO),
-      }),
-    );
-
-    // Como texto, 'A10' precede a 'A9' ('1' < '9' en el segundo caracter).
-    expect(resultado).toBe('50.0000');
-  });
-
-  it('convierte tambien el coste unitario a la unidad de la linea: 20.000 por bidon de 20 L son 1.000 por litro (R15)', () => {
+  it('convierte tambien el coste unitario a la unidad de la linea: 20.000 por bidon de 20 L son 1.000 por litro (R59)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '20.0000',
@@ -352,7 +384,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBe('20.0000');
   });
 
-  it('no promedia costes unitarios de unidades distintas (R15)', () => {
+  it('promedia costes ya convertidos a la unidad de la linea, no los costes en bruto (R59)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '30.0000',
@@ -370,11 +402,13 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBe('45.0000');
   });
 
-  it('cubre exactamente la existencia cuando la necesidad iguala el stock disponible (R15)', () => {
+  it('cubre exactamente cuando la necesidad iguala el disponible, aunque la existencia sea mayor (R61)', () => {
     const resultado = calculateIngredientsCost(
       input({
         orderQuantity: '25.0000',
-        batches: [lote({ stock: '25', unitCost: '4.0000' })],
+        // La existencia es mucho mayor que lo disponible: lo que decide la cobertura es
+        // `available`, no `stock`.
+        batches: [lote({ stock: '999', available: '25.0000', unitCost: '4.0000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -382,7 +416,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBe('100.0000');
   });
 
-  it('no cubre por una milesima y queda sin importe (R16)', () => {
+  it('no cubre por una milesima de disponible y queda sin importe (R61)', () => {
     // La necesaria sale de `orderQuantity * percentage / 100`: con un porcentaje de 2 decimales,
     // la milesima extra viene de la propia cantidad del pedido.
     const resultado = calculateIngredientsCost(
@@ -397,7 +431,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).toBeNull();
   });
 
-  it('un producto sin lotes deja el pedido sin importe (R16)', () => {
+  it('un producto sin lotes deja el pedido sin importe (R61)', () => {
     const resultado = calculateIngredientsCost(
       input({
         lines: [linea({ productId: PRODUCT_A })],

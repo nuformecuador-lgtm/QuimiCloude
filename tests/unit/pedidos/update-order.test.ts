@@ -497,13 +497,15 @@ function lineaDeReceta(overrides: Partial<RecipeExecutionLine> = {}): RecipeExec
 }
 
 function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
+  const stock = overrides.stock ?? '100';
   return {
     productId: PRODUCTO_X,
     lot: '1',
-    stock: '100',
+    stock,
     unitCost: '3.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
+    available: stock,
     ...overrides,
   };
 }
@@ -612,6 +614,26 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       expect(prod.findCostingBatches, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
       expect(uni.findRefs, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('pasa el `id` del pedido como `excludeOrderId`: lo que EL mismo tiene apartado cuenta como disponible para si mismo (R65)', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
+    const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: prod.products,
+      units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
+
+    expect(prod.findCostingBatches).toHaveBeenCalledWith([PRODUCTO_X], EMPRESA_A, { excludeOrderId: ORDER_ID });
   });
 
   it('sin pedidos.modificar no se lee ni un lote ni una unidad (R23)', async () => {

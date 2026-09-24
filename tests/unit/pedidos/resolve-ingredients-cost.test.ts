@@ -60,13 +60,15 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
 }
 
 function lote(overrides: Partial<CostingBatch> = {}): CostingBatch {
+  const stock = overrides.stock ?? '50.0000';
   return {
     productId: PRODUCT_A,
     lot: '1',
-    stock: '50.0000',
+    stock,
     unitCost: '2.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
+    available: stock,
     ...overrides,
   };
 }
@@ -220,5 +222,25 @@ describe('resolveIngredientsCost', () => {
     // de pedido (2:3), con los mismos porcentajes.
     expect(con200).toBe('20.0000');
     expect(con300).toBe('30.0000');
+  });
+
+  it('sin `options.orderId` pide los lotes sin excluir ningun pedido; con el, lo reenvia como `excludeOrderId` (R65)', async () => {
+    const cat = catalogoDeRecetas();
+    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }], [lote()]);
+    const uni = catalogoDeUnidades();
+
+    await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
+    expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: undefined });
+
+    await resolveIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+      { orderId: 'pedido-1' },
+    );
+    expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: 'pedido-1' });
   });
 });
