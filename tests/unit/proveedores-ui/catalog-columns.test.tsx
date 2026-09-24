@@ -82,6 +82,36 @@ describe('catalogo del proveedor — celdas de material y medidas (R28)', () => 
     );
   });
 
+  it('quita los ceros de relleno del diametro y el alto sin redondear (R28)', async () => {
+    montar([
+      linea({
+        measurements: {
+          diameter: { value: '7.5000', unit: 'cm' },
+          height: { value: '12.0000', unit: 'cm' },
+          mouth: '28/410',
+        },
+      }),
+    ]);
+
+    expect(screen.getByTestId('data-table-cell-measurements')).toHaveTextContent(
+      'Ø 7.5 cm · alto 12 cm · boca 28/410',
+    );
+  });
+
+  it('no redondea el diametro al quitar los ceros de relleno (R28)', async () => {
+    montar([
+      linea({
+        measurements: {
+          diameter: { value: '7.5550', unit: 'cm' },
+          height: null,
+          mouth: null,
+        },
+      }),
+    ]);
+
+    expect(screen.getByTestId('data-table-cell-measurements')).toHaveTextContent('Ø 7.555 cm');
+  });
+
   it('con solo el diametro, la celda pinta unicamente esa medida', async () => {
     montar([
       linea({

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type { CatalogLineMeasurements, CatalogLineView } from '@/lib/modules/proveedores';
-import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import {
   resolvePresentationName,
@@ -120,10 +120,10 @@ function formatMeasurements(measurements: CatalogLineMeasurements | null): strin
 
   const parts: string[] = [];
   if (measurements.diameter !== null) {
-    parts.push(`Ø ${measurements.diameter.value} ${measurements.diameter.unit}`);
+    parts.push(`Ø ${trimDecimal(measurements.diameter.value)} ${measurements.diameter.unit}`);
   }
   if (measurements.height !== null) {
-    parts.push(`alto ${measurements.height.value} ${measurements.height.unit}`);
+    parts.push(`alto ${trimDecimal(measurements.height.value)} ${measurements.height.unit}`);
   }
   if (measurements.mouth !== null) {
     parts.push(`boca ${measurements.mouth}`);

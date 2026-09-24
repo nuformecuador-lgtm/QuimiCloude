@@ -92,8 +92,8 @@ const oldChangesCost = '500.0000';
  */
 const existingMaterial = 'vidrio';
 
-/** Texto exacto de las medidas de la fila «nueva», con los mismos decimales que trae el guion. */
-const newLineMeasurementsText = 'Ø 7.5000 cm · alto 12.0000 cm · boca 28/410';
+/** Texto exacto de las medidas de la fila «nueva», sin los ceros de relleno del guion. */
+const newLineMeasurementsText = 'Ø 7.5 cm · alto 12 cm · boca 28/410';
 
 /** El material corregido en la revision de la fila «nueva». */
 const correctedMaterial = `${FIXTURE_PREFIX}material_${RUN_ID.slice(0, 8)}`;
