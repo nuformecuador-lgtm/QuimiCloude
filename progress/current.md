@@ -18,6 +18,10 @@
 
 ## Evaluaciones
 
+### QC-165 administradores-por-el-maestro y QC-166 area-del-maestro - NACEN con `/afinar-feature` (2026-09-24)
+
+**QC-165** (backend, bloqueada por QC-161): 8 decisiones y 2 abiertas en `specs/QC-165-administradores-por-el-maestro/requirements.md`. **QC-166** (frontend, bloqueada por QC-162 y QC-165) sin sembrar. **QC-162** pasa a backend (la pantalla sale a QC-166). **QC-161** cierra su pregunta del login (aterriza en su area) y queda sin preguntas abiertas.
+
 ### QC-164 unidad-del-pedido - NACE con `/afinar-feature` (2026-09-24)
 
 **QC-164** (fullstack): 10 decisiones y 4 abiertas en `specs/QC-164-unidad-del-pedido/requirements.md`; **reabre QC-147** (el pedido vuelve a tener unidad) y toca el consumo de **QC-141** (in_progress) y los envases de **QC-150** (spec_ready): ordenar en F1.0. **QC-163** creada por error y **cancelada** el mismo dia: duplicaba el contenido de la presentacion que ya trae QC-150 (R6-R8). Pregunta del dominio 1 anotada en `docs/architecture.md`.

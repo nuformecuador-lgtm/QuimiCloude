@@ -20,9 +20,7 @@ _Pendiente: los escribe spec_author (F1.2)._
 
 ## Preguntas abiertas
 
-1. **El login del Maestro.** No tiene empresa, y la sesión lleva una (QC-48) de la que depende todo el
-   aislamiento (QC-61, RLS). No está decidido qué lleva su sesión, a qué pantalla aterriza, ni si eso
-   entra en esta ficha o en QC-162. `spec_author` propone la frontera en `design.md`.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -39,3 +37,4 @@ _Pendiente: los escribe spec_author (F1.2)._
 | 2026-09-24 | ¿Dependencia o tabla nueva? | **Ninguna.** Solo migración y seed, que crea lo que falta (heredado de **QC-6**). |
 | 2026-09-24 | ¿Maestro aparece en el selector de roles? | **Nunca.** Ni en el alta ni en la edición, y el **service rechaza** asignarlo aunque se fuerce la petición: un Maestro solo nace por seed. Cierra la escalada del Administrador de cualquier empresa a dueño de la plataforma. Enmienda **QC-94/QC-67** (todo rol aparecía en el selector). |
 | 2026-09-24 | ¿A qué empresa pertenece el Maestro? | **A ninguna.** `users.company_id` sigue **obligatoria para todos menos el Maestro**: enmienda **QC-47**. La base debe garantizar que solo un Maestro tenga la empresa vacía. |
+| 2026-09-24 | ¿Cómo inicia sesión el Maestro? | **Como cualquiera, y entra en esta ficha**: aterriza en su **área propia** (las pantallas son **QC-166**). Las pantallas de empresa le niegan el acceso **por permiso**, igual que a cualquiera sin permiso (**QC-93**). |

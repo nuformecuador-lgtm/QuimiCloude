@@ -2436,7 +2436,7 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "rol-maestro",
-      "description": "Nace el rol MAESTRO (dueno de la plataforma, por encima de las empresas) y con el empresas.consultar y empresas.modificar (modificar cubre alta, edicion y baja): una enmienda mas al catalogo cerrado de QC-74. El Maestro recibe SOLO esos dos; Administrador, Operador y Empacador no cambian. EL MAESTRO NO PERTENECE A NINGUNA EMPRESA: users.company_id sigue obligatoria para todos menos para el (enmienda a QC-47). EL PRIMER MAESTRO lo crea el seed, igual que el Administrador inicial: usuario, contrasena y correo desde .env (QC-6). NUNCA aparece en el selector de roles y el servidor rechaza asignarlo. ACOTADA el 2026-09-24 con /afinar-feature. ABIERTO: como inicia sesion el Maestro sin empresa (QC-48/QC-61), aqui o en QC-162. NO ENTRA: la gestion de empresas (QC-162). CHOCA en el catalogo de permisos con QC-153 y QC-142: recuento contra dev al implementar.",
+      "description": "Nace el rol MAESTRO (dueno de la plataforma, por encima de las empresas) y con el empresas.consultar y empresas.modificar (modificar cubre alta, edicion y baja): una enmienda mas al catalogo cerrado de QC-74. El Maestro recibe SOLO esos dos; Administrador, Operador y Empacador no cambian. EL MAESTRO NO PERTENECE A NINGUNA EMPRESA: users.company_id sigue obligatoria para todos menos para el (enmienda a QC-47). EL PRIMER MAESTRO lo crea el seed, igual que el Administrador inicial: usuario, contrasena y correo desde .env (QC-6). NUNCA aparece en el selector de roles y el servidor rechaza asignarlo. ACOTADA el 2026-09-24 con /afinar-feature. LOGIN: inicia sesion como cualquiera y aterriza en su area (QC-166); las pantallas de empresa le niegan el acceso por permiso (QC-93). NO ENTRA: gestion de empresas (QC-162), administradores por el Maestro (QC-165), pantallas (QC-166). CHOCA en el catalogo de permisos con QC-153 y QC-142: recuento contra dev al implementar.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -2451,11 +2451,11 @@
       "epic": "QC-46",
       "epic_name": "Multiempresa",
       "name": "gestion-de-empresas",
-      "description": "El Maestro ve todas las empresas de la plataforma y las da de alta, edita y da de baja: operaciones de servidor y su pantalla. Exige empresas.consultar / empresas.modificar (QC-161). Se acota con /afinar-feature. ABIERTO: como cruza el Maestro el aislamiento por empresa (QC-48/QC-61; el usuario pertenece a UNA empresa, QC-47); en que ruta vive la pantalla; que pasa con los usuarios de una empresa dada de baja. BLOQUEADA POR QC-161.",
+      "description": "El Maestro ve todas las empresas de la plataforma y las da de alta, edita y da de baja, en el servidor. Exige empresas.consultar / empresas.modificar (QC-161). LA PANTALLA SALE el 2026-09-24 a QC-166 (Area del Maestro). El Maestro no tiene empresa y trabaja en su area propia. Se acota con /afinar-feature. ABIERTO: que pasa con los usuarios de una empresa dada de baja. BLOQUEADA POR QC-161.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
-      "zone": "fullstack",
+      "zone": "backend",
       "branch": "feature/QC-162-gestion-de-empresas",
       "depends_on": [
         "QC-161"
@@ -2491,6 +2491,41 @@
       "branch": "feature/QC-164-unidad-del-pedido",
       "depends_on": [],
       "spec_path": "specs/QC-164-unidad-del-pedido"
+    },
+    {
+      "key": "QC-165",
+      "id": 165,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "administradores-por-el-maestro",
+      "description": "El Maestro da de ALTA, EDITA y da de BAJA usuarios con rol Administrador en CUALQUIER empresa, eligiendo la empresa. Solo Administradores. Lo autoriza empresas.modificar (lista: empresas.consultar); SIN permiso nuevo. Hereda campos (QC-4/QC-66), unicidad por empresa (QC-47), alta sin contrasena con enlace (QC-79), baja logica. ACOTADA el 2026-09-24 con /afinar-feature. E2E diferido a QC-166. NO ENTRA: pantallas (QC-166), empresas (QC-162). BLOQUEADA POR QC-161.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-165-administradores-por-el-maestro",
+      "depends_on": [
+        "QC-161"
+      ],
+      "spec_path": "specs/QC-165-administradores-por-el-maestro"
+    },
+    {
+      "key": "QC-166",
+      "id": 166,
+      "epic": "QC-46",
+      "epic_name": "Multiempresa",
+      "name": "area-del-maestro",
+      "description": "Area propia del Maestro, separada del ERP: pantallas EMPRESAS (lista, alta, edicion, baja) y ADMINISTRADORES (lista por empresa, alta eligiendo empresa, edicion, baja). Aterriza aqui al iniciar sesion; no ve inventario, pedidos ni /configuracion. E2E: SI, paga el diferido de QC-161, QC-165 y QC-162. Se acota con /afinar-feature. ABIERTO: ruta del area y navegacion. BLOQUEADA POR QC-162 y QC-165.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-166-area-del-maestro",
+      "depends_on": [
+        "QC-162",
+        "QC-165"
+      ],
+      "spec_path": "specs/QC-166-area-del-maestro"
     }
   ]
 }
