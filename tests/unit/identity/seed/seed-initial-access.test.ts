@@ -803,6 +803,72 @@ describe('seedInitialAccess', () => {
     expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.modificar');
   });
 
+  it('QC-142 R13: sobre una base sembrada antes de esta feature -todo salvo documentos.*- el seed crea exactamente esos dos permisos y las dos asignaciones del Administrador, y la segunda corrida no cambia nada', async () => {
+    const codigosDeDocumentos = PERMISSIONS.filter((permission) => permission.module === 'documentos').map(
+      (permission) => permission.code,
+    );
+    const administradorId = ROLES_YA_SEMBRADOS.get(ROLE_ADMINISTRADOR) ?? '';
+    const operadorId = ROLES_YA_SEMBRADOS.get(ROLE_OPERADOR) ?? '';
+    const empacadorId = ROLES_YA_SEMBRADOS.get(ROLE_EMPACADOR) ?? '';
+
+    const yaExistentes = PERMISSIONS.map((permission) => permission.code).filter(
+      (code) => !codigosDeDocumentos.includes(code),
+    );
+    const asignacionesDeDocumentosDelAdministrador = new Set(
+      codigosDeDocumentos.map((code) => `${administradorId}|${code}`),
+    );
+    const asignacionesExistentes = new Set(
+      [...asignacionesDelSeed(ROLES_YA_SEMBRADOS)].filter(
+        (asignacion) => !asignacionesDeDocumentosDelAdministrador.has(asignacion),
+      ),
+    );
+
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      permisosExistentes: new Set(yaExistentes),
+      asignacionesExistentes,
+    });
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    const primeraCorrida = await seedInitialAccess({
+      repository,
+      passwordHasher,
+      credentials,
+      checkCredentialPolicy,
+    });
+
+    // Primero: se creo exactamente lo que faltaba de documentos, y nada mas.
+    expect(new Set(primeraCorrida.createdPermissions)).toEqual(new Set(codigosDeDocumentos));
+    expect(primeraCorrida.createdRolePermissions).toBe(codigosDeDocumentos.length);
+
+    const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
+      ?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    expect(paresCreados.every((par) => par.roleId === administradorId)).toBe(true);
+    expect(new Set(paresCreados.map((par) => par.permissionCode))).toEqual(new Set(codigosDeDocumentos));
+
+    // Operador y Empacador siguen sin ninguna entrada de documentos.
+    for (const codigo of codigosDeDocumentos) {
+      expect(repository.asignacionesExistentes.has(`${operadorId}|${codigo}`)).toBe(false);
+      expect(repository.asignacionesExistentes.has(`${empacadorId}|${codigo}`)).toBe(false);
+    }
+
+    // Y la segunda corrida, sobre el MISMO repositorio ya completo, no escribe nada.
+    const llamadasTrasLaPrimera = repository.llamadas.length;
+    const segundaCorrida = await seedInitialAccess({
+      repository,
+      passwordHasher,
+      credentials,
+      checkCredentialPolicy,
+    });
+    const llamadasDeLaSegunda = repository.llamadas.slice(llamadasTrasLaPrimera);
+    expect(llamadasDeEscritura(llamadasDeLaSegunda)).toEqual([]);
+    expect(segundaCorrida.createdPermissions).toEqual([]);
+    expect(segundaCorrida.createdRolePermissions).toBe(0);
+  });
+
   // Caso 15 (QC-74 R10)
   it('sobre una base ya sembrada la segunda corrida no crea ningun permiso ni ninguna asignacion', async () => {
     const repository = crearRepositorioFalso({

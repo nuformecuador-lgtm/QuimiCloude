@@ -840,6 +840,54 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
+  it('QC-142 R13: sobre la base ya sembrada salvo documentos.*, el seed crea exactamente esos dos permisos y las dos asignaciones del Administrador, y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const codigosDeDocumentos = PERMISSIONS.filter((permission) => permission.module === 'documentos')
+        .map((permission) => permission.code)
+        .sort();
+
+      // La base local YA trae el seed completo (ver cabecera). Se retira SOLO lo de documentos,
+      // dentro del tx, para simular una base sembrada antes de esta feature.
+      await tx.rolePermission.deleteMany({ where: { permissionCode: { in: codigosDeDocumentos } } });
+      await tx.permission.deleteMany({ where: { code: { in: codigosDeDocumentos } } });
+
+      const permisosAntes = await tx.permission.count();
+      const asignacionesAntes = await tx.rolePermission.count();
+      const operadorAntes = await codigosEnBaseDe(tx, ROLE_OPERADOR);
+      const empacadorAntes = await codigosEnBaseDe(tx, ROLE_EMPACADOR);
+
+      const repository = createInitialAccessRepository(tx);
+      const first = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+
+      // Primero: se creo exactamente lo que faltaba de documentos, y nada mas.
+      expect(first.createdPermissions.slice().sort()).toEqual(codigosDeDocumentos);
+      expect(first.createdRolePermissions).toBe(codigosDeDocumentos.length);
+      expect(await tx.permission.count()).toBe(permisosAntes + codigosDeDocumentos.length);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + codigosDeDocumentos.length);
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+      // Operador y Empacador, intactos: ninguno gana documentos.*.
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(operadorAntes);
+      expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).toEqual(empacadorAntes);
+
+      // Y la segunda corrida, ya con el catalogo completo, no cambia ningun conteo.
+      const second = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await tx.permission.count()).toBe(permisosAntes + codigosDeDocumentos.length);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + codigosDeDocumentos.length);
+    });
+  });
+
   // CADA rol de `SEED_ROLES` -no solo Administrador y Operador- tiene en la base exactamente los
   // permisos que el seed le declara, ni uno mas ni uno menos.
   it('R25 — cada rol de semilla tiene en `role_permissions` exactamente los permisos que declara SEED_ROLE_PERMISSIONS', async () => {
