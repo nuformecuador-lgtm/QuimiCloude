@@ -89,6 +89,9 @@ const UNIT_COST = '10.0000';
 /** La cantidad de cada pedido: exactamente lo que una receta al cien por cien necesita del lote. */
 const ORDER_QUANTITY = '1500';
 
+/** Divide `ORDER_QUANTITY` en envases enteros: Finalizar exige contenido para dar de alta el lote. */
+const PRESENTATION_CONTENT = '1';
+
 const CANCELLATION_REASON = `Cancelado por el E2E ${RUN_ID}`;
 
 /**
@@ -360,6 +363,8 @@ test.beforeAll(async () => {
       name: PRESENTATION_NAME,
       nameNormalized: normalizePresentationName(PRESENTATION_NAME),
       unitId: unit.id,
+      // Sin contenido, Finalizar rechaza con `presentation_without_content` (QC-150 R18).
+      content: PRESENTATION_CONTENT,
       companyId,
     },
     select: { id: true },

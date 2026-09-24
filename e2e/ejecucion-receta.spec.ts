@@ -87,6 +87,9 @@ const firstNames = `Qc63${RUN_ID.slice(0, 8)}`;
 
 const ORDER_QUANTITY = '3.0';
 
+/** Divide `ORDER_QUANTITY` en envases enteros: Finalizar exige contenido para dar de alta el lote. */
+const PRESENTATION_CONTENT = '1';
+
 /**
  * Posicion inicial de la serie de este fixture. Alta y aleatoria para no chocar con
  * `orders_company_year_sequence_key` ni con el worker del otro navegador.
@@ -134,6 +137,7 @@ const STEP_FINISH_TESTID = 'step-reader-finish';
 let companyId: string | null = null;
 let recipeId: string | null = null;
 let productId: string | null = null;
+let presentationId: string | null = null;
 let operatorUserId: string | null = null;
 let orderPendingId: string | null = null;
 let orderInProgressId: string | null = null;
@@ -194,6 +198,7 @@ async function seedOrder(params: {
 }): Promise<{ id: string; numberText: string }> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
   if (!recipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
+  if (!presentationId) throw new Error('la presentacion del fixture no existe: fallo el beforeAll');
 
   const year = new Date().getUTCFullYear();
   const order = await prisma.order.create({
@@ -203,6 +208,8 @@ async function seedOrder(params: {
       orderSequence: params.sequence,
       recipeId,
       quantity: ORDER_QUANTITY,
+      presentationId,
+      presentationContent: PRESENTATION_CONTENT,
       status: params.status,
     },
     select: { id: true },
@@ -311,10 +318,13 @@ test.beforeAll(async () => {
       name: PRESENTATION_NAME,
       nameNormalized: normalizePresentationName(PRESENTATION_NAME),
       unitId: unit.id,
+      // Sin contenido, Finalizar rechaza con `presentation_without_content` (QC-150 R18).
+      content: PRESENTATION_CONTENT,
       companyId,
     },
     select: { id: true },
   });
+  presentationId = presentation.id;
 
   // Existencia de sobra: la entrega consume del lote mas antiguo, y este es el unico.
   await prisma.productBatch.create({
