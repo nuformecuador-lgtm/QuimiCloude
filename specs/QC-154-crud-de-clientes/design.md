@@ -16,7 +16,12 @@
 > (`@module clientes`, FK escalares sin `@relation`, clave candidata `customers_company_id_id_key`,
 > RLS activada y forzada), la migración `20260924120000_customers` y el armazón del módulo
 > (`index.ts` que reexporta el tipo `Customer`, `domain/customer.ts`, `ports/.gitkeep`,
-> `adapters/.gitkeep`). **Esta ficha no toca la base** (R37): lo consume y llena el armazón.
+> `adapters/.gitkeep`). Esta ficha lo consume y llena el armazón.
+>
+> **Enmienda F1.4 (2026-09-24).** El humano decidió que la búsqueda **ignore acentos** (P2). Eso
+> trae **una migración** a esta ficha: tres columnas normalizadas, su relleno y tres índices de
+> trigramas. Va en el **§ 17**, que manda sobre cualquier frase anterior que diga «sin migración».
+> Las secciones afectadas llevan su nota en línea.
 
 ---
 
@@ -31,9 +36,12 @@
 | `lib/modules/clientes/index.ts` | Conserva `Customer` y añade tipos, esquemas, errores, lista blanca y las cinco factories — **solo** de `./domain`. |
 | `lib/composition/index.ts` | Gana la fachada `clientes` en un **bloque nuevo al final** (§ 10). |
 | `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts` | **Duodécima enmienda**: `customer_not_found` (§ 7). |
-| `tests/…` | Nuevos y **ampliados**; ver § 11 y § 12. |
+| `tests/…` | Nuevos y **ampliados**; ver § 11, § 12 y § 17. |
+| `db/schema.prisma` | *(F1.4)* `Customer` gana `firstNamesNormalized`, `lastNamesNormalized` y `cityNormalized`. Nada más (§ 17). |
+| `db/migrations/<ts>_customers_search_normalized/{migration.sql,down.sql}` | *(F1.4)* Columnas, relleno, `NOT NULL` y tres GIN de trigramas parciales, escritos a mano (§ 17). |
+| `lib/modules/clientes/domain/customer-text.ts` | *(F1.4)* `normalizeCustomerText`, la única normalización del módulo. |
 
-**No se toca** `db/` (R37), `app/`, `components/`, `hooks/`, `e2e/`, `middleware.ts` (R38),
+**No se toca** ninguna otra parte de `db/` (R37 enmendado), `app/`, `components/`, `hooks/`, `e2e/`, `middleware.ts` (R38),
 `lib/modules/pedidos/**` (R40), `lib/modules/identity/**` (los permisos ya los sembró QC-153) ni
 `lib/shared/pagination.ts` (se consume, R36).
 
@@ -243,6 +251,10 @@ export const CUSTOMER_QUERYABLE: ListQueryable = {
 opcionales, el alcance habla de buscar clientes, y en QC-155 la persona buscará por cómo se llama o de
 dónde es. Añadir uno es una línea en el adaptador y un caso de test.
 
+> **F1.4 (2026-09-24): lo que sigue sobre semántica, acentos y comodines queda REEMPLAZADO por
+> § 17.3.** La búsqueda compara **formas normalizadas**, no las columnas en crudo con `ILIKE`. Se
+> conserva el texto original para que se vea qué cambió.
+
 **Búsqueda — semántica.** El término se parte por espacios en palabras; **cada** palabra debe
 aparecer (`contains`, `mode: 'insensitive'`) en **alguna** de las tres columnas:
 
@@ -323,6 +335,11 @@ export type CustomerView = Omit<Customer, 'companyId' | 'deletedAt'>;
 export type NewCustomer = Pick<Customer, 'firstNames' | 'lastNames' | 'city' | 'phone' | 'email' | 'address'>;
 ```
 
+*(F1.4)* `NewCustomer` gana además `firstNamesNormalized`, `lastNamesNormalized` y `cityNormalized`.
+Los calcula **el caso de uso** con `normalizeCustomerText`, igual que `create-supplier.ts` empareja
+`name` y `nameNormalized`, para que el emparejamiento se vea con un doble del puerto (R42).
+`CustomerView` **no** los lleva (R47). El tipo `Customer` de QC-153 **no se toca**.
+
 Se **derivan** del tipo `Customer` que dejó QC-153 en vez de repetir los campos: si el modelo gana un
 campo, el compilador lo dice en los dos sitios. `companyId` no sale (quien pregunta ya es de esa
 empresa) y `deletedAt` tampoco (sería siempre `null`, R25). Los autores salen como **identificadores**,
@@ -377,6 +394,8 @@ export interface CustomerRepository {
 
 - **`…Alive` en el nombre no es adorno**: el filtro `deletedAt: null` es del puerto (R25), así ningún
   caso de uso puede olvidarlo. Ninguna operación de restaurar ni de listar dados de baja.
+- *(F1.4)* **`create` y `updateAlive` escriben también las tres formas normalizadas** que les llegan
+  en `NewCustomer`, sin volver a normalizar nada: si hubiera dos definiciones, podrían divergir (R42).
 - **`create`** escribe `companyScopeColumns(scope)`, los seis datos, `createdAt = updatedAt = now`,
   `createdBy = updatedBy = actorId` (R21). `updatedAt` es `@updatedAt` en Prisma, pero se escribe
   explícito con el `now` del caso de uso para que el reloj sea uno solo.
@@ -466,7 +485,8 @@ regla al consumir los permisos»). Cambio por cambio, y qué **no** se toca:
 
 Los casos cambiados conservan el `R<n>` de QC-153 en su nombre y **añaden** el de QC-154 (p. ej.
 `R20 (QC-153), R35 (QC-154) — …`), para que la trazabilidad de las dos fichas siga apuntando a un test
-vivo. Y el archivo gana casos propios de QC-154: sin migración ni cambio de `schema.prisma` (R37), sin
+vivo. Y el archivo gana casos propios de QC-154: *(F1.4)* solo **una** migración nueva, la de § 17,
+y en `schema.prisma` solo los tres campos normalizados de `Customer` (R37 enmendado); sin
 nada bajo `app/` que nombre clientes (R38), sin mención a `pedidos` (R40), y sin reimplementar la
 paginación (R36).
 
@@ -484,6 +504,9 @@ paginación (R36).
 | `tests/unit/errores/catalogo.test.ts` | 54 → 55 | R34. |
 | `tests/integration/aislamiento.json` | dos entradas nuevas en `commit` (§ 13) | La guardia `guard-aislamiento-integracion` exige declarar todo `*.int.test.ts`. |
 | `tests/guards/guard-ambito-empresa-clientes.test.ts` | **nuevo**, calcado del de proveedores | R12. |
+| `tests/guards/guard-identificador-de-request.test.ts` | *(F1.4)* el nombre de la migración nueva en su **lista cerrada** de migraciones, con el comentario de una línea de siempre | Sin la fila, `hallazgosDeMigraciones` se pone roja con la migración nueva. |
+| `tests/unit/clientes/schema/customers-schema.test.ts` (QC-153) | *(F1.4)* `CUSTOMER_COLUMNS` gana los tres campos normalizados. El caso cambiado lleva `R4 (QC-153), R42 (QC-154)` en el nombre y **sigue siendo un censo exacto** | Hoy es un censo cerrado de columnas y se pondría rojo. Las columnas nuevas son **derivadas**, no dato de negocio: R4 de QC-153 («ningún dato de negocio distinto de los seis») sigue siendo verdad. |
+| `tests/integration/clientes/customers-constraints.int.test.ts` (QC-153) | *(F1.4)* Los `tx.customer.create` y el `INSERT` crudo del ayudante pasan las tres formas normalizadas, y el censo de columnas en `snake_case` gana las tres | Sin esto no compila (Prisma las exige como obligatorias) o la base las rechaza por `NOT NULL`. |
 
 `guard-arquitectura-modulos`, `guard-catalogo-de-errores`, `guard-rls-force`, `guard-empresa-en-esquema`
 y `guard-dependencias-aprobadas` **no se tocan**: ya barren todos los módulos y cierran R33, R35 y R39
@@ -499,8 +522,9 @@ de QC-155, que es donde hay pantalla y menú.
 **Base de datos propia: `QuimiCloude_QC154`** (lección de QC-147). `DATABASE_URL` y `DIRECT_URL` se
 sobrescriben **en el entorno del comando** para que apunten a ella —nunca a la compartida del `.env`—;
 de ella sale la plantilla y la base efímera de cada corrida de integración (`tests/integration/_global-setup.ts`).
-Esta ficha no tiene migración, pero la base tiene que llevar aplicada la de QC-153
-(`pnpm run db:migrate` sobre `QuimiCloude_QC154` antes de la primera corrida).
+*(F1.4)* La migración de § 17 se aplica, se revierte y se vuelve a aplicar **contra
+`QuimiCloude_QC154`** (`db:migrate` → `db:rollback` → `db:migrate`), y la salida se pega en la
+bitácora. La base necesita antes la migración de QC-153.
 
 | Nivel | Archivo | Qué demuestra |
 | --- | --- | --- |
@@ -550,12 +574,24 @@ estándar bastaría si algún día la hubiera).
 
 ## 15. Alternativas descartadas
 
-### A1. Búsqueda insensible a acentos con columna normalizada o `unaccent` — descartada para esta ficha
+### A1. Búsqueda insensible a acentos con columna normalizada — **YA NO DESCARTADA (F1.4, 2026-09-24)**
 
-Es lo que hace proveedores y lo que la pantalla querrá. Exige una **migración** (columnas
-`*_normalized` con su backfill, o la extensión `unaccent` más un índice de expresión), y R37 —que
-viene de la decisión 5: el modelo es QC-153— la deja fuera. Queda como **P2** con su coste escrito; si
-el humano la quiere, es una ficha de modelo propia, no un añadido a esta.
+La descarté en F1.2 porque exigía una migración. En F1.4 **el humano la eligió**, y se implementa en
+**esta** ficha (§ 17). Queda como constancia de que la posición por defecto era otra.
+
+### A1-bis. `unaccent` con índice de expresión en vez de columna almacenada — descartada
+
+Evitaría las tres columnas: bastaría un `CREATE INDEX … (unaccent(lower(first_names)) gin_trgm_ops)`
+y un `WHERE unaccent(lower(...)) LIKE`. Se descarta por tres razones:
+
+- **Nadie la usa en el repositorio.** La cabecera de `20260904160000_list_query_indexes` explica por
+  qué eligió `translate` y no `unaccent()`.
+- **`unaccent()` no es `IMMUTABLE`**, así que no entra en un índice sin una función envoltorio.
+- **La comparación se partiría en dos definiciones**, una en SQL y otra en TypeScript, que pueden
+  divergir. El precedente (§ 17) tiene una sola definición: la de la aplicación, que escribe la
+  columna y normaliza el término.
+
+El `translate` solo se usa una vez, para el relleno.
 
 ### A2. Buscar el término entero contra cada columna — descartada
 
@@ -603,6 +639,9 @@ devolverlo haría viajar al navegador la empresa y una marca de baja siempre `nu
 
 ## 16. Preguntas abiertas que deja este diseño
 
+> **F1.4 (2026-09-24): las cuatro están cerradas.** P3, P4 y P5 se aceptan como estaban. P2 cambia a
+> «ignora acentos» (§ 17). El texto que sigue se conserva como historia.
+
 Las cinco están en `requirements.md > Preguntas abiertas`. La 1 queda **cerrada por QC-153**. Las
 cuatro nuevas llevan posición por defecto escrita y **ninguna bloquea la implementación**:
 
@@ -611,3 +650,121 @@ cuatro nuevas llevan posición por defecto escrita y **ninguna bloquea la implem
 - **P4** texto de `customer_not_found` (§ 7) — forma parte de la **enmienda al catálogo**, que requiere
   aprobación humana explícita en F1.4.
 - **P5** identificador sin forma (§ 5.3, A4) — una clase de error y un caso de test.
+
+---
+
+## 17. F1.4 (2026-09-24): búsqueda sin acentos — la migración (R37 enmendado, R41–R47)
+
+### 17.1 El precedente que se copia (verificado en el árbol, no supuesto)
+
+| Pieza | Dónde está hoy | Qué se copia |
+| --- | --- | --- |
+| Columna normalizada **escrita por la aplicación** | `products`, `recipes`, `suppliers`, `presentations`, `units`, `supplier_catalog_lines` (`name_normalized`); `normalizeSupplierName` en `proveedores/domain/supplier-name.ts` | Una columna `*_normalized` por campo buscable. Una función de dominio: `NFD`, quitar `\p{Diacritic}`, `toLowerCase`, quitar `[^a-z0-9]`. |
+| Relleno en SQL con `translate`, **sin `unaccent`** | `db/migrations/20260904160000_list_query_indexes/migration.sql` § 2 | Se añade la columna **anulable**, se hace el `UPDATE … regexp_replace(lower(translate(…)), '[^a-z0-9]', '', 'g')` con **la misma** lista de caracteres, y **después** `SET NOT NULL`. |
+| Índice de búsqueda | Misma migración, § 3: `USING gin (<col> gin_trgm_ops) WHERE deleted_at IS NULL` | Tres índices parciales, uno por columna. |
+| Extensión | Misma migración: `CREATE EXTENSION IF NOT EXISTS pg_trgm`, y el `down.sql` **no** la retira | Igual: `IF NOT EXISTS` en el UP, **ningún** `DROP EXTENSION` en el DOWN (R45, R46). |
+| El término se normaliza con la **misma** función que escribió la columna | `normalizedSearchCondition(search, normalize)` en `proveedores/.../list-query-sql.ts` | Igual, pero **por palabra** (§ 17.3). |
+| Búsqueda de pedidos por nombre de receta (QC-68) | `pedidos` resuelve primero los ids de receta contra `recipes.name_normalized` (índice `recipes_name_normalized_all_trgm_idx`) y después filtra pedidos por `recipeId IN (…)` | Confirma el mecanismo: columna normalizada + trigramas. **No** se copia el paso de dos consultas, porque aquí las columnas están en la misma tabla. |
+
+### 17.2 Esquema y migración
+
+```prisma
+model Customer {
+  // … lo de QC-153, sin tocar …
+  firstNamesNormalized String @map("first_names_normalized")
+  lastNamesNormalized  String @map("last_names_normalized")
+  cityNormalized       String @map("city_normalized")
+}
+```
+
+Sin `@unique` y sin `@@index`: los índices parciales no los modela Prisma y viven solo en el SQL,
+igual que los de la migración precedente (R44, R45). Hay que actualizar el comentario `///` del
+modelo, que hoy dice «no hay columna normalizada».
+
+`db/migrations/<ts>_customers_search_normalized/migration.sql`. `<ts>` tiene que ser **posterior a la
+última migración de `dev` en el momento de crearla**; hoy la última conocida es `20260924180000`.
+
+1. `CREATE EXTENSION IF NOT EXISTS pg_trgm;`
+2. `ALTER TABLE "customers" ADD COLUMN "first_names_normalized" text;` y lo mismo para
+   `last_names_normalized` y `city_normalized`.
+3. `UPDATE "customers" SET "first_names_normalized" = regexp_replace(lower(translate("first_names",
+   '<lista del precedente>', '<lista del precedente>')), '[^a-z0-9]', '', 'g'), …` para las tres,
+   **sobre todas las filas**, vivas y dadas de baja (R43). El filtro de borrado solo aplica al índice,
+   no al dato.
+4. `ALTER TABLE "customers" ALTER COLUMN "…_normalized" SET NOT NULL;` para las tres (R44).
+5. `CREATE INDEX "customers_first_names_normalized_trgm_idx" ON "customers" USING gin
+   ("first_names_normalized" gin_trgm_ops) WHERE "deleted_at" IS NULL;` y sus gemelos
+   `customers_last_names_normalized_trgm_idx` y `customers_city_normalized_trgm_idx` (R45).
+
+La migración se escribe **a mano**, con la misma cabecera de aviso de drift que la precedente:
+`customers` tiene FK escalares, clave candidata y RLS que Prisma no conoce, así que generarla con
+Prisma emitiría `DROP` de drift. **Ningún `DROP` en el UP.**
+
+`down.sql` (R46), en orden inverso: `DROP INDEX IF EXISTS` de los tres, y después
+`ALTER TABLE "customers" DROP COLUMN IF EXISTS` de las tres columnas. **Sin `DROP EXTENSION`**, por la
+misma razón escrita en el `down.sql` precedente.
+
+**Diferencia de juego de caracteres, aceptada como en el precedente.** El `translate` cubre las vocales
+con tilde, diéresis y circunflejo, y la `ñ`. La función de TypeScript cubre además cualquier diacrítico
+Unicode, como `ç` o `ã`. Una fila **ya existente** con uno de esos caracteres quedaría rellenada distinto
+de como la escribiría la aplicación, hasta su siguiente edición. R43 exige la coincidencia **solo en el
+juego del precedente**, que es lo que su test comprueba. `customers` nació ayer (QC-153) y lo más
+probable es que esté vacía en producción. **No se amplía la lista**: sería apartarse del precedente sin
+que nadie lo haya pedido.
+
+### 17.3 Búsqueda y filtro (R41, R47)
+
+- `domain/customer-text.ts`: `normalizeCustomerText(value)`, la misma forma que `normalizeSupplierName`.
+  Se **copia**: importarla de `proveedores` es ruta profunda prohibida (A6).
+- **Búsqueda.** Lo hace el adaptador: parte el término por espacios, normaliza cada palabra con
+  `normalizeCustomerText` y descarta las vacías. Si no queda ninguna, no hay búsqueda (R41, mismo
+  criterio que `normalizedSearchCondition`). Si queda alguna:
+  `AND` de `{ OR: [{ firstNamesNormalized: { contains: w } }, { lastNamesNormalized: { contains: w } },
+  { cityNormalized: { contains: w } }] }`, **sin** `mode: 'insensitive'` (la columna ya está en
+  minúsculas y sin acentos, y así puede usar el índice de trigramas, como en proveedores).
+- **Por qué sigue siendo por palabras.** La normalización quita los espacios, así que «Juan Carlos» se
+  guarda como `juancarlos`. Por eso cada palabra se busca por separado: «carlos pérez» encuentra a
+  *Juan Carlos* / *Pérez Gómez*.
+- **Comodines.** `%` y `_` desaparecen al normalizar. La cláusula de R30 sobre comodines queda
+  absorbida: un término hecho solo de símbolos es ausencia de búsqueda, como en todos los listados del
+  repositorio. El caso de integración «`%` no devuelve a todos» **se sustituye** por «un término hecho
+  solo de símbolos equivale a no buscar».
+- **Filtro de ciudad (R47).** `city: 'text'` se traduce a `{ cityNormalized: { contains:
+  normalizeCustomerText(value) } }`, **no** a `textCondition` sobre la columna en crudo. Aquí se aparta
+  de proveedores, cuyos filtros de texto van contra la columna en crudo. Si no, buscar «bogota»
+  encontraría «Bogotá» y filtrar por «bogota» no, sobre la **misma** columna. Un valor que queda vacío
+  al normalizar deja el filtro sin efecto.
+- **Orden.** Sigue sobre las columnas **en crudo** (`last_names`, `first_names`): el orden que se
+  muestra es el del dato que se muestra.
+- **Lo que no entra.** Los índices btree de **orden** que `list_query_indexes` creó para los siete
+  listados de entonces **no** se añaden. La decisión F1.4 habla de la búsqueda, y el orden de los
+  clientes de una empresa no los necesita. Añadirlos después es una migración de cinco líneas.
+
+### 17.4 Tests que añade la migración
+
+| Nivel | Archivo | Qué demuestra |
+| --- | --- | --- |
+| Unit | `tests/unit/clientes/customer-text.test.ts` | Normalización: acentos, mayúsculas, `ñ`, símbolos, espacios; y que da **lo mismo** que `normalizeSupplierName` sobre una batería (las dos definiciones no se separan en silencio). |
+| Unit | `tests/unit/clientes/customer-service.test.ts` (ampliado) | R42: el alta y la edición pasan al puerto cada forma normalizada emparejada con su dato. |
+| Estático | `tests/unit/clientes/schema/customers-search-migration.test.ts` | R43–R46, con **sensibilidad**. El UP añade las tres columnas anulables, las rellena **antes** del `SET NOT NULL` y usa la lista de `translate` **idéntica** a la del precedente (leída de su archivo, no copiada en el test). Tres GIN `gin_trgm_ops` parciales, `CREATE EXTENSION IF NOT EXISTS`, ningún `DROP`, ningún `UNIQUE`, ninguna otra tabla. El DOWN lo revierte todo sin `DROP EXTENSION`. Se comprueba que el test se pone rojo al: poner el `SET NOT NULL` antes del `UPDATE`, quitar un `WHERE deleted_at IS NULL`, meter un `DROP EXTENSION` en el DOWN. |
+| Integración (`transaccion`) | `tests/integration/clientes/customers-search-migration.int.test.ts` | **R43**, dentro de una transacción con `ROLLBACK`: se revierte la migración con su `down.sql`, se insertan clientes vivos y dados de baja con acentos, se aplica el UP y se compara cada valor con `normalizeCustomerText`. **R44**: `NOT NULL` real (`23502`). **R45**: los tres índices en `pg_indexes`, con su predicado. |
+| Integración | `tests/integration/clientes/list-query-customers.int.test.ts` (ampliado) | R41, R47 contra el motor: «maria» encuentra «María», «PEREZ» encuentra «Pérez», «bogota» filtra «Bogotá»; palabras en columnas distintas; término de solo símbolos. |
+| Ciclo real | task T17 | R46: `db:migrate` → `db:rollback` → `db:migrate` sobre `QuimiCloude_QC154`, con la salida en la bitácora. |
+
+### 17.5 Complejidad y solapes
+
+- **Complejidad.** La ficha pasa de CRUD puro a CRUD con una migración con relleno. Además hay que
+  enmendar **dos tests de QC-153** (el censo del esquema y los `create` de su test de restricciones).
+  Es del tamaño de QC-43, que tuvo tres cambios de esquema y se clasificó `high`. **Propongo subirla
+  de `medium` a `high`**; lo decide el leader.
+- **Solape con QC-150** (`producto-terminado`, `in_progress`, zona `fullstack`). QC-150 también añade
+  migraciones y toca `db/schema.prisma`, aunque en otros modelos (`Presentation`, `Product` y los
+  enums). Los archivos comunes son tres:
+  - `db/schema.prisma`: modelos distintos, conflicto de texto improbable pero posible.
+  - `tests/guards/guard-identificador-de-request.test.ts`: las dos fichas añaden su migración al
+    final de la **misma lista cerrada**, así que el conflicto de merge es seguro y trivial.
+  - El **orden de las marcas de tiempo**: la que se mergee después tiene que llevar una marca
+    posterior a la última de `dev`, como exige el propio spec de QC-150.
+
+  No hay solape de tablas ni de módulos. Lo que el leader debe considerar es el conflicto en esos dos
+  archivos compartidos, no el cupo de zona (son zonas distintas).

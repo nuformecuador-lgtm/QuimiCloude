@@ -196,6 +196,9 @@ reimplementar esa aritmética dentro del módulo `clientes`.
 
 **R37.** El sistema NO DEBE incluir en esta ficha ninguna migración ni ningún cambio de
 `db/schema.prisma`.
+*(Enmendado por la nota F1.4 del 2026-09-24: la única excepción es la migración de búsqueda sin
+acentos de R43–R46. Lo demás de R37 sigue vigente: ninguna otra migración ni ningún otro cambio de
+esquema.)*
 
 **R38.** El sistema NO DEBE incluir en esta ficha ninguna pantalla, página, componente, entrada de menú
 ni ruta bajo `app/` —van a **QC-155**—, ni ningún test E2E; su verificación es **unitaria, estática y de
@@ -253,21 +256,31 @@ búsqueda» del alcance y llevan posición por defecto abierta (P2, P3 abajo).
    migración que R37 excluye y que sería otra ficha. R30 está escrito para no prejuzgarlo más allá de
    las mayúsculas.
 
+   > **RESUELTA en F1.4 (2026-09-24) en sentido CONTRARIO a la posición por defecto:** la búsqueda
+   > **ignora acentos**. Ver la nota F1.4 al final y R41–R47.
+
 3. **Orden por defecto y campos consultables del listado.** *Añadida por `spec_author` en F1.2.* La
    tabla no lo cierra. **Posición por defecto escrita, no decidida**: orden por **apellidos y después
    nombres**, ascendente (R29); ordenables nombres, apellidos, ciudad y las dos fechas; filtrables la
    ciudad (texto) y la fecha de alta (rango) (R28). Cambiarlo es una línea de la lista blanca y su
    test: no bloquea la implementación.
 
+   > **RESUELTA en F1.4 (2026-09-24):** se acepta la posición por defecto tal cual.
+
 4. **Texto del código nuevo `customer_not_found`.** *Añadida por `spec_author` en F1.2.* Es la
    **duodécima enmienda** al catálogo cerrado de errores (R34) y la aprueba el humano en F1.4.
    **Propuesta:** «El cliente solicitado no existe.», gemela de la de `supplier_not_found`
    (`design.md > 7`).
 
+   > **RESUELTA en F1.4 (2026-09-24):** aprobada la enmienda con el texto «El cliente solicitado no
+   > existe.».
+
 5. **Un identificador sin forma de identificador.** *Añadida por `spec_author` en F1.2.* Proveedores no
    lo valida y lo deja llegar a la base. **Posición por defecto escrita, no decidida** (R23,
    `design.md > 5.3`): responder «cliente no encontrado» **sin tocar el repositorio**, porque un
    identificador que no puede existir es, para quien pregunta, lo mismo que uno inexistente.
+
+   > **RESUELTA en F1.4 (2026-09-24):** se acepta la posición por defecto tal cual.
 
 Si durante la implementación aparece cualquier otra ambigüedad, el implementer **para y la reporta al
 leader**; no la rellena con supuestos.
@@ -283,3 +296,65 @@ leader**; no la rellena con supuestos.
 | 2026-09-23 | ¿Cómo se reparte el módulo? | Tres fichas como Proveedores (QC-42/43/44): **QC-153** modelo, **QC-154** CRUD, **QC-155** pantalla, en la épica nueva **QC-152 Clientes**. |
 | 2026-09-23 | ¿Pedido ↔ cliente? | **No entra** en el módulo base: ficha aparte **QC-156** (bloqueada por QC-154). |
 | 2026-09-23 | ¿E2E? | **Sí**, en la pantalla (**QC-155**), por tocar permisos (`CHECKPOINTS.md`). El modelo y el CRUD se verifican con tests unitarios y de integración. |
+| 2026-09-24 (F1.4) | ¿La búsqueda distingue acentos? (P2) | **No: ignora acentos además de mayúsculas.** Se aparta de la posición por defecto del spec y **mete una migración en esta ficha**, con el mecanismo que ya usa el repositorio (columna `*_normalized` calculada por la aplicación, relleno de las filas existentes, índice GIN de trigramas parcial). Aplica a nombres, apellidos y ciudad. |
+| 2026-09-24 (F1.4) | Texto de `customer_not_found` (P4) | **Duodécima enmienda** al catálogo cerrado de errores con el texto «El cliente solicitado no existe.». |
+| 2026-09-24 (F1.4) | Orden y campos consultables del listado (P3) | La propuesta: orden por defecto apellidos, nombres, id (ascendente); ordenables nombres, apellidos, ciudad y las dos fechas; filtrables ciudad (texto) y fecha de alta (rango). |
+| 2026-09-24 (F1.4) | Identificador sin forma de uuid (P5) | La propuesta: responde `customer_not_found` **sin llegar a la base**. |
+
+## Nota F1.4 (2026-09-24)
+
+El humano respondió las cuatro preguntas que abrió `spec_author` (filas nuevas de «Decisiones
+cerradas»). P3, P4 y P5 se aceptan tal como estaban escritas y no cambian ningún requisito. **P2
+cambia de sentido**: la búsqueda ignora acentos, y eso trae una migración a esta ficha. Los requisitos
+**no se renumeran**. R37 lleva su enmienda escrita en línea, y lo nuevo va de **R41 a R47**:
+
+- **R41 reemplaza la regla de comparación de R30** (sin mayúsculas **y sin acentos**, y el caso
+  «término vacío tras normalizar»). Del resto de R30 sigue vigente «cada palabra en nombres, apellidos
+  o ciudad». La cláusula de los comodines queda **absorbida**: la normalización los quita.
+- **R47 amplía R28**: el filtro de ciudad compara igual que la búsqueda.
+
+Mecanismo copiado del repositorio, sin inventar nada. Detalle en `design.md > 17`.
+- **Columnas:** `name_normalized` de productos, recetas y proveedores, escritas por la aplicación con
+  su función `normalize*Name`.
+- **Relleno:** el de `20260904160000_list_query_indexes`, con `translate` y sin `unaccent`.
+- **Índices:** GIN `gin_trgm_ops` parcial `WHERE deleted_at IS NULL`, como en esa misma migración.
+- **Búsqueda de pedidos por receta (QC-68):** resuelve contra `recipes.name_normalized`, es decir, con
+  el mismo mecanismo.
+
+**R41.** CUANDO el listado trae un término de búsqueda, el sistema DEBE partirlo en palabras,
+normalizar cada una —sin acentos, en minúsculas y sin caracteres que no sean letras o dígitos— y
+devolver solo los clientes en los que **cada palabra normalizada** aparece en la forma normalizada de
+sus nombres, de sus apellidos o de su ciudad; y SI ninguna palabra conserva contenido tras
+normalizarla, ENTONCES DEBE tratar el término como ausencia de búsqueda.
+
+**R42.** CUANDO se da de alta o se edita un cliente, el sistema DEBE persistir, junto a los nombres, los
+apellidos y la ciudad, su **forma normalizada**, calculada con **una única** función de normalización
+del módulo, y DEBE mantener cada dato y su forma normalizada sincronizados en toda escritura.
+
+**R43.** CUANDO se aplica la migración de esta ficha sobre una base que ya tiene clientes, vivos o dados
+de baja, el sistema DEBE rellenar la forma normalizada de **todas** esas filas antes de exigirla como
+no nula, y el valor rellenado DEBE coincidir con el de la función de normalización de la aplicación
+para los caracteres acentuados que cubre el precedente.
+
+**R44.** El sistema DEBE exigir **en la base** que las tres formas normalizadas no sean nulas, y NO DEBE
+declarar sobre ellas ningún índice ni restricción de unicidad.
+
+**R45.** El sistema DEBE servir la búsqueda con un índice de trigramas **parcial sobre los clientes
+vivos** para cada una de las tres formas normalizadas, y la migración NO DEBE añadir, quitar ni cambiar
+ninguna columna, índice ni restricción de otra tabla. Lo único que puede crear fuera de `customers` es
+la extensión de trigramas, y solo si no existe ya.
+
+**R46.** CUANDO se revierte la migración de esta ficha, el esquema DEBE quedar **exactamente** en el
+estado previo: sin las tres columnas normalizadas ni sus índices, con el resto de `customers` intacto
+y **sin retirar** la extensión de trigramas.
+
+**R47.** CUANDO el listado filtra por ciudad, el sistema DEBE comparar la ciudad normalizada con el
+valor del filtro normalizado, ignorando acentos y mayúsculas igual que la búsqueda; y NO DEBE devolver
+ninguna forma normalizada en la ficha ni en el listado, ni declararla como campo ordenable o filtrable.
+
+| Decisión F1.4 | Requisito(s) |
+| --- | --- |
+| P2 — la búsqueda ignora acentos (migración) | R41, R42, R43, R44, R45, R46, R47; R37 enmendado |
+| P4 — `customer_not_found`, «El cliente solicitado no existe.» | R34 |
+| P3 — orden y campos consultables | R28, R29 |
+| P5 — id sin forma → `customer_not_found` sin base | R23 |
