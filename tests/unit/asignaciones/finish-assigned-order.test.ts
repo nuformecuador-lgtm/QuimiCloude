@@ -12,6 +12,7 @@ import {
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
   PresentationWithoutContentError,
+  RecipeNotFoundError,
   RecipeWithoutLinesError,
   UnauthorizedError,
 } from '@/lib/modules/asignaciones/domain/errors';
@@ -47,7 +48,8 @@ type TransitionResult =
   | 'insufficient_material'
   | 'recipe_without_lines'
   | 'presentation_without_content'
-  | 'no_whole_package';
+  | 'no_whole_package'
+  | 'recipe_not_found';
 
 type Dobles = {
   readonly deps: FinishAssignedOrderDeps;
@@ -286,6 +288,19 @@ describe('finishAssignedOrder — QC-141: el Finalizar traduce lo que devuelve e
 
     await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
       NoWholePackageError,
+    );
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('D24: `recipe_not_found` se traduce a RecipeNotFoundError, sin reintentar', async () => {
+    const { deps, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      transitionResults: ['recipe_not_found'],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      RecipeNotFoundError,
     );
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
   });
