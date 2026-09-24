@@ -101,7 +101,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       mensaje de fallo de R26 dice que QC-154 lo relaja al consumir los permisos. **Hecho cuando:**
       verde, con casos sintéticos de un `'clientes.modificar'` en un archivo de `app/` y de un archivo
       en `adapters/driving/` que lo ponen rojo. *Depende de T3 y T4.*
-- [ ] **T11.** `tests/integration/clientes/customers-constraints.int.test.ts` (`design.md > 7`), en
+- [x] **T11.** `tests/integration/clientes/customers-constraints.int.test.ts` (`design.md > 7`), en
       transacción revertida: R2, R3, R5–R17. Alta en `tests/integration/aislamiento.json`
       (`transaccion`). **Hecho cuando:** verde contra la base efímera y `guard-aislamiento-integracion`
       verde. *Depende de T2.*
