@@ -100,19 +100,20 @@ const RANGO_TIENE_COMMITS_PROPIOS = (() => {
   return Number((salida ?? '0').trim()) > 0;
 })();
 
-function nadaQueMirar(ctx: Pick<import('vitest').TestContext, 'skip'>): boolean {
+/** El merge-base, o `null` con un `ctx.skip()` en voz alta si no hay nada que mirar. */
+function baseDeFusionOMuda(ctx: Pick<import('vitest').TestContext, 'skip'>): string | null {
   if (MERGE_BASE === null) {
     ctx.skip('no se pudo calcular el merge-base con origin/dev: este caso NO ha comprobado nada.');
-    return true;
+    return null;
   }
   if (!RANGO_TIENE_COMMITS_PROPIOS) {
     ctx.skip(
       'origin/dev..HEAD no tiene ningun commit propio (ya mergeada, o corriendo sobre dev): ' +
         'este caso NO ha comprobado nada.',
     );
-    return true;
+    return null;
   }
-  return false;
+  return MERGE_BASE;
 }
 
 describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
@@ -172,13 +173,14 @@ describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
   });
 
   it('R29: el diff de la rama contra origin/dev no añade ningun archivo bajo db/', (ctx) => {
-    if (nadaQueMirar(ctx)) return;
+    const base = baseDeFusionOMuda(ctx);
+    if (base === null) return;
 
     // Dos fuentes, como en `guard-convenciones-proveedores.test.ts`: los archivos ya COMMITEADOS
     // desde el merge-base (`git diff`) y los del ARBOL DE TRABAJO todavia sin commitear (`git
     // status --porcelain`). Un archivo nuevo sin `git add` no aparece en `git diff` -no tiene blob
     // que comparar-, y quedarse solo con `git diff` dejaria pasar justo ese caso.
-    const salidaDiff = git(['diff', '--name-only', '--diff-filter=A', MERGE_BASE, '--', 'db/']);
+    const salidaDiff = git(['diff', '--name-only', '--diff-filter=A', base, '--', 'db/']);
     expect(salidaDiff, 'git no pudo calcular el diff de db/').not.toBeNull();
 
     const anadidos = new Set(
@@ -202,10 +204,11 @@ describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
   });
 
   it('D20: components/shared/entity-image.tsx no aparece en el diff de la rama', (ctx) => {
-    if (nadaQueMirar(ctx)) return;
+    const base = baseDeFusionOMuda(ctx);
+    if (base === null) return;
 
     const ARCHIVO = 'components/shared/entity-image.tsx';
-    const salida = git(['diff', '--name-only', MERGE_BASE, '--', ARCHIVO]);
+    const salida = git(['diff', '--name-only', base, '--', ARCHIVO]);
     expect(salida, `git no pudo calcular el diff de ${ARCHIVO}`).not.toBeNull();
 
     const tocado = (salida as string).trim();
