@@ -18,8 +18,9 @@
  *    delante lo que otra ejecucion viva acaba de crear;
  *  - `afterAll` borra siempre, aunque el test reviente, **por el `companyId` EXACTO de este
  *    worker** -nunca por el prefijo, porque `fullyParallel` reparte los tests en workers distintos,
- *    cada uno con su propio `RUN_ID`-, en el orden que imponen las FK RESTRICT: pedidos -> receta
- *    (sus lineas van en cascada) -> lote -> producto -> presentacion -> usuario -> empresa.
+ *    cada uno con su propio `RUN_ID`-, en el orden que imponen las FK RESTRICT: apartados (el pedido
+ *    guardado los deja en `reservation_movements` e `inventory_movements`) -> pedidos -> receta (sus
+ *    lineas van en cascada) -> lote -> producto -> presentacion -> usuario -> empresa.
  *
  * SEMBRADO SIN PASAR POR LA PANTALLA (`e2e/ajuste-de-inventario.spec.ts`,
  * `e2e/recetas-porcentaje.spec.ts`): el producto CON unidad, su presentacion y su lote se crean con
@@ -198,14 +199,16 @@ function rowByNumber(page: Page, numberText: string): Locator {
 test.beforeAll(async () => {
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
 
-  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: pedidos -> recetas (sus
-  // lineas van en cascada) -> lotes -> productos -> presentaciones -> usuarios -> empresas.
+  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: apartados -> pedidos ->
+  // recetas (sus lineas van en cascada) -> lotes -> productos -> presentaciones -> usuarios -> empresas.
   const orphanCompanies = await prisma.company.findMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
     select: { id: true },
   });
   const orphanCompanyIds = orphanCompanies.map((company) => company.id);
   if (orphanCompanyIds.length > 0) {
+    await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -343,6 +346,8 @@ test.afterAll(async () => {
   // `FIXTURE_PREFIX`-: `fullyParallel` reparte los tests de este archivo en workers distintos, cada
   // uno con su propio `RUN_ID`. Casi todas las tablas de esta ficha llevan `company_id`.
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    () => prisma.reservationMovement.deleteMany({ where: { companyId } }),
+    () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
     () => prisma.order.deleteMany({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
