@@ -140,14 +140,15 @@
 
 ### T10 — E2E de documentos (R19, R20)
 
-- [ ] Comentario de las líneas 133-135 corregido (el Administrador sube por `documentos.modificar`).
-- [ ] Caso nuevo según `design.md > 6`: rol efímero `qc107_e2e_…` con `proveedores.consultar` y
+- [x] Comentario de las líneas 133-135 corregido (el Administrador sube por `documentos.modificar`).
+- [x] Caso nuevo según `design.md > 6`: rol efímero `qc107_e2e_…` con `proveedores.consultar` y
   `proveedores.modificar`, usuario activo en la misma empresa, intento de subida → error
   `data-code="unauthorized"`, cero `PUT` interceptados, conteo de tandas de la empresa igual antes y
   después. Limpieza en `afterAll` (usuario → asignaciones del rol → rol) y de huérfanos por prefijo.
   Nombre del caso con `R20` de esta ficha, distinguible del `(R20)` de QC-107.
 - **Archivos:** `e2e/documentos.spec.ts`.
 - **Depende de:** T2, T3 (la base del E2E necesita la migración y el seed aplicados).
+- **Cerrada 2026-09-24 con salvedad:** el caso nuevo (R20 de esta ficha) pasa. El recorrido de subida de tres PDFs (R19) falla en `error` durante el procesado, que esta rama no toca; es rojo heredado de `dev`, medido sobre `origin/dev` limpio al cerrar QC-146 (`progress/current.md > Deudas`).
 - **Hecho cuando:** `pnpm run e2e -- documentos` verde en Chromium y WebKit contra
   `QuimiCloude_QC142` sembrada, con **un solo E2E corriendo en la máquina**; el caso R19 existente
   sigue verde sin cambiar su cuerpo.
