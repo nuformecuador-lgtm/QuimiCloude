@@ -139,7 +139,7 @@ Archivos: `lib/modules/documentos/ports/{document-batch-repository,crop-catalog}
 `READ_LINK_TTL_SECONDS`, error envuelto sin secretos); `readFileForReview` devuelve `null` para otra
 empresa (**R3**); la medida del tamaño está en la bitácora y, si no cabe, se ha parado a preguntar.
 
-## T9 — Caso de uso de vista previa `[depende de T4, T6, T7, T8]`
+## [x] T9 — Caso de uso de vista previa `[depende de T4, T6, T7, T8]`
 
 Archivos: `lib/modules/documentos/domain/preview-catalog-import.ts` (nuevo),
 `lib/modules/documentos/domain/catalog-import-input.ts` (esquema zod del borde),
