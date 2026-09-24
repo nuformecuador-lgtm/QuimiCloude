@@ -126,6 +126,14 @@ del dominio.
    QC-123-, y entregar lo consume como salida real. El vencimiento **sigue sin consumidor** y la
    pregunta **sigue abierta** en esa mitad. La existencia pasa de entera a **decimal** en la misma ficha. Detalle en
    `specs/QC-141-reserva-de-material-del-pedido/requirements.md`.
+   **Avanza el 2026-09-24 (QC-150): el lote tiene ya una entrada por producción.** Finalizar un
+   pedido en `/asignacion/[id]` da de alta, en la misma transacción que el consumo, un **lote de
+   producto terminado**: un cuarto tipo de producto (`FINISHED_PRODUCT`, junto a `PRODUCT`,
+   `MACHINE` y `PACKAGING`), uno por receta + presentación y nacido solo la primera vez. La cantidad
+   son envases enteros × el contenido de la presentación, que se copia en el pedido y en el lote, y
+   el libro lo asienta como `production` con el pedido que lo causa. Un producto terminado no se
+   crea a mano, no admite alta manual de lotes, no es ingrediente de receta y solo admite ajustes
+   que restan. Detalle en `specs/QC-150-producto-terminado/requirements.md`.
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
