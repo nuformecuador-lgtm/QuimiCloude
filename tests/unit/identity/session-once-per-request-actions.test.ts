@@ -320,6 +320,20 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/documentos/adapters/driving/document-batch-actions')
       ).getBatchStatusAction('4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742'),
   },
+  {
+    // Anadida por QC-158: su archivo de `driving/` resuelve las dos caras de la sesion, asi que el
+    // censo tiene que cubrirlo. Entrada VALIDA para que la resolucion de actor llegue a ocurrir
+    // -una entrada invalida rechaza antes de `currentActor()`, que es justo lo que esta lista mide-.
+    archivo: 'lib/modules/documentos/adapters/driving/catalog-import-actions.ts',
+    nombre: 'previewCatalogImportAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/documentos/adapters/driving/catalog-import-actions')
+      ).previewCatalogImportAction({
+        supplierId: '4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742',
+        documentFileId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      }),
+  },
 ];
 
 /**
