@@ -404,3 +404,49 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Verificación, solo esos 4 archivos: **4 archivos, 67 pasados, 2 skipped** (ninguno añadido por la
   rama); eslint limpio.
 - T13 sigue a falta de un `./init.sh` completo verde del leader.
+
+## Vuelta 5 (2026-09-24): review RECHAZADO (`progress/review_QC-150-producto-terminado.md`, `6576626a`)
+
+- **B3 + merge de `dev`** (backend_dev). Nuestras dos migraciones se revirtieron sobre `QuimiCloude_QC150`.
+  Antes hubo que borrar 10 `products` `FINISHED_PRODUCT` de empresas de fixture E2E (`qc141_e2e_*`,
+  `qc150_e2e_*`, `qc63_e2e_*`), sin lotes ni asientos; ninguno de empresa real. Merge `eb326a95`, con 3
+  conflictos resueltos sin ambigüedad: `docs/architecture.md` (versión de dev + nuestro párrafo),
+  `MIGRACIONES_ESPERADAS` (las de las dos ramas) y `data-table-alcance` (dev quita
+  `aislamiento-proveedores`, nosotros sumamos `producto-terminado`: se queda en 21). Renombradas en
+  `89754188` a **`20260924130000_finished_product_enum_values`** y
+  **`20260924130100_finished_products_and_content_copies`** (la última de dev es
+  `20260924120000_customers`). `db:migrate` al día (51); cliente, typegen y plantilla
+  (`qct_tpl_c15c5644c9a4`) regenerados. `pnpm install --frozen-lockfile` sincronizó
+  `react-intersection-observer`, que ya venía aprobada en dev (QC-140). Los 8 archivos afectados: 132/132.
+- **D23** (`1dce4135`): decisión humana registrada al final de `requirements.md`.
+- **B1** (`571f6400`, `3479dfcf`, `aed97b1d`, `1df98667`, `0303d214`, backend_dev): 54 líneas de
+  comentario de producción con cita → 0 (filtro sobre el diff contra el merge-base con `origin/dev`).
+  Solo comentarios; los que venían de dev no se tocaron. Tests de esquema 42/42.
+- **B2** (`1b963dd5`): `tests/integration/inventario/finished-goods.int.test.ts` › «R23 — acceso cruzado». La empresa B
+  pasa el `presentationId` de A y obtiene `presentation_without_content`; productos, lotes y asientos de
+  las dos empresas no cambian.
+- **m9, sin arreglar y para el leader**: con su presentación pero el `recipeId` de A, la empresa B **sí
+  escribe** un producto terminado propio con `recipe_id` de otra empresa (lo probó una sonda efímera,
+  retirada). La FK `products_recipe_id_fkey` es simple. Hoy lo cubre el único llamante, que toma la
+  receta del pedido bloqueado por empresa. No hay test permanente: fijar esa escritura sería
+  consagrarla.
+- **m2** (`8977b31f`): `finish-with-finished-goods.int.test.ts` › R42. Un ingrediente `MACHINE` con
+  lote en existencia y `unit_cost` nulo (y con presentación, sin la cual la reserva lo da por
+  insuficiente) cuenta cero; el pedido sigue con importe nulo (R43).
+- **D23** (`9b3303c2`): `product-type-lock.int.test.ts` › «D23 — editar un producto terminado con su
+  mismo tipo…» (el caso de `:155`, renombrado) y «D23 — renombrar un producto terminado y volver a
+  recibir la misma combinación suma el lote al mismo producto».
+- **m3**: los dos «R25» ajenos (`product-batches-panel.test.tsx:241`, `adjust-batch-dialog.test.tsx:327`)
+  vienen de `7db6944a` (QC-92), ya en dev antes de la rama: no se tocan.
+- **m5** (`52f2a483`): de 49 comentarios con cita en tests y e2e añadidos por la rama a 0. Queda un falso
+  positivo en `product-page.test.tsx` (una cita a R20 que ya venía de dev, en una línea cambiada).
+- Tests de B2, m2, D23 y m5, en serie: 516 pasados, 2 skipped.
+- **E2E**, una corrida de los tres specs (`scratchpad/qc150-e2e-v5.log`): 9 passed y 1 failed, R37 en
+  webkit, con `goto('/login')` interrumpido por una redirección de la página anterior tras
+  `clearCookies`. Arreglado en el spec con `goto('about:blank')` antes de cada cambio de sesión
+  (`5d3d77c4`). `producto-terminado` repetido (`qc150-e2e-v6.log`): 2/2 en chromium y webkit. Puerto 3117 libre
+  antes y después de cada corrida.
+- **Rojo que no es de esta ficha (para el leader)**: `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`
+  › «R29: el diff de la rama contra origin/dev no añade ningun archivo bajo db/» (QC-140, llegó con el
+  merge). Compara la rama en curso contra `origin/dev`, así que se pone rojo en **cualquier** rama que
+  añada una migración mientras tenga commits propios. No se toca: su alcance es de QC-140.
