@@ -175,6 +175,27 @@ export class RecipeWithoutLinesError extends AsignacionesError {
   }
 }
 
+/** El Finalizar de la planta intento entregar un pedido sin presentacion o sin contenido con
+ *  el que calcular los envases del lote de producto terminado. Mismo `code` que
+ *  `PresentationWithoutContentError` de `pedidos` (QC-150, R18). */
+export class PresentationWithoutContentError extends AsignacionesError {
+  readonly code = 'presentation_without_content';
+
+  constructor(diagnostic?: string) {
+    super('presentation_without_content', diagnostic);
+  }
+}
+
+/** El Finalizar de la planta intento entregar un pedido cuya cantidad no llena ni un envase de
+ *  su presentacion. Mismo `code` que `NoWholePackageError` de `pedidos` (QC-150, R19). */
+export class NoWholePackageError extends AsignacionesError {
+  readonly code = 'no_whole_package';
+
+  constructor(diagnostic?: string) {
+    super('no_whole_package', diagnostic);
+  }
+}
+
 /**
  * La persona existe y su cuenta esta activa, pero supervisa los pedidos de toda la empresa: no
  * se le puede asignar la responsabilidad de ejecutar uno. Se distingue de
