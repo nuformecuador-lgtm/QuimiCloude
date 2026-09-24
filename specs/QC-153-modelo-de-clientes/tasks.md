@@ -93,7 +93,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       R4, R5, R7, R11, R15, R16, R19 y el tipo `Customer` atado al modelo. **Hecho cuando:** verde, y
       cada detector tiene su caso sintético que muerde (p. ej. un `@relation` en `companyId`, un
       `@unique` en `email`, un campo más en el tipo). *Depende de T1 y T3.*
-- [ ] **T9.** [P] `tests/unit/clientes/schema/customers-migration.test.ts` (`design.md > 7`): R1–R7,
+- [x] **T9.** [P] `tests/unit/clientes/schema/customers-migration.test.ts` (`design.md > 7`): R1–R7,
       R10, R12, R13, R17, R18, R22–R24, R27, más la cabecera sin citas. **Hecho cuando:** verde, y un
       SQL sintético con `ON DELETE SET NULL`, con `CASCADE` en el `DROP`, con `'Operador'` en la
       asignación o con un `ALTER TABLE "orders"` lo pone rojo. *Depende de T2 y T4.*
