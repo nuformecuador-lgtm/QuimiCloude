@@ -41,16 +41,10 @@ import { READ_LINK_TTL_SECONDS } from './limits';
 import type { CropCatalog } from '../ports/crop-catalog';
 import type { DocumentBatchRepository } from '../ports/document-batch-repository';
 
-import {
-  createFindCatalogLinesByIdentity,
-  createImportCatalogLines,
-  normalizeSupplierName,
-} from '@/lib/modules/proveedores';
-import {
-  createCreatePresentation,
-  normalizePresentationName,
-  type PresentationCatalog,
-} from '@/lib/modules/inventario';
+import { normalizeSupplierName } from '@/lib/modules/proveedores';
+import type { createFindCatalogLinesByIdentity, createImportCatalogLines } from '@/lib/modules/proveedores';
+import { normalizePresentationName } from '@/lib/modules/inventario';
+import type { createCreatePresentation, PresentationCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** El caso de uso de `proveedores` ya construido, no su fabrica: quien lo cablea es
