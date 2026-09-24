@@ -2526,6 +2526,23 @@
         "QC-165"
       ],
       "spec_path": "specs/QC-166-area-del-maestro"
+    },
+    {
+      "key": "QC-167",
+      "id": 167,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "recorrido-de-ejecucion-en-el-dashboard",
+      "description": "El registro de ejecucion que guarda **QC-82** (arrancar, retomar, avanzar, retroceder, cancelar y finalizar, con instante, pedido, quien, posicion del paso y motivo al cancelar) **se consulta en el dashboard del Administrador**. Hoy nadie puede verlo sin entrar en la base.\n\n**NACE EL 2026-09-24** por decision del humano al revisar QC-82, que deja fuera la pantalla de consulta. Bloqueada por QC-82.\n\n**QUEDA ABIERTO, se acota con `/afinar-feature`:** que permiso lo abre (hoy el dashboard exige `dashboard.consultar`, solo Administrador); que se muestra (recorrido de un pedido, lista de ejecuciones recientes o las dos; tiempos entre pasos, vueltas atras, abandonos con motivo); filtros y paginacion; aislamiento por empresa.\n\n**NO ENTRA:** escribir el registro (QC-82); purgarlo (QC-124).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-167-recorrido-de-ejecucion-en-el-dashboard",
+      "depends_on": [
+        "QC-82"
+      ],
+      "spec_path": "specs/QC-167-recorrido-de-ejecucion-en-el-dashboard"
     }
   ]
 }
