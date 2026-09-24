@@ -570,6 +570,9 @@ test.describe('reserva de material del pedido', () => {
       data: { orderId: orderB.id, userId: operatorUserId!, companyId: companyId! },
     });
 
+    // Con la sesion del admin viva, `/login` redirige fuera y el formulario no aparece: se
+    // vacia el frasco de cookies antes de entrar como Operador.
+    await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
