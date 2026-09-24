@@ -283,6 +283,21 @@ test.beforeAll(async () => {
   const orphanRecipeIds = orphanRecipes.map((recipe) => recipe.id);
   if (orphanRecipeIds.length > 0) {
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    // Un producto terminado huerfano, de una corrida cortada por memoria, tambien restringe el
+    // borrado de la receta: sus movimientos y lotes primero, luego el producto, y solo entonces
+    // la receta.
+    const orphanFinishedProducts = await prisma.product.findMany({
+      where: { recipeId: { in: orphanRecipeIds } },
+      select: { id: true },
+    });
+    const orphanFinishedProductIds = orphanFinishedProducts.map((product) => product.id);
+    if (orphanFinishedProductIds.length > 0) {
+      await prisma.inventoryMovement.deleteMany({
+        where: { batch: { productId: { in: orphanFinishedProductIds } } },
+      });
+      await prisma.productBatch.deleteMany({ where: { productId: { in: orphanFinishedProductIds } } });
+      await prisma.product.deleteMany({ where: { id: { in: orphanFinishedProductIds } } });
+    }
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
   await prisma.user.deleteMany({
@@ -415,13 +430,16 @@ test.afterAll(async () => {
         : Promise.resolve(),
     () =>
       scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
-    () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
+    // El producto terminado que Finalizar da de alta (`products.recipe_id`) RESTRINGE el borrado
+    // de la receta: sus lotes y movimientos ya se fueron arriba, asi que aqui solo falta el
+    // producto en si, antes de poder borrar la receta.
     () =>
       scopedCompanyId
         ? prisma.productBatch.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       scopedCompanyId ? prisma.product.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
+    () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     () =>
       scopedCompanyId
         ? prisma.presentation.deleteMany({ where: { companyId: scopedCompanyId } })
@@ -475,10 +493,12 @@ test.describe('producto terminado', () => {
       year: order.orderYear,
       sequence: order.orderSequence,
     });
+    // Igualdad NUMERICA, no de texto: el valor vuelve de un `DECIMAL(14,4)` y como se serialicen
+    // sus ceros de relleno es cosa de la libreria, no del dato.
     expect(
-      order.presentationContent?.toString(),
+      order.presentationContent?.equals(PRESENTATION_CONTENT_INITIAL) ?? false,
       'el pedido deberia copiar el contenido de la presentacion al crearse (R38)',
-    ).toBe(`${PRESENTATION_CONTENT_INITIAL}.0000`);
+    ).toBe(true);
 
     // --- 3. Se asigna al Operador por Prisma: la asignacion no es lo que este recorrido demuestra
     // (mismo criterio que `e2e/reserva-de-material.spec.ts`).
