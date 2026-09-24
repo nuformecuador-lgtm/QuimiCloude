@@ -36,9 +36,9 @@ import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { createCreateOrder, createQuoteOrderCost } from '@/lib/modules/pedidos'
+import { createCreateOrder, createQuoteOrderCost, createUpdateOrder } from '@/lib/modules/pedidos'
 
-import type { Actor } from '@/lib/modules/pedidos'
+import type { Actor, NewOrder } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch'
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
@@ -387,6 +387,82 @@ describe('R6: una receta de otra empresa da sin importe, igual que una receta si
     } finally {
       await borrarReceta(recipeIdQ)
       await borrarProducto(productIdQ)
+    }
+  })
+})
+
+describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado como disponible', () => {
+  it('editar sin cambiar nada conserva el importe, aunque el pedido haya apartado el unico lote entero', async () => {
+    const { productId } = await crearProductoConLote(A, { stock: '6', unitCost: '5.0000', purchaseDate: '2026-01-01' })
+    const recipeId = await crearReceta(A, productId)
+    let orderId: string | null = null
+
+    try {
+      const now = () => new Date('2026-05-12T12:00:00.000Z')
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
+
+      // necesaria = 6 * 100 % = 6: aparta el UNICO lote entero. Sin R65, el lote quedaria con
+      // disponible cero para el calculo de la propia edicion y el importe se perderia.
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      orderId = creado.id
+      expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
+
+      const sinCambios: NewOrder = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId }
+      await edicion(orderId, sinCambios, actorDe(A))
+      expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
+
+      // La cotizacion de EDICION, con el `orderId` del propio pedido, coincide con lo guardado.
+      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const cotizacion = await cotizar({ recipeId, quantity: '6.0000', orderId }, actorDe(A))
+      expect(cotizacion.ingredientsCost).toBe('30.0000')
+
+      // Sin el `orderId`, la cotizacion es la de un pedido NUEVO: como el unico lote ya esta
+      // apartado por este pedido, no queda nada disponible para nadie mas.
+      const cotizacionSinOrderId = await cotizar({ recipeId, quantity: '6.0000' }, actorDe(A))
+      expect(cotizacionSinOrderId.ingredientsCost).toBeNull()
+    } finally {
+      if (orderId !== null) await borrarPedido(orderId)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+})
+
+describe('aislamiento: `orderId` de OTRA empresa no cambia nada (R65, ambito)', () => {
+  it('cotizar la receta de A con el `orderId` de un pedido de Q da el mismo resultado que sin `orderId`', async () => {
+    const { productId } = await crearProductoConLote(A, { stock: '6', unitCost: '5.0000', purchaseDate: '2026-01-01' })
+    const recipeId = await crearReceta(A, productId)
+    const { productId: productIdQ } = await crearProductoConLote(Q, { stock: '6', unitCost: '5.0000', purchaseDate: '2026-01-01' })
+    const recipeIdQ = await crearReceta(Q, productIdQ)
+    let orderIdDeQ: string | null = null
+
+    try {
+      const now = () => new Date('2026-05-13T12:00:00.000Z')
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
+
+      // El unico pedido que existe aparta el material de Q, no el de A: el lote de A sigue
+      // entero disponible para la cotizacion de abajo.
+      const creadoQ = await alta(
+        { recipeId: recipeIdQ, quantity: '6.0000', priority: 'MEDIA', presentationId: Q.presentationId },
+        actorDe(Q),
+      )
+      orderIdDeQ = creadoQ.id
+
+      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const sinOrderId = await cotizar({ recipeId, quantity: '6.0000' }, actorDe(A))
+      // El `orderId` es de Q, de OTRA empresa: la consulta de A sigue acotada a `companyId` de A,
+      // asi que excluirlo no puede devolver nada distinto de no excluir nada.
+      const conOrderIdAjeno = await cotizar({ recipeId, quantity: '6.0000', orderId: orderIdDeQ }, actorDe(A))
+
+      expect(sinOrderId.ingredientsCost).toBe('30.0000')
+      expect(conOrderIdAjeno.ingredientsCost).toBe('30.0000')
+    } finally {
+      if (orderIdDeQ !== null) await borrarPedido(orderIdDeQ)
+      await borrarReceta(recipeIdQ)
+      await borrarProducto(productIdQ)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
     }
   })
 })
