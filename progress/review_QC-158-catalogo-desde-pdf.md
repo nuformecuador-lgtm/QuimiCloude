@@ -176,3 +176,47 @@ cierra también m1.
    pantalla en el E2E, que cierra m1).
 2. Recomendado en la misma vuelta: m2 (el comentario falso) y las notas de m4 y m5 en `design.md`.
 3. El gate completo del leader en verde, E2E incluidos.
+
+---
+
+# Vuelta 2 (2026-09-24, HEAD `9eb7d7e3`)
+
+## Veredicto: **OK**: 0 bloqueantes, 3 menores abiertos (no bloquean)
+
+El OK queda condicionado, como en la vuelta 1, a que el gate completo del leader (`./init.sh`, E2E
+incluidos) termine en verde. En esta vuelta no corrí ni la suite ni los E2E, para no chocar en el
+puerto 3117.
+
+**Lo que corrí:** `vitest run` de `catalog-columns`, `catalog-import-review`, `catalog-import-page`
+y `supplier-detail-page`: **4 files, 72 passed**. Revisé el diff `3f0520e3..9eb7d7e3` entero (9
+commits).
+
+## Cierre de cada hallazgo, comprobado contra el código
+
+| Hallazgo | Estado | Comprobación |
+|---|---|---|
+| **B1** (R28, mostrar) | **cerrado** | `tests/unit/proveedores-ui/catalog-columns.test.tsx` monta `DataTable` con `buildCatalogColumns` real y afirma el texto de `data-table-cell-material` y `data-table-cell-measurements`: formato completo, ceros de relleno (`7.5000` → `7.5`), sin redondeo (`7.5550` → `7.555`), cada medida sola y «sin dato». **Falla si se rompe:** sin `trimDecimal`, «Ø 7.5000 cm» no contiene «Ø 7.5 cm»; si redondeara, «7.56» no contiene «7.555»; si la celda no se pintara, falla `findByTestId`/`EMPTY_CELL`. |
+| Decisión humana (2): medidas sin ceros | cumple | `catalog-columns.tsx` usa `trimDecimal` (`parseDecimal` + `formatDecimal`, no redondea; `lib/shared/ui/decimal-display.ts` sin tocar). Nota en `design.md > 16`. |
+| **m1** (R38 en pantalla) | cerrado dentro de la decisión humana (1) | El E2E afirma en la pantalla del catálogo el material, las medidas (texto exacto), la presentación y el costo de la línea nueva, y el material y el costo de la «cambia». La imagen se comprueba solo en la base, según la decisión humana documentada en `design.md > 16` (pintarla con URL firmada es de QC-140). |
+| **m2** (comentario falso) | cerrado | Comentario quitado; `cropCatalog` deja de exportarse y nadie más lo importaba (grep vacío). |
+| **m3** (bloques largos) | cerrado | Commit `220a95f0` solo toca comentarios, más el `export` de m2: las cabeceras pasan a 3–5 líneas de porqué, sin pasos numerados. El barrido de citas en las líneas añadidas de `lib app components db` sigue vacío. |
+| **m4**, **m5** | cerrados | Notas fechadas en `design.md > 16`. |
+| **m6** (R15 en el E2E) | cerrado, **ahora puede fallar** | La línea viva se siembra con `material: 'vidrio'` y el guion trae `null` para esa fila. Si el `DO UPDATE` pisara `material`, la base quedaría en `null` y fallaría `toBe(existingMaterial)`. Además se comprueba en pantalla. |
+| **m7** | cerrado | Nombre corregido y ahora se afirma `previewCatalogImportActionMock` llamado una vez (el `Promise.all`). |
+| **m8** | cerrado | `data-testid` por unidad (`…-option-<key>-<unitId>`). El E2E elige la unidad sembrada y afirma `newPresentation.unitId === unit`, que antes era un simple `not.toBeNull()`. |
+| **m9** | pasa a la descripción del PR | Sin cambio de código, correcto. |
+| **m10** (a11y) | cerrado | En solo lectura, `<span id>` + `aria-labelledby`. Test `toHaveAccessibleName('Material')`. |
+| **m11** (respuestas fuera de orden) | cerrado | `reclassifySeqRef` descarta cualquier respuesta que no sea la última. El test resuelve la segunda antes que la primera y comprueba que la vieja no pisa. |
+| **m12** (móvil real) | abierto, del humano | Informativo; `design.md > 15` solo exige WebKit. |
+
+## Menores abiertos
+- **m12**: la pasada manual en un iPhone o Android real sigue pendiente (humano).
+- **m13 (nuevo).** En `catalog-columns.test.tsx`, los tres casos «con solo el diámetro / el alto /
+  la boca… *únicamente* esa medida» usan `toHaveTextContent`, que busca subcadena: no fallarían si la
+  celda pintara además otras partes. El caso del formato completo sí fija la cadena entera.
+  Endurecerlo con `{ normalizeWhitespace }` + regex anclada `^…$`, o con `toHaveTextContent` sobre
+  el texto exacto vía `textContent === …`.
+- **m14 (nuevo).** La decisión humana (1), que R38 compruebe la imagen solo en la base, está
+  fechada en `design.md > 16`, pero no en la tabla de decisiones de `requirements.md`, que es donde
+  este repo registra lo que acota un requisito. Conviene una nota fechada allí, sin reescribir R38,
+  para que quien lea R38 no crea que el E2E incumple.
