@@ -200,6 +200,44 @@ describe('ProductBatchesPanel', () => {
     expect(screen.getByTestId('accion-b2')).toBeInTheDocument();
   });
 
+  it('R25 — division exacta: pinta el numero de envases junto a la cantidad', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '50.0000', packageContent: '1.0000' }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.getByTestId('product-batch-packages')).toHaveTextContent('50 envases');
+  });
+
+  it('R25 — un solo envase se muestra en singular', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '1.0000', packageContent: '1.0000' }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.getByTestId('product-batch-packages')).toHaveTextContent('1 envase');
+  });
+
+  it('R25 — division no entera: no pinta ninguna cifra de envases', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '49.5000', packageContent: '1.0000' }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.queryByTestId('product-batch-packages')).toBeNull();
+  });
+
+  it('R25 — sin packageContent: no pinta ninguna cifra de envases', () => {
+    const batches: ProductBatchView[] = [lote({ id: 'b1', stock: '50.0000', packageContent: null })];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.queryByTestId('product-batch-packages')).toBeNull();
+  });
+
   it('multiplataforma: el disparador de la ranura de acciones cumple el objetivo tactil minimo (R25)', () => {
     const batches: ProductBatchView[] = [lote({ id: 'b1' })];
 
