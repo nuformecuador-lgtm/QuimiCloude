@@ -2,9 +2,16 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ASSIGNED_ORDER_DELIVERED_TESTID } from '@/app/(private)/asignacion/components';
+import {
+  ASSIGNED_ORDER_DELIVERED_TESTID,
+  AssignedOrderDeliveredNotice,
+} from '@/app/(private)/asignacion/components';
 import AsignacionPage from '@/app/(private)/asignacion/page';
-import { DELIVERED_ORDER_PARAM } from '@/lib/shared/routes';
+import {
+  DELIVERED_ORDER_PACKAGES_PARAM,
+  DELIVERED_ORDER_PARAM,
+  DELIVERED_ORDER_PRODUCT_PARAM,
+} from '@/lib/shared/routes';
 
 /**
  * Resuelve los Server Components `async` del arbol antes de entregarselo al renderer de cliente.
@@ -99,5 +106,61 @@ describe('lista de pedidos asignados — R15: aviso de entrega al volver de fina
     await renderPantalla();
 
     expect(screen.queryByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toBeNull();
+  });
+
+  it('R24: con los parametros nuevos, tambien pasa los envases y el nombre del producto al aviso', async () => {
+    await renderPantalla({
+      [DELIVERED_ORDER_PARAM]: '2026-0000007',
+      [DELIVERED_ORDER_PACKAGES_PARAM]: '50',
+      [DELIVERED_ORDER_PRODUCT_PARAM]: 'Desengrasante industrial · Botella 1L',
+    });
+
+    const aviso = await screen.findByTestId(ASSIGNED_ORDER_DELIVERED_TESTID);
+    expect(aviso).toHaveTextContent(
+      'Pedido 2026-0000007 entregado. Entraron 50 envases de Desengrasante industrial · Botella 1L.',
+    );
+  });
+});
+
+describe('AssignedOrderDeliveredNotice — R24: envases y producto en la confirmacion', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('con envases y producto, pinta cuantos envases enteros entraron y de que producto', () => {
+    render(
+      <AssignedOrderDeliveredNotice
+        orderNumber="2026-0000007"
+        packages="50"
+        productName="Desengrasante industrial · Botella 1L"
+      />,
+    );
+
+    expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toHaveTextContent(
+      'Pedido 2026-0000007 entregado. Entraron 50 envases de Desengrasante industrial · Botella 1L.',
+    );
+  });
+
+  it('con un solo envase, usa el singular', () => {
+    render(
+      <AssignedOrderDeliveredNotice
+        orderNumber="2026-0000008"
+        packages="1"
+        productName="Barniz acrílico · Bidón 20L"
+      />,
+    );
+
+    expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toHaveTextContent(
+      'Pedido 2026-0000008 entregado. Entraron 1 envase de Barniz acrílico · Bidón 20L.',
+    );
+  });
+
+  it('sin envases ni producto -URL de antes de esta ficha-, pinta el aviso de siempre', () => {
+    render(<AssignedOrderDeliveredNotice orderNumber="2026-0000009" />);
+
+    expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toHaveTextContent(
+      'Pedido 2026-0000009 entregado',
+    );
+    expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).not.toHaveTextContent('envases');
   });
 });
