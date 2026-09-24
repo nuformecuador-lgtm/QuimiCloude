@@ -184,10 +184,10 @@ describe('adjustBatchStockAction', () => {
     await adjustBatchStockAction(INITIAL, formDataOf({ ...VALID_ADJUST_FIELDS, delta: '-7' }));
 
     const [candidato] = adjustBatchStockMock.mock.calls[0] as [Record<string, unknown>];
-    expect(candidato).toEqual({ batchId: BATCH_ID, delta: -7, reason: 'merma' });
+    expect(candidato).toEqual({ batchId: BATCH_ID, delta: '-7', reason: 'merma' });
   });
 
-  it('rechaza un delta que no es un entero, sin llamar al caso de uso', async () => {
+  it('rechaza un delta que no es un decimal valido, sin llamar al caso de uso', async () => {
     const result = await adjustBatchStockAction(
       INITIAL,
       formDataOf({ ...VALID_ADJUST_FIELDS, delta: '1e3' }),

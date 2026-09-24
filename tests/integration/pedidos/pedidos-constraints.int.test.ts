@@ -514,6 +514,9 @@ describe('el pedido como fila completa', () => {
       'priority',
       'quantity',
       'recipe_id',
+      // `reserved_at`: el instante desde el que cuenta la caducidad de la reserva, o `null` si
+      // el pedido no tiene material apartado.
+      'reserved_at',
       'status',
       'updated_at',
       'updated_by',

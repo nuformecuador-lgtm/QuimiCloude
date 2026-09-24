@@ -509,6 +509,42 @@ async function vaciarPedidos(tx: Prisma.TransactionClient) {
   await tx.$executeRawUnsafe('DELETE FROM "orders"')
 }
 
+// ---------------------------------------------------------------------------
+// FK posteriores que cuelgan de `orders_id_company_id_key`
+// ---------------------------------------------------------------------------
+
+/**
+ * El DOWN de esta migracion suelta `orders_id_company_id_key` (paso 3), pero dos migraciones
+ * posteriores (`20260923150100_reservations_and_decimal_stock`) le anadieron FK compuestas que
+ * la referencian: `reservation_movements_order_id_fkey` e `inventory_movements_order_id_fkey`.
+ * Sobre la base YA migrada a HEAD (con la que corre esta suite) esas FK existen, y Postgres
+ * rechaza el `DROP CONSTRAINT` de la clave mientras algo la referencie. Se retiran antes de
+ * correr el DOWN y se restauran despues de un UP posterior, todo dentro de la transaccion del
+ * caso -que termina en ROLLBACK-; no es una migracion nueva ni un cambio de las existentes.
+ */
+const RESERVATION_ORDER_FK =
+  'ALTER TABLE "reservation_movements" ADD CONSTRAINT "reservation_movements_order_id_fkey" ' +
+  'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
+  'ON DELETE RESTRICT ON UPDATE CASCADE'
+const INVENTORY_ORDER_FK =
+  'ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_order_id_fkey" ' +
+  'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
+  'ON DELETE RESTRICT ON UPDATE CASCADE'
+
+async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
+  await tx.$executeRawUnsafe(
+    'ALTER TABLE "reservation_movements" DROP CONSTRAINT "reservation_movements_order_id_fkey"',
+  )
+  await tx.$executeRawUnsafe(
+    'ALTER TABLE "inventory_movements" DROP CONSTRAINT "inventory_movements_order_id_fkey"',
+  )
+}
+
+async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
+  await tx.$executeRawUnsafe(RESERVATION_ORDER_FK)
+  await tx.$executeRawUnsafe(INVENTORY_ORDER_FK)
+}
+
 afterAll(async () => {
   await prisma.$disconnect()
 })
@@ -699,6 +735,7 @@ describe('R2, R3, R13 — el UP asigna todos los pedidos a «QuimiCloud» sin re
       await vaciarPedidos(tx)
 
       // Estado previo a la migracion, dentro de la transaccion.
+      await dropForeignKeysDependingOnOrdersCompanyKey(tx)
       await runScript(tx, DOWN)
       expect(await fotoDelEsquema(tx)).toEqual({ ...ESQUEMA_PREVIO, rlsForzada: RLS_FORZADA })
 
@@ -715,6 +752,7 @@ describe('R2, R3, R13 — el UP asigna todos los pedidos a «QuimiCloud» sin re
       expect(antes.assignments).toBe(1)
 
       await runScript(tx, UP)
+      await restoreForeignKeysDependingOnOrdersCompanyKey(tx)
 
       expect(await fotoDelEsquema(tx)).toEqual({ ...ESQUEMA_UP, rlsForzada: RLS_FORZADA })
       expect(await contarFilas(tx)).toEqual(antes)
@@ -746,6 +784,7 @@ describe('R2, R3, R13 — el UP asigna todos los pedidos a «QuimiCloud» sin re
     await inRolledBackTransaction(async (tx) => {
       const quimicloud = await quimicloudId(tx)
       await vaciarPedidos(tx)
+      await dropForeignKeysDependingOnOrdersCompanyKey(tx)
       await runScript(tx, DOWN)
 
       const recipeId = await crearReceta(tx, quimicloud)
@@ -934,6 +973,7 @@ describe('R5, R7 — el DOWN limpio restaura el esquema global y deja el contado
       await insertarAsignacion(tx, { orderId: ids[0] as string, userId: persona, companyId: quimicloud })
       const antes = await contarFilas(tx)
 
+      await dropForeignKeysDependingOnOrdersCompanyKey(tx)
       await runScript(tx, DOWN)
 
       expect(await fotoDelEsquema(tx)).toEqual({ ...ESQUEMA_PREVIO, rlsForzada: RLS_FORZADA })

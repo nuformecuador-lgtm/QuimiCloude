@@ -41,7 +41,6 @@ const TEN = BigInt(10)
 const MAX_OUTPUT_UNSCALED = TEN ** BigInt(14) - BigInt(1)
 
 const DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/
-const DIGITS_ONLY_PATTERN = /^\d+$/
 
 type Scaled = { readonly unscaled: bigint; readonly scale: number }
 
@@ -74,7 +73,8 @@ function multiplyInternal(a: bigint, b: bigint): bigint {
   return (a * b) / pow10(INTERNAL_SCALE)
 }
 
-/** Promedio simple de costes unitarios ya escalados a `INTERNAL_SCALE`. */
+/** Promedio simple de costes unitarios ya escalados a `INTERNAL_SCALE`, sin ponderar por la
+ *  cantidad de ningun lote. */
 function averageInternal(values: readonly bigint[]): bigint {
   const sum = values.reduce((total, value) => total + value, ZERO)
   return sum / BigInt(values.length)
@@ -91,31 +91,6 @@ function formatFixedOutputScale(unscaled: bigint): string {
   const digits = unscaled.toString().padStart(OUTPUT_SCALE + 1, '0')
   const cut = digits.length - OUTPUT_SCALE
   return `${digits.slice(0, cut)}.${digits.slice(cut)}`
-}
-
-/** Desempate de lotes: numerico si los dos numeros de lote son solo digitos; como texto si
- *  alguno trae cualquier otro caracter. El correlativo que genera el backend no rellena con
- *  ceros, y comparar como texto pondria '10' antes que '9'. */
-function compareLots(a: string, b: string): number {
-  if (DIGITS_ONLY_PATTERN.test(a) && DIGITS_ONLY_PATTERN.test(b)) {
-    const numericA = BigInt(a)
-    const numericB = BigInt(b)
-    if (numericA === numericB) {
-      return 0
-    }
-    return numericA < numericB ? -1 : 1
-  }
-  if (a === b) {
-    return 0
-  }
-  return a < b ? -1 : 1
-}
-
-function compareBatches(a: CostingBatch, b: CostingBatch): number {
-  if (a.purchaseDate !== b.purchaseDate) {
-    return a.purchaseDate < b.purchaseDate ? -1 : 1
-  }
-  return compareLots(a.lot, b.lot)
 }
 
 /** Coste (escalado a `INTERNAL_SCALE`) de un ingrediente, o `null` si no se puede componer. */
@@ -139,24 +114,33 @@ function calculateLineCost(
     return ZERO
   }
 
-  const productBatches = batches
-    .filter((batch) => batch.productId === line.productId)
-    .slice()
-    .sort(compareBatches)
+  // Todos los lotes del producto con disponible mayor que cero entran en el promedio, se
+  // necesiten o no para cubrir la cantidad necesaria; ni el orden de compra ni el numero de
+  // lote importan ya para el coste.
+  const productBatches = batches.filter((batch) => batch.productId === line.productId)
 
   let coveredInternal = ZERO
-  const usedUnitCostsInternal: bigint[] = []
+  const unitCostsInternal: bigint[] = []
 
   for (const batch of productBatches) {
+    const availableScaled = parseDecimal(batch.available)
+    if (availableScaled === null) {
+      return null
+    }
+    const availableInternalNative = toInternal(availableScaled)
+    if (availableInternalNative <= ZERO) {
+      continue
+    }
+
     const batchUnit = units.get(batch.unitId)
     if (batchUnit === undefined) {
       return null
     }
 
-    let stockConverted: string
+    let availableConverted: string
     let unitFactor: string
     try {
-      stockConverted = convertQuantity(String(batch.stock), batchUnit, lineUnit)
+      availableConverted = convertQuantity(batch.available, batchUnit, lineUnit)
       unitFactor = convertQuantity('1', lineUnit, batchUnit)
     } catch (error) {
       if (error instanceof IncompatibleUnitsError) {
@@ -165,26 +149,22 @@ function calculateLineCost(
       throw error
     }
 
-    const stockScaled = parseDecimal(stockConverted)
+    const availableConvertedScaled = parseDecimal(availableConverted)
     const factorScaled = parseDecimal(unitFactor)
     const unitCostScaled = parseDecimal(batch.unitCost)
-    if (stockScaled === null || factorScaled === null || unitCostScaled === null) {
+    if (availableConvertedScaled === null || factorScaled === null || unitCostScaled === null) {
       return null
     }
 
-    coveredInternal += toInternal(stockScaled)
-    usedUnitCostsInternal.push(multiplyInternal(toInternal(unitCostScaled), toInternal(factorScaled)))
-
-    if (coveredInternal >= neededInternal) {
-      break
-    }
+    coveredInternal += toInternal(availableConvertedScaled)
+    unitCostsInternal.push(multiplyInternal(toInternal(unitCostScaled), toInternal(factorScaled)))
   }
 
-  if (coveredInternal < neededInternal) {
+  if (coveredInternal < neededInternal || unitCostsInternal.length === 0) {
     return null
   }
 
-  const averageUnitCostInternal = averageInternal(usedUnitCostsInternal)
+  const averageUnitCostInternal = averageInternal(unitCostsInternal)
   return multiplyInternal(averageUnitCostInternal, neededInternal)
 }
 

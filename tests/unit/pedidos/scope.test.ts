@@ -120,6 +120,14 @@ const CARPETA_ASIGNACION = 'app/(private)/asignacion/'
 const SPECS_E2E_AJENOS_QUE_COINCIDEN_POR_NOMBRE = new Set(['e2e/pedidos-asignados.spec.ts'])
 
 /**
+ * El Route Handler del proceso diario que caduca la reserva de los pedidos: un cron interno,
+ * no una Server Action -no hay sesion que abrir, la puerta es un secreto- y no la pantalla de
+ * pedidos. Exclusion NOMBRADA, igual que `CARPETA_ASIGNACION`: cualquier otra ruta HTTP de
+ * pedidos sigue cayendo.
+ */
+const RUTA_CRON_CADUCIDAD = 'app/api/cron/caducar-pedidos/route.ts'
+
+/**
  * R57, INVERTIDO por QC-35: la pantalla de pedidos vive en `carpetaDeLaPantalla` -derivada de
  * `ORDERS_ROUTE`- y en NINGUN otro sitio de `app/` ni de `components/`.
  *
@@ -135,14 +143,21 @@ export function pantallasDePedidosFueraDeSuCarpeta(
     (ruta) =>
       /^(app|components)\/.*\b(pedidos|orders)\b/i.test(ruta) &&
       !ruta.startsWith(`${carpetaDeLaPantalla}/`) &&
-      !ruta.startsWith(CARPETA_ASIGNACION),
+      !ruta.startsWith(CARPETA_ASIGNACION) &&
+      ruta !== RUTA_CRON_CADUCIDAD,
   )
 }
 
-/** R54, R57: ningun route handler —`app/**\/route.ts`— de esta feature. Las mutaciones van
- *  como Server Actions y los webhooks no son de esta ficha. */
+/** Ningun route handler —`app/**\/route.ts`— de esta feature, salvo el cron nombrado
+ *  en `RUTA_CRON_CADUCIDAD`. Las mutaciones van como Server Actions y los webhooks no son de
+ *  esta ficha; el proceso diario tampoco es una mutacion de usuario y no tiene sesion que
+ *  abrir, asi que va como Route Handler (`docs/architecture.md > Server Actions vs Route
+ *  Handlers`). */
 export function routeHandlersDePedidos(rutas: readonly string[]): readonly string[] {
-  return rutas.filter((ruta) => /^app\/.*\/route\.tsx?$/.test(ruta) && /pedidos|orders/i.test(ruta))
+  return rutas.filter(
+    (ruta) =>
+      /^app\/.*\/route\.tsx?$/.test(ruta) && /pedidos|orders/i.test(ruta) && ruta !== RUTA_CRON_CADUCIDAD,
+  )
 }
 
 /** R57: los specs E2E de pedidos que hay. QC-35 trajo el suyo; la lista se afirma CERRADA. */
@@ -169,6 +184,9 @@ export function consumidoresDeUiFueraDeSuCarpeta(
     // Segunda pantalla legitima que consume el contrato publico de `pedidos`, no una fuga por
     // goteo de la pantalla de `pedidos` (ver `CARPETA_ASIGNACION` arriba).
     .filter((entrada) => !entrada.nombre.startsWith(CARPETA_ASIGNACION))
+    // El Route Handler del cron consume el driving de `pedidos` por su ruta exacta, no la
+    // pantalla (ver `RUTA_CRON_CADUCIDAD` arriba).
+    .filter((entrada) => entrada.nombre !== RUTA_CRON_CADUCIDAD)
     .map((entrada) => entrada.nombre)
 }
 

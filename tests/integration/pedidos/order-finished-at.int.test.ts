@@ -2,17 +2,24 @@
  * La fecha de terminado contra una base Postgres REAL, con la migracion
  * `20260923120000_orders_finished_at` aplicada.
  *
- * POR QUE COMMITEA Y NO SE ENVUELVE EN UNA TRANSACCION CON ROLLBACK: `transitionAliveOrder`,
- * `createOrder`, `updateAliveOrder` y `cancelAliveOrder` hablan con el cliente Prisma GLOBAL
- * (`@/lib/shared/db/prisma`), no con un `tx` inyectado -mismo motivo que
- * `order-repository.int.test.ts`-, y `createOrder` ademas abre su PROPIA `prisma.$transaction`
- * con el lock de aviso del correlativo dentro. Envolver la corrida en una transaccion del test
- * seria un aislamiento de mentira: esas llamadas correrian en otra conexion del pool. Cada caso
- * siembra su propio pedido y lo borra en un `finally`, por su `id` exacto.
+ * POR QUE COMMITEA Y NO SE ENVUELVE EN UNA TRANSACCION CON ROLLBACK:
+ * `createOrderWriteRepository(tx).setStatus/.create`, `updateAliveOrder` y `cancelAliveOrder`
+ * hablan con el cliente Prisma GLOBAL (`@/lib/shared/db/prisma`) o abren su PROPIA
+ * `prisma.$transaction` (`withOrderTransaction`, con el lock de aviso del correlativo dentro
+ * del alta) -mismo motivo que `order-repository.int.test.ts`-. Envolver la corrida en una
+ * transaccion del test seria un aislamiento de mentira: esas llamadas correrian en otra
+ * conexion del pool. Cada caso siembra su propio pedido y lo borra en un `finally`, por su `id`
+ * exacto.
  *
  * El `CHECK` es la unica excepcion que usa SQL crudo dentro de un `SAVEPOINT`: la escritura
  * se espera que falle y no puede dejar la conexion del caso en un estado abortado para el resto
  * del archivo.
+ *
+ * `createOrder` y `transitionAliveOrder` -sin llamantes desde que el Finalizar consume dentro de
+ * `createTransitionOrder`- se retiraron. El alta de siembra pasa por `withOrderTransaction` +
+ * `createOrderWriteRepository`, y el `describe` que probaba `transitionAliveOrder` como sujeto
+ * reapunta al camino vivo equivalente: `createOrderWriteRepository(tx).setStatus`, el mismo
+ * `UPDATE` condicional que ahora escribe `finished_at`.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -20,10 +27,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
-import { transitionAliveOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
@@ -144,9 +151,21 @@ async function seedOrder(overrides: Partial<NewOrder> = {}): Promise<string> {
   const sequence = nextSequence
   nextSequence += 1
   const now = instant(1 + (sequence % 25))
-  const result = await createOrder(baseOrder(overrides), YEAR, actorId, now, null, scope())
-  if (result === 'duplicate_number') throw new Error('el alta de siembra choco con un numero duplicado')
+  const result = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(baseOrder(overrides), YEAR, actorId, now, null, scope()),
+  )
   return result.id
+}
+
+/** `setStatus` del `OrderWriteRepository` sobre el cliente global (`createOrderWriteRepository()`
+ *  sin `tx`, valido fuera de una transaccion compartida): el camino vivo de transicion de estado. */
+function setStatus(
+  id: string,
+  from: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO',
+  to: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO',
+  now: Date,
+): Promise<'ok' | 'not_found' | 'stale'> {
+  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, scope())
 }
 
 async function readFinishedAt(id: string): Promise<{ status: string; finishedAt: Date | null }> {
@@ -176,11 +195,11 @@ afterAll(async () => {
 })
 
 describe('R3 — Finalizar deja ENTREGADO y finished_at = now, en la misma escritura', () => {
-  it('transitionAliveOrder de EN_CURSO a ENTREGADO escribe la fecha del reloj inyectado', async () => {
+  it('setAliveOrderStatus de EN_CURSO a ENTREGADO escribe la fecha del reloj inyectado', async () => {
     const id = await seedOrder({ status: 'EN_CURSO' })
     try {
       const now = new Date(Date.UTC(YEAR, 6, 1, 9, 30, 0, 0))
-      const resultado = await transitionAliveOrder(id, companyId, 'EN_CURSO', 'ENTREGADO', actorId, now)
+      const resultado = await setStatus(id, 'EN_CURSO', 'ENTREGADO', now)
       expect(resultado).toBe('ok')
 
       const stored = await readFinishedAt(id)
@@ -191,11 +210,11 @@ describe('R3 — Finalizar deja ENTREGADO y finished_at = now, en la misma escri
     }
   })
 
-  it('transitionAliveOrder de PENDIENTE a EN_CURSO NO escribe finished_at', async () => {
+  it('setAliveOrderStatus de PENDIENTE a EN_CURSO NO escribe finished_at', async () => {
     const id = await seedOrder({ status: 'PENDIENTE' })
     try {
       const now = new Date(Date.UTC(YEAR, 6, 2, 9, 30, 0, 0))
-      const resultado = await transitionAliveOrder(id, companyId, 'PENDIENTE', 'EN_CURSO', actorId, now)
+      const resultado = await setStatus(id, 'PENDIENTE', 'EN_CURSO', now)
       expect(resultado).toBe('ok')
 
       const stored = await readFinishedAt(id)

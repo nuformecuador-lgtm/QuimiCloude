@@ -66,7 +66,7 @@ const PRODUCTO_REF: ProductRef = {
   id: LINEA_VALIDA.productId,
   name: 'Acido sulfurico',
   unitId: UNIT_ID,
-  stockByUnit: [{ unitId: UNIT_ID, quantity: 3 }],
+  stockByUnit: [{ unitId: UNIT_ID, quantity: '3.0000' }],
 };
 
 function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepository {
@@ -341,7 +341,7 @@ describe('R33 — la lista no trae lineas, el detalle si', () => {
         productName: PRODUCTO_REF.name,
         percentage: '100.00',
         productUnitId: UNIT_ID,
-        productStock: 3,
+        productStock: '3.0000',
       },
     ]);
   });
@@ -362,12 +362,12 @@ describe('R14, R24 — existencia del insumo en SU PROPIA unidad', () => {
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
       unitId: UNIT_ID,
-      stockByUnit: [{ unitId: UNIT_ID, quantity: 15 }],
+      stockByUnit: [{ unitId: UNIT_ID, quantity: '15.0000' }],
     });
 
     const detalle = await getRecipe('receta-1', ADMIN);
     expect(detalle.lines[0].productUnitId).toBe(UNIT_ID);
-    expect(detalle.lines[0].productStock).toBe(15);
+    expect(detalle.lines[0].productStock).toBe('15.0000');
   });
 
   it('R24: un insumo sin lotes se guarda con esa linea y el detalle sale sin unidad, con existencia 0', async () => {
@@ -386,7 +386,7 @@ describe('R14, R24 — existencia del insumo en SU PROPIA unidad', () => {
     const getRecipe = createGetRecipe({ recipes, products, images });
     const detalle = await getRecipe('receta-1', ADMIN);
     expect(detalle.lines[0].productUnitId).toBeNull();
-    expect(detalle.lines[0].productStock).toBe(0);
+    expect(detalle.lines[0].productStock).toBe('0.0000');
   });
 
   it('R24: un insumo dado de baja sale sin unidad y sin existencia (null)', async () => {

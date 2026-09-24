@@ -6,13 +6,35 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { listBatchMovementsAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
-import type { InventoryMovementView, MovementReason } from '@/lib/modules/inventario';
+import type { BatchHistoryEntry, MovementReason } from '@/lib/modules/inventario';
+import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
+const KIND_LABEL = 'Tipo';
+const QUANTITY_LABEL = 'Cantidad';
 const REASON_LABEL = 'Motivo';
+const ORDER_LABEL = 'Pedido';
 const AUTHOR_LABEL = 'Autor';
 const DATE_LABEL = 'Fecha';
+
+/** Sin autor, lo hizo el sistema: caducidad, la migracion que aparta pedidos vivos. */
+const SYSTEM_AUTHOR = 'Sistema';
+
+/**
+ * Etiqueta legible de cada tipo de asiento del historial, en el mismo orden que
+ * `BatchHistoryEntry['kind']`: el libro fisico (apertura, ajuste, salida por entrega) y el libro
+ * de la reserva (apartado, liberacion, caducidad, consumo).
+ */
+const KIND_LABELS: Record<BatchHistoryEntry['kind'], string> = {
+  opening: 'Apertura',
+  adjustment: 'Ajuste',
+  consumption: 'Salida por entrega',
+  reserve: 'Apartado',
+  release: 'Liberación',
+  expire: 'Caducidad',
+  consume: 'Consumo',
+};
 
 /**
  * Deriva la etiqueta legible de un motivo a partir del propio valor, sin enumerarlo a mano:
@@ -24,10 +46,9 @@ export function movementReasonLabel(reason: MovementReason): string {
   return conEspacios.charAt(0).toUpperCase() + conEspacios.slice(1);
 }
 
-/** El alta no lleva motivo: se nombra por lo que es, no se le inventa uno. */
-function movementReasonDisplay(movement: InventoryMovementView): string {
-  if (movement.kind === 'opening') return 'Alta de lote';
-  return movement.reason === null ? '' : movementReasonLabel(movement.reason);
+/** Etiqueta del tipo de asiento. Exportada por el mismo motivo que `movementReasonLabel`. */
+export function movementKindLabel(kind: BatchHistoryEntry['kind']): string {
+  return KIND_LABELS[kind];
 }
 
 /**
@@ -41,7 +62,7 @@ function formatMovementDate(createdAt: string): string {
 type LoadState =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
-  | { readonly status: 'success'; readonly data: readonly InventoryMovementView[] }
+  | { readonly status: 'success'; readonly data: readonly BatchHistoryEntry[] }
   | ErrorState;
 
 type BatchHistoryProps = {
@@ -104,22 +125,52 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
 
         {state.status === 'success' && state.data.length > 0 ? (
           <ul data-testid="batch-history-list">
-            {state.data.map((movimiento) => (
-              <li key={movimiento.id} data-testid={`batch-history-entry-${movimiento.id}`}>
-                <span className="text-xs text-muted-foreground">{REASON_LABEL}</span>
-                <span data-testid="batch-history-entry-reason">
-                  {movementReasonDisplay(movimiento)}
-                </span>
-                <span className="text-xs text-muted-foreground">{AUTHOR_LABEL}</span>
-                <span data-testid="batch-history-entry-author">
-                  {movimiento.authorName ?? 'Sin autor'}
-                </span>
-                <span className="text-xs text-muted-foreground">{DATE_LABEL}</span>
-                <span data-testid="batch-history-entry-date">
-                  {formatMovementDate(movimiento.createdAt)}
-                </span>
-              </li>
-            ))}
+            {state.data.map((movimiento) => {
+              // `kind` distingue los dos libros; su `id` es unico dentro del suyo.
+              return (
+                <li
+                  key={`${movimiento.kind}-${movimiento.id}`}
+                  data-testid={`batch-history-entry-${movimiento.id}`}
+                >
+                  <span className="text-xs text-muted-foreground">{KIND_LABEL}</span>
+                  <span data-testid="batch-history-entry-kind">
+                    {movementKindLabel(movimiento.kind)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{QUANTITY_LABEL}</span>
+                  <span
+                    data-testid="batch-history-entry-quantity"
+                    title={exactDecimalTitle(movimiento.quantity)}
+                    aria-label={trimDecimal(movimiento.quantity)}
+                  >
+                    {formatDecimalDisplay(movimiento.quantity)}
+                  </span>
+                  {movimiento.reason === null ? null : (
+                    <>
+                      <span className="text-xs text-muted-foreground">{REASON_LABEL}</span>
+                      <span data-testid="batch-history-entry-reason">
+                        {movementReasonLabel(movimiento.reason)}
+                      </span>
+                    </>
+                  )}
+                  {movimiento.orderNumberText === null ? null : (
+                    <>
+                      <span className="text-xs text-muted-foreground">{ORDER_LABEL}</span>
+                      <span data-testid="batch-history-entry-order">
+                        {movimiento.orderNumberText}
+                      </span>
+                    </>
+                  )}
+                  <span className="text-xs text-muted-foreground">{AUTHOR_LABEL}</span>
+                  <span data-testid="batch-history-entry-author">
+                    {movimiento.authorName ?? SYSTEM_AUTHOR}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{DATE_LABEL}</span>
+                  <span data-testid="batch-history-entry-date">
+                    {formatMovementDate(movimiento.createdAt)}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         ) : null}
       </CollapsibleContent>

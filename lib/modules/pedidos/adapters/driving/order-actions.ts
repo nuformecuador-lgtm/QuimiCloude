@@ -16,6 +16,10 @@ import {
 } from '@/lib/modules/pedidos';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
+// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
+// existe.
+import type { OrderCoverage } from '@/lib/modules/inventario';
+
 /**
  * Server Actions del pedido (T15, R5, R54, R56, `design.md > 9`). Copia en forma de
  * `lib/modules/proveedores/adapters/driving/supplier-actions.ts`, que a su vez copia la de
@@ -289,6 +293,37 @@ export async function listOrdersAction(query: unknown): Promise<OrderListResult>
   try {
     const data = await pedidos.listOrders(query, actor);
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// La cobertura de VARIOS pedidos a la vez, UNA consulta por pagina. Bloque nuevo al final: no
+// reordena ni reformatea nada de arriba.
+// ---------------------------------------------------------------------------------------------
+
+/** Una entrada del array plano: un `Map` no cruza el borde de una Server Action tan bien como un
+ *  array serializable, mismo criterio que `OrderResponsiblesEntry` de `asignaciones`. */
+export type OrderCoverageEntry = { readonly orderId: string; readonly coverage: OrderCoverage };
+
+export type OrderCoverageBatchResult =
+  | { status: 'success'; data: readonly OrderCoverageEntry[] }
+  | ErrorState;
+
+/**
+ * La cobertura de la pagina entera: argumento ya tipado, no `FormData` -no viene de un
+ * `<form>`-. Ningun permiso se comprueba aqui: la frontera es `requirePermission(actor,
+ * 'pedidos.consultar')` en la primera linea del caso de uso.
+ */
+export async function listOrderCoverageAction(
+  orderIds: readonly string[],
+): Promise<OrderCoverageBatchResult> {
+  const actor = await currentActor();
+
+  try {
+    const coverage = await pedidos.findCoverage(orderIds, actor);
+    return { status: 'success', data: [...coverage].map(([orderId, value]) => ({ orderId, coverage: value })) };
   } catch (error) {
     return toErrorState(error);
   }

@@ -39,6 +39,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -69,13 +70,14 @@ function dobles() {
     })
 
   const orders = {
-    create: explota('orders.create'),
     findAliveById: explota('orders.findAliveById'),
     listAlive: explota('orders.listAlive'),
-    updateAlive: explota('orders.updateAlive'),
-    cancelAlive: explota('orders.cancelAlive'),
-    softDeleteAlive: explota('orders.softDeleteAlive'),
   } as unknown as OrderRepository
+
+  // La unidad de trabajo TAMBIEN explota si se abre sin autorizacion: el permiso se exige
+  // ANTES de abrir la transaccion compartida con `inventario`, y `run` es justo el punto por
+  // el que se abre.
+  const unitOfWork = { run: explota('unitOfWork.run') } as unknown as OrderUnitOfWork
 
   const recipes = {
     findRefsIncludingDeleted: explota('recipes.findRefsIncludingDeleted'),
@@ -113,9 +115,10 @@ function dobles() {
       ...Object.values(units as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(presentations as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      unitOfWork.run as unknown as ReturnType<typeof vi.fn>,
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, products, units, presentations, log, llamadas }
+  return { orders, recipes, products, units, presentations, log, unitOfWork, llamadas }
 }
 
 /** Los dobles de la invocacion en curso. Se renuevan en CADA caso para que el contador de uno
@@ -130,6 +133,7 @@ function depsDeTurno() {
     units: enCurso.units,
     presentations: enCurso.presentations,
     log: enCurso.log,
+    unitOfWork: enCurso.unitOfWork,
   }
 }
 
@@ -159,12 +163,20 @@ const SIETE: readonly (readonly [string, string, Invocacion])[] = [
     'cancelOrder',
     MODIFICAR,
     (actor, entrada = { reason: 'sin stock' }) =>
-      createCancelOrder({ orders: depsDeTurno().orders })(ORDER_ID, entrada, actor),
+      createCancelOrder({ orders: depsDeTurno().orders, unitOfWork: depsDeTurno().unitOfWork })(
+        ORDER_ID,
+        entrada,
+        actor,
+      ),
   ],
   [
     'deleteOrder',
     MODIFICAR,
-    (actor) => createDeleteOrder({ orders: depsDeTurno().orders })(ORDER_ID, actor),
+    (actor) =>
+      createDeleteOrder({ orders: depsDeTurno().orders, unitOfWork: depsDeTurno().unitOfWork })(
+        ORDER_ID,
+        actor,
+      ),
   ],
   [
     'quoteOrderCost',

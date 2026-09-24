@@ -154,6 +154,27 @@ export class WorkGroupNotFoundError extends AsignacionesError {
   }
 }
 
+/** El Finalizar de la planta intento entregar y `pedidos` respondio `'insufficient_material'`
+ *  -ni el lote apartado ni el resto de lotes con disponible alcanzan-. Mismo `code` que
+ *  `InsufficientMaterialError` de `pedidos`. */
+export class MaterialShortageError extends AsignacionesError {
+  readonly code = 'insufficient_material';
+
+  constructor(diagnostic?: string) {
+    super('insufficient_material', diagnostic);
+  }
+}
+
+/** El Finalizar de la planta intento entregar un pedido sin material apartado cuya receta
+ *  actual no tiene ninguna linea. Mismo `code` que `RecipeWithoutLinesError` de `pedidos`. */
+export class RecipeWithoutLinesError extends AsignacionesError {
+  readonly code = 'recipe_without_lines';
+
+  constructor(diagnostic?: string) {
+    super('recipe_without_lines', diagnostic);
+  }
+}
+
 /**
  * La persona existe y su cuenta esta activa, pero supervisa los pedidos de toda la empresa: no
  * se le puede asignar la responsabilidad de ejecutar uno. Se distingue de

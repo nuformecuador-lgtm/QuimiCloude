@@ -33,9 +33,10 @@ import { normalizePresentationName } from '@/lib/modules/inventario'
 import { findRecipeIdsMatchingName } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { normalizeRecipeName } from '@/lib/modules/recetas'
 import {
-  createOrder,
+  createOrderWriteRepository,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination'
 
@@ -104,9 +105,9 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
 
 /** Alta por el adaptador REAL. Registra el id para que el `afterAll` la borre. */
 async function alta(now: Date, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), YEAR, actorId, now, null, scope())
-  expect(resultado).not.toBe('duplicate_number')
-  const fila = resultado as OrderRow
+  const fila = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(baseOrder(overrides), YEAR, actorId, now, null, scope()),
+  )
   creados.push(fila.id)
   return fila
 }

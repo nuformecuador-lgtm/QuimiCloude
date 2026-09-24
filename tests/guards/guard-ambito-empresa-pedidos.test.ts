@@ -31,8 +31,9 @@
 //      traves de un ayudante del mismo archivo al que se le pasa-. Declararlo y no usarlo seria la
 //      misma fuga con mejor cara.
 //
-// EL CAMINO DEL SQL CRUDO DEL ALTA (`design.md > 5`, «el caso raro»). `createOrder` no puede
-// recibir un `Prisma.OrderWhereInput`: escribe con `$queryRaw`. Para ese camino no basta con que
+// EL CAMINO DEL SQL CRUDO DEL ALTA, «el caso raro». `insertAliveOrder` (el UNICO `INSERT` de
+// pedido) no puede recibir un
+// `Prisma.OrderWhereInput`: escribe con `$queryRaw`. Para ese camino no basta con que
 // la funcion llame a `companyScopeColumns(scope)`, porque podria llamarla y luego escribir
 // `scope.companyId` a mano en el SQL. Asi que aqui se LEE LA PLANTILLA SQL y se exige que la
 // empresa que se ESCRIBE en `company_id` y la que acota el SUBSELECT DEL MAXIMO (R24) sean las dos
@@ -230,8 +231,9 @@ type ArchivoAnalizado = {
   readonly consumidoras: ReadonlySet<string>
 }
 
-function analizar(archivo: string): ArchivoAnalizado {
-  const source = readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8')
+/** El nucleo del analisis sobre TEXTO: separado de `analizar` para que un anti-placebo pueda
+ *  probarlo con una fuente fabricada, sin escribir nada a disco. */
+function analizarFuente(archivo: string, source: string): ArchivoAnalizado {
   const conCadenas = sinComentarios(source)
   const codigo = vaciarCadenas(conCadenas)
   const funciones = funcionesDe(codigo, conCadenas)
@@ -258,6 +260,102 @@ function analizar(archivo: string): ArchivoAnalizado {
   }
 
   return { archivo, codigo, funciones, envolturas, consumidoras }
+}
+
+function analizar(archivo: string): ArchivoAnalizado {
+  return analizarFuente(archivo, readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8'))
+}
+
+/**
+ * Archivos exentos por NOMBRE del barrido de ambito. Solo `pedidos`
+ * puede llegar aqui: es la unica funcion del modulo que abre `prisma.$transaction` sin filtrar
+ * ninguna tabla por su cuenta. La aprueba un humano en un spec -nunca quien escribe el
+ * adaptador-, y por eso la lista lleva su motivo al lado, no solo el nombre.
+ */
+const EXENTOS_DEL_AMBITO: ReadonlyMap<string, string> = new Map([
+  [
+    'order-unit-of-work-prisma.ts',
+    'Solo abre la transaccion que comparten pedidos e inventario (prisma.$transaction); no lee ' +
+      'ni escribe tablas. Excepcion aprobada por el humano en QC-141, decision D21 (2026-09-23).',
+  ],
+])
+
+/**
+ * Para que la exencion no sea un cheque en blanco: en un archivo exento, TODO acceso `prisma.…`
+ * tiene que ser `prisma.$transaction`. Cualquier otro -una consulta nueva que alguien anada ahi
+ * aprovechando el nombre ya exento- sale en la lista. Trabaja sobre el codigo YA vaciado de
+ * comentarios y cadenas (`analizado.codigo`), para que un anti-placebo pueda probarlo sin
+ * pasar por `analizar`.
+ */
+function accesosPrismaFueraDeTransaction(codigoSinComentariosNiCadenas: string): readonly string[] {
+  const accesos = codigoSinComentariosNiCadenas.match(/\bprisma\s*\.\s*\$?\w+/g) ?? []
+  return accesos.filter((acceso) => !/^prisma\s*\.\s*\$transaction\b/.test(acceso.replace(/\s+/g, ' ')))
+}
+
+/**
+ * En el archivo exento, `tx` -el cliente de transaccion que el `run` recibido de fuera declara
+ * como parametro- NO puede tocar ningun modelo aqui dentro: este archivo solo abre la
+ * transaccion y REENVIA `run`, nunca consulta por su cuenta. Cualquier `tx.<algo>` -un modelo, un
+ * metodo crudo- es la misma fuga que un `prisma.` suelto, con el nombre disfrazado.
+ */
+function accesosTxEnArchivoExento(codigoSinComentariosNiCadenas: string): readonly string[] {
+  return codigoSinComentariosNiCadenas.match(/\btx\s*\.\s*\w+/g) ?? []
+}
+
+/**
+ * ¿El archivo importa `prisma` con un alias distinto de `prisma`? Sobre el SOURCE original: un
+ * alias no vive dentro de una cadena ni de un comentario que valga la pena vaciar aparte.
+ *
+ * Cubre las tres formas del import de `@/lib/shared/db/prisma`: un especificador con nombre
+ * entre varios (`import { a, prisma as X }`), comillas simples o dobles, y el import de
+ * namespace (`import * as X from '...'`, donde CUALQUIER uso de `X.prisma` es ya un alias).
+ */
+function aliasDePrisma(source: string): string | null {
+  const importacion = /import\s*(?:\{([^}]*)\}|\*\s*as\s+(\w+))\s*from\s*(['"])@\/lib\/shared\/db\/prisma\3/g
+  for (const match of source.matchAll(importacion)) {
+    const especificadores = match[1]
+    const namespaceAlias = match[2]
+    if (namespaceAlias !== undefined) return namespaceAlias
+    if (especificadores === undefined) continue
+    for (const especificador of especificadores.split(',')) {
+      const conAlias = /^\s*prisma\s+as\s+(\w+)\s*$/.exec(especificador)
+      if (conAlias !== null) return conAlias[1] ?? null
+    }
+  }
+  return null
+}
+
+/** Los hallazgos de ambito de UN archivo (fuera del exento): la misma comprobacion que antes
+ *  hacia el `it` en linea, ahora como funcion pura para que el anti-placebo la ejercite con una
+ *  fuente fabricada. */
+function hallazgosDeAmbitoPorArchivo(archivo: string, analizado: ArchivoAnalizado): readonly string[] {
+  const hallazgos: string[] = []
+
+  for (const match of analizado.codigo.matchAll(TOCA_LA_BASE)) {
+    const dentro = analizado.funciones.some((f) => match.index > f.inicio && match.index < f.fin)
+    if (dentro) continue
+    const linea = analizado.codigo.slice(0, match.index).split('\n').length
+    hallazgos.push(
+      `${archivo}:${String(linea)} ejecuta una consulta fuera de una \`function\` declarada: la guardia no puede comprobar su ambito. Escribela como \`function\` que declare \`scope: OrderScope\``,
+    )
+  }
+
+  for (const funcion of analizado.funciones) {
+    if (!tocaLaBase(funcion.cuerpo)) continue
+    if (ambitoDeclarado(funcion) === null) {
+      hallazgos.push(
+        `${archivo}:${funcion.nombre} consulta la base SIN declarar \`scope: OrderScope\` (o \`companyId: string\` en el catalogo). \`pedidos\` NO tiene ninguna consulta sin ambito aprobada (QC-60 R18, design.md > 5)`,
+      )
+      continue
+    }
+    if (!analizado.consumidoras.has(funcion.nombre)) {
+      hallazgos.push(
+        `${archivo}:${funcion.nombre} declara el ambito pero no lo lleva hasta las envolturas de \`./company-scope\`: un ambito que no entra en el \`where\` (o en lo que se escribe) no filtra nada (R18)`,
+      )
+    }
+  }
+
+  return hallazgos
 }
 
 // --- Los dos puertos y su cableado -------------------------------------------------------------
@@ -307,7 +405,14 @@ function porComasDeNivelCero(texto: string): readonly string[] {
  * (`{ findAliveById: findAliveOrderTargetById }`) y el troceo por lineas de la guardia de
  * inventario no veria nada.
  */
-function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, string> {
+type Cableado = {
+  readonly cableado: ReadonlyMap<string, string>
+  /** El lado derecho tal cual, por metodo: lo que necesita `METODOS_DELEGADOS_EN_DOMINIO` para
+   *  comprobar la llamada entera y no solo el nombre de la fabrica. */
+  readonly crudo: ReadonlyMap<string, string>
+}
+
+function cableadoDe(constante: string, interfaz: string): Cableado {
   const ruta = join(repoRoot, 'lib', 'composition', 'index.ts')
   const source = vaciarCadenas(sinComentarios(readFileSync(ruta, 'utf8')))
   const inicio = source.indexOf(`const ${constante}: ${interfaz} = {`)
@@ -316,23 +421,37 @@ function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, st
   const cuerpo = source.slice(abre + 1, cierreEquilibrado(source, abre, '{', '}'))
 
   const cableado = new Map<string, string>()
+  const crudo = new Map<string, string>()
   for (const entrada of porComasDeNivelCero(cuerpo)) {
     const conNombre = /^(\w+)\s*:\s*(\w+)$/.exec(entrada)
     if (conNombre !== null) {
       cableado.set(conNombre[1] ?? '', conNombre[2] ?? '')
+      crudo.set(conNombre[1] ?? '', (conNombre[2] ?? '').trim())
       continue
     }
     const abreviado = /^(\w+)$/.exec(entrada)
     if (abreviado !== null) {
       cableado.set(abreviado[1] ?? '', abreviado[1] ?? '')
+      crudo.set(abreviado[1] ?? '', (abreviado[1] ?? '').trim())
       continue
     }
-    // Una entrada que no es `metodo: funcion` ni `metodo` -una lambda en linea, un `bind`, un
-    // spread- no se puede seguir hasta una funcion del adaptador. Se registra tal cual para que el
-    // test la NOMBRE en vez de ignorarla en silencio.
+    // `metodo: fabricaDeDominio(...)` -una llamada, no una referencia suelta- es la forma de
+    // `transitionAliveById` (`METODOS_DELEGADOS_EN_DOMINIO`, mas abajo). Se registra
+    // metodo -> nombre de la fabrica para que el cableado SIGA teniendo la clave correcta; el
+    // resto de la verificacion la hace un `it` propio, no el barrido generico.
+    const conLlamada = /^(\w+)\s*:\s*(\w+)\s*\(/.exec(entrada)
+    if (conLlamada !== null) {
+      const metodo = conLlamada[1] ?? ''
+      cableado.set(metodo, conLlamada[2] ?? '')
+      crudo.set(metodo, entrada.slice(entrada.indexOf(':') + 1).trim())
+      continue
+    }
+    // Una entrada que no es `metodo: funcion`, `metodo` ni `metodo: fabrica(...)` -una lambda en
+    // linea, un `bind`, un spread- no se puede seguir hasta una funcion del adaptador. Se
+    // registra tal cual para que el test la NOMBRE en vez de ignorarla en silencio.
     cableado.set(entrada, '')
   }
-  return cableado
+  return { cableado, crudo }
 }
 
 const PUERTOS = [
@@ -353,6 +472,21 @@ const PUERTOS = [
     literal: 'companyId: string',
   },
 ] as const
+
+/**
+ * `OrderCatalog.transitionAliveById` ya no cablea una funcion cruda de
+ * `order-catalog-prisma.ts` -cablea `createTransitionOrder`, un caso de uso de
+ * `pedidos/domain` que abre `OrderUnitOfWork` y, por dentro, llama a
+ * `OrderWriteRepository.lockAliveById` y `.setStatus`, implementadas en `order-prisma.ts`. Esas
+ * dos SI declaran y consumen `scope: OrderScope`, y el barrido sin lista de excepciones de mas
+ * abajo -que recorre TODA funcion de persistencia que toque la base- ya lo exige de ellas: el
+ * ambito de este metodo no deja de vigilarse, se vigila donde la base se toca de verdad. Por eso
+ * este metodo se verifica aparte del barrido generico «cableado a una funcion con nombre del
+ * adaptador», que asume un adaptador que lee `prisma.order` directamente.
+ */
+const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
+  ['transitionAliveById', /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*\}\s*\)$/],
+])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {
   // Toda la guardia se apoya en que «llegar hasta una envoltura de `./company-scope`» significa
@@ -395,7 +529,7 @@ describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {
 describe('QC-60 R18 — cada metodo de los dos puertos declara Y consume el ambito de empresa', () => {
   for (const puerto of PUERTOS) {
     const metodos = metodosDeLaInterfaz(puerto.ruta, puerto.nombre)
-    const cableado = cableadoDe(puerto.constante, puerto.nombre)
+    const { cableado, crudo } = cableadoDe(puerto.constante, puerto.nombre)
     const adaptador = analizar(puerto.adaptador)
     const forma = FORMAS_DE_AMBITO.find((f) => f.identificador === puerto.ambito)
 
@@ -405,6 +539,7 @@ describe('QC-60 R18 — cada metodo de los dos puertos declara Y consume el ambi
       expect(metodos.size, `${puerto.nombre} deberia declarar metodos`).toBeGreaterThan(0)
       expect([...cableado.keys()].sort()).toEqual([...metodos.keys()].sort())
       for (const [metodo, implementacion] of cableado) {
+        if (METODOS_DELEGADOS_EN_DOMINIO.has(metodo)) continue
         expect(
           implementacion,
           `${puerto.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda, un bind ni un spread`,
@@ -424,6 +559,24 @@ describe('QC-60 R18 — cada metodo de los dos puertos declara Y consume el ambi
     })
 
     for (const metodo of metodos.keys()) {
+      const delegado = METODOS_DELEGADOS_EN_DOMINIO.get(metodo)
+
+      if (delegado !== undefined) {
+        it(`${puerto.nombre}.${metodo} delega en una fabrica de dominio cuya escritura real YA vigila el barrido sin excepciones`, () => {
+          const llamada = crudo.get(metodo)
+          expect(
+            llamada !== undefined && delegado.test(llamada),
+            `${puerto.constante}.${metodo} deberia estar cableado exactamente a ${delegado.source}, y esta a: ${llamada ?? '(nada)'}`,
+          ).toBe(true)
+          // El adaptador crudo del puerto NO declara ya esta funcion: quien de verdad toca la
+          // base para este metodo es `OrderWriteRepository.lockAliveById`/`.setStatus`
+          // (`order-prisma.ts`), y esas SI estan en el barrido sin lista de excepciones de mas
+          // abajo.
+          expect(adaptador.funciones.some((f) => f.nombre === metodo)).toBe(false)
+        })
+        continue
+      }
+
       it(`${puerto.nombre}.${metodo} declara \`${puerto.literal}\` y lo lleva hasta el punto unico`, () => {
         const implementacion = cableado.get(metodo)
         expect(implementacion, `${metodo} no esta cableado en lib/composition`).toBeTruthy()
@@ -454,7 +607,7 @@ describe('QC-60 R18 — cada metodo de los dos puertos declara Y consume el ambi
   }
 })
 
-describe('QC-60 R18 — ninguna consulta del modulo se queda sin ambito, y NO hay lista de excepciones', () => {
+describe('QC-60 R18, D21 — ninguna consulta del modulo se queda sin ambito, salvo la UNICA excepcion con nombre que aprobo el humano', () => {
   /** Los archivos de persistencia del modulo, leidos del disco y no de una lista a mano. */
   const archivos = readdirSync(PERSISTENCE_ROOT).filter((archivo) => archivo.endsWith('.ts'))
 
@@ -466,50 +619,40 @@ describe('QC-60 R18 — ninguna consulta del modulo se queda sin ambito, y NO ha
     // ANTI-PLACEBO del troceador. Si `funcionesDe` dejara de reconocer las declaraciones -o se
     // quedara con la llave de un tipo de retorno-, el barrido de abajo no encontraria NINGUNA
     // funcion que toque la base y pasaria en verde sin mirar nada. Las cuentas de hoy: seis en
-    // `order-prisma.ts` (el alta, la ficha, el listado y las tres escrituras) y una en el
-    // catalogo. Se exige el minimo, no la igualdad: la consulta numero ocho entra por el barrido,
-    // que es donde tiene que morder.
+    // `order-prisma.ts` (`insertAliveOrder`, la ficha, el listado y las tres escrituras) y una
+    // en el catalogo. Se exige el minimo, no la
+    // igualdad: la consulta numero ocho entra por el barrido, que es donde tiene que morder.
     const conConsulta = (archivo: string): readonly string[] =>
       analizar(archivo)
         .funciones.filter((f) => tocaLaBase(f.cuerpo))
         .map((f) => f.nombre)
 
     expect(conConsulta('order-prisma.ts').length).toBeGreaterThanOrEqual(6)
-    expect(conConsulta('order-prisma.ts')).toContain('createOrder')
+    expect(conConsulta('order-prisma.ts')).toContain('insertAliveOrder')
     expect(conConsulta('order-catalog-prisma.ts').length).toBeGreaterThanOrEqual(1)
   })
 
   for (const archivo of archivos) {
+    const motivoExencion = EXENTOS_DEL_AMBITO.get(archivo)
+
+    if (motivoExencion !== undefined) {
+      it(`${archivo}: exento por nombre (${motivoExencion}) — todo \`prisma.\` que trae es \`prisma.$transaction\`, y ningun \`tx.<modelo>\``, () => {
+        const analizado = analizar(archivo)
+        expect(
+          accesosPrismaFueraDeTransaction(analizado.codigo),
+          `${archivo} esta exento del ambito porque SOLO abre \`prisma.$transaction\` (design.md > 5.2.1, D21); cualquier otro acceso a \`prisma.\` no es parte de esa excepcion`,
+        ).toEqual([])
+        expect(
+          accesosTxEnArchivoExento(analizado.codigo),
+          `${archivo} esta exento porque no consulta ninguna tabla; un \`tx.<modelo>\` aqui es la misma fuga que un \`prisma.\` suelto, con el nombre disfrazado (R58)`,
+        ).toEqual([])
+      })
+      continue
+    }
+
     it(`${archivo}: toda funcion que toca la base declara y consume el ambito`, () => {
       const analizado = analizar(archivo)
-
-      // Ninguna consulta vive FUERA de una `function` que el troceo vea. Sin esto, una consulta
-      // escrita como `const leer = async () => prisma.order.findMany()` no entraria en el barrido
-      // y la guardia la ignoraria sin decir nada.
-      for (const match of analizado.codigo.matchAll(TOCA_LA_BASE)) {
-        const dentro = analizado.funciones.some(
-          (f) => match.index > f.inicio && match.index < f.fin,
-        )
-        const linea = analizado.codigo.slice(0, match.index).split('\n').length
-        expect(
-          dentro,
-          `${archivo}:${String(linea)} ejecuta una consulta fuera de una \`function\` declarada: la guardia no puede comprobar su ambito. Escribela como \`function\` que declare \`scope: OrderScope\``,
-        ).toBe(true)
-      }
-
-      for (const funcion of analizado.funciones) {
-        if (!tocaLaBase(funcion.cuerpo)) continue
-        // SIN excepciones: aqui no hay ningun `if (EXCEPCIONES.has(...)) continue`, y es a
-        // proposito (ver la cabecera).
-        expect(
-          ambitoDeclarado(funcion),
-          `${archivo}:${funcion.nombre} consulta la base SIN declarar \`scope: OrderScope\` (o \`companyId: string\` en el catalogo). \`pedidos\` NO tiene ninguna consulta sin ambito aprobada (QC-60 R18, design.md > 5)`,
-        ).not.toBeNull()
-        expect(
-          analizado.consumidoras.has(funcion.nombre),
-          `${archivo}:${funcion.nombre} declara el ambito pero no lo lleva hasta las envolturas de \`./company-scope\`: un ambito que no entra en el \`where\` (o en lo que se escribe) no filtra nada (R18)`,
-        ).toBe(true)
-      }
+      expect(hallazgosDeAmbitoPorArchivo(archivo, analizado)).toEqual([])
     })
 
     if (archivo !== PUNTO_UNICO) {
@@ -528,6 +671,106 @@ describe('QC-60 R18 — ninguna consulta del modulo se queda sin ambito, y NO ha
   }
 })
 
+describe('QC-60 R18, D21, B3 — la excepcion con nombre no es un cheque en blanco', () => {
+  /** Todos los `.ts` de `pedidos`, recorridos del disco -sin lista a mano-, para que el barrido
+   *  sin alias no dependa de que alguien lo actualice al anadir un archivo. */
+  function archivosDePedidos(): readonly string[] {
+    const encontrados: string[] = []
+    const recorrer = (directorio: string) => {
+      for (const entrada of readdirSync(directorio, { withFileTypes: true })) {
+        const ruta = join(directorio, entrada.name)
+        if (entrada.isDirectory()) {
+          recorrer(ruta)
+          continue
+        }
+        if (entrada.name.endsWith('.ts')) encontrados.push(ruta)
+      }
+    }
+    recorrer(MODULE_ROOT)
+    return encontrados
+  }
+
+  it('R58 — la lista de exentos tiene UNA sola entrada, y es la de la transaccion compartida', () => {
+    expect(Array.from(EXENTOS_DEL_AMBITO.keys())).toEqual(['order-unit-of-work-prisma.ts'])
+  })
+
+  it('R58 — el archivo exento, de verdad, solo abre `prisma.$transaction`', () => {
+    const analizado = analizar('order-unit-of-work-prisma.ts')
+    expect(accesosPrismaFueraDeTransaction(analizado.codigo)).toEqual([])
+  })
+
+  it('R58 — ningun archivo de `pedidos` importa `prisma` con un alias', () => {
+    for (const ruta of archivosDePedidos()) {
+      const source = readFileSync(ruta, 'utf8')
+      expect(
+        aliasDePrisma(source),
+        `${ruta} importa \`prisma\` con un alias: eso es exactamente el truco que esquivaba esta guardia (B3). Se importa como \`prisma\`, sin alias`,
+      ).toBeNull()
+    }
+  })
+
+  it('ANTI-PLACEBO — una consulta nueva DENTRO del archivo exento, aprovechando su nombre, sale en rojo', () => {
+    const fuenteFabricada = `
+      import { prisma } from '@/lib/shared/db/prisma';
+
+      export async function withOrderTransaction(run) {
+        return prisma.$transaction(run);
+      }
+
+      export async function otraCosaQueSeCuela() {
+        return prisma.order.findMany();
+      }
+    `
+    const analizado = analizarFuente('order-unit-of-work-prisma.ts', fuenteFabricada)
+    expect(accesosPrismaFueraDeTransaction(analizado.codigo).length).toBeGreaterThan(0)
+  })
+
+  it('R58 — ANTI-PLACEBO: un `tx.order.findMany` dentro del callback de `$transaction`, en el archivo exento, sale en rojo', () => {
+    const fuenteFabricada = `
+      import { prisma } from '@/lib/shared/db/prisma';
+
+      export async function withOrderTransaction(run) {
+        return prisma.$transaction(async (tx) => {
+          await tx.order.findMany();
+          return run(tx);
+        });
+      }
+    `
+    const analizado = analizarFuente('order-unit-of-work-prisma.ts', fuenteFabricada)
+    expect(accesosTxEnArchivoExento(analizado.codigo).length).toBeGreaterThan(0)
+  })
+
+  it('ANTI-PLACEBO — un alias de `prisma` en OTRO archivo de `pedidos` sale en rojo', () => {
+    const fuenteFabricada = `import { prisma as ocultito } from '@/lib/shared/db/prisma';\n`
+    expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
+  })
+
+  it('R58 — ANTI-PLACEBO: un alias de `prisma` entre VARIOS especificadores sale en rojo', () => {
+    const fuenteFabricada = `import { algo, prisma as ocultito, otraCosa } from '@/lib/shared/db/prisma';\n`
+    expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
+  })
+
+  it('R58 — ANTI-PLACEBO: un alias de `prisma` con COMILLAS DOBLES sale en rojo', () => {
+    const fuenteFabricada = `import { prisma as ocultito } from "@/lib/shared/db/prisma";\n`
+    expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
+  })
+
+  it('R58 — ANTI-PLACEBO: un import de NAMESPACE (`import * as db`) del modulo de prisma sale en rojo', () => {
+    const fuenteFabricada = `import * as db from '@/lib/shared/db/prisma';\n`
+    expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
+  })
+
+  it('ANTI-PLACEBO — una consulta SIN empresa en un archivo NO exento sale en rojo', () => {
+    const fuenteFabricada = `
+      export async function leerSinAmbito(id: string) {
+        return prisma.order.findFirst({ where: { id } });
+      }
+    `
+    const analizado = analizarFuente('archivo-fabricado-sin-ambito.ts', fuenteFabricada)
+    expect(hallazgosDeAmbitoPorArchivo('archivo-fabricado-sin-ambito.ts', analizado).length).toBeGreaterThan(0)
+  })
+})
+
 describe('QC-60 R18, R22, R24 — el SQL crudo escribe y numera con la empresa de `companyScopeColumns`', () => {
   /** Las funciones de persistencia que ejecutan SQL crudo, en todos los archivos del modulo. */
   const conSqlCrudo = readdirSync(PERSISTENCE_ROOT)
@@ -538,11 +781,11 @@ describe('QC-60 R18, R22, R24 — el SQL crudo escribe y numera con la empresa d
         .map((funcion) => ({ archivo, funcion })),
     )
 
-  it('el barrido encuentra el alta: `createOrder` ejecuta SQL crudo', () => {
+  it('el barrido encuentra el alta: `insertAliveOrder` ejecuta SQL crudo', () => {
     // ANTI-PLACEBO: si el troceo no viera el `$queryRaw`, los casos de abajo no correrian sobre
     // nada y R24 quedaria sin vigilar.
     expect(conSqlCrudo.map(({ archivo, funcion }) => `${archivo}:${funcion.nombre}`)).toContain(
-      'order-prisma.ts:createOrder',
+      'order-prisma.ts:insertAliveOrder',
     )
   })
 
