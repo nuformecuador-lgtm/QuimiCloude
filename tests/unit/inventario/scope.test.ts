@@ -346,12 +346,20 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // es la pantalla que esta ficha añade -el alta del catalogo la sigue cubriendo
     // `inventario.spec.ts` y esta ficha no la toca-. La guardia no se afloja; se le añade un
     // renglon.
+    // ACTUALIZADO 2026-09-24 (QC-150, producto-terminado): entra un CUARTO nombre,
+    // `producto-terminado.spec.ts`, en el orden que el matcher devuelve (alfabetico). Casa con
+    // `screenPattern` por la palabra «producto» en el nombre del archivo. No es una segunda
+    // pantalla del catalogo: lo que ejercita es el recorrido de un pedido que se finaliza y hace
+    // nacer un producto terminado con su lote en la pestaña «Producto terminado» de Inventario
+    // (R37) -el alta del catalogo la sigue cubriendo `inventario.spec.ts` y esta ficha no la
+    // toca-. La guardia no se afloja; se le añade un renglon.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
       E2E_DE_AISLAMIENTO,
       'ajuste-de-inventario.spec.ts',
       'inventario.spec.ts',
+      'producto-terminado.spec.ts',
     ])
 
     // Defensa extra, para que el renglon nuevo no sea una puerta trasera: el spec de QC-49 tiene
