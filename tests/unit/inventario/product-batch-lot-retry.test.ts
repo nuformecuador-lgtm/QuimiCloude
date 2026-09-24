@@ -61,7 +61,7 @@ const UNIDAD_ID = '77777777-7777-4777-8777-777777777777';
 
 const LOTE_GENERADO: NewProductBatch = {
   presentationId: '55555555-5555-4555-8555-555555555555',
-  stock: 10,
+  stock: '10',
   unitCost: '2.5000',
   lot: null,
   purchaseDate: '2026-09-10',
@@ -185,22 +185,18 @@ describe('createWithFirstBatch — unidad del producto y recalculo (QC-121, R1, 
     expect(doble.batchCreate).not.toHaveBeenCalled();
   });
 
-  it('recalcula stock DESPUES del asiento del lote, sumando de los lotes del producto', async () => {
-    doble.batchFindMany.mockResolvedValue([
-      { stock: 4, presentation: { unitId: UNIDAD_ID } },
-      { stock: 6, presentation: { unitId: UNIDAD_ID } },
-    ]);
-
+  it('recalcula stock DESPUES del asiento del lote, sumando en SQL sobre los lotes del producto', async () => {
     await createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO);
 
-    expect(doble.batchFindMany.mock.invocationCallOrder[0]).toBeGreaterThan(
-      doble.movementCreate.mock.invocationCallOrder[0],
-    );
     const llamadaUpdate = doble.executeRaw.mock.calls.find((llamada) =>
       sqlDe(llamada[0]).includes('UPDATE "products"'),
     );
     if (llamadaUpdate === undefined) throw new Error('no se llamo al UPDATE de stock');
-    expect((llamadaUpdate[0] as Prisma.Sql).values).toEqual([10, PRODUCTO_ID, EMPRESA]);
+    expect(doble.executeRaw.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      doble.movementCreate.mock.invocationCallOrder[0],
+    );
+    expect(sqlDe(llamadaUpdate[0])).toMatch(/SELECT\s+sum\(/i);
+    expect((llamadaUpdate[0] as Prisma.Sql).values).toEqual([PRODUCTO_ID, EMPRESA, PRODUCTO_ID, EMPRESA]);
     // Ninguna otra columna del producto: ni nombre, ni alerta, ni unidad, ni fecha de
     // modificacion (R9, R11 heredado del alta).
     expect(sqlDe(llamadaUpdate[0])).not.toContain('name');
@@ -209,8 +205,10 @@ describe('createWithFirstBatch — unidad del producto y recalculo (QC-121, R1, 
   });
 
   it('si el recalculo lanza, no queda ni el producto ni el lote (R9)', async () => {
-    const fallo = new Error('mezcla de unidades');
-    doble.batchFindMany.mockRejectedValue(fallo);
+    const fallo = new Error('la base rechazo el UPDATE de stock');
+    // El unico `$executeRaw` de este camino, antes del recalculo, es el lock de aviso del
+    // correlativo: la segunda llamada es la que recalcula.
+    doble.executeRaw.mockResolvedValueOnce(0).mockRejectedValueOnce(fallo);
 
     await expect(createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO)).rejects.toBe(fallo);
 
@@ -363,13 +361,14 @@ describe('addBatchToAlive — no toca el producto salvo su stock recalculado (QC
     expect(doble.presentationFindFirst).not.toHaveBeenCalled();
     expect(doble.productCreate).not.toHaveBeenCalled();
 
-    expect(doble.batchFindMany.mock.invocationCallOrder[0]).toBeGreaterThan(
+    expect(doble.executeRaw.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
       doble.movementCreate.mock.invocationCallOrder[0],
     );
     const llamadaUpdate = doble.executeRaw.mock.calls.find((llamada) =>
       sqlDe(llamada[0]).includes('UPDATE "products"'),
     );
     if (llamadaUpdate === undefined) throw new Error('no se llamo al UPDATE de stock');
+    expect(sqlDe(llamadaUpdate[0])).toMatch(/SELECT\s+sum\(/i);
     // La UNICA columna que el recalculo toca es `stock`: nada de nombre, alerta, unidad ni
     // fecha de modificacion.
     expect(sqlDe(llamadaUpdate[0])).not.toContain('name');
@@ -379,8 +378,10 @@ describe('addBatchToAlive — no toca el producto salvo su stock recalculado (QC
   });
 
   it('si el recalculo lanza, el resultado se rechaza en vez de darse por bueno (R9)', async () => {
-    const fallo = new Error('mezcla de unidades');
-    doble.batchFindMany.mockRejectedValue(fallo);
+    const fallo = new Error('la base rechazo el UPDATE de stock');
+    // El unico `$executeRaw` de este camino, antes del recalculo, es el lock de aviso del
+    // correlativo: la segunda llamada es la que recalcula.
+    doble.executeRaw.mockResolvedValueOnce(0).mockRejectedValueOnce(fallo);
 
     await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).rejects.toBe(fallo);
 

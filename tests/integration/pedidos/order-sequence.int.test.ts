@@ -3,12 +3,16 @@
  *
  * REESCRITO POR QC-60 (2026-09-16). Nacio en QC-34 (T17) para probar `next_order_sequence(integer)`
  * —una secuencia de Postgres POR ANO evaluada dentro del `INSERT`— y QC-60 T3 dejo caer esa funcion
- * a proposito: el eje del correlativo paso de «ano» a «(empresa, ano)», y ahora lo reparte
- * `createOrder` con un `pg_advisory_xact_lock` por `(empresa, ano)` y un `max()+1` dentro del
- * `INSERT` (`specs/QC-60-aislamiento-por-empresa-en-pedidos/design.md > 3.2`). Los requisitos que
- * este archivo cubria para QC-34 —R11 «el numero lo entrega la base», R12 «la primera alta del ano
- * arranca en 1», R13 «no se reutiliza un numero entregado»— siguen en pie y se prueban aqui contra el
- * mecanismo NUEVO, llamando al adaptador REAL y no a una copia de su SQL.
+ * a proposito: el eje del correlativo paso de «ano» a «(empresa, ano)», y ahora lo reparte el
+ * `INSERT` de `insertAliveOrder` con un `pg_advisory_xact_lock` por `(empresa, ano)` y un `max()+1`
+ * dentro de si mismo. Los requisitos que este archivo cubria siguen en pie —«el numero lo entrega
+ * la base», «la primera alta del ano arranca en 1», «no se reutiliza un numero entregado»— y se
+ * prueban aqui contra el mecanismo NUEVO, llamando al adaptador REAL y no a una copia de su SQL.
+ *
+ * `createOrder` -el alta suelta con su propio bucle de reintento- se retiro; el UNICO `INSERT` de
+ * pedido que queda es `insertAliveOrder`, sobre `withOrderTransaction` + `createOrderWriteRepository`,
+ * el mismo par que ata `OrderUnitOfWork` en `lib/composition`. El reintento del correlativo sigue
+ * vivo, pero ahora en `withOrderTransaction`.
  *
  * DOS CAMBIOS DE COMPORTAMIENTO, deliberados y escritos en `design.md > 3.4` de QC-60:
  *   - un alta ABORTADA ya NO deja hueco: con `max()+1` el numero no se consume. Aquellas fichas
@@ -20,9 +24,9 @@
  * `order-sequence-race.int.test.ts` (QC-60 T14), con el patron medido de QC-81. Y el reparto por
  * empresa y el «78 tras 37/44/77» viven en `company-scope-queries.int.test.ts` (T13).
  *
- * AISLAMIENTO POR COMMIT: `createOrder` usa el cliente Prisma GLOBAL y abre su PROPIA transaccion,
- * asi que la transaccion con rollback que este archivo usaba antes no lo envolveria. Una empresa
- * efimera por caso, borrada en `finally`.
+ * AISLAMIENTO POR COMMIT: `withOrderTransaction` usa el cliente Prisma GLOBAL y abre su PROPIA
+ * transaccion, asi que la transaccion con rollback que este archivo usaba antes no lo envolveria.
+ * Una empresa efimera por caso, borrada en `finally`.
  *
  * ANOS DE PRUEBA MUY LEJANOS (28xx): el CHECK `orders_order_year_matches_created_at` (QC-33 R41) ata
  * `order_year` al ano UTC de `created_at`, y cada alta pasa un `now` de ese ano. Se afirma sobre el
@@ -35,7 +39,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName } from '@/lib/modules/inventario';
-import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewOrder, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
@@ -144,16 +149,16 @@ function pedido(presentationId: string, overrides: Partial<NewOrder> = {}): NewO
 }
 
 async function alta(fixture: Fixture, year: number, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
-  const resultado = await createOrder(
-    pedido(fixture.presentationId, overrides),
-    year,
-    fixture.actorId,
-    instantIn(year),
-    null,
-    { companyId: fixture.companyId },
+  return withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(
+      pedido(fixture.presentationId, overrides),
+      year,
+      fixture.actorId,
+      instantIn(year),
+      null,
+      { companyId: fixture.companyId },
+    ),
   );
-  if (resultado === 'duplicate_number') throw new Error('el alta devolvio duplicate_number');
-  return resultado;
 }
 
 async function correlativos(fixture: Fixture, year: number): Promise<number[]> {

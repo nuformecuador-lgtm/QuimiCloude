@@ -13,7 +13,8 @@
  * Chromium y WebKit corren a la vez sobre la misma base.
  *
  * `recipes.company_id` es columna obligatoria: la receta del fixture la lleva, con la empresa del
- * propio fixture.
+ * propio fixture. La receta lleva ademas una unica linea al 100 % con un producto que tiene lote
+ * y existencia de sobra: entregar consume material, y una receta sin lineas rechaza el Finalizar.
  *
  * El rol `Operador` es el REAL del seed, nunca un fixture: sus permisos son el dato bajo prueba
  * del camino feliz y de la reentrada. Para el camino negativo hace falta un actor SIN
@@ -28,6 +29,7 @@ import type { Prisma } from '@prisma/client';
 
 import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -50,6 +52,15 @@ const SHARED_TOKEN = `${FIXTURE_PREFIX}${RUN_ID}`;
 const COMPANY_NAME = `${SHARED_TOKEN}_empresa`;
 
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
+
+/** El unico ingrediente de la receta del fixture: Finalizar lo consume al entregar. */
+const PRODUCT_NAME = `${SHARED_TOKEN}_producto`;
+const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
+const BATCH_LOT = `${SHARED_TOKEN}_lote`;
+
+/** Muy por encima de `ORDER_QUANTITY`: la entrega debe alcanzar sin agotar el lote. */
+const BATCH_STOCK = '100.0000';
+const UNIT_COST = '10.0000';
 
 /** Nombre del rol efimero sin ningun permiso, usado solo para el camino negativo. */
 const NO_PERMISSIONS_ROLE_NAME = `${SHARED_TOKEN}_rol_sin_permisos`;
@@ -122,6 +133,7 @@ const STEP_FINISH_TESTID = 'step-reader-finish';
 
 let companyId: string | null = null;
 let recipeId: string | null = null;
+let productId: string | null = null;
 let operatorUserId: string | null = null;
 let orderPendingId: string | null = null;
 let orderInProgressId: string | null = null;
@@ -221,8 +233,13 @@ test.beforeAll(async () => {
   });
   const orphanCompanyIds = orphanCompanies.map((company) => company.id);
   if (orphanCompanyIds.length > 0) {
+    await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   const orphanRecipes = await prisma.recipe.findMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -265,6 +282,55 @@ test.beforeAll(async () => {
   operatorUserId = await createUser(operatorUser, operatorRole.id);
   await createUser(noAccessUser, noPermissionsRole.id);
 
+  // La unidad NO se crea: es una de las cuatro del catalogo arrancador (misma referencia que
+  // `e2e/recetas-porcentaje.spec.ts` y `e2e/ajuste-de-inventario.spec.ts`).
+  const unit = await prisma.unit.findFirstOrThrow({
+    where: { nameNormalized: 'litro', companyId: null },
+    select: { id: true },
+  });
+
+  // El unico ingrediente de la receta: `products.unit_id` se fija A MANO, porque
+  // `product_batches_check_unit` rechaza el lote de mas abajo si el producto no tiene ya unidad.
+  productId = (
+    await prisma.product.create({
+      data: {
+        name: PRODUCT_NAME,
+        nameNormalized: normalizeProductName(PRODUCT_NAME),
+        unitId: unit.id,
+        // `products.stock` la mantiene la aplicacion, nunca un disparador: se fija a mano para
+        // que case con el lote de mas abajo, igual que `e2e/recetas-porcentaje.spec.ts`.
+        stock: BATCH_STOCK,
+        companyId,
+      },
+      select: { id: true },
+    })
+  ).id;
+
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: PRESENTATION_NAME,
+      nameNormalized: normalizePresentationName(PRESENTATION_NAME),
+      unitId: unit.id,
+      companyId,
+    },
+    select: { id: true },
+  });
+
+  // Existencia de sobra: la entrega consume del lote mas antiguo, y este es el unico.
+  await prisma.productBatch.create({
+    data: {
+      productId,
+      presentationId: presentation.id,
+      companyId,
+      stock: BATCH_STOCK,
+      unitCost: UNIT_COST,
+      lot: BATCH_LOT,
+      purchaseDate: new Date('2026-01-01T00:00:00Z'),
+      createdBy: operatorUserId,
+    },
+    select: { id: true },
+  });
+
   recipeId = (
     await prisma.recipe.create({
       data: {
@@ -273,6 +339,10 @@ test.beforeAll(async () => {
         createdBy: operatorUserId,
         companyId,
         steps: RECIPE_STEPS as unknown as Prisma.InputJsonValue,
+        // Una unica linea al 100 %: sin ella la receta esta vacia y Finalizar la rechaza con
+        // `recipe_without_lines`. El `INSERT` directo no pasa por el servicio, asi que la suma
+        // de 100 % no la valida nadie: mismo criterio que `e2e/recetas-porcentaje.spec.ts`.
+        lines: { create: [{ productId, percentage: '100.00' }] },
       },
       select: { id: true },
     })
@@ -300,7 +370,17 @@ test.afterAll(async () => {
   // Por los identificadores de ESTE worker, nunca por `FIXTURE_PREFIX`: el otro proyecto
   // (Chromium/WebKit) sigue corriendo. Cada paso corre aunque falle el anterior.
   const scopedCompanyId = companyId;
+  // Uno de los casos entrega el pedido, y entregar consume: deja filas en `reservation_movements` e
+  // `inventory_movements` que hay que borrar antes que el pedido y el lote (FK RESTRICT).
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    () =>
+      scopedCompanyId
+        ? prisma.reservationMovement.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.inventoryMovement.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
     () =>
       scopedCompanyId
         ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
@@ -310,6 +390,18 @@ test.afterAll(async () => {
         ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
+    () =>
+      scopedCompanyId
+        ? prisma.productBatch.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.product.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.presentation.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
     () =>
       prisma.user.deleteMany({
         where: { username: { in: [operatorUser.username, noAccessUser.username] } },

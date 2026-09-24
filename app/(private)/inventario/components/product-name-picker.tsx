@@ -44,7 +44,7 @@ export const PRODUCT_NAME_FIELD = 'name';
 export type ProductNameOption = {
   readonly id: string;
   readonly name: string;
-  readonly qtyAlert: number | null;
+  readonly qtyAlert: string | null;
   /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
   readonly type: ProductType;
   /**

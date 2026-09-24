@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
 import {
+  InvalidTransitionError,
   DuplicateOrderNumberError,
   OrderNotFoundError,
   RecipeNotFoundError,
@@ -22,6 +23,7 @@ import {
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
@@ -84,24 +86,28 @@ type Dobles = {
   readonly products: ProductCatalog
   readonly units: UnitCatalog
   readonly presentations: PresentationCatalog
+  readonly unitOfWork: ReturnType<typeof fakeUnitOfWork>['unitOfWork']
   readonly now: () => Date
 }
 
 function dobles(opciones: {
   fila?: OrderRow | null
   recetas?: readonly RecipeRef[]
-  alta?: OrderRow | 'duplicate_number'
+  alta?: OrderRow
   edicion?: 'ok' | 'not_found'
   presentaciones?: readonly { readonly id: string; readonly name: string }[]
 }): Dobles & {
   readonly create: ReturnType<typeof vi.fn>
   readonly findAliveById: ReturnType<typeof vi.fn>
+  readonly lockAliveById: ReturnType<typeof vi.fn>
   readonly updateAlive: ReturnType<typeof vi.fn>
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>
   readonly findPresentationRefs: ReturnType<typeof vi.fn>
 } {
   const create = vi.fn(async () => opciones.alta ?? fila())
-  const findAliveById = vi.fn(async () => opciones.fila ?? null)
+  const filaVista = opciones.fila === undefined ? null : opciones.fila
+  const findAliveById = vi.fn(async () => filaVista)
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
   const updateAlive = vi.fn(async () => opciones.edicion ?? 'ok')
   const findRefsIncludingDeleted = vi.fn(async () => opciones.recetas ?? [RECETA_VIVA])
   const findPresentationRefs = vi.fn(
@@ -125,13 +131,16 @@ function dobles(opciones: {
     })
 
   const orders = {
-    create,
     findAliveById,
     listAlive: explota('orders.listAlive'),
-    updateAlive,
-    cancelAlive: explota('orders.cancelAlive'),
-    softDeleteAlive: explota('orders.softDeleteAlive'),
   } as unknown as OrderRepository
+
+  const setReservedAt = vi.fn(async () => undefined)
+  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
+  const { unitOfWork } = fakeUnitOfWork({
+    orders: { lockAliveById, create, updateAlive, setReservedAt },
+    reservations: { syncForOrder },
+  })
 
   return {
     orders,
@@ -142,9 +151,11 @@ function dobles(opciones: {
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
+    unitOfWork,
     now: () => AHORA,
     create,
     findAliveById,
+    lockAliveById,
     updateAlive,
     findRefsIncludingDeleted,
     findPresentationRefs,
@@ -268,18 +279,10 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     ).rejects.toBeInstanceOf(ValidationError)
   })
 
-  it('traduce el duplicado del correlativo a su error de dominio propio', async () => {
-    // El `23505` del indice unico llega como resultado DISCRIMINADO, no como excepcion de
-    // Prisma (`design.md > 4.2`).
-    const d = dobles({ alta: 'duplicate_number' })
-
-    expect(await codigoDelFallo(() => createCreateOrder(d)(ENTRADA_ALTA, ADMIN))).toBe(
-      'duplicate_number',
-    )
-    await expect(createCreateOrder(d)(ENTRADA_ALTA, ADMIN)).rejects.toBeInstanceOf(
-      DuplicateOrderNumberError,
-    )
-  })
+  // El `23505` del correlativo ya NO se traduce aqui. `OrderWriteRepository.create` lo deja
+  // SUBIR, y quien reintenta con una transaccion nueva es `OrderUnitOfWork`; agotados los tres
+  // intentos, la excepcion de Prisma sube sin traducir. Lo prueba
+  // `tests/integration/pedidos/order-unit-of-work.int.test.ts`, contra Postgres real.
 })
 
 describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
@@ -361,12 +364,8 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       totalPages: 1,
     }))
     const orders = {
-      create: vi.fn(),
       findAliveById: vi.fn(),
       listAlive,
-      updateAlive: vi.fn(),
-      cancelAlive: vi.fn(),
-      softDeleteAlive: vi.fn(),
     } as unknown as OrderRepository
     const findRefsIncludingDeleted = vi.fn(async () => [RECETA_VIVA])
     const findIdsMatchingName = vi.fn(async (): Promise<readonly string[] | null> => null)

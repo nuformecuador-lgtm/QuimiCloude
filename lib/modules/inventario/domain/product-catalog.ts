@@ -37,11 +37,17 @@ export interface ProductCatalog {
    *  no compile. */
   findRefs(ids: readonly ProductId[], companyId: string): Promise<readonly ProductRef[]>;
 
-  /** Lotes CON EXISTENCIA (`stock > 0`) de los productos pedidos, de productos vivos y de esa
-   *  empresa. Un producto sin lotes con existencia simplemente no aparece. NO ordena: el
-   *  orden del calculo es criterio de negocio de quien costea. */
+  /** Lotes CON DISPONIBLE (`stock - apartado > 0`) de los productos pedidos, de productos
+   *  vivos y de esa empresa. Un producto sin lotes con disponible simplemente no aparece. NO
+   *  ordena: el promedio de quien costea no depende del orden.
+   *
+   *  Con `excludeOrderId`, lo que ESE pedido tiene apartado no se resta del disponible: es
+   *  para que la edicion y la cotizacion de un pedido que ya existe cuenten su propia reserva
+   *  como disponible para si mismo. Un `excludeOrderId` de otra empresa no cambia nada: las
+   *  dos tablas que agregan el disponible siguen acotadas a `companyId`. */
   findCostingBatches(
     ids: readonly ProductId[],
     companyId: string,
+    options?: { readonly excludeOrderId?: string },
   ): Promise<readonly CostingBatch[]>;
 }

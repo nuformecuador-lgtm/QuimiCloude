@@ -18,10 +18,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order';
 import { RecipeNotFoundError, UnauthorizedError, type PedidosError } from '@/lib/modules/pedidos/domain/errors';
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
-import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { CostingBatch, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
@@ -128,19 +129,13 @@ function catalogoDePresentaciones(): { presentations: PresentationCatalog; findR
 
 function repositorioDePedidos() {
   const create = vi.fn(async () => filaCreada());
-  const explota = (nombre: string) =>
-    vi.fn(() => {
-      throw new Error(`${nombre} no deberia llamarse en este caso`);
-    });
-  const orders = {
-    create,
-    findAliveById: explota('findAliveById'),
-    listAlive: explota('listAlive'),
-    updateAlive: explota('updateAlive'),
-    cancelAlive: explota('cancelAlive'),
-    softDeleteAlive: explota('softDeleteAlive'),
-  } as unknown as OrderRepository;
-  return { orders, create };
+  const setReservedAt = vi.fn(async () => undefined);
+  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+  const { unitOfWork } = fakeUnitOfWork({
+    orders: { create, setReservedAt },
+    reservations: { syncForOrder },
+  });
+  return { unitOfWork, create, setReservedAt, syncForOrder };
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -157,7 +152,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
-      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -177,7 +172,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const repo2 = repositorioDePedidos();
     await expect(
       createCreateOrder({
-        orders: repo2.orders,
+        unitOfWork: repo2.unitOfWork,
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
@@ -190,7 +185,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat2 = catalogoDeRecetas();
     const repo3 = repositorioDePedidos();
     const errorInexistente = await createCreateOrder({
-      orders: repo3.orders,
+      unitOfWork: repo3.unitOfWork,
       recipes: cat2.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -206,7 +201,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
-      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -223,7 +218,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
-      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -244,7 +239,7 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
     const createOrder = createCreateOrder({
-      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -264,7 +259,7 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
     const createOrder = createCreateOrder({
-      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -284,13 +279,13 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
 
   it('R13: el coste y la cantidad no dependen de la presentacion', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
-    const prod = catalogoDeProductos([loteCosteable({ stock: 100, unitCost: '3.0000' })]);
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo1 = repositorioDePedidos();
     const repo2 = repositorioDePedidos();
 
     const createOrder1 = createCreateOrder({
-      orders: repo1.orders,
+      unitOfWork: repo1.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
@@ -298,7 +293,7 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
       now: () => AHORA,
     });
     const createOrder2 = createCreateOrder({
-      orders: repo2.orders,
+      unitOfWork: repo2.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
@@ -333,33 +328,28 @@ function lineaDeReceta(overrides: Partial<RecipeExecutionLine> = {}): RecipeExec
 }
 
 function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
+  const stock = overrides.stock ?? '100';
   return {
     productId: PRODUCTO_X,
     lot: '1',
-    stock: 100,
+    stock,
     unitCost: '3.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
+    available: stock,
     ...overrides,
   };
 }
 
-/** Los DOS puertos y el catalogo de recetas FALLAN SI SE LLAMAN: no basta con que el alta
- *  rechace, tiene que rechazar SIN haber leido nada (R23). */
+/** La unidad de trabajo y el catalogo de recetas FALLAN SI SE LLAMAN: no basta con que el alta
+ *  rechace, tiene que rechazar SIN haber leido nada ni abierto la transaccion. */
 function catalogosQueExplotan() {
   const explota = (nombre: string) =>
     vi.fn(() => {
       throw new Error(`${nombre} no deberia llamarse sin permiso`);
     });
   return {
-    orders: {
-      create: explota('orders.create'),
-      findAliveById: explota('orders.findAliveById'),
-      listAlive: explota('orders.listAlive'),
-      updateAlive: explota('orders.updateAlive'),
-      cancelAlive: explota('orders.cancelAlive'),
-      softDeleteAlive: explota('orders.softDeleteAlive'),
-    } as unknown as OrderRepository,
+    unitOfWork: { run: explota('unitOfWork.run') } as unknown as OrderUnitOfWork,
     recipes: {
       findRefsIncludingDeleted: explota('recipes.findRefsIncludingDeleted'),
       findExecutionContentById: explota('recipes.findExecutionContentById'),
@@ -381,11 +371,11 @@ function catalogosQueExplotan() {
 describe('T5 — el alta calcula el importe de los ingredientes', () => {
   it('el alta calcula el importe y lo pasa al puerto (R10)', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
-    const prod = catalogoDeProductos([loteCosteable({ stock: 100, unitCost: '3.0000' })]);
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
-      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
@@ -409,14 +399,14 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
         lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}` }),
       );
       const lotes = Array.from({ length: 5 }, (_, i) =>
-        loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: 100, unitCost: '1.0000' }),
+        loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: '100', unitCost: '1.0000' }),
       );
       const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, lineas]]));
       const prod = catalogoDeProductos(lotes);
       const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
       const repo = repositorioDePedidos();
       const createOrder = createCreateOrder({
-        orders: repo.orders,
+        unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
         products: prod.products,
         units: uni.units,
@@ -439,7 +429,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       permissions: ['pedidos.consultar'],
     };
     const createOrder = createCreateOrder({
-      orders: catalogos.orders,
+      unitOfWork: catalogos.unitOfWork,
       recipes: catalogos.recipes,
       products: catalogos.products,
       units: catalogos.units,
@@ -456,11 +446,11 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     const cat = catalogoDeRecetas(
       new Map([[RECETA_DE_A, [lineaDeReceta()]]]),
     );
-    const prod = catalogoDeProductos([loteCosteable({ stock: 1, unitCost: '10000000000.0000' })]);
+    const prod = catalogoDeProductos([loteCosteable({ stock: '1', unitCost: '10000000000.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
-      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
@@ -473,5 +463,187 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.create).toHaveBeenCalledTimes(1);
     expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBeNull();
+  });
+
+  it('el alta no excluye ningun pedido del disponible: todavia no aparto nada (R65)', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
+    const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: prod.products,
+      units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder(
+      { recipeId: RECETA_DE_A, quantity: '20.0000', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
+
+    expect(prod.findCostingBatches).toHaveBeenCalledWith([PRODUCTO_X], EMPRESA_A, { excludeOrderId: undefined });
+  });
+});
+
+describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
+  /** Registra el ORDEN real de las llamadas al `scope` de la unidad de trabajo, no solo si se
+   *  llamaron: `create` -> `syncForOrder` -> `setReservedAt` es el pseudocodigo literal del
+   *  caso de uso. */
+  function repositorioConOrden(outcome: 'reserved' | 'not_reserved' = 'reserved') {
+    const orden: string[] = [];
+    const create = vi.fn(async () => {
+      orden.push('orders.create');
+      return filaCreada();
+    });
+    const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => {
+      void [id, reservedAt];
+      orden.push('orders.setReservedAt');
+    });
+    const syncForOrder = vi.fn(async () => {
+      orden.push('reservations.syncForOrder');
+      return { kind: outcome } as const;
+    });
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create, setReservedAt },
+      reservations: { syncForOrder },
+    });
+    return { unitOfWork, orden, create, setReservedAt, syncForOrder };
+  }
+
+  it('el orden real es create -> syncForOrder -> setReservedAt(now) cuando aparta', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const repo = repositorioConOrden('reserved');
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+
+    expect(repo.orden).toEqual(['orders.create', 'reservations.syncForOrder', 'orders.setReservedAt']);
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
+  });
+
+  it('setReservedAt recibe null cuando el reparto no aparta (not_reserved)', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const repo = repositorioConOrden('not_reserved');
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+  });
+
+  it('R41: el permiso se exige ANTES de abrir la unidad de trabajo', async () => {
+    const cat = catalogoDeRecetas();
+    const unitOfWork = {
+      run: vi.fn(() => {
+        throw new Error('unitOfWork.run no deberia llamarse sin permiso');
+      }),
+    };
+    const createOrder = createCreateOrder({
+      unitOfWork: unitOfWork as unknown as ReturnType<typeof repositorioDePedidos>['unitOfWork'],
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
+
+    await expect(
+      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, SIN_PERMISO),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(unitOfWork.run).not.toHaveBeenCalled();
+  });
+
+  it('R49: una receta sin lineas guarda sin error y deja reserved_at nulo', async () => {
+    // Receta sin lineas: `catalogoDeRecetas()` por defecto sin mapa devuelve `lines: []`.
+    const cat = catalogoDeRecetas();
+    const repo = repositorioConOrden('not_reserved');
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    const creado = await createOrder(
+      { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
+
+    expect(creado.id).toBe(filaCreada().id);
+    expect(repo.syncForOrder).toHaveBeenCalledTimes(1);
+    const requerido = (repo.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(requerido.requirement).toEqual([]);
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+  });
+
+  it('m7: la receta para la reserva se lee con `scope.recipes`, no con el lector global del coste', async () => {
+    const lineas = [lineaDeReceta()];
+    // El lector GLOBAL solo responde por el COSTE (fuera de la unidad de trabajo): una sola
+    // llamada. Si `create-order.ts` volviera a preguntarle por la reserva, esta prueba lo
+    // detectaria contando sus llamadas.
+    const findExecutionContentByIdGlobal = vi.fn(async (id: string) => ({
+      id,
+      name: 'Receta',
+      isDeleted: false,
+      steps: [],
+      lines: lineas,
+    }));
+    const recipesGlobal = {
+      findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'x', isDeleted: false }))),
+      findExecutionContentById: findExecutionContentByIdGlobal,
+    } as unknown as RecipeCatalog;
+    // El lector de `scope.recipes` -sobre el cliente de LA transaccion- es el UNICO que puede
+    // responder por la reserva.
+    const findExecutionContentByIdDeLaTransaccion = vi.fn(async (id: string) => ({
+      id,
+      name: 'Receta',
+      isDeleted: false,
+      steps: [],
+      lines: lineas,
+    }));
+    const create = vi.fn(async () => filaCreada());
+    const setReservedAt = vi.fn(async () => undefined);
+    const syncForOrder = vi.fn(async (input: { requirement: readonly unknown[] }) => {
+      expect(input.requirement).toEqual([{ productId: PRODUCTO_X, quantity: '10' }]);
+      return { kind: 'reserved' as const };
+    });
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create, setReservedAt },
+      reservations: { syncForOrder },
+      recipes: { findExecutionContentById: findExecutionContentByIdDeLaTransaccion },
+    });
+    const createOrder = createCreateOrder({
+      unitOfWork,
+      recipes: recipesGlobal,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+
+    expect(findExecutionContentByIdGlobal).toHaveBeenCalledTimes(1);
+    expect(findExecutionContentByIdDeLaTransaccion).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
   });
 });

@@ -60,13 +60,15 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
 }
 
 function lote(overrides: Partial<CostingBatch> = {}): CostingBatch {
+  const stock = overrides.stock ?? '50.0000';
   return {
     productId: PRODUCT_A,
     lot: '1',
-    stock: 50,
+    stock,
     unitCost: '2.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
+    available: stock,
     ...overrides,
   };
 }
@@ -78,7 +80,7 @@ describe('resolveIngredientsCost', () => {
     );
     const prod = catalogoDeProductos(
       [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
-      [lote({ stock: 50, unitCost: '2.0000' })],
+      [lote({ stock: '50.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
 
@@ -117,7 +119,7 @@ describe('resolveIngredientsCost', () => {
     const cat = catalogoDeRecetas();
     const prod = catalogoDeProductos(
       [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
-      [lote({ stock: 1, unitCost: '2.0000' })],
+      [lote({ stock: '1.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
 
@@ -159,7 +161,7 @@ describe('resolveIngredientsCost', () => {
     );
     const prod = catalogoDeProductos(
       [{ id: PRODUCT_A, name: 'A', unitId: GRAMO.id, stockByUnit: [] }],
-      [lote({ unitId: KILOGRAMO.id, stock: 2, unitCost: '5.0000' })],
+      [lote({ unitId: KILOGRAMO.id, stock: '2.0000', unitCost: '5.0000' })],
     );
     const uni = catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILOGRAMO.id, KILOGRAMO]]));
 
@@ -189,7 +191,7 @@ describe('resolveIngredientsCost', () => {
       stockByUnit: [],
     }));
     const batches = Array.from({ length: 4 }, (_, i) =>
-      lote({ productId: `${PRODUCT_A}-${i}`, stock: 1000, unitCost: '1.0000' }),
+      lote({ productId: `${PRODUCT_A}-${i}`, stock: '1000.0000', unitCost: '1.0000' }),
     );
     const cat = catalogoDeRecetas(contenido({ lines }));
     const prod = catalogoDeProductos(refs, batches);
@@ -209,7 +211,7 @@ describe('resolveIngredientsCost', () => {
     );
     const prod = catalogoDeProductos(
       [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
-      [lote({ stock: 1000, unitCost: '1.0000' })],
+      [lote({ stock: '1000.0000', unitCost: '1.0000' })],
     );
     const uni = catalogoDeUnidades();
 
@@ -220,5 +222,25 @@ describe('resolveIngredientsCost', () => {
     // de pedido (2:3), con los mismos porcentajes.
     expect(con200).toBe('20.0000');
     expect(con300).toBe('30.0000');
+  });
+
+  it('sin `options.orderId` pide los lotes sin excluir ningun pedido; con el, lo reenvia como `excludeOrderId` (R65)', async () => {
+    const cat = catalogoDeRecetas();
+    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }], [lote()]);
+    const uni = catalogoDeUnidades();
+
+    await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
+    expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: undefined });
+
+    await resolveIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+      { orderId: 'pedido-1' },
+    );
+    expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: 'pedido-1' });
   });
 });

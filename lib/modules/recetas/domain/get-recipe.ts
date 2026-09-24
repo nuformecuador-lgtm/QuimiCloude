@@ -14,11 +14,14 @@ export type GetRecipeDeps = {
   readonly images: RecipeImageStorage;
 };
 
-/** Existencia del producto en SU PROPIA unidad: 0 cuando no tiene lotes -y por
- *  tanto ninguna unidad resoluble-, la cantidad de esa unidad en el resto de los casos. */
-function stockInProductUnit(ref: ProductRef): number {
-  if (ref.unitId === null) return 0;
-  return ref.stockByUnit.find((entry) => entry.unitId === ref.unitId)?.quantity ?? 0;
+const NO_BATCHES_STOCK = '0.0000';
+
+/** Existencia del producto en SU PROPIA unidad: `'0.0000'` cuando no tiene lotes -y por
+ *  tanto ninguna unidad resoluble-, la cantidad de esa unidad, en cadena, en el resto de los
+ *  casos. */
+function stockInProductUnit(ref: ProductRef): string {
+  if (ref.unitId === null) return NO_BATCHES_STOCK;
+  return ref.stockByUnit.find((entry) => entry.unitId === ref.unitId)?.quantity ?? NO_BATCHES_STOCK;
 }
 
 /**
