@@ -14,6 +14,8 @@ import type {
 import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type {
   ConsumptionOutcome,
+  FinishedGoodsIntake,
+  FinishedGoodsOutcome,
   MaterialReservations,
   ReservationOutcome,
 } from '@/lib/modules/inventario';
@@ -65,6 +67,23 @@ export function fakeOrderUnitOfWork(scope: OrderTransactionScope): OrderUnitOfWo
   return { run: (work) => work(scope) };
 }
 
+/** Un `FinishedGoodsIntake` que explota si se le llama: solo el Finalizar de QC-150 lo toca, y
+ *  quien no espera esa llamada -crear, editar, cancelar, caducar- lo hereda sin personalizarlo.
+ *  Quien SI la espera pasa su propio doble por `overrides`. */
+export function fakeFinishedGoodsIntake(
+  overrides: Partial<FinishedGoodsIntake> = {},
+): FinishedGoodsIntake & Record<keyof FinishedGoodsIntake, ReturnType<typeof vi.fn>> {
+  const receiveFromOrder = vi.fn(
+    async (): Promise<FinishedGoodsOutcome> => {
+      throw new Error('FinishedGoodsIntake.receiveFromOrder no deberia llamarse en este caso');
+    },
+  );
+  return {
+    receiveFromOrder,
+    ...overrides,
+  } as unknown as FinishedGoodsIntake & Record<keyof FinishedGoodsIntake, ReturnType<typeof vi.fn>>;
+}
+
 /** Lector de receta del `scope`, sobre el `tx`: por defecto una
  *  receta SIN lineas, para que quien no la personaliza obtenga una necesidad vacia y no un
  *  dato inventado. Quien necesite lineas concretas pasa su propio `RecipeCatalog` de dobles
@@ -91,17 +110,26 @@ export function fakeUnitOfWork(overrides: {
   readonly orders?: Partial<OrderWriteRepository>;
   readonly reservations?: Partial<MaterialReservations>;
   readonly recipes?: Partial<OrderTransactionScope['recipes']>;
+  readonly finishedGoods?: Partial<FinishedGoodsIntake>;
 } = {}): {
   readonly unitOfWork: OrderUnitOfWork;
   readonly orders: OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
   readonly reservations: MaterialReservations &
     Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
   readonly recipes: OrderTransactionScope['recipes'] & Record<'findExecutionContentById', ReturnType<typeof vi.fn>>;
+  readonly finishedGoods: FinishedGoodsIntake & Record<keyof FinishedGoodsIntake, ReturnType<typeof vi.fn>>;
 } {
   const orders = fakeOrderWriteRepository(overrides.orders);
   const reservations = fakeMaterialReservations(overrides.reservations);
   const recipes = fakeRecipeExecutionReader(overrides.recipes);
-  return { unitOfWork: fakeOrderUnitOfWork({ orders, reservations, recipes }), orders, reservations, recipes };
+  const finishedGoods = fakeFinishedGoodsIntake(overrides.finishedGoods);
+  return {
+    unitOfWork: fakeOrderUnitOfWork({ orders, reservations, recipes, finishedGoods }),
+    orders,
+    reservations,
+    recipes,
+    finishedGoods,
+  };
 }
 
 /** Fila minima de `OrderWriteRepository.lockAliveById`: los tests que no la personalizan usan

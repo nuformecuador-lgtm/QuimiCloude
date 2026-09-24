@@ -54,7 +54,7 @@ import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventar
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
-import { fakeOrderUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeFinishedGoodsIntake, fakeOrderUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
@@ -194,6 +194,8 @@ function almacen() {
     orders: writeOrders as unknown as OrderTransactionScope['orders'],
     reservations: reservations as unknown as OrderTransactionScope['reservations'],
     recipes: recipes as unknown as OrderTransactionScope['recipes'],
+    // Ningun caso de este archivo llega a ENTREGADO: ninguno espera que se llame.
+    finishedGoods: fakeFinishedGoodsIntake(),
   })
   const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
   const units = {
