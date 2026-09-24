@@ -18,6 +18,14 @@ export type TransitionOrderDeps = {
   readonly unitOfWork: OrderUnitOfWork;
 };
 
+/** Se lanza dentro de la unidad de trabajo cuando `setStatus` ya consumio material pero no pudo
+ *  mover el estado: deshace la transaccion y lleva el resultado real hacia fuera. */
+class StatusChangeAfterConsumptionFailedError extends Error {
+  constructor(readonly outcome: 'not_found' | 'stale') {
+    super(`setStatus devolvio '${outcome}' tras consumir material`);
+  }
+}
+
 /** Firma exacta de `OrderCatalog['transitionAliveById']`: es lo que `asignaciones` invoca sin
  *  saber que, por dentro, hay una transaccion con dos modulos. */
 export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['transitionAliveById'] {
@@ -29,7 +37,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
     actorId: string,
     now: Date,
   ) {
-    // Falla rapido, sin abrir transaccion, igual que hacia `transitionAliveOrder`.
+    // Falla rapido, sin abrir transaccion, si el destino no es alcanzable desde el estado actual.
     assertTransition(from, to);
 
     try {
@@ -43,8 +51,8 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
         // Consume ANTES de mover el estado: si falta material o la receta no tiene lineas, la
         // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos.
         if (to === 'ENTREGADO') {
-          // Con el cliente de ESTA transaccion (`scope.recipes`), no con el lector global: una
-          // segunda conexion mientras esta retiene la suya es lo que `design.md > 5.2.2` evita.
+          // Con el cliente de ESTA transaccion (`scope.recipes`), no con el lector global: pedir
+          // una segunda conexion mientras esta retiene la suya es espera o error bajo carga.
           const content = await scope.recipes.findExecutionContentById(locked.recipeId, companyId);
           const requirement = buildRequirement(content?.lines ?? [], locked.quantity);
 
@@ -60,7 +68,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           if (outcome.kind === 'nothing_to_consume') throw new RecipeWithoutLinesError();
 
           const result = await scope.orders.setStatus(id, from, to, actorId, now, { companyId });
-          if (result !== 'ok') return result;
+          if (result !== 'ok') throw new StatusChangeAfterConsumptionFailedError(result);
 
           await scope.orders.setReservedAt(id, null, { companyId });
           return 'ok';
@@ -71,6 +79,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
     } catch (err) {
       if (err instanceof InsufficientMaterialError) return 'insufficient_material';
       if (err instanceof RecipeWithoutLinesError) return 'recipe_without_lines';
+      if (err instanceof StatusChangeAfterConsumptionFailedError) return err.outcome;
       throw err;
     }
   };

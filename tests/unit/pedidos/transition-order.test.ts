@@ -12,7 +12,7 @@ import { createTransitionOrder } from '@/lib/modules/pedidos/domain/transition-o
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
-import type { OrderTransactionScope } from '@/lib/modules/pedidos/ports/order-unit-of-work';
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeExecutionLine } from '@/lib/modules/recetas';
 
 const EMPRESA = 'c-1';
@@ -182,6 +182,39 @@ describe('createTransitionOrder', () => {
 
     // R51: si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
     expect(setStatus).not.toHaveBeenCalled();
+    expect(setReservedAt).not.toHaveBeenCalled();
+  });
+
+  it('R51: setStatus devuelve stale tras consumir y la unidad se deshace', async () => {
+    const { recipes } = catalogoDeRecetas();
+    const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
+    const setStatus = vi.fn(async () => 'stale' as const);
+    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const setReservedAt = vi.fn();
+    const { orders, reservations, recipes: scopeRecipes } = fakeUnitOfWork({
+      orders: { lockAliveById, setStatus, setReservedAt },
+      reservations: { consumeForOrder },
+      recipes,
+    });
+    let vioLaExcepcion = false;
+    const unitOfWork: OrderUnitOfWork = {
+      run: async <T>(work: (scope: OrderTransactionScope) => Promise<T>) => {
+        try {
+          return await work({ orders, reservations, recipes: scopeRecipes });
+        } catch (err) {
+          vioLaExcepcion = true;
+          throw err;
+        }
+      },
+    };
+    const transitionAliveById = createTransitionOrder({ unitOfWork });
+
+    await expect(
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+    ).resolves.toBe('stale');
+
+    expect(vioLaExcepcion).toBe(true);
+    expect(consumeForOrder).toHaveBeenCalledTimes(1);
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
