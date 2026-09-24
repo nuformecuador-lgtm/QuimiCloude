@@ -470,7 +470,7 @@ describe('calculateIngredientsCost', () => {
   });
 });
 
-// `calculateLotIngredientsCost` (D13, R42): el costo del LOTE de producto terminado cuenta cero
+// `calculateLotIngredientsCost`: el costo del LOTE de producto terminado cuenta cero
 // cada ingrediente sin costo, en vez de dejar el total entero sin importe como hace
 // `calculateIngredientsCost`. Nunca devuelve `null`.
 describe('calculateLotIngredientsCost', () => {
@@ -491,7 +491,7 @@ describe('calculateLotIngredientsCost', () => {
     );
 
     // Con calculateIngredientsCost este mismo insumo sin costo habria invalidado el total
-    // entero (R43); aqui el ingrediente A solo aporta 10 * 100 = 1000,0000.
+    // entero; aqui el ingrediente A solo aporta 10 * 100 = 1000,0000.
     expect(resultado).toBe('1000.0000');
   });
 

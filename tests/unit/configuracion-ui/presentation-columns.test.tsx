@@ -1,5 +1,4 @@
-// QC-45 T4 — Las columnas de la lista de presentaciones y sus acciones de fila: R8, R9, R11, R19,
-// R20, R32.
+// Las columnas de la lista de presentaciones y sus acciones de fila.
 //
 // **Las columnas son DATOS**, asi que el test recorre la DECLARACION en vez de listar literales:
 // anadir una columna es anadir una entrada a `PRESENTATION_COLUMNS`, y eso es justo lo que el test

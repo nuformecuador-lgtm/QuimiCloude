@@ -848,7 +848,7 @@ describe('R28 — el homonimo vivo es un producto terminado', () => {
 
   it('rechaza cuando addBatchToAlive lo descubre bajo la fila bloqueada -carrera cerrada-', async () => {
     // El homonimo era PRODUCT en la lectura, pero el adaptador -con la fila ya bloqueada-
-    // descubre que nacio FINISHED_PRODUCT entre esa lectura y la escritura (R28).
+    // descubre que nacio FINISHED_PRODUCT entre esa lectura y la escritura.
     const products = montarRepositorio({
       findAliveIdByNameInPresentationUnit: vi.fn<
         ProductRepository['findAliveIdByNameInPresentationUnit']

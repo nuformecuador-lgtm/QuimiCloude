@@ -1,5 +1,5 @@
 // Contrato estatico de `db/migrations/*_finished_products_and_content_copies` para la parte que
-// toca `orders`: la copia del contenido de la presentacion (D16) y sus dos CHECK.
+// toca `orders`: la copia del contenido de la presentacion y sus dos CHECK.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

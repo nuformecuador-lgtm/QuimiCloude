@@ -166,7 +166,7 @@ async function crearFixture(): Promise<Fixture> {
     data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
     select: { id: true },
   });
-  // Contenido `1` (QC-150, R6): las cantidades de este archivo son enteras, asi que un envase
+  // Contenido `1`: las cantidades de este archivo son enteras, asi que un envase
   // entero coincide con la cantidad pedida y el Finalizar nunca rechaza por `no_whole_package`.
   const presentation = await prisma.presentation.create({
     data: {
@@ -193,7 +193,7 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[]): P
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
-  // El producto terminado que un Finalizar da de alta (QC-150) referencia la receta con
+  // El producto terminado que un Finalizar da de alta referencia la receta con
   // `ON DELETE RESTRICT`: se limpia ANTES de borrar la receta, no solo los ingredientes.
   await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, type: 'FINISHED_PRODUCT' } } });
   await prisma.product.deleteMany({ where: { companyId: fixture.companyId, type: 'FINISHED_PRODUCT' } });
@@ -559,7 +559,7 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
         new Date(),
       );
 
-      // El exito de un Finalizar lleva el lote de producto terminado que entro (QC-150, R24).
+      // El exito de un Finalizar lleva el lote de producto terminado que entro.
       expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: { packages: '10' } });
       expect(await stockDe(batchId)).toBe('90.0000');
       const movimientos = await movimientosDe(creado.id);

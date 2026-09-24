@@ -89,7 +89,7 @@ describe('R30: el selector de insumos nunca pide productos terminados', () => {
       />,
     );
 
-    // La página inicial ya viene filtrada por tipo desde el servidor (R30, R49): si un producto
+    // La página inicial ya viene filtrada por tipo desde el servidor: si un producto
     // terminado se colara ahí, esto lo detecta igual, con las dos pestañas abiertas.
     await user.click(screen.getByTestId('recipe-line-product-0'));
     expect(

@@ -476,7 +476,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // razon de que este spec estuviera aqui ya no existe; sigue siendo una lista cerrada y un spec
   // mas que referencie `data-table` vuelve a ponerla en rojo.
   //
-  // 2026-09-24 (QC-150, producto-terminado, R37): entra `e2e/producto-terminado.spec.ts`, y no
+  // Entra `e2e/producto-terminado.spec.ts`, y no
   // afloja la lista. No estrena pantalla: recorre las de presentaciones, pedidos, asignacion e
   // inventario, ya en esta lista, y localiza `data-table-cell-orderNumber`, `data-table-row-<id>`
   // y `data-table-cell-name` porque lo que afirma -el pedido finalizado y el lote de producto
@@ -532,7 +532,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // la pantalla de presentaciones la consume (QC-45 R8, R36). La lista sigue CERRADA: un
       // sexto spec que referencie `data-table` vuelve a ponerla en rojo.
       'e2e/presentaciones.spec.ts',
-      // La trae QC-150 el 2026-09-24 (R37): ver la nota de arriba. Va antes que `proveedores`
+      // Ver la nota de arriba. Va antes que `proveedores`
       // porque la lista esta ORDENADA y 'd' precede a 'v'.
       'e2e/producto-terminado.spec.ts',
       'e2e/proveedores.spec.ts',

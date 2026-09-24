@@ -591,10 +591,10 @@ describe('R42, R43 — el coste del lote', () => {
     await crearLineaCompleta(recipeConLinea, productId);
 
     try {
-      // Se crea con la receta VACIA -sin lineas, `calculateIngredientsCost` devuelve `null`
-      // (R42: importe nulo)-, que tampoco aparta nada; se recarga con la receta con linea por
-      // fuera del caso de uso, igual que el patron de `order-reservation.int.test.ts` (R31): el
-      // pedido llega al Finalizar sin nada apartado y sin importe guardado.
+      // Se crea con la receta VACIA -sin lineas, `calculateIngredientsCost` devuelve `null`,
+      // que tampoco aparta nada-; se recarga con la receta con linea por fuera del caso de uso,
+      // igual que el patron de `order-reservation.int.test.ts`: el pedido llega al Finalizar sin
+      // nada apartado y sin importe guardado.
       const creado = await createOrder(nuevoPedido(recipeVacia, fixture.presentationId, '10.0000'), actorDe(fixture));
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
       expect(antes.ingredientsCost).toBeNull();
@@ -612,7 +612,7 @@ describe('R42, R43 — el coste del lote', () => {
       expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('90.0000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
-      // El importe guardado del pedido sigue nulo: el recalculo del lote no lo escribe (R43).
+      // El importe guardado del pedido sigue nulo: el recalculo del lote no lo escribe.
       expect(despues.ingredientsCost).toBeNull();
     } finally {
       await borrarFixture(fixture, [productId]);
@@ -630,7 +630,7 @@ describe('R42, R43 — el coste del lote', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
-      // El ingrediente MACHINE sin costo invalida el importe del pedido entero (R43: sigue nulo).
+      // El ingrediente MACHINE sin costo invalida el importe del pedido entero.
       expect(antes.ingredientsCost).toBeNull();
 
       const resultado = await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'ENTREGADO', fixture.actorId, new Date());
@@ -639,7 +639,7 @@ describe('R42, R43 — el coste del lote', () => {
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
       // Solo el ingrediente con costo cuenta: 60% de 10 x 5.0000 = 30.0000, entre 10 (cantidad
-      // que entra) = 3.0000. El de la maquina sin costo aporta cero (R42).
+      // que entra) = 3.0000. El de la maquina sin costo aporta cero.
       expect(lote.unitCost?.toFixed(4)).toBe('3.0000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });

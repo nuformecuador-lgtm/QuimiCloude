@@ -81,7 +81,6 @@ describe('updatePresentationSchema — la edicion es reemplazo completo (R12)', 
   });
 });
 
-// QC-150 — el contenido de la presentacion (absorbe QC-130).
 describe('createPresentationSchema — el contenido (R6)', () => {
   it('R6: acepta un decimal mayor que cero, hasta diez enteros y cuatro decimales', () => {
     const result = createPresentationSchema.safeParse({

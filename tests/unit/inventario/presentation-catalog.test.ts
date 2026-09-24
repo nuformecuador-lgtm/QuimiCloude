@@ -24,7 +24,7 @@ describe('toPresentationRef', () => {
     expect(ref).toEqual({ id: 'pr-1', name: 'Bidon 20L', content: null });
   });
 
-  // QC-150 (R38-R40): ampliacion nombrada del contrato -`PresentationRef` gana `content`-,
+  // Ampliacion nombrada del contrato -`PresentationRef` gana `content`-,
   // el que `pedidos` copia al crear o cambiar de presentacion.
   it('mapea el contenido con los 4 decimales de DECIMAL(14,4) (R38)', () => {
     const ref = toPresentationRef({

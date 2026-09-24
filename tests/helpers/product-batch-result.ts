@@ -1,5 +1,5 @@
-// QC-150 T10: `addBatchToAlive` y `adjustBatchStock` ganaron un resultado-sentinela
-// ('finished_product' / 'increase_not_allowed', R28/R31). Los tests de otras fichas que ya
+// `addBatchToAlive` y `adjustBatchStock` ganaron un resultado-sentinela
+// ('finished_product' / 'increase_not_allowed'). Los tests de otras fichas que ya
 // sabian que su fixture no es un producto terminado siguen leyendo `.batchId`/`.stock` sin
 // volver a comprobarlo caso por caso: estas dos funciones estrechan el tipo y fallan alto si
 // alguna vez llegara el sentinela donde no se espera.

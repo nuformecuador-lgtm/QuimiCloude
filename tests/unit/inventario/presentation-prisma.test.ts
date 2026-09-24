@@ -122,7 +122,7 @@ describe('toPresentationView — mapeo de fila a contrato (R15)', () => {
     expect(presentationSelect.unitId).toBe(true);
   });
 
-  // QC-150 (R6, R8): ampliacion nombrada del contrato -`PresentationView` gana `content`-.
+  // Ampliacion nombrada del contrato -`PresentationView` gana `content`-.
   it('el select pide la columna content, y el contenido se formatea con los 4 decimales de DECIMAL(14,4) (R6, R8)', () => {
     expect(presentationSelect.content).toBe(true);
     expect(

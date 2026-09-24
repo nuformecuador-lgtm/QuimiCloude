@@ -58,7 +58,6 @@ describe('createProductSchema', () => {
   });
 
   it('D22 — rechaza el nombre de producto de mas de 200 caracteres y acepta hasta 200', () => {
-    // R11, D22
     const productName201 = 'a'.repeat(201);
     const productName200 = 'a'.repeat(200);
     expect(

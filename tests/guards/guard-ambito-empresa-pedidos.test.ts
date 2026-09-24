@@ -487,8 +487,8 @@ const PUERTOS = [
 const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
   [
     'transitionAliveById',
-    // QC-150: gana `recipes`, `products` y `units` -las lecturas globales del coste del lote y
-    // del nombre de la receta (`design.md > 4.3`)-, ademas de `unitOfWork`.
+    // Gana `recipes`, `products` y `units` -las lecturas globales del coste del lote y del
+    // nombre de la receta-, ademas de `unitOfWork`.
     /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,?\s*\}\s*\)$/,
   ],
 ])

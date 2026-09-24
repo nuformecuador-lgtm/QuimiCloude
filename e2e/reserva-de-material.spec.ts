@@ -396,7 +396,7 @@ test.beforeAll(async () => {
       name: PRESENTATION_NAME,
       nameNormalized: normalizePresentationName(PRESENTATION_NAME),
       unitId: unit.id,
-      // Sin contenido, Finalizar rechaza con `presentation_without_content` (QC-150 R18).
+      // Sin contenido, Finalizar rechaza con `presentation_without_content`.
       content: PRESENTATION_CONTENT,
       companyId,
     },

@@ -244,7 +244,7 @@ describe('R29 — un producto terminado no puede ser ingrediente', () => {
 
   it('rechaza la edicion cuando una linea NUEVA senala un producto terminado, sin escribir', async () => {
     // La linea de `LINEA_VALIDA` ya esta en `FILA_RECETA`: update-recipe.ts solo revalida
-    // contra el catalogo las lineas NUEVAS (R45/R46), asi que el caso usa un producto
+    // contra el catalogo las lineas NUEVAS, asi que el caso usa un producto
     // distinto para que la comprobacion se dispare de verdad.
     const terminadoId = '44444444-4444-4444-8444-444444444444';
     const edicionConTerminado = {

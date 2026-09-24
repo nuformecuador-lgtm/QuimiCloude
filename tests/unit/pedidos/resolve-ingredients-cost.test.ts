@@ -246,10 +246,10 @@ describe('resolveIngredientsCost', () => {
   });
 });
 
-// `resolveLotIngredientsCost` (D13, R42): la hermana que orquesta las mismas lecturas pero
+// `resolveLotIngredientsCost`: la hermana que orquesta las mismas lecturas pero
 // termina en `calculateLotIngredientsCost` -un ingrediente sin costo cuenta cero- en vez de
-// `calculateIngredientsCost`. Comparte firma completa, incluido `options.orderId` (C5: el
-// pedido que se finaliza tiene su propio material apartado, que cuenta como disponible para si).
+// `calculateIngredientsCost`. Comparte firma completa, incluido `options.orderId`: el
+// pedido que se finaliza tiene su propio material apartado, que cuenta como disponible para si.
 describe('resolveLotIngredientsCost', () => {
   it('pedido 200, 10 % de un insumo en L con un lote de 50 L a 2,0000 -> 40,0000, igual que resolveIngredientsCost', async () => {
     const cat = catalogoDeRecetas(

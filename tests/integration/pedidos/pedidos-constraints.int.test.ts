@@ -507,7 +507,7 @@ describe('el pedido como fila completa', () => {
       'ingredients_cost',
       'order_sequence',
       'order_year',
-      // `presentation_content` es la copia del contenido de la presentacion (QC-150 R38-R40):
+      // `presentation_content` es la copia del contenido de la presentacion:
       // no es un total, un impuesto ni un cliente. Antes de `presentation_id` por el mismo
       // `sort()` lexicografico ('presentation_c' < 'presentation_i').
       'presentation_content',

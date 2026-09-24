@@ -62,7 +62,7 @@ async function transitionAliveByIdReal(
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
   const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
-  // QC-150: yendo a `ENTREGADO`, el exito real lleva `finishedGoods` -aqui no hay producto
+  // Yendo a `ENTREGADO`, el exito real lleva `finishedGoods` -aqui no hay producto
   // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
   // reconoce el exito por esta forma, no por el literal `'ok'`.
   if (resultado === 'ok' && to === 'ENTREGADO') {

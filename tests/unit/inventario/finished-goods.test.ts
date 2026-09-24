@@ -1,7 +1,6 @@
 // tests/unit/inventario/finished-goods.test.ts
 //
-// `planFinishedGoods` es dominio puro: nada aqui toca la base ni el reloj. Cubre R12, R14, R19,
-// R41 y R42 (`design.md > 4.1`, anexo `> 10` C3).
+// `planFinishedGoods` es dominio puro: nada aqui toca la base ni el reloj.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

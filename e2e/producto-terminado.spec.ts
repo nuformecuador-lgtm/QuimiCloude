@@ -1,22 +1,22 @@
 /**
- * E2E del producto terminado (QC-150, T12): dar contenido a una presentacion, crear y finalizar un
- * pedido con ella, y ver el lote nacer en Inventario, con su cambio de contenido posterior.
+ * E2E del producto terminado: dar contenido a una presentacion, crear y finalizar un pedido con
+ * ella, y ver el lote nacer en Inventario, con su cambio de contenido posterior.
  *
  * EL RECORRIDO, en un solo `test()` -cada paso es la precondicion del siguiente, partirlo
  * obligaria a resembrar el estado de los anteriores-:
  *   1. el Administrador entra a Presentaciones y le pone contenido `1` a la presentacion del
- *      fixture, por la pantalla (R8);
+ *      fixture, por la pantalla;
  *   2. crea un pedido de `50.5` con esa presentacion, DESPUES de ponerle el contenido, por la
  *      pantalla de Pedidos;
  *   3. se asigna al Operador por Prisma -la asignacion no es lo que este recorrido demuestra, mismo
  *      criterio que `e2e/reserva-de-material.spec.ts`- y el Operador lo entra y lo finaliza por el
  *      Finalizar de la planta en `/asignacion/[id]`;
- *   4. la confirmacion dice los envases enteros y el nombre del producto terminado (R24);
+ *   4. la confirmacion dice los envases enteros y el nombre del producto terminado;
  *   5. el Administrador entra a Inventario, pestana «Producto terminado», y ve el producto con su
- *      lote de 50 y «50 envases» (R11, R13, R25);
+ *      lote de 50 y «50 envases»;
  *   6. cambia el contenido de la presentacion a `2` y el lote sigue diciendo «50 envases»: los
- *      envases se calculan con el contenido GUARDADO en el lote, no con el vigente (R25, R40, R41);
- *   7. el dialogo de ajuste del lote avisa que solo se admiten cantidades que restan (R33).
+ *      envases se calculan con el contenido GUARDADO en el lote, no con el vigente;
+ *   7. el dialogo de ajuste del lote avisa que solo se admiten cantidades que restan.
  *
  * QUE APORTA SOBRE UNIT E INTEGRACION, que es lo unico que justifica su coste: la cadena entera
  * -presentaciones, pedidos, asignacion y inventario- contra un navegador real y Postgres, con las
@@ -77,7 +77,7 @@ const SHARED_TOKEN = `${FIXTURE_PREFIX}${RUN_ID}`;
 /** Nunca la empresa de instalacion: `companies_name_unique` es GLOBAL. */
 const COMPANY_NAME = `${SHARED_TOKEN}_empresa`;
 const PRODUCT_NAME = `${SHARED_TOKEN}_ingrediente`;
-/** Lleva «Botella 1L» a proposito: es la presentacion del recorrido de `design.md > 8`. */
+/** Lleva «Botella 1L» a proposito, para que el nombre del recorrido se lea con sentido. */
 const PRESENTATION_NAME = `${SHARED_TOKEN}_Botella 1L`;
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 const BATCH_LOT = `${SHARED_TOKEN}_lote`;
@@ -86,10 +86,10 @@ const BATCH_LOT = `${SHARED_TOKEN}_lote`;
 const BATCH_STOCK = '200.0000';
 const UNIT_COST = '10.0000';
 
-/** `50.5 / 1` da 50 envases enteros y 50 de cantidad: el 0.5 sobrante no entra (R12). */
+/** `50.5 / 1` da 50 envases enteros y 50 de cantidad: el 0.5 sobrante no entra. */
 const ORDER_QUANTITY = '50.5';
 const PRESENTATION_CONTENT_INITIAL = '1';
-/** El contenido cambia DESPUES del Finalizar: el lote ya guarda el suyo propio (R25, R40, R41). */
+/** El contenido cambia DESPUES del Finalizar: el lote ya guarda el suyo propio. */
 const PRESENTATION_CONTENT_CHANGED = '2';
 const EXPECTED_PACKAGES_LABEL = '50 envases';
 
@@ -200,7 +200,7 @@ async function createUser(user: Credentials, roleId: string): Promise<string> {
   return created.id;
 }
 
-/** Le pone -o le cambia- el contenido a la presentacion del fixture, por la pantalla (R8). */
+/** Le pone -o le cambia- el contenido a la presentacion del fixture, por la pantalla. */
 async function setPresentationContent(page: Page, content: string): Promise<void> {
   await page.goto(presentationsUrl(PRESENTATION_NAME));
   await expect(page.getByTestId('presentaciones-title')).toBeVisible({ timeout: 60_000 });
@@ -517,11 +517,11 @@ test.describe('producto terminado', () => {
 
     await loginAndLand(page, adminUser);
 
-    // --- 1. El contenido de la presentacion, por la pantalla (R8).
+    // --- 1. El contenido de la presentacion, por la pantalla.
     await setPresentationContent(page, PRESENTATION_CONTENT_INITIAL);
 
-    // --- 2. El pedido, DESPUES de darle contenido a la presentacion: R38 copia ese contenido en
-    // el pedido al crearlo.
+    // --- 2. El pedido, DESPUES de darle contenido a la presentacion: el pedido copia ese
+    // contenido al crearlo.
     await createOrder(page, ORDER_QUANTITY);
     const order = await prisma.order.findFirstOrThrow({
       where: { recipeId, deletedAt: null },
@@ -573,14 +573,14 @@ test.describe('producto terminado', () => {
 
     const finishedProductName = `${RECIPE_NAME} · ${PRESENTATION_NAME}`;
 
-    // R24: la confirmacion dice los envases enteros y el nombre del producto terminado.
+    // La confirmacion dice los envases enteros y el nombre del producto terminado.
     const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderNumber);
     await expect(aviso).toContainText(EXPECTED_PACKAGES_LABEL);
     await expect(aviso).toContainText(finishedProductName);
 
-    // El producto terminado nacio de verdad, no solo lo dice la pantalla (R11).
+    // El producto terminado nacio de verdad, no solo lo dice la pantalla.
     const finishedProduct = await prisma.product.findFirstOrThrow({
       where: { companyId: companyId!, type: 'FINISHED_PRODUCT', recipeId, presentationId },
       select: { id: true, name: true },
@@ -588,7 +588,7 @@ test.describe('producto terminado', () => {
     expect(finishedProduct.name).toBe(finishedProductName);
 
     // --- 5. Inventario, pestana «Producto terminado»: el producto con su lote de 50 y «50
-    // envases» (R11, R13, R25).
+    // envases».
     await page.context().clearCookies();
     await loginAndLand(page, adminUser);
 
@@ -598,7 +598,7 @@ test.describe('producto terminado', () => {
     await expect(batchRow.getByTestId('product-batch-packages')).toHaveText(EXPECTED_PACKAGES_LABEL);
 
     // --- 6. Cambiar el contenido de la presentacion a 2: el lote guarda el SUYO propio, no el
-    // vigente de la presentacion (R25, R40, R41).
+    // vigente de la presentacion.
     await setPresentationContent(page, PRESENTATION_CONTENT_CHANGED);
 
     batchesSheet = await openFinishedGoodsBatchesPanel(page, finishedProductName);
@@ -608,7 +608,7 @@ test.describe('producto terminado', () => {
       EXPECTED_PACKAGES_LABEL,
     );
 
-    // --- 7. El dialogo de ajuste del lote avisa que solo se admiten cantidades que restan (R33).
+    // --- 7. El dialogo de ajuste del lote avisa que solo se admiten cantidades que restan.
     await batchRowAfter.getByTestId('adjust-batch-open').click();
     await expect(page.getByTestId('adjust-batch-dialog')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('adjust-batch-finished-product-notice')).toHaveText(

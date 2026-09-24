@@ -4,7 +4,7 @@
 // antes de abrir la unidad, `lockAliveById` antes de `consumeForOrder`, `consumeForOrder` antes
 // de `setStatus`: si falta material o la receta no tiene lineas, ni el estado ni `finishedAt`
 // quedan escritos) y los resultados posibles, incluida el alta del lote de producto terminado
-// del Finalizar (QC-150).
+// del Finalizar.
 
 import { describe, expect, it, vi } from 'vitest';
 
