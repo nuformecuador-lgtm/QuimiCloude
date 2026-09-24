@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-141 cerrada y QC-150 F2.0 (2026-09-24)
+
+**QC-141 `done`** (F2.5): PR #116 mergeado (`08935782`), tarjeta en *Finalizado* y comentada; worktree desregistrado pero la **carpeta `.worktrees/QC-141-...` sigue** (archivo en uso en Windows), borrar a mano; rama local intacta. **Pendiente F2.6**: resumen en `progress/history.md` y poda del baseline de rojos con el proximo gate completo. **QC-140** pasa a `in_progress` en disco: el board la tenia *En curso* y tiene worktree con implementacion (divergencia de F0 no importada). **QC-150 F2.0 hecho**: spec aprobado el 2026-09-23, bloqueo por QC-141 levantado; `in_progress`, *En curso*. Cupo `fullstack` **3 de 3** (QC-140, QC-150, QC-158). QC-164 (`pending`) cambiara los envases de QC-150: va detras.
+
 ### QC-165 administradores-por-el-maestro y QC-166 area-del-maestro - NACEN con `/afinar-feature` (2026-09-24)
 
 **QC-165** (backend, bloqueada por QC-161): 8 decisiones y 2 abiertas en `specs/QC-165-administradores-por-el-maestro/requirements.md`. **QC-166** (frontend, bloqueada por QC-162 y QC-165) sin sembrar. **QC-162** pasa a backend (la pantalla sale a QC-166). **QC-161** cierra su pregunta del login (aterriza en su area) y queda sin preguntas abiertas.
