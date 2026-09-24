@@ -53,6 +53,23 @@ describe('SupplierShowcaseRow — nombre del proveedor (R6)', () => {
     expect(enlace).toHaveAttribute('href', supplierDetailRoute(proveedor.id));
     expect(enlace).toHaveTextContent(proveedor.name);
   });
+
+  it('R39 — el nombre del proveedor puede encoger y partirse, aunque no tenga espacios', () => {
+    const proveedor = fila({ name: 'a'.repeat(120) });
+
+    render(<SupplierShowcaseRow row={proveedor} productSearch="" />);
+
+    const enlace = screen.getByTestId('supplier-detail-link');
+    expect(enlace.className).toContain('min-w-11');
+    expect(enlace.className).toContain('max-w-full');
+
+    // El texto de un `<a>` flex es un item anónimo que no encoge; por eso va en un `span`.
+    const span = enlace.querySelector('span');
+    expect(span).not.toBeNull();
+    expect(span?.className).toContain('min-w-0');
+    expect(span?.className).toContain('break-words');
+    expect(span).toHaveTextContent(proveedor.name);
+  });
 });
 
 describe('SupplierShowcaseRow — sin líneas (R30)', () => {

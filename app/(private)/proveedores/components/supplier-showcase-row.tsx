@@ -63,13 +63,16 @@ export function SupplierShowcaseRow({ row, productSearch }: SupplierShowcaseRowP
 
   return (
     <li className="flex flex-col gap-2 py-3" data-testid={`supplier-showcase-row-${row.id}`}>
+      {/*
+        El texto de un `<a>` flex es un item anonimo que no encoge; por eso va en un `span`.
+      */}
       <Link
         href={supplierDetailRoute(row.id)}
-        className="inline-flex min-h-11 min-w-11 items-center justify-start rounded-lg font-medium underline-offset-4 hover:underline"
+        className="inline-flex min-h-11 min-w-11 max-w-full items-center justify-start rounded-lg font-medium underline-offset-4 hover:underline"
         aria-label={`Ver el detalle de ${row.name}`}
         data-testid="supplier-detail-link"
       >
-        {row.name}
+        <span className="min-w-0 break-words">{row.name}</span>
       </Link>
 
       {lines.length === 0 ? (
