@@ -7,6 +7,7 @@ import type {
   ClaimedFile,
   CreatedBatch,
   DocumentBatchRepository,
+  FileForReview,
   JobOutcome,
   NewBatch,
 } from '../../../ports/document-batch-repository';
@@ -148,6 +149,35 @@ export async function readBatch(batchId: string, companyId: string): Promise<Bat
   };
 }
 
+/**
+ * Sin `include`, mismo motivo que `readBatch`: la FK entre archivo y tanda esta escrita a mano.
+ * Dos consultas acotadas por empresa, no una: la segunda solo se hace si la primera encontro el
+ * archivo, y las dos exigen `companyId`, asi que un archivo o una tanda de otra empresa se
+ * comportan como inexistentes.
+ */
+export async function readFileForReview(
+  documentFileId: string,
+  companyId: string,
+): Promise<FileForReview | null> {
+  const file = await prisma.documentFile.findFirst({
+    where: { id: documentFileId, companyId },
+    select: { status: true, extractedText: true, batchId: true },
+  });
+  if (file === null) return null;
+
+  const batch = await prisma.documentBatch.findFirst({
+    where: { id: file.batchId, companyId },
+    select: { strategy: true },
+  });
+  if (batch === null) return null;
+
+  return {
+    status: file.status as DocumentFileStatus,
+    strategy: batch.strategy as PdfStrategy,
+    extractedText: file.extractedText,
+  };
+}
+
 export const documentBatchRepositoryPrisma: DocumentBatchRepository = {
   createBatch,
   attachMessageId,
@@ -155,4 +185,5 @@ export const documentBatchRepositoryPrisma: DocumentBatchRepository = {
   finish,
   expireStale,
   readBatch,
+  readFileForReview,
 };

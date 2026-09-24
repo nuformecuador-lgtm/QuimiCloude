@@ -59,6 +59,9 @@ function dobles() {
     readBatch: vi.fn(async () => {
       throw new Error('enqueue-batch no lee ninguna tanda');
     }),
+    readFileForReview: vi.fn(async () => {
+      throw new Error('enqueue-batch no lee para revision');
+    }),
   };
 
   let contadorDeMensajes = 0;
