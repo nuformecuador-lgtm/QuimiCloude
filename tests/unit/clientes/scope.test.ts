@@ -213,7 +213,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     return hallazgos
   }
 
-  it('R26 (QC-153) — el literal de los dos permisos solo aparece en permissions.ts o en lib/modules/clientes/domain', () => {
+  it('R26 (QC-153), R35 (QC-154) — el literal de los dos permisos solo aparece en permissions.ts o en lib/modules/clientes/domain', () => {
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
@@ -222,7 +222,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     ).toEqual([])
   })
 
-  it('R26 (QC-153) — adapters/driving/ contiene exactamente customer-actions.ts', () => {
+  it('R26 (QC-153), R35 (QC-154) — adapters/driving/ contiene exactamente customer-actions.ts', () => {
     const driving = filesIn(join(moduloDir, 'adapters', 'driving'), /\.tsx?$/).map((ruta) =>
       relative(join(moduloDir, 'adapters', 'driving'), ruta).split(sep).join('/'),
     )
