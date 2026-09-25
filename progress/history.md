@@ -4832,3 +4832,14 @@ podar.
   **QC-169**) y un flake de module-contract. El merge de `origin/dev` (QC-160) previo al merge del PR se subió **sin gate**
   por decisión del humano (conflicto solo en `tests/baseline-rojos.json`).
 - **Desbloquea QC-168** (estado Por empacar), y tras ella QC-82.
+
+## 2026-09-25 — QC-169-permiso-de-la-confirmacion-del-catalogo
+
+- **Qué:** la vista previa y la confirmación de la importación del catálogo desde PDF exigen `proveedores.modificar`
+  (constante `CATALOG_IMPORT_PERMISSION` en `documentos`), no el permiso de subida. Devuelve `dev` a verde: el rojo de
+  `catalog-import-isolation.int.test.ts` nació del choque entre QC-158 (#119) y QC-142 (#120), dos PR mergeados sin
+  cruzarse. Se corrigió el código, no el test; `tests/baseline-rojos.json` queda vacío.
+- **PR #123.** Spec R1–R13, P1 ratificada (la vista previa también `proveedores.modificar`). Review OK con 3 menores de
+  tests abiertos (orden permiso→validación sin test, barrel sin comprobar la constante, un `describe` con nombre viejo).
+- **Incidencia:** el primer gate completo lo mató la falta de memoria de la máquina (varias sesiones a la vez); se
+  relanzó solo y salió verde (727/9978). **Lección:** un gate completo a la vez.
