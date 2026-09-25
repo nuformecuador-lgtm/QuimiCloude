@@ -85,7 +85,7 @@ Tras T3 (usa `PRODUCT_NAME_MAX_LENGTH`). **Toca:** `lib/modules/documentos/domai
 
 ## Tanda 2 — orquestación y borde
 
-### T5 [ ] (P2, P4) — `documentos`: vista previa y confirmación
+### T5 [x] (P2, P4) — `documentos`: vista previa y confirmación
 Tras T1, T2, T3, T4. **Toca:** `lib/modules/documentos/domain/actor.ts` (`FORMULA_IMPORT_PERMISSION`),
 `preview-formula-import.ts`, `confirm-formula-import.ts` (nuevos), `lib/modules/documentos/index.ts`,
 `lib/composition/index.ts` (bloque de `documentos`: `previewFormulaImport`, `confirmFormulaImport` con

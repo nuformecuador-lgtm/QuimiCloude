@@ -199,3 +199,23 @@ $ pnpm exec playwright test e2e/documentos.spec.ts e2e/catalogo-desde-pdf.spec.t
   antes de la línea 325; `git checkout -- e2e/catalogo-desde-pdf.spec.ts`, árbol limpio):
   `pnpm exec playwright test e2e/catalogo-desde-pdf.spec.ts` → `2 passed (30.1s)`.
 - No se arregla aquí: es un archivo de QC-158/QC-160 fuera de las tasks de esta ficha. **Para el leader.**
+
+## T5 — `documentos`: vista previa y confirmación (backend_dev, `4ec88dab`, `92949ff6`, `0e8d7091`)
+
+- Nuevos: `lib/modules/documentos/domain/{preview-formula-import,confirm-formula-import}.ts`;
+  `tests/unit/documentos/{preview-formula-import (13),confirm-formula-import (22),formula-import-authorization (14)}.test.ts`.
+- Modificados: `documentos/domain/actor.ts` (`FORMULA_IMPORT_PERMISSION = 'recetas.modificar'`, no sale
+  por el barrel, igual que `CATALOG_IMPORT_PERMISSION`); `documentos/index.ts` (publica casos de uso,
+  `reviewFormulaImport`, `extractFormulaFromText`, `stepTextToDocument`, esquemas y tipos);
+  `lib/composition/index.ts` (solo el bloque de `documentos`: `previewFormulaImport`,
+  `confirmFormulaImport`); `tests/unit/documentos/module-contract.test.ts`;
+  `tests/unit/composition/documentos-facade.test.ts` (censo cerrado de la fachada, 12 → 14 claves; no
+  estaba en la lista de T5, lo exige el cableado).
+
+```
+typecheck limpio · lint 0 errores (7 avisos preexistentes ajenos; desaparece el de productNameLookup)
+vitest run tests/unit/documentos tests/guards tests/unit/composition/documentos-facade.test.ts
+  124 archivos, 1370 verdes / 34 skip
+vitest related: tests/unit/configuracion-ui/user-table.test.tsx rojo en la corrida grande y 27/27 aislado
+  (saturación de jsdom; ajeno)
+```
