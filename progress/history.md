@@ -4819,3 +4819,16 @@ podar.
   convenciones; M2 E2E sin WebKit), vuelta 2 OK. Gate completo 715/715; E2E de documentos 3/3 en Chromium y WebKit.
 - **Decisión:** el arreglo de `catalog-import-isolation` (rojo en dev por el choque QC-158 × QC-142) se revirtió de
   esta rama y se dejó a **QC-169**; sigue en el baseline de rojos hasta entonces.
+
+## 2026-09-25 — QC-150-producto-terminado
+
+- **Qué:** nace el tipo `FINISHED_PRODUCT`. Al Finalizar un pedido entra, en la misma operación, un lote del producto
+  terminado de su receta + presentación, en envases enteros redondeando hacia abajo y con coste = ingredientes / cantidad.
+  La presentación gana su «contenido» (absorbe QC-130). Se prohíbe crearlo o darle lotes a mano, usarlo de ingrediente y
+  ajustarlo sumando; los ajustes que restan se permiten.
+- **PR #121**, merge `3d6f817b`. Spec R1–R44. Review: vueltas 1 y 2 rechazadas, vuelta 3 OK. Decisiones humanas en F2.1:
+  D22 (nombre de producto hasta 200), D23 (terminado editable), D24 (receta de otra empresa se rechaza en pedidos).
+- **Gate:** completo en `bdaa2fc3` verde salvo el rojo heredado de `catalog-import-isolation` (baseline, lo arregla
+  **QC-169**) y un flake de module-contract. El merge de `origin/dev` (QC-160) previo al merge del PR se subió **sin gate**
+  por decisión del humano (conflicto solo en `tests/baseline-rojos.json`).
+- **Desbloquea QC-168** (estado Por empacar), y tras ella QC-82.

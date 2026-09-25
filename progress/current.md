@@ -19,9 +19,9 @@
 
 ## Evaluaciones
 
-### QC-150 - PR #121 abierto (2026-09-24)
+### QC-150 - CERRADA (2026-09-25)
 
-F2.4 hecho: https://github.com/singularis-co/QuimiCloude/pull/121 . Review vuelta 3 OK (0 bloqueantes). Decisiones humanas en F2.1: D22 (nombre de producto hasta 200), D23 (terminado editable), D24 (receta de otra empresa se rechaza en pedidos). Gate completo en bdaa2fc3: verde salvo el rojo heredado de dev (catalog-import-isolation, en baseline, lo arregla **QC-169**) y un flake de module-contract (pasa 9/9 aislado); el humano decidio abrir el PR igual. **Tras el merge (F2.5)**: tarjeta a Finalizado, desmontar worktree, borrar la base QuimiCloude_QC150.
+PR #121, merge `3d6f817b`. Resumen en `progress/history.md`. Tarjeta en *Finalizado* y comentada. Worktree desregistrado; la carpeta sigue en disco (ver Deudas). Desbloquea **QC-168**.
 
 ### QC-142 - CERRADA (2026-09-24)
 
@@ -671,7 +671,7 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
-- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-142-permiso-propio-de-documentos`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` y `.worktrees/QC-160-boton-de-subida-de-pdf` (2026-09-25) ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC142`, `QuimiCloude_QC145` y `QuimiCloude_QC147` y `QuimiCloude_QC160` sobran y se puede borrar.
+- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-142-permiso-propio-de-documentos`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` y `.worktrees/QC-160-boton-de-subida-de-pdf` (2026-09-25) y `.worktrees/QC-150-producto-terminado` (2026-09-25) ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC142`, `QuimiCloude_QC145` y `QuimiCloude_QC147` y `QuimiCloude_QC160` y `QuimiCloude_QC150` sobran y se puede borrar.
 ### El E2E de dev tiene 11 rojos que no son de ninguna ficha en curso (2026-09-22)
 
 Medido por el leader al cerrar QC-146, sobre `origin/dev` limpio (`bc902800`), chromium, un worker: fallan `cierre-de-sesiones` (cierra sesiones de otra persona), `documentos` R20, `errores` R33, `inventario` R26 y QC-90 R32, `permisos` (Operador aterriza en asignacion), `presentaciones` R36, `proveedores` R51, `session` (dos casos) y `usuarios` R4/R42. Los mismos fallan en la rama de QC-146, que no los toca. Nadie tiene la ficha: hace falta una en el board.
