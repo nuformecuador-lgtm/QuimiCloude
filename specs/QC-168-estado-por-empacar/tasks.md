@@ -97,19 +97,19 @@ invocado (R12–R25, R39).
 
 ## Tanda 3 — pantallas
 
-### T11 [ ] — Server Actions de empaque
+### T11 [x] — Server Actions de empaque
 Tras T10. **Toca:** `lib/modules/asignaciones/adapters/driving/order-packing-actions.ts` (nuevo),
 `lib/shared/routes.ts` (`packingOrderRoute`, `PACKED_ORDER_PARAM`),
 `tests/unit/asignaciones/order-packing-actions.test.ts` (nuevo), test de una lectura de sesión por petición.
 **Hecho cuando:** traduce errores por `code`, redirige tras Terminar (R26).
 
-### T12 [ ] — Pestaña «Por empacar»
+### T12 [x] — Pestaña «Por empacar»
 Tras T10. **Toca:** `app/(private)/asignacion/page.tsx`, `app/(private)/asignacion/components/{index.ts,packing-orders-list-section.tsx,packing-orders-columns.tsx,packing-orders-skeleton.tsx,packed-order-notice.tsx,assignment-view-params.ts,company-orders-columns.tsx,assigned-order-delivered-notice.tsx}`,
 tests en `tests/unit/asignaciones-ui/`.
 **Hecho cuando:** pestaña solo con el permiso y al final; «Todos» con etiquetas y filtro nuevos;
 confirmación «Pedido N por empacar»; 44×44 (R9, R14, R16, R39, R41, R43).
 
-### T13 [ ] — Pantalla del pedido de empaque
+### T13 [x] — Pantalla del pedido de empaque
 Tras T11. **Toca:** `app/(private)/asignacion/empaque/[id]/page.tsx`,
 `app/(private)/asignacion/empaque/[id]/components/{index.ts,packing-order-screen.tsx}` (nuevos),
 `tests/unit/asignaciones-ui/packing-order-page.test.tsx` (nuevo).
@@ -124,7 +124,7 @@ sin exportaciones perdidas (R42).
 
 ## Tanda 4 — cierre
 
-### T15 [ ] [P] — Enmiendas fechadas en specs cerrados
+### T15 [x] [P] — Enmiendas fechadas en specs cerrados
 **Toca:** `specs/QC-63-…/requirements.md`, `specs/QC-141-…/requirements.md`,
 `specs/QC-150-…/requirements.md`, `specs/QC-145-…/requirements.md`, `specs/QC-74-…/requirements.md`,
 `specs/QC-144-rol-empacador/requirements.md`, `docs/architecture.md` (pregunta 2 del dominio).

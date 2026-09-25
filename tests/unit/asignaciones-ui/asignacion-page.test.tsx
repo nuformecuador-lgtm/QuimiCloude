@@ -12,12 +12,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SessionUser } from '@/lib/modules/identity';
 
-const { getSessionUserMock } = vi.hoisted(() => ({
+const { getSessionUserMock, getSessionContextMock, listPackingOrdersMock } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<SessionUser | null>>(),
+  getSessionContextMock: vi.fn<() => Promise<unknown>>(),
+  listPackingOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock('@/lib/composition', () => ({
-  identity: { getSessionUser: getSessionUserMock },
+  identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
+  asignaciones: { listPackingOrders: listPackingOrdersMock },
   // `order-assignment-actions.ts` construye su traductor de errores al cargar el modulo: sin este
   // doble el import de las secciones (aunque nunca se invoquen) rompe la carga del archivo.
   observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
@@ -29,6 +32,7 @@ import {
   AssignmentViewTabs,
   CompanyOrdersListSection,
   FinishedOrdersListSection,
+  PackingOrdersListSection,
 } from '@/app/(private)/asignacion/components';
 
 function sesionCon(permissions: readonly string[]): SessionUser {
@@ -44,6 +48,11 @@ function sesionCon(permissions: readonly string[]): SessionUser {
 const OPERADOR = ['inventario.consultar', 'asignaciones.consultar'];
 const EMPACADOR = ['asignaciones.consultar', 'terminados.consultar'];
 const ADMINISTRADOR = ['pedidos.consultar', 'asignaciones.consultar', 'terminados.consultar'];
+const EMPACADOR_CON_EMPAQUE = [
+  'asignaciones.consultar',
+  'terminados.consultar',
+  'empaque.modificar',
+];
 
 /** Busca en el árbol de elementos, SIN montarlo, todos los nodos cuyo `type` sea `objetivo`. */
 function encontrarPorTipo(nodo: ReactNode, objetivo: unknown, hallazgos: ReactElement[] = []): ReactElement[] {
@@ -68,6 +77,14 @@ async function invocar(vista?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getSessionContextMock.mockResolvedValue({ companyId: 'company-1' });
+  listPackingOrdersMock.mockResolvedValue({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 1,
+  });
 });
 
 describe('R11 — Operador: solo «Mis asignados», sin pestañas', () => {
@@ -166,6 +183,46 @@ describe('R27 — «Terminados» y «Todos» reciben los mismos parametros de pa
   });
 });
 
+describe('R39 — la pestaña «Por empacar» solo aparece con `empaque.modificar`, y al final', () => {
+  it('sin el permiso, no se ofrece la pestaña ni se monta la seccion', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+
+    const arbol = await invocar();
+
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    expect(pestanas.props).toMatchObject({ views: ['asignados', 'terminados'] });
+    expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(0);
+  });
+
+  it('con el permiso, la pestaña se ofrece al final y `?vista=por_empacar` monta la seccion', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR_CON_EMPAQUE));
+
+    const arbol = await invocar('por_empacar');
+
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    expect(pestanas.props).toMatchObject({ views: ['asignados', 'terminados', 'por_empacar'] });
+    expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(1);
+  });
+
+  it('pedida por la direccion sin el permiso, cae a la vista por defecto sin revelar que existe', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+
+    const arbol = await invocar('por_empacar');
+
+    expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(0);
+    expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(1);
+  });
+
+  it('con el permiso, aterriza en «Mis asignados» igual que antes: R39 no cambia el aterrizaje', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR_CON_EMPAQUE));
+
+    const arbol = await invocar();
+
+    expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(1);
+    expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(0);
+  });
+});
+
 describe('las pestañas miden al menos 44x44 px (`design.md > 6.6`)', () => {
   afterEach(() => {
     cleanup();
@@ -182,5 +239,20 @@ describe('las pestañas miden al menos 44x44 px (`design.md > 6.6`)', () => {
       expect(boton.tagName).toBe('A');
       expect(boton).toHaveAttribute('href');
     }
+  });
+
+  it('R39 - «Por empacar» se ofrece al final, con su propia etiqueta y objetivo tactil', () => {
+    render(
+      <AssignmentViewTabs
+        current="asignados"
+        views={['asignados', 'terminados', 'por_empacar']}
+      />,
+    );
+
+    const disparadores = screen.getAllByRole('tab');
+    expect(disparadores).toHaveLength(3);
+    expect(disparadores.at(-1)).toHaveTextContent('Por empacar');
+    expect(disparadores.at(-1)?.className).toContain('min-h-11');
+    expect(disparadores.at(-1)?.className).toContain('min-w-11');
   });
 });

@@ -45,7 +45,7 @@ async function resolverServerComponents(nodo: ReactNode): Promise<ReactNode> {
 }
 
 /**
- * La lista de pedidos asignados pinta el aviso de entrega al volver de finalizar (R15):
+ * La lista de pedidos asignados pinta el aviso de «por empacar» al volver de finalizar (R9):
  * `finishAssignedOrderAction` redirige aqui con `DELIVERED_ORDER_PARAM` en la URL, nunca con un
  * estado de exito que la propia accion no puede resolver -ver `order-execution-screen.tsx`.
  */
@@ -57,6 +57,9 @@ const { getSessionUserMock, listAssignedOrdersActionMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+  // `packing-orders-list-section.tsx` construye su traductor de errores al cargar el modulo -esta
+  // en el mismo barrel que `AssignedOrderDeliveredNotice`- y sin este doble la carga revienta.
+  observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => ({
@@ -93,7 +96,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('lista de pedidos asignados — R15: aviso de entrega al volver de finalizar', () => {
+describe('lista de pedidos asignados — R9: aviso de «por empacar» al volver de finalizar', () => {
   it('con el parametro presente, el aviso queda visible y nombra el pedido', async () => {
     await renderPantalla({ [DELIVERED_ORDER_PARAM]: '2026-0000007' });
 
@@ -108,7 +111,7 @@ describe('lista de pedidos asignados — R15: aviso de entrega al volver de fina
     expect(screen.queryByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toBeNull();
   });
 
-  it('R24: con los parametros nuevos, tambien pasa los envases y el nombre del producto al aviso', async () => {
+  it('R9: con los parametros nuevos, tambien pasa los envases y el nombre del producto al aviso', async () => {
     await renderPantalla({
       [DELIVERED_ORDER_PARAM]: '2026-0000007',
       [DELIVERED_ORDER_PACKAGES_PARAM]: '50',
@@ -117,12 +120,12 @@ describe('lista de pedidos asignados — R15: aviso de entrega al volver de fina
 
     const aviso = await screen.findByTestId(ASSIGNED_ORDER_DELIVERED_TESTID);
     expect(aviso).toHaveTextContent(
-      'Pedido 2026-0000007 entregado. Entraron 50 envases de Desengrasante industrial · Botella 1L.',
+      'Pedido 2026-0000007 por empacar. Entraron 50 envases de Desengrasante industrial · Botella 1L.',
     );
   });
 });
 
-describe('AssignedOrderDeliveredNotice — R24: envases y producto en la confirmacion', () => {
+describe('AssignedOrderDeliveredNotice — R9: envases y producto en la confirmacion de «por empacar»', () => {
   afterEach(() => {
     cleanup();
   });
@@ -137,7 +140,7 @@ describe('AssignedOrderDeliveredNotice — R24: envases y producto en la confirm
     );
 
     expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toHaveTextContent(
-      'Pedido 2026-0000007 entregado. Entraron 50 envases de Desengrasante industrial · Botella 1L.',
+      'Pedido 2026-0000007 por empacar. Entraron 50 envases de Desengrasante industrial · Botella 1L.',
     );
   });
 
@@ -151,7 +154,7 @@ describe('AssignedOrderDeliveredNotice — R24: envases y producto en la confirm
     );
 
     expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toHaveTextContent(
-      'Pedido 2026-0000008 entregado. Entraron 1 envase de Barniz acrílico · Bidón 20L.',
+      'Pedido 2026-0000008 por empacar. Entraron 1 envase de Barniz acrílico · Bidón 20L.',
     );
   });
 
@@ -159,7 +162,7 @@ describe('AssignedOrderDeliveredNotice — R24: envases y producto en la confirm
     render(<AssignedOrderDeliveredNotice orderNumber="2026-0000009" />);
 
     expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toHaveTextContent(
-      'Pedido 2026-0000009 entregado',
+      'Pedido 2026-0000009 por empacar',
     );
     expect(screen.getByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).not.toHaveTextContent('envases');
   });
