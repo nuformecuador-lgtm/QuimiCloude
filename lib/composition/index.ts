@@ -392,6 +392,24 @@ import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-pro
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
 import { requestScoped } from '@/lib/shared/request-scope';
+// `clientes` (T11). Imports al final del bloque, bloque de cableado al final del archivo: no
+// reordena ni reformatea nada de lo que hay arriba.
+import {
+  createCreateCustomer,
+  createDeleteCustomer,
+  createGetCustomer,
+  createListCustomers,
+  createUpdateCustomer,
+} from '@/lib/modules/clientes';
+import {
+  createCustomer,
+  findAliveCustomerById,
+  listAliveCustomers,
+  softDeleteAliveCustomer,
+  updateAliveCustomer,
+} from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
+import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/clientes/ports/list-query-log';
+import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -1562,4 +1580,35 @@ export const documentos = {
   // de arriba. Claves NUEVAS al final: ninguna de las de arriba se toca.
   previewCatalogImport,
   confirmCatalogImport,
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// `clientes` (T11). Bloque nuevo al final: no reordena ni reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+
+/** QC-57 (R6): la MISMA implementacion de `lib/shared/observability`, vista por el puerto que
+ *  declara `clientes`. */
+const clientesListQueryLog: ClientesListQueryLog = { ignoredFields: logIgnoredListQueryFields };
+
+const customerRepository: CustomerRepository = {
+  create: createCustomer,
+  findAliveById: findAliveCustomerById,
+  updateAlive: updateAliveCustomer,
+  softDeleteAlive: softDeleteAliveCustomer,
+  listAlive: listAliveCustomers,
+};
+
+/**
+ * Fachada del modulo `clientes` ya cableada (T11, `design.md > 10`). Es lo que consume la
+ * Server Action de T12.
+ *
+ * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo
+ * recibe por parametro, y quien lo obtiene de las dos caras de la sesion es la Server Action.
+ */
+export const clientes = {
+  createCustomer: createCreateCustomer({ customers: customerRepository }),
+  updateCustomer: createUpdateCustomer({ customers: customerRepository }),
+  deleteCustomer: createDeleteCustomer({ customers: customerRepository }),
+  getCustomer: createGetCustomer({ customers: customerRepository }),
+  listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),
 } as const;

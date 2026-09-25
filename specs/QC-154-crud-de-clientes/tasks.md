@@ -140,7 +140,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       *Depende de:* T9. **Hecho cuando:** pasa, y **falla** con un fabricado que añade una función de
       persistencia sin `scope` **y** con otro que lo declara y no lo usa (R12).
 
-- [ ] **T11 — Contrato y composición.** `index.ts` reexporta tipos, esquemas, constantes de largo,
+- [x] **T11 — Contrato y composición.** `index.ts` reexporta tipos, esquemas, constantes de largo,
       errores, `CUSTOMER_QUERYABLE` y las cinco factories con sus `*Deps` —solo de `./domain`,
       conservando `Customer`—; `lib/composition/index.ts` gana el bloque `clientes` **al final**
       (`design.md > 10`), sin reordenar nada.

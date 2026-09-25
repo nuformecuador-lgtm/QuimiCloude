@@ -662,3 +662,27 @@ $ pnpm exec vitest run tests/guards/guard-ambito-empresa-clientes.test.ts
  Test Files  1 passed (1)
       Tests  18 passed (18)
 ```
+
+## T11 — Contrato y composición
+
+- `lib/modules/clientes/index.ts`: reexporta tipos, esquemas, constantes de largo, errores,
+  `CUSTOMER_QUERYABLE` y las cinco factories con sus `*Deps` — **solo** de `./domain`,
+  conservando el reexport de `Customer` desde `./domain/customer` que exige `scope.test.ts`.
+- `lib/composition/index.ts`: bloque `clientes` **al final** del archivo (tras el bloque
+  `documentos`), con sus imports al final del bloque de imports existente; no se reordena ni
+  reformatea ninguna línea de lo que había.
+
+### Verificación de T11
+
+```
+$ pnpm exec next typegen && pnpm run typecheck
+✓ Types generated successfully
+> tsc --noEmit
+(sin salida — 0 errores)
+
+$ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts tests/guards/guard-ambito-empresa-clientes.test.ts
+ Test Files  2 passed (2)
+      Tests  80 passed (80)
+  → guard-ambito-empresa-clientes ya no falla por «lib/composition no ata customerRepository»:
+    el cableado existe desde este commit.
+```
