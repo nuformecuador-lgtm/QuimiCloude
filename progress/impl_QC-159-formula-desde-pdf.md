@@ -351,3 +351,77 @@ vitest run tests/unit/recetas-ui/formula-import-review.test.tsx   22/22 verdes
 vitest run tests/unit/recetas-ui                                  14 archivos, 296 verdes
 typecheck limpio · lint 0 errores
 ```
+
+## T11 — E2E (INCOMPLETA, `3d86fad0`)
+
+- `e2e/formula-desde-pdf.spec.ts` (454 líneas, un caso que recorre reemplazar y renombrar) y el alta
+  en `tests/guards/guard-identificador-de-request.test.ts`: escritos por backend_dev, que se cortó por
+  el límite de la API **antes de ver verde**. Guardados en `3d86fad0`, marcado «SIN verificar».
+  Queda en `test-results/` un rojo de WebKit de esa corrida, sin analizar.
+- **Bloqueo al retomar (2026-09-25):** el puerto 3117 lo tiene un `next dev` **de este mismo worktree**
+  (PID 21260, bajo `cmd` 13616, creado 14:12) y un Playwright WebKit de la corrida cortada (PID 11660).
+  Pararlos lo denegó el clasificador de permisos, y después también el `typecheck`. No se ha
+  ejecutado nada más. Con `reuseExistingServer: false`, el E2E no puede correr mientras el puerto siga
+  ocupado.
+- **Pendiente:** liberar el puerto (humano/leader), correr
+  `pnpm exec playwright test e2e/formula-desde-pdf.spec.ts --reporter=line` hasta verde en Chromium y
+  WebKit, repetir `e2e/documentos.spec.ts`, `typecheck` y la guardia de identificador, y marcar T11.
+  La tanda 2/3 **no** se ha cerrado con `--rapido` (lo último verde con `--rapido` es la tanda 1, sobre
+  `174ef725`).
+
+## T14 — cierre (preparado; el `./init.sh` completo lo corre el leader)
+
+### Mapa R → test
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/documentos-ui/formula-pdf-upload.test.tsx`; E2E `e2e/formula-desde-pdf.spec.ts` (sin verificar) |
+| R2 | `tests/unit/recetas-ui/formula-import-page.test.tsx` (dos renders iguales); E2E |
+| R3 | `tests/unit/documentos/preview-formula-import.test.ts`; `formula-import-page.test.tsx` |
+| R4, R5, R6 | `tests/unit/documentos/formula-extraction.test.ts` |
+| R7 | `formula-extraction.test.ts` (incluido el caso `"1e2"` como cadena, ver T4); E2E |
+| R8 | `formula-extraction.test.ts`; `tests/unit/recetas-ui/formula-import-review.test.tsx` |
+| R9 | `formula-extraction.test.ts`; `tests/unit/documentos/formula-step-text.test.ts` |
+| R10 | `preview-formula-import.test.ts` (cero escrituras); `formula-import-review.test.tsx` |
+| R11 | `preview-formula-import.test.ts`; `tests/integration/inventario/product-name-lookup.int.test.ts`; `formula-import-review.test.tsx`; E2E |
+| R12 | `tests/unit/documentos/review-formula-import.test.ts`; `formula-import-review.test.tsx`; E2E |
+| R13 | `review-formula-import.test.ts`; `formula-import-review.test.tsx` |
+| R14 | `review-formula-import.test.ts`; `formula-import-review.test.tsx`; E2E |
+| R15, R16 | `review-formula-import.test.ts`; `tests/unit/documentos/confirm-formula-import.test.ts`; `formula-import-review.test.tsx` |
+| R17 | `preview-formula-import.test.ts`; `tests/integration/recetas/recipe-catalog-by-name.int.test.ts`; `formula-import-review.test.tsx`; E2E |
+| R18 | `confirm-formula-import.test.ts`; `tests/integration/documentos/formula-import.int.test.ts`; E2E |
+| R19 | `confirm-formula-import.test.ts`; E2E |
+| R20 | `confirm-formula-import.test.ts`; `recipe-catalog-by-name.int.test.ts`; `tests/unit/documentos/formula-import-actions.test.ts` |
+| R21 | `formula-import.int.test.ts` (pedido idéntico fila a fila); `formula-import-review.test.tsx` (texto del aviso) |
+| R22 | `preview-formula-import.test.ts` (la vista previa no llama a ningún puerto de escritura) y los casos de rechazo de `confirm-formula-import.test.ts` («cero escrituras»). **No hay caso con `R22` en el nombre.** |
+| R23 | `confirm-formula-import.test.ts`: «R15, R16 — la revisión del servidor rechaza antes de escribir nada» y «R24 — el producto elegido se relee en el servidor». **No hay caso con `R23` en el nombre.** |
+| R24 | `confirm-formula-import.test.ts`; `formula-import-actions.test.ts` |
+| R25 | `tests/unit/inventario/create-raw-material.test.ts`; `tests/integration/inventario/create-raw-material.int.test.ts`; `confirm-formula-import.test.ts`; E2E |
+| R26 | `confirm-formula-import.test.ts`; `product-name-lookup.int.test.ts` |
+| R27 | `confirm-formula-import.test.ts`; `formula-import.int.test.ts` |
+| R28 | `confirm-formula-import.test.ts` (tres filas de `design.md > 7.2`); `formula-import.int.test.ts` |
+| R29 | `confirm-formula-import.test.ts`; `formula-import-actions.test.ts`; `formula-import-review.test.tsx`; E2E |
+| R30 | `tests/unit/documentos/formula-import-authorization.test.ts` |
+| R31 | `formula-import-authorization.test.ts`; `create-raw-material.test.ts`; `formula-import-actions.test.ts` |
+| R32 | `formula-import-page.test.tsx`; `tests/guards/guard-pantallas-exigen-permiso.test.ts` (alta de la ruta) |
+| R33 | `formula-import.int.test.ts`; `product-name-lookup.int.test.ts`; `recipe-catalog-by-name.int.test.ts` |
+| R34 | `tests/unit/documentos-ui/formulas-upload.test.tsx` (sin `documentos.modificar` no hay botón; casos nombrados con los R de QC-107) y `document-upload-convenciones.test.ts` («las dos páginas que montan la pieza llaman a canUploadDocuments»). **No hay caso con `R34` en el nombre.** |
+| R35 | `tests/unit/documentos/qc159-alcance.test.ts`; `confirm-formula-import.test.ts` (sin `image`); `formula-import-review.test.tsx` |
+| R36, R37 | `qc159-alcance.test.ts` (rojo a mano probado, ver T12) |
+| R38 | `formula-import-review.test.tsx` (`min-h-11 min-w-11`, `text-base`, sin `hover:` como única vía); E2E en WebKit (sin verificar) |
+| R39 | `e2e/formula-desde-pdf.spec.ts` — **sin verificar** |
+
+### Solapes con QC-168 / QC-138
+
+- A 2026-09-25 ninguna de las dos ha llegado a `dev` (solo sus commits de spec). Nada que resolver aún.
+- Previsto al sincronizar (F2.3): listas cerradas y registros (`lib/composition/index.ts`,
+  `lib/shared/routes.ts`, `guard-pantallas-exigen-permiso`, `guard-identificador-de-request`,
+  `session-once-per-request-actions`, `aislamiento.json`) → unión; **más** los once tests de
+  `pedidos`/`asignaciones` cuyo doble de `RecipeCatalog` ganó `findAliveByNormalizedName` (T1), que
+  QC-168 puede tocar.
+
+### Deudas y avisos para el leader
+
+- `e2e/catalogo-desde-pdf.spec.ts` rojo en `dev` por QC-160 (le falta abrir el diálogo), no está en
+  `tests/baseline-rojos.json`; comprobado que con el diálogo abierto pasa 2/2 con el doble de T10.
+- Borrar `QuimiCloude_QC159` al cerrar la feature; restaurar `.env` desde `.env.bak-QuimiCloude` si hace falta.
