@@ -273,6 +273,10 @@ con el fallo).
 
 ## Preguntas abiertas
 
+**Ninguna.** Las tres que hubo están resueltas: la 1 por QC-153/QC-154 y la 2 y la 3 por el humano
+al aprobar el spec (ver `## Nota de aprobación (2026-09-25)` al final). Se conservan abajo como
+historia.
+
 1. **Largo máximo de cada campo y validación de formato del correo y del teléfono.** No se preguntó; el
    precedente es proveedores (`Supplier`: `phone` y `email` opcionales). `spec_author` lo toma de ahí
    y lo dice, o lo lleva a F1.4 si el precedente no lo cierra.
@@ -312,3 +316,13 @@ leader**; no la rellena con supuestos.
 | 2026-09-23 | ¿Cómo se reparte el módulo? | Tres fichas como Proveedores (QC-42/43/44): **QC-153** modelo, **QC-154** CRUD, **QC-155** pantalla, en la épica nueva **QC-152 Clientes**. |
 | 2026-09-23 | ¿Pedido ↔ cliente? | **No entra** en el módulo base: ficha aparte **QC-156** (bloqueada por QC-154). |
 | 2026-09-23 | ¿E2E? | **Sí**, en la pantalla (**QC-155**), por tocar permisos (`CHECKPOINTS.md`). El modelo y el CRUD se verifican con tests unitarios y de integración. |
+
+## Nota de aprobación (2026-09-25)
+
+El humano **aprobó el spec** el 2026-09-25 y aceptó las dos posiciones por defecto tal como estaban
+escritas. Ningún requisito cambia ni se renumera.
+
+| Fecha | Pregunta | Decisión | Requisito(s) |
+|---|---|---|---|
+| 2026-09-25 | ¿Sección e icono del ítem del menú? (P2) | Sección **«Cadena»**, junto a Proveedores, declarado **al final** de `PRIVATE_NAV_ITEMS` (no cambia el aterrizaje de ningún rol), con el icono **nuevo `contact`** (`Contact` de `lucide-react`, ya instalado). | R4, R6 |
+| 2026-09-25 | ¿Qué columnas se ven? (P3) | **Todas**: los seis datos, **dirección incluida**, más la fecha de alta y la de última modificación. **Sin autores.** | R10, R11 |
