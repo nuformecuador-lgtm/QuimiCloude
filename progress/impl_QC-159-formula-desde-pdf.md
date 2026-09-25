@@ -59,3 +59,28 @@ exit=0
 
 **T0 cerrada:** todo «igual» salvo la fila de QC-169, que cambió en el sentido que el diseño ya
 prescribe. No hace falta volver al spec.
+
+## T8 — ruta y acceso «Revisar» desde la subida de fórmulas (frontend_dev, `de71c4b6`)
+
+- Nuevos: `app/(private)/produccion/formulas/components/formula-pdf-upload.tsx`,
+  `tests/unit/documentos-ui/formula-pdf-upload.test.tsx`.
+- Modificados: `lib/shared/routes.ts` (`formulaImportRoute`), `formulas/components/index.ts`,
+  `formulas/page.tsx` (`{canUpload ? <FormulaPdfUpload /> : null}`, sigue con `canUploadDocuments`),
+  `tests/unit/documentos-ui/document-upload-convenciones.test.ts` (enmienda de `design.md > 6.3` con el
+  motivo escrito).
+- **Fuera de la lista de T8, por efecto directo del cambio** (sin cambiar lo que afirman):
+  `tests/unit/recetas-ui/recipe-form.test.tsx` (el barrel de fórmulas arrastra ahora
+  `DocumentUploadDialog` → `observabilidad`; su doble de `@/lib/composition` gana
+  `observabilidad.readRequestIdHeader`, como ya hace `formulas-upload.test.tsx`) y
+  `tests/unit/recetas-ui/recipe-route-contract.test.ts` (lista cerrada de exports de `routes.ts`: alta
+  de `formulaImportRoute`).
+- `document-upload-review-link.test.tsx` y `formulas-upload.test.tsx` verdes **sin editarlos**.
+
+```
+typecheck: limpio · lint: 0 errores (7 avisos preexistentes ajenos)
+vitest run tests/unit/documentos-ui/formula-pdf-upload.test.tsx      1 archivo, 5 tests verdes
+vitest run tests/unit/documentos-ui                                   13 archivos, 66 tests verdes
+vitest run tests/unit/proveedores-ui/catalog-pdf-upload.test.tsx      1 archivo, 3 tests verdes
+vitest run tests/unit/recetas-ui                                      12 archivos, 267 tests verdes
+vitest run guard-rutas-privadas-cubiertas + guard-arquitectura-modulos 2 archivos, 69 tests verdes
+```

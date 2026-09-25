@@ -139,7 +139,7 @@ Tras T5. **Toca:** `lib/modules/documentos/adapters/driving/formula-import-actio
 con **su** código (no `unexpected_error`); éxito ⇒ `revalidatePath` de `FORMULAS_ROUTE` y de la ficha;
 una lectura de sesión por invocación (**R20, R24, R29, R31**, parte borde).
 
-### T8 [ ] [P] — Ruta y acceso «Revisar» desde la subida de fórmulas
+### T8 [x] [P] — Ruta y acceso «Revisar» desde la subida de fórmulas
 Tras T0. **Toca:** `lib/shared/routes.ts` (`formulaImportRoute`),
 `app/(private)/produccion/formulas/components/formula-pdf-upload.tsx` (nuevo),
 `app/(private)/produccion/formulas/components/index.ts`, `app/(private)/produccion/formulas/page.tsx`,
