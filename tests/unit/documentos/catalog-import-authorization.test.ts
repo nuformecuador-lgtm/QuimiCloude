@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { DOCUMENT_UPLOAD_PERMISSION, type Actor } from '@/lib/modules/documentos/domain/actor';
+import { CATALOG_IMPORT_PERMISSION, type Actor } from '@/lib/modules/documentos/domain/actor';
 import { UnauthorizedError } from '@/lib/modules/documentos/domain/errors';
 import { createConfirmCatalogImport } from '@/lib/modules/documentos/domain/confirm-catalog-import';
 import type { CatalogImportDeps } from '@/lib/modules/documentos/domain/preview-catalog-import';
@@ -152,11 +152,37 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         ]),
       });
       const confirm = createConfirmCatalogImport(deps);
-      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [DOCUMENT_UPLOAD_PERMISSION, 'inventario.modificar'] };
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION, 'inventario.modificar'] };
 
       await confirm(actor, entradaBase([filaRevisada()]));
 
       expect(bitacora[0]).toBe('repository.readFileForReview');
+    });
+
+    it('R3 — el actor tiene solo `documentos.modificar`: unauthorized y ningun puerto tocado', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora);
+      const confirm = createConfirmCatalogImport(deps);
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] };
+
+      await expect(confirm(actor, entradaBase([filaRevisada()]))).rejects.toBeInstanceOf(UnauthorizedError);
+
+      expect(bitacora).toEqual([]);
+    });
+
+    it('R4 — el actor tiene solo `proveedores.modificar` y no hay presentacion nueva: devuelve el resumen', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        presentations: dobleDePresentaciones(bitacora, [
+          { id: PRESENTACION_LITRO, name: 'Bidon 20L', nameNormalized: 'bidon20l', unitId: UNIDAD_LITRO },
+        ]),
+      });
+      const confirm = createConfirmCatalogImport(deps);
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
+
+      const resumen = await confirm(actor, entradaBase([filaRevisada()]));
+
+      expect(resumen).toEqual({ created: 1, updated: 0, unchanged: 0, presentationsCreated: 0 });
     });
   });
 
@@ -168,7 +194,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         units: dobleDeUnidades(bitacora, [{ id: UNIDAD_LITRO, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]),
       });
       const confirm = createConfirmCatalogImport(deps);
-      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [DOCUMENT_UPLOAD_PERMISSION] };
+      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
 
       await expect(
         confirm(
@@ -189,7 +215,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         ]),
       });
       const confirm = createConfirmCatalogImport(deps);
-      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [DOCUMENT_UPLOAD_PERMISSION] };
+      const actorSinInventario: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
 
       const resumen = await confirm(actorSinInventario, entradaBase([filaRevisada()]));
 
