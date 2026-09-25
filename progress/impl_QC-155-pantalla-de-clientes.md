@@ -156,3 +156,130 @@ T0+T1). `./init.sh` completo queda para el cierre de la ficha (T9).
 
 No se tocó `lib/modules/**`, `lib/composition/**`, `db/**`, `components/shared/**`,
 `components/ui/**` ni `package.json`. No se tocó `feature_list.json` ni `progress/current.md`.
+
+## T2 — `customer-list-params.ts`
+
+### Archivos tocados
+
+- `app/(private)/clientes/components/customer-list-params.ts` (nuevo): parser/serializador puro,
+  copia de `recipe-list-params.ts`/`order-list-params.ts`, con el filtro de ciudad (texto) y de
+  fecha de alta (rango), ambos derivados de `CUSTOMER_QUERYABLE.filterable` y nunca escritos a
+  mano. `customerListHref`, `hasActiveSearchOrFilter`, `clearSearchAndFilters` y
+  `withSearchResetsPage` (extendido a «termino **o** filtro cambiaron»).
+- `app/(private)/clientes/components/index.ts` (nuevo): barrel, arrancado con este primer archivo.
+- `tests/unit/clientes-ui/customer-list-params.test.ts` (nuevo).
+
+### Mapa R<n> → test
+
+| Requisito | Test |
+| --- | --- |
+| R12 | `customer-list-params.test.ts` > "busqueda recortada y sin normalizar", "busqueda de solo espacios" |
+| R13 | `customer-list-params.test.ts` > "filtro de ciudad recortado", rango de fechas, `describe('withSearchResetsPage ...')` completo |
+| R14 | `customer-list-params.test.ts` > "el orden solo acepta columnas de la lista blanca del contrato", "orden sobre campo no ordenable" |
+| R16 | `customer-list-params.test.ts` > `describe('parseCustomerListParams acota, nunca falla (R16)')` completo (`it.each(CONTRATO)`) |
+| R17 | `customer-list-params.test.ts` > "la consulta construida se vuelve a leer igual...", "la consulta no escribe busqueda, orden, ciudad ni fechas cuando estan vacios" |
+| R1 (parcial, destino derivado) | `customer-list-params.test.ts` > "el destino se deriva de la constante de ruta de clientes" |
+| R20 (parcial, activo/limpiar) | `customer-list-params.test.ts` > `describe('busqueda o filtro activos y limpiar (R20)')` |
+
+### Salida real de los tests
+
+```
+$ pnpm exec vitest run tests/unit/clientes-ui/customer-list-params.test.ts
+ Test Files  1 passed (1)
+      Tests  42 passed (42)
+```
+
+`pnpm run typecheck` y `pnpm run lint`: verdes (los mismos 7 warnings preexistentes y ajenos de
+`confirm-catalog-import.test.ts` y `order-service.test.ts`).
+
+## T3 — `customer-labels.ts` y `customer-columns.tsx`
+
+### Archivos tocados
+
+- `app/(private)/clientes/components/customer-columns.tsx` (nuevo): `buildCustomerColumns` (factoria,
+  no array del modulo, porque la celda de acciones es un componente de cliente que llega por
+  parametro — mismo patron que `order-columns.tsx`/`recipe-columns.tsx` — y `customer-row-actions.tsx`
+  todavia no existe, T6a). Nueve columnas: `lastNames`, `firstNames`, `city`, `phone`, `email`,
+  `address`, `createdAt`, `updatedAt`, `actions`. `sortable` y `filter` derivados de
+  `CUSTOMER_QUERYABLE`, nunca escritos a mano. Marcador de ausencia en telefono/correo/direccion.
+  Fechas en UTC.
+- `app/(private)/clientes/components/customer-labels.ts` (nuevo): reexporta `CUSTOMERS_LABEL` de
+  `private-nav.ts` (mismo patron que `unit-labels.ts`), `CUSTOMERS_TITLE_TESTID` y
+  `CUSTOMER_TABLE_TEXTS` (`design.md > 8`).
+- `app/(private)/clientes/components/index.ts`: suma los dos archivos al barrel.
+- `tests/unit/clientes-ui/customer-columns.test.tsx` (nuevo).
+
+### Mapa R<n> → test
+
+| Requisito | Test |
+| --- | --- |
+| R10 | `customer-columns.test.tsx` > `describe('las columnas declaradas son exactamente las nueve acordadas (R10)')` (positivo y negativo) |
+| R11 | `customer-columns.test.tsx` > `describe('telefono, correo y direccion pintan un marcador identificable cuando faltan (R11)')` |
+| R14 | `customer-columns.test.tsx` > `describe('las ordenables son exactamente la lista blanca del contrato (R14)')` y `describe('los filtros son exactamente los que declara la lista blanca (R13)')` |
+
+### Salida real de los tests
+
+```
+$ pnpm exec vitest run tests/unit/clientes-ui/customer-columns.test.tsx tests/unit/clientes-ui/customer-list-params.test.ts
+ Test Files  2 passed (2)
+      Tests  56 passed (56)
+```
+
+`pnpm run typecheck` y `pnpm run lint`: verdes, mismos warnings ajenos.
+
+## T4 — Estados: `customer-list-skeleton.tsx`, `customer-list-empty.tsx`, `customer-list-error.tsx`
+
+### Archivos tocados
+
+- `app/(private)/clientes/components/customer-list-skeleton.tsx` (nuevo): copia de
+  `order-list-skeleton.tsx`, `CUSTOMER_SKELETON_COLUMN_COUNT = 9` (mismo numero que
+  `buildCustomerColumns(...).length`), `data-testid="customer-list-skeleton"` y
+  `"customer-row-skeleton"`, `role="status"` + `aria-busy`.
+- `app/(private)/clientes/components/customer-list-empty.tsx` (nuevo): recibe `canModify` y
+  **decide ella misma** si monta el disparador de alta que le llega por `children` (R5, R19); con
+  `firstPageHref` presente pinta el enlace a la primera pagina y no el disparador (R20). El caso
+  «sin coincidencias» no vive aqui (design.md > 5.1): lo pinta la propia tabla en T6.
+- `app/(private)/clientes/components/customer-list-error.tsx` (nuevo): mensaje, `code` aparte y
+  reintento como **enlace** a `retryHref` (`customerListHref(params)`, pasado por quien lo monta),
+  no `router.refresh()` — desviación deliberada de `design.md > 5.1` respecto del patron mayoritario
+  del repo (unidades, pedidos, grupos), que usa `router.refresh()`. Usa `UnexpectedErrorNotice`
+  para el codigo inesperado, igual que las demas pantallas (QC-71).
+- `app/(private)/clientes/components/index.ts`: suma los tres archivos al barrel.
+- `tests/unit/clientes-ui/customer-list-skeleton.test.tsx`,
+  `tests/unit/clientes-ui/customer-list-empty.test.tsx` y
+  `tests/unit/clientes-ui/customer-list-error.test.tsx` (nuevos).
+
+### Mapa R<n> → test
+
+| Requisito | Test |
+| --- | --- |
+| R19 | `customer-list-empty.test.tsx` > `describe('el vacio es identificable y no finge que haya lista (R19)')`, `describe('el disparador de alta solo se monta con canModify (R5, R19)')` (canModify=false sin disparador, canModify=true con disparador) |
+| R20 | `customer-list-empty.test.tsx` > "con `firstPageHref` presente, el disparador no se monta aunque `canModify` sea true (R20)", `describe('la vuelta a la primera pagina es un enlace real...')` |
+| R21 | `customer-list-skeleton.test.tsx` > todo el archivo (numero de columnas, `role="status"`, `aria-busy`) |
+| R22 | `customer-list-error.test.tsx` > `describe('el error es identificable...')`, `describe('el reintento es un enlace real...')` |
+| R7 | `customer-list-error.test.tsx` > "NO pinta ninguna tabla: «fallo» no es «no hay clientes» (R7, R22)" |
+| R39, R40 | `customer-list-empty.test.tsx` y `customer-list-error.test.tsx` > controles >= 44x44 px, sin `:hover` como unica via, localizados por `data-testid`/rol, nunca por copy |
+
+### Salida real de los tests
+
+```
+$ pnpm exec vitest run tests/unit/clientes-ui/customer-list-skeleton.test.tsx tests/unit/clientes-ui/customer-list-empty.test.tsx tests/unit/clientes-ui/customer-list-error.test.tsx
+ Test Files  3 passed (3)
+      Tests  16 passed (16)
+```
+
+`pnpm exec vitest related --run` sobre los siete archivos de `app/(private)/clientes/components/`
+tocados en T2–T4: 5 archivos de test relacionados, **72 passed (72)**.
+
+`pnpm run typecheck`: verde. `pnpm run lint`: verde, mismos 7 warnings preexistentes y ajenos
+(`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+
+### Archivos fuera de alcance (T2–T4)
+
+No se tocó `lib/modules/**` salvo su **lectura** de `lib/modules/clientes/index.ts` (el barrel
+publico) para confirmar los nombres exactos de exportacion antes de escribir los imports —ninguna
+edicion—, tampoco `lib/composition/**`, `db/**`, `components/shared/**` (solo se **importa** desde
+su barrel publico `@/components/shared/data-table` y desde `@/components/shared/unexpected-error-notice`,
+igual que hacen pedidos/unidades/recetas), `components/ui/**` ni `package.json`. No se tocó
+`specs/**`, `feature_list.json` ni `progress/current.md`. No se corrio `./init.sh` completo (queda
+para T9).
