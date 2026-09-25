@@ -84,6 +84,7 @@ function catalogoQueFalla(): ProductCatalog {
   return {
     findRefs: vi.fn<ProductCatalog['findRefs']>(explota),
     findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(explota),
+    findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(explota),
   };
 }
 
@@ -143,6 +144,9 @@ function montarPuertosPermisivos(): Puertos {
       ]),
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');
+      }),
+      findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(() => {
+        throw new Error('recetas no debe leer envases de empaque');
       }),
     },
     images: {

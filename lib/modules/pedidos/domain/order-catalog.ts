@@ -92,15 +92,19 @@ export interface OrderCatalog {
    * empresa, pero su estado ya no es `from` porque alguien lo movio entre la lectura y esta
    * llamada.
    *
-   * Si `to` es `'ENTREGADO'`, la misma llamada consume el material apartado:
+   * Si `to` es `'POR_EMPACAR'`, la misma llamada consume el material apartado:
    * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
    * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
    *
-   * Yendo a `'ENTREGADO'`, la misma llamada da tambien de alta el lote de producto terminado
+   * Yendo a `'POR_EMPACAR'`, la misma llamada da tambien de alta el lote de producto terminado
    * de la combinacion del pedido: el exito lleva `finishedGoods` con lo que entro;
    * `'presentation_without_content'`, `'no_whole_package'` y `'recipe_not_found'` deshacen la
    * operacion entera igual que los dos casos de arriba. El `'ok'` sin `finishedGoods` sigue
-   * siendo el unico resultado posible cuando `to` no es `'ENTREGADO'`.
+   * siendo el unico resultado posible cuando `to` no es `'POR_EMPACAR'`.
+   *
+   * `'EN_EMPAQUE'` y `'ENTREGADO'` no son destino valido de este metodo: se rechazan con
+   * `InvalidTransitionError`, aunque la matriz de transiciones los admita, porque solo los
+   * alcanzan las dos acciones de empaque, que si conocen a quien empaca.
    */
   transitionAliveById(
     id: string,

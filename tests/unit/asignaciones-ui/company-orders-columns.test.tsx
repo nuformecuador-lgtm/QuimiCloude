@@ -11,6 +11,7 @@ import {
   COMPANY_ORDER_RESPONSIBLES_COLUMN_ID,
   COMPANY_ORDER_STATUS_COLUMN_ID,
   COMPANY_ORDER_STATUS_FILTER_OPTIONS,
+  COMPANY_ORDER_STATUS_LABELS,
   buildCompanyOrdersColumns,
 } from '@/app/(private)/asignacion/components';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
@@ -101,6 +102,13 @@ describe('R31 - la columna de fecha de terminado solo con el filtro exactamente 
   });
 });
 
+describe('R41 - las etiquetas de estado cubren los seis valores del contrato', () => {
+  it('«Por empacar» y «En empaque» son literales, no el nombre del enum', () => {
+    expect(COMPANY_ORDER_STATUS_LABELS.POR_EMPACAR).toBe('Por empacar');
+    expect(COMPANY_ORDER_STATUS_LABELS.EN_EMPAQUE).toBe('En empaque');
+  });
+});
+
 describe('R24 - la columna Estado declara el filtro select de los cuatro estados', () => {
   it('la columna Estado trae `filter: select` con las cuatro opciones', () => {
     const columns = buildCompanyOrdersColumns({ showFinishedAt: false });
@@ -140,6 +148,16 @@ describe('R25 - la presentación, la prioridad, el estado y los responsables', (
     expect(cell).toHaveTextContent('Entregado');
     expect(cell).toHaveAttribute('data-status', 'ENTREGADO');
   });
+
+  it.each(['POR_EMPACAR', 'EN_EMPAQUE'] as const)(
+    'estado (R41): %s se lee con su etiqueta propia, no con el literal del enum',
+    (status) => {
+      renderCell(COMPANY_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status });
+      const cell = screen.getByTestId('company-order-status');
+      expect(cell).toHaveAttribute('data-status', status);
+      expect(cell).toHaveTextContent(COMPANY_ORDER_STATUS_LABELS[status]);
+    },
+  );
 
   it('responsables: sin responsables, la celda no da error', () => {
     renderCell(COMPANY_ORDER_RESPONSIBLES_COLUMN_ID, { ...BASE_ORDER, responsibles: [] });

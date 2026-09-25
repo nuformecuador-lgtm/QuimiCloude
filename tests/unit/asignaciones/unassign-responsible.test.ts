@@ -365,6 +365,21 @@ describe('QC-87 — unassignResponsible', () => {
       expect(assignments.deleteOne).not.toHaveBeenCalled();
     });
 
+    it('POR_EMPACAR y EN_EMPAQUE congelan: `order_produced_frozen` sin borrado (R33)', async () => {
+      for (const estado of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+        filas = estadoInicial();
+        const unassign = crearCasoDeUso(estado);
+
+        const error = await unassign(ACTOR, { orderId: PEDIDO, userId: ANA }).catch(
+          (e: unknown) => e,
+        );
+
+        expect((error as AsignacionesError).code).toBe('order_produced_frozen');
+        expect(assignments.deleteOne).not.toHaveBeenCalled();
+        expect(filas).toEqual(estadoInicial());
+      }
+    });
+
     it('R12: «no existe» NO es «entregado» — son codigos distintos sobre la misma operacion', async () => {
       const inexistente = crearCasoDeUso(null);
       const noExiste = await inexistente(ACTOR, { orderId: PEDIDO, userId: ANA }).catch(

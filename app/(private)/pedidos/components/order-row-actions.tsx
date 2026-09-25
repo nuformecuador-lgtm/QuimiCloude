@@ -25,10 +25,10 @@ import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
  * cierto: no se puede editar, cancelar ni eliminar —de responsables no dice nada—.
  *
  * **Un solo predicado para el estado final** (`isFinalOrderStatus`): con el pedido en
- * `ENTREGADO` o `CANCELADO` los tres controles van `disabled` **con el motivo VISIBLE** —no solo
- * en `title`, que en tactil no aparece nunca— y **no se monta ningun dialogo**. La pantalla
- * anticipa la regla; el backend la impide igual (`invalid_transition`, `not_cancellable`,
- * `not_deletable`), asi que anticipar no es confiar.
+ * `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` o `EN_EMPAQUE` los tres controles van `disabled` **con
+ * el motivo VISIBLE** —no solo en `title`, que en tactil no aparece nunca— y **no se monta ningun
+ * dialogo**. La pantalla anticipa la regla; el backend la impide igual (`invalid_transition`,
+ * `not_cancellable`, `not_deletable`), asi que anticipar no es confiar.
  *
  * **Puntos de enganche de T10, T11 y T12.** Los tres disparadores emiten por callback opcional
  * (`onEdit`, `onCancel`, `onDelete`) con el pedido entero. Cuando existan `OrderSheet`,
@@ -42,13 +42,16 @@ import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
- * Que estados del contrato son FINALES (R24). Mapa exhaustivo y tipado —no una comparacion
- * suelta contra dos literales— para que un quinto estado rompa el `typecheck` en vez de colarse
- * como «no final» por defecto.
+ * Que estados del contrato ya no admiten editar, cancelar ni borrar. Mapa exhaustivo y tipado
+ * —no una comparacion suelta contra los literales— para que un estado nuevo rompa el
+ * `typecheck` en vez de colarse como «editable» por defecto. `POR_EMPACAR` y `EN_EMPAQUE` ya
+ * consumieron material y dieron de alta un lote: se cierran igual que `ENTREGADO`.
  */
 const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   PENDIENTE: false,
   EN_CURSO: false,
+  POR_EMPACAR: true,
+  EN_EMPAQUE: true,
   ENTREGADO: true,
   CANCELADO: true,
 };

@@ -20,7 +20,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
@@ -96,7 +96,7 @@ const recipes: RecipeCatalog = {
   findIdsMatchingName: findRecipeIdsMatchingName,
 };
 
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts };
 const presentations: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,

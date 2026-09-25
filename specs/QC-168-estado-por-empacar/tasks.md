@@ -52,7 +52,7 @@ Operador sin cambios; migración idempotente y reversible; guardias `guard-permi
 
 ## Tanda 2 — dominio
 
-### T6 [ ] — Finalizar deja `POR_EMPACAR`
+### T6 [x] — Finalizar deja `POR_EMPACAR`
 Tras T2. **Toca:** `lib/modules/pedidos/domain/transition-order.ts`, `order-catalog.ts` (doc),
 `lib/modules/asignaciones/domain/finish-assigned-order.ts`,
 `lib/modules/asignaciones/adapters/driving/order-execution-actions.ts` (doc),
@@ -62,7 +62,7 @@ Tras T2. **Toca:** `lib/modules/pedidos/domain/transition-order.ts`, `order-cata
 `finished_at` nulo; cada error deshace todo; `transitionAliveById` rechaza destinos `EN_EMPAQUE` y
 `ENTREGADO`; doble Finalizar no da segundo lote (R4–R8, R10).
 
-### T7 [ ] [P] — Estados congelados en `asignaciones`
+### T7 [x] [P] — Estados congelados en `asignaciones`
 Tras T5. **Toca:** `lib/modules/asignaciones/domain/order-state.ts`, `start-assigned-order.ts`,
 `tests/unit/asignaciones/order-state.test.ts`, `start-assigned-order.test.ts`,
 `assign-responsibles`/`unassign-responsible`/`remove-work-group-from-order` tests.
@@ -78,7 +78,7 @@ Tras T1, T2. **Toca:** `lib/modules/pedidos/domain/order-catalog.ts`, `order-pac
 uno `ok` y uno `taken`; Terminar escribe estado + fecha en una sentencia; otra empresa ⇒ `not_found`;
 `guard-ambito-empresa-pedidos` verde (R18–R24, R28).
 
-### T9 [ ] [P] — Envases del lote por pedido en `inventario`
+### T9 [x] [P] — Envases del lote por pedido en `inventario`
 **Toca:** `lib/modules/inventario/domain/product-catalog.ts`,
 `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`, `lib/composition/index.ts`,
 `tests/unit/inventario/product-catalog.test.ts`, `tests/integration/inventario/finished-goods-receipts.int.test.ts`
@@ -116,7 +116,7 @@ Tras T11. **Toca:** `app/(private)/asignacion/empaque/[id]/page.tsx`,
 **Hecho cuando:** 404 sin permiso; Comenzar/Terminar/ninguno según R17; `guard-pantallas-exigen-permiso`
 verde (R17, R40, R43).
 
-### T14 [ ] [P] — Pedidos: etiquetas y acciones cerradas
+### T14 [x] [P] — Pedidos: etiquetas y acciones cerradas
 Tras T2. **Toca:** `app/(private)/pedidos/components/order-status-badge.tsx`, `order-row-actions.tsx`,
 `tests/unit/pedidos-ui/order-row-actions.test.tsx`, `order-columns.test.tsx`.
 **Hecho cuando:** etiquetas nuevas; editar/cancelar/borrar deshabilitados con motivo visible; barrel

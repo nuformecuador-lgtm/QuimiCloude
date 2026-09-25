@@ -2,12 +2,14 @@
 //
 // Implementa `OrderCatalog['transitionAliveById']` (`order-catalog.ts`) sobre la unidad de
 // trabajo compartida con `inventario`: mueve el estado del pedido y, si el destino es
-// `ENTREGADO`, consume el material apartado y da de alta el lote de producto terminado de su
-// combinacion, todo en la MISMA transaccion. `asignaciones` solo conoce la firma del
-// puerto, nunca este archivo.
+// `POR_EMPACAR`, consume el material apartado y da de alta el lote de producto terminado de su
+// combinacion, todo en la MISMA transaccion. `EN_EMPAQUE` y `ENTREGADO` no son destino de este
+// metodo: solo los alcanzan los dos metodos de empaque, que conocen a quien empaca.
+// `asignaciones` solo conoce la firma del puerto, nunca este archivo.
 
 import {
   InsufficientMaterialError,
+  InvalidTransitionError,
   NoWholePackageError,
   PresentationWithoutContentError,
   RecipeNotFoundError,
@@ -58,6 +60,12 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
   ) {
     // Falla rapido, sin abrir transaccion, si el destino no es alcanzable desde el estado actual.
     assertTransition(from, to);
+    // `EN_EMPAQUE` y `ENTREGADO` SI son destinos legales de la matriz (los usan Comenzar y
+    // Terminar), pero este metodo no conoce a quien empaca: los rechaza igual que un destino
+    // fuera de la matriz.
+    if (to === 'EN_EMPAQUE' || to === 'ENTREGADO') {
+      throw new InvalidTransitionError(`de ${from} a ${to}`);
+    }
 
     try {
       return await deps.unitOfWork.run(async (scope) => {
@@ -68,8 +76,9 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
         if (locked.status !== from) return 'stale';
 
         // Consume ANTES de mover el estado: si falta material o la receta no tiene lineas, la
-        // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos.
-        if (to === 'ENTREGADO') {
+        // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos
+        // -`finishedAt` no lo escribe este destino de todos modos, solo Terminar-.
+        if (to === 'POR_EMPACAR') {
           // Sin presentacion no hay combinacion que dar de alta: se rechaza antes de
           // tocar el apartado. Un pedido CON presentacion pero sin contenido -ni copiado ni
           // vigente- lo rechaza mas abajo `finishedGoods.receiveFromOrder`.

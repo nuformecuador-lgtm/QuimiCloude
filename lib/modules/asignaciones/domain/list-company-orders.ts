@@ -14,6 +14,7 @@ import type { CompanyOrderView } from './company-order-view';
 
 import {
   formatOrderNumber,
+  ORDER_STATUS_FLOW,
   ORDER_STATUS_VALUES,
   type OrderCatalog,
   type OrderStatus,
@@ -51,7 +52,9 @@ export function createListCompanyOrders(
     if (!parsed.success) throw new ValidationError();
     const { page, pageSize, statuses } = parsed.data;
 
-    const statusesEfectivos = [...new Set(statuses ?? ORDER_STATUS_VALUES)];
+    // Sin filtro, el orden que viaja al catalogo es el del flujo de trabajo (`design.md > 1.1`),
+    // no el de declaracion del enum: es el que pinta el filtro de «Todos».
+    const statusesEfectivos = [...new Set(statuses ?? ORDER_STATUS_FLOW)];
     const ordering = resolveOrdering(statusesEfectivos);
 
     const ordersPage = await deps.orders.listAliveSummariesInCompany(

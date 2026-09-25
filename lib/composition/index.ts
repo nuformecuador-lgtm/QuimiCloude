@@ -83,6 +83,7 @@ import {
   findAliveIdByNameInPresentationUnit,
   findAliveProductById,
   findBatchesOfAliveProduct,
+  findFinishedGoodsReceipts,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -794,7 +795,11 @@ export const inventario = {
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
-const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+const productCatalog: ProductCatalog = {
+  findRefs: findProductRefs,
+  findCostingBatches,
+  findFinishedGoodsReceipts,
+};
 
 const presentationCatalog: PresentationCatalog = {
   findRefs: findPresentationRefs,

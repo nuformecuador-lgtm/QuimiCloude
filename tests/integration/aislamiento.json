@@ -152,6 +152,11 @@
       "desde": "2026-09-24"
     },
     {
+      "archivo": "inventario/finished-goods-receipts.int.test.ts",
+      "motivo": "QC-168 T9 (R14): 'findFinishedGoodsReceipts' (product-prisma.ts) lee con el cliente Prisma GLOBAL (no acepta 'tx'), asi que el asiento 'production' que alimenta la lectura tiene que quedar CONFIRMADO; una transaccion del test con ROLLBACK no la alimentaria. Cada caso escribe el asiento con 'receiveFinishedGoods' -misma ruta que produccion, envuelta en su propia 'prisma.$transaction' que CONFIRMA, igual que 'finished-goods.int.test.ts'- y limpia lo suyo en un 'finally', en el orden que exigen las FK (asientos -> lotes -> productos -> pedidos -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
+    },
+    {
       "archivo": "inventario/finished-product-prohibitions.int.test.ts",
       "motivo": "QC-150 T10 (R28, R31, R32): llama a 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' con un 'FOR NO KEY UPDATE' dentro, igual que 'product-type-lock.int.test.ts'; una transaccion del test no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (unidad, presentacion, receta, producto terminado -que exige el CHECK 'products_finished_identity_matches_type'-, usuario, rol y tipo de documento) y la limpia en un 'finally' en el orden que exigen las FK (asientos -> lotes -> producto -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-24"

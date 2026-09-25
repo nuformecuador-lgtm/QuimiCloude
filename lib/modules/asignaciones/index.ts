@@ -56,6 +56,9 @@ export {
   RecipeWithoutLinesError,
   PresentationWithoutContentError,
   NoWholePackageError,
+  OrderPackingTakenError,
+  OrderNotPackableError,
+  OrderProducedFrozenError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
