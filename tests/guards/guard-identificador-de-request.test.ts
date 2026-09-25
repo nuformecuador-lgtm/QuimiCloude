@@ -131,6 +131,15 @@ export const E2E_ESPERADOS = [
   // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
   'documentos.spec.ts',
   'ejecucion-receta.spec.ts',
+  // Alta el 2026-09-25 (QC-168) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. El recorrido que ejercita: el Operario finaliza y el
+  // pedido queda «Por empacar» sin verlo entre sus propias pestanas, Pedidos no deja cancelarlo
+  // en ese estado, y un Empacador lo comienza, lo termina y lo ve despues en «Terminados». NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'empaque.spec.ts',
   'errores.spec.ts',
   'grupos-de-trabajo.spec.ts',
   'inventario.spec.ts',
