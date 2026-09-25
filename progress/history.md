@@ -4843,3 +4843,17 @@ podar.
   tests abiertos (orden permiso→validación sin test, barrel sin comprobar la constante, un `describe` con nombre viejo).
 - **Incidencia:** el primer gate completo lo mató la falta de memoria de la máquina (varias sesiones a la vez); se
   relanzó solo y salió verde (727/9978). **Lección:** un gate completo a la vez.
+
+## 2026-09-25 — QC-154-crud-de-clientes
+
+- **Qué:** casos de uso y Server Actions de `clientes` (alta, edición, baja lógica, detalle, listado paginado) con
+  autorización en el service (`clientes.consultar`/`clientes.modificar`, solo Administrador), aislamiento por empresa
+  e id no uuid = `customer_not_found`. **Búsqueda sin acentos** (decisión F1.4) con migración propia: tres columnas
+  normalizadas, relleno y GIN trigram. `customer_not_found` es la **decimotercera** enmienda del catálogo (QC-150 la
+  duodécima). Catálogo de errores en 57.
+- **PR #124.** Spec R1–R47. Review: vuelta 1 rechazada (B1 citas en comentarios, **B2 tests que escribían en lib/ y
+  app/ y provocaban ENOENT intermitentes en otras guardias**, B3 claves exactas contra la base), vuelta 2 OK. Deuda m1:
+  limpiar a la vez las siete copias de `list-query.ts`.
+- **Incidencias:** el implementer se cortó dos veces sin informe (se reanudó sin pérdida); un gate lo mató la falta de
+  memoria. Rojos ajenos del gate (catálogo de QC-158, infra y concurrencia bajo carga) pasaron aislados.
+- **Desbloquea QC-155 y QC-156.**

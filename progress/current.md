@@ -21,6 +21,10 @@
 
 ## Evaluaciones
 
+**2026-09-25: nace QC-170** `pedido-en-varias-presentaciones` (fullstack, high), del chat; bloqueada por QC-168. **ACOTADA** con `/afinar-feature`: 9 decisiones y 3 preguntas abiertas en `specs/QC-170-pedido-en-varias-presentaciones/requirements.md`. Enmienda QC-168 (producto terminado al terminar el empaque) y QC-146 (desaparece la presentacion unica); aviso escrito en el issue de QC-168.
+
+**2026-09-25:** QC-154 cerrada (PR #124; resumen en history). **QC-155 F1.0 hecho**: `frontend`, `complexity: medium`, worktree montado; cupo `frontend` 1 de 2. **Spec R1-R42/T0-T9 aprobado el 2026-09-25** (menu en «Cadena», todas las columnas); `in_progress`.
+
 ### QC-159 formula-desde-pdf - ACOTADA con `/afinar-feature` y F1.0 (2026-09-25)
 
 10 decisiones, ninguna abierta, en `specs/QC-159-formula-desde-pdf/requirements.md`. Board actualizado (descripcion y `complexity:high`). No bloqueada por QC-157 (prompt, ficha humana). **F1.0 y F1.1 hechos**: worktree montado con `.env`; cupo `fullstack` 1 de 3 en curso (QC-168); el cruce de archivos con QC-168 (pedidos) se mira en F2.0 con los dos `tasks.md`. F1.2: `spec_author` lanzado. **F1.2/F1.3 hechos**: R1-R39, T0-T14 (`e0ff3ad8`), tarjeta *En revision*; P1-P4 con propuesta (P1: materia prima sin lote, excepcion a QC-90). Solapes con QC-168 solo en listas cerradas (guardias, `routes.ts`, `composition/index.ts`, `aislamiento.json`). **F1.4 APROBADO el 2026-09-25** («aprobado»: P1-P4 con la propuesta). **F2.0 hecho**: `in_progress`, *En curso*, cupo `fullstack` 2 de 3 con QC-168; los solapes son listas cerradas, se unen al sincronizar (precedente QC-158 x QC-141).
