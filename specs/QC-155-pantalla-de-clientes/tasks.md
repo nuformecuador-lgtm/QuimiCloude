@@ -59,14 +59,14 @@
 
 ## Tanda 3 — Formulario y baja (paralelas entre sí)
 
-- [ ] **T5 [P] — `customer-form.tsx` y `customer-sheet.tsx`.** Depende de T3.
+- [x] **T5 [P] — `customer-form.tsx` y `customer-sheet.tsx`.** Depende de T3.
   `design.md > 6`: seis campos, validación previa con `createCustomerSchema`, `maxLength` desde las
   constantes, correo y teléfono `type="text"` sin `pattern`, precarga desde la fila, `bind` del `id` en
   la edición, errores por `code`, éxito con toast + `router.refresh()`.
   **Hecho:** `customer-form.test.tsx` y `customer-sheet.test.tsx` cubren R24–R30. El caso del máximo
   exacto se acepta y el de máximo+1 no llama a la acción. Un solo `Toaster`.
 
-- [ ] **T6a [P] — `delete-customer-dialog.tsx` y `customer-row-actions.tsx`.** Depende de T3.
+- [x] **T6a [P] — `delete-customer-dialog.tsx` y `customer-row-actions.tsx`.** Depende de T3.
   `design.md > 7`.
   **Hecho:** `delete-customer-dialog.test.tsx` cubre R31–R33 (nombra al cliente, no invoca sin
   confirmar, error dentro y abierto, sin restaurar).
