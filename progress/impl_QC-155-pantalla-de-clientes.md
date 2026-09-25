@@ -402,3 +402,106 @@ No se tocó `lib/modules/**`, `lib/composition/**`, `db/**`, `components/shared/
 `customer-table.tsx`, `customer-list-section.tsx`, el barrel final y `page.tsx` completa quedan
 para T6, que es quien decide `canModify` en el servidor y lo baja por props hasta
 `CustomerRowActions` y hasta el disparador de alta de la cabecera.
+
+## T6 — `customer-table.tsx`, `customer-list-section.tsx`, barrel y `page.tsx` completa
+
+### Archivos tocados
+
+- `app/(private)/clientes/components/customer-table.tsx` (nuevo): monta la tabla compartida
+  (`DataTable`) con `status="idle"` siempre — el error y el vacío se pintan fuera —, columnas de
+  `buildCustomerColumns({ rowActions })` con `CustomerRowActions` enchufada por fila, y
+  `toolbarActions={canModify ? <CustomerSheet /> : undefined}` para el disparador de alta
+  (`customer-create-open`), que así vive en la barra de la tabla y no en la propia tabla ni en
+  `page.tsx` (`design.md > 6`: "disparador en `toolbarActions` de la tabla y en el vacío"). La
+  navegación va en `startTransition` y `router.push(customerListHref(...))`, con `aria-busy` +
+  atenuación mientras está en vuelo, sin desmontar nada (R21). La sincronización de la caja de
+  búsqueda con «Atrás» (`boxEpoch`, `pendingSearches`, `lastSearch`, `clearing`) es una **copia
+  literal** del mecanismo de `order-table.tsx:143-215` (R18, `design.md > 5.3`), sin tocar
+  `components/shared/data-table`: es la segunda copia que la ficha anota como deuda con nombre
+  (`design.md > 12`, riesgo 3), no una tercera definición del mismo problema.
+- `app/(private)/clientes/components/customer-list-section.tsx` (nuevo): `async`, llama
+  `listCustomersAction(params)` **una vez**, importada por su ruta exacta, y despacha los cinco
+  casos de `design.md > 5.1`: error → `CustomerListError`; cero filas sin término/filtro →
+  `CustomerListEmpty` (con `<CustomerSheet />` como disparador de alta cuando la página es la
+  primera, o el enlace a la primera página cuando `page > totalPages` — los dos casos comparten un
+  solo componente, que ya decide internamente cuál mostrar según `firstPageHref`); cero filas con
+  término o filtro → `CustomerTable` con `noMatches`; filas → `CustomerTable`. `canModify` solo se
+  transporta, nunca se decide aquí (R8).
+- `app/(private)/clientes/components/index.ts`: suma `customer-table` y `customer-list-section`
+  al barrel.
+- `app/(private)/clientes/page.tsx` (reemplaza la versión mínima de T1): primera línea
+  `requirePagePermission('clientes.consultar')` (R3), luego `searchParams`, `canModifyCustomers()`
+  (copia literal de `canModifyUsers()` de `configuracion/usuarios/page.tsx`: `assertPermission`
+  contra `'clientes.modificar'`, sin `currentUserId` porque esta pantalla no tiene «uno mismo») y
+  `parseCustomerListParams`. `<Suspense>` **sin `key`**, con `<CustomerListSkeleton>` como
+  `fallback` para la primera carga (R21) y `<CustomerListSection>` dentro (R17, R18).
+- `tests/unit/clientes-ui/private-nav-clientes.test.ts`: se activa (quita el `it.skip`) el caso
+  «item y página declaran el MISMO código» — ahora `page.tsx` tiene exactamente un
+  `requirePagePermission(...)`, así que el test puede leerlo de la fuente real.
+- `tests/unit/shared/data-table-alcance.test.ts`: alta de la NOVENA pantalla consumidora
+  (`CUSTOMERS_ROUTE`) en `carpetasAutorizadas`, y se **tensa** el ancla mínima de consumidores de
+  siete a ocho (`toBeGreaterThan(8)`). No se toca la lista cerrada de E2E (`e2e/clientes.spec.ts`
+  no existe todavía: es T8).
+- `tests/unit/clientes-ui/customer-table.test.tsx` (nuevo, copia del patrón de
+  `order-table.test.tsx`).
+- `tests/unit/clientes-ui/customer-list-section.test.tsx` (nuevo, copia del patrón de
+  `order-list-section.test.tsx`, simplificado: sin catálogos adicionales).
+- `tests/unit/clientes-ui/clientes-page.test.tsx` (nuevo, copia del patrón de
+  `usuarios-page.test.tsx`).
+
+### Mapa R<n> → test
+
+| Requisito | Test |
+| --- | --- |
+| R9 | `customer-table.test.tsx` > "la tabla estrena el componente compartido y no declara uno propio (R9)" |
+| R12 | `customer-table.test.tsx` > "escribir en la caja navega desde la primera pagina, conservando lo demas (R12, R13)" |
+| R13 | `customer-table.test.tsx` > "las filas se pintan en el orden en que llegan (R13)"; `customer-list-section.test.tsx` > "«Limpiar la busqueda» enlaza sin `q`..." |
+| R18 | `customer-table.test.tsx` > `describe('la caja sigue a la URL cuando el termino cambia por fuera (R18)')` (eco propio no remonta; cambio externo sí remonta; tras «Limpiar», el eco y luego un cambio externo no dejan la caja atrás) |
+| R19 | `customer-list-section.test.tsx` > "vacio: sin ningun cliente...", "el disparador de alta del vacio solo aparece con `canModify` (R19, R5)" |
+| R20 | `customer-list-section.test.tsx` > `describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R20)')`, `describe('la pagina que se quedo atras vuelve a la primera (R20)')` |
+| R21 | `customer-table.test.tsx` > `describe('mientras la navegacion esta en vuelo, la caja conserva foco y texto (R21)')` (aria-busy, atenuación, sin desmontar) |
+| R22 | `customer-list-section.test.tsx` > "error: se dice que fallo...", "el reintento del error enlaza a la MISMA consulta..." |
+| R23 | `customer-table.test.tsx` > "el desbordamiento horizontal lo absorbe el primitivo (R23)" |
+| R7 | `customer-list-section.test.tsx` > `describe('la pantalla no autoriza nada por su cuenta (R7)')`, "se invoca listCustomersAction UNA vez..." |
+| R3 | `clientes-page.test.tsx` > `describe('el corte por permiso ocurre antes de leer o pintar nada (R3)')` |
+| R5 | `clientes-page.test.tsx` > `describe('canModify sale de assertPermission y de nada mas (R5, R8)')`; `customer-table.test.tsx` > `describe('las acciones de fila respetan canModify (R5)')` |
+| R6 | `private-nav-clientes.test.ts` > "item y pagina declaran el MISMO codigo, no uno contenido en el otro" (activado en esta task) |
+| R8 | `clientes-page.test.tsx` > "la fuente NO compara el conjunto de permisos a mano", "la pantalla no se construye sus propios datos..." |
+| R1, R2 (cobertura de la lista cerrada) | `data-table-alcance.test.ts` > "solo las nueve pantallas autorizadas importan components/shared/data-table" |
+
+### Salida real de los tests
+
+```
+$ pnpm exec vitest run tests/unit/clientes-ui/customer-table.test.tsx tests/unit/clientes-ui/customer-list-section.test.tsx tests/unit/clientes-ui/clientes-page.test.tsx tests/unit/clientes-ui/private-nav-clientes.test.ts
+ Test Files  4 passed (4)
+      Tests  55 passed (55)
+
+$ pnpm exec vitest run tests/unit/clientes-ui tests/unit/shared/data-table-alcance.test.ts tests/guards/guard-pantallas-exigen-permiso.test.ts tests/guards/guard-rutas-privadas-cubiertas.test.ts tests/unit/clientes/scope.test.ts tests/unit/navegacion/private-layout-menu.test.tsx
+ Test Files  18 passed (18)
+      Tests  242 passed | 2 skipped (244)
+```
+
+(Los 2 `skipped` son ajenos a esta task: casos condicionales de otras fichas que no aplican en
+este estado del repo.)
+
+```
+$ pnpm exec vitest related --run "app/(private)/clientes/components/customer-table.tsx" \
+    "app/(private)/clientes/components/customer-list-section.tsx" \
+    "app/(private)/clientes/components/index.ts" "app/(private)/clientes/page.tsx"
+ Test Files  11 passed (11)
+      Tests  154 passed (154)
+```
+
+`pnpm run typecheck`: verde. `pnpm run lint`: verde, 0 errores (los mismos 7 warnings
+preexistentes y ajenos de `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+
+### Archivos fuera de alcance (T6)
+
+No se tocó `lib/modules/**`, `lib/composition/**` (solo se **importa**, igual que
+`configuracion/usuarios/page.tsx`), `db/**`, `components/shared/**` (solo se **importa** su
+barrel público `@/components/shared/data-table`, sin abrir ni un archivo suyo — lo confirma
+`data-table-alcance.test.ts` en verde), `components/ui/**` ni `package.json`. No se tocó
+`specs/**`, `feature_list.json` ni `progress/current.md`. `e2e/clientes.spec.ts` y su alta en
+`E2E_ESPERADOS`/`data-table-alcance.test.ts` quedan para T8. Las guardias de fuente propias de la
+ruta (`clientes-convenciones.test.ts`, `data-table-intacta-clientes.test.ts`,
+`clientes-viewport.test.tsx`) quedan para T7.
