@@ -70,6 +70,7 @@ PR #118, merge `a738d81f`. Resumen en `progress/history.md`. **Deuda: T14, revis
 ### QC-161 rol-maestro y QC-162 gestion-de-empresas - NACEN con `/afinar-feature` (2026-09-24)
 
 **QC-161** (backend) creada y sembrada: 11 decisiones (Maestro sin empresa, enmienda QC-47; nunca en el selector de roles) y 1 pregunta abierta (su login sin empresa en la sesion) en `specs/QC-161-rol-maestro/requirements.md`. **QC-162** (fullstack, bloqueada por QC-161) creada sin sembrar. Choca con QC-153/QC-142 en el catalogo de permisos: no en paralelo.
+**2026-09-25 · F0 parcial:** el board tenia QC-161 en *En revision* desde el spec del 2026-09-24 (`ec5802c2`, en la rama: R1-R35, 15 tasks, 7 preguntas) y el disco seguia en `pending`: pasa a `spec_ready`. **Cupo `backend` lleno (QC-131, QC-154, QC-169)**: tras aprobar, solo espera. Choca en el catalogo de permisos con **QC-168** (`empaque.modificar`, en curso); D3 ya escribe el recuento contra dev al implementar.
 
 ### QC-160 - CERRADA (2026-09-25)
 
