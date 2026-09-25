@@ -283,3 +283,65 @@ su barrel publico `@/components/shared/data-table` y desde `@/components/shared/
 igual que hacen pedidos/unidades/recetas), `components/ui/**` ni `package.json`. No se tocó
 `specs/**`, `feature_list.json` ni `progress/current.md`. No se corrio `./init.sh` completo (queda
 para T9).
+
+## T5 — `customer-form.tsx` y `customer-sheet.tsx`
+
+### Archivos tocados
+
+- `app/(private)/clientes/components/customer-form.tsx` (nuevo): `<form action>` no controlado +
+  `useActionState`, calcado de `presentation-form.tsx` (validacion previa con el MISMO esquema que
+  valida el servidor, `createCustomerSchema` del barrel publico de `clientes`, sin reescribir sus
+  reglas). Seis campos (`CUSTOMER_BUSINESS_FIELDS`), tres obligatorios (`CUSTOMER_REQUIRED_FIELDS`)
+  con `required`/`aria-required`. `maxLength` de cada campo sale de las constantes
+  `CUSTOMER_*_MAX_LENGTH` del barrel, nunca de un numero suelto. Correo y telefono son
+  `type="text"` con `inputMode="email"`/`"tel"` y sin `pattern`. La edicion precarga los seis
+  valores de la fila (`CustomerView`) y el envio es reemplazo completo: un opcional vaciado viaja
+  vacio, tal cual llega del `<input>`, sin ninguna limpieza de `FormData` (a diferencia de
+  unidades, aqui no hay pareja de campos que omitir). Ningun `code` del modulo `clientes`
+  identifica un campo (`unauthorized`, `customer_not_found`, `invalid_input`, `unexpected`), asi
+  que todo rechazo del servidor va a la region `role="alert"` del formulario; solo la validacion
+  previa del cliente pinta error junto a un campo.
+- `app/(private)/clientes/components/customer-sheet.tsx` (nuevo): panel lateral calcado de
+  `presentation-sheet.tsx`/`unit-sheet.tsx`. Sin `open`, trae su propio disparador de alta
+  (`customer-create-open`); con `open`/`onOpenChange`, es el enganche controlado de la edicion
+  desde la fila (T6a). Exito: cierra, `toast.success(...)` sobre el `<Toaster/>` que ya monta
+  `app/(private)/layout.tsx` —no se monta otro— y `router.refresh()`. Sin `revalidatePath`.
+- `app/(private)/clientes/components/index.ts`: suma los dos archivos al barrel.
+- `tests/unit/clientes-ui/customer-form.test.tsx` y `tests/unit/clientes-ui/customer-sheet.test.tsx`
+  (nuevos). El formulario se monta siempre a traves de `CustomerSheet`, porque `SheetContent`
+  exige un `Sheet` como ancestro (mismo patron que `presentation-sheet.test.tsx`).
+
+### Mapa R<n> → test
+
+| Requisito | Test |
+| --- | --- |
+| R24 | `customer-sheet.test.tsx` > `describe('panel lateral de clientes (R24)')` (panel lateral sin navegar, cerrar no navega, la edicion abre el mismo panel precargado) |
+| R25 | `customer-form.test.tsx` > `describe('los seis campos, y ninguno mas (R25)')` (los seis campos exactos; los tres obligatorios marcados y los tres opcionales sin marcar) |
+| R26 | `customer-form.test.tsx` > `describe('validacion previa con el esquema del contrato (R26)')`: "el largo maximo EXACTO... se acepta", "un caracter MAS que el maximo NO llama a la operacion...", "un obligatorio vacio no llama a la operacion: el navegador bloquea el envio antes", "el maximo de los tres opcionales tambien se acota...", "el correo y el telefono son `type=\"text\"` sin `pattern`...", "el correo y el telefono aceptan texto sin formato...", "los limites usados son los que exporta el contrato publico..." |
+| R27 | `customer-form.test.tsx` > `describe('precarga y reemplazo completo en la edicion (R27)')` (precarga de los seis valores; reemplazo completo ligado al id; vaciar un opcional lo envia vacio) |
+| R28 | `customer-form.test.tsx` > `describe('los rechazos se distinguen por su codigo, nunca por el texto (R28)')` (`customer_not_found`, `unauthorized`, `invalid_input` del servidor, no cierra ni pierde lo escrito, identificador del error inesperado con y sin catalogo) |
+| R29 | `customer-form.test.tsx` > `describe('no hay advertencia de duplicado (R29)')` (dos altas con los mismos seis datos, sin dialogo ni bloqueo) |
+| R30 | `customer-sheet.test.tsx` > `describe('exito: cerrar, avisar y refrescar (R30)')` (alta y edicion con exito cierran + toast + refresh; el panel no monta una segunda region de avisos) |
+
+### Salida real de los tests
+
+```
+$ pnpm exec vitest run tests/unit/clientes-ui/customer-form.test.tsx tests/unit/clientes-ui/customer-sheet.test.tsx
+ Test Files  2 passed (2)
+      Tests  25 passed (25)
+```
+
+`pnpm exec vitest related --run` sobre `customer-form.tsx`, `customer-sheet.tsx` e `index.ts`:
+7 archivos de test relacionados, **97 passed (97)**.
+
+`pnpm run typecheck`: verde. `pnpm run lint`: verde, mismos 7 warnings preexistentes y ajenos
+(`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+
+### Archivos fuera de alcance (T5)
+
+No se tocó `lib/modules/**`, `lib/composition/**`, `db/**`, `components/shared/**` (solo se
+**importa** `@/components/shared/unexpected-error-notice`, igual que unidades/presentaciones),
+`components/ui/**` ni `package.json`. No se tocó `specs/**`, `feature_list.json` ni
+`progress/current.md`. `customer-row-actions.tsx` y `delete-customer-dialog.tsx` quedan para T6a:
+este panel se prueba con el disparador propio y con un enganche `open`/`onOpenChange` simulado por
+un boton minimo en el test, tal como hara la fila real.
