@@ -643,4 +643,133 @@ describe('ninguna imagen ni recorte, y accesibilidad tactil (R35, R38)', () => {
     expect(screen.queryByAltText(/recorte/i)).toBeNull();
     expect(screen.getByTestId('formula-import-confirm')).toHaveClass('min-h-11', 'min-w-11');
   });
+
+  it('todos los botones e inputs interactivos de la revision llevan min-h-11 (R38)', () => {
+    renderReview({
+      ingredients: [
+        {
+          // Preseleccionada: ofrece los botones "elegir" y "crear".
+          readName: 'Sosa preseleccionada',
+          percentage: '34.00',
+          percentageRead: '34',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'one', productId: PRODUCT_EXISTING.id, productName: PRODUCT_EXISTING.name, unitId: null },
+        },
+        {
+          // Varias coincidencias: arranca en "elegir", con el selector de producto pintado.
+          readName: 'Acido con varias',
+          percentage: '33.00',
+          percentageRead: '33',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'several', count: 2 },
+        },
+        {
+          // Sin coincidencia: arranca en "crear", con el nombre editable pintado.
+          readName: 'Perfume sin coincidencia',
+          percentage: '33.00',
+          percentageRead: '33',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'none' },
+        },
+      ],
+      nameClash: { recipeId: 'receta-existente', recipeName: 'Detergente base' },
+    });
+
+    expect(screen.getByTestId('formula-import-name')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-description')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-add-ingredient')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-confirm')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-clash-replace')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-clash-rename')).toHaveClass('min-h-11', 'min-w-11');
+
+    // Fila 0 (preseleccionada): "Quitar", "elegir producto existente" y "crear materia prima".
+    expect(screen.getByTestId('formula-import-row-remove-0')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-choose-button-0')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-create-button-0')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-percentage-0')).toHaveClass('min-h-11', 'min-w-11');
+
+    // Fila 1 (elegir): "Quitar", "crear materia prima" y el selector de producto.
+    expect(screen.getByTestId('formula-import-row-remove-1')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-create-button-1')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-product-picker-1')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-percentage-1')).toHaveClass('min-h-11', 'min-w-11');
+
+    // Fila 2 (crear): "Quitar", "elegir producto existente" y el nombre editable.
+    expect(screen.getByTestId('formula-import-row-remove-2')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-choose-button-2')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-new-name-2')).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByTestId('formula-import-row-percentage-2')).toHaveClass('min-h-11', 'min-w-11');
+  });
+
+  it('los campos de texto de la revision tienen letra de 16px (text-base) (R38)', () => {
+    renderReview({
+      ingredients: [
+        {
+          readName: 'Sosa preseleccionada',
+          percentage: '34.00',
+          percentageRead: '34',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'one', productId: PRODUCT_EXISTING.id, productName: PRODUCT_EXISTING.name, unitId: null },
+        },
+        {
+          readName: 'Perfume sin coincidencia',
+          percentage: '33.00',
+          percentageRead: '33',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'none' },
+        },
+      ],
+    });
+
+    expect(screen.getByTestId('formula-import-name')).toHaveClass('text-base');
+    expect(screen.getByTestId('formula-import-description')).toHaveClass('text-base');
+    expect(screen.getByTestId('formula-import-row-percentage-0')).toHaveClass('text-base');
+    expect(screen.getByTestId('formula-import-row-new-name-1')).toHaveClass('text-base');
+  });
+
+  it('ninguna parte de la revision depende de hover para mostrarse (R38)', () => {
+    const { container } = renderReview({
+      ingredients: [
+        {
+          readName: 'Sosa preseleccionada',
+          percentage: '34.00',
+          percentageRead: '34',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'one', productId: PRODUCT_EXISTING.id, productName: PRODUCT_EXISTING.name, unitId: null },
+        },
+        {
+          readName: 'Acido con varias',
+          percentage: '33.00',
+          percentageRead: '33',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'several', count: 2 },
+        },
+        {
+          readName: 'Perfume sin coincidencia',
+          percentage: '33.00',
+          percentageRead: '33',
+          quantityRead: null,
+          unitRead: null,
+          match: { kind: 'none' },
+        },
+      ],
+      nameClash: { recipeId: 'receta-existente', recipeName: 'Detergente base' },
+    });
+
+    // Mismo criterio que `document-upload-a11y-tactil.test.tsx`: decorar con `hover:` (color,
+    // fondo) no es lo que R38 prohibe; lo que prohibe es que algo solo se revele al pasar el
+    // puntero, invisible en tactil.
+    for (const elemento of container.querySelectorAll('*')) {
+      expect(elemento.getAttribute('class') ?? '').not.toMatch(
+        /group-hover:(opacity|visible|flex|block|inline)|hover:(opacity|visible|block|flex|inline)/,
+      );
+    }
+  });
 });
