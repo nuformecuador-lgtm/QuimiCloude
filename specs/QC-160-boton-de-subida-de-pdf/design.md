@@ -339,6 +339,14 @@ Ninguno. No hay tabla, columna, migración, RLS ni seed. El permiso lo trae QC-1
   - Nuevo: `package.json` no cambia respecto de `dev` en dependencias, y la carpeta del componente
     solo importa del diálogo de `@/components/ui/dialog`, nunca de `@base-ui/react` directamente
     (R20).
+> **Nota 2026-09-24 (decisión del leader tras la revisión, M1).** Se quita el caso «el manifiesto no
+> gana ninguna dependencia respecto de `origin/dev`». El patrón de comparar con `origin/dev` castiga a
+> las fichas posteriores: la primera que añada una dependencia aprobada se pone roja aquí, porque su
+> `origin/dev` todavía no la tiene (el mismo fallo que se corrigió en `7cd534e8`). Esa clase de guardia
+> la cubre QC-99. R20 sigue cubierto por `tests/guards/guard-dependencias-aprobadas.test.ts`, por el
+> caso que prohíbe importar `@base-ui/react` en la carpeta del componente y por la comprobación de
+> `git diff --stat` de T8.
+
 - `module-contract.test.ts`: `canUploadDocuments` en `EXPORTACIONES_DE_EJECUCION`.
 - Tests de componente de QC-107: **sin cambios**. Si alguno se pone rojo, se ha roto R9.
 

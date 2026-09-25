@@ -3,7 +3,6 @@
 //
 // Cubre R9, R15, R16, R18, R19 y R22 (`specs/QC-107-componente-de-carga-de-archivos/tasks.md > T10`).
 
-import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
@@ -19,10 +18,10 @@ const RAIZ = join(__dirname, '..', '..', '..');
 const CARPETA_DEL_COMPONENTE = 'components/shared/document-upload';
 
 /**
- * Donde el montaje de esta ficha esta permitido: el listado de formulas monta el dialogo
- * directamente, y el detalle de proveedor lo hace a traves de su envoltorio de cliente, porque una
- * funcion (`reviewHrefFor`) no puede cruzar del Server Component al cliente y `page.tsx` deja de
- * importar el componente directo.
+ * Donde el montaje de la ventana de subida esta permitido: el listado de formulas monta el
+ * dialogo directamente, y el detalle de proveedor lo hace a traves de su envoltorio de cliente,
+ * porque una funcion (`reviewHrefFor`) no puede cruzar del Server Component al cliente y
+ * `page.tsx` deja de importar el componente directo.
  */
 const PANTALLA_CON_MONTAJE = 'app/(private)/proveedores/[id]/components/catalog-pdf-upload.tsx';
 const PAGINA_DEL_PROVEEDOR = 'app/(private)/proveedores/[id]/page.tsx';
@@ -269,52 +268,19 @@ describe('quien decide el montaje es el servidor, nunca la pieza (R12)', () => {
   });
 });
 
-/** Nombres de `dependencies` + `devDependencies` de un `package.json` en texto. */
-function nombresDeDependencias(manifiesto: string): string[] {
-  const json = JSON.parse(manifiesto) as {
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-  };
-  return [
-    ...new Set([...Object.keys(json.dependencies ?? {}), ...Object.keys(json.devDependencies ?? {})]),
-  ].sort();
-}
-
-/** Las que aparecen en la rama y no en la base. */
-function dependenciasNuevas(base: readonly string[], rama: readonly string[]): string[] {
-  const enBase = new Set(base);
-  return rama.filter((nombre) => !enBase.has(nombre)).sort();
-}
-
 /** Si un import trae el dialogo directamente de la libreria en vez de la primitiva del repo. */
 function importaElDialogoDeBaseUiDirecto(codigo: string): boolean {
   return /from\s+'@base-ui\/react/.test(codigo);
 }
 
-describe('esta ficha no reescribe ni añade dependencias (R20)', () => {
-  it('el manifiesto no gana ninguna dependencia respecto de origin/dev', () => {
-    const manifiestoEnDev = execFileSync(
-      'git',
-      ['-c', 'core.quotepath=off', 'show', 'origin/dev:package.json'],
-      { cwd: RAIZ, encoding: 'utf8' },
-    );
-    const enDev = nombresDeDependencias(manifiestoEnDev);
-    const enLaRama = nombresDeDependencias(leer('package.json'));
-    expect(enDev.length).toBeGreaterThan(20);
-
-    expect(dependenciasNuevas(enDev, enLaRama)).toEqual([]);
-  });
-
+describe('la ventana de subida usa la primitiva de dialogo existente (R20)', () => {
   it('la carpeta del componente importa el dialogo solo de la primitiva del repo, nunca de @base-ui/react', () => {
     for (const { ruta, codigo } of CODIGO_DEL_COMPONENTE) {
       expect(importaElDialogoDeBaseUiDirecto(codigo), ruta).toBe(false);
     }
   });
 
-  it('los dos detectores muerden con un ejemplo malo y no con uno bueno', () => {
-    expect(dependenciasNuevas(['react', 'next'], ['react', 'next', 'axios'])).toEqual(['axios']);
-    expect(dependenciasNuevas(['react'], ['react'])).toEqual([]);
-
+  it('el detector muerde con un ejemplo malo y no con uno bueno', () => {
     expect(importaElDialogoDeBaseUiDirecto("import { Dialog } from '@base-ui/react/dialog';")).toBe(
       true,
     );
