@@ -60,6 +60,7 @@ import {
   createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
+  createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
@@ -776,6 +777,8 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  */
 export const inventario = {
   createProduct: createCreateProduct({ products: productRepository }),
+  // QC-159 T3: materia prima SIN lote desde la revision de una formula (P1).
+  createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
   getProduct: createGetProduct({ products: productRepository }),

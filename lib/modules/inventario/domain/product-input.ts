@@ -13,13 +13,17 @@ import { MANUAL_PRODUCT_TYPE_VALUES, PRODUCT_TYPES } from './product-type';
  * `deliveryTimeSchema` de este archivo: lo que ya no se acepta tampoco se valida.
  */
 
+/** Publicado por el barrel (QC-159 `design.md > 5.3`) para que otro modulo -la revision de
+ *  formula de `documentos`- valide el nombre de una materia prima nueva sin copiar el numero. */
+export const PRODUCT_NAME_MAX_LENGTH = 200;
+
 /**
  * `trim()` va ANTES de `min(1)`: si se aplicara despues, '   ' pasaria el minimo de
  * longitud y solo se recortaria tras la validacion, incumpliendo R9 -"recortar antes de
  * guardarlo"-. Con `.trim().min(1)`, en ese orden, zod ya recorta el valor de salida del
  * `parse` y lo que queda vacio tras recortar se rechaza.
  */
-const productNameSchema = z.string().trim().min(1).max(200);
+export const productNameSchema = z.string().trim().min(1).max(PRODUCT_NAME_MAX_LENGTH);
 
 /**
  * Duplicado a proposito del de `product-batch-input.ts`: de otro campo del mismo modulo solo se

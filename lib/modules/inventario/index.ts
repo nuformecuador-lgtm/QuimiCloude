@@ -47,6 +47,8 @@ export {
 export {
   createProductSchema,
   updateProductSchema,
+  productNameSchema,
+  PRODUCT_NAME_MAX_LENGTH,
   type CreateProductInput,
   type UpdateProductInput,
 } from './domain/product-input';
@@ -66,6 +68,10 @@ export { type InventoryMovementView, type NewInventoryMovement } from './domain/
 export { MOVEMENT_REASONS, type MovementReason } from './domain/movement-reason';
 
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
+export {
+  createCreateRawMaterial,
+  type CreateRawMaterialDeps,
+} from './domain/create-raw-material';
 export { createUpdateProduct, type UpdateProductDeps } from './domain/update-product';
 export { createDeleteProduct, type DeleteProductDeps } from './domain/delete-product';
 export { createGetProduct, type GetProductDeps } from './domain/get-product';
