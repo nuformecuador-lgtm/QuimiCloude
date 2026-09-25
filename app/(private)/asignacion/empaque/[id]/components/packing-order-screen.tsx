@@ -18,10 +18,9 @@ import type { OrderStatus } from '@/lib/modules/pedidos';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
 /**
- * La pantalla de un pedido de empaque (R17, R43, `design.md > 6`).
- *
- * Sin control de edicion: los datos del pedido se leen tal cual llegaron por props. Solo tres
- * desenlaces posibles segun R17 -comparando SIEMPRE `packedById` con el actor, nunca por nombre-:
+ * La pantalla de un pedido de empaque. Sin control de edicion: los datos del pedido se leen tal
+ * cual llegaron por props. Se compara SIEMPRE `packedById` con el actor, nunca por nombre, porque
+ * dos usuarios pueden llamarse igual. Solo tres desenlaces posibles:
  *
  *   1. `POR_EMPACAR` -> boton **Comenzar**.
  *   2. `EN_EMPAQUE` a nombre del propio actor -> boton **Terminar**.
@@ -29,7 +28,7 @@ import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
  *
  * `startPackingAction` vuelve a la MISMA pantalla (revalida su ruta); `finishPackingAction`
  * termina, en el servidor, con una redireccion a «Por empacar» -su camino feliz nunca resuelve
- * aqui-, igual que `finishAssignedOrderAction` en la pantalla de ejecucion.
+ * aqui-.
  */
 
 export const PACKING_ORDER_SCREEN_TESTID = 'packing-order-screen';
@@ -64,7 +63,7 @@ function packerLabel(order: PackingOrderRow): string {
   return order.packedByName === null ? PACKER_UNKNOWN_TEXT : `Lo esta empacando ${order.packedByName}.`;
 }
 
-/** Solo se pintan los dos estados que `getPackingOrder` puede devolver (R17); cualquier otro es
+/** Solo se pintan los dos estados que `getPackingOrder` puede devolver; cualquier otro es
  *  imposible en esta pantalla y se muestra tal cual sin tumbarla. */
 function statusLabel(status: OrderStatus): string {
   if (status === 'POR_EMPACAR') return 'Por empacar';
@@ -77,7 +76,7 @@ const FINISH_INITIAL_STATE: FinishPackingResult = { status: 'success' };
 
 export type PackingOrderScreenProps = {
   readonly order: PackingOrderRow;
-  /** El id del actor de la sesion, nunca su nombre: R17 se decide comparando `packedById`. */
+  /** El id del actor de la sesion, nunca su nombre: se decide comparando `packedById`. */
   readonly actorId: string;
 };
 

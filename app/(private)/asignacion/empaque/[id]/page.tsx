@@ -31,11 +31,12 @@ async function currentActor(): Promise<Actor | null> {
 }
 
 /**
- * Pantalla de un pedido de empaque (R17, R40, `design.md > 6`).
+ * Pantalla de un pedido de empaque.
  *
- * **El corte por permiso es la PRIMERA linea** (R40): sin `empaque.modificar` responde 404, nunca
- * 403. La direccion sale de `packingOrderRoute` (`lib/shared/routes.ts`); esta carpeta es solo la
- * forma en que el App Router materializa esa constante.
+ * **El corte por permiso es la PRIMERA linea**: sin `empaque.modificar` responde 404, nunca
+ * 403, para no revelar que el pedido existe a quien no puede verlo. La direccion sale de
+ * `packingOrderRoute` (`lib/shared/routes.ts`); esta carpeta es solo la forma en que el App
+ * Router materializa esa constante.
  *
  * `getPackingOrder` es la MISMA fila que compone «Por empacar» para un unico pedido: si no existe,
  * esta dada de baja, es de otra empresa o su estado no es `POR_EMPACAR`/`EN_EMPAQUE`, lanza
