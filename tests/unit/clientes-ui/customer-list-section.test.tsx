@@ -16,8 +16,11 @@ import {
   CUSTOMER_LIST_CLEAR_SEARCH_TESTID,
   CUSTOMER_LIST_NO_MATCHES_TESTID,
   CustomerListSection,
+  PAGE_SIZE_PARAM,
+  SORT_PARAM,
+  SORT_SEPARATOR,
 } from '@/app/(private)/clientes/components';
-import type { DataTableParams } from '@/components/shared/data-table';
+import { PAGE_SIZE_OPTIONS, type DataTableParams } from '@/components/shared/data-table';
 import type { CustomerView } from '@/lib/modules/clientes';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
@@ -246,6 +249,10 @@ describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R20)', () 
   });
 });
 
+const TAMANO_NO_POR_DEFECTO = PAGE_SIZE_OPTIONS.find((opcion) => opcion !== DEFAULT_PAGE_SIZE)!;
+const ORDEN_NO_POR_DEFECTO = { columnId: 'createdAt', direction: 'asc' } as const;
+const ORDEN_EN_LA_URL = `${ORDEN_NO_POR_DEFECTO.columnId}${SORT_SEPARATOR}${ORDEN_NO_POR_DEFECTO.direction}`;
+
 describe('la pagina que se quedo atras vuelve a la primera (R20)', () => {
   it('con la pagina vacia y page > 1 se ofrece el enlace a la primera, derivado de CUSTOMERS_ROUTE', async () => {
     listCustomersActionMock.mockResolvedValue(pagina([], { page: 4, totalPages: 2 }));
@@ -259,12 +266,17 @@ describe('la pagina que se quedo atras vuelve a la primera (R20)', () => {
     expect(screen.queryByTestId(CUSTOMER_LIST_NO_MATCHES_TESTID)).toBeNull();
   });
 
-  it('con un termino vigente y page > totalPages, gana a "sin coincidencias" y conserva el termino', async () => {
+  it('con un termino vigente y page > totalPages, gana a "sin coincidencias" y conserva termino, tamaño y orden', async () => {
     listCustomersActionMock.mockResolvedValue(pagina([], { page: 3, totalPages: 2 }));
 
     render(
       await CustomerListSection({
-        params: parametros({ page: 3, search: 'ana' }),
+        params: parametros({
+          page: 3,
+          search: 'ana',
+          pageSize: TAMANO_NO_POR_DEFECTO,
+          sort: ORDEN_NO_POR_DEFECTO,
+        }),
         canModify: false,
       }),
     );
@@ -275,12 +287,14 @@ describe('la pagina que se quedo atras vuelve a la primera (R20)', () => {
     expect(destino.pathname).toBe(CUSTOMERS_ROUTE);
     expect(destino.searchParams.get('page')).toBe('1');
     expect(destino.searchParams.get('q')).toBe('ana');
+    expect(destino.searchParams.get(PAGE_SIZE_PARAM)).toBe(String(TAMANO_NO_POR_DEFECTO));
+    expect(destino.searchParams.get(SORT_PARAM)).toBe(ORDEN_EN_LA_URL);
     expect(within(tabla).getByTestId('data-table-search')).toHaveValue('ana');
     expect(screen.queryByTestId(CUSTOMER_LIST_NO_MATCHES_TESTID)).toBeNull();
     expect(screen.queryByTestId(CUSTOMER_LIST_CLEAR_SEARCH_TESTID)).toBeNull();
   });
 
-  it('con un filtro vigente y page > totalPages, gana a "sin coincidencias" y conserva el filtro', async () => {
+  it('con un filtro vigente y page > totalPages, gana a "sin coincidencias" y conserva filtro, tamaño y orden', async () => {
     listCustomersActionMock.mockResolvedValue(pagina([], { page: 5, totalPages: 1 }));
 
     render(
@@ -288,6 +302,8 @@ describe('la pagina que se quedo atras vuelve a la primera (R20)', () => {
         params: parametros({
           page: 5,
           filters: { city: { kind: 'text', value: 'Cali' } },
+          pageSize: TAMANO_NO_POR_DEFECTO,
+          sort: ORDEN_NO_POR_DEFECTO,
         }),
         canModify: false,
       }),
@@ -298,6 +314,8 @@ describe('la pagina que se quedo atras vuelve a la primera (R20)', () => {
     const destino = new URL(enlace.getAttribute('href') as string, 'http://localhost');
     expect(destino.searchParams.get('page')).toBe('1');
     expect(destino.searchParams.get('city')).toBe('Cali');
+    expect(destino.searchParams.get(PAGE_SIZE_PARAM)).toBe(String(TAMANO_NO_POR_DEFECTO));
+    expect(destino.searchParams.get(SORT_PARAM)).toBe(ORDEN_EN_LA_URL);
     expect(screen.queryByTestId(CUSTOMER_LIST_NO_MATCHES_TESTID)).toBeNull();
   });
 });
