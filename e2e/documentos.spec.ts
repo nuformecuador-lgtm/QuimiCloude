@@ -1,5 +1,5 @@
 /**
- * E2E de la carga de documentos (QC-107 y QC-160, R16-R19): el recorrido completo —login, boton
+ * E2E de la carga de documentos: el recorrido completo —login, boton
  * que abre la ventana, elegir PDFs, subirlos, ver las filas llegar a «listo»—, en el detalle de un
  * proveedor y en el listado de formulas, en Chromium y en WebKit (WebKit es el motor de iOS y se
  * ejercita, no se supone).
@@ -51,10 +51,10 @@ const RUN_ID = randomUUID().replace(/-/g, '');
  */
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
-/** Cuantos PDFs sube el recorrido del proveedor (R16). No es un tope del modulo. */
+/** Cuantos PDFs sube el recorrido del proveedor. No es un tope del modulo. */
 const FILES_IN_BATCH = 3;
 
-/** Cuantos PDFs sube el recorrido de formulas (R17). No es un tope del modulo. */
+/** Cuantos PDFs sube el recorrido de formulas. No es un tope del modulo. */
 const FORMULA_FILES_IN_BATCH = 2;
 
 /**
@@ -313,9 +313,9 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 /** Instala la intercepcion del `PUT` al enlace firmado y devuelve el contador vivo. */
-function interceptSignedUploads(page: Page): { count(): number } {
+async function interceptSignedUploads(page: Page): Promise<{ count(): number }> {
   let intercepted = 0;
-  void page.route(`${STORAGE_ORIGIN}/**`, async (route) => {
+  await page.route(`${STORAGE_ORIGIN}/**`, async (route) => {
     // Cabeceras de CORS porque el destino es de otro origen: sin ellas el navegador descarta la
     // respuesta y la fila se quedaria en «no se pudo subir». El preflight se responde igual.
     const headers = {
@@ -346,7 +346,7 @@ test.describe('documentos', () => {
     // --- 1. La subida al enlace firmado se atiende AQUI, en el navegador. Es el unico trafico que
     // sale del proceso, y se cuenta para que un cambio de origen en el almacenamiento en memoria se
     // note como un rojo con nombre y no como un recorrido que parece pasar.
-    const uploads = interceptSignedUploads(page);
+    const uploads = await interceptSignedUploads(page);
 
     await loginAndLand(page, adminUser);
 
@@ -437,7 +437,7 @@ test.describe('documentos', () => {
       throw new Error('el fixture no esta completo: fallo el beforeAll');
     }
 
-    const uploads = interceptSignedUploads(page);
+    const uploads = await interceptSignedUploads(page);
 
     await loginAndLand(page, adminUser);
 
@@ -497,7 +497,7 @@ test.describe('documentos', () => {
     ).toBe(FORMULA_FILES_IN_BATCH);
   });
 
-  test('un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no ve el boton ni la subida (R18 permiso propio)', async ({
+  test('un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no ve el boton ni la subida: el caso sin permiso de subida (R18)', async ({
     page,
   }) => {
     const supplier = supplierId;
@@ -506,7 +506,7 @@ test.describe('documentos', () => {
       throw new Error('el fixture no esta completo: fallo el beforeAll');
     }
 
-    const uploads = interceptSignedUploads(page);
+    const uploads = await interceptSignedUploads(page);
 
     // Conteo tomado ANTES del intento: los casos comparten empresa, y este afirma sobre su propia
     // variacion en vez de depender del orden de los tests.
