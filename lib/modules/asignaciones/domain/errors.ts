@@ -249,3 +249,13 @@ export class OrderProducedFrozenError extends AsignacionesError {
     super('order_produced_frozen', diagnostic);
   }
 }
+
+/** Finalizar sobre un pedido `PENDIENTE`: aun no paso por `EN_CURSO`, asi que no hay nada que
+ *  terminar todavia. Mismo `code` que `InvalidTransitionError` de `pedidos`. */
+export class InvalidTransitionError extends AsignacionesError {
+  readonly code = 'invalid_transition';
+
+  constructor(diagnostic?: string) {
+    super('invalid_transition', diagnostic);
+  }
+}

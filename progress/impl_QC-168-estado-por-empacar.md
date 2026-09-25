@@ -126,11 +126,12 @@ QC-150 R10/R13/R24/R26/R27/R37; QC-145 R3/R30; QC-74 R3/R8; QC-144 R9; `docs/arc
 - **D-1 `packedById` en `PackingOrderRow`.** R17 exige distinguir «a su nombre» de «a nombre de otro», y la fila
   solo traía el nombre. Se expone el id que ya existía (`AssignedOrderSummary.packedBy`) y la pantalla compara
   por id, nunca por nombre. Es contrato interno: no cambia ningún requisito.
-- **A-1 Finalizar sobre `PENDIENTE` responde `order_not_found`** (`finish-assigned-order.ts`, `assertFinishable`).
+- **A-1 [RESUELTO 2026-09-25] Finalizar sobre `PENDIENTE` responde `order_not_found`** (`finish-assigned-order.ts`, `assertFinishable`).
   `design.md > 2` pide rechazar sin llamar a `transitionAliveById`, pero **no dice con qué error**. Para
   `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` se usa el error propio de cada estado; para `PENDIENTE`
   el subagente eligió `order_not_found`, porque abrir la pantalla ya lo pasa a `EN_CURSO` y solo se llega ahí
-  por una llamada directa. **El spec no lo respalda: confirmar o corregir** (la otra candidata es `invalid_transition`).
+  por una llamada directa. Decisión humana: responde `invalid_transition` (código ya existente en el catálogo,
+  reutilizado con `InvalidTransitionError` propia de `asignaciones`, mismo patrón que `MaterialShortageError`).
 - **A-2 Comenzar, tras éxito, revalida la pantalla del pedido y no redirige.** El spec solo fija el destino de Terminar.
 - `list-company-orders.ts` («Todos» sin filtro) pasa a `ORDER_STATUS_FLOW`, como pide `design.md > 1.1`,
   aunque no estaba en el «Toca» de ninguna task.

@@ -98,6 +98,7 @@ const ALLOWED = {
   (`PENDIENTE` por P5, o `POR_EMPACAR`/`EN_EMPAQUE`/`ENTREGADO`/`CANCELADO`), lanza sin llamar a
   `transitionAliveById`; la carrera la cierra el `'stale'` del `UPDATE … WHERE status = from`, que ya
   existe. Ningún segundo lote puede nacer: el consumo y el alta van después del bloqueo de la fila.
+  Finalizar sobre `PENDIENTE` → `invalid_transition` (decisión humana 2026-09-25, A-1).
 
 ## 3. Empaque: contrato entre módulos
 

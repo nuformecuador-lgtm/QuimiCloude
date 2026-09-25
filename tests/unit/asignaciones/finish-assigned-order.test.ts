@@ -7,6 +7,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
 import {
   AsignacionesError,
+  InvalidTransitionError,
   MaterialShortageError,
   NoWholePackageError,
   OrderCancelledNotAssignableError,
@@ -260,12 +261,12 @@ describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () =>
     expect(transitionAliveById).not.toHaveBeenCalled();
   });
 
-  it('PENDIENTE rechaza con `order_not_found` sin escribir', async () => {
+  it('PENDIENTE rechaza con `invalid_transition` sin escribir (A-1)', async () => {
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['PENDIENTE'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
     await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
-      OrderNotFoundError,
+      InvalidTransitionError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
   });

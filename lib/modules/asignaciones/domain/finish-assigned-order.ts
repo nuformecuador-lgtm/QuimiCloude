@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import {
+  InvalidTransitionError,
   MaterialShortageError,
   NoWholePackageError,
   OrderNotFoundError,
@@ -38,12 +39,12 @@ export type FinishAssignedOrderResult = {
  * `EN_EMPAQUE` los rechaza `assertOrderAcceptsWrites`, con el error propio de cada uno; el
  * unico estado que esa funcion admite sin ser `EN_CURSO` es `PENDIENTE` -abrir la pantalla del
  * pedido ya lo habria dejado `EN_CURSO`, asi que llegar aqui es un Finalizar disparado antes de
- * eso-.
+ * eso-, y se rechaza con `invalid_transition` (decision humana 2026-09-25, A-1).
  */
 function assertFinishable(order: OrderAssignmentTarget): void {
   if (order.status === 'EN_CURSO') return;
   assertOrderAcceptsWrites(order);
-  throw new OrderNotFoundError();
+  throw new InvalidTransitionError();
 }
 
 /**
