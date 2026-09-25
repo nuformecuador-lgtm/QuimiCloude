@@ -81,6 +81,10 @@ feature y por el seed. [D4, D9] *(La mitad de `roles` la vigila además R27.)*
 **R9.** El seed DEBE asignar al rol `Administrador` todos los permisos del catálogo, incluido
 `terminados.consultar`, escritos uno a uno y sin comodín. [D5]
 
+> *Enmendado el 2026-09-25 por QC-168: deja de ser «todos». El Administrador no recibe
+> `empaque.modificar` —primer permiso que `ADMIN_EXCLUDED_PERMISSIONS` excluye de su asignación—;
+> el resto del catálogo, incluido `terminados.consultar`, sigue asignándosele uno a uno.*
+
 **R10.** El seed DEBE seguir asignando al rol `Operador` exactamente `inventario.consultar` y
 `asignaciones.consultar`: NO DEBE asignarle `terminados.consultar`. [D3, D5]
 
