@@ -410,8 +410,9 @@ test.describe('formula-desde-pdf', () => {
     await expect(page.getByTestId('formula-import-review')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('formula-import-clash')).toBeVisible({ timeout: 30_000 });
 
-    // `blur()` a secas puede correr antes de que React confirme el estado (WebKit): se espera
-    // el valor en pantalla y se sale del campo con un Tab real, que dispara el evento nativo.
+    // El `fill` puede llegar antes de que la pagina hidrate; funciona porque la pantalla relee
+    // el valor del DOM al perder el foco, asi que se espera el valor en pantalla y se sale con
+    // un Tab real.
     const nameField = page.getByTestId('formula-import-name');
     await nameField.fill(renamedRecipeName);
     await expect(nameField).toHaveValue(renamedRecipeName);
