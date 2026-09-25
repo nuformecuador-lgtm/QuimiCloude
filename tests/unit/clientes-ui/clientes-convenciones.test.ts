@@ -508,19 +508,26 @@ describe('la pantalla no usa `100vh` como alto (R39)', () => {
 // ------------------------------------------------------------------------------------------
 
 /**
- * Un `getByText`/`queryByText`/`findByText` con un literal de cadena (no una variable, no una
- * constante exportada, no una expresion regular). Es la forma de LOCALIZAR un control, un
- * estado o un destino por su copy, que es justo lo que se prohibe.
+ * Localizar por copy: una consulta por texto (`getByText`, `getAllByLabelText`...) con un literal
+ * de cadena como primer argumento, o una consulta por rol con `{ name: <literal> }`.
  *
- * `toHaveTextContent` queda FUERA a proposito: no localiza nada, verifica el contenido de un
- * elemento que YA se localizo por rol o `data-testid` —el caso legitimo de
- * `customer-list-section.test.tsx`, que confirma el texto de un error de servidor sobre la
- * celda que su propio `testId.errorMensaje` ya identifico—.
+ * Literal es solo una cadena entre comillas o backticks. Una expresion regular o una constante
+ * exportada NO lo son: la constante sigue al copy si este cambia, y la regex es la via que la
+ * libreria ofrece para comprobar una ausencia sin fijar el texto exacto.
+ *
+ * `toHaveTextContent` queda fuera: no localiza, verifica un elemento ya localizado por rol o testid.
  */
+const CONSULTA_POR_TEXTO_LITERAL =
+  /\b(?:get|query|find)(?:All)?By(?:Text|LabelText|PlaceholderText|DisplayValue|Title|AltText)\(\s*['"`]/g;
+const CONSULTA_POR_ROL_CON_NOMBRE_LITERAL =
+  /\b(?:get|query|find)(?:All)?ByRole\(\s*['"`][^'"`]*['"`]\s*,\s*\{[^}]*\bname\s*:\s*['"`]/g;
+
 function afirmaSobreCopy(fuente: string): string[] {
   const codigo = sinComentarios(fuente);
-  const patron = /\b(getByText|queryByText|findByText)\(\s*['"]/g;
-  return codigo.match(patron) ?? [];
+  return [
+    ...(codigo.match(CONSULTA_POR_TEXTO_LITERAL) ?? []),
+    ...(codigo.match(CONSULTA_POR_ROL_CON_NOMBRE_LITERAL) ?? []),
+  ];
 }
 
 describe('los tests de la carpeta localizan por rol, testid o constante, no por copy (R40)', () => {
@@ -545,6 +552,45 @@ describe('los tests de la carpeta localizan por rol, testid o constante, no por 
         "screen.getByText('Cliente creado.');\n",
       );
       expect(afirmaSobreCopy(leer(ruta))).not.toEqual([]);
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it('sensibilidad: una consulta por rol FABRICADA con `{ name: <literal> }` dispara, con cualquier comilla y variante', () => {
+    const raiz = tmpdirDePrueba('qc155-convenciones-r40-rol-');
+    try {
+      const casos = [
+        "screen.getByRole('link', { name: 'Reintentar' });",
+        'screen.queryByRole("button", { name: "Guardar" });',
+        "await screen.findByRole('dialog', { hidden: true, name: `Editar` });",
+        "screen.getAllByRole('row', {\n  name: 'Ana',\n});",
+        "within(tabla).queryAllByRole('cell', { name: 'Madrid' });",
+        "screen.getByLabelText('Nombre');",
+      ];
+      casos.forEach((contenido, indice) => {
+        const ruta = fabricar(raiz, `sensibilidad-${indice}.test.tsx`, `${contenido}\n`);
+        expect(afirmaSobreCopy(leer(ruta)), contenido).toHaveLength(1);
+      });
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+
+  it('el caso simetrico: `name` con regex o constante, y rol sin `name`, NO disparan', () => {
+    const raiz = tmpdirDePrueba('qc155-convenciones-r40-rol-');
+    try {
+      const ruta = fabricar(
+        raiz,
+        'sensibilidad-rol-limpio.test.tsx',
+        [
+          "screen.queryByRole('button', { name: /restaurar/i });",
+          "screen.getByRole('link', { name: CUSTOMER_LIST_RETRY_LABEL });",
+          "screen.getByRole('heading', { level: 1 });",
+          'screen.getByText(CUSTOMER_TABLE_TEXTS.loading);',
+        ].join('\n'),
+      );
+      expect(afirmaSobreCopy(leer(ruta))).toEqual([]);
     } finally {
       rmSync(raiz, { recursive: true, force: true });
     }
