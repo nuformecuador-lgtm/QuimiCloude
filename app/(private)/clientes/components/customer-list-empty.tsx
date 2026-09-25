@@ -10,29 +10,29 @@ export const CUSTOMER_LIST_FIRST_PAGE_TESTID = 'customer-list-first-page';
 
 export type CustomerListEmptyProps = {
   /**
-   * MIENTRAS la sesion no incluya `clientes.modificar`, el disparador de alta no se monta (R5,
-   * R19): ni siquiera deshabilitado. Este componente es quien decide, para que la regla no
-   * dependa de que quien lo use se acuerde de aplicarla.
+   * MIENTRAS la sesion no incluya `clientes.modificar`, el disparador de alta no se monta: ni
+   * siquiera deshabilitado. Este componente es quien decide, para que la regla no dependa de que
+   * quien lo use se acuerde de aplicarla.
    */
   readonly canModify: boolean;
   /**
    * Destino a la primera pagina, presente SOLO cuando la pagina pedida se quedo sin elementos por
-   * ser mayor que el total (R20). Ausente cuando no hay ni un cliente (R19): en ese caso, y solo
-   * en ese, se monta el disparador de alta.
+   * ser mayor que el total. Ausente cuando no hay ni un cliente: en ese caso, y solo en ese, se
+   * monta el disparador de alta.
    */
   readonly firstPageHref?: string;
-  /** El disparador de alta (R19), enchufado por quien monta la seccion. */
+  /** El disparador de alta, enchufado por quien monta la seccion. */
   readonly children?: ReactNode;
 };
 
 /**
- * Estado vacio de la lista de clientes (R19, R20, `design.md > 5.1`).
+ * Estado vacio de la lista de clientes.
  *
  * Se pinta FUERA de `<DataTable>`, no con su prop `status`: el vacio de esta pantalla lleva
  * accion propia y copy propio, igual que `order-list-empty.tsx`.
  *
  * El caso «sin coincidencias» (busqueda o filtro activos sin resultado) NO vive aqui: lo pinta la
- * propia tabla, con la caja de busqueda montada (`design.md > 5.1`).
+ * propia tabla, con la caja de busqueda montada.
  */
 export function CustomerListEmpty({ canModify, firstPageHref, children }: CustomerListEmptyProps) {
   return (

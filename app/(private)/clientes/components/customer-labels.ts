@@ -1,7 +1,7 @@
 import type { DataTableTexts } from '@/components/shared/data-table';
 
 /**
- * Etiqueta visible de la pantalla de clientes (`design.md > 8`).
+ * Etiqueta visible de la pantalla de clientes.
  *
  * **Este archivo no declara el texto: lo reexporta.** El nombre de la pantalla y el de su enlace
  * de menu son el mismo dato, y dos copias es como se acaba con un titulo que dice una cosa y un
@@ -14,8 +14,8 @@ export const CUSTOMERS_TITLE_TESTID = 'clientes-title';
 
 /**
  * Textos del componente compartido. Viven aqui, junto a las demas etiquetas de la pantalla, y no
- * en `customer-table.tsx` (T6): la tabla compartida no incrusta copy de ningun dominio. Ningun
- * test afirma sobre estos literales (R40): los controles se localizan por rol o por `data-testid`.
+ * en `customer-table.tsx`: la tabla compartida no incrusta copy de ningun dominio. Ningun test
+ * afirma sobre estos literales: los controles se localizan por rol o por `data-testid`.
  */
 export const CUSTOMER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay clientes que mostrar.',

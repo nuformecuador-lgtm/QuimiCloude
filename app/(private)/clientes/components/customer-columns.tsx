@@ -8,7 +8,7 @@ import { CUSTOMER_QUERYABLE, type CustomerView } from '@/lib/modules/clientes';
 import { CITY_COLUMN_ID, CREATED_AT_COLUMN_ID } from './customer-list-params';
 
 /**
- * Las nueve columnas de la lista de clientes, declaradas como datos (`design.md > 5.4`).
+ * Las nueve columnas de la lista de clientes, declaradas como datos.
  *
  * **Factoria y no un array del modulo**: la columna de acciones es un componente de cliente que
  * llega por parametro (mismo patron que `order-columns.tsx` y `recipe-columns.tsx`), porque en

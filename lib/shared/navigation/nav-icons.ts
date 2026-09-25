@@ -46,6 +46,5 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   // QC-67 R2 — la fila del unico icono que esa ficha anade. El `Record<NavIconName, LucideIcon>`
   // obliga a que este aqui: olvidarla no compila.
   users: Users,
-  // QC-155 R4 — la fila del unico icono que esa ficha anade.
   contact: Contact,
 };

@@ -16,19 +16,19 @@ export type CustomerListErrorProps = {
    * `reference` del error inesperado.
    */
   readonly error: ErrorState;
-  /** Destino del reintento, derivado de `customerListHref(params)` (R22). */
+  /** Destino del reintento, derivado de `customerListHref(params)`. */
   readonly retryHref: string;
 };
 
 /**
- * Estado de error de la lista de clientes (R7, R22, `design.md > 5.1`).
+ * Estado de error de la lista de clientes.
  *
- * No se pinta una tabla vacia cuando la consulta falla: confundir «fallo» con «no hay nada» es
- * exactamente lo que R22 impide. El reintento es un ENLACE a la propia URL de la lista y no
+ * No se pinta una tabla vacia cuando la consulta falla: confundir «fallo» con «no hay nada»
+ * seria el error contrario. El reintento es un ENLACE a la propia URL de la lista y no
  * `router.refresh()`: este componente no necesita frontera de cliente para pedir de nuevo los
  * datos, porque volver a pedir esta pagina ya vuelve a ejecutar el Server Component.
  *
- * Es tambien donde aterriza R7: si la operacion responde `unauthorized`, la pantalla no decide
+ * Tambien es donde aterriza un error de autorizacion de la operacion: la pantalla no decide
  * nada por su cuenta, presenta el error y no muestra ni un dato de clientes.
  */
 export function CustomerListError({ error, retryHref }: CustomerListErrorProps) {

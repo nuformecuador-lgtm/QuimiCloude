@@ -107,7 +107,7 @@ export const UNITS_LABEL = 'Unidades';
 export const USERS_LABEL = 'Usuarios';
 
 /**
- * Etiqueta del sidebar para la pantalla de clientes (QC-155, R4).
+ * Etiqueta del sidebar para la pantalla de clientes.
  *
  * `CUSTOMERS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay
  * codigo previo que la importara de este archivo, asi que no hay compatibilidad que sostener.
@@ -178,7 +178,7 @@ export type NavIconName =
   // ya estan tomados dentro de la MISMA seccion «Configuración». `lucide-react` ya esta instalado
   // (no es dependencia nueva) y el `Record` de `NAV_ICONS` obliga a que su fila exista.
   | 'users'
-  // QC-155 R4: el item de clientes. Ninguno de los anteriores habla de una persona externa a la
+  // El item de clientes. Ninguno de los anteriores habla de una persona externa a la
   // organizacion, y `users` ya lo usa el item de usuarios internos. `lucide-react` ya esta
   // instalado (no es dependencia nueva) y el `Record` de `NAV_ICONS` obliga a que su fila exista.
   | 'contact';
@@ -399,7 +399,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     icon: 'users',
     section: NAV_SECTION_OPERATION,
   },
-  // QC-155 R4, R6 — ULTIMO item del array, en «Cadena» junto a Proveedores:
+  // ULTIMO item del array, en «Cadena» junto a Proveedores:
   // `groupNavItemsBySection` agrupa por orden de aparicion, asi que se dibuja tras Proveedores, y
   // `firstVisibleNavHref` recorre el array crudo, asi que ponerlo al final no cambia el aterrizaje
   // de ningun rol.

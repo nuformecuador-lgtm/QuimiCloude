@@ -17,11 +17,11 @@ import { CustomerRowActions } from './customer-row-actions';
 import { CustomerSheet } from './customer-sheet';
 
 /**
- * La tabla de la lista de clientes (R9, R12, R13, R18, R21, R23, `design.md > 5.2, 5.3, 5.4`).
+ * La tabla de la lista de clientes.
  *
- * **Usa la tabla de datos compartida de QC-55**, importada por su barrel publico: no se declara
- * una tabla propia, ni una barra de paginacion propia, y no se abre un solo archivo de
- * `components/shared/data-table/` (R9).
+ * **Usa la tabla de datos compartida**, importada por su barrel publico: no se declara una
+ * tabla propia, ni una barra de paginacion propia, y no se abre un solo archivo de
+ * `components/shared/data-table/`.
  *
  * **Solo emite; el servidor recalcula.** `onParamsChange` entrega el `DataTableParams` completo
  * y aqui se traduce a una navegacion (`router.push`) con la cadena de consulta canonica
@@ -31,13 +31,13 @@ import { CustomerSheet } from './customer-sheet';
  * **`status` es SIEMPRE `'idle'`**: el error y el vacio se pintan fuera de `<DataTable>`, con
  * copy y acciones propias. El «cargando» de la primera carga lo cubre el `<Suspense>` de la
  * pagina; el de cada navegacion posterior lo da esta tabla, mientras esta en vuelo, sin
- * desmontar nada (R21).
+ * desmontar nada.
  *
- * **La caja de busqueda esta sincronizada con «Atras»** (R18, `design.md > 5.3`), COPIA del
- * mecanismo de `order-table.tsx` sin tocar `components/shared`: es deuda con nombre (design.md
- * riesgo 3), no una tercera definicion del mismo problema.
+ * **La caja de busqueda esta sincronizada con «Atras»**, COPIA del mecanismo de
+ * `order-table.tsx` sin tocar `components/shared`: es deuda con nombre, no una tercera
+ * definicion del mismo problema.
  *
- * **El desbordamiento horizontal lo absorbe el primitivo** (R23): `components/ui/table.tsx` ya
+ * **El desbordamiento horizontal lo absorbe el primitivo**: `components/ui/table.tsx` ya
  * envuelve la tabla en un contenedor con `overflow-x-auto`.
  */
 
@@ -66,7 +66,7 @@ export type CustomerTableProps = {
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;
   readonly totalPages: number;
-  /** Si la sesion trae `clientes.modificar` (R5). Decision de presentacion, bajada por props. */
+  /** Si la sesion trae `clientes.modificar`. Decision de presentacion, bajada por props. */
   readonly canModify: boolean;
   /**
    * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
@@ -97,7 +97,7 @@ export function CustomerTable({
     borrador una vez al montarse, asi que sin remontarla seguiria mostrando el termino viejo
     tanto tras «Limpiar» como tras un cambio de `params.search` que no vino de la propia caja
     (Atras, otro enlace). `clearing` adelanta el vaciado del «Limpiar» mientras esa navegacion
-    todavia esta en vuelo. COPIA de `order-table.tsx` (design.md > 5.3).
+    todavia esta en vuelo. COPIA de `order-table.tsx`.
   */
   const [boxEpoch, setBoxEpoch] = useState(0);
   const [clearing, setClearing] = useState(false);
@@ -132,7 +132,7 @@ export function CustomerTable({
   /*
     La navegacion va DENTRO de una transicion, y su `isPending` es la senal de «algo esta en
     vuelo». Esa senal NO desmonta nada: se anuncia con `aria-busy` y un rotulo visible, atenuando
-    la tabla, que sigue montada y sigue aceptando teclas (R21).
+    la tabla, que sigue montada y sigue aceptando teclas.
   */
   const navigate = (href: string) => {
     startTransition(() => {

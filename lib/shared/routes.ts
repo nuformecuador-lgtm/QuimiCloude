@@ -222,7 +222,7 @@ export const DELIVERED_ORDER_PACKAGES_PARAM = 'entregado_envases';
 export const DELIVERED_ORDER_PRODUCT_PARAM = 'entregado_producto';
 
 /**
- * Pantalla de clientes (QC-155, R1).
+ * Pantalla de clientes.
  *
  * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
  * `identity` la necesitan y no pueden depender de la navegacion, que arrastra etiquetas, iconos y
@@ -273,9 +273,9 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // Sin esta fila, `(private)` no aparece en la URL y `/asignacion` se serviria SIN sesion. Una
   // sola entrada: la comparacion por segmentos ya cubre cualquier subcamino.
   ASSIGNED_ORDERS_ROUTE,
-  // QC-155 R2: la pantalla de clientes. Sin esta fila, `(private)` no aparece en la URL y
-  // `/clientes` se serviria SIN sesion. Una sola entrada: no hay pagina de detalle, y la
-  // comparacion por segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso
-  // `clientes.consultar` lo exige la propia pantalla.
+  // La pantalla de clientes. Sin esta fila, `(private)` no aparece en la URL y `/clientes` se
+  // serviria SIN sesion. Una sola entrada: no hay pagina de detalle, y la comparacion por
+  // segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso `clientes.consultar` lo
+  // exige la propia pantalla.
   CUSTOMERS_ROUTE,
 ] as const;

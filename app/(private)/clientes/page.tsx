@@ -25,12 +25,12 @@ export const metadata: Metadata = {
 const PERMISO_DENEGADO = new Error('permiso denegado');
 
 /**
- * `true` si la sesion trae `clientes.modificar` (R5).
+ * `true` si la sesion trae `clientes.modificar`.
  *
  * **No es autorizacion, es PRESENTACION**: decide que se emite en el HTML, no que se puede
- * hacer. Quien autoriza de verdad son los cinco casos de uso de `clientes`. La pertenencia la
+ * hacer. Quien autoriza de verdad son los casos de uso de `clientes`. La pertenencia la
  * resuelve `assertPermission`, y nada mas: un `permissions.includes(...)` aqui seria una
- * segunda definicion de pertenencia, libre de divergir de la unica que QC-74 R12 dejo en pie.
+ * segunda definicion de pertenencia, libre de divergir.
  */
 async function canModifyCustomers(): Promise<boolean> {
   const user = await identity.getSessionUser();
@@ -45,7 +45,7 @@ async function canModifyCustomers(): Promise<boolean> {
 }
 
 /**
- * Pantalla de la lista de clientes (R1, R3, R5, `design.md > 2.2`).
+ * Pantalla de la lista de clientes.
  *
  * **La ubicacion sale de `CUSTOMERS_ROUTE`** (`lib/shared/routes.ts`): el nombre de la carpeta
  * es solo la forma en que el App Router materializa esa constante. La marca y la etiqueta llegan
@@ -55,23 +55,22 @@ async function canModifyCustomers(): Promise<boolean> {
  * layout privado ya lo es.
  *
  * **El corte por permiso vive AQUI y es UNO SOLO**: `clientes.consultar`, en la primera linea del
- * cuerpo, antes de resolver `searchParams` y antes de leer o pintar nada (R3). Sin sesion,
+ * cuerpo, antes de resolver `searchParams` y antes de leer o pintar nada. Sin sesion,
  * `requirePagePermission` redirige al login; con sesion pero sin el permiso responde 404. Es uno
- * y no dos, porque QC-74 decidio que `modificar` no implica `consultar`.
+ * y no dos, porque `modificar` no implica `consultar`.
  *
- * **`clientes.modificar` no corta: oculta** (R5). Baja a los componentes de cliente como un
- * `boolean` por props (R8); ellos no leen la sesion, no importan el punto de composicion y no
- * piden nada por su cuenta.
+ * **`clientes.modificar` no corta: oculta**. Baja a los componentes de cliente como un
+ * `boolean` por props; ellos no leen la sesion, no importan el punto de composicion y no piden
+ * nada por su cuenta.
  *
- * **El estado de lista vive en la cadena de consulta, no en React** (R17): asi recargar,
- * compartir el enlace, abrir y cerrar el panel lateral o volver con «Atras» conserva pagina,
- * tamano, orden, filtros y busqueda. `searchParams` es una `Promise`, y se resuelve DESPUES del
- * corte.
+ * **El estado de lista vive en la cadena de consulta, no en React**: asi recargar, compartir el
+ * enlace, abrir y cerrar el panel lateral o volver con «Atras» conserva pagina, tamano, orden,
+ * filtros y busqueda. `searchParams` es una `Promise`, y se resuelve DESPUES del corte.
  *
- * **El `<Suspense>` NO lleva `key`** (R18, `design.md > 5.2`): remontar el limite en cada cambio
- * de consulta borraria la caja de busqueda y con ella el foco del campo que se esta escribiendo.
- * La senal de «en vuelo» la da `CustomerTable` mientras la navegacion esta en curso, sin
- * desmontar nada; el `fallback` de aqui cubre solo la primera carga.
+ * **El `<Suspense>` NO lleva `key`**: remontar el limite en cada cambio de consulta borraria la
+ * caja de busqueda y con ella el foco del campo que se esta escribiendo. La senal de «en vuelo»
+ * la da `CustomerTable` mientras la navegacion esta en curso, sin desmontar nada; el `fallback`
+ * de aqui cubre solo la primera carga.
  */
 export default async function ClientesPage({
   searchParams,

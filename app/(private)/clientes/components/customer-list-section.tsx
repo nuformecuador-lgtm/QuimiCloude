@@ -13,30 +13,29 @@ import { CustomerSheet } from './customer-sheet';
 import { CustomerTable } from './customer-table';
 
 /**
- * Seccion de lista: pide los datos y despacha a uno de los cinco casos (R7, R19, R20, R22,
- * `design.md > 5.1`).
+ * Seccion de lista: pide los datos y despacha a uno de los cinco casos.
  *
  * **Server Component `async`**: los datos se piden en el servidor y bajan al cliente ya
- * renderizados. Es la parte que la pagina envuelve en `<Suspense>`, de modo que el esqueleto de
- * R21 aparece solo mientras esta consulta esta en vuelo.
+ * renderizados. Es la parte que la pagina envuelve en `<Suspense>`, de modo que el esqueleto
+ * aparece solo mientras esta consulta esta en vuelo.
  *
- * **Una sola llamada a `listCustomersAction`** (R7), importada por su RUTA EXACTA (R34), nunca
- * desde el barrel publico del modulo. `params` viaja **entero y sin traducir**: `DataTableParams`
- * es campo a campo la misma forma que `ListQuery`, y el esquema del caso de uso es un
+ * **Una sola llamada a `listCustomersAction`**, importada por su RUTA EXACTA, nunca desde el
+ * barrel publico del modulo. `params` viaja **entero y sin traducir**: `DataTableParams` es
+ * campo a campo la misma forma que `ListQuery`, y el esquema del caso de uso es un
  * `strictObject`.
  *
- * **Aqui no se decide nada sobre permisos** (R8): no se lee la sesion, no se repite ninguna
+ * **Aqui no se decide nada sobre permisos**: no se lee la sesion, no se repite ninguna
  * comprobacion y no se ocultan columnas por rol. `canModify` solo se transporta: lo resolvio la
  * pagina.
  *
- * **R7**: si la operacion responde con un error de autorizacion, se pinta el estado de error y
- * NO se presenta ni un dato de clientes.
+ * Si la operacion responde con un error de autorizacion, se pinta el estado de error y NO se
+ * presenta ni un dato de clientes.
  */
 
 export type CustomerListSectionProps = {
   /** Los parametros ya acotados por `parseCustomerListParams`. */
   readonly params: DataTableParams;
-  /** Si la sesion trae `clientes.modificar` (R5). Llega por props desde la pagina (R8). */
+  /** Si la sesion trae `clientes.modificar`. Llega por props desde la pagina. */
   readonly canModify: boolean;
 };
 

@@ -79,8 +79,8 @@ function parseIsoDate(raw: string | undefined): string | null {
 }
 
 /**
- * Acota los parametros de la URL a un `DataTableParams` siempre valido (R16): ninguna entrada
- * produce un error, todas producen una lista. El resultado se pasa entero a `listCustomersAction`.
+ * Acota los parametros de la URL a un `DataTableParams` siempre valido: ninguna entrada produce
+ * un error, todas producen una lista. El resultado se pasa entero a `listCustomersAction`.
  */
 export function parseCustomerListParams(
   searchParams: CustomerListSearchParams | undefined,
@@ -140,7 +140,7 @@ export function buildCustomerListQuery(params: DataTableParams): string {
   return query.toString();
 }
 
-/** Destino de la lista con unos parametros dados, derivado de `CUSTOMERS_ROUTE` (R1). */
+/** Destino de la lista con unos parametros dados, derivado de `CUSTOMERS_ROUTE`. */
 export function customerListHref(params: DataTableParams): string {
   return `${CUSTOMERS_ROUTE}?${buildCustomerListQuery(params)}`;
 }

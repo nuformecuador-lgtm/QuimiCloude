@@ -2,12 +2,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 /**
- * Estado «cargando» de la lista de clientes (R21, `design.md > 5.2`).
+ * Estado «cargando» de la lista de clientes.
  *
  * Se pinta como `fallback` del `<Suspense>` de la pagina, con `rows` = el tamano de pagina pedido.
  *
  * `role="status"` + `aria-busy`: quien usa lector de pantalla oye que algo se esta cargando en
- * lugar de encontrarse una tabla vacia, que es justo lo que R21 prohibe confundir.
+ * lugar de encontrarse una tabla vacia.
  */
 
 /**
