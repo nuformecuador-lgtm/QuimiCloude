@@ -343,15 +343,17 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
     expect(enviado.get('quantity')).toBe('0.1');
   });
 
-  it('captura la cantidad con el control NUMERICO del navegador, con paso libre', () => {
+  it('captura la cantidad con el control NUMERICO del navegador, con paso libre y sin negativos', () => {
     // El control es numerico. Que `0.1005` llegue intacta al `FormData` lo comprueba el test de
     // arriba. `step="any"` es imprescindible: con el paso entero por defecto un decimal seria
-    // invalido.
+    // invalido. `min="0.01"` es la señal al navegador de que no ofrezca negativos ni cero -el
+    // «mayor que cero» real lo sigue cerrando el esquema del contrato al enviar.
     renderFormulario();
 
     const control = screen.getByTestId('order-field-quantity');
     expect(control).toHaveAttribute('type', 'number');
     expect(control).toHaveAttribute('step', 'any');
+    expect(control).toHaveAttribute('min', '0.01');
     expect(control).toHaveAttribute('inputmode', 'decimal');
 
     // Y el campo de precio unitario NO existe: se fue con la columna (2026-09-07).
@@ -451,7 +453,8 @@ describe('la presentación del pedido (R16, R17, R18, R19)', () => {
     const campo = screen.getByTestId('presentation-value') as HTMLInputElement;
     expect(campo).toHaveValue('');
     // El campo espejo conserva la validacion nativa de `required` (mismo primitivo que el
-    // selector de producto): el navegador bloquea el envio antes de que la action se invoque.
+    // selector de producto), aunque el formulario tiene `noValidate` y quien de verdad decide
+    // si el envio procede es el esquema del contrato en `save()`.
     expect(campo.validity.valid).toBe(false);
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
