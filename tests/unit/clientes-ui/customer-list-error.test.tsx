@@ -4,7 +4,7 @@
 // `router.refresh()`: pedir de nuevo la misma URL vuelve a ejecutar el Server Component que hizo
 // la consulta.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -73,8 +73,9 @@ describe('el reintento es un enlace real a la propia lista, alcanzable con el de
   it('se alcanza por su rol de enlace y con un nombre accesible', () => {
     render(<CustomerListError error={CODIGOS[0]!} retryHref={RETRY_HREF} />);
 
-    const enlace = screen.getByRole('link', { name: 'Reintentar' });
+    const enlace = within(screen.getByTestId(CUSTOMER_LIST_ERROR_TESTID)).getByRole('link');
     expect(enlace).toBe(screen.getByTestId(CUSTOMER_LIST_RETRY_TESTID));
+    expect(enlace).toHaveAccessibleName();
   });
 
   it('no recorta el destino recibido: los parametros llegan intactos al `href`', () => {
