@@ -38,9 +38,8 @@
 > IA y cola simuladas · `[D11]` borrado lógico e identificadores en inglés. Las **once** quedan citadas
 > al menos una vez.
 >
-> **Requisitos provisionales.** Los marcados con ⚑ dependen de una pregunta abierta de abajo (`P1`…`P4`)
-> y están escritos con la propuesta de `design.md > 11`. Si el humano decide otra cosa, se reescriben
-> antes de F2.
+> **Decisiones de F1.4.** Las preguntas `P1`…`P4` se aprobaron el 2026-09-25 tal como las proponía
+> `design.md > 11`; son las cuatro últimas filas de la tabla y se citan `[P1]`…`[P4]`.
 
 ### Entrada a la revisión
 
@@ -72,12 +71,12 @@ código `invalid_input`, sin ningún dato y sin escribir nada. `[D1]`
 **R6.** El sistema NO DEBE modificar el texto guardado en el archivo al interpretarlo: la
 interpretación ocurre al abrir la revisión, y el texto sigue siendo el que dejó la IA. `[D1]`
 
-**R7.** ⚑`P3` El sistema DEBE proponer como porcentaje de un ingrediente el valor leído **solo si**,
+**R7.** El sistema DEBE proponer como porcentaje de un ingrediente el valor leído **solo si**,
 tras quitar espacios y un `%` final y aceptar la coma como separador decimal, es un número de hasta 3
 enteros y 2 decimales, mayor que 0 y no mayor que 100 —venga como cadena o como número JSON—. En
 cualquier otro caso (ausente, texto, más de 2 decimales, 0, negativo, mayor que 100) el porcentaje
 DEBE llegar **vacío** y la fila DEBE mostrar al lado el valor leído tal cual. El sistema NO DEBE
-redondear ningún porcentaje. `[D3]`
+redondear ningún porcentaje. `[D3]` `[P3]`
 
 **R8.** SI un ingrediente trae **cantidad** o **unidad** leídas, ENTONCES el sistema DEBE mostrarlas
 en su fila como referencia de lo que dice el PDF, y NO DEBE convertirlas en porcentaje ni guardarlas
@@ -160,10 +159,10 @@ ese momento: NO DEBE fiarse de lo que calculó el navegador. `[D1]` `[D4]` `[D6]
 empresa, ENTONCES el sistema DEBE rechazar con `invalid_input`; SI apunta a un **producto terminado**,
 ENTONCES con `action_not_allowed`. En los dos casos NO DEBE escribir nada. `[D5]`
 
-**R25.** ⚑`P1` CUANDO se confirma una fila que pide crear una materia prima, el sistema DEBE crear en la
+**R25.** CUANDO se confirma una fila que pide crear una materia prima, el sistema DEBE crear en la
 empresa del actor un producto de tipo **«Producto»** con el nombre revisado (de 1 a 200 caracteres tras
 recortar), **sin lotes**, sin unidad y con existencia 0, y DEBE usarlo como ingrediente de esa fila.
-`[D4]`
+`[D4]` `[P1]`
 
 **R26.** SI al confirmar ya existe **exactamente un** producto vivo de la empresa, no terminado, con el
 nombre normalizado de una materia prima que se pide crear, ENTONCES el sistema DEBE **reutilizarlo** en
@@ -176,9 +175,9 @@ los permisos de R30 y R31— **antes** de crear ninguna materia prima. La escrit
 creadas —limitación declarada en `design.md > 7`— y una confirmación posterior DEBE reutilizarlas (R26).
 `[D4]` `[D6]`
 
-**R28.** ⚑`P4` CUANDO la misma revisión se confirma dos veces con el mismo contenido, el estado final
+**R28.** CUANDO la misma revisión se confirma dos veces con el mismo contenido, el estado final
 de recetas y productos DEBE ser el mismo que tras la primera: ninguna receta ni materia prima
-duplicada. `[D1]` `[D6]`
+duplicada. `[D1]` `[D6]` `[P4]`
 
 **R29.** CUANDO la confirmación termina bien, el sistema DEBE decir si la receta se **creó** o se
 **reemplazó**, cuántas materias primas se **crearon** y cuántas se **reutilizaron**, y DEBE llevar a la
@@ -186,9 +185,9 @@ ficha de esa receta. `[D1]`
 
 ### Permiso y empresa
 
-**R30.** ⚑`P2` Ver la vista previa y confirmar DEBEN exigir **`recetas.modificar`**, comprobado en el
+**R30.** Ver la vista previa y confirmar DEBEN exigir **`recetas.modificar`**, comprobado en el
 service como **primera** operación, antes de leer el archivo, las recetas o los productos. Sin él, el
-sistema DEBE responder `unauthorized` sin leer ni escribir nada. `[D9]`
+sistema DEBE responder `unauthorized` sin leer ni escribir nada. `[D9]` `[P2]`
 
 **R31.** SI la confirmación necesita crear alguna materia prima y el actor no tiene
 **`inventario.modificar`**, ENTONCES el sistema DEBE rechazar la confirmación entera con `unauthorized`,
@@ -238,23 +237,7 @@ almacenamiento del PDF simulados, con dos casos:
 
 ## Preguntas abiertas
 
-Cuatro, todas con propuesta en `design.md > 11`. Ninguna reabre la tabla de abajo: nacen al medir el
-código contra ella. Los requisitos afectados llevan ⚑.
-
-- **P1 — La materia prima nace sin lote** (R25). QC-90 cerró el 2026-09-10 «el alta SIEMPRE crea
-  lote», y [D4] pide crear el producto «con el nombre leído», sin presentación ni costo. **Propuesta:**
-  excepción acotada a esta revisión —producto de tipo «Producto», sin lote, sin unidad, existencia 0 y
-  sin cantidad de alerta—; el alta manual de inventario sigue creando siempre su lote.
-- **P2 — Permiso de la vista previa** (R30). [D9] fija el de confirmar, no el de ver. **Propuesta:**
-  `recetas.modificar` también para la vista previa, y **no** `documentos.modificar`: revisar es trabajo
-  de recetas, y quien sube no tiene por qué ser quien revisa.
-- **P3 — Porcentaje que llega como número JSON** (R7). QC-158 trata un costo numérico como vacío.
-  **Propuesta:** aceptarlo si su forma decimal cabe en 3 enteros y 2 decimales, porque con 5 cifras
-  significativas la conversión es exacta; lo demás, vacío.
-- **P4 — ¿Bloquear la segunda confirmación?** (R28). **Propuesta:** no marcar el archivo, como QC-158:
-  la doble confirmación no duplica nada (receta nueva → `recipe_duplicate_name`; reemplazo → mismo
-  contenido; materias primas → reutilizadas por R26). Marcarlo exigiría una columna nueva en
-  `document_files`.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -271,3 +254,7 @@ código contra ella. Los requisitos afectados llevan ⚑.
 | 2026-09-25 | ¿Permiso? | Confirmar exige **`recetas.modificar`** (QC-86); crear un producto desde la revisión exige **también `inventario.modificar`** (análogo a QC-158 [F6]). Validado en el service. Subir sigue con `documentos.modificar` (QC-142). |
 | 2026-09-25 | ¿E2E? | **Sí**, con la IA y la cola **simuladas** (patrón de QC-107/QC-158). |
 | Heredada de la spec 4 | Borrado e identificadores | Borrado **lógico** e identificadores de base de datos **en inglés**. |
+| 2026-09-25 | P1 — ¿La materia prima creada en la revisión nace con lote? | **Sin lote**: producto «Producto», sin unidad, existencia 0 y sin cantidad de alerta. Excepción a QC-90 («el alta SIEMPRE crea lote») **limitada a esta revisión**; el alta manual de inventario sigue creando su lote. Aprobada en F1.4. |
+| 2026-09-25 | P2 — ¿Permiso de la vista previa? | **`recetas.modificar`**, el mismo que confirmar, y **no** `documentos.modificar`. Aprobada en F1.4. |
+| 2026-09-25 | P3 — ¿Porcentaje que llega como número JSON? | **Se acepta** si su forma decimal cabe en 3 enteros y 2 decimales; lo demás llega vacío. Aprobada en F1.4. |
+| 2026-09-25 | P4 — ¿Bloquear la segunda confirmación? | **No** se marca el archivo, como QC-158: la doble confirmación no duplica nada. Aprobada en F1.4. |

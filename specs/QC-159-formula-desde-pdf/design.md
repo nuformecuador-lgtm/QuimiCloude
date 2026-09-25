@@ -100,7 +100,7 @@ campos no se parecen:
    que revisar).
 5. **Porcentaje (R7):** `readPercentage(raw: unknown): { value: string | null; read: string | null }`.
    - cadena: recortar, quitar un `%` final, si hay **una** coma y ningún punto cambiarla por punto;
-   - número JSON (⚑P3): `Number.isFinite(n)` y `String(n)` sin exponente → esa cadena;
+   - número JSON (P3): `Number.isFinite(n)` y `String(n)` sin exponente → esa cadena;
    - la cadena resultante vale si casa con `PERCENTAGE_PATTERN` (barrel de `recetas`) y
      `percentageToHundredths` da `> 0` y `<= 10000`. Si vale → `value`; si no → `value: null`.
    - `read` es siempre el valor leído tal cual (cadena, o `String(n)`), para mostrarlo al lado (R7).
@@ -207,7 +207,7 @@ Orden fijo (R30, R3, R33, R23, R27):
 
 1. `requirePermission(actor, FORMULA_IMPORT_PERMISSION)` — **primera línea**.
    `FORMULA_IMPORT_PERMISSION: PermissionCode = 'recetas.modificar'` en `documentos/domain/actor.ts`,
-   escrita una vez (⚑P2).
+   escrita una vez (P2).
 2. `safeParse` de la entrada → `ValidationError`.
 3. `repository.readFileForReview(documentFileId, actor.companyId)`; `null`, estado ≠ `done` o
    estrategia ≠ `formula` ⇒ **el mismo** `ValidationError` (R3).
@@ -275,7 +275,7 @@ el permiso ya lo comprobó `documentos`, y este servicio solo lee.
   ```
   Adaptador en `product-catalog-prisma.ts` (no en `product-prisma.ts`, que toca QC-168).
 - **`createCreateRawMaterial(deps)(input, actor): Promise<{ id: string }>`** (caso de uso **nuevo**,
-  `domain/create-raw-material.ts`), ⚑P1:
+  `domain/create-raw-material.ts`), P1:
   - `requirePermission(actor, 'inventario.modificar')` primera línea;
   - `z.strictObject({ name: productNameSchema })` (se exporta `productNameSchema` desde
     `product-input.ts` en vez de copiarlo);
@@ -369,7 +369,7 @@ y `revalidatePath(recipeEditRoute(id))`. Alta en `session-once-per-request-actio
   rechazable se comprueba antes (pasos 2–8), y la siguiente confirmación las **reutiliza** por R26 en
   vez de duplicarlas.
 
-### 7.2 Doble confirmación (R28, ⚑P4)
+### 7.2 Doble confirmación (R28, P4)
 
 Sin marcar el archivo, como QC-158 (`> 8`, «Reconfirmar»):
 
@@ -403,7 +403,7 @@ uso, así que su efecto es el que ya tiene editarla, y esta ficha no añade ning
 | Operación | Comprobación | Dónde |
 |---|---|---|
 | Abrir la pantalla | `recetas.consultar` + `recetas.modificar` → 404 | `page.tsx` (R32) |
-| Vista previa / confirmar | `recetas.modificar`, primera línea (⚑P2) | `documentos` (R30) |
+| Vista previa / confirmar | `recetas.modificar`, primera línea (P2) | `documentos` (R30) |
 | Escribir la receta | `recetas.modificar` | `recetas.createRecipe` / `updateRecipe` (defensa en profundidad) |
 | Crear materia prima | `inventario.modificar`, antes de escribir nada | `documentos` paso 8 (R31) y `createRawMaterial` |
 | Subir | `documentos.modificar` | sin cambios (QC-142, QC-160; R34) |
@@ -442,9 +442,10 @@ de ellos de dos líneas.
   `formula-desde-pdf.spec.ts`; `data-table-alcance.test.ts` solo si el spec afirma filas del listado de
   fórmulas (no está previsto: se afirma en la ficha). `guard-dobles-e2e.test.ts` sin cambios.
 
-## 11. Preguntas abiertas con propuesta
+## 11. Preguntas de F1.4 (aprobadas)
 
 ### 11.1 P1 — Materia prima sin lote (R25)
+**Aprobada 2026-09-25 (F1.4)**, con la propuesta tal cual.
 **Choque medido:** QC-90 cerró «el alta SIEMPRE crea lote» y [D4] pide crear el ingrediente «con el
 nombre leído», sin presentación ni costo, que el lote exige.
 **Propuesta:** excepción **acotada a esta revisión**: `createRawMaterial` crea un `PRODUCT` sin lote,
@@ -457,12 +458,14 @@ reutiliza el alta tal cual, pero convierte la revisión de una fórmula en un al
 a inventar un costo—. **Afecta a:** R25, T3, T8.
 
 ### 11.2 P2 — Permiso de la vista previa (R30)
+**Aprobada 2026-09-25 (F1.4)**, con la propuesta tal cual.
 **Propuesta:** `recetas.modificar` (el mismo que confirmar) y **no** `documentos.modificar`. Motivo:
 [D9] fija confirmar en recetas; exigir además el de documentos impediría revisar a quien no sube, y
 revisar es trabajo de recetas. **Alternativa:** exigir los dos, como QC-158 (que exige
 `documentos.modificar`). **Afecta a:** R30, T5.
 
 ### 11.3 P3 — Porcentaje como número JSON (R7)
+**Aprobada 2026-09-25 (F1.4)**, con la propuesta tal cual.
 **Propuesta:** aceptarlo si `String(n)` casa con `PERCENTAGE_PATTERN`. Con hasta 5 cifras
 significativas el número de coma flotante vuelve **exactamente** a su literal decimal (el `toString`
 de JS da el más corto que se relee igual), así que no se pierde nada; lo que no cabe llega vacío con
@@ -471,6 +474,7 @@ cifras. **Alternativa:** vacío siempre, como QC-158 — más uniforme, pero un 
 en vez de `"12.5"` obligaría a teclear todos los porcentajes. **Afecta a:** R7, T4.
 
 ### 11.4 P4 — Bloquear la segunda confirmación (R28)
+**Aprobada 2026-09-25 (F1.4)**, con la propuesta tal cual.
 **Propuesta:** no marcar el archivo (`> 7.2`), como QC-158. **Alternativa:** columna
 `document_files.imported_at` (migración + `down.sql`) y rechazo de la segunda: cierra la carrera de dos
 clics, pero impide volver a importar el mismo PDF tras borrar la receta, y mete en `documentos` un
@@ -531,8 +535,8 @@ intacto y solo **exporta** `productNameSchema` desde `product-input.ts`, que QC-
 - **Ejecución con la fórmula reemplazada** de pedidos aún no ejecutados (`> 7.3`): es el efecto de
   editar la receta, no uno nuevo; queda dicho en el aviso.
 - **Tope de 1 MB de la Server Action**: una fórmula son decenas de líneas y pasos; muy por debajo.
-- **P1** es la decisión con más alcance: si el humano elige la alternativa, cambian R12, R25, T3 y la
-  pantalla (campos de lote en la fila).
+- **P1** es la decisión con más alcance (aprobada 2026-09-25, F1.4): la materia prima sin lote es una
+  excepción a QC-90 limitada a esta revisión.
 
 ## 15. Dependencias
 

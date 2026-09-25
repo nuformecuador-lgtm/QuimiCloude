@@ -4,9 +4,8 @@
 > cierra con su test. `[P]` = puede ir en paralelo con las demás `[P]` de su tanda. Dependencias en
 > «Tras». Cierre de tanda: `./init.sh --rapido`; cierre de feature: `./init.sh`.
 >
-> Las tasks marcadas ⚑ dependen de una pregunta abierta (`requirements.md > Preguntas abiertas`); se
-> implementan con la propuesta de `design.md > 11` **solo** si el humano la aprueba en F1.4. Ninguna
-> task crea migraciones (`design.md > 2`).
+> P1–P4 se aprobaron el 2026-09-25 (F1.4) tal como las propone `design.md > 11`; las tasks que las
+> citan se implementan así. Ninguna task crea migraciones (`design.md > 2`).
 
 ## Tanda 0 — preparación
 
@@ -46,7 +45,7 @@ Tras T0. **Toca:** `lib/modules/inventario/domain/product-name-lookup.ts` (nuevo
 ninguno dado de baja, ninguno de otra empresa; lista vacía ⇒ sin consulta. Guardia de ámbito de
 `inventario` verde. Cubre **R11, R26, R33** (parte `inventario`).
 
-### T3 [ ] ⚑P1 — `inventario`: alta de materia prima sin lote
+### T3 [ ] (P1) — `inventario`: alta de materia prima sin lote
 Tras T2 (comparten `inventario/index.ts` y el bloque de `inventario` de la composición).
 **Toca:** `lib/modules/inventario/domain/create-raw-material.ts` (nuevo),
 `lib/modules/inventario/domain/product-input.ts` (solo **exportar** `productNameSchema` y
@@ -62,7 +61,7 @@ Tras T2 (comparten `inventario/index.ts` y el bloque de `inventario` de la compo
 `product_batches` y cero en el libro de movimientos, en la empresa del actor. Los tests de
 `create-product` siguen verdes sin tocarlos. Cubre **R25** y la defensa en profundidad de **R31**.
 
-### T4 [ ] ⚑P3 — `documentos`: interpretación y reglas puras
+### T4 [ ] (P3) — `documentos`: interpretación y reglas puras
 Tras T3 (usa `PRODUCT_NAME_MAX_LENGTH`). **Toca:** `lib/modules/documentos/domain/formula-extraction.ts`,
 `formula-step-text.ts`, `review-formula-import.ts`, `formula-import-input.ts` (nuevos),
 `lib/modules/documentos/ports/document-batch-repository.ts` (solo el comentario de `FileForReview`),
@@ -86,7 +85,7 @@ Tras T3 (usa `PRODUCT_NAME_MAX_LENGTH`). **Toca:** `lib/modules/documentos/domai
 
 ## Tanda 2 — orquestación y borde
 
-### T5 [ ] ⚑P2 ⚑P4 — `documentos`: vista previa y confirmación
+### T5 [ ] (P2, P4) — `documentos`: vista previa y confirmación
 Tras T1, T2, T3, T4. **Toca:** `lib/modules/documentos/domain/actor.ts` (`FORMULA_IMPORT_PERMISSION`),
 `preview-formula-import.ts`, `confirm-formula-import.ts` (nuevos), `lib/modules/documentos/index.ts`,
 `lib/composition/index.ts` (bloque de `documentos`: `previewFormulaImport`, `confirmFormulaImport` con
@@ -206,7 +205,7 @@ esquema de entrada (se prueba y se revierte) (**R35, R36, R37**).
 Tras T5. **Toca:** `specs/QC-129-textos-definitivos-de-los-prompts/requirements.md` (nota: R11 se
 enmienda con la forma de `design.md > 3` de QC-159), `specs/QC-158-catalogo-desde-pdf/requirements.md`
 (nota: R2 superado en su primera mitad por QC-159; R3 intacto), `specs/QC-90-alta-del-primer-lote/requirements.md`
-(nota, **solo si P1 se aprueba**: excepción de la materia prima desde la revisión de fórmula).
+(nota: excepción de la materia prima sin lote desde la revisión de fórmula, P1 aprobada el 2026-09-25).
 **Hacer:** notas fechadas al final de cada archivo, sin tocar sus tablas ni sus requisitos.
 **Hecho cuando:** las tres notas enlazan a este spec; ninguna tabla de decisiones ajena cambió.
 
