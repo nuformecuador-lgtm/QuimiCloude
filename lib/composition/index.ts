@@ -339,6 +339,7 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
 import {
   createConfirmCatalogImport,
+  createConfirmFormulaImport,
   createConvertPdfs,
   createCropCatalogImages,
   createDownloadDocument,
@@ -347,10 +348,12 @@ import {
   createIssueReadLink,
   createIssueUploadLinks,
   createPreviewCatalogImport,
+  createPreviewFormulaImport,
   createProcessPdfByStrategy,
   createReadPdfWithAi,
   createRunDocumentJob,
   type CatalogImportDeps,
+  type FormulaImportDeps,
 } from '@/lib/modules/documentos';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
@@ -1549,6 +1552,26 @@ const previewCatalogImport = createPreviewCatalogImport(catalogImportDeps);
 const confirmCatalogImport = createConfirmCatalogImport(catalogImportDeps);
 
 /**
+ * `FormulaImportDeps` (QC-159 `design.md > 5.1`), compartido por la vista previa y la
+ * confirmacion de una importacion de formula. `recipeCatalog` y `productCatalog` son los MISMOS
+ * que ya usan `recetas` y `pedidos` mas arriba -dos instancias del mismo puerto serian dos
+ * cableados que pueden divergir-; `inventario.createRawMaterial`, `recetas.createRecipe` y
+ * `recetas.updateRecipe` son los casos de uso ya cableados en sus propias fachadas.
+ */
+const formulaImportDeps: FormulaImportDeps = {
+  repository: documentBatchRepository,
+  recipes: recipeCatalog,
+  products: productCatalog,
+  productNames: productNameLookup,
+  createRawMaterial: inventario.createRawMaterial,
+  createRecipe: recetas.createRecipe,
+  updateRecipe: recetas.updateRecipe,
+};
+
+const previewFormulaImport = createPreviewFormulaImport(formulaImportDeps);
+const confirmFormulaImport = createConfirmFormulaImport(formulaImportDeps);
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1602,6 +1625,10 @@ export const documentos = {
   // de arriba. Claves NUEVAS al final: ninguna de las de arriba se toca.
   previewCatalogImport,
   confirmCatalogImport,
+  // Las DOS operaciones de la revision de formula (QC-159), ya cableadas con
+  // `formulaImportDeps` de arriba. Claves NUEVAS al final, mismo criterio.
+  previewFormulaImport,
+  confirmFormulaImport,
 } as const;
 
 // ---------------------------------------------------------------------------------------
