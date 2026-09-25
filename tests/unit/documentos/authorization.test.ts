@@ -12,11 +12,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  CATALOG_IMPORT_PERMISSION,
   DOCUMENT_UPLOAD_PERMISSION,
   requirePermission,
   type Actor,
 } from '@/lib/modules/documentos/domain/actor';
 import { DocumentosError, UnauthorizedError } from '@/lib/modules/documentos/domain/errors';
+import { createEnqueueBatch } from '@/lib/modules/documentos/domain/enqueue-batch';
+import { createGetBatchStatus } from '@/lib/modules/documentos/domain/get-batch-status';
+import { createIssueUploadLinks } from '@/lib/modules/documentos/domain/issue-upload-links';
 import {
   PERMISSIONS,
   ROLE_ADMINISTRADOR,
@@ -223,6 +227,35 @@ describe('documentos — autorizacion', () => {
       expect(apariciones[0]).toMatch(/actor\.ts$/);
     });
 
+    it('R11 — el codigo de `CATALOG_IMPORT_PERMISSION` se escribe UNA sola vez y es distinto del de subida', async () => {
+      const { readdirSync, readFileSync, statSync } = await import('node:fs');
+      const { dirname, join } = await import('node:path');
+      const { fileURLToPath } = await import('node:url');
+      const moduloDir = join(
+        dirname(fileURLToPath(import.meta.url)),
+        '..',
+        '..',
+        '..',
+        'lib',
+        'modules',
+        'documentos',
+      );
+      const fuentes = (function listar(dir: string): readonly string[] {
+        return readdirSync(dir).flatMap((nombre) => {
+          const ruta = join(dir, nombre);
+          return statSync(ruta).isDirectory() ? listar(ruta) : ruta.endsWith('.ts') ? [ruta] : [];
+        });
+      })(moduloDir);
+
+      expect(fuentes.length).toBeGreaterThan(0);
+      const apariciones = fuentes.filter((ruta) =>
+        readFileSync(ruta, 'utf8').includes(`'${CATALOG_IMPORT_PERMISSION}'`),
+      );
+      expect(apariciones).toHaveLength(1);
+      expect(apariciones[0]).toMatch(/actor\.ts$/);
+      expect(CATALOG_IMPORT_PERMISSION).not.toBe(DOCUMENT_UPLOAD_PERMISSION);
+    });
+
     it('R17 — ningun fuente del modulo compara el nombre de ningun rol del seed', async () => {
       const { readdirSync, readFileSync, statSync } = await import('node:fs');
       const { dirname, join } = await import('node:path');
@@ -251,6 +284,50 @@ describe('documentos — autorizacion', () => {
           expect(fuente, `${ruta} no debe nombrar el rol '${nombre}'`).not.toContain(nombre);
         }
       }
+    });
+  });
+
+  describe('la subida sigue exigiendo su propio permiso (R10)', () => {
+    function actorSoloProveedores(): Actor {
+      return conPermisos(CATALOG_IMPORT_PERMISSION);
+    }
+
+    it('R10 — issueUploadLinks rechaza a un actor con solo `proveedores.modificar`', async () => {
+      const storage = dobleDeAlmacenamiento();
+      const issueUploadLinks = createIssueUploadLinks({ storage });
+
+      await expect(issueUploadLinks(actorSoloProveedores(), { paths: [] })).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
+      for (const metodo of Object.values(storage)) expect(metodo).not.toHaveBeenCalled();
+    });
+
+    it('R10 — enqueueBatch rechaza a un actor con solo `proveedores.modificar`', async () => {
+      const repository = { createBatch: vi.fn(), attachMessageId: vi.fn() };
+      const queue = { publish: vi.fn() };
+      const enqueueBatch = createEnqueueBatch({
+        repository: repository as never,
+        queue: queue as never,
+      });
+
+      await expect(enqueueBatch(actorSoloProveedores(), { strategy: 'catalogo', paths: [] })).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
+      expect(repository.createBatch).not.toHaveBeenCalled();
+      expect(queue.publish).not.toHaveBeenCalled();
+    });
+
+    it('R10 — getBatchStatus rechaza a un actor con solo `proveedores.modificar`', async () => {
+      const repository = { expireStale: vi.fn(), readBatch: vi.fn() };
+      const config = { timeoutSeconds: vi.fn(() => 60) };
+      const getBatchStatus = createGetBatchStatus({
+        repository: repository as never,
+        config: config as never,
+      });
+
+      await expect(getBatchStatus(actorSoloProveedores(), 'lote-1')).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(repository.expireStale).not.toHaveBeenCalled();
+      expect(repository.readBatch).not.toHaveBeenCalled();
     });
   });
 });

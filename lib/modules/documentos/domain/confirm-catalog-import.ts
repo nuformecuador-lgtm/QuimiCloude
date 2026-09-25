@@ -8,7 +8,7 @@ import { assertPermission } from '@/lib/modules/identity';
 import { normalizePresentationName, PresentationDuplicateNameError } from '@/lib/modules/inventario';
 import { normalizeSupplierName } from '@/lib/modules/proveedores';
 
-import { requirePermission, DOCUMENT_UPLOAD_PERMISSION, type Actor } from './actor';
+import { requirePermission, CATALOG_IMPORT_PERMISSION, type Actor } from './actor';
 import {
   classifyCatalogImportRows,
   type AliveCatalogLine,
@@ -104,7 +104,7 @@ export function createConfirmCatalogImport(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<CatalogImportSummary> {
-    requirePermission(actor, DOCUMENT_UPLOAD_PERMISSION);
+    requirePermission(actor, CATALOG_IMPORT_PERMISSION);
 
     const parsed = confirmCatalogImportInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
