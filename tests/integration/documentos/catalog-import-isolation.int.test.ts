@@ -233,10 +233,11 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
     const supplierId = await crearProveedor(empresa.companyId);
     const documentFileId = await crearArchivoListo(empresa.companyId);
     const unitId = await unidadDeSistema();
+    // La confirmacion exige el permiso de subida de documentos, ademas de los de proveedores e inventario.
     const actor: Actor = {
       id: empresa.userId,
       companyId: empresa.companyId,
-      permissions: ['proveedores.modificar', 'inventario.modificar'],
+      permissions: ['proveedores.modificar', 'inventario.modificar', 'documentos.modificar'],
     };
 
     const marker = token();
@@ -309,10 +310,11 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
     const supplierId = await crearProveedor(empresa.companyId);
     const documentFileId = await crearArchivoListo(empresa.companyId);
     const unitId = await unidadDeSistema();
+    // La confirmacion exige el permiso de subida de documentos, ademas de los de proveedores e inventario.
     const actor: Actor = {
       id: empresa.userId,
       companyId: empresa.companyId,
-      permissions: ['proveedores.modificar', 'inventario.modificar'],
+      permissions: ['proveedores.modificar', 'inventario.modificar', 'documentos.modificar'],
     };
 
     const marker = token();
@@ -346,7 +348,12 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       const otra = await crearEmpresa();
       const supplierId = await crearProveedor(empresa.companyId);
       const documentFileDeOtra = await crearArchivoListo(otra.companyId);
-      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'] };
+      // La confirmacion exige el permiso de subida de documentos, ademas del de proveedores.
+      const actor: Actor = {
+        id: empresa.userId,
+        companyId: empresa.companyId,
+        permissions: ['proveedores.modificar', 'documentos.modificar'],
+      };
       const deps = crearDeps();
       const confirm = createConfirmCatalogImport(deps);
 
@@ -368,7 +375,12 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       const otra = await crearEmpresa();
       const supplierDeOtra = await crearProveedor(otra.companyId);
       const documentFileId = await crearArchivoListo(empresa.companyId);
-      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'] };
+      // La confirmacion exige el permiso de subida de documentos, ademas del de proveedores.
+      const actor: Actor = {
+        id: empresa.userId,
+        companyId: empresa.companyId,
+        permissions: ['proveedores.modificar', 'documentos.modificar'],
+      };
       const deps = crearDeps();
       const confirm = createConfirmCatalogImport(deps);
 
@@ -391,10 +403,11 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       const supplierId = await crearProveedor(empresa.companyId);
       const documentFileId = await crearArchivoListo(empresa.companyId);
       const unidadAjena = await crearUnidadPropia(otra.companyId, `Unidad ajena ${token()}`);
+      // La confirmacion exige el permiso de subida de documentos, ademas de los de proveedores e inventario.
       const actor: Actor = {
         id: empresa.userId,
         companyId: empresa.companyId,
-        permissions: ['proveedores.modificar', 'inventario.modificar'],
+        permissions: ['proveedores.modificar', 'inventario.modificar', 'documentos.modificar'],
       };
       const deps = crearDeps();
       const confirm = createConfirmCatalogImport(deps);
@@ -425,7 +438,12 @@ describe('createConfirmCatalogImport — aislamiento contra Postgres real (R21, 
       const rutaDeOtroArchivo = `${empresa.companyId}/${otroArchivo}/1-1.png`;
       const deps = crearDeps({ crops: dobleDeRecortes([rutaDeOtroArchivo]) });
       const confirm = createConfirmCatalogImport(deps);
-      const actor: Actor = { id: empresa.userId, companyId: empresa.companyId, permissions: ['proveedores.modificar'] };
+      // La confirmacion exige el permiso de subida de documentos, ademas del de proveedores.
+      const actor: Actor = {
+        id: empresa.userId,
+        companyId: empresa.companyId,
+        permissions: ['proveedores.modificar', 'documentos.modificar'],
+      };
 
       await expect(
         confirm(actor, {
