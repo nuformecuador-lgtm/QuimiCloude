@@ -2576,6 +2576,23 @@
       "branch": "feature/QC-169-permiso-de-la-confirmacion-del-catalogo",
       "depends_on": [],
       "spec_path": "specs/QC-169-permiso-de-la-confirmacion-del-catalogo"
+    },
+    {
+      "key": "QC-170",
+      "id": 170,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "pedido-en-varias-presentaciones",
+      "description": "Un pedido puede ENVASARSE EN VARIAS PRESENTACIONES: se preparan 100 L de crema y se reparten en botellas de 1 L, 200 ml, etc. Se asignan varias presentaciones con su numero de envases y el sistema va diciendo CUANTO QUEDA DISPONIBLE (de 100 L, 5 x 200 ml -> quedan 99 L). NACE DEL CHAT el 2026-09-25. Cambia QC-146 (una sola presentacion) y el alta del producto terminado de QC-150 (un lote por presentacion); encaja con el empaque de QC-168. ABIERTO, se acota con /afinar-feature: cuando se asigna (alta del pedido o empaque), quien, si debe cubrir todo (sobrante: merma o granel), convivencia con QC-146 y pedidos existentes, efecto en producto terminado y coste, como se muestra el disponible. BLOQUEADA POR QC-168.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-170-pedido-en-varias-presentaciones",
+      "depends_on": [
+        "QC-168"
+      ],
+      "spec_path": "specs/QC-170-pedido-en-varias-presentaciones"
     }
   ]
 }

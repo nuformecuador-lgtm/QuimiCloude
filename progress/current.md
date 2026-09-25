@@ -21,6 +21,8 @@
 
 ## Evaluaciones
 
+**2026-09-25: nace QC-170** `pedido-en-varias-presentaciones` (fullstack, epica Pedidos), del chat; bloqueada por QC-168 (otra sesion); sin acotar.
+
 **2026-09-25:** QC-154 cerrada (PR #124; resumen en history). **QC-155 F1.0 hecho**: `frontend`, `complexity: medium`, worktree montado; cupo `frontend` 1 de 2.
 
 ### QC-159 formula-desde-pdf - ACOTADA con `/afinar-feature` y F1.0 (2026-09-25)
