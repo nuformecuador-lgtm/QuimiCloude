@@ -1031,3 +1031,76 @@ Verificacion (sin tocar `scope.test.ts` ni ningun otro test):
 Archivos tocados en este anexo: `specs/QC-154-crud-de-clientes/tasks.md` (fila R32 de la tabla de
 Trazabilidad) y `progress/impl_QC-154-crud-de-clientes.md` (este anexo). Nada en
 `feature_list.json`, `progress/current.md` ni en ningun test.
+
+## Correcciones tras review (RECHAZADO, `progress/review_QC-154-crud-de-clientes.md`)
+
+Solo se toco `tests/unit/clientes/scope.test.ts`. Nada en `lib/`, `app/`, `db/`, otros tests,
+`feature_list.json` ni `progress/current.md`.
+
+### B2 — `scope.test.ts` fabricaba archivos en el arbol real
+
+Los cinco casos de sensibilidad (`R26` x2, `R36`, `R38`, `R40`) escribian con `writeFileSync`
+dentro de `lib/modules/clientes/**` o `app/__sensibilidad_clientes__/`, real, y borraban en
+`finally`. Con el proyecto `node` de vitest en paralelo, cualquier guardia que barriera esas
+raices podia toparse con el fabricado a medio vivir o ya borrado (ENOENT intermitente).
+
+Arreglo: los cinco detectores quedaron parametrizados por raiz/directorio, con el arbol real
+como valor por defecto —`fuentesDeProduccion(raiz = repoRoot)`,
+`detectarLiteralesDePermiso(raiz = repoRoot)`, `hallazgosDePaginacion(dir = moduloDir)`,
+`coincidenciasEnApp(appDir = join(repoRoot, 'app'))`, `hallazgosDeAcoplamiento(modDir = moduloDir,
+pedidosDir = PEDIDOS_DIR)`—. Cada caso de sensibilidad fabrica ahora en su propio
+`mkdtempSync(join(tmpdir(), 'qc154-scope-'))`, replica solo la estructura relativa necesaria
+(`domain/...`, `lib/modules/clientes/...` o el directorio de `app` completo segun el parametro que
+sustituye) y borra con `rmSync(..., { recursive: true, force: true })` en el `finally`. Se anadio
+un caso barato que sella la regresion: el propio archivo no puede tener un `writeFileSync` o
+`mkdirSync` que apunte a `repoRoot`/`moduloDir` sin pasar por un `mkdtempSync`.
+
+Los nombres de los casos existentes no cambiaron. Cada uno de los cinco se verifico con una
+mutacion manual (romper el detector o ignorar el parametro de raiz/dir) que lo puso rojo, y se
+revirtio; el diff final quedo identico al que habia antes de mutar (comprobado con `diff` byte a
+byte). El caso sello tambien se verifico igual.
+
+### m6 — la sensibilidad de R37 no probaba nada de verdad
+
+`'el censo de campos dispara con un campo fabricado de mas'` rehacia el mapeo de campos en linea
+sin llamar a `camposDe`: no ejercia el predicado real. `cuerpoDeModelo`/`camposDe` ganaron un
+parametro `schemaTexto` (el schema real de `db/schema.prisma` por defecto), y el caso pasa ahora
+un `model Customer { ... }` fabricado **en memoria** (nunca escrito a disco) a la misma funcion
+que usa el caso real, comprobando que el censo resultante incluye el campo de mas y difiere del
+censo del schema real. Verificado con una mutacion (el filtro de `camposDe` ignorando el campo
+fabricado) que puso el caso rojo, y revertida.
+
+### m7 — R40 solo miraba el especificador de import
+
+`hallazgosDeAcoplamiento` solo detectaba `@/lib/modules/<x>`; un `prisma.customer`/`customers`
+crudo dentro de `pedidos`, o un `prisma.order`/`orders` dentro de `clientes`, no disparaba nada.
+Se anadio `nombraModeloOTabla(fuente, modelo, tabla)` (mira `prisma.<modelo>\b` o `\b<tabla>\b`) y
+se aplica en ambas direcciones dentro de `hallazgosDeAcoplamiento`. Se confirmo con `grep` contra
+el arbol real (`lib/modules/pedidos` sin `customer`/`customers`/`prisma.customer`;
+`lib/modules/clientes` sin `order`/`orders`/`prisma.order`) que no hay falsos positivos. Se anadio
+un caso nuevo que fabrica en dos `mkdtempSync` independientes (uno emulando `clientes` con
+`prisma.order.findMany()`, otro emulando `pedidos` con la tabla `'customers'`) y comprueba que
+ambos aparecen en los hallazgos. Verificado con una mutacion (anular `nombraModeloOTabla`) que
+puso el caso rojo, y revertida.
+
+### Verificacion (repetida tres veces sobre el HEAD final, `63925abd`)
+
+```
+pnpm run typecheck   → tsc --noEmit, sin salida, sin errores (las 3 veces)
+pnpm run lint        → 0 errores, 7 warnings preexistentes ajenos
+                        (tests/unit/documentos/confirm-catalog-import.test.ts,
+                        tests/unit/pedidos/order-service.test.ts; archivos no tocados)
+
+pnpm exec vitest run tests/unit/clientes tests/guards
+  RUN 1 → Test Files 54 passed (54) · Tests 662 passed | 5 skipped (667)
+  RUN 2 → Test Files 54 passed (54) · Tests 662 passed | 5 skipped (667)
+  RUN 3 → Test Files 54 passed (54) · Tests 662 passed | 5 skipped (667)
+```
+
+`git status` tras las tres corridas: `nothing to commit, working tree clean` — ningun fabricado
+quedo en el arbol.
+
+Tres commits, uno por hallazgo: `54eb838e` (B2), `97c5393c` (m6), `63925abd` (m7). Los tres
+empujados a `origin/feature/QC-154-crud-de-clientes`.
+
+Archivo tocado: solo `tests/unit/clientes/scope.test.ts`.
