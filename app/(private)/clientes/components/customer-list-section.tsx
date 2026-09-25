@@ -48,27 +48,42 @@ export async function CustomerListSection({ params, canModify }: CustomerListSec
   }
 
   const { items, page: currentPage, totalPages } = result.data;
+  const outOfRange = items.length === 0 && currentPage > FIRST_PAGE;
+  const active = hasActiveSearchOrFilter(params);
 
-  if (items.length === 0 && !hasActiveSearchOrFilter(params)) {
-    // Vacio de verdad, pagina 1: la unica situacion en la que se ofrece «dar de alta el primer
-    // cliente» (R19). El disparador de alta es `<CustomerSheet />`, hijo de este estado y no de
-    // la tabla, porque con cero clientes la tabla ni llega a montarse.
+  if (items.length === 0 && !active) {
+    // Vacio de verdad, o la pagina que se quedo atras sin termino ni filtro: es la unica
+    // situacion en la que se ofrece «dar de alta el primer cliente». El disparador de alta es
+    // `<CustomerSheet />`, hijo de este estado y no de la tabla, porque con cero clientes la
+    // tabla ni llega a montarse.
     return (
       <CustomerListEmpty
         canModify={canModify}
-        firstPageHref={
-          currentPage > FIRST_PAGE ? customerListHref({ ...params, page: FIRST_PAGE }) : undefined
-        }
+        firstPageHref={outOfRange ? customerListHref({ ...params, page: FIRST_PAGE }) : undefined}
       >
         <CustomerSheet />
       </CustomerListEmpty>
     );
   }
 
+  if (outOfRange) {
+    // Con termino o filtro vigentes, la pagina que se quedo atras gana al «sin coincidencias»:
+    // hay coincidencias, solo que en otra pagina. Sigue siendo la TABLA, con su caja montada, y
+    // el enlace conserva termino, filtros, tamano y orden.
+    return (
+      <CustomerTable
+        customers={items}
+        params={params}
+        totalPages={totalPages}
+        canModify={canModify}
+        outOfRange={{ firstPageHref: customerListHref({ ...params, page: FIRST_PAGE }) }}
+      />
+    );
+  }
+
   if (items.length === 0) {
-    // La pagina pedida se quedo sin elementos (page > totalPages) o la busqueda/filtro no
-    // encontro nada: en los dos casos sigue siendo la TABLA, con su caja de busqueda montada
-    // (R20). `withSearchResetsPage`/`hasActiveSearchOrFilter` ya distinguen esto del vacio de R19.
+    // Dentro de rango y sin filas: la busqueda o el filtro no encontraron nada. Sigue siendo la
+    // TABLA, con su caja de busqueda montada.
     return (
       <CustomerTable
         customers={items}

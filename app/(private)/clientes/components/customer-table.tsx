@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 
 import { CUSTOMER_TABLE_TEXTS } from './customer-labels';
 import { buildCustomerColumns } from './customer-columns';
+import { CUSTOMER_LIST_FIRST_PAGE_TESTID } from './customer-list-empty';
 import { FIRST_PAGE, customerListHref, withSearchResetsPage } from './customer-list-params';
 import { CustomerRowActions } from './customer-row-actions';
 import { CustomerSheet } from './customer-sheet';
@@ -48,8 +49,11 @@ export const CUSTOMER_LIST_CLEAR_SEARCH_TESTID = 'customer-list-clear-search';
 
 /** Copy del estado «sin coincidencias», distinto del de «no hay clientes». */
 export const CUSTOMER_NO_MATCHES_MESSAGE = 'No hay clientes que coincidan con la búsqueda.';
+/** Copy de la página que se quedó atrás, con término o filtro vigentes. */
+export const CUSTOMER_OUT_OF_RANGE_MESSAGE = 'Esta página ya no tiene clientes.';
 
 const CLEAR_SEARCH_LABEL = 'Limpiar la búsqueda';
+const FIRST_PAGE_LABEL = 'Volver a la primera página';
 
 // Con modificadores o boton central se deja al navegador abrir otra pestana.
 function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
@@ -69,9 +73,22 @@ export type CustomerTableProps = {
    * DENTRO de la tabla, con la caja montada, en vez del vacio de `customer-list-empty.tsx`.
    */
   readonly noMatches?: { readonly clearHref: string };
+  /**
+   * Presente solo con cero filas, `page > totalPages` y un termino o filtro vigentes: la pagina
+   * pedida se quedo sin elementos, pero sigue habiendo coincidencias en otra pagina. Mutuamente
+   * excluyente con `noMatches`.
+   */
+  readonly outOfRange?: { readonly firstPageHref: string };
 };
 
-export function CustomerTable({ customers, params, totalPages, canModify, noMatches }: CustomerTableProps) {
+export function CustomerTable({
+  customers,
+  params,
+  totalPages,
+  canModify,
+  noMatches,
+  outOfRange,
+}: CustomerTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -163,13 +180,24 @@ export function CustomerTable({ customers, params, totalPages, canModify, noMatc
         onParamsChange={handleParamsChange}
         status="idle"
         texts={
-          noMatches === undefined
-            ? CUSTOMER_TABLE_TEXTS
-            : { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_NO_MATCHES_MESSAGE }
+          outOfRange !== undefined
+            ? { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_OUT_OF_RANGE_MESSAGE }
+            : noMatches === undefined
+              ? CUSTOMER_TABLE_TEXTS
+              : { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_NO_MATCHES_MESSAGE }
         }
         toolbarActions={canModify ? <CustomerSheet /> : undefined}
         emptyAction={
-          noMatches === undefined ? undefined : (
+          outOfRange !== undefined ? (
+            <Link
+              href={outOfRange.firstPageHref}
+              data-slot="button"
+              data-testid={CUSTOMER_LIST_FIRST_PAGE_TESTID}
+              className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+            >
+              {FIRST_PAGE_LABEL}
+            </Link>
+          ) : noMatches === undefined ? undefined : (
             <div
               data-testid={CUSTOMER_LIST_NO_MATCHES_TESTID}
               className="flex flex-wrap items-center justify-center gap-2"

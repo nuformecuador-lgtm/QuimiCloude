@@ -258,6 +258,48 @@ describe('la pagina que se quedo atras vuelve a la primera (R20)', () => {
     // Sin busqueda ni filtro: NO es el caso «sin coincidencias».
     expect(screen.queryByTestId(CUSTOMER_LIST_NO_MATCHES_TESTID)).toBeNull();
   });
+
+  it('con un termino vigente y page > totalPages, gana a "sin coincidencias" y conserva el termino', async () => {
+    listCustomersActionMock.mockResolvedValue(pagina([], { page: 3, totalPages: 2 }));
+
+    render(
+      await CustomerListSection({
+        params: parametros({ page: 3, search: 'ana' }),
+        canModify: false,
+      }),
+    );
+
+    const tabla = screen.getByTestId(testId.tabla);
+    const enlace = within(tabla).getByTestId(testId.primeraPagina);
+    const destino = new URL(enlace.getAttribute('href') as string, 'http://localhost');
+    expect(destino.pathname).toBe(CUSTOMERS_ROUTE);
+    expect(destino.searchParams.get('page')).toBe('1');
+    expect(destino.searchParams.get('q')).toBe('ana');
+    expect(within(tabla).getByTestId('data-table-search')).toHaveValue('ana');
+    expect(screen.queryByTestId(CUSTOMER_LIST_NO_MATCHES_TESTID)).toBeNull();
+    expect(screen.queryByTestId(CUSTOMER_LIST_CLEAR_SEARCH_TESTID)).toBeNull();
+  });
+
+  it('con un filtro vigente y page > totalPages, gana a "sin coincidencias" y conserva el filtro', async () => {
+    listCustomersActionMock.mockResolvedValue(pagina([], { page: 5, totalPages: 1 }));
+
+    render(
+      await CustomerListSection({
+        params: parametros({
+          page: 5,
+          filters: { city: { kind: 'text', value: 'Cali' } },
+        }),
+        canModify: false,
+      }),
+    );
+
+    const tabla = screen.getByTestId(testId.tabla);
+    const enlace = within(tabla).getByTestId(testId.primeraPagina);
+    const destino = new URL(enlace.getAttribute('href') as string, 'http://localhost');
+    expect(destino.searchParams.get('page')).toBe('1');
+    expect(destino.searchParams.get('city')).toBe('Cali');
+    expect(screen.queryByTestId(CUSTOMER_LIST_NO_MATCHES_TESTID)).toBeNull();
+  });
 });
 
 describe('la pantalla no autoriza nada por su cuenta (R7)', () => {
