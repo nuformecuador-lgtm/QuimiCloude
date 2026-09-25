@@ -32,6 +32,8 @@
 
 **Semilla con datos viejos que `spec_author` reconcilia contra `dev`:** (1) «catalogo cerrado de quince permisos» ya no es cierto (QC-142, QC-153 lo ampliaron); la decision sigue: no nace permiso. (2) QC-141 ya existe: «alcanza» debe medirse contra lo **disponible** (existencia menos reservado), a confirmar en el design. (3) QC-130 cancelada: el contenido de la presentacion lo trajo QC-150. (4) 3 preguntas abiertas en la semilla (lote vencido, distintivo en la lista del Operador, fallo del desbloqueo dentro de la transaccion del lote).
 
+**F1.2/F1.3 hechos el 2026-09-25**: R1-R40, T0-T15, commit `2172c702` en la rama; tarjeta *En revision*. `spec_author` se colgo una vez (watchdog, sin escribir) y se reanudo sin perdida. Decision central: el bloqueo sale del `insufficient` de la reserva de QC-141, no del coste. P1-P10 + 3 de la semilla con propuesta en `design.md > 0`; R4, R12, R16, R20, R23, R27, R31 provisionales. QC-168 tambien esta en F1.4: el orden de implementacion se decide en F2.0. **Parada en F1.4.**
+
 ### QC-150 - CERRADA (2026-09-25)
 
 PR #121, merge `3d6f817b`. Resumen en `progress/history.md`. Tarjeta en *Finalizado* y comentada. Worktree desregistrado; la carpeta sigue en disco (ver Deudas). Desbloquea **QC-168**.
