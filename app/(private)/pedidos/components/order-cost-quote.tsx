@@ -13,7 +13,7 @@ export const ORDER_COST_QUOTE_QUOTING_TESTID = 'order-cost-quote-quoting';
 export const ORDER_COST_QUOTE_ERROR_TESTID = 'order-cost-quote-error';
 
 /** Copy no afirmado por ningun test: van por `data-testid`. */
-const QUOTE_LABEL = 'Coste estimado de ingredientes';
+const QUOTE_LABEL = 'Coste estimado de producción';
 const QUOTING_LABEL = 'cotizando…';
 const ERROR_PREFIX = 'No se pudo cotizar:';
 
