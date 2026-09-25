@@ -11,8 +11,8 @@ type FormulaNameClashProps = {
 };
 
 /**
- * El aviso de choque de nombre (R17): una receta viva ya tiene ese nombre. El texto es EXACTO
- * -`design.md > 6.4`-, y las dos opciones son las unicas que R17 admite: reemplazarla o cambiar
+ * El aviso de choque de nombre: una receta viva ya tiene ese nombre. El texto es EXACTO
+ * y las dos opciones son las unicas admitidas: reemplazarla o cambiar
  * el nombre. Ninguna de las dos decide aqui lo que pasa despues; eso lo hace quien llama.
  */
 export function FormulaNameClash({ recipeName, onReplace, onRename }: FormulaNameClashProps) {

@@ -58,7 +58,7 @@ export type IngredientRowState = {
   /** Producto elegido (preseleccionado o por el selector). Cadena vacia = ninguno. */
   readonly productId: string;
   readonly productLabel: string;
-  /** Nombre editable de la materia prima a crear, precargado con el leido (R12). */
+  /** Nombre editable de la materia prima a crear, precargado con el leido. */
   readonly newProductName: string;
   /** Cuantos productos vivos coinciden con el nombre leido cuando `match.kind === 'several'`. */
   readonly severalCount: number | null;
@@ -69,7 +69,7 @@ function percentageToDraft(percentage: string): string | null {
   return trimmed === '' ? null : trimmed.replace(',', '.');
 }
 
-/** La fila inicial de un ingrediente leido, con el modo que le corresponde segun `match` (R11). */
+/** La fila inicial de un ingrediente leido, con el modo que le corresponde segun `match`. */
 function toIngredientRowState(ingredient: FormulaImportPreviewIngredient, index: number): IngredientRowState {
   const base = {
     key: `formula-ingredient-${index}`,
@@ -95,12 +95,12 @@ function toIngredientRowState(ingredient: FormulaImportPreviewIngredient, index:
     return { ...base, mode: 'choose', productId: '', productLabel: '', severalCount: ingredient.match.count };
   }
 
-  // Sin ninguna coincidencia: se OFRECE crear la materia prima con el nombre leido (R11), sin
+  // Sin ninguna coincidencia: se OFRECE crear la materia prima con el nombre leido, sin
   // forzar la eleccion -el revisor puede cambiar a "elegir producto" en su lugar.
   return { ...base, mode: 'create', productId: '', productLabel: '', severalCount: null };
 }
 
-/** Una fila anadida a mano (R12): sin nombre leido, arranca pidiendo elegir un producto. */
+/** Una fila anadida a mano: sin nombre leido, arranca pidiendo elegir un producto. */
 function blankIngredientRow(): IngredientRowState {
   return {
     key: createLocalKey('formula-ingredient'),
@@ -138,7 +138,7 @@ const ROW_PROBLEM_LABELS: Record<RowProblem, string> = {
   repeated: 'ingrediente repetido',
 };
 
-/** Los motivos que impiden confirmar (R15, R16), nombrando las filas afectadas. */
+/** Los motivos que impiden confirmar, nombrando las filas afectadas. */
 function buildConfirmReasons(
   issues: FormulaReviewIssues,
   nameClash: FormulaImportPreview['nameClash'],
@@ -184,11 +184,11 @@ type FormulaImportReviewProps = {
 
 /**
  * La revision de una importacion de formula: nombre y descripcion, una tarjeta por ingrediente,
- * los pasos con `RecipeStepsField` tal cual, y el aviso de choque de nombre (`design.md > 6.4`).
+ * los pasos con `RecipeStepsField` tal cual, y el aviso de choque de nombre.
  *
  * `reviewFormulaImport` -la misma funcion PURA que usa el servidor- se llama en cada cambio para
- * habilitar «Confirmar» sin ir y volver (R10, R15); el choque de nombre lo anade este componente
- * porque solo el servidor puede comprobarlo contra la base (R17).
+ * habilitar «Confirmar» sin ir y volver; el choque de nombre lo anade este componente
+ * porque solo el servidor puede comprobarlo contra la base.
  */
 export function FormulaImportReview({ documentFileId, units, initialProductPage, preview }: FormulaImportReviewProps) {
   const [name, setName] = useState(preview.name ?? '');
@@ -242,7 +242,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   function handleNameChange(value: string) {
     setName(value);
     // El choque quedo atado a un nombre concreto: si el revisor sigue escribiendo, la eleccion
-    // anterior ya no aplica hasta que se vuelva a comprobar (R17).
+    // anterior ya no aplica hasta que se vuelva a comprobar.
     setReplaceChoice(null);
   }
 

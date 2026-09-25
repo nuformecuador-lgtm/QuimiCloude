@@ -25,7 +25,7 @@ const ROW_PROBLEM_LABELS: Record<RowProblem, string> = {
   repeated: 'ingrediente repetido',
 };
 
-/** «20 kg», «20» o «kg», segun lo que trajo el PDF; `null` si no hay nada que mostrar (R8). */
+/** «20 kg», «20» o «kg», segun lo que trajo el PDF; `null` si no hay nada que mostrar. */
 function referenceText(quantityRead: string | null, unitRead: string | null): string | null {
   const parts = [quantityRead, unitRead].filter((part): part is string => part !== null && part !== '');
   return parts.length === 0 ? null : parts.join(' ');
@@ -38,17 +38,16 @@ type FormulaIngredientRowProps = {
   readonly units: readonly UnitRef[];
   readonly initialProductPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };
   /** Productos ya elegidos en OTRAS filas: se apartan del selector (mismo criterio que las
-   *  lineas de receta, aunque aqui NO es un requisito -R16 ya marca la fila repetida-, es solo
-   *  para no invitar a repetir por accidente). */
+   *  lineas de receta), solo para no invitar a repetir por accidente. */
   readonly excludedIds: readonly string[];
   readonly onChange: (patch: Partial<IngredientRowState>) => void;
   readonly onRemove: () => void;
 };
 
 /**
- * Una tarjeta por ingrediente leido (R10): nombre leido, porcentaje editable con su «leido: …»
- * y su referencia de cantidad/unidad (R7, R8), y el producto asignado en uno de TRES modos
- * (R11, R12): preseleccionado, elegir un producto existente o crear una materia prima con el
+ * Una tarjeta por ingrediente leido: nombre leido, porcentaje editable con su «leido: …»
+ * y su referencia de cantidad/unidad, y el producto asignado en uno de TRES modos:
+ * preseleccionado, elegir un producto existente o crear una materia prima con el
  * nombre editable. `Quitar` retira la fila entera.
  */
 export function FormulaIngredientRow({

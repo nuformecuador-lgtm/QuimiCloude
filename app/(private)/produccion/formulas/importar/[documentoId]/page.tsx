@@ -25,9 +25,9 @@ const FIRST_PAGE = 1;
 
 /**
  * Estado de error de esta pantalla: un rechazo de las unidades, de los productos o de la vista
- * previa, siempre SIN ningun dato del documento (R3, R32). El mensaje es SIEMPRE el mismo,
- * cualquiera de los cuatro motivos que R3 junta bajo `invalid_input`: no se distingue archivo
- * inexistente, de otra empresa, fuera de estado o de otra tanda.
+ * previa, siempre SIN ningun dato del documento. El mensaje es SIEMPRE el mismo, cualquiera de
+ * los motivos que agrupa `invalid_input`: no se distingue archivo inexistente, de otra empresa,
+ * fuera de estado o de otra tanda.
  */
 function ImportErrorNotice({ error }: { readonly error: ErrorState }) {
   return (
@@ -61,11 +61,10 @@ function ImportErrorNotice({ error }: { readonly error: ErrorState }) {
 }
 
 /**
- * Pantalla de revision de una importacion de formula desde un PDF, para un archivo concreto
- * (`design.md > 6.1`).
+ * Pantalla de revision de una importacion de formula desde un PDF, para un archivo concreto.
  *
- * **El corte por permiso vive AQUI, y son DOS**: `recetas.consultar` y `recetas.modificar`
- * (R32), mismo patron que `/configuracion/unidades` y la revision de catalogo. Se aparta a
+ * **El corte por permiso vive AQUI, y son DOS**: `recetas.consultar` y `recetas.modificar`,
+ * mismo patron que `/configuracion/unidades` y la revision de catalogo. Se aparta a
  * proposito del criterio de `formulas/nueva` -que solo pide `consultar`-: esta pantalla no tiene
  * uso de solo lectura, muestra el contenido de un documento y su unica accion es escribir.
  *

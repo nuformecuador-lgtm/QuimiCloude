@@ -19,7 +19,7 @@ type FormulaImportSummaryProps = {
 };
 
 /**
- * Resultado de una confirmacion que termino bien (R29): si la receta se creo o se reemplazo,
+ * Resultado de una confirmacion que termino bien: si la receta se creo o se reemplazo,
  * cuantas materias primas se crearon y cuantas se reutilizaron, y la vuelta a la ficha de esa
  * receta -que sale de `recipeEditRoute`, nunca de un literal.
  */
