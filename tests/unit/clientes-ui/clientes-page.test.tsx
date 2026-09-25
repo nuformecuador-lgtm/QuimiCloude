@@ -20,7 +20,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CUSTOMERS_TITLE_TESTID, CUSTOMER_ROW_ACTIONS_TESTID } from '@/app/(private)/clientes/components';
 import ClientesPage from '@/app/(private)/clientes/page';
 import type { CustomerView } from '@/lib/modules/clientes';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_OPERADOR,
+  SEED_ROLE_PERMISSIONS,
+} from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { CUSTOMERS_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -93,12 +99,12 @@ const CODIGOS_DE_CLIENTES: readonly string[] = PERMISSIONS.filter(
 const PERMISO_DE_CONSULTA = 'clientes.consultar';
 const PERMISO_DE_ESCRITURA = 'clientes.modificar';
 
-function sesionCon(permissions: readonly string[]) {
+function sesionCon(permissions: readonly string[], roleName: string = ROLE_ADMINISTRADOR) {
   return {
     id: '99999999-9999-4999-8999-999999999999',
     username: 'admin.prueba',
     displayName: 'Admin De Prueba',
-    roleName: 'Administrador',
+    roleName,
     permissions,
   };
 }
@@ -320,6 +326,36 @@ describe('`canModify` sale de assertPermission y de nada mas (R5, R8)', () => {
 
     for (const prohibido of ['prisma', '@/db', "fetch('/api", 'next/headers']) {
       expect(fuente, `page.tsx no debe usar ${prohibido}`).not.toContain(prohibido);
+    }
+  });
+});
+
+describe('a nivel de pantalla, con los tres conjuntos de permisos del seed (R6)', () => {
+  it.each([
+    [ROLE_ADMINISTRADOR, SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]],
+    [ROLE_OPERADOR, SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]],
+    [ROLE_EMPACADOR, SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]],
+  ])('%s: se sirve solo si trae clientes.consultar, y escribe solo si trae clientes.modificar', async (roleName, permissions) => {
+    getSessionUserMock.mockResolvedValue(sesionCon(permissions ?? [], roleName));
+
+    const puedeConsultar = (permissions ?? []).includes(PERMISO_DE_CONSULTA);
+    const puedeEscribir = (permissions ?? []).includes(PERMISO_DE_ESCRITURA);
+
+    if (!puedeConsultar) {
+      await expect(arbolDeLaPantalla()).rejects.toThrow();
+      expect(notFoundMock).toHaveBeenCalled();
+      return;
+    }
+
+    await renderPantalla();
+
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    if (puedeEscribir) {
+      expect(screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toBeInTheDocument();
+    } else {
+      expect(screen.queryByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toBeNull();
+      expect(screen.queryByTestId('customer-create-open')).toBeNull();
     }
   });
 });
