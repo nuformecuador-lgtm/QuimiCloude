@@ -1175,6 +1175,11 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // CERRADA.
         'supplierCatalogImportRoute',
         'supplierDetailRoute',
+        // Alta QC-159: la revision de una formula importada desde PDF, derivada de
+        // `FORMULAS_ROUTE` (`/produccion/formulas/importar/<archivo>`). No es del asistente de
+        // lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue
+        // CERRADA.
+        'formulaImportRoute',
       ].sort(),
     );
   });

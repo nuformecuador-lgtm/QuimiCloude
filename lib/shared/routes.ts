@@ -54,6 +54,17 @@ export function recipeEditRoute(id: string): string {
 }
 
 /**
+ * Ruta de la revision de un archivo de formula importado desde PDF, derivada de `FORMULAS_ROUTE`.
+ * Mismo patron que `supplierCatalogImportRoute`: el segmento `importar` cuelga del listado y no
+ * hay una segunda constante de prefijo. No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la
+ * comparacion por segmentos de `FORMULAS_ROUTE` ya cubre cualquier subcamino, incluido este, y un
+ * id de receta es un UUID, asi que el segmento estatico `importar` nunca choca con `[id]`.
+ */
+export function formulaImportRoute(documentFileId: string): string {
+  return `${FORMULAS_ROUTE}/importar/${documentFileId}`;
+}
+
+/**
  * Pantalla de proveedores (QC-44, R2).
  *
  * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
