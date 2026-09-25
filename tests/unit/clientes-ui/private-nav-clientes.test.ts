@@ -109,8 +109,7 @@ describe('la navegacion privada lleva a clientes (R4)', () => {
 });
 
 describe('el permiso del item es EL MISMO que exige la pantalla (R6)', () => {
-  // Se activa cuando la pantalla completa reemplace a la version minima de esta tanda.
-  it.skip('item y pagina declaran el MISMO codigo, no uno contenido en el otro', () => {
+  it('item y pagina declaran el MISMO codigo, no uno contenido en el otro', () => {
     const permisos = permisosDeLaPantalla();
     expect(permisos).toHaveLength(1);
     expect(ITEMS_DE_CLIENTES[0]?.permission).toBe(permisos[0]);

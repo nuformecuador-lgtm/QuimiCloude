@@ -16,6 +16,7 @@ import { describe, expect, it, type TestContext } from 'vitest'
 // literal escrito a mano: asi un cambio de ruta arrastra esta prueba con el mismo commit.
 import {
   ASSIGNED_ORDERS_ROUTE,
+  CUSTOMERS_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
@@ -179,6 +180,14 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   //
   // AMPLIADO el 2026-09-15 (QC-56): entra la pantalla de recetas como SEPTIMO consumidor
   // declarado. El caso que la dejaba fuera se invierte; una OCTAVA pantalla sigue en rojo.
+  //
+  // AMPLIADO el 2026-09-25 (QC-155, pantalla-de-clientes): entra la NOVENA pantalla declarada
+  // -clientes-, por decision cerrada 5 (`specs/QC-155-pantalla-de-clientes/requirements.md >
+  // Decisiones cerradas`, «Tres fichas como Proveedores») y R9: su lista se monta sobre la tabla
+  // compartida por su barrel publico, sin tocar ni un archivo de `components/shared/data-table/`.
+  // Se anade la fila y se TENSA el resto del centinela -el ancla de consumidores minimos sube de
+  // siete a ocho-, nunca se afloja: la lista sigue CERRADA y una DECIMA pantalla vuelve a poner
+  // esto en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
@@ -189,7 +198,8 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
    * La QUINTA -`UNITS_ROUTE`- la trae QC-39 (R15, R31) con el mismo criterio: su lista se monta
    * sobre la tabla compartida por decision cerrada del 2026-09-08 y sus acciones de fila van como
    * columna normal `pinnable: false`, sin anadirle nada a `components/shared/data-table/`. La
-   * SEXTA -`USERS_ROUTE`- la trae QC-67 (R9) con el mismo criterio y por la misma via.
+   * SEXTA -`USERS_ROUTE`- la trae QC-67 (R9) con el mismo criterio y por la misma via. La NOVENA
+   * -`CUSTOMERS_ROUTE`- la trae QC-155 (R9) con el mismo criterio y por la misma via.
    */
   const carpetasAutorizadas = [
     ORDERS_ROUTE,
@@ -202,6 +212,8 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     FORMULAS_ROUTE,
     // 2026-09-16: la lista de pedidos asignados pasa a montarse sobre la tabla compartida.
     ASSIGNED_ORDERS_ROUTE,
+    // 2026-09-25: la pantalla de clientes se monta sobre la tabla compartida (QC-155 R9).
+    CUSTOMERS_ROUTE,
   ].map(carpetaDeRuta)
 
   function carpetaDeRuta(ruta: string): string {
@@ -214,7 +226,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las ocho pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las nueve pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -222,15 +234,15 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las ocho pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion): migrar una novena es una decision, no un descuido (R29, R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las nueve pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes): migrar una decima es una decision, no un descuido (R29, R34)`,
         ).toBe(true)
         consumidores += 1
       }
     }
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
-    // TENSA con cada alta: hoy son OCHO pantallas autorizadas, asi que se exige al menos un
-    // consumidor por pantalla (2026-09-16; antes eran siete).
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(7)
+    // TENSA con cada alta: hoy son NUEVE pantallas autorizadas, asi que se exige al menos un
+    // consumidor por pantalla (2026-09-25; antes eran ocho).
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(8)
   })
 
   it('la pantalla de recetas SI consume la tabla compartida (R29)', () => {
