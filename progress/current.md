@@ -71,6 +71,7 @@ PR #118, merge `a738d81f`. Resumen en `progress/history.md`. **Deuda: T14, revis
 
 **QC-161** (backend) creada y sembrada: 11 decisiones (Maestro sin empresa, enmienda QC-47; nunca en el selector de roles) y 1 pregunta abierta (su login sin empresa en la sesion) en `specs/QC-161-rol-maestro/requirements.md`. **QC-162** (fullstack, bloqueada por QC-161) creada sin sembrar. Choca con QC-153/QC-142 en el catalogo de permisos: no en paralelo.
 **2026-09-25 · F0 parcial:** el board tenia QC-161 en *En revision* desde el spec del 2026-09-24 (`ec5802c2`, en la rama: R1-R35, 15 tasks, 7 preguntas) y el disco seguia en `pending`: pasa a `spec_ready`. **Cupo `backend` lleno (QC-131, QC-154, QC-169)**: tras aprobar, solo espera. Choca en el catalogo de permisos con **QC-168** (`empaque.modificar`, en curso); D3 ya escribe el recuento contra dev al implementar.
+**F1.4 APROBADO el 2026-09-25** con enmienda del humano: **nombre de usuario unico en todo el sistema**, correo unico por empresa, el Maestro no se duplica (D13-D16; enmienda QC-47). Resto de preguntas con la propuesta (D17-D20). Spec R1-R44, T0-T14, `8e4d2cc1` en la rama (primer push de la rama). **Pendiente de confirmar:** R39, la migracion FALLA y lista los usuarios repetidos si ya hay duplicados entre empresas (y si esos nombres pueden salir en el log del build de Vercel). **Espera cupo `backend`** (QC-131, QC-154, QC-169). Condicion del PR: `SEED_MAESTRO_*` en Vercel (prod y preview) y en el `.env`; propuesta de usuario `plataforma.inicial`.
 
 ### QC-160 - CERRADA (2026-09-25)
 
