@@ -247,9 +247,18 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   }
 
   function handleNameBlur() {
+    // Un nombre ya invalido para reviewFormulaImport no puede chocar con nada: no vale la pena
+    // recomprobarlo, y evita disparar la accion con un valor que el servidor igual rechazaria.
+    if (issues.name !== 'ok') return;
+
     const requestId = ++clashCheckSeqRef.current;
     startCheckingName(async () => {
-      const result = await previewFormulaImportAction({ documentFileId, name });
+      let result: Awaited<ReturnType<typeof previewFormulaImportAction>>;
+      try {
+        result = await previewFormulaImportAction({ documentFileId, name });
+      } catch {
+        return;
+      }
       if (requestId !== clashCheckSeqRef.current) return;
       if (result.status === 'success') setNameClash(result.data.nameClash);
     });

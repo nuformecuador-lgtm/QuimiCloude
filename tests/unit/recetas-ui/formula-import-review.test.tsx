@@ -476,6 +476,40 @@ describe('el choque de nombre exige elegir antes de confirmar (R17, R21)', () =>
     });
     await waitFor(() => expect(screen.queryByTestId('formula-import-clash')).toBeNull());
   });
+
+  it('un nombre ya invalido no recomprueba el choque al perder el foco', async () => {
+    const user = setupUser();
+    renderReview({ ingredients: [ingredienteCompleto()] });
+
+    await user.clear(screen.getByTestId('formula-import-name'));
+    await user.tab();
+
+    expect(previewFormulaImportActionMock).not.toHaveBeenCalled();
+  });
+
+  it('un error de la accion al recomprobar el choque no rompe la pantalla', async () => {
+    const user = setupUser();
+    previewFormulaImportActionMock.mockRejectedValue(new Error('red caida'));
+
+    renderReview({
+      ingredients: [ingredienteCompleto()],
+      nameClash: { recipeId: 'receta-existente', recipeName: 'Detergente base' },
+    });
+
+    await user.click(screen.getByTestId('formula-import-clash-rename'));
+    await user.type(screen.getByTestId('formula-import-name'), ' nuevo');
+    await user.tab();
+
+    await waitFor(() => {
+      expect(previewFormulaImportActionMock).toHaveBeenCalledWith({
+        documentFileId: DOCUMENT_FILE_ID,
+        name: 'Detergente base nuevo',
+      });
+    });
+
+    // El choque previo se mantiene: la accion fallo, asi que no hay dato nuevo para reemplazarlo.
+    expect(screen.getByTestId('formula-import-clash-message')).toBeInTheDocument();
+  });
 });
 
 describe('la confirmacion escribe solo al confirmar y navega al resultado (R29)', () => {
