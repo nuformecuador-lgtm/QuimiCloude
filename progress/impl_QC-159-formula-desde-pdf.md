@@ -375,7 +375,7 @@ typecheck limpio · lint 0 errores
 
 | R | Test |
 |---|---|
-| R1 | `tests/unit/documentos-ui/formula-pdf-upload.test.tsx`; E2E `e2e/formula-desde-pdf.spec.ts` (sin verificar) |
+| R1 | `tests/unit/documentos-ui/formula-pdf-upload.test.tsx`; E2E `e2e/formula-desde-pdf.spec.ts` |
 | R2 | `tests/unit/recetas-ui/formula-import-page.test.tsx` (dos renders iguales); E2E |
 | R3 | `tests/unit/documentos/preview-formula-import.test.ts`; `formula-import-page.test.tsx` |
 | R4, R5, R6 | `tests/unit/documentos/formula-extraction.test.ts` |
@@ -408,8 +408,8 @@ typecheck limpio · lint 0 errores
 | R34 | `tests/unit/documentos-ui/formulas-upload.test.tsx` (sin `documentos.modificar` no hay botón; casos nombrados con los R de QC-107) y `document-upload-convenciones.test.ts` («las dos páginas que montan la pieza llaman a canUploadDocuments»). **No hay caso con `R34` en el nombre.** |
 | R35 | `tests/unit/documentos/qc159-alcance.test.ts`; `confirm-formula-import.test.ts` (sin `image`); `formula-import-review.test.tsx` |
 | R36, R37 | `qc159-alcance.test.ts` (rojo a mano probado, ver T12) |
-| R38 | `formula-import-review.test.tsx` (`min-h-11 min-w-11`, `text-base`, sin `hover:` como única vía); E2E en WebKit (sin verificar) |
-| R39 | `e2e/formula-desde-pdf.spec.ts` — **sin verificar** |
+| R38 | `formula-import-review.test.tsx` (`min-h-11 min-w-11`, `text-base`, sin `hover:` como única vía); E2E en WebKit |
+| R39 | `e2e/formula-desde-pdf.spec.ts` (Chromium y WebKit, verde el 2026-09-25) |
 
 ### Solapes con QC-168 / QC-138
 
@@ -425,3 +425,44 @@ typecheck limpio · lint 0 errores
 - `e2e/catalogo-desde-pdf.spec.ts` rojo en `dev` por QC-160 (le falta abrir el diálogo), no está en
   `tests/baseline-rojos.json`; comprobado que con el diálogo abierto pasa 2/2 con el doble de T10.
 - Borrar `QuimiCloude_QC159` al cerrar la feature; restaurar `.env` desde `.env.bak-QuimiCloude` si hace falta.
+
+## T11 — cierre (2026-09-25, tras liberar el leader el puerto 3117)
+
+- **Rojo de WebKit en `formula-desde-pdf.spec.ts:419`** (el aviso de choque no desaparece al renombrar).
+  **Causa**, confirmada con la traza y el log del servidor: en WebKit el `fill` del nombre ocurre antes
+  de que React termine de hidratar la página (llega pintada del servidor). El `input` no llega a
+  `onChange`, el estado se queda con el nombre leído, `handleNameBlur` recomprueba con el nombre viejo
+  (`previewFormulaImportAction({…,"name":"guion-e2e-formula-nombre"})`, única llamada tras reabrir) y el
+  siguiente render **devuelve el campo al nombre viejo** (snapshot tras `Tab`: valor
+  `guion-e2e-formula-nombre`, «Comprobando»). Es un fallo de la pantalla: un usuario de Safari que escriba
+  al abrir la página perdería el texto igual.
+- **Arreglo `42dbe083`** (frontend_dev): `handleNameBlur` lee el valor del DOM; si difiere del estado lo
+  sincroniza (y anula la elección de reemplazar) y recomprueba con ese valor; la guarda de nombre
+  inválido usa `createRecipeSchema.shape.name` sobre el valor del DOM. Dos casos nuevos en
+  `formula-import-review.test.tsx` (texto entrado sin `input`/`change` + `blur` ⇒ recomprueba con el
+  valor nuevo, quita el aviso y el campo lo conserva; DOM vacío ⇒ no recomprueba). El test E2E **no** se
+  cambió. Aviso: cualquier otro campo controlado de la pantalla (descripción, porcentajes) puede perder
+  lo tecleado antes de hidratar; no se tocó (es el comportamiento general de React en el repo).
+
+```
+vitest run tests/unit/recetas-ui                                     14 archivos, 298 verdes
+$ pnpm exec playwright test e2e/formula-desde-pdf.spec.ts --workers=1 --reporter=line
+  [1/2] [chromium] … [2/2] [webkit] …   2 passed (44.4s)
+$ pnpm exec playwright test e2e/documentos.spec.ts --workers=1 --reporter=line
+  6 passed (1.0m)
+Puerto 3117: libre antes y después de cada corrida (sin `next dev` ni Playwright vivos).
+```
+
+## Cierre de las tandas 2 y 3 — `./init.sh --rapido` (sobre `42dbe083`)
+
+```
+ Test Files  356 passed (356)
+      Tests  5098 passed | 49 skipped (5147)        (relacionados, incluida integración en base efímera)
+test-db: borrada la base de la corrida: qct_qc159_15d32d70_muhhubpf_dpo.
+ Test Files  51 passed (51)                          (todas las guardias)
+      Tests  647 passed | 11 skipped (658)
+✓ test:rapido paso · == init OK == · exit 0
+```
+
+Con esto R39 queda cubierto por `e2e/formula-desde-pdf.spec.ts` **verificado** en Chromium y WebKit.
+T14 queda a falta del `./init.sh` completo, que corre el leader.

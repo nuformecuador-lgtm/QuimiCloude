@@ -185,7 +185,7 @@ recorte ⇒ coordenadas; `e2e/documentos.spec.ts` y `e2e/catalogo-desde-pdf.spec
 
 ## Tanda 3 — extremo a extremo, alcance y cierre
 
-### T11 [ ] — E2E
+### T11 [x] — E2E
 Tras T9, T10. **Toca:** `e2e/formula-desde-pdf.spec.ts` (nuevo),
 `tests/guards/guard-identificador-de-request.test.ts` (lista de E2E),
 `tests/unit/shared/data-table-alcance.test.ts` (solo si el spec afirma filas de la tabla de fórmulas;
