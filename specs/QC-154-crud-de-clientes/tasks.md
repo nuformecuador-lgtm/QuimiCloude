@@ -268,7 +268,7 @@ aquí. El reviewer rechaza si falta uno (`CHECKPOINTS.md > Trazabilidad`).
 | R29 | `tests/integration/clientes/list-query-customers.int.test.ts` | `R29 — sin orden pedido ordena por apellidos y nombres y recorre las paginas sin repetir ni omitir` |
 | R30 | `tests/integration/clientes/list-query-customers.int.test.ts` | `R30 — cada palabra debe aparecer en nombres, apellidos o ciudad` *(F1.4: la parte de mayúsculas y comodines la cierra R41)* |
 | R31 | `tests/integration/clientes/list-query-customers.int.test.ts` | `R31 — el total describe el conjunto filtrado y el filtro se aplica antes de paginar` |
-| R32 | `tests/unit/clientes/customer-actions.test.ts` + `tests/unit/clientes/scope.test.ts` | `R32 — las mutaciones reciben FormData y las consultas argumentos tipados` + `R32 — no hay ningun route handler de clientes` |
+| R32 | `tests/unit/clientes/customer-actions.test.ts` | `R32 — las mutaciones reciben FormData y las consultas argumentos tipados` (el mismo caso cubre, en su punto 3, que no hay route handler propio ni `fetch` a una ruta interna) |
 | R33 | `tests/unit/clientes/customer-actions.test.ts` + `tests/guards/guard-catalogo-de-errores.test.ts` | `R33 — traduce cada error de dominio por su code estable, nunca por el texto` + guardia existente |
 | R34 | `tests/unit/errores/catalogo.test.ts` | `las 55 entradas estan, y cada codigo tiene exactamente una clave` + `R34 — customer_not_found tiene clave y texto no vacio` |
 | R35 | `tests/guards/guard-arquitectura-modulos.test.ts` + `tests/unit/clientes/scope.test.ts` | guardia existente + `R20 (QC-153), R35 (QC-154) — ningun archivo alcanzable desde el contrato declara 'use server'` y `… — lista cerrada de archivos del modulo` |

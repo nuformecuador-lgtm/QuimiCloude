@@ -1003,3 +1003,31 @@ declara y amplio exactamente lo de `design.md > 12`, y dejo escrito el riesgo de
 transitorio por concurrencia de workers -reproducido esta vez, no solo citado-, sin tocar el
 patron de `scope.test.ts` que el diseno exige. Un solo hallazgo de nomenclatura (R32, ver tabla),
 sin ningun requisito sin cubrir. T16 (gate completo) queda para el leader.
+
+## Anexo (cierre del hallazgo de R32)
+
+Se releyo el hallazgo de la fila 964 (segundo test de R32 inexistente con ese nombre literal en
+`scope.test.ts`) contra `design.md`. `design.md > 13` («Como se verifica») atribuye R32
+explicitamente a `tests/unit/clientes/customer-actions.test.ts` (fila `R7, R32, R33`) y a
+`tests/unit/clientes/scope.test.ts` **solo** `R35 (parte), R36, R37, R38, R40` -sin R32-, la misma
+lista que enumera `design.md > 11` para lo que esta ficha anade a `scope.test.ts`. `design.md`
+dice explicitamente que otro test (`customer-actions.test.ts`) cubre R32, asi que no se anadio el
+caso a `scope.test.ts`: se habria estado testeando una propiedad ya cubierta con un nombre que el
+propio diseno no pide ahi. Se corrigio la tabla de Trazabilidad de `tasks.md` (fila R32): ahora
+cita solo `tests/unit/clientes/customer-actions.test.ts` y su caso real
+(`R32 — las mutaciones reciben FormData y las consultas argumentos tipados`, que en su punto 3
+verifica que no exista `app/api/clientes` ni `app/api/customers` y que ninguna accion llame por
+`fetch`).
+
+Verificacion (sin tocar `scope.test.ts` ni ningun otro test):
+
+- `pnpm exec vitest run tests/unit/clientes/scope.test.ts` → 1 archivo, 21/21 en verde (sin
+  cambios).
+- `pnpm run typecheck` → sin salida, sin errores.
+- `pnpm run lint` → 0 errores, 7 warnings preexistentes en
+  `tests/unit/documentos/confirm-catalog-import.test.ts` y `tests/unit/pedidos/order-service.test.ts`
+  (archivos no tocados por este anexo).
+
+Archivos tocados en este anexo: `specs/QC-154-crud-de-clientes/tasks.md` (fila R32 de la tabla de
+Trazabilidad) y `progress/impl_QC-154-crud-de-clientes.md` (este anexo). Nada en
+`feature_list.json`, `progress/current.md` ni en ningun test.
