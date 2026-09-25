@@ -312,6 +312,59 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
     }
   });
 
+  it('un pedido cuyo lote quedo sin contenido de envase se omite, sin tumbar el resto', async () => {
+    const fixture = await sembrarFixture('2');
+    const orderIdSinContenido = await sembrarPedido(
+      fixture.empresa.companyId,
+      fixture.recipeId,
+      fixture.presentationId,
+    );
+    const orderIdConContenido = await sembrarPedido(
+      fixture.empresa.companyId,
+      fixture.recipeId,
+      fixture.presentationId,
+    );
+    let productId: string | null = null;
+
+    try {
+      const sinContenido = await recibir(fixture.empresa.companyId, {
+        orderId: orderIdSinContenido,
+        recipeId: fixture.recipeId,
+        presentationId: fixture.presentationId,
+        orderQuantity: '4',
+        lotCost: '4',
+        actorId: fixture.empresa.userId,
+      });
+      productId = sinContenido.productId;
+      // Simula un lote cuyo contenido de envase se perdio: el CHECK del esquema no lo impide
+      // (`packageContent` es opcional), asi que este caso puede darse en datos reales.
+      await prisma.productBatch.updateMany({
+        where: { productId: sinContenido.productId },
+        data: { packageContent: null },
+      });
+
+      const conContenido = await recibir(fixture.empresa.companyId, {
+        orderId: orderIdConContenido,
+        recipeId: fixture.recipeId,
+        presentationId: fixture.presentationId,
+        orderQuantity: '6',
+        lotCost: '6',
+        actorId: fixture.empresa.userId,
+      });
+      expect(conContenido.productId).toBe(productId);
+
+      const receipts = await findFinishedGoodsReceipts(
+        [orderIdSinContenido, orderIdConContenido],
+        fixture.empresa.companyId,
+      );
+
+      expect(receipts).toEqual([{ orderId: orderIdConContenido, packages: '3' }]);
+    } finally {
+      if (productId !== null) await limpiarProducto(productId);
+      await limpiarFixture(fixture, [orderIdSinContenido, orderIdConContenido]);
+    }
+  });
+
   it('con una lista vacia de pedidos no consulta la base y devuelve una lista vacia', async () => {
     const antes = await prisma.inventoryMovement.count({ where: { kind: 'production' } });
 

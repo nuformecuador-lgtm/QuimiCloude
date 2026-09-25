@@ -1099,7 +1099,8 @@ async function findProductionMovements(
  * Implementa `ProductCatalog['findFinishedGoodsReceipts']`: los envases que de verdad entraron
  * por cada pedido, leidos del asiento `production` -uno por pedido, porque el Finalizar solo se
  * escribe una vez- y divididos por el contenido guardado en su lote. Un `orderId` sin ese
- * asiento, o de otra empresa, simplemente no aparece en la respuesta.
+ * asiento, con lote sin contenido de envase, o de otra empresa, simplemente no aparece en la
+ * respuesta: quien compone la fila del pedido trata la ausencia como `packages: null`.
  *
  * No exige `inventario.consultar`: quien llama ya autorizo con su propio permiso. Por eso NO es
  * un caso de uso de `inventario`, sino una lectura directa que `asignaciones` compone dentro de
@@ -1113,12 +1114,10 @@ export async function findFinishedGoodsReceipts(
 
   const rows = await findProductionMovements(orderIds, { companyId });
 
-  return rows.map((row) => {
-    if (row.orderId === null || row.batch.packageContent === null) {
-      throw new Error(
-        'findFinishedGoodsReceipts: asiento production sin pedido o sin contenido de envase guardado en el lote',
-      );
-    }
-    return { orderId: row.orderId, packages: packagesFromReceipt(row.quantity, row.batch.packageContent) };
-  });
+  return rows
+    .filter(
+      (row): row is typeof row & { orderId: string; batch: { packageContent: Prisma.Decimal } } =>
+        row.orderId !== null && row.batch.packageContent !== null,
+    )
+    .map((row) => ({ orderId: row.orderId, packages: packagesFromReceipt(row.quantity, row.batch.packageContent) }));
 }
