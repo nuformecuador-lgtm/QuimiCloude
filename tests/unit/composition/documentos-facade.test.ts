@@ -51,7 +51,7 @@ vi.mock('@/lib/modules/documentos/adapters/driven/storage/document-storage-memor
 import { documentos } from '@/lib/composition';
 
 describe('documentos — la fachada expone la lectura con IA (fachada cableada)', () => {
-  it('R21 — expone exactamente las doce claves del censo, y cada una con la forma que promete', () => {
+  it('R21 — expone exactamente las catorce claves del censo, y cada una con la forma que promete', () => {
     // 2026-09-18 (QC-111, `@upstash/qstash` y su Route Handler ya aprobados): el procesamiento en
     // cola suma cuatro claves legitimas al censo -- `enqueueBatch`, `getBatchStatus`,
     // `queueSignature` y `runDocumentJob` --. La lista sigue siendo un censo CERRADO comparado con
@@ -60,10 +60,15 @@ describe('documentos — la fachada expone la lectura con IA (fachada cableada)'
     //
     // 2026-09-24 (importacion de catalogo desde PDF): suma `previewCatalogImport` y
     // `confirmCatalogImport`, los dos casos de uso de la revision. El censo sigue CERRADO.
+    //
+    // 2026-09-25 (QC-159, importacion de formula desde PDF): suma `previewFormulaImport` y
+    // `confirmFormulaImport`, los dos casos de uso de esta revision.
     expect(Object.keys(documentos).sort()).toEqual(
       [
         'confirmCatalogImport',
+        'confirmFormulaImport',
         'previewCatalogImport',
+        'previewFormulaImport',
         'convertPdfs',
         'downloadDocument',
         'enqueueBatch',

@@ -143,6 +143,17 @@ export const E2E_ESPERADOS = [
   'documentos.spec.ts',
   'ejecucion-receta.spec.ts',
   'errores.spec.ts',
+  // Alta el 2026-09-25 (QC-159) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO
+  // se relaja -el archivo se nombra, uno a uno-. Lo que ejercita: sube un PDF de formula desde
+  // el listado de formulas, abre su revision, preselecciona un ingrediente, crea otro como
+  // materia prima, rellena un porcentaje que llego vacio hasta sumar 100 %, edita los pasos,
+  // ve el aviso de choque de nombre con una receta sembrada, reemplaza y confirma; y luego
+  // reabre la misma revision, cambia el nombre y confirma para crear una receta nueva sin tocar
+  // la reemplazada. NO ejercita el cruce borde -> accion del identificador de peticion: el spec
+  // no lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
+  // sigue INTACTO.
+  'formula-desde-pdf.spec.ts',
   'grupos-de-trabajo.spec.ts',
   'inventario.spec.ts',
   'login-skin.spec.ts',

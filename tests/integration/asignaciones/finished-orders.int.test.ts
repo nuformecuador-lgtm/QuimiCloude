@@ -99,6 +99,9 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
         findIdsMatchingName: async () => {
           throw new Error('QC-145: listFinishedOrders no busca recetas por nombre');
         },
+        findAliveByNormalizedName: async () => {
+          throw new Error('QC-145: listFinishedOrders no busca la receta viva por su nombre');
+        },
       },
       people: assignmentDirectoryPrisma,
       presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },

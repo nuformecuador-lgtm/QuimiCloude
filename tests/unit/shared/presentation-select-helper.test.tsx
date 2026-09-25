@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 
-import { PresentationSelect } from '@/components/shared/presentation-select';
+import { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 
 import { setupUser } from '../../helpers/user-event';
 
@@ -91,5 +91,43 @@ describe('PresentationSelect · ayuda de la etiqueta', () => {
 
     const texto = await screen.findByTestId('presentation-helper-text', {}, { timeout: 3_000 });
     expect(texto).toHaveTextContent(HELPER_TEXT);
+  });
+});
+
+/**
+ * Boton de borrar del combobox (pedido humano, sin ficha SDD): la X permite vaciar de un golpe
+ * lo escrito y lo elegido, sin tener que borrar el texto letra a letra.
+ */
+describe('PresentationSelect · boton de borrar', () => {
+  it('no aparece con el campo vacio', () => {
+    render(<PresentationSelect />);
+
+    expect(screen.queryByTestId('presentation-select-clear')).toBeNull();
+  });
+
+  it('aparece con una presentacion ya elegida', () => {
+    render(
+      <PresentationSelect defaultValue="presentacion-1" defaultLabel="Galon 20L" />,
+    );
+
+    const borrar = screen.getByTestId('presentation-select-clear');
+    expect(borrar).toHaveAccessibleName('Borrar presentación');
+  });
+
+  it('pulsarla vacia el texto y el campo oculto del formulario', async () => {
+    const user = setupUser();
+
+    render(
+      <form data-testid="formulario">
+        <PresentationSelect defaultValue="presentacion-1" defaultLabel="Galon 20L" />
+      </form>,
+    );
+
+    await user.click(screen.getByTestId('presentation-select-clear'));
+
+    expect(screen.getByTestId('presentation-select')).toHaveValue('');
+    const enviado = new FormData(screen.getByTestId('formulario') as HTMLFormElement);
+    expect(enviado.get(PRESENTATION_FIELD)).toBe('');
+    expect(screen.queryByTestId('presentation-select-clear')).toBeNull();
   });
 });

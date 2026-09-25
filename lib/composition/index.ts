@@ -60,6 +60,7 @@ import {
   createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
+  createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
@@ -73,6 +74,7 @@ import {
 import {
   findCostingBatches,
   findProductRefs,
+  findProductsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
@@ -109,6 +111,7 @@ import type {
   OrderNumberDirectory,
   PresentationCatalog,
   ProductCatalog,
+  ProductNameLookup,
   ReservationQueries,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
@@ -224,6 +227,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
   createRecipeExecutionReader,
+  findAliveRecipeByNormalizedName,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -335,6 +339,7 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
 import {
   createConfirmCatalogImport,
+  createConfirmFormulaImport,
   createConvertPdfs,
   createCropCatalogImages,
   createDownloadDocument,
@@ -343,10 +348,12 @@ import {
   createIssueReadLink,
   createIssueUploadLinks,
   createPreviewCatalogImport,
+  createPreviewFormulaImport,
   createProcessPdfByStrategy,
   createReadPdfWithAi,
   createRunDocumentJob,
   type CatalogImportDeps,
+  type FormulaImportDeps,
 } from '@/lib/modules/documentos';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
@@ -773,6 +780,7 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  */
 export const inventario = {
   createProduct: createCreateProduct({ products: productRepository }),
+  createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
   getProduct: createGetProduct({ products: productRepository }),
@@ -817,6 +825,12 @@ const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingB
 const presentationCatalog: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,
+};
+
+/** `ProductNameLookup` cableado con el adaptador driven DE INVENTARIO: resolucion de
+ *  ingredientes POR NOMBRE. Interfaz propia, no un metodo mas de `ProductCatalog`. */
+const productNameLookup: ProductNameLookup = {
+  findAliveByNormalizedNames: findProductsByNormalizedNames,
 };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
@@ -1017,6 +1031,7 @@ const recipeCatalog: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
 
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
@@ -1534,6 +1549,26 @@ const previewCatalogImport = createPreviewCatalogImport(catalogImportDeps);
 const confirmCatalogImport = createConfirmCatalogImport(catalogImportDeps);
 
 /**
+ * Compartido por la vista previa y la confirmacion de una importacion de formula.
+ * `recipeCatalog` y `productCatalog` son los MISMOS que ya usan `recetas` y `pedidos`
+ * mas arriba -dos instancias del mismo puerto serian dos cableados que pueden divergir-;
+ * `inventario.createRawMaterial`, `recetas.createRecipe` y `recetas.updateRecipe` son los
+ * casos de uso ya cableados en sus propias fachadas.
+ */
+const formulaImportDeps: FormulaImportDeps = {
+  repository: documentBatchRepository,
+  recipes: recipeCatalog,
+  products: productCatalog,
+  productNames: productNameLookup,
+  createRawMaterial: inventario.createRawMaterial,
+  createRecipe: recetas.createRecipe,
+  updateRecipe: recetas.updateRecipe,
+};
+
+const previewFormulaImport = createPreviewFormulaImport(formulaImportDeps);
+const confirmFormulaImport = createConfirmFormulaImport(formulaImportDeps);
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1587,6 +1622,10 @@ export const documentos = {
   // de arriba. Claves NUEVAS al final: ninguna de las de arriba se toca.
   previewCatalogImport,
   confirmCatalogImport,
+  // Las DOS operaciones de la revision de formula, ya cableadas con
+  // `formulaImportDeps` de arriba. Claves NUEVAS al final, mismo criterio.
+  previewFormulaImport,
+  confirmFormulaImport,
 } as const;
 
 // ---------------------------------------------------------------------------------------

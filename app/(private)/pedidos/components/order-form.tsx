@@ -612,11 +612,23 @@ export function OrderForm({
             />
 
             {/*
-              Cantidad, presentacion y prioridad EN UNA FILA (decision humana): `flex` que en
-              angosto se apila -movil primero (R45)- y en `sm` o mas ancho pone los tres campos
-              lado a lado, cada uno creciendo por igual (`flex-1`).
+              Presentacion, cantidad y prioridad EN UNA FILA (decision humana): rejilla de 12
+              columnas que en angosto se apila -movil primero (R45)- y en `sm` o mas ancho reparte
+              presentacion (6), cantidad (3) y prioridad (3), en ese orden.
             */}
-            <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+              {/*
+                Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo
+                elegir una existente del catalogo.
+              */}
+              <div className="sm:col-span-6">
+                <PresentationSelect
+                  defaultValue={initialValue(PRESENTATION_FIELD, order?.presentationId ?? '')}
+                  defaultLabel={order?.presentationName ?? ''}
+                  error={fieldErrors.presentationId}
+                />
+              </div>
+
               {/*
                 Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
                 `step="any"` para que el decimal no choque contra el paso entero por defecto, y
@@ -628,7 +640,7 @@ export function OrderForm({
                 humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
                 sus decimales. El `FormData` viaja con el valor ya colocado.
               */}
-              <div className="sm:flex-1">
+              <div className="sm:col-span-3">
                 <OrderField
                   name="quantity"
                   label={FIELD_LABELS.quantity}
@@ -647,20 +659,8 @@ export function OrderForm({
                 />
               </div>
 
-              {/*
-                Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo
-                elegir una existente del catalogo.
-              */}
-              <div className="sm:flex-1">
-                <PresentationSelect
-                  defaultValue={initialValue(PRESENTATION_FIELD, order?.presentationId ?? '')}
-                  defaultLabel={order?.presentationName ?? ''}
-                  error={fieldErrors.presentationId}
-                />
-              </div>
-
               {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
-              <div className="sm:flex-1">
+              <div className="sm:col-span-3">
                 <SelectField
                   name="priority"
                   label={FIELD_LABELS.priority}
