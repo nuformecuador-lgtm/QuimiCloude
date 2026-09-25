@@ -59,9 +59,9 @@ const IGNORED_DIRS = new Set(['node_modules', '.next', '.git', '.prisma', 'dist'
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 
-/** Los cinco modulos de negocio: el alcance de la comprobacion de contrato sobre barriles y
+/** Los seis modulos de negocio: el alcance de la comprobacion de contrato sobre barriles y
  * Server Actions. `identity` queda fuera a proposito: es el dueño del catalogo y del seed. */
-const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos'];
+const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos', 'clientes'];
 
 /**
  * Los tres modelos de Prisma que este catalogo declara intocables desde la aplicacion, con el

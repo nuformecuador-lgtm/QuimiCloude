@@ -147,7 +147,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       *Depende de:* T7, T9. **Hecho cuando:** `guard-arquitectura-modulos` pasa y el contrato no
       arrastra `'use server'`, Prisma ni `next/*` (R35).
 
-- [ ] **T12 — Server Actions.** `adapters/driving/customer-actions.ts` (`design.md > 9`), y en el
+- [x] **T12 — Server Actions.** `adapters/driving/customer-actions.ts` (`design.md > 9`), y en el
       mismo commit la fila `listCustomersAction` en `ACCIONES` de
       `tests/unit/identity/session-once-per-request-actions.test.ts`, más `'clientes'` en
       `BUSINESS_MODULES` de `guard-permisos-no-administrables` y en `MODULOS_DE_NEGOCIO` de

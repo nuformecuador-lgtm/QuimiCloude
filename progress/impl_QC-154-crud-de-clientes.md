@@ -686,3 +686,67 @@ $ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts tests/gua
   → guard-ambito-empresa-clientes ya no falla por «lib/composition no ata customerRepository»:
     el cableado existe desde este commit.
 ```
+
+## T12 — Server Actions
+
+- `lib/modules/clientes/adapters/driving/customer-actions.ts`: cinco Server Actions
+  (`createCustomerAction`, `updateCustomerAction`, `deleteCustomerAction`, `getCustomerAction`,
+  `listCustomersAction`), calcadas de `supplier-actions.ts`. `currentActor()` resuelve las dos
+  caras de la sesión con un único `runInRequestScope(() => Promise.all([...]))`. La baja rechaza
+  un `id` vacío del `FormData` con `invalid_input` **sin** llamar al caso de uso. El traductor
+  único es `createErrorStateTranslator(ClientesError, observabilidad.readRequestIdHeader)`. La
+  action no repite ninguna comprobación de permiso ni ninguna regla de negocio.
+- En el mismo commit: fila `listCustomersAction` en `ACCIONES` de
+  `tests/unit/identity/session-once-per-request-actions.test.ts`; `'clientes'` en
+  `BUSINESS_MODULES` de `tests/guards/guard-permisos-no-administrables.test.ts`; `'clientes'` en
+  `MODULOS_DE_NEGOCIO` de `tests/guards/guard-identificador-de-request.test.ts`.
+- `tests/unit/clientes/customer-actions.test.ts` (nuevo): R7, R32, R33, más el caso R22 (QC-59)
+  heredado del patrón de `proveedores` (falta de cualquiera de las dos caras de sesión).
+- Los dos rojos esperados de `tests/unit/clientes/scope.test.ts` (lista cerrada de archivos y
+  `adapters/driving/` exacto) quedan **verdes** sin relajar ningún test: `customer-actions.ts` es
+  ahora exactamente el único archivo de `adapters/driving/`.
+
+### Verificación de T12
+
+```
+$ pnpm exec next typegen && pnpm run typecheck
+✓ Types generated successfully
+> tsc --noEmit
+(sin salida — 0 errores)
+
+$ pnpm run lint
+✖ 7 problems (0 errors, 7 warnings)   ← preexistentes, ajenos a esta tanda
+  (tests/unit/documentos/confirm-catalog-import.test.ts, tests/unit/pedidos/order-service.test.ts)
+
+$ pnpm exec vitest run tests/unit/clientes/customer-actions.test.ts
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+$ pnpm exec vitest run tests/unit/clientes/scope.test.ts tests/guards/guard-ambito-empresa-clientes.test.ts \
+  tests/guards/guard-permisos-no-administrables.test.ts tests/guards/guard-identificador-de-request.test.ts \
+  tests/unit/identity/session-once-per-request-actions.test.ts
+ Test Files  5 passed (5)
+      Tests  121 passed (121)
+  → una corrida aislada dio un rojo transitorio en guard-permisos-no-administrables: un ENOENT al
+    leer lib/modules/clientes/__sensibilidad_literal__.ts, el fabricado que scope.test.ts crea y
+    borra en su propio caso. Es una condicion de carrera entre workers de vitest leyendo el mismo
+    arbol de archivos a la vez (no una regresion de esta tanda): repetido tres veces mas y en
+    solitario, siempre 121/121 en verde.
+
+$ pnpm exec vitest run tests/guards/guard-catalogo-de-errores.test.ts tests/guards/guard-autorizacion-por-permiso.test.ts \
+  tests/guards/guard-contrato-listados.test.ts tests/guards/guard-arquitectura-modulos.test.ts
+ Test Files  4 passed (4)
+      Tests  129 passed (129)
+
+$ pnpm exec vitest run tests/unit/clientes
+ Test Files  10 passed (10)
+      Tests  84 passed (84)
+  → los dos rojos de T4/T9 (lista cerrada de archivos, adapters/driving/ exacto) quedan verdes.
+```
+
+## Veredicto (tanda T9/T10/T11/T12)
+
+T9, T10, T11 y T12 cerradas y verificadas con evidencia real, cada una en su propio commit.
+Ningún rojo pendiente propio de esta tanda; el único rojo observado (`guard-permisos-no-
+administrables` leyendo el fabricado temporal de `scope.test.ts`) es un flake de concurrencia
+entre workers, reproducido y descartado corriendo la misma batería en solitario tres veces.

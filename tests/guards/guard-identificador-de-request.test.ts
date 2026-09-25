@@ -433,6 +433,7 @@ export const MODULOS_DE_NEGOCIO = [
   'proveedores',
   'recetas',
   'unidades',
+  'clientes',
 ] as const
 
 export const TODOS_LOS_MODULOS = [...MODULOS_DE_NEGOCIO, 'errores', 'observabilidad'] as const
