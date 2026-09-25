@@ -137,6 +137,6 @@ Tras T12, T13, T14. **Toca:** `e2e/empaque.spec.ts` (nuevo), `e2e/ejecucion-rece
 `e2e/pedidos-asignados.spec.ts`.
 **Hecho cuando:** recorrido de R48 verde y los E2E existentes adaptados a Finalizar → Por empacar.
 
-### T17 [ ] — Gate completo y trazabilidad
+### T17 [x] — Gate completo y trazabilidad
 Tras todas. **Toca:** `progress/impl_QC-168-estado-por-empacar.md`.
 **Hecho cuando:** `./init.sh` verde; mapa `R1..R48 → test` completo.

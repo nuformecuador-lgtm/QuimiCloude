@@ -370,3 +370,9 @@ T9 completa: `findFinishedGoodsReceipts` implementado, cableado, acotado por emp
 (`guard-ambito-empresa-inventario` verde), con test unitario e integración nuevos y typecheck/lint
 en verde; el efecto colateral en dobles de `ProductCatalog` fuera de `inventario` quedó resuelto
 sin tocar código de producción de `pedidos`/`asignaciones`/`app`.
+
+## T17 — gate completo (leader, 2026-09-25)
+
+`./init.sh` completo en `867e9c9f` (tras el merge de origin/dev): **verde**. 755/755 archivos, 10312 tests
+(122 omitidos), baseline vacío, sin rojos nuevos; todas las migraciones con `down.sql`. E2E de empaque,
+ejecucion-receta, producto-terminado, reserva-de-material y pedidos-terminados: 20/20 (Chromium+WebKit).
