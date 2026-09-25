@@ -20,6 +20,10 @@
 
 ## Evaluaciones
 
+### QC-169 - F1.0 (2026-09-25)
+
+`backend`, **`complexity: low`**. Arreglo del rojo de dev (`catalog-import-isolation`, choque QC-158 x QC-142). Decisiones ya cerradas por el humano en el issue (confirmar exige `proveedores.modificar`; se corrige codigo, no tests; quitar la entrada de baseline que puso QC-150). Sin `/afinar-feature`: no quedan huecos. Cupo `backend` 3 de 3 (QC-131 humana, QC-154). Worktree montado.
+
 ### QC-138 - F1.0 y F1.1 (2026-09-25)
 
 **`arranca 138` del humano.** Worktree desde `origin/dev` (`51fdf5b6`, trae QC-150, QC-160 y el F1.0 de QC-168). `zone:fullstack` y `complexity:high` ya evaluadas y en el board; no se parte. `depends_on` QC-123 y QC-141, las dos `done`. **Cupo `fullstack`: 1 de 3 en curso** (QC-168 en F1.2, esta en F1.0).
