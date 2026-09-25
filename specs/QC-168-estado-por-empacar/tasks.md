@@ -131,7 +131,7 @@ sin exportaciones perdidas (R42).
 **NO toca** `specs/QC-82-…` (R45).
 **Hecho cuando:** cada requisito de `design.md > 8` lleva nota «Enmendado el <fecha> por QC-168».
 
-### T16 [ ] — E2E
+### T16 [x] — E2E
 Tras T12, T13, T14. **Toca:** `e2e/empaque.spec.ts` (nuevo), `e2e/ejecucion-receta.spec.ts`,
 `e2e/producto-terminado.spec.ts`, `e2e/reserva-de-material.spec.ts`, `e2e/pedidos-terminados.spec.ts`,
 `e2e/pedidos-asignados.spec.ts`.

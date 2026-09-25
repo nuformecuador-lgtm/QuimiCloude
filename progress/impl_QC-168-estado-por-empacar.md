@@ -30,7 +30,7 @@ Rama `feature/QC-168-estado-por-empacar`, worktree `.worktrees/QC-168-estado-por
 | T13 pantalla de empaque | [x] | `41b82a9b` |
 | T12 pestaña «Por empacar» | [x] | `bba94fd1` |
 | censos de `lib/shared/routes.ts` | — | `fb9f331b` |
-| T16 E2E **escrito, sin correr** | [ ] | `24b1d6d1` |
+| T16 E2E (20/20 Chromium+WebKit, corridos por el leader) | [x] | `24b1d6d1`, `d399f622` |
 | tests de límites R44/R45 (5/5 verdes) + esta bitácora | — | último commit de la rama |
 | T17 gate completo | [ ] | lo corre el leader |
 
@@ -101,8 +101,8 @@ QC-150 R10/R13/R24/R26/R27/R37; QC-145 R3/R30; QC-74 R3/R8; QC-144 R9; `docs/arc
 | R42 | `unit/pedidos-ui/order-row-actions.test.tsx` |
 | R43 | `unit/asignaciones-ui/packing-order-page.test.tsx` › R43; `packing-orders-{columns,list-section}.test.tsx` |
 | R44, R45 | `unit/asignaciones/packing-limits.test.ts` |
-| R46, R47 | `unit/pedidos/schema/order-packing-states-migration.test.ts` (sin tabla nueva; guardia `RAISE` y recreación literal en `down.sql`); ciclo real anotado en «Base de datos» |
-| R48 | `e2e/empaque.spec.ts` (**escrito, sin correr**) |
+| R46, R47 | `unit/pedidos/schema/order-packing-states-migration.test.ts` (sin tabla nueva; guardia `RAISE` y recreación literal en `down.sql`); `integration/pedidos/order-packing-states-rollback.int.test.ts` › R47 (el `down.sql` real aborta contra Postgres con pedidos en `POR_EMPACAR` y en `EN_EMPAQUE`, y el esquema queda intacto); ciclo real anotado en «Base de datos» |
+| R48 | `e2e/empaque.spec.ts` (verde, lo corrió el leader) |
 
 ## Salida real de los tests
 
@@ -118,7 +118,7 @@ QC-150 R10/R13/R24/R26/R27/R37; QC-145 R3/R30; QC-74 R3/R8; QC-144 R9; `docs/arc
   - `tests/unit/configuracion-ui/user-table.test.tsx` › «la accion de editar… (R26)»: un `findByTestId` que vence
     por tiempo bajo carga. En solitario pasa **27/27 tres veces seguidas** y pasó en el `--rapido` #2. La rama no
     toca `configuracion`. Intermitente y ajeno.
-- E2E: **sin correr** (lo corre el leader): `e2e/empaque.spec.ts` y los adaptados `ejecucion-receta`,
+- E2E: **corridos por el leader, 20/20 en Chromium y WebKit**, antes de `6c5a6967`/`d399f622` (que no tocan UI): `e2e/empaque.spec.ts` y los adaptados `ejecucion-receta`,
   `producto-terminado`, `reserva-de-material` y `pedidos-terminados` (`pedidos-asignados` revisado, sin cambios).
 
 ## Decisiones de implementación y puntos abiertos
@@ -126,7 +126,7 @@ QC-150 R10/R13/R24/R26/R27/R37; QC-145 R3/R30; QC-74 R3/R8; QC-144 R9; `docs/arc
 - **D-1 `packedById` en `PackingOrderRow`.** R17 exige distinguir «a su nombre» de «a nombre de otro», y la fila
   solo traía el nombre. Se expone el id que ya existía (`AssignedOrderSummary.packedBy`) y la pantalla compara
   por id, nunca por nombre. Es contrato interno: no cambia ningún requisito.
-- **A-1 [RESUELTO 2026-09-25] Finalizar sobre `PENDIENTE` responde `order_not_found`** (`finish-assigned-order.ts`, `assertFinishable`).
+- **A-1 [RESUELTO 2026-09-25] Finalizar sobre `PENDIENTE` responde `invalid_transition`** (`finish-assigned-order.ts`, `assertFinishable`).
   `design.md > 2` pide rechazar sin llamar a `transitionAliveById`, pero **no dice con qué error**. Para
   `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` se usa el error propio de cada estado; para `PENDIENTE`
   el subagente eligió `order_not_found`, porque abrir la pantalla ya lo pasa a `EN_CURSO` y solo se llega ahí
@@ -135,6 +135,30 @@ QC-150 R10/R13/R24/R26/R27/R37; QC-145 R3/R30; QC-74 R3/R8; QC-144 R9; `docs/arc
 - **A-2 Comenzar, tras éxito, revalida la pantalla del pedido y no redirige.** El spec solo fija el destino de Terminar.
 - `list-company-orders.ts` («Todos» sin filtro) pasa a `ORDER_STATUS_FLOW`, como pide `design.md > 1.1`,
   aunque no estaba en el «Toca» de ninguna task.
+
+## Vuelta 2 (2026-09-25, tras la review RECHAZADA de `26d7ca5b`)
+
+| Hallazgo | Cierre | Commit |
+|---|---|---|
+| **Bloqueante 1** citas en comentarios (19 archivos) | Quitadas todas las citas `R<n>`, `QC-<n> T<n>`, `design.md > n`, `D<n>`, `A-1` de las líneas añadidas por la rama; se deja el porqué en palabras donde aportaba. Solo comentarios. `git diff -U0 07b784ad..HEAD -- app lib db` filtrado por esas citas: **0 líneas**. Las citas de filas preexistentes de `order-state.ts` que la rama no toca se dejan (regla de no arrastrar) | `b909aad4` (app/), `cd479b47` (lib/, db/) |
+| menor 1 estado en disco | T16 `[x]` en `tasks.md`; T17 sigue `[ ]` (gate completo del leader). Bitácora: E2E corregido a «20/20 Chromium+WebKit por el leader», título de A-1 a `invalid_transition` | commit de esta bitácora |
+| menor 2 comentarios falsos de `packed_by` | `db/schema.prisma`, `order-catalog.ts` (`AssignedOrderSummary.packedBy`) y `migration.sql` dicen ahora lo que hace el CHECK: obligatorio en `EN_EMPAQUE`, NULL en `PENDIENTE`/`EN_CURSO`/`POR_EMPACAR`/`CANCELADO`, opcional en `ENTREGADO`. Tocar `migration.sql` cambia su checksum: se actualizó a mano la fila de `_prisma_migrations` **solo en `QuimiCloude_QC168`** (base propia); `prisma migrate status` sigue «up to date» y la plantilla de tests se regeneró por huella | `cd479b47` |
+| menor 3 comentario de «Todos» con `ORDER_STATUS_FLOW` | Comentario reescrito: el array solo alimenta el `IN`; el orden lo decide `resolveOrdering`. Sin cambio de código | `cd479b47` |
+| menor 4 `findFinishedGoodsReceipts` lanzaba | El adaptador omite los asientos sin `orderId` o sin `packageContent` en el lote, y la fila sale con `packages: null` (`packing-order-view.ts` ya traduce la ausencia). Caso nuevo en `integration/inventario/finished-goods-receipts.int.test.ts` (6/6) | `b36630db` |
+| menor 5 R47 solo estático | Test nuevo `integration/pedidos/order-packing-states-rollback.int.test.ts` (registrado en `aislamiento.json`, categoría `transaccion`): ejecuta el bloque de guardia del `down.sql` real en la base efímera de la corrida, dentro de una transacción con SAVEPOINT que acaba en ROLLBACK; con un pedido en `POR_EMPACAR` y con otro en `EN_EMPAQUE` aborta con «ROLLBACK ABORTADO» y el enum y `packed_by` siguen intactos. 2/2. No toca `QuimiCloude` ni `QuimiCloude_QC168` | `9baeb71b` |
+| menor 6 sesión una vez por request | Dos casos nuevos en `unit/identity/session-once-per-request-render.test.tsx`: sección `por_empacar` de `/asignacion` y pantalla `/asignacion/empaque/[id]`. Aislado 9/9 | `4ed0253b` |
+| menor 7 import no usado | Quitado `OrderNotFoundError` de `unit/asignaciones/finish-assigned-order.test.ts`; eslint 0 avisos | `cd479b47` |
+| menor 8 limpieza preexistente mezclada con código | Está en commits ya hechos (`43b509d6`, `3656a699`); no se reescribe historia. Se anota aquí para la revisión; en esta vuelta la limpieza fue en commits propios, solo comentarios | — |
+
+Salida real de los subagentes: typecheck limpio; eslint de todos los tocados 0/0; unit de dominio afectados 181/181;
+`tests/guards` 562 verdes, 5 skip (43 archivos); `finished-goods-receipts.int` 6/6; `order-packing-states-rollback.int` 2/2;
+`guard-aislamiento-integracion` 6/6; `session-once-per-request-render` 9/9 aislado.
+
+`./init.sh --rapido` #4 (HEAD `9baeb71b`): typecheck ✓, lint ✓, base `QuimiCloude_QC168` al día (55 migraciones);
+`Test Files 1 failed | 515 passed (516)`, `Tests 2 failed | 7382 passed | 62 skipped (7446)`, 1 unhandled rejection.
+Único rojo: `tests/integration/documentos/catalog-import-isolation.int.test.ts` (R21, R22) y su rechazo no
+capturado (`catalog-import-isolation.int.test.ts:274`): **baseline** (`tests/baseline-rojos.json`), lo arregla QC-169.
+`session-once-per-request-render` pasó. E2E no se repiten: esta vuelta no cambia UI.
 
 ---
 
