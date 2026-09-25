@@ -1,9 +1,11 @@
-// La guardia de alcance del modelo de clientes.
+// La guardia de alcance del modulo de clientes.
 //
-// Esta ficha es SOLO el modelo, el armazon del modulo y la enmienda al catalogo de permisos: sin
-// caso de uso, sin puerto con metodos, sin adaptador, sin Server Action, sin ruta, sin pantalla y
-// sin E2E. Eso llega mas adelante. Se censa el ARBOL DE ARCHIVOS y el TEXTO de produccion, no el
-// grafo de imports.
+// QC-153 la escribio cuando la ficha era SOLO el modelo, el armazon del modulo y la enmienda al
+// catalogo de permisos. QC-154 (`design.md > 11`) llena el modulo con los cinco casos de uso, el
+// puerto, el adaptador y la Server Action, asi que los casos que asumian un modulo vacio cambian
+// -uno a uno, y se anota cual- y se anaden los propios de esta ficha (R36, R37, R38, R40). Sigue
+// sin E2E (decision 7, R38 de QC-154). Se censa el ARBOL DE ARCHIVOS y el TEXTO de produccion, no
+// el grafo de imports.
 
 import {
   existsSync,
@@ -103,26 +105,55 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
     }
   })
 
-  it('ports y adapters estan vacios salvo su .gitkeep: ningun caso de uso, puerto ni adaptador todavia', () => {
-    for (const carpeta of ['ports', 'adapters']) {
-      const contenido = filesIn(join(moduloDir, carpeta))
-      expect(
-        contenido.map((ruta) => relative(moduloDir, ruta)),
-        `${carpeta} deberia estar vacia salvo .gitkeep`,
-      ).toEqual([join(carpeta, '.gitkeep')])
-    }
-    // domain solo tiene el tipo, sin caso de uso.
-    const domainFiles = filesIn(join(moduloDir, 'domain'), /\.tsx?$/)
-    expect(domainFiles.map((ruta) => relative(moduloDir, ruta))).toEqual([join('domain', 'customer.ts')])
+  it('R20 (QC-153), R35 (QC-154) — lista cerrada de archivos del modulo tras QC-154', () => {
+    // QC-153 exigia "domain solo tiene customer.ts" y "ports/adapters vacios salvo .gitkeep":
+    // esas dos aserciones son FALSAS a proposito desde QC-154 (`design.md > 11`), que llena el
+    // armazon con los cinco casos de uso, el puerto, el adaptador y la Server Action. Lo que las
+    // sustituye sigue siendo una lista CERRADA -sin ningun .gitkeep sobrante-: un archivo de mas
+    // o de menos la pone roja igual que antes.
+    const ARCHIVOS_ESPERADOS = [
+      'adapters/driven/persistence/company-scope.ts',
+      'adapters/driven/persistence/customer-prisma.ts',
+      'adapters/driven/persistence/list-query-sql.ts',
+      'adapters/driving/customer-actions.ts',
+      'domain/actor.ts',
+      'domain/create-customer.ts',
+      'domain/customer-id.ts',
+      'domain/customer-input.ts',
+      'domain/customer-queryable.ts',
+      'domain/customer-scope.ts',
+      'domain/customer-text.ts',
+      'domain/customer-view.ts',
+      'domain/customer.ts',
+      'domain/delete-customer.ts',
+      'domain/errors.ts',
+      'domain/get-customer.ts',
+      'domain/list-customers.ts',
+      'domain/list-query.ts',
+      'domain/page.ts',
+      'domain/update-customer.ts',
+      'index.ts',
+      'ports/customer-repository.ts',
+      'ports/list-query-log.ts',
+    ]
+    const archivosReales = filesIn(moduloDir, /\.tsx?$/)
+      .map((ruta) => relative(moduloDir, ruta).split(sep).join('/'))
+      .sort()
+    expect(archivosReales).toEqual(ARCHIVOS_ESPERADOS)
   })
 
-  it('ningun archivo alcanzable desde el contrato declara \'use server\'', () => {
+  it('R20 (QC-153), R35 (QC-154) — ningun archivo alcanzable desde el contrato declara \'use server\'', () => {
+    // Acotado (`design.md > 11`): antes barria TODO el modulo; desde QC-154 el modulo tiene una
+    // Server Action de verdad en adapters/driving/, que SI declara 'use server', y el contrato
+    // (index.ts) no la reexporta -no es "alcanzable desde el contrato"-.
     for (const archivo of filesIn(moduloDir, /\.tsx?$/)) {
+      const relativa = relative(moduloDir, archivo).split(sep).join('/')
+      if (relativa.startsWith('adapters/driving/')) continue
       const fuente = leer(archivo)
       const primeraLineaUtil = fuente.split('\n').find((line) => line.trim().length > 0) ?? ''
       expect(
         /^(['"])use server\1/.test(primeraLineaUtil.trim()),
-        `${archivo} no puede declarar 'use server' en esta ficha`,
+        `${archivo} no puede declarar 'use server' fuera de adapters/driving/`,
       ).toBe(false)
     }
   })
@@ -158,44 +189,64 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 
   const PERMISO_YA_CUBIERTO = 'lib/modules/identity/domain/permissions.ts'
 
-  /** El predicado real de R26: que archivos de produccion, fuera de permissions.ts, nombran los
-   *  dos literales de permiso. Lo usan el caso real y el caso «que muerde». */
+  /** Rutas de produccion donde el literal de permiso SI puede aparecer desde QC-154
+   *  (`design.md > 11`): `permissions.ts`, que ya lo cubria, y `lib/modules/clientes/domain/**`,
+   *  porque los cinco casos de uso nombran `'clientes.consultar'`/`'clientes.modificar'` en su
+   *  primera linea (R2, R3). Cualquier OTRO archivo de produccion sigue en rojo: `app/`,
+   *  `components/`, otro modulo o `adapters/` de clientes. */
+  function permisoPermitidoEn(relativo: string): boolean {
+    return relativo === PERMISO_YA_CUBIERTO || relativo.startsWith('lib/modules/clientes/domain/')
+  }
+
+  /** El predicado real de R26: que archivos de produccion, fuera de lo permitido, nombran los
+   *  dos literales de permiso. Lo usan el caso real y los casos «que muerde». */
   function detectarLiteralesDePermiso(): string[] {
     const PERMISOS_CLIENTES = /'clientes\.consultar'|'clientes\.modificar'/
     const hallazgos: string[] = []
     for (const relativo of fuentesDeProduccion()) {
-      if (relativo === PERMISO_YA_CUBIERTO) continue
+      if (permisoPermitidoEn(relativo)) continue
       const fuente = stripComments(leer(join(repoRoot, relativo)))
       if (PERMISOS_CLIENTES.test(fuente)) hallazgos.push(relativo)
     }
     return hallazgos
   }
 
-  it('el literal de los dos permisos solo aparece en permissions.ts', () => {
+  it('R26 (QC-153) — el literal de los dos permisos solo aparece en permissions.ts o en lib/modules/clientes/domain', () => {
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
-      'ningun archivo distinto de permissions.ts puede nombrar clientes.consultar/modificar ' +
-        '(QC-154 relaja esta regla al consumir los permisos): ' +
-        hallazgos.join(', '),
+      'ningun archivo distinto de permissions.ts o de lib/modules/clientes/domain/** puede ' +
+        'nombrar clientes.consultar/modificar: ' + hallazgos.join(', '),
     ).toEqual([])
   })
 
-  it('adapters/driving/ esta vacio: ningun caso de uso ni Server Action todavia', () => {
-    const driving = filesIn(join(moduloDir, 'adapters', 'driving'), /\.tsx?$/)
-    expect(
-      driving,
-      'no puede haber ningun archivo en adapters/driving/ en esta ficha (QC-154 relaja esta regla al consumir los permisos)',
-    ).toEqual([])
+  it('R26 (QC-153) — adapters/driving/ contiene exactamente customer-actions.ts', () => {
+    const driving = filesIn(join(moduloDir, 'adapters', 'driving'), /\.tsx?$/).map((ruta) =>
+      relative(join(moduloDir, 'adapters', 'driving'), ruta).split(sep).join('/'),
+    )
+    expect(driving).toEqual(['customer-actions.ts'])
   })
 
   it('la regla de literales dispara con un archivo fabricado que si nombra el permiso', () => {
-    // El MISMO detector que usa el caso real, aplicado a un archivo de produccion de verdad.
+    // El MISMO detector que usa el caso real, aplicado a un archivo de produccion de verdad,
+    // FUERA de lib/modules/clientes/domain/.
     const relativoFabricado = 'lib/modules/clientes/__sensibilidad_literal__.ts'
     const rutaFabricada = join(repoRoot, relativoFabricado)
     writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
     try {
       expect(detectarLiteralesDePermiso()).toContain(relativoFabricado)
+    } finally {
+      rmSync(rutaFabricada)
+    }
+  })
+
+  it('el caso simetrico: el mismo literal DENTRO de domain/ no dispara', () => {
+    // Es justo lo que la relajacion permite: un caso de uso de verdad nombra el permiso ahi.
+    const relativoFabricado = 'lib/modules/clientes/domain/__sensibilidad_literal__.ts'
+    const rutaFabricada = join(repoRoot, relativoFabricado)
+    writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+    try {
+      expect(detectarLiteralesDePermiso()).not.toContain(relativoFabricado)
     } finally {
       rmSync(rutaFabricada)
     }
@@ -279,5 +330,203 @@ describe('R29 — sin dependencias nuevas', () => {
       dependenciasAnadidas(['zod'], ['zod', 'left-pad']),
     ).toEqual(['left-pad'])
     expect(dependenciasAnadidas(['zod'], ['zod'])).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// R36 — sin aritmetica de paginacion propia
+// ---------------------------------------------------------------------------------------------
+
+describe('R36 — el modulo clientes no reimplementa el calculo de paginacion', () => {
+  // Copia del detector de `tests/unit/proveedores/scope.test.ts`: `clientes` CONSUME
+  // `lib/shared/pagination.ts` (`toOffsetLimit`, `buildPage`, `DEFAULT_PAGE_SIZE`,
+  // `MAX_PAGE_SIZE`) y no lleva ninguna aritmetica propia de desplazamiento, limite ni total
+  // de paginas.
+  const SOSPECHOSOS: readonly { readonly nombre: string; readonly pattern: RegExp }[] = [
+    { nombre: 'Math.ceil sobre un total (calculo de totalPages a mano)', pattern: /Math\.ceil\(\s*total\b/ },
+    { nombre: '(page - 1) * algo (calculo de offset a mano)', pattern: /\(\s*page\s*-\s*1\s*\)\s*\*/ },
+    { nombre: 'multiplicacion por pageSize (calculo de offset/limit a mano)', pattern: /\*\s*pageSize\b|\bpageSize\s*\*/ },
+    { nombre: 'segunda declaracion del defecto o del tope de pagina', pattern: /(DEFAULT_PAGE_SIZE|MAX_PAGE_SIZE)\s*=/ },
+    { nombre: 'Math.min contra un literal de tope de pagina', pattern: /Math\.min\([^)]*\b25\b/ },
+  ]
+
+  function hallazgosDePaginacion(): string[] {
+    const hallazgos: string[] = []
+    for (const archivo of filesIn(moduloDir, /\.tsx?$/)) {
+      const fuente = leer(archivo)
+      for (const { nombre, pattern } of SOSPECHOSOS) {
+        if (pattern.test(fuente)) hallazgos.push(`${archivo}: ${nombre}`)
+      }
+    }
+    return hallazgos
+  }
+
+  it('R36 — lib/modules/clientes/** no reimplementa la aritmetica de paginacion', () => {
+    const hallazgos = hallazgosDePaginacion()
+    expect(
+      hallazgos,
+      `lib/modules/clientes/** parece reimplementar la aritmetica de paginacion en vez de usar ` +
+        `lib/shared/pagination.ts: ${hallazgos.join('; ')}`,
+    ).toEqual([])
+  })
+
+  it('el detector dispara con un archivo fabricado que calcula el offset a mano', () => {
+    const relativoFabricado = 'lib/modules/clientes/domain/__sensibilidad_paginacion__.ts'
+    const rutaFabricada = join(repoRoot, relativoFabricado)
+    writeFileSync(rutaFabricada, 'export const offset = (page: number, pageSize: number) => (page - 1) * pageSize\n')
+    try {
+      expect(hallazgosDePaginacion().some((h) => h.startsWith(rutaFabricada))).toBe(true)
+    } finally {
+      rmSync(rutaFabricada)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// R37 (enmendado) — una sola migracion nueva, y solo los tres campos normalizados en schema.prisma
+// ---------------------------------------------------------------------------------------------
+
+describe('R37 — una sola migracion nueva y solo tres campos normalizados en Customer', () => {
+  const schema = leer(join(repoRoot, 'db', 'schema.prisma'))
+
+  function cuerpoDeModelo(modelo: string): string {
+    const match = new RegExp(`model ${modelo} \\{([\\s\\S]*?)\\n\\}`, 'm').exec(schema)
+    if (!match) throw new Error(`no se encontro "model ${modelo}" en db/schema.prisma`)
+    return match[1] as string
+  }
+
+  function camposDe(modelo: string): readonly string[] {
+    return cuerpoDeModelo(modelo)
+      .split('\n')
+      .map((linea) => linea.trim().replace(/\s+/g, ' '))
+      .filter((linea) => linea.length > 0 && !linea.startsWith('//'))
+      .map((linea) => (linea.startsWith('@@') ? linea : (linea.split(' ')[0] as string)))
+  }
+
+  it('model Customer solo gano los tres campos normalizados respecto a QC-153', () => {
+    expect(camposDe('Customer')).toEqual([
+      'id',
+      'firstNames',
+      'lastNames',
+      'city',
+      'phone',
+      'email',
+      'address',
+      // F1.4: las tres unicas columnas nuevas de esta ficha.
+      'firstNamesNormalized',
+      'lastNamesNormalized',
+      'cityNormalized',
+      'companyId',
+      'createdBy',
+      'updatedBy',
+      'createdAt',
+      'updatedAt',
+      'deletedAt',
+      '@@unique([companyId, id], map: "customers_company_id_id_key")',
+      '@@index([createdBy], map: "customers_created_by_idx")',
+      '@@index([updatedBy], map: "customers_updated_by_idx")',
+      '@@map("customers")',
+    ])
+  })
+
+  it('solo dos migraciones del repo tocan la tabla customers: la de QC-153 y la de esta ficha', () => {
+    const migracionesDir = join(repoRoot, 'db', 'migrations')
+    const tocanCustomers = readdirSync(migracionesDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .filter((entry) => {
+        const sql = join(migracionesDir, entry.name, 'migration.sql')
+        if (!existsSync(sql)) return false
+        const sinComentarios = leer(sql)
+          .replace(/\/\*[\s\S]*?\*\//g, ' ')
+          .replace(/--[^\n]*/g, ' ')
+        return /\bcustomers\b/i.test(sinComentarios)
+      })
+      .map((entry) => entry.name)
+      .sort()
+    expect(tocanCustomers).toEqual(['20260924120000_customers', '20260924190000_customers_search_normalized'])
+  })
+
+  it('el censo de campos dispara con un campo fabricado de mas', () => {
+    const cuerpoFabricado = 'id String\n  extra String\n'
+    const campos = cuerpoFabricado
+      .split('\n')
+      .map((linea) => linea.trim().replace(/\s+/g, ' '))
+      .filter((linea) => linea.length > 0)
+      .map((linea) => linea.split(' ')[0] as string)
+    expect(campos).not.toEqual(['id'])
+    expect(campos).toContain('extra')
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// R38 — nada bajo app/ que nombre clientes
+// ---------------------------------------------------------------------------------------------
+
+describe('R38 — nada bajo app/ que nombre clientes', () => {
+  const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
+
+  function coincidenciasEnApp(): string[] {
+    const appDir = join(repoRoot, 'app')
+    return filesIn(appDir)
+      .map((ruta) => relative(appDir, ruta).split(sep).join('/'))
+      .filter((relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(appDir, relativa))))
+  }
+
+  it('ningun archivo de app/ nombra ni el nombre, ni la tabla, ni el permiso ni la ruta de clientes', () => {
+    const coincidencias = coincidenciasEnApp()
+    expect(coincidencias, `archivo de app/ con marca de clientes inesperada: ${coincidencias.join(', ')}`).toEqual([])
+  })
+
+  it('el detector dispara con una pantalla fabricada que nombra la ruta de clientes', () => {
+    const appDir = join(repoRoot, 'app')
+    const relativoFabricado = '__sensibilidad_clientes__/page.tsx'
+    const rutaFabricada = join(appDir, relativoFabricado)
+    mkdirSync(dirname(rutaFabricada), { recursive: true })
+    writeFileSync(rutaFabricada, "export default function Pagina() { return <a href=\"/clientes\">Clientes</a> }\n")
+    try {
+      expect(coincidenciasEnApp()).toContain(relativoFabricado)
+    } finally {
+      rmSync(dirname(rutaFabricada), { recursive: true, force: true })
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// R40 — clientes no nombra pedidos, ni pedidos nombra clientes
+// ---------------------------------------------------------------------------------------------
+
+describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => {
+  const PEDIDOS_DIR = join(repoRoot, 'lib', 'modules', 'pedidos')
+
+  /** Especificador de import de otro modulo, sea barrel o ruta profunda: `@/lib/modules/<x>`. */
+  function importaModulo(fuente: string, modulo: string): boolean {
+    return new RegExp(`@/lib/modules/${modulo}\\b`).test(fuente)
+  }
+
+  function hallazgosDeAcoplamiento(): string[] {
+    const hallazgos: string[] = []
+    for (const archivo of filesIn(moduloDir, /\.tsx?$/)) {
+      if (importaModulo(leer(archivo), 'pedidos')) hallazgos.push(relative(repoRoot, archivo).split(sep).join('/'))
+    }
+    for (const archivo of filesIn(PEDIDOS_DIR, /\.tsx?$/)) {
+      if (importaModulo(leer(archivo), 'clientes')) hallazgos.push(relative(repoRoot, archivo).split(sep).join('/'))
+    }
+    return hallazgos
+  }
+
+  it('ningun archivo de clientes importa pedidos, y ninguno de pedidos importa clientes', () => {
+    const hallazgos = hallazgosDeAcoplamiento()
+    expect(hallazgos, `acoplamiento entre clientes y pedidos: ${hallazgos.join(', ')}`).toEqual([])
+  })
+
+  it('el detector dispara con un import fabricado de pedidos desde clientes', () => {
+    const relativoFabricado = 'lib/modules/clientes/domain/__sensibilidad_pedidos__.ts'
+    const rutaFabricada = join(repoRoot, relativoFabricado)
+    writeFileSync(rutaFabricada, "import type { Order } from '@/lib/modules/pedidos'\nexport type { Order }\n")
+    try {
+      expect(hallazgosDeAcoplamiento()).toContain(relativoFabricado)
+    } finally {
+      rmSync(rutaFabricada)
+    }
   })
 })
