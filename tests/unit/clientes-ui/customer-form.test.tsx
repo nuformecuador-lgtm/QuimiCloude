@@ -207,6 +207,26 @@ describe('validacion previa con el esquema del contrato (R26)', () => {
     expect(screen.getByTestId(CUSTOMER_FORM_TESTID)).toBeInTheDocument();
   });
 
+  it('un obligatorio con solo espacios pasa la validacion nativa pero no llama a la operacion', async () => {
+    // La validacion nativa del navegador acepta espacios como contenido, asi que el submit llega
+    // hasta la validacion previa del esquema, que si los rechaza.
+    const user = setupUser();
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.firstNames), '   ');
+    await user.type(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.lastNames), 'Rodríguez');
+    await user.type(screen.getByTestId(CUSTOMER_FIELD_TESTIDS.city), 'Cali');
+
+    const campo = screen.getByTestId(CUSTOMER_FIELD_TESTIDS.firstNames) as HTMLInputElement;
+    expect(campo.checkValidity()).toBe(true);
+
+    await user.click(screen.getByTestId(CUSTOMER_FORM_SUBMIT_TESTID));
+
+    await screen.findByTestId(CUSTOMER_ERROR_TESTIDS.firstNames);
+    expect(createCustomerActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(CUSTOMER_FORM_TESTID)).toBeInTheDocument();
+  });
+
   it('el maximo de los tres opcionales tambien se acota con la constante del contrato', async () => {
     const user = setupUser();
     await abrirAlta(user);
