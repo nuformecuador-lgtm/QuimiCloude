@@ -115,7 +115,7 @@ Tras T1, T2, T3, T4. **Toca:** `lib/modules/documentos/domain/actor.ts` (`FORMUL
 - las tres filas de `design.md > 7.2` con dobles (**R28**); resumen `created`/`replaced` y recuentos
   (**R29**, parte dominio); sin confirmar no hay ninguna escritura (**R22**).
 
-### T6 [ ] — Integración de la confirmación
+### T6 [x] — Integración de la confirmación
 Tras T5. **Toca:** `tests/integration/documentos/formula-import.int.test.ts` (nuevo),
 `tests/integration/aislamiento.json`.
 **Hacer:** contra la base de tests, con los adaptadores reales y el caso de uso compuesto.

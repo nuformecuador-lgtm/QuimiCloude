@@ -274,3 +274,22 @@ vitest run formula-import-actions + session-once-per-request-actions + tests/gua
   640 verdes, 1 rojo, 5 skip — el rojo era guard-aislamiento-integracion por el archivo de T6 aún sin
   declarar en aislamiento.json (T6 en curso)
 ```
+
+## T6 — integración de la confirmación (backend_dev, `f06d4fcf`)
+
+- `tests/integration/documentos/formula-import.int.test.ts` (nuevo, 8 casos, empresa efímera por caso;
+  adaptadores reales de documentos, recetas, inventario y pedidos), `tests/integration/aislamiento.json`
+  (`commit`, con motivo y `desde`).
+- R18: reemplazar conserva id, nombre e `image_path` y cambia líneas y pasos; una línea `150.00`
+  inyectada envolviendo `replaceAlive` (tras validar el dominio) la rechaza el `CHECK`
+  `recipe_lines_percentage_check` y la receta queda como estaba.
+- R21: pedido con `ingredientsCost` guardado (alta real) idéntico fila a fila (`JSON.stringify`) tras reemplazar.
+- R27: `createRecipe` que falla tras crear la materia prima ⇒ la materia prima queda; la segunda
+  confirmación la reutiliza. R28: crear y luego reconfirmar reemplazando ⇒ una receta, una materia prima.
+- R33: archivo, receta a reemplazar y producto de otra empresa ⇒ como inexistentes, nada escrito.
+
+```
+typecheck limpio · lint 0 errores
+vitest run --project integration tests/integration/documentos/formula-import.int.test.ts   8 passed
+vitest run tests/guards/guard-aislamiento-integracion.test.ts                                6 passed
+```
