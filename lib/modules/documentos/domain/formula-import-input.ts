@@ -7,7 +7,7 @@
  */
 import { z } from 'zod';
 
-import { MAX_FORMULA_STEPS } from './review-formula-import';
+import { MAX_RECIPE_STEPS } from '@/lib/modules/recetas';
 
 export const previewFormulaImportInputSchema = z.object({
   documentFileId: z.string().uuid(),
@@ -28,7 +28,7 @@ export const confirmFormulaImportInputSchema = z
     name: z.string(),
     description: z.string().nullable(),
     lines: z.array(draftLineInputSchema).max(200),
-    steps: z.array(z.unknown()).max(MAX_FORMULA_STEPS),
+    steps: z.array(z.unknown()).max(MAX_RECIPE_STEPS),
     // null = crear una receta nueva; un id = reemplazar esa receta
     replaceRecipeId: z.string().uuid().nullable(),
   })

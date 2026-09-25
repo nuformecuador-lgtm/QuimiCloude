@@ -12,7 +12,14 @@
  */
 
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
-import { createRecipeSchema, PERCENTAGE_PATTERN, percentageToHundredths, recipeStepSchema, sumPercentages } from '@/lib/modules/recetas';
+import {
+  createRecipeSchema,
+  MAX_RECIPE_STEPS,
+  PERCENTAGE_PATTERN,
+  percentageToHundredths,
+  recipeStepSchema,
+  sumPercentages,
+} from '@/lib/modules/recetas';
 import { normalizeProductName, PRODUCT_NAME_MAX_LENGTH } from '@/lib/modules/inventario';
 
 export type DraftLine =
@@ -45,12 +52,6 @@ export type FormulaReviewIssues = {
   readonly canConfirm: boolean;
 };
 
-/** Mismo tope que el alta y la edicion de receta. Se publica UNA sola vez, en el mismo archivo
- *  que la usa para decidir "too_many", y el esquema de entrada de la confirmacion la importa en
- *  vez de repetir el numero a mano; escrito como division para no coincidir por casualidad con
- *  otro limite propio de este modulo que un test vigila por su digito exacto. */
-export const MAX_FORMULA_STEPS = 100 / 2;
-
 function nameStatus(name: string): FormulaReviewIssues['name'] {
   const result = createRecipeSchema.shape.name.safeParse(name);
   if (result.success) return 'ok';
@@ -66,7 +67,7 @@ function descriptionStatus(description: string | null): FormulaReviewIssues['des
 }
 
 function stepsStatus(steps: readonly RecipeStepDocument[]): FormulaReviewIssues['steps'] {
-  if (steps.length > MAX_FORMULA_STEPS) return 'too_many';
+  if (steps.length > MAX_RECIPE_STEPS) return 'too_many';
   const allValid = steps.every((step) => recipeStepSchema.safeParse(step).success);
   return allValid ? 'ok' : 'invalid';
 }

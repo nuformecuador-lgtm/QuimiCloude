@@ -62,6 +62,7 @@ export {
   recipeStepSpanSchema,
   recipeStepChecklistItemSchema,
   MAX_STEP_ELEMENTS,
+  MAX_RECIPE_STEPS,
   countRecipeStepElements,
   type RecipeStepInput,
   type RecipeStepDocument,
