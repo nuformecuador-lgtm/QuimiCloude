@@ -23,7 +23,7 @@
 
 **2026-09-25: nacen QC-172, QC-173 y QC-174** (epica Recetas), del chat: `versiones-de-receta` (fullstack; copia con vinculo, propagacion asistida, pasos compartidos; incluye el selector de version en el pedido, cruce con QC-168/QC-170/QC-164), `fases-en-los-pasos` (fullstack; lista de fases + fase en cada paso, sin migrar) y `crear-versiones-en-la-receta` (frontend, bloqueada por QC-172). Sin acotar; decisiones y abiertas en la descripcion de cada una.
 
-**2026-09-25: nace QC-171** `recortes-con-url-publica` (backend, epica Documentos e IA), del chat: los recortes del catalogo pasan a URL publica por decision del humano. Hallazgo: las imagenes importadas hoy no se ven (se guarda la ruta y `EntityImage` la usa como `src`). Pregunta 1 cerrada por el humano: bucket de recortes **publico pero propio**, separado del de recetas. Sin acotar; 3 preguntas abiertas en la descripcion.
+**2026-09-25: nace QC-171** `recortes-con-url-publica` (backend, epica Documentos e IA), del chat: los recortes del catalogo pasan a URL publica por decision del humano. Hallazgo: las imagenes importadas hoy no se ven (se guarda la ruta y `EntityImage` la usa como `src`). **ACOTADA el 2026-09-25** con `/afinar-feature`: 8 decisiones, ninguna abierta, en `specs/QC-171-recortes-con-url-publica/requirements.md`. Board actualizado (description y `zone:backend` -> `zone:fullstack`).
 
 **2026-09-25: nace QC-170** `pedido-en-varias-presentaciones` (fullstack, high), del chat; bloqueada por QC-168. **ACOTADA** con `/afinar-feature`: 9 decisiones y 3 preguntas abiertas en `specs/QC-170-pedido-en-varias-presentaciones/requirements.md`. Enmienda QC-168 (producto terminado al terminar el empaque) y QC-146 (desaparece la presentacion unica); aviso escrito en el issue de QC-168.
 
