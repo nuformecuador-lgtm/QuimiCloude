@@ -5,4 +5,6 @@ export * from './customer-list-empty';
 export * from './customer-list-error';
 export * from './customer-list-params';
 export * from './customer-list-skeleton';
+export * from './customer-row-actions';
 export * from './customer-sheet';
+export * from './delete-customer-dialog';

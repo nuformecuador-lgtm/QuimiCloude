@@ -345,3 +345,60 @@ No se tocó `lib/modules/**`, `lib/composition/**`, `db/**`, `components/shared/
 `progress/current.md`. `customer-row-actions.tsx` y `delete-customer-dialog.tsx` quedan para T6a:
 este panel se prueba con el disparador propio y con un enganche `open`/`onOpenChange` simulado por
 un boton minimo en el test, tal como hara la fila real.
+
+## T6a — `delete-customer-dialog.tsx` y `customer-row-actions.tsx`
+
+### Archivos tocados
+
+- `app/(private)/clientes/components/delete-customer-dialog.tsx` (nuevo): confirmacion de baja
+  calcada de `delete-unit-dialog.tsx`. Nombra al cliente por `firstNames lastNames` en
+  `delete-customer-message`, con el aviso de irreversibilidad. El `id` viaja en un `<input
+  type="hidden">` dentro del `<form>`, que solo se envia al pulsar confirmar
+  (`useActionState(deleteCustomerAction, ...)`, sin `bind`: `deleteCustomerAction` ya lee el `id`
+  del `FormData`). El rechazo se pinta dentro del dialogo (`delete-customer-error`), distinguido
+  por su `code` (`data-code`), y el dialogo sigue abierto; con exito aplica lo de T5: cerrar, toast
+  y `router.refresh()`.
+- `app/(private)/clientes/components/customer-row-actions.tsx` (nuevo): las dos acciones de fila
+  (editar, dar de baja), calcado de `unit-row-actions.tsx`/`presentation-row-actions.tsx`. Con
+  `canModify === false` devuelve `null` (celda vacia, sin boton deshabilitado): es la decision de
+  presentacion que baja por props desde la seccion/tabla (T6), no una segunda comprobacion de
+  autorizacion. Cada boton mide 44x44 px y su `aria-label` nombra al cliente. Monta
+  `CustomerSheet` (editar, controlado) y `DeleteCustomerDialog` (baja, montado solo mientras esta
+  abierto) por fila, igual que unidades y presentaciones.
+- `app/(private)/clientes/components/index.ts`: suma los dos archivos al barrel.
+- `tests/unit/clientes-ui/delete-customer-dialog.test.tsx` (nuevo). `deleteCustomerAction` es un
+  doble espia; las otras cuatro actions del modulo fallan si se les llama, para que un dialogo que
+  de paso listara o editara se note. `CustomerRowActions` se ejercita en el mismo archivo (mismo
+  patron que `delete-unit-dialog.test.tsx` con `UnitRowActions`): no hay un
+  `customer-row-actions.test.tsx` aparte.
+
+### Mapa R<n> → test
+
+| Requisito | Test |
+| --- | --- |
+| R31 | `delete-customer-dialog.test.tsx` > `describe('el dialogo nombra al cliente (R31)')` (nombres y apellidos completos, advertencia de irreversibilidad, sin el uuid visible) y `describe('mientras el usuario no confirme no se invoca la baja (R31)')` (abrir no invoca, pedir la baja desde la fila abre el dialogo sin invocar, volver atras cierra sin invocar) |
+| R32 | `delete-customer-dialog.test.tsx` > `describe('los rechazos se pintan DENTRO del dialogo, que sigue abierto (R32)')` (`customer_not_found`, `unauthorized`, `invalid_input`, los tres codigos distintos) y `describe('la fila no se retira cuando la baja se rechaza (R32)')` |
+| R33 | `delete-customer-dialog.test.tsx` > `describe('sin control de ver, filtrar, contar ni restaurar bajas (R33)')` |
+
+### Salida real de los tests
+
+```
+$ pnpm exec vitest run tests/unit/clientes-ui/delete-customer-dialog.test.tsx
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+```
+
+`pnpm exec vitest related --run` sobre `customer-row-actions.tsx`, `delete-customer-dialog.tsx` e
+`index.ts`: 8 archivos de test relacionados, **112 passed (112)**.
+
+`pnpm run typecheck`: verde. `pnpm run lint`: verde, mismos 7 warnings preexistentes y ajenos
+(`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+
+### Archivos fuera de alcance (T6a)
+
+No se tocó `lib/modules/**`, `lib/composition/**`, `db/**`, `components/shared/**` (solo se
+**importa** `@/components/shared/unexpected-error-notice`), `components/ui/**` ni
+`package.json`. No se tocó `specs/**`, `feature_list.json` ni `progress/current.md`.
+`customer-table.tsx`, `customer-list-section.tsx`, el barrel final y `page.tsx` completa quedan
+para T6, que es quien decide `canModify` en el servidor y lo baja por props hasta
+`CustomerRowActions` y hasta el disparador de alta de la cabecera.
