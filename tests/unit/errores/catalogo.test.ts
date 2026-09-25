@@ -39,10 +39,10 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 56 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 59 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 56 y no 54: entran `presentation_without_content` y `no_whole_package`.
-      expect(ERROR_CODES).toHaveLength(56)
+      // 59 y no 56: entran `order_packing_taken`, `order_not_packable` y `order_produced_frozen`.
+      expect(ERROR_CODES).toHaveLength(59)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -310,6 +310,42 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     it('la cabecera de error-codes.ts redacta la duodecima enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
       expect(source).toContain('**Duodecima enmienda, 2026-09-24**')
+    })
+  })
+
+  describe('decimotercera enmienda, 2026-09-25 — order_packing_taken, order_not_packable, order_produced_frozen', () => {
+    it('los tres codigos estan en el catalogo con su clave y su texto exactos', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('order_packing_taken')
+      expect(codigos).toContain('order_not_packable')
+      expect(codigos).toContain('order_produced_frozen')
+      expect(ERROR_MESSAGE_KEY.order_packing_taken).toBe('errors.order_packing_taken')
+      expect(ERROR_MESSAGE_KEY.order_not_packable).toBe('errors.order_not_packable')
+      expect(ERROR_MESSAGE_KEY.order_produced_frozen).toBe('errors.order_produced_frozen')
+      expect(errorMessage('order_packing_taken')).toBe('Otro empacador esta empacando este pedido.')
+      expect(errorMessage('order_not_packable')).toBe(
+        'El pedido no esta en un estado que admita esa accion de empaque.',
+      )
+      expect(errorMessage('order_produced_frozen')).toBe(
+        'Un pedido ya producido conserva sus responsables tal como estaban.',
+      )
+    })
+
+    it('se distinguen entre si y de order_not_found, invalid_transition y order_delivered_frozen', () => {
+      const tomado = errorMessage('order_packing_taken')
+      const noEmpacable = errorMessage('order_not_packable')
+      const congelado = errorMessage('order_produced_frozen')
+      expect(tomado).not.toBe(noEmpacable)
+      expect(tomado).not.toBe(congelado)
+      expect(noEmpacable).not.toBe(congelado)
+      expect(tomado).not.toBe(errorMessage('order_not_found'))
+      expect(noEmpacable).not.toBe(errorMessage('invalid_transition'))
+      expect(congelado).not.toBe(errorMessage('order_delivered_frozen'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decimotercera enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decimotercera enmienda, 2026-09-25**')
     })
   })
 

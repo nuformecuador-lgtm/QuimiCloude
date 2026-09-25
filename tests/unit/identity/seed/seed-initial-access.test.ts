@@ -752,8 +752,10 @@ describe('seedInitialAccess', () => {
     const codigosDelAdministrador = paresCreados
       .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
       .map((par) => par.permissionCode);
-    expect(codigosDelAdministrador).toHaveLength(PERMISSIONS.length);
-    expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
+    expect(codigosDelAdministrador).toHaveLength(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]!.length);
+    expect(new Set(codigosDelAdministrador)).toEqual(
+      new Set(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]),
+    );
     // El orden es el de `SEED_ROLE_PERMISSIONS`, que es como el seed los recorre.
     expect(
       paresCreados
@@ -766,7 +768,7 @@ describe('seedInitialAccess', () => {
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_EMPACADOR))
         .map((par) => par.permissionCode),
-    ).toEqual(['asignaciones.consultar', 'terminados.consultar']);
+    ).toEqual(['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar']);
 
     // Y el orden del algoritmo: los roles ANTES que los permisos, y los permisos ANTES
     // que el administrador (`design.md > 3`). Sin ese orden, una asignacion no tendria

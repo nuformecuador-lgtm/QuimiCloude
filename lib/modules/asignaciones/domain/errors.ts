@@ -220,3 +220,32 @@ export class UserCannotBeResponsibleError extends AsignacionesError {
     super('user_cannot_be_responsible', diagnostic);
   }
 }
+
+/** Comenzar o Terminar sobre un pedido de empaque que otro actor ya tiene tomado, o Terminar
+ *  activado por quien no es el que lo empaca. */
+export class OrderPackingTakenError extends AsignacionesError {
+  readonly code = 'order_packing_taken';
+
+  constructor(diagnostic?: string) {
+    super('order_packing_taken', diagnostic);
+  }
+}
+
+/** Comenzar o Terminar sobre un pedido cuyo estado actual no admite esa accion de empaque. */
+export class OrderNotPackableError extends AsignacionesError {
+  readonly code = 'order_not_packable';
+
+  constructor(diagnostic?: string) {
+    super('order_not_packable', diagnostic);
+  }
+}
+
+/** El pedido esta `POR_EMPACAR` o `EN_EMPAQUE`: sus responsables se congelan igual que en
+ *  `ENTREGADO`, con un codigo propio porque la frase que corresponde es otra. */
+export class OrderProducedFrozenError extends AsignacionesError {
+  readonly code = 'order_produced_frozen';
+
+  constructor(diagnostic?: string) {
+    super('order_produced_frozen', diagnostic);
+  }
+}

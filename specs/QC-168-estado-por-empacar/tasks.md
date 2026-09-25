@@ -6,7 +6,7 @@
 
 ## Tanda 1 — base de datos y contrato de estados
 
-### T1 [ ] — Migración de esquema
+### T1 [x] — Migración de esquema
 **Toca:** `db/schema.prisma` (enum `OrderStatus`, `Order.packedBy`),
 `db/migrations/20260925120000_order_packing_states/{migration.sql,down.sql}`,
 `tests/unit/pedidos/schema/pedidos-schema.test.ts`, `tests/unit/pedidos/schema/pedidos-migration.test.ts`,
@@ -18,7 +18,7 @@ CHECK/índice recreado en `down.sql` con su definición literal; integración pr
 `orders_packed_by_matches_status` y `orders_delivered_not_deleted`, 23503 de la FK con usuario de otra
 empresa, `finished_at` rechazado en `POR_EMPACAR` (R1, R3, R8, R28, R32, R46, R47).
 
-### T2 [ ] — Estados y matriz en `pedidos`
+### T2 [x] — Estados y matriz en `pedidos`
 Tras T1. **Toca:** `lib/modules/pedidos/domain/order-classification.ts`, `order-transitions.ts`,
 `index.ts` (`ORDER_STATUS_FLOW`), `tests/unit/pedidos/module-contract.test.ts`,
 `order-transitions.test.ts`, `update-order.test.ts`.
@@ -26,14 +26,14 @@ Tras T1. **Toca:** `lib/modules/pedidos/domain/order-classification.ts`, `order-
 **Hecho cuando:** los 36 pares de la matriz probados; editar `POR_EMPACAR`/`EN_EMPAQUE` da
 `invalid_transition` sin llamar a la unidad de trabajo (R1, R2, R32).
 
-### T3 [ ] [P] — Cancelar y borrar
+### T3 [x] [P] — Cancelar y borrar
 Tras T2. **Toca:** `lib/modules/pedidos/domain/delete-order.ts`, `tests/unit/pedidos/cancel-order.test.ts`,
 `delete-order.test.ts`, `tests/unit/pedidos/expire-stale-orders.test.ts`.
 **Hacer:** `NO_BORRABLES` + dos estados; `CANCELABLES` sin cambios.
 **Hecho cuando:** cancelar los dos estados ⇒ `not_cancellable` sin liberar; borrar ⇒ `not_deletable`;
 cancelar `PENDIENTE`/`EN_CURSO` igual que hoy; el proceso diario no toca los dos estados (R29–R32).
 
-### T4 [ ] [P] — Permiso `empaque.modificar`
+### T4 [x] [P] — Permiso `empaque.modificar`
 **Toca:** `lib/modules/identity/domain/permissions.ts` (catálogo, seed, `ADMIN_EXCLUDED_PERMISSIONS`),
 `lib/modules/identity/index.ts`, `db/migrations/20260925120100_packing_permission/{migration.sql,down.sql}`,
 `tests/unit/identity/permissions.test.ts`, `tests/unit/identity/seed/seed-initial-access.test.ts`,
@@ -44,7 +44,7 @@ cancelar `PENDIENTE`/`EN_CURSO` igual que hoy; el proceso diario no toca los dos
 Operador sin cambios; migración idempotente y reversible; guardias `guard-permisos-sembrados` y
 `catalogo-sin-total-fijo` verdes (R34–R38).
 
-### T5 [ ] [P] — Códigos de error
+### T5 [x] [P] — Códigos de error
 **Toca:** `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts`,
 `lib/modules/asignaciones/domain/errors.ts`, `tests/unit/errores/catalogo.test.ts`.
 **Hacer:** `order_packing_taken`, `order_not_packable`, `order_produced_frozen` (⚑ P1) con sus clases.
