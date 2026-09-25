@@ -69,6 +69,20 @@ describe('el reintento es un enlace real a la propia lista, alcanzable con el de
     expect(enlace.className).not.toContain('hover:block');
     expect(enlace).toBeVisible();
   });
+
+  it('se alcanza por su rol de enlace y con un nombre accesible', () => {
+    render(<CustomerListError error={CODIGOS[0]!} retryHref={RETRY_HREF} />);
+
+    const enlace = screen.getByRole('link', { name: 'Reintentar' });
+    expect(enlace).toBe(screen.getByTestId(CUSTOMER_LIST_RETRY_TESTID));
+  });
+
+  it('no recorta el destino recibido: los parametros llegan intactos al `href`', () => {
+    const destino = '/clientes?page=3&q=ana&pageSize=25&sort=createdAt%3Aasc';
+    render(<CustomerListError error={CODIGOS[0]!} retryHref={destino} />);
+
+    expect(screen.getByTestId(CUSTOMER_LIST_RETRY_TESTID)).toHaveAttribute('href', destino);
+  });
 });
 
 describe('el error INESPERADO conserva el identificador de la peticion (QC-71)', () => {
