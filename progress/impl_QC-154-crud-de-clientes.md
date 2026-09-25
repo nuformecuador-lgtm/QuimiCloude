@@ -637,3 +637,28 @@ $ pnpm exec vitest run tests/unit/clientes/scope.test.ts
       Tests  2 failed | 99 passed (101)
   → los dos rojos esperados (lista cerrada de archivos, adapters/driving/ exacto), sin cambio.
 ```
+
+## T10 — Guardia del ámbito de empresa
+
+- `tests/guards/guard-ambito-empresa-clientes.test.ts`, calcada de
+  `guard-ambito-empresa-proveedores.test.ts` pero recortada a un solo puerto
+  (`CustomerRepository`, 5 métodos) y sin el caso de `isSupplierAlive`/arrastre transaccional,
+  que no existen en `clientes`.
+- **Los dos fabricados exigidos, comprobados en rojo real y revertidos** (append temporal al
+  final de `customer-prisma.ts`, corrida de la guardia, y borrado exacto del texto añadido):
+  1. Una función nueva (`findAnyCustomerById(id)`) que toca `prisma.customer.findFirst` **sin**
+     declarar `scope: CustomerScope` → rojo real: *"consulta la base SIN declarar
+     `scope: CustomerScope`"*.
+  2. La misma función, ahora **declarando** `scope: CustomerScope` pero sin componerlo en el
+     `where` (`void scope;`) → rojo real, distinto del anterior: *"declara el ámbito pero no lo
+     lleva hasta las envolturas de `./company-scope`"*.
+  3. Revertido (el archivo en disco vuelve a ser exactamente el de T9) y la guardia vuelve a
+     18/18 en verde.
+
+### Verificación de T10
+
+```
+$ pnpm exec vitest run tests/guards/guard-ambito-empresa-clientes.test.ts
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+```

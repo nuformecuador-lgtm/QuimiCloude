@@ -135,7 +135,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       *Depende de:* T6, T17. **Hecho cuando:** typecheck limpio, es el único archivo del módulo que importa
       `@prisma/client` junto con `company-scope.ts`, y ninguna consulta nombra otro modelo.
 
-- [ ] **T10 [P] — Guardia del ámbito de empresa.** `tests/guards/guard-ambito-empresa-clientes.test.ts`,
+- [x] **T10 [P] — Guardia del ámbito de empresa.** `tests/guards/guard-ambito-empresa-clientes.test.ts`,
       calcada de la de proveedores con `CustomerScope`.
       *Depende de:* T9. **Hecho cuando:** pasa, y **falla** con un fabricado que añade una función de
       persistencia sin `scope` **y** con otro que lo declara y no lo usa (R12).
