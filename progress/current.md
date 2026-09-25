@@ -21,7 +21,7 @@
 
 ## Evaluaciones
 
-**2026-09-25: nace QC-171** `recortes-con-url-publica` (backend, epica Documentos e IA), del chat: los recortes del catalogo pasan a URL publica por decision del humano. Hallazgo: las imagenes importadas hoy no se ven (se guarda la ruta y `EntityImage` la usa como `src`). Sin acotar; 4 preguntas abiertas en la descripcion.
+**2026-09-25: nace QC-171** `recortes-con-url-publica` (backend, epica Documentos e IA), del chat: los recortes del catalogo pasan a URL publica por decision del humano. Hallazgo: las imagenes importadas hoy no se ven (se guarda la ruta y `EntityImage` la usa como `src`). Pregunta 1 cerrada por el humano: bucket de recortes **publico pero propio**, separado del de recetas. Sin acotar; 3 preguntas abiertas en la descripcion.
 
 **2026-09-25: nace QC-170** `pedido-en-varias-presentaciones` (fullstack, high), del chat; bloqueada por QC-168. **ACOTADA** con `/afinar-feature`: 9 decisiones y 3 preguntas abiertas en `specs/QC-170-pedido-en-varias-presentaciones/requirements.md`. Enmienda QC-168 (producto terminado al terminar el empaque) y QC-146 (desaparece la presentacion unica); aviso escrito en el issue de QC-168.
 
