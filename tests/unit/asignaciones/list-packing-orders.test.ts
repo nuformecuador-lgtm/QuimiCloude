@@ -160,6 +160,7 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         packages: '5',
         status: 'POR_EMPACAR',
         packedByName: null,
+        packedById: null,
       },
       {
         id: PEDIDO_2,
@@ -169,8 +170,21 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         packages: '3',
         status: 'EN_EMPAQUE',
         packedByName: 'Beto',
+        packedById: BETO,
       },
     ]);
+  });
+
+  it('R14/R17: `packedById` trae el id de quien empaca en EN_EMPAQUE y null en POR_EMPACAR', async () => {
+    const { deps } = montar();
+    const listPackingOrders = createListPackingOrders(deps);
+
+    const page = await listPackingOrders(ACTOR, { page: 1 });
+
+    const porEmpacar = page.items.find((item) => item.id === PEDIDO_1);
+    const enEmpaque = page.items.find((item) => item.id === PEDIDO_2);
+    expect(porEmpacar?.packedById).toBeNull();
+    expect(enEmpaque?.packedById).toBe(BETO);
   });
 
   it('respeta la paginacion pedida', async () => {

@@ -260,6 +260,20 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).startAssignedOrderAction('no-es-un-uuid'),
   },
   {
+    // Anadida por QC-168, que estrena la pantalla de empaque: su archivo de `driving/` resuelve
+    // las dos caras de la sesion, asi que el censo tiene que cubrirlo. La accion captura los
+    // errores y devuelve un estado, asi que un `orderId` que no exista no rompe la invocacion.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-packing-actions.ts',
+    nombre: 'startPackingAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.set('orderId', 'no-es-un-uuid');
+      return (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-packing-actions')
+      ).startPackingAction({ status: 'success' }, formData);
+    },
+  },
+  {
     // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe
     // el caso: lo que esta lista mide es cuantas veces se lee la sesion por invocacion.
     archivo: 'lib/modules/documentos/adapters/driving/document-upload-actions.ts',

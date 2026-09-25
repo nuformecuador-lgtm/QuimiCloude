@@ -12,6 +12,7 @@ function uuid(seed: string): string {
 
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
+const BETO = uuid('2');
 const PEDIDO = uuid('7');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
@@ -27,6 +28,8 @@ const RESUMEN = {
   finishedAt: null,
   packedBy: null,
 };
+
+const RESUMEN_EN_EMPAQUE = { ...RESUMEN, status: 'EN_EMPAQUE', packedBy: BETO };
 
 type Dobles = {
   readonly deps: GetPackingOrderDeps;
@@ -92,7 +95,17 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       packages: '5',
       status: 'POR_EMPACAR',
       packedByName: null,
+      packedById: null,
     });
+  });
+
+  it('R17: en `EN_EMPAQUE`, `packedById` trae el id de quien empaca', async () => {
+    const { deps } = montar({ items: [RESUMEN_EN_EMPAQUE] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.packedById).toBe(BETO);
   });
 });
 

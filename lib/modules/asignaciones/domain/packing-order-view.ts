@@ -18,8 +18,8 @@ export type PackingOrderViewDeps = ComposeOrderRowsDeps & {
   readonly products: ProductCatalog;
 };
 
-/** Las seis piezas que la pantalla de «Por empacar» necesita de cada fila. `packedByName` viaja
- *  vacio (`null`) en `POR_EMPACAR`, porque todavia no hay quien empaca. */
+/** Las piezas que la pantalla de «Por empacar» necesita de cada fila. `packedByName` y `packedById`
+ *  viajan vacios (`null`) en `POR_EMPACAR`, porque todavia no hay quien empaca. */
 export type PackingOrderRow = {
   readonly id: string;
   readonly numberText: string;
@@ -31,6 +31,7 @@ export type PackingOrderRow = {
   readonly packages: string | null;
   readonly status: OrderStatus;
   readonly packedByName: string | null;
+  readonly packedById: string | null;
 };
 
 export async function composePackingOrderRows(
@@ -64,6 +65,7 @@ export async function composePackingOrderRows(
       packages: packagesByOrder.get(order.id) ?? null,
       status: order.status,
       packedByName: order.packedBy === null ? null : packerNames.get(order.packedBy) ?? order.packedBy,
+      packedById: order.packedBy,
     };
   });
 }
