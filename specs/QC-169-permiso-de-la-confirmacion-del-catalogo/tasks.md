@@ -58,7 +58,7 @@
   `progress/impl_QC-169-permiso-de-la-confirmacion-del-catalogo.md`.
 - **Depende de:** T2, T3
 
-### T7 — Gate y trazabilidad
+### [x] T7 — Gate y trazabilidad — `./init.sh` completo verde el 2026-09-25: 727 archivos, 9978 tests, baseline vacío
 - [ ] `./init.sh --rapido` para cerrar la tanda.
 - [ ] `./init.sh` completo antes del PR. El comparador debe decir «sin rojos nuevos … baseline
   vacio» y no mostrar ningún aviso «por limpiar».
