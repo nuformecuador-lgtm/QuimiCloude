@@ -27,7 +27,7 @@
 
 ### QC-169 - F1.0 (2026-09-25)
 
-`backend`, **`complexity: low`**. Arreglo del rojo de dev (`catalog-import-isolation`, choque QC-158 x QC-142). Decisiones ya cerradas por el humano en el issue (confirmar exige `proveedores.modificar`; se corrige codigo, no tests; quitar la entrada de baseline que puso QC-150). Sin `/afinar-feature`: no quedan huecos. Cupo `backend` 3 de 3 (QC-131 humana, QC-154). Worktree montado. **F1.2-F2.0 hechos el 2026-09-25**: spec R1-R13/T1-T7 (`30905fb9`), aprobado con P1 ratificada (vista previa tambien `proveedores.modificar`); `in_progress`.
+`backend`, **`complexity: low`**. Arreglo del rojo de dev (`catalog-import-isolation`, choque QC-158 x QC-142). Decisiones ya cerradas por el humano en el issue (confirmar exige `proveedores.modificar`; se corrige codigo, no tests; quitar la entrada de baseline que puso QC-150). Sin `/afinar-feature`: no quedan huecos. Cupo `backend` 3 de 3 (QC-131 humana, QC-154). Worktree montado. **F1.2-F2.0 hechos el 2026-09-25**: spec R1-R13/T1-T7 (`30905fb9`), aprobado con P1 ratificada (vista previa tambien `proveedores.modificar`); `in_progress`. **Review OK** (0 bloqueantes, 3 menores de tests abiertos en el PR); gate completo VERDE (727/9978, baseline vacio; el primer intento lo mato la falta de memoria). **PR #123 abierto.**
 
 ### QC-138 - F1.0 y F1.1 (2026-09-25)
 
