@@ -158,7 +158,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
 
 ## Grupo D — contra la base y cierre
 
-- [ ] **T13 [P] — Integración: CRUD y aislamiento.**
+- [x] **T13 [P] — Integración: CRUD y aislamiento.**
       `tests/integration/clientes/customer-repository.int.test.ts` contra `QuimiCloude_QC154`, con su
       entrada en `commit` de `tests/integration/aislamiento.json` (motivo y `desde`, `design.md > 13`).
       *Depende de:* T9. **Hecho cuando:** pasa y cubre R9, R10, R11, R13, R15, R19, R21, R23, R24, R25;
