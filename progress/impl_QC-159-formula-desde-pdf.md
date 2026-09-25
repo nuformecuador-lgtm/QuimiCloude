@@ -251,3 +251,26 @@ lint 0 errores
 ```
 
 Pendiente de volver a correrla cuando exista la pantalla de T9 (entra en su barrido).
+
+## T7 — Server Actions (backend_dev, `6508dccd`)
+
+- Nuevos: `lib/modules/documentos/adapters/driving/formula-import-actions.ts`
+  (`previewFormulaImportAction(input: unknown): Promise<{status:'success';data:FormulaImportPreview}|ErrorState>`,
+  `confirmFormulaImportAction(input: unknown): Promise<{status:'success';data:FormulaImportSummary}|ErrorState>`),
+  `lib/modules/documentos/adapters/driving/formula-import-error-translator.ts`,
+  `tests/unit/documentos/formula-import-actions.test.ts` (24 casos); alta en
+  `tests/unit/identity/session-once-per-request-actions.test.ts`.
+- **Desviación de forma respecto a `design.md > 6.2`:** la cadena de tres `createErrorStateTranslator`
+  (`DocumentosError` → `RecetasError` → `InventarioError` → `unexpected_error` por el de `documentos`)
+  vive en un archivo auxiliar y no dentro del de la acción. En el mismo archivo,
+  `guard-catalogo-de-errores.test.ts` (R23 de su ficha) lo marcaba como «traductor casero» porque
+  combina `instanceof` con el literal `{ status: 'error', … }` de `invalid_input` en el borde. Revisado:
+  el auxiliar **no construye ningún estado**, solo delega en el traductor único; comportamiento y orden
+  son los del diseño. Precedente de auxiliar sin `'use server'` en `driving/`: `identity/.../login-form-state.ts`.
+
+```
+lint 0 errores
+vitest run formula-import-actions + session-once-per-request-actions + tests/guards
+  640 verdes, 1 rojo, 5 skip — el rojo era guard-aislamiento-integracion por el archivo de T6 aún sin
+  declarar en aislamiento.json (T6 en curso)
+```

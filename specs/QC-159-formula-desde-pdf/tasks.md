@@ -129,7 +129,7 @@ Tras T5. **Toca:** `tests/integration/documentos/formula-import.int.test.ts` (nu
   segunda confirmación la reutiliza (**R27**);
 - archivo, receta y producto de otra empresa ⇒ como inexistentes (**R33**).
 
-### T7 [ ] — Server Actions
+### T7 [x] — Server Actions
 Tras T5. **Toca:** `lib/modules/documentos/adapters/driving/formula-import-actions.ts` (nuevo),
 `tests/unit/documentos/formula-import-actions.test.ts` (nuevo),
 `tests/unit/identity/session-once-per-request-actions.test.ts` (alta).
