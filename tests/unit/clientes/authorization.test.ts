@@ -179,10 +179,16 @@ describe('R3 — sin clientes.modificar el alta, la edicion y la baja se rechaza
 
 describe('R4 — actor ausente, sin permisos o con el permiso contrario se rechaza igual', () => {
   it('R4 — actor ausente, sin permisos o con el permiso contrario se rechaza igual', async () => {
+    // `assertPermission` (identity/domain/require-permission.ts) usa `Array.isArray` antes de
+    // buscar el codigo: un actor sin la clave `permissions` cae por ese `Array.isArray(undefined)`
+    // y se rechaza igual que el resto, sin llegar nunca a `.includes`.
+    const sinClavePermissions = { id: 'u-1', companyId: COMPANY_ID } as unknown as Actor
+
     for (const caso of TODOS_LOS_CASOS) {
       await esperarRechazoSinTocarNada(caso, null, 'actor ausente (null)')
       await esperarRechazoSinTocarNada(caso, undefined, 'actor ausente (undefined)')
       await esperarRechazoSinTocarNada(caso, actorCon(), 'conjunto de permisos vacio')
+      await esperarRechazoSinTocarNada(caso, sinClavePermissions, 'actor sin la clave permissions')
 
       const contrario = caso.permiso === CONSULTAR ? MODIFICAR : CONSULTAR
       await esperarRechazoSinTocarNada(caso, actorCon(contrario), `solo el permiso contrario (${contrario})`)
