@@ -153,7 +153,7 @@ sin cambiar lo que afirma).
 sigue llamando a `canUploadDocuments` (**R34**); `document-upload-review-link.test.tsx` y los tests de
 QC-107 verdes **sin editarlos**.
 
-### T9 [ ] — Pantalla de revisión
+### T9 [x] — Pantalla de revisión
 Tras T7, T8. **Toca:** `app/(private)/produccion/formulas/importar/[documentoId]/page.tsx`,
 `…/components/{index.ts,formula-import-review.tsx,formula-ingredient-row.tsx,formula-name-clash.tsx,formula-import-summary.tsx}`
 (nuevos), `tests/unit/recetas-ui/formula-import-page.test.tsx`,

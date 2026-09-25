@@ -310,3 +310,24 @@ vitest run tests/guards/guard-aislamiento-integracion.test.ts                   
 typecheck limpio · lint 0 errores
 vitest run tests/unit/documentos + create-raw-material + recipe-catalog + tests/guards   127 archivos, 1436 verdes / 34 skip
 ```
+
+## T9 — pantalla de revisión (frontend_dev, `e818f56b`)
+
+- Nuevos: `app/(private)/produccion/formulas/importar/[documentoId]/page.tsx` y
+  `components/{index.ts,formula-import-review.tsx,formula-ingredient-row.tsx,formula-name-clash.tsx,formula-import-summary.tsx}`;
+  `tests/unit/recetas-ui/formula-import-page.test.tsx` (7) y `formula-import-review.test.tsx` (20).
+- Modificados: `tests/guards/guard-pantallas-exigen-permiso.test.ts` (alta de la ruta, 14 → 15) y
+  `tests/unit/recetas-ui/recipe-route-contract.test.ts` (fuera de la lista de T9): esa suite asumía
+  **un solo** barrel bajo `formulas/`; `design.md > 6.4` pide que la subruta tenga el suyo, así que
+  `importar` entra en `CARPETAS_LEGITIMAS` y el subárbol queda fuera **solo** de los dos asertos de
+  «un único barrel» (reexport compartido y lista cerrada de acciones); las demás comprobaciones siguen
+  corriendo sobre los archivos nuevos. Revisado por el implementer: coherente con el diseño.
+- `RecipeForm`, `RecipeStepsField` y `ProductPicker` sin tocar. Integridad tras el stash de la limpieza:
+  typecheck limpio y sus 27 tests verdes.
+- Comentarios con `R<n>` y `design.md` en los componentes nuevos: se limpian en un commit aparte antes de T11.
+
+```
+typecheck limpio · lint 0 errores (7 avisos preexistentes ajenos)
+vitest run tests/unit/recetas-ui tests/unit/documentos/qc159-alcance.test.ts tests/guards
+  59 archivos, 890 verdes / 5 skip
+```
