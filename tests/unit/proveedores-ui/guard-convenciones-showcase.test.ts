@@ -10,9 +10,8 @@ import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
  * Cubre lo que ningun render puede ver: que `react-intersection-observer` siga aislada en un solo
  * archivo, que nadie escuche el desplazamiento a mano, que la URL de proveedores no se incruste
  * como literal, que los componentes de cliente de la vista no arrastren la composicion ni la base
- * de datos al navegador, y dos propiedades de lo que TOCAN LOS COMMITS DE QC-140 -no el diff de
- * la rama que corre esta guardia, que puede traer trabajo de otra ficha-: que no aparezca ningun
- * archivo bajo `db/` y que `components/shared/entity-image.tsx` no cambie (se reutiliza tal cual).
+ * de datos al navegador, y dos propiedades del DIFF de la rama: que no aparezca ningun archivo
+ * bajo `db/` y que `components/shared/entity-image.tsx` no cambie (se reutiliza tal cual).
  */
 
 const RAIZ = join(__dirname, '..', '..', '..');
@@ -82,67 +81,46 @@ function git(args: readonly string[]): string | null {
   }
 }
 
-/** Marca con la que QC-140 firma sus commits (`fix(QC-140): ...`, `test(QC-140): ...`, ...). */
-const MARCA_DE_LA_FEATURE = 'QC-140';
+/** El merge-base con `origin/dev`, o `null` si no se puede calcular (sin git, o sin esa rama). */
+const MERGE_BASE = (() => {
+  const salida = git(['merge-base', 'origin/dev', 'HEAD']);
+  const sha = (salida ?? '').trim();
+  return sha.length > 0 ? sha : null;
+})();
 
 /**
- * Archivos que TOCAN los commits DE QC-140 dentro de `origin/dev..HEAD`, mas los del arbol de
- * trabajo. `null` cuando no hay ninguno: QC-140 ya esta fusionada en `origin/dev` -su merge
- * (PR #118) borra sus commits del rango de cualquier rama que arranque despues, esta incluida- o
- * la rama no tiene relacion con `origin/dev`.
- *
- * Solo cuentan los commits firmados por la ficha, no el diff entero de la rama: una rama ajena con
- * sus propias migraciones no debe poner en rojo un caso que protege el alcance de esta.
+ * `true` cuando `origin/dev..HEAD` trae al menos un commit propio. Una vez mergeada esta rama,
+ * `dev` corre esta misma guardia con el diff vacio: sin esta comprobacion, R29 y D20 pasarian en
+ * verde sin haber mirado nada (mismo patron que `tests/unit/identity/qc78-alcance.test.ts` y
+ * `tests/unit/proveedores-ui/guard-convenciones-proveedores.test.ts`).
  */
-function archivosDeQC140(): readonly string[] | null {
-  // `--grep` casa con cualquier mensaje que MENCIONE la marca, no solo con quien la firma: un
-  // commit de otra ficha que la nombre de pasada (p.ej. en su cuerpo) tambien entraria. Se filtra
-  // en JS sobre el asunto (`%s`) exigiendo que empiece `tipo(QC-140)`, la forma en que esta
-  // feature firma sus propios commits.
-  const salidaLog = git(['log', '--no-merges', '--format=%H%x09%s', 'origin/dev..HEAD']);
-  if (salidaLog === null) return null;
-  const ASUNTO_FIRMADO = new RegExp(`^\\w+\\(${MARCA_DE_LA_FEATURE}\\)`);
-  const commits = salidaLog
-    .split('\n')
-    .map((linea) => linea.trim())
-    .filter((linea) => linea.length > 0)
-    .filter((linea) => ASUNTO_FIRMADO.test(linea.split('\t')[1] ?? ''))
-    .map((linea) => linea.split('\t')[0]);
-  if (commits.length === 0) return null;
+const RANGO_TIENE_COMMITS_PROPIOS = (() => {
+  if (MERGE_BASE === null) return false;
+  const salida = git(['rev-list', '--count', 'origin/dev..HEAD']);
+  return Number((salida ?? '0').trim()) > 0;
+})();
 
-  const tocados = new Set<string>();
-  const salidaShow = git(['show', '--pretty=format:', '--name-only', ...commits]);
-  for (const ruta of (salidaShow ?? '').split('\n')) {
-    const limpia = ruta.trim();
-    if (limpia.length > 0) tocados.add(aPosix(limpia));
+/** El merge-base, o `null` con un `ctx.skip()` en voz alta si no hay nada que mirar. */
+function baseDeFusionOMuda(ctx: Pick<import('vitest').TestContext, 'skip'>): string | null {
+  if (MERGE_BASE === null) {
+    ctx.skip('no se pudo calcular el merge-base con origin/dev: este caso NO ha comprobado nada.');
+    return null;
   }
-
-  // El arbol de trabajo cuenta: un cambio de QC-140 sin commitear no deja de ser suyo. Solo se
-  // llega aqui cuando el rango YA tiene commits con la marca -la unica senal disponible de que
-  // esta corrida es la rama de QC-140-, asi que sumar lo sin commitear no le atribuye a QC-140
-  // el trabajo sin commitear de otra ficha que comparta el arbol.
-  const salidaEstado = git(['status', '--porcelain']);
-  for (const linea of (salidaEstado ?? '').split('\n')) {
-    if (linea.trim().length === 0) continue;
-    const camino = linea.slice(3).trim();
-    const destino = camino.includes(' -> ') ? camino.split(' -> ')[1] : camino;
-    tocados.add(aPosix(destino.replace(/^"|"$/g, '')));
+  // Lo que se mide es el diff de ESTA ficha: en la rama de otra ficha, sus migraciones legitimas
+  // no son asunto de este caso y lo pondrian rojo sin motivo.
+  const rama = (git(['rev-parse', '--abbrev-ref', 'HEAD']) ?? '').trim();
+  if (!rama.startsWith('feature/QC-140-')) {
+    ctx.skip(`la rama actual (${rama || 'desconocida'}) no es la del catalogo visual: este caso NO ha comprobado nada.`);
+    return null;
   }
-
-  return [...tocados].sort();
-}
-
-/** Los archivos de QC-140, o `null` con un `ctx.skip()` en voz alta si no hay nada que mirar. */
-function archivosDeQC140OMudo(ctx: Pick<import('vitest').TestContext, 'skip'>): readonly string[] | null {
-  const tocados = archivosDeQC140();
-  if (tocados === null) {
+  if (!RANGO_TIENE_COMMITS_PROPIOS) {
     ctx.skip(
-      `origin/dev..HEAD no tiene ningun commit de ${MARCA_DE_LA_FEATURE} (ya fusionada en dev, o ` +
-        'esta rama no tiene relacion con ella): este caso NO ha comprobado nada.',
+      'origin/dev..HEAD no tiene ningun commit propio (ya mergeada, o corriendo sobre dev): ' +
+        'este caso NO ha comprobado nada.',
     );
     return null;
   }
-  return tocados;
+  return MERGE_BASE;
 }
 
 describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
@@ -201,22 +179,46 @@ describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
     expect(hallazgos).toEqual([]);
   });
 
-  it('R29: los commits de QC-140 en el rango no tocan ningun archivo bajo db/', (ctx) => {
-    const tocados = archivosDeQC140OMudo(ctx);
-    if (tocados === null) return;
+  it('R29: el diff de la rama contra origin/dev no añade ningun archivo bajo db/', (ctx) => {
+    const base = baseDeFusionOMuda(ctx);
+    if (base === null) return;
 
-    const bajoDb = tocados.filter((ruta) => ruta.startsWith('db/'));
-    expect(bajoDb, `QC-140 toca archivos bajo db/: ${bajoDb.join(', ')}`).toEqual([]);
+    // Dos fuentes, como en `guard-convenciones-proveedores.test.ts`: los archivos ya COMMITEADOS
+    // desde el merge-base (`git diff`) y los del ARBOL DE TRABAJO todavia sin commitear (`git
+    // status --porcelain`). Un archivo nuevo sin `git add` no aparece en `git diff` -no tiene blob
+    // que comparar-, y quedarse solo con `git diff` dejaria pasar justo ese caso.
+    const salidaDiff = git(['diff', '--name-only', '--diff-filter=A', base, '--', 'db/']);
+    expect(salidaDiff, 'git no pudo calcular el diff de db/').not.toBeNull();
+
+    const anadidos = new Set(
+      (salidaDiff as string)
+        .split('\n')
+        .map((linea) => linea.trim())
+        .filter((linea) => linea.length > 0),
+    );
+
+    const salidaEstado = git(['status', '--porcelain', '--', 'db/']);
+    expect(salidaEstado, 'git no pudo leer el estado de db/').not.toBeNull();
+
+    for (const linea of (salidaEstado as string).split('\n')) {
+      if (linea.trim().length === 0) continue;
+      const camino = linea.slice(3).trim();
+      const destino = camino.includes(' -> ') ? camino.split(' -> ')[1] : camino;
+      anadidos.add(aPosix(destino.replace(/^"|"$/g, '')));
+    }
+
+    expect([...anadidos].sort(), `la ficha anade archivos bajo db/: ${[...anadidos].join(', ')}`).toEqual([]);
   });
 
-  it('D20: QC-140 no toca components/shared/entity-image.tsx', (ctx) => {
-    const tocados = archivosDeQC140OMudo(ctx);
-    if (tocados === null) return;
+  it('D20: components/shared/entity-image.tsx no aparece en el diff de la rama', (ctx) => {
+    const base = baseDeFusionOMuda(ctx);
+    if (base === null) return;
 
     const ARCHIVO = 'components/shared/entity-image.tsx';
-    expect(
-      tocados.includes(ARCHIVO),
-      `QC-140 toca ${ARCHIVO}, y D20 dice que se reutiliza tal cual`,
-    ).toBe(false);
+    const salida = git(['diff', '--name-only', base, '--', ARCHIVO]);
+    expect(salida, `git no pudo calcular el diff de ${ARCHIVO}`).not.toBeNull();
+
+    const tocado = (salida as string).trim();
+    expect(tocado, `la ficha toca ${ARCHIVO}, y D20 dice que se reutiliza tal cual`).toBe('');
   });
 });

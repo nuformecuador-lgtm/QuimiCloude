@@ -4800,3 +4800,12 @@ podar.
   reanudó sin pérdida. **Lección:** comprobar el último commit antes de estimar.
 - **Quedan:** imagen en pantalla con URL firmada → **QC-140** (encargo en su issue); R37 en móvil real (humano);
   prompt de catálogo en Vercel y firma → **QC-131** (humano).
+
+## 2026-09-24 — QC-142-permiso-propio-de-documentos
+
+- **Qué:** `documentos` deja de pedir prestado `proveedores.modificar`: nacen `documentos.consultar` y `documentos.modificar`, solo para el Administrador; la migración hace heredar `documentos.modificar` a todo rol con `proveedores.modificar`. Los tres casos de uso de subida exigen el permiso nuevo; las lecturas siguen sin permiso.
+- **PR #120**, merge `5d3e90d9`. Spec R1–R21, D1–D8. Review: rechazado por 1 mayor (el test anti-total no veía aserciones multilínea ni un `/*` dentro de un string), aprobado en la segunda. Gate completo verde (688/688).
+- **Ningún test fija ya el total del catálogo de permisos**, y un test nuevo lo impide: QC-161 y QC-168 también lo amplían.
+- **Para arrancarla se subió el cupo de `backend` a 3** con `/afinar-regla` (`cdfc6bb`).
+- **Quinto test de alcance que compara contra la rama y rompe fichas ajenas** (QC-140 R29, QC-158 R36a): corregidos. La clase entera es **QC-99**.
+- **Deuda:** el recorrido E2E de subida de PDFs sigue en rojo, heredado de `dev`.

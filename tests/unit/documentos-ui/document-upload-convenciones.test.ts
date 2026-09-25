@@ -197,13 +197,13 @@ describe('lo que la pieza de subida NO trae', () => {
       expect(sinComentarios(leer(ruta)), ruta).not.toMatch(/proveedores\.\w+/);
     }
 
-    // El catalogo de permisos sigue cerrado: nada nuevo para documentos ni para subir.
+    // El catalogo gano un permiso propio de documentos: los unicos codigos que casan con este
+    // patron son exactamente esos dos, sin ningun otro `subir` ni `carga`.
     const codigos = PERMISSIONS.map((permiso) => permiso.code);
-    for (const codigo of codigos) {
-      expect(codigo).not.toMatch(/documento|subir|carga/i);
-    }
+    const quePareceDeSubida = codigos.filter((codigo) => /documento|subir|carga/i.test(codigo));
+    expect(quePareceDeSubida.sort()).toEqual(['documentos.consultar', 'documentos.modificar']);
 
-    // Lo que el modulo exige es un codigo QUE YA EXISTIA, no uno inventado para esta ficha.
+    // Lo que el modulo exige es un codigo que vive en el catalogo, no un string suelto sin registrar.
     expect(codigos).toContain(DOCUMENT_UPLOAD_PERMISSION);
 
     // El componente no nombra ningun permiso: quien autoriza es el caso de uso.

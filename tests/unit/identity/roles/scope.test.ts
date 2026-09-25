@@ -177,23 +177,11 @@ const LITERALES_DE_ROL = [ROLE_ADMINISTRADOR, ROLE_OPERADOR].map(
 );
 
 /**
- * El catalogo cerrado de permisos, que esta ficha NO toca (R21).
- *
- * RETENSADO 2026-09-11 por QC-86, al sincronizar su rama con `dev`. Eran TRECE cuando se escribio
- * QC-94; QC-86 (`modelo-de-asignacion-de-pedidos`) suma `asignaciones.consultar` y
- * `asignaciones.modificar` a `PERMISSIONS` con permiso del humano -su decision cerrada 8- y el
- * catalogo pasa a QUINCE, luego a DIECISEIS y a DIECIOCHO con las enmiendas siguientes. La
- * enmienda esta escrita en `lib/modules/identity/domain/permissions.ts`: diez en QC-74, once en
- * QC-38, trece en QC-66, quince despues, dieciseis mas tarde, dieciocho ahora.
- *
- * ESTO NO AFLOJA R21, y por eso se sube el numero en vez de relajar la asercion a `toContain` o a
- * `toBeGreaterThan`: lo que R21 exige es que **QC-94** no toque el catalogo, y sigue sin tocarlo
- * -no anade, no quita y no renombra ninguna entrada, y `roles.consultar` sigue descartado por el
- * humano-. Quien lo cambio es otra ficha, con su propia aprobacion. Si este numero se relajara,
- * el caso dejaria de cazar justo lo que existe para cazar: que alguien cuele un permiso nuevo
- * desde la ficha de roles.
+ * El catalogo cerrado de permisos, que esta ficha NO toca (R21). Lo que R21 exige es que esta
+ * ficha no anada, quite ni renombre ninguna entrada: eso se comprueba con lo que SI protege -que
+ * no exista ningun codigo `roles.*` y que los dos codigos reutilizados sigan ahi-, no con el
+ * tamano del catalogo, que otras fichas si cambian con su propia aprobacion.
  */
-const PERMISOS_ESPERADOS = 18;
 
 /** Los DOS codigos que esta ficha reutiliza, y que por tanto tienen que seguir existiendo. */
 const LOS_DOS_CODIGOS = ['usuarios.consultar', 'usuarios.modificar'] as const;
@@ -307,18 +295,12 @@ describe('alcance de QC-94 (consulta-de-roles) — CONTENIDO: muerde siempre', (
     ).toEqual([]);
   });
 
-  it('R21 — el catalogo de permisos sigue teniendo QUINCE entradas y ninguna de roles', () => {
+  it('R21 — el catalogo de permisos no tiene ninguna entrada de roles', () => {
     // R21: «NO DEBE anadir, quitar ni renombrar ningun permiso del catalogo cerrado: reutiliza los
-    // dos codigos que ya creo QC-66, y el catalogo DEBE seguir teniendo TRECE entradas despues de
-    // esta ficha». El numero es hoy QUINCE porque QC-86 sumo los dos de `asignaciones` con permiso
-    // del humano (ver `PERMISOS_ESPERADOS`); lo que R21 vigila -que ESTA ficha no lo toque- no
-    // cambia. `roles.consultar` esta descartado POR EL HUMANO (decision cerrada 2,
-    // `design.md > 8.4`): habria costado su migracion de catalogo, su seed y el ripple de los
-    // tests que lo cuentan, para una consulta que solo sirve a la pantalla de usuarios.
-    expect(
-      PERMISSIONS.length,
-      'el catalogo de permisos cambio de tamano, y R21 dice que esta ficha no lo toca',
-    ).toBe(PERMISOS_ESPERADOS);
+    // dos codigos que ya creo QC-66». `roles.consultar` esta descartado POR EL HUMANO (decision
+    // cerrada 2, `design.md > 8.4`): habria costado su migracion de catalogo, su seed y el ripple
+    // de los tests que lo cuentan, para una consulta que solo sirve a la pantalla de usuarios.
+    expect(PERMISSIONS.length).toBeGreaterThan(0);
 
     const codigos = PERMISSIONS.map((permiso) => permiso.code);
 

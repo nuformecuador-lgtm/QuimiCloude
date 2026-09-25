@@ -118,6 +118,37 @@ describe('documentos — emision de enlaces de subida', () => {
     });
   });
 
+  describe('documentos.modificar decide, nunca proveedores.* (R14, R15, R16)', () => {
+    it('R15 — proveedores.modificar y proveedores.consultar, sin documentos.modificar, rechazan sin tocar el puerto', async () => {
+      const doble = dobleDeAlmacenamiento();
+      const actor: Actor = {
+        id: PERSONA,
+        companyId: EMPRESA,
+        permissions: ['proveedores.modificar', 'proveedores.consultar'],
+      };
+
+      await expect(emisor(doble.storage)(actor, tanda(1))).rejects.toThrow(UnauthorizedError);
+      expect(doble.llamadas).toEqual([]);
+    });
+
+    it('R15 — solo documentos.consultar, sin documentos.modificar, tambien rechaza', async () => {
+      const doble = dobleDeAlmacenamiento();
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.consultar'] };
+
+      await expect(emisor(doble.storage)(actor, tanda(1))).rejects.toThrow(UnauthorizedError);
+      expect(doble.llamadas).toEqual([]);
+    });
+
+    it('R16 — documentos.modificar sin ningun permiso de proveedores autoriza la operacion', async () => {
+      const doble = dobleDeAlmacenamiento();
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] };
+
+      const { uploads } = await emisor(doble.storage)(actor, tanda(1));
+
+      expect(uploads).toHaveLength(1);
+    });
+  });
+
   describe('la tanda se rechaza ENTERA, sin firmar nada (R8, R9, R16)', () => {
     it('R8 — once archivos: `invalid_input` y CERO enlaces firmados, ni siquiera los diez primeros', async () => {
       const doble = dobleDeAlmacenamiento();
