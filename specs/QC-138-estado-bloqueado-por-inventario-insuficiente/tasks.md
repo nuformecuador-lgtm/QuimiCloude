@@ -8,10 +8,12 @@
 ## T0. Confirmar las respuestas de F1.4 y el estado de QC-168
 
 - **Depende de:** aprobación del spec.
-- **Archivos:** ninguno de producción. Solo `progress/impl_QC-138-...md`, donde se anotan las
-  respuestas a P1-P10 y a las preguntas 1-3, y si QC-168 ya está en `dev`.
-- **Hecho:** los requisitos provisionales (R4, R12, R16, R20, R23, R27, R31) están confirmados o
-  reescritos. El orden del enum está decidido según `design.md > 10`.
+- **Archivos:** ninguno de producción. Solo `progress/impl_QC-138-...md`, donde se anota si
+  QC-168 ya está en `dev`. P1-P10 y las preguntas 2 y 3 quedaron aprobadas el 2026-09-25 en F1.4
+  tal como estaban propuestas (`requirements.md > Decisiones cerradas`, D17-D27); la pregunta 1
+  sigue abierta y no bloquea.
+- **Hecho:** R4, R12, R16, R20, R23, R27 y R31 son firmes, con la propuesta aprobada. El orden del
+  enum está decidido según `design.md > 10`.
 
 ## T1. Enum `BLOQUEADO` y mapas exhaustivos que no compilan sin él
 

@@ -7,17 +7,17 @@
 
 ## 0. Preguntas con propuesta (para F1.4)
 
-Nada de esta sección está decidido. Cada punto dice qué propone el spec, qué requisitos dependen
-de la respuesta y qué cambia si el humano elige otra cosa.
+**Aprobadas por el humano el 2026-09-25 en F1.4**, todas tal como están propuestas (filas D17-D27
+de `requirements.md > Decisiones cerradas`). Las alternativas se conservan como registro.
 
-**P1. El catálogo ya no tiene quince permisos.** `lib/modules/identity/domain/permissions.ts`
+**P1. El catálogo ya no tiene quince permisos.** **Aprobada 2026-09-25 (F1.4).** `lib/modules/identity/domain/permissions.ts`
 tiene hoy **20** códigos (terminados, clientes y documentos se sumaron después de QC-123), y QC-168
 lo llevará a 21. La decisión heredada sigue en pie: **no nace ningún permiso**.
 *Propuesta:* leer D15 como «ningún permiso nuevo», sin cifra. R37 no nombra ningún número y su
 test comprueba que no aparece ningún código nuevo, no el tamaño del catálogo, así que no choca con
 QC-168.
 
-**P2. «Alcanza» se mide contra el disponible, y el bloqueado no reserva.** QC-141 ya expone la
+**P2. «Alcanza» se mide contra el disponible, y el bloqueado no reserva.** **Aprobada 2026-09-25 (F1.4).** QC-141 ya expone la
 medida: `syncForOrder` (adaptador `reservation-prisma.ts`) calcula el disponible de cada lote como
 `existencia − apartado por otros pedidos`, lo reparte todo-o-nada con `planReservation` y, en la
 edición, cuenta como disponible lo que el propio pedido tenía apartado. Hoy devuelve
@@ -34,9 +34,9 @@ nula y `insufficient`.
   pasa al instante de la revisión: los 15 días empiezan a contar ahí (R14).
 - Un producto **sin lotes, y por tanto sin unidad**, ya cuenta como «no alcanza» en QC-141 (E1).
   Su existencia es cero, así que es falta de material de verdad y no un dato incompleto. Se
-  propone que bloquee (R4, provisional).
+  propone que bloquee (R4).
 
-**P3. La revisión falla a mitad (pregunta abierta 3 de la semilla).** D6 dice «síncrono, dentro de
+**P3. La revisión falla a mitad (pregunta abierta 3 de la semilla).** **Aprobada 2026-09-25 (F1.4)**, opción (b). D6 dice «síncrono, dentro de
 la operación de inventario». Hay dos lecturas:
 - (a) **Misma transacción de base** que el alta o el ajuste. Si falla un pedido, se pierde también
   el lote. Además la transacción retiene el bloqueo de los productos mientras se revisan N pedidos.
@@ -49,43 +49,45 @@ lote, que es legítima por sí misma (R23). El pedido vuelve a revisarse en la s
 material o en su próxima edición. Si el humano elige (a), R23 cambia a «deshace todo» y la sección
 7 cambia de mecanismo: el alta tendría que abrir la transacción compartida de `pedidos`.
 
-**P4. La nota central de la semilla (`calculateIngredientsCost` y su `null`).** Decisión en `## 2`:
-**no se usa el coste para decidir si bloquea**. Se aprueba con el spec.
+**P4. La nota central de la semilla (`calculateIngredientsCost` y su `null`).** **Aprobada
+2026-09-25 (F1.4)** como decisión central. Decisión en `## 2`: **no se usa el coste para decidir si
+bloquea**.
 
-**P5. Liberaciones que no disparan la revisión.** Cancelar, caducar, borrar o editar a la baja un
+**P5. Liberaciones que no disparan la revisión.** **Aprobada 2026-09-25 (F1.4).** Cancelar, caducar, borrar o editar a la baja un
 pedido también dejan material disponible. D4 solo nombra el alta de lote y el ajuste al alza.
 *Propuesta:* respetar D4 al pie de la letra (R20). El bloqueado se desbloquea en la siguiente
 entrada de material o al editarlo. Si el humano quiere incluirlas, cancelar, borrar y editar
 llamarían a la misma revisión (sección 7) y la caducidad lo haría por empresa al terminar.
 
-**P6. Editar un `EN_CURSO` que deja de alcanzar.** La edición de Pedidos sigue admitiendo un
+**P6. Editar un `EN_CURSO` que deja de alcanzar.** **Aprobada 2026-09-25 (F1.4).** La edición de Pedidos sigue admitiendo un
 `EN_CURSO` (`update-order.ts` comprueba `assertTransition(EN_CURSO, EN_CURSO)`), y hoy ese caso
 libera la reserva sin más. D11 prohíbe `EN_CURSO → BLOQUEADO` y dice que un `EN_CURSO` tiene que
 implicar que había material.
 *Propuesta:* rechazar esa edición con `insufficient_material`, un código que ya existe (R12).
 *Alternativa:* mantener el comportamiento actual, es decir, un `EN_CURSO` sin nada apartado.
 
-**P7. Orden de la revisión.** Si el material que entra no da para todos los bloqueados, alguno
+**P7. Orden de la revisión.** **Aprobada 2026-09-25 (F1.4).** Si el material que entra no da para todos los bloqueados, alguno
 tiene que ir primero.
 *Propuesta:* del más antiguo al más nuevo por `created_at`, desempatando por `id`. Es el mismo
 criterio con el que QC-141 apartó los pedidos existentes al migrar (R16).
 *Alternativa:* por prioridad descendente y después por antigüedad.
 
-**P8. Pedidos `PENDIENTE` existentes sin material apartado.** Hoy hay pedidos que no alcanzaron y
+**P8. Pedidos `PENDIENTE` existentes sin material apartado.** **Aprobada 2026-09-25 (F1.4).** Hoy hay pedidos que no alcanzaron y
 quedaron `PENDIENTE` sin reserva.
 *Propuesta:* **no se migran**. D5 dice que el inventario nunca bloquea un pedido que ya estaba
 `PENDIENTE`, y convertirlos en un script sería exactamente eso. Se bloquean solo si alguien los
 edita y siguen sin alcanzar.
 
-**P9. Borrar un bloqueado.** D10 dice «cancelable y editable, como un `PENDIENTE`», pero no habla
+**P9. Borrar un bloqueado.** **Aprobada 2026-09-25 (F1.4).** D10 dice «cancelable y editable, como un `PENDIENTE`», pero no habla
 del borrado lógico.
 *Propuesta:* se puede borrar (R27). `delete-order.ts` usa una lista de no borrables
 (`ENTREGADO`, `CANCELADO`), así que el valor nuevo queda borrable sin tocar código.
 
-**P10. Qué cambió con QC-150, y QC-130 cancelada.**
+**P10. Qué cambió con QC-150, y QC-130 cancelada.** **Aprobada 2026-09-25 (F1.4).**
 - El Alcance y D1 citan QC-130 para «dato incompleto» y «que la presentación declare cuánto
   contiene». QC-130 está cancelada: el contenido de la presentación lo trajo QC-150. El spec no
-  reescribe el Alcance. *Propuesta:* que el humano cambie esa referencia a QC-150.
+  reescribe el Alcance. *Propuesta:* que el humano cambie esa referencia a QC-150. *(Hecho en el
+  Alcance de `requirements.md` con nota fechada el 2026-09-25.)*
 - **El contenido de la presentación no interviene en el bloqueo.** Solo lo usa el Finalizar, al
   que un `BLOQUEADO` no llega nunca (R28).
 - **La entrada por producción (`production`) de QC-150 no dispara la revisión** (R20). Un producto
@@ -93,10 +95,10 @@ del borrado lógico.
 - **El Finalizar de QC-150 no cambia.** Solo se toca `transition-order.ts` si la matriz lo exige
   (sección 4).
 
-**Preguntas 1 y 2 de la semilla, sin cerrar:**
+**Preguntas 1 y 2 de la semilla:**
 - **Pregunta 1, lote vencido.** Sigue abierta y no bloquea: QC-141 no descuenta vencidos, así que
   esta ficha tampoco. *Propuesta:* nada hasta que se cierre la pregunta 2 del dominio.
-- **Pregunta 2, distintivo.** *Propuesta:*
+- **Pregunta 2, distintivo.** **Aprobada 2026-09-25 (F1.4).** *Propuesta:*
   - En la lista del Operador: etiqueta «Bloqueado» en la columna Estado.
   - En lugar del enlace «Entrar», un botón deshabilitado «Entrar» con el texto visible «Falta
     material: no se puede iniciar», con el mismo patrón que el aviso de `EN_CURSO` de
@@ -314,7 +316,7 @@ createOrder(input, actor):
     - `insufficient` con confirmación → `setStatus(locked.status, 'BLOQUEADO')` si hace falta.
       `syncForOrder` ya liberó lo propio, con el actor como autor (R11).
     - Cualquier otro resultado desde `BLOQUEADO` → `setStatus('BLOQUEADO', 'PENDIENTE')` (R10).
-  - Estado `EN_CURSO` e `insufficient` → `InsufficientMaterialError` (R12, provisional P6).
+  - Estado `EN_CURSO` e `insufficient` → `InsufficientMaterialError` (R12, P6).
 - **Por qué lanzar dentro de la transacción y no preguntar antes:** así el modal solo aparece si
   en el instante de escribir no alcanza, y el segundo envío vuelve a decidir con datos frescos (R8).
   Sin carrera y sin una segunda definición de cobertura.

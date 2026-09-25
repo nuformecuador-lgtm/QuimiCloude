@@ -11,7 +11,10 @@
 > **Lo que NO entra.** La **reserva de material** → **QC-141**, que bloquea a ésta: sin ella dos
 > pedidos creados el mismo día pueden contar con los mismos 2.000 gr y verse cubiertos los dos.
 > Pintar el importe en la pantalla → **QC-122**. Que la presentación declare cuánto contiene →
-> **QC-130**. Devoluciones, que no existen en el ERP.
+> **QC-150**. Devoluciones, que no existen en el ERP.
+>
+> *(2026-09-25, F1.4: la referencia era QC-130, cancelada; el contenido de la presentación lo trajo
+> QC-150. Cambio aprobado por el humano con P10, fila D26.)*
 >
 > Sembrado por `/afinar-feature` el 2026-09-21. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
@@ -24,7 +27,8 @@
 > recalcula importe, D4 qué movimientos disparan, D5 ajuste a la baja, D6 síncrono, D7 modal, D8
 > bloquea al editar, D9 lo ve el Operador, D10 cancelable y editable, D11 no se arranca a mano, D12
 > reserva (QC-141), D13 enum, D14 posición del valor, D15 sin permiso nuevo, D16 borrado e
-> identificadores.
+> identificadores. D17-D27 son las filas cerradas en F1.4 (2026-09-25): D17 decisión central (P4),
+> D18 P1, D19 P2, D20 P3, D21 P5, D22 P6, D23 P7, D24 P8, D25 P9, D26 P10, D27 distintivo.
 >
 > **Vocabulario** (heredado de QC-141). *Necesidad* de un ingrediente: cantidad del pedido × % de
 > su línea / 100, en la unidad del producto. *Disponible* de un lote: su existencia menos lo que
@@ -32,10 +36,6 @@
 > ingrediente la suma de disponibles es menor que su necesidad —la misma regla con la que QC-141
 > decide que un pedido no aparta nada (QC-141 R8-R11)—. *Pedido bloqueado*: pedido vivo en
 > `BLOQUEADO`.
->
-> **Requisitos provisionales.** Los marcados **(provisional, Pn)** llevan la propuesta de
-> `design.md > 0` y dependen de que el humano la apruebe en F1.4. Si la rechaza, cambian antes de
-> implementar.
 
 ### A. Qué bloquea
 
@@ -51,7 +51,7 @@ pedido `[D1]`.
 ingrediente cuya unidad no comparte base con la del lote, un importe que desborda la columna, lotes
 sin coste—, ENTONCES el sistema NO DEBE bloquear el pedido por esa causa `[D1]` (P4).
 
-**R4.** *(Provisional, P2.)* SI el producto de un ingrediente no tiene unidad porque nunca tuvo
+**R4.** SI el producto de un ingrediente no tiene unidad porque nunca tuvo
 lotes, ENTONCES el sistema DEBE tratar ese ingrediente como que no alcanza `[D1]` `[D12]`.
 
 **R5.** MIENTRAS un pedido esté `BLOQUEADO`, el sistema NO DEBE tener material apartado para él y
@@ -82,7 +82,7 @@ sin mostrar el modal, también si antes estaba `BLOQUEADO`, y DEBE apartar su ma
 sistema DEBE liberar todo lo apartado en la misma operación, con quien edita como autor `[D8]`
 `[D12]`.
 
-**R12.** *(Provisional, P6.)* SI se edita un pedido `EN_CURSO` y con los datos nuevos no alcanza,
+**R12.** SI se edita un pedido `EN_CURSO` y con los datos nuevos no alcanza,
 ENTONCES el sistema DEBE rechazar la edición con `insufficient_material` sin escribir nada `[D11]`.
 
 ### C. Desbloqueo automático
@@ -100,7 +100,7 @@ ninguno `[D2]` `[D12]`.
 el calculado en ese instante con los lotes de ese momento (QC-141 R59-R61), también cuando el
 resultado es «sin importe» `[D3]`.
 
-**R16.** *(Provisional, P7.)* La revisión DEBE recorrer los pedidos bloqueados de la empresa del
+**R16.** La revisión DEBE recorrer los pedidos bloqueados de la empresa del
 más antiguo al más nuevo por fecha de creación, desempatando por identificador, de modo que el
 material que entra se aparte antes para el más antiguo `[D2]`.
 
@@ -113,7 +113,7 @@ esté en `BLOQUEADO`, ni ningún pedido de otra empresa `[D6]`.
 **R19.** CUANDO un ajuste a la baja deje sin cubrir la necesidad de un pedido `PENDIENTE`, el
 sistema NO DEBE pasarlo a `BLOQUEADO` `[D5]`.
 
-**R20.** *(Provisional, P5.)* El sistema NO DEBE disparar la revisión con ningún movimiento distinto
+**R20.** El sistema NO DEBE disparar la revisión con ningún movimiento distinto
 de los de R13: ni un ajuste negativo, ni un consumo, ni una entrada por producción, ni la
 liberación de material por cancelar, caducar, borrar o editar otro pedido `[D4]` `[D5]`.
 
@@ -124,7 +124,7 @@ sale a `PENDIENTE` por R10 o R14, o a `CANCELADO` por R25 `[D2]` `[D11]`.
 pedido y cada apartado con el instante de la revisión y **sin persona autora** —lo hizo el
 sistema—, como hace la caducidad de QC-141 `[D2]`.
 
-**R23.** *(Provisional, P3.)* SI la revisión de un pedido falla, ENTONCES el sistema DEBE dejar ese
+**R23.** SI la revisión de un pedido falla, ENTONCES el sistema DEBE dejar ese
 pedido como estaba, seguir con los demás, notificar el fallo por el canal definido indicando la
 empresa, el pedido y el código del error, y NO DEBE deshacer el movimiento de inventario que la
 disparó `[D6]`.
@@ -142,7 +142,7 @@ reglas que un `PENDIENTE` `[D10]`.
 **R26.** El sistema DEBE permitir editar un pedido `BLOQUEADO` con el mismo formulario y las mismas
 validaciones que un `PENDIENTE`, recalculando su importe como cualquier edición `[D10]`.
 
-**R27.** *(Provisional, P9.)* El sistema DEBE permitir borrar lógicamente un pedido `BLOQUEADO`
+**R27.** El sistema DEBE permitir borrar lógicamente un pedido `BLOQUEADO`
 como a un `PENDIENTE` `[D10]` `[D16]`.
 
 **R28.** El sistema NO DEBE llevar un pedido `BLOQUEADO` a `EN_CURSO` ni a `ENTREGADO` por ninguna
@@ -157,7 +157,7 @@ pedido `BLOQUEADO` `[D12]`.
 **R30.** CUANDO un Operador consulte sus pedidos asignados, el sistema DEBE incluir los `BLOQUEADO`
 que tiene asignados junto a los `PENDIENTE` y `EN_CURSO`, con su estado `[D9]`.
 
-**R31.** *(Provisional en su aspecto, pregunta 2.)* MIENTRAS un pedido asignado esté `BLOQUEADO`,
+**R31.** MIENTRAS un pedido asignado esté `BLOQUEADO`,
 la lista del Operador DEBE mostrarlo marcado como bloqueado y con la acción de entrar deshabilitada,
 con el motivo en texto visible —no solo en un tooltip— y un objetivo táctil de al menos 44×44 px
 `[D9]`.
@@ -220,6 +220,17 @@ entrar; un alta de lote que lo cubre lo deja `PENDIENTE` con material apartado `
 | D14 último valor y duplicado vigilado | R35 |
 | D15 sin permiso nuevo | R37, R38 |
 | D16 borrado e identificadores | R27, R39 |
+| D17 decisión central: «no alcanza» sale de la reserva | R1, R3 |
+| D18 ningún permiso nuevo, sin cifra | R37 |
+| D19 disponible y reserva del bloqueado | R1, R4, R5, R11, R14 |
+| D20 fallo de la revisión no deshace el alta | R23 |
+| D21 las liberaciones no disparan | R20 |
+| D22 `EN_CURSO` que deja de alcanzar | R12 |
+| D23 orden de la revisión | R16 |
+| D24 `PENDIENTE` existentes no se migran | R1, R19 |
+| D25 borrado lógico del bloqueado | R27 |
+| D26 QC-150 en lugar de QC-130 | R20, R28 |
+| D27 distintivo del bloqueado | R31, R34 |
 
 ## Preguntas abiertas
 
@@ -227,32 +238,9 @@ entrar; un alta de lote que lo cubre lo deja `PENDIENTE` con material apartado `
    (`docs/architecture.md > Preguntas abiertas del dominio`), «respondida a medias, no cerrada»
    desde QC-90. Hoy no hay vencimiento en `ProductBatch`, así que la cuestión no bloquea esta
    ficha; el día que se cierre, «no alcanza» tendrá que decidir si descuenta lo vencido.
-2. **Qué distintivo lleva el pedido bloqueado en la lista del Operador.** Que se vea y que no se
-   pueda iniciar está decidido; **cómo** se ve —color, etiqueta, icono, texto del botón
-   deshabilitado— no se habló y no se rellena con un supuesto.
-3. **Si el desbloqueo automático falla a mitad, ¿se deshace el alta del lote?** La revisión corre
-   síncrona dentro de la operación de inventario, así que la transacción las une por defecto; pero
-   nadie decidió si un fallo revisando pedidos debe tumbar el registro del material, que es una
-   operación legítima por sí misma.
-   *(F1.2: propuesta en `design.md > 0`, P3. R23 queda provisional hasta la respuesta.)*
 
-> **Añadidas en F1.2** al reconciliar la semilla con `dev` (2026-09-25). Cada una lleva su
-> propuesta en `design.md > 0` y **ninguna está cerrada**: las cierra el humano en F1.4.
->
-> 4. **(P1)** El catálogo ya no tiene quince permisos, sino veinte (QC-142, QC-153 y otras
->    lo ampliaron); QC-168 lo llevará a veintiuno. ¿Se lee D15 como «ningún permiso nuevo», sin
->    cifra?
-> 5. **(P2)** ¿«Alcanza» se mide contra el disponible de QC-141 (existencia menos apartado)? ¿Un
->    pedido bloqueado no aparta nada, libera al bloquearse y aparta al desbloquearse? ¿Cuenta como
->    «no alcanza» un producto sin lotes (QC-141 E1)?
-> 6. **(P5)** Cancelar, caducar, borrar o editar a la baja otro pedido también libera material.
->    ¿Se queda fuera de los disparadores, como dice D4?
-> 7. **(P6)** ¿Qué pasa al editar un `EN_CURSO` de forma que ya no alcanza?
-> 8. **(P7)** ¿En qué orden se revisan los bloqueados cuando el material no llega para todos?
-> 9. **(P8)** Los `PENDIENTE` que hoy existen sin material apartado, ¿se migran a `BLOQUEADO`?
-> 10. **(P9)** ¿Se puede borrar lógicamente un `BLOQUEADO`?
-> 11. **(P10)** El Alcance cita QC-130 («que la presentación declare cuánto contiene»), cancelada;
->    lo trajo QC-150. ¿Actualiza el humano esa línea del Alcance?
+> **Cerradas en F1.4 (2026-09-25).** La 2 (distintivo) y la 3 (fallo de la revisión) de la semilla,
+> y las añadidas en F1.2 (P1-P10), pasan a `## Decisiones cerradas`, filas D17-D27.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -274,6 +262,17 @@ entrar; un alta de lote que lo cubre lo deja `PENDIENTE` con material apartado `
 | Heredada de QC-33 | ¿Dónde va el valor nuevo? | **El último, después de `CANCELADO`.** `ALTER TYPE … ADD VALUE` solo sabe añadir al final, y en este enum el orden no significa nada de negocio —a diferencia del de la prioridad—. `ORDER_STATUS_VALUES` en `order-classification.ts` es un duplicado a mano vigilado por `module-contract.test.ts` (QC-33 R35), que compara las dos listas valor a valor **y en orden**: se tocan juntas o el gate se pone rojo. |
 | Heredada de QC-123 | ¿Nace un permiso nuevo? | **No.** El catálogo cerrado de quince permisos no se enmienda. |
 | Heredada de la spec 4 | Borrado e identificadores | Borrado **lógico** con `created_at` / `updated_at` / `deleted_at`, e identificadores de base de datos **en inglés**. |
+| 2026-09-25 | **Decisión central (P4):** ¿de dónde sale «no alcanza»? | De la **reserva de QC-141** (`ReservationOutcome` gana `insufficient`), en la misma transacción que aparta; **no** de `calculateIngredientsCost` ni de su `null`. |
+| 2026-09-25 | (P1) ¿Cómo se lee D15 si el catálogo ya no tiene quince permisos? | **Ningún permiso nuevo, sin cifra**: el test comprueba que no aparece ningún código, no el tamaño del catálogo. |
+| 2026-09-25 | (P2) ¿Contra qué se mide «alcanza» y qué aparta un bloqueado? | Contra el **disponible** de QC-141; un `BLOQUEADO` no aparta nada, libera al bloquearse y aparta al desbloquearse; un producto sin lotes **no alcanza**. |
+| 2026-09-25 | (P3, pregunta 3 de la semilla) Si la revisión falla, ¿se deshace el alta del lote? | **No.** Misma petición, una transacción propia por pedido: el pedido que falla queda `BLOQUEADO`, se notifica y el movimiento de inventario se conserva. |
+| 2026-09-25 | (P5) ¿Cancelar, caducar, borrar o editar otro pedido disparan la revisión? | **No.** Solo el alta de lote y el ajuste al alza, como dice D4. |
+| 2026-09-25 | (P6) ¿Qué pasa al editar un `EN_CURSO` que deja de alcanzar? | Se **rechaza** con `insufficient_material` sin escribir nada. |
+| 2026-09-25 | (P7) ¿En qué orden se revisan los bloqueados? | **Del más antiguo al más nuevo** por `created_at`, desempatando por `id`. |
+| 2026-09-25 | (P8) ¿Se migran a `BLOQUEADO` los `PENDIENTE` existentes sin material apartado? | **No.** Solo se bloquean si alguien los edita y siguen sin alcanzar. |
+| 2026-09-25 | (P9) ¿Se puede borrar lógicamente un `BLOQUEADO`? | **Sí**, como un `PENDIENTE`. |
+| 2026-09-25 | (P10) ¿Qué cambia con QC-150 y QC-130 cancelada? | La referencia del Alcance pasa a **QC-150**; el contenido de la presentación no interviene en el bloqueo, la entrada por producción no dispara la revisión y el Finalizar no cambia. |
+| 2026-09-25 | (Pregunta 2 de la semilla) ¿Qué distintivo lleva el bloqueado? | Etiqueta «Bloqueado» en Estado; en la lista del Operador, botón «Entrar» deshabilitado con el texto visible «Falta material: no se puede iniciar»; en Pedidos, insignia con la variante `destructive`. |
 
 ### Nota de diseño que la acotación deja planteada, no resuelta
 
