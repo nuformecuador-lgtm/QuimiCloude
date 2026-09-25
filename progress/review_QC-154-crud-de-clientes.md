@@ -188,3 +188,49 @@ Son las 11 claves: `id`, los seis datos, los dos instantes y los dos autores. Ni
 2. B2: poner los fabricados de `scope.test.ts` en `mkdtempSync` con los detectores parametrizados por raiz. Incluye el fabricado heredado de QC-153 en la linea 233.
 3. B3: afirmar las claves exactas de la salida real del adaptador en `customer-repository.int.test.ts`, y actualizar las filas R22 y R47.
 4. Despues, `./init.sh` completo en verde y T16 marcada. Los menores m2, m4, m5 y m8 son baratos y conviene hacerlos en la misma vuelta.
+
+---
+
+## Vuelta 2 (2026-09-25) — HEAD `3a2a2010`
+
+### Veredicto: **OK**, condicionado a que el gate completo salga verde
+
+Quedan abiertos 0 bloqueantes y 2 menores (m1 y m9), y ninguno de los dos bloquea. La ficha pasa a `done` cuando se cumplan dos cosas:
+- el `./init.sh` completo del leader sale verde;
+- T16 queda marcada.
+
+### Que ejecute
+
+```
+pnpm exec vitest run tests/unit/clientes tests/guards
+-> exit 0 · Test Files 54 passed (54) · Tests 664 passed | 5 skipped (669)
+```
+
+Mientras corria, sondee en bucle `git status --porcelain --untracked-files=all -- lib app`, y durante toda la corrida no aparecio **ningun** archivo en `lib/` ni en `app/`. Ninguno de los 5 skipped es un `.skip` explicito de `tests/unit/clientes` ni de `tests/guards`, segun el grep.
+
+No corri la integracion ni el gate, por instruccion. Los cierres de B3 y m5 son tests de integracion. Los revise leyendo el codigo y los confirma el gate del leader.
+
+### Cierre de cada hallazgo, comprobado contra el codigo
+
+| Hallazgo | Estado | Evidencia |
+| --- | --- | --- |
+| B1 | **Cerrado** | Repeti el grep `QC-<n>`, `R<n>`, `design.md`, «decision cerrada», `P2-5` y `T<n>` sobre `git diff origin/dev...HEAD -U0 -- lib db app components hooks middleware.ts`. Solo devuelve lineas de `domain/list-query.ts` (la copia caracter a caracter, m1) y un falso positivo (`'T00:00:00.000Z'`). Las cabeceras de la migracion y del `down.sql` quedan limpias, igual que el bloque de `lib/composition` y el resto del modulo |
+| B2 | **Cerrado** | Los seis casos de sensibilidad de `scope.test.ts` escriben bajo `mkdtempSync(tmpdir())` y hacen `rmSync` en `finally`: lineas 235, 249, 380, 487, 544 y 558/559 (este ultimo es el nuevo de m7). Los detectores reciben la raiz por parametro (`fuentesDeProduccion`, `detectarLiteralesDePermiso`, `hallazgosDePaginacion`, `coincidenciasEnApp`, `hallazgosDeAcoplamiento`). Un caso nuevo (linea 583) prohibe `writeFileSync`/`mkdirSync` sobre `join(repoRoot\|moduloDir`. En `tests/guards` los otros dos que escriben (`guard-sesiones-cortadas`, `guard-validador-ve-worktrees-hermanos`) ya lo hacian en un temporal |
+| B3 | **Cerrado** | En `customer-repository.int.test.ts`: `R22 — findAliveCustomerById devuelve exactamente las 11 claves…` y `R47 — cada item de listAliveCustomers devuelve exactamente las 11 claves…`. Los dos afirman `Object.keys(...).sort()` igual a la lista cerrada, contra la base real. Las filas R22 y R47 de `tasks.md` los citan |
+| m1 | Abierto, como deuda anotada | Hace falta una ficha que limpie a la vez las siete copias de `list-query.ts` |
+| m2 | Cerrado | `textCondition`/`TextCondition` borrados. La cabecera ya no dice que se usan |
+| m3 | Cerrado | El test de la cabecera de la migracion busca tambien `QC-<n>` y `design.md` |
+| m4 | Cerrado | El caso de R25 cita en su nombre la guardia que sostiene la propiedad (`metodosEsperados: 5`) |
+| m5 | Cerrado | R10 compara `updatedAt`, `updatedBy` y `deletedAt` de la fila ajena antes y despues |
+| m6 | Cerrado | La sensibilidad de R37 ejerce `camposDe` |
+| m7 | Cerrado | R40 detecta tambien el modelo y la tabla (`prisma.order`, `'customers'`), con fabricado en un temporal |
+| m8 | Cerrado | Tabla de trazabilidad alineada con los nombres reales |
+| m9 | Abierto | T16 depende del gate completo del leader |
+| m10 | Cerrado | Fuera los comentarios con la ruta del archivo |
+| m11 | Cerrado | R4 prueba un actor sin la clave `permissions`. El comentario lo explica con el `Array.isArray` de `assertPermission` |
+
+### Cambios nuevos de esta vuelta
+
+- **Renumeracion de la migracion.** Pasa a `20260924200000_customers_search_normalized`, posterior a la ultima de `origin/dev` (`20260924190100_finished_products_and_content_copies`, de QC-150). Todas las referencias estan actualizadas: `guard-identificador-de-request`, `scope.test.ts` R37, el test estatico, las dos de integracion y la bitacora. Ya no queda ningun `20260924190000_customers…`.
+- **Enmienda del catalogo.** `error-codes.ts` deja a QC-150 como «Duodecima enmienda» y a `customer_not_found` como «Decimotercera enmienda, 2026-09-24». `catalogo.test.ts` afirma las dos cabeceras y el censo de 57 (54, mas 2 de QC-150, mas 1 de esta ficha).
+- **Los dos merges con dev** no meten nada de otra ficha en el diff de la rama contra `origin/dev`.
