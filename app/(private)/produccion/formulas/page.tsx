@@ -3,7 +3,10 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { buttonVariants } from '@/components/ui/button';
+import { DocumentUploadDialog } from '@/components/shared/document-upload';
 import { cn } from '@/lib/utils';
+import { identity } from '@/lib/composition';
+import { canUploadDocuments } from '@/lib/modules/documentos';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
@@ -25,6 +28,7 @@ export default async function FormulasPage({
   await requirePagePermission('recetas.consultar');
 
   const params = parseRecipeListParams(await searchParams);
+  const canUpload = canUploadDocuments(await identity.getSessionUser());
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -32,15 +36,18 @@ export default async function FormulasPage({
         <h1 data-testid="recipes-title" className="text-2xl font-semibold">
           {RECIPES_LABEL}
         </h1>
-        {/* Un enlace y no `Button` con `render`: Base UI le pondría `role="button"` al `<a>`. */}
-        <Link
-          href={NEW_RECIPE_ROUTE}
-          data-slot="button"
-          data-testid="recipe-create-open"
-          className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
-        >
-          Nueva fórmula
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Un enlace y no `Button` con `render`: Base UI le pondría `role="button"` al `<a>`. */}
+          <Link
+            href={NEW_RECIPE_ROUTE}
+            data-slot="button"
+            data-testid="recipe-create-open"
+            className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
+          >
+            Nueva fórmula
+          </Link>
+          {canUpload ? <DocumentUploadDialog strategy="formula" /> : null}
+        </div>
       </div>
       {/* Sin `key`: remontar el límite en cada consulta borraría el foco del campo de búsqueda. */}
       <Suspense fallback={<RecipeTableSkeleton rows={params.pageSize} />}>

@@ -15,6 +15,7 @@ export {
   BatchDuplicateLotError,
   BatchNotFoundError,
   BatchStockNegativeError,
+  ActionNotAllowedError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 export {
@@ -29,7 +30,11 @@ export {
   sanitizeListQuery,
 } from './domain/list-query';
 export { PRESENTATION_QUERYABLE } from './domain/presentation-queryable';
-export { PRODUCT_QUERYABLE, PRODUCT_TYPE_VALUES } from './domain/product-queryable';
+export {
+  PRODUCT_QUERYABLE,
+  PRODUCT_TYPE_VALUES,
+  MANUAL_PRODUCT_TYPE_VALUES,
+} from './domain/product-queryable';
 export { PRODUCT_TYPES, type ProductType } from './domain/product-type';
 export { normalizePresentationName } from './domain/presentation-name';
 export { normalizeProductName } from './domain/product-name';
@@ -91,6 +96,12 @@ export {
   ceilToScale4,
 } from './domain/decimal-quantity';
 export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
+export {
+  planFinishedGoods,
+  type FinishedGoodsPlan,
+  type FinishedGoodsOutcome,
+  type FinishedGoodsIntake,
+} from './domain/finished-goods';
 
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.

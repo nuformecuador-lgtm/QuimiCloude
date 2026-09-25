@@ -6,7 +6,11 @@ import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeleteProduct } from '@/lib/modules/inventario/domain/delete-product';
-import { ProductNotFoundError, ValidationError } from '@/lib/modules/inventario/domain/errors';
+import {
+  ActionNotAllowedError,
+  ProductNotFoundError,
+  ValidationError,
+} from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
@@ -168,6 +172,27 @@ describe('R14 — no encontrado al editar o al borrar', () => {
   });
 });
 
+describe('R4 (QC-150) — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () => {
+  it('el puerto devolviendo type_locked se traduce a ActionNotAllowedError', async () => {
+    const products = montarRepositorio({
+      updateAlive: vi.fn<ProductRepository['updateAlive']>(async () => 'type_locked'),
+    });
+    const updateProduct = createUpdateProduct({ products, now: () => AHORA });
+
+    await expect(
+      updateProduct('producto-1', { ...PRODUCTO_VALIDO, type: 'FINISHED_PRODUCT' }, ADMIN),
+    ).rejects.toBeInstanceOf(ActionNotAllowedError);
+  });
+
+  it('la edicion normal (sin bloqueo) sigue aceptando cualquiera de los tres tipos manuales', async () => {
+    const products = montarRepositorio();
+    const updateProduct = createUpdateProduct({ products, now: () => AHORA });
+
+    await updateProduct('producto-1', { ...PRODUCTO_VALIDO, type: 'PRODUCT' }, ADMIN);
+    expect(products.updateAlive).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('el borrado usa la operacion logica del puerto, nunca una fisica', () => {
   it('borrar llama a softDeleteAlive con el actor y el instante, no a un delete fisico', async () => {
     // R15, R16
@@ -230,12 +255,22 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
     afirmarPuertoIntacto(products);
   });
 
-  it('R11 — nombre de mas de 120 caracteres', async () => {
+  it('D22 — nombre de mas de 200 caracteres', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await expect(
-      createProduct({ ...ALTA_VALIDA, name: 'x'.repeat(121) }, ADMIN),
+      createProduct({ ...ALTA_VALIDA, name: 'x'.repeat(201) }, ADMIN),
+    ).rejects.toBeInstanceOf(ValidationError);
+    afirmarPuertoIntacto(products);
+  });
+
+  it('R2 (QC-150) — el alta manual con type FINISHED_PRODUCT se rechaza sin escribir nada', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await expect(
+      createProduct({ ...ALTA_VALIDA, type: 'FINISHED_PRODUCT' }, ADMIN),
     ).rejects.toBeInstanceOf(ValidationError);
     afirmarPuertoIntacto(products);
   });

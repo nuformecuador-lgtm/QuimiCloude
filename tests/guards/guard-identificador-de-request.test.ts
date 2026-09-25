@@ -189,6 +189,15 @@ export const E2E_ESPERADOS = [
   // accion del identificador de peticion: el spec no lee ni afirma nada sobre el identificador
   // ni sobre `reference`, asi que el diferimiento sigue INTACTO.
   'pedidos-terminados.spec.ts',
+  // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto
+  // de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se
+  // nombra, uno a uno-. El recorrido que ejercita: dar contenido a una presentacion, crear y
+  // asignar un pedido con ella, finalizarlo en `/asignacion/[id]` y ver en Inventario el producto
+  // terminado nacer con su lote, su cantidad y sus envases; y que el lote sigue diciendo los
+  // mismos envases al cambiar despues el contenido de la presentacion. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que el diferimiento sigue INTACTO.
+  'producto-terminado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -323,9 +332,13 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: agrega `material` y `measurements` a las lineas del catalogo de proveedor;
   // no toca el identificador de peticion.
   '20260924180000_supplier_catalog_line_material_and_measurements',
+  // Ninguna de las dos toca el identificador de peticion: una anade valores a dos enums, la
+  // otra da forma a la identidad del producto terminado y a las copias de contenido.
+  '20260924190000_finished_product_enum_values',
+  '20260924190100_finished_products_and_content_copies',
   // Igual patron: anade las tres columnas normalizadas de `customers` para la busqueda sin
   // acentos; no toca el identificador de peticion.
-  '20260924190000_customers_search_normalized',
+  '20260924200000_customers_search_normalized',
 ] as const
 
 export function hallazgosDeMigraciones(

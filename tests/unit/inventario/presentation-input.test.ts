@@ -80,3 +80,49 @@ describe('updatePresentationSchema — la edicion es reemplazo completo (R12)', 
     expect(result.success && result.data.unitId).toBe(otra);
   });
 });
+
+describe('createPresentationSchema — el contenido (R6)', () => {
+  it('R6: acepta un decimal mayor que cero, hasta diez enteros y cuatro decimales', () => {
+    const result = createPresentationSchema.safeParse({
+      name: 'Botella 1L',
+      unitId: UNIDAD,
+      content: '1234567890.1234',
+    });
+
+    expect(result.success && result.data.content).toBe('1234567890.1234');
+  });
+
+  it('R6: se vacia con ausencia o con null, y no con la cadena vacia', () => {
+    const sinCampo = createPresentationSchema.safeParse({ name: 'Botella 1L', unitId: UNIDAD });
+    const conNull = createPresentationSchema.safeParse({
+      name: 'Botella 1L',
+      unitId: UNIDAD,
+      content: null,
+    });
+
+    expect(sinCampo.success && sinCampo.data.content).toBeUndefined();
+    expect(conNull.success && conNull.data.content).toBeNull();
+  });
+});
+
+describe('createPresentationSchema — los seis rechazos del contenido (R7)', () => {
+  const casos: Array<[string, string]> = [
+    ['cero', '0'],
+    ['negativo', '-1'],
+    ['mas de cuatro decimales', '1.12345'],
+    ['mas de diez cifras enteras', '12345678901'],
+    ['notacion cientifica, no es un decimal plano', '1e3'],
+    ['coma en vez de punto, no es un decimal plano', '1,5'],
+  ];
+
+  it.each(casos)('rechaza %s (%s) con invalid_input, sin escribir nada', (_motivo, valor) => {
+    const result = createPresentationSchema.safeParse({
+      name: 'Botella 1L',
+      unitId: UNIDAD,
+      content: valor,
+    });
+
+    expect(result.success).toBe(false);
+    expect(camposConError(result)).toContain('content');
+  });
+});

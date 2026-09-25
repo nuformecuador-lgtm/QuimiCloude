@@ -28,7 +28,12 @@ import {
   adjustBatchStockAction,
   type AdjustBatchStockFormState,
 } from '@/lib/modules/inventario/adapters/driving/batch-actions';
-import { MOVEMENT_REASONS, type ProductBatchView } from '@/lib/modules/inventario';
+import {
+  MOVEMENT_REASONS,
+  PRODUCT_TYPES,
+  type ProductBatchView,
+  type ProductType,
+} from '@/lib/modules/inventario';
 
 import { movementReasonLabel } from './batch-history';
 
@@ -48,6 +53,7 @@ const ZERO_DELTA_MESSAGE = 'La cantidad no puede ser cero.';
 const MISSING_REASON_MESSAGE = 'Elegi un motivo.';
 const OVER_RESERVED_MESSAGE =
   'El lote queda sobre-reservado: hay pedidos sin cobertura completa.';
+const FINISHED_PRODUCT_NOTICE = 'Solo se admiten ajustes que restan.';
 
 /** Mismo patron que la action: el signo se conserva, hasta 4 decimales pasan. */
 const DECIMAL_DELTA_PATTERN = /^-?\d{1,10}(\.\d{1,4})?$/;
@@ -80,6 +86,8 @@ export type AdjustBatchDialogProps = {
   readonly batch: ProductBatchView;
   /** Permiso `inventario.modificar`, resuelto en el servidor y bajado por props. */
   readonly canAdjust: boolean;
+  /** Tipo del producto dueño del lote. Con `FINISHED_PRODUCT` se avisa que solo se admite restar. */
+  readonly productType?: ProductType;
   readonly onAdjusted?: () => void;
 };
 
@@ -93,19 +101,26 @@ export type AdjustBatchDialogProps = {
  * lo decide la action y el caso de uso, este componente solo evita el viaje redondo cuando la
  * cantidad es cero.
  */
-export function AdjustBatchDialog({ batch, canAdjust, onAdjusted }: AdjustBatchDialogProps) {
+export function AdjustBatchDialog({
+  batch,
+  canAdjust,
+  productType,
+  onAdjusted,
+}: AdjustBatchDialogProps) {
   if (!canAdjust) return null;
 
   return (
-    <AdjustBatchDialogContent batch={batch} onAdjusted={onAdjusted} />
+    <AdjustBatchDialogContent batch={batch} productType={productType} onAdjusted={onAdjusted} />
   );
 }
 
 function AdjustBatchDialogContent({
   batch,
+  productType,
   onAdjusted,
 }: {
   readonly batch: ProductBatchView;
+  readonly productType?: ProductType;
   readonly onAdjusted?: () => void;
 }) {
   const fieldId = useId();
@@ -187,6 +202,12 @@ function AdjustBatchDialogContent({
           <DialogTitle>{DIALOG_TITLE}</DialogTitle>
           <DialogDescription>Lote {batch.lot}.</DialogDescription>
         </DialogHeader>
+
+        {productType !== PRODUCT_TYPES.FINISHED_PRODUCT ? null : (
+          <p className="text-sm text-muted-foreground" data-testid="adjust-batch-finished-product-notice">
+            {FINISHED_PRODUCT_NOTICE}
+          </p>
+        )}
 
         {zeroError ? (
           <p

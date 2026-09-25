@@ -4809,3 +4809,26 @@ podar.
 - **Para arrancarla se subió el cupo de `backend` a 3** con `/afinar-regla` (`cdfc6bb`).
 - **Quinto test de alcance que compara contra la rama y rompe fichas ajenas** (QC-140 R29, QC-158 R36a): corregidos. La clase entera es **QC-99**.
 - **Deuda:** el recorrido E2E de subida de PDFs sigue en rojo, heredado de `dev`.
+
+## 2026-09-25 — QC-160-boton-de-subida-de-pdf
+
+- **Qué:** la subida de PDFs de QC-107 deja de estar siempre a la vista: un botón «Subir PDFs» la abre en una
+  ventana (diálogo) con el estado por archivo dentro. En `/proveedores/[id]` (estrategia catálogo) y, montaje nuevo,
+  en el listado `/produccion/formulas` (estrategia fórmula). El botón solo lo ve quien tiene `documentos.modificar` (QC-142).
+- **PR #122**, merge `685845f2`. Spec R1–R22. Review: vuelta 1 rechazada (M1 caso del manifiesto en el test de
+  convenciones; M2 E2E sin WebKit), vuelta 2 OK. Gate completo 715/715; E2E de documentos 3/3 en Chromium y WebKit.
+- **Decisión:** el arreglo de `catalog-import-isolation` (rojo en dev por el choque QC-158 × QC-142) se revirtió de
+  esta rama y se dejó a **QC-169**; sigue en el baseline de rojos hasta entonces.
+
+## 2026-09-25 — QC-150-producto-terminado
+
+- **Qué:** nace el tipo `FINISHED_PRODUCT`. Al Finalizar un pedido entra, en la misma operación, un lote del producto
+  terminado de su receta + presentación, en envases enteros redondeando hacia abajo y con coste = ingredientes / cantidad.
+  La presentación gana su «contenido» (absorbe QC-130). Se prohíbe crearlo o darle lotes a mano, usarlo de ingrediente y
+  ajustarlo sumando; los ajustes que restan se permiten.
+- **PR #121**, merge `3d6f817b`. Spec R1–R44. Review: vueltas 1 y 2 rechazadas, vuelta 3 OK. Decisiones humanas en F2.1:
+  D22 (nombre de producto hasta 200), D23 (terminado editable), D24 (receta de otra empresa se rechaza en pedidos).
+- **Gate:** completo en `bdaa2fc3` verde salvo el rojo heredado de `catalog-import-isolation` (baseline, lo arregla
+  **QC-169**) y un flake de module-contract. El merge de `origin/dev` (QC-160) previo al merge del PR se subió **sin gate**
+  por decisión del humano (conflicto solo en `tests/baseline-rojos.json`).
+- **Desbloquea QC-168** (estado Por empacar), y tras ella QC-82.

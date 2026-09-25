@@ -82,6 +82,7 @@ function filaExistente(): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: PRESENTATION_ID,
+    presentationContent: null,
   }
 }
 
@@ -89,7 +90,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
   it('con importe: la cotizacion coincide con el ingredientsCost del alta y de la edicion', async () => {
     const d = crearDobles()
     const presentations: PresentationCatalog = {
-      findRefs: vi.fn(async () => [{ id: PRESENTATION_ID, name: 'Presentacion de prueba' }]),
+      findRefs: vi.fn(async () => [{ id: PRESENTATION_ID, name: 'Presentacion de prueba', content: null }]),
       findByNormalizedNames: vi.fn(async () => []),
     }
     const recipesConVigencia = {

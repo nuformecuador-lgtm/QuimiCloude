@@ -26,6 +26,7 @@ export type {
   OrderCatalog,
   AssignedOrderSummary,
   OrderSummaryOrdering,
+  FinishedGoodsReceipt,
 } from './domain/order-catalog';
 
 // ---------------------------------------------------------------------------------------

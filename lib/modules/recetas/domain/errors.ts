@@ -66,6 +66,16 @@ export class RecipeDuplicateNameError extends RecetasError {
   }
 }
 
+/** Una linea de la receta senala un producto terminado, que no puede ser
+ *  ingrediente. Entrada con forma valida; lo que se rechaza es la accion. */
+export class ActionNotAllowedError extends RecetasError {
+  readonly code = 'action_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('action_not_allowed', diagnostic);
+  }
+}
+
 /**
  * Entrada que no cumple el esquema de validacion o una regla de negocio previa al
  * repositorio (R7, R9, R14, R16, R17, R19, R20, R23, R30, R46).

@@ -136,6 +136,26 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/presentation-content.int.test.ts",
+      "motivo": "QC-150 T4: ejercita 'createPresentation'/'updatePresentation' desde @/lib/composition -el camino real de una Server Action-, que hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (unidad, presentacion y, cuando hace falta, producto, lote, receta y pedido) y la limpia en un 'finally' en el orden que exigen las FK (pedidos -> receta -> asientos -> lotes -> producto -> presentacion -> unidad -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
+    },
+    {
+      "archivo": "inventario/product-type-lock.int.test.ts",
+      "motivo": "QC-150 T6 (R4): llama a 'updateAliveProduct' de 'product-prisma.ts', que usa el cliente Prisma GLOBAL y abre SU PROPIA 'prisma.$transaction' con un 'FOR NO KEY UPDATE' dentro, igual que 'product-crud.int.test.ts'; una transaccion del test no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (y, cuando hace falta, unidad, presentacion y receta para el producto terminado, que exige el CHECK 'products_finished_identity_matches_type') y la limpia en un 'finally' en el orden que exigen las FK (producto -> receta -> presentacion -> unidad). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
+    },
+    {
+      "archivo": "inventario/finished-goods.int.test.ts",
+      "motivo": "QC-150 T7: 'receiveFinishedGoods' (product-prisma.ts) recibe el 'tx' de quien llama y no abre transaccion propia, asi que cada caso la envuelve con 'prisma.$transaction' sobre el cliente GLOBAL, igual que hara 'withOrderTransaction' en produccion; una transaccion del test no la envolveria. R21 necesita que la escritura CONFIRME para que la segunda llamada choque de verdad contra 'inventory_movements_one_production_per_order', y R22 necesita dos conexiones reales a la vez con 'Promise.all'. Cada caso fabrica su propia empresa (y, para R23, una segunda) con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, receta y pedido) y la limpia en un 'finally' en el orden que exigen las FK (asientos -> lotes -> productos -> pedidos -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
+    },
+    {
+      "archivo": "inventario/finished-product-prohibitions.int.test.ts",
+      "motivo": "QC-150 T10 (R28, R31, R32): llama a 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' con un 'FOR NO KEY UPDATE' dentro, igual que 'product-type-lock.int.test.ts'; una transaccion del test no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (unidad, presentacion, receta, producto terminado -que exige el CHECK 'products_finished_identity_matches_type'-, usuario, rol y tipo de documento) y la limpia en un 'finally' en el orden que exigen las FK (asientos -> lotes -> producto -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
+    },
+    {
       "archivo": "inventario/company-scope-queries.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-49 T13): siembra filas de DOS empresas a la vez y llama a los adaptadores driven directamente para demostrar que el WHERE del SQL acota por empresa. Esos adaptadores usan el cliente Prisma global; committea y borra lo suyo. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-12"
@@ -211,6 +231,11 @@
       "desde": "2026-09-23"
     },
     {
+      "archivo": "pedidos/order-content-copy.int.test.ts",
+      "motivo": "QC-150 T14: ejercita el flujo REAL de alta y edicion ('createCreateOrder'/'createUpdateOrder') cableado a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades' -el mismo conjunto que 'lib/composition' ata-, y 'withOrderTransaction' abre ademas SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no lo envolveria. Una empresa efimera (randomUUID) nace en 'beforeAll' y muere en 'afterAll'; cada caso siembra su propia receta y presentacion (sin producto ni lote: ningun caso ejercita el coste) y las borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
+    },
+    {
       "archivo": "pedidos/order-cost-quote.int.test.ts",
       "motivo": "QC-151 T7: ejercita 'pedidos.quoteOrderCost' junto con 'createCreateOrder', los dos cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', que hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra su propio producto/lote/receta y los borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"
@@ -234,6 +259,11 @@
       "archivo": "pedidos/order-unit-of-work.int.test.ts",
       "motivo": "QC-141 T8: 'withOrderTransaction' (order-unit-of-work-prisma.ts) abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que envolver la corrida en una transaccion del test seria aislamiento de mentira -correria en otra conexion del pool-. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. El caso de R15 fuerza el fallo DENTRO de 'run', despues de 'create' y de 'syncForOrder', y comprueba con el cliente global que no quedo ni el pedido ni el asiento de reserva. El caso del reintento reutiliza el trigger determinista de 'order-duplicate-number.int.test.ts' -sin el no hay forma de provocar el choque del correlativo sin una carrera de verdad- para demostrar que la unidad ENTERA se reintenta, no solo el INSERT.",
       "desde": "2026-09-23"
+    },
+    {
+      "archivo": "pedidos/finish-with-finished-goods.int.test.ts",
+      "motivo": "QC-150 T8: el Finalizar da de alta el producto terminado, cableado igual que 'order-reservation.int.test.ts' -'withOrderTransaction' y 'createFinishAssignedOrder' abren o participan de transacciones contra el cliente GLOBAL, asi que una transaccion del test no las envolveria-, con un caso que dos Finalizar A LA VEZ del mismo pedido necesitan que cada rama CONFIRME para que la otra la vea (R21). Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta, producto y lote) y la limpia en un 'finally'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
     },
     {
       "archivo": "pedidos/order-reservation-concurrency.int.test.ts",

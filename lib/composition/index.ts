@@ -101,6 +101,7 @@ import {
   createMaterialReservations,
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
@@ -1044,6 +1045,7 @@ const orderUnitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        finishedGoods: createFinishedGoodsIntake(tx),
       };
       return work(scope);
     }),
@@ -1173,7 +1175,12 @@ const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
+  transitionAliveById: createTransitionOrder({
+    unitOfWork: orderUnitOfWork,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
 };
 
 /**

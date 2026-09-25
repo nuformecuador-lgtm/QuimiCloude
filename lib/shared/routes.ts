@@ -214,6 +214,14 @@ export function assignedOrderRoute(id: string): string {
 export const DELIVERED_ORDER_PARAM = 'entregado';
 
 /**
+ * Junto a `DELIVERED_ORDER_PARAM`, cuantos envases enteros de producto terminado
+ * entraron y el nombre del producto que los recibio: `?entregado=<numero>&entregado_envases=
+ * <n>&entregado_producto=<nombre>`.
+ */
+export const DELIVERED_ORDER_PACKAGES_PARAM = 'entregado_envases';
+export const DELIVERED_ORDER_PRODUCT_PARAM = 'entregado_producto';
+
+/**
  * Prefijos de URL que cuelgan de `app/(private)/` y, por tanto, exigen sesion valida (R1).
  *
  * `(private)` es un route group: **no aparece en la URL**, asi que el middleware no puede

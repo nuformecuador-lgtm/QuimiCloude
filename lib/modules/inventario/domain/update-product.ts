@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { ProductNotFoundError, ValidationError } from './errors';
+import { ActionNotAllowedError, ProductNotFoundError, ValidationError } from './errors';
 import { updateProductSchema } from './product-input';
 
 import type { ProductRepository } from '../ports/product-repository';
@@ -46,6 +46,7 @@ export function createUpdateProduct(
     const updated = await deps.products.updateAlive(id, parsed.data, now(), {
       companyId: actor.companyId,
     });
+    if (updated === 'type_locked') throw new ActionNotAllowedError();
     if (!updated) throw new ProductNotFoundError();
   };
 }

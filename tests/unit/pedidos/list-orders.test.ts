@@ -77,6 +77,7 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: null,
+    presentationContent: null,
     ...overrides,
   }
 }
@@ -699,7 +700,7 @@ describe('listOrders — la presentacion del pedido (R21, R22)', () => {
     ]
     const d = dobles({
       pagina: pagina(filas, { total: 3 }),
-      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L' }],
+      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L', content: null }],
     })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)

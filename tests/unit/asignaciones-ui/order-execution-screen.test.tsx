@@ -270,6 +270,48 @@ describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar 
   });
 });
 
+describe('pantalla de ejecucion — QC-150 R18, R19: los errores nuevos del Finalizar usan el mensaje del catalogo', () => {
+  async function finalizarConError(codigo: string, mensaje: string) {
+    finishAssignedOrderActionMock.mockResolvedValue({ status: 'error', code: codigo, message: mensaje });
+    vi.useFakeTimers();
+    try {
+      render(<OrderExecutionScreen execution={EXECUTION} />);
+      marcarTodo();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    fireEvent.click(screen.getByTestId('step-reader-finish'));
+
+    return screen.findByTestId('order-execution-finish-error');
+  }
+
+  it('R18: un pedido sin presentacion con contenido muestra el mensaje de `presentation_without_content`', async () => {
+    const error = await finalizarConError(
+      'presentation_without_content',
+      'La presentacion del pedido no indica su contenido: completala en Presentaciones antes de finalizar.',
+    );
+
+    expect(error).toHaveTextContent(
+      'La presentacion del pedido no indica su contenido: completala en Presentaciones antes de finalizar.',
+    );
+  });
+
+  it('R19: un pedido sin ni un envase entero muestra el mensaje de `no_whole_package`', async () => {
+    const error = await finalizarConError(
+      'no_whole_package',
+      'La cantidad del pedido no llena ni un envase de su presentacion.',
+    );
+
+    expect(error).toHaveTextContent(
+      'La cantidad del pedido no llena ni un envase de su presentacion.',
+    );
+  });
+});
+
 describe('pantalla de ejecucion — R25: muestra la presentación o Sin presentación', () => {
   it('con presentationName pinta el nombre en su propia linea', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);

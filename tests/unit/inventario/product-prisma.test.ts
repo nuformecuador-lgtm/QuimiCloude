@@ -18,8 +18,11 @@ import { Prisma } from '@prisma/client';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import {
   PRODUCT_SELECT,
+  buildProductWhere,
   toProductView,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+
+import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 
 describe('toProductView', () => {
   const filaBase = {
@@ -90,5 +93,30 @@ describe('PRODUCT_SELECT: columnas propias del producto, sin catalogo de lotes',
     expect(Object.keys(PRODUCT_SELECT)).toContain('stock');
     expect(Object.keys(PRODUCT_SELECT)).toContain('unitId');
     expect(Object.keys(PRODUCT_SELECT)).not.toContain('batches');
+  });
+});
+
+describe('R5 (QC-150) — el listado filtra por FINISHED_PRODUCT', () => {
+  function consulta(values: readonly string[]): ListQuery {
+    return {
+      page: 1,
+      pageSize: 20,
+      sort: null,
+      search: '',
+      filters: { type: { kind: 'select', values } },
+    };
+  }
+
+  it('acepta FINISHED_PRODUCT en el filtro de tipo, ahora que amplio PRODUCT_TYPE_VALUES', () => {
+    const where = buildProductWhere(consulta(['FINISHED_PRODUCT']), { companyId: 'empresa-1' });
+    const filtros = (where.AND as Array<{ AND?: Array<{ type?: { in: readonly string[] } }> }>)[1]?.AND ?? [];
+    const filtroTipo = filtros.find((condicion) => condicion.type !== undefined);
+    expect(filtroTipo?.type).toEqual({ in: ['FINISHED_PRODUCT'] });
+  });
+
+  it('un valor fuera de PRODUCT_TYPE_VALUES no compone ninguna condicion de tipo', () => {
+    const where = buildProductWhere(consulta(['NO_EXISTE']), { companyId: 'empresa-1' });
+    const segundo = (where.AND as Array<{ AND?: unknown[] }>)[1];
+    expect(segundo?.AND).toBeUndefined();
   });
 });

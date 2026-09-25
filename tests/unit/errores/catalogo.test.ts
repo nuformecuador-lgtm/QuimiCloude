@@ -39,10 +39,10 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 55 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 57 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 55 y no 54: entra `customer_not_found`.
-      expect(ERROR_CODES).toHaveLength(55)
+      // 57 y no 54: entran `customer_not_found`, `presentation_without_content` y `no_whole_package`.
+      expect(ERROR_CODES).toHaveLength(57)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -301,6 +301,37 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     it('la cabecera de error-codes.ts redacta la duodecima enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
       expect(source).toContain('**Duodecima enmienda, el 2026-09-24**')
+    })
+  })
+
+  describe('QC-150 R18, R19 — presentation_without_content y no_whole_package son la decimotercera enmienda', () => {
+    it('los dos codigos estan en el catalogo con su clave y su texto propios', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('presentation_without_content')
+      expect(codigos).toContain('no_whole_package')
+      expect(ERROR_MESSAGE_KEY.presentation_without_content).toBe('errors.presentation_without_content')
+      expect(ERROR_MESSAGE_KEY.no_whole_package).toBe('errors.no_whole_package')
+      expect(errorMessage('presentation_without_content')).toBe(
+        'La presentacion del pedido no indica su contenido: completala en Presentaciones antes de finalizar.',
+      )
+      expect(errorMessage('no_whole_package')).toBe(
+        'La cantidad del pedido no llena ni un envase de su presentacion.',
+      )
+    })
+
+    it('se distinguen entre si y de invalid_input y action_not_allowed', () => {
+      const sinContenido = errorMessage('presentation_without_content')
+      const sinEnvase = errorMessage('no_whole_package')
+      expect(sinContenido).not.toBe(sinEnvase)
+      expect(sinContenido).not.toBe(errorMessage('invalid_input'))
+      expect(sinContenido).not.toBe(errorMessage('action_not_allowed'))
+      expect(sinEnvase).not.toBe(errorMessage('invalid_input'))
+      expect(sinEnvase).not.toBe(errorMessage('action_not_allowed'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decimotercera enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decimotercera enmienda, 2026-09-24**')
     })
   })
 

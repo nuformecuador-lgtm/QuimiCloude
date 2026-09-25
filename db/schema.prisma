@@ -253,6 +253,8 @@ model Presentation {
   companyId      String   @map("company_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Cuanto cabe en un envase, en la unidad de la presentacion. NULL = no declarado.
+  content        Decimal? @db.Decimal(14, 4)
 
   batches ProductBatch[]
 
@@ -284,11 +286,15 @@ model Product {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  /// Solo en productos terminados: de que receta y en que presentacion se fabrica.
+  recipeId       String?     @map("recipe_id") @db.Uuid
+  presentationId String?     @map("presentation_id") @db.Uuid
 
   batches ProductBatch[]
 
   @@index([companyId], map: "products_company_id_idx")
   @@index([unitId], map: "products_unit_id_idx")
+  @@index([recipeId], map: "products_recipe_id_idx")
   @@map("products")
 }
 
@@ -318,9 +324,12 @@ model ProductBatch {
   updatedBy      String?   @map("updated_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Contenido del envase con el que se contaron las unidades del lote. Solo en lotes de
+  /// producto terminado.
+  packageContent Decimal?  @map("package_content") @db.Decimal(14, 4)
 
-  product      Product              @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  presentation Presentation?        @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentation Presentation?       @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   movements    InventoryMovement[]
 
   @@unique([companyId, lot], map: "product_batches_company_lot_unique")
@@ -340,6 +349,7 @@ enum InventoryMovementKind {
   opening
   adjustment
   consumption
+  production
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
@@ -413,7 +423,9 @@ enum ProductType {
   PRODUCT
   MACHINE
   PACKAGING
+  FINISHED_PRODUCT
 }
+
 /// `recipes_company_name_unique` (empresa, nombre) es PARCIAL por `deleted_at IS NULL` y por
 /// eso no se declara `@@unique` aqui: Prisma no modela indices parciales. Ese mismo indice
 /// hace de indice de `companyId`, asi que tampoco hay un `@@index([companyId])` propio. Los
@@ -588,37 +600,40 @@ enum OrderPriority {
 /// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
 /// @module pedidos
 model Order {
-  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderYear          Int           @map("order_year")
-  orderSequence      Int           @map("order_sequence")
-  recipeId           String        @map("recipe_id") @db.Uuid
-  quantity           Decimal       @db.Decimal(14, 4)
-  priority           OrderPriority @default(BAJA)
-  status             OrderStatus   @default(PENDIENTE)
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderYear           Int           @map("order_year")
+  orderSequence       Int           @map("order_sequence")
+  recipeId            String        @map("recipe_id") @db.Uuid
+  quantity            Decimal       @db.Decimal(14, 4)
+  priority            OrderPriority @default(BAJA)
+  status              OrderStatus   @default(PENDIENTE)
   /// Sin longitud en la columna: el tope vive en la validacion de entrada. Que exista solo en un
   /// pedido cancelado lo exige el CHECK `orders_cancellation_reason_matches_status`.
-  cancellationReason String?       @map("cancellation_reason")
-  companyId          String        @map("company_id") @db.Uuid
-  createdBy          String?       @map("created_by") @db.Uuid
-  updatedBy          String?       @map("updated_by") @db.Uuid
-  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt          DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  cancellationReason  String?       @map("cancellation_reason")
+  companyId           String        @map("company_id") @db.Uuid
+  createdBy           String?       @map("created_by") @db.Uuid
+  updatedBy           String?       @map("updated_by") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt           DateTime?     @map("deleted_at") @db.Timestamptz(6)
   /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
   /// escribio. NULL = no se pudo calcular; nunca 0.
-  ingredientsCost    Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
+  ingredientsCost     Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
   /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
   /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
   /// entregar lo vacian.
-  reservedAt         DateTime?     @map("reserved_at") @db.Timestamptz(6)
+  reservedAt          DateTime?     @map("reserved_at") @db.Timestamptz(6)
   /// El envase en que se entrega lo fabricado, del catalogo de `inventario`. NULL en los
   /// pedidos que existian antes de esta columna. Sin `@relation`: es drift, con FK COMPUESTA
   /// `(company_id, presentation_id)` escrita a mano en la migracion.
-  presentationId     String?       @map("presentation_id") @db.Uuid
+  presentationId      String?       @map("presentation_id") @db.Uuid
   /// Instante en que el pedido paso a ENTREGADO al finalizarlo en planta. NULL en los entregados
   /// antes de existir la columna. Solo puede tener valor si el estado es ENTREGADO, lo exige el
   /// CHECK `orders_finished_at_requires_delivered`.
-  finishedAt         DateTime?     @map("finished_at") @db.Timestamptz(6)
+  finishedAt          DateTime?     @map("finished_at") @db.Timestamptz(6)
+  /// Copia del contenido de la presentacion al crear el pedido o al cambiarle la presentacion.
+  /// NULL = la presentacion no tenia contenido entonces, o el pedido es anterior a esta columna.
+  presentationContent Decimal?      @map("presentation_content") @db.Decimal(14, 4)
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")

@@ -69,6 +69,7 @@ const ORDER_SELECT = {
   createdBy: true,
   updatedBy: true,
   presentationId: true,
+  presentationContent: true,
 } satisfies Prisma.OrderSelect;
 
 type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
@@ -103,6 +104,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
     presentationId: row.presentationId,
+    presentationContent: row.presentationContent === null ? null : fromDecimal(row.presentationContent),
   };
 }
 
@@ -440,6 +442,8 @@ export async function updateAliveOrder(
       updatedAt: now,
       updatedBy: actorId,
       presentationId: data.presentationId,
+      presentationContent:
+        data.presentationContent === null ? null : toDecimalInput(data.presentationContent),
     },
   });
   return count === 1 ? 'ok' : 'not_found';
@@ -565,7 +569,7 @@ async function insertAliveOrder(
     INSERT INTO "orders" (
       "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
       "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
-      "updated_at", "presentation_id"
+      "updated_at", "presentation_id", "presentation_content"
     ) VALUES (
       ${companyId}::uuid,
       ${year}::integer,
@@ -582,7 +586,8 @@ async function insertAliveOrder(
       ${actorId}::uuid,
       ${now}::timestamptz,
       ${now}::timestamptz,
-      ${data.presentationId}::uuid
+      ${data.presentationId}::uuid,
+      ${data.presentationContent}::numeric
     )
     RETURNING "id", "order_year", "order_sequence"
   `);
@@ -608,6 +613,8 @@ async function insertAliveOrder(
     createdBy: actorId,
     updatedBy: actorId,
     presentationId: data.presentationId,
+    presentationContent:
+      data.presentationContent === null ? null : fromDecimal(toDecimalInput(data.presentationContent)),
   };
 }
 

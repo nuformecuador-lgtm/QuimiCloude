@@ -33,6 +33,13 @@ export type OrderAssignmentTarget = {
  *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
+/** Lo que entro al inventario cuando un Finalizar dio de alta un lote de producto terminado:
+ *  el nombre de quien lo recibio y cuantos envases enteros. */
+export type FinishedGoodsReceipt = {
+  readonly productName: string;
+  readonly packages: string;
+};
+
 export interface OrderCatalog {
   /**
    * `null` = no existe, esta dado de baja, o NO ES DE ESA EMPRESA: para quien pregunta son el
@@ -88,6 +95,12 @@ export interface OrderCatalog {
    * Si `to` es `'ENTREGADO'`, la misma llamada consume el material apartado:
    * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
    * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
+   *
+   * Yendo a `'ENTREGADO'`, la misma llamada da tambien de alta el lote de producto terminado
+   * de la combinacion del pedido: el exito lleva `finishedGoods` con lo que entro;
+   * `'presentation_without_content'`, `'no_whole_package'` y `'recipe_not_found'` deshacen la
+   * operacion entera igual que los dos casos de arriba. El `'ok'` sin `finishedGoods` sigue
+   * siendo el unico resultado posible cuando `to` no es `'ENTREGADO'`.
    */
   transitionAliveById(
     id: string,
@@ -96,7 +109,17 @@ export interface OrderCatalog {
     to: OrderStatus,
     actorId: string,
     now: Date,
-  ): Promise<'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines'>;
+  ): Promise<
+    | 'ok'
+    | { readonly kind: 'ok'; readonly finishedGoods: FinishedGoodsReceipt }
+    | 'not_found'
+    | 'stale'
+    | 'insufficient_material'
+    | 'recipe_without_lines'
+    | 'presentation_without_content'
+    | 'no_whole_package'
+    | 'recipe_not_found'
+  >;
 }
 
 /**

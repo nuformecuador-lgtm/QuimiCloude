@@ -39,6 +39,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma'
 import {
   createRecipeExecutionReader,
@@ -97,6 +98,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        finishedGoods: createFinishedGoodsIntake(tx),
       }
       return work(scope)
     }),
@@ -367,13 +369,13 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
       expect(await ingredientsCostCrudo(orderId)).toBe('20.0000')
 
       // Edicion #1: sube la cantidad sin desbordar la existencia. Recalcula a OTRO numero.
-      const editadoInput: NewOrder = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId }
+      const editadoInput: NewOrder = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
       await edicion(orderId, editadoInput, actorDe(A))
       // necesaria = 8 * 100 % = 8, cubierta (stock 10) -> 8 * 5 = 40.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('40.0000')
 
       // Edicion #2: sube la cantidad hasta que la existencia YA NO cubre -> sustituye por NULL.
-      const editadoSinCubrir: NewOrder = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId }
+      const editadoSinCubrir: NewOrder = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
       await edicion(orderId, editadoSinCubrir, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
     } finally {
@@ -517,7 +519,7 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       expect(despuesDeAlta.batches).toBe(antesDeAlta.batches)
       expect(despuesDeAlta.movements).toBe(antesDeAlta.movements)
 
-      const editado: NewOrder = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', presentationId: A.presentationId }
+      const editado: NewOrder = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
       await edicion(orderId, editado, actorDe(A))
 
       const despuesDeEdicion = await fotoDeInventario(A)
@@ -551,7 +553,14 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
       new Date('2026-01-03T00:00:00.000Z'),
       { companyId: A.companyId },
     )
-    if (loteB === null || loteC === null) throw new Error('no se pudo sembrar B o C')
+    if (
+      loteB === null ||
+      loteB === 'finished_product' ||
+      loteC === null ||
+      loteC === 'finished_product'
+    ) {
+      throw new Error('no se pudo sembrar B o C')
+    }
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
@@ -591,7 +600,9 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
       new Date('2026-01-02T00:00:00.000Z'),
       { companyId: A.companyId },
     )
-    if (loteNuevo === null) throw new Error('no se pudo sembrar el lote nuevo')
+    if (loteNuevo === null || loteNuevo === 'finished_product') {
+      throw new Error('no se pudo sembrar el lote nuevo')
+    }
     const recipeId = await crearReceta(A, productId)
     let ordenQueApartaTodo: string | null = null
     let ordenBajoPrueba: string | null = null
