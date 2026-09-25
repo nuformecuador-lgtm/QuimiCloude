@@ -505,3 +505,36 @@ barrel público `@/components/shared/data-table`, sin abrir ni un archivo suyo �
 `E2E_ESPERADOS`/`data-table-alcance.test.ts` quedan para T8. Las guardias de fuente propias de la
 ruta (`clientes-convenciones.test.ts`, `data-table-intacta-clientes.test.ts`,
 `clientes-viewport.test.tsx`) quedan para T7.
+
+## T7 — Guardias de fuente de la ruta
+
+Commit `66912e98`. Archivos nuevos (ningún archivo de producción tocado):
+
+- `tests/unit/clientes-ui/clientes-convenciones.test.ts`
+- `tests/unit/clientes-ui/data-table-intacta-clientes.test.ts`
+- `tests/unit/clientes-ui/clientes-viewport.test.tsx`
+
+### Mapa R<n> → test
+
+| R | Test |
+| --- | --- |
+| R9 | `data-table-intacta-clientes.test.ts` (acotado a `components/shared/data-table/`; sensibilidad: contrato `data-table-types.ts` fabricado en tmpdir con `renderRowActions` + contrato real como caso limpio) |
+| R34 | `clientes-convenciones.test.ts` > "toda lectura y toda escritura..." y "los componentes de cliente reciben los datos..." (sensibilidad: fabricado en tmpdir con las tres violaciones + caso simétrico limpio) |
+| R35 | `clientes-convenciones.test.ts` > "la feature no toca..." (diff contra merge-base con `dev`; sensibilidad: detector puro `intocablesTocados` sobre listas fabricadas) |
+| R36 | `clientes-convenciones.test.ts` > "los componentes propios viven en `components/`..." (sensibilidad en tmpdir) |
+| R37 | `clientes-convenciones.test.ts` > "lo heredado no se re-crea..." (sensibilidad: `layout.tsx` fabricado en tmpdir) |
+| R38 | `clientes-convenciones.test.ts` > "la pantalla no nombra pedidos..." (sensibilidad: import de `@/lib/modules/pedidos` en tmpdir) |
+| R39 | `clientes-convenciones.test.ts` > "la pantalla no usa `100vh`..." + `clientes-viewport.test.tsx` (`describe.each` 375px y 1280px: 44×44px, texto ≥16px, sin `:hover` único, área segura) |
+| R40 | `clientes-convenciones.test.ts` > "los tests de la carpeta localizan por rol..." (excluye `toHaveTextContent`, que comprueba contenido de un elemento ya localizado por testid; sensibilidad en tmpdir) |
+
+### Salida real de los tests
+
+```
+pnpm exec vitest run tests/unit/clientes-ui/clientes-convenciones.test.ts tests/unit/clientes-ui/data-table-intacta-clientes.test.ts tests/unit/clientes-ui/clientes-viewport.test.tsx
+Test Files  3 passed (3)
+     Tests  44 passed (44)
+```
+
+`pnpm run lint`: 0 errores (7 warnings preexistentes ajenos). `pnpm run typecheck`: el agente de T7 vio
+`app/layout.tsx: Cannot find name 'LayoutProps'` porque el agente de T8 había borrado `.next`; tras
+`pnpm exec next typegen` el typecheck vuelve a verde (comprobado por el implementer).

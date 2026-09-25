@@ -87,7 +87,7 @@
 
 ## Tanda 5 — Convenciones
 
-- [ ] **T7 [P] — Guardias de fuente de la ruta.** Depende de T6.
+- [x] **T7 [P] — Guardias de fuente de la ruta.** Depende de T6.
   `clientes-convenciones.test.ts` (R34–R40), `data-table-intacta-clientes.test.ts` (R9) y
   `clientes-viewport.test.tsx` (R39), cada una con su caso de sensibilidad sobre un fabricado en un
   tmpdir.
