@@ -505,6 +505,11 @@ describe('R10: un cliente de otra empresa responde como no encontrado y su fila 
       );
       customerId = created.id;
 
+      const filaOriginal = await prisma.customer.findUniqueOrThrow({
+        where: { id: created.id },
+        select: { updatedAt: true, updatedBy: true, deletedAt: true },
+      });
+
       // Empresa A intenta leer, editar y dar de baja el cliente de la empresa B.
       expect(await findAliveCustomerById(created.id, empresaA.scope)).toBeNull();
       expect(
@@ -535,6 +540,10 @@ describe('R10: un cliente de otra empresa responde como no encontrado y su fila 
         where: { id: created.id },
         select: { updatedAt: true, updatedBy: true, deletedAt: true },
       });
+      // El intento de otra empresa no deja ningun rastro en la fila.
+      expect(filaCrudaAjena.updatedAt).toEqual(filaOriginal.updatedAt);
+      expect(filaCrudaAjena.updatedBy).toBe(filaOriginal.updatedBy);
+      expect(filaCrudaAjena.deletedAt).toEqual(filaOriginal.deletedAt);
       expect(filaCrudaAjena.updatedBy).toBe(empresaB.actorId);
       expect(filaCrudaAjena.deletedAt).toBeNull();
     } finally {
