@@ -8,7 +8,7 @@
  * presentacion nueva es una funcion pura aparte que la pantalla llama con la lista de unidades que
  * ya carga; por eso esta vista previa publica el texto de unidad leido, no un identificador elegido.
  */
-import { requirePermission, DOCUMENT_UPLOAD_PERMISSION, type Actor } from './actor';
+import { requirePermission, CATALOG_IMPORT_PERMISSION, type Actor } from './actor';
 import { extractCatalogFromText, type ExtractedLine } from './catalog-extraction';
 import { previewCatalogImportInputSchema, type ReviewedLineInput } from './catalog-import-input';
 import {
@@ -243,7 +243,7 @@ export function createPreviewCatalogImport(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<CatalogImportPreview> {
-    requirePermission(actor, DOCUMENT_UPLOAD_PERMISSION);
+    requirePermission(actor, CATALOG_IMPORT_PERMISSION);
 
     const parsed = previewCatalogImportInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

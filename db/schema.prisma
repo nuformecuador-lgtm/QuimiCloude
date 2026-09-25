@@ -736,25 +736,31 @@ model DocumentFile {
   @@map("document_files")
 }
 
-/// Nada es unico: dos clientes pueden repetir todos sus datos, asi que no hay columna normalizada ni
-/// indice unico de negocio. `companyId`, `createdBy` y `updatedBy` van sin `@relation` para que un
-/// `include` no cruce a otro modulo; sus FK estan escritas a mano y son drift. `customers_company_id_id_key`
-/// es la clave candidata para las FK compuestas de las tablas que apunten a un cliente.
+/// Nada es unico: dos clientes pueden repetir todos sus datos, asi que no hay indice unico de
+/// negocio. Las tres columnas `*Normalized` son derivadas, escritas por la aplicacion para la
+/// busqueda sin acentos; no llevan `@unique` ni `@@index` porque sus indices de trigramas son
+/// parciales y viven solo en la migracion. `companyId`, `createdBy` y `updatedBy` van sin
+/// `@relation` para que un `include` no cruce a otro modulo; sus FK estan escritas a mano y son
+/// drift. `customers_company_id_id_key` es la clave candidata para las FK compuestas de las
+/// tablas que apunten a un cliente.
 /// @module clientes
 model Customer {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  firstNames String    @map("first_names")
-  lastNames  String    @map("last_names")
-  city       String
-  phone      String?
-  email      String?
-  address    String?
-  companyId  String    @map("company_id") @db.Uuid
-  createdBy  String?   @map("created_by") @db.Uuid
-  updatedBy  String?   @map("updated_by") @db.Uuid
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstNames           String    @map("first_names")
+  lastNames            String    @map("last_names")
+  city                 String
+  phone                String?
+  email                String?
+  address              String?
+  firstNamesNormalized String    @map("first_names_normalized")
+  lastNamesNormalized  String    @map("last_names_normalized")
+  cityNormalized       String    @map("city_normalized")
+  companyId            String    @map("company_id") @db.Uuid
+  createdBy            String?   @map("created_by") @db.Uuid
+  updatedBy            String?   @map("updated_by") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   @@unique([companyId, id], map: "customers_company_id_id_key")
   @@index([createdBy], map: "customers_created_by_idx")

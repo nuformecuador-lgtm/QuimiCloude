@@ -59,6 +59,7 @@ export const ERROR_MESSAGE_KEY = {
   insufficient_material: 'errors.insufficient_material',
   recipe_without_lines: 'errors.recipe_without_lines',
   user_cannot_be_responsible: 'errors.user_cannot_be_responsible',
+  customer_not_found: 'errors.customer_not_found',
   presentation_without_content: 'errors.presentation_without_content',
   no_whole_package: 'errors.no_whole_package',
   order_packing_taken: 'errors.order_packing_taken',
@@ -151,6 +152,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.recipe_without_lines':
     'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
   'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
+  'errors.customer_not_found': 'El cliente solicitado no existe.',
   'errors.presentation_without_content':
     'La presentacion del pedido no indica su contenido: completala en Presentaciones antes de finalizar.',
   'errors.no_whole_package':

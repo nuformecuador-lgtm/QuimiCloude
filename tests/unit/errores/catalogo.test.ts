@@ -39,10 +39,11 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 59 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 60 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 59 y no 56: entran `order_packing_taken`, `order_not_packable` y `order_produced_frozen`.
-      expect(ERROR_CODES).toHaveLength(59)
+      // 60 y no 56: entran `customer_not_found` (QC-154), `order_packing_taken`,
+      // `order_not_packable` y `order_produced_frozen` (QC-168).
+      expect(ERROR_CODES).toHaveLength(60)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -282,6 +283,28 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     })
   })
 
+  describe('R34 — customer_not_found tiene clave y texto no vacio', () => {
+    it('customer_not_found esta en el catalogo con su clave y su texto exacto', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('customer_not_found')
+      expect(ERROR_MESSAGE_KEY.customer_not_found).toBe('errors.customer_not_found')
+      expect(errorMessage('customer_not_found')).toBe('El cliente solicitado no existe.')
+      expect(errorMessage('customer_not_found').trim().length).toBeGreaterThan(0)
+    })
+
+    it('se distingue de supplier_not_found, invalid_input y unexpected', () => {
+      const texto = errorMessage('customer_not_found')
+      expect(texto).not.toBe(errorMessage('supplier_not_found'))
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('unexpected'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decimotercera enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decimotercera enmienda, 2026-09-24**')
+    })
+  })
+
   describe('QC-150 R18, R19 — presentation_without_content y no_whole_package son la duodecima enmienda', () => {
     it('los dos codigos estan en el catalogo con su clave y su texto propios', () => {
       const codigos: readonly string[] = ERROR_CODES
@@ -313,7 +336,7 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     })
   })
 
-  describe('decimotercera enmienda, 2026-09-25 — order_packing_taken, order_not_packable, order_produced_frozen', () => {
+  describe('decimocuarta enmienda, 2026-09-25 — order_packing_taken, order_not_packable, order_produced_frozen', () => {
     it('los tres codigos estan en el catalogo con su clave y su texto exactos', () => {
       const codigos: readonly string[] = ERROR_CODES
       expect(codigos).toContain('order_packing_taken')
@@ -343,9 +366,9 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
       expect(congelado).not.toBe(errorMessage('order_delivered_frozen'))
     })
 
-    it('la cabecera de error-codes.ts redacta la decimotercera enmienda con su fecha', () => {
+    it('la cabecera de error-codes.ts redacta la decimocuarta enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
-      expect(source).toContain('**Decimotercera enmienda, 2026-09-25**')
+      expect(source).toContain('**Decimocuarta enmienda, 2026-09-25**')
     })
   })
 
