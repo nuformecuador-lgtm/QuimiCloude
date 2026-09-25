@@ -18,10 +18,10 @@ const RAIZ = join(__dirname, '..', '..', '..');
 const CARPETA_DEL_COMPONENTE = 'components/shared/document-upload';
 
 /**
- * Donde el montaje de la ventana de subida esta permitido: el listado de formulas monta el
- * dialogo directamente, y el detalle de proveedor lo hace a traves de su envoltorio de cliente,
- * porque una funcion (`reviewHrefFor`) no puede cruzar del Server Component al cliente y
- * `page.tsx` deja de importar el componente directo.
+ * Donde el montaje de la ventana de subida esta permitido: QC-159 le da a cada fila de fórmula un
+ * enlace de revisión (`reviewHrefFor`), y esa función no puede cruzar del Server Component
+ * (`page.tsx`) al cliente. Por eso el listado de fórmulas deja de montar el diálogo directo y pasa
+ * a montarlo, como ya hacía el detalle de proveedor, a través de un envoltorio de cliente propio.
  */
 const PANTALLA_CON_MONTAJE = 'app/(private)/proveedores/[id]/components/catalog-pdf-upload.tsx';
 const PAGINA_DEL_PROVEEDOR = 'app/(private)/proveedores/[id]/page.tsx';
@@ -29,9 +29,10 @@ const PAGINA_DEL_PROVEEDOR = 'app/(private)/proveedores/[id]/page.tsx';
 /** La carpeta de las pantallas de formulas, DERIVADA de la constante de ruta. */
 const CARPETA_DE_FORMULAS = `app/(private)${FORMULAS_ROUTE}`;
 const PAGINA_DE_FORMULAS = `${CARPETA_DE_FORMULAS}/page.tsx`;
+const ENVOLTORIO_DE_FORMULAS = `${CARPETA_DE_FORMULAS}/components/formula-pdf-upload.tsx`;
 
-/** Los dos y unicos puntos de montaje de la pieza. */
-const MONTAJES_PERMITIDOS = [PAGINA_DE_FORMULAS, PANTALLA_CON_MONTAJE].sort();
+/** Los dos y unicos puntos de montaje de la pieza: ambos, envoltorios de cliente. */
+const MONTAJES_PERMITIDOS = [ENVOLTORIO_DE_FORMULAS, PANTALLA_CON_MONTAJE].sort();
 
 /** Lo que identifica al componente alla donde se importe. */
 const MARCAS_DEL_COMPONENTE = ['document-upload', 'DocumentUpload'] as const;
@@ -142,8 +143,9 @@ describe('lo que la pieza de subida NO trae', () => {
 
     expect(existsSync(join(RAIZ, 'app/(private)/documentos'))).toBe(false);
 
-    // Enmienda: la subida ahora tambien se monta en el listado de formulas, dentro de una
-    // ventana, asi que la lista de paginas que la montan pasa a tener dos entradas y no una.
+    // Enmienda: el listado de formulas ya no monta el dialogo directo (necesita `reviewHrefFor`,
+    // que no cruza del Server Component al cliente), asi que pasa por su propio envoltorio de
+    // cliente, igual que el detalle de proveedor. Los dos montajes siguen siendo envoltorios.
     const paginasQueLoMontan = fuentesBajo('app')
       .filter((ruta) => ruta.endsWith('.tsx'))
       .filter((ruta) =>
@@ -185,17 +187,23 @@ describe('lo que la pieza de subida NO trae', () => {
     }
   });
 
-  it('la unica pantalla de formulas que monta la pieza es el listado, y no aparece ningun permiso nuevo (R18)', () => {
+  it('la unica fuente de formulas que monta la pieza es su envoltorio de cliente, y no aparece ningun permiso nuevo (R18)', () => {
     const fuentesDeFormulas = fuentesBajo(CARPETA_DE_FORMULAS);
     expect(fuentesDeFormulas.length).toBeGreaterThan(0);
 
-    // Enmienda: el listado de formulas ahora si monta la pieza (en una ventana); `nueva/` y
-    // `[id]/` siguen sin montarla.
+    // Enmienda: el listado de formulas deja de montar la pieza directo y pasa a montarla a
+    // traves de `components/formula-pdf-upload.tsx` (necesita `reviewHrefFor`, y una funcion no
+    // cruza del Server Component al cliente); `page.tsx`, `nueva/` y `[id]/` no la montan.
     const queLaMontan = fuentesDeFormulas.filter((ruta) => {
       const codigo = sinComentarios(leer(ruta));
       return MARCAS_DEL_COMPONENTE.some((marca) => codigo.includes(marca));
     });
-    expect(queLaMontan).toEqual([aPosix(PAGINA_DE_FORMULAS)]);
+    expect(queLaMontan).toEqual([aPosix(ENVOLTORIO_DE_FORMULAS)]);
+
+    // Y la pagina del listado usa ese envoltorio, nunca el componente directo.
+    const pagina = sinComentarios(leer(PAGINA_DE_FORMULAS));
+    expect(pagina).not.toMatch(/DocumentUpload/);
+    expect(pagina).toContain('FormulaPdfUpload');
 
     // Y no se le presta el permiso de proveedores para poder subir desde ahi.
     for (const ruta of fuentesDeFormulas) {

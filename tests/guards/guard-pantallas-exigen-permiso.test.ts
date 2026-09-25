@@ -223,6 +223,12 @@ function describir(infracciones: readonly Infraccion[]): string {
 // PDF. Llama a `requirePagePermission` DOS veces -`proveedores.consultar` y
 // `proveedores.modificar`-, mismo patron que `/configuracion/unidades`: revisar y confirmar la
 // importacion son una escritura sobre el catalogo del proveedor, no una lectura sola.
+//
+// TENSADA el 2026-09-25 (QC-159 T9): de catorce a QUINCE, con
+// `/produccion/formulas/importar/[documentoId]`, la revision de una importacion de formula desde
+// un PDF. Llama a `requirePagePermission` DOS veces -`recetas.consultar` y `recetas.modificar`
+// (R32)-, mismo patron que las dos filas anteriores: revisar y confirmar la importacion son una
+// escritura sobre las recetas, no una lectura sola.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',
@@ -234,6 +240,7 @@ const RUTAS_ESPERADAS_HOY = [
   '/pedidos',
   '/produccion/formulas',
   '/produccion/formulas/[id]',
+  '/produccion/formulas/importar/[documentoId]',
   '/produccion/formulas/nueva',
   '/proveedores',
   '/proveedores/[id]',
@@ -241,7 +248,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las catorce pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las quince pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);
