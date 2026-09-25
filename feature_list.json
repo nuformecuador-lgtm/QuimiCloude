@@ -2583,10 +2583,10 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "pedido-en-varias-presentaciones",
-      "description": "Un pedido puede ENVASARSE EN VARIAS PRESENTACIONES: se preparan 100 L de crema y se reparten en botellas de 1 L, 200 ml, etc. Se asignan varias presentaciones con su numero de envases y el sistema va diciendo CUANTO QUEDA DISPONIBLE (de 100 L, 5 x 200 ml -> quedan 99 L). NACE DEL CHAT el 2026-09-25. Cambia QC-146 (una sola presentacion) y el alta del producto terminado de QC-150 (un lote por presentacion); encaja con el empaque de QC-168. ABIERTO, se acota con /afinar-feature: cuando se asigna (alta del pedido o empaque), quien, si debe cubrir todo (sobrante: merma o granel), convivencia con QC-146 y pedidos existentes, efecto en producto terminado y coste, como se muestra el disponible. BLOQUEADA POR QC-168.",
+      "description": "Un pedido se REPARTE EN VARIAS PRESENTACIONES (100 L de crema en botellas de 1 L, 200 ml...): lineas de N envases x presentacion, y el sistema dice CUANTO QUEDA DISPONIBLE (de 100 L, 5 x 200 ml -> 99 L) con el contenido de la presentacion (QC-150) y la conversion de unidades (QC-76). NACE DEL CHAT y se ACOTA el 2026-09-25: reparto opcional al crear y OBLIGATORIO para comenzar el empaque; lo define pedidos.modificar y el Empacador, cambiable hasta Terminar; el sobrante es merma; el producto terminado entra AL TERMINAR EL EMPAQUE, un lote por linea, coste repartido por cantidad (ENMIENDA QC-168 y QC-150); la presentacion unica de QC-146 DESAPARECE y los pedidos existentes la convierten en su reparto; E2E si. Detalle en specs/QC-170-pedido-en-varias-presentaciones/requirements.md. NO ENTRA: flujo de empaque (QC-168), log (QC-82), ventas. BLOQUEADA POR QC-168.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-170-pedido-en-varias-presentaciones",
       "depends_on": [
