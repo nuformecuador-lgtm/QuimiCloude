@@ -219,3 +219,11 @@ vitest run tests/unit/documentos tests/guards tests/unit/composition/documentos-
 vitest related: tests/unit/configuracion-ui/user-table.test.tsx rojo en la corrida grande y 27/27 aislado
   (saturación de jsdom; ajeno)
 ```
+
+## T13 — notas fechadas en specs afectados (implementer)
+
+- Notas añadidas **al final** de `specs/QC-129-textos-definitivos-de-los-prompts/requirements.md` (R11
+  enmendado con la forma de `design.md > 3`), `specs/QC-158-catalogo-desde-pdf/requirements.md` (R2
+  superado en su primera mitad; R3 intacto) y `specs/QC-90-alta-del-primer-lote/requirements.md`
+  (excepción de la materia prima sin lote, P1). Las tres enlazan a este spec; `git diff` = solo
+  añadidos al final (10 + 9 + 9 líneas), ninguna tabla ni requisito ajeno cambiado.

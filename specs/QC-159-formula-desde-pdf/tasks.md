@@ -201,7 +201,7 @@ Tras T5. **Toca:** `tests/unit/documentos/qc159-alcance.test.ts` (nuevo).
 **Hecho cuando:** verde, y rojo a mano al añadir una migración de prueba o una clave en castellano al
 esquema de entrada (se prueba y se revierte) (**R35, R36, R37**).
 
-### T13 [ ] [P] — Notas fechadas en specs afectados
+### T13 [x] [P] — Notas fechadas en specs afectados
 Tras T5. **Toca:** `specs/QC-129-textos-definitivos-de-los-prompts/requirements.md` (nota: R11 se
 enmienda con la forma de `design.md > 3` de QC-159), `specs/QC-158-catalogo-desde-pdf/requirements.md`
 (nota: R2 superado en su primera mitad por QC-159; R3 intacto), `specs/QC-90-alta-del-primer-lote/requirements.md`
