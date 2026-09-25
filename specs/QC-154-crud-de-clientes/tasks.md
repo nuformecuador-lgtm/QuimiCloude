@@ -70,7 +70,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       *Depende de:* T0. **Hecho cuando:** la guardia pasa con siete módulos, y **falla** si se cambia
       una sola línea de la copia de `clientes` (comprobado y revertido).
 
-- [ ] **T3 — Enmienda al catálogo de errores.** `customer_not_found` en `ERROR_CODES` con la línea
+- [x] **T3 — Enmienda al catálogo de errores.** `customer_not_found` en `ERROR_CODES` con la línea
       de «Duodécima enmienda» en la cabecera, su clave y **el texto aprobado en F1.4** (P4) en
       `error-catalog.ts`; `tests/unit/errores/catalogo.test.ts` de 54 a 55.
       *Depende de:* **respuesta humana a P4**. **Hecho cuando:** `catalogo.test.ts` y
@@ -192,7 +192,7 @@ Grupo A. T9 espera a T17.
 
 ## Grupo E — búsqueda sin acentos (F1.4, 2026-09-24; `design.md > 17`)
 
-- [ ] **T17 — La migración.** `db/schema.prisma`: los tres campos `*Normalized` de `Customer` y el
+- [x] **T17 — La migración.** `db/schema.prisma`: los tres campos `*Normalized` de `Customer` y el
       comentario `///` actualizado. `db/migrations/<ts>_customers_search_normalized/{migration.sql,
       down.sql}`, **escrita a mano**, con `<ts>` posterior a la última migración de `dev` en el momento
       de crearla. Lleva los cinco pasos de `design.md > 17.2` y la lista de `translate` **copiada
@@ -203,7 +203,7 @@ Grupo A. T9 espera a T17.
       *Depende de:* T0. **Hecho cuando:** `pnpm run db:migrate` aplica sobre `QuimiCloude_QC154`,
       typecheck limpio, y los tests de QC-153 y `guard-identificador-de-request` pasan.
 
-- [ ] **T18 [P] — Normalización.** `domain/customer-text.ts` (`normalizeCustomerText`) y
+- [x] **T18 [P] — Normalización.** `domain/customer-text.ts` (`normalizeCustomerText`) y
       `tests/unit/clientes/customer-text.test.ts`.
       *Depende de:* T0. **Hecho cuando:** el test pasa, incluida la equivalencia con
       `normalizeSupplierName` sobre la batería.
