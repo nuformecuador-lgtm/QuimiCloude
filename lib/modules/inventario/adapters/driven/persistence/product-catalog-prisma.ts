@@ -5,12 +5,14 @@ import { prisma } from '@/lib/shared/db/prisma';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ProductId, ProductRef } from '../../../domain/product-catalog';
 import type { CostingBatch } from '../../../domain/costing-batch';
+import type { ProductNameMatch } from '../../../domain/product-name-lookup';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
 import type { ProductType } from '../../../domain/product-type';
 
 import { batchCompanyScope, productCompanyScope } from './company-scope';
 import { findReservedAndAvailableByBatch } from './reservation-prisma';
 import { compareQuantities } from '../../../domain/decimal-quantity';
+import { normalizeProductName } from '../../../domain/product-name';
 
 /**
  * Implementa `ProductCatalog['findRefs']`: el hueco que el contrato publico de `inventario`
@@ -186,4 +188,57 @@ export async function findCostingBatches(
   return rows
     .map((row) => toCostingBatch(row, aggregates.get(row.id)?.available ?? row.stock.toFixed(4)))
     .filter((batch) => compareQuantities(batch.available, '0.0000') > 0);
+}
+
+type ProductByNameRow = {
+  readonly id: string;
+  readonly name: string;
+  readonly nameNormalized: string;
+  readonly type: ProductType;
+  readonly unitId: string | null;
+};
+
+/**
+ * La consulta real. Vive aparte de `findProductsByNormalizedNames` por el mismo motivo que
+ * `findAliveProducts`: declara el `scope` como `InventoryScope` y lo lleva hasta
+ * `productCompanyScope`.
+ */
+async function findAliveProductsByNormalizedNames(
+  normalizedNames: readonly string[],
+  scope: InventoryScope,
+): Promise<readonly ProductByNameRow[]> {
+  const rows = await prisma.product.findMany({
+    where: {
+      AND: [
+        productCompanyScope(scope),
+        { nameNormalized: { in: [...normalizedNames] }, deletedAt: null },
+      ],
+    },
+    select: { id: true, name: true, nameNormalized: true, type: true, unitId: true },
+  });
+  return rows.map((row) => ({ ...row, type: row.type as ProductType }));
+}
+
+/**
+ * Implementa `ProductNameLookup['findAliveByNormalizedNames']`: productos VIVOS de esa empresa
+ * cuyo `name_normalized` esta entre los de `names`, normalizados aqui -no por quien llama- con
+ * `normalizeProductName`, la unica definicion de «mismo nombre» del modulo. Incluye los
+ * terminados: filtrarlos es de quien llama (QC-159 `design.md > 5.3`).
+ */
+export async function findProductsByNormalizedNames(
+  names: readonly string[],
+  companyId: string,
+): Promise<readonly ProductNameMatch[]> {
+  const normalized = [...new Set(names.map(normalizeProductName))].filter((name) => name.length > 0);
+  if (normalized.length === 0) return [];
+
+  const rows = await findAliveProductsByNormalizedNames(normalized, { companyId });
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    nameNormalized: row.nameNormalized,
+    type: row.type,
+    unitId: row.unitId,
+  }));
 }

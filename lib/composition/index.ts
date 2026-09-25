@@ -73,6 +73,7 @@ import {
 import {
   findCostingBatches,
   findProductRefs,
+  findProductsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
@@ -109,6 +110,7 @@ import type {
   OrderNumberDirectory,
   PresentationCatalog,
   ProductCatalog,
+  ProductNameLookup,
   ReservationQueries,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
@@ -818,6 +820,13 @@ const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingB
 const presentationCatalog: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,
+};
+
+/** `ProductNameLookup` cableado con el adaptador driven DE INVENTARIO (QC-159 `design.md >
+ *  5.3`): la resolucion de ingredientes POR NOMBRE que `documentos` necesita para la revision
+ *  de una formula leida de un PDF. Interfaz propia, no un metodo mas de `ProductCatalog`. */
+const productNameLookup: ProductNameLookup = {
+  findAliveByNormalizedNames: findProductsByNormalizedNames,
 };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
