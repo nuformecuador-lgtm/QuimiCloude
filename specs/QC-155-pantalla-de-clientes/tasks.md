@@ -39,19 +39,19 @@
 
 ## Tanda 2 — Piezas puras y estados (paralelas entre sí)
 
-- [ ] **T2 [P] — `customer-list-params.ts`.** Depende de T1.
+- [x] **T2 [P] — `customer-list-params.ts`.** Depende de T1.
   Parser/serializador (`design.md > 4`), `customerListHref`, `hasActiveSearchOrFilter`,
   `clearSearchAndFilters` y `withSearchResetsPage` (término **o** filtros reinician la página).
   **Hecho:** `customer-list-params.test.ts` cubre R13 (reinicio), R14, R16 y R17, y `parse(build(p)) = p`.
   Sin React ni `next/*`.
 
-- [ ] **T3 [P] — `customer-labels.ts` y `customer-columns.tsx`.** Depende de T1.
+- [x] **T3 [P] — `customer-labels.ts` y `customer-columns.tsx`.** Depende de T1.
   Columnas de `design.md > 5.4`, con `sortable`/`filter` derivados de `CUSTOMER_QUERYABLE`, fecha en
   UTC y marcador de ausencia.
   **Hecho:** `customer-columns.test.tsx` cubre R10, R11 y R14 (ordenables = lista blanca, filtros =
   lista blanca, ninguna columna prohibida).
 
-- [ ] **T4 [P] — Estados: `customer-list-skeleton.tsx`, `customer-list-empty.tsx`, `customer-list-error.tsx`.**
+- [x] **T4 [P] — Estados: `customer-list-skeleton.tsx`, `customer-list-empty.tsx`, `customer-list-error.tsx`.**
   Depende de T1. `data-testid` propios y distintos. El vacío recibe `canModify` y solo entonces monta el
   disparador. El error lleva mensaje, código y reintento con `customerListHref`.
   **Hecho:** tests unitarios de los tres, incluido que el vacío **no** tiene disparador con
