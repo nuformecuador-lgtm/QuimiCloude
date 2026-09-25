@@ -25,9 +25,9 @@
 
 10 decisiones, ninguna abierta, en `specs/QC-159-formula-desde-pdf/requirements.md`. Board actualizado (descripcion y `complexity:high`). No bloqueada por QC-157 (prompt, ficha humana). **F1.0 y F1.1 hechos**: worktree montado con `.env`; cupo `fullstack` 1 de 3 en curso (QC-168); el cruce de archivos con QC-168 (pedidos) se mira en F2.0 con los dos `tasks.md`. F1.2: `spec_author` lanzado. **F1.2/F1.3 hechos**: R1-R39, T0-T14 (`e0ff3ad8`), tarjeta *En revision*; P1-P4 con propuesta (P1: materia prima sin lote, excepcion a QC-90). Solapes con QC-168 solo en listas cerradas (guardias, `routes.ts`, `composition/index.ts`, `aislamiento.json`). **Parada en F1.4.**
 
-### QC-169 - F1.0 (2026-09-25)
+### QC-169 - CERRADA (2026-09-25)
 
-`backend`, **`complexity: low`**. Arreglo del rojo de dev (`catalog-import-isolation`, choque QC-158 x QC-142). Decisiones ya cerradas por el humano en el issue (confirmar exige `proveedores.modificar`; se corrige codigo, no tests; quitar la entrada de baseline que puso QC-150). Sin `/afinar-feature`: no quedan huecos. Cupo `backend` 3 de 3 (QC-131 humana, QC-154). Worktree montado. **F1.2-F2.0 hechos el 2026-09-25**: spec R1-R13/T1-T7 (`30905fb9`), aprobado con P1 ratificada (vista previa tambien `proveedores.modificar`); `in_progress`. **Review OK** (0 bloqueantes, 3 menores de tests abiertos en el PR); gate completo VERDE (727/9978, baseline vacio; el primer intento lo mato la falta de memoria). **PR #123 abierto.**
+PR #123; resumen en `progress/history.md`. `dev` vuelve a verde con el baseline de rojos vacio.
 
 ### QC-138 - F1.0 y F1.1 (2026-09-25)
 
