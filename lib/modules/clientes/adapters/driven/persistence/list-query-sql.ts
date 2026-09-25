@@ -1,11 +1,10 @@
-// lib/modules/clientes/adapters/driven/persistence/list-query-sql.ts
 /**
  * Traduccion del contrato generico de consulta (`domain/list-query.ts`) a las condiciones que
  * Prisma entiende. Vive en `adapters/driven/` porque es lo que el dominio no puede saber:
  * `gte`/`lte`/`contains` son vocabulario de la base.
  *
- * Se copian SOLO las dos funciones que este modulo usa (`textCondition`, `dateRangeCondition`),
- * no el archivo entero de `proveedores`: copiar tambien `numberRange`, `select` o
+ * Se copia SOLO la funcion que este modulo usa (`dateRangeCondition`), no el archivo entero de
+ * `proveedores`: copiar tambien `numberRange`, `select`, `textCondition` o
  * `normalizedSearchCondition` dejaria codigo muerto en un modulo que no los usa (regla de
  * dependencias entre modulos: no se importa de `proveedores` por una ruta profunda).
  *
@@ -16,9 +15,6 @@
 
 /** Condicion de rango de una columna `timestamptz`. `lt` -no `lte`- por lo explicado arriba. */
 export type DateRangeCondition = { gte?: Date; lt?: Date };
-
-/** Condicion de subcadena insensible a mayusculas sobre una columna en crudo. */
-export type TextCondition = { contains: string; mode: 'insensitive' };
 
 const MIDNIGHT_UTC = 'T00:00:00.000Z';
 const MILLISECONDS_PER_DAY = 86_400_000;
@@ -46,10 +42,4 @@ export function dateRangeCondition(
     ...(start === null ? {} : { gte: start }),
     ...(endDay === null ? {} : { lt: new Date(endDay.getTime() + MILLISECONDS_PER_DAY) }),
   };
-}
-
-/** Filtro de TEXTO sobre una columna en crudo: `contains` con `mode: 'insensitive'`. */
-export function textCondition(value: string): TextCondition | null {
-  const trimmed = value.trim();
-  return trimmed === '' ? null : { contains: trimmed, mode: 'insensitive' };
 }
