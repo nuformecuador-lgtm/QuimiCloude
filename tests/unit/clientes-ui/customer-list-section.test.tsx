@@ -1,13 +1,13 @@
-// QC-155 T6 — Los cinco casos de la lista de clientes: R7, R19, R20, R22 (`design.md > 5.1`).
+// Los cinco casos de la lista de clientes.
 //
 // `CustomerListSection` es un Server Component `async`, asi que se le llama como funcion y se
 // renderiza lo que devuelve: es lo que permite ejercitar los cinco casos sin base de datos.
 //
-// **`listCustomersAction` esta mockeada.** Es el borde del modulo `clientes` (QC-154, `done` y
-// mergeado), que esta ficha no abre (R35), y sustituirla es lo unico que permite ejercitar error,
+// **`listCustomersAction` esta mockeada.** Es el borde del modulo `clientes`, que esta
+// pantalla no abre, y sustituirla es lo unico que permite ejercitar error,
 // vacio, sin coincidencias y lista.
 //
-// **Los casos se distinguen por `data-testid` DISTINTOS** (R40), nunca por copy.
+// **Los casos se distinguen por `data-testid` DISTINTOS**, nunca por copy.
 
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -127,7 +127,7 @@ describe('los casos se distinguen por data-testid (R19, R20, R22, R40)', () => {
     expect(screen.queryByTestId(testId.tabla)).toBeNull();
     expect(screen.queryByTestId(testId.error)).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
-    // Vacio de verdad: no se ofrece «volver a la primera pagina», que es otro caso distinto (R20).
+    // Vacio de verdad: no se ofrece «volver a la primera pagina», que es otro caso distinto.
     expect(screen.queryByTestId(testId.primeraPagina)).toBeNull();
   });
 

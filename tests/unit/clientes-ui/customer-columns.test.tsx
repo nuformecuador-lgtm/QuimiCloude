@@ -1,9 +1,9 @@
-// QC-155 T3 — Las nueve columnas de la lista de clientes: R10, R11, R14.
+// Las nueve columnas de la lista de clientes.
 //
 // Las columnas son DATOS, asi que el test las recorre en vez de listar literales: anadir una
 // columna es anadir una fila a `buildCustomerColumns`.
 //
-// Los asserts van sobre ids de columna, `data-testid` y constantes exportadas (R40), nunca sobre
+// Los asserts van sobre ids de columna, `data-testid` y constantes exportadas, nunca sobre
 // el copy de las etiquetas.
 
 import { cleanup, render, screen } from '@testing-library/react';

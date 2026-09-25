@@ -1,4 +1,4 @@
-// QC-155 T6a — La confirmacion de baja de un cliente: R31, R32, R33.
+// La confirmacion de baja de un cliente.
 //
 // `deleteCustomerAction` es un doble espia; las otras cuatro actions FALLAN si se les llama. Un
 // dialogo de baja que de paso listara, creara o editara seria un fallo silencioso, asi que se

@@ -181,13 +181,11 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   // AMPLIADO el 2026-09-15 (QC-56): entra la pantalla de recetas como SEPTIMO consumidor
   // declarado. El caso que la dejaba fuera se invierte; una OCTAVA pantalla sigue en rojo.
   //
-  // AMPLIADO el 2026-09-25 (QC-155, pantalla-de-clientes): entra la NOVENA pantalla declarada
-  // -clientes-, por decision cerrada 5 (`specs/QC-155-pantalla-de-clientes/requirements.md >
-  // Decisiones cerradas`, «Tres fichas como Proveedores») y R9: su lista se monta sobre la tabla
-  // compartida por su barrel publico, sin tocar ni un archivo de `components/shared/data-table/`.
-  // Se anade la fila y se TENSA el resto del centinela -el ancla de consumidores minimos sube de
-  // siete a ocho-, nunca se afloja: la lista sigue CERRADA y una DECIMA pantalla vuelve a poner
-  // esto en rojo.
+  // Entra la NOVENA pantalla declarada -clientes-: su lista se monta sobre la tabla compartida
+  // por su barrel publico, sin tocar ni un archivo de `components/shared/data-table/`. Se anade
+  // la fila y se TENSA el resto del centinela -el ancla de consumidores minimos sube de siete a
+  // ocho-, nunca se afloja: la lista sigue CERRADA y una DECIMA pantalla vuelve a poner esto en
+  // rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
@@ -198,8 +196,8 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
    * La QUINTA -`UNITS_ROUTE`- la trae QC-39 (R15, R31) con el mismo criterio: su lista se monta
    * sobre la tabla compartida por decision cerrada del 2026-09-08 y sus acciones de fila van como
    * columna normal `pinnable: false`, sin anadirle nada a `components/shared/data-table/`. La
-   * SEXTA -`USERS_ROUTE`- la trae QC-67 (R9) con el mismo criterio y por la misma via. La NOVENA
-   * -`CUSTOMERS_ROUTE`- la trae QC-155 (R9) con el mismo criterio y por la misma via.
+   * SEXTA -`USERS_ROUTE`- la trae QC-67 (R9) con el mismo criterio y por la misma via.
+   * La NOVENA -`CUSTOMERS_ROUTE`- la trae la pantalla de clientes con el mismo criterio.
    */
   const carpetasAutorizadas = [
     ORDERS_ROUTE,
@@ -212,7 +210,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     FORMULAS_ROUTE,
     // 2026-09-16: la lista de pedidos asignados pasa a montarse sobre la tabla compartida.
     ASSIGNED_ORDERS_ROUTE,
-    // 2026-09-25: la pantalla de clientes se monta sobre la tabla compartida (QC-155 R9).
+    // 2026-09-25: la pantalla de clientes se monta sobre la tabla compartida.
     CUSTOMERS_ROUTE,
   ].map(carpetaDeRuta)
 
@@ -501,13 +499,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // VEINTIDOS; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla
   // en rojo.
   //
-  // 2026-09-25 (QC-155, pantalla-de-clientes, T8): entra la pantalla de clientes como NOVENA
-  // pantalla que consume la tabla compartida, y su E2E `e2e/clientes.spec.ts` entra con ella. Su
-  // recorrido localiza `data-table-search`, `data-table-cell-lastNames`, `data-table-cell-city` y
-  // `data-table-row-<id>` porque la lista de clientes ES la tabla compartida (R9), y el recorrido
-  // busca, edita y da de baja sobre la fila que ella sirve. El centinela vuelve de VEINTIDOS a
-  // VEINTITRES; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a
-  // ponerla en rojo.
+  // Entra la pantalla de clientes como NOVENA pantalla que consume la tabla compartida, y su E2E
+  // `e2e/clientes.spec.ts` entra con ella. Su recorrido localiza `data-table-search`,
+  // `data-table-cell-lastNames`, `data-table-cell-city` y `data-table-row-<id>` porque la lista
+  // de clientes ES la tabla compartida, y el recorrido busca, edita y da de baja sobre la fila
+  // que ella sirve. El centinela vuelve de VEINTIDOS a VEINTITRES; la lista sigue CERRADA, y un
+  // spec mas que referencie `data-table` vuelve a ponerla en rojo.
   it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintitres', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
@@ -532,8 +529,8 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-09-24). Va antes
       // que `e2e/clientes.spec.ts` porque la lista esta ORDENADA y 'a' precede a 'l'.
       'e2e/catalogo-desde-pdf.spec.ts',
-      // 2026-09-25 (QC-155, T8): ver la nota de arriba. Va antes que `e2e/ejecucion-receta.spec.ts`
-      // porque la lista esta ORDENADA y 'c' precede a 'e'.
+      // Ver la nota de arriba. Va antes que `e2e/ejecucion-receta.spec.ts` porque la lista esta
+      // ORDENADA y 'c' precede a 'e'.
       'e2e/clientes.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
       // tabla por la lista de pedidos asignados, que ya la consumia.

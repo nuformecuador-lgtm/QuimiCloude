@@ -1,4 +1,4 @@
-// El item de navegacion de clientes (R4, R6).
+// El item de navegacion de clientes.
 //
 // Se ITERA `PRIVATE_NAV_ITEMS` y se afirma sobre `CUSTOMERS_ROUTE`, `CUSTOMERS_LABEL` y el
 // `testId`, nunca sobre el literal del copy. Mismo patron que `private-nav-usuarios.test.ts` y

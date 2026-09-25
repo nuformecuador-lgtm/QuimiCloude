@@ -1,21 +1,20 @@
 /**
- * E2E de la pantalla de clientes (QC-155, T8): el camino completo de quien tiene los dos permisos
- * y el rechazo de quien no tiene ninguno (R41, R42).
+ * E2E de la pantalla de clientes: el camino completo de quien tiene los dos permisos y el rechazo
+ * de quien no tiene ninguno.
  *
- * Por que existe, y por que AQUI: `requirements.md > R41` lo pide entero -login -> `CUSTOMERS_ROUTE`
- * -> ve la lista -> da de alta un cliente y lo ve -> lo encuentra con la caja de busqueda -> lo
- * edita y ve el dato cambiado -> lo da de baja y deja de verlo- y ademas un segundo recorrido
- * (R42) donde una sesion valida SIN `clientes.consultar` recibe 404 dentro del layout privado y
- * no ve ni el item del menu ni un solo dato de clientes. Es la unica verificacion de extremo a
- * extremo de todo el modulo (decision cerrada 7 de `requirements.md`): el modelo (QC-153) y el
- * CRUD (QC-154) ya se verifican con tests unitarios y de integracion.
+ * Recorrido 1, entero: login -> `CUSTOMERS_ROUTE` -> ve la lista -> da de alta un cliente y lo ve
+ * -> lo encuentra con la caja de busqueda -> lo edita y ve el dato cambiado -> lo da de baja y
+ * deja de verlo. Recorrido 2: una sesion valida SIN `clientes.consultar` recibe 404 dentro del
+ * layout privado y no ve ni el item del menu ni un solo dato de clientes. Es la unica
+ * verificacion de extremo a extremo de todo el modulo: el modelo y el CRUD ya se verifican con
+ * tests unitarios y de integracion.
  *
  * Que aporta sobre unit e integracion, que es lo unico que justifica su coste:
  *  - La cadena entera en un navegador de verdad: cookie firmada por el servidor, middleware, el
  *    corte por permiso de la pagina (`clientes.consultar`), el Server Component de la lista, las
- *    Server Actions REALES de alta, edicion y baja de QC-154 contra Postgres, y el
+ *    Server Actions REALES de alta, edicion y baja del modulo contra Postgres, y el
  *    `router.refresh()` posterior de cada una.
- *  - **La sincronizacion de la caja de busqueda con la URL** (R18, `design.md > 5.3`): el
+ *  - **La sincronizacion de la caja de busqueda con la URL**: el
  *    recorrido escribe en la caja de verdad y espera a que la URL lo lleve, cosa que jsdom no
  *    reproduce igual que un navegador con su propio rebote de 300 ms.
  *  - El panel lateral (`Sheet`) y el dialogo de confirmacion (`AlertDialog`) son primitivos con su
@@ -25,17 +24,17 @@
  * NAVEGACION SIEMPRE POR URL (`page.goto`), nunca pulsando el item del menu, salvo la UNICA
  * comprobacion de que `nav-clientes` existe o no para cada rol: pulsar el item metera en el
  * recorrido el filtrado del menu por permisos, que no es lo que este spec afirma. La URL se
- * deriva SIEMPRE de `CUSTOMERS_ROUTE` (R1): ningun literal `/clientes` en todo el archivo.
+ * deriva SIEMPRE de `CUSTOMERS_ROUTE`: ningun literal `/clientes` en todo el archivo.
  *
- * POR QUE LA EMPRESA NACE SIN NINGUN CLIENTE: el estado vacio de R19 -"todavia no hay clientes
+ * POR QUE LA EMPRESA NACE SIN NINGUN CLIENTE: el estado vacio -"todavia no hay clientes
  * registrados", con el disparador de alta dentro- es justo el primer paso del recorrido 1, y solo
  * se ve con una empresa realmente sin filas. El alta, la busqueda, la edicion y la baja son
  * entonces las UNICAS escrituras del recorrido, todas por la interfaz: no hay ninguna precondicion
  * que sembrar por la base de datos, a diferencia de usuarios o unidades.
  *
- * EL APELLIDO LLEVA TILDE A PROPOSITO (R41: "lo encuentra con la caja de busqueda"): el recorrido
- * busca despues por el mismo apellido SIN tilde, para ejercitar de punta a punta la normalizacion
- * que QC-154 R41 dejo en el modulo (`normalizeCustomerText`, NFD + descarte de diacriticos). Se
+ * EL APELLIDO LLEVA TILDE A PROPOSITO: el recorrido busca despues por el mismo apellido SIN
+ * tilde, para ejercitar de punta a punta la normalizacion del modulo (`normalizeCustomerText`,
+ * NFD + descarte de diacriticos). Se
  * importa esa MISMA funcion -nunca una segunda definicion- para componer el termino de busqueda a
  * partir del dato del fixture.
  *
@@ -63,14 +62,14 @@
  * LOS `data-testid` VAN COMO CONSTANTES LOCALES y no importados del barrel de la ruta: sus
  * modulos son de CLIENTE (`'use client'`, JSX, `useActionState`) e importarlos desde el proceso de
  * Node del runner arrastraria React sin aportar nada. Es el mismo criterio que
- * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Ningun assert mira copy (R40): todo se localiza
+ * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Ningun assert mira copy: todo se localiza
  * por `data-testid`, por rol ARIA o por valores del fixture.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
  * importarse y `next dev` -que arranca el `webServer` de la config- carga el suyo.
  *
  * SE CORRE con `pnpm exec playwright test e2e/clientes.spec.ts --project=chromium
- * --project=webkit`, nunca con `pnpm run e2e -- <archivo>` (`design.md > 11`).
+ * --project=webkit`, nunca con `pnpm run e2e -- <archivo>`.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -90,7 +89,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { prisma } from '@/lib/shared/db/prisma';
 import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 
-// QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+// La entrada y su aterrizaje, derivado de los permisos del usuario en la base.
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -114,7 +113,7 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
  */
 const SEARCH_PARAM = 'q';
 
-/** `data-testid` de la pantalla, del panel lateral, de la tabla compartida y del dialogo (R40). */
+/** `data-testid` de la pantalla, del panel lateral, de la tabla compartida y del dialogo. */
 const TITLE_TESTID = 'clientes-title';
 const DATA_TABLE_TESTID = 'data-table';
 const LIST_EMPTY_TESTID = 'customer-list-empty';
@@ -133,10 +132,10 @@ const ACTION_DELETE_TESTID = 'customer-action-delete';
 const DELETE_DIALOG_TESTID = 'delete-customer-dialog';
 const DELETE_MESSAGE_TESTID = 'delete-customer-message';
 const DELETE_CONFIRM_TESTID = 'delete-customer-confirm';
-/** El 404 de la zona privada (QC-75 R8): se pinta DENTRO del layout, con su menu ya filtrado. */
+/** El 404 de la zona privada: se pinta DENTRO del layout, con su menu ya filtrado. */
 const NOT_FOUND_TESTID = 'private-not-found';
 
-/** Palabras que la pantalla de 404 NO puede contener (R6): delatarian que la pantalla existe. */
+/** Palabras que la pantalla de 404 NO puede contener: delatarian que la pantalla existe. */
 const FORBIDDEN_404_WORDS = ['cliente', 'permiso', 'autoriz'] as const;
 
 type Credentials = { readonly username: string; readonly password: string };
@@ -152,9 +151,9 @@ const operatorUser: Credentials = {
 };
 
 /**
- * Los seis datos capturados en el alta (R25). Solo los tres obligatorios: telefono, correo y
+ * Los seis datos capturados en el alta. Solo los tres obligatorios: telefono, correo y
  * direccion se dejan vacios a proposito, que ya cubren `customer-form.test.tsx` y
- * `customer-columns.test.tsx` (R11).
+ * `customer-columns.test.tsx`.
  *
  * **El apellido lleva tilde** (ver cabecera): se busca despues por el mismo apellido sin ella.
  */
@@ -167,12 +166,12 @@ const nuevoCliente = {
 /** El termino de busqueda: la MISMA normalizacion que aplica el modulo, sobre el apellido real. */
 const SEARCH_TERM = normalizeCustomerText(nuevoCliente.lastNames);
 
-/** La ciudad tras la edicion (R27). */
+/** La ciudad tras la edicion. */
 const CIUDAD_EDITADA = `${FIXTURE_PREFIX}ciudad_editada_${RUN_ID}`;
 
 /**
  * Empresa efimera de este worker. El indice `companies_name_unique` es GLOBAL, asi que nunca la
- * de instalacion. El listado de clientes esta acotado a la empresa del actor (decision cerrada 4),
+ * de instalacion. El listado de clientes esta acotado a la empresa del actor,
  * asi que esta empresa es tambien lo que aisla la lista de este worker de la del otro.
  */
 const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
@@ -206,8 +205,8 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
       passwordHash: await createPasswordHash(user.password),
       roleId: role.id,
       companyId,
-      // QC-78 R1: explicito, no por defecto. La columna es `@default(pending)` y desde esa ficha
-      // `pending` no entra por el login, asi que este usuario efimero no llegaria a la pantalla.
+      // Explicito, no por defecto: la columna es `@default(pending)` y una cuenta `pending` no
+      // entra por el login, asi que este usuario efimero no llegaria a la pantalla.
       accountStatus: 'active',
     },
     select: { id: true },
@@ -299,44 +298,43 @@ test.describe('pantalla de clientes', () => {
   }) => {
     await loginAndLand(page, adminUser);
 
-    // --- 1. La pantalla se sirve a quien tiene `clientes.consultar`, y su item de menu existe
-    // (R4). No se pulsa a proposito (ver cabecera): la navegacion del recorrido es por URL.
+    // --- 1. La pantalla se sirve a quien tiene `clientes.consultar`, y su item de menu existe.
+    // No se pulsa a proposito (ver cabecera): la navegacion del recorrido es por URL.
     await expect(page.getByTestId('nav-clientes')).toHaveCount(1);
 
     const listUrl = CUSTOMERS_ROUTE;
     await page.goto(listUrl);
     await expect(page.getByTestId(TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // --- 2. La empresa de este worker nace sin ningun cliente: el estado vacio de R19, con el
-    // disparador de alta DENTRO (la sesion trae `clientes.modificar`, R5, R6). La tabla compartida
+    // --- 2. La empresa de este worker nace sin ningun cliente: el estado vacio, con el
+    // disparador de alta DENTRO (la sesion trae `clientes.modificar`). La tabla compartida
     // ni siquiera se monta con cero filas de verdad.
     await expect(page.getByTestId(LIST_EMPTY_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(DATA_TABLE_TESTID)).toHaveCount(0);
 
-    // --- 3. El alta ocurre en un PANEL LATERAL, SIN cambiar de URL (R24).
+    // --- 3. El alta ocurre en un PANEL LATERAL, SIN cambiar de URL.
     const urlBeforeSheet = page.url();
     await page.getByTestId(CREATE_OPEN_TESTID).first().click();
     await expect(page.getByTestId(SHEET_TESTID)).toBeVisible({ timeout: 60_000 });
     expect(page.url(), 'abrir el panel no debe navegar').toBe(urlBeforeSheet);
 
-    // --- 4. Los tres obligatorios (R25). Telefono, correo y direccion se dejan vacios a
-    // proposito: R11 y su marcador de ausencia ya los cubren los tests de unidad.
+    // --- 4. Los tres obligatorios. Telefono, correo y direccion se dejan vacios a
+    // proposito: su marcador de ausencia ya lo cubren los tests de unidad.
     await page.getByTestId(FIELD_FIRST_NAMES_TESTID).fill(nuevoCliente.firstNames);
     await page.getByTestId(FIELD_LAST_NAMES_TESTID).fill(nuevoCliente.lastNames);
     await page.getByTestId(FIELD_CITY_TESTID).fill(nuevoCliente.city);
 
-    // --- 5. Guardar: la Server Action REAL de QC-154 contra Postgres, sin `fetch` de por medio
-    // (R34).
+    // --- 5. Guardar: la Server Action REAL del modulo contra Postgres, sin `fetch` de por medio.
     await page.getByTestId(FORM_SUBMIT_TESTID).click();
 
     // --- 6. Con exito el panel se cierra y se avisa por el `<Toaster />` que el layout privado YA
-    // monta (R30). Se afirma que HAY un aviso, no cual es su texto.
+    // monta. Se afirma que HAY un aviso, no cual es su texto.
     await expect(page.getByTestId(SHEET_TESTID)).toHaveCount(0, { timeout: 60_000 });
     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
 
     // --- 7. Lo guardo el backend de verdad, no solo lo pinto la pantalla: la fila existe, cuelga
     // de la empresa DEL ACTOR (que el formulario no envia) y los tres opcionales quedaron sin
-    // valor -nunca cadena vacia (QC-154 R16)-.
+    // valor -nunca cadena vacia-.
     const created = await prisma.customer.findFirstOrThrow({
       where: { lastNames: nuevoCliente.lastNames },
       select: { id: true, companyId: true, phone: true, email: true, address: true },
@@ -346,8 +344,8 @@ test.describe('pantalla de clientes', () => {
     expect(created.email).toBeNull();
     expect(created.address).toBeNull();
 
-    // --- 8. Y el cliente esta en la lista sin que nadie recargue nada (R30), con los MISMOS
-    // parametros de lista que habia antes de abrir el panel (R24).
+    // --- 8. Y el cliente esta en la lista sin que nadie recargue nada, con los MISMOS
+    // parametros de lista que habia antes de abrir el panel.
     expect(page.url(), 'cerrar el panel no debe perder los parametros de lista').toBe(
       urlBeforeSheet,
     );
@@ -358,16 +356,16 @@ test.describe('pantalla de clientes', () => {
       rowLocator.getByTestId(LAST_NAMES_CELL_TESTID).filter({ hasText: exactText(nuevoCliente.lastNames) }),
     ).toHaveCount(1, { timeout: 60_000 });
 
-    // --- 9. LA BUSQUEDA SIN TILDE (R41, R12): el termino escrito en la caja de VERDAD llega al
+    // --- 9. LA BUSQUEDA SIN TILDE: el termino escrito en la caja de VERDAD llega al
     // servidor y este recorta sobre el conjunto entero -no hay filtrado en el cliente-. El termino
-    // no lleva tilde y la fila que la tiene aparece igual, porque el modulo normaliza (QC-154 R41).
+    // no lleva tilde y la fila que la tiene aparece igual, porque el modulo normaliza.
     await searchFor(page, SEARCH_TERM);
     await expect(page.getByTestId(NO_MATCHES_TESTID)).toHaveCount(0);
     await expect(
       rowLocator.getByTestId(LAST_NAMES_CELL_TESTID).filter({ hasText: exactText(nuevoCliente.lastNames) }),
     ).toHaveCount(1, { timeout: 60_000 });
 
-    // --- 10. Editar (R27): precarga los seis valores actuales, aqui se cambia SOLO la ciudad y
+    // --- 10. Editar: precarga los seis valores actuales, aqui se cambia SOLO la ciudad y
     // se envia el reemplazo completo.
     await rowLocator.getByTestId(ACTION_EDIT_TESTID).click();
     await expect(page.getByTestId(SHEET_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -375,13 +373,13 @@ test.describe('pantalla de clientes', () => {
     await page.getByTestId(FORM_SUBMIT_TESTID).click();
     await expect(page.getByTestId(SHEET_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
-    // --- 11. La celda cambia (R27, R30), en la MISMA fila -localizada por el id que puso la base
+    // --- 11. La celda cambia en la MISMA fila -localizada por el id que puso la base
     // de datos, no por su posicion-.
     await expect(rowLocator.getByTestId(CITY_CELL_TESTID)).toHaveText(exactText(CIUDAD_EDITADA), {
       timeout: 60_000,
     });
 
-    // --- 12. Dar de baja (R31): el dialogo NOMBRA al cliente por su nombre completo.
+    // --- 12. Dar de baja: el dialogo NOMBRA al cliente por su nombre completo.
     await rowLocator.getByTestId(ACTION_DELETE_TESTID).click();
     await expect(page.getByTestId(DELETE_DIALOG_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(DELETE_MESSAGE_TESTID)).toContainText(
@@ -390,7 +388,7 @@ test.describe('pantalla de clientes', () => {
     await page.getByTestId(DELETE_CONFIRM_TESTID).click();
     await expect(page.getByTestId(DELETE_DIALOG_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
-    // --- 13. La baja es LOGICA en la base (R31, decision cerrada 4): la fila sigue existiendo,
+    // --- 13. La baja es LOGICA en la base: la fila sigue existiendo,
     // pero marcada.
     const deshabilitado = await prisma.customer.findUniqueOrThrow({
       where: { id: created.id },
@@ -398,8 +396,8 @@ test.describe('pantalla de clientes', () => {
     });
     expect(deshabilitado.deletedAt, 'la baja debe marcar deletedAt, no borrar la fila').not.toBeNull();
 
-    // --- 14. Y DEJA DE VERSE (R33, R41): con la busqueda todavia puesta, la lista pasa a «sin
-    // coincidencias» -la caja sigue montada (R20)- y la fila del cliente dado de baja ya no
+    // --- 14. Y DEJA DE VERSE: con la busqueda todavia puesta, la lista pasa a «sin
+    // coincidencias» -la caja sigue montada- y la fila del cliente dado de baja ya no
     // aparece en ninguna parte de la pantalla.
     await expect(page.getByTestId(NO_MATCHES_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(
@@ -410,12 +408,12 @@ test.describe('pantalla de clientes', () => {
   test('una sesion valida sin `clientes.consultar` recibe 404 dentro del layout privado y no ve la tabla (R42)', async ({
     page,
   }) => {
-    // El Operador del seed no tiene ni `clientes.consultar` ni `clientes.modificar` (decision
-    // cerrada 3), asi que la pantalla de clientes le esta cerrada. Donde aterriza lo deriva
+    // El Operador del seed no tiene ni `clientes.consultar` ni `clientes.modificar`,
+    // asi que la pantalla de clientes le esta cerrada. Donde aterriza lo deriva
     // `loginAndLand` de sus permisos (`e2e/helpers/landing.ts`).
     await loginAndLand(page, operatorUser);
 
-    // --- 1. Sin `clientes.consultar` el item de menu no se emite (R4, R6): ni etiqueta, ni
+    // --- 1. Sin `clientes.consultar` el item de menu no se emite: ni etiqueta, ni
     // destino, ni identificador de test.
     await expect(page.getByTestId('nav-clientes')).toHaveCount(0);
 
@@ -429,12 +427,12 @@ test.describe('pantalla de clientes', () => {
       'una ruta privada sin permiso debe responder 404, indistinguible de una que no existe',
     ).toBe(404);
 
-    // --- 3. Y ese 404 se pinta DENTRO del layout privado (QC-75 R8): el usuario conserva su menu
+    // --- 3. Y ese 404 se pinta DENTRO del layout privado: el usuario conserva su menu
     // y su salida en vez de quedarse en una pagina pelada.
     const notFound = page.getByTestId(NOT_FOUND_TESTID);
     await expect(notFound).toBeVisible({ timeout: 60_000 });
 
-    // --- 4. Y no delata nada (R4): ni el modulo, ni el permiso, ni que la pantalla exista.
+    // --- 4. Y no delata nada: ni el modulo, ni el permiso, ni que la pantalla exista.
     const notFoundText = ((await notFound.textContent()) ?? '').toLowerCase();
     for (const word of FORBIDDEN_404_WORDS) {
       expect(

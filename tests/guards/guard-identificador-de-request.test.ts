@@ -127,16 +127,16 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
   'catalogo-desde-pdf.spec.ts',
-  // Alta el 2026-09-25 (QC-155, pantalla-de-clientes, T8) por el MISMO motivo y en el MISMO sitio
-  // que las demas: esta lista es CERRADA y su punto de extension por diseno es darse de alta en
-  // ella. El ancla NO se relaja -el archivo se nombra, uno a uno-. El recorrido que ejercita
-  // (R41, R42): el Administrador ve el item de menu, llega a la pantalla vacia, da de alta un
-  // cliente con apellido acentuado, lo encuentra en la caja de busqueda escribiendo el mismo
-  // apellido SIN tilde, lo edita y ve la celda cambiar, y lo da de baja tras lo cual la busqueda
-  // muestra «sin coincidencias»; y una sesion sin `clientes.consultar` recibe 404 dentro del
-  // layout privado sin ver ni el item ni un solo dato de clientes. NO ejercita el cruce borde ->
-  // accion del identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni
-  // sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  // Por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto de
+  // extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
+  // uno a uno-. El recorrido que ejercita: el Administrador ve el item de menu, llega a la
+  // pantalla vacia, da de alta un cliente con apellido acentuado, lo encuentra en la caja de
+  // busqueda escribiendo el mismo apellido SIN tilde, lo edita y ve la celda cambiar, y lo da de
+  // baja tras lo cual la busqueda muestra «sin coincidencias»; y una sesion sin
+  // `clientes.consultar` recibe 404 dentro del layout privado sin ver ni el item ni un solo dato
+  // de clientes. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no
+  // lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
+  // sigue INTACTO.
   'clientes.spec.ts',
   // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
   // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.

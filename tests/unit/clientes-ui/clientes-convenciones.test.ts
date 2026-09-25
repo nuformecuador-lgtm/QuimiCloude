@@ -1,15 +1,14 @@
-// QC-155 T7 — Guardias de convencion de la pantalla de clientes: R34-R40
-// (`specs/QC-155-pantalla-de-clientes/tasks.md > Tanda 5`).
+// Guardias de convencion de la pantalla de clientes.
 //
 // Que mira este archivo y que NO. Las guardias hermanas ya cubren:
 //   - `customers-route-contract.test.ts`: la constante de ruta y el literal `'/clientes'`.
-//   - `data-table-intacta-clientes.test.ts`: R9, la tabla compartida sin tocar.
-//   - `clientes-viewport.test.tsx`: R39, el render real en los dos anchos.
+//   - `data-table-intacta-clientes.test.ts`: la tabla compartida sin tocar.
+//   - `clientes-viewport.test.tsx`: el render real en los dos anchos.
 //   - `clientes-page.test.tsx`, `private-nav-clientes.test.ts`: el corte y el item del menu.
-// Este archivo cierra lo que ninguna de ellas mira, por FUENTE: R34 (actions por ruta exacta,
-// sin fetch propio, sin route handler propio), R35 (primitivas y modulo intocables, sobre el
-// diff), R36 (barrel unico, sin ruta profunda), R37 (nada re-creado), R38 (sin pedidos), R39
-// (sin 100vh en la fuente) y R40 (los tests de la carpeta no afirman sobre copy).
+// Este archivo cierra lo que ninguna de ellas mira, por FUENTE: actions por ruta exacta, sin
+// fetch ni route handler propios; primitivas y modulo intocables, sobre el diff; barrel unico,
+// sin ruta profunda; nada re-creado; sin pedidos; sin 100vh en la fuente; y los tests de la
+// carpeta no afirman sobre copy.
 //
 // Cada detector es una funcion PURA que camina un ARBOL DE ARCHIVOS de verdad —el de la ruta o
 // uno fabricado en un `mkdtempSync`—, nunca una cadena suelta en memoria: asi la sensibilidad
@@ -41,7 +40,7 @@ const CARPETA_DE_LA_RUTA = `app/(private)${CUSTOMERS_ROUTE}`;
 const CARPETA_DE_COMPONENTES = `${CARPETA_DE_LA_RUTA}/components`;
 const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
 
-/** Las cinco operaciones del modulo, por su ruta EXACTA (R34). */
+/** Las cinco operaciones del modulo, por su ruta EXACTA. */
 const RUTA_DE_LAS_ACCIONES = '@/lib/modules/clientes/adapters/driving/customer-actions';
 const ACCIONES = [
   'listCustomersAction',
@@ -51,14 +50,14 @@ const ACCIONES = [
   'deleteCustomerAction',
 ] as const;
 
-/** Barrel del modulo: por aqui salen contratos y tipos, JAMAS una Server Action (R34). */
+/** Barrel del modulo: por aqui salen contratos y tipos, JAMAS una Server Action. */
 const BARREL_DEL_MODULO = '@/lib/modules/clientes';
 
-/** Lo que R35 declara intocable para esta feature, sobre el DIFF. */
+/** Lo que esta feature no puede tocar, sobre el DIFF. */
 const INTOCABLES = ['lib/modules/', 'lib/composition/', 'db/', 'components/ui/'] as const;
 const MANIFIESTO = 'package.json';
 
-/** Lo que un componente de cliente NO puede importar (R34): arrastraria Prisma al navegador. */
+/** Lo que un componente de cliente NO puede importar: arrastraria Prisma al navegador. */
 const PROHIBIDO_EN_CLIENTE = ['@/lib/composition', '@/lib/shared/db', '@prisma/client', '@/db'] as const;
 
 // ------------------------------------------------------------------------------------------
@@ -126,7 +125,7 @@ function fabricar(raiz: string, relativo: string, contenido: string): string {
 }
 
 // ------------------------------------------------------------------------------------------
-// R34 — Toda lectura y toda escritura por la ruta exacta; sin fetch propio; sin route handler
+// Toda lectura y toda escritura por la ruta exacta; sin fetch propio; sin route handler
 // ------------------------------------------------------------------------------------------
 
 /** Una Server Action importada por el BARREL del modulo en vez de por su ruta exacta. */
@@ -168,7 +167,7 @@ function fetchAPropia(fuente: string): string[] {
     .map((patron) => patron.source);
 }
 
-/** Recorre `carpetaAbsoluta` y aplica los tres detectores de R34; devuelve TODAS las violaciones. */
+/** Recorre `carpetaAbsoluta` y aplica los tres detectores de arriba; devuelve TODAS las violaciones. */
 function violacionesR34(carpetaAbsoluta: string): string[] {
   const violaciones: string[] = [];
   for (const archivo of fuentesBajoAbsoluto(carpetaAbsoluta)) {
@@ -260,7 +259,7 @@ describe('toda lectura y toda escritura pasan por las Server Actions del modulo,
 });
 
 // ------------------------------------------------------------------------------------------
-// R34 — Los componentes de cliente reciben los datos, no los buscan
+// Los componentes de cliente reciben los datos, no los buscan
 // ------------------------------------------------------------------------------------------
 
 function importesProhibidosDeCliente(fuente: string): string[] {
@@ -306,7 +305,7 @@ describe('los componentes de cliente reciben los datos, no los buscan (R34)', ()
 });
 
 // ------------------------------------------------------------------------------------------
-// R36 — Barrel unico: carpeta `components/`, sin ruta profunda desde fuera
+// Barrel unico: carpeta `components/`, sin ruta profunda desde fuera
 // ------------------------------------------------------------------------------------------
 
 /** Un importe que entra por el archivo concreto en vez de por el barrel de la ruta. */
@@ -375,7 +374,7 @@ describe('los componentes propios viven en `components/` y salen del barrel (R36
 });
 
 // ------------------------------------------------------------------------------------------
-// R37 — Lo heredado se hereda montado; nada se re-crea ni se duplica
+// Lo heredado se hereda montado; nada se re-crea ni se duplica
 // ------------------------------------------------------------------------------------------
 
 describe('lo heredado no se re-crea ni se duplica (R37)', () => {
@@ -430,7 +429,7 @@ describe('lo heredado no se re-crea ni se duplica (R37)', () => {
 });
 
 // ------------------------------------------------------------------------------------------
-// R38 — La pantalla no nombra pedidos
+// La pantalla no nombra pedidos
 // ------------------------------------------------------------------------------------------
 
 function nombraPedidos(fuente: string): boolean {
@@ -474,7 +473,7 @@ describe('la pantalla no nombra pedidos ni ofrece ningun vinculo con ellos (R38)
 });
 
 // ------------------------------------------------------------------------------------------
-// R39 — Nada de `100vh` en la fuente de la ruta (el render real va en clientes-viewport.test.tsx)
+// Nada de `100vh` en la fuente de la ruta (el render real va en clientes-viewport.test.tsx)
 // ------------------------------------------------------------------------------------------
 
 function usa100vh(fuente: string): boolean {
@@ -505,13 +504,13 @@ describe('la pantalla no usa `100vh` como alto (R39)', () => {
 });
 
 // ------------------------------------------------------------------------------------------
-// R40 — Los tests de la carpeta no afirman sobre literales de copy
+// Los tests de la carpeta no afirman sobre literales de copy
 // ------------------------------------------------------------------------------------------
 
 /**
  * Un `getByText`/`queryByText`/`findByText` con un literal de cadena (no una variable, no una
  * constante exportada, no una expresion regular). Es la forma de LOCALIZAR un control, un
- * estado o un destino por su copy, que es justo lo que R40 prohibe.
+ * estado o un destino por su copy, que es justo lo que se prohibe.
  *
  * `toHaveTextContent` queda FUERA a proposito: no localiza nada, verifica el contenido de un
  * elemento que YA se localizo por rol o `data-testid` —el caso legitimo de
@@ -567,7 +566,7 @@ describe('los tests de la carpeta localizan por rol, testid o constante, no por 
 });
 
 // ------------------------------------------------------------------------------------------
-// R35 — Primitivas, modulos, composicion, base de datos y manifiesto, sobre el DIFF
+// Primitivas, modulos, composicion, base de datos y manifiesto, sobre el DIFF
 // ------------------------------------------------------------------------------------------
 
 function git(args: readonly string[]): string {
@@ -603,7 +602,7 @@ function tocadosBajo(base: string, rutas: readonly string[]): string[] {
 
 /**
  * LA PRECONDICION DE RAMA, copiada de `usuarios-convenciones.test.ts`: la senal es CONJUNTIVA
- * (el `page.tsx` de la ruta MAS la carpeta de spec de esta ficha), para que R35 no acuse a una
+ * (el `page.tsx` de la ruta MAS la carpeta de spec de esta ficha), para que la guardia no acuse a una
  * rama ajena de abrir lo que ella, legitimamente, tiene abierto.
  */
 const ARCHIVO_CENTRAL = `${CARPETA_DE_LA_RUTA}/page.tsx`;
@@ -632,7 +631,7 @@ function saltarSiNoEsLaRamaDeQC155(ctx: Pick<TestContext, 'skip'>, base: string)
   }
 }
 
-/** R35 sobre una lista de rutas cualquiera: pura, para que la sensibilidad la ejercite sin git. */
+/** Los intocables sobre una lista de rutas cualquiera: pura, para que la sensibilidad la ejercite sin git. */
 function intocablesTocados(rutas: readonly string[]): string[] {
   return rutas.filter((ruta) => INTOCABLES.some((intocable) => ruta.startsWith(intocable)) || ruta === MANIFIESTO);
 }

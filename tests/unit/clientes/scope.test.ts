@@ -301,8 +301,8 @@ describe('R28 — el UNICO E2E que nombra clientes es e2e/clientes.spec.ts', () 
   }
 
   it('ningun otro archivo de e2e/, ni por nombre ni por contenido, nombra clientes', () => {
-    // El spec propio todavia no existe: la lista compara TODO archivo salvo ese nombre, asi que
-    // sigue vigilando lo mismo antes y despues de que aparezca.
+    // Se compara TODO archivo de e2e/ salvo `e2e/clientes.spec.ts`: cualquier otro spec que
+    // nombre clientes es un hallazgo.
     const hallazgos = e2eAjenosAClientes()
     expect(hallazgos, `spec E2E ajeno con marca de clientes: ${hallazgos.join(', ')}`).toEqual([])
   })

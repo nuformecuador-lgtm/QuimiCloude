@@ -1,8 +1,8 @@
-// QC-155 T7 — La tabla compartida queda INTACTA: R9 (copia de `data-table-intacta-usuarios.test.ts`).
+// La tabla compartida queda INTACTA (copia de `data-table-intacta-usuarios.test.ts`).
 //
-// R9 prohibe DOS cosas: declarar una tabla o una barra de paginacion propias, y modificar
+// Se prohiben DOS cosas: declarar una tabla o una barra de paginacion propias, y modificar
 // cualquier archivo de `components/shared/data-table/`. Lo primero se ve por fuente —
-// `clientes-convenciones.test.ts > R37` ya comprueba que `customer-table.tsx` entra por el
+// `clientes-convenciones.test.ts` ya comprueba que `customer-table.tsx` entra por el
 // barrel compartido y no hay ninguna copia bajo la ruta—. Lo segundo es una propiedad del
 // DIFF: se mide contra el merge-base con `dev`, calculado en cada ejecucion (el porque, en el
 // comentario de `REFERENCIAS_DE_DEV`), y si el rango no existe el caso se SALTA con el motivo
@@ -42,7 +42,7 @@ function findRepoRoot(startDir: string): string {
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
-/** La UNICA carpeta que esta feature no puede tocar por R9: la tabla compartida. */
+/** La UNICA carpeta que esta feature no puede tocar: la tabla compartida. */
 const INTOCABLE = 'components/shared/data-table';
 
 const REFERENCIAS_DE_DEV = ['origin/dev', 'dev'] as const;
@@ -95,8 +95,8 @@ function fuenteSinComentarios(ruta: string): string {
 /**
  * LA PRECONDICION DE RAMA, copiada de `data-table-intacta-usuarios.test.ts` y de
  * `usuarios-convenciones.test.ts`: la senal es CONJUNTIVA (el `page.tsx` de la ruta de clientes
- * MAS la carpeta de spec de esta ficha), para que R9 no acuse a una rama ajena de tocar la tabla
- * compartida cuando ni siquiera es la rama de QC-155.
+ * MAS la carpeta de spec de esta ficha), para que la guardia no acuse a una rama ajena de tocar
+ * la tabla compartida cuando ni siquiera es la rama de esta pantalla.
  */
 const ARCHIVO_CENTRAL_DE_QC155 = 'app/(private)/clientes/page.tsx';
 const CARPETA_SPEC_DE_QC155 = 'specs/QC-155-pantalla-de-clientes/';

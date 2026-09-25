@@ -1,4 +1,4 @@
-// QC-155 T5 — El formulario de alta y edicion de cliente: R25, R26, R27, R28, R29.
+// El formulario de alta y edicion de cliente.
 //
 // Se monta a traves de `CustomerSheet`, porque `SheetContent` exige un `Sheet` como ancestro. La
 // validacion previa corre con el esquema real del contrato publico (`createCustomerSchema`), sin

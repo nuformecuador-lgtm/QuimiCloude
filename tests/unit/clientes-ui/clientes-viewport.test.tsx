@@ -1,22 +1,21 @@
-// QC-155 T7 — Multiplataforma: R39.
+// Multiplataforma de la pantalla de clientes.
 //
 // La pantalla REAL, con `ClientesPage` directamente (no hace falta el layout privado completo:
-// R39 aqui no mide el desbordamiento de la barra lateral, que ya cubren las guardias heredadas
+// aqui no se mide el desbordamiento de la barra lateral, que ya cubren las guardias heredadas
 // de `docs/architecture.md`, sino altura, `:hover`, area tactil y tamano de fuente DENTRO de la
-// pantalla de clientes). El arnes de mocks es el mismo que `clientes-page.test.tsx` (T6): doble
+// pantalla de clientes). El arnes de mocks es el mismo que `clientes-page.test.tsx`: doble
 // del proveedor de sesion en `@/lib/composition` y de las cinco Server Actions de
 // `customer-actions.ts` por su ruta exacta.
 //
-// Cada caso corre a 375 px y a 1280 px, sin excepcion de escritorio
-// (`requirements.md > Decisiones cerradas > Multiplataforma`), con `describe.each` para que el
-// informe diga en cual de los dos anchos fallo.
+// Cada caso corre a 375 px y a 1280 px, sin excepcion de escritorio, con `describe.each` para
+// que el informe diga en cual de los dos anchos fallo.
 //
 // jsdom no hace layout: `offsetWidth` es 0 y las clases de Tailwind no estan compiladas aqui.
 // «44x44 px» y «16 px» se afirman sobre los TOKENS de clase (`min-h-11`/`min-w-11` = 2.75rem =
 // 44px; `text-base` = 1rem = 16px, con `md:text-base` para que no baje en el breakpoint), mismo
-// criterio que QC-11, QC-35 y QC-44.
+// criterio que las guardias multiplataforma de otras pantallas.
 //
-// Ningun assert sobre copy (R40): todo se localiza por `data-testid` o por rol accesible.
+// Ningun assert sobre copy: todo se localiza por `data-testid` o por rol accesible.
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
@@ -41,10 +40,10 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { setupUser } from '../../helpers/user-event';
 import { NARROW_VIEWPORT, WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
-/** Area tactil minima de R39: `min-h-11`/`min-w-11` = 2.75rem = 44 px. */
+/** Area tactil minima: `min-h-11`/`min-w-11` = 2.75rem = 44 px. */
 const AREA_TACTIL = ['min-h-11', 'min-w-11'] as const;
 
-/** Tamano de fuente minimo de R39: `text-base` = 1rem = 16 px, y que no baje en el breakpoint. */
+/** Tamano de fuente minimo de un campo: `text-base` = 1rem = 16 px, y que no baje en el breakpoint. */
 const FUENTE_DE_CAMPO = ['text-base', 'md:text-base'] as const;
 
 const { getSessionUserMock, listCustomersActionMock } = vi.hoisted(() => ({
@@ -206,7 +205,7 @@ describe.each(VIEWPORTS)('pantalla de clientes en viewport %s (%i px)', (_nombre
     expect(screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID)).toBeVisible();
 
     // En las clases: ningun elemento REVELA nada con el puntero. Un `hover:bg-muted` es
-    // decoracion; lo que R39 prohibe es que la existencia o la visibilidad dependan del puntero.
+    // decoracion; lo que se prohibe es que la existencia o la visibilidad dependan del puntero.
     const revelaConElPuntero = /^(group-)?hover:(flex|block|inline|inline-flex|visible|opacity-100)$/;
     const ocultoDeSalida = new Set(['invisible', 'opacity-0']);
 

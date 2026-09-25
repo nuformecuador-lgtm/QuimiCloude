@@ -1,4 +1,4 @@
-// Contrato de la ruta de clientes: R1 y R2.
+// Contrato de la ruta de clientes.
 //
 // Copia del patron de `usuarios-route-contract.test.ts`: la URL vive en UNA sola constante de
 // `lib/shared/routes.ts`, ningun archivo de producto la incrusta como literal, y el prefijo
@@ -25,11 +25,11 @@ import {
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
-/** La pantalla, DERIVADA de la constante (R1): el route group `(private)` no aporta segmento. */
+/** La pantalla, DERIVADA de la constante: el route group `(private)` no aporta segmento. */
 const PAGE_DIR = `app/(private)${CUSTOMERS_ROUTE}`;
 const PAGE_PATH = `${PAGE_DIR}/page.tsx`;
 
-/** El unico archivo del producto autorizado a contener la URL como texto (R1). */
+/** El unico archivo del producto autorizado a contener la URL como texto. */
 const ARCHIVO_DE_LA_CONSTANTE = join('lib', 'shared', 'routes.ts');
 
 /** Texto del archivo sin comentarios: un literal citado dentro de un comentario no es codigo. */

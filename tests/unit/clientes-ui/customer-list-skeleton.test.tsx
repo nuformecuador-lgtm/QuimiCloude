@@ -1,4 +1,4 @@
-// QC-155 T4 — El esqueleto declara tantas columnas como la tabla: R21.
+// El esqueleto declara tantas columnas como la tabla.
 //
 // `CUSTOMER_SKELETON_COLUMN_COUNT` es una constante escrita a mano a proposito —el esqueleto lo
 // renderiza un Server Component y no puede importar el modulo de cliente de las columnas—, asi

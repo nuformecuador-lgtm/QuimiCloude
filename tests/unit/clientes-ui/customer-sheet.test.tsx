@@ -1,4 +1,4 @@
-// QC-155 T5 — El panel lateral de alta y edicion de cliente: R24, R30.
+// El panel lateral de alta y edicion de cliente.
 //
 // Las Server Actions estan mockeadas: son el borde del modulo `clientes`, que esta ficha no
 // abre, y sustituirlas es lo unico que permite ejercitar el panel sin base de datos. La

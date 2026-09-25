@@ -1,6 +1,6 @@
-// QC-155 T4 — El estado de error de la lista de clientes: R7, R22, R39, R40.
+// El estado de error de la lista de clientes.
 //
-// El reintento es un ENLACE a `customerListHref(params)` (`design.md > 5.1`), no
+// El reintento es un ENLACE a `customerListHref(params)`, no
 // `router.refresh()`: pedir de nuevo la misma URL vuelve a ejecutar el Server Component que hizo
 // la consulta.
 
@@ -21,7 +21,7 @@ import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificado
 
 const RETRY_HREF = '/clientes?page=1';
 
-/** Los codigos con los que la lectura de la lista puede rechazarse (`design.md > 0`). */
+/** Los codigos con los que la lectura de la lista puede rechazarse. */
 const CODIGOS: readonly ErrorState[] = [
   { status: 'error', code: 'unauthorized', message: 'No tienes permiso.' },
   { status: 'error', code: 'invalid_input', message: 'La consulta no es válida.' },

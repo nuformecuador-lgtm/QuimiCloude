@@ -1,13 +1,13 @@
-// QC-155 T6 — La tabla de la lista de clientes: R9, R12, R13, R18, R21, R23.
+// La tabla de la lista de clientes.
 //
 // **`useRouter` esta mockeada**: la tabla no navega de verdad en jsdom, pero lo que importa es
 // que emita **la consulta exacta**, y eso se afirma sobre el `href` que recibe `router.push`.
 //
-// **La sincronizacion de la caja de busqueda es una COPIA de `order-table.test.tsx`**
-// (`design.md > 5.3`): el eco de la propia caja no remonta (conserva foco y texto), y un cambio
+// **La sincronizacion de la caja de busqueda es una COPIA de `order-table.test.tsx`**:
+// el eco de la propia caja no remonta (conserva foco y texto), y un cambio
 // externo de `params.search` (Atras, otro enlace) si remonta con el termino nuevo.
 //
-// **Ningun assert sobre copy** (R40): filas, celdas y controles se localizan por los
+// **Ningun assert sobre copy**: filas, celdas y controles se localizan por los
 // `data-testid` del componente compartido y por constantes exportadas.
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -79,7 +79,7 @@ function cliente(id: string, overrides: Partial<CustomerView> = {}): CustomerVie
   };
 }
 
-/** Llegan a proposito DESORDENADOS respecto de cualquier criterio: R13 se comprueba con ellos. */
+/** Llegan a proposito DESORDENADOS respecto de cualquier criterio: el orden se comprueba con ellos. */
 const CLIENTES: readonly CustomerView[] = [
   cliente('c3', { lastNames: 'Zapata' }),
   cliente('c1', { lastNames: 'Alba' }),
@@ -454,7 +454,7 @@ describe('el selector de tamano ofrece exactamente 10 y 25, con 10 por defecto (
     const otro = PAGE_SIZE_OPTIONS.find((option) => option !== params.pageSize)!;
 
     await user.click(screen.getByTestId('data-table-page-size'));
-    // Popup de Base UI recien abierto: se espera a que suelte `pointer-events: none` (QC-58).
+    // Popup de Base UI recien abierto: se espera a que suelte `pointer-events: none`.
     await user.click(await esperarInteractiva(screen.getByTestId(`data-table-page-size-${otro}`)));
 
     expect(ultimoDestino()).toBe(

@@ -1,4 +1,4 @@
-// QC-155 T4 — El estado vacio de la lista de clientes: R19, R20, R21, R39, R40.
+// El estado vacio de la lista de clientes.
 //
 // El componente se monta SOLO —sin la seccion— porque lo que aqui se mide es su forma: que
 // disparador ofrece y bajo que condicion. El despacho real (cuando se pinta cada caso) lo cubre

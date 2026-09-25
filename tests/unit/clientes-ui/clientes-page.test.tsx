@@ -1,14 +1,13 @@
-// QC-155 T6 — El corte por permiso de la pantalla de clientes y la decision `canModify`: R3, R5,
-// R6, R8.
+// El corte por permiso de la pantalla de clientes y la decision `canModify`.
 //
-// **La ubicacion se DERIVA de la constante** (R1): la ruta esperada se compone como
+// **La ubicacion se DERIVA de la constante**: la ruta esperada se compone como
 // `app/(private)${CUSTOMERS_ROUTE}/page.tsx`.
 //
 // **Se mockea el PROVEEDOR DE SESION, no `requirePagePermission`.** Con el doble en
 // `@/lib/composition`, el corte se ejecuta de verdad —`assertPermission` incluido— y lo unico
 // sustituido es de donde sale la sesion. Copia de `usuarios-page.test.tsx`.
 //
-// **Nada se afirma por copy** (R40): la cabecera se busca por su ROL ARIA y los permisos se
+// **Nada se afirma por copy**: la cabecera se busca por su ROL ARIA y los permisos se
 // derivan del catalogo de `identity`.
 
 import { cleanup, render, screen } from '@testing-library/react';
@@ -91,7 +90,7 @@ function fuenteDeLaPagina(): string {
     .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ' ');
 }
 
-/** Los dos codigos del modulo `clientes`, DERIVADOS del catalogo (R40): nunca escritos a mano. */
+/** Los dos codigos del modulo `clientes`, DERIVADOS del catalogo: nunca escritos a mano. */
 const CODIGOS_DE_CLIENTES: readonly string[] = PERMISSIONS.filter(
   (entrada) => entrada.module === 'clientes',
 ).map((entrada) => entrada.code);
@@ -109,7 +108,7 @@ function sesionCon(permissions: readonly string[], roleName: string = ROLE_ADMIN
   };
 }
 
-/** Un cliente cualquiera: lo que la pantalla haga con el depende SOLO de `canModify` (R5). */
+/** Un cliente cualquiera: lo que la pantalla haga con el depende SOLO de `canModify`. */
 const CLIENTE: CustomerView = {
   id: '11111111-1111-4111-8111-111111111111',
   firstNames: 'Ana',
@@ -227,7 +226,7 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R3)', () => {
   });
 
   it('con sesion pero sin `clientes.consultar` responde 404, no redirige', async () => {
-    // Lleva el OTRO permiso del modulo a proposito: QC-74 decidio que `modificar` NO concede
+    // Lleva el OTRO permiso del modulo a proposito: `modificar` NO concede
     // `consultar`.
     getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_ESCRITURA]));
 
@@ -302,7 +301,7 @@ describe('`canModify` sale de assertPermission y de nada mas (R5, R8)', () => {
 
     await renderPantalla();
 
-    // Ni disparador, ni boton deshabilitado, ni panel, ni dialogo: nada en el arbol servido (R5).
+    // Ni disparador, ni boton deshabilitado, ni panel, ni dialogo: nada en el arbol servido.
     expect(screen.queryByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toBeNull();
     expect(screen.queryByTestId('customer-create-open')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
