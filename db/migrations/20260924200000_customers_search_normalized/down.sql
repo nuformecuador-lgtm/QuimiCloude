@@ -1,4 +1,4 @@
--- DOWN de `20260924190000_customers_search_normalized`.
+-- DOWN de `20260924200000_customers_search_normalized`.
 --
 -- Revierte EXACTAMENTE lo que hace `migration.sql`, en orden inverso: primero los tres indices,
 -- despues las tres columnas. NO HACE `DROP EXTENSION pg_trgm`: la extension es un objeto de la

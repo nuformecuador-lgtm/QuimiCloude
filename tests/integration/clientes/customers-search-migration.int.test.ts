@@ -1,4 +1,4 @@
-// La migracion `db/migrations/20260924190000_customers_search_normalized/` contra Postgres REAL.
+// La migracion `db/migrations/20260924200000_customers_search_normalized/` contra Postgres REAL.
 //
 // AISLAMIENTO — mismo patron que `clientes/customers-migration.int.test.ts`: cada `it` corre
 // dentro de `prisma.$transaction` interactiva y termina lanzando `RollbackSignal`. La operacion

@@ -24,7 +24,7 @@ function findRepoRoot(startDir: string): string {
 }
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
-const migrationDir = join(repoRoot, 'db', 'migrations', '20260924190000_customers_search_normalized')
+const migrationDir = join(repoRoot, 'db', 'migrations', '20260924200000_customers_search_normalized')
 const precedentMigrationFile = join(
   repoRoot,
   'db',

@@ -1,6 +1,6 @@
 /**
  * T13 — tests de integracion del CRUD y del aislamiento por empresa de CLIENTES (QC-154)
- * contra una base Postgres REAL, con la migracion `20260924190000_customers_search_normalized`
+ * contra una base Postgres REAL, con la migracion `20260924200000_customers_search_normalized`
  * aplicada encima de `20260924120000_customers` (QC-153).
  *
  * AISLAMIENTO: los cinco metodos de `customer-prisma.ts` llaman al cliente Prisma GLOBAL, no a

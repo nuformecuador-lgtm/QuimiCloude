@@ -452,7 +452,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       })
       .map((entry) => entry.name)
       .sort()
-    expect(tocanCustomers).toEqual(['20260924120000_customers', '20260924190000_customers_search_normalized'])
+    expect(tocanCustomers).toEqual(['20260924120000_customers', '20260924200000_customers_search_normalized'])
   })
 
   it('el censo de campos dispara con un campo fabricado de mas', () => {
