@@ -425,3 +425,170 @@ T1, T2, T4, T19, T20 y T21 cerradas y verificadas con evidencia real (incluido e
 migración contra `QuimiCloude_QC154`). Los únicos rojos son los dos esperados y documentados de T4
 (lista cerrada de archivos y `adapters/driving/` exacto), que se cierran en T12/T15 cuando el resto
 del módulo se llene; no se relajó ninguna regla para ocultarlos.
+
+---
+
+# Tanda T5, T6, T7, T8 (Grupo B)
+
+## T5 — Esquemas de entrada
+
+- `lib/modules/clientes/domain/customer-input.ts`: los seis largos máximos (`design.md > 6.3`),
+  `blankToNull` copiado (tres líneas, sin importarlo de `proveedores`), y `createCustomerSchema`
+  (`z.object`, no `strictObject`: las claves de más se descartan) con `trim()` antes de `min`/`max`
+  y `transform` que aplica `blankToNull` a los tres opcionales. `updateCustomerSchema =
+  createCustomerSchema` (reemplazo completo, R20). Sin `refine` cruzado (no hay regla «al menos
+  uno de» en clientes, a diferencia de proveedores).
+- `tests/unit/clientes/customer-input.test.ts`: R14 (ausente/vacío/blanco de los tres
+  obligatorios, con recorte), R15 (las 5³ combinaciones de ausencia de los tres opcionales, más
+  contenido con recorte), R16 (máximo exacto acepta, máximo+1 rechaza, para los seis campos), R17
+  (sin formato de correo ni teléfono) y R18 (claves ajenas —`companyId`, `createdBy`, `deletedAt`,
+  `nit`— sin efecto en lo que llega al puerto).
+
+## T6 — Tipos de salida, lista blanca y puerto
+
+- `lib/modules/clientes/domain/customer-view.ts`: `NewCustomer` (`Pick` de `Customer` más las tres
+  formas normalizadas, R42) y `CustomerView` (`Omit<Customer, 'companyId' | 'deletedAt'>`, R22).
+- `lib/modules/clientes/domain/customer-queryable.ts`: `CUSTOMER_QUERYABLE` con `sortable`
+  (nombres, apellidos, ciudad, las dos fechas), `filterable` (ciudad texto, fecha de alta rango) y
+  `searchable: true` (R28).
+- `lib/modules/clientes/ports/customer-repository.ts`: los cinco métodos con `scope:
+  CustomerScope` como último parámetro obligatorio, sin resultado `'duplicate'` (R19).
+- Borrado `lib/modules/clientes/ports/.gitkeep`.
+- Sin test propio (T6 no lo pide); el typecheck limpio es su criterio de «hecho» y T7 los ejercita
+  con dobles.
+
+## T7 — Los cinco casos de uso
+
+- `lib/modules/clientes/domain/{create,update,delete,get,list}-customer.ts`: `requirePermission`
+  en la primera línea de los cinco; `isCustomerId(id)` en `get`/`update`/`delete`, después del
+  permiso y antes del puerto (P5); el alta y la edición calculan las tres formas normalizadas con
+  `normalizeCustomerText` (T18) y las pasan al puerto emparejadas con su dato (R42); reloj
+  inyectable `now?: () => Date`.
+- `tests/unit/clientes/customer-service.test.ts`: R9 (empresa del actor, no la de la entrada),
+  R13 (alta devuelve el id), R18 (censo exacto de lo que llega al puerto), R19 (duplicados sin
+  error), R20 (reemplazo completo, opcional ausente), R21 (autoría), R22 (censo de la ficha), R23
+  (inexistente/dado de baja/id sin forma → `customer_not_found`, sin tocar el puerto con el id sin
+  forma), R25 (censo exacto del puerto, sin restaurar), R42 (formas normalizadas emparejadas, con
+  acentos reales) y R47 (ficha y listado sin las tres formas normalizadas).
+- `tests/unit/clientes/list-customers.test.ts`: R26 (rechazo sin leer del repositorio, con el
+  defecto de página aplicado), R27 (campo omitido no rompe y el log recibe solo el nombre, nunca
+  el texto buscado ni el valor del filtro) y R28 (censo de `CUSTOMER_QUERYABLE` y que `deletedAt`/
+  `companyId` no llegan al puerto aunque se pidan).
+
+## T8 — Autorización
+
+- `tests/unit/clientes/authorization.test.ts`: dobles del puerto y del log que **explotan si se
+  llaman** (mismo patrón que `tests/unit/proveedores/authorization.test.ts`). R1 (el actor es
+  parámetro, ningún archivo de `domain/` lee sesión ni cabecera), R2 (lectura sin
+  `clientes.consultar`), R3 (escritura sin `clientes.modificar`), R4 (actor ausente, vacío, o solo
+  el permiso contrario), R5 (sin permiso y con entrada inválida responde `unauthorized`, no
+  `invalid_input`; se comprueba que el permiso se evalúa antes que `isCustomerId`/`zod`) y R8 (los
+  tres conjuntos reales de `SEED_ROLE_PERMISSIONS`: Administrador autoriza las cinco, Operador y
+  Empacador las rechazan las cinco).
+- `tests/guards/guard-autorizacion-por-permiso.test.ts`: `'clientes'` añadido a `BUSINESS_MODULES`
+  (séptimo módulo de negocio). La guardia sigue en verde: `actor.ts` de `clientes` autoriza por
+  permiso, sin `roleName` ni literal de rol (R6).
+
+## Verificación — salida real (tanda T5/T6/T7/T8)
+
+```
+$ pnpm exec next typegen && pnpm run typecheck
+✓ Types generated successfully
+> tsc --noEmit
+(sin salida — 0 errores)
+
+$ pnpm run lint
+✖ 7 problems (0 errors, 7 warnings)   ← preexistentes, ajenos a esta tanda
+  (tests/unit/documentos/confirm-catalog-import.test.ts, tests/unit/pedidos/order-service.test.ts)
+
+$ pnpm exec vitest run tests/unit/clientes/customer-input.test.ts
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+
+$ pnpm exec vitest run tests/unit/clientes/customer-service.test.ts tests/unit/clientes/list-customers.test.ts
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+
+$ pnpm exec vitest run tests/unit/clientes/authorization.test.ts
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+
+$ pnpm exec vitest run tests/guards/guard-autorizacion-por-permiso.test.ts
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+
+$ pnpm exec vitest run tests/unit/clientes
+ Test Files  1 failed | 7 passed (8)
+      Tests  2 failed | 72 passed (74)
+  → los dos rojos son los mismos dos esperados de T4 (lista cerrada de archivos del módulo y
+    adapters/driving/ exacto), sin cambio; se cierran en T12/T15.
+
+$ pnpm exec vitest related --run lib/modules/clientes/domain/create-customer.ts \
+  lib/modules/clientes/domain/update-customer.ts lib/modules/clientes/domain/delete-customer.ts \
+  lib/modules/clientes/domain/get-customer.ts lib/modules/clientes/domain/list-customers.ts \
+  lib/modules/clientes/domain/customer-input.ts lib/modules/clientes/domain/customer-view.ts \
+  lib/modules/clientes/domain/customer-queryable.ts lib/modules/clientes/ports/customer-repository.ts \
+  tests/guards/guard-autorizacion-por-permiso.test.ts
+ Test Files  5 passed (5)
+      Tests  38 passed (38)
+```
+
+No se corrió `pnpm test` ni `./init.sh` (fuera del encargo de esta tanda; el encargo pedía
+`typecheck`, `lint`, y `vitest run`/`related` acotado a los archivos y guardias tocados).
+
+## Mapa `R<n> → test` (lo que cubre esta tanda)
+
+| R | Test |
+| --- | --- |
+| R14 | `tests/unit/clientes/customer-input.test.ts` → `R14 — ...` |
+| R15 | `tests/unit/clientes/customer-input.test.ts` → `R15 — ...` |
+| R16 | `tests/unit/clientes/customer-input.test.ts` → `R16 — ...` |
+| R17 | `tests/unit/clientes/customer-input.test.ts` → `R17 — ...` |
+| R18 | `tests/unit/clientes/customer-input.test.ts` → `R18 — ...` + `tests/unit/clientes/customer-service.test.ts` → `R18 — ...` |
+| R19 | `tests/unit/clientes/customer-service.test.ts` → `R19 — ...` |
+| R9 | `tests/unit/clientes/customer-service.test.ts` → `R9 — ...` |
+| R13 | `tests/unit/clientes/customer-service.test.ts` → `R13 — ...` |
+| R20 | `tests/unit/clientes/customer-service.test.ts` → `R20 — ...` |
+| R21 | `tests/unit/clientes/customer-service.test.ts` → `R21 — ...` |
+| R22 | `tests/unit/clientes/customer-service.test.ts` → `R22 — ...` |
+| R23 | `tests/unit/clientes/customer-service.test.ts` → `R23 — ...` |
+| R25 | `tests/unit/clientes/customer-service.test.ts` → `R25 — ...` |
+| R42 | `tests/unit/clientes/customer-service.test.ts` → `R42 — ...` |
+| R47 | `tests/unit/clientes/customer-service.test.ts` → `R47 — ...` |
+| R26 | `tests/unit/clientes/list-customers.test.ts` → `R26 — ...` |
+| R27 | `tests/unit/clientes/list-customers.test.ts` → `R27 — ...` |
+| R28 | `tests/unit/clientes/list-customers.test.ts` → `R28 — ...` |
+| R1 | `tests/unit/clientes/authorization.test.ts` → `R1 — ...` |
+| R2 | `tests/unit/clientes/authorization.test.ts` → `R2 — ...` |
+| R3 | `tests/unit/clientes/authorization.test.ts` → `R3 — ...` |
+| R4 | `tests/unit/clientes/authorization.test.ts` → `R4 — ...` |
+| R5 | `tests/unit/clientes/authorization.test.ts` → `R5 — ...` |
+| R6 | `tests/guards/guard-autorizacion-por-permiso.test.ts` → `BUSINESS_MODULES` incluye `clientes` |
+| R8 | `tests/unit/clientes/authorization.test.ts` → `R8 — ...` |
+
+## Archivos tocados (tanda T5/T6/T7/T8)
+
+- `lib/modules/clientes/domain/customer-input.ts` (nuevo)
+- `lib/modules/clientes/domain/customer-view.ts` (nuevo)
+- `lib/modules/clientes/domain/customer-queryable.ts` (nuevo)
+- `lib/modules/clientes/ports/customer-repository.ts` (nuevo)
+- `lib/modules/clientes/ports/.gitkeep` (borrado)
+- `lib/modules/clientes/domain/create-customer.ts` (nuevo)
+- `lib/modules/clientes/domain/update-customer.ts` (nuevo)
+- `lib/modules/clientes/domain/delete-customer.ts` (nuevo)
+- `lib/modules/clientes/domain/get-customer.ts` (nuevo)
+- `lib/modules/clientes/domain/list-customers.ts` (nuevo)
+- `tests/unit/clientes/customer-input.test.ts` (nuevo)
+- `tests/unit/clientes/customer-service.test.ts` (nuevo)
+- `tests/unit/clientes/list-customers.test.ts` (nuevo)
+- `tests/unit/clientes/authorization.test.ts` (nuevo)
+- `tests/guards/guard-autorizacion-por-permiso.test.ts`
+- `specs/QC-154-crud-de-clientes/tasks.md` (checkboxes T5, T6, T7, T8)
+
+## Veredicto (tanda T5/T6/T7/T8)
+
+T5, T6, T7 y T8 cerradas y verificadas con evidencia real. Los archivos nuevos de esta tanda son
+exactamente los que la lista cerrada de `tests/unit/clientes/scope.test.ts` espera (verificado
+antes de escribir cada uno); los dos rojos que quedan en ese archivo son los mismos dos ya
+documentados en la tanda de T4 (adaptadores y Server Action, Grupo C), sin ningún rojo nuevo. No
+se tocó `feature_list.json` ni `progress/current.md`.

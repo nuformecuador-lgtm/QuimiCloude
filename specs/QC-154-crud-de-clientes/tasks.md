@@ -93,27 +93,27 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
 
 ## Grupo B — casos de uso (depende de A)
 
-- [ ] **T5 — Esquemas de entrada.** `domain/customer-input.ts` (`design.md > 6.3`): seis constantes de
+- [x] **T5 — Esquemas de entrada.** `domain/customer-input.ts` (`design.md > 6.3`): seis constantes de
       largo, `trim` antes de `min`/`max`, `blankToNull` en los tres opcionales, `z.object` (claves de
       más descartadas), sin formato.
       *Depende de:* T1. **Hecho cuando:** `tests/unit/clientes/customer-input.test.ts` pasa (R14–R18),
       con el caso «exactamente el máximo se acepta, uno más se rechaza» para **cada** campo.
 
-- [ ] **T6 — Tipos de salida, lista blanca y puerto.** `domain/customer-view.ts` (derivados con
+- [x] **T6 — Tipos de salida, lista blanca y puerto.** `domain/customer-view.ts` (derivados con
       `Omit`/`Pick`), `domain/customer-queryable.ts` (`design.md > 6.2`),
       `ports/customer-repository.ts` (`design.md > 8`, **sin** resultado `'duplicate'`). **Borra
       `ports/.gitkeep`.**
       *Depende de:* T2, T5. **Hecho cuando:** typecheck limpio y los cinco métodos llevan
       `scope: CustomerScope` como último parámetro obligatorio.
 
-- [ ] **T7 — Los cinco casos de uso.** `create`, `update`, `delete`, `get`, `list`, con
+- [x] **T7 — Los cinco casos de uso.** `create`, `update`, `delete`, `get`, `list`, con
       `requirePermission` en la **primera línea** y `isCustomerId` en `get`/`update`/`delete` antes
       del puerto (P5). *(F1.4)* El alta y la edición calculan las tres formas normalizadas con
       `normalizeCustomerText` (T18) y las pasan al puerto emparejadas con su dato (R42).
       *Depende de:* T6, T18. **Hecho cuando:** `tests/unit/clientes/customer-service.test.ts` (R9, R13,
       R19–R25) y `tests/unit/clientes/list-customers.test.ts` (R26, R27, R28) pasan con dobles.
 
-- [ ] **T8 — Autorización.** `tests/unit/clientes/authorization.test.ts` con dobles que **registran**
+- [x] **T8 — Autorización.** `tests/unit/clientes/authorization.test.ts` con dobles que **registran**
       toda llamada.
       *Depende de:* T7. **Hecho cuando:** cubre los cinco casos con actor ausente, sin permisos,
       conjunto vacío, solo el permiso contrario (R4), permiso ausente con entrada inválida (R5), y
