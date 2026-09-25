@@ -13,7 +13,7 @@
  * NINGUNA AFIRMACION GLOBAL sobre el catalogo de clientes: cada caso mira solo las filas que el
  * mismo sembro, localizadas por su id o por un marcador irrepetible.
  *
- * Requisitos cubiertos: R9, R10, R11, R13, R15, R19, R21, R23, R24, R25.
+ * Requisitos cubiertos: R9, R10, R11, R13, R15, R19, R21, R22, R23, R24, R25, R47.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -583,6 +583,67 @@ describe('R11: el listado y su total solo cuentan la empresa del actor', () => {
     } finally {
       if (idsA.length > 0) await prisma.customer.deleteMany({ where: { id: { in: idsA } } });
       if (idsB.length > 0) await prisma.customer.deleteMany({ where: { id: { in: idsB } } });
+    }
+  });
+});
+
+/** Las 11 claves reales de `CustomerView`, en el orden que exige `Object.keys(...).sort()`. */
+const CUSTOMER_VIEW_KEYS = [
+  'address',
+  'city',
+  'createdAt',
+  'createdBy',
+  'email',
+  'firstNames',
+  'id',
+  'lastNames',
+  'phone',
+  'updatedAt',
+  'updatedBy',
+].sort();
+
+describe('R22 y R47: las claves de la fila real, no las del doble', () => {
+  it('R22 — findAliveCustomerById devuelve exactamente las 11 claves, sin companyId ni deletedAt', async () => {
+    let customerId: string | null = null;
+    try {
+      const created = await createCustomer(
+        customerInput(),
+        empresaA.actorId,
+        new Date('2026-01-01T00:00:00Z'),
+        empresaA.scope,
+      );
+      customerId = created.id;
+
+      const ficha = await findAliveCustomerById(created.id, empresaA.scope);
+      expect(ficha).not.toBeNull();
+      expect(Object.keys(ficha!).sort()).toEqual(CUSTOMER_VIEW_KEYS);
+    } finally {
+      if (customerId !== null) await prisma.customer.delete({ where: { id: customerId } });
+    }
+  });
+
+  it('R47 — cada item de listAliveCustomers devuelve exactamente las 11 claves, sin ninguna forma normalizada', async () => {
+    const marca = `r47claves${token().slice(0, 8)}`;
+    let customerId: string | null = null;
+    try {
+      const created = await createCustomer(
+        customerInput({ firstNames: `Nombre ${marca}` }),
+        empresaA.actorId,
+        new Date('2026-01-01T00:00:00Z'),
+        empresaA.scope,
+      );
+      customerId = created.id;
+
+      const pagina = await listAliveCustomers(
+        consulta({ search: marca, pageSize: 25 }),
+        empresaA.scope,
+      );
+      expect(pagina.items.length).toBeGreaterThan(0);
+      for (const item of pagina.items) {
+        expect(Object.keys(item).sort()).toEqual(CUSTOMER_VIEW_KEYS);
+      }
+    } finally {
+      if (customerId !== null) await prisma.customer.delete({ where: { id: customerId } });
     }
   });
 });

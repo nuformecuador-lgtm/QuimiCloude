@@ -258,7 +258,7 @@ aquí. El reviewer rechaza si falta uno (`CHECKPOINTS.md > Trazabilidad`).
 | R19 | `tests/integration/clientes/customer-repository.int.test.ts` | `R19 — dos clientes vivos con los mismos seis datos se crean los dos` |
 | R20 | `tests/unit/clientes/customer-service.test.ts` | `R20 — la edicion reemplaza los seis datos y el opcional ausente queda como ausencia` |
 | R21 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R21 — el actor queda como autor de creacion y modificacion al crear, y solo de modificacion al editar y dar de baja` + `R21 — editar y dar de baja no pisan created_by ni created_at` |
-| R22 | `tests/unit/clientes/customer-service.test.ts` | `R22 — la ficha devuelve id, seis datos, instantes y autores, sin empresa ni marca de baja` |
+| R22 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R22 — la ficha devuelve id, seis datos, instantes y autores, sin empresa ni marca de baja` + `R22 — findAliveCustomerById devuelve exactamente las 11 claves, sin companyId ni deletedAt` |
 | R23 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R23 — inexistente, dado de baja o id sin forma responden customer_not_found; el id sin forma no llega al puerto` + `R23 — editar o dar de baja un cliente ya dado de baja no cambia ninguna fila` |
 | R24 | `tests/integration/clientes/customer-repository.int.test.ts` | `R24 — la baja conserva la fila completa y marca deleted_at` |
 | R25 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R25 — no existe ninguna operacion de restaurar ni de listar dados de baja` + `R25 — la ficha y el listado excluyen los dados de baja` |
@@ -283,7 +283,7 @@ aquí. El reviewer rechaza si falta uno (`CHECKPOINTS.md > Trazabilidad`).
 | R44 | `tests/integration/clientes/customers-search-migration.int.test.ts` + `tests/unit/clientes/schema/customers-search-migration.test.ts` | `R44 — la base rechaza con 23502 una forma normalizada nula` + `R44 — ninguna forma normalizada lleva UNIQUE` |
 | R45 | `tests/unit/clientes/schema/customers-search-migration.test.ts` + `tests/integration/clientes/customers-search-migration.int.test.ts` | `R45 — tres GIN de trigramas parciales sobre vivos y ninguna otra tabla tocada` + `R45 — los tres indices existen con su predicado` |
 | R46 | `tests/unit/clientes/schema/customers-search-migration.test.ts` + task **T21** | `R46 — el down.sql quita indices y columnas y no retira pg_trgm` + ciclo real `db:migrate` → `db:rollback` → `db:migrate` |
-| R47 | `tests/integration/clientes/list-query-customers.int.test.ts` + `tests/unit/clientes/customer-service.test.ts` | `R47 — filtrar por bogota devuelve Bogota con tilde` + `R47 — ni la ficha ni el listado devuelven formas normalizadas` |
+| R47 | `tests/integration/clientes/list-query-customers.int.test.ts` + `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R47 — filtrar por bogota devuelve Bogota con tilde` + `R47 — ni la ficha ni el listado devuelven formas normalizadas` + `R47 — cada item de listAliveCustomers devuelve exactamente las 11 claves, sin ninguna forma normalizada` |
 
 **Tests que no hay que escribir:** R6 (en parte), R33 (en parte), R35 (en parte), R36 (en parte) y R39
 los cierran guardias y tests **que ya existen**; algunos se **amplían** (`design.md > 12`). Ninguno se
