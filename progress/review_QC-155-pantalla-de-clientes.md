@@ -187,3 +187,77 @@ T4 lo llama «desviación deliberada de `design.md > 5.1`», pero el enlace es j
    ir a la primera página conservando término y filtros, más su test con búsqueda activa.
 3. Opcional, en la misma vuelta: m3 y m4 (dos tests), m2, m6 y m7 (bitácora y un comentario de test), y m5.
 4. Luego el leader corre `./init.sh` completo (T9) y vuelve a pedir review.
+
+---
+
+# Vuelta 2 (2026-09-25, HEAD `08391504`)
+
+## Veredicto vuelta 2: **RECHAZADO**
+
+Hay un bloqueante nuevo (B3), que entró con el cierre de m1, y quedan cuatro menores abiertos.
+B1 y B2 están cerrados.
+
+## Verificación ejecutada
+
+| Qué | Resultado |
+| --- | --- |
+| `vitest run tests/unit/clientes-ui` | 16 archivos, 234 passed |
+| `scope`, `data-table-alcance`, `app-sidebar`, `recipe-route-contract`, `private-layout-menu` + **todas** las guardias (`guard`) | 56 archivos, 739 passed, 13 skipped (casos de rama ajenos) |
+| `pnpm run typecheck` / `pnpm run lint` | verde / 0 errores (los 7 warnings ajenos de siempre) |
+| Mutación de B2: restauré temporalmente `customer-list-section.tsx` de `b3fd3601^` y corrí su test, luego `git checkout` (worktree limpio) | **Los 2 casos nuevos se ponen en rojo** y los 13 restantes quedan verdes: el test muerde |
+| Suite completa, `./init.sh` completo, E2E | No se corrieron (los corre el leader) |
+
+## Cierre de hallazgos de la vuelta 1
+
+- **B1 — CERRADO.** Barrido repetido sobre las líneas que añade `origin/dev...HEAD` en `app/`, `lib/` y `components/`: **0** coincidencias de `QC-<n>`, `R<n>`, `design.md`, «decisión cerrada» o `T<n>`. Comprobé que `5c548fe9` solo toca comentarios: todas las líneas `+`/`-` del commit son de comentario. Los bloques largos (el «de paso») siguen algo por encima de 5 líneas en `page.tsx` y `customer-table.tsx`. No lo reabro: era opcional.
+- **B2 — CERRADO.**
+  - `outOfRange` (cero filas y `page > 1`) se despacha **antes** que el caso «sin coincidencias» cuando hay término o filtro. Ofrece `customerListHref({ ...params, page: FIRST_PAGE })`, que conserva término, filtros, tamaño y orden, y lo hace dentro de la tabla con la caja montada.
+  - El caso sin término no cambia. La rama sigue siendo `CustomerListEmpty`, con `firstPageHref` si `page > 1`, igual que antes (la condición es equivalente). Su test previo sigue verde.
+  - «Sin coincidencias» dentro de rango (página 1) no cambia.
+  - Los dos tests nuevos muerden (mutación arriba).
+- **Reutilizar el testid es correcto.** Lo que se reutiliza es `CUSTOMER_LIST_FIRST_PAGE_TESTID` (`customer-list-first-page`), el del **enlace**, importado como constante y no copiado como literal. El testid del contenedor `customer-list-empty` no se reutiliza. Es el mismo control con la misma función, «volver a la primera página», en dos estados que se excluyen entre sí. El contenedor los distingue: `customer-list-empty` en uno y `customer-table` en el otro, y el test nuevo localiza el enlace `within(tabla)`. Un testid distinto obligaría a que E2E y tests conocieran dos nombres para la misma acción, sin ganar nada. El mensaje «Esta página ya no tiene clientes.» repite el copy del vacío, que es coherente, y ningún test lo afirma.
+- **m1 — ABIERTO, y de su cierre sale B3.** `084adb78` añade dos casos que siguen siendo de `href`: localizar el enlace por rol y comprobar que el destino llega intacto. Ninguno demuestra que el reintento reejecute la sección, ni se añadió a design §5.1 la dependencia de `staleTimes.dynamic`. Sigue siendo menor.
+- **m2 — CERRADO.** La bitácora anota las dos guardias tensadas en `b153b968`.
+- **m3 — CERRADO.** Hay un caso con `'   '` en un obligatorio. Afirma que `checkValidity()` es `true`, que aparece `customer-error-first-names` y que no se llama a la acción.
+- **m4 — PARCIAL, sigue menor.** El `it.each` sobre los tres roles del seed **deduce** qué esperar leyendo el propio seed (`puedeConsultar = permissions.includes(...)`), así que no fija R6 por sí solo. Si el seed diera `clientes.consultar` al Operador, el caso seguiría verde. Hoy lo fija la combinación con el ancla de `private-nav-clientes.test.ts` («solo el Administrador tiene el permiso»). Además, la rama de escritura solo afirma las acciones de fila y no `customer-create-open`. Falta fijar lo esperado por rol: Administrador sirve y ofrece las tres escrituras; Operador y Empacador reciben 404.
+- **m5 — CERRADO.** Las líneas de comentario que añaden `tests/` y `e2e/` tienen 0 citas de `QC-<n>`, `R<n>` o `design.md`.
+- **m6 — CERRADO.** El comentario obsoleto de `scope.test.ts` ya no está.
+- **m7 — CERRADO.** La bitácora corrige la etiqueta del reintento.
+
+## Hallazgos nuevos
+
+### B3 — BLOQUEANTE — El test nuevo de m1 afirma sobre copy, contra R40
+
+`tests/unit/clientes-ui/customer-list-error.test.tsx:76`:
+
+```ts
+const enlace = screen.getByRole('link', { name: 'Reintentar' });
+```
+
+R40 dice: «Los tests de la pantalla DEBEN localizar controles […] por rol ARIA, `data-testid` o
+constantes exportadas, y NO DEBEN afirmar sobre literales de copy». El nombre accesible
+`'Reintentar'` es copy escrito como literal. Si alguien cambia el texto del botón, el test se rompe
+sin que haya cambiado ningún comportamiento, que es justo lo que R40 prohíbe. Además, la guardia de
+R40 (`clientes-convenciones.test.ts > afirmaSobreCopy`) solo busca `getByText`, `queryByText` y
+`findByText` con un literal, **no** `{ name: '…' }`. Por eso el test que dice cubrir R40 no lo
+detectó.
+
+**Qué falta.** Quitar el literal. Vale localizar por `getByRole('link')` dentro del contenedor
+`customer-list-error`, o exportar el rótulo como constante y usarla. Con eso se cierra B3.
+
+### n1 — menor — La guardia de R40 no ve los nombres accesibles literales
+Hay que ampliar `afirmaSobreCopy` para que detecte `ByRole(…, { name: '…' })` (y `ByLabelText('…')`
+si aparece), con su caso de sensibilidad fabricado. No bloquea una vez retirado el único caso real
+(B3), pero sin esto la regresión volverá a pasar en verde.
+
+### n2 — menor — El test de B2 con término no comprueba tamaño ni orden
+Pide conservar término, filtros, tamaño y orden. El caso con término afirma `page` y `q`, y el de
+filtro afirma `page` y `city`. Ninguno afirma `pageSize` ni `sort`. Hoy se cumple por construcción
+(`{ ...params, page }`), pero el test no lo fija.
+
+## Estado abierto
+
+- **Bloqueantes abiertos: 1** (B3).
+- **Menores abiertos: 4** (m1, m4 parcial, n1 y n2).
+
+Para OK basta con B3, que es una línea en un test. Luego el leader corre `./init.sh` completo (T9).
