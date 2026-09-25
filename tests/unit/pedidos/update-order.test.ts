@@ -19,6 +19,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
+import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -171,7 +172,7 @@ const EDICION_HACIA_B = {
 
 /** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar la edicion sobre
  *  pedidos en distintos estados. */
-function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO') {
+function repositorioConEstado(status: OrderStatus) {
   const filaVista = {
     ...filaExistente(),
     status,
@@ -360,8 +361,8 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     }
   });
 
-  it('R10: ENTREGADO y CANCELADO rechazan con invalid_transition sin consultar el catalogo de presentaciones', async () => {
-    for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
+  it('R10: ENTREGADO, CANCELADO, POR_EMPACAR y EN_EMPAQUE rechazan con invalid_transition sin consultar el catalogo de presentaciones', async () => {
+    for (const status of ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const) {
       const cat = catalogoDeRecetas();
       const repo = repositorioConEstado(status);
       const pres = catalogoDePresentaciones();
@@ -616,9 +617,9 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
   });
 });
 
-describe('QC-145 R8 — un pedido ENTREGADO o CANCELADO rechaza toda edicion, sin escribir', () => {
-  it('ENTREGADO y CANCELADO -> `invalid_transition`, aunque la entrada no traiga ningun `status`', async () => {
-    for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
+describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE rechaza toda edicion, sin escribir', () => {
+  it('ENTREGADO, CANCELADO, POR_EMPACAR y EN_EMPAQUE -> `invalid_transition`, aunque la entrada no traiga ningun `status` (R32)', async () => {
+    for (const status of ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const) {
       const cat = catalogoDeRecetas();
       const repo = repositorioConEstado(status);
       const pres = catalogoDePresentaciones();

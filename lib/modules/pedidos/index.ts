@@ -11,6 +11,7 @@ export type { OrderId, OrderNumber } from './domain/order-number';
 export {
   ORDER_PRIORITY_VALUES,
   ORDER_STATUS_VALUES,
+  ORDER_STATUS_FLOW,
   DEFAULT_ORDER_PRIORITY,
   DEFAULT_ORDER_STATUS,
 } from './domain/order-classification';

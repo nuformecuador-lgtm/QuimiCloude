@@ -336,6 +336,10 @@ export const MIGRACIONES_ESPERADAS = [
   // otra da forma a la identidad del producto terminado y a las copias de contenido.
   '20260924190000_finished_product_enum_values',
   '20260924190100_finished_products_and_content_copies',
+  // Ninguna de las dos toca el identificador de peticion: una anade los dos estados de empaque
+  // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
+  '20260925120000_order_packing_states',
+  '20260925120100_packing_permission',
 ] as const
 
 export function hallazgosDeMigraciones(

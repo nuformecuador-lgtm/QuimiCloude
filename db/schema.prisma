@@ -576,8 +576,10 @@ enum OrderStatus {
   PENDIENTE
   EN_CURSO
   ENTREGADO
-  /// Va el ultimo: reordenar obligaria a recrear el tipo en vez de anadir un valor.
   CANCELADO
+  POR_EMPACAR
+  /// Va el ultimo: reordenar obligaria a recrear el tipo en vez de anadir un valor.
+  EN_EMPAQUE
 }
 
 /// El orden de declaracion es el de la prioridad, de menor a mayor: Postgres ordena un enum por
@@ -634,6 +636,10 @@ model Order {
   /// Copia del contenido de la presentacion al crear el pedido o al cambiarle la presentacion.
   /// NULL = la presentacion no tenia contenido entonces, o el pedido es anterior a esta columna.
   presentationContent Decimal?      @map("presentation_content") @db.Decimal(14, 4)
+  /// Quien tiene el pedido en empaque. NULL fuera de EN_EMPAQUE, lo exige el CHECK
+  /// `orders_packed_by_matches_status`. Sin `@relation`: es drift, con FK COMPUESTA
+  /// `(packed_by, company_id)` escrita a mano en la migracion.
+  packedBy            String?       @map("packed_by") @db.Uuid
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
@@ -641,6 +647,7 @@ model Order {
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
   @@index([presentationId], map: "orders_presentation_id_idx")
+  @@index([packedBy], map: "orders_packed_by_idx")
   @@map("orders")
 }
 

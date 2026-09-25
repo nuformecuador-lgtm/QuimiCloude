@@ -548,13 +548,15 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `> 8.3`): el duplicado no se evita, se VIGILA. Se compara valor a valor y EN ORDEN —el
     // orden de la prioridad ES el dato (decision cerrada 4)—, asi que un `toEqual` sobre el
     // array, no un `toContain` ni un conjunto.
-    // El CUARTO estado -`CANCELADO`- lo anadio QC-34 (su decision cerrada 3) a las DOS listas a
-    // la vez; que sigan cuadrando valor a valor y EN ORDEN es exactamente lo que R35 vigila.
+    // Cada valor nuevo se anade a las DOS listas a la vez; que sigan cuadrando valor a valor y
+    // EN ORDEN es exactamente lo que R35 vigila.
     expect(enumValues('OrderStatus')).toEqual([
       'PENDIENTE',
       'EN_CURSO',
       'ENTREGADO',
       'CANCELADO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
     ])
     expect([...ORDER_STATUS_VALUES]).toEqual(enumValues('OrderStatus'))
 
