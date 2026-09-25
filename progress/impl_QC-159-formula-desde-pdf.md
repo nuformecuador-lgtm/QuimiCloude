@@ -293,3 +293,20 @@ typecheck limpio · lint 0 errores
 vitest run --project integration tests/integration/documentos/formula-import.int.test.ts   8 passed
 vitest run tests/guards/guard-aislamiento-integracion.test.ts                                6 passed
 ```
+
+## Limpieza de comentarios de la rama (backend_dev, `f433532e`)
+
+- Revisión del implementer: las líneas de producción añadidas por la rama citaban `QC-159`, `design.md`,
+  `R<n>`, `T<n>`, `P<n>` (regla de `docs/conventions.md > Comentarios`). Commit solo de comentarios, 13
+  archivos de `lib/` (composición, `documentos`, `inventario`, `recetas`); los comentarios preexistentes
+  no se tocaron.
+- `git diff -U0 origin/dev...HEAD -- lib app components | grep -E '^\+' | grep -E 'QC-[0-9]+|\bR[0-9]+\b|design\.md|\bT[0-9]+\b|\bP[1-4]\b'`
+  → vacío (antes de T9; se repite al cerrar T9).
+- Incidencia de proceso: el subagente hizo un `git stash push -u -- lib app components` temporal
+  (aplicado y borrado por SHA) mientras T9 escribía en `app/`. Comprobado después: los seis archivos de
+  T9 siguen en disco y no queda ningún stash de la ficha; la integridad de T9 se verifica con sus tests.
+
+```
+typecheck limpio · lint 0 errores
+vitest run tests/unit/documentos + create-raw-material + recipe-catalog + tests/guards   127 archivos, 1436 verdes / 34 skip
+```
