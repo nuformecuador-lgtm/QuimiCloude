@@ -1,6 +1,6 @@
 # QC-171 — recortes-con-url-publica · design.md
 
-> Decisiones técnicas para `requirements.md` (R1–R23). Las decisiones cerradas `[D1]`…`[D9]` no se
+> Decisiones técnicas para `requirements.md` (R1–R24). Las decisiones cerradas `[D1]`…`[D9]` no se
 > reabren aquí: esto es solo el **cómo**.
 
 ## 0. Estado de partida (medido en el código, 2026-09-25)
@@ -18,24 +18,25 @@
 Consecuencia: la vitrina y la tabla hoy ponen una **ruta** en `src` y por eso nunca se ve la imagen;
 la revisión sí la ve, pero pagando un enlace firmado por recorte.
 
-## 1. Almacenamiento: mismo nombre de variable, bucket nuevo y público (R1, R18, `[D2]`, `[D4]`, `[D5]`)
+## 1. Almacenamiento: el mismo bucket, ahora público (R1, R17, R18, `[D2]`, `[D4]` enmendada, `[D5]`)
 
-- **No cambia ninguna línea de código de configuración ni de subida.** `SUPABASE_CROPS_BUCKET` sigue
-  siendo la única variable del bucket de recortes (`crop-storage-config-env.ts`), y la comparten la
-  subida y la lectura, como hoy. Lo que cambia es **su valor**: pasa a nombrar un bucket **nuevo y
-  público**, propio de los recortes (sigue en pie el `[D17]` de QC-110).
-- **Operación manual (P1)**: crear el bucket público en Supabase en cada entorno y re-apuntar la
-  variable en `.env` y en Vercel. El repo no crea buckets (no hay SQL de `storage.buckets` en `db/`), así
-  que esto no es una migración: es la task humana T8.
+- **No cambia ninguna línea de código de configuración ni de subida, ni ningún valor de entorno.**
+  `SUPABASE_CROPS_BUCKET` sigue siendo la única variable del bucket de recortes
+  (`crop-storage-config-env.ts`), con **el mismo valor** en cada entorno, y la comparten la subida y la
+  lectura, como hoy. Es el bucket propio de QC-110 (`[D17]`), que sigue separado del de recetas.
+- **Operación manual (T8)**: el humano cambia ese bucket a **público** en Supabase, en cada entorno. El
+  repo no crea ni configura buckets (no hay SQL de `storage.buckets` en `db/`), así que no es una
+  migración. Sus límites de tamaño y tipo no cambian.
 - `.env.example` actualiza **solo el comentario** de `SUPABASE_CROPS_BUCKET` para decir que el bucket es
   **público**, propio y distinto del de recetas y del privado de PDF (R1). La variable sigue vacía.
-- **Recortes anteriores (`[D4]`)**: sus rutas siguen en `supplier_catalog_lines.image_path`. Al leer, se
-  compone la URL contra el bucket nuevo, donde ese objeto no existe → la imagen falla al cargar →
-  `EntityImage` cae al marcador por `onError` (R17). Sin código nuevo. Una importación **sin confirmar**
-  de un PDF procesado antes del cambio lista 0 recortes en el bucket nuevo, así que sus filas salen sin
-  imagen propuesta; se re-importa el PDF si se quiere la imagen.
-- **Ninguna referencia al bucket anterior** en el código (R18): como la variable es la misma, no queda
-  ningún nombre ni valor del bucket privado viejo en el repo.
+- **Recortes ya subidos (`[D4]`)**: siguen en el mismo bucket y con la misma ruta en
+  `supplier_catalog_lines.image_path`. Al leer, su URL se compone igual que la de uno nuevo y, con el
+  bucket ya público, se ven sin moverlos ni re-importar (R17). Una importación **sin confirmar** de un PDF
+  procesado antes del cambio lista sus recortes como siempre y los pinta con URL pública.
+- **Imagen que no carga** (objeto inexistente, o bucket aún privado en un entorno sin T8): `EntityImage`
+  cae al marcador por `onError` (R24). Sin código nuevo.
+- **Nada se mueve ni se reescribe** (R18): ni objetos ni rutas guardadas; el código conoce un solo
+  bucket de recortes.
 
 ## 2. Puerto `CropCatalog` de `documentos` (R4, R5, R6, R7, R9, R10, R21, R22)
 
@@ -165,8 +166,8 @@ sin `token` ni caducidad (R6). No se escribe a mano (ver alternativa A3).
 ## 6. Datos, RLS, migraciones
 
 **Ninguna.** No hay tabla, columna ni migración nueva: se sigue guardando la ruta en
-`supplier_catalog_lines.image_path` (R2). Sin RLS nueva. El único cambio de «datos» es operativo: el
-bucket (P1, T8).
+`supplier_catalog_lines.image_path` (R2), y ninguna ruta existente se reescribe (R18). Sin RLS nueva. El
+único cambio fuera del código es operativo: pasar el bucket actual a público (T8).
 
 ## 7. Tests existentes que cambian, y por qué
 
@@ -198,13 +199,13 @@ nuevo de R1 sobre `.env.example`), `read-document.test.ts`, `recipe-image-scope.
 
 ## 8. Alternativas descartadas
 
-- **A1. Hacer público el bucket privado actual.** Recuperaría los recortes viejos gratis, pero `[D4]` fija
-  que esos recortes se dan por perdidos y se quedan donde están, y cambiaría la visibilidad de objetos
-  que se subieron bajo la premisa de bucket privado. Descartada.
-- **A2. Variable nueva (`SUPABASE_CROPS_PUBLIC_BUCKET`) para el bucket público.** Obliga a tocar la
-  subida para que escriba en el bucket nuevo —y la subida es de QC-176 (`[D8]`)— o deja dos variables
-  para un mismo concepto, una sin consumidor. Re-apuntar la variable existente consigue lo mismo sin
-  tocar código de subida. Descartada.
+- **A1. Bucket nuevo y público, re-apuntando `SUPABASE_CROPS_BUCKET`, con los recortes viejos
+  perdidos.** Era la propuesta de la primera versión de este spec. La descartó el humano en F1.4
+  (`[D4]` enmendada): reutilizar el bucket actual conserva los recortes ya subidos, no exige crear ni
+  configurar nada nuevo en cada entorno y deja la variable como está.
+- **A2. Variable nueva (`SUPABASE_CROPS_PUBLIC_BUCKET`) para un bucket público aparte.** Obliga a tocar
+  la subida —que es de QC-176 (`[D8]`)— o deja dos variables para un mismo concepto, una sin consumidor,
+  y además perdería los recortes ya subidos, contra `[D4]`. Descartada.
 - **A3. Componer la URL a mano** (`` `${url}/storage/v1/object/public/${bucket}/${path}` ``). Reimplementa
   lo que hace `getPublicUrl` de una librería ya aprobada, y ataría el repo al formato interno de
   Supabase. Contra `docs/architecture.md > Dependencias de terceros` y `[D7]`. Descartada.
@@ -226,6 +227,7 @@ nuevo de R1 sobre `.env.example`), `read-document.test.ts`, `recipe-image-scope.
 - **Riesgo de conflicto**: `lib/composition/index.ts` es archivo caliente (lo toca cualquier ficha de
   módulo) y además tiene cambios sin commitear en el árbol principal. T4 toca dos bloques acotados
   (`cropCatalog` y la declaración previa a `proveedores`).
-- **Riesgo operativo**: si se despliega sin T8, los recortes nuevos siguen subiendo al bucket privado y
-  la URL pública no resuelve: toda imagen sale en marcador. No rompe ninguna pantalla, pero la ficha no
-  se puede dar por cumplida en un entorno sin T8.
+- **Riesgo operativo**: si se despliega sin T8, el bucket sigue privado y la URL pública no resuelve:
+  toda imagen sale en marcador (R24), **incluida la revisión**, que hoy sí se ve con enlace firmado. No
+  rompe ninguna pantalla, pero conviene hacer T8 **antes** de desplegar el código en cada entorno, y la
+  ficha no se da por cumplida en un entorno sin T8.

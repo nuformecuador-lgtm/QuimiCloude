@@ -10,7 +10,7 @@
 > catálogo del proveedor. En las dos últimas la imagen importada hoy no se ve, porque la pantalla
 > recibe la ruta y la usa como dirección.
 >
-> **Lo que NO entra.** Mover los recortes que ya están en el bucket privado (se dan por perdidos).
+> **Lo que NO entra.** Mover recortes entre buckets: se reutiliza el bucket actual, que pasa a público.
 > Borrar recortes al descartar una importación o dar de baja un proveedor (no se abre ficha hasta
 > que se pida). La imagen de `products` y la de recetas, que no vienen de un recorte. Los PDF, que
 > siguen en su bucket privado con enlace firmado.
@@ -23,7 +23,8 @@
 
 > Las decisiones cerradas se citan como `[D1]`…`[D9]` por **orden de fila** en la tabla de abajo:
 > `[D1]` pueden ser públicas · `[D2]` bucket público y propio · `[D3]` se guarda la ruta, la URL se
-> compone en el servidor al leer · `[D4]` los recortes del bucket privado se dan por perdidos ·
+> compone en el servidor al leer · `[D4]` (enmendada en F1.4) se reutiliza el bucket de recortes
+> actual, que el humano cambia a público, y los recortes ya subidos siguen valiendo ·
 > `[D5]` QC-110 se mantiene, se deroga la fila 2026-09-24 de QC-158 · `[D6]` permisos sin cambios ·
 > `[D7]` ninguna librería nueva · `[D8]` frontera con QC-176 · `[D9]` sin E2E nuevo.
 > «Recorte» es el PNG que el recorte de imágenes del PDF deja en almacenamiento; «ruta» es su clave
@@ -33,10 +34,11 @@
 
 ### Dónde viven los recortes
 
-**R1.** El sistema DEBE guardar los recortes en un bucket de **acceso público** que sea **propio de
-los recortes**, configurado por su propia variable de nombre de bucket y distinto del bucket de
-imágenes de receta y del bucket privado de los PDF; la dirección del proyecto y la credencial DEBEN
-seguir siendo las compartidas. `[D1]` `[D2]` `[D5]`
+**R1.** El sistema DEBE seguir guardando y leyendo los recortes en el **bucket de recortes actual**
+—el que ya nombra su propia variable de bucket, sin cambiar de nombre ni de valor—, que pasa a ser de
+**acceso público** y sigue siendo **propio de los recortes**, distinto del bucket de imágenes de receta
+y del bucket privado de los PDF; la dirección del proyecto y la credencial DEBEN seguir siendo las
+compartidas. `[D1]` `[D2]` `[D4]` `[D5]`
 
 **R2.** El sistema DEBE seguir guardando como imagen de la línea del catálogo, y devolviendo como
 imagen de cada fila de la revisión, la **ruta** del recorte y nunca una URL. `[D3]`
@@ -97,12 +99,16 @@ ella, DEBE devolverla sin URL y la pantalla DEBE mostrar el marcador de «sin im
 
 ### Recortes anteriores
 
-**R17.** SI la imagen de una URL compuesta no se puede cargar —como la de una línea cuya ruta apunta a
-un recorte que se subió al bucket privado anterior—, ENTONCES la pantalla DEBE mostrar el marcador de
-`EntityImage` en lugar de la imagen rota. `[D4]`
+**R17.** CUANDO una línea del catálogo o una importación sin confirmar tiene la ruta de un recorte
+subido **antes** de esta ficha, el sistema DEBE componer su URL pública exactamente igual que la de un
+recorte nuevo, de modo que se vea en las tres pantallas sin re-importar el PDF. `[D4]`
 
-**R18.** El sistema NO DEBE leer, copiar ni mover ningún objeto del bucket privado anterior de
-recortes: el código DEBE conocer un único bucket de recortes. `[D4]`
+**R18.** El sistema NO DEBE mover, copiar ni renombrar ningún recorte ya subido, ni reescribir ninguna
+ruta guardada: el código DEBE conocer un único bucket de recortes, el actual, bajo la misma variable
+de configuración. `[D4]`
+
+**R24.** SI la imagen de una URL compuesta no se puede cargar, ENTONCES la pantalla DEBE mostrar el
+marcador de `EntityImage` en lugar de la imagen rota. `[D3]`
 
 ### Permisos y alcance
 
@@ -128,18 +134,13 @@ sin modificación. `[D8]`
 
 ## Preguntas abiertas
 
-> Nuevas de F1.2. Ninguna reabre la tabla de decisiones: son datos operativos que no están en
-> `docs/`, `specs/` ni en el código. Cada una lleva su propuesta.
+Ninguna pendiente.
 
-- **P1. ¿Quién crea el bucket público y con qué límites, en cada entorno?** El repo no crea buckets
-  (no hay SQL de `storage.buckets` en `db/`): hoy se configuran a mano. Falta el nombre del bucket y
-  su tamaño máximo por archivo. **Propuesta:** el humano crea en Supabase (desarrollo y producción) un
-  bucket nuevo **público**, con tipo permitido `image/png` y el mismo tamaño máximo que tenga el
-  privado actual, y re-apunta `SUPABASE_CROPS_BUCKET` a él en el `.env` local y en Vercel (ver
-  `design.md > 1`). Sin eso, los recortes nuevos se siguen subiendo al privado y la URL no resuelve.
-- **P2. ¿Qué se hace con el bucket privado anterior?** La ficha deja fuera *mover* sus recortes, pero
-  no dice si se conserva o se borra. **Propuesta:** se deja intacto; borrarlo es una operación manual
-  del humano fuera de esta ficha, y ninguna línea de código lo referencia después de ella (R18).
+- ~~**P1. ¿Quién crea el bucket público y con qué límites, en cada entorno?**~~ **RESUELTA en F1.4
+  (2026-09-25):** no hay bucket nuevo. El humano cambia a público el bucket de recortes actual en cada
+  entorno; sus límites de tamaño y tipo no cambian y `SUPABASE_CROPS_BUCKET` no se toca (`[D4]`, T8).
+- ~~**P2. ¿Qué se hace con el bucket privado anterior?**~~ **RESUELTA en F1.4 (2026-09-25):** no hay
+  bucket anterior: es el mismo, ahora público, y sus recortes siguen valiendo (`[D4]`, R17, R18).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -148,7 +149,7 @@ sin modificación. `[D8]`
 | 2026-09-25 | ¿Las imágenes del catálogo pueden ser públicas? | **Sí.** Las rutas llevan empresa y archivo (dos UUID) y nadie puede listar el bucket sin credencial. |
 | 2026-09-25 | ¿Bucket compartido con recetas o propio? | **Público pero propio**, separado del de recetas: ciclo de vida y límites de tamaño y tipo independientes. Los buckets no tienen coste propio en Supabase. |
 | 2026-09-25 | ¿Se guarda la URL o la ruta? | **La ruta.** La URL pública se compone en el servidor al leer, nunca en la pantalla. Heredado de QC-25 R25 y QC-26. |
-| 2026-09-25 | ¿Qué pasa con los recortes ya subidos al bucket privado? | **Se dan por perdidos.** No se mueven; las líneas que los tienen muestran el marcador de `EntityImage` (heredado de QC-140 D5) y se re-importa el PDF si se quiere la imagen. |
+| 2026-09-25 | ¿Qué pasa con los recortes ya subidos al bucket privado? | **ENMENDADA el 2026-09-25 por el humano (F1.4): se reutiliza el bucket actual y el humano lo cambia a público.** No hay bucket nuevo ni se re-apunta `SUPABASE_CROPS_BUCKET`, y los recortes ya subidos **siguen valiendo**: pasan a verse con URL pública sin moverlos. Sustituye a la decisión original («se dan por perdidos»). El bucket sigue siendo propio, separado del de recetas. |
 | 2026-09-25 | ¿Deroga decisiones anteriores? | **QC-110 no**: su bucket «nuevo y propio» (`[D17]`) se mantiene. **Se deroga la fila 2026-09-24 de QC-158** («pintarla con URL firmada es de QC-140»): se pinta con URL pública, y lo hace esta ficha porque QC-140 cerró sin pintarla. |
 | 2026-09-25 | ¿Permisos? | **Sin cambios**: cada pantalla conserva el suyo (`proveedores.consultar`, heredado de QC-140 D10; los de documentos, de QC-142 y QC-169). La URL pública no pasa por ningún permiso. |
 | 2026-09-25 | ¿Librería? | **Ninguna nueva**: `getPublicUrl` de `@supabase/storage-js`, ya aprobada y en uso en recetas. |

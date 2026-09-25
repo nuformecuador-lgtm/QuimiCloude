@@ -105,7 +105,10 @@ composición afirma que, con los dobles del E2E puestos, la URL de una línea de
 `https://documentos-e2e.invalid/crops/<ruta>` y sin ellos pasa por `cropPublicUrl` (**R1**: la imagen
 de la línea y la de la revisión salen del **mismo** bucket de recortes; **R22**); la integración, con
 una línea real con `image_path` en la base y los casos de uso cableados, devuelve `imageUrl` en la
-tabla y en la vitrina y `imageUrl: null` en la línea sin ruta (**R13**, **R14**, **R16**).
+tabla y en la vitrina y `imageUrl: null` en la línea sin ruta (**R13**, **R14**, **R16**); y una línea
+sembrada con una ruta de recorte **ya existente** (forma `<empresa>/<archivo>/<página>-<n>.png`, sin
+pasar por la importación) sale con la misma URL que compone `cropPublicUrl` para esa ruta y con su
+`image_path` intacto en la base (**R17**).
 
 ## [ ] T5 — Pantallas de vitrina y catálogo `[depende de T3]`
 
@@ -120,7 +123,7 @@ Archivos: `app/(private)/proveedores/components/showcase-line-card.tsx`,
   `CatalogLineListItem`. `components/shared/entity-image.tsx` **no se toca**.
 
 **Hecho cuando:** los tests de UI cubren **R15** (con `imageUrl` la miniatura lleva esa URL en `src`,
-en vitrina y tabla), **R16** (sin `imageUrl` → marcador con `data-missing`), **R17** (`fireEvent.error`
+en vitrina y tabla), **R16** (sin `imageUrl` → marcador con `data-missing`), **R24** (`fireEvent.error`
 sobre la miniatura → marcador, en vitrina y tabla) y **R3** (el formulario de edición de una línea con
 imagen reenvía en su campo oculto la **ruta**, no la URL); `image-url-screens.test.ts` cubre **R8**
 (ningún archivo de las tres pantallas —`proveedores/components`, `proveedores/[id]/components`,
@@ -140,7 +143,8 @@ Archivos: `.env.example` (solo el comentario de `SUPABASE_CROPS_BUCKET`),
 **Hecho cuando:** el caso nuevo de `crop-storage-config.test.ts` cubre **R1** (la variable sigue vacía,
 el comentario dice «PUBLICO» y la configuración sigue compartiendo dirección y credencial);
 `qc171-alcance.test.ts` cubre **R18** (en el código de producción hay **una** sola variable de bucket
-de recortes y ningún otro nombre de bucket de recortes), **R20** (`document-storage-supabase.ts` sigue
+de recortes, `SUPABASE_CROPS_BUCKET`, y ningún otro nombre de bucket de recortes; ningún adaptador de
+recortes llama a `move` ni `copy`; la rama no añade migración que toque `image_path`), **R20** (`document-storage-supabase.ts` sigue
 usando `createSignedUrl`; `recipe-image-supabase.ts` y la lectura de `products` sin `cropPublicUrl`) y
 **R21** (`package.json` sin dependencias nuevas frente a `docs/dependencias.md`);
 `read-document.test.ts`, `recipe-image-scope.test.ts` y `guard-dependencias-aprobadas.test.ts` verdes
@@ -152,23 +156,25 @@ Archivos: `progress/impl_QC-171-recortes-con-url-publica.md`.
 
 - `./init.sh` completo.
 - `pnpm run e2e -- catalogo-desde-pdf` en Chromium, **sin modificar** el spec.
-- Mapa `R1…R23 → test` en la bitácora.
+- Mapa `R1…R24 → test` en la bitácora.
 
 **Hecho cuando:** gate completo verde; el E2E de QC-158 pasa sin cambios (**R22**); cada `R<n>` tiene al
 menos un test nombrado en la bitácora; `git diff --stat dev` no incluye ningún archivo de la frontera
 `[D8]` listado arriba (**R23**).
 
-## [ ] T8 — Bucket público en cada entorno `[humano]` `[bloqueada por P1]`
+## [ ] T8 — El humano pasa a público el bucket de recortes actual en cada entorno `[humano]`
 
-Archivos: ninguno del repo (`.env` local del humano y variables de Vercel).
+Archivos: ninguno del repo. **No** se toca `SUPABASE_CROPS_BUCKET` ni ninguna variable de Vercel.
 
-- Crear el bucket **público** en Supabase (desarrollo y producción) con tipo `image/png` y el tamaño
-  máximo que se decida en P1; re-apuntar `SUPABASE_CROPS_BUCKET`.
-- Comprobación manual: importar un PDF, confirmar una línea con imagen y verla en la revisión, en la
-  vitrina y en la tabla del catálogo.
+- En Supabase (desarrollo y producción), cambiar a **público** el bucket que ya nombra
+  `SUPABASE_CROPS_BUCKET`. Sus límites de tamaño y tipo se quedan como están.
+- Hacerlo **antes** de desplegar el código en ese entorno: sin ello la revisión, que hoy se ve con
+  enlace firmado, pasaría a salir en marcador (`design.md > 9`).
+- Comprobación manual: una línea importada **antes** de la ficha se ve en la vitrina y en la tabla del
+  catálogo (**R17**), e importar un PDF nuevo la muestra en la revisión, la vitrina y la tabla.
 
 **Hecho cuando:** el humano anota en la bitácora el entorno, la fecha y el resultado de la comprobación.
-No bloquea el merge del código (sin T8 las imágenes salen en marcador, **R17**), pero sí dar la ficha
+No bloquea el merge del código (sin T8 las imágenes salen en marcador, **R24**), pero sí dar la ficha
 por cumplida en ese entorno.
 
 ---
