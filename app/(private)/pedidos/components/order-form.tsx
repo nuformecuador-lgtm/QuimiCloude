@@ -529,6 +529,11 @@ export function OrderForm({
       pantalla -el minimo gana al tope `sm:max-w-md`, que sigue de suelo si alguien quita la prop-.
       `pb-[env(safe-area-inset-bottom)]` para que el pie no quede bajo la barra de gestos de iOS
       (R45). El desbordamiento vertical lo absorbe el CUERPO, no el panel.
+
+      `noValidate` en el `<form>`: el `min` del campo de cantidad es solo para el NAVEGADOR -que
+      la flecha del control numerico no ofrezca bajar de 0.01-, no para que el navegador decida
+      si el envio procede. Quien valida al enviar sigue siendo `createOrderSchema`/
+      `updateOrderSchema`, igual que ya hacia el resto del formulario.
     */
     <SheetContent
       side="right"
@@ -536,7 +541,7 @@ export function OrderForm({
       className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
       data-testid="order-sheet"
       isForm
-      formProps={{ action: formAction, 'data-testid': ORDER_FORM_TESTID }}
+      formProps={{ action: formAction, noValidate: true, 'data-testid': ORDER_FORM_TESTID }}
       footer={<FormActions canSave={canSave} />}
     >
       <SheetHeader>
@@ -607,56 +612,73 @@ export function OrderForm({
             />
 
             {/*
-              Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
-              `step="any"` para que el decimal no choque contra el paso entero por defecto. El valor
-              sigue viajando como cadena en el `FormData` y sigue validandolo el esquema del contrato.
-
-              Al SOLTAR EL FOCO el valor se coloca a DOS decimales y sin ceros finales (decision
-              humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
-              sus decimales. El `FormData` viaja con el valor ya colocado.
+              Cantidad, presentacion y prioridad EN UNA FILA (decision humana): `flex` que en
+              angosto se apila -movil primero (R45)- y en `sm` o mas ancho pone los tres campos
+              lado a lado, cada uno creciendo por igual (`flex-1`).
             */}
-            <OrderField
-              name="quantity"
-              label={FIELD_LABELS.quantity}
-              required
-              type="number"
-              step="any"
-              inputMode="decimal"
-              roundDecimals={2}
-              defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
-              onValueChange={(value) => {
-                setQuantity(value);
-                quote.onQuantityChange(recipe?.id ?? null, value);
-              }}
-              error={fieldErrors.quantity}
-            />
+            <div className="flex flex-col gap-4 sm:flex-row">
+              {/*
+                Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
+                `step="any"` para que el decimal no choque contra el paso entero por defecto, y
+                `min="0.01"` para que el navegador no ofrezca negativos ni cero -el «mayor que cero»
+                real lo sigue cerrando el esquema del contrato al enviar. El valor sigue viajando
+                como cadena en el `FormData`.
 
-            {/* El bloque de coste: fuera de la condicion de receta elegida, para verse con guion sin receta. */}
+                Al SOLTAR EL FOCO el valor se coloca a DOS decimales y sin ceros finales (decision
+                humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
+                sus decimales. El `FormData` viaja con el valor ya colocado.
+              */}
+              <div className="sm:flex-1">
+                <OrderField
+                  name="quantity"
+                  label={FIELD_LABELS.quantity}
+                  required
+                  type="number"
+                  step="any"
+                  min="0.01"
+                  inputMode="decimal"
+                  roundDecimals={2}
+                  defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
+                  onValueChange={(value) => {
+                    setQuantity(value);
+                    quote.onQuantityChange(recipe?.id ?? null, value);
+                  }}
+                  error={fieldErrors.quantity}
+                />
+              </div>
+
+              {/*
+                Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo
+                elegir una existente del catalogo.
+              */}
+              <div className="sm:flex-1">
+                <PresentationSelect
+                  defaultValue={initialValue(PRESENTATION_FIELD, order?.presentationId ?? '')}
+                  defaultLabel={order?.presentationName ?? ''}
+                  error={fieldErrors.presentationId}
+                />
+              </div>
+
+              {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
+              <div className="sm:flex-1">
+                <SelectField
+                  name="priority"
+                  label={FIELD_LABELS.priority}
+                  defaultValue={initialValue('priority', order?.priority ?? DEFAULT_ORDER_PRIORITY)}
+                  options={ORDER_PRIORITY_VALUES.map((value) => ({
+                    value,
+                    label: ORDER_PRIORITY_LABELS[value],
+                  }))}
+                  triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
+                  optionTestId={ORDER_PRIORITY_OPTION_TESTID}
+                  error={fieldErrors.priority}
+                />
+              </div>
+            </div>
+
+            {/* El bloque de coste: DEBAJO de la fila, no entre los campos. Fuera de la condicion
+                de receta elegida, para verse con guion sin receta. */}
             <OrderCostQuote {...quote.state} />
-
-            {/*
-              Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo
-              elegir una existente del catalogo.
-            */}
-            <PresentationSelect
-              defaultValue={initialValue(PRESENTATION_FIELD, order?.presentationId ?? '')}
-              defaultLabel={order?.presentationName ?? ''}
-              error={fieldErrors.presentationId}
-            />
-
-            {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
-            <SelectField
-              name="priority"
-              label={FIELD_LABELS.priority}
-              defaultValue={initialValue('priority', order?.priority ?? DEFAULT_ORDER_PRIORITY)}
-              options={ORDER_PRIORITY_VALUES.map((value) => ({
-                value,
-                label: ORDER_PRIORITY_LABELS[value],
-              }))}
-              triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
-              optionTestId={ORDER_PRIORITY_OPTION_TESTID}
-              error={fieldErrors.priority}
-            />
           </div>
         </div>
 

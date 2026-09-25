@@ -2593,6 +2593,21 @@
         "QC-168"
       ],
       "spec_path": "specs/QC-170-pedido-en-varias-presentaciones"
+    },
+    {
+      "key": "QC-171",
+      "id": 171,
+      "epic": "QC-105",
+      "epic_name": "Documentos e IA",
+      "name": "recortes-con-url-publica",
+      "description": "Las imagenes recortadas de un catalogo en PDF pasan a ser PUBLICAS y se muestran con URL publica en vez de enlace firmado. NACE DEL CHAT el 2026-09-25, por decision del humano: las imagenes del catalogo de un proveedor pueden ser publicas.\n\nPOR QUE. Hoy la revision de la importacion hace 1 + N solicitudes a Supabase cada vez que se abre: un listado y un enlace firmado por cada recorte. Con URL publica la URL se compone sin ninguna solicitud. Ademas, al confirmar, la linea del catalogo guarda la RUTA del recorte, y la imagen compartida la usa tal cual como direccion: una ruta no es una URL, asi que hoy las imagenes importadas NO se ven en el catalogo ni en la vitrina, y sale el marcador de sin imagen.\n\nQUE ENTRA. Los recortes se leen con URL publica en la revision de la importacion y en todas las pantallas que muestran la imagen de una linea de catalogo o de un producto que venga de un recorte. Se sigue guardando la ruta, no la URL, igual que hace recetas con su imagen. Las rutas siguen llevando empresa y archivo, y nadie puede listar el bucket sin credencial.\n\nDECIDIDO el 2026-09-25 por el humano: el bucket de recortes es PUBLICO pero PROPIO, NO se une al de imagenes de receta. Motivo: lo publico ahorra solicitudes y trafico (URL estable que se cachea, sin enlaces que caducan), y un bucket propio mantiene separados el ciclo de vida de los recortes (limpiar al descartar una importacion o borrar un proveedor) y sus limites de tamano y tipo. Los buckets no tienen coste propio en Supabase.\n\nABIERTO, se acota con /afinar-feature: que pasa con los recortes que ya estan en el bucket privado (moverlos o darlos por perdidos, hoy solo hay datos de prueba); si la composicion de la URL publica se comparte con la de recetas o cada modulo compone la suya; si deroga alguna decision de QC-110 o QC-158 que pedia bucket propio y privado.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-171-recortes-con-url-publica",
+      "depends_on": [],
+      "spec_path": "specs/QC-171-recortes-con-url-publica"
     }
   ]
 }
