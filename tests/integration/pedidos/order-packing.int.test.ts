@@ -53,6 +53,7 @@ type Fixture = {
   readonly recipeId: string;
   readonly packerId: string;
   readonly otherPackerId: string;
+  readonly documentTypeCodes: readonly string[];
 };
 
 async function createCompany(label: string): Promise<string> {
@@ -65,7 +66,7 @@ async function createCompany(label: string): Promise<string> {
   return company.id;
 }
 
-async function createUser(companyId: string): Promise<string> {
+async function createUser(companyId: string): Promise<{ id: string; documentTypeCode: string }> {
   const marca = token();
   const documentType = await prisma.documentType.create({
     data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
@@ -91,7 +92,7 @@ async function createUser(companyId: string): Promise<string> {
     },
     select: { id: true },
   });
-  return user.id;
+  return { id: user.id, documentTypeCode: documentType.code };
 }
 
 async function crearFixture(): Promise<Fixture> {
@@ -101,9 +102,15 @@ async function crearFixture(): Promise<Fixture> {
     data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
     select: { id: true },
   });
-  const packerId = await createUser(companyId);
-  const otherPackerId = await createUser(companyId);
-  return { companyId, recipeId: recipe.id, packerId, otherPackerId };
+  const packer = await createUser(companyId);
+  const otherPacker = await createUser(companyId);
+  return {
+    companyId,
+    recipeId: recipe.id,
+    packerId: packer.id,
+    otherPackerId: otherPacker.id,
+    documentTypeCodes: [packer.documentTypeCode, otherPacker.documentTypeCode],
+  };
 }
 
 async function borrarFixture(fixture: Fixture, orderIds: readonly string[]): Promise<void> {
@@ -114,20 +121,26 @@ async function borrarFixture(fixture: Fixture, orderIds: readonly string[]): Pro
   const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { roleId: true } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   await prisma.role.deleteMany({ where: { id: { in: users.map((u) => u.roleId) } } });
+  await prisma.documentType.deleteMany({ where: { code: { in: [...fixture.documentTypeCodes] } } });
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
 /** Empresa AJENA, con un unico empacador propio: para R24 (pedido de otra empresa). */
-async function crearOtraEmpresa(): Promise<{ companyId: string; packerId: string }> {
+async function crearOtraEmpresa(): Promise<{ companyId: string; packerId: string; documentTypeCode: string }> {
   const companyId = await createCompany('ajena');
-  const packerId = await createUser(companyId);
-  return { companyId, packerId };
+  const packer = await createUser(companyId);
+  return { companyId, packerId: packer.id, documentTypeCode: packer.documentTypeCode };
 }
 
-async function borrarOtraEmpresa(otra: { companyId: string; packerId: string }): Promise<void> {
+async function borrarOtraEmpresa(otra: {
+  companyId: string;
+  packerId: string;
+  documentTypeCode: string;
+}): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: otra.packerId }, select: { roleId: true } });
   await prisma.user.deleteMany({ where: { id: otra.packerId } });
   if (user !== null) await prisma.role.deleteMany({ where: { id: user.roleId } });
+  await prisma.documentType.deleteMany({ where: { code: otra.documentTypeCode } });
   await prisma.company.deleteMany({ where: { id: otra.companyId } });
 }
 
