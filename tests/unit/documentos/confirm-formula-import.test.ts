@@ -205,6 +205,57 @@ describe('createConfirmFormulaImport', () => {
     });
   });
 
+  describe('R3, R23, R33 — la confirmacion vuelve a leer el archivo, no se fia de lo que ya vio el navegador', () => {
+    it('R23 — archivo inexistente (o de otra empresa) con una entrada por lo demas valida: invalid_input, cero escrituras y cero lecturas de productos/recetas', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, { repository: dobleDeRepositorio(bitacora, null) });
+      const confirm = createConfirmFormulaImport(deps);
+
+      await expect(confirm(actorConPermiso(), entradaBase())).rejects.toMatchObject({ code: 'invalid_input' });
+
+      expect(deps.products.findRefs).not.toHaveBeenCalled();
+      expect(deps.recipes.findAliveByNormalizedName).not.toHaveBeenCalled();
+      expect(deps.productNames.findAliveByNormalizedNames).not.toHaveBeenCalled();
+      expect(deps.createRawMaterial).not.toHaveBeenCalled();
+      expect(deps.createRecipe).not.toHaveBeenCalled();
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+    });
+
+    it('R3 — archivo que todavia no llego a `done` con una entrada por lo demas valida: invalid_input, cero escrituras y cero lecturas de productos/recetas', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        repository: dobleDeRepositorio(bitacora, { status: 'processing', strategy: 'formula', extractedText: null }),
+      });
+      const confirm = createConfirmFormulaImport(deps);
+
+      await expect(confirm(actorConPermiso(), entradaBase())).rejects.toMatchObject({ code: 'invalid_input' });
+
+      expect(deps.products.findRefs).not.toHaveBeenCalled();
+      expect(deps.recipes.findAliveByNormalizedName).not.toHaveBeenCalled();
+      expect(deps.productNames.findAliveByNormalizedNames).not.toHaveBeenCalled();
+      expect(deps.createRawMaterial).not.toHaveBeenCalled();
+      expect(deps.createRecipe).not.toHaveBeenCalled();
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+    });
+
+    it('R33 — archivo de una tanda `catalogo` con una entrada por lo demas valida: invalid_input, cero escrituras y cero lecturas de productos/recetas', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        repository: dobleDeRepositorio(bitacora, { status: 'done', strategy: 'catalogo', extractedText: null }),
+      });
+      const confirm = createConfirmFormulaImport(deps);
+
+      await expect(confirm(actorConPermiso(), entradaBase())).rejects.toMatchObject({ code: 'invalid_input' });
+
+      expect(deps.products.findRefs).not.toHaveBeenCalled();
+      expect(deps.recipes.findAliveByNormalizedName).not.toHaveBeenCalled();
+      expect(deps.productNames.findAliveByNormalizedNames).not.toHaveBeenCalled();
+      expect(deps.createRawMaterial).not.toHaveBeenCalled();
+      expect(deps.createRecipe).not.toHaveBeenCalled();
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+    });
+  });
+
   describe('R24 — el producto elegido se relee en el servidor', () => {
     it('el producto no existe, esta de baja o es de otra empresa: invalid_input, cero escrituras', async () => {
       const bitacora: Bitacora = [];

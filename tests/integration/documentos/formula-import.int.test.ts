@@ -540,18 +540,22 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
       const empresa = await crearEmpresa();
       const otra = await crearEmpresa();
       const documentFileDeOtra = await crearArchivoListoFormula(otra.companyId);
+      const productoPropio = await crearProducto(empresa.companyId, `Ingrediente propio ${token()}`);
       const confirm = createConfirmFormulaImport(crearDeps());
 
+      // La entrada es VALIDA por si sola -linea completa al 100,00 %, con un producto de la
+      // propia empresa y sin choque de nombre-, para que el rechazo salga de la busqueda del
+      // archivo acotada a la empresa del actor y no de una validacion mas temprana.
       await expect(
         confirm(actorDe(empresa), {
           documentFileId: documentFileDeOtra,
           name: `Formula ${token()}`,
           description: null,
-          lines: [],
+          lines: [{ kind: 'existing', productId: productoPropio, percentage: '100.00' }],
           steps: [],
           replaceRecipeId: null,
         }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 'invalid_input' });
 
       const recetas = await prisma.recipe.count({ where: { companyId: empresa.companyId } });
       expect(recetas).toBe(0);
@@ -577,7 +581,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
           steps: [],
           replaceRecipeId: recetaAjena.id,
         }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 'recipe_not_found' });
 
       const recetasDeEmpresa = await prisma.recipe.count({ where: { companyId: empresa.companyId } });
       expect(recetasDeEmpresa).toBe(0);
@@ -601,7 +605,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
           steps: [],
           replaceRecipeId: null,
         }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 'invalid_input' });
 
       const recetas = await prisma.recipe.count({ where: { companyId: empresa.companyId } });
       expect(recetas).toBe(0);
