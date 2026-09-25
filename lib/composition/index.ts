@@ -224,6 +224,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
   createRecipeExecutionReader,
+  findAliveRecipeByNormalizedName,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -1017,6 +1018,8 @@ const recipeCatalog: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
+  // QC-159 T1: el choque de nombre de la revision de formula.
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
 
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */

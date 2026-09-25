@@ -36,6 +36,7 @@ import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/
 import {
   createRecipeExecutionReader,
   findRecipeExecutionContentById,
+  findAliveRecipeByNormalizedName,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
@@ -92,6 +93,7 @@ const recipes: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 }
 
 const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches }

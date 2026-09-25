@@ -83,6 +83,28 @@ export async function findRecipeIdsMatchingName(
 }
 
 /**
+ * Implementa `RecipeCatalog['findAliveByNormalizedName']`: la receta VIVA de esa empresa cuyo
+ * `name_normalized` es el de `name`, o `null`. CON `deleted_at IS NULL` en el `where` -a
+ * diferencia de `findRecipeRefsIncludingDeleted`-: esta busqueda es para el choque de nombre de
+ * QC-159, que solo le importa lo que hoy ocupa ese nombre.
+ */
+export async function findAliveRecipeByNormalizedName(
+  name: string,
+  companyId: string,
+): Promise<{ id: RecipeId; name: string } | null> {
+  const normalized = normalizeRecipeName(name);
+  if (normalized === '') return null;
+
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { nameNormalized: normalized, deletedAt: null }] },
+    select: { id: true, name: true },
+  });
+
+  return row === null ? null : { id: row.id, name: row.name };
+}
+
+/**
  * Valida cada elemento crudo del `Json` de `steps` contra el esquema del dominio y descarta el
  * que no pasa, conservando el orden -mismo criterio de tolerancia que `recipe-prisma.ts`, pero
  * repetido aqui en vez de importado: este adaptador no toca el repositorio interno de receta.
