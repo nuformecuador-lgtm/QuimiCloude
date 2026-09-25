@@ -152,6 +152,15 @@ preexistentes en `tests/unit/documentos/confirm-catalog-import.test.ts` y
 **No se corrió `pnpm test` ni `./init.sh` completo** (fuera del alcance de esta entrega, que es
 T0+T1). `./init.sh` completo queda para el cierre de la ficha (T9).
 
+### Guardias tocadas que design §10 declaraba «No se tocan» (anotado tras la review)
+
+En `b153b968` también se tensaron dos guardias, inevitablemente, al añadir la ruta y el ítem de menú:
+
+- `tests/guards/guard-nav-permisos-declarados.test.ts`: ancla de 9 a 10 enlaces, lista exacta.
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts`: de 14 a 15 rutas, lista exacta.
+
+Las dos siguen siendo listas exactas: se tensan, no se relajan.
+
 ### Archivos fuera de alcance
 
 No se tocó `lib/modules/**`, `lib/composition/**`, `db/**`, `components/shared/**`,
@@ -241,8 +250,8 @@ $ pnpm exec vitest run tests/unit/clientes-ui/customer-columns.test.tsx tests/un
   «sin coincidencias» no vive aqui (design.md > 5.1): lo pinta la propia tabla en T6.
 - `app/(private)/clientes/components/customer-list-error.tsx` (nuevo): mensaje, `code` aparte y
   reintento como **enlace** a `retryHref` (`customerListHref(params)`, pasado por quien lo monta),
-  no `router.refresh()` — desviación deliberada de `design.md > 5.1` respecto del patron mayoritario
-  del repo (unidades, pedidos, grupos), que usa `router.refresh()`. Usa `UnexpectedErrorNotice`
+  no `router.refresh()`, tal como pide `design.md > 5.1`. Se aparta del patron de unidades, pedidos y
+  grupos, que usan `router.refresh()`; no es una desviacion del spec. Usa `UnexpectedErrorNotice`
   para el codigo inesperado, igual que las demas pantallas (QC-71).
 - `app/(private)/clientes/components/index.ts`: suma los tres archivos al barrel.
 - `tests/unit/clientes-ui/customer-list-skeleton.test.tsx`,
