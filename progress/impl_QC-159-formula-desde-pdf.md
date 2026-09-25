@@ -125,3 +125,59 @@ vitest run --project integration recipe-catalog-by-name + product-name-lookup
   + create-raw-material + tests/integration/asignaciones + tests/integration/pedidos 38 archivos, 305 tests verdes
 vitest run guard-aislamiento-integracion + guard-ambito-empresa-inventario           33 tests verdes
 ```
+
+## T4 — `documentos`: interpretación y reglas puras (backend_dev, `700fcbdf` + `174ef725`)
+
+- Nuevos: `lib/modules/documentos/domain/{formula-extraction,formula-step-text,review-formula-import,formula-import-input}.ts`,
+  `tests/unit/documentos/{formula-extraction,formula-step-text,review-formula-import}.test.ts` (64 casos).
+- `ports/document-batch-repository.ts`: solo los comentarios de `FileForReview`/`readFileForReview`
+  (ya no hablan de «catálogo»).
+- Todo interno a `documentos`: el barrel y `module-contract.test.ts` se tocan en T5.
+- **Corrección `174ef725`:** la primera versión escribía el tope de pasos como `100 / 2` en
+  `documentos` para esquivar la guardia de números sueltos del módulo (`ai-limits.test.ts`). Se
+  rechazó: esquiva la guardia y reescribe una regla de `recetas`. Ahora `recetas` publica
+  `MAX_RECIPE_STEPS = 50` (`recipe-input.ts`, la regla de su esquema no cambia; se limpió el comentario
+  con citas de esas líneas) y `documentos` lo importa del barrel.
+- **Lectura del caso `1e2` de T4 (R7):** tras `JSON.parse`, el número JSON `1e2` es `100`, que P3
+  acepta (`String(100) = "100"`), así que el único `1e2` que puede llegar vacío es la **cadena**
+  `"1e2"` (no casa con `PERCENTAGE_PATTERN`). Se implementó y se probó así; el camino numérico de P3
+  se prueba con `12.5`. Un número JSON cuya `String(n)` sí lleve exponente (p. ej. `1e-7`) llega vacío.
+  No contradice ni P3 ni R7; queda anotado para el reviewer.
+
+```
+typecheck limpio · lint 0 errores
+vitest related --run <5 archivos de T4>                         3 archivos, 64 tests verdes
+vitest run tests/unit/documentos (T4)                           76 archivos, 735 verdes / 29 skip
+tras 174ef725: vitest run tests/unit/documentos tests/unit/recetas   115 archivos, 1324 verdes / 29 skip
+tras 174ef725: vitest related --run <4 archivos>                253 archivos, 3716 verdes / 1 skip
+```
+
+## T10 — doble de IA para fórmulas (backend_dev, `ef5c8b27`)
+
+- `lib/modules/documentos/adapters/driven/ai/ai-reader-canned.ts`: partes todas `pdf` ⇒
+  `CANNED_FORMULA_TEXT`; el prompt del recorte sigue mandando primero; lo demás ⇒ catálogo.
+  Constantes `CANNED_FORMULA_*`: nombre `guion-e2e-formula-nombre`; ingredientes
+  `guion-e2e-formula-preseleccion` (25), `guion-e2e-formula-materia-prima-nueva` (60) y uno **sin
+  nombre** con `percentage: null`, `quantity: "250"`, `unit: "g"` (`CANNED_FORMULA_MISSING_PERCENTAGE = '15'`
+  para cuadrar 100); tres pasos, el segundo de dos líneas. El nombre del tercero no lo fija
+  `design.md > 10`; sin nombre, el E2E tiene que **elegir** un producto en esa fila (recorre R12).
+- `tests/unit/documentos/ai-reader-canned.test.ts` ampliado; el texto de guion se parsea entero como JSON.
+
+```
+vitest run tests/unit/documentos tests/guards/guard-dobles-e2e.test.ts   77 archivos, 742 verdes / 29 skip
+typecheck limpio · lint 0 errores
+```
+
+## Cierre de la tanda 1 (T1–T4, más T8 y T10) — `./init.sh --rapido`
+
+```
+$ ./init.sh --rapido           (sobre 174ef725)
+ Test Files  340 passed (340)
+      Tests  4849 passed | 49 skipped (4898)        (relacionados, incluida integración en base efímera)
+test-db: borrada la base de la corrida: qct_qc159_15d32d70_muh7ctmf_ge4.
+[test:rapido] todas las guardias
+ Test Files  51 passed (51)
+      Tests  647 passed | 11 skipped (658)
+✓ test:rapido paso · ✓ todas las migraciones tienen down.sql · == init OK ==
+exit 0
+```

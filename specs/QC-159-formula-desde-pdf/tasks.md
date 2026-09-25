@@ -61,7 +61,7 @@ Tras T2 (comparten `inventario/index.ts` y el bloque de `inventario` de la compo
 `product_batches` y cero en el libro de movimientos, en la empresa del actor. Los tests de
 `create-product` siguen verdes sin tocarlos. Cubre **R25** y la defensa en profundidad de **R31**.
 
-### T4 [ ] (P3) — `documentos`: interpretación y reglas puras
+### T4 [x] (P3) — `documentos`: interpretación y reglas puras
 Tras T3 (usa `PRODUCT_NAME_MAX_LENGTH`). **Toca:** `lib/modules/documentos/domain/formula-extraction.ts`,
 `formula-step-text.ts`, `review-formula-import.ts`, `formula-import-input.ts` (nuevos),
 `lib/modules/documentos/ports/document-batch-repository.ts` (solo el comentario de `FileForReview`),
@@ -175,7 +175,7 @@ Tras T7, T8. **Toca:** `app/(private)/produccion/formulas/importar/[documentoId]
 - ninguna imagen ni recorte en la pantalla (**R35**); objetivos `min-h-11 min-w-11`, campos
   `text-base`, sin acción solo en `hover:` (**R38**).
 
-### T10 [ ] [P] — Doble de IA para fórmulas
+### T10 [x] [P] — Doble de IA para fórmulas
 Tras T4 (forma del JSON). **Toca:** `lib/modules/documentos/adapters/driven/ai/ai-reader-canned.ts`,
 `tests/unit/documentos/ai-reader-canned.test.ts` (nuevo o ampliado).
 **Hacer:** `design.md > 10` (tercer caso por forma de las partes; constantes `CANNED_FORMULA_*`).
