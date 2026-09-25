@@ -2338,7 +2338,7 @@
       "epic_name": "Clientes",
       "name": "pantalla-de-clientes",
       "description": "Pantalla /clientes: tabla compartida (busqueda, paginacion, orden), panel de alta y edicion, entrada del menu solo con clientes.consultar. E2E si (permisos). Decisiones en specs/QC-155-pantalla-de-clientes/requirements.md. BLOQUEADA POR QC-154.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
