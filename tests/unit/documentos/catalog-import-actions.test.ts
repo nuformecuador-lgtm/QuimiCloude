@@ -6,7 +6,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { UnauthorizedError, ValidationError } from '@/lib/modules/documentos';
-import { DOCUMENT_UPLOAD_PERMISSION } from '@/lib/modules/documentos/domain/actor';
+import { CATALOG_IMPORT_PERMISSION } from '@/lib/modules/documentos/domain/actor';
 import { supplierDetailRoute } from '@/lib/shared/routes';
 
 import type { Actor, CatalogImportPreview, CatalogImportSummary } from '@/lib/modules/documentos';
@@ -55,7 +55,7 @@ const SESSION_USER = {
   username: 'ana.perez',
   displayName: 'Ana Perez',
   roleName: 'Administrador',
-  permissions: [DOCUMENT_UPLOAD_PERMISSION],
+  permissions: [CATALOG_IMPORT_PERMISSION],
 };
 
 const SESSION_CONTEXT = { userId: PERSONA, companyId: EMPRESA, roleName: 'Administrador' };
@@ -63,7 +63,7 @@ const SESSION_CONTEXT = { userId: PERSONA, companyId: EMPRESA, roleName: 'Admini
 const ACTOR_ESPERADO: Actor = {
   id: PERSONA,
   companyId: EMPRESA,
-  permissions: [DOCUMENT_UPLOAD_PERMISSION],
+  permissions: [CATALOG_IMPORT_PERMISSION],
 };
 
 const PREVIEW_ENTRADA_VALIDA = { supplierId: PROVEEDOR, documentFileId: ARCHIVO };
