@@ -86,7 +86,7 @@ uno `ok` y uno `taken`; Terminar escribe estado + fecha en una sentencia; otra e
 **Hecho cuando:** devuelve los envases del asiento de producción por pedido, solo de la empresa;
 `guard-ambito-empresa-inventario` verde (R14).
 
-### T10 [ ] — Casos de uso de empaque en `asignaciones`
+### T10 [x] — Casos de uso de empaque en `asignaciones`
 Tras T5, T8, T9. **Toca:** `lib/modules/asignaciones/domain/{list-packing-orders,get-packing-order,start-packing,finish-packing,packing-order-view}.ts`
 (nuevos), `assignment-views.ts`, `index.ts`, `lib/composition/index.ts`,
 `tests/unit/asignaciones/{list-packing-orders,start-packing,finish-packing,get-packing-order}.test.ts`

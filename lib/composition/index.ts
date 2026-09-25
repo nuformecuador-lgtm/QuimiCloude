@@ -314,15 +314,19 @@ import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-grou
 import {
   createAssignResponsibles,
   createFinishAssignedOrder,
+  createFinishPacking as createFinishPackingOrder,
   createGetAssignedOrderExecution,
+  createGetPackingOrder,
   createListAssignedOrders,
   createListCompanyOrders,
   createListFinishedOrders,
   createListOrderResponsibles,
+  createListPackingOrders,
   createListResponsibleCandidates,
   createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
+  createStartPacking as createStartPackingOrder,
   createUnassignResponsible,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -1317,6 +1321,37 @@ export const asignaciones = {
   }),
   listResponsibleCandidates: createListResponsibleCandidates({
     people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  // QC-168 T10 - el empaque (`design.md > 3`). `listPackingOrders` y `getPackingOrder` comparten
+  // los MISMOS `orderCatalog`, `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog`
+  // y `peopleDirectory` del resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y
+  // la ejecucion, arriba- para los envases. `startPacking` y `finishPacking` solo necesitan
+  // `orderCatalog`: ningun adaptador nuevo.
+  listPackingOrders: createListPackingOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    products: productCatalog,
+    now: () => new Date(),
+  }),
+  getPackingOrder: createGetPackingOrder({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    products: productCatalog,
+    now: () => new Date(),
+  }),
+  startPacking: createStartPackingOrder({
+    orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  finishPacking: createFinishPackingOrder({
+    orders: orderCatalog,
     now: () => new Date(),
   }),
 } as const;

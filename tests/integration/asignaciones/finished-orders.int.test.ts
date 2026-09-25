@@ -22,7 +22,9 @@ vi.mock('@/lib/shared/db/prisma', async () => {
 
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
+import { createFinishPacking } from '@/lib/modules/asignaciones/domain/finish-packing';
 import { createListFinishedOrders } from '@/lib/modules/asignaciones/domain/list-finished-orders';
+import { createStartPacking } from '@/lib/modules/asignaciones/domain/start-packing';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { ROLE_EMPACADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 import {
@@ -35,7 +37,11 @@ import {
   listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
-import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import {
+  createOrderWriteRepository,
+  finishPackingAliveOrder,
+  startPackingAliveOrder,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
@@ -82,12 +88,12 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany,
     transitionAliveById: transitionAliveByIdReal,
-    startPackingAliveById: async () => {
-      throw new Error('este fixture no ejercita el empaque');
-    },
-    finishPackingAliveById: async () => {
-      throw new Error('este fixture no ejercita el empaque');
-    },
+    // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
+    // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.
+    startPackingAliveById: (id, companyId, packerId, now) =>
+      startPackingAliveOrder(id, packerId, now, { companyId }),
+    finishPackingAliveById: (id, companyId, packerId, now) =>
+      finishPackingAliveOrder(id, packerId, now, { companyId }),
   };
   const assignments = createOrderAssignmentRepository(tx);
 
@@ -115,6 +121,9 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       orders,
       now: () => NOW,
     }),
+    // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.
+    startPacking: createStartPacking({ orders, now: () => NOW }),
+    finishPacking: createFinishPacking({ orders, now: () => NOW }),
   };
 }
 
@@ -228,6 +237,52 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       await finishAssignedOrder(actorEmpacador, { orderId: pedido });
 
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+    });
+  });
+
+  it('R27: Finalizar -> Comenzar -> Terminar deja el pedido en «Terminados» con la fecha de Terminar', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const { listFinishedOrders, finishAssignedOrder, startPacking, finishPacking } = wireListFinishedOrders(
+        fixture.tx,
+      );
+
+      const operario = await createPerson(fixture, fixture.companyA);
+      const empacador = await createPerson(fixture, fixture.companyA);
+      const pedido = await createOrder(fixture, { status: 'EN_CURSO' });
+
+      await fixture.useCases.assign(
+        actorOf(fixture.companyA),
+        { orderId: pedido, userIds: [operario], workGroupIds: [] },
+        NOW,
+      );
+
+      const actorOperario: Actor = {
+        id: operario,
+        companyId: fixture.companyA,
+        permissions: ['asignaciones.consultar'],
+      };
+      const actorEmpacador: Actor = {
+        id: empacador,
+        companyId: fixture.companyA,
+        permissions: PERMISOS_DEL_EMPACADOR,
+      };
+
+      // Finalizar: EN_CURSO -> POR_EMPACAR. Todavia no aparece en «Terminados».
+      await finishAssignedOrder(actorOperario, { orderId: pedido });
+      expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+
+      // Comenzar: POR_EMPACAR -> EN_EMPAQUE, a nombre del Empacador. Sigue sin aparecer.
+      await startPacking(actorEmpacador, { orderId: pedido });
+      expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+
+      // Terminar: EN_EMPAQUE -> ENTREGADO, con `finished_at` en la misma escritura (R21), en el
+      // instante que el fixture cablea como reloj (`NOW`).
+      const { numberText } = await finishPacking(actorEmpacador, { orderId: pedido });
+      expect(numberText.length).toBeGreaterThan(0);
+
+      // Ahora si aparece en «Terminados», con la fecha de Terminar.
+      const pagina = await listFinishedOrders(actorEmpacador, { page: 1 });
+      expect(pagina.items).toEqual([expect.objectContaining({ id: pedido, finishedAt: NOW })]);
     });
   });
 

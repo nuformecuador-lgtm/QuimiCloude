@@ -11,10 +11,11 @@
  */
 import { assertPermission, type PermissionBearer, type PermissionCode } from '@/lib/modules/identity';
 
-export type AssignmentViewKind = 'asignados' | 'terminados' | 'todos';
+export type AssignmentViewKind = 'asignados' | 'terminados' | 'todos' | 'por_empacar';
 
 const PEDIDOS_CONSULTAR: PermissionCode = 'pedidos.consultar';
 const TERMINADOS_CONSULTAR: PermissionCode = 'terminados.consultar';
+const EMPAQUE_MODIFICAR: PermissionCode = 'empaque.modificar';
 
 /**
  * Centinela privado y reutilizado: `assertPermission` exige una fabrica de error porque su
@@ -36,16 +37,22 @@ function hasPermission(
 
 /**
  * Las vistas que este usuario puede ver, en el orden en que se ofrecen. Nunca vacio: quien no
- * tiene ninguno de los tres permisos igual recibe `['asignados']`, porque esta funcion no decide
+ * tiene ninguno de los cuatro permisos igual recibe `['asignados']`, porque esta funcion no decide
  * si el usuario puede entrar a `/asignacion` en absoluto, solo que vistas le tocan si entra.
+ *
+ * `por_empacar` se anade SIEMPRE AL FINAL, sea cual sea la vista por defecto que ya se calculo: R39
+ * no cambia el aterrizaje de nadie, solo ofrece la pestana a quien tiene `empaque.modificar`.
  */
 export function resolveAssignmentViews(
   bearer: PermissionBearer | null | undefined,
 ): readonly AssignmentViewKind[] {
-  if (hasPermission(bearer, PEDIDOS_CONSULTAR)) return ['todos'];
+  const views: AssignmentViewKind[] = hasPermission(bearer, PEDIDOS_CONSULTAR)
+    ? ['todos']
+    : hasPermission(bearer, TERMINADOS_CONSULTAR)
+      ? ['asignados', 'terminados']
+      : ['asignados'];
 
-  const views: AssignmentViewKind[] = ['asignados'];
-  if (hasPermission(bearer, TERMINADOS_CONSULTAR)) views.push('terminados');
+  if (hasPermission(bearer, EMPAQUE_MODIFICAR)) views.push('por_empacar');
   return views;
 }
 

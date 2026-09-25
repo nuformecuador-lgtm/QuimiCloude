@@ -185,3 +185,17 @@ export {
   type ListResponsibleCandidatesDeps,
   type ResponsibleCandidate,
 } from './domain/list-responsible-candidates';
+
+// ---------------------------------------------------------------------------------------
+// QC-168 T10 — El empaque: la fila comun y los cuatro casos de uso de `design.md > 3`. Bloque
+// NUEVO al final: no reordena ni reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export type { PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
+export { createListPackingOrders, type ListPackingOrdersDeps } from './domain/list-packing-orders';
+export { createGetPackingOrder, type GetPackingOrderDeps } from './domain/get-packing-order';
+export { createStartPacking, type StartPackingDeps } from './domain/start-packing';
+export {
+  createFinishPacking,
+  type FinishPackingDeps,
+  type FinishPackingResult,
+} from './domain/finish-packing';
