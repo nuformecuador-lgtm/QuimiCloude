@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { createOrderSchema } from '@/lib/modules/pedidos';
 import { consumedQuantity, formatPercentage, type RecipeLineView } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
@@ -44,9 +45,12 @@ import { subtractDecimal } from './order-decimal';
  * parte del insumo dentro de la receta.
  *
  * **La columna «cantidad requerida» es `consumedQuantity(pedido, porcentaje)`**: la cantidad
- * del pedido por el porcentaje, dividido 100, en decimal exacto. Sin cantidad escrita vale `0`;
- * en cuanto cambia el campo, se recalcula. Es una columna DE CONSULTA: no viaja en el envio, que
- * sigue llevando la cantidad tal cual se escribio.
+ * del pedido por el porcentaje, dividido 100, en decimal exacto. Sin una cantidad DECIMAL MAYOR
+ * QUE CERO -vacia, cero, negativa o no numerica- vale `0` y no se calcula: la misma regla
+ * `quantitySchema` del esquema del contrato (`createOrderSchema.shape.quantity`), no una copia,
+ * decide que cuenta como cantidad valida aqui. En cuanto cambia el campo a un valor valido, se
+ * recalcula. Es una columna DE CONSULTA: no viaja en el envio, que sigue llevando la cantidad tal
+ * cual se escribio.
  *
  * **La columna «restante» resta lo requerido al stock**: `stock - requerida`, con
  * `subtractDecimal` —misma aritmetica exacta—. Si el pedido pide mas de lo que hay, el valor
@@ -109,9 +113,15 @@ export function OrderIngredientsTable({
   loading,
   error,
 }: OrderIngredientsTableProps) {
+  /**
+   * La cantidad escrita solo cuenta si es la que el contrato acepta -decimal mayor que cero-:
+   * reutiliza `quantitySchema` en vez de repetir el patron o el `> 0` a mano.
+   */
+  const hasValidQuantity = createOrderSchema.shape.quantity.safeParse(quantity).success;
+
   /** Cantidad requerida de una linea: cantidad del pedido x porcentaje / 100, en decimal exacto. */
   const requiredOf = (line: RecipeLineView): string =>
-    quantity.trim() === '' ? '0' : consumedQuantity(quantity, line.percentage);
+    hasValidQuantity ? consumedQuantity(quantity, line.percentage) : '0';
 
   /** Restante de una linea: el stock MENOS lo requerido. `null` = el producto no tiene stock. */
   const remainingOf = (line: RecipeLineView): string | null =>

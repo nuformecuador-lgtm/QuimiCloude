@@ -35,6 +35,7 @@ const testId = {
   opcion: `${RECIPE_PICKER_TESTID}-option`,
   popup: `${RECIPE_PICKER_TESTID}-popup`,
   vacio: `${RECIPE_PICKER_TESTID}-empty`,
+  borrar: `${RECIPE_PICKER_TESTID}-clear`,
 } as const;
 
 const PRIMERA_PAGINA = [
@@ -201,6 +202,35 @@ describe('selector de receta (R31, R43)', () => {
 
     expect(loQueSeEnviaria().get(RECIPE_FIELD)).toBe('');
     expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('la X de borrar no aparece con el campo vacio', () => {
+    renderPicker();
+
+    expect(screen.queryByTestId(testId.borrar)).toBeNull();
+  });
+
+  it('la X de borrar aparece con una receta ya elegida', () => {
+    renderPicker({ defaultValue: RECETA_LEJANA.id, defaultLabel: RECETA_LEJANA.name });
+
+    expect(screen.getByTestId(testId.borrar)).toHaveAccessibleName('Borrar receta');
+  });
+
+  it('pulsar la X vacia el texto, el campo oculto y avisa con null', async () => {
+    const user = setupUser();
+    const onSelect = vi.fn();
+    renderPicker({
+      defaultValue: RECETA_LEJANA.id,
+      defaultLabel: RECETA_LEJANA.name,
+      onSelect,
+    });
+
+    await user.click(screen.getByTestId(testId.borrar));
+
+    expect(screen.getByTestId(testId.campo)).toHaveValue('');
+    expect(loQueSeEnviaria().get(RECIPE_FIELD)).toBe('');
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByTestId(testId.borrar)).toBeNull();
   });
 
   it('no importa ninguna operacion de creacion de recetas ni filtra por texto en memoria', () => {

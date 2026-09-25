@@ -5,6 +5,7 @@ import { useCallback, useId, useRef, useState } from 'react';
 
 import {
   Autocomplete,
+  AutocompleteClear,
   AutocompleteContent,
   AutocompleteInput,
   AutocompleteInputGroup,
@@ -282,9 +283,14 @@ export function RecipePicker({
             aria-label={PICKER_LABEL}
             aria-invalid={error === undefined ? undefined : true}
             aria-describedby={error === undefined ? undefined : errorId}
-            className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full`}
+            className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full pr-8`}
             placeholder={PLACEHOLDER}
             data-testid={RECIPE_PICKER_TESTID}
+          />
+          {/* Su click dispara `onValueChange('')`, que ya es el camino que retira la eleccion. */}
+          <AutocompleteClear
+            aria-label="Borrar receta"
+            data-testid={`${RECIPE_PICKER_TESTID}-clear`}
           />
         </AutocompleteInputGroup>
 
