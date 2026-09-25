@@ -1,5 +1,6 @@
 import {
   ASSIGNED_ORDERS_ROUTE,
+  CUSTOMERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
@@ -105,6 +106,15 @@ export const UNITS_LABEL = 'Unidades';
  */
 export const USERS_LABEL = 'Usuarios';
 
+/**
+ * Etiqueta del sidebar para la pantalla de clientes (QC-155, R4).
+ *
+ * `CUSTOMERS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay
+ * codigo previo que la importara de este archivo, asi que no hay compatibilidad que sostener.
+ * Mismo criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL` y `UNITS_LABEL`.
+ */
+export const CUSTOMERS_LABEL = 'Clientes';
+
 /** Lleva tilde a proposito: es el texto que se lee en pantalla, no el segmento de la URL. */
 export const ASSIGNED_ORDERS_LABEL = 'Asignación';
 
@@ -167,7 +177,11 @@ export type NavIconName =
   // `flask-conical` para «Usuarios» seria un icono que miente, y ademas `boxes` y `flask-conical`
   // ya estan tomados dentro de la MISMA seccion «Configuración». `lucide-react` ya esta instalado
   // (no es dependencia nueva) y el `Record` de `NAV_ICONS` obliga a que su fila exista.
-  | 'users';
+  | 'users'
+  // QC-155 R4: el item de clientes. Ninguno de los anteriores habla de una persona externa a la
+  // organizacion, y `users` ya lo usa el item de usuarios internos. `lucide-react` ya esta
+  // instalado (no es dependencia nueva) y el `Record` de `NAV_ICONS` obliga a que su fila exista.
+  | 'contact';
 
 export type NavLink = {
   readonly kind: 'link';
@@ -384,6 +398,24 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     permission: 'usuarios.consultar',
     icon: 'users',
     section: NAV_SECTION_OPERATION,
+  },
+  // QC-155 R4, R6 — ULTIMO item del array, en «Cadena» junto a Proveedores:
+  // `groupNavItemsBySection` agrupa por orden de aparicion, asi que se dibuja tras Proveedores, y
+  // `firstVisibleNavHref` recorre el array crudo, asi que ponerlo al final no cambia el aterrizaje
+  // de ningun rol.
+  //
+  // El permiso es `clientes.consultar`, EL MISMO codigo que exige la pantalla con
+  // `requirePagePermission`. Que item y pagina sigan diciendo lo mismo lo vigila
+  // `tests/unit/clientes-ui/private-nav-clientes.test.ts`, que LEE el codigo de la fuente de
+  // `page.tsx` en vez de repetirlo aqui.
+  {
+    kind: 'link',
+    href: CUSTOMERS_ROUTE,
+    label: CUSTOMERS_LABEL,
+    testId: 'nav-clientes',
+    permission: 'clientes.consultar',
+    icon: 'contact',
+    section: NAV_SECTION_CHAIN,
   },
 ];
 

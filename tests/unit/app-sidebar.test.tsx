@@ -232,6 +232,7 @@ describe('barra lateral privada', () => {
       'nav-usuarios',
       'nav-produccion',
       'nav-proveedores',
+      'nav-clientes',
       'nav-presentaciones',
       'nav-unidades',
     ];
@@ -536,7 +537,10 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // y el MISMO orden.
     // «Asignación» va ENTRE Dashboard e Inventario, no al final: el aterrizaje de quien no tiene
     // `dashboard.consultar` es el primer item visible de su menu, asi que ese orden lo decide.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(9);
+    //
+    // TENSADO: la entrada nueva es la pantalla de clientes, ULTIMO del array y de la seccion
+    // «Cadena», detras de proveedores. El ancla se TENSA, nunca se afloja: sube de nueve a DIEZ.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(10);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
       'nav-asignacion',
@@ -547,6 +551,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
       'nav-presentaciones',
       'nav-unidades',
       'nav-usuarios',
+      'nav-clientes',
     ]);
   });
 

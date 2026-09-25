@@ -191,13 +191,19 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 
   const PERMISO_YA_CUBIERTO = 'lib/modules/identity/domain/permissions.ts'
 
-  /** Rutas de produccion donde el literal de permiso SI puede aparecer desde QC-154
-   *  (`design.md > 11`): `permissions.ts`, que ya lo cubria, y `lib/modules/clientes/domain/**`,
-   *  porque los cinco casos de uso nombran `'clientes.consultar'`/`'clientes.modificar'` en su
-   *  primera linea (R2, R3). Cualquier OTRO archivo de produccion sigue en rojo: `app/`,
-   *  `components/`, otro modulo o `adapters/` de clientes. */
+  /** Rutas de produccion donde el literal de permiso SI puede aparecer: el corte de la propia
+   *  pantalla y el item del menu que la enlaza, cada uno acotado a su archivo exacto -nunca a la
+   *  carpeta de componentes de la ruta, que sigue en rojo. */
+  const PANTALLA_PERMITIDA = 'app/(private)/clientes/page.tsx'
+  const NAV_PERMITIDA = 'lib/shared/navigation/private-nav.ts'
+
   function permisoPermitidoEn(relativo: string): boolean {
-    return relativo === PERMISO_YA_CUBIERTO || relativo.startsWith('lib/modules/clientes/domain/')
+    return (
+      relativo === PERMISO_YA_CUBIERTO ||
+      relativo.startsWith('lib/modules/clientes/domain/') ||
+      relativo === PANTALLA_PERMITIDA ||
+      relativo === NAV_PERMITIDA
+    )
   }
 
   /** El predicado real de R26: que archivos de produccion, fuera de lo permitido, nombran los
@@ -213,7 +219,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     return hallazgos
   }
 
-  it('R26 (QC-153), R35 (QC-154) — el literal de los dos permisos solo aparece en permissions.ts o en lib/modules/clientes/domain', () => {
+  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx o en private-nav.ts', () => {
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
@@ -257,31 +263,59 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
       rmSync(raiz, { recursive: true, force: true })
     }
   })
+
+  it('R37 (QC-155) — el literal en otro archivo de app/(private)/clientes/components/ SI dispara', () => {
+    // La admision de esta ficha es acotada a los DOS archivos exactos de permisoPermitidoEn: la
+    // carpeta de componentes de la propia ruta sigue en rojo si nombra el literal fuera de ellos.
+    const raiz = mkdtempSync(join(tmpdir(), 'qc155-scope-'))
+    try {
+      const relativoFabricado = 'app/(private)/clientes/components/__sensibilidad_literal__.ts'
+      const rutaFabricada = join(raiz, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+      expect(detectarLiteralesDePermiso(raiz)).toContain(relativoFabricado)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------------------------
 // R28 — ningun test E2E nombra clientes
 // ---------------------------------------------------------------------------------------------
 
-describe('R28 — sin ningun test E2E de clientes', () => {
-  it('ningun nombre de archivo de e2e/ menciona clientes', () => {
-    const e2eDir = join(repoRoot, 'e2e')
-    const coincidencias = filesIn(e2eDir)
+describe('R28 — el UNICO E2E que nombra clientes es e2e/clientes.spec.ts', () => {
+  const E2E_DE_CLIENTES = 'clientes.spec.ts'
+  const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
+
+  /** Archivos de e2e/, por nombre o por contenido, que delatan clientes fuera del unico spec
+   *  permitido. Parametrizado por directorio para que la sensibilidad pueda fabricar su propio
+   *  arbol en un tmpdir. */
+  function e2eAjenosAClientes(e2eDir: string = join(repoRoot, 'e2e')): string[] {
+    return filesIn(e2eDir)
       .map((ruta) => relative(e2eDir, ruta).split(sep).join('/'))
-      .filter((relativa) => /cliente/i.test(relativa))
-    expect(coincidencias, `spec E2E de clientes inesperado: ${coincidencias.join(', ')}`).toEqual([])
+      .filter((relativa) => relativa !== E2E_DE_CLIENTES)
+      .filter(
+        (relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(e2eDir, relativa))),
+      )
+  }
+
+  it('ningun otro archivo de e2e/, ni por nombre ni por contenido, nombra clientes', () => {
+    // El spec propio todavia no existe: la lista compara TODO archivo salvo ese nombre, asi que
+    // sigue vigilando lo mismo antes y despues de que aparezca.
+    const hallazgos = e2eAjenosAClientes()
+    expect(hallazgos, `spec E2E ajeno con marca de clientes: ${hallazgos.join(', ')}`).toEqual([])
   })
 
-  // "cliente" a secas es ambiguo en este repo -"componente de CLIENTE", "el cliente insertara la
-  // fila"- asi que el contenido se vigila con marcadores propios del modulo, no con la palabra
-  // suelta: la tabla, los dos codigos de permiso o la ruta.
-  it('ningun contenido de e2e/ nombra la tabla, el permiso o la ruta de clientes', () => {
-    const e2eDir = join(repoRoot, 'e2e')
-    const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
-    const coincidencias = filesIn(e2eDir)
-      .map((ruta) => relative(e2eDir, ruta).split(sep).join('/'))
-      .filter((relativa) => MARCADORES_DE_CLIENTES.test(leer(join(e2eDir, relativa))))
-    expect(coincidencias, `contenido E2E de clientes inesperado: ${coincidencias.join(', ')}`).toEqual([])
+  it('un fabricado e2e/otro-clientes.spec.ts dispara', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc155-scope-'))
+    try {
+      const relativoFabricado = 'otro-clientes.spec.ts'
+      writeFileSync(join(raiz, relativoFabricado), "test('nombra clientes', () => {})\n")
+      expect(e2eAjenosAClientes(raiz)).toContain(relativoFabricado)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
   })
 })
 
@@ -469,16 +503,18 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
 // R38 — nada bajo app/ que nombre clientes
 // ---------------------------------------------------------------------------------------------
 
-describe('R38 — nada bajo app/ que nombre clientes', () => {
+describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombra clientes', () => {
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
+  const CARPETA_PERMITIDA = '(private)/clientes/'
 
   function coincidenciasEnApp(appDir: string = join(repoRoot, 'app')): string[] {
     return filesIn(appDir)
       .map((ruta) => relative(appDir, ruta).split(sep).join('/'))
+      .filter((relativa) => !relativa.startsWith(CARPETA_PERMITIDA))
       .filter((relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(appDir, relativa))))
   }
 
-  it('ningun archivo de app/ nombra ni el nombre, ni la tabla, ni el permiso ni la ruta de clientes', () => {
+  it('ningun archivo de app/ fuera de app/(private)/clientes/ nombra ni el nombre, ni la tabla, ni el permiso ni la ruta de clientes', () => {
     const coincidencias = coincidenciasEnApp()
     expect(coincidencias, `archivo de app/ con marca de clientes inesperada: ${coincidencias.join(', ')}`).toEqual([])
   })
@@ -491,6 +527,19 @@ describe('R38 — nada bajo app/ que nombre clientes', () => {
       mkdirSync(dirname(rutaFabricada), { recursive: true })
       writeFileSync(rutaFabricada, "export default function Pagina() { return <a href=\"/clientes\">Clientes</a> }\n")
       expect(coincidenciasEnApp(appDir)).toContain(relativoFabricado)
+    } finally {
+      rmSync(appDir, { recursive: true, force: true })
+    }
+  })
+
+  it('el caso simetrico: el mismo marcador DENTRO de (private)/clientes/ no dispara', () => {
+    const appDir = mkdtempSync(join(tmpdir(), 'qc155-scope-'))
+    try {
+      const relativoFabricado = '(private)/clientes/components/__sensibilidad_clientes__.ts'
+      const rutaFabricada = join(appDir, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export const ruta = '/clientes'\n")
+      expect(coincidenciasEnApp(appDir)).not.toContain(relativoFabricado)
     } finally {
       rmSync(appDir, { recursive: true, force: true })
     }

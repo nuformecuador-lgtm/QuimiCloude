@@ -223,9 +223,14 @@ function describir(infracciones: readonly Infraccion[]): string {
 // PDF. Llama a `requirePagePermission` DOS veces -`proveedores.consultar` y
 // `proveedores.modificar`-, mismo patron que `/configuracion/unidades`: revisar y confirmar la
 // importacion son una escritura sobre el catalogo del proveedor, no una lectura sola.
+//
+// TENSADA: de catorce a QUINCE, con `/clientes`. Llama a `requirePagePermission` UNA sola vez
+// -`clientes.consultar`-, mismo patron que `/configuracion/usuarios`: la escritura no cierra la
+// pantalla, solo oculta sus acciones.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',
+  '/clientes',
   '/configuracion/presentaciones',
   '/configuracion/unidades',
   '/configuracion/usuarios',
@@ -241,7 +246,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las catorce pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las quince pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);

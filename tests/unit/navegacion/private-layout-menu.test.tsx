@@ -108,6 +108,9 @@ const testId = {
   // humana del 2026-09-21. Declara `usuarios.consultar` —el MISMO codigo que exige su pantalla—,
   // que ningun rol del seed tiene salvo el Administrador, igual que unidades (R2, R3).
   usuarios: 'nav-usuarios',
+  // Item de la seccion «Cadena», junto a Proveedores. Declara `clientes.consultar`, que el seed
+  // da SOLO al Administrador -el Operador no lo tiene-, igual que unidades.
+  clientes: 'nav-clientes',
 } as const;
 
 /** Los codigos del catalogo de QC-74, sin escribir ninguno a mano. QC-38 lo dejo en ONCE al
@@ -169,6 +172,8 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     // TENSADO el 2026-09-08 (QC-39 T4, R10): «Unidades» exige `unidades.consultar`, que este
     // usuario no tiene, asi que tampoco puede estar en el HTML servido.
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
+    // «Clientes» exige `clientes.consultar`, que este usuario tampoco tiene.
+    expect(screen.queryByTestId(testId.clientes)).toBeNull();
   });
 
   it('con solo `inventario.consultar`, el control de cerrar sesion sigue presente', async () => {
@@ -199,6 +204,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.produccion,
       testId.recetas,
       testId.presentaciones,
+      testId.clientes,
     ]) {
       expect(screen.queryByTestId(item), `${item} no debe estar en el arbol`).toBeNull();
     }
@@ -230,6 +236,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.produccion,
       testId.presentaciones,
       testId.unidades,
+      testId.clientes,
     ]) {
       expect(screen.getByTestId(item)).toBeInTheDocument();
     }
@@ -291,7 +298,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
   });
 
-  it('ancla: el menu real tiene los nueve items que este test vigila', async () => {
+  it('ancla: el menu real tiene los diez items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): el ancla sube de seis a siete con
@@ -314,6 +321,28 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       // menos N». Su `section` paso de «Configuración» a «Operación» el 2026-09-21 sin moverlo de
       // sitio en el array, asi que esta lista no cambia.
       testId.usuarios,
+      // Sube de ocho a nueve con `nav-clientes`, ULTIMO del array y de la seccion «Cadena», tras
+      // Proveedores.
+      testId.clientes,
     ]);
+  });
+
+  it('con los permisos del Administrador el layout pinta el item de clientes', async () => {
+    const permisos = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR];
+    expect(permisos, 'el seed deberia asignar permisos al Administrador').toBeDefined();
+
+    await renderLayout(permisos ?? []);
+
+    expect(screen.getByTestId(testId.clientes)).toBeInTheDocument();
+  });
+
+  it('con los permisos del Operador el item de clientes no llega al arbol', async () => {
+    const permisos = SEED_ROLE_PERMISSIONS[ROLE_OPERADOR];
+    expect(permisos, 'el seed deberia asignar permisos al Operador').toBeDefined();
+
+    await renderLayout(permisos ?? []);
+
+    expect(screen.getByTestId(testId.inventario)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.clientes)).toBeNull();
   });
 });
