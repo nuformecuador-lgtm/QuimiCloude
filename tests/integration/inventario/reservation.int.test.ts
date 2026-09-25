@@ -580,7 +580,9 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
       new Date(),
       ambito(fixture),
     );
-    if (agregado === null) throw new Error('el producto deberia seguir vivo');
+    if (agregado === null || agregado === 'finished_product') {
+      throw new Error('el producto deberia seguir vivo');
+    }
     const batchIdNuevo = agregado.batchId;
 
     const orderId = await createOrderRow(fixture);

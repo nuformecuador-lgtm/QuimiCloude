@@ -17,6 +17,9 @@ export type PresentationView = {
    *  nombre ni su simbolo -eso es del catalogo de `unidades`, otro modulo-. La edicion
    *  precarga la unidad elegida a partir de este campo. */
   readonly unitId: string;
+  /** Lo que cabe en un envase, en la unidad de arriba. `null` = sin declarar.
+   *  Cadena decimal con los 4 decimales de `DECIMAL(14,4)`, nunca `number`. */
+  readonly content: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };

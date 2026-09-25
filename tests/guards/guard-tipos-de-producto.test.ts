@@ -199,13 +199,19 @@ describe('guardia — un unico dueño de los literales de tipo de producto', () 
     expect(relativos).toContain('lib/modules/inventario/domain/product-type.ts');
   });
 
-  it('PRODUCT_TYPES sigue teniendo los tres tipos y PRODUCT_TYPE_VALUES no diverge', () => {
+  it('PRODUCT_TYPES sigue teniendo los cuatro tipos y PRODUCT_TYPE_VALUES no diverge', () => {
     expect(PRODUCT_TYPES.PRODUCT).toBe('PRODUCT');
     expect(PRODUCT_TYPES.MACHINE).toBe('MACHINE');
     expect(PRODUCT_TYPES.PACKAGING).toBe('PACKAGING');
+    expect(PRODUCT_TYPES.FINISHED_PRODUCT).toBe('FINISHED_PRODUCT');
     expect([...PRODUCT_TYPE_VALUES].sort()).toEqual(
-      [PRODUCT_TYPES.PRODUCT, PRODUCT_TYPES.MACHINE, PRODUCT_TYPES.PACKAGING].sort(),
+      [
+        PRODUCT_TYPES.PRODUCT,
+        PRODUCT_TYPES.MACHINE,
+        PRODUCT_TYPES.PACKAGING,
+        PRODUCT_TYPES.FINISHED_PRODUCT,
+      ].sort(),
     );
-    expect(PRODUCT_TYPE_VALUES).toHaveLength(3);
+    expect(PRODUCT_TYPE_VALUES).toHaveLength(4);
   });
 });

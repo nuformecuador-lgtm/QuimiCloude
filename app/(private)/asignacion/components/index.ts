@@ -4,6 +4,7 @@ export {
   ASSIGNED_ORDER_DELIVERED_TESTID,
   AssignedOrderDeliveredNotice,
   assignedOrderDeliveredNoticeText,
+  assignedOrderDeliveredWithPackagesText,
 } from './assigned-order-delivered-notice';
 export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,

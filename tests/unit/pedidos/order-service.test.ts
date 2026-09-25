@@ -76,6 +76,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: PRESENTATION_ID,
+    presentationContent: null,
     ...overrides,
   }
 }
@@ -233,7 +234,14 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
 
     const [data, , actorId] = d.create.mock.calls[0] as [Record<string, unknown>, number, string]
     expect(actorId).toBe(ADMIN.id)
-    expect(Object.keys(data).sort()).toEqual(['presentationId', 'priority', 'quantity', 'recipeId', 'status'])
+    expect(Object.keys(data).sort()).toEqual([
+      'presentationContent',
+      'presentationId',
+      'priority',
+      'quantity',
+      'recipeId',
+      'status',
+    ])
     expect(data.status).toBe('PENDIENTE')
   })
 
@@ -409,6 +417,7 @@ describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', (
       quantity: '10.0000',
       priority: 'ALTA',
       presentationId: PRESENTATION_ID,
+      presentationContent: null,
     })
     expect(actorId).toBe(ADMIN.id)
     expect(instante).toBe(AHORA)

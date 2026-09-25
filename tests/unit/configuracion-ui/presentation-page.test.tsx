@@ -141,6 +141,7 @@ function presentacion(overrides: Partial<PresentationView> = {}): PresentationVi
     name: DATO_QUE_NO_DEBE_VERSE,
     nameNormalized: 'presentacion secreta no visible',
     unitId: UNIDADES[0]!.id,
+    content: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     ...overrides,

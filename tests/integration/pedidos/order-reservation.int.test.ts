@@ -22,6 +22,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
@@ -83,6 +84,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        finishedGoods: createFinishedGoodsIntake(tx),
       };
       return work(scope);
     }),
@@ -111,7 +113,12 @@ const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date(
 
 /** El camino del Finalizar de la planta: `OrderCatalog['transitionAliveById']` cableado igual
  *  que `lib/composition`, sin pasar por `asignaciones`. */
-const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
+const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({
+  unitOfWork,
+  recipes,
+  products,
+  units,
+});
 
 // ---------------------------------------------------------------------------
 // Empresa efimera
@@ -165,8 +172,16 @@ async function crearFixture(): Promise<Fixture> {
     data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
     select: { id: true },
   });
+  // Contenido `1`: las cantidades de este archivo son enteras, asi que un envase
+  // entero coincide con la cantidad pedida y el Finalizar nunca rechaza por `no_whole_package`.
   const presentation = await prisma.presentation.create({
-    data: { name: `Bidon ${marca}`, nameNormalized: normalizeForTest(`Bidon ${marca}`), unitId: unit.id, companyId: company.id },
+    data: {
+      name: `Bidon ${marca}`,
+      nameNormalized: normalizeForTest(`Bidon ${marca}`),
+      unitId: unit.id,
+      companyId: company.id,
+      content: '1.0000',
+    },
     select: { id: true },
   });
   return {
@@ -184,6 +199,10 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[]): P
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
+  // El producto terminado que un Finalizar da de alta referencia la receta con
+  // `ON DELETE RESTRICT`: se limpia ANTES de borrar la receta, no solo los ingredientes.
+  await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, type: 'FINISHED_PRODUCT' } } });
+  await prisma.product.deleteMany({ where: { companyId: fixture.companyId, type: 'FINISHED_PRODUCT' } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
@@ -228,7 +247,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
 }
 
 function nuevoPedido(recipeId: string, presentationId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status, presentationId };
+  return { recipeId, quantity, priority: 'BAJA', status, presentationId, presentationContent: null };
 }
 
 type ReservaResumen = { readonly kind: string; readonly quantity: string; readonly createdBy: string | null };
@@ -546,7 +565,8 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
         new Date(),
       );
 
-      expect(resultado).toBe('ok');
+      // El exito de un Finalizar lleva el lote de producto terminado que entro.
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: { packages: '10' } });
       expect(await stockDe(batchId)).toBe('90.0000');
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos.map((m) => m.kind)).toEqual(['reserve', 'consume']);
@@ -644,7 +664,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
         new Date(),
       );
 
-      expect(resultado).toBe('ok');
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: { packages: '10' } });
       expect(await stockDe(batchId)).toBe('90.0000');
       // Sin apartado previo no hay nada que resolver en `reservation_movements` -la salida
       // fisica queda en `inventory_movements`, asentada por `consumeBatchStock`-.

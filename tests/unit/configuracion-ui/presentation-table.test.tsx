@@ -71,6 +71,7 @@ function presentacion(id: string, name: string): PresentationView {
     name,
     nameNormalized: name.toLowerCase(),
     unitId: UNIDAD_ACTUAL,
+    content: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   };

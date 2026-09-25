@@ -80,7 +80,7 @@ function sqlDe(llamada: unknown): string {
  * usado por `createWithFirstBatch`) y el bloqueo del producto de `adjustBatchStock`. Se reparten
  * por la tabla que leen, no por el orden.
  */
-function doblarLecturaDelProducto(fila: { id: string } | null): void {
+function doblarLecturaDelProducto(fila: { id: string; type?: string } | null): void {
   doble.queryRaw.mockImplementation(async (consulta: unknown) => {
     if (sqlDe(consulta).includes('FROM "products"')) return fila === null ? [] : [fila];
     return [{ top: '0' }];
@@ -315,5 +315,39 @@ describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121
 
     expect(doble.batchUpdate).toHaveBeenCalledTimes(1);
     expect(doble.movementCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('adjustBatchStock — producto terminado (R31, R32)', () => {
+  it("R31: delta positivo sobre FINISHED_PRODUCT devuelve 'increase_not_allowed' sin UPDATE ni asiento", async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, type: 'FINISHED_PRODUCT' });
+
+    await expect(
+      adjustBatchStock(LOTE_ID, '1', 'conteo_fisico', ACTOR_ID, AHORA, AMBITO),
+    ).resolves.toBe('increase_not_allowed');
+
+    expect(doble.batchUpdate).not.toHaveBeenCalled();
+    expect(doble.movementCreate).not.toHaveBeenCalled();
+    expect(doble.executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('R32: delta negativo sobre FINISHED_PRODUCT se aplica igual que a cualquier otro lote', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, type: 'FINISHED_PRODUCT' });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(6) });
+
+    await expect(adjustBatchStock(LOTE_ID, '-4', 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      stock: '6.0000',
+      reserved: '0.0000',
+      overReserved: false,
+    });
+  });
+
+  it('R32: delta negativo que dejaria la existencia bajo cero se rechaza igual que a cualquier otro lote', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, type: 'FINISHED_PRODUCT' });
+    doble.batchUpdate.mockRejectedValueOnce(violacionDeCheck('product_batches_stock_non_negative'));
+
+    await expect(
+      adjustBatchStock(LOTE_ID, '-100', 'merma', ACTOR_ID, AHORA, AMBITO),
+    ).rejects.toBeInstanceOf(BatchStockNegativeError);
   });
 });

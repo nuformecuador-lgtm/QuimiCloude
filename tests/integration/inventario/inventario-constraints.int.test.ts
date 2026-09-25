@@ -810,10 +810,14 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     // `20260904160000_list_query_indexes`, es NOT NULL y NO tiene indice unico -el nombre
     // del producto no es unico, QC-14 decision cerrada 6-.
     'name_normalized',
+    // La receta y la presentacion que identifican el producto terminado: las dos van
+    // siempre juntas (o ninguna), lo vigila el CHECK de identidad mas abajo.
+    'presentation_id',
     'qty_alert',
+    'recipe_id',
     // La existencia guardada, suma de los lotes, que la aplicacion recalcula.
     'stock',
-    // El tipo de producto (PRODUCT/MACHINE/PACKAGING), la anade bc902800.
+    // El tipo de producto (PRODUCT/MACHINE/PACKAGING/FINISHED_PRODUCT), la anade bc902800.
     'type',
     // La unidad del producto, fija desde su primer lote. Esta lista es una igualdad exacta,
     // asi que es ella quien vigila que no vuelva a desaparecer.
@@ -866,6 +870,10 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
       ORDER BY c.conname`
     expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([
       ['products_company_id_fkey', 'companies'],
+      // La identidad del producto terminado suma estas dos: la presentacion (compuesta con
+      // company_id, mismo patron que orders_company_id_presentation_id_fkey) y la receta.
+      ['products_company_id_presentation_id_fkey', 'presentations'],
+      ['products_recipe_id_fkey', 'recipes'],
       ['products_unit_id_fkey', 'units'],
     ])
 
@@ -886,6 +894,10 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
       WHERE conrelid = 'public.products'::regclass AND contype = 'c'
       ORDER BY conname`
     expect(rows.map((row) => row.conname)).toEqual([
+      // Ata `type = FINISHED_PRODUCT` a que `recipe_id` y `presentation_id` esten las dos
+      // presentes, y a la inversa: ningun producto terminado sin identidad ni identidad
+      // colgando de un producto que no lo sea.
+      'products_finished_identity_matches_type',
       'products_qty_alert_non_negative',
       'products_stock_non_negative',
     ])

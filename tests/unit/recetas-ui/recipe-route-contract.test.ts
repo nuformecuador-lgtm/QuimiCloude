@@ -1142,6 +1142,15 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // R12 de QC-64 sigue INTACTA. La lista sigue siendo CERRADA y por igualdad exacta: una
         // constante mas vuelve a ponerla en rojo.
         'DELIVERED_ORDER_PARAM',
+        // Altas junto a `DELIVERED_ORDER_PARAM`: los nombres de los
+        // parametros de consulta que la pantalla de ejecucion pone al Finalizar -cuantos envases
+        // enteros de producto terminado y el nombre del producto- y que la confirmacion lee.
+        // Tampoco son rutas ni funciones de ruta ni estrenan ninguna del asistente de lectura -no
+        // las marca el patron de arriba ni apuntan a ninguna URL-, asi que ese contrato sigue
+        // INTACTO. La lista sigue siendo CERRADA y por igualdad exacta: una constante mas vuelve
+        // a ponerla en rojo.
+        'DELIVERED_ORDER_PACKAGES_PARAM',
+        'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
         'INVENTORY_ROUTE',

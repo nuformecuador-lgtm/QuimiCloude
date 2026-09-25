@@ -21,6 +21,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { DuplicateOrderNumberError } from '@/lib/modules/pedidos/domain/errors';
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
@@ -63,6 +64,7 @@ function runInOrderTransaction<T>(work: (scope: OrderTransactionScope) => Promis
       orders: createOrderWriteRepository(tx),
       reservations: createMaterialReservations(tx),
       recipes: createRecipeExecutionReader(tx),
+      finishedGoods: createFinishedGoodsIntake(tx),
     }),
   );
 }
@@ -174,6 +176,7 @@ function newOrder(fixture: Fixture, quantity = '1.0000'): NewOrder {
     priority: 'BAJA',
     status: 'PENDIENTE',
     presentationId: fixture.presentationId,
+    presentationContent: null,
   };
 }
 

@@ -49,8 +49,11 @@ function parseEnum(name: string): readonly string[] {
 }
 
 describe('db/migrations/*_inventory_movement_kind_consumption', () => {
-  it('R1: db/schema.prisma declara InventoryMovementKind en orden opening, adjustment, consumption', () => {
-    expect(parseEnum('InventoryMovementKind')).toEqual(['opening', 'adjustment', 'consumption'])
+  it('R1 (ampliada): db/schema.prisma declara InventoryMovementKind con consumption por delante de cualquier valor posterior', () => {
+    // El orden absoluto lo fija la migracion que anade cada valor; aqui solo importa que
+    // consumption siga estando y por delante de lo que venga despues de el.
+    const values = parseEnum('InventoryMovementKind')
+    expect(values.slice(0, 3)).toEqual(['opening', 'adjustment', 'consumption'])
   })
 
   it('el UP anade el valor consumption y no hace nada mas', () => {

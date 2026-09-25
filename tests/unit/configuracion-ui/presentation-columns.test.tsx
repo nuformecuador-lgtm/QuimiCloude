@@ -1,5 +1,4 @@
-// QC-45 T4 — Las DOS columnas de la lista de presentaciones y sus acciones de fila: R9, R11, R19,
-// R20, R32.
+// Las columnas de la lista de presentaciones y sus acciones de fila.
 //
 // **Las columnas son DATOS**, asi que el test recorre la DECLARACION en vez de listar literales:
 // anadir una columna es anadir una entrada a `PRESENTATION_COLUMNS`, y eso es justo lo que el test
@@ -19,7 +18,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ACTIONS_COLUMN_ID,
+  CONTENT_COLUMN_ID,
   NAME_COLUMN_ID,
+  NO_CONTENT_LABEL,
   PRESENTATION_ACTION_DELETE_TESTID,
   PRESENTATION_ACTION_EDIT_TESTID,
   PRESENTATION_COLUMN_COUNT,
@@ -86,6 +87,7 @@ function presentacion(overrides: Partial<PresentationView> = {}): PresentationVi
     name: 'Bidón 20 L',
     nameNormalized: 'bidon 20 l',
     unitId: UNIDAD_ACTUAL,
+    content: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-02-20T10:00:00.000Z'),
     ...overrides,
@@ -103,22 +105,23 @@ afterEach(() => {
   cleanup();
 });
 
-describe('las columnas declaradas son exactamente DOS (R9)', () => {
-  it('la unidad NO gana columna: solo se ve abriendo el panel (QC-80, `design.md > 5`)', () => {
+describe('las columnas declaradas', () => {
+  it('la unidad NO gana columna propia: solo se ve abriendo el panel', () => {
     // En negativo y a proposito: pintarla abriria una pregunta que nadie hizo (¿el nombre?, ¿el
-    // simbolo?, ¿resuelto contra que catalogo?). Coste aceptado y escrito en el diseno.
+    // simbolo?, ¿resuelto contra que catalogo?). Va, en cambio, junto al contenido.
     const ids = buildPresentationColumns(UNIDADES).map((column) => column.id);
 
     expect(ids).not.toContain('unitId');
     expect(ids).not.toContain('unit');
   });
 
-  it('en positivo: nombre y acciones, en el orden de `design.md > 6`', () => {
+  it('en positivo: nombre, contenido y acciones, en ese orden', () => {
     expect(PRESENTATION_COLUMNS.map((column) => column.id)).toEqual([
       NAME_COLUMN_ID,
+      CONTENT_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(PRESENTATION_COLUMNS).toHaveLength(2);
+    expect(PRESENTATION_COLUMNS).toHaveLength(3);
     expect(PRESENTATION_COLUMN_COUNT).toBe(PRESENTATION_COLUMNS.length);
   });
 
@@ -179,6 +182,32 @@ describe('la celda de nombre pinta el nombre TAL CUAL y ningun dato tecnico (R9)
     expect(container.textContent).toBe(view.name);
     expect(container.textContent).not.toContain(view.id);
     expect(container.textContent).not.toContain(view.nameNormalized);
+  });
+});
+
+describe('la celda de contenido pinta el contenido junto a la unidad, o que no lo tiene (R8)', () => {
+  it('con contenido, pinta la cantidad y la unidad de la presentacion', () => {
+    const view = presentacion({ content: '1.0000', unitId: UNIDADES[1]!.id });
+
+    const { container } = pintarCelda(CONTENT_COLUMN_ID, view);
+
+    expect(container.textContent).toBe(`1 ${UNIDADES[1]!.symbol}`);
+  });
+
+  it('sin contenido, pinta el aviso de que no lo tiene', () => {
+    const view = presentacion({ content: null });
+
+    const { container } = pintarCelda(CONTENT_COLUMN_ID, view);
+
+    expect(container.textContent).toBe(NO_CONTENT_LABEL);
+  });
+
+  it('quita los ceros de relleno del decimal guardado, sin redondear', () => {
+    const view = presentacion({ content: '0.7500', unitId: UNIDADES[0]!.id });
+
+    const { container } = pintarCelda(CONTENT_COLUMN_ID, view);
+
+    expect(container.textContent).toBe(`0.75 ${UNIDADES[0]!.symbol}`);
   });
 });
 

@@ -104,6 +104,7 @@ export function PresentationRowActions({ presentation, units }: PresentationRowA
           id: presentation.id,
           name: presentation.name,
           unitId: presentation.unitId,
+          content: presentation.content,
         }}
         units={units}
         open={editOpen}

@@ -13,6 +13,7 @@ export const PRODUCT_TYPES = Object.freeze({
   PRODUCT: 'PRODUCT',
   MACHINE: 'MACHINE',
   PACKAGING: 'PACKAGING',
+  FINISHED_PRODUCT: 'FINISHED_PRODUCT',
 } as const);
 
 /** Union tipada derivada del catalogo: anadir un valor aqui obliga a revisar usos. */
@@ -23,6 +24,17 @@ export type ProductType = (typeof PRODUCT_TYPES)[keyof typeof PRODUCT_TYPES];
  * Derivado del catalogo para que no pueda divergir de `PRODUCT_TYPES`.
  */
 export const PRODUCT_TYPE_VALUES = [
+  PRODUCT_TYPES.PRODUCT,
+  PRODUCT_TYPES.MACHINE,
+  PRODUCT_TYPES.PACKAGING,
+  PRODUCT_TYPES.FINISHED_PRODUCT,
+] as const satisfies readonly ProductType[];
+
+/**
+ * Los tipos que se pueden elegir en el alta y la edicion manuales: sin `FINISHED_PRODUCT`, que
+ * solo nace al finalizar un pedido.
+ */
+export const MANUAL_PRODUCT_TYPE_VALUES = [
   PRODUCT_TYPES.PRODUCT,
   PRODUCT_TYPES.MACHINE,
   PRODUCT_TYPES.PACKAGING,
