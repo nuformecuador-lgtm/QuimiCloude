@@ -66,7 +66,14 @@ describe('migration.sql — cabecera sin citas', () => {
   it('la cabecera de migration.sql y de down.sql no cita ninguna ficha ni requisito', () => {
     for (const fuente of [upSource, downSource]) {
       expect(fuente).not.toMatch(/\bR\d+\b/)
+      expect(fuente).not.toMatch(/\bQC-\d+\b/)
+      expect(fuente).not.toMatch(/design\.md/)
       expect(fuente).not.toMatch(/decisi[oó]n cerrada/i)
+    }
+
+    // Sensibilidad OBLIGATORIA: una cita fabricada de cada patron tiene que tumbar el predicado.
+    for (const citaFabricada of ['QC-999', '`design.md > 1`']) {
+      expect(`${upSource}\n-- ${citaFabricada}`).toMatch(/\bQC-\d+\b|design\.md/)
     }
   })
 })
