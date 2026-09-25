@@ -4809,3 +4809,13 @@ podar.
 - **Para arrancarla se subió el cupo de `backend` a 3** con `/afinar-regla` (`cdfc6bb`).
 - **Quinto test de alcance que compara contra la rama y rompe fichas ajenas** (QC-140 R29, QC-158 R36a): corregidos. La clase entera es **QC-99**.
 - **Deuda:** el recorrido E2E de subida de PDFs sigue en rojo, heredado de `dev`.
+
+## 2026-09-25 — QC-160-boton-de-subida-de-pdf
+
+- **Qué:** la subida de PDFs de QC-107 deja de estar siempre a la vista: un botón «Subir PDFs» la abre en una
+  ventana (diálogo) con el estado por archivo dentro. En `/proveedores/[id]` (estrategia catálogo) y, montaje nuevo,
+  en el listado `/produccion/formulas` (estrategia fórmula). El botón solo lo ve quien tiene `documentos.modificar` (QC-142).
+- **PR #122**, merge `685845f2`. Spec R1–R22. Review: vuelta 1 rechazada (M1 caso del manifiesto en el test de
+  convenciones; M2 E2E sin WebKit), vuelta 2 OK. Gate completo 715/715; E2E de documentos 3/3 en Chromium y WebKit.
+- **Decisión:** el arreglo de `catalog-import-isolation` (rojo en dev por el choque QC-158 × QC-142) se revirtió de
+  esta rama y se dejó a **QC-169**; sigue en el baseline de rojos hasta entonces.
