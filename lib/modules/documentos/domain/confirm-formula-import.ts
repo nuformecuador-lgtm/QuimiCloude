@@ -1,12 +1,12 @@
 /**
  * La confirmacion de una importacion de formula: vuelve a leer el archivo y a validar EN EL
- * SERVIDOR todo lo que el navegador ya comprobo -no se fia de el (R23)-, y rechaza la
+ * SERVIDOR todo lo que el navegador ya comprobo -no se fia de el-, y rechaza la
  * confirmacion entera si algo no cuadra, para no dejar una escritura parcial.
  *
  * El permiso de inventario solo se exige si de verdad hace falta crear alguna materia prima
- * nueva, y siempre ANTES de crearla (R27, R31): las materias primas creadas en una confirmacion
- * cuya receta falla despues pueden quedar creadas -limitacion declarada en `design.md > 7`- y la
- * siguiente confirmacion las reutiliza en vez de duplicarlas (R26).
+ * nueva, y siempre ANTES de crearla: las materias primas creadas en una confirmacion cuya
+ * receta falla despues pueden quedar creadas, y la siguiente confirmacion las reutiliza en
+ * vez de duplicarlas.
  */
 import { assertPermission } from '@/lib/modules/identity';
 import {
@@ -96,7 +96,7 @@ export function createConfirmFormulaImport(
     });
     if (!issues.canConfirm) throw new ValidationError(diagnosticoDeRevision(issues));
 
-    // R23, R24: los productos EXISTENTES elegidos, releidos del catalogo -nunca de lo que mando
+    // Los productos EXISTENTES elegidos, releidos del catalogo -nunca de lo que mando
     // el navegador-.
     const existingProductIds = lines
       .filter((line): line is Extract<ConfirmLineInput, { kind: 'existing' }> => line.kind === 'existing')
@@ -115,9 +115,8 @@ export function createConfirmFormulaImport(
       if (finished) throw new ActionNotAllowedError();
     }
 
-    // R25, R26: las materias primas NUEVAS, resueltas por nombre normalizado -0 crea, 1 reutiliza,
-    // mas de 1 rechaza-, y R16 en su forma cruzada: la reutilizada no puede coincidir con el
-    // producto que otra fila ya eligio.
+    // Las materias primas NUEVAS, resueltas por nombre normalizado -0 crea, 1 reutiliza, mas de
+    // 1 rechaza-; la reutilizada tampoco puede coincidir con el producto que otra fila ya eligio.
     const existingProductIdSet = new Set(existingProductIds);
     const newMaterialNeeds = collectNewMaterialNeeds(lines);
     const distinctNormalizedNames = [...new Set(newMaterialNeeds.map((need) => need.normalizedName))];
@@ -152,7 +151,7 @@ export function createConfirmFormulaImport(
       }
     }
 
-    // R17, R20: el choque contra el nombre CONFIRMADO, no el leido.
+    // El choque contra el nombre CONFIRMADO, no el leido.
     const clash = await deps.recipes.findAliveByNormalizedName(name, actor.companyId);
     if (clash !== null) {
       if (replaceRecipeId === null || replaceRecipeId !== clash.id) throw new RecipeDuplicateNameError();
@@ -163,7 +162,7 @@ export function createConfirmFormulaImport(
       throw new RecipeNotFoundError();
     }
 
-    // R27, R31: el permiso de inventario, SOLO si de verdad hace falta crear, y ANTES de crear.
+    // El permiso de inventario, SOLO si de verdad hace falta crear, y ANTES de crear.
     if (toCreate.length > 0) {
       assertPermission(actor, 'inventario.modificar', () => new UnauthorizedError());
     }
@@ -181,7 +180,7 @@ export function createConfirmFormulaImport(
     }));
     const finalSteps = rawSteps.map((step) => recipeStepSchema.parse(step));
 
-    // R18, R19, R35: SIN `image` en los dos caminos.
+    // SIN `image`: el import de formula no toca la imagen de la receta.
     if (clash !== null) {
       const result = await deps.updateRecipe(
         clash.id,

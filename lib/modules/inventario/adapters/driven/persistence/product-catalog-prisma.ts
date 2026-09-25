@@ -223,7 +223,7 @@ async function findAliveProductsByNormalizedNames(
  * Implementa `ProductNameLookup['findAliveByNormalizedNames']`: productos VIVOS de esa empresa
  * cuyo `name_normalized` esta entre los de `names`, normalizados aqui -no por quien llama- con
  * `normalizeProductName`, la unica definicion de «mismo nombre» del modulo. Incluye los
- * terminados: filtrarlos es de quien llama (QC-159 `design.md > 5.3`).
+ * terminados: filtrarlos es de quien llama.
  */
 export async function findProductsByNormalizedNames(
   names: readonly string[],

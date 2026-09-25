@@ -19,13 +19,12 @@ export type CreateRawMaterialDeps = {
 const createRawMaterialSchema = z.strictObject({ name: productNameSchema });
 
 /**
- * Alta de MATERIA PRIMA desde la revision de una formula (QC-159 `design.md > 5.3`, P1):
- * excepcion, acotada a esta revision, a la decision de QC-90 de que el alta SIEMPRE crea lote.
- * El producto nace de tipo `PRODUCT`, SIN lote, sin unidad y con existencia 0 -por el
- * `DEFAULT` de la columna, no porque este caso de uso la escriba-, usando `products.create`,
- * el metodo del puerto que ya existe y hasta ahora no tenia llamantes. El alta manual de
- * inventario (`createCreateProduct`) sigue creando siempre su lote: este caso de uso no la
- * toca.
+ * Alta de MATERIA PRIMA desde la revision de una formula: excepcion, acotada a esta revision,
+ * a la regla general de que el alta de inventario SIEMPRE crea lote. El producto nace de tipo
+ * `PRODUCT`, SIN lote, sin unidad y con existencia 0 -por el `DEFAULT` de la columna, no porque
+ * este caso de uso la escriba-, usando `products.create`, el metodo del puerto que ya existe y
+ * hasta ahora no tenia llamantes. El alta manual de inventario (`createCreateProduct`) sigue
+ * creando siempre su lote: este caso de uso no la toca.
  *
  * `requirePermission(actor, 'inventario.modificar')` es la PRIMERA linea, antes de zod y antes
  * de tocar el puerto: quien no puede crear materia prima no dispara ninguna consulta.

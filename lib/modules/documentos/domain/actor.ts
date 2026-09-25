@@ -47,7 +47,7 @@ export const CATALOG_IMPORT_PERMISSION: PermissionCode = 'proveedores.modificar'
 /**
  * El permiso de la importacion de formula desde PDF (vista previa y confirmacion). Escribe en
  * `recetas`, asi que es el permiso de escribir una receta, el mismo que editarla a mano. NO es el
- * de subida (P2): quien revisa una formula no necesita poder subir archivos.
+ * de subida: quien revisa una formula no necesita poder subir archivos.
  */
 export const FORMULA_IMPORT_PERMISSION: PermissionCode = 'recetas.modificar';
 

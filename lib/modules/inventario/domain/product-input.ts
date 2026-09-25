@@ -13,8 +13,8 @@ import { MANUAL_PRODUCT_TYPE_VALUES, PRODUCT_TYPES } from './product-type';
  * `deliveryTimeSchema` de este archivo: lo que ya no se acepta tampoco se valida.
  */
 
-/** Publicado por el barrel (QC-159 `design.md > 5.3`) para que otro modulo -la revision de
- *  formula de `documentos`- valide el nombre de una materia prima nueva sin copiar el numero. */
+/** Publicado por el barrel para que otro modulo -la revision de formula de `documentos`- valide
+ *  el nombre de una materia prima nueva sin copiar el numero. */
 export const PRODUCT_NAME_MAX_LENGTH = 200;
 
 /**

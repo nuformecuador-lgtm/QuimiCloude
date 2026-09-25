@@ -85,8 +85,8 @@ export async function findRecipeIdsMatchingName(
 /**
  * Implementa `RecipeCatalog['findAliveByNormalizedName']`: la receta VIVA de esa empresa cuyo
  * `name_normalized` es el de `name`, o `null`. CON `deleted_at IS NULL` en el `where` -a
- * diferencia de `findRecipeRefsIncludingDeleted`-: esta busqueda es para el choque de nombre de
- * QC-159, que solo le importa lo que hoy ocupa ese nombre.
+ * diferencia de `findRecipeRefsIncludingDeleted`-: esta busqueda es para el choque de nombre,
+ * que solo le importa lo que hoy ocupa ese nombre.
  */
 export async function findAliveRecipeByNormalizedName(
   name: string,

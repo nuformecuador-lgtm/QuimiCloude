@@ -189,10 +189,10 @@ export { createConfirmCatalogImport, type CatalogImportSummary } from './domain/
 // tiene dependencias que inyectar.
 export { suggestUnitId } from './domain/suggest-unit';
 
-// La interpretacion tolerante del texto que la IA dejo guardado para un archivo de formula
-// (R4-R9), y el paso de un texto de paso a documento (R9): dominio puro, sin base ni framework.
-// La pantalla de revision (T9) los necesita para pintar «leido: ...» sin volver a interpretar en
-// el cliente lo que ya interpreto el servidor.
+// La interpretacion tolerante del texto que la IA dejo guardado para un archivo de formula, y
+// el paso de un texto de paso a documento: dominio puro, sin base ni framework. La pantalla de
+// revision los necesita para pintar «leido: ...» sin volver a interpretar en el cliente lo que
+// ya interpreto el servidor.
 export {
   extractFormulaFromText,
   type ExtractedIngredient,

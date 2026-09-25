@@ -2,12 +2,12 @@
 import type { ProductType } from './product-type';
 
 /**
- * Servicio que `inventario` ofrece a los demas modulos para resolver ingredientes POR NOMBRE
- * (QC-159 `design.md > 5.3`): quien revisa una fórmula leída de un PDF trae nombres de texto,
- * no identificadores, y necesita saber que producto vivo -si alguno- coincide.
+ * Servicio que `inventario` ofrece a los demas modulos para resolver ingredientes POR NOMBRE:
+ * quien revisa una fórmula leída de un PDF trae nombres de texto, no identificadores, y necesita
+ * saber que producto vivo -si alguno- coincide.
  *
- * Interfaz NUEVA y no un metodo mas de `ProductCatalog` a proposito: QC-168 anade un metodo a
- * `product-catalog.ts` en paralelo y asi los dos cambios no se pisan.
+ * Interfaz NUEVA y no un metodo mas de `ProductCatalog` a proposito, para no chocar con otro
+ * cambio en paralelo sobre `product-catalog.ts`.
  *
  * Lo implementa un adaptador driven DE INVENTARIO -el unico autorizado a consultar
  * `prisma.product`- y lo cablea `lib/composition`.

@@ -87,9 +87,9 @@ function isValidNewName(name: string): boolean {
   return trimmed.length >= 1 && trimmed.length <= PRODUCT_NAME_MAX_LENGTH;
 }
 
-/** Clave de identidad de una fila para detectar repetidas (R16): el mismo producto elegido, o
- *  el mismo nombre normalizado pedido como materia prima nueva. Una fila sin producto asignado
- *  no compite por ninguna clave. */
+/** Clave de identidad de una fila para detectar repetidas: el mismo producto elegido, o el
+ *  mismo nombre normalizado pedido como materia prima nueva. Una fila sin producto asignado no
+ *  compite por ninguna clave. */
 function lineKey(line: DraftLine): string | null {
   if (line.kind === 'existing') return `existing:${line.productId}`;
   if (line.kind === 'new') return `new:${normalizeProductName(line.newProductName)}`;

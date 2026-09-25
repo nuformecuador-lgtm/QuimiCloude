@@ -780,7 +780,6 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  */
 export const inventario = {
   createProduct: createCreateProduct({ products: productRepository }),
-  // QC-159 T3: materia prima SIN lote desde la revision de una formula (P1).
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
@@ -828,9 +827,8 @@ const presentationCatalog: PresentationCatalog = {
   findByNormalizedNames: findPresentationsByNormalizedNames,
 };
 
-/** `ProductNameLookup` cableado con el adaptador driven DE INVENTARIO (QC-159 `design.md >
- *  5.3`): la resolucion de ingredientes POR NOMBRE que `documentos` necesita para la revision
- *  de una formula leida de un PDF. Interfaz propia, no un metodo mas de `ProductCatalog`. */
+/** `ProductNameLookup` cableado con el adaptador driven DE INVENTARIO: resolucion de
+ *  ingredientes POR NOMBRE. Interfaz propia, no un metodo mas de `ProductCatalog`. */
 const productNameLookup: ProductNameLookup = {
   findAliveByNormalizedNames: findProductsByNormalizedNames,
 };
@@ -1033,7 +1031,6 @@ const recipeCatalog: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
-  // QC-159 T1: el choque de nombre de la revision de formula.
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
 
@@ -1552,11 +1549,11 @@ const previewCatalogImport = createPreviewCatalogImport(catalogImportDeps);
 const confirmCatalogImport = createConfirmCatalogImport(catalogImportDeps);
 
 /**
- * `FormulaImportDeps` (QC-159 `design.md > 5.1`), compartido por la vista previa y la
- * confirmacion de una importacion de formula. `recipeCatalog` y `productCatalog` son los MISMOS
- * que ya usan `recetas` y `pedidos` mas arriba -dos instancias del mismo puerto serian dos
- * cableados que pueden divergir-; `inventario.createRawMaterial`, `recetas.createRecipe` y
- * `recetas.updateRecipe` son los casos de uso ya cableados en sus propias fachadas.
+ * Compartido por la vista previa y la confirmacion de una importacion de formula.
+ * `recipeCatalog` y `productCatalog` son los MISMOS que ya usan `recetas` y `pedidos`
+ * mas arriba -dos instancias del mismo puerto serian dos cableados que pueden divergir-;
+ * `inventario.createRawMaterial`, `recetas.createRecipe` y `recetas.updateRecipe` son los
+ * casos de uso ya cableados en sus propias fachadas.
  */
 const formulaImportDeps: FormulaImportDeps = {
   repository: documentBatchRepository,
@@ -1625,7 +1622,7 @@ export const documentos = {
   // de arriba. Claves NUEVAS al final: ninguna de las de arriba se toca.
   previewCatalogImport,
   confirmCatalogImport,
-  // Las DOS operaciones de la revision de formula (QC-159), ya cableadas con
+  // Las DOS operaciones de la revision de formula, ya cableadas con
   // `formulaImportDeps` de arriba. Claves NUEVAS al final, mismo criterio.
   previewFormulaImport,
   confirmFormulaImport,

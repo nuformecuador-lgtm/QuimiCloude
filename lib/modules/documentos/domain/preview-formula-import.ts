@@ -1,6 +1,6 @@
 /**
  * La vista previa de una importacion de formula. Nunca escribe nada: comprobar la receta con la
- * que choca es cosa de esta vista previa (R17), pero decidir que hacer con ese choque -reemplazar
+ * que choca es cosa de esta vista previa, pero decidir que hacer con ese choque -reemplazar
  * o renombrar- es de la confirmacion. Archivo inexistente, de otra empresa, no `done` o de otra
  * tanda dan el mismo rechazo, para no filtrar cual de los cuatro es.
  *
@@ -83,8 +83,8 @@ function distinctNormalizedReadNames(ingredients: readonly ExtractedIngredient[]
   return [...names];
 }
 
-/** El match de una fila (R11): solo cuentan los productos vivos que NO son producto terminado
- *  -uno nunca se preselecciona-. Sin nombre leido, la fila no tiene con que buscar. */
+/** El match de una fila: solo cuentan los productos vivos que NO son producto terminado -uno
+ *  nunca se preselecciona-. Sin nombre leido, la fila no tiene con que buscar. */
 function matchIngredient(
   ingredient: ExtractedIngredient,
   byNormalizedName: ReadonlyMap<string, readonly ProductNameMatch[]>,

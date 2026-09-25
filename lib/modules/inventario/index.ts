@@ -112,8 +112,8 @@ export {
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
-// QC-159 T2: resolver ingredientes POR NOMBRE (interfaz nueva, no un metodo mas de
-// ProductCatalog, para no pisarse con el metodo que QC-168 anade a este ultimo).
+// Resolver ingredientes POR NOMBRE: interfaz nueva, no un metodo mas de ProductCatalog, para no
+// pisarse con otro cambio en paralelo sobre este ultimo.
 export type { ProductNameLookup, ProductNameMatch } from './domain/product-name-lookup';
 export type {
   PresentationByName,
