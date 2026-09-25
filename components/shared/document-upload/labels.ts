@@ -36,3 +36,11 @@ export const REVIEW_LABEL = 'Revisar';
 export function tooManyFilesMessage(max: number): string {
   return `Se admiten como mucho ${max} archivos por tanda. Vuelve a elegir.`;
 }
+
+export const OPEN_LABEL = 'Subir PDFs';
+export const DIALOG_TITLE = 'Subir PDFs';
+export const CLOSE_LABEL = 'Cerrar';
+
+export function dialogDescription(max: number): string {
+  return `Solo PDF, hasta ${max} archivos por tanda.`;
+}

@@ -297,6 +297,7 @@ describe('documentos — contrato del modulo y frontera', () => {
 /** Lo que el contrato publica EN EJECUCION: funciones, clases de error, constantes y el esquema. */
 const EXPORTACIONES_DE_EJECUCION = [
   'requirePermission',
+  'canUploadDocuments',
   'DocumentosError',
   'UnauthorizedError',
   'ValidationError',

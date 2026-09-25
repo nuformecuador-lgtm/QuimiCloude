@@ -1,6 +1,6 @@
 'use client';
 
-import { DocumentUpload } from '@/components/shared/document-upload';
+import { DocumentUploadDialog } from '@/components/shared/document-upload';
 import { supplierCatalogImportRoute } from '@/lib/shared/routes';
 
 /**
@@ -14,7 +14,7 @@ export type CatalogPdfUploadProps = {
 
 export function CatalogPdfUpload({ supplierId }: CatalogPdfUploadProps) {
   return (
-    <DocumentUpload
+    <DocumentUploadDialog
       strategy="catalogo"
       reviewHrefFor={(documentFileId) => supplierCatalogImportRoute(supplierId, documentFileId)}
     />

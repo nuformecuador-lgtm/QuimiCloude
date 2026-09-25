@@ -32,6 +32,7 @@ vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () =
 import { CatalogPdfUpload } from '@/app/(private)/proveedores/[id]/components';
 import {
   DOCUMENT_UPLOAD_INPUT_TESTID,
+  DOCUMENT_UPLOAD_OPEN_TESTID,
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   rowReviewLinkTestId,
 } from '@/components/shared/document-upload';
@@ -71,8 +72,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// La subida ahora se abre desde un boton en una ventana: cada caso pulsa
+// `document-upload-open` antes de tocar la subida o el enlace de revision.
 async function elegirYSubir(): Promise<void> {
   const user = setupUser();
+  await user.click(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID));
   await user.upload(screen.getByTestId(DOCUMENT_UPLOAD_INPUT_TESTID), [pdf('catalogo.pdf')]);
   await user.click(screen.getByTestId(DOCUMENT_UPLOAD_SUBMIT_TESTID));
 }
@@ -94,6 +98,19 @@ describe('el envoltorio de subida de catalogo del proveedor', () => {
     await elegirYSubir();
 
     const enlace = await screen.findByTestId(rowReviewLinkTestId(0));
+    expect(enlace).toHaveAttribute('href', supplierCatalogImportRoute(PROVEEDOR_ID, ARCHIVO_ID));
+  });
+
+  it('«Revisar» sigue disponible dentro de la ventana, en una fila lista (R22)', async () => {
+    render(<CatalogPdfUpload supplierId={PROVEEDOR_ID} />);
+
+    const user = setupUser();
+    await user.click(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID));
+    await user.upload(screen.getByTestId(DOCUMENT_UPLOAD_INPUT_TESTID), [pdf('catalogo.pdf')]);
+    await user.click(screen.getByTestId(DOCUMENT_UPLOAD_SUBMIT_TESTID));
+
+    const enlace = await screen.findByTestId(rowReviewLinkTestId(0));
+    expect(enlace).toBeVisible();
     expect(enlace).toHaveAttribute('href', supplierCatalogImportRoute(PROVEEDOR_ID, ARCHIVO_ID));
   });
 });

@@ -1,13 +1,14 @@
 /**
- * E2E de la carga de documentos (QC-107, T15): el recorrido completo de R20 —login, pantalla de
- * detalle de proveedor, elegir tres PDFs, subirlos, ver tres filas y verlas llegar a «listo»—,
- * en Chromium y en WebKit (R21: WebKit es el motor de iOS y se ejercita, no se supone).
+ * E2E de la carga de documentos: el recorrido completo —login, boton
+ * que abre la ventana, elegir PDFs, subirlos, ver las filas llegar a «listo»—, en el detalle de un
+ * proveedor y en el listado de formulas, en Chromium y en WebKit (WebKit es el motor de iOS y se
+ * ejercita, no se supone).
  *
  * Que aporta sobre los unit de componente, que es lo unico que justifica su coste:
  *  - La cadena entera en un navegador de verdad: cookie firmada por el servidor, middleware, el
- *    Server Component del detalle y las Server Actions REALES de `documentos` contra Postgres.
+ *    Server Component de cada pantalla y las Server Actions REALES de `documentos` contra Postgres.
  *    En jsdom esas acciones son dobles; aqui son las de verdad.
- *  - La SUBIDA desde el navegador (R5): el `PUT` sale del cliente al enlace firmado y no atraviesa
+ *  - La SUBIDA desde el navegador: el `PUT` sale del cliente al enlace firmado y no atraviesa
  *    ninguna accion. Aqui se ve salir de verdad.
  *  - El sondeo vivo: las filas pasan de su fase de navegador al estado que persiste el modulo.
  *
@@ -16,9 +17,9 @@
  * guion. Lo unico que sale del navegador es el `PUT` al enlace firmado, y lo intercepta
  * `page.route()` mas abajo.
  *
- * LA URL NUNCA SE ESCRIBE A MANO: sale de `supplierDetailRoute`, igual que `LOGIN_ROUTE` lo hace
- * dentro del helper de login. Y ningun assert mira literales de copy: se afirma sobre
- * `data-testid` estables, sobre `data-phase`/`data-status` y sobre roles accesibles.
+ * LAS URLS NUNCA SE ESCRIBEN A MANO: salen de `supplierDetailRoute` y `FORMULAS_ROUTE`, igual que
+ * `LOGIN_ROUTE` lo hace dentro del helper de login. Y ningun assert mira literales de copy: se
+ * afirma sobre `data-testid` estables, sobre `data-phase`/`data-status` y sobre roles accesibles.
  *
  * DATOS: `companies`, `users`, `suppliers`, `document_batches` y `document_files` son tablas
  * reales y COMPARTIDAS, y los dos proyectos corren a la vez. Por eso todo lo que este spec crea
@@ -28,13 +29,13 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
-import { supplierDetailRoute } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
 
@@ -50,8 +51,11 @@ const RUN_ID = randomUUID().replace(/-/g, '');
  */
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
-/** Cuantos PDFs sube el recorrido. Es el numero que pide R20, no un tope del modulo. */
+/** Cuantos PDFs sube el recorrido del proveedor. No es un tope del modulo. */
 const FILES_IN_BATCH = 3;
+
+/** Cuantos PDFs sube el recorrido de formulas. No es un tope del modulo. */
+const FORMULA_FILES_IN_BATCH = 2;
 
 /**
  * El origen al que el almacenamiento en memoria firma sus subidas. Es un TLD RESERVADO: no resuelve
@@ -102,14 +106,20 @@ const fileNames = Array.from(
 );
 
 /**
+ * Los nombres de los dos PDFs del recorrido de formulas, unicos por worker y con el mismo prefijo
+ * `qc107_e2e_` que el barrido de huerfanos ya reconoce.
+ */
+const formulaFileNames = Array.from(
+  { length: FORMULA_FILES_IN_BATCH },
+  (_, index) => `${FIXTURE_PREFIX}formula_${index + 1}_${RUN_ID}.pdf`,
+);
+
+/**
  * Los bytes que elige quien sube. Da igual QUE contienen: el `PUT` esta interceptado y el
  * almacenamiento en memoria devuelve su propio PDF minimo cuando el trabajo baja el archivo. Lo
  * que importa es que el navegador tenga bytes que mandar.
  */
 const pdfBytes = Buffer.from('%PDF-1.4\n%%EOF\n', 'ascii');
-
-/** El PDF que elige el usuario sin `documentos.modificar` en el caso R20 de esta ficha. */
-const noUploadFileName = `${FIXTURE_PREFIX}noupload_doc_${RUN_ID}.pdf`;
 
 let companyId: string | null = null;
 let supplierId: string | null = null;
@@ -302,8 +312,29 @@ test.afterAll(async () => {
 // codigo.
 test.setTimeout(180_000);
 
+/** Instala la intercepcion del `PUT` al enlace firmado y devuelve el contador vivo. */
+async function interceptSignedUploads(page: Page): Promise<{ count(): number }> {
+  let intercepted = 0;
+  await page.route(`${STORAGE_ORIGIN}/**`, async (route) => {
+    // Cabeceras de CORS porque el destino es de otro origen: sin ellas el navegador descarta la
+    // respuesta y la fila se quedaria en «no se pudo subir». El preflight se responde igual.
+    const headers = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'PUT, OPTIONS',
+      'access-control-allow-headers': 'content-type',
+    };
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    intercepted += 1;
+    await route.fulfill({ status: 200, headers, body: '' });
+  });
+  return { count: () => intercepted };
+}
+
 test.describe('documentos', () => {
-  test('sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)', async ({
+  test('abre la ventana desde el detalle de un proveedor, sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R16)', async ({
     page,
   }) => {
     const supplier = supplierId;
@@ -315,40 +346,35 @@ test.describe('documentos', () => {
     // --- 1. La subida al enlace firmado se atiende AQUI, en el navegador. Es el unico trafico que
     // sale del proceso, y se cuenta para que un cambio de origen en el almacenamiento en memoria se
     // note como un rojo con nombre y no como un recorrido que parece pasar.
-    let intercepted = 0;
-    await page.route(`${STORAGE_ORIGIN}/**`, async (route) => {
-      // Cabeceras de CORS porque el destino es de otro origen: sin ellas el navegador descarta la
-      // respuesta y la fila se quedaria en «no se pudo subir». El preflight se responde igual.
-      const headers = {
-        'access-control-allow-origin': '*',
-        'access-control-allow-methods': 'PUT, OPTIONS',
-        'access-control-allow-headers': 'content-type',
-      };
-      if (route.request().method() === 'OPTIONS') {
-        await route.fulfill({ status: 204, headers });
-        return;
-      }
-      intercepted += 1;
-      await route.fulfill({ status: 200, headers, body: '' });
-    });
+    const uploads = await interceptSignedUploads(page);
 
     await loginAndLand(page, adminUser);
 
-    // --- 2. La pantalla de detalle, por su constante de ruta. El componente se monta debajo del
-    // catalogo y no depende de ningun dato del proveedor.
+    // --- 2. La pantalla de detalle, por su constante de ruta. Antes de pulsar el boton, la
+    // ventana esta cerrada: solo se ve el boton, la subida esta en el DOM pero oculta (`keepMounted`).
     await page.goto(supplierDetailRoute(supplier));
     await expect(page.getByTestId('supplier-detail-name')).toHaveText(supplierName, {
       timeout: 60_000,
     });
-    await expect(page.getByTestId('document-upload')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('document-upload-open')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('document-upload')).toBeHidden();
 
-    // --- 3. Elegir los tres PDFs por el selector real, que es la unica via de entrada (R21: nada
-    // depende de arrastrar con un raton).
+    // --- 3. Abrir la ventana.
+    await page.getByTestId('document-upload-open').click();
+    await expect(page.getByTestId('document-upload-dialog')).toBeVisible({ timeout: 60_000 });
+
+    // Tandas de estrategia `catalogo` de esta empresa ANTES de subir: el caso de formulas puede
+    // compartir empresa si cae en el mismo worker, asi que se filtra tambien por estrategia.
+    const catalogBatchesBefore = await prisma.documentBatch.count({
+      where: { companyId: company, strategy: 'catalogo' },
+    });
+
+    // --- 4. Elegir los tres PDFs por el selector real, que es la unica via de entrada.
     await page
       .getByTestId('document-upload-input')
       .setInputFiles(fileNames.map((name) => ({ name, mimeType: PDF_MIME_TYPE, buffer: pdfBytes })));
 
-    // --- 4. Tres filas, una por archivo, con SU nombre y todavia en fase de navegador: es el
+    // --- 5. Tres filas, una por archivo, con SU nombre y todavia en fase de navegador: es el
     // «antes» contra el que se afirma despues que el estado CAMBIO.
     await expect(page.getByTestId('document-upload-list')).toBeVisible({ timeout: 60_000 });
     for (const [index, name] of fileNames.entries()) {
@@ -363,11 +389,11 @@ test.describe('documentos', () => {
       'una fila por archivo elegido, ni una mas',
     ).toBe(FILES_IN_BATCH);
 
-    // --- 5. Subir: emision de enlaces y encolado con las Server Actions REALES, y el `PUT` de cada
+    // --- 6. Subir: emision de enlaces y encolado con las Server Actions REALES, y el `PUT` de cada
     // archivo saliendo del navegador.
     await page.getByTestId('document-upload-submit').click();
 
-    // --- 6. Y cada fila llega a «listo» por su cuenta, sin que nadie recargue: el sondeo la lleva
+    // --- 7. Y cada fila llega a «listo» por su cuenta, sin que nadie recargue: el sondeo la lleva
     // del estado que el modulo persiste hasta el final. Se afirma el ESTADO, nunca el texto que la
     // IA de guion devolvio, que ninguna pantalla pinta.
     for (const index of fileNames.keys()) {
@@ -382,27 +408,96 @@ test.describe('documentos', () => {
     await expect(page.getByTestId('document-upload-error')).toHaveCount(0);
     await expect(page.getByTestId('document-upload-selection-error')).toHaveCount(0);
 
-    expect(intercepted, 'los tres archivos suben sus bytes desde el navegador').toBe(
+    expect(uploads.count(), 'los tres archivos suben sus bytes desde el navegador').toBe(
       FILES_IN_BATCH,
     );
 
-    // Lo guardo el backend de verdad, no solo lo pinto la pantalla: una tanda con sus tres filas
-    // terminadas, bajo la empresa de este worker.
-    const batches = await prisma.documentBatch.findMany({
-      where: { companyId: company },
-      select: { id: true, strategy: true },
+    // Lo guardo el backend de verdad, no solo lo pinto la pantalla: una tanda NUEVA con estrategia
+    // `catalogo`, con sus tres filas terminadas.
+    const catalogBatches = await prisma.documentBatch.findMany({
+      where: { companyId: company, strategy: 'catalogo' },
+      select: { id: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
     });
-    expect(batches.length, 'el recorrido encola UNA tanda').toBe(1);
-    expect(batches[0].strategy, 'la estrategia es la que monta la pantalla de proveedores').toBe(
-      'catalogo',
+    expect(catalogBatches.length, 'el recorrido encola UNA tanda catalogo nueva').toBe(
+      catalogBatchesBefore + 1,
     );
+    const newBatch = catalogBatches[0];
     expect(
-      await prisma.documentFile.count({ where: { batchId: batches[0].id, status: 'done' } }),
+      await prisma.documentFile.count({ where: { batchId: newBatch.id, status: 'done' } }),
       'las tres filas deberian estar terminadas en la base',
     ).toBe(FILES_IN_BATCH);
   });
 
-  test('un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no puede subir (R20 permiso propio)', async ({
+  test('abre la ventana desde el listado de formulas y sube dos PDFs hasta terminar (R17)', async ({
+    page,
+  }) => {
+    const company = companyId;
+    if (company === null) {
+      throw new Error('el fixture no esta completo: fallo el beforeAll');
+    }
+
+    const uploads = await interceptSignedUploads(page);
+
+    await loginAndLand(page, adminUser);
+
+    // El listado de formulas, por su constante de ruta: nunca el literal.
+    await page.goto(FORMULAS_ROUTE);
+    await expect(page.getByTestId('recipes-title')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('document-upload-open')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('document-upload')).toBeHidden();
+
+    await page.getByTestId('document-upload-open').click();
+    await expect(page.getByTestId('document-upload-dialog')).toBeVisible({ timeout: 60_000 });
+
+    const formulaBatchesBefore = await prisma.documentBatch.count({
+      where: { companyId: company, strategy: 'formula' },
+    });
+
+    await page
+      .getByTestId('document-upload-input')
+      .setInputFiles(
+        formulaFileNames.map((name) => ({ name, mimeType: PDF_MIME_TYPE, buffer: pdfBytes })),
+      );
+
+    await expect(page.getByTestId('document-upload-list')).toBeVisible({ timeout: 60_000 });
+    for (const [index, name] of formulaFileNames.entries()) {
+      await expect(page.getByTestId(`document-upload-row-name-${index}`)).toHaveText(name);
+    }
+
+    await page.getByTestId('document-upload-submit').click();
+
+    for (const index of formulaFileNames.keys()) {
+      await expect(page.getByTestId(`document-upload-row-status-${index}`)).toHaveAttribute(
+        'data-status',
+        'done',
+        { timeout: 120_000 },
+      );
+    }
+
+    await expect(page.getByTestId('document-upload-error')).toHaveCount(0);
+    await expect(page.getByTestId('document-upload-selection-error')).toHaveCount(0);
+
+    expect(uploads.count(), 'los dos archivos suben sus bytes desde el navegador').toBe(
+      FORMULA_FILES_IN_BATCH,
+    );
+
+    const formulaBatches = await prisma.documentBatch.findMany({
+      where: { companyId: company, strategy: 'formula' },
+      select: { id: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(formulaBatches.length, 'el recorrido encola UNA tanda formula nueva').toBe(
+      formulaBatchesBefore + 1,
+    );
+    const newBatch = formulaBatches[0];
+    expect(
+      await prisma.documentFile.count({ where: { batchId: newBatch.id, status: 'done' } }),
+      'las dos filas deberian estar terminadas en la base',
+    ).toBe(FORMULA_FILES_IN_BATCH);
+  });
+
+  test('un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no ve el boton ni la subida: el caso sin permiso de subida (R18)', async ({
     page,
   }) => {
     const supplier = supplierId;
@@ -411,52 +506,24 @@ test.describe('documentos', () => {
       throw new Error('el fixture no esta completo: fallo el beforeAll');
     }
 
-    // Ningun PUT deberia salir del navegador: el rechazo pasa en el service, antes de emitir el
-    // enlace firmado.
-    let intercepted = 0;
-    await page.route(`${STORAGE_ORIGIN}/**`, async (route) => {
-      const headers = {
-        'access-control-allow-origin': '*',
-        'access-control-allow-methods': 'PUT, OPTIONS',
-        'access-control-allow-headers': 'content-type',
-      };
-      if (route.request().method() === 'OPTIONS') {
-        await route.fulfill({ status: 204, headers });
-        return;
-      }
-      intercepted += 1;
-      await route.fulfill({ status: 200, headers, body: '' });
-    });
+    const uploads = await interceptSignedUploads(page);
 
-    // Conteo tomado ANTES del intento: los dos casos comparten empresa, y este afirma sobre su
-    // propia variacion en vez de depender del orden de los tests.
+    // Conteo tomado ANTES del intento: los casos comparten empresa, y este afirma sobre su propia
+    // variacion en vez de depender del orden de los tests.
     const batchesBefore = await prisma.documentBatch.count({ where: { companyId: company } });
 
     await loginAndLand(page, noUploadUser);
 
     await page.goto(supplierDetailRoute(supplier));
+    // La pagina cargo de verdad: sin esto el caso pasaria en vacio si la ruta nunca resolviera.
     await expect(page.getByTestId('supplier-detail-name')).toHaveText(supplierName, {
       timeout: 60_000,
     });
-    await expect(page.getByTestId('document-upload')).toBeVisible({ timeout: 60_000 });
 
-    // La pagina monto la subida antes de intentar nada: si esto fallara, el caso no probaria R20,
-    // probaria que la pantalla nunca llego a cargar.
-    await expect(page.getByTestId('document-upload-trigger')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('document-upload-open')).toHaveCount(0);
+    await expect(page.getByTestId('document-upload')).toHaveCount(0);
 
-    await page
-      .getByTestId('document-upload-input')
-      .setInputFiles([{ name: noUploadFileName, mimeType: PDF_MIME_TYPE, buffer: pdfBytes }]);
-
-    await page.getByTestId('document-upload-submit').click();
-
-    await expect(page.getByTestId('document-upload-error')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId('document-upload-error')).toHaveAttribute(
-      'data-code',
-      'unauthorized',
-    );
-
-    expect(intercepted, 'el rechazo pasa antes de emitir ningun enlace firmado').toBe(0);
+    expect(uploads.count(), 'sin boton no hay ningun enlace firmado que interceptar').toBe(0);
 
     const batchesAfter = await prisma.documentBatch.count({ where: { companyId: company } });
     expect(batchesAfter, 'ninguna tanda queda persistida en esta empresa').toBe(batchesBefore);
