@@ -16,7 +16,13 @@ import { join } from 'node:path';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CUSTOMERS_TITLE_TESTID, CUSTOMER_ROW_ACTIONS_TESTID } from '@/app/(private)/clientes/components';
+import {
+  CUSTOMERS_TITLE_TESTID,
+  CUSTOMER_ACTION_DELETE_TESTID,
+  CUSTOMER_ACTION_EDIT_TESTID,
+  CUSTOMER_CREATE_OPEN_TESTID,
+  CUSTOMER_ROW_ACTIONS_TESTID,
+} from '@/app/(private)/clientes/components';
 import ClientesPage from '@/app/(private)/clientes/page';
 import type { CustomerView } from '@/lib/modules/clientes';
 import {
@@ -303,7 +309,7 @@ describe('`canModify` sale de assertPermission y de nada mas (R5, R8)', () => {
 
     // Ni disparador, ni boton deshabilitado, ni panel, ni dialogo: nada en el arbol servido.
     expect(screen.queryByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toBeNull();
-    expect(screen.queryByTestId('customer-create-open')).toBeNull();
+    expect(screen.queryByTestId(CUSTOMER_CREATE_OPEN_TESTID)).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(notFoundMock).not.toHaveBeenCalled();
   });
@@ -330,17 +336,21 @@ describe('`canModify` sale de assertPermission y de nada mas (R5, R8)', () => {
 });
 
 describe('a nivel de pantalla, con los tres conjuntos de permisos del seed (R6)', () => {
+  const ESCRITURAS = [
+    CUSTOMER_CREATE_OPEN_TESTID,
+    CUSTOMER_ROW_ACTIONS_TESTID,
+    CUSTOMER_ACTION_EDIT_TESTID,
+    CUSTOMER_ACTION_DELETE_TESTID,
+  ] as const;
+
   it.each([
-    [ROLE_ADMINISTRADOR, SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]],
-    [ROLE_OPERADOR, SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]],
-    [ROLE_EMPACADOR, SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]],
-  ])('%s: se sirve solo si trae clientes.consultar, y escribe solo si trae clientes.modificar', async (roleName, permissions) => {
-    getSessionUserMock.mockResolvedValue(sesionCon(permissions ?? [], roleName));
+    { rol: ROLE_ADMINISTRADOR, servida: true, escribe: true },
+    { rol: ROLE_OPERADOR, servida: false, escribe: false },
+    { rol: ROLE_EMPACADOR, servida: false, escribe: false },
+  ])('$rol: servida=$servida, escribe=$escribe', async ({ rol, servida, escribe }) => {
+    getSessionUserMock.mockResolvedValue(sesionCon(SEED_ROLE_PERMISSIONS[rol] ?? [], rol));
 
-    const puedeConsultar = (permissions ?? []).includes(PERMISO_DE_CONSULTA);
-    const puedeEscribir = (permissions ?? []).includes(PERMISO_DE_ESCRITURA);
-
-    if (!puedeConsultar) {
+    if (!servida) {
       await expect(arbolDeLaPantalla()).rejects.toThrow();
       expect(notFoundMock).toHaveBeenCalled();
       return;
@@ -350,11 +360,12 @@ describe('a nivel de pantalla, con los tres conjuntos de permisos del seed (R6)'
 
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-    if (puedeEscribir) {
-      expect(screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toBeInTheDocument();
-    } else {
-      expect(screen.queryByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toBeNull();
-      expect(screen.queryByTestId('customer-create-open')).toBeNull();
+    for (const testid of ESCRITURAS) {
+      if (escribe) {
+        expect(screen.getByTestId(testid), testid).toBeInTheDocument();
+      } else {
+        expect(screen.queryByTestId(testid), testid).toBeNull();
+      }
     }
   });
 });
