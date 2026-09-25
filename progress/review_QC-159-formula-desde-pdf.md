@@ -197,3 +197,40 @@ cuatro líneas, ningún test se pone rojo:**
 Solo B1: tests de la relectura del archivo en la confirmación (unit, tres estados) y el caso de
 integración «archivo de otra empresa» con entrada válida y código afirmado. Después, el leader
 corre `./init.sh` completo y cierra T14.
+
+## Vuelta 2 (2026-09-25, sobre `efbb0c92`)
+
+Alcance: solo los commits `d6a7976c`..`efbb0c92`. Por decisión del leader, m1, m3, m5 y m6 quedan
+como deuda anotada en la bitácora.
+
+### Veredicto vuelta 2: **OK**: B1 cerrado, sin bloqueantes
+
+### B1: cerrado, comprobado con mutación
+- Tests nuevos en `confirm-formula-import.test.ts`: tres casos con una **entrada válida**
+  (`entradaBase()`): archivo `null`, `status: 'processing'` y tanda `catalogo`. Cada uno afirma
+  `invalid_input` por código, y que no se llamó a `findRefs`, `findAliveByNormalizedName`,
+  `findAliveByNormalizedNames`, `createRawMaterial`, `createRecipe` ni `updateRecipe`. Esas «no
+  llamadas» son las que muerden: sin la comprobación del archivo, el flujo sigue hasta `findRefs`.
+- `formula-import.int.test.ts:539`: ahora con línea completa al 100,00 % de un producto propio y
+  `rejects.toMatchObject({ code: 'invalid_input' })`. Los casos 560 y 588 afirman también su código
+  (`recipe_not_found` e `invalid_input`).
+- **Mutación hecha por mí:** la condición de `confirm-formula-import.ts:87` se envolvió en
+  `false && (…)`. Resultado: **3 rojos** en el unit (los tres casos nuevos) y **1 rojo** en la
+  integración («archivo de otra empresa»). Archivo restaurado con `git checkout --` y árbol limpio
+  comprobado. Tras restaurar: unit dirigido (`confirm-formula-import`, `create-raw-material-alcance`,
+  `formula-import-review`, `formula-import-actions`, `tests/guards`) con 48 archivos, 652 verdes y
+  5 saltados; integración `formula-import.int.test.ts` con 8/8.
+
+### Menores corregidos
+- m2: `tests/unit/inventario/create-raw-material-alcance.test.ts` limita `createRawMaterial` y
+  `createCreateRawMaterial` a sus rutas permitidas, y dentro de `lib/composition/index.ts` a la
+  fachada de `inventario` y `formulaImportDeps`. Cada detector tiene su caso con una infracción
+  fabricada, así que no es vacuo.
+- m4: R38 afirma ahora `min-h-11 min-w-11` en todos los controles de la revisión (nombre,
+  descripción, añadir, confirmar, choque y los de cada fila), `text-base` en los campos de texto y
+  ningún `hover:` en la revisión.
+- m7: se quitó el comentario redundante de `MAX_RECIPE_STEPS`.
+- m8: `formula-import-actions.ts` ya no duplica la explicación; remite al traductor.
+- m9: el comentario del E2E nombra la causa real (la hidratación y la relectura del DOM). Solo
+  cambia el comentario, no la lógica del test.
+- Las líneas de producción añadidas en esta vuelta no citan fichas ni requisitos.
