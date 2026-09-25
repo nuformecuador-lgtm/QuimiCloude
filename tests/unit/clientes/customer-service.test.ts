@@ -208,7 +208,10 @@ describe('casos de uso del cliente', () => {
     expect(sinForma.spies.softDeleteAlive).not.toHaveBeenCalled()
   })
 
-  it('R25 — no existe ninguna operacion de restaurar ni de listar dados de baja', async () => {
+  // `CustomerRepository` es una interfaz de TypeScript: sin instancia real, solo el doble se
+  // puede reflejar en tiempo de ejecucion. Que el TIPO del puerto tenga exactamente estos
+  // cinco metodos lo sostiene `guard-ambito-empresa-clientes` (`metodosEsperados: 5`).
+  it('R25 — no existe ninguna operacion de restaurar ni de listar dados de baja (metodosEsperados: 5 en guard-ambito-empresa-clientes)', async () => {
     const puerto = Object.keys(makeCustomers().repo).sort()
     expect(puerto).toEqual(['create', 'findAliveById', 'listAlive', 'softDeleteAlive', 'updateAlive'])
 
