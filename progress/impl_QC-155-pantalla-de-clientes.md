@@ -576,3 +576,26 @@ Consulta de limpieza tras la corrida: `{"customers":0,"customersByLastNames":0,"
 
 Nota operativa: el puerto fijo 3117 de `playwright.config.ts` lo comparten todos los worktrees; la
 corrida esperó a que otro worktree lo liberara.
+
+## Cierre de trazabilidad (implementer)
+
+R15 solo estaba cubierto por el parser (`customer-list-params.test.ts`: 10 por defecto, 25 admitido,
+cualquier otro valor cae al defecto). Commit `871992d7` lo afirma sobre la tabla renderizada, sin
+tocar producción.
+
+| R | Test |
+| --- | --- |
+| R15 | `customer-list-params.test.ts` (casos «tamano dentro de las opciones», «tamano fuera de las opciones», «tamano no numerico») + `customer-table.test.tsx` > "el selector de tamano ofrece exactamente 10 y 25, con 10 por defecto (R15)" (3 casos) y "con mas clientes de los que caben, anterior y siguiente navegan a la pagina correcta e indican pagina y total (R15)" (4 casos) |
+
+```
+pnpm exec vitest run tests/unit/clientes-ui/customer-table.test.tsx tests/unit/clientes-ui/clientes-convenciones.test.ts
+Test Files  2 passed (2)
+     Tests  51 passed (51)
+```
+
+### Verificación final del implementer (tras `git merge origin/dev`: «Already up to date»)
+
+- `pnpm exec next typegen` + `pnpm run typecheck`: verde (el `LayoutProps` se debía a que se borró `.next`).
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes ajenos.
+- Segunda corrida del E2E tras sincronizar: chromium 2 passed, webkit 2 passed, **4 passed (29.4s)**; 0 filas `qc155_e2e_` en customers, users y companies.
+- No se ha corrido la suite completa ni `./init.sh`: T9 (gate completo) le toca al leader.
