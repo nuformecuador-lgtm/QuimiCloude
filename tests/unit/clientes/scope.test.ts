@@ -509,16 +509,28 @@ describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => 
     return new RegExp(`@/lib/modules/${modulo}\\b`).test(fuente)
   }
 
+  /** El modelo de Prisma (`prisma.<modelo>`) o el nombre de tabla de la otra entidad, sin pasar
+   *  por un import: R40 prohibe nombrar el modulo, el modelo Y la tabla (m7). */
+  function nombraModeloOTabla(fuente: string, modelo: string, tabla: string): boolean {
+    return new RegExp(`\\bprisma\\.${modelo}\\b`).test(fuente) || new RegExp(`\\b${tabla}\\b`).test(fuente)
+  }
+
   function hallazgosDeAcoplamiento(
     modDir: string = moduloDir,
     pedidosDir: string = PEDIDOS_DIR,
   ): string[] {
     const hallazgos: string[] = []
     for (const archivo of filesIn(modDir, /\.tsx?$/)) {
-      if (importaModulo(leer(archivo), 'pedidos')) hallazgos.push(archivo)
+      const fuente = leer(archivo)
+      if (importaModulo(fuente, 'pedidos') || nombraModeloOTabla(fuente, 'order', 'orders')) {
+        hallazgos.push(archivo)
+      }
     }
     for (const archivo of filesIn(pedidosDir, /\.tsx?$/)) {
-      if (importaModulo(leer(archivo), 'clientes')) hallazgos.push(archivo)
+      const fuente = leer(archivo)
+      if (importaModulo(fuente, 'clientes') || nombraModeloOTabla(fuente, 'customer', 'customers')) {
+        hallazgos.push(archivo)
+      }
     }
     return hallazgos
   }
@@ -540,6 +552,27 @@ describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => 
     }
   })
 
+  it('el detector tambien dispara con el modelo o la tabla de la otra entidad, sin ningun import', () => {
+    // m7: un `prisma.customer`/`customers` dentro de pedidos, o un `prisma.order`/`orders` dentro
+    // de clientes, delatan el acoplamiento igual que un import -y ninguno pasa por `@/lib/modules`.
+    const raizClientes = mkdtempSync(join(tmpdir(), 'qc154-scope-'))
+    const raizPedidos = mkdtempSync(join(tmpdir(), 'qc154-scope-'))
+    try {
+      const fabricadoEnClientes = join(raizClientes, 'domain', '__sensibilidad_orders__.ts')
+      mkdirSync(dirname(fabricadoEnClientes), { recursive: true })
+      writeFileSync(fabricadoEnClientes, "export const consultaOrdenes = () => prisma.order.findMany()\n")
+
+      const fabricadoEnPedidos = join(raizPedidos, '__sensibilidad_customers__.ts')
+      writeFileSync(fabricadoEnPedidos, "export const tabla = 'customers'\n")
+
+      const hallazgos = hallazgosDeAcoplamiento(raizClientes, raizPedidos)
+      expect(hallazgos).toContain(fabricadoEnClientes)
+      expect(hallazgos).toContain(fabricadoEnPedidos)
+    } finally {
+      rmSync(raizClientes, { recursive: true, force: true })
+      rmSync(raizPedidos, { recursive: true, force: true })
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------------------------
