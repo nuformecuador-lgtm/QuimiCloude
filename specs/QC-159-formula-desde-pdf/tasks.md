@@ -9,7 +9,7 @@
 
 ## Tanda 0 — preparación
 
-### T0 [ ] — Sincronizar y medir
+### T0 [x] — Sincronizar y medir
 **Toca:** `progress/impl_QC-159-formula-desde-pdf.md` (nuevo).
 **Hacer:** rebasar sobre `origin/dev`; confirmar que siguen como las mide `design.md > 0`:
 `readFileForReview`, `DocumentUploadDialog.reviewHrefFor`, `createRecipe`/`updateRecipe` con `image`
