@@ -55,7 +55,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
 
 ## Grupo A — cimientos
 
-- [ ] **T1 [P] — Dominio base.** `domain/actor.ts` (copia de `proveedores`, error propio),
+- [x] **T1 [P] — Dominio base.** `domain/actor.ts` (copia de `proveedores`, error propio),
       `domain/customer-scope.ts`, `domain/errors.ts` (`ClientesError`, `UnauthorizedError`,
       `CustomerNotFoundError`, `ValidationError`), `domain/page.ts` (`Page<T>`),
       `domain/customer-id.ts` (`isCustomerId`).
@@ -63,7 +63,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       **Hecho cuando:** `pnpm run typecheck` limpio y `domain/` solo importa `zod`, `./` y los barrels
       de `identity` y `errores`.
 
-- [ ] **T2 [P] — Contrato de listados: copia y guardia.** `domain/list-query.ts` copiado
+- [x] **T2 [P] — Contrato de listados: copia y guardia.** `domain/list-query.ts` copiado
       **carácter a carácter** de `proveedores` salvo el nombre del módulo (`design.md > 6.1`),
       `ports/list-query-log.ts`, y `clientes` como **séptimo** módulo de `MODULOS` en
       `tests/guards/guard-contrato-listados.test.ts`.
@@ -77,7 +77,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       `guard-catalogo-de-errores` pasan, y el diff de `lib/modules/errores/` es exactamente ese código
       (R34).
 
-- [ ] **T4 [P] — Alcance, adelantado: `tests/unit/clientes/scope.test.ts`.** Los cambios de
+- [x] **T4 [P] — Alcance, adelantado: `tests/unit/clientes/scope.test.ts`.** Los cambios de
       `design.md > 11`, uno a uno: lista cerrada de archivos del módulo tras QC-154 (sin `.gitkeep`);
       `'use server'` prohibido fuera de `adapters/driving/`; literales de permiso permitidos solo en
       `permissions.ts` y `lib/modules/clientes/domain/**` (con el fabricado simétrico dentro de
@@ -208,21 +208,21 @@ Grupo A. T9 espera a T17.
       *Depende de:* T0. **Hecho cuando:** el test pasa, incluida la equivalencia con
       `normalizeSupplierName` sobre la batería.
 
-- [ ] **T19 [P] — Test estático de la migración.**
+- [x] **T19 [P] — Test estático de la migración.**
       `tests/unit/clientes/schema/customers-search-migration.test.ts` (R43–R46).
       *Depende de:* T17. **Hecho cuando:** pasa, y se pone rojo con cada una de estas mutaciones
       (comprobado y revertido): `SET NOT NULL` antes del `UPDATE`, un índice sin `WHERE deleted_at IS
       NULL`, un `UNIQUE`, un `ALTER` sobre otra tabla, un `DROP EXTENSION` en el DOWN, y un DOWN que
       deja una columna.
 
-- [ ] **T20 [P] — Integración de la migración.**
+- [x] **T20 [P] — Integración de la migración.**
       `tests/integration/clientes/customers-search-migration.int.test.ts`, en `transaccion` de
       `aislamiento.json` (R43, R44, R45).
       *Depende de:* T17, T18. **Hecho cuando:** pasa contra `QuimiCloude_QC154`. El relleno coincide
       con `normalizeCustomerText` en filas vivas **y** dadas de baja con los caracteres del precedente,
       y el `NOT NULL` se rechaza con `23502`.
 
-- [ ] **T21 — Ciclo real de la migración.** `pnpm run db:migrate` → `pnpm run db:rollback` →
+- [x] **T21 — Ciclo real de la migración.** `pnpm run db:migrate` → `pnpm run db:rollback` →
       `pnpm run db:migrate` sobre `QuimiCloude_QC154`, con la salida pegada en la bitácora.
       *Depende de:* T17. **Hecho cuando:** tras el rollback, `customers` es **idéntica** a la de QC-153
       (sin las tres columnas ni sus índices), `pg_trgm` sigue instalada, y `_prisma_migrations` es

@@ -161,8 +161,267 @@ tienen la firma de los flakes de saturación que documenta `docs/verification.md
 - `lib/modules/clientes/domain/customer-text.ts` (nuevo)
 - `tests/unit/clientes/customer-text.test.ts` (nuevo)
 
-## Veredicto
+## Veredicto (tanda T0/T3/T17/T18)
 
 T0, T3, T17 y T18 cerradas y verificadas con evidencia real; el único rojo es el esperado por el
 orden de dependencia T3→T1 (documentado en `design.md`, no corregible sin salirse del alcance
 encargado).
+
+---
+
+# Tanda T1, T2, T4, T19, T20, T21
+
+## T1 — Dominio base
+
+- `lib/modules/clientes/domain/actor.ts` (`Actor`, `requirePermission`, copia de `proveedores` con
+  `UnauthorizedError` propio), `domain/customer-scope.ts` (`CustomerScope`), `domain/errors.ts`
+  (`ClientesError`, `UnauthorizedError`, `CustomerNotFoundError` con `code = 'customer_not_found'`,
+  `ValidationError`), `domain/page.ts` (`Page<T>`), `domain/customer-id.ts` (`isCustomerId`, `zod`
+  `.uuid()`).
+- Cierra el rojo esperado de T3: `CustomerNotFoundError` declara `customer_not_found`, y
+  `tests/guards/guard-catalogo-de-errores.test.ts > ... > el catalogo no tiene entradas huerfanas
+  (R9)` vuelve a verde (comprobado: 70/70 en la corrida de abajo).
+- `domain/` de `clientes` solo importa `zod`, `./` y los barrels de `identity` (`assertPermission`,
+  `PermissionCode`) y `errores` (`errorMessage`, `ErrorCode`), tal como exige el «Hecho cuando».
+
+## T2 — Contrato de listados: copia y guardia
+
+- `lib/modules/clientes/domain/list-query.ts`: copia **carácter a carácter** de
+  `proveedores/domain/list-query.ts`, cambiando solo las dos líneas que nombran el módulo (ruta de
+  la cabecera y «modulo `clientes`»).
+- `lib/modules/clientes/ports/list-query-log.ts`: copia idéntica de la forma del puerto.
+- `tests/guards/guard-contrato-listados.test.ts`: `clientes` entra como **séptimo** módulo de
+  `MODULOS` (import + fila). Se aprovechó para corregir la prosa «seis modulos» → «siete modulos»
+  en comentarios y nombres de `describe`/`it` de ese archivo (el propio contrato, no una copia
+  duplicada como `list-query.ts`, así que no aplica la regla de «no corregir el five/seven» de
+  `design.md > 6.1`).
+- **Fabricado y rojo real, revertido:** se movió `SEARCH_MAX_LENGTH` de 120 a 200 en
+  `lib/modules/clientes/domain/list-query.ts` → `guard-contrato-listados.test.ts` cayó en
+  `bloque 2 — coinciden caracter a caracter salvo el nombre del modulo` (`expected [ 'clientes' ]
+  to deeply equal []`). Se revirtió y la guardia volvió a verde (20/20).
+
+## T4 — Alcance adelantado: `tests/unit/clientes/scope.test.ts`
+
+Cambios uno a uno, exactamente los que `design.md > 11` enumera:
+
+- **Lista cerrada de archivos del módulo tras QC-154** (nuevo test
+  `R20 (QC-153), R35 (QC-154) — lista cerrada de archivos del modulo tras QC-154`), que sustituye
+  a los dos casos de QC-153 que asumían el módulo vacío (`ports y adapters vacios...` y `domain
+  solo tiene customer.ts`). Sin ningún `.gitkeep` en la lista esperada.
+- **`'use server'` acotado a fuera de `adapters/driving/`** (mismo nombre `R20 (QC-153), R35
+  (QC-154) — ...`).
+- **Literal de permiso relajado** a `permissions.ts` **y** `lib/modules/clientes/domain/**`
+  (`R26 (QC-153) — el literal de los dos permisos solo aparece en permissions.ts o en
+  lib/modules/clientes/domain`), con el fabricado simétrico **dentro** de `domain/` que **no**
+  dispara (`el caso simetrico: el mismo literal DENTRO de domain/ no dispara`), además del
+  fabricado ya existente **fuera** de `domain/` que sigue disparando.
+- **`adapters/driving/` = exactamente `customer-actions.ts`**
+  (`R26 (QC-153) — adapters/driving/ contiene exactamente customer-actions.ts`), que sustituye al
+  viejo «`adapters/driving/` esta vacio».
+- **Casos propios nuevos:** `R36` (sin aritmética de paginación propia, copiado del detector de
+  `tests/unit/proveedores/scope.test.ts`), `R37` (una sola migración nueva que toca `customers`, y
+  `schema.prisma` solo gana los tres campos normalizados de `Customer`, con censo exacto de campos
+  y conteo de migraciones que tocan `customers`), `R38` (nada bajo `app/` que nombre clientes,
+  mismo patrón que el R28 de QC-153 sobre `e2e/`), `R40` (ni `clientes` importa `pedidos` ni
+  `pedidos` importa `clientes`, por especificador `@/lib/modules/<x>`, no por texto suelto: el
+  propio `list-query.ts` copiado menciona «pedidos» en un comentario legítimo y un detector por
+  palabra suelta habría dado un falso positivo).
+- Los casos de **R28 y R29 de QC-153 quedan intactos** (sin tocar una línea).
+
+**Rojo esperado de esta tanda, documentado y NO relajado** (el módulo aún no está lleno; se cierra
+en T12/T15):
+
+- `R20 (QC-153), R35 (QC-154) — lista cerrada de archivos del modulo tras QC-154`: hoy el módulo
+  solo tiene 9 de los 23 archivos esperados (faltan `customer-input.ts`, `customer-view.ts`,
+  `customer-queryable.ts`, los cinco casos de uso, `customer-repository.ts`, y todo `adapters/`).
+- `R26 (QC-153) — adapters/driving/ contiene exactamente customer-actions.ts`: hoy
+  `adapters/driving/` está vacío (nace en T12).
+
+**Fabricados comprobados en rojo y revertidos** (sin tocar disco fuera del propio `try/finally` de
+cada caso):
+- Literal de permiso fuera de `domain/` → detectado (test ya existente, sigue en verde).
+- Literal de permiso dentro de `domain/` → **no** detectado (caso simétrico nuevo).
+- `(page - 1) * pageSize` en un archivo fabricado de `domain/` → detectado por R36 (con la
+  corrección de comparar contra la ruta absoluta que usa `filesIn`, no la relativa).
+- Import de `@/lib/modules/pedidos` desde un archivo fabricado de `lib/modules/clientes/domain/`
+  → detectado por R40.
+- Ruta `/clientes` en una pantalla fabricada bajo `app/` → detectado por R38.
+
+## T19 — Test estático de la migración de búsqueda sin acentos
+
+- `tests/unit/clientes/schema/customers-search-migration.test.ts`: extensión `pg_trgm` sin
+  `DROP EXTENSION`; las tres columnas se añaden anulables y se rellenan **antes** del
+  `SET NOT NULL` (predicado `rellenaAntesDeNotNull`); el relleno usa la **misma** pareja de
+  `translate(...)` que `20260904160000_list_query_indexes` (leída de su archivo, no copiada a
+  mano); `SET NOT NULL` para las tres columnas y ningún `UNIQUE`; los tres índices son
+  `gin_trgm_ops` con `WHERE deleted_at IS NULL` y ninguna otra tabla se toca; el `down.sql` revierte
+  los tres índices y las tres columnas, en orden inverso, sin `DROP EXTENSION`.
+- **Las seis mutaciones exigidas por `tasks.md`, comprobadas en rojo y revertidas** (todas en
+  memoria, el archivo en disco no se tocó):
+  1. `SET NOT NULL` antes del `UPDATE` → `rellenaAntesDeNotNull` da `false` sobre el texto
+     sintético con el orden invertido.
+  2. Un índice sin `WHERE deleted_at IS NULL` → el mismo patrón que exige el caso real deja de
+     casar contra la versión sin el `WHERE`.
+  3. Un `UNIQUE` fabricado → aparece en el texto sin comentarios (mientras que el real, limpio de
+     comentarios, no lo tiene).
+  4. Un `ALTER TABLE "orders"` fabricado → aparece en la lista de alteres ajenos (que en el real
+     está vacía).
+  5. Un `DROP EXTENSION` fabricado en el down → aparece (mientras que el down real, limpio de
+     comentarios, no lo tiene: la cabecera SÍ menciona «DROP» en prosa, por eso se limpian
+     comentarios antes de esas dos aserciones).
+  6. Un down que se olvida una columna → el conteo de `DROP COLUMN` baja de 3 a 2.
+
+## T20 — Integración de la migración de búsqueda sin acentos
+
+- `tests/integration/clientes/customers-search-migration.int.test.ts`, declarado en `transaccion`
+  de `tests/integration/aislamiento.json` (mismo patrón que
+  `clientes/customers-migration.int.test.ts`: transacción interactiva con `RollbackSignal`).
+- **R43**: dentro de la transacción se aplica el `down.sql` de esta migración (vuelve al esquema de
+  QC-153), se insertan por SQL crudo un cliente vivo y uno dado de baja con acentos (`María José`,
+  `Pérez Muñoz`, `Bogotá`; `Andrés`, `Niño Peña`, `Medellín`), se aplica el `migration.sql`, y se
+  compara cada columna `*Normalized` con `normalizeCustomerText` importada de
+  `lib/modules/clientes/domain/customer-text.ts` (ruta profunda permitida en tests).
+- **R44**: `INSERT` crudo que omite `first_names_normalized` → `23502` real, con `SAVEPOINT`/
+  `ROLLBACK TO SAVEPOINT` (mismo patrón que `customers-constraints.int.test.ts`).
+- **R45**: `pg_indexes` devuelve los tres índices `*_trgm_idx`, cada uno con `gin_trgm_ops` y
+  `deleted_at IS NULL` en su `indexdef`.
+- Corrida real contra una base efímera plantillada desde `QuimiCloude_QC154` (`DATABASE_URL`/
+  `DIRECT_URL` sobrescritos en el entorno del comando, nunca la compartida del `.env`):
+  ```
+  test-db: plantilla reutilizada: qct_tpl_28550f7af953 (las migraciones no han cambiado)
+  test-db: la corrida de integracion va contra qct_qc154_682c05c8_mug8qblt_9ss (copia de qct_tpl_28550f7af953).
+  Test Files  1 passed (1)
+       Tests  3 passed (3)
+  test-db: borrada la base de la corrida: qct_qc154_682c05c8_mug8qblt_9ss.
+  ```
+- Se corrió también toda la carpeta `tests/integration/clientes` contra la misma base propia:
+  3 archivos, 25 tests, todos verdes; sin regresión sobre `customers-constraints.int.test.ts` ni
+  `customers-migration.int.test.ts`.
+
+## T21 — Ciclo real de la migración (`db:migrate` → `db:rollback` → `db:migrate`)
+
+Contra `QuimiCloude_QC154`, con `DATABASE_URL`/`DIRECT_URL` sobrescritos en el entorno del comando.
+
+**1) `pnpm run db:migrate`** (partía con la migración ya aplicada desde T17/T0):
+```
+52 migrations found in prisma/migrations
+No pending migrations to apply.
+```
+
+**2) `pnpm run db:rollback`**:
+```
+db:rollback: aplicando down.sql de 20260924190000_customers_search_normalized y borrando su fila de _prisma_migrations
+db:rollback: 20260924190000_customers_search_normalized revertida.
+```
+
+Estado de `customers` tras el rollback (consultado con un script `tsx` desechable vía
+`information_schema.columns`, `pg_indexes` y `pg_extension`, borrado al terminar):
+- Columnas: `address, city, company_id, created_at, created_by, deleted_at, email, first_names,
+  id, last_names, phone, updated_at, updated_by` — **sin** las tres `*_normalized` (13, las de
+  QC-153).
+- Índices: `customers_company_id_id_key, customers_created_by_idx, customers_pkey,
+  customers_updated_by_idx` — **sin** los tres `*_trgm_idx`.
+- `pg_trgm` **sigue instalada** (`SELECT extname FROM pg_extension` la devuelve).
+- `_prisma_migrations`: la fila de `20260924190000_customers_search_normalized` ya no aparece
+  entre las últimas aplicadas (queda `20260924180000_supplier_catalog_line_material_and_measurements`
+  como la más reciente de esta zona).
+
+**3) `pnpm run db:migrate`** (segunda vez, reaplica):
+```
+Applying migration `20260924190000_customers_search_normalized`
+The following migration(s) have been applied:
+migrations/
+  └─ 20260924190000_customers_search_normalized/
+    └─ migration.sql
+All migrations have been successfully applied.
+```
+
+Estado de `customers` tras la segunda aplicación: las 16 columnas (las 13 de QC-153 + las tres
+`*_normalized`), los tres índices `*_trgm_idx` de vuelta, `pg_trgm` instalada, y
+`_prisma_migrations` con `20260924190000_customers_search_normalized` como la más reciente. R46
+verificado con el ciclo real, no solo con el `down.sql` leído en el test estático de T19.
+
+## Verificación — salida real (tanda T1/T2/T4/T19/T20/T21)
+
+```
+$ pnpm exec next typegen && pnpm run typecheck
+✓ Types generated successfully
+> tsc --noEmit
+(sin salida — 0 errores)
+
+$ pnpm run lint
+✖ 7 problems (0 errors, 7 warnings)   ← preexistentes, ajenos a esta tanda
+
+$ pnpm exec vitest run tests/guards/guard-catalogo-de-errores.test.ts tests/unit/errores/catalogo.test.ts
+ Test Files  2 passed (2)
+      Tests  70 passed (70)          ← el rojo de T3 ya no existe
+
+$ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts
+ Test Files  1 passed (1)
+      Tests  62 passed (62)
+
+$ pnpm exec vitest run tests/guards/guard-contrato-listados.test.ts
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+
+$ pnpm exec vitest run tests/unit/clientes/scope.test.ts
+ Test Files  1 failed (1)
+      Tests  2 failed | 19 passed (21)   ← los dos rojos esperados de T4 (ver arriba)
+
+$ pnpm exec vitest run tests/unit/clientes/schema/customers-search-migration.test.ts
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+$ pnpm exec vitest run tests/guards/guard-aislamiento-integracion.test.ts
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+
+$ DATABASE_URL=...QuimiCloude_QC154 DIRECT_URL=...QuimiCloude_QC154 \
+  pnpm exec vitest run tests/integration/clientes
+ Test Files  3 passed (3)
+      Tests  25 passed (25)
+```
+
+No se corrió `pnpm test` ni `./init.sh` (fuera del encargo de esta tanda; los explícitamente
+permitidos eran `typecheck`, `lint`, `vitest related`/archivos concretos, las guardias tocadas y
+los tests de integración propios).
+
+## Mapa `R<n> → test` (lo que cubre esta tanda)
+
+| R | Test |
+| --- | --- |
+| R27 (parte) | `tests/guards/guard-contrato-listados.test.ts` → séptimo módulo `clientes` |
+| R31 (parte) | `tests/guards/guard-contrato-listados.test.ts` → bloque 3, pureza del dominio de `clientes` |
+| R32 (parte) | `tests/guards/guard-catalogo-de-errores.test.ts` → `CustomerNotFoundError` cierra el orfanato |
+| R36 | `tests/unit/clientes/scope.test.ts` → `R36 — lib/modules/clientes/** no reimplementa la aritmetica de paginacion` |
+| R37 (enmendado) | `tests/unit/clientes/scope.test.ts` → `model Customer solo gano los tres campos normalizados...` + `solo dos migraciones del repo tocan la tabla customers...` |
+| R38 | `tests/unit/clientes/scope.test.ts` → `R38 — nada bajo app/ que nombre clientes` |
+| R40 | `tests/unit/clientes/scope.test.ts` → `R40 — clientes no nombra pedidos ni pedidos nombra clientes` |
+| R35 (parte) | `tests/unit/clientes/scope.test.ts` → `R20 (QC-153), R35 (QC-154) — ...` (dos casos; **dos siguen en rojo esperado**, ver arriba) |
+| R43 | `tests/unit/clientes/schema/customers-search-migration.test.ts` (relleno antes del NOT NULL, misma pareja de `translate`) + `tests/integration/clientes/customers-search-migration.int.test.ts` (`R43 — ...`) |
+| R44 | `tests/unit/clientes/schema/customers-search-migration.test.ts` (NOT NULL, sin UNIQUE) + `tests/integration/clientes/customers-search-migration.int.test.ts` (`R44 — ...`) |
+| R45 | `tests/unit/clientes/schema/customers-search-migration.test.ts` (tres GIN parciales, ninguna otra tabla) + `tests/integration/clientes/customers-search-migration.int.test.ts` (`R45 — ...`) |
+| R46 | `tests/unit/clientes/schema/customers-search-migration.test.ts` (down sin DROP EXTENSION, down que olvida columna) + **T21**, ciclo real `db:migrate` → `db:rollback` → `db:migrate` |
+
+## Archivos tocados (tanda T1/T2/T4/T19/T20/T21)
+
+- `lib/modules/clientes/domain/actor.ts` (nuevo)
+- `lib/modules/clientes/domain/customer-scope.ts` (nuevo)
+- `lib/modules/clientes/domain/errors.ts` (nuevo)
+- `lib/modules/clientes/domain/page.ts` (nuevo)
+- `lib/modules/clientes/domain/customer-id.ts` (nuevo)
+- `lib/modules/clientes/domain/list-query.ts` (nuevo)
+- `lib/modules/clientes/ports/list-query-log.ts` (nuevo)
+- `tests/guards/guard-contrato-listados.test.ts`
+- `tests/unit/clientes/scope.test.ts`
+- `tests/unit/clientes/schema/customers-search-migration.test.ts` (nuevo)
+- `tests/integration/clientes/customers-search-migration.int.test.ts` (nuevo)
+- `tests/integration/aislamiento.json`
+- `specs/QC-154-crud-de-clientes/tasks.md` (checkboxes T1, T2, T4, T19, T20, T21)
+
+## Veredicto (tanda T1/T2/T4/T19/T20/T21)
+
+T1, T2, T4, T19, T20 y T21 cerradas y verificadas con evidencia real (incluido el ciclo real de
+migración contra `QuimiCloude_QC154`). Los únicos rojos son los dos esperados y documentados de T4
+(lista cerrada de archivos y `adapters/driving/` exacto), que se cierran en T12/T15 cuando el resto
+del módulo se llene; no se relajó ninguna regla para ocultarlos.
