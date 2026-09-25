@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, useTransition } from 'react';
+import type { FocusEvent } from 'react';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
   type RowProblem,
 } from '@/lib/modules/documentos';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
-import { formatPercentage } from '@/lib/modules/recetas';
+import { createRecipeSchema, formatPercentage } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import {
@@ -246,16 +247,24 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
     setReplaceChoice(null);
   }
 
-  function handleNameBlur() {
+  function handleNameBlur(event: FocusEvent<HTMLInputElement>) {
+    // El DOM manda: si el revisor escribio antes de que React hidratara, `onChange` nunca vio
+    // esas pulsaciones y el estado se quedo atras del valor que se ve en pantalla.
+    const domValue = event.currentTarget.value;
+    if (domValue !== name) {
+      setName(domValue);
+      setReplaceChoice(null);
+    }
+
     // Un nombre ya invalido para reviewFormulaImport no puede chocar con nada: no vale la pena
     // recomprobarlo, y evita disparar la accion con un valor que el servidor igual rechazaria.
-    if (issues.name !== 'ok') return;
+    if (createRecipeSchema.shape.name.safeParse(domValue).success !== true) return;
 
     const requestId = ++clashCheckSeqRef.current;
     startCheckingName(async () => {
       let result: Awaited<ReturnType<typeof previewFormulaImportAction>>;
       try {
-        result = await previewFormulaImportAction({ documentFileId, name });
+        result = await previewFormulaImportAction({ documentFileId, name: domValue });
       } catch {
         return;
       }

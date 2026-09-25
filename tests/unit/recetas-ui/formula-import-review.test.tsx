@@ -1,7 +1,7 @@
 // La revision de una importacion de formula: una tarjeta por ingrediente, los tres modos de
 // asignacion de producto, los pasos, la suma en vivo, el aviso de choque y la confirmacion.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { FormulaImportPreview, FormulaImportSummary } from '@/lib/modules/documentos';
@@ -52,6 +52,14 @@ afterEach(() => {
 
 const DOCUMENT_FILE_ID = 'ARCHIVO-ID-NO-VISIBLE';
 const UNITS: readonly UnitRef[] = [];
+
+const NATIVE_INPUT_VALUE_SETTER = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+
+/** Escribe en el input SIN pasar por React (sin disparar `input`/`change`), como cuando el
+ *  revisor teclea antes de que React termine de hidratar la pagina. */
+function writeWithoutReact(input: HTMLInputElement, value: string) {
+  NATIVE_INPUT_VALUE_SETTER?.call(input, value);
+}
 
 const PRODUCT_EXISTING: ProductPickerOption = { id: 'producto-existente', name: 'Sosa cáustica', unitId: null };
 const PRODUCT_ANOTHER: ProductPickerOption = { id: 'producto-otro', name: 'Ácido cítrico', unitId: null };
@@ -475,6 +483,43 @@ describe('el choque de nombre exige elegir antes de confirmar (R17, R21)', () =>
       });
     });
     await waitFor(() => expect(screen.queryByTestId('formula-import-clash')).toBeNull());
+  });
+
+  it('un nombre escrito antes de que React hidrate se lee del DOM al perder el foco (R17)', async () => {
+    previewFormulaImportActionMock.mockResolvedValue({
+      status: 'success',
+      data: preview({ nameClash: null }),
+    });
+
+    renderReview({
+      ingredients: [ingredienteCompleto()],
+      nameClash: { recipeId: 'receta-existente', recipeName: 'Detergente base' },
+    });
+
+    const input = screen.getByTestId('formula-import-name') as HTMLInputElement;
+    // Sin `input`/`change`: React nunca vio esta escritura, como en WebKit cuando hidrata tarde.
+    writeWithoutReact(input, 'Detergente reformulado');
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(previewFormulaImportActionMock).toHaveBeenCalledWith({
+        documentFileId: DOCUMENT_FILE_ID,
+        name: 'Detergente reformulado',
+      });
+    });
+    await waitFor(() => expect(screen.queryByTestId('formula-import-clash')).toBeNull());
+    expect(screen.getByTestId('formula-import-name')).toHaveValue('Detergente reformulado');
+  });
+
+  it('un valor de DOM vacio escrito antes de hidratar no recomprueba el choque (R17)', async () => {
+    renderReview({ ingredients: [ingredienteCompleto()] });
+
+    const input = screen.getByTestId('formula-import-name') as HTMLInputElement;
+    writeWithoutReact(input, '');
+    fireEvent.blur(input);
+
+    expect(previewFormulaImportActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('formula-import-name')).toHaveValue('');
   });
 
   it('un nombre ya invalido no recomprueba el choque al perder el foco', async () => {
