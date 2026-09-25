@@ -1104,3 +1104,100 @@ Tres commits, uno por hallazgo: `54eb838e` (B2), `97c5393c` (m6), `63925abd` (m7
 empujados a `origin/feature/QC-154-crud-de-clientes`.
 
 Archivo tocado: solo `tests/unit/clientes/scope.test.ts`.
+
+## Correcciones tras review, tanda 2 (B1, m2, m3, m10, m1)
+
+Retoma una sesion cortada a mitad de B1: 18 archivos sin commitear (migracion
+`20260924190000_customers_search_normalized` up/down, `lib/composition/index.ts`,
+`lib/modules/clientes/**`) que solo tocaban comentarios.
+
+### B1 — limpieza de citas de trazabilidad en comentarios de produccion
+
+El diff sin commitear ya solo tocaba comentarios (confirmado linea por linea). Se completo el
+barrido con `git diff origin/dev -- lib db app` (dev + working tree juntos) buscando
+`R[0-9]+|QC-[0-9]+|design\.md|\bP[0-9]\b|\bT[0-9]+\b|decisi[oó]n cerrada` en las lineas anadidas,
+excluyendo `lib/modules/clientes/domain/list-query.ts` (m1, copia literal vigilada por
+`guard-contrato-listados`, sin tocar). Grep final sobre esas lineas:
+
+```
+$ awk '/^diff --git/{f=$0} /^\+/ && !/^\+\+\+/{print f"::"$0}' <(git diff origin/dev -- lib db app) \
+  | grep -iE 'R[0-9]+|QC-[0-9]+|design\.md|\bP[0-9]\b|\bT[0-9]+\b|decisi[oó]n cerrada' \
+  | grep -v 'domain/list-query\.ts'
+diff --git a/lib/modules/clientes/adapters/driven/persistence/list-query-sql.ts b/...::+const MIDNIGHT_UTC = 'T00:00:00.000Z';
+```
+
+El unico resultado es un falso positivo (`\bT[0-9]+\b` casando con el literal de hora
+`T00:00:00.000Z`, no una cita de tarea). `db/schema.prisma` (el `///` del modelo `Customer`
+que toco QC-154) tambien se reviso aparte: limpio, sin citas.
+
+`migration.sql`/`down.sql` cambiaron (solo comentarios). Contra la base propia
+`QuimiCloude_QC154` (`DATABASE_URL`/`DIRECT_URL` sobrescritos en el entorno del comando, nunca la
+compartida):
+
+```
+$ DATABASE_URL=...QuimiCloude_QC154 DIRECT_URL=...QuimiCloude_QC154 pnpm exec prisma migrate status
+Datasource "db": PostgreSQL database "QuimiCloude_QC154", schema "public" at "localhost:5432"
+52 migrations found in prisma/migrations
+Database schema is up to date!
+```
+
+Sin drift de checksum: no hizo falta `db:rollback`/`db:migrate`.
+
+Commit `0d75f635`, 18 archivos.
+
+### m2 — `textCondition`/`TextCondition` muertos en `list-query-sql.ts`
+
+Ninguno de los dos se importaba en ningun lado de `clientes` (verificado con grep en
+`lib/modules/clientes` y en `tests/`). Se borraron junto con la cabecera, que decia «se copian
+las DOS funciones que este modulo usa» cuando solo usa `dateRangeCondition`; ahora dice «se copia
+SOLO la funcion» y nombra `textCondition` entre las que quedan fuera. Commit `7afb16ce`.
+
+### m3 — el guard de cabecera de migracion no vigilaba `QC-<n>` ni `design.md`
+
+`tests/unit/clientes/schema/customers-search-migration.test.ts`, caso «la cabecera no cita»:
+solo probaba `R\d+` y «decision cerrada». Se le sumaron `\bQC-\d+\b` y `design\.md`, con su propia
+sensibilidad (una cita fabricada de cada patron tiene que tumbar el predicado). Verificacion
+manual: se inserto `-- QC-999 cita fabricada de prueba` como primera linea de `migration.sql`, la
+corrida marco el caso en rojo (`expect(fuente).not.toMatch(/\bQC-\d+\b/)` fallando), y se
+revirtio con `cp` desde una copia de respaldo (`git diff` vacio despues de revertir). Vuelto a
+correr: verde, 8/8. Commit `f0286205`.
+
+### m10 — comentario de primera linea con la ruta del archivo
+
+Los seis archivos senalados (`customer-input.ts`, `customer-queryable.ts`, `customer-text.ts`,
+`customer-view.ts`, `list-query-sql.ts`, `list-query-log.ts`) ya no tenian ese comentario: B1 lo
+resolvio en los cuatro de `domain/` y en `list-query-log.ts` (que no es copia literal vigilada por
+`guard-contrato-listados`, solo `domain/list-query.ts` lo es), y m2 lo resolvio en
+`list-query-sql.ts` al reescribir su cabecera. Verificado con `head -1` sobre los seis: ninguno
+empieza con `// lib/modules/...`. Sin commit propio (nada que cambiar).
+
+### m1 — deuda declarada, no tocada
+
+`lib/modules/clientes/domain/list-query.ts` sigue siendo una de las siete copias literales del
+contrato de listado, vigiladas por `tests/guards/guard-contrato-listados.test.ts` (bloque 2:
+"coinciden caracter a caracter salvo el nombre del modulo"). Limpiar sus comentarios en solitario
+rompe esa igualdad textual contra las otras seis. Queda como deuda para una ficha aparte que
+limpie las **siete** copias (`inventario`, `recetas`, `proveedores`, `unidades`, `pedidos`,
+`identity`, `clientes`) a la vez, no como parte de QC-154.
+
+### Verificacion final
+
+```
+pnpm run typecheck
+  → tsc --noEmit, sin salida, sin errores
+
+pnpm run lint
+  → eslint: 0 errores, 7 warnings preexistentes ajenos
+    (tests/unit/documentos/confirm-catalog-import.test.ts,
+    tests/unit/pedidos/order-service.test.ts; archivos no tocados)
+
+DATABASE_URL/DIRECT_URL -> QuimiCloude_QC154
+pnpm exec vitest run tests/unit/clientes tests/guards tests/integration/clientes
+  → Test Files 59 passed (59) · Tests 706 passed | 5 skipped (711)
+```
+
+`git status` tras la corrida: `nothing to commit, working tree clean`.
+
+Tres commits de codigo/tests, uno por hallazgo: `0d75f635` (B1), `7afb16ce` (m2), `f0286205`
+(m3). m10 no genero commit (ya resuelto por B1/m2) y m1 queda anotado como deuda, sin tocar.
+Todos empujados a `origin/feature/QC-154-crud-de-clientes`.
