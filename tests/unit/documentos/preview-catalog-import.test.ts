@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { DOCUMENT_UPLOAD_PERMISSION, type Actor } from '@/lib/modules/documentos/domain/actor';
+import { CATALOG_IMPORT_PERMISSION, type Actor } from '@/lib/modules/documentos/domain/actor';
 import { UnauthorizedError, ValidationError } from '@/lib/modules/documentos/domain/errors';
 import {
   createPreviewCatalogImport,
@@ -22,7 +22,7 @@ const ARCHIVO = '44444444-4444-4444-8444-444444444444';
 const PRESENTACION_LITRO = '55555555-5555-4555-8555-555555555555';
 
 function actorConPermiso(): Actor {
-  return { id: PERSONA, companyId: EMPRESA, permissions: [DOCUMENT_UPLOAD_PERMISSION] };
+  return { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
 }
 
 const JSON_UNA_LINEA_NUEVA = JSON.stringify({
@@ -254,6 +254,7 @@ describe('createPreviewCatalogImport', () => {
       ['actor ausente', undefined],
       ['sin el permiso exigido', { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.consultar'] }],
       ['con el conjunto vacio', { id: PERSONA, companyId: EMPRESA, permissions: [] }],
+      ['R8 — solo con `documentos.modificar`', { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] }],
     ];
 
     for (const [nombre, actor] of actoresDenegados) {
@@ -284,6 +285,17 @@ describe('createPreviewCatalogImport', () => {
       await preview(actorConPermiso(), { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
 
       expect(bitacora[0]).toBe('repository.readFileForReview');
+    });
+
+    it('R9 — con solo `proveedores.modificar` (sin `documentos.modificar`) devuelve la vista previa', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora);
+      const preview = createPreviewCatalogImport(deps);
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION] };
+
+      const resultado = await preview(actor, { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
+
+      expect(resultado.rows).toHaveLength(1);
     });
   });
 });
