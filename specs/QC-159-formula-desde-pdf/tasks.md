@@ -195,7 +195,7 @@ no previsto).
 ancla; limpieza por empresa en `try/finally` (**R39**; recorre también R1, R11, R12, R14, R17, R18, R19,
 R25).
 
-### T12 [ ] [P] — Guardia de alcance
+### T12 [x] [P] — Guardia de alcance
 Tras T5. **Toca:** `tests/unit/documentos/qc159-alcance.test.ts` (nuevo).
 **Hacer:** las comprobaciones de la fila R35–R37 de `design.md > 16`.
 **Hecho cuando:** verde, y rojo a mano al añadir una migración de prueba o una clave en castellano al

@@ -227,3 +227,27 @@ vitest related: tests/unit/configuracion-ui/user-table.test.tsx rojo en la corri
   superado en su primera mitad; R3 intacto) y `specs/QC-90-alta-del-primer-lote/requirements.md`
   (excepción de la materia prima sin lote, P1). Las tres enlazan a este spec; `git diff` = solo
   añadidos al final (10 + 9 + 9 líneas), ninguna tabla ni requisito ajeno cambiado.
+
+## T12 — guardia de alcance (backend_dev, `547ab378`)
+
+- `tests/unit/documentos/qc159-alcance.test.ts` (nuevo, 17 casos): R36 sin migraciones ni
+  `db/schema.prisma` en el diff contra `dev` (ruta real comprobada: `db/migrations`, `db/schema.prisma`);
+  exige que existan las seis fuentes de dominio (no pasa en vacío) y recoge `formula-import-actions.ts` y
+  `formulas/importar/**` si existen; R35 sin `crop`/`recorte`; R36 claves reales de los dos esquemas
+  (leídas del barrel, incluida la unión de `lines`) y de `formula-extraction.ts` contra lista cerrada en
+  inglés; R36 sin `delete`/`deleteMany` de `recipe`/`product`; R37 nada bajo `borradores-de-prompts/`,
+  `FORMULA_PROMPT` solo en `strategy-prompt-env.ts` y `playwright.config.ts`, `CANNED_FORMULA_TEXT` es
+  JSON puro. Cada detector tiene su caso con entrada infractora inventada.
+
+```
+vitest run tests/unit/documentos/qc159-alcance.test.ts   17 passed
+Rojo a mano 1 (db/migrations/20990101000000_prueba_temporal_qc159/migration.sql, revertido):
+  FAIL R36: el diff de esta rama contra dev no trae ninguna migracion ni cambia db/schema.prisma
+  db/migrations/20990101000000_prueba_temporal_qc159/migration.sql: expected [ Array(1) ] to deeply equal []
+Rojo a mano 2 (clave `nombre` en previewFormulaImportInputSchema, revertido):
+  FAIL R36: las claves reales de los esquemas de entrada estan todas en la lista cerrada
+  nombre: expected [ 'nombre' ] to deeply equal []
+lint 0 errores
+```
+
+Pendiente de volver a correrla cuando exista la pantalla de T9 (entra en su barrido).
