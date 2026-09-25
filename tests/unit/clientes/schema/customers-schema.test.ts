@@ -98,6 +98,9 @@ const CUSTOMER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['phone', 'phone'],
   ['email', 'email'],
   ['address', 'address'],
+  ['firstNamesNormalized', 'first_names_normalized'],
+  ['lastNamesNormalized', 'last_names_normalized'],
+  ['cityNormalized', 'city_normalized'],
   ['companyId', 'company_id'],
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
@@ -106,8 +109,12 @@ const CUSTOMER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
 ]
 
+/** Derivadas para la busqueda sin acentos: no son dato de negocio y el tipo `Customer` del
+ *  armazon no las lleva (R42). */
+const CUSTOMER_NORMALIZED_COLUMNS = ['firstNamesNormalized', 'lastNamesNormalized', 'cityNormalized']
+
 describe('db/schema.prisma — modelo Customer', () => {
-  it('declara id uuid propio mas los seis datos de R1, y ninguno mas (R1, R4)', () => {
+  it('declara id uuid propio mas los seis datos de R1, y ninguno mas (R1, R4 (QC-153), R42 (QC-154))', () => {
     const id = field(customer, 'id')
     expect(id.type).toBe('String')
     expect(id.isOptional).toBe(false)
@@ -296,7 +303,12 @@ describe('db/schema.prisma — modelo Customer', () => {
       deletedAt: true,
     } satisfies Record<keyof Customer, true>
 
-    const modelFieldNames = customer.fields.map((candidate) => candidate.name).sort()
+    // Las tres normalizadas son derivadas para la busqueda (R42, QC-154): el modelo las lleva y
+    // el tipo `Customer` del armazon no, a proposito.
+    const modelFieldNames = customer.fields
+      .map((candidate) => candidate.name)
+      .filter((name) => !CUSTOMER_NORMALIZED_COLUMNS.includes(name))
+      .sort()
     expect(Object.keys(CUSTOMER_TYPE_FIELDS).sort()).toEqual(modelFieldNames)
 
     // Sensibilidad OBLIGATORIA: un campo de mas (o de menos) en el tipo tiene que tumbar el
@@ -306,5 +318,13 @@ describe('db/schema.prisma — modelo Customer', () => {
     const conCampoDeMenos: Record<string, true> = { ...CUSTOMER_TYPE_FIELDS }
     delete conCampoDeMenos.city
     expect(Object.keys(conCampoDeMenos).sort()).not.toEqual(modelFieldNames)
+
+    // Y las tres normalizadas, si se quitan del filtro, tienen que tumbar la comparacion:
+    // demuestra que el filtro de arriba no esta vaciando la lista por accidente.
+    expect(
+      Object.keys(CUSTOMER_TYPE_FIELDS)
+        .sort()
+        .concat(),
+    ).not.toEqual(customer.fields.map((candidate) => candidate.name).sort())
   })
 })

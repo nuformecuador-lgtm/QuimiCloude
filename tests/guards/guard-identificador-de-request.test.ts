@@ -323,6 +323,9 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: agrega `material` y `measurements` a las lineas del catalogo de proveedor;
   // no toca el identificador de peticion.
   '20260924180000_supplier_catalog_line_material_and_measurements',
+  // Igual patron: anade las tres columnas normalizadas de `customers` para la busqueda sin
+  // acentos; no toca el identificador de peticion.
+  '20260924190000_customers_search_normalized',
 ] as const
 
 export function hallazgosDeMigraciones(
