@@ -181,3 +181,21 @@ test-db: borrada la base de la corrida: qct_qc159_15d32d70_muh7ctmf_ge4.
 ✓ test:rapido paso · ✓ todas las migraciones tienen down.sql · == init OK ==
 exit 0
 ```
+
+### E2E de regresión de T10 (`documentos.spec.ts` y `catalogo-desde-pdf.spec.ts`, puerto 3117 libre)
+
+```
+$ pnpm exec playwright test e2e/documentos.spec.ts e2e/catalogo-desde-pdf.spec.ts --reporter=line
+  2 failed   [chromium] y [webkit] catalogo-desde-pdf.spec.ts:281 — getByTestId('document-upload') Received: hidden
+  6 passed (2.1m)                                        (documentos.spec.ts: 6/6)
+```
+
+- **Rojo ajeno, deuda de `dev`:** QC-160 (`b03f4811`, 2026-09-24 18:42) metió la subida del detalle de
+  proveedor en un diálogo con botón `document-upload-open` y actualizó `documentos.spec.ts`, pero
+  `catalogo-desde-pdf.spec.ts` (QC-158, último cambio `121f3bd5` a las 14:55 del mismo día, que no tiene
+  QC-160 en su historia) sigue esperando la sección visible sin abrir el diálogo. Esta rama no toca
+  `proveedores/` ni `components/shared/document-upload/`. No está en `tests/baseline-rojos.json`.
+- **Prueba de que T10 no rompe el catálogo:** con un parche **local y revertido** (abrir el diálogo
+  antes de la línea 325; `git checkout -- e2e/catalogo-desde-pdf.spec.ts`, árbol limpio):
+  `pnpm exec playwright test e2e/catalogo-desde-pdf.spec.ts` → `2 passed (30.1s)`.
+- No se arregla aquí: es un archivo de QC-158/QC-160 fuera de las tasks de esta ficha. **Para el leader.**
