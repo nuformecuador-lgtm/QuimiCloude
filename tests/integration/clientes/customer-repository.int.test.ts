@@ -155,7 +155,7 @@ afterAll(async () => {
 });
 
 describe('R9: el alta usa la empresa del actor', () => {
-  it('el cliente creado queda en la empresa del actor', async () => {
+  it('R9 — el cliente creado queda en la empresa del actor', async () => {
     let customerId: string | null = null;
     try {
       const created = await createCustomer(
@@ -178,7 +178,7 @@ describe('R9: el alta usa la empresa del actor', () => {
 });
 
 describe('R13: crea el cliente con datos validos y devuelve su identificador', () => {
-  it('devuelve un id con forma de uuid y la ficha coincide con lo enviado', async () => {
+  it('R13 — crea el cliente con datos validos y devuelve su identificador', async () => {
     let customerId: string | null = null;
     try {
       const input = customerInput({
@@ -212,7 +212,7 @@ describe('R13: crea el cliente con datos validos y devuelve su identificador', (
 });
 
 describe('R15: el opcional en blanco se guarda como NULL', () => {
-  it('los tres opcionales ausentes quedan NULL en la fila', async () => {
+  it('R15 — el opcional en blanco se guarda como NULL', async () => {
     let customerId: string | null = null;
     try {
       const created = await createCustomer(
@@ -235,7 +235,7 @@ describe('R15: el opcional en blanco se guarda como NULL', () => {
 });
 
 describe('R19: dos clientes vivos con los mismos seis datos se crean los dos', () => {
-  it('no hay ninguna restriccion de unicidad sobre los datos de negocio', async () => {
+  it('R19 — dos clientes vivos con los mismos seis datos se crean los dos', async () => {
     let ids: string[] = [];
     try {
       const input = customerInput({ phone: '+57 300 000 0000' });
@@ -270,7 +270,7 @@ describe('R19: dos clientes vivos con los mismos seis datos se crean los dos', (
 });
 
 describe('R21: la autoria de creacion y de modificacion', () => {
-  it('el actor queda como autor de creacion y modificacion al crear, y solo de modificacion al editar y dar de baja', async () => {
+  it('R21 — editar y dar de baja no pisan created_by ni created_at', async () => {
     const autorCreador = await crearEmpresaConActor();
     const autorEditor = empresaA.actorId;
     const autorQueBaja = empresaB.actorId;
@@ -349,7 +349,7 @@ describe('R21: la autoria de creacion y de modificacion', () => {
 });
 
 describe('R23: un cliente ya dado de baja no cambia con una segunda operacion', () => {
-  it('editar o dar de baja un cliente ya dado de baja no cambia ninguna fila', async () => {
+  it('R23 — editar o dar de baja un cliente ya dado de baja no cambia ninguna fila', async () => {
     let customerId: string | null = null;
     try {
       const created = await createCustomer(
@@ -406,7 +406,7 @@ describe('R23: un cliente ya dado de baja no cambia con una segunda operacion', 
 });
 
 describe('R24: la baja conserva la fila completa y marca deleted_at', () => {
-  it('la fila NO se elimina fisicamente: sigue entera, con todos sus datos de negocio', async () => {
+  it('R24 — la baja conserva la fila completa y marca deleted_at', async () => {
     let customerId: string | null = null;
     try {
       const input = customerInput({
@@ -457,7 +457,7 @@ describe('R24: la baja conserva la fila completa y marca deleted_at', () => {
 });
 
 describe('R25: la ficha y el listado excluyen los dados de baja', () => {
-  it('sin restaurar: la ficha y una busqueda por su marca dejan de encontrarlo tras la baja', async () => {
+  it('R25 — la ficha y el listado excluyen los dados de baja', async () => {
     let customerId: string | null = null;
     try {
       const marca = `r25${token().slice(0, 10)}`;
@@ -493,7 +493,7 @@ describe('R25: la ficha y el listado excluyen los dados de baja', () => {
 });
 
 describe('R10: un cliente de otra empresa responde como no encontrado y su fila queda intacta', () => {
-  it('la ficha, la edicion y la baja de un cliente de otra empresa responden `not_found`/null/false, y la fila ajena queda intacta al releerla', async () => {
+  it('R10 — la ficha, la edicion y la baja de un cliente de otra empresa responden customer_not_found y la fila ajena queda intacta', async () => {
     let customerId: string | null = null;
     try {
       const input = customerInput({ phone: '+57 300 999 8877' });
@@ -544,7 +544,7 @@ describe('R10: un cliente de otra empresa responde como no encontrado y su fila 
 });
 
 describe('R11: el listado y su total solo cuentan la empresa del actor', () => {
-  it('una busqueda que casa con clientes de otra empresa no los devuelve', async () => {
+  it('R11 — el listado y su total solo cuentan la empresa del actor', async () => {
     const marca = `r11${token().slice(0, 10)}`;
     let idsA: string[] = [];
     let idsB: string[] = [];
