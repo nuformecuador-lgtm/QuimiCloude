@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-150 - PR #121 abierto (2026-09-24)
+
+F2.4 hecho: https://github.com/singularis-co/QuimiCloude/pull/121 . Review vuelta 3 OK (0 bloqueantes). Decisiones humanas en F2.1: D22 (nombre de producto hasta 200), D23 (terminado editable), D24 (receta de otra empresa se rechaza en pedidos). Gate completo en bdaa2fc3: verde salvo el rojo heredado de dev (catalog-import-isolation, en baseline, lo arregla **QC-169**) y un flake de module-contract (pasa 9/9 aislado); el humano decidio abrir el PR igual. **Tras el merge (F2.5)**: tarjeta a Finalizado, desmontar worktree, borrar la base QuimiCloude_QC150.
+
 ### QC-142 - CERRADA (2026-09-24)
 
 PR #120, merge `5d3e90d9`. Resumen en `progress/history.md`. Desbloquea QC-160 (spec aprobado), QC-159 y QC-157.

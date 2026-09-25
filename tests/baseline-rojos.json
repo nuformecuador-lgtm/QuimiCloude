@@ -2,7 +2,7 @@
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Todo lo que NO este aqui y salga rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
   "archivos": {
     "tests/integration/documentos/catalog-import-isolation.int.test.ts": {
-      "motivo": "Rojo heredado de dev, no de esta rama: R21 (timeout) y R22 (UnauthorizedError). Lo causa el choque entre QC-158 (PR #119) y QC-142 (PR #120): confirmCatalogImport exige DOCUMENT_UPLOAD_PERMISSION, que QC-142 paso a documentos.modificar, y los actores del test solo tienen proveedores.modificar. El archivo y el modulo documentos son identicos en origin/dev, que ya esta rojo. Lo arregla QC-169 (la confirmacion exigira proveedores.modificar), decidido por el humano el 2026-09-24; QC-169 debe borrar esta entrada al cerrar.",
+      "motivo": "Rojo de dev desde el 2026-09-24: QC-158 (#119) hizo que confirmCatalogImport exigiera DOCUMENT_UPLOAD_PERMISSION y QC-142 (#120) lo paso a documentos.modificar, asi que los actores del test (con proveedores.modificar) reciben UnauthorizedError en R21/R22. Por decision humana se arregla en el CODIGO, no en el test: lo hace QC-169 (confirmar exige proveedores.modificar). Salida limpia: QC-169 borra esta entrada. QC-160 no toca ese caso de uso.",
       "desde": "2026-09-24"
     }
   }

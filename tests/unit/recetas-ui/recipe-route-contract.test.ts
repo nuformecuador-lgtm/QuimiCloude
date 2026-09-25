@@ -536,11 +536,41 @@ describe('contrato de la ruta de recetas', () => {
       'requireAdmin',
       // No casa con `requirePagePermission`, que es lo que las paginas deben llamar.
       'requirePermission(',
-      'getSessionUser',
+      'assertPermission',
       'ADMIN_ROLE_NAME',
       'decideRouteAccess',
       'next/headers',
     ]);
+
+    // Ampliacion estrecha: el listado consulta la sesion SOLO para decidir si monta la subida de
+    // documentos, nunca para autorizar datos de recetas. Cualquier otro archivo de la ruta sigue
+    // sin poder tocar la sesion.
+    const PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR = enRutaDePosix(PAGE_PATH);
+
+    ningunArchivoContiene(
+      ['getSessionUser'],
+      FUENTES_DE_LA_RUTA.filter((ruta) => ruta !== PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR),
+    );
+
+    const paginaDeListado = fuenteSinComentarios(PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR);
+    expect(
+      paginaDeListado.split('getSessionUser').length - 1,
+      `${PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR} usa getSessionUser mas de una vez`,
+    ).toBe(1);
+    expect(
+      paginaDeListado,
+      `${PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR} solo puede usar la sesion para decidir si monta la subida`,
+    ).toMatch(/canUploadDocuments\(\s*await\s+identity\.getSessionUser\(\)\s*\)/);
+    // La linea que llama a la sesion no puede llevar ademas un permiso de recetas: eso volveria a
+    // ser autorizar datos, no decidir si se monta la subida.
+    const lineaConSesion = paginaDeListado
+      .split('\n')
+      .find((linea) => linea.includes('getSessionUser'));
+    expect(lineaConSesion, `no se encontro la linea con getSessionUser`).toBeDefined();
+    expect(
+      lineaConSesion,
+      `${PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR}: la linea de la sesion no puede llevar un permiso de recetas`,
+    ).not.toMatch(/recetas\.\w+/);
   });
 
   // El permiso que exigen las pantallas y el de su item de menu tienen que ser el mismo codigo: se
