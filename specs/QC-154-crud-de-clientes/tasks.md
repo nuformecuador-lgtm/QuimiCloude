@@ -176,7 +176,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       hecho solo de símbolos (`%`, `_`, `---`) equivale a no buscar. Este caso **sustituye** al viejo
       «`%` no devuelve a todos».
 
-- [ ] **T15 — Cierre del alcance.** Releer `tests/unit/clientes/scope.test.ts` con el módulo ya lleno
+- [x] **T15 — Cierre del alcance.** Releer `tests/unit/clientes/scope.test.ts` con el módulo ya lleno
       y comprobar que ninguna guardia se relajó fuera de lo que `design.md > 11` declara.
       *Depende de:* T12, T13, T14. **Hecho cuando:** cada regla de alcance falla con su fabricado, y la
       bitácora lista qué se relajó (solo § 11) y qué se amplió (§ 12).

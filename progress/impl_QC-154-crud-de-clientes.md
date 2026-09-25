@@ -750,3 +750,256 @@ T9, T10, T11 y T12 cerradas y verificadas con evidencia real, cada una en su pro
 Ningún rojo pendiente propio de esta tanda; el único rojo observado (`guard-permisos-no-
 administrables` leyendo el fabricado temporal de `scope.test.ts`) es un flake de concurrencia
 entre workers, reproducido y descartado corriendo la misma batería en solitario tres veces.
+
+---
+
+# Tanda T13, T14, T15 (Grupo D)
+
+## Sincronizacion con `origin/dev` antes de empezar
+
+`git fetch origin dev` trajo dos commits por encima del punto de partida de esta rama
+(`9ce363e5`): `ffbb4633` (QC-169, solo `feature_list.json`) y `7c30a294` (QC-150, solo
+`progress/current.md`). Ninguno de los dos toca `db/schema.prisma`, `db/migrations/` ni
+`tests/guards/guard-identificador-de-request.test.ts`: no hay ninguna migracion de QC-150 con
+timestamp posterior a `20260924190000`, asi que no hizo falta renumerar nada. Se hizo
+`git merge origin/dev --no-edit` (merge, no rebase), sin conflictos.
+
+## T13 — Integracion: CRUD y aislamiento
+
+- `tests/integration/clientes/customer-repository.int.test.ts` (nuevo), contra
+  `QuimiCloude_QC154` (`DATABASE_URL`/`DIRECT_URL` sobrescritos en el entorno del comando, nunca
+  la compartida del `.env`). Cada caso fabrica su propia empresa efimera (documento, rol,
+  usuario, empresa) con `randomUUID`; el `afterAll` cuenta que no quedo ninguna fila de
+  `customers` de esas empresas antes de borrarlas, en el orden de las FK (`customers` -> usuarios
+  -> rol y tipo de documento -> empresa).
+- R10 se demuestra releyendo la fila ajena: tras que la empresa A intenta leer/editar/dar de baja
+  un cliente de la empresa B (null/'not_found'/false), se relee la fila con el scope de la
+  empresa B y se comprueba que sigue con sus datos originales y su `updatedBy` intacto, ademas de
+  mirar la fila cruda de Prisma.
+- Cobertura exacta pedida por `tasks.md`: R9, R10, R11, R13, R15, R19, R21, R23, R24, R25.
+- Entrada nueva en `commit` de `tests/integration/aislamiento.json`, con motivo y `desde`
+  (2026-09-24): el adaptador usa el cliente Prisma global, asi que una transaccion de test con
+  ROLLBACK no lo envolveria.
+- Los nombres de `it()` se corrigieron en un commit de seguimiento para llevar el prefijo
+  `R<n> — ...` exacto de la tabla de Trazabilidad de `tasks.md` (el primer commit los tenia en el
+  `describe()` pero no en el `it()`).
+
+## T14 — Integracion: listado
+
+- `tests/integration/clientes/list-query-customers.int.test.ts` (nuevo), misma base y misma
+  declaracion en `aislamiento.json`. Cada caso siembra sus propios clientes con un marcador
+  irrepetible (`MARCA` + un sufijo por caso) para no depender del estado del catalogo de la
+  empresa.
+- Cobertura exacta: R26 (100 a 25, con `total`), R29 (recorrido de paginas sin repetir ni omitir
+  por apellidos/nombres, con un caso de empate real de 4 filas resuelto por el desempate en
+  `id`), R30 (dos palabras en columnas distintas + termino en blanco comparado contra
+  `search: ''` con el mismo filtro de ciudad), R31 (total del conjunto filtrado, no de la
+  pagina), R11 con busqueda (una busqueda que casa con clientes de otra empresa no los trae).
+- F1.4: R41 (mayusculas/acentos + termino de solo simbolos comparado contra `search: ''`, que
+  sustituye el viejo caso «`%` no devuelve a todos») y R47 (filtrar por «bogota» encuentra
+  «Bogota» y no «Medellin»).
+
+### Verificacion real de T13/T14
+
+```
+$ pnpm exec next typegen && pnpm run typecheck
+✓ Types generated successfully
+> tsc --noEmit
+(sin salida — 0 errores)
+
+$ pnpm run lint
+✖ 7 problems (0 errors, 7 warnings)   ← preexistentes, ajenos a esta tanda
+
+$ DATABASE_URL=...QuimiCloude_QC154 DIRECT_URL=...QuimiCloude_QC154 \
+  pnpm exec vitest run tests/integration/clientes/customer-repository.int.test.ts
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+
+$ DATABASE_URL=...QuimiCloude_QC154 DIRECT_URL=...QuimiCloude_QC154 \
+  pnpm exec vitest run tests/integration/clientes/list-query-customers.int.test.ts
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+$ DATABASE_URL=...QuimiCloude_QC154 DIRECT_URL=...QuimiCloude_QC154 \
+  pnpm exec vitest run tests/integration/clientes
+ Test Files  5 passed (5)
+      Tests  44 passed (44)
+
+$ pnpm exec vitest run tests/guards/guard-aislamiento-integracion.test.ts
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+```
+
+## T15 — Cierre del alcance
+
+`tests/unit/clientes/scope.test.ts` releido con el modulo ya lleno (21 casos, todos verdes en
+una corrida limpia). Cada regla que `design.md > 11` declara se comprobo en rojo real contra el
+arbol de disco, con el fabricado indicado, y se revirtio:
+
+| Regla | Fabricado usado | Resultado |
+| --- | --- | --- |
+| R20/R35 — lista cerrada de archivos del modulo | `domain/__fabricado_extra__.ts` de mas | Rojo real: `archivosReales` trae 24 en vez de 23. Revertido, vuelve a 21/21 verde. |
+| R20/R35 — 'use server' fuera de `adapters/driving/` | Se antepuso 'use server' a `customer-scope.ts` | Rojo real: `customer-scope.ts no puede declarar 'use server' fuera de adapters/driving/`. Revertido con `git checkout`. |
+| R26 — `adapters/driving/` = exactamente `customer-actions.ts` | `adapters/driving/__fabricado_extra__.ts` | Rojo real: `['customer-actions.ts', '__fabricado_extra__.ts']` distinto de `['customer-actions.ts']`. Borrado, vuelve a verde. |
+| R26 — literal de permiso fuera de `domain/` | Caso ya en el archivo (`lib/modules/clientes/__sensibilidad_literal__.ts`) | Ya en verde: dispara. |
+| R26 — literal DENTRO de `domain/` no dispara | Caso ya en el archivo (`domain/__sensibilidad_literal__.ts`) | Ya en verde: NO dispara (caso simetrico exigido). |
+| R28 — sin E2E de clientes | Sin cambio (decision 7, `design.md > 11` dice "Ninguno") | No aplica fabricado nuevo: QC-153 ya lo cubre e intacto. |
+| R29 — sin dependencias nuevas | Caso ya en el archivo (datos sinteticos) | Ya en verde. |
+| R36 — sin aritmetica de paginacion propia | Caso ya en el archivo (`domain/__sensibilidad_paginacion__.ts`) | Ya en verde: dispara. |
+| R37 — schema.prisma solo gana los tres campos normalizados | Campo `fabricadoDeMas` insertado a mano en `model Customer` | Rojo real: aparece en el censo de campos. Revertido con `git checkout`. |
+| R37 — una sola migracion nueva toca `customers` | Carpeta `db/migrations/99999999999999_fabricado_customers/migration.sql` con `ALTER TABLE "customers"` | Rojo real: lista con una migracion de mas. Carpeta borrada, vuelve a verde. |
+| R38 — nada bajo `app/` que nombre clientes | Caso ya en el archivo (`app/__sensibilidad_clientes__/page.tsx`) | Ya en verde: dispara. |
+| R40 — sin acoplamiento con `pedidos` | Caso ya en el archivo (`domain/__sensibilidad_pedidos__.ts`) | Ya en verde: dispara. |
+
+**Que se relajo (solo lo que `design.md > 11` declara, nada mas):**
+
+1. `ports y adapters estan vacios salvo su .gitkeep` + `domain solo tiene customer.ts` pasa a ser
+   una lista cerrada de 23 archivos (sin ningun `.gitkeep`).
+2. `ningun archivo alcanzable desde el contrato declara 'use server'`, antes barria todo el
+   modulo, ahora se acota a excluir `adapters/driving/**`.
+3. `el literal de los dos permisos solo aparece en permissions.ts` se relaja a `permissions.ts`
+   y `lib/modules/clientes/domain/**`.
+4. `adapters/driving/ esta vacio` pasa a `adapters/driving/` contiene exactamente
+   `customer-actions.ts`.
+
+Nada mas se toco: los casos de R28 y R29 de QC-153 siguen intactos, sin una linea cambiada
+(confirmado leyendo el archivo: no llevan ningun `R<n> (QC-154)` en el nombre).
+
+**Que se amplio (`design.md > 12`, ninguno relajado):** `guard-contrato-listados` (septimo
+modulo `clientes`), `guard-autorizacion-por-permiso` ('clientes' en `BUSINESS_MODULES`),
+`guard-permisos-no-administrables` (idem), `guard-identificador-de-request` ('clientes' en
+`MODULOS_DE_NEGOCIO` mas la migracion `20260924190000_customers_search_normalized` en su lista
+cerrada), `tests/unit/identity/session-once-per-request-actions.test.ts` (fila
+`listCustomersAction`), `tests/unit/errores/catalogo.test.ts` (54 a 55),
+`tests/integration/aislamiento.json` (dos entradas nuevas en `commit`, T13 y T14),
+`tests/unit/clientes/schema/customers-schema.test.ts` y
+`tests/integration/clientes/customers-constraints.int.test.ts` (F1.4, tanda anterior). Ninguna
+guardia existente perdio un caso ni un aserto.
+
+### Riesgo observado: ENOENT transitorio por concurrencia de workers
+
+`scope.test.ts` fabrica y borra, dentro del mismo `it()` (con `try`/`finally`), archivos reales
+bajo `lib/modules/clientes/**` y `app/__sensibilidad_clientes__/page.tsx`. El diseno lo exige
+(la sensibilidad tiene que probarse contra el arbol real, no contra un array en memoria) y no se
+cambio. El riesgo se reprodujo en esta tanda, no solo se cito de la anterior. Corrida de:
+`tests/unit/clientes`, `guard-ambito-empresa-clientes`, `guard-contrato-listados`,
+`guard-autorizacion-por-permiso`, `guard-arquitectura-modulos`, `guard-catalogo-de-errores`,
+`guard-permisos-no-administrables`, `guard-identificador-de-request`,
+`guard-aislamiento-integracion`, `session-once-per-request-actions`, `catalogo`, repetida tres
+veces:
+
+- Corrida 1: 20 archivos, 355 tests, todos verdes.
+- Corrida 2: `guard-catalogo-de-errores.test.ts` falla con `ENOENT: no such file or directory,
+  open '...\lib\modules\clientes\__sensibilidad_literal__.ts'` al leer todos los archivos de
+  `lib/modules/**` de una vez (otro worker borro el fabricado de `scope.test.ts` entre el listado
+  y la lectura). 2 tests de 355 fallaron esa corrida.
+- Corrida 3: 20 archivos, 355 tests, todos verdes de nuevo.
+
+Cada archivo, corrido EN SOLITARIO (`scope.test.ts`, `guard-catalogo-de-errores.test.ts`,
+`guard-permisos-no-administrables.test.ts`, `guard-arquitectura-modulos.test.ts`), sale siempre
+verde: confirma que es una condicion de carrera entre workers de Vitest leyendo el mismo arbol de
+archivos a la vez, no una regresion de esta ni de una tanda anterior.
+
+**Guardias en riesgo** (recorren `lib/modules/**` y/o `app/**` con `readdirSync`, y por tanto
+pueden ver un fabricado a medio escribir/borrar de `scope.test.ts` si corren en el mismo lote de
+workers): `guard-arquitectura-modulos`, `guard-autorizacion-por-permiso`,
+`guard-catalogo-de-errores`, `guard-permisos-no-administrables`, `guard-identificador-de-request`,
+las cinco `guard-ambito-empresa-*`, `guard-pantallas-exigen-permiso`,
+`guard-rutas-privadas-cubiertas`, y cualquier otra guardia que recorra esas raices con
+`readdirSync`.
+
+**Que significa para el gate completo.** `./init.sh` corre Vitest con mas de un worker; un rojo
+en una de esas guardias que solo aparece ahi y desaparece al reintentar la MISMA corrida (sin
+tocar codigo) es este flake, no una regresion, igual que ya documento la bitacora de T9-T12. No
+se cambia el patron de `scope.test.ts` (el diseno lo prescribe) ni se afina la configuracion de
+Vitest: es una decision de arnes, no de esta ficha. Se deja la observacion escrita para quien
+corra el gate completo (T16, fuera de esta tanda).
+
+### Verificacion final de T15
+
+```
+$ pnpm exec vitest run tests/unit/clientes/scope.test.ts
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+
+$ git status --short
+(vacio: todos los fabricados de esta verificacion se revirtieron)
+```
+
+## Mapa `R<n> → test`, R1 a R47, verificado con grep contra los nombres reales
+
+| R | Archivo(s) | Nombre real del test (grep) |
+| --- | --- | --- |
+| R1 | `tests/unit/clientes/authorization.test.ts` | `R1 — cada operacion recibe el actor por parametro y no lee ninguna sesion` |
+| R2 | `tests/unit/clientes/authorization.test.ts` | `R2 — sin clientes.consultar la ficha y el listado se rechazan sin llamar al puerto` |
+| R3 | `tests/unit/clientes/authorization.test.ts` | `R3 — sin clientes.modificar el alta, la edicion y la baja se rechazan sin llamar al puerto` |
+| R4 | `tests/unit/clientes/authorization.test.ts` | `R4 — actor ausente, sin permisos o con el permiso contrario se rechaza igual` |
+| R5 | `tests/unit/clientes/authorization.test.ts` | `R5 — sin permiso y con entrada invalida responde unauthorized, no invalid_input` |
+| R6 | `tests/guards/guard-autorizacion-por-permiso.test.ts` | `BUSINESS_MODULES` incluye `'clientes'` (guardia ampliada, verde) |
+| R7 | `tests/unit/clientes/customer-actions.test.ts` + `tests/unit/identity/session-once-per-request-actions.test.ts` | `R7 — la accion toma usuario y empresa de la sesion y no vuelve a comprobar el permiso` + fila `listCustomersAction` |
+| R8 | `tests/unit/clientes/authorization.test.ts` | `R8 — con los permisos sembrados del Administrador se autorizan las cinco y con los del Operador o el Empacador se rechazan` |
+| R9 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R9 — el alta usa la empresa del actor aunque la entrada traiga otra` + `R9 — el cliente creado queda en la empresa del actor` |
+| R10 | `tests/integration/clientes/customer-repository.int.test.ts` | `R10 — la ficha, la edicion y la baja de un cliente de otra empresa responden customer_not_found y la fila ajena queda intacta` |
+| R11 | `tests/integration/clientes/customer-repository.int.test.ts` + `tests/integration/clientes/list-query-customers.int.test.ts` | `R11 — el listado y su total solo cuentan la empresa del actor` + `R11 — una busqueda que casa con clientes de otra empresa no los devuelve` |
+| R12 | `tests/guards/guard-ambito-empresa-clientes.test.ts` | `R12 — cada metodo del puerto declara Y consume el ambito de empresa` (mas otros tres casos R12) |
+| R13 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R13 — el alta con datos validos devuelve el identificador del puerto` + `R13 — crea el cliente con datos validos y devuelve su identificador` |
+| R14 | `tests/unit/clientes/customer-input.test.ts` | `R14 — rechaza nombres, apellidos o ciudad ausentes, vacios o en blanco, y recorta los validos` |
+| R15 | `tests/unit/clientes/customer-input.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R15 — acepta cualquier combinacion de opcionales ausentes y convierte el blanco en ausencia` + `R15 — el opcional en blanco se guarda como NULL` |
+| R16 | `tests/unit/clientes/customer-input.test.ts` | `R16 — acepta cada dato en su largo maximo y rechaza uno mas` |
+| R17 | `tests/unit/clientes/customer-input.test.ts` | `R17 — acepta como correo y telefono cualquier texto dentro del largo` |
+| R18 | `tests/unit/clientes/customer-input.test.ts` + `tests/unit/clientes/customer-service.test.ts` | `R18 — las claves ajenas a los seis datos no salen del esquema` + `R18 — al puerto solo llegan los seis datos de negocio (mas sus tres formas normalizadas)` |
+| R19 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R19 — dos clientes vivos con los mismos seis datos se crean los dos, sin error de duplicado` + `R19 — dos clientes vivos con los mismos seis datos se crean los dos` |
+| R20 | `tests/unit/clientes/customer-service.test.ts` | `R20 — la edicion reemplaza los seis datos y el opcional ausente queda como ausencia` |
+| R21 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R21 — el actor queda como autor de creacion y modificacion al crear, y solo de modificacion al editar y dar de baja` + `R21 — editar y dar de baja no pisan created_by ni created_at` |
+| R22 | `tests/unit/clientes/customer-service.test.ts` | `R22 — la ficha devuelve id, seis datos, instantes y autores, sin empresa ni marca de baja` |
+| R23 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R23 — inexistente, dado de baja o id sin forma responden customer_not_found; el id sin forma no llega al puerto` + `R23 — editar o dar de baja un cliente ya dado de baja no cambia ninguna fila` |
+| R24 | `tests/integration/clientes/customer-repository.int.test.ts` | `R24 — la baja conserva la fila completa y marca deleted_at` |
+| R25 | `tests/unit/clientes/customer-service.test.ts` + `tests/integration/clientes/customer-repository.int.test.ts` | `R25 — no existe ninguna operacion de restaurar ni de listar dados de baja` + `R25 — la ficha y el listado excluyen los dados de baja` |
+| R26 | `tests/unit/clientes/list-customers.test.ts` + `tests/integration/clientes/list-query-customers.int.test.ts` | `R26 — rechaza pagina o tamano no enteros o menores que 1 sin leer del repositorio` + `R26 — usa 10 por defecto y devuelve 25 como maximo cuando se piden 100, con el total` |
+| R27 | `tests/unit/clientes/list-customers.test.ts` + `tests/guards/guard-contrato-listados.test.ts` | `R27 — omite el campo no declarado sin fallar y registra solo su nombre` + `clientes` como septimo modulo (`MODULOS`) |
+| R28 | `tests/unit/clientes/list-customers.test.ts` | `R28 — solo son ordenables y filtrables los campos declarados, nunca deletedAt ni companyId` |
+| R29 | `tests/integration/clientes/list-query-customers.int.test.ts` | `R29 — sin orden pedido ordena por apellidos y nombres y recorre las paginas sin repetir ni omitir` |
+| R30 | `tests/integration/clientes/list-query-customers.int.test.ts` | `R30 — cada palabra debe aparecer en nombres, apellidos o ciudad` |
+| R31 | `tests/integration/clientes/list-query-customers.int.test.ts` | `R31 — el total describe el conjunto filtrado y el filtro se aplica antes de paginar` |
+| R32 | `tests/unit/clientes/customer-actions.test.ts` | `R32 — las mutaciones reciben FormData y las consultas argumentos tipados`. Hallazgo: el segundo test que la tabla de `tasks.md` cita para R32 (`scope.test.ts` con «R32 — no hay ningun route handler de clientes») no existe con ese nombre literal; la propiedad la sigue cerrando `R38 — nada bajo app/ que nombre clientes` (barre `app/` entero, route handlers incluidos) desde una tanda anterior (T4). No se creo un test nuevo con ese nombre para no inventar uno fuera del alcance de T13-T15; se deja anotado. |
+| R33 | `tests/unit/clientes/customer-actions.test.ts` + `tests/guards/guard-catalogo-de-errores.test.ts` | `R33 — traduce cada error de dominio por su code estable, nunca por el texto` + guardia existente (verde) |
+| R34 | `tests/unit/errores/catalogo.test.ts` | `las 55 entradas estan...` + `R34 — customer_not_found tiene clave y texto no vacio` |
+| R35 | `tests/guards/guard-arquitectura-modulos.test.ts` + `tests/unit/clientes/scope.test.ts` | guardia existente (verde) + `R20 (QC-153), R35 (QC-154) — lista cerrada de archivos del modulo` + `... — ningun archivo alcanzable desde el contrato declara 'use server'` |
+| R36 | `tests/unit/clientes/scope.test.ts` + `tests/unit/pagination.test.ts` | `R36 — lib/modules/clientes/** no reimplementa la aritmetica de paginacion` + tests existentes de 10/25 |
+| R37 | `tests/unit/clientes/scope.test.ts` | `model Customer solo gano los tres campos normalizados respecto a QC-153` + `solo dos migraciones del repo tocan la tabla customers: la de QC-153 y la de esta ficha` |
+| R38 | `tests/unit/clientes/scope.test.ts` | `ningun archivo de app/ nombra ni el nombre, ni la tabla, ni el permiso ni la ruta de clientes` (describe `R38`) + los dos casos `R28 — sin ningun test E2E de clientes` de QC-153, intactos |
+| R39 | `tests/guards/guard-dependencias-aprobadas.test.ts` | guardia existente (verde) |
+| R40 | `tests/unit/clientes/scope.test.ts` | `ningun archivo de clientes importa pedidos, y ninguno de pedidos importa clientes` (describe `R40`) |
+| R41 | `tests/integration/clientes/list-query-customers.int.test.ts` + `tests/unit/clientes/customer-text.test.ts` | `R41 — la busqueda ignora acentos y mayusculas y un termino solo de simbolos equivale a no buscar` + `R41 — normaliza sin acentos, en minusculas y sin simbolos, igual que normalizeSupplierName` |
+| R42 | `tests/unit/clientes/customer-service.test.ts` + `tests/unit/clientes/schema/customers-schema.test.ts` | `R42 — el alta y la edicion pasan cada forma normalizada emparejada con su dato` + censo de columnas (`R1, R4 (QC-153), R42 (QC-154)`) |
+| R43 | `tests/integration/clientes/customers-search-migration.int.test.ts` + `tests/unit/clientes/schema/customers-search-migration.test.ts` | `R43 — ...` (T20) + relleno antes del NOT NULL (T19) |
+| R44 | `tests/integration/clientes/customers-search-migration.int.test.ts` + `tests/unit/clientes/schema/customers-search-migration.test.ts` | `R44 — ...` (T20) + NOT NULL sin UNIQUE (T19) |
+| R45 | `tests/integration/clientes/customers-search-migration.int.test.ts` + `tests/unit/clientes/schema/customers-search-migration.test.ts` | `R45 — ...` (T20) + tres GIN parciales (T19) |
+| R46 | `tests/unit/clientes/schema/customers-search-migration.test.ts` + tarea T21 | down sin DROP EXTENSION (T19) + ciclo real `db:migrate` → `db:rollback` → `db:migrate` (T21, arriba en esta bitacora) |
+| R47 | `tests/integration/clientes/list-query-customers.int.test.ts` + `tests/unit/clientes/customer-service.test.ts` | `R47 — filtrar por bogota devuelve Bogota con tilde` + `R47 — ni la ficha ni el listado devuelven formas normalizadas` |
+
+Todos los R1 a R47 tienen al menos un test real verificado por grep. El unico hallazgo es el de
+R32 anotado arriba: es una discrepancia de nombre literal contra la tabla de `tasks.md`, no un
+requisito sin cubrir (la propiedad si la cierra R38 de `scope.test.ts`).
+
+## Archivos tocados (tanda T13/T14/T15)
+
+- `tests/integration/clientes/customer-repository.int.test.ts` (nuevo)
+- `tests/integration/clientes/list-query-customers.int.test.ts` (nuevo)
+- `tests/integration/aislamiento.json` (dos entradas nuevas en `commit`)
+- `specs/QC-154-crud-de-clientes/tasks.md` (checkboxes T13, T14, T15)
+- `progress/impl_QC-154-crud-de-clientes.md` (esta seccion)
+
+Nada bajo `feature_list.json` ni fuera de esta lista. Ninguna dependencia nueva.
+
+## Veredicto (tanda T13/T14/T15)
+
+T13 y T14 cerradas con evidencia real contra `QuimiCloude_QC154` (44/44 en
+`tests/integration/clientes`, `guard-aislamiento-integracion` en verde) y con los nombres de test
+exactos de la tabla de Trazabilidad. T15 releyo `scope.test.ts` con el modulo lleno (21/21 en
+verde), confirmo en rojo real cada regla de alcance con su fabricado (revertido en todos los
+casos, `git status` limpio al terminar), documento que solo se relajo lo que `design.md > 11`
+declara y amplio exactamente lo de `design.md > 12`, y dejo escrito el riesgo de ENOENT
+transitorio por concurrencia de workers -reproducido esta vez, no solo citado-, sin tocar el
+patron de `scope.test.ts` que el diseno exige. Un solo hallazgo de nomenclatura (R32, ver tabla),
+sin ningun requisito sin cubrir. T16 (gate completo) queda para el leader.
