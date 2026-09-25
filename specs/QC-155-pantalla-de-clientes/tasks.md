@@ -105,7 +105,7 @@
 
 ## Cierre
 
-- [ ] **T9 — Gate completo y trazabilidad.** Depende de todas.
+- [x] **T9 — Gate completo y trazabilidad.** (2026-09-25: `./init.sh` completo verde, 754 archivos, 10323 tests, baseline vacío) Depende de todas.
   `./init.sh` completo en verde. El mapa `R1…R42 → test` en `progress/impl_QC-155-pantalla-de-clientes.md`,
   sin ningún requisito sin test. Comprobar que el diff no toca `lib/modules/**`, `lib/composition/**`,
   `db/**`, `components/shared/**`, `components/ui/**` ni `package.json` (R35).
