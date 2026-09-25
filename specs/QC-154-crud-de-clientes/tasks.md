@@ -181,7 +181,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       *Depende de:* T12, T13, T14. **Hecho cuando:** cada regla de alcance falla con su fabricado, y la
       bitácora lista qué se relajó (solo § 11) y qué se amplió (§ 12).
 
-- [ ] **T16 — Cierre.** `./init.sh` completo en verde, `progress/impl_QC-154-crud-de-clientes.md` con
+- [x] **T16 — Cierre.** (2026-09-25: gate completo 735 verdes; 3 rojos ajenos que pasan 14/14 aislados tras sincronizar con dev; `--rapido` verde) `./init.sh` completo en verde, `progress/impl_QC-154-crud-de-clientes.md` con
       la lista de T0, la salida real de los tests y el mapa `R<n> → test` de abajo, y todas las tasks
       marcadas `[x]`.
       *Depende de:* todas. **Hecho cuando:** `CHECKPOINTS.md` se cumple entero.
