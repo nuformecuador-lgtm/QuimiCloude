@@ -592,3 +592,48 @@ exactamente los que la lista cerrada de `tests/unit/clientes/scope.test.ts` espe
 antes de escribir cada uno); los dos rojos que quedan en ese archivo son los mismos dos ya
 documentados en la tanda de T4 (adaptadores y Server Action, Grupo C), sin ningún rojo nuevo. No
 se tocó `feature_list.json` ni `progress/current.md`.
+
+---
+
+# Tanda T9, T10, T11, T12 (Grupo C)
+
+## T9 — Adaptador driven
+
+- `lib/modules/clientes/adapters/driven/persistence/company-scope.ts`: copia del patrón de
+  `proveedores` (`companyScope` privada + dos envolturas, `customerCompanyScope` y
+  `companyScopeColumns`).
+- `lib/modules/clientes/adapters/driven/persistence/list-query-sql.ts`: **solo**
+  `textCondition` y `dateRangeCondition`, copiados de `proveedores` (no el archivo entero:
+  `numberRangeCondition`, `selectCondition` y `normalizedSearchCondition` no los usa este
+  módulo). `textCondition` queda exportado y sin consumidor en `customer-prisma.ts` porque el
+  filtro de ciudad (R47, `design.md > 17.3`) va contra `cityNormalized`, no contra la columna en
+  crudo: importarlo sin usarlo hubiera sido un `unused import` de lint, así que no se importa.
+- `lib/modules/clientes/adapters/driven/persistence/customer-prisma.ts`: los cinco métodos de
+  `CustomerRepository`. `create` y `updateAlive` escriben las tres formas normalizadas que ya
+  traen (sin volver a normalizar nada); `updateAlive` y `softDeleteAlive` son `updateMany` con
+  `{ id, deletedAt: null, ...customerCompanyScope(scope) }`; `softDeleteAlive` sin transacción
+  (el cliente no arrastra tabla hija, a diferencia del proveedor); orden por defecto
+  `lastNames ASC, firstNames ASC, id ASC` con `TIE_BREAKER`; `listAliveCustomers` usa
+  `toOffsetLimit`/`buildPage` y un único objeto `where` para `findMany` y `count`. La búsqueda
+  (`searchCondition`) parte el término por espacios, normaliza cada palabra con
+  `normalizeCustomerText` y descarta las vacías, contra las tres columnas `*Normalized` sin
+  `mode: 'insensitive'` (R30, R41). El filtro de ciudad normaliza el valor contra
+  `cityNormalized` (R47). `select` explícito sin `companyId`, `deletedAt` ni las tres formas
+  normalizadas.
+- Borrado `lib/modules/clientes/adapters/.gitkeep`.
+- **Comprobado**: es el único archivo del módulo (junto con `company-scope.ts`) que importa
+  `@prisma/client`; ninguna consulta nombra otro modelo que `customer`.
+
+### Verificación de T9
+
+```
+$ pnpm exec next typegen && pnpm run typecheck
+✓ Types generated successfully
+> tsc --noEmit
+(sin salida — 0 errores)
+
+$ pnpm exec vitest run tests/unit/clientes/scope.test.ts
+ Test Files  1 failed (1)
+      Tests  2 failed | 99 passed (101)
+  → los dos rojos esperados (lista cerrada de archivos, adapters/driving/ exacto), sin cambio.
+```

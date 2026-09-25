@@ -123,7 +123,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
 
 ## Grupo C — adaptadores y cableado (depende de B)
 
-- [ ] **T9 — Adaptador driven.** `adapters/driven/persistence/company-scope.ts`,
+- [x] **T9 — Adaptador driven.** `adapters/driven/persistence/company-scope.ts`,
       `list-query-sql.ts` (solo `textCondition` y `dateRangeCondition`) y `customer-prisma.ts`:
       ámbito en todo `where`, `deletedAt: null`, autoría, `updateMany` para editar y dar de baja,
       búsqueda por palabras (`AND` de `OR` sobre tres columnas) — *(F1.4)* contra las tres columnas
