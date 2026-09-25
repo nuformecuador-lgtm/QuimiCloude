@@ -73,7 +73,7 @@
 
 ## Tanda 4 — La lista montada
 
-- [ ] **T6 — `customer-table.tsx`, `customer-list-section.tsx`, barrel y `page.tsx` completa.** Depende
+- [x] **T6 — `customer-table.tsx`, `customer-list-section.tsx`, barrel y `page.tsx` completa.** Depende
   de T2, T3, T4, T5 y T6a.
   Tabla compartida con transición sin desmontar y la sincronización de la caja copiada de
   `order-table.tsx` (`design.md > 5.2`, `5.3`). Sección con el despacho de `design.md > 5.1`. Página con
