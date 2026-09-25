@@ -71,7 +71,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       una sola línea de la copia de `clientes` (comprobado y revertido).
 
 - [x] **T3 — Enmienda al catálogo de errores.** `customer_not_found` en `ERROR_CODES` con la línea
-      de «Duodécima enmienda» en la cabecera, su clave y **el texto aprobado en F1.4** (P4) en
+      de «Decimotercera enmienda» en la cabecera, su clave y **el texto aprobado en F1.4** (P4) en
       `error-catalog.ts`; `tests/unit/errores/catalogo.test.ts` de 54 a 55.
       *Depende de:* **respuesta humana a P4**. **Hecho cuando:** `catalogo.test.ts` y
       `guard-catalogo-de-errores` pasan, y el diff de `lib/modules/errores/` es exactamente ese código

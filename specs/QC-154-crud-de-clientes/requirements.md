@@ -268,7 +268,7 @@ búsqueda» del alcance y llevan posición por defecto abierta (P2, P3 abajo).
    > **RESUELTA en F1.4 (2026-09-24):** se acepta la posición por defecto tal cual.
 
 4. **Texto del código nuevo `customer_not_found`.** *Añadida por `spec_author` en F1.2.* Es la
-   **duodécima enmienda** al catálogo cerrado de errores (R34) y la aprueba el humano en F1.4.
+   **decimotercera enmienda** al catálogo cerrado de errores (R34) y la aprueba el humano en F1.4.
    **Propuesta:** «El cliente solicitado no existe.», gemela de la de `supplier_not_found`
    (`design.md > 7`).
 
@@ -297,7 +297,7 @@ leader**; no la rellena con supuestos.
 | 2026-09-23 | ¿Pedido ↔ cliente? | **No entra** en el módulo base: ficha aparte **QC-156** (bloqueada por QC-154). |
 | 2026-09-23 | ¿E2E? | **Sí**, en la pantalla (**QC-155**), por tocar permisos (`CHECKPOINTS.md`). El modelo y el CRUD se verifican con tests unitarios y de integración. |
 | 2026-09-24 (F1.4) | ¿La búsqueda distingue acentos? (P2) | **No: ignora acentos además de mayúsculas.** Se aparta de la posición por defecto del spec y **mete una migración en esta ficha**, con el mecanismo que ya usa el repositorio (columna `*_normalized` calculada por la aplicación, relleno de las filas existentes, índice GIN de trigramas parcial). Aplica a nombres, apellidos y ciudad. |
-| 2026-09-24 (F1.4) | Texto de `customer_not_found` (P4) | **Duodécima enmienda** al catálogo cerrado de errores con el texto «El cliente solicitado no existe.». |
+| 2026-09-24 (F1.4) | Texto de `customer_not_found` (P4) | **Decimotercera enmienda** al catálogo cerrado de errores con el texto «El cliente solicitado no existe.». |
 | 2026-09-24 (F1.4) | Orden y campos consultables del listado (P3) | La propuesta: orden por defecto apellidos, nombres, id (ascendente); ordenables nombres, apellidos, ciudad y las dos fechas; filtrables ciudad (texto) y fecha de alta (rango). |
 | 2026-09-24 (F1.4) | Identificador sin forma de uuid (P5) | La propuesta: responde `customer_not_found` **sin llegar a la base**. |
 

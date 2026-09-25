@@ -40,10 +40,10 @@ Verificado punto por punto contra el árbol de la rama (commit de partida `94d24
 
 No se tocó `feature_list.json` ni `progress/current.md`.
 
-## T3 — Enmienda al catálogo de errores (duodécima)
+## T3 — Enmienda al catálogo de errores (decimotercera)
 
 - `lib/modules/errores/domain/error-codes.ts`: `customer_not_found` añadido a `ERROR_CODES`, con
-  la línea de cabecera «**Duodecima enmienda, el 2026-09-24**: `customer_not_found`.».
+  la línea de cabecera «**Decimotercera enmienda, 2026-09-24**: `customer_not_found`.».
 - `lib/modules/errores/domain/error-catalog.ts`: clave `customer_not_found: 'errors.customer_not_found'`
   y texto `'El cliente solicitado no existe.'` (aprobado en F1.4).
 - `tests/unit/errores/catalogo.test.ts`: censo de 54 a 55 entradas, y nuevo bloque
@@ -1262,7 +1262,9 @@ en el mismo punto:
 - `lib/modules/errores/domain/error-catalog.ts` y `error-codes.ts`: `customer_not_found` (nuestro)
   contra `presentation_without_content` y `no_whole_package` (QC-150). Se conservaron los tres
   codigos, sus claves y sus textos; la cabecera de `error-codes.ts` paso a tener una
-  "Decimotercera enmienda" para los dos codigos de QC-150 (la nuestra ya era la duodecima).
+  "Decimotercera enmienda" para los dos codigos de QC-150 (la nuestra ya era la duodecima; el
+  leader corrigio despues el orden: QC-150 entro antes en dev, asi que su enmienda es la
+  duodecima y la nuestra la decimotercera).
 - `tests/unit/errores/catalogo.test.ts`: el censo literal de `ERROR_CODES.length` decia 55 en
   nuestro lado (54 + `customer_not_found`) y 56 en el de dev (54 + los dos de QC-150). El total
   correcto es 57 (54 + 1 + 2); se fusionaron los dos `describe` de verificacion de codigo (uno por

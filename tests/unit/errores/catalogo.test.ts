@@ -298,13 +298,13 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
       expect(texto).not.toBe(errorMessage('unexpected'))
     })
 
-    it('la cabecera de error-codes.ts redacta la duodecima enmienda con su fecha', () => {
+    it('la cabecera de error-codes.ts redacta la decimotercera enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
-      expect(source).toContain('**Duodecima enmienda, el 2026-09-24**')
+      expect(source).toContain('**Decimotercera enmienda, 2026-09-24**')
     })
   })
 
-  describe('QC-150 R18, R19 — presentation_without_content y no_whole_package son la decimotercera enmienda', () => {
+  describe('QC-150 R18, R19 — presentation_without_content y no_whole_package son la duodecima enmienda', () => {
     it('los dos codigos estan en el catalogo con su clave y su texto propios', () => {
       const codigos: readonly string[] = ERROR_CODES
       expect(codigos).toContain('presentation_without_content')
@@ -329,9 +329,9 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
       expect(sinEnvase).not.toBe(errorMessage('action_not_allowed'))
     })
 
-    it('la cabecera de error-codes.ts redacta la decimotercera enmienda con su fecha', () => {
+    it('la cabecera de error-codes.ts redacta la duodecima enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
-      expect(source).toContain('**Decimotercera enmienda, 2026-09-24**')
+      expect(source).toContain('**Duodecima enmienda, 2026-09-24**')
     })
   })
 

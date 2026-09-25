@@ -14,8 +14,8 @@
  * Aprobada por el humano el 2026-09-18.
  * **Decima enmienda, el 2026-09-22 (fix directo)**: `action_not_allowed`.
  * **Decimoprimera enmienda, el 2026-09-23**: `insufficient_material`, `recipe_without_lines`.
- * **Duodecima enmienda, el 2026-09-24**: `customer_not_found`.
- * **Decimotercera enmienda, 2026-09-24**: `presentation_without_content`, `no_whole_package`.
+ * **Duodecima enmienda, 2026-09-24**: `presentation_without_content`, `no_whole_package`.
+ * **Decimotercera enmienda, 2026-09-24**: `customer_not_found`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -91,14 +91,14 @@ export const ERROR_CODES = [
   // Distinto de `user_not_assignable`: la cuenta esta activa. Lo que impide asignar a esta persona
   // como responsable es que supervisa los pedidos de toda la empresa.
   'user_cannot_be_responsible',
-  // Distinto de `supplier_not_found`: la entidad es un cliente, no un proveedor.
-  'customer_not_found',
   // Distinto de `invalid_input`: el pedido y su presentacion son validos, falta el contenido con
   // el que calcular los envases del lote de producto terminado.
   'presentation_without_content',
   // Distinto de `presentation_without_content`: hay contenido, pero la cantidad del pedido no
   // llega a llenar ni un envase.
   'no_whole_package',
+  // Distinto de `supplier_not_found`: la entidad es un cliente, no un proveedor.
+  'customer_not_found',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

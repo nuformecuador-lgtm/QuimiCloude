@@ -35,7 +35,7 @@
 | `lib/modules/clientes/adapters/driving/customer-actions.ts` | **Un único archivo** de Server Actions (§ 9). Se **borra** `adapters/.gitkeep`. |
 | `lib/modules/clientes/index.ts` | Conserva `Customer` y añade tipos, esquemas, errores, lista blanca y las cinco factories — **solo** de `./domain`. |
 | `lib/composition/index.ts` | Gana la fachada `clientes` en un **bloque nuevo al final** (§ 10). |
-| `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts` | **Duodécima enmienda**: `customer_not_found` (§ 7). |
+| `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts` | **Decimotercera enmienda**: `customer_not_found` (§ 7). |
 | `tests/…` | Nuevos y **ampliados**; ver § 11, § 12 y § 17. |
 | `db/schema.prisma` | *(F1.4)* `Customer` gana `firstNamesNormalized`, `lastNamesNormalized` y `cityNormalized`. Nada más (§ 17). |
 | `db/migrations/<ts>_customers_search_normalized/{migration.sql,down.sql}` | *(F1.4)* Columnas, relleno, `NOT NULL` y tres GIN de trigramas parciales, escritos a mano (§ 17). |
@@ -347,7 +347,7 @@ no nombres, mismo criterio que proveedores.
 
 ---
 
-## 7. Errores y la duodécima enmienda al catálogo (R33, R34 — P4)
+## 7. Errores y la decimotercera enmienda al catálogo (R33, R34 — P4)
 
 `domain/errors.ts`, calcado de `proveedores`:
 
@@ -366,7 +366,7 @@ no nombres, mismo criterio que proveedores.
 **La enmienda**, en tres sitios y nada más (R34):
 
 1. `error-codes.ts`: `'customer_not_found'` al final de `ERROR_CODES`, y en la cabecera la línea
-   «**Duodécima enmienda, el <fecha de aprobación>**: `customer_not_found`.» (sin citar la ficha: los
+   «**Decimotercera enmienda, el <fecha de aprobación>**: `customer_not_found`.» (sin citar la ficha: los
    comentarios de producción no citan fichas, `docs/conventions.md`).
 2. `error-catalog.ts`: `customer_not_found: 'errors.customer_not_found'` y el texto.
    **Propuesta (P4):** `'El cliente solicitado no existe.'` —gemela de `supplier_not_found`—. Lo aprueba
