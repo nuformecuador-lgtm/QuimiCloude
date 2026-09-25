@@ -209,7 +209,7 @@ enmienda con la forma de `design.md > 3` de QC-159), `specs/QC-158-catalogo-desd
 **Hacer:** notas fechadas al final de cada archivo, sin tocar sus tablas ni sus requisitos.
 **Hecho cuando:** las tres notas enlazan a este spec; ninguna tabla de decisiones ajena cambió.
 
-### T14 [ ] — Cierre
+### T14 [x] — Cierre
 Tras todas. **Toca:** `progress/impl_QC-159-formula-desde-pdf.md`.
 **Hecho cuando:** `./init.sh` verde; mapa `R1..R39 → test` completo con el test concreto de cada uno
 (plan de `design.md > 16`); solapes con QC-168/QC-138 anotados con su resolución si alguna llegó a

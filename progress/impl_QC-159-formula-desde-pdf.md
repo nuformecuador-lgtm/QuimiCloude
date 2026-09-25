@@ -533,3 +533,12 @@ test-db: borrada la base de la corrida: qct_qc159_15d32d70_muhje4dk_f0o.
 
 No se hizo merge de `dev` ni se corrió `./init.sh` completo. Ni el E2E ni la pantalla cambiaron de
 código en esta vuelta (solo el comentario de m9), así que no se repitió el E2E.
+
+## T14 — gate completo (leader, 2026-09-25)
+
+Sobre `d7126b23` (merge de origin/dev sin conflictos ni migraciones nuevas):
+
+- 1a corrida: 755/756 archivos; 1 rojo, timeout de 20 s en `tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts` R7 (703 s de corrida, Postgres compartido con otras sesiones). Aislado: 5/5. Mismo flake por carga ya registrado en `progress/history.md`. No va al baseline.
+- 2a corrida: `Test Files 756 passed (756)`, `Tests 10321 passed | 122 skipped`, 471 s, `== init OK ==`.
+- Baseline de rojos vacío: nada que podar.
+- E2E `formula-desde-pdf.spec.ts` 2/2 (Chromium, WebKit) sobre `ed75c9d2`; desde entonces solo cambiaron comentarios y tests.
