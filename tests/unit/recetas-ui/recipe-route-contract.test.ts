@@ -1159,6 +1159,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'LOGIN_ROUTE_SESSION_ENDED',
         'NEW_RECIPE_ROUTE',
         'ORDERS_ROUTE',
+        // Alta junto con `packingOrderRoute`: el nombre del parametro de consulta que la pantalla
+        // de empaque, dentro de /asignacion, no es un detalle de Pedidos.
+        'PACKED_ORDER_PARAM',
         'PRESENTATIONS_ROUTE',
         'PRIVATE_ROUTE_PREFIXES',
         // No es una ruta: el nombre del parametro de LOGIN_ROUTE_SESSION_ENDED.
@@ -1167,6 +1170,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'UNITS_ROUTE',
         'assignedOrderRoute',
         'credentialSetupRoute',
+        // Vive en /asignacion (pantalla de empaque), no en Pedidos: no estrena ninguna ruta del
+        // asistente de lectura.
+        'packingOrderRoute',
         'USERS_ROUTE',
         'recipeEditRoute',
         // Alta el 2026-09-24: la revision de un catalogo importado desde PDF, derivada de
