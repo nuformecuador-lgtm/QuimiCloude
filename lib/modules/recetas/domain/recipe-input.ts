@@ -201,7 +201,6 @@ export type RecipeStepInput = z.infer<typeof recipeStepSchema>;
 /** Alias de lectura: el documento de un paso es el mismo dentro y fuera (`design.md > 2`). */
 export type RecipeStepDocument = RecipeStepInput;
 
-/** Tope de pasos por receta. */
 export const MAX_RECIPE_STEPS = 50;
 
 /** `.default([])`: sin pasos se persiste la lista vacia, no `undefined`. */

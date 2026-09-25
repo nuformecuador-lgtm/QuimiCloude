@@ -7,11 +7,8 @@
  * `catalog-import-actions.ts`: como ninguna de las dos lee ni escribe nada con una entrada rota,
  * rechazar en el borde no adelanta ningun veredicto de autorizacion.
  *
- * `documentos.confirmFormulaImport` puede rechazar con un error de `recetas` (el choque de nombre,
- * la receta que ya no existe, un producto terminado) o de `inventario` (el permiso de crear una
- * materia prima), asi que el error se prueba contra TRES familias, en orden: `DocumentosError`,
- * `RecetasError` e `InventarioError`. La primera clase que lo reconoce lo traduce; si ninguna, cae
- * al traductor de `documentos`, que lo deja en `unexpected_error` como siempre.
+ * Como se traduce el error de `confirmFormulaImport` (puede venir de tres modulos distintos):
+ * `formula-import-error-translator.ts`.
  *
  * Este archivo NO se reexporta desde el contrato del modulo: un `'use server'` en su cierre
  * transitivo lo volveria inimportable desde un componente de cliente.
