@@ -166,7 +166,7 @@ salida del `db:migrate` sobre `QuimiCloude_QC154`.
       afirma contando que no quedó ninguna fila de las empresas efímeras; y
       `guard-aislamiento-integracion` pasa.
 
-- [ ] **T14 [P] — Integración: listado.**
+- [x] **T14 [P] — Integración: listado.**
       `tests/integration/clientes/list-query-customers.int.test.ts`, misma base y misma declaración en
       `aislamiento.json`, con más filas que una página y dos empresas.
       *Depende de:* T9. **Hecho cuando:** pasa y cubre R26 (100 → 25), R29 (sin repetir ni omitir al
