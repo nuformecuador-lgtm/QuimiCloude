@@ -81,7 +81,7 @@ const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
  * Sin esta linea el modulo nuevo quedaria FUERA del barrido y la guardia pasaria en verde sin
  * mirarlo, que es justo el agujero que el caso «el barrido encuentra los seis modulos» vigila.
  */
-const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos', 'asignaciones'];
+const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos', 'asignaciones', 'clientes'];
 
 const IGNORED_DIRS = new Set(['node_modules', '.next', '.git', '.prisma', 'dist', '.worktrees']);
 
