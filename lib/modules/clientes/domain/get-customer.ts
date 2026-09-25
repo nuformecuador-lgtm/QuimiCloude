@@ -11,8 +11,8 @@ export type GetCustomerDeps = {
 };
 
 /**
- * Ficha de un cliente (R22, R23). Un id sin forma de uuid se rechaza como no encontrado (P5)
- * sin llegar al puerto.
+ * Ficha de un cliente. Un id sin forma de uuid se rechaza como no encontrado, sin llegar al
+ * puerto.
  */
 export function createGetCustomer(
   deps: GetCustomerDeps,

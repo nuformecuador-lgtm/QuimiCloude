@@ -11,8 +11,8 @@ export type DeleteCustomerDeps = {
 };
 
 /**
- * Baja de cliente (R21, R23, R24, R25): baja logica, sin restaurar. Un id sin forma de uuid se
- * rechaza como no encontrado (P5) sin llegar al puerto.
+ * Baja de cliente: baja logica, sin restaurar. Un id sin forma de uuid se rechaza como no
+ * encontrado, sin llegar al puerto.
  */
 export function createDeleteCustomer(
   deps: DeleteCustomerDeps,

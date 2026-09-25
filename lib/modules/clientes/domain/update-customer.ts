@@ -13,9 +13,9 @@ export type UpdateCustomerDeps = {
 };
 
 /**
- * Edicion de cliente (R20, R21, R23, R42): reemplazo completo de los seis datos de negocio, no
- * parche campo a campo. Un id sin forma de uuid se rechaza como no encontrado (P5) sin llegar
- * al puerto.
+ * Edicion de cliente: reemplazo completo de los seis datos de negocio, no parche campo a
+ * campo. Un id sin forma de uuid se rechaza como no encontrado, sin llegar al puerto: no hay
+ * razon de negocio para distinguirlo de un id ajeno o inexistente.
  */
 export function createUpdateCustomer(
   deps: UpdateCustomerDeps,
@@ -49,7 +49,7 @@ export function createUpdateCustomer(
       scope,
     );
 
-    // R10, R23: inexistente, dado de baja o de otra empresa son el mismo caso para el dominio.
+    // Inexistente, dado de baja o de otra empresa son el mismo caso para el dominio.
     if (result === 'not_found') throw new CustomerNotFoundError();
   };
 }

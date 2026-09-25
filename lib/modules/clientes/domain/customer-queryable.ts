@@ -1,8 +1,7 @@
-// lib/modules/clientes/domain/customer-queryable.ts
 /**
- * Lista blanca del listado de clientes (R28). Lo que no este aqui se omite sin romper la
- * consulta (R27). Ninguna forma normalizada esta declarada: no son ordenables ni filtrables
- * (R47).
+ * Lista blanca del listado de clientes. Lo que no este aqui se omite sin romper la consulta.
+ * Ninguna forma normalizada esta declarada: son derivadas para buscar, no un dato de negocio
+ * ordenable ni filtrable.
  */
 
 import type { ListQueryable } from './list-query';

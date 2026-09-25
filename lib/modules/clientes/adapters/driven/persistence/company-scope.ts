@@ -4,7 +4,7 @@ import type { CustomerScope } from '../../../domain/customer-scope';
 
 /**
  * La unica definicion de «de la empresa» del modulo `clientes`; toda consulta o escritura de
- * `customers` la toma de aqui para que no haya copias que diverjan (R12).
+ * `customers` la toma de aqui para que no haya copias que diverjan.
  *
  * Las lecturas la componen al mismo nivel que `deletedAt: null`, nunca fundida con la busqueda
  * ni con los filtros. El `count` del listado usa literalmente el mismo objeto `where` que el

@@ -13,8 +13,8 @@ export type CreateCustomerDeps = {
 };
 
 /**
- * Alta de cliente (R9, R13, R42). `requirePermission` es la primera linea, antes de `zod` y
- * antes de tocar el puerto (R2, R3, R5).
+ * Alta de cliente. `requirePermission` es la primera linea, antes de `zod` y antes de tocar
+ * el puerto: sin autorizacion no hay validacion que valga.
  */
 export function createCreateCustomer(
   deps: CreateCustomerDeps,
@@ -27,14 +27,14 @@ export function createCreateCustomer(
   ): Promise<{ id: string }> {
     requirePermission(actor, 'clientes.modificar');
 
-    // La empresa sale del ACTOR y jamas de la entrada (R9).
+    // La empresa sale del ACTOR y jamas de la entrada.
     const scope: CustomerScope = { companyId: actor.companyId };
 
     const parsed = createCustomerSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
-    // R42: las tres formas normalizadas se calculan aqui, con la unica funcion del modulo, y
-    // viajan emparejadas con su dato.
+    // Las tres formas normalizadas se calculan aqui, con la unica funcion del modulo, y viajan
+    // emparejadas con su dato.
     return deps.customers.create(
       {
         ...parsed.data,

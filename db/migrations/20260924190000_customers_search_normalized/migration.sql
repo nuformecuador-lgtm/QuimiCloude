@@ -1,9 +1,9 @@
--- QC-154 (F1.4) — busqueda de clientes sin acentos: tres columnas normalizadas y sus indices.
+-- Busqueda de clientes sin acentos: tres columnas normalizadas y sus indices.
 --
--- ESCRITA A MANO, no generada con `prisma migrate dev --create-only`, y es deliberado
--- (design.md > 17.2): `customers` tiene FK escalares sin `@relation`, clave candidata y RLS
--- forzada que Prisma no conoce, y una generacion automatica emitiria `DROP` de drift. Aqui NO
--- hay ni un solo `DROP`: esta migracion solo ANADE columnas y CREA indices.
+-- ESCRITA A MANO, no generada con `prisma migrate dev --create-only`: `customers` tiene FK
+-- escalares sin `@relation`, clave candidata y RLS forzada que Prisma no conoce, y una
+-- generacion automatica emitiria `DROP` de drift. Aqui NO hay ni un solo `DROP`: esta
+-- migracion solo ANADE columnas y CREA indices.
 --
 -- Mecanismo copiado de `20260904160000_list_query_indexes`: columna anulable, relleno con
 -- `translate` (mismo juego de caracteres, sin `unaccent()`), `SET NOT NULL` despues del

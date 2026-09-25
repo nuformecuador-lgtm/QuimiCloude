@@ -6,7 +6,7 @@ import { ClientesError, type Actor, type CustomerView, type Page } from '@/lib/m
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
- * Server Actions del cliente (`design.md > 9`), calcadas de `supplier-actions.ts`.
+ * Server Actions del cliente, calcadas de `supplier-actions.ts`.
  *
  * `create`/`update`/`delete` reciben `FormData`: el esquema vive en el caso de uso, esta
  * action solo extrae los campos. `get`/`list` son consultas con argumento tipado: quien las
@@ -70,7 +70,7 @@ function buildCustomerCandidate(formData: FormData): unknown {
   };
 }
 
-/** Alta de cliente (R7, R32). */
+/** Alta de cliente. */
 export async function createCustomerAction(
   prevState: CreateCustomerFormState,
   formData: FormData,
@@ -139,7 +139,7 @@ export async function getCustomerAction(id: string): Promise<CustomerQueryResult
   }
 }
 
-/** Lista paginada de clientes (R7). Consulta: argumento tipado. `query` es `unknown` porque la
+/** Lista paginada de clientes. Consulta: argumento tipado. `query` es `unknown` porque la
  *  forma entera vive dentro del caso de uso. */
 export async function listCustomersAction(query: unknown): Promise<CustomerListResult> {
   const actor = await currentActor();

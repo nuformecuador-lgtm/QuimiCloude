@@ -14,14 +14,14 @@ export type ListCustomersDeps = {
   readonly log: ListQueryLog;
 };
 
-/** Nombre con el que este listado se identifica en el log de campos omitidos (R27). */
+/** Nombre con el que este listado se identifica en el log de campos omitidos. */
 const LIST_NAME = 'customers';
 
 const listQuerySchema = createListQuerySchema();
 
 /**
- * Listado paginado de clientes con el contrato generico de consulta (R26-R31). Orden: permiso,
- * forma, saneado, log de lo podado, puerto.
+ * Listado paginado de clientes con el contrato generico de consulta. Orden: permiso, forma,
+ * saneado, log de lo podado, puerto.
  */
 export function createListCustomers(
   deps: ListCustomersDeps,

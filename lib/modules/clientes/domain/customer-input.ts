@@ -1,4 +1,3 @@
-// lib/modules/clientes/domain/customer-input.ts
 import { z } from 'zod';
 
 export const CUSTOMER_FIRST_NAMES_MAX_LENGTH = 80;
@@ -23,7 +22,7 @@ const emailSchema = z.string().trim().max(CUSTOMER_EMAIL_MAX_LENGTH).nullish();
 const addressSchema = z.string().trim().max(CUSTOMER_ADDRESS_MAX_LENGTH).nullish();
 
 /**
- * Alta y edicion usan el mismo esquema (R20): reemplazo completo, sin `refine` cruzado entre
+ * Alta y edicion usan el mismo esquema: reemplazo completo, sin `refine` cruzado entre
  * opcionales.
  */
 export const createCustomerSchema = z

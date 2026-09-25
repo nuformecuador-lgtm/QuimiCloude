@@ -23,8 +23,8 @@ export {
 } from './domain/customer-input';
 export { type NewCustomer, type CustomerView } from './domain/customer-view';
 
-// Las cinco factories de caso de uso (`design.md > 5`). Los tipos `*Deps` viajan con ellas:
-// quien las cablea es `lib/composition`, y sin el tipo no podria declarar la dependencia.
+// Las cinco factories de caso de uso. Los tipos `*Deps` viajan con ellas: quien las cablea es
+// `lib/composition`, y sin el tipo no podria declarar la dependencia.
 export { createCreateCustomer, type CreateCustomerDeps } from './domain/create-customer';
 export { createUpdateCustomer, type UpdateCustomerDeps } from './domain/update-customer';
 export { createDeleteCustomer, type DeleteCustomerDeps } from './domain/delete-customer';

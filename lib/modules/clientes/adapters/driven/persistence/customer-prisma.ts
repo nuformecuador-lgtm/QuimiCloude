@@ -14,8 +14,8 @@ import type { CustomerScope } from '../../../domain/customer-scope';
 import type { NewCustomer, CustomerView } from '../../../domain/customer-view';
 
 /**
- * Implementa `CustomerRepository` (`design.md > 8`) con Prisma. Junto con `company-scope.ts` es
- * el UNICO archivo del modulo que importa `@prisma/client`. Ninguna consulta nombra otro modelo.
+ * Implementa `CustomerRepository` con Prisma. Junto con `company-scope.ts` es el UNICO archivo
+ * del modulo que importa `@prisma/client`. Ninguna consulta nombra otro modelo.
  *
  * `deleted_at IS NULL` va en el `where` de toda lectura y de toda escritura que exija que la
  * fila siga viva, nunca en un `if` posterior: el filtro es del puerto, y por eso ningun caso de
@@ -23,7 +23,7 @@ import type { NewCustomer, CustomerView } from '../../../domain/customer-view';
  */
 
 /** `select` unico para las dos lecturas. `deleted_at`, `company_id` y las tres formas
- *  normalizadas NO salen: nunca son dato de salida (R22, R47). */
+ *  normalizadas NO salen: nunca son dato de salida. */
 const CUSTOMER_SELECT = {
   id: true,
   firstNames: true,
@@ -58,9 +58,9 @@ function toCustomerView(row: CustomerRow): CustomerView {
 }
 
 /**
- * `create` de `CustomerRepository` (R9, R13, R21, R42). Escribe `created_by` Y `updated_by` con
- * el mismo `actorId`, y los seis datos junto con las tres formas normalizadas que ya trae
- * `data`: este adaptador no vuelve a normalizar nada.
+ * `create` de `CustomerRepository`. Escribe `created_by` Y `updated_by` con el mismo
+ * `actorId`, y los seis datos junto con las tres formas normalizadas que ya trae `data`: este
+ * adaptador no vuelve a normalizar nada.
  */
 export async function createCustomer(
   data: NewCustomer,
@@ -90,7 +90,7 @@ export async function createCustomer(
   return { id: created.id };
 }
 
-/** `findAliveById` (R22, R23): `deleted_at IS NULL` y el ambito de empresa en el `where`. */
+/** `findAliveById`: `deleted_at IS NULL` y el ambito de empresa en el `where`. */
 export async function findAliveCustomerById(
   id: string,
   scope: CustomerScope,
@@ -103,9 +103,9 @@ export async function findAliveCustomerById(
 }
 
 /**
- * `updateAlive` (R20, R21, R23). `updateMany` con `deletedAt: null` en el `where`: si el
- * cliente no existe, ya esta dado de baja o es de otra empresa, `count` sale 0 y se devuelve
- * `'not_found'` en vez de lanzar. `data` NUNCA incluye `createdBy` ni `createdAt` (R21).
+ * `updateAlive`. `updateMany` con `deletedAt: null` en el `where`: si el cliente no existe, ya
+ * esta dado de baja o es de otra empresa, `count` sale 0 y se devuelve `'not_found'` en vez de
+ * lanzar. `data` NUNCA incluye `createdBy` ni `createdAt`.
  */
 export async function updateAliveCustomer(
   id: string,
@@ -134,9 +134,8 @@ export async function updateAliveCustomer(
 }
 
 /**
- * `softDeleteAlive` (R21, R24). Borrado LOGICO: marca `deleted_at` y sella `updated_at`/
- * `updated_by`, nunca `prisma.customer.delete`. Sin transaccion: el cliente no arrastra ninguna
- * tabla hija.
+ * `softDeleteAlive`. Borrado LOGICO: marca `deleted_at` y sella `updated_at`/`updated_by`,
+ * nunca `prisma.customer.delete`. Sin transaccion: el cliente no arrastra ninguna tabla hija.
  */
 export async function softDeleteAliveCustomer(
   id: string,
@@ -151,11 +150,12 @@ export async function softDeleteAliveCustomer(
   return count === 1;
 }
 
-/** Desempate ESTABLE por identificador (R29). */
+/** Desempate ESTABLE por identificador: sin el, dos filas con la misma columna de orden
+ *  podrian intercambiar posicion entre paginas. */
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.CustomerOrderByWithRelationInput;
 
-/** Orden POR DEFECTO: `lastNames ASC, firstNames ASC, id ASC` (P3). Se construye en CADA
- *  llamada, no como constante compartida: Prisma exige un array mutable en `orderBy`. */
+/** Orden POR DEFECTO: `lastNames ASC, firstNames ASC, id ASC`. Se construye en CADA llamada,
+ *  no como constante compartida: Prisma exige un array mutable en `orderBy`. */
 function defaultOrderBy(): Prisma.CustomerOrderByWithRelationInput[] {
   return [{ lastNames: 'asc' }, { firstNames: 'asc' }, TIE_BREAKER];
 }
@@ -184,9 +184,9 @@ function customerOrderBy(sort: ListSort | null): Prisma.CustomerOrderByWithRelat
 
 /**
  * Un filtro del contrato -> la condicion de la columna que le corresponde. `city` va contra
- * `cityNormalized` con el mismo `normalizeCustomerText` que escribio la columna (R47, `design.md
- * > 17.3`): filtrar por «bogota» tiene que encontrar «Bogotá», sobre la MISMA columna que la
- * busqueda usa. Un valor que queda vacio al normalizar deja el filtro sin efecto.
+ * `cityNormalized` con el mismo `normalizeCustomerText` que escribio la columna: filtrar por
+ * «bogota» tiene que encontrar «Bogotá», sobre la MISMA columna que la busqueda usa. Un valor
+ * que queda vacio al normalizar deja el filtro sin efecto.
  */
 function customerFilterWhere(
   field: string,
@@ -210,11 +210,11 @@ function customerFilterWhere(
 }
 
 /**
- * Termino de busqueda -> `AND` de `OR` sobre las tres columnas normalizadas (R30, R41, `design.md
- * > 17.3`). El termino se parte por espacios; cada palabra se normaliza con
- * `normalizeCustomerText` y las vacias se descartan -asi «juan pérez» encuentra a *Juan* /
- * *Pérez* aunque vivan en columnas distintas, y un termino hecho solo de simbolos equivale a no
- * buscar. Sin `mode: 'insensitive'`: las columnas ya estan en minusculas y sin acentos.
+ * Termino de busqueda -> `AND` de `OR` sobre las tres columnas normalizadas. El termino se
+ * parte por espacios; cada palabra se normaliza con `normalizeCustomerText` y las vacias se
+ * descartan -asi «juan pérez» encuentra a *Juan* / *Pérez* aunque vivan en columnas distintas, y
+ * un termino hecho solo de simbolos equivale a no buscar. Sin `mode: 'insensitive'`: las
+ * columnas ya estan en minusculas y sin acentos.
  */
 function searchCondition(search: string): readonly Prisma.CustomerWhereInput[] | null {
   const words = search
@@ -233,9 +233,9 @@ function searchCondition(search: string): readonly Prisma.CustomerWhereInput[] |
 }
 
 /**
- * `where` UNICO del listado de clientes: el mismo objeto para el `findMany` y para el `count`
- * (R11, R31). `deletedAt: null` y el ambito de empresa siempre, al mismo nivel y nunca fundidos
- * con la busqueda ni con los filtros.
+ * `where` UNICO del listado de clientes: el mismo objeto para el `findMany` y para el `count`.
+ * `deletedAt: null` y el ambito de empresa siempre, al mismo nivel y nunca fundidos con la
+ * busqueda ni con los filtros.
  */
 function buildCustomerWhere(query: ListQuery, scope: CustomerScope): Prisma.CustomerWhereInput {
   const search = searchCondition(query.search) ?? [];
@@ -252,8 +252,8 @@ function buildCustomerWhere(query: ListQuery, scope: CustomerScope): Prisma.Cust
 }
 
 /**
- * `listAlive` con el contrato generico de consulta (R26-R31). El `limit` que llega a Prisma -y
- * el `pageSize` que sale en el `Page`- es el ACOTADO que devuelve `toOffsetLimit`, nunca el que
+ * `listAlive` con el contrato generico de consulta. El `limit` que llega a Prisma -y el
+ * `pageSize` que sale en el `Page`- es el ACOTADO que devuelve `toOffsetLimit`, nunca el que
  * pidio el llamante. `total` sale de un `count` con el MISMO `where` que el `findMany`.
  */
 export async function listAliveCustomers(

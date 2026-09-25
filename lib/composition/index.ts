@@ -392,7 +392,7 @@ import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-pro
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
 import { requestScoped } from '@/lib/shared/request-scope';
-// `clientes` (T11). Imports al final del bloque, bloque de cableado al final del archivo: no
+// `clientes`. Imports al final del bloque, bloque de cableado al final del archivo: no
 // reordena ni reformatea nada de lo que hay arriba.
 import {
   createCreateCustomer,
@@ -1583,11 +1583,11 @@ export const documentos = {
 } as const;
 
 // ---------------------------------------------------------------------------------------
-// `clientes` (T11). Bloque nuevo al final: no reordena ni reformatea nada de lo de arriba.
+// `clientes`. Bloque nuevo al final: no reordena ni reformatea nada de lo de arriba.
 // ---------------------------------------------------------------------------------------
 
-/** QC-57 (R6): la MISMA implementacion de `lib/shared/observability`, vista por el puerto que
- *  declara `clientes`. */
+/** La MISMA implementacion de `lib/shared/observability`, vista por el puerto que declara
+ *  `clientes`. */
 const clientesListQueryLog: ClientesListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
 const customerRepository: CustomerRepository = {
@@ -1599,8 +1599,7 @@ const customerRepository: CustomerRepository = {
 };
 
 /**
- * Fachada del modulo `clientes` ya cableada (T11, `design.md > 10`). Es lo que consume la
- * Server Action de T12.
+ * Fachada del modulo `clientes` ya cableada. Es lo que consume la Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo
  * recibe por parametro, y quien lo obtiene de las dos caras de la sesion es la Server Action.
