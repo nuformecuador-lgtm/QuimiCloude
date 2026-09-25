@@ -2552,7 +2552,7 @@
       "epic_name": "Pedidos",
       "name": "estado-por-empacar",
       "description": "El pedido gana dos estados entre EN_CURSO y ENTREGADO: **POR_EMPACAR** y **EN_EMPAQUE**.\n\n* **Flujo:** PENDIENTE -> EN_CURSO -> **POR_EMPACAR** (el Operario finaliza la produccion) -> **EN_EMPAQUE** (el Empacador comienza) -> ENTREGADO (el Empacador termina).\n* **Cualquier Empacador de la empresa** toma cualquier pedido Por empacar, sin asignacion: el primero que lo comienza se lo queda y solo el lo termina.\n* **Inventario al producir:** al pasar a Por empacar se consume el material (QC-141) y entra el lote de producto terminado (QC-150). `finished_at` al entregar.\n* **No se cancela** ni Por empacar ni En empaque; los problemas se corrigen con ajuste (QC-92).\n* **Permiso nuevo de empaque, solo el Empacador** (catalogo 16 -> 17).\n* **Pestana «Por empacar» en /asignacion**; cada fila abre una pantalla con Comenzar y Terminar.\n* E2E si. Sin migracion de datos.\n\n**NO ENTRA:** registrar el empaque en el log (lo anade **QC-82**, despues de esta); que el Administrador empaque; asignar empacadores.\n\n**Orden:** QC-150 -> QC-168 -> QC-82.\n\n--- Acotada por `/afinar-feature` el 2026-09-24. Las decisiones estan en `specs/QC-168-estado-por-empacar/requirements.md`. ---",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
