@@ -2608,6 +2608,53 @@
       "branch": "feature/QC-171-recortes-con-url-publica",
       "depends_on": [],
       "spec_path": "specs/QC-171-recortes-con-url-publica"
+    },
+    {
+      "key": "QC-172",
+      "id": 172,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "versiones-de-receta",
+      "description": "Una receta puede tener VERSIONES (variaciones): la misma formula con porcentajes cambiados e ingredientes anadidos o quitados, sin tocar la original. Ejemplo: \"Crema base\" (agua 70, glicerina 10, cera 15, perfume 5) y su version \"Sin perfume\" (agua 70, glicerina 15, cera 15). NACE DEL CHAT el 2026-09-25.\n\nDECIDIDO POR EL HUMANO EL 2026-09-25\n1. COPIA CON VINCULO: crear una version copia las lineas de la receta en una receta nueva que apunta a la original. El pedido guarda la version elegida, asi que reserva de material, coste, ejecucion en planta y producto terminado la leen como a cualquier receta. Descartadas: tabla de versiones aparte (obliga a reescribir todo lo que lee lineas) y guardar solo diferencias (la version cambiaria sola y podria dejar de sumar 100 %).\n2. CADA VERSION SUMA 100 %, con la misma validacion que ya tienen las recetas.\n3. PROPAGACION ASISTIDA: al guardar la original, el sistema ofrece aplicar el cambio a sus versiones. Solo se aplica en los ingredientes que la version NO cambio; si una version deja de sumar 100 % queda POR REVISAR y no se puede elegir en un pedido hasta ajustarla.\n4. LAS VERSIONES COMPARTEN LOS PASOS DE LA ORIGINAL: solo cambian ingredientes y porcentajes; los pasos (y sus fases) se leen siempre de la original.\n5. LAS VERSIONES NO SALEN COMO RECETAS SUELTAS en la lista: cuelgan de su original.\n\nQUE ENTRA. El modelo y las operaciones de servidor de las versiones (crear, editar, borrar, listar las de una receta, propagar). Y en el FORMULARIO DE PEDIDO, al elegir una receta, un segundo selector de VERSION (\"Original\" + sus versiones), DESHABILITADO si la receta no tiene versiones; las versiones por revisar no se ofrecen.\n\nLO QUE NO ENTRA. La pantalla para crear y editar versiones desde la receta: ficha aparte, bloqueada por esta. Que un pedido conserve la formula con la que se creo si luego se edita la receta: pasa igual hoy sin versiones y seria ficha propia. Las fases de los pasos: ficha aparte.\n\nABIERTO, se acota con /afinar-feature: nombre de la version (libre o numerado), si se puede crear una version de una version, que pasa con las versiones al borrar la original, si una version puede ser la receta de un producto terminado, si el pedido guarda la version al editarlo. CRUCE: el formulario de pedido lo tocan tambien QC-168, QC-170 y QC-164; se mira en F2.0.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-172-versiones-de-receta",
+      "depends_on": [],
+      "spec_path": "specs/QC-172-versiones-de-receta"
+    },
+    {
+      "key": "QC-173",
+      "id": 173,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "fases-en-los-pasos",
+      "description": "Los pasos de una receta se pueden AGRUPAR POR FASES: pasos 1-3 = Fase 1 \"Mezcla\", pasos 4-6 = Fase 2 \"Envasado\". NACE DEL CHAT el 2026-09-25.\n\nDECIDIDO POR EL HUMANO EL 2026-09-25\n1. LISTA DE FASES + FASE EN CADA PASO. Junto a los pasos se guarda una lista de fases con nombre y orden, y cada paso dice a que fase pertenece. Renombrar una fase se hace en un solo sitio; arrastrar un paso a otra fase solo le cambia la fase. Descartadas: pasos anidados dentro de fases (obliga a migrar todo lo guardado y a cambiar la numeracion de la ejecucion en planta) y rangos de pasos (se desfasan al reordenar).\n2. LOS PASOS DE UNA FASE VAN SEGUIDOS: no puede haber Mezcla, Envasado y otra vez Mezcla.\n3. LA NUMERACION DE PASOS SIGUE SIENDO CORRIDA (1 a N), no reinicia por fase.\n4. LAS RECETAS EXISTENTES NO SE MIGRAN: sin fases se ven como hoy, sin agrupar.\n\nEJEMPLO\n- Fase 1 · Mezcla: 1. Calentar el agua a 70 C; 2. Agregar la glicerina; 3. Fundir la cera y mezclar 10 min\n- Fase 2 · Envasado: 4. Dejar enfriar a 35 C; 5. Llenar los envases; 6. Etiquetar\n\nQUE ENTRA. Guardar las fases con la receta, crearlas, renombrarlas, borrarlas y asignar pasos en el editor de pasos; y mostrar el agrupador donde se leen los pasos, incluida la ejecucion en planta.\n\nLO QUE NO ENTRA. Tiempos o registro por fase. Las versiones de receta: si se hacen, comparten los pasos y fases de la original (decidido en la ficha de versiones).\n\nABIERTO, se acota con /afinar-feature: si una receta con fases puede tener pasos sueltos sin fase, que pasa con los pasos al borrar una fase, tope de fases, si el registro de ejecucion (QC-82) necesita saber la fase.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-173-fases-en-los-pasos",
+      "depends_on": [],
+      "spec_path": "specs/QC-173-fases-en-los-pasos"
+    },
+    {
+      "key": "QC-174",
+      "id": 174,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "crear-versiones-en-la-receta",
+      "description": "Desde la pantalla de una receta se pueden CREAR, EDITAR, VER y BORRAR sus versiones (variaciones). NACE DEL CHAT el 2026-09-25. BLOQUEADA POR QC-172, que pone el modelo y las operaciones de servidor.\n\nQUE ENTRA\n- Boton \"Nueva version\" en la receta: parte de una copia de las lineas de la original.\n- Editar la version: subir o bajar porcentajes, anadir y quitar ingredientes, con la regla del 100 % visible mientras se edita, igual que en la receta.\n- Ver las versiones de la receta (cuelgan de la original, no salen sueltas en la lista) y cuales estan POR REVISAR.\n- Al guardar la ORIGINAL, el aviso de PROPAGACION ASISTIDA: \"N versiones parten de esta receta, aplicar el cambio?\", y senalar las que quedan por revisar.\n- Los pasos de una version se muestran de SOLO LECTURA: son los de la original (decidido en QC-172).\n\nLas decisiones de fondo (copia con vinculo, propagacion asistida, pasos compartidos, 100 % por version) estan en QC-172 y no se reabren aqui.\n\nLO QUE NO ENTRA. El selector de version en el pedido y el modelo: QC-172. Las fases de los pasos: QC-173.\n\nABIERTO, se acota con /afinar-feature: donde vive la edicion de la version (pagina propia, panel o pestana dentro de la receta), como se ve la diferencia con la original (resaltar lo que cambio o no), quien puede crear versiones (mismo permiso que editar recetas o uno propio), si hace falta E2E.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-174-crear-versiones-en-la-receta",
+      "depends_on": [
+        "QC-172"
+      ],
+      "spec_path": "specs/QC-174-crear-versiones-en-la-receta"
     }
   ]
 }
