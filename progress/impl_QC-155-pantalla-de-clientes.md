@@ -538,3 +538,41 @@ Test Files  3 passed (3)
 `pnpm run lint`: 0 errores (7 warnings preexistentes ajenos). `pnpm run typecheck`: el agente de T7 vio
 `app/layout.tsx: Cannot find name 'LayoutProps'` porque el agente de T8 había borrado `.next`; tras
 `pnpm exec next typegen` el typecheck vuelve a verde (comprobado por el implementer).
+
+## T8 — `e2e/clientes.spec.ts`
+
+Commit `00227c0f`. Archivos:
+
+- `e2e/clientes.spec.ts` (nuevo): dos recorridos, fixtures `qc155_e2e_`, `loginAndLand`, sin red.
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de `'clientes.spec.ts'` en `E2E_ESPERADOS`.
+- `tests/unit/shared/data-table-alcance.test.ts`: alta de `e2e/clientes.spec.ts` en la lista cerrada de E2E (ancla tensada de 22 a 23).
+
+El caso R28 acotado de `tests/unit/clientes/scope.test.ts` admite el spec tal cual (excluye por nombre exacto).
+
+### Mapa R<n> → test
+
+| R | Test |
+| --- | --- |
+| R41 | `e2e/clientes.spec.ts` > "el Administrador entra por la URL, da de alta un cliente, lo encuentra sin tilde, lo edita y lo da de baja (R41)" |
+| R42 | `e2e/clientes.spec.ts` > "una sesion valida sin `clientes.consultar` recibe 404 dentro del layout privado y no ve la tabla (R42)" |
+
+### Salida real
+
+`pnpm exec playwright test e2e/clientes.spec.ts --project=chromium --project=webkit` contra `QuimiCloude_QC155`:
+
+```
+Running 4 tests using 4 workers
+✓ [chromium] R42 (20.8s)
+✓ [webkit]   R42 (22.1s)
+✓ [chromium] R41 (30.9s)
+✓ [webkit]   R41 (33.0s)
+4 passed (43.3s)
+```
+
+Consulta de limpieza tras la corrida: `{"customers":0,"customersByLastNames":0,"users":0,"companies":0}`.
+
+`pnpm exec vitest run tests/guards/guard-e2e-landing.test.ts tests/guards/guard-identificador-de-request.test.ts tests/unit/shared/data-table-alcance.test.ts tests/unit/clientes/scope.test.ts`:
+4 archivos, 78 passed | 2 skipped. `typecheck` limpio; `lint` 0 errores (7 warnings preexistentes ajenos).
+
+Nota operativa: el puerto fijo 3117 de `playwright.config.ts` lo comparten todos los worktrees; la
+corrida esperó a que otro worktree lo liberara.

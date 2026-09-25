@@ -95,7 +95,7 @@
 
 ## Tanda 6 — E2E
 
-- [ ] **T8 — `e2e/clientes.spec.ts`.** Depende de T6 (y de T0 para la base).
+- [x] **T8 — `e2e/clientes.spec.ts`.** Depende de T6 (y de T0 para la base).
   Los dos recorridos de `design.md > 11`, con fixtures `qc155_e2e_` y `loginAndLand`. **En la misma
   task:** `'clientes.spec.ts'` en `E2E_ESPERADOS` y `e2e/clientes.spec.ts` en la lista de E2E de
   `data-table-alcance.test.ts`. Comprobar que el caso R28 acotado de `scope.test.ts` (T1) lo admite.
