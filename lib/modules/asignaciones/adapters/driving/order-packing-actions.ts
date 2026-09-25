@@ -63,7 +63,7 @@ export async function startPackingAction(
 
 export type FinishPackingResult = { status: 'success' } | ErrorState;
 
-/** Deja el pedido `ENTREGADO` y vuelve a la pestaña «Por empacar» con la confirmacion (R26). */
+/** Deja el pedido `ENTREGADO` y vuelve a la pestaña «Por empacar» con la confirmacion. */
 export async function finishPackingAction(
   _prevState: FinishPackingResult,
   formData: FormData,

@@ -19,9 +19,9 @@ ALTER TABLE "orders" ADD CONSTRAINT "orders_packed_by_company_id_fkey"
   FOREIGN KEY ("packed_by", "company_id") REFERENCES "users"("id", "company_id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- Quien empaca existe si y solo si el pedido esta EN_EMPAQUE. La segunda rama cierra ademas los
--- estados donde nadie ha empezado a empacar todavia: la columna solo puede llevar valor en
--- EN_EMPAQUE o en ENTREGADO (los entregados antiguos no lo tienen; los nuevos lo conservan).
+-- Quien empaca es obligatorio en EN_EMPAQUE (primera rama) y esta prohibido en PENDIENTE,
+-- EN_CURSO, POR_EMPACAR y CANCELADO (segunda rama); en ENTREGADO puede llevar valor o no
+-- (los entregados antiguos no lo tienen, los nuevos lo conservan).
 ALTER TABLE "orders" ADD CONSTRAINT "orders_packed_by_matches_status" CHECK (
   ("status"::text <> 'EN_EMPAQUE' OR "packed_by" IS NOT NULL)
   AND

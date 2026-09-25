@@ -1,8 +1,9 @@
 // lib/modules/asignaciones/domain/finish-packing.ts
 /**
  * Terminar: `EN_EMPAQUE -> ENTREGADO`, con `finished_at` en la misma escritura que el cambio de
- * estado (R21), solo si el actor es quien tiene el pedido en empaque. Sin comprobacion de
- * asignacion (D2) y sin ningun puerto de inventario (R25).
+ * estado, solo si el actor es quien tiene el pedido en empaque. Sin comprobacion de asignacion:
+ * cualquier actor con `empaque.modificar` puede terminar cualquier pedido vivo de su empresa, y
+ * sin ningun puerto de inventario: el material ya se consumio al iniciar la produccion.
  *
  * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `ENTREGADO`, el
  * filtro de estado con el que se leyo ya no lo encontraria (mismo motivo que
@@ -35,7 +36,7 @@ export function createFinishPacking(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<FinishPackingResult> {
-    // R13: autorizar va antes de validar la entrada y antes de tocar ningun puerto.
+    // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'empaque.modificar');
 
     const parsed = finishPackingSchema.safeParse(input);

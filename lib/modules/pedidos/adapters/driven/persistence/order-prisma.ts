@@ -760,10 +760,10 @@ async function findAlivePackingStatus(
 }
 
 /**
- * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar, `design.md > 3`): un
- * `UPDATE` condicional `WHERE status = 'POR_EMPACAR'`. `count = 1` es el unico camino de exito;
- * cualquier otro caso relee la fila para distinguir «no existe» de «ya la tiene otro» de «ya es
- * mia» de «no admite Comenzar».
+ * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar): un `UPDATE` condicional
+ * `WHERE status = 'POR_EMPACAR'`. `count = 1` es el unico camino de exito; cualquier otro caso
+ * relee la fila para distinguir «no existe» de «ya la tiene otro» de «ya es mia» de «no admite
+ * Comenzar».
  */
 export async function startPackingAliveOrder(
   id: string,
@@ -784,10 +784,10 @@ export async function startPackingAliveOrder(
 }
 
 /**
- * Implementa `OrderPackingRepository['finishPackingAlive']` (Terminar, `design.md > 3`): el
- * `UPDATE` condicional exige ademas `packed_by = packerId`, y escribe `finished_at` en la MISMA
- * sentencia que el estado (R21). Cualquier caso que no mueva la fila relee para distinguir «no
- * existe» de «lo tiene otro empacador» de «no admite Terminar».
+ * Implementa `OrderPackingRepository['finishPackingAlive']` (Terminar): el `UPDATE` condicional
+ * exige ademas `packed_by = packerId`, y escribe `finished_at` en la MISMA sentencia que el
+ * estado. Cualquier caso que no mueva la fila relee para distinguir «no existe» de «lo tiene
+ * otro empacador» de «no admite Terminar».
  */
 export async function finishPackingAliveOrder(
   id: string,

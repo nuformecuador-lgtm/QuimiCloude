@@ -1,8 +1,8 @@
 // lib/modules/asignaciones/domain/list-packing-orders.ts
 /**
  * «Por empacar»: los pedidos `POR_EMPACAR` y `EN_EMPAQUE` de toda la empresa, sin filtro por
- * asignacion (D2) y con el mismo orden y los mismos tamanos de pagina que la lista de trabajo
- * (R16).
+ * asignacion -cualquiera con `empaque.modificar` ve todos los de su empresa- y con el mismo
+ * orden y los mismos tamanos de pagina que la lista de trabajo.
  */
 import { z } from 'zod';
 
@@ -30,7 +30,7 @@ export function createListPackingOrders(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<Page<PackingOrderRow>> {
-    // R13: autorizar va antes de validar la entrada y antes de tocar ningun puerto.
+    // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'empaque.modificar');
 
     const parsed = listPackingOrdersSchema.safeParse(input);

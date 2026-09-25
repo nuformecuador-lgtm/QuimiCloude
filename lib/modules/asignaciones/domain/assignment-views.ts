@@ -40,7 +40,7 @@ function hasPermission(
  * tiene ninguno de los cuatro permisos igual recibe `['asignados']`, porque esta funcion no decide
  * si el usuario puede entrar a `/asignacion` en absoluto, solo que vistas le tocan si entra.
  *
- * `por_empacar` se anade SIEMPRE AL FINAL, sea cual sea la vista por defecto que ya se calculo: R39
+ * `por_empacar` se anade SIEMPRE AL FINAL, sea cual sea la vista por defecto que ya se calculo:
  * no cambia el aterrizaje de nadie, solo ofrece la pestana a quien tiene `empaque.modificar`.
  */
 export function resolveAssignmentViews(

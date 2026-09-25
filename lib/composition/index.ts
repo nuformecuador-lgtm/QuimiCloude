@@ -1168,7 +1168,8 @@ export const observabilidad = {
  *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
  *  consume el material en la misma transaccion. */
 /** `OrderPackingRepository` cableado con las dos escrituras crudas de `order-prisma.ts`: cada
- *  una un `UPDATE` condicional fuera de `orderUnitOfWork` (R25). */
+ *  una un `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida
+ *  con `inventario`. */
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
   finishPackingAlive: finishPackingAliveOrder,
@@ -1323,11 +1324,11 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
-  // QC-168 T10 - el empaque (`design.md > 3`). `listPackingOrders` y `getPackingOrder` comparten
-  // los MISMOS `orderCatalog`, `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog`
-  // y `peopleDirectory` del resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y
-  // la ejecucion, arriba- para los envases. `startPacking` y `finishPacking` solo necesitan
-  // `orderCatalog`: ningun adaptador nuevo.
+  // `listPackingOrders` y `getPackingOrder` comparten los MISMOS `orderCatalog`,
+  // `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog` y `peopleDirectory` del
+  // resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y la ejecucion, arriba-
+  // para los envases. `startPacking` y `finishPacking` solo necesitan `orderCatalog`: ningun
+  // adaptador nuevo.
   listPackingOrders: createListPackingOrders({
     orders: orderCatalog,
     assignments: orderAssignmentRepository,

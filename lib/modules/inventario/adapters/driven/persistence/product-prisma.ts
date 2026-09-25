@@ -1098,12 +1098,12 @@ async function findProductionMovements(
 /**
  * Implementa `ProductCatalog['findFinishedGoodsReceipts']`: los envases que de verdad entraron
  * por cada pedido, leidos del asiento `production` -uno por pedido, porque el Finalizar solo se
- * escribe una vez (R10)- y divididos por el contenido guardado en su lote. Un `orderId` sin ese
+ * escribe una vez- y divididos por el contenido guardado en su lote. Un `orderId` sin ese
  * asiento, o de otra empresa, simplemente no aparece en la respuesta.
  *
- * No exige `inventario.consultar`: quien llama ya autorizo con su propio permiso (D2 de
- * `design.md`). Por eso NO es un caso de uso de `inventario`, sino una lectura directa que
- * `asignaciones` compone dentro de la suya.
+ * No exige `inventario.consultar`: quien llama ya autorizo con su propio permiso. Por eso NO es
+ * un caso de uso de `inventario`, sino una lectura directa que `asignaciones` compone dentro de
+ * la suya.
  */
 export async function findFinishedGoodsReceipts(
   orderIds: readonly string[],

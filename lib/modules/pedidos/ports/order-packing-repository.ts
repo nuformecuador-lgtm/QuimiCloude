@@ -3,7 +3,7 @@ import type { OrderScope } from '../domain/order-scope';
 /**
  * Puerto de las dos escrituras del empaque, cada una UN `UPDATE` condicional con ambito de
  * empresa, fuera de la unidad de trabajo compartida con `inventario`: ninguna de las dos toca
- * material ni producto terminado (R25).
+ * material ni producto terminado.
  *
  * Mismo criterio de ambito que `OrderWriteRepository`: `scope: OrderScope` es SIEMPRE el ultimo
  * parametro (`tests/guards/guard-ambito-empresa-pedidos.test.ts`).

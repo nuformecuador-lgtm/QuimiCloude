@@ -171,8 +171,9 @@ export type AssignedOrderSummary = {
   /** `null` = sin fecha de terminado: un pedido entregado antes de que la columna existiera, o
    *  uno que no esta ENTREGADO. */
   readonly finishedAt: Date | null;
-  /** Quien tiene el pedido en empaque: `null` fuera de `EN_EMPAQUE`. El identificador viaja en
-   *  crudo, igual que `recipeId`; el nombre lo resuelve quien consulta con el directorio de
-   *  personas. */
+  /** Quien tiene el pedido en empaque: obligatorio en `EN_EMPAQUE`, `null` en `PENDIENTE`,
+   *  `EN_CURSO`, `POR_EMPACAR` y `CANCELADO`, y opcional en `ENTREGADO` (los entregados antiguos
+   *  no lo tienen, los nuevos lo conservan). El identificador viaja en crudo, igual que
+   *  `recipeId`; el nombre lo resuelve quien consulta con el directorio de personas. */
   readonly packedBy: string | null;
 };

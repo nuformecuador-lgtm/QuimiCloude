@@ -52,8 +52,9 @@ export function createListCompanyOrders(
     if (!parsed.success) throw new ValidationError();
     const { page, pageSize, statuses } = parsed.data;
 
-    // Sin filtro, el orden que viaja al catalogo es el del flujo de trabajo (`design.md > 1.1`),
-    // no el de declaracion del enum: es el que pinta el filtro de «Todos».
+    // Sin filtro, los estados que viajan al catalogo son los del flujo de trabajo y no los de
+    // declaracion del enum, aunque el orden de la lista no depende de este array: solo
+    // `resolveOrdering` decide, y unicamente cuando el filtro es exactamente `['ENTREGADO']`.
     const statusesEfectivos = [...new Set(statuses ?? ORDER_STATUS_FLOW)];
     const ordering = resolveOrdering(statusesEfectivos);
 

@@ -35,11 +35,11 @@ export type FinishAssignedOrderResult = {
 };
 
 /**
- * R10: solo `EN_CURSO` puede finalizarse. `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y
- * `EN_EMPAQUE` los rechaza `assertOrderAcceptsWrites`, con el error propio de cada uno; el
- * unico estado que esa funcion admite sin ser `EN_CURSO` es `PENDIENTE` -abrir la pantalla del
- * pedido ya lo habria dejado `EN_CURSO`, asi que llegar aqui es un Finalizar disparado antes de
- * eso-, y se rechaza con `invalid_transition` (decision humana 2026-09-25, A-1).
+ * Solo `EN_CURSO` puede finalizarse. `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` los
+ * rechaza `assertOrderAcceptsWrites`, con el error propio de cada uno; el unico estado que esa
+ * funcion admite sin ser `EN_CURSO` es `PENDIENTE` -abrir la pantalla del pedido ya lo habria
+ * dejado `EN_CURSO`, asi que llegar aqui es un Finalizar disparado antes de eso-, y se rechaza
+ * con `invalid_transition` en vez de un error propio, porque ese estado no tiene uno.
  */
 function assertFinishable(order: OrderAssignmentTarget): void {
   if (order.status === 'EN_CURSO') return;

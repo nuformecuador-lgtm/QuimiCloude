@@ -12,7 +12,6 @@ import {
   NoWholePackageError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
-  OrderNotFoundError,
   OrderProducedFrozenError,
   PresentationWithoutContentError,
   RecipeNotFoundError,

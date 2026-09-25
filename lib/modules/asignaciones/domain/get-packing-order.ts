@@ -2,8 +2,7 @@
 /**
  * La misma fila de `list-packing-orders.ts` para un unico pedido: la pantalla de empaque abre con
  * esto. `null` o cualquier estado distinto de `POR_EMPACAR`/`EN_EMPAQUE` es `order_not_found`,
- * igual que un pedido inexistente (D2): esta consulta no revela que el pedido existe en otro
- * estado.
+ * igual que un pedido inexistente: esta consulta no revela que el pedido existe en otro estado.
  */
 import { z } from 'zod';
 
@@ -30,7 +29,7 @@ export function createGetPackingOrder(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<PackingOrderRow> {
-    // R13: autorizar va antes de validar la entrada y antes de tocar ningun puerto.
+    // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'empaque.modificar');
 
     const parsed = getPackingOrderSchema.safeParse(input);

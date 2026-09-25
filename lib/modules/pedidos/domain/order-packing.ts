@@ -2,7 +2,7 @@
 //
 // Implementa `OrderCatalog['startPackingAliveById']` y `['finishPackingAliveById']` sobre
 // `OrderPackingRepository` (`ports/order-packing-repository.ts`): cada uno delega en UN `UPDATE`
-// condicional del adaptador, sin abrir la unidad de trabajo compartida con `inventario` (R25).
+// condicional del adaptador, sin abrir la unidad de trabajo compartida con `inventario`.
 // `asignaciones` solo conoce la firma del puerto, nunca este archivo.
 
 import { assertTransition } from './order-transitions';

@@ -222,9 +222,9 @@ export const DELIVERED_ORDER_PACKAGES_PARAM = 'entregado_envases';
 export const DELIVERED_ORDER_PRODUCT_PARAM = 'entregado_producto';
 
 /**
- * Pantalla del pedido de empaque (QC-168, `design.md > 6`), derivada de `ASSIGNED_ORDERS_ROUTE`
- * como `assignedOrderRoute`. No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la comparacion
- * por segmentos de `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/empaque/<id>`.
+ * Pantalla del pedido de empaque, derivada de `ASSIGNED_ORDERS_ROUTE` como `assignedOrderRoute`.
+ * No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la comparacion por segmentos de
+ * `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/empaque/<id>`.
  */
 export function packingOrderRoute(id: string): string {
   return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
