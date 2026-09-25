@@ -377,7 +377,7 @@ typecheck limpio · lint 0 errores
 |---|---|
 | R1 | `tests/unit/documentos-ui/formula-pdf-upload.test.tsx`; E2E `e2e/formula-desde-pdf.spec.ts` |
 | R2 | `tests/unit/recetas-ui/formula-import-page.test.tsx` (dos renders iguales); E2E |
-| R3 | `tests/unit/documentos/preview-formula-import.test.ts`; `formula-import-page.test.tsx` |
+| R3 | Vista previa: `tests/unit/documentos/preview-formula-import.test.ts`; `formula-import-page.test.tsx`. Confirmación: `confirm-formula-import.test.ts` «R3 — archivo que todavía no llegó a done…» (entrada válida, `invalid_input`, cero puertos de escritura), junto a sus vecinos R23/R33; mutación comprobada (vuelta 1) |
 | R4, R5, R6 | `tests/unit/documentos/formula-extraction.test.ts` |
 | R7 | `formula-extraction.test.ts` (incluido el caso `"1e2"` como cadena, ver T4); E2E |
 | R8 | `formula-extraction.test.ts`; `tests/unit/recetas-ui/formula-import-review.test.tsx` |
@@ -394,7 +394,7 @@ typecheck limpio · lint 0 errores
 | R20 | `confirm-formula-import.test.ts`; `recipe-catalog-by-name.int.test.ts`; `tests/unit/documentos/formula-import-actions.test.ts` |
 | R21 | `formula-import.int.test.ts` (pedido idéntico fila a fila); `formula-import-review.test.tsx` (texto del aviso) |
 | R22 | `preview-formula-import.test.ts` (la vista previa no llama a ningún puerto de escritura) y los casos de rechazo de `confirm-formula-import.test.ts` («cero escrituras»). **No hay caso con `R22` en el nombre.** |
-| R23 | `confirm-formula-import.test.ts`: «R15, R16 — la revisión del servidor rechaza antes de escribir nada» y «R24 — el producto elegido se relee en el servidor». **No hay caso con `R23` en el nombre.** |
+| R23 | `confirm-formula-import.test.ts`: «R23 — archivo inexistente (o de otra empresa)…» (**relectura del archivo**, entrada válida, `invalid_input`, cero llamadas a `findRefs`, `findAliveByNormalizedName(s)`, `createRawMaterial`, `createRecipe`, `updateRecipe`), «R15, R16 — la revisión del servidor rechaza antes de escribir nada» y «R24 — el producto elegido se relee en el servidor». Rojo al borrar la relectura de `confirm-formula-import.ts:86-89` (vuelta 1) |
 | R24 | `confirm-formula-import.test.ts`; `formula-import-actions.test.ts` |
 | R25 | `tests/unit/inventario/create-raw-material.test.ts`; `tests/integration/inventario/create-raw-material.int.test.ts`; `confirm-formula-import.test.ts`; E2E |
 | R26 | `confirm-formula-import.test.ts`; `product-name-lookup.int.test.ts` |
@@ -404,11 +404,11 @@ typecheck limpio · lint 0 errores
 | R30 | `tests/unit/documentos/formula-import-authorization.test.ts` |
 | R31 | `formula-import-authorization.test.ts`; `create-raw-material.test.ts`; `formula-import-actions.test.ts` |
 | R32 | `formula-import-page.test.tsx`; `tests/guards/guard-pantallas-exigen-permiso.test.ts` (alta de la ruta) |
-| R33 | `formula-import.int.test.ts`; `product-name-lookup.int.test.ts`; `recipe-catalog-by-name.int.test.ts` |
+| R33 | `confirm-formula-import.test.ts` «R33 — archivo de una tanda catalogo…»; `formula-import.int.test.ts` (archivo de otra empresa con entrada válida ⇒ `invalid_input`; receta de otra empresa ⇒ `recipe_not_found`; producto de otra empresa ⇒ `invalid_input`, códigos afirmados); `product-name-lookup.int.test.ts`; `recipe-catalog-by-name.int.test.ts` |
 | R34 | `tests/unit/documentos-ui/formulas-upload.test.tsx` (sin `documentos.modificar` no hay botón; casos nombrados con los R de QC-107) y `document-upload-convenciones.test.ts` («las dos páginas que montan la pieza llaman a canUploadDocuments»). **No hay caso con `R34` en el nombre.** |
 | R35 | `tests/unit/documentos/qc159-alcance.test.ts`; `confirm-formula-import.test.ts` (sin `image`); `formula-import-review.test.tsx` |
 | R36, R37 | `qc159-alcance.test.ts` (rojo a mano probado, ver T12) |
-| R38 | `formula-import-review.test.tsx` (`min-h-11 min-w-11`, `text-base`, sin `hover:` como única vía); E2E en WebKit |
+| R38 | `formula-import-review.test.tsx`: `min-h-11 min-w-11` en todos los botones e inputs de la revisión, `text-base` en nombre, descripción, porcentaje y nombre de materia prima, y ninguna acción que dependa de `hover:` (vuelta 1, m4); E2E en WebKit |
 | R39 | `e2e/formula-desde-pdf.spec.ts` (Chromium y WebKit, verde el 2026-09-25) |
 
 ### Solapes con QC-168 / QC-138
@@ -466,3 +466,70 @@ test-db: borrada la base de la corrida: qct_qc159_15d32d70_muhhubpf_dpo.
 
 Con esto R39 queda cubierto por `e2e/formula-desde-pdf.spec.ts` **verificado** en Chromium y WebKit.
 T14 queda a falta del `./init.sh` completo, que corre el leader.
+
+## Vuelta 1 de review (RECHAZADO por B1, `e9f9cddd`) — correcciones
+
+### B1 — relectura del archivo al confirmar (backend_dev, `d6a7976c`)
+
+- `tests/unit/documentos/confirm-formula-import.test.ts`: `describe('R3, R23, R33 — la confirmacion vuelve
+  a leer el archivo…')` con tres casos de **entrada válida**: archivo `null` (R23), `status: 'processing'`
+  (R3) y `strategy: 'catalogo'` (R33). Los tres afirman `{ code: 'invalid_input' }` y cero llamadas a
+  `findRefs`, `findAliveByNormalizedName`, `findAliveByNormalizedNames`, `createRawMaterial`,
+  `createRecipe` y `updateRecipe`.
+- `tests/integration/documentos/formula-import.int.test.ts`: «archivo de otra empresa» con línea válida
+  al 100,00 % y `{ code: 'invalid_input' }`; «receta de otra empresa» ⇒ `{ code: 'recipe_not_found' }`;
+  «producto de otra empresa» ⇒ `{ code: 'invalid_input' }` (ya no `.rejects.toThrow()` a secas).
+- **Mutación:** sin la comprobación de `confirm-formula-import.ts:86-89`, los tres unitarios y el de
+  integración del archivo de otra empresa se ponen rojos («promise resolved … instead of rejecting»).
+  Restaurado: `git diff` de ese archivo vacío; unit 25/25, integración 8/8.
+- Mapa R→test actualizado en las filas R3, R23 y R33 (y R38 por m4).
+
+### Menores hechos
+
+- **m2** (`7918accd`): `tests/unit/inventario/create-raw-material-alcance.test.ts` (5 casos). En
+  producción, `createRawMaterial`/`createCreateRawMaterial` solo pueden aparecer en `lib/modules/inventario/**`,
+  `lib/composition/index.ts` y `lib/modules/documentos/domain/**`, y dentro de la composición solo en la
+  fachada `inventario` y en `formulaImportDeps`. Tiene detectores con entrada infractora inventada y
+  rojo a mano (llamada temporal en `lib/shared/db/prisma.ts`, revertida, `git status` limpio).
+- **m4** (`5d3f952c`): tres casos R38 nuevos en `formula-import-review.test.tsx`. Cubren `min-h-11 min-w-11`
+  en todos los botones e inputs (nombre, descripción, añadir, confirmar, reemplazar, cambiar nombre, y
+  por fila quitar, modos, porcentaje, selector y nombre de materia prima), `text-base` en los campos de
+  texto y que ninguna acción dependa de `hover:` (el mismo patrón que `document-upload-a11y-tactil.test.tsx`).
+  El código ya cumplía.
+- **m7** y **m8** (`f5c30ef8`, solo comentarios): se borra «Tope de pasos por receta.» en `recipe-input.ts`;
+  el bloque de la cadena de traductores queda solo en `formula-import-error-translator.ts` y la acción
+  lleva un puntero de una línea.
+- **m9** (`e792bd57`, solo comentario): el comentario del E2E antes del `fill` del nombre da ahora la
+  causa medida (el `fill` puede llegar antes de hidratar y la pantalla relee el DOM al perder el foco).
+
+### Deuda anotada, sin tocar (decisión del leader)
+
+- **m1**: la hidratación. Descripción, porcentajes, nombre de materia prima y pasos pierden, de forma
+  visible, lo tecleado antes de hidratar; el nombre solo queda cubierto si el `blur` llega hidratado.
+  Es un patrón de todo el repo. Propuesta: ficha aparte (un helper de E2E que espere la hidratación, o
+  una política común para los campos controlados SSR), que decide el humano.
+- **m3**: `formulas/importar/**` queda fuera de la lista cerrada de acciones de `recipe-route-contract.test.ts`
+  y no tiene una propia.
+- **m5**: R39 encadena «reemplazar» y «renombrar» en un solo `test`, así que un fallo en el primero oculta el segundo.
+- **m6**: `review-formula-import.ts > isValidNewName` repite el recorte y los límites en vez de usar
+  `productNameSchema.safeParse`. El tope es el mismo (`PRODUCT_NAME_MAX_LENGTH`).
+
+### Verificación de la vuelta 1
+
+```
+typecheck limpio · lint 0 errores (7 avisos preexistentes ajenos)
+vitest run tests/unit/documentos tests/unit/inventario tests/unit/recetas tests/guards   234 archivos, 3051 verdes / 39 skip
+vitest run tests/unit/recetas-ui                                                         14 archivos, 301 verdes
+vitest run --project integration tests/integration/documentos/formula-import.int.test.ts 8 passed
+
+$ ./init.sh --rapido            (sobre f5c30ef8)
+ Test Files  357 passed (357)
+      Tests  5109 passed | 49 skipped (5158)
+test-db: borrada la base de la corrida: qct_qc159_15d32d70_muhje4dk_f0o.
+ Test Files  51 passed (51)     (guardias)
+      Tests  647 passed | 11 skipped (658)
+✓ test:rapido paso · == init OK == · exit 0
+```
+
+No se hizo merge de `dev` ni se corrió `./init.sh` completo. Ni el E2E ni la pantalla cambiaron de
+código en esta vuelta (solo el comentario de m9), así que no se repitió el E2E.
