@@ -1347,3 +1347,20 @@ no se marco.
 Cinco commits en esta tanda: `28bbddb5` (B3), `e672005a` (m5), `d2ea93e3` (m4), `7cf24a16` (m11),
 `297bf238` (m8), mas `eb0c2a52` (merge de `origin/dev`) y `c9bfa6df` (renumeracion). Todos
 empujados a `origin/feature/QC-154-crud-de-clientes`.
+
+## Renumeracion tras QC-150 (leader): decision "quien entro antes en dev"
+
+QC-150 se fusiono en `dev` antes que QC-154, asi que su enmienda (`presentation_without_content`,
+`no_whole_package`) es la duodecima y la nuestra (`customer_not_found`) pasa a ser la
+decimotercera, detras. Se restauro en `lib/modules/errores/domain/error-codes.ts` la linea de
+`presentation_without_content`/`no_whole_package` exactamente como esta en `origin/dev`
+(cabecera y orden dentro de `ERROR_CODES`), y se puso `customer_not_found` como "Decimotercera
+enmienda" a continuacion. Se ajustaron los dos bloques de `tests/unit/errores/catalogo.test.ts`
+que citaban el numero de enmienda por nombre, y las tres referencias en
+`specs/QC-154-crud-de-clientes/{design,requirements,tasks}.md`. Luego `git fetch origin dev` +
+`git merge origin/dev` (trae `d661e64b`, solo `feature_list.json` y `progress/current.md`, sin
+conflicto).
+
+- `pnpm run typecheck` → exit code 0.
+- `pnpm exec vitest run tests/unit/errores tests/guards/guard-catalogo-de-errores.test.ts` →
+  3 test files, 82 tests, todos verdes.
