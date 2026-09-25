@@ -167,3 +167,82 @@ Para pasar a OK:
 
 Las menores no bloquean. Recomiendo en la misma vuelta m1 (limpiar citas en líneas ya tocadas), m3 y
 m5, que son baratas.
+
+---
+
+## Revisión 2 (2026-09-24)
+
+> Solo se revisa lo que cambió desde `8d5cdfa4`: los commits `f9c2a73b`, `5052409e`, `3655cbdb`,
+> `33bfb15f`, `11f5a43f` y `712c2f54`. **No hay diff de producción** (`app/`, `components/`, `lib/`)
+> desde la vuelta 1. No corrí la suite ni el E2E, por instrucción del leader. Solo leí diffs y código.
+
+### Mayores de la vuelta 1
+
+- **M1: cerrado.** El caso que comparaba con `origin/dev` desaparece de
+  `document-upload-convenciones.test.ts`, junto con sus helpers y el import de `execFileSync`. Queda
+  el caso del import de `@base-ui/react`, con su detector sintético. La nota fechada está en
+  `design.md > 9.2`. Menciona `7cd534e8` y explica cómo sigue cubierto R20.
+- **M2: cerrado.** WebKit 3/3 en una corrida sobre el archivo final, contra `QuimiCloude_QC160`.
+  Sale en la bitácora y en la nota de `tasks.md > T7`, y así R15 queda cubierto también en el motor
+  de iOS. Hay un matiz en r2.
+
+### Rojos del gate
+
+- **`recipe-route-contract.test.ts` (`3655cbdb`): la ampliación es estrecha.** `getSessionUser` sale
+  de la lista global, pero se vuelve a prohibir en **todas** las fuentes de la ruta salvo
+  `formulas/page.tsx`. Ahí solo puede aparecer **una vez** (se cuenta sin comentarios), tiene que
+  estar dentro de `canUploadDocuments(await identity.getSessionUser())` y su línea no puede llevar
+  `recetas.*`. Además, `assertPermission` pasa a estar prohibido en toda la ruta, lo que cierra la
+  otra vía de decidir autorización a mano. La sesión solo puede llegar a la página como el booleano
+  del módulo `documentos`, y nunca como un usuario sobre el que comparar permisos de recetas. Queda un
+  hueco teórico, no bloqueante: nada impide usar ese booleano para condicionar datos de recetas. Pero
+  eso sería autorizar datos de recetas con un permiso de documentos, y lo cazaría la revisión. Sin
+  cambios en producción.
+- **`catalog-import-isolation.int.test.ts` (`11f5a43f`): no esconde nada, al contrario.**
+  `confirm-catalog-import.ts:107` exige `requirePermission(actor, DOCUMENT_UPLOAD_PERMISSION)` antes
+  de todo, desde que se juntaron QC-142 y QC-158. Sin ese permiso, los dos casos de camino feliz
+  salían rojos. Los **cuatro de acceso cruzado seguían verdes por el motivo equivocado**: afirman
+  `rejects.toThrow()` genérico y el `UnauthorizedError` los satisfacía antes de llegar a la
+  comprobación de empresa. Con `documentos.modificar` en los seis actores, esos cuatro vuelven a medir
+  el aislamiento. Ningún caso esperaba `unauthorized` a propósito, y no entra nada en la baseline.
+  - *Observación, fuera del diff y sin contar:* el `rejects.toThrow()` genérico de esos cuatro casos
+    (líneas ~367, 394, 423 y 455, de QC-158) es justo lo que dejó pasar este choque sin avisar.
+    Conviene una ficha que afirme la clase o el `code` del error esperado.
+
+### Menores de la vuelta 1
+
+| | Estado |
+|---|---|
+| m1 | Cerrado en las líneas señaladas: la cabecera y los dos docblocks del E2E ya no citan, y «esta ficha» sale del docblock y del nombre del bloque. Pero la vuelta 2 introduce dos citas nuevas (r1). |
+| m2 | Cerrado. Hay un caso `true` con el literal escrito en el test, y el implementer comprobó que la mutación lo pone rojo. |
+| m3 | Cerrado. Dos escenarios: archivos elegidos con `data-phase="pending"`, y la tanda en `processing`. Popup `not.toBeVisible()` tras cerrar, y popup y fila visibles tras reabrir. |
+| m4 | Cerrado. Conjuntos mínimos: `proveedores.consultar` + `documentos.modificar`, y `recetas.consultar` + `documentos.modificar`. |
+| m5 | Cerrado. `interceptSignedUploads` es `async` y las tres llamadas usan `await`. |
+| m6 | Justificado. El nombre queda «…: el caso sin permiso de subida (R18)». Se aparta de `design.md > 9.3`, que pedía conservar «QC-142 R20», pero lo hace a favor de la convención: en el nombre va el `R<n>` de esta ficha, y el de otra se confundiría con el R20 de aquí. |
+
+### Hallazgos nuevos
+
+**Mayores:** ninguno.
+
+**Menores:**
+- **r1 — Dos comentarios nuevos citan un requisito.** Son `// Conjunto minimo (R10): si el boton
+  exigiera un permiso de mas, este caso lo detectaria.`, en `formulas-upload.test.tsx` y en
+  `supplier-detail-upload.test.tsx`. En tests, `R<n>` va en el nombre del caso, que ya lo lleva. Basta
+  con quitar «(R10)».
+- **r2 — Chromium no se volvió a correr sobre el E2E final, y la bitácora dice que lo cubre
+  `./init.sh`, lo que no es cierto.** `init.sh` no corre Playwright: lo dice su propia cabecera, en
+  las líneas 45-47. El 3/3 de Chromium es de antes de `f9c2a73b` (el `await` de la intercepción y el
+  nombre de R18). El riesgo es bajo: los dos cambios son inocuos, y WebKit sí corrió sobre el archivo
+  final. Aun así, T7 pide los dos motores. Recomiendo una corrida de Chromium antes del PR y corregir
+  esa frase de la bitácora.
+
+### Comentarios nuevos
+
+Leí las líneas añadidas en esta vuelta, en tests y en E2E. No hay citas de ficha, D, `design.md` ni
+«decisión cerrada». Las únicas citas de `R<n>` son las dos de r1. Los comentarios de `11f5a43f`
+(«La confirmacion exige el permiso de subida…») y de `3655cbdb` explican un porqué y no citan nada.
+
+### Veredicto de la revisión 2
+
+**OK (aprobado)**: 0 mayores y 2 menores (r1, r2). Queda de cierre, fuera de este veredicto:
+`./init.sh` completo en verde, que corre el leader, y la casilla de T8.
