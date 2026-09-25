@@ -331,3 +331,23 @@ typecheck limpio · lint 0 errores (7 avisos preexistentes ajenos)
 vitest run tests/unit/recetas-ui tests/unit/documentos/qc159-alcance.test.ts tests/guards
   59 archivos, 890 verdes / 5 skip
 ```
+
+## Después de T9: limpieza de la pantalla y un fallo real (`03bda24e`, `f1012176`)
+
+- `03bda24e` (frontend_dev): solo comentarios en `formulas/importar/[documentoId]/**` (sin citas).
+  `git diff -U0 origin/dev...HEAD -- lib app components | grep '^+' | grep -E 'QC-…|R<n>|design.md|T<n>|P<n>'`
+  → vacío. (El `order-form.tsx` de `pedidos` que salió en un grep con `origin/dev` de dos puntos es de
+  `dev`, que avanzó con el PR #125; la rama no lo toca.)
+- **Fallo de T9 destapado al volver a correr sus tests** (`formula-import-review.test.tsx`, «un nombre
+  vacío se marca…», `TypeError … reading 'status'` en `handleNameBlur`): el componente recomprobaba el
+  choque al perder el foco **aunque el nombre ya fuera inválido** y no capturaba un rechazo de la
+  acción; era intermitente (rechazo dentro de `startTransition`), por eso T9 lo vio verde. No venía del
+  stash de la limpieza (`git diff e818f56b` lo confirma). Arreglo `f1012176`: `handleNameBlur` sale si
+  `issues.name !== 'ok'` y un fallo de la acción conserva el aviso previo. Dos casos nuevos: nombre
+  inválido no recomprueba; error de la acción no rompe la pantalla.
+
+```
+vitest run tests/unit/recetas-ui/formula-import-review.test.tsx   22/22 verdes
+vitest run tests/unit/recetas-ui                                  14 archivos, 296 verdes
+typecheck limpio · lint 0 errores
+```
