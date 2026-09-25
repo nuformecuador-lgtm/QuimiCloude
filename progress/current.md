@@ -31,6 +31,8 @@ PR #120, merge `5d3e90d9`. Resumen en `progress/history.md`. Desbloquea QC-160 (
 
 ### QC-168 - NACE y se ACOTA con `/afinar-feature` (2026-09-24)
 
+**F1.0 y F1.1 hechos el 2026-09-25** (`arranca 168` del humano, tras cerrar QC-150). Worktree desde `origin/dev` (`7e1087af`, ya trae QC-150 y QC-160) con `.env` copiado. `zone:fullstack` y `complexity:high` ya estaban evaluadas y en el board; no se parte en dos, como ninguna `fullstack` reciente. `depends_on: QC-150`, **`done`**. **Cupo `fullstack`: 1 de 3.** Las otras en curso son `backend` (QC-131, QC-154): distinta zona, sin cupo compartido; ojo al solape en `db/schema.prisma` con QC-154 (se cruza en F2.0 con `tasks.md`). F1.2: `spec_author` lanzado sobre la semilla (13 decisiones, 0 abiertas).
+
 **13 decisiones cerradas**, ninguna abierta, en `specs/QC-168-estado-por-empacar/requirements.md`. Bloqueada por QC-150 y **bloquea a QC-82**, cuyo spec aprobado hay que revisar antes de implementar (Finalizar deja Por empacar; dos acciones de empaque en el registro). Orden: QC-150 -> QC-168 -> QC-82. Tambien nacio **QC-167** (consulta del recorrido en el dashboard, bloqueada por QC-82).
 
 ### QC-140 - CERRADA (2026-09-24)
