@@ -29,8 +29,8 @@
 
 ## Requisitos (EARS)
 
-> Cada requisito cita entre corchetes la decisión que cubre. `[P1]` remite a la pregunta abierta P1
-> (la vista previa), que está resuelta con propuesta y la ratifica el humano al aprobar el spec.
+> Cada requisito cita entre corchetes la decisión que cubre. `[P1]` remite a P1 (la vista previa),
+> cerrada por el humano el 2026-09-25 (ver la nota al final).
 > "Rechazo por autorización" es el mismo `unauthorized` que usa hoy el módulo `documentos`.
 
 ### Confirmar la importación
@@ -87,8 +87,8 @@
 
 ## Preguntas abiertas
 
-- **P1 — ¿Qué permiso exige la VISTA PREVIA?** *Resuelta con propuesta; el humano la ratifica al
-  aprobar el spec.* Hoy exige `documentos.modificar` (`preview-catalog-import.ts:246`, la misma
+- **P1 — ¿Qué permiso exige la VISTA PREVIA?** *Cerrada: el humano la ratificó el 2026-09-25
+  (ver la nota al final).* Hoy exige `documentos.modificar` (`preview-catalog-import.ts:246`, la misma
   `DOCUMENT_UPLOAD_PERMISSION` que la confirmación). Propuesta: `proveedores.modificar`, igual que
   confirmar (R7 a R9). Hay tres motivos medidos en el código:
   1. R31 de QC-158 ya decía que «ver la vista previa y confirmar DEBEN exigir
@@ -122,3 +122,9 @@
   de integración. En `dev`, ese archivo **no** contiene `documentos.modificar`: sus actores llevan
   solo `proveedores.modificar` e `inventario.modificar`, como los escribió QC-158. Lo he comprobado
   con grep en el worktree. D3 se cumple sobre el archivo tal como está hoy en `dev`.
+
+## Nota: decisión cerrada tras la aprobación (no reabrir)
+
+| Fecha | Decisión |
+|---|---|
+| 2026-09-25 | El humano aprobó el spec y ratificó P1: la VISTA PREVIA de la importación exige `proveedores.modificar`, igual que confirmar (D1). La cubren R7, R8 y R9. Se añade aquí y no en la tabla de arriba para no renumerar las decisiones D1 a D4. |
