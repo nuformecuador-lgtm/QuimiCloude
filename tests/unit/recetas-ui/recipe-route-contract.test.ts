@@ -93,6 +93,19 @@ function fuentesBajo(carpetaRelativa: string): string[] {
 
 const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
 
+/**
+ * `importar/[documentoId]` es una ruta HERMANA bajo el mismo `FORMULAS_ROUTE`, con su propio
+ * `page.tsx`, su propio `components/index.ts` y su propio contrato -probado en
+ * `formula-import-page.test.tsx` y `formula-import-review.test.tsx`-. Las comprobaciones de ESTE
+ * archivo hablan de las TRES paginas de listar/crear/editar receta; las dos que asumen que solo
+ * existe UN barrel bajo `formulas/` (el reexport compartido y la lista cerrada de acciones)
+ * quedan fuera de esa ruta hermana para no mezclar dos contratos en un mismo aserto.
+ */
+const CARPETA_IMPORTAR_FORMULA = `${enRutaDePosix(CARPETA_RUTA)}/importar/`;
+const FUENTES_DE_LA_RUTA_SIN_IMPORTAR = FUENTES_DE_LA_RUTA.filter(
+  (ruta) => !ruta.startsWith(CARPETA_IMPORTAR_FORMULA),
+);
+
 const ARCHIVOS_DE_LA_LISTA = [
   join(COMPONENTES_PATH, 'recipe-columns.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
@@ -718,7 +731,7 @@ describe('contrato de la ruta de recetas', () => {
       'listUnitsAction',
     ]);
 
-    for (const ruta of FUENTES_DE_LA_RUTA) {
+    for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
       const codigo = fuenteSinComentarios(ruta);
       const patron = /([A-Za-z][A-Za-z0-9_]*Action)\(/g;
       let encaje: RegExpExecArray | null;
@@ -868,7 +881,7 @@ describe('contrato de la ruta de recetas', () => {
     // Regla de `docs/architecture.md > Componentes`.
     const barrel = fuenteSinComentarios(BARREL_PATH.split('\\').join('/'));
 
-    for (const ruta of FUENTES_DE_LA_RUTA) {
+    for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
       if (!ruta.includes('/components/') || ruta.endsWith('/index.ts')) continue;
       const nombreDeArchivo = ruta.split('/').pop() as string;
       if (FUERA_DEL_BARREL.includes(nombreDeArchivo)) {
@@ -905,7 +918,7 @@ describe('contrato de la ruta de recetas', () => {
     // La frontera cliente/servidor se declara en cada componente, no en el barrel.
     expect(barrel).not.toContain('use client');
 
-    const CARPETAS_LEGITIMAS = ['components', 'nueva', '[id]'];
+    const CARPETAS_LEGITIMAS = ['components', 'nueva', '[id]', 'importar'];
     const raizDeLaRuta = readdirSync(join(RAIZ, CARPETA_RUTA), { withFileTypes: true });
     const archivosDeAppRouter = ['page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx'];
 
