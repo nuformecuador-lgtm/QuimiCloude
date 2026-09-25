@@ -17,10 +17,15 @@
 ## Requisitos (EARS)
 
 > Cada requisito cita entre corchetes la fila de «Decisiones cerradas» que lo origina, numeradas
-> [D1]..[D12] en el orden de la tabla. Las doce quedan cubiertas; el mapa inverso está al final.
-> Ningún requisito afirma el **total** del catálogo de permisos: QC-142 y QC-168 también lo
-> enmiendan y el orden de merge no está fijado (heredado de QC-144, [D3]). Donde hace falta
-> contar, se afirma la **presencia y la ausencia de códigos concretos**.
+> [D1]..[D20] en el orden de la tabla (D1–D12 del afinado del 2026-09-24; D13–D20 de la revisión
+> humana del 2026-09-25). Las veinte quedan cubiertas; el mapa inverso está al final.
+> Ningún requisito afirma el **total** del catálogo de permisos: QC-168 y QC-169 siguen en curso y el
+> orden de merge no está fijado (heredado de QC-144, [D3]); `dev` ya tiene una guardia que prohíbe
+> totales fijos en los tests. Donde hace falta contar, se afirma la **presencia y la ausencia de
+> códigos concretos**.
+>
+> Vuelta de F1.2 del 2026-09-25: se reescriben R2, R10, R14, R28 y R33 y se añaden R36–R44. Ningún
+> otro requisito cambia de texto ni de número.
 
 ### El Maestro frente al Administrador
 
@@ -34,7 +39,8 @@
 
 - **R2.** El catálogo de roles que siembra el sistema DEBE contener un rol llamado «Maestro», con
   una descripción no vacía, además de Administrador, Operador y Empacador, cuyos nombres y
-  descripciones NO DEBEN cambiar. `[D2]`
+  descripciones NO DEBEN cambiar; en particular, la descripción del Administrador sigue siendo
+  «Acceso total al sistema.». `[D2]` `[D19]`
 - **R3.** El literal del nombre del rol Maestro DEBE aparecer entre comillas en **un único** archivo
   del código de producción, el catálogo de roles de `identity`; cualquier otro archivo de producción
   que lo necesite DEBE importar su constante. `[D2]`
@@ -65,20 +71,22 @@
 ### El primer Maestro
 
 - **R10.** MIENTRAS no exista ningún usuario vivo con rol Maestro, CUANDO corra el seed, el sistema
-  DEBE crear **exactamente un** usuario con rol Maestro, sin empresa, con estado de cuenta activo y
-  con el nombre de usuario, la contraseña y el correo leídos de tres variables de entorno propias,
-  análogas a las del Administrador inicial. `[D5]`
+  DEBE crear **exactamente un** usuario con rol Maestro, sin empresa, con estado de cuenta activo,
+  con el nombre de usuario, la contraseña y el correo leídos de `SEED_MAESTRO_USERNAME`,
+  `SEED_MAESTRO_PASSWORD` y `SEED_MAESTRO_EMAIL`, con nombres «Plataforma», apellidos «Inicial» y
+  los mismos marcadores de fecha de nacimiento, teléfono y documento que el Administrador inicial.
+  `[D5]` `[D17]` `[D20]`
 - **R11.** SI ya existe un usuario vivo con rol Maestro, ENTONCES el seed NO DEBE leer esas tres
   variables NI crear otro Maestro, y DEBE terminar con éxito aunque falten. `[D5]`
 - **R12.** SI hace falta crear el Maestro y alguna de sus tres variables falta o está vacía,
   ENTONCES el seed DEBE fallar con un error que nombre todas las que faltan, sin ningún valor, y
   NO DEBE escribir nada en la base: ni roles, ni permisos, ni asignaciones, ni empresa, ni usuarios.
-  `[D5]`
+  `[D5]` `[D17]`
 - **R13.** SI hace falta crear el Maestro y su contraseña no cumple la política de credenciales,
   ENTONCES el seed DEBE fallar nombrando las reglas incumplidas y nunca la contraseña, sin escribir
   nada. Cuando sí la crea, la base DEBE guardar solo su hash, nunca el texto en claro. `[D5]`
-- **R14.** El archivo de ejemplo de entorno DEBE declarar las tres variables del Maestro, sin valor.
-  `[D5]`
+- **R14.** El archivo de ejemplo de entorno DEBE declarar `SEED_MAESTRO_USERNAME`,
+  `SEED_MAESTRO_PASSWORD` y `SEED_MAESTRO_EMAIL`, sin valor. `[D5]` `[D17]`
 - **R15.** La creación del Administrador inicial y de la empresa inicial NO DEBE cambiar: crear el
   Maestro NO DEBE crear, leer ni reutilizar ninguna empresa, y SI el Administrador ya existe y el
   Maestro no, ENTONCES el seed DEBE crear solo el Maestro. `[D5]`
@@ -133,10 +141,11 @@
   `[D11]`
 - **R27.** SI se intenta guardar en la base un usuario con rol Maestro que tiene empresa —al crearlo
   o al cambiarle el rol o la empresa—, ENTONCES la base DEBE rechazarlo sin escribir nada. `[D11]`
-- **R28.** Entre los usuarios vivos sin empresa, el correo, el nombre de usuario y el par tipo y
-  número de documento DEBEN ser únicos, sin distinguir mayúsculas en correo y nombre de usuario, con
-  la misma regla que ya rige dentro de cada empresa. *(Propuesta del spec: ver «Preguntas abiertas».)*
-  `[D11]`
+- **R28.** SI se intenta guardar en la base un usuario vivo sin empresa cuyo correo, sin distinguir
+  mayúsculas, o cuyo par tipo y número de documento coincide con el de otro usuario vivo sin empresa
+  —al crearlo o al cambiarle esos datos—, ENTONCES la base DEBE rechazarlo sin escribir nada. Un
+  usuario sin empresa dado de baja NO DEBE ocupar ni su correo ni su documento. (El nombre de usuario
+  lo cubre R36.) `[D11]` `[D15]`
 - **R29.** SI una operación con ámbito de empresa la invoca un actor cuya sesión no tiene empresa,
   ENTONCES el sistema DEBE rechazarla como no autorizada antes de tocar el repositorio, aunque el
   actor tuviera el permiso que la operación exige. `[D11]` `[D12]`
@@ -155,12 +164,51 @@
   válido, ENTONCES la sesión DEBE seguir siendo inválida, como hoy. `[D12]`
 - **R33.** CUANDO el Maestro inicie sesión sin un destino de vuelta válido, el sistema DEBE llevarlo
   al destino que resulta de filtrar el menú con sus permisos, con el mismo respaldo que a cualquier
-  usuario. `[D12]`
+  usuario; MIENTRAS ningún enlace del menú exija `empresas.consultar` ni `empresas.modificar`, ese
+  destino DEBE ser el respaldo de siempre, que le responde el 404 dentro de la zona privada con su
+  cabecera y su cierre de sesión. `[D12]` `[D18]`
 - **R34.** CUANDO el Maestro pida cualquier pantalla privada para la que no tiene permiso —entre
   ellas las de empresa—, el sistema DEBE responder el mismo 404 dentro de la zona privada que a
   cualquier usuario sin ese permiso, sin ningún dato del módulo. `[D12]`
 - **R35.** CUANDO el Maestro cierre sesión, el sistema DEBE cerrarla igual que a cualquier usuario,
   y la sesión cerrada NO DEBE volver a valer. `[D12]`
+
+### Unicidad del nombre de usuario y del correo
+
+- **R36.** SI se intenta guardar en la base un usuario vivo —al crearlo o al cambiarle el nombre de
+  usuario— cuyo nombre de usuario coincide, sin distinguir mayúsculas, con el de otro usuario vivo de
+  **cualquier** empresa o sin empresa, ENTONCES la base DEBE rechazarlo sin escribir nada. Un usuario
+  dado de baja NO DEBE ocupar su nombre de usuario. `[D13]`
+- **R37.** SI se intenta guardar un usuario vivo de una empresa cuyo correo, sin distinguir
+  mayúsculas, o cuyo par tipo y número de documento coincide con el de otro usuario vivo **de la
+  misma empresa**, ENTONCES la base DEBE rechazarlo sin escribir nada; CUANDO la coincidencia sea
+  solo con un usuario de otra empresa o sin empresa, el sistema DEBE aceptarlo. `[D14]` `[D15]`
+- **R38.** CUANDO se aplique la migración sobre una base en la que ningún nombre de usuario se
+  repite entre usuarios vivos, sin distinguir mayúsculas, el sistema DEBE dejar en vigor la
+  unicidad de R36 sin cambiar ninguna fila de usuario. `[D13]`
+- **R39.** SI al aplicar la migración dos o más usuarios vivos comparten nombre de usuario, sin
+  distinguir mayúsculas, ENTONCES la migración DEBE fallar entera, sin renombrar, borrar ni dar de
+  baja a nadie y sin dejar aplicada ninguna parte, con un mensaje que liste cada nombre repetido y
+  cuántos usuarios vivos lo comparten. *(Propuesta, pendiente de confirmar: ver «Preguntas
+  abiertas».)* `[D13]`
+- **R40.** SI un alta o una edición de usuario pide un nombre de usuario que ya tiene otro usuario
+  vivo, de su empresa, de otra o sin empresa, ENTONCES el sistema DEBE rechazarla con el error de
+  nombre de usuario duplicado, que señala ese campo, sin escribir nada y sin exponer ningún dato del
+  usuario con el que choca. `[D13]`
+- **R41.** El mensaje del error de nombre de usuario duplicado NO DEBE decir que el choque es dentro
+  de la empresa; los mensajes de correo duplicado y de documento duplicado DEBEN seguir diciéndolo.
+  `[D13]` `[D14]`
+- **R42.** SI hace falta crear el Maestro y su nombre de usuario coincide, sin distinguir
+  mayúsculas, con el de cualquier usuario vivo o con el del Administrador inicial que la misma
+  corrida va a crear, ENTONCES el seed DEBE fallar con un error que diga que el nombre de usuario del
+  Maestro ya está en uso, sin escribir su valor, y NO DEBE escribir nada en la base. `[D16]`
+- **R43.** SI hace falta crear el Maestro y su correo coincide, sin distinguir mayúsculas, con el de
+  otro usuario vivo sin empresa, ENTONCES el seed DEBE fallar con un error que diga que el correo del
+  Maestro ya está en uso, sin escribir su valor, y NO DEBE escribir nada en la base; CUANDO el correo
+  coincida solo con el de un usuario de una empresa, el seed DEBE crearlo. `[D15]` `[D16]`
+- **R44.** CUANDO alguien inicie sesión, el sistema DEBE localizar la cuenta solo por su nombre de
+  usuario, sin distinguir mayúsculas y sin pedir empresa, y la sesión emitida DEBE ser la de la
+  única cuenta viva con ese nombre, sea de una empresa o el Maestro. `[D12]` `[D13]`
 
 ### Mapa decisión → requisitos
 
@@ -177,43 +225,40 @@
 | D9 — ni dependencia ni tabla | R20, R21, R22 |
 | D10 — nunca en el selector | R23, R24, R25 |
 | D11 — sin empresa | R1, R22, R26, R27, R28, R29 |
-| D12 — inicia sesión como cualquiera | R29, R30, R31, R32, R33, R34, R35 |
+| D12 — inicia sesión como cualquiera | R29, R30, R31, R32, R33, R34, R35, R44 |
+| D13 (D-a) — nombre de usuario único en todo el sistema | R36, R38, R39, R40, R41, R44 |
+| D14 (D-b) — correo único por empresa | R37, R41 |
+| D15 (D-c) — el Maestro no se duplica | R28, R37, R43 |
+| D16 — el seed se niega a duplicar al Maestro | R42, R43 |
+| D17 — variables `SEED_MAESTRO_*` | R10, R12, R14 |
+| D18 — aterrizaje en el 404 privado hasta QC-166 | R33 |
+| D19 — descripción del Administrador sin tocar | R2 |
+| D20 — marcadores «Plataforma» / «Inicial» | R10 |
 
 ## Preguntas abiertas
 
-Ninguna heredada del afinado. Las que siguen las abre el spec al medir el código; ninguna bloquea
-el diseño, pero todas necesitan un sí o un no del humano al aprobar.
+1. **Nombres de usuario ya repetidos entre empresas en la base desplegada** *(propuesta, pendiente
+   de confirmar: el humano aprobó el 2026-09-25 antes de verla)*. Hasta hoy la unicidad del nombre de
+   usuario es por empresa (QC-47), así que la base de `dev`, la de preview o la de producción pueden
+   tener ya dos usuarios vivos con el mismo nombre en empresas distintas. El spec no puede saberlo:
+   no hay acceso a esas bases y ningún dato del repo lo dice. En la base de los tests de integración
+   no hay caso: la migración corre antes del seed, sobre una base sin usuarios. **Propuesta (R39):**
+   la migración comprueba los duplicados **antes** de tocar nada y, si hay alguno, falla entera con
+   un mensaje que lista cada nombre repetido (en minúsculas) y cuántos usuarios vivos lo comparten;
+   no renombra, no borra ni da de baja a nadie. Como el `build` corre `prisma migrate deploy`, el
+   despliegue falla hasta que alguien resuelva los duplicados a mano. Es el mismo criterio que ya
+   aplicó la reversión de QC-47 («fallar antes que perder el dato»), que solo contaba los duplicados;
+   esta propuesta además los nombra. Lo que hay que confirmar: (a) que se falla en vez de renombrar;
+   (b) que el mensaje puede llevar los nombres de usuario, que quedarán en el log del `build` de
+   Vercel. Si (b) es que no, el mensaje da solo el número de nombres repetidos.
 
-1. **Precondición de despliegue.** El `build` encadena `prisma migrate deploy && tsx scripts/seed.ts
-   && next build`, así que el seed corre en **cada** despliegue. El primero tras el merge no
-   encontrará ningún Maestro y exigirá sus tres variables: si no están en Vercel (producción y
-   preview), **el despliegue falla** (R12). Lo mismo en local: la plantilla de los tests de
-   integración corre `db:seed`, y sin las variables en el `.env` del worktree falla toda la
-   integración. ¿Quién las da de alta y cuándo? Nombres propuestos: `SEED_MAESTRO_USERNAME`,
-   `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL`.
-2. **Aterrizaje hasta QC-166.** Con solo `empresas.*` y ningún enlace de menú que los pida, R33 lleva
-   al Maestro al respaldo de siempre: `/dashboard`, que le responde el 404 dentro de la zona privada,
-   con cabecera y cerrar sesión (el mismo camino que QC-93 R14–R17 para un usuario sin permisos). Su
-   área propia llega con QC-166, que solo tiene que añadir un enlace protegido por
-   `empresas.consultar`. ¿Se acepta ese estado intermedio?
-3. **Unicidad entre usuarios sin empresa (R28).** Los tres índices únicos de QC-47 llevan
-   `company_id` delante y en Postgres dos `NULL` no chocan: sin índices propios, dos Maestros podrían
-   tener el mismo nombre de usuario. R28 lo cierra con tres índices parciales para las filas sin
-   empresa. Es una propuesta del spec, no una decisión del afinado: ¿se aprueba?
-4. **Nombre de usuario repetido entre el Maestro y una empresa.** El login busca el nombre de usuario
-   **sin mirar la empresa** y se queda con la primera fila (`LIMIT 1`). Ese problema ya existe entre
-   dos empresas y esta ficha no lo crea, pero el Maestro lo hereda: si su nombre de usuario coincide
-   con el de alguien de una empresa, el login elige uno de los dos. ¿Se deja como deuda aparte (lo
-   que propone el spec) o el seed debe negarse a crear un Maestro con un nombre ya usado?
-5. **Descripción del Administrador.** Dice «Acceso total al sistema.» y deja de ser exacta: no tendrá
-   `empresas.*`. D4 dice «sin cambios», así que el spec **no** la toca. ¿Se confirma?
-6. **Marcadores del Maestro inicial.** Como el Administrador inicial, necesita nombres, fecha de
-   nacimiento, teléfono y documento de instalación. El spec propone nombres «Plataforma» / «Inicial»
-   y los mismos marcadores de fecha, teléfono y documento que el Administrador. No propone «Maestro»
-   como nombre de pila, porque volvería a escribir el literal del rol fuera de su archivo (R3).
-7. **Aviso, sin pregunta.** D8 difiere el E2E a **QC-162**, pero la descripción de QC-166 en
-   `feature_list.json` dice que es QC-166 quien «paga el diferido de QC-161». No se reabre nada: basta
-   con que la ficha que tenga la pantalla lo recoja.
+**Nota, sin pregunta (antes pregunta 7).** D8 difiere el E2E a **QC-162**, pero la descripción de
+QC-166 en `feature_list.json` dice que es QC-166 quien «paga el diferido de QC-161». No se reabre
+nada: basta con que la ficha que tenga la pantalla lo recoja.
+
+**Preguntas del spec del 2026-09-24 ya resueltas** (quedan en «Decisiones cerradas» con fecha
+2026-09-25): la 1 → D17; la 2 → D18; la 3 → absorbida por D13 y D15; la 4 → cerrada por D13; la
+5 → D19; la 6 → D20.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -231,3 +276,11 @@ el diseño, pero todas necesitan un sí o un no del humano al aprobar.
 | 2026-09-24 | ¿Maestro aparece en el selector de roles? | **Nunca.** Ni en el alta ni en la edición, y el **service rechaza** asignarlo aunque se fuerce la petición: un Maestro solo nace por seed. Cierra la escalada del Administrador de cualquier empresa a dueño de la plataforma. Enmienda **QC-94/QC-67** (todo rol aparecía en el selector). |
 | 2026-09-24 | ¿A qué empresa pertenece el Maestro? | **A ninguna.** `users.company_id` sigue **obligatoria para todos menos el Maestro**: enmienda **QC-47**. La base debe garantizar que solo un Maestro tenga la empresa vacía. |
 | 2026-09-24 | ¿Cómo inicia sesión el Maestro? | **Como cualquiera, y entra en esta ficha**: aterriza en su **área propia** (las pantallas son **QC-166**). Las pantallas de empresa le niegan el acceso **por permiso**, igual que a cualquiera sin permiso (**QC-93**). |
+| 2026-09-25 | (D-a) ¿El nombre de usuario es único por empresa o en todo el sistema? | **Único en todo el sistema**, sin distinguir mayúsculas y entre usuarios vivos, como hoy. Enmienda la unicidad por empresa de **QC-47** para el nombre de usuario. Con esto el login, que busca sin empresa, deja de ser ambiguo: **cierra la pregunta 4 del spec**. Texto del humano: «nombre de usuario debe ser unico, el email tambien por empresa, si es el maestro no se debe poder duplicar». |
+| 2026-09-25 | (D-b) ¿Y el correo? | **Sigue siendo único por empresa** (regla de QC-47, sin cambios). El documento, también. |
+| 2026-09-25 | (D-c) ¿Se puede duplicar el Maestro? | **No.** Su nombre de usuario lo cubre D-a; su correo y su documento no pueden repetir los de otro usuario vivo sin empresa (unicidad propia para las filas sin empresa, la propuesta que el spec hacía en R28). **Absorbe la pregunta 3 del spec** junto con D-a. |
+| 2026-09-25 | ¿Qué hace el seed ante un choque? | **Se niega** a crear el Maestro si su nombre de usuario choca con el de cualquier usuario vivo o su correo con el de otro Maestro: error claro y sin escribir nada. |
+| 2026-09-25 | ¿Quién da de alta `SEED_MAESTRO_*` y cuándo? (pregunta 1) | `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD` y `SEED_MAESTRO_EMAIL`: las da de alta **el humano** en Vercel (producción y preview) y en el `.env` **antes del merge**. Es condición del PR. |
+| 2026-09-25 | ¿Aterrizaje hasta QC-166? (pregunta 2) | **Se acepta** el estado intermedio: el Maestro aterriza en el 404 dentro de la zona privada hasta que QC-166 añada su enlace. |
+| 2026-09-25 | ¿Descripción del Administrador? (pregunta 5) | **No se toca**: sigue «Acceso total al sistema.». |
+| 2026-09-25 | ¿Marcadores del Maestro inicial? (pregunta 6) | Nombres **«Plataforma»**, apellidos **«Inicial»**; fecha, teléfono y documento, los mismos marcadores que el Administrador inicial. |
