@@ -124,6 +124,34 @@ export interface OrderCatalog {
     | 'no_whole_package'
     | 'recipe_not_found'
   >;
+
+  /**
+   * Comenzar el empaque: `POR_EMPACAR -> EN_EMPAQUE` con `packerId` como quien empaca, en una
+   * sola escritura con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
+   * empacador repitiendo Comenzar sobre su propio `EN_EMPAQUE`, sin escribir nada;
+   * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'not_packable'` es cualquier otro estado;
+   * `'not_found'` es el mismo caso que en `findAliveById` -no existe, esta de baja o es de
+   * otra empresa-.
+   */
+  startPackingAliveById(
+    id: string,
+    companyId: string,
+    packerId: string,
+    now: Date,
+  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'>;
+
+  /**
+   * Terminar el empaque: `EN_EMPAQUE -> ENTREGADO`, con `finishedAt` en la MISMA escritura que
+   * el cambio de estado, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
+   * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
+   * `'not_found'` es el mismo caso que en `findAliveById`.
+   */
+  finishPackingAliveById(
+    id: string,
+    companyId: string,
+    packerId: string,
+    now: Date,
+  ): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'>;
 }
 
 /**
@@ -143,4 +171,8 @@ export type AssignedOrderSummary = {
   /** `null` = sin fecha de terminado: un pedido entregado antes de que la columna existiera, o
    *  uno que no esta ENTREGADO. */
   readonly finishedAt: Date | null;
+  /** Quien tiene el pedido en empaque: `null` fuera de `EN_EMPAQUE`. El identificador viaja en
+   *  crudo, igual que `recipeId`; el nombre lo resuelve quien consulta con el directorio de
+   *  personas. */
+  readonly packedBy: string | null;
 };

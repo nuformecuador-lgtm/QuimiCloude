@@ -65,10 +65,10 @@ async function transitionAliveByIdReal(
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
   const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
-  // Yendo a `ENTREGADO`, el exito real lleva `finishedGoods` -aqui no hay producto
+  // Yendo a `POR_EMPACAR`, el exito real lleva `finishedGoods` -aqui no hay producto
   // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
   // reconoce el exito por esta forma, no por el literal `'ok'`.
-  if (resultado === 'ok' && to === 'ENTREGADO') {
+  if (resultado === 'ok' && to === 'POR_EMPACAR') {
     return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
   }
   return resultado;
@@ -82,6 +82,12 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany,
     transitionAliveById: transitionAliveByIdReal,
+    startPackingAliveById: async () => {
+      throw new Error('este fixture no ejercita el empaque');
+    },
+    finishPackingAliveById: async () => {
+      throw new Error('este fixture no ejercita el empaque');
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 
@@ -195,7 +201,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
     });
   });
 
-  it('R30: finalizar por el caso de uso real deja el pedido con fecha en «Terminados»', async () => {
+  it('R27: finalizar por el caso de uso real deja el pedido POR_EMPACAR, y ese estado NO aparece en «Terminados»', async () => {
     await inRolledBackTransaction(async (fixture) => {
       const { listFinishedOrders, finishAssignedOrder } = wireListFinishedOrders(fixture.tx);
 
@@ -217,11 +223,11 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       // Antes de finalizar, no aparece: no esta ENTREGADO todavia.
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 
+      // El Finalizar de QC-168 deja el pedido POR_EMPACAR, no ENTREGADO: el lote de producto
+      // terminado que entra viene en la respuesta, pero `finished_at` lo escribe Terminar.
       await finishAssignedOrder(actorEmpacador, { orderId: pedido });
 
-      const pagina = await listFinishedOrders(actorEmpacador, { page: 1 });
-      expect(pagina.items.map((item) => item.id)).toEqual([pedido]);
-      expect(pagina.items[0]?.finishedAt).toEqual(NOW);
+      expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
     });
   });
 

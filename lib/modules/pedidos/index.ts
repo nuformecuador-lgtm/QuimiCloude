@@ -141,6 +141,12 @@ export type { DeleteOrderDeps } from './domain/delete-order';
 export { createTransitionOrder } from './domain/transition-order';
 export type { TransitionOrderDeps } from './domain/transition-order';
 
+/** Implementan `OrderCatalog['startPackingAliveById']` y `['finishPackingAliveById']`: Comenzar
+ *  y Terminar el empaque, cada uno un `UPDATE` condicional sin abrir la unidad de trabajo de
+ *  `inventario` (R25). `lib/composition` las cablea sobre el adaptador driven de `pedidos`. */
+export { createStartPacking, createFinishPacking } from './domain/order-packing';
+export type { OrderPackingDeps } from './domain/order-packing';
+
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
 export { createFindCoverage, MAX_ORDERS_PER_COVERAGE_BATCH } from './domain/find-coverage';

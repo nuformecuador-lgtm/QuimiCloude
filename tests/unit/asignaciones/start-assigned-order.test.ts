@@ -47,6 +47,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     status: 'PENDIENTE',
     presentationId: null,
     finishedAt: null,
+    packedBy: null,
     ...overrides,
   };
 }

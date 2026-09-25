@@ -629,9 +629,14 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // Finalizar consume dentro de `createTransitionOrder`, que YA es quien cablea
     // `OrderCatalog.transitionAliveById`-, y con ella se fue la ultima razon para que ese
     // adaptador importara `order-transitions.ts`.
+    //
+    // `order-packing.ts` (QC-168) tambien la consume: Comenzar y Terminar llaman a
+    // `assertTransition` con la transicion fija que cada uno alcanza -`POR_EMPACAR -> EN_EMPAQUE`
+    // y `EN_EMPAQUE -> ENTREGADO`- antes de delegar en `OrderPackingRepository`.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
+      'lib/modules/pedidos/domain/order-packing.ts',
       DUENO,
       'lib/modules/pedidos/domain/transition-order.ts',
       'lib/modules/pedidos/domain/update-order.ts',

@@ -69,7 +69,7 @@ Tras T5. **Toca:** `lib/modules/asignaciones/domain/order-state.ts`, `start-assi
 **Hecho cuando:** los dos estados rechazan las tres escrituras y la apertura con `order_produced_frozen`;
 la consulta de responsables sigue (R11, R33).
 
-### T8 [ ] — Métodos de empaque en `pedidos`
+### T8 [x] — Métodos de empaque en `pedidos`
 Tras T1, T2. **Toca:** `lib/modules/pedidos/domain/order-catalog.ts`, `order-packing.ts` (nuevo),
 `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`, `order-catalog-prisma.ts`
 (`packedBy` en el resumen), `lib/composition/index.ts`, `tests/unit/pedidos/order-packing.test.ts`

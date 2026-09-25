@@ -53,6 +53,12 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     transitionAliveById: async () => {
       throw new Error('listCompanyOrders no ejecuta ninguna transicion');
     },
+    startPackingAliveById: async () => {
+      throw new Error('listCompanyOrders no ejecuta ninguna transicion');
+    },
+    finishPackingAliveById: async () => {
+      throw new Error('listCompanyOrders no ejecuta ninguna transicion');
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 

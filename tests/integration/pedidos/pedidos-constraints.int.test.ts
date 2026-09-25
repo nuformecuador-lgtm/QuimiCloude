@@ -507,6 +507,10 @@ describe('el pedido como fila completa', () => {
       'ingredients_cost',
       'order_sequence',
       'order_year',
+      // `packed_by` es quien tiene el pedido en empaque: no es un total, un impuesto ni un
+      // cliente. Entre `order_year` y `presentation_content` por el mismo `sort()`
+      // lexicografico ('order_year' < 'packed_by' < 'presentation_c').
+      'packed_by',
       // `presentation_content` es la copia del contenido de la presentacion:
       // no es un total, un impuesto ni un cliente. Antes de `presentation_id` por el mismo
       // `sort()` lexicografico ('presentation_c' < 'presentation_i').

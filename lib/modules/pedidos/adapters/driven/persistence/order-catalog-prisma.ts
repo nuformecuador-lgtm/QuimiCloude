@@ -68,6 +68,7 @@ type AssignedOrderSummaryRow = {
   readonly status: string;
   readonly presentationId: string | null;
   readonly finishedAt: Date | null;
+  readonly packedBy: string | null;
 };
 
 /** `select` unico de los dos listados de resumen: si uno gana una columna y el otro no, el
@@ -82,6 +83,7 @@ const SUMMARY_SELECT = {
   status: true,
   presentationId: true,
   finishedAt: true,
+  packedBy: true,
 } as const;
 
 /** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
@@ -116,6 +118,7 @@ export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOr
     status: row.status as OrderStatus,
     presentationId: row.presentationId,
     finishedAt: row.finishedAt,
+    packedBy: row.packedBy,
   };
 }
 

@@ -205,22 +205,27 @@ import {
   createDeleteOrder,
   createExpireStaleOrders,
   createFindCoverage,
+  createFinishPacking,
   createGetOrder,
   createListOrders,
   createQuoteOrderCost,
+  createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
+  finishPackingAliveOrder,
   findAliveOrderById,
   findExpirableOrders,
   listAliveOrders,
+  startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
+import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
@@ -1158,6 +1163,13 @@ export const observabilidad = {
  *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
  *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
  *  consume el material en la misma transaccion. */
+/** `OrderPackingRepository` cableado con las dos escrituras crudas de `order-prisma.ts`: cada
+ *  una un `UPDATE` condicional fuera de `orderUnitOfWork` (R25). */
+const orderPackingRepository: OrderPackingRepository = {
+  startPackingAlive: startPackingAliveOrder,
+  finishPackingAlive: finishPackingAliveOrder,
+};
+
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
@@ -1168,6 +1180,8 @@ const orderCatalog: OrderCatalog = {
     products: productCatalog,
     units: unitCatalog,
   }),
+  startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
+  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository }),
 };
 
 /**

@@ -111,6 +111,12 @@ const orderCatalog: OrderCatalog = {
     throw new Error('este archivo no ejercita listAliveSummariesInCompany');
   },
   transitionAliveById: createTransitionOrder({ unitOfWork, recipes, products, units }),
+  startPackingAliveById: async () => {
+    throw new Error('este archivo no ejercita el empaque');
+  },
+  finishPackingAliveById: async () => {
+    throw new Error('este archivo no ejercita el empaque');
+  },
 };
 
 function finishAssignedOrderPara(orderId: string) {
