@@ -19,12 +19,17 @@ import {
   CUSTOMER_LIST_NO_MATCHES_TESTID,
   CUSTOMER_TABLE_TEXTS,
   CustomerTable,
+  buildCustomerListQuery,
 } from '@/app/(private)/clientes/components';
-import { SEARCH_DEBOUNCE_MS, type DataTableParams } from '@/components/shared/data-table';
+import {
+  PAGE_SIZE_OPTIONS,
+  SEARCH_DEBOUNCE_MS,
+  type DataTableParams,
+} from '@/components/shared/data-table';
 import type { CustomerView } from '@/lib/modules/clientes';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { routerMock } = vi.hoisted(() => ({
@@ -419,5 +424,83 @@ describe('las acciones de fila respetan `canModify` (R5)', () => {
 
     expect(screen.getAllByTestId('customer-row-actions')).toHaveLength(CLIENTES.length);
     expect(screen.getByTestId('customer-create-open')).toBeInTheDocument();
+  });
+});
+
+describe('el selector de tamano ofrece exactamente 10 y 25, con 10 por defecto (R15)', () => {
+  it('el selector abierto ofrece solo esas dos opciones', async () => {
+    const user = setupUser();
+    montar();
+
+    await user.click(screen.getByTestId('data-table-page-size'));
+
+    expect(await screen.findAllByRole('option')).toHaveLength(PAGE_SIZE_OPTIONS.length);
+    expect(PAGE_SIZE_OPTIONS).toEqual([10, 25]);
+    for (const tamano of PAGE_SIZE_OPTIONS) {
+      expect(screen.getByTestId(`data-table-page-size-${tamano}`)).toBeInTheDocument();
+    }
+  });
+
+  it('sin tamano en la URL la tabla parte del tamano por defecto (10)', () => {
+    const params = montar();
+
+    expect(params.pageSize).toBe(DEFAULT_PAGE_SIZE);
+    expect(DEFAULT_PAGE_SIZE).toBe(10);
+  });
+
+  it('elegir el otro tamano navega con ese tamano y vuelve a la primera pagina', async () => {
+    const user = setupUser();
+    const params = montar({ page: 3 }, 5);
+    const otro = PAGE_SIZE_OPTIONS.find((option) => option !== params.pageSize)!;
+
+    await user.click(screen.getByTestId('data-table-page-size'));
+    // Popup de Base UI recien abierto: se espera a que suelte `pointer-events: none` (QC-58).
+    await user.click(await esperarInteractiva(screen.getByTestId(`data-table-page-size-${otro}`)));
+
+    expect(ultimoDestino()).toBe(
+      `${CUSTOMERS_ROUTE}?${buildCustomerListQuery({ ...params, page: 1, pageSize: otro })}`,
+    );
+  });
+});
+
+describe('con mas clientes de los que caben, anterior y siguiente navegan a la pagina correcta e indican pagina y total (R15)', () => {
+  it('el indicador muestra la pagina actual y el total de paginas', () => {
+    montar({ page: 2 }, 3);
+
+    expect(screen.getByTestId('data-table-page-indicator')).toHaveAttribute('role', 'status');
+    expect(screen.getByTestId('data-table-page-indicator')).toHaveTextContent('Página 2 de 3');
+  });
+
+  it('«siguiente» navega a la pagina siguiente conservando lo demas', async () => {
+    const user = setupUser();
+    const params = montar({ page: 1 }, 3);
+
+    await user.click(screen.getByTestId('data-table-next'));
+
+    expect(ultimoDestino()).toBe(
+      `${CUSTOMERS_ROUTE}?${buildCustomerListQuery({ ...params, page: 2 })}`,
+    );
+  });
+
+  it('«anterior» navega a la pagina anterior conservando lo demas', async () => {
+    const user = setupUser();
+    const params = montar({ page: 3 }, 3);
+
+    await user.click(screen.getByTestId('data-table-previous'));
+
+    expect(ultimoDestino()).toBe(
+      `${CUSTOMERS_ROUTE}?${buildCustomerListQuery({ ...params, page: 2 })}`,
+    );
+  });
+
+  it('en la primera pagina «anterior» esta deshabilitado; en la ultima, «siguiente»', () => {
+    montar({ page: 1 }, 3);
+    expect(screen.getByTestId('data-table-previous')).toBeDisabled();
+    expect(screen.getByTestId('data-table-next')).toBeEnabled();
+
+    cleanup();
+    montar({ page: 3 }, 3);
+    expect(screen.getByTestId('data-table-previous')).toBeEnabled();
+    expect(screen.getByTestId('data-table-next')).toBeDisabled();
   });
 });
