@@ -167,10 +167,12 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
   const RAICES_DE_PRODUCCION = ['lib', 'app', 'components', 'hooks'] as const
   const CARPETAS_IGNORADAS = new Set(['node_modules', '.next', '.git', 'dist', 'build'])
 
-  function fuentesDeProduccion(): string[] {
+  /** Parametrizada por raiz (real por defecto) para que la sensibilidad pueda fabricar un arbol
+   *  en un tmpdir en vez de escribir dentro del repo. */
+  function fuentesDeProduccion(raiz: string = repoRoot): string[] {
     const encontrados: string[] = []
     function recorrer(relativo: string): void {
-      const absoluto = join(repoRoot, relativo)
+      const absoluto = join(raiz, relativo)
       if (!existsSync(absoluto)) return
       for (const entrada of readdirSync(absoluto, { withFileTypes: true })) {
         if (CARPETAS_IGNORADAS.has(entrada.name)) continue
@@ -182,8 +184,8 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
         if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entrada.name)) encontrados.push(hijo)
       }
     }
-    for (const raiz of RAICES_DE_PRODUCCION) recorrer(raiz)
-    if (existsSync(join(repoRoot, 'middleware.ts'))) encontrados.push('middleware.ts')
+    for (const raizProduccion of RAICES_DE_PRODUCCION) recorrer(raizProduccion)
+    if (existsSync(join(raiz, 'middleware.ts'))) encontrados.push('middleware.ts')
     return encontrados.sort()
   }
 
@@ -200,12 +202,12 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 
   /** El predicado real de R26: que archivos de produccion, fuera de lo permitido, nombran los
    *  dos literales de permiso. Lo usan el caso real y los casos «que muerde». */
-  function detectarLiteralesDePermiso(): string[] {
+  function detectarLiteralesDePermiso(raiz: string = repoRoot): string[] {
     const PERMISOS_CLIENTES = /'clientes\.consultar'|'clientes\.modificar'/
     const hallazgos: string[] = []
-    for (const relativo of fuentesDeProduccion()) {
+    for (const relativo of fuentesDeProduccion(raiz)) {
       if (permisoPermitidoEn(relativo)) continue
-      const fuente = stripComments(leer(join(repoRoot, relativo)))
+      const fuente = stripComments(leer(join(raiz, relativo)))
       if (PERMISOS_CLIENTES.test(fuente)) hallazgos.push(relativo)
     }
     return hallazgos
@@ -229,26 +231,30 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 
   it('la regla de literales dispara con un archivo fabricado que si nombra el permiso', () => {
     // El MISMO detector que usa el caso real, aplicado a un archivo de produccion de verdad,
-    // FUERA de lib/modules/clientes/domain/.
-    const relativoFabricado = 'lib/modules/clientes/__sensibilidad_literal__.ts'
-    const rutaFabricada = join(repoRoot, relativoFabricado)
-    writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+    // FUERA de lib/modules/clientes/domain/. Se fabrica en un tmpdir, nunca en el repo.
+    const raiz = mkdtempSync(join(tmpdir(), 'qc154-scope-'))
     try {
-      expect(detectarLiteralesDePermiso()).toContain(relativoFabricado)
+      const relativoFabricado = 'lib/modules/clientes/__sensibilidad_literal__.ts'
+      const rutaFabricada = join(raiz, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+      expect(detectarLiteralesDePermiso(raiz)).toContain(relativoFabricado)
     } finally {
-      rmSync(rutaFabricada)
+      rmSync(raiz, { recursive: true, force: true })
     }
   })
 
   it('el caso simetrico: el mismo literal DENTRO de domain/ no dispara', () => {
     // Es justo lo que la relajacion permite: un caso de uso de verdad nombra el permiso ahi.
-    const relativoFabricado = 'lib/modules/clientes/domain/__sensibilidad_literal__.ts'
-    const rutaFabricada = join(repoRoot, relativoFabricado)
-    writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+    const raiz = mkdtempSync(join(tmpdir(), 'qc154-scope-'))
     try {
-      expect(detectarLiteralesDePermiso()).not.toContain(relativoFabricado)
+      const relativoFabricado = 'lib/modules/clientes/domain/__sensibilidad_literal__.ts'
+      const rutaFabricada = join(raiz, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+      expect(detectarLiteralesDePermiso(raiz)).not.toContain(relativoFabricado)
     } finally {
-      rmSync(rutaFabricada)
+      rmSync(raiz, { recursive: true, force: true })
     }
   })
 })
@@ -350,9 +356,9 @@ describe('R36 — el modulo clientes no reimplementa el calculo de paginacion', 
     { nombre: 'Math.min contra un literal de tope de pagina', pattern: /Math\.min\([^)]*\b25\b/ },
   ]
 
-  function hallazgosDePaginacion(): string[] {
+  function hallazgosDePaginacion(dir: string = moduloDir): string[] {
     const hallazgos: string[] = []
-    for (const archivo of filesIn(moduloDir, /\.tsx?$/)) {
+    for (const archivo of filesIn(dir, /\.tsx?$/)) {
       const fuente = leer(archivo)
       for (const { nombre, pattern } of SOSPECHOSOS) {
         if (pattern.test(fuente)) hallazgos.push(`${archivo}: ${nombre}`)
@@ -371,13 +377,14 @@ describe('R36 — el modulo clientes no reimplementa el calculo de paginacion', 
   })
 
   it('el detector dispara con un archivo fabricado que calcula el offset a mano', () => {
-    const relativoFabricado = 'lib/modules/clientes/domain/__sensibilidad_paginacion__.ts'
-    const rutaFabricada = join(repoRoot, relativoFabricado)
-    writeFileSync(rutaFabricada, 'export const offset = (page: number, pageSize: number) => (page - 1) * pageSize\n')
+    const raiz = mkdtempSync(join(tmpdir(), 'qc154-scope-'))
     try {
-      expect(hallazgosDePaginacion().some((h) => h.startsWith(rutaFabricada))).toBe(true)
+      const rutaFabricada = join(raiz, 'domain', '__sensibilidad_paginacion__.ts')
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, 'export const offset = (page: number, pageSize: number) => (page - 1) * pageSize\n')
+      expect(hallazgosDePaginacion(raiz).some((h) => h.startsWith(rutaFabricada))).toBe(true)
     } finally {
-      rmSync(rutaFabricada)
+      rmSync(raiz, { recursive: true, force: true })
     }
   })
 })
@@ -465,8 +472,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
 describe('R38 — nada bajo app/ que nombre clientes', () => {
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
-  function coincidenciasEnApp(): string[] {
-    const appDir = join(repoRoot, 'app')
+  function coincidenciasEnApp(appDir: string = join(repoRoot, 'app')): string[] {
     return filesIn(appDir)
       .map((ruta) => relative(appDir, ruta).split(sep).join('/'))
       .filter((relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(appDir, relativa))))
@@ -478,15 +484,15 @@ describe('R38 — nada bajo app/ que nombre clientes', () => {
   })
 
   it('el detector dispara con una pantalla fabricada que nombra la ruta de clientes', () => {
-    const appDir = join(repoRoot, 'app')
-    const relativoFabricado = '__sensibilidad_clientes__/page.tsx'
-    const rutaFabricada = join(appDir, relativoFabricado)
-    mkdirSync(dirname(rutaFabricada), { recursive: true })
-    writeFileSync(rutaFabricada, "export default function Pagina() { return <a href=\"/clientes\">Clientes</a> }\n")
+    const appDir = mkdtempSync(join(tmpdir(), 'qc154-scope-'))
     try {
-      expect(coincidenciasEnApp()).toContain(relativoFabricado)
+      const relativoFabricado = '__sensibilidad_clientes__/page.tsx'
+      const rutaFabricada = join(appDir, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export default function Pagina() { return <a href=\"/clientes\">Clientes</a> }\n")
+      expect(coincidenciasEnApp(appDir)).toContain(relativoFabricado)
     } finally {
-      rmSync(dirname(rutaFabricada), { recursive: true, force: true })
+      rmSync(appDir, { recursive: true, force: true })
     }
   })
 })
@@ -503,13 +509,16 @@ describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => 
     return new RegExp(`@/lib/modules/${modulo}\\b`).test(fuente)
   }
 
-  function hallazgosDeAcoplamiento(): string[] {
+  function hallazgosDeAcoplamiento(
+    modDir: string = moduloDir,
+    pedidosDir: string = PEDIDOS_DIR,
+  ): string[] {
     const hallazgos: string[] = []
-    for (const archivo of filesIn(moduloDir, /\.tsx?$/)) {
-      if (importaModulo(leer(archivo), 'pedidos')) hallazgos.push(relative(repoRoot, archivo).split(sep).join('/'))
+    for (const archivo of filesIn(modDir, /\.tsx?$/)) {
+      if (importaModulo(leer(archivo), 'pedidos')) hallazgos.push(archivo)
     }
-    for (const archivo of filesIn(PEDIDOS_DIR, /\.tsx?$/)) {
-      if (importaModulo(leer(archivo), 'clientes')) hallazgos.push(relative(repoRoot, archivo).split(sep).join('/'))
+    for (const archivo of filesIn(pedidosDir, /\.tsx?$/)) {
+      if (importaModulo(leer(archivo), 'clientes')) hallazgos.push(archivo)
     }
     return hallazgos
   }
@@ -520,13 +529,31 @@ describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => 
   })
 
   it('el detector dispara con un import fabricado de pedidos desde clientes', () => {
-    const relativoFabricado = 'lib/modules/clientes/domain/__sensibilidad_pedidos__.ts'
-    const rutaFabricada = join(repoRoot, relativoFabricado)
-    writeFileSync(rutaFabricada, "import type { Order } from '@/lib/modules/pedidos'\nexport type { Order }\n")
+    const raiz = mkdtempSync(join(tmpdir(), 'qc154-scope-'))
     try {
-      expect(hallazgosDeAcoplamiento()).toContain(relativoFabricado)
+      const rutaFabricada = join(raiz, 'domain', '__sensibilidad_pedidos__.ts')
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "import type { Order } from '@/lib/modules/pedidos'\nexport type { Order }\n")
+      expect(hallazgosDeAcoplamiento(raiz, PEDIDOS_DIR)).toContain(rutaFabricada)
     } finally {
-      rmSync(rutaFabricada)
+      rmSync(raiz, { recursive: true, force: true })
     }
+  })
+
+})
+
+// ---------------------------------------------------------------------------------------------
+// Sello contra la regresion de B2: ningun fabricado de este archivo escribe en el arbol real.
+// ---------------------------------------------------------------------------------------------
+
+describe('este propio archivo no escribe fabricados dentro del repo', () => {
+  it('ningun writeFileSync/mkdirSync apunta a repoRoot o moduloDir sin pasar por un tmpdir', () => {
+    const propioArchivo = fileURLToPath(import.meta.url)
+    const fuente = stripComments(leer(propioArchivo))
+    const escrituraFueraDeTmp = /(writeFileSync|mkdirSync)\(\s*join\(\s*(repoRoot|moduloDir)\b/
+    expect(
+      escrituraFueraDeTmp.test(fuente),
+      'un writeFileSync/mkdirSync de este archivo apunta directo a repoRoot/moduloDir en vez de a un mkdtempSync',
+    ).toBe(false)
   })
 })
