@@ -2408,11 +2408,11 @@
       "id": 159,
       "name": "formula-desde-pdf",
       "zone": "fullstack",
-      "complexity": null,
+      "complexity": "high",
       "depends_on": [
         "QC-142"
       ],
-      "description": "Lo que la IA lee de un PDF de formula (procesado por TEXTO) se convierte en una RECETA (nombre, ingredientes en porcentaje, pasos) tras una revision humana. NACE el 2026-09-23 al acotar la lectura de PDF con IA junto con QC-158. Ya decidido: revision antes de guardar; ingredientes en porcentaje (QC-147, QC-157). Se acota con /afinar-feature (ingrediente que no existe como producto, receta que ya existe, pasos). BLOQUEADA POR QC-142."
+      "description": "Lo que la IA lee de un PDF de formula (procesado por TEXTO) se convierte en una RECETA (nombre, ingredientes en porcentaje, pasos) tras una revision humana. NACE el 2026-09-23 al acotar la lectura de PDF con IA junto con QC-158. Ya decidido: revision antes de guardar; ingredientes en porcentaje (QC-147, QC-157). BLOQUEADA POR QC-142. ACOTADA el 2026-09-25 con /afinar-feature: revision en /produccion/formulas/importar/[documentoId]; ingrediente sin producto -> el revisor elige uno existente o lo crea como materia prima (crear exige tambien inventario.modificar); receta con el mismo nombre -> el revisor elige reemplazarla o renombrar; pasos editables; % con suma exacta 100,00 % (QC-147); nunca un producto terminado (QC-150); confirmar exige recetas.modificar; E2E si con IA y cola simuladas. NO ENTRA: el prompt (QC-157), la subida (QC-107/QC-160), imagen. Decisiones en specs/QC-159-formula-desde-pdf/requirements.md."
     },
     {
       "key": "QC-160",

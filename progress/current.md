@@ -20,6 +20,10 @@
 
 ## Evaluaciones
 
+### QC-159 formula-desde-pdf - ACOTADA con `/afinar-feature` (2026-09-25)
+
+10 decisiones, ninguna abierta, en `specs/QC-159-formula-desde-pdf/requirements.md`. Board actualizado (descripcion y `complexity:high`). No bloqueada por QC-157 (prompt, ficha humana).
+
 ### QC-169 - F1.0 (2026-09-25)
 
 `backend`, **`complexity: low`**. Arreglo del rojo de dev (`catalog-import-isolation`, choque QC-158 x QC-142). Decisiones ya cerradas por el humano en el issue (confirmar exige `proveedores.modificar`; se corrige codigo, no tests; quitar la entrada de baseline que puso QC-150). Sin `/afinar-feature`: no quedan huecos. Cupo `backend` 3 de 3 (QC-131 humana, QC-154). Worktree montado. **F1.2-F2.0 hechos el 2026-09-25**: spec R1-R13/T1-T7 (`30905fb9`), aprobado con P1 ratificada (vista previa tambien `proveedores.modificar`); `in_progress`.
