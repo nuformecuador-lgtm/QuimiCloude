@@ -108,3 +108,60 @@ pruebas que corrí están bien.
 ## Decisión humana
 
 No hace falta ninguna.
+
+---
+
+# Vuelta 2 (2026-09-25): rango `26d7ca5b..2cdcc378`
+
+## Veredicto: **OK**: 0 bloqueantes, 0 menores abiertos
+
+Solo queda T17 (el gate completo), que corre el leader. No hace falta ninguna decisión humana.
+
+## Lo que corrí
+
+- `pnpm run typecheck`: verde.
+- eslint de los `.ts`/`.tsx` tocados en la vuelta: 0 errores y 0 avisos.
+- 60 archivos unit: `tests/unit/asignaciones`, `tests/unit/pedidos/schema`, `product-catalog`, `session-once-per-request-render`, `packing-order-page` y `guard-aislamiento-integracion`. 878/878.
+- Integración, uno a uno: `order-packing-states-rollback` 2/2 y `finished-goods-receipts` 6/6.
+- `prisma migrate status` sobre `QuimiCloude_QC168`: «up to date», 55 migraciones.
+
+## Cierre de cada hallazgo
+
+| Hallazgo | Estado | Comprobación |
+|---|---|---|
+| Bloqueante 1, citas en comentarios | **Cerrado** | `git diff -U0 07b784ad..2cdcc378 -- app lib components hooks middleware.ts db`, filtrando las líneas `+` por `QC-<n>`, `R<n>`, `D<n>`, `A-<n>`, `design.md` o «decisión cerrada»: **0 líneas**. En `b909aad4` y `cd479b47` no cambia ninguna línea que no sea comentario dentro de `app/`, `lib/` y `db/`. La única línea de código es la del menor 7, en un test. Está declarada en el mensaje del commit y es trivial |
+| menor 1, disco atrasado | **Cerrado** | T16 `[x]`, T17 `[ ]` a propósito (gate del leader). La bitácora está corregida (E2E 20/20 y el título de A-1) |
+| menor 2, comentarios falsos de `packed_by` | **Cerrado** | `schema.prisma`, `order-catalog.ts` y `migration.sql` describen ahora el CHECK tal cual es |
+| menor 3, comentario de «Todos» | **Cerrado** | El comentario dice ahora que el array solo alimenta el `IN` |
+| menor 4, `findFinishedGoodsReceipts` lanzaba | **Cerrado**, ver el juicio abajo | Caso nuevo en integración: «un pedido cuyo lote quedo sin contenido de envase se omite, sin tumbar el resto» |
+| menor 5, R47 solo estático | **Cerrado** | `order-packing-states-rollback.int.test.ts` ejecuta contra Postgres el bloque de guardia **real**, leído del `down.sql`, con un pedido en `POR_EMPACAR` y con otro en `EN_EMPAQUE`. Comprueba «ROLLBACK ABORTADO» y que el enum y `packed_by` siguen intactos. No ejecuta el `down.sql` entero, pero junto con el test estático de que la guardia es la primera sentencia y con que `db:rollback` corre el archivo en una sola transacción, R47 queda cubierto |
+| menor 6, sesión una vez por petición | **Cerrado** | Hay dos casos nuevos, la sección `por_empacar` y `/asignacion/empaque/[id]`. En mi corrida el archivo sale verde dentro del lote de 60 |
+| menor 7, import sin usar | **Cerrado** | eslint 0 avisos |
+| menor 8, limpieza mezclada con código | **Aceptado tal cual** | Está en commits ya publicados. Reescribir historia en una rama que ya está en origin cuesta más que lo que protege la convención. Esta vuelta sí separó la limpieza en commits propios |
+
+## Los dos puntos que pidió el leader
+
+**M4 (`b36630db`) sí cambia comportamiento, pero no es alcance nuevo.** R14 exige los envases enteros
+en cada fila, y eso no cambia: un pedido que pasó por Finalizar siempre tiene su asiento `production`
+con lote y `packageContent`, porque QC-150 R41 guarda el contenido en el lote. El caso que se tolera
+no se alcanza por ningún camino de la aplicación. La vuelta 1 ya había fijado ese contrato en la
+propia rama: `PackingOrderRow.packages` es `null` si no hay dato, `composePackingOrderRows` traduce la
+ausencia y la columna pinta «—». Antes el adaptador contradecía ese contrato y tumbaba la lista
+entera por una sola fila. Ahora se degrada solo esa fila, que es lo que la rama ya declaraba. No
+toca ningún requisito ni añade ninguna pantalla. Queda anotado, sin contarlo como hallazgo, que la
+inconsistencia se omite sin dejar rastro. Si algún día se quiere detectar, lo que toca es un aviso
+por observabilidad, no volver a lanzar.
+
+**M2: editar `migration.sql` y el checksum puesto a mano. Aceptable, y no deja nada roto.**
+- La migración solo existe en esta rama. `QuimiCloude` (la compartida) y `dev` no la tienen, así que
+  ninguna otra base guarda el checksum viejo.
+- En `QuimiCloude_QC168` la fila de `_prisma_migrations` guarda
+  `aa4a11ab…2d008`, que coincide con el `sha256sum` del archivo actual, y `migrate status` dice «up to
+  date». Esa base se borra al cerrar la feature.
+- Las bases efímeras de los tests se regeneran por huella, así que toman el archivo nuevo. Mis dos
+  corridas de integración de esta vuelta migraron limpio.
+- `migrate deploy`, que es lo que corre fuera de desarrollo, aplicará la versión nueva la primera
+  vez. Como el cambio es solo de comentarios, el esquema resultante es idéntico.
+- Condición para que siga siendo aceptable: el `migration.sql` no se vuelve a tocar una vez que la
+  rama llegue a `dev`. A partir de ahí, cualquier corrección va en una migración nueva. Queda como
+  regla, no como hallazgo.
