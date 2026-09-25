@@ -396,14 +396,16 @@ describe('R36 — el modulo clientes no reimplementa el calculo de paginacion', 
 describe('R37 — una sola migracion nueva y solo tres campos normalizados en Customer', () => {
   const schema = leer(join(repoRoot, 'db', 'schema.prisma'))
 
-  function cuerpoDeModelo(modelo: string): string {
-    const match = new RegExp(`model ${modelo} \\{([\\s\\S]*?)\\n\\}`, 'm').exec(schema)
-    if (!match) throw new Error(`no se encontro "model ${modelo}" en db/schema.prisma`)
+  // `schemaTexto` es parametrizable para que la sensibilidad pueda ejercer este MISMO predicado
+  // contra un modelo fabricado en memoria, sin escribir en db/schema.prisma.
+  function cuerpoDeModelo(modelo: string, schemaTexto: string = schema): string {
+    const match = new RegExp(`model ${modelo} \\{([\\s\\S]*?)\\n\\}`, 'm').exec(schemaTexto)
+    if (!match) throw new Error(`no se encontro "model ${modelo}" en el schema`)
     return match[1] as string
   }
 
-  function camposDe(modelo: string): readonly string[] {
-    return cuerpoDeModelo(modelo)
+  function camposDe(modelo: string, schemaTexto: string = schema): readonly string[] {
+    return cuerpoDeModelo(modelo, schemaTexto)
       .split('\n')
       .map((linea) => linea.trim().replace(/\s+/g, ' '))
       .filter((linea) => linea.length > 0 && !linea.startsWith('//'))
@@ -454,14 +456,12 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
   })
 
   it('el censo de campos dispara con un campo fabricado de mas', () => {
-    const cuerpoFabricado = 'id String\n  extra String\n'
-    const campos = cuerpoFabricado
-      .split('\n')
-      .map((linea) => linea.trim().replace(/\s+/g, ' '))
-      .filter((linea) => linea.length > 0)
-      .map((linea) => linea.split(' ')[0] as string)
-    expect(campos).not.toEqual(['id'])
-    expect(campos).toContain('extra')
+    // Ejerce el MISMO `camposDe` que usa el caso real, contra un schema fabricado en memoria
+    // (nunca contra db/schema.prisma), para que un campo de mas de verdad se cuele en el censo.
+    const schemaFabricado = 'model Customer {\n  id String\n  extra String\n}\n'
+    const campos = camposDe('Customer', schemaFabricado)
+    expect(campos).toEqual(['id', 'extra'])
+    expect(campos).not.toEqual(camposDe('Customer'))
   })
 })
 
