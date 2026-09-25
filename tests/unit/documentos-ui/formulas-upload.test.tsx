@@ -153,12 +153,13 @@ afterEach(() => {
 
 describe('el boton de subida en el listado de formulas', () => {
   it('con documentos.modificar pinta el boton, la subida esta oculta hasta pulsarlo y encola la estrategia formula (R6, R10)', async () => {
+    // Conjunto minimo (R10): si el boton exigiera un permiso de mas, este caso lo detectaria.
     getSessionUserMock.mockResolvedValue({
       id: 'u-test-42',
       username: 'carla.duarte',
       displayName: 'Carla Duarte Salas',
       roleName: 'Administrador',
-      permissions: PERMISSIONS.map((permiso) => permiso.code),
+      permissions: ['recetas.consultar', 'documentos.modificar'],
     });
 
     await renderPantalla();

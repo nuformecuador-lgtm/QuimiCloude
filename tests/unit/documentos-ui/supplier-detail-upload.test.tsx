@@ -256,6 +256,11 @@ afterEach(() => {
 
 describe('el montaje en la pantalla de proveedores', () => {
   it('con permiso de subida hay boton, la subida esta oculta hasta pulsarlo, y al subir se encola catalogo (R1, R5, R10)', async () => {
+    // Conjunto minimo (R10): si el boton exigiera un permiso de mas, este caso lo detectaria.
+    getSessionUserMock.mockResolvedValue(
+      sesionCon(['proveedores.consultar', 'documentos.modificar']),
+    );
+
     await renderPantalla();
 
     expect(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeVisible();

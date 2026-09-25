@@ -35,6 +35,7 @@ import {
   DOCUMENT_UPLOAD_TESTID,
   DocumentUploadDialog,
   rowNameTestId,
+  rowPhaseTestId,
   rowReviewLinkTestId,
   rowStatusTestId,
 } from '@/components/shared/document-upload';
@@ -191,7 +192,9 @@ describe('cerrar y reabrir a mitad de tanda conserva las filas, sus fases y su e
     const user = setupUser();
     render(<DocumentUploadDialog strategy="catalogo" />);
 
-    await abrir(user);
+    const popup = await abrir(user);
+    expect(popup).toBeVisible();
+
     await user.upload(screen.getByTestId(DOCUMENT_UPLOAD_INPUT_TESTID), [pdf('uno.pdf')]);
     await user.click(screen.getByTestId(DOCUMENT_UPLOAD_SUBMIT_TESTID));
 
@@ -206,6 +209,7 @@ describe('cerrar y reabrir a mitad de tanda conserva las filas, sus fases y su e
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.queryByText(/seguro|confirmar|descartar/i)).toBeNull();
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_DIALOG_TESTID)).not.toBeVisible();
 
     // El sondeo, como en `use-batch-status.test.tsx`: sigue vivo pasado de sobra un intervalo,
     // con la ventana cerrada.
@@ -214,8 +218,35 @@ describe('cerrar y reabrir a mitad de tanda conserva las filas, sus fases y su e
 
     await user.click(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID));
 
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_DIALOG_TESTID)).toBeVisible();
+    expect(screen.getByTestId(rowNameTestId(0))).toBeVisible();
     expect(screen.getByTestId(rowNameTestId(0))).toHaveTextContent('uno.pdf');
     expect(screen.getByTestId(rowStatusTestId(0))).toHaveAttribute('data-status', 'processing');
+  });
+
+  it('con archivos elegidos antes de subir, cerrar y reabrir conserva la fila y su fase', async () => {
+    const user = setupUser();
+    render(<DocumentUploadDialog strategy="catalogo" />);
+
+    const popup = await abrir(user);
+    expect(popup).toBeVisible();
+
+    await user.upload(screen.getByTestId(DOCUMENT_UPLOAD_INPUT_TESTID), [pdf('dos.pdf')]);
+
+    expect(screen.getByTestId(rowNameTestId(0))).toHaveTextContent('dos.pdf');
+    expect(screen.getByTestId(rowPhaseTestId(0))).toHaveAttribute('data-phase', 'pending');
+    expect(issueUploadLinksActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId(DOCUMENT_UPLOAD_CLOSE_TESTID));
+
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_DIALOG_TESTID)).not.toBeVisible();
+
+    await user.click(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID));
+
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_DIALOG_TESTID)).toBeVisible();
+    expect(screen.getByTestId(rowNameTestId(0))).toBeVisible();
+    expect(screen.getByTestId(rowNameTestId(0))).toHaveTextContent('dos.pdf');
+    expect(screen.getByTestId(rowPhaseTestId(0))).toHaveAttribute('data-phase', 'pending');
   });
 });
 

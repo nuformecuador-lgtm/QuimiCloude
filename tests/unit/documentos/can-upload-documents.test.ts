@@ -32,6 +32,12 @@ describe('canUploadDocuments — el predicado de presentacion del modulo documen
     expect(canUploadDocuments(actorCon(DOCUMENT_UPLOAD_PERMISSION))).toBe(true);
   });
 
+  it('R12: con el literal "documentos.modificar" escrito aqui devuelve true', () => {
+    // Escrito a mano y no via la constante: si alguien cambia el valor del permiso, este caso
+    // se pone rojo aunque el conteo de abajo no lo detecte (solo mira lib/modules/documentos).
+    expect(canUploadDocuments(actorCon('documentos.modificar'))).toBe(true);
+  });
+
   it('R12: con proveedores.modificar devuelve false', () => {
     expect(canUploadDocuments(actorCon('proveedores.modificar'))).toBe(false);
   });
