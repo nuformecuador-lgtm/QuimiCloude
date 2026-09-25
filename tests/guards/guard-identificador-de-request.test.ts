@@ -336,6 +336,9 @@ export const MIGRACIONES_ESPERADAS = [
   // otra da forma a la identidad del producto terminado y a las copias de contenido.
   '20260924190000_finished_product_enum_values',
   '20260924190100_finished_products_and_content_copies',
+  // Igual patron: anade las tres columnas normalizadas de `customers` para la busqueda sin
+  // acentos; no toca el identificador de peticion.
+  '20260924200000_customers_search_normalized',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -443,6 +446,7 @@ export const MODULOS_DE_NEGOCIO = [
   'proveedores',
   'recetas',
   'unidades',
+  'clientes',
 ] as const
 
 export const TODOS_LOS_MODULOS = [...MODULOS_DE_NEGOCIO, 'errores', 'observabilidad'] as const

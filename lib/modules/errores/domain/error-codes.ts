@@ -15,6 +15,7 @@
  * **Decima enmienda, el 2026-09-22 (fix directo)**: `action_not_allowed`.
  * **Decimoprimera enmienda, el 2026-09-23**: `insufficient_material`, `recipe_without_lines`.
  * **Duodecima enmienda, 2026-09-24**: `presentation_without_content`, `no_whole_package`.
+ * **Decimotercera enmienda, 2026-09-24**: `customer_not_found`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -96,6 +97,8 @@ export const ERROR_CODES = [
   // Distinto de `presentation_without_content`: hay contenido, pero la cantidad del pedido no
   // llega a llenar ni un envase.
   'no_whole_package',
+  // Distinto de `supplier_not_found`: la entidad es un cliente, no un proveedor.
+  'customer_not_found',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

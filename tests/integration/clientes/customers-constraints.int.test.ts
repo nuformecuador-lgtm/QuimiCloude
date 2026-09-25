@@ -124,6 +124,16 @@ function asUuid(id: string): Prisma.Sql {
   return Prisma.sql`CAST(${id} AS uuid)`
 }
 
+/** Misma forma que `normalizeSupplierName`: suficiente para satisfacer el NOT NULL de las tres
+ *  columnas derivadas sin repetir la logica de negocio de otro modulo (R42). */
+function normalizeForTest(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
 type CustomerColumn =
   | 'first_names'
   | 'last_names'
@@ -131,6 +141,9 @@ type CustomerColumn =
   | 'phone'
   | 'email'
   | 'address'
+  | 'first_names_normalized'
+  | 'last_names_normalized'
+  | 'city_normalized'
   | 'company_id'
   | 'created_by'
   | 'updated_by'
@@ -202,6 +215,9 @@ describe('datos del cliente (R1-R6)', () => {
           phone: '+57 300 111 2233',
           email: `maria.${marker}@cliente.test`,
           address: 'Calle 10 # 5-20',
+          firstNamesNormalized: normalizeForTest('Maria Jose'),
+          lastNamesNormalized: normalizeForTest(`Rodriguez ${marker}`),
+          cityNormalized: normalizeForTest('Bogota'),
           companyId,
         },
         select: { id: true },
@@ -228,6 +244,9 @@ describe('datos del cliente (R1-R6)', () => {
           first_names: Prisma.sql`'Ana'`,
           last_names: Prisma.sql`'Perez'`,
           city: Prisma.sql`'Cali'`,
+          first_names_normalized: Prisma.sql`'ana'`,
+          last_names_normalized: Prisma.sql`'perez'`,
+          city_normalized: Prisma.sql`'cali'`,
           company_id: asUuid(companyId),
         }
         delete columnas[omitida]
@@ -241,7 +260,15 @@ describe('datos del cliente (R1-R6)', () => {
 
       // Y el UPDATE que deja un obligatorio en NULL tambien se rechaza.
       const { id } = await tx.customer.create({
-        data: { firstNames: 'Ana', lastNames: 'Perez', city: 'Cali', companyId },
+        data: {
+          firstNames: 'Ana',
+          lastNames: 'Perez',
+          city: 'Cali',
+          firstNamesNormalized: 'ana',
+          lastNamesNormalized: 'perez',
+          cityNormalized: 'cali',
+          companyId,
+        },
         select: { id: true },
       })
       const sqlStateUpdate = await expectRejectedByDatabase(
@@ -262,7 +289,15 @@ describe('datos del cliente (R1-R6)', () => {
       const companyId = await createCompany(tx)
 
       const sinNinguno = await tx.customer.create({
-        data: { firstNames: 'Sin', lastNames: 'Contacto', city: 'Medellin', companyId },
+        data: {
+          firstNames: 'Sin',
+          lastNames: 'Contacto',
+          city: 'Medellin',
+          firstNamesNormalized: 'sin',
+          lastNamesNormalized: 'contacto',
+          cityNormalized: 'medellin',
+          companyId,
+        },
         select: { id: true },
       })
       const leido = await tx.customer.findUniqueOrThrow({ where: { id: sinNinguno.id } })
@@ -276,6 +311,9 @@ describe('datos del cliente (R1-R6)', () => {
           lastNames: 'Telefono',
           city: 'Medellin',
           phone: '+57 300 555 6677',
+          firstNamesNormalized: 'con',
+          lastNamesNormalized: 'telefono',
+          cityNormalized: 'medellin',
           companyId,
         },
         select: { id: true },
@@ -293,7 +331,18 @@ describe('datos del cliente (R1-R6)', () => {
       const largo = 'a'.repeat(10_000)
 
       const { id } = await tx.customer.create({
-        data: { firstNames: largo, lastNames: largo, city: largo, phone: largo, email: largo, address: largo, companyId },
+        data: {
+          firstNames: largo,
+          lastNames: largo,
+          city: largo,
+          phone: largo,
+          email: largo,
+          address: largo,
+          firstNamesNormalized: largo,
+          lastNamesNormalized: largo,
+          cityNormalized: largo,
+          companyId,
+        },
         select: { id: true },
       })
       const customer = await tx.customer.findUniqueOrThrow({ where: { id } })
@@ -318,6 +367,9 @@ describe('datos del cliente (R1-R6)', () => {
           city: 'Cali',
           email: 'no-es-un-correo',
           phone: 'abc',
+          firstNamesNormalized: 'correo',
+          lastNamesNormalized: 'raro',
+          cityNormalized: 'cali',
           companyId,
         },
         select: { id: true },
@@ -340,6 +392,9 @@ describe('duplicados (R7)', () => {
         phone: '+57 300 999 0000',
         email: 'juan.gomez@cliente.test',
         address: 'Av Siempre Viva 123',
+        firstNamesNormalized: 'juan',
+        lastNamesNormalized: 'gomez',
+        cityNormalized: 'bogota',
         companyId,
       }
       const first = await tx.customer.create({ data, select: { id: true } })
@@ -360,6 +415,9 @@ describe('empresa (R8, R9, R10)', () => {
             first_names: Prisma.sql`'Sin'`,
             last_names: Prisma.sql`'Empresa'`,
             city: Prisma.sql`'Cali'`,
+            first_names_normalized: Prisma.sql`'sin'`,
+            last_names_normalized: Prisma.sql`'empresa'`,
+            city_normalized: Prisma.sql`'cali'`,
           }),
         'cliente sin empresa',
       )
@@ -372,6 +430,9 @@ describe('empresa (R8, R9, R10)', () => {
             first_names: Prisma.sql`'Con'`,
             last_names: Prisma.sql`'Fantasma'`,
             city: Prisma.sql`'Cali'`,
+            first_names_normalized: Prisma.sql`'con'`,
+            last_names_normalized: Prisma.sql`'fantasma'`,
+            city_normalized: Prisma.sql`'cali'`,
             company_id: asUuid(randomUUID()),
           }),
         'cliente con empresa inexistente',
@@ -384,7 +445,15 @@ describe('empresa (R8, R9, R10)', () => {
     await inRolledBackTransaction(async (tx) => {
       const companyId = await createCompany(tx)
       const { id } = await tx.customer.create({
-        data: { firstNames: 'Con', lastNames: 'Baja', city: 'Cali', companyId },
+        data: {
+          firstNames: 'Con',
+          lastNames: 'Baja',
+          city: 'Cali',
+          firstNamesNormalized: 'con',
+          lastNamesNormalized: 'baja',
+          cityNormalized: 'cali',
+          companyId,
+        },
         select: { id: true },
       })
       await tx.customer.update({ where: { id }, data: { deletedAt: new Date() } })
@@ -403,7 +472,15 @@ describe('empresa (R8, R9, R10)', () => {
       const companyA = await createCompany(tx)
       const companyB = await createCompany(tx)
       const { id: customerId } = await tx.customer.create({
-        data: { firstNames: 'De', lastNames: 'CompanyA', city: 'Cali', companyId: companyA },
+        data: {
+          firstNames: 'De',
+          lastNames: 'CompanyA',
+          city: 'Cali',
+          firstNamesNormalized: 'de',
+          lastNamesNormalized: 'companya',
+          cityNormalized: 'cali',
+          companyId: companyA,
+        },
         select: { id: true },
       })
 
@@ -454,7 +531,15 @@ describe('escalares sin @relation, pero con FK reales (R11)', () => {
 
       const companyId = await createCompany(tx)
       const created = await tx.customer.create({
-        data: { firstNames: 'Sin', lastNames: 'Relacion', city: 'Cali', companyId },
+        data: {
+          firstNames: 'Sin',
+          lastNames: 'Relacion',
+          city: 'Cali',
+          firstNamesNormalized: 'sin',
+          lastNamesNormalized: 'relacion',
+          cityNormalized: 'cali',
+          companyId,
+        },
       })
       // El objeto leido no expone ninguna propiedad "company" ni "createdByUser" navegable:
       // solo el escalar `companyId`.
@@ -482,7 +567,15 @@ describe('auditoria (R12, R13)', () => {
       const editor = await createUser(tx, companyId)
 
       const sinAutor = await tx.customer.create({
-        data: { firstNames: 'Sin', lastNames: 'Autor', city: 'Cali', companyId },
+        data: {
+          firstNames: 'Sin',
+          lastNames: 'Autor',
+          city: 'Cali',
+          firstNamesNormalized: 'sin',
+          lastNamesNormalized: 'autor',
+          cityNormalized: 'cali',
+          companyId,
+        },
         select: { id: true },
       })
       const sinAutorRow = await tx.customer.findUniqueOrThrow({
@@ -493,7 +586,17 @@ describe('auditoria (R12, R13)', () => {
       expect(sinAutorRow.updatedBy).toBeNull()
 
       const conAutor = await tx.customer.create({
-        data: { firstNames: 'Con', lastNames: 'Autor', city: 'Cali', companyId, createdBy: autor, updatedBy: autor },
+        data: {
+          firstNames: 'Con',
+          lastNames: 'Autor',
+          city: 'Cali',
+          firstNamesNormalized: 'con',
+          lastNamesNormalized: 'autor',
+          cityNormalized: 'cali',
+          companyId,
+          createdBy: autor,
+          updatedBy: autor,
+        },
         select: { id: true },
       })
       await tx.customer.update({ where: { id: conAutor.id }, data: { updatedBy: editor } })
@@ -511,6 +614,9 @@ describe('auditoria (R12, R13)', () => {
             first_names: Prisma.sql`'Con'`,
             last_names: Prisma.sql`'Fantasma'`,
             city: Prisma.sql`'Cali'`,
+            first_names_normalized: Prisma.sql`'con'`,
+            last_names_normalized: Prisma.sql`'fantasma'`,
+            city_normalized: Prisma.sql`'cali'`,
             company_id: asUuid(companyId),
             created_by: asUuid(randomUUID()),
           }),
@@ -525,7 +631,16 @@ describe('auditoria (R12, R13)', () => {
       const companyId = await createCompany(tx)
       const autor = await createUser(tx, companyId)
       await tx.customer.create({
-        data: { firstNames: 'Con', lastNames: 'Autor', city: 'Cali', companyId, createdBy: autor },
+        data: {
+          firstNames: 'Con',
+          lastNames: 'Autor',
+          city: 'Cali',
+          firstNamesNormalized: 'con',
+          lastNamesNormalized: 'autor',
+          cityNormalized: 'cali',
+          companyId,
+          createdBy: autor,
+        },
       })
 
       const sqlState = await expectRejectedByDatabase(
@@ -550,7 +665,16 @@ describe('auditoria (R12, R13)', () => {
       const autor = await createUser(tx, companyId)
       const soloEditor = await createUser(tx, companyId)
       const cliente = await tx.customer.create({
-        data: { firstNames: 'Con', lastNames: 'Autor', city: 'Cali', companyId, createdBy: autor },
+        data: {
+          firstNames: 'Con',
+          lastNames: 'Autor',
+          city: 'Cali',
+          firstNamesNormalized: 'con',
+          lastNamesNormalized: 'autor',
+          cityNormalized: 'cali',
+          companyId,
+          createdBy: autor,
+        },
         select: { id: true },
       })
       await tx.customer.update({ where: { id: cliente.id }, data: { updatedBy: soloEditor } })
@@ -584,6 +708,9 @@ describe('baja, marcas de tiempo y forma de la tabla (R14, R15, R16, R17)', () =
           phone: '+57 300 000 1111',
           email: 'baja@cliente.test',
           address: 'Calle Baja 1',
+          firstNamesNormalized: 'a',
+          lastNamesNormalized: 'dardebaja',
+          cityNormalized: 'cali',
           companyId,
         },
         select: { id: true },
@@ -613,7 +740,15 @@ describe('baja, marcas de tiempo y forma de la tabla (R14, R15, R16, R17)', () =
     await inRolledBackTransaction(async (tx) => {
       const companyId = await createCompany(tx)
       const { id } = await tx.customer.create({
-        data: { firstNames: 'Marca', lastNames: 'Tiempo', city: 'Cali', companyId },
+        data: {
+          firstNames: 'Marca',
+          lastNames: 'Tiempo',
+          city: 'Cali',
+          firstNamesNormalized: 'marca',
+          lastNamesNormalized: 'tiempo',
+          cityNormalized: 'cali',
+          companyId,
+        },
         select: { id: true },
       })
       const antes = await tx.customer.findUniqueOrThrow({
@@ -631,7 +766,7 @@ describe('baja, marcas de tiempo y forma de la tabla (R14, R15, R16, R17)', () =
     })
   })
 
-  it('la tabla y sus columnas estan en snake_case ingles (R16)', async () => {
+  it('la tabla y sus columnas estan en snake_case ingles (R16 (QC-153), R42 (QC-154))', async () => {
     await inRolledBackTransaction(async (tx) => {
       const columnas = await tx.$queryRaw<{ column_name: string }[]>`
         SELECT column_name FROM information_schema.columns
@@ -640,14 +775,17 @@ describe('baja, marcas de tiempo y forma de la tabla (R14, R15, R16, R17)', () =
       expect(columnas.map((c) => c.column_name)).toEqual([
         'address',
         'city',
+        'city_normalized',
         'company_id',
         'created_at',
         'created_by',
         'deleted_at',
         'email',
         'first_names',
+        'first_names_normalized',
         'id',
         'last_names',
+        'last_names_normalized',
         'phone',
         'updated_at',
         'updated_by',

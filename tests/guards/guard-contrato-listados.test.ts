@@ -1,17 +1,17 @@
-// QC-57 T3 — Guardia: el contrato de lista es UNO aunque el archivo sea seis (R31, R32).
+// QC-57 T3 — Guardia: el contrato de lista es UNO aunque el archivo sea siete (R31, R32).
 //
-// `lib/modules/<m>/domain/list-query.ts` esta duplicado a proposito en los seis modulos con
+// `lib/modules/<m>/domain/list-query.ts` esta duplicado a proposito en los siete modulos con
 // listado: el dominio no puede importar `lib/shared/**` (decision cerrada 13,
 // `docs/architecture.md > La regla de dependencias`), asi que se comparte la FORMA y no el
-// archivo. **Seis copias sin esta guardia no son un contrato, son seis contratos parecidos**
+// archivo. **Siete copias sin esta guardia no son un contrato, son siete contratos parecidos**
 // (`design.md > 2.1`, riesgo 3).
 //
 // Tres bloques, y ninguno sobra:
-//   1. **Equivalencia de comportamiento** (R32): la misma bateria canonica contra los seis
+//   1. **Equivalencia de comportamiento** (R32): la misma bateria canonica contra los siete
 //      esquemas, exigiendo el mismo veredicto y la MISMA salida saneada. Cada caso se compara
-//      contra un esperado ESCRITO -no solo contra el primer modulo-: seis copias igual de mal
+//      contra un esperado ESCRITO -no solo contra el primer modulo-: siete copias igual de mal
 //      seguirian de acuerdo entre si.
-//   2. **Equivalencia de texto**: los seis fuentes son identicos salvo el nombre del modulo en
+//   2. **Equivalencia de texto**: los siete fuentes son identicos salvo el nombre del modulo en
 //      la cabecera. Coge la divergencia que todavia no ha llegado a cambiar el comportamiento
 //      -un comentario borrado, un tope movido en una rama sin probar-.
 //   3. **Pureza del dominio** (R31): ninguno importa `lib/shared`, `@prisma/client`, `next/` ni
@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import type { ListQuery, ListQueryable } from '@/lib/modules/inventario/domain/list-query';
+import * as clientes from '@/lib/modules/clientes/domain/list-query';
 import * as identity from '@/lib/modules/identity/domain/list-query';
 import * as inventario from '@/lib/modules/inventario/domain/list-query';
 import * as pedidos from '@/lib/modules/pedidos/domain/list-query';
@@ -52,9 +53,10 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
 /**
- * Los SEIS modulos con listado. QC-57 nacio con CINCO (`design.md > 1`: siete listas en cinco
- * carpetas de modulo) y **QC-66 anade la sexta copia**, `identity`, para el listado de usuarios
- * (su `design.md > 8.1`): misma firma abierta, misma bateria, mismo fuente.
+ * Los SIETE modulos con listado. QC-57 nacio con CINCO (`design.md > 1`: siete listas en cinco
+ * carpetas de modulo), **QC-66 anade la sexta copia**, `identity`, para el listado de usuarios
+ * (su `design.md > 8.1`), y **QC-154 anade la septima**, `clientes` (`design.md > 6.1`): misma
+ * firma abierta, misma bateria, mismo fuente.
  */
 const MODULOS = [
   { nombre: 'inventario', contrato: inventario },
@@ -63,6 +65,7 @@ const MODULOS = [
   { nombre: 'unidades', contrato: unidades },
   { nombre: 'pedidos', contrato: pedidos },
   { nombre: 'identity', contrato: identity },
+  { nombre: 'clientes', contrato: clientes },
 ] as const;
 
 const NOMBRES_DE_MODULO = MODULOS.map((m) => m.nombre);
@@ -75,7 +78,7 @@ const NOMBRES_DE_MODULO = MODULOS.map((m) => m.nombre);
  * POR ESO QC-80 NO LA TOCA aunque `PRODUCT_QUERYABLE` haya perdido su `unitId` (R21). El
  * `unitId` de aqui abajo es un nombre de campo SINTETICO -hace de «campo con forma `select`»- y
  * no la columna de ningun modulo: si esta constante siguiera a la lista blanca real de
- * productos, el dia que un listado cambia un campo se caerian los seis modulos a la vez y la
+ * productos, el dia que un listado cambia un campo se caerian los siete modulos a la vez y la
  * guardia diria que el contrato diverge cuando lo que cambio fue una tabla. La prueba de que el
  * listado de productos ya no ofrece ese filtro vive donde corresponde:
  * `tests/unit/inventario/list-query.test.ts`.
@@ -224,9 +227,9 @@ export function importsProhibidos(fuente: string): readonly string[] {
   );
 }
 
-describe('guardia — el contrato de listados es uno solo en los seis modulos', () => {
+describe('guardia — el contrato de listados es uno solo en los siete modulos', () => {
   describe('bloque 1 — mismo veredicto y misma salida saneada (R32)', () => {
-    it('los seis modulos exportan la fabrica del esquema y el saneador', () => {
+    it('los siete modulos exportan la fabrica del esquema y el saneador', () => {
       const incompletos = MODULOS.filter(
         ({ contrato }) =>
           typeof contrato.createListQuerySchema !== 'function' ||
@@ -236,20 +239,20 @@ describe('guardia — el contrato de listados es uno solo en los seis modulos', 
       expect(incompletos).toEqual([]);
     });
 
-    it.each(ACEPTADOS)('acepta y sanea igual en los seis: $nombre', ({ entrada, esperado }) => {
+    it.each(ACEPTADOS)('acepta y sanea igual en los siete: $nombre', ({ entrada, esperado }) => {
       const resultados = MODULOS.map(({ nombre, contrato }) => {
         const query = contrato.createListQuerySchema().parse(entrada);
         return { nombre, saneada: contrato.sanitizeListQuery(query, CANONICA) };
       });
 
-      // Contra un esperado ESCRITO: que los seis coincidan entre si no basta si los seis
+      // Contra un esperado ESCRITO: que los siete coincidan entre si no basta si los siete
       // estan mal (`design.md > 2.1`).
       for (const { nombre, saneada } of resultados) {
         expect(`${nombre}: ${JSON.stringify(saneada)}`).toBe(`${nombre}: ${JSON.stringify(esperado)}`);
       }
     });
 
-    it.each(RECHAZADOS)('rechaza en los seis: $nombre', ({ entrada }) => {
+    it.each(RECHAZADOS)('rechaza en los siete: $nombre', ({ entrada }) => {
       const aceptantes = MODULOS.filter(
         ({ contrato }) => contrato.createListQuerySchema().safeParse(entrada).success,
       ).map(({ nombre }) => nombre);
@@ -257,7 +260,7 @@ describe('guardia — el contrato de listados es uno solo en los seis modulos', 
       expect(aceptantes).toEqual([]);
     });
 
-    it('omite la busqueda igual en los seis cuando el listado no busca (R17)', () => {
+    it('omite la busqueda igual en los siete cuando el listado no busca (R17)', () => {
       const resultados = MODULOS.map(({ nombre, contrato }) => {
         const query = contrato.createListQuerySchema().parse({ search: 'sosa' });
         return { nombre, saneada: contrato.sanitizeListQuery(query, CANONICA_SIN_BUSQUEDA) };
@@ -272,7 +275,7 @@ describe('guardia — el contrato de listados es uno solo en los seis modulos', 
       }
     });
 
-    it('aplica los mismos defectos en los seis', () => {
+    it('aplica los mismos defectos en los siete', () => {
       // R1 — sin `pageSize`: el 10 y el tope de 25 son del adaptador (R29), no del esquema.
       const defectos = MODULOS.map(({ contrato }) =>
         JSON.stringify(contrato.createListQuerySchema().parse({})),
@@ -283,7 +286,7 @@ describe('guardia — el contrato de listados es uno solo en los seis modulos', 
     });
   });
 
-  describe('bloque 2 — los seis fuentes son la misma copia', () => {
+  describe('bloque 2 — los siete fuentes son la misma copia', () => {
     it('coinciden caracter a caracter salvo el nombre del modulo', () => {
       const textos = NOMBRES_DE_MODULO.map((modulo) => ({
         modulo,
@@ -315,7 +318,7 @@ describe('guardia — el contrato de listados es uno solo en los seis modulos', 
   });
 
   describe('bloque 3 — el dominio del contrato solo depende de zod (R31)', () => {
-    it('ninguno de los seis importa lib/shared, Prisma, next ni components', () => {
+    it('ninguno de los siete importa lib/shared, Prisma, next ni components', () => {
       const hallazgos = NOMBRES_DE_MODULO.flatMap((modulo) =>
         importsProhibidos(fuenteDe(modulo)).map((especificador) => `${modulo}: ${especificador}`),
       );
@@ -323,7 +326,7 @@ describe('guardia — el contrato de listados es uno solo en los seis modulos', 
       expect(hallazgos).toEqual([]);
     });
 
-    it('los seis importan zod y nada mas', () => {
+    it('los siete importan zod y nada mas', () => {
       const hallazgos = NOMBRES_DE_MODULO.flatMap((modulo) =>
         especificadoresImportados(fuenteDe(modulo))
           .filter((especificador) => especificador !== 'zod')
