@@ -11,7 +11,7 @@
 
 ## Tanda 0 — Base
 
-- [ ] **T0 — Verificar la base heredada y preparar la base propia.**
+- [x] **T0 — Verificar la base heredada y preparar la base propia.**
   Comprobar en el worktree lo que `design.md > 0` da por hecho: las cinco acciones y sus tipos en
   `customer-actions.ts`, `CUSTOMER_QUERYABLE` y `createCustomerSchema` en el barrel, las primitivas
   `sheet`/`alert-dialog`/`sonner` en `components/ui/`, y `loginAndLand` en `e2e/helpers/landing.ts`.
@@ -22,7 +22,7 @@
 
 ## Tanda 1 — Ruta, menú y alcance (va antes que cualquier archivo en `app/`)
 
-- [ ] **T1 — Constante, prefijo, ítem de menú, icono y alcance de `scope.test.ts`.** Depende de T0.
+- [x] **T1 — Constante, prefijo, ítem de menú, icono y alcance de `scope.test.ts`.** Depende de T0.
   `CUSTOMERS_ROUTE` + fila en `PRIVATE_ROUTE_PREFIXES` (`lib/shared/routes.ts`); `CUSTOMERS_LABEL`,
   `'contact'` en `NavIconName` y el ítem **al final** de `PRIVATE_NAV_ITEMS` en «Cadena» con
   `clientes.consultar` (`private-nav.ts`); fila `contact: Contact` (`nav-icons.ts`). Sustituir por su
