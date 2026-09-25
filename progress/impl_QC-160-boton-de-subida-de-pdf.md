@@ -178,7 +178,57 @@ sin mocks nuevos.
   El recorrido de tres PDFs, que se daba por rojo heredado de `dev`, llegó a «terminado» en esta
   corrida. Después, en el 3117 solo quedaban conexiones en `TIME_WAIT`.
 
+## Vuelta 2 (2026-09-24): revisión rechazada con 2 mayores y 6 menores, y 3 rojos del gate
+
+La revisión está en `progress/review_QC-160-boton-de-subida-de-pdf.md`, commiteada con M1.
+
+| Punto | Qué se hizo | Commit |
+|---|---|---|
+| M1 | Opción (a) del leader: se quita el caso «el manifiesto no gana ninguna dependencia respecto de origin/dev» de `document-upload-convenciones.test.ts`, con sus helpers. Nota fechada en `design.md > 9.2`. R20 sigue cubierto por `guard-dependencias-aprobadas`, por el caso que prohíbe importar `@base-ui/react` y por el diff-stat de T8. | `5052409e` |
+| M2 | E2E en WebKit, una corrida, verde 3/3 (salida abajo). T7 cumple su «Hecho cuando» en los dos motores. | — (sin cambios de código) |
+| Gate: `recipe-route-contract.test.ts` | El archivo tiene un mecanismo de ampliación nombrada, `AMPLIACION_RECETAS_*`, pero es para diffs de `lib/modules/recetas` y `db/`, no para fuentes de la ruta. Por eso la ampliación se hizo estrecha, dentro del propio caso. `getSessionUser` sigue prohibido en toda la ruta salvo en `formulas/page.tsx`, y ahí solo puede aparecer una vez, como `canUploadDocuments(await identity.getSessionUser())`, sin un literal `recetas.*` en esa línea. Además, `assertPermission` pasa a la lista de prohibidos. El motivo está escrito en el test. Producción sin tocar. | `3655cbdb` |
+| Gate: `catalog-import-isolation.int.test.ts` | `documentos.modificar` añadido a los 6 actores. La confirmación exige `DOCUMENT_UPLOAD_PERMISSION` en su primera línea para todos, no solo en R22, y ningún caso esperaba `unauthorized` a propósito. El motivo va comentado. | `11f5a43f` |
+| Gate: `guard-dobles-e2e` | Flake, según el leader. No se toca. | — |
+| m1 | Sin citas de fichas ni R en los comentarios tocados de `e2e/documentos.spec.ts`. En convenciones, «esta ficha» sale del nombre del bloque R20 y del docblock de `PANTALLA_CON_MONTAJE`. | `f9c2a73b`, `5052409e` |
+| m2 | Caso nuevo `R12` con el literal `'documentos.modificar'` escrito en el test. Con la constante mutada se pone rojo; mutación deshecha. | `33bfb15f` |
+| m3 | R21 cubre los dos escenarios: con archivos elegidos, con `data-phase`, y con la tanda en `processing`. Afirma el popup `not.toBeVisible()` tras cerrar, y el popup y la fila visibles tras reabrir. | `33bfb15f` |
+| m4 | Los casos R10 usan el conjunto mínimo: `proveedores.consultar` + `documentos.modificar`, y `recetas.consultar` + `documentos.modificar`. | `33bfb15f` |
+| m5 | `interceptSignedUploads` es `async` y hace `await page.route(...)`; las tres llamadas también esperan. | `f9c2a73b` |
+| m6 | El caso R18 pasa a llamarse «… no ve el boton ni la subida: el caso sin permiso de subida (R18)», sin citar ficha. | `f9c2a73b` |
+
+### Salidas de la vuelta 2
+
+- Vitest de los archivos tocados: convenciones, `recipe-route-contract`, `can-upload-documents`,
+  `document-upload-dialog`, `supplier-detail-upload`, `formulas-upload` y `guard-dependencias-aprobadas`.
+  Resultado: `Test Files 7 passed (7)` y `Tests 67 passed (67)`.
+- Integración, corrida sola:
+  - Comando: `pnpm exec vitest run tests/integration/documentos/catalog-import-isolation.int.test.ts --project=integration`.
+  - Resultado: 6/6 en 3,99 s. R21 tardó 173 ms, sin timeout.
+  - Base: el `globalSetup` copia la plantilla `qct_tpl_a3f9d657e639` en una efímera,
+    `qct_qc160_e336770c_mug7zpf6_hoo`, a partir del `.env` que apunta a `QuimiCloude_QC160`.
+- `pnpm run typecheck`: sin errores.
+  - El `next dev` del E2E dejó a medias `.next/dev/types/validator.ts`, que es ignorado por git, y
+    daba un `TS1128`.
+  - Se regeneró con `next typegen`.
+- `pnpm run lint`: 0 errores y los mismos 7 warnings preexistentes.
+- E2E en **WebKit**: el puerto 3117 estaba libre y no había Playwright en marcha. Una corrida,
+  `pnpm exec playwright test e2e/documentos.spec.ts --project=webkit`, con `DATABASE_URL` y
+  `DIRECT_URL` en `QuimiCloude_QC160`:
+
+  ```
+  ✓ 3 [webkit] … sin documentos.modificar no ve el boton ni la subida: el caso sin permiso de subida (R18) (16.5s)
+  ✓ 2 [webkit] … abre la ventana desde el listado de formulas y sube dos PDFs hasta terminar (R17) (18.3s)
+  ✓ 1 [webkit] … abre la ventana desde el detalle de un proveedor, sube tres PDFs … (R16) (19.7s)
+  3 passed (41.4s)
+  ```
+
+- La corrida de Chromium (3/3) es de antes de m5 y m6 (el `await` de la intercepción y el nombre de
+  R18). WebKit ya corrió sobre el archivo final. Chromium no se repitió porque la instrucción era una
+  sola corrida; lo cubre el `./init.sh` completo.
+
+En el mapa, R18 pasa a ser `e2e/documentos.spec.ts` › «… no ve el boton ni la subida: el caso sin
+permiso de subida (R18)», y R15 queda cubierto también por el E2E en WebKit.
+
 ## Pendiente para el leader
 
 - `./init.sh` completo (T8), con `QuimiCloude_QC160`.
-- E2E en **WebKit**: T7 y R15 lo nombran, pero la instrucción era correr solo Chromium y una sola vez.

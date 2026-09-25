@@ -173,6 +173,8 @@
   tandas antes y después. El nombre lleva `R18` y conserva la referencia a QC-142 R20.
 - [x] Sin cambios en `playwright.config.ts` ni en los dobles (R19). Ningún archivo E2E nuevo.
 - **Archivos:** `e2e/documentos.spec.ts`.
+- **Nota 2026-09-24.** Verde contra `QuimiCloude_QC160`, una corrida por motor y sin otro E2E en la
+  máquina: Chromium 3/3 y WebKit 3/3. Detalle en `progress/impl_QC-160-boton-de-subida-de-pdf.md`.
 - **Depende de:** T4, T5.
 - **Hecho cuando:** `pnpm run e2e -- documentos` verde en Chromium y WebKit contra
   `QuimiCloude_QC160` sembrada, **con un solo E2E corriendo en la máquina** y ninguna petición fuera
