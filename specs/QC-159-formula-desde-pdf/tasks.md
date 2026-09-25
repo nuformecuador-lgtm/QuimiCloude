@@ -23,7 +23,7 @@ spec antes de T1.
 
 ## Tanda 1 — piezas de cada módulo dueño
 
-### T1 [ ] [P] — `recetas`: receta viva por nombre
+### T1 [x] [P] — `recetas`: receta viva por nombre
 Tras T0. **Toca:** `lib/modules/recetas/domain/recipe-catalog.ts`,
 `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`, `lib/composition/index.ts`
 (objeto `recipeCatalog`), `tests/unit/recetas/recipe-catalog.test.ts`,
@@ -33,7 +33,7 @@ Tras T0. **Toca:** `lib/modules/recetas/domain/recipe-catalog.ts`,
 receta dada de baja ni una de otra empresa; nombre que normaliza a `''` ⇒ `null`. Cubre **R17, R20,
 R33** (parte `recetas`).
 
-### T2 [ ] [P] — `inventario`: productos vivos por nombre
+### T2 [x] [P] — `inventario`: productos vivos por nombre
 Tras T0. **Toca:** `lib/modules/inventario/domain/product-name-lookup.ts` (nuevo),
 `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`,
 `lib/modules/inventario/index.ts`, `lib/composition/index.ts` (constante `productNameLookup`),
@@ -45,7 +45,7 @@ Tras T0. **Toca:** `lib/modules/inventario/domain/product-name-lookup.ts` (nuevo
 ninguno dado de baja, ninguno de otra empresa; lista vacía ⇒ sin consulta. Guardia de ámbito de
 `inventario` verde. Cubre **R11, R26, R33** (parte `inventario`).
 
-### T3 [ ] (P1) — `inventario`: alta de materia prima sin lote
+### T3 [x] (P1) — `inventario`: alta de materia prima sin lote
 Tras T2 (comparten `inventario/index.ts` y el bloque de `inventario` de la composición).
 **Toca:** `lib/modules/inventario/domain/create-raw-material.ts` (nuevo),
 `lib/modules/inventario/domain/product-input.ts` (solo **exportar** `productNameSchema` y

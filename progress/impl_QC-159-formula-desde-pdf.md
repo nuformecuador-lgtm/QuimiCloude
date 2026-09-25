@@ -84,3 +84,44 @@ vitest run tests/unit/proveedores-ui/catalog-pdf-upload.test.tsx      1 archivo,
 vitest run tests/unit/recetas-ui                                      12 archivos, 267 tests verdes
 vitest run guard-rutas-privadas-cubiertas + guard-arquitectura-modulos 2 archivos, 69 tests verdes
 ```
+
+## T1 — `recetas`: receta viva por nombre (backend_dev, `7dadb385`)
+
+- `lib/modules/recetas/domain/recipe-catalog.ts` (`findAliveByNormalizedName`),
+  `adapters/driven/persistence/recipe-catalog-prisma.ts`, `lib/composition/index.ts` (`recipeCatalog`),
+  `tests/unit/recetas/recipe-catalog.test.ts`, `tests/integration/recetas/recipe-catalog-by-name.int.test.ts`
+  (nuevo), `tests/integration/aislamiento.json`.
+- **Colateral no previsto en el spec:** el método nuevo es obligatorio en `RecipeCatalog`, así que los
+  dobles/cableados de la interfaz en `tests/integration/asignaciones/{assigned-orders,company-orders,
+  finished-orders,responsible-eligibility}.int.test.ts`, `tests/integration/pedidos/{finish-with-finished-goods,
+  order-content-copy,order-cost-quote,order-expiry,order-ingredients-cost,order-reservation-concurrency,
+  order-reservation}.int.test.ts` y `tests/unit/pedidos/resolve-ingredients-cost.test.ts` ganan ese campo
+  (sin tocar lógica). **Solape posible con QC-168** (pedidos) al sincronizar con `dev` en F2.3: unión.
+
+## T2 — `inventario`: productos vivos por nombre (backend_dev, `09a28ba4`)
+
+- `lib/modules/inventario/domain/product-name-lookup.ts` (nuevo), `adapters/driven/persistence/product-catalog-prisma.ts`,
+  `lib/modules/inventario/index.ts`, `lib/composition/index.ts` (`productNameLookup`, sin consumidor
+  hasta T5: un aviso de lint `no-unused-vars` esperado), `tests/unit/inventario/product-name-lookup.test.ts`
+  (nuevo), `tests/integration/inventario/product-name-lookup.int.test.ts` (nuevo), `aislamiento.json`.
+- `product-catalog.ts` y `product-prisma.ts` **sin tocar**.
+
+## T3 — `inventario`: alta de materia prima sin lote (backend_dev, `90cc18b9`)
+
+- `lib/modules/inventario/domain/create-raw-material.ts` (nuevo), `product-input.ts` (exporta
+  `productNameSchema` y `PRODUCT_NAME_MAX_LENGTH = 200`, regla intacta), `inventario/index.ts`,
+  `lib/composition/index.ts` (`inventario.createRawMaterial`), `tests/unit/inventario/create-raw-material.test.ts`,
+  `tests/integration/inventario/create-raw-material.int.test.ts` (nuevos), `aislamiento.json`,
+  `tests/unit/inventario/schema/inventario-schema.test.ts` (lista cerrada de factorías del barrel).
+- `create-product.ts` **sin tocar**; sus tests verdes sin editarlos.
+
+### Salida de verificación de T1–T3
+
+```
+typecheck: 0 errores · lint: 0 errores, 8 avisos (preexistentes + productNameLookup hasta T5)
+vitest run tests/unit/recetas tests/unit/pedidos/resolve-ingredients-cost.test.ts   40 archivos, 599 tests verdes
+vitest run tests/unit/inventario                                                     67 archivos, 1023 verdes / 5 skip
+vitest run --project integration recipe-catalog-by-name + product-name-lookup
+  + create-raw-material + tests/integration/asignaciones + tests/integration/pedidos 38 archivos, 305 tests verdes
+vitest run guard-aislamiento-integracion + guard-ambito-empresa-inventario           33 tests verdes
+```
