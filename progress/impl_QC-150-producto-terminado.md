@@ -553,3 +553,20 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   bien y no se tocó.
 - Verificación: el archivo da 8 pasados y 3 skipped con motivo; `tests/guards` 560 pasados, 5
   skipped; eslint limpio; typecheck sale con 0.
+
+## F2.3 (2) (2026-09-24): segundo merge de `origin/dev` (QC-142, PR #120)
+
+- Merge `a0f5912d` (implementer). Un conflicto, `tests/unit/documentos/qc158-alcance.test.ts`.
+- **Corrección, para el PR:** las dos guardias ajenas que esta rama arreglaba ya las arregló QC-142 en
+  `dev`: `qc158-alcance.test.ts` (su `b23b7569`) y el centinela de `db/` de
+  `guard-convenciones-showcase.test.ts` (su `e476cfd1`). En los dos archivos se conserva **la versión de
+  `dev`**, idéntica a `origin/dev`, y se descartan nuestros cambios (`ae5597ce`, `df6d0894`,
+  `1f53a137`, `338b6678`). **Esta rama ya no arregla deuda ajena**: lo que dicen de ella la vuelta 6,
+  la vuelta 7 (n2) y la sección F2.3 anterior queda superado. En esta rama, las versiones de `dev` dan:
+  `qc158-alcance` 8 pasados y 3 skipped; `guard-convenciones-showcase` 4 pasados y 2 skipped.
+- Migración nueva de dev, `20260924130000_documents_permissions`: anterior a las de la ficha
+  (`20260924190000`/`190100`), así que no se renombra nada. `db:migrate` la aplica en `QuimiCloude_QC150`; `migrate
+  status` al día; cliente, typegen y plantilla (`qct_tpl_87988ea6377c`, 53) regenerados. Lockfile sin
+  cambios. El merge no obligó a ampliar ningún censo.
+- Verificación: typecheck sale con 0; lint 0 errores (7 avisos, ninguno de la rama); `tests/guards`
+  43 archivos → 560 pasados, 5 skipped.
