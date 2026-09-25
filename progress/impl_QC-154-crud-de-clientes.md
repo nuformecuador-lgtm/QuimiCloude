@@ -1201,3 +1201,147 @@ pnpm exec vitest run tests/unit/clientes tests/guards tests/integration/clientes
 Tres commits de codigo/tests, uno por hallazgo: `0d75f635` (B1), `7afb16ce` (m2), `f0286205`
 (m3). m10 no genero commit (ya resuelto por B1/m2) y m1 queda anotado como deuda, sin tocar.
 Todos empujados a `origin/feature/QC-154-crud-de-clientes`.
+
+## Correcciones tras review, tanda 3 y merge con dev
+
+### B3 — claves exactas de `findAliveCustomerById` y `listAliveCustomers` (`28bbddb5`)
+
+`customer-repository.int.test.ts` afirmaba el contenido de la ficha y del listado, pero no que
+`Object.keys(...)` fuera exactamente las 11 claves de `CustomerView`: un `select` con `companyId`,
+`deletedAt` o alguna forma `*Normalized` de mas habria pasado en silencio. Dos casos nuevos,
+`R22 — findAliveCustomerById devuelve exactamente las 11 claves, sin companyId ni deletedAt` y
+`R47 — cada item de listAliveCustomers devuelve exactamente las 11 claves, sin ninguna forma
+normalizada`, comparan `Object.keys(fila).sort()` contra el array literal de las 11 claves. Las
+filas R22 y R47 de `tasks.md` se actualizaron para citarlos.
+
+### m5 — `R10` no probaba que la fila ajena quedara intacta en sus tres columnas de auditoria (`e672005a`)
+
+El caso ya afirmaba `customer_not_found`; le faltaba comprobar que `updated_at`, `updated_by` y
+`deleted_at` de la fila de la otra empresa no cambiaran tras el intento de editarla o darla de
+baja. Se le sumaron esas tres aserciones sobre la fila leida de nuevo despues del intento.
+
+### m4 — cita `guard-ambito-empresa-clientes` en el caso de R25 que mira el doble de metodos (`d2ea93e3`)
+
+`customer-service.test.ts` ya afirmaba que el puerto solo tiene los cinco metodos esperados con un
+doble de prueba, pero un doble de TypeScript no puede reflejar que el TIPO del puerto este cerrado
+en tiempo de ejecucion; eso lo sostiene `metodosEsperados: 5` en la propia guardia. Se agrego un
+comentario que lo dice y se actualizo el nombre del caso para citar la guardia; la fila R25 de
+`tasks.md` ya la citaba.
+
+### m11 — `R4` no cubria un actor con la clave `permissions` ausente (`7cf24a16`)
+
+`authorization.test.ts` probaba `null`, `undefined` y `[]`, pero no un objeto actor sin la clave
+`permissions` en absoluto (frente a `assertPermission`, que hace `actor.permissions ?? []`). Se
+sumo un cuarto caso al mismo test que fabrica un actor sin esa clave y comprueba que se rechaza
+igual.
+
+### m8 — nombres de la tabla de trazabilidad desfasados de los tests reales (`297bf238`)
+
+Verificado con `grep` contra cada archivo citado: R12 citaba una frase que no existia (la real es
+`${archivo}: toda funcion que toca la base declara y consume el ambito`, parametrizada por archivo
+de persistencia); R36-R38 y R43-R46 citaban paráfrasis en vez del texto exacto de sus `it`/
+`describe`; R34 seguia en 55 tras el merge con dev, cuando ahora son 57; y los dos casos `R26
+(QC-153)` de `scope.test.ts` que `design.md > 11` pedia etiquetar tambien con `(QC-154)` (bajo
+R35, la guardia de arquitectura hexagonal) no llevaban esa segunda etiqueta. Se corrigieron las
+filas R12, R35, R36, R37, R38, R43, R44, R45 y R46 de `tasks.md` para citar el texto exacto, y se
+les agrego `R35 (QC-154)` a los dos `it` de `scope.test.ts` sobre el literal de permisos y sobre
+`adapters/driving/`.
+
+### El merge con `origin/dev` (`eb0c2a52`)
+
+`origin/dev` traia 150 commits por delante, entre ellos QC-150 (producto terminado) con dos
+migraciones del **mismo timestamp** que la nuestra
+(`20260924190000_finished_product_enum_values` y `20260924190100_finished_products_and_content_copies`,
+contra nuestra `20260924190000_customers_search_normalized`). Antes del merge, `db:rollback` quito
+nuestra migracion de `QuimiCloude_QC154` y `prisma migrate status` confirmo que solo quedaba
+pendiente esa, sin nada de dev todavia (la base era nueva para la rama).
+
+`git merge origin/dev` dejo cuatro conflictos, todos en listas cerradas que las dos ramas ampliaron
+en el mismo punto:
+
+- `lib/modules/errores/domain/error-catalog.ts` y `error-codes.ts`: `customer_not_found` (nuestro)
+  contra `presentation_without_content` y `no_whole_package` (QC-150). Se conservaron los tres
+  codigos, sus claves y sus textos; la cabecera de `error-codes.ts` paso a tener una
+  "Decimotercera enmienda" para los dos codigos de QC-150 (la nuestra ya era la duodecima).
+- `tests/unit/errores/catalogo.test.ts`: el censo literal de `ERROR_CODES.length` decia 55 en
+  nuestro lado (54 + `customer_not_found`) y 56 en el de dev (54 + los dos de QC-150). El total
+  correcto es 57 (54 + 1 + 2); se fusionaron los dos `describe` de verificacion de codigo (uno por
+  ficha) y se corrigio el conteo y su comentario.
+- `tests/guards/guard-identificador-de-request.test.ts`: la lista cerrada de migraciones que no
+  tocan el identificador de peticion tenia una entrada nuestra y dos de dev con el mismo prefijo de
+  timestamp. Se conservaron las tres, con las de dev primero (cronologicamente ya en dev) y la
+  nuestra al final, ya con el nombre `20260924200000_customers_search_normalized` que le tocaria
+  tras renumerar.
+
+`db/schema.prisma`, `lib/composition/index.ts`, `tests/integration/aislamiento.json`,
+`feature_list.json` y `progress/current.md` no llegaron a conflicto: git los fusiono solos, y se
+verifico con `git grep` que ninguno quedo con marcadores `<<<<<<<`/`=======`/`>>>>>>>` y que el
+modelo `Customer` y los modulos de QC-150 seguian ambos en `schema.prisma`.
+
+### Renumeracion de la migracion (`c9bfa6df`)
+
+Con dos migraciones de dev en `20260924190000` y `20260924190100`, la nuestra se movio con
+`git mv` a `20260924200000_customers_search_normalized` para quedar ultima del directorio.
+Referencias actualizadas (verificadas con `git grep '20260924190000_customers'`, que solo deja
+resultados en `progress/impl_...md` e historicos de `progress/review_...md`, sin tocar):
+`db/migrations/20260924200000_customers_search_normalized/down.sql` (su propio comentario de
+cabecera), `tests/guards/guard-identificador-de-request.test.ts` (ya con el nombre nuevo desde el
+commit del merge), `tests/integration/clientes/customer-repository.int.test.ts`,
+`tests/integration/clientes/customers-search-migration.int.test.ts`,
+`tests/unit/clientes/schema/customers-search-migration.test.ts` y
+`tests/unit/clientes/scope.test.ts`.
+
+`pnpm exec prisma generate` regenero el cliente sin avisos. No existe script `next typegen` en
+`package.json` (solo `db:migrate:create`, `db:migrate`, `db:rollback`, `db:seed`, `db:test`), asi
+que no aplica. Contra `QuimiCloude_QC154` (`DATABASE_URL`/`DIRECT_URL` sobrescritos en el entorno
+del comando, nunca la compartida):
+
+```
+$ pnpm run db:migrate
+54 migrations found in prisma/migrations
+Applying migration `20260924190000_finished_product_enum_values`
+Applying migration `20260924190100_finished_products_and_content_copies`
+Applying migration `20260924200000_customers_search_normalized`
+All migrations have been successfully applied.
+```
+
+Ciclo `db:rollback` -> `db:migrate` repetido para confirmar que el nombre nuevo funciona en las dos
+direcciones: el rollback deshizo solo `20260924200000_customers_search_normalized` (su fila salio
+de `_prisma_migrations`, `db:migrate` la volvio a aplicar sola) y `prisma migrate status` termino en
+`Database schema is up to date!`.
+
+### Verificacion final (tanda 3 + merge)
+
+```
+pnpm run typecheck
+  → tsc --noEmit, sin salida, sin errores
+
+pnpm run lint
+  → eslint: 0 errores, 7 warnings preexistentes ajenos
+    (tests/unit/documentos/confirm-catalog-import.test.ts,
+    tests/unit/pedidos/order-service.test.ts; archivos no tocados por esta ficha)
+
+pnpm exec vitest run tests/unit/clientes tests/guards
+  → 3 corridas seguidas, cada una: Test Files 54 passed (54) ·
+    Tests 664 passed | 5 skipped (669). Sin ENOENT en ninguna.
+
+pnpm exec vitest run tests/unit/errores
+  → Test Files 2 passed (2) · Tests 48 passed (48)
+
+DATABASE_URL/DIRECT_URL -> QuimiCloude_QC154
+pnpm exec vitest run tests/integration/clientes
+  → Test Files 5 passed (5) · Tests 46 passed (46)
+    (corrida contra una base efimera clonada de la plantilla `qct_tpl_a120af3d84d6`,
+    construida sobre QuimiCloude_QC154 y borrada al terminar, como hace
+    tests/helpers/test-database.ts en toda corrida de integracion)
+```
+
+`tests/baseline-rojos.json` trae una entrada ajena a `clientes`
+(`tests/integration/documentos/catalog-import-isolation.int.test.ts`, rojo de dev desde el
+2026-09-24 por QC-158/QC-142, a resolver en QC-169): no se corrio ni se toco, es deuda de otra
+ficha. No se ejecuto `pnpm test` ni `./init.sh` completo (fuera del alcance de esta tanda) y T16
+no se marco.
+
+Cinco commits en esta tanda: `28bbddb5` (B3), `e672005a` (m5), `d2ea93e3` (m4), `7cf24a16` (m11),
+`297bf238` (m8), mas `eb0c2a52` (merge de `origin/dev`) y `c9bfa6df` (renumeracion). Todos
+empujados a `origin/feature/QC-154-crud-de-clientes`.
