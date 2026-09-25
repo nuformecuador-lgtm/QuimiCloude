@@ -19,6 +19,7 @@
     "asignaciones/unassign.int.test.ts",
     "clientes/customers-constraints.int.test.ts",
     "clientes/customers-migration.int.test.ts",
+    "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/documents-permissions-migration.int.test.ts",
     "identity/identity-constraints.int.test.ts",
@@ -333,6 +334,16 @@
       "archivo": "unidades/unit-write.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-38): su cabecera explica POR QUE no usa el patron de rollback de 'unidades-constraints.int.test.ts' -los tres casos de uso, via 'unit-write-prisma.ts', llaman al cliente Prisma GLOBAL, asi que una llamada dentro del callback de prisma.$transaction correria en otra conexion del pool y no veria las filas-. Cada caso crea sus filas y las borra el mismo.",
       "desde": "2026-09-12"
+    },
+    {
+      "archivo": "clientes/customer-repository.int.test.ts",
+      "motivo": "T13 (QC-154): ejercita los cinco metodos de customer-prisma.ts, que llaman al cliente Prisma GLOBAL (mismo criterio que supplier-crud.int.test.ts), asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol y tipo de documento incluidos) y la limpia en un finally/afterAll, en el orden que exigen las FK: customers -> usuarios -> rol y tipo de documento -> empresa. El afterAll cuenta que no quedo ninguna fila de customers de esas empresas antes de borrarlas. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
+    },
+    {
+      "archivo": "clientes/list-query-customers.int.test.ts",
+      "motivo": "T14 (QC-154): ejercita listAliveCustomers de customer-prisma.ts, que usa el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso siembra sus propios clientes con un marcador irrepetible y los borra por id exacto en su finally; las empresas efimeras (usuario, rol y tipo de documento incluidos) se limpian en afterAll, con el mismo conteo de defensa que customer-repository.int.test.ts. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-24"
     }
   ]
 }

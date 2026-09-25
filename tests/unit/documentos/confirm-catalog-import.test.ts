@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { DOCUMENT_UPLOAD_PERMISSION, type Actor } from '@/lib/modules/documentos/domain/actor';
+import { CATALOG_IMPORT_PERMISSION, type Actor } from '@/lib/modules/documentos/domain/actor';
 import { ValidationError } from '@/lib/modules/documentos/domain/errors';
 import { createConfirmCatalogImport } from '@/lib/modules/documentos/domain/confirm-catalog-import';
 import type { CatalogImportDeps } from '@/lib/modules/documentos/domain/preview-catalog-import';
@@ -21,7 +21,7 @@ const PRESENTACION_LITRO = '55555555-5555-4555-8555-555555555555';
 const UNIDAD_LITRO = '66666666-6666-4666-8666-666666666666';
 
 function actorConPermiso(): Actor {
-  return { id: PERSONA, companyId: EMPRESA, permissions: [DOCUMENT_UPLOAD_PERMISSION, 'inventario.modificar'] };
+  return { id: PERSONA, companyId: EMPRESA, permissions: [CATALOG_IMPORT_PERMISSION, 'inventario.modificar'] };
 }
 
 const ARCHIVO_LISTO: FileForReview = { status: 'done', strategy: 'catalogo', extractedText: null };

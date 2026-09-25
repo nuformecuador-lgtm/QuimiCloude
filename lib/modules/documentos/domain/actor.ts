@@ -38,6 +38,13 @@ export type Actor = {
 export const DOCUMENT_UPLOAD_PERMISSION: PermissionCode = 'documentos.modificar';
 
 /**
+ * El permiso de la importacion de catalogo desde PDF (vista previa y confirmacion). Escribe en el
+ * catalogo de un PROVEEDOR, asi que es el permiso de proveedores, el mismo que editar lineas a
+ * mano. NO es el de subida: son constantes separadas para que no vuelvan a acoplarse.
+ */
+export const CATALOG_IMPORT_PERMISSION: PermissionCode = 'proveedores.modificar';
+
+/**
  * Primera linea de cada caso de uso: ANTES de validar la entrada y ANTES de tocar ningun puerto.
  *
  * Falla cerrado: actor ausente (`null`/`undefined`), sin conjunto de permisos, con el conjunto

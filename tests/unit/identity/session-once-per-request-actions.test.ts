@@ -334,6 +334,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         documentFileId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
       }),
   },
+  {
+    // Anadida por QC-154: su archivo de `driving/` resuelve las dos caras de la sesion, asi que
+    // el censo tiene que cubrirlo. Se invoca la LECTURA, que es la mas barata.
+    archivo: 'lib/modules/clientes/adapters/driving/customer-actions.ts',
+    nombre: 'listCustomersAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/clientes/adapters/driving/customer-actions')
+      ).listCustomersAction({ page: 1 }),
+  },
 ];
 
 /**
