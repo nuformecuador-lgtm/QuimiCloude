@@ -344,6 +344,11 @@
       "archivo": "clientes/list-query-customers.int.test.ts",
       "motivo": "T14 (QC-154): ejercita listAliveCustomers de customer-prisma.ts, que usa el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso siembra sus propios clientes con un marcador irrepetible y los borra por id exacto en su finally; las empresas efimeras (usuario, rol y tipo de documento incluidos) se limpian en afterAll, con el mismo conteo de defensa que customer-repository.int.test.ts. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-24"
+    },
+    {
+      "archivo": "proveedores/catalog-image-url.int.test.ts",
+      "motivo": "T4 (QC-171): ejercita `listCatalogLines` y `listSupplierShowcase` ya cableados por `lib/composition`, cuyos adaptadores driven llaman al cliente Prisma GLOBAL (mismo criterio que supplier-showcase.int.test.ts), asi que una transaccion del test con ROLLBACK no los envolveria -correrian en otra conexion del pool y verian una base vacia-. Siembra una empresa efimera con randomUUID (proveedor, presentacion y dos lineas de catalogo) y COMMITEA; el afterAll borra lineas, proveedor, presentacion y empresa por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
     }
   ]
 }

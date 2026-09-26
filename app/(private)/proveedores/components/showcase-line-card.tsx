@@ -12,7 +12,7 @@ export function ShowcaseLineCard({ line }: ShowcaseLineCardProps) {
       className="flex w-20 shrink-0 snap-start flex-col items-center gap-1 text-center"
       data-testid={`showcase-line-card-${line.id}`}
     >
-      <EntityImage path={line.imagePath} name={line.name} />
+      <EntityImage path={line.imageUrl} name={line.name} />
       <span className="line-clamp-2 text-xs">{line.name}</span>
     </li>
   );

@@ -1,4 +1,5 @@
 import { requirePermission, type Actor } from './actor';
+import { toImageUrl } from './catalog-image-url';
 import { SupplierNotFoundError, ValidationError } from './errors';
 import { SHOWCASE_LINE_BATCH, SHOWCASE_LINE_SORT, showcaseLinesQuerySchema } from './supplier-showcase';
 import type { SupplierScope } from './supplier-scope';
@@ -7,15 +8,17 @@ import type { CatalogLineView } from './catalog-line-view';
 import type { ListQuery } from './list-query';
 import type { ShowcaseLine, ShowcaseLinesPage } from './supplier-showcase';
 
+import type { CatalogImageUrl } from '../ports/catalog-image-url';
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
 export type ListShowcaseLinesDeps = {
   readonly catalog: SupplierCatalogRepository;
+  readonly images: CatalogImageUrl;
 };
 
 /** `CatalogLineView` -> `ShowcaseLine`: sin autores, sin fechas, sin importes. */
-function toShowcaseLine(line: CatalogLineView): ShowcaseLine {
-  return { id: line.id, name: line.name, imagePath: line.imagePath };
+function toShowcaseLine(line: CatalogLineView, images: CatalogImageUrl): ShowcaseLine {
+  return { id: line.id, name: line.name, imageUrl: toImageUrl(line.imagePath, images) };
 }
 
 /**
@@ -53,7 +56,7 @@ export function createListShowcaseLines(
     if (page === 'supplier_not_found') throw new SupplierNotFoundError();
 
     return {
-      items: page.items.map(toShowcaseLine),
+      items: page.items.map((line) => toShowcaseLine(line, deps.images)),
       page: page.page,
       hasMore: page.page < page.totalPages,
     };

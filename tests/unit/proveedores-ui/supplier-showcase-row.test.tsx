@@ -20,7 +20,7 @@ function linea(overrides: Partial<ShowcaseLine> = {}): ShowcaseLine {
   return {
     id: crypto.randomUUID(),
     name: 'Ácido cítrico anhidro',
-    imagePath: null,
+    imageUrl: null,
     ...overrides,
   };
 }

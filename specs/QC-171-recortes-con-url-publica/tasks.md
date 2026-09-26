@@ -15,7 +15,7 @@
 
 ---
 
-## [ ] T0 — Medir antes de escribir
+## [x] T0 — Medir antes de escribir
 
 Archivos: `progress/impl_QC-171-recortes-con-url-publica.md` (bitácora, nueva).
 
@@ -25,7 +25,7 @@ Archivos: `progress/impl_QC-171-recortes-con-url-publica.md` (bitácora, nueva).
 
 **Hecho cuando:** la bitácora tiene el gate de partida verde y la lista de tests afectados.
 
-## [ ] T1 — Puerto `CropCatalog` con URL pública `[P con T3, T6]`
+## [x] T1 — Puerto `CropCatalog` con URL pública `[P con T3, T6]`
 
 Archivos: `lib/modules/documentos/ports/crop-catalog.ts`,
 `lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase.ts`,
@@ -44,7 +44,7 @@ la ruta), **R6** (la URL no lleva `token` ni caducidad) y **R7** (sin variables,
 valores); `crop-catalog-memory.test.ts` cubre **R22** (mismo origen y formato que hoy);
 `storage-config.test.ts` sigue viendo **cuatro** importadores de la librería (**R21**), sin modificarlo.
 
-## [ ] T2 — Vista previa con URL pública `[depende de T1]`
+## [x] T2 — Vista previa con URL pública `[depende de T1]`
 
 Archivos: `lib/modules/documentos/domain/preview-catalog-import.ts` (solo el bloque de `crops`, líneas
 283-287, y el import de `READ_LINK_TTL_SECONDS` si queda sin uso),
@@ -64,7 +64,7 @@ empieza por `http`); `catalog-import-authorization.test.ts` afirma **R19** para 
 permiso, `list` y `publicUrl` no se llaman); `crop-pairing.test.ts` y `crop-catalog-images.test.ts`
 verdes **sin cambios** (**R23**).
 
-## [ ] T3 — `proveedores`: puerto y URL en las tres lecturas `[P con T1, T6]`
+## [x] T3 — `proveedores`: puerto y URL en las tres lecturas `[P con T1, T6]`
 
 Archivos: `lib/modules/proveedores/ports/catalog-image-url.ts` (nuevo),
 `lib/modules/proveedores/ports/supplier-repository.ts`,
@@ -90,7 +90,7 @@ ruta); `authorization.test.ts` cubre **R19** para vitrina y catálogo (sin `prov
 imagen y empresa y que no hay URL firmada; `showcase-prisma.test.ts` y
 `tests/integration/proveedores/supplier-showcase.int.test.ts` verdes **sin cambios**.
 
-## [ ] T4 — Composición `[depende de T1, T2, T3]`
+## [x] T4 — Composición `[depende de T1, T2, T3]`
 
 Archivos: `lib/composition/index.ts` (bloque `cropCatalog` y una declaración nueva **antes** de
 `export const proveedores`), `tests/unit/composition/proveedores-image-url.test.ts` (nuevo),
@@ -110,7 +110,7 @@ sembrada con una ruta de recorte **ya existente** (forma `<empresa>/<archivo>/<p
 pasar por la importación) sale con la misma URL que compone `cropPublicUrl` para esa ruta y con su
 `image_path` intacto en la base (**R17**).
 
-## [ ] T5 — Pantallas de vitrina y catálogo `[depende de T3]`
+## [x] T5 — Pantallas de vitrina y catálogo `[depende de T3]`
 
 Archivos: `app/(private)/proveedores/components/showcase-line-card.tsx`,
 `app/(private)/proveedores/[id]/components/catalog-columns.tsx`,
@@ -131,7 +131,7 @@ imagen reenvía en su campo oculto la **ruta**, no la URL); `image-url-screens.t
 `SUPABASE_` ni concatena una ruta en un `src`); la revisión (`catalog-import-review.test.tsx`) verde
 **sin cambios**, que es **R11**.
 
-## [ ] T6 — `.env.example` y alcance `[P con T1, T3]`
+## [x] T6 — `.env.example` y alcance `[P con T1, T3]`
 
 Archivos: `.env.example` (solo el comentario de `SUPABASE_CROPS_BUCKET`),
 `tests/unit/documentos/crop-storage-config.test.ts` (un caso nuevo),

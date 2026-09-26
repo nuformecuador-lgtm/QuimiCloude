@@ -18,7 +18,7 @@ import {
   SHOWCASE_SUPPLIER_BATCH,
   SHOWCASE_SUPPLIER_SORT,
 } from '../../../domain/supplier-showcase';
-import type { ShowcasePage, ShowcaseQuery } from '../../../domain/supplier-showcase';
+import type { ShowcasePageRecord, ShowcaseQuery } from '../../../domain/supplier-showcase';
 import type { NewSupplier, SupplierView } from '../../../domain/supplier-view';
 
 /**
@@ -394,7 +394,7 @@ export async function listAliveSuppliers(
 export async function listShowcaseAliveSuppliers(
   query: ShowcaseQuery,
   scope: SupplierScope,
-): Promise<ShowcasePage> {
+): Promise<ShowcasePageRecord> {
   const supplierSearch = normalizedSearchCondition(query.supplierSearch, normalizeSupplierName);
   const productSearch = normalizedSearchCondition(query.productSearch, normalizeSupplierName);
 

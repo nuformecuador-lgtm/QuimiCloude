@@ -14,7 +14,7 @@ export const SHOWCASE_LINE_SORT = { columnId: 'name', direction: 'asc' } as cons
 export type ShowcaseLine = {
   readonly id: string;
   readonly name: string;
-  readonly imagePath: string | null;
+  readonly imageUrl: string | null;
 };
 
 /** `lines` es como maximo `SHOWCASE_LINE_BATCH`; vacio pinta «Sin productos todavia». */
@@ -33,6 +33,29 @@ export type ShowcasePage = {
 
 export type ShowcaseLinesPage = {
   readonly items: readonly ShowcaseLine[];
+  readonly page: number;
+  readonly hasMore: boolean;
+};
+
+/**
+ * Lo que el repositorio devuelve de verdad (`design.md > 4.2`): la ruta guardada, no la URL. El
+ * dominio mapea esto a `ShowcaseLine` con `toImageUrl`; el puerto no conoce la URL publica.
+ */
+export type ShowcaseLineRecord = {
+  readonly id: string;
+  readonly name: string;
+  readonly imagePath: string | null;
+};
+
+export type ShowcaseRowRecord = {
+  readonly id: string;
+  readonly name: string;
+  readonly lines: readonly ShowcaseLineRecord[];
+  readonly hasMoreLines: boolean;
+};
+
+export type ShowcasePageRecord = {
+  readonly items: readonly ShowcaseRowRecord[];
   readonly page: number;
   readonly hasMore: boolean;
 };

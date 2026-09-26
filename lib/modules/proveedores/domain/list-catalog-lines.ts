@@ -1,19 +1,27 @@
 import { requirePermission, type Actor } from './actor';
+import { toImageUrl } from './catalog-image-url';
 import { SupplierNotFoundError, ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { SUPPLIER_CATALOG_LINE_QUERYABLE } from './supplier-catalog-line-queryable';
 import type { SupplierScope } from './supplier-scope';
 
-import type { CatalogLineView } from './catalog-line-view';
+import type { CatalogLineListItem, CatalogLineView } from './catalog-line-view';
 import type { Page } from './page';
 
+import type { CatalogImageUrl } from '../ports/catalog-image-url';
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
 export type ListCatalogLinesDeps = {
   readonly catalog: SupplierCatalogRepository;
   readonly log: ListQueryLog;
+  readonly images: CatalogImageUrl;
 };
+
+/** `CatalogLineView` -> `CatalogLineListItem`: conserva `imagePath` y anade `imageUrl`. */
+function toListItem(line: CatalogLineView, images: CatalogImageUrl): CatalogLineListItem {
+  return { ...line, imageUrl: toImageUrl(line.imagePath, images) };
+}
 
 /** Nombre con el que este listado se identifica en el log de campos omitidos (R6). */
 const LIST_NAME = 'supplierCatalogLines';
@@ -49,12 +57,12 @@ export function createListCatalogLines(
   supplierId: string,
   input: unknown,
   actor: Actor | null | undefined,
-) => Promise<Page<CatalogLineView>> {
+) => Promise<Page<CatalogLineListItem>> {
   return async function listCatalogLines(
     supplierId: string,
     input: unknown,
     actor: Actor | null | undefined,
-  ): Promise<Page<CatalogLineView>> {
+  ): Promise<Page<CatalogLineListItem>> {
     requirePermission(actor, 'proveedores.consultar');
 
     const scope: SupplierScope = { companyId: actor.companyId };
@@ -68,6 +76,6 @@ export function createListCatalogLines(
     const page = await deps.catalog.listBySupplierAlive(supplierId, query, scope);
     if (page === 'supplier_not_found') throw new SupplierNotFoundError();
 
-    return page;
+    return { ...page, items: page.items.map((line) => toListItem(line, deps.images)) };
   };
 }

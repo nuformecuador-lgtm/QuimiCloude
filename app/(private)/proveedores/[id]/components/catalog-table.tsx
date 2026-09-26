@@ -8,7 +8,7 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
-import type { CatalogLineView } from '@/lib/modules/proveedores';
+import type { CatalogLineListItem } from '@/lib/modules/proveedores';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { CatalogLineSheet } from './catalog-line-sheet';
@@ -90,7 +90,7 @@ export const CATALOG_TABLE_TEXTS: DataTableTexts = {
 };
 
 export type CatalogTableProps = {
-  readonly lines: readonly CatalogLineView[];
+  readonly lines: readonly CatalogLineListItem[];
   readonly directories: CatalogDirectories;
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;

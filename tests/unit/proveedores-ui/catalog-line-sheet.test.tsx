@@ -20,7 +20,11 @@ import type {
   CreatePresentationFormState,
   PresentationListResult,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
-import { createCatalogLineSchema, type CatalogLineView, type SupplierView } from '@/lib/modules/proveedores';
+import {
+  createCatalogLineSchema,
+  type CatalogLineListItem,
+  type SupplierView,
+} from '@/lib/modules/proveedores';
 import type {
   CatalogLineListResult,
   CatalogLineMutationFormState,
@@ -267,7 +271,7 @@ function proveedor(overrides: Partial<SupplierView> = {}): SupplierView {
   };
 }
 
-function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
+function linea(overrides: Partial<CatalogLineListItem> = {}): CatalogLineListItem {
   return {
     id: LINEA_ID,
     supplierId: PROVEEDOR_ID,
@@ -275,6 +279,7 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
     presentationId: PRESENTACION.id,
     unitId: UNIDAD.id,
     imagePath: null,
+    imageUrl: null,
     cost: '99.5000',
     minPurchase: '2.5000',
     deliveryTime: 3,
@@ -289,7 +294,7 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
 }
 
 function paginaDeLineas(
-  items: readonly CatalogLineView[],
+  items: readonly CatalogLineListItem[],
   extra: { page?: number; total?: number } = {},
 ): CatalogLineListResult {
   const total = extra.total ?? items.length;
@@ -705,6 +710,27 @@ describe('linea de catalogo — edicion (R31, R46)', () => {
     expect(enviado.get('minPurchase')).toBe('2.5');
     expect(enviado.get('deliveryTime')).toBe(String(laLinea.deliveryTime));
     expect(createCatalogLineActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R3 — una linea con imagen reenvia en su campo oculto la RUTA, no la URL con la que se pinto', async () => {
+    const user = setupUser();
+    const laLinea = linea({
+      imagePath: 'empresa-1/archivo-1/1-0.png',
+      imageUrl: 'https://cdn.example/storage/v1/object/public/recortes/empresa-1/archivo-1/1-0.png',
+    });
+    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([laLinea]));
+
+    await renderPantalla();
+    await abrirEdicion(user);
+
+    const campoImagen = document.querySelector<HTMLInputElement>('[name="imagePath"]');
+    expect(campoImagen).toHaveValue(laLinea.imagePath);
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateCatalogLineActionMock).toHaveBeenCalledTimes(1));
+    const [, , enviado] = updateCatalogLineActionMock.mock.calls[0];
+    expect(enviado.get('imagePath')).toBe(laLinea.imagePath);
   });
 
   it('la precarga NO redondea: cuatro decimales se reenvian intactos', async () => {

@@ -24,6 +24,7 @@ import type { CatalogLineView } from '@/lib/modules/proveedores/domain/catalog-l
 import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
 import type { Page } from '@/lib/modules/proveedores/domain/page';
 import type { SupplierView } from '@/lib/modules/proveedores/domain/supplier-view';
+import type { CatalogImageUrl } from '@/lib/modules/proveedores/ports/catalog-image-url';
 import type { ListQueryLog } from '@/lib/modules/proveedores/ports/list-query-log';
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
@@ -59,6 +60,11 @@ function montarProveedores() {
   return { suppliers, log, listSuppliers: createListSuppliers({ suppliers, log }) };
 }
 
+/** Doble mudo: devuelve la ruta prefijada, sin componer nada de verdad. */
+function imagesMudo(): CatalogImageUrl {
+  return { publicUrl: vi.fn<CatalogImageUrl['publicUrl']>((path) => `https://cdn.test/${path}`) };
+}
+
 function montarCatalogo(
   resultado: Page<CatalogLineView> | 'supplier_not_found' = paginaVacia<CatalogLineView>(),
 ) {
@@ -72,7 +78,8 @@ function montarCatalogo(
     listBySupplierAlive,
   } satisfies SupplierCatalogRepository;
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };
-  return { catalog, log, listCatalogLines: createListCatalogLines({ catalog, log }) };
+  const images = imagesMudo();
+  return { catalog, log, images, listCatalogLines: createListCatalogLines({ catalog, log, images }) };
 }
 
 /** La consulta que llego al puerto de proveedores en la ultima llamada. */
