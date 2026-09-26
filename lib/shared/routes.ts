@@ -54,6 +54,17 @@ export function recipeEditRoute(id: string): string {
 }
 
 /**
+ * Ruta de la revision de un archivo de formula importado desde PDF, derivada de `FORMULAS_ROUTE`.
+ * Mismo patron que `supplierCatalogImportRoute`: el segmento `importar` cuelga del listado y no
+ * hay una segunda constante de prefijo. No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la
+ * comparacion por segmentos de `FORMULAS_ROUTE` ya cubre cualquier subcamino, incluido este, y un
+ * id de receta es un UUID, asi que el segmento estatico `importar` nunca choca con `[id]`.
+ */
+export function formulaImportRoute(documentFileId: string): string {
+  return `${FORMULAS_ROUTE}/importar/${documentFileId}`;
+}
+
+/**
  * Pantalla de proveedores (QC-44, R2).
  *
  * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
@@ -222,6 +233,36 @@ export const DELIVERED_ORDER_PACKAGES_PARAM = 'entregado_envases';
 export const DELIVERED_ORDER_PRODUCT_PARAM = 'entregado_producto';
 
 /**
+ * Pantalla del pedido de empaque, derivada de `ASSIGNED_ORDERS_ROUTE` como `assignedOrderRoute`.
+ * No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la comparacion por segmentos de
+ * `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/empaque/<id>`.
+ */
+export function packingOrderRoute(id: string): string {
+  return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
+}
+
+/**
+ * Nombre del parametro de consulta con el que Terminar anuncia, al volver a la pestaña «Por
+ * empacar», que un pedido acaba de quedar `ENTREGADO`: `?vista=por_empacar&empacado=<numero>`.
+ * Mismo patron que `DELIVERED_ORDER_PARAM`, con su propio nombre porque son dos confirmaciones
+ * en dos pestañas distintas.
+ */
+export const PACKED_ORDER_PARAM = 'empacado';
+
+/**
+ * Pantalla de clientes.
+ *
+ * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
+ * `identity` la necesitan y no pueden depender de la navegacion, que arrastra etiquetas, iconos y
+ * agrupacion de UI. Nace aqui, como `SUPPLIERS_ROUTE` y `ORDERS_ROUTE`: no hay codigo previo que
+ * la importara de `private-nav`, asi que no hay reexport de compatibilidad que sostener.
+ *
+ * **No hay helper de ruta de detalle**: el cliente son seis campos planos que caben en la fila y
+ * en el panel lateral, sin pagina de `/clientes/[id]`.
+ */
+export const CUSTOMERS_ROUTE = '/clientes';
+
+/**
  * Prefijos de URL que cuelgan de `app/(private)/` y, por tanto, exigen sesion valida (R1).
  *
  * `(private)` es un route group: **no aparece en la URL**, asi que el middleware no puede
@@ -260,4 +301,9 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // Sin esta fila, `(private)` no aparece en la URL y `/asignacion` se serviria SIN sesion. Una
   // sola entrada: la comparacion por segmentos ya cubre cualquier subcamino.
   ASSIGNED_ORDERS_ROUTE,
+  // La pantalla de clientes. Sin esta fila, `(private)` no aparece en la URL y `/clientes` se
+  // serviria SIN sesion. Una sola entrada: no hay pagina de detalle, y la comparacion por
+  // segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso `clientes.consultar` lo
+  // exige la propia pantalla.
+  CUSTOMERS_ROUTE,
 ] as const;

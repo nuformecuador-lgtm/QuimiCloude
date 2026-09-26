@@ -333,6 +333,13 @@ const EXPORTACIONES_DE_EJECUCION = [
   'createPreviewCatalogImport',
   'createConfirmCatalogImport',
   'suggestUnitId',
+  'extractFormulaFromText',
+  'stepTextToDocument',
+  'reviewFormulaImport',
+  'confirmFormulaImportInputSchema',
+  'previewFormulaImportInputSchema',
+  'createPreviewFormulaImport',
+  'createConfirmFormulaImport',
 ] as const;
 
 /** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
@@ -377,6 +384,19 @@ const EXPORTACIONES_DE_TIPO = [
   'CatalogImportPreviewCrop',
   'CatalogImportPreviewRow',
   'CatalogImportSummary',
+  'ExtractedIngredient',
+  'FormulaExtraction',
+  'DraftLine',
+  'FormulaDraft',
+  'FormulaReviewIssues',
+  'RowProblem',
+  'ConfirmFormulaImportInput',
+  'PreviewFormulaImportInput',
+  'FormulaImportDeps',
+  'FormulaImportIngredientMatch',
+  'FormulaImportPreview',
+  'FormulaImportPreviewIngredient',
+  'FormulaImportSummary',
 ] as const;
 
 /** Nombres exportados SOLO como tipo por un barril, leidos del fuente: `export { type X } from ...`

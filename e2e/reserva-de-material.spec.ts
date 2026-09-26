@@ -610,8 +610,9 @@ test.describe('reserva de material del pedido', () => {
     await expect(productRow.getByTestId('product-reserved')).toContainText('1500');
     await expect(productRow.getByTestId('product-available')).toContainText('500');
 
-    // --- 6. Entregar B por el Finalizar de la planta: la edicion en Pedidos ya no mueve el
-    // estado. Se asigna B al Operador por Prisma -mismo patron que
+    // --- 6. Finalizar B por el Finalizar de la planta -consume el material apartado y lo deja
+    // «por empacar»-: la edicion en Pedidos ya no mueve el estado. Se asigna B al Operador por
+    // Prisma -mismo patron que
     // `e2e/ejecucion-receta.spec.ts`, la asignacion no es lo que este recorrido demuestra-, y de
     // ahi en mas el actor cambia al Operador: con `pedidos.consultar` -como el admin de arriba-
     // `/asignacion` fuerza la vista «Todos», sin columna «Entrar» ni Finalizar.
@@ -648,15 +649,18 @@ test.describe('reserva de material del pedido', () => {
       { timeout: 60_000 },
     );
 
+    // Finalizar deja el pedido «por empacar», no «entregado»: el consumo de material -que este
+    // recorrido demuestra- ya ocurrio en esa misma operacion.
     const deliveredOrderB = await prisma.order.findUniqueOrThrow({
       where: { id: orderB.id },
       select: { status: true },
     });
-    expect(deliveredOrderB.status).toBe('ENTREGADO');
+    expect(deliveredOrderB.status).toBe('POR_EMPACAR');
 
     const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderBNumber);
+    await expect(aviso).toContainText('por empacar');
 
     // El Operador tiene `inventario.consultar`: no hace falta volver a entrar como admin para
     // leer Inventario ni el historial del lote.

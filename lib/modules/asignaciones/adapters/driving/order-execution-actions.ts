@@ -64,7 +64,7 @@ function finishFromFormData(formData: FormData): unknown {
   return { orderId: formData.get('orderId') };
 }
 
-/** Deja el pedido `ENTREGADO` y vuelve a la lista de pedidos asignados. */
+/** Deja el pedido `POR_EMPACAR` y vuelve a la lista de pedidos asignados. */
 export async function finishAssignedOrderAction(
   _prevState: FinishAssignedOrderResult,
   formData: FormData,

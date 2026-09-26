@@ -4857,3 +4857,52 @@ podar.
 - **Incidencias:** el implementer se cortó dos veces sin informe (se reanudó sin pérdida); un gate lo mató la falta de
   memoria. Rojos ajenos del gate (catálogo de QC-158, infra y concurrencia bajo carga) pasaron aislados.
 - **Desbloquea QC-155 y QC-156.**
+
+## 2026-09-26 — QC-168-estado-por-empacar
+
+- **Qué:** el pedido gana **POR_EMPACAR** y **EN_EMPAQUE** entre EN_CURSO y ENTREGADO. Finalizar la producción deja el
+  pedido Por empacar (consume material de QC-141 y da entrada al lote de producto terminado de QC-150); cualquier
+  Empacador de la empresa lo comienza (se lo queda, columna `orders.packed_by`; Comenzar repetido es idempotente) y
+  solo él lo termina (ENTREGADO, `finished_at`). Ninguno de los dos se cancela. Permiso nuevo `empaque.modificar`, solo
+  del Empacador (catálogo «previo + 1»; `ADMIN_EXCLUDED_PERMISSIONS`). Pestaña «Por empacar» al final de `/asignacion`
+  y pantalla `/asignacion/empaque/[id]`. Se retira PENDIENTE→ENTREGADO; Finalizar sobre PENDIENTE = `invalid_transition`
+  (A-1, decisión humana). Catálogo de errores 56→59.
+- **PR #129**, merge `6b1cb4ee`. Spec R1–R48, T1–T17. Review: vuelta 1 rechazada (citas R<n> en 19 archivos + 8
+  menores), vuelta 2 OK. E2E 20/20 (Chromium + WebKit). Gate completo verde en `f4e758e9` (789/789, baseline vacío,
+  nada que podar).
+- **Incidencias:** dos sincronizaciones con `dev` (QC-154; luego QC-155 y QC-159). La segunda dejó el PR `CONFLICTING`:
+  tres listas cerradas resueltas por unión con centinelas tensados, y un **cuarto archivo auto-mergeado que no
+  compilaba** (`formula-import.int.test.ts` de QC-159, puerto `ProductCatalog` sin `findFinishedGoodsReceipts`).
+  **Lección:** tras un merge limpio, el typecheck manda, no la ausencia de conflictos. Dos gates los mató la falta de
+  memoria. La base `QuimiCloude_QC168` queda por borrar (a mano) y la carpeta del worktree en disco.
+- **Desbloquea QC-82** (con las 6 enmiendas de `design.md` §9), **QC-138** y **QC-170**.
+
+## 2026-09-26 — QC-155-pantalla-de-clientes
+
+- **Qué:** la pantalla `/clientes` sobre el CRUD de QC-154: tabla compartida (búsqueda `?q=`, paginación y orden),
+  panel lateral de alta y edición, baja con confirmación, y la entrada del menú en «Cadena», visible solo con
+  `clientes.consultar`. Zona `frontend`, `complexity: medium`.
+- **PR #127**, mergeado el 2026-09-26 (`6a957fe8`). Spec R1–R42 / T0–T9, aprobado el 2026-09-25 (todas las columnas).
+  Review: vuelta 1 rechazada (B1 citas en comentarios, B2 página fuera de rango con término de búsqueda), vuelta 2
+  rechazada (B3, un test que afirmaba sobre el texto de la UI, contra R40), y B3 cerrado. Menores que quedan abiertos:
+  m1 (el reintento del error solo se prueba por su `href`), m4 parcial (R6 se deduce del seed), n1 y n2.
+- **Verificación:** E2E 4/4 en Chromium y WebKit; gate completo verde (754 archivos / 10323 tests, baseline vacío,
+  nada que podar).
+- **Incidencia:** `wt.sh done` desenganchó el worktree, pero la carpeta quedó en disco con archivos bloqueados (ver
+  *Deudas*). La base `QuimiCloude_QC155` sigue creada.
+
+## 2026-09-26 — QC-159-formula-desde-pdf
+
+- **Qué:** lo que la IA lee de un PDF de fórmula se convierte en una **receta** tras una revisión humana en
+  `/produccion/formulas/importar/[documentoId]`: nombre, ingredientes en porcentaje con suma exacta 100,00 % y pasos
+  editables. Ingrediente sin producto: el revisor elige uno existente o lo crea como materia prima (exige además
+  `inventario.modificar`); receta con el mismo nombre: reemplazar o renombrar; nunca un producto terminado; confirmar
+  exige `recetas.modificar`. La confirmación relee el archivo (empresa, estado y tanda) antes de escribir.
+- **PR #128**, merge `a16b8baa`. Spec R1–R39, T0–T14. P1 aprobada en F1.4: la materia prima creada en la revisión
+  **nace sin lote**, excepción a QC-90 limitada a esta revisión. Sin migraciones.
+- **Review:** vuelta 1 rechazada (B1: la relectura del archivo al confirmar sin test), vuelta 2 OK con mutación.
+  Gate completo verde (756/756). E2E verde en Chromium y WebKit.
+- **Deuda (menores del review):** m1 el arreglo de hidratación cubre solo el nombre; m3 `formulas/importar/**` fuera
+  de la lista cerrada de acciones de las guardias; m5 los dos casos del E2E van encadenados en un solo `test`;
+  m6 `isValidNewName` repite a mano el recorte y los límites 1..200.
+- **Pendiente local:** borrar la base `QuimiCloude_QC159`.

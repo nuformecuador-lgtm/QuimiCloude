@@ -83,6 +83,9 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');
       }),
+      findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(() => {
+        throw new Error('recetas no debe leer envases de empaque');
+      }),
     };
     const images = montarAlmacenamiento();
     const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
@@ -114,6 +117,9 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');
       }),
+      findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(() => {
+        throw new Error('recetas no debe leer envases de empaque');
+      }),
     };
     const images = montarAlmacenamiento();
     const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
@@ -138,6 +144,9 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');
+      }),
+      findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(() => {
+        throw new Error('recetas no debe leer envases de empaque');
       }),
     };
     const images = montarAlmacenamiento();
@@ -170,6 +179,9 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');
       }),
+      findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(() => {
+        throw new Error('recetas no debe leer envases de empaque');
+      }),
     };
     const images = montarAlmacenamiento();
     const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
@@ -191,6 +203,9 @@ describe('R18 — productName del detalle sigue pidiendose sobre TODAS las linea
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');
+      }),
+      findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(() => {
+        throw new Error('recetas no debe leer envases de empaque');
       }),
     };
     const images = montarAlmacenamiento();

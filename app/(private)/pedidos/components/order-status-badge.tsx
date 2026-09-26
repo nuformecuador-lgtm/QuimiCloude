@@ -3,7 +3,7 @@
 import { Badge } from '@/components/ui/badge';
 import {
   ORDER_PRIORITY_VALUES,
-  ORDER_STATUS_VALUES,
+  ORDER_STATUS_FLOW,
   type OrderPriority,
   type OrderStatus,
 } from '@/lib/modules/pedidos';
@@ -32,6 +32,8 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   PENDIENTE: 'Pendiente',
   EN_CURSO: 'En curso',
+  POR_EMPACAR: 'Por empacar',
+  EN_EMPAQUE: 'En empaque',
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
 };
@@ -51,6 +53,8 @@ export const ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
 const STATUS_VARIANTS: Readonly<Record<OrderStatus, 'default' | 'secondary' | 'outline' | 'destructive'>> = {
   PENDIENTE: 'outline',
   EN_CURSO: 'default',
+  POR_EMPACAR: 'secondary',
+  EN_EMPAQUE: 'default',
   ENTREGADO: 'secondary',
   CANCELADO: 'destructive',
 };
@@ -68,7 +72,7 @@ const PRIORITY_VARIANTS: Readonly<Record<OrderPriority, 'default' | 'secondary' 
  * ni a decidir como se leen.
  */
 export const ORDER_STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] =
-  ORDER_STATUS_VALUES.map((value) => ({ value, label: ORDER_STATUS_LABELS[value] }));
+  ORDER_STATUS_FLOW.map((value) => ({ value, label: ORDER_STATUS_LABELS[value] }));
 
 export const ORDER_PRIORITY_FILTER_OPTIONS: readonly { value: string; label: string }[] =
   ORDER_PRIORITY_VALUES.map((value) => ({ value, label: ORDER_PRIORITY_LABELS[value] }));

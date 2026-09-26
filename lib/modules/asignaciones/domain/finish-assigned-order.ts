@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import {
+  InvalidTransitionError,
   MaterialShortageError,
   NoWholePackageError,
   OrderNotFoundError,
@@ -34,12 +35,26 @@ export type FinishAssignedOrderResult = {
 };
 
 /**
- * Deja el pedido en `ENTREGADO`. No recibe ni admite ningun dato de lo marcado: la entrada es
- * solo el identificador del pedido, y nada de lo recorrido en pantalla se persiste.
+ * Solo `EN_CURSO` puede finalizarse. `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` los
+ * rechaza `assertOrderAcceptsWrites`, con el error propio de cada uno; el unico estado que esa
+ * funcion admite sin ser `EN_CURSO` es `PENDIENTE` -abrir la pantalla del pedido ya lo habria
+ * dejado `EN_CURSO`, asi que llegar aqui es un Finalizar disparado antes de eso-, y se rechaza
+ * con `invalid_transition` en vez de un error propio, porque ese estado no tiene uno.
+ */
+function assertFinishable(order: OrderAssignmentTarget): void {
+  if (order.status === 'EN_CURSO') return;
+  assertOrderAcceptsWrites(order);
+  throw new InvalidTransitionError();
+}
+
+/**
+ * Deja el pedido en `POR_EMPACAR`, no en `ENTREGADO`: el Empacador lo entrega despues, con
+ * Terminar. No recibe ni admite ningun dato de lo marcado: la entrada es solo el identificador
+ * del pedido, y nada de lo recorrido en pantalla se persiste.
  *
- * Devuelve el numero visible del pedido para que la lista, al volver, pueda confirmar la
- * entrega, junto con los envases y el producto terminado que recibio el lote. Se lee
- * ANTES de transicionar: una vez `ENTREGADO`, el pedido ya no aparece entre los estados de
+ * Devuelve el numero visible del pedido para que la lista, al volver, pueda confirmar que
+ * queda por empacar, junto con los envases y el producto terminado que recibio el lote. Se lee
+ * ANTES de transicionar: una vez `POR_EMPACAR`, el pedido ya no aparece entre los estados de
  * trabajo que consulta `listAliveSummariesByIds`.
  *
  * `transitionAliveById` consume el material y da de alta el lote de producto terminado por
@@ -70,9 +85,7 @@ export function createFinishAssignedOrder(
       actor.companyId,
     );
     if (order === null) throw new OrderNotFoundError();
-    if (order.status === 'ENTREGADO' || order.status === 'CANCELADO') {
-      assertOrderAcceptsWrites(order);
-    }
+    assertFinishable(order);
 
     const summaryPage = await deps.orders.listAliveSummariesByIds(
       actor.companyId,
@@ -91,7 +104,7 @@ export function createFinishAssignedOrder(
         orderId,
         actor.companyId,
         order.status,
-        'ENTREGADO',
+        'POR_EMPACAR',
         actor.id,
         now,
       );
@@ -107,12 +120,10 @@ export function createFinishAssignedOrder(
       if (result === 'recipe_not_found') throw new RecipeNotFoundError();
       // 'stale': alguien lo movio entre la lectura y esta llamada. Se relee y se reintenta
       // contra el estado real. ('ok' en cadena no ocurre aqui: el destino siempre es
-      // `ENTREGADO`, que solo devuelve el `'ok'` con `finishedGoods`.)
+      // `POR_EMPACAR`, que solo devuelve el `'ok'` con `finishedGoods`.)
       order = await deps.orders.findAliveById(orderId, actor.companyId);
       if (order === null) throw new OrderNotFoundError();
-      if (order.status === 'ENTREGADO' || order.status === 'CANCELADO') {
-        assertOrderAcceptsWrites(order);
-      }
+      assertFinishable(order);
     }
   };
 }

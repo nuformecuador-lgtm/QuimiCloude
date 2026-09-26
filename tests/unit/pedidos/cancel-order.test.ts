@@ -180,6 +180,19 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
     ).rejects.toBeInstanceOf(NotCancellableError)
   })
 
+  it('no cancela un pedido POR_EMPACAR ni uno EN_EMPAQUE: el material ya se consumio (R29)', async () => {
+    for (const status of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      const d = dobles({ fila: fila(status) })
+
+      expect(
+        await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
+        status,
+      ).toBe('not_cancellable')
+      expect(d.cancelAlive, status).not.toHaveBeenCalled()
+      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+    }
+  })
+
   it('no cancela un pedido ya CANCELADO, y su motivo queda intacto (R28, R29)', async () => {
     const d = dobles({ fila: fila('CANCELADO', 'motivo original') })
 

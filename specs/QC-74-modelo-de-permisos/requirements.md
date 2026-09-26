@@ -48,6 +48,11 @@ produccion, donde cada permiso tiene un codigo con la forma `<modulo>.<accion>`,
 los dos permisos `<modulo>.consultar` y `<modulo>.modificar`, y el permiso `<modulo>.modificar`
 DEBE cubrir tambien el borrado.
 
+> *Enmendado el 2026-09-25 por QC-168: `empaque` es el primer módulo solo de escritura. Declara
+> únicamente `empaque.modificar`, sin `empaque.consultar` —el Empacador no consulta inventario, y
+> «consultar» mentiría sobre un módulo que solo escribe—. `MODULOS_SOLO_ESCRITURA` documenta la
+> excepción.*
+
 **R4.** SI un modulo no tiene ningun caso de uso de escritura, ENTONCES el sistema DEBE declarar
 para ese modulo unicamente `<modulo>.consultar` (hoy: `dashboard` y `unidades`).
 
@@ -68,6 +73,10 @@ nombre de su rol.
 **R8.** El sistema DEBE asignar al rol `Administrador` los diez permisos del catalogo, escritos
 uno a uno, y NO DEBE reconocer ningun comodin ni regla implicita que conceda permisos por ser
 `Administrador`.
+
+> *Enmendado el 2026-09-25 por QC-168: el Administrador deja de recibir el catálogo entero.
+> `empaque.modificar` queda fuera: es el primer permiso que `ADMIN_EXCLUDED_PERMISSIONS` excluye de
+> su asignación en el seed.*
 
 **R9.** El sistema DEBE asignar al rol `Operador` exactamente un permiso: `inventario.consultar`.
 

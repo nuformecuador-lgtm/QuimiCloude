@@ -45,6 +45,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     status: 'ENTREGADO',
     presentationId: null,
     finishedAt: new Date('2026-09-20T10:00:00.000Z'),
+    packedBy: null,
     ...overrides,
   };
 }

@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { findProductRefs, findCostingBatches } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma'
+import { findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
@@ -36,6 +37,7 @@ import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/
 import {
   createRecipeExecutionReader,
   findRecipeExecutionContentById,
+  findAliveRecipeByNormalizedName,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
@@ -92,9 +94,10 @@ const recipes: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 }
 
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches }
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts }
 
 const presentations: PresentationCatalog = {
   findRefs: findPresentationRefs,

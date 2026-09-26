@@ -224,6 +224,10 @@ let UnidadesPage: (typeof import('@/app/(private)/configuracion/unidades/page'))
 let UnitListSection: (typeof import('@/app/(private)/configuracion/unidades/components/unit-list-section'))['UnitListSection'];
 let PedidosPage: (typeof import('@/app/(private)/pedidos/page'))['default'];
 let OrderListSection: (typeof import('@/app/(private)/pedidos/components/order-list-section'))['OrderListSection'];
+let AsignacionPage: (typeof import('@/app/(private)/asignacion/page'))['default'];
+let PackingOrdersListSection: (typeof import('@/app/(private)/asignacion/components'))['PackingOrdersListSection'];
+let VIEW_PARAM: (typeof import('@/app/(private)/asignacion/components'))['VIEW_PARAM'];
+let PackingOrderPage: (typeof import('@/app/(private)/asignacion/empaque/[id]/page'))['default'];
 let listUsersAction: (typeof import('@/lib/modules/identity/adapters/driving/user-actions'))['listUsersAction'];
 let listWorkGroupsAction: (typeof import('@/lib/modules/identity/adapters/driving/work-group-actions'))['listWorkGroupsAction'];
 let listResponsiblesForOrdersAction: (typeof import('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions'))['listResponsiblesForOrdersAction'];
@@ -241,6 +245,11 @@ beforeAll(async () => {
   ));
   ({ default: PedidosPage } = await import('@/app/(private)/pedidos/page'));
   ({ OrderListSection } = await import('@/app/(private)/pedidos/components/order-list-section'));
+  ({ default: AsignacionPage } = await import('@/app/(private)/asignacion/page'));
+  ({ PackingOrdersListSection, VIEW_PARAM } = await import(
+    '@/app/(private)/asignacion/components'
+  ));
+  ({ default: PackingOrderPage } = await import('@/app/(private)/asignacion/empaque/[id]/page'));
   ({ listUsersAction } = await import('@/lib/modules/identity/adapters/driving/user-actions'));
   ({ listWorkGroupsAction } = await import(
     '@/lib/modules/identity/adapters/driving/work-group-actions'
@@ -309,10 +318,35 @@ async function pintarPedidos(): Promise<void> {
   await listWorkGroupsAction({ page: 1, pageSize: 25 });
 }
 
+/** `/asignacion?vista=por_empacar`: layout + pagina + la seccion de lista que la pagina monta. */
+async function pintarPorEmpacar(): Promise<void> {
+  await pintarLayout();
+  await AsignacionPage({ searchParams: Promise.resolve({ [VIEW_PARAM]: 'por_empacar' }) });
+  await PackingOrdersListSection({ params: PARAMS });
+}
+
+/**
+ * `/asignacion/empaque/[id]`: layout + pagina. Con la base doblada el pedido no aparece y la
+ * pagina corta con `notFound`, que aqui se descarta: lo que se cuenta es la lectura de sesion, no
+ * el desenlace de la pagina.
+ */
+async function pintarPantallaDeEmpaque(): Promise<void> {
+  await pintarLayout();
+  try {
+    await PackingOrderPage({
+      params: Promise.resolve({ id: '0a3f2b1c-9e0d-4a4c-8b9e-772a5f6c1d8b' }),
+    });
+  } catch (error) {
+    if (!(error instanceof CorteDeNext)) throw error;
+  }
+}
+
 const PANTALLAS = [
   { ruta: '/configuracion/usuarios', pintar: pintarUsuarios },
   { ruta: '/configuracion/unidades', pintar: pintarUnidades },
   { ruta: '/pedidos', pintar: pintarPedidos },
+  { ruta: '/asignacion?vista=por_empacar', pintar: pintarPorEmpacar },
+  { ruta: '/asignacion/empaque/[id]', pintar: pintarPantallaDeEmpaque },
 ] as const;
 
 describe('QC-104 · una sola lectura de sesion por peticion (pantallas)', () => {

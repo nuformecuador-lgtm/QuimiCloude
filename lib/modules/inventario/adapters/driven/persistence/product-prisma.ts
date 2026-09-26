@@ -13,6 +13,7 @@ import { writeMovement } from './batch-movement-prisma';
 import {
   batchCompanyScope,
   companyScopeColumns,
+  movementCompanyScope,
   presentationCompanyScope,
   productCompanyScope,
 } from './company-scope';
@@ -1064,4 +1065,59 @@ export async function receiveFinishedGoods(
   await recalculateProductStock(tx, product.id, scope);
 
   return { kind: 'received', productId: product.id, productName: product.name, packages: plan.packages };
+}
+
+/** `quantity / packageContent`, como entero: `receiveFinishedGoods` siempre escribe la cantidad
+ *  del asiento `production` como un multiplo exacto del contenido del lote (`planFinishedGoods`),
+ *  asi que la division nunca deja resto. */
+function packagesFromReceipt(quantity: Prisma.Decimal, packageContent: Prisma.Decimal): string {
+  const scaledQuantity = BigInt(quantity.toFixed(4).replace('.', ''));
+  const scaledContent = BigInt(packageContent.toFixed(4).replace('.', ''));
+  return (scaledQuantity / scaledContent).toString();
+}
+
+/**
+ * La consulta real. Vive aparte de `findFinishedGoodsReceipts` por el mismo motivo que
+ * `findAliveProducts`: declara el `scope` como `InventoryScope` y lo lleva hasta
+ * `movementCompanyScope`, el punto unico del modulo.
+ */
+async function findProductionMovements(
+  orderIds: readonly string[],
+  scope: InventoryScope,
+): Promise<
+  readonly { readonly orderId: string | null; readonly quantity: Prisma.Decimal; readonly batch: { readonly packageContent: Prisma.Decimal | null } }[]
+> {
+  return prisma.inventoryMovement.findMany({
+    where: {
+      AND: [movementCompanyScope(scope), { kind: 'production', orderId: { in: [...orderIds] } }],
+    },
+    select: { orderId: true, quantity: true, batch: { select: { packageContent: true } } },
+  });
+}
+
+/**
+ * Implementa `ProductCatalog['findFinishedGoodsReceipts']`: los envases que de verdad entraron
+ * por cada pedido, leidos del asiento `production` -uno por pedido, porque el Finalizar solo se
+ * escribe una vez- y divididos por el contenido guardado en su lote. Un `orderId` sin ese
+ * asiento, con lote sin contenido de envase, o de otra empresa, simplemente no aparece en la
+ * respuesta: quien compone la fila del pedido trata la ausencia como `packages: null`.
+ *
+ * No exige `inventario.consultar`: quien llama ya autorizo con su propio permiso. Por eso NO es
+ * un caso de uso de `inventario`, sino una lectura directa que `asignaciones` compone dentro de
+ * la suya.
+ */
+export async function findFinishedGoodsReceipts(
+  orderIds: readonly string[],
+  companyId: string,
+): Promise<readonly { orderId: string; packages: string }[]> {
+  if (orderIds.length === 0) return [];
+
+  const rows = await findProductionMovements(orderIds, { companyId });
+
+  return rows
+    .filter(
+      (row): row is typeof row & { orderId: string; batch: { packageContent: Prisma.Decimal } } =>
+        row.orderId !== null && row.batch.packageContent !== null,
+    )
+    .map((row) => ({ orderId: row.orderId, packages: packagesFromReceipt(row.quantity, row.batch.packageContent) }));
 }

@@ -17,10 +17,12 @@ export type CancelOrderDeps = {
 };
 
 /**
- * Los DOS estados desde los que se cancela (decision cerrada 6, R28). Desde `ENTREGADO` no
- * se cancela -eso seria una devolucion, que no existe (pregunta abierta 1)- y desde
- * `CANCELADO` tampoco, porque es final. Escrito como lista para que anadir un quinto estado
- * obligue a decidir explicitamente si es cancelable.
+ * Los DOS estados desde los que se cancela. Desde `ENTREGADO` no se cancela -eso seria una
+ * devolucion, que no existe- y desde `CANCELADO` tampoco, porque es final. `POR_EMPACAR` y
+ * `EN_EMPAQUE` tampoco: el material ya se consumio al dejar el pedido `POR_EMPACAR`, asi que
+ * cancelar dejaria un consumo sin pedido que lo explique; un problema en esos dos estados se
+ * corrige con un ajuste de inventario, no con esta lista. Escrita como lista para que anadir un
+ * septimo estado obligue a decidir explicitamente si es cancelable.
  */
 const CANCELABLES: readonly OrderStatus[] = ['PENDIENTE', 'EN_CURSO'];
 

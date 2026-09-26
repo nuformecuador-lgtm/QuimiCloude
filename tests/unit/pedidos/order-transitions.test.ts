@@ -20,17 +20,18 @@ import {
   isAllowedTransition,
 } from '@/lib/modules/pedidos/domain/order-transitions'
 
-/** Los UNICOS pares permitidos (decision cerrada 5): las tres transiciones hacia delante y el
- *  «quedarse igual» de los dos estados NO finales. Nada mas. */
+/** Los UNICOS pares permitidos (`design.md > 2`): las cuatro transiciones hacia delante y el
+ *  «quedarse igual» de los dos estados editables desde Pedidos. Nada mas. */
 const PERMITIDOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = [
   ['PENDIENTE', 'PENDIENTE'],
   ['PENDIENTE', 'EN_CURSO'],
-  ['PENDIENTE', 'ENTREGADO'],
   ['EN_CURSO', 'EN_CURSO'],
-  ['EN_CURSO', 'ENTREGADO'],
+  ['EN_CURSO', 'POR_EMPACAR'],
+  ['POR_EMPACAR', 'EN_EMPAQUE'],
+  ['EN_EMPAQUE', 'ENTREGADO'],
 ]
 
-/** Los 16 pares de la matriz, en el orden de declaracion del conjunto cerrado. */
+/** Los 36 pares de la matriz, en el orden de declaracion del conjunto cerrado. */
 const TODOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = ORDER_STATUS_VALUES.flatMap(
   (from) => ORDER_STATUS_VALUES.map((to) => [from, to] as const),
 )
@@ -39,18 +40,18 @@ function esperado(from: OrderStatus, to: OrderStatus): boolean {
   return PERMITIDOS.some(([f, t]) => f === from && t === to)
 }
 
-describe('pedidos — transiciones de estado en la edicion', () => {
-  it('la matriz es de 4x4 y hay exactamente 5 pares permitidos', () => {
-    // Si alguien anadiera un quinto estado sin revisar esta tabla, el 16 dejaria de cuadrar.
-    expect(ORDER_STATUS_VALUES).toHaveLength(4)
-    expect(TODOS).toHaveLength(16)
+describe('pedidos — transiciones de estado', () => {
+  it('la matriz es de 6x6 y hay exactamente 6 pares permitidos', () => {
+    // Si alguien anadiera un septimo estado sin revisar esta tabla, el 36 dejaria de cuadrar.
+    expect(ORDER_STATUS_VALUES).toHaveLength(6)
+    expect(TODOS).toHaveLength(36)
     expect(TODOS.filter(([from, to]) => esperado(from, to))).toHaveLength(PERMITIDOS.length)
-    expect(PERMITIDOS).toHaveLength(5)
+    expect(PERMITIDOS).toHaveLength(6)
   })
 
-  it.each(TODOS)('%s -> %s se decide como manda la decision cerrada 5', (from, to) => {
-    // R22: las tres permitidas, el «quedarse igual» de los no finales, y TODO lo demas
-    // rechazado -incluido cualquier retroceso-.
+  it.each(TODOS)('%s -> %s se decide como manda la matriz de design.md > 2', (from, to) => {
+    // R1, R2: las cuatro permitidas, el «quedarse igual» de PENDIENTE y EN_CURSO, y TODO lo
+    // demas rechazado -incluido cualquier retroceso-.
     expect(isAllowedTransition(from, to)).toBe(esperado(from, to))
 
     if (esperado(from, to)) {
@@ -60,12 +61,14 @@ describe('pedidos — transiciones de estado en la edicion', () => {
     expect(() => assertTransition(from, to)).toThrow(InvalidTransitionError)
   })
 
-  it('las tres transiciones hacia delante de la decision 5 estan permitidas, y ningun retroceso', () => {
+  it('las cuatro transiciones hacia delante estan permitidas, y ningun retroceso (R1, R2)', () => {
     // Escrito aparte del `each` para que el mensaje diga cual falta si alguien vacia la tabla.
     expect(isAllowedTransition('PENDIENTE', 'EN_CURSO')).toBe(true)
-    expect(isAllowedTransition('EN_CURSO', 'ENTREGADO')).toBe(true)
-    expect(isAllowedTransition('PENDIENTE', 'ENTREGADO')).toBe(true)
+    expect(isAllowedTransition('EN_CURSO', 'POR_EMPACAR')).toBe(true)
+    expect(isAllowedTransition('POR_EMPACAR', 'EN_EMPAQUE')).toBe(true)
+    expect(isAllowedTransition('EN_EMPAQUE', 'ENTREGADO')).toBe(true)
 
+    expect(isAllowedTransition('PENDIENTE', 'ENTREGADO')).toBe(false)
     expect(isAllowedTransition('EN_CURSO', 'PENDIENTE')).toBe(false)
     expect(isAllowedTransition('ENTREGADO', 'EN_CURSO')).toBe(false)
     expect(isAllowedTransition('ENTREGADO', 'PENDIENTE')).toBe(false)
@@ -74,9 +77,16 @@ describe('pedidos — transiciones de estado en la edicion', () => {
     expect(isAllowedTransition('CANCELADO', 'ENTREGADO')).toBe(false)
   })
 
+  it('POR_EMPACAR y EN_EMPAQUE no admiten «quedarse igual»: no son editables desde Pedidos (R32)', () => {
+    for (const estado of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      expect(isAllowedTransition(estado, estado), `${estado} -> ${estado}`).toBe(false)
+      expect(() => assertTransition(estado, estado)).toThrow(InvalidTransitionError)
+    }
+  })
+
   it('ENTREGADO y CANCELADO son finales: no admiten ni «quedarse igual»', () => {
-    // R21: un pedido final no admite NINGUNA edicion, ni siquiera la que solo cambia la
-    // prioridad. Por eso su lista esta vacia y no lleva su propio estado.
+    // Un pedido final no admite NINGUNA edicion, ni siquiera la que solo cambia la prioridad.
+    // Por eso su lista esta vacia y no lleva su propio estado.
     for (const final of ['ENTREGADO', 'CANCELADO'] as const) {
       for (const destino of ORDER_STATUS_VALUES) {
         expect(isAllowedTransition(final, destino), `${final} -> ${destino}`).toBe(false)
@@ -86,10 +96,23 @@ describe('pedidos — transiciones de estado en la edicion', () => {
   })
 
   it('CANCELADO no es destino de ningun par: solo lo escribe cancelOrder', () => {
-    // R24 y decision cerrada 7: la edicion no puede cancelar. Aqui se afirma sobre la tabla
-    // entera, no sobre un caso: ningun origen -ni siquiera CANCELADO- llega a CANCELADO.
+    // La edicion no puede cancelar. Aqui se afirma sobre la tabla entera, no sobre un caso:
+    // ningun origen -ni siquiera CANCELADO- llega a CANCELADO.
     for (const from of ORDER_STATUS_VALUES) {
       expect(isAllowedTransition(from, 'CANCELADO'), `${from} -> CANCELADO`).toBe(false)
+    }
+  })
+
+  it('EN_EMPAQUE y ENTREGADO solo se alcanzan desde POR_EMPACAR y EN_EMPAQUE respectivamente (R1)', () => {
+    // Nadie mas que POR_EMPACAR llega a EN_EMPAQUE, y nadie mas que EN_EMPAQUE llega a
+    // ENTREGADO: son las dos acciones de empaque, no la edicion normal.
+    for (const from of ORDER_STATUS_VALUES) {
+      if (from !== 'POR_EMPACAR') {
+        expect(isAllowedTransition(from, 'EN_EMPAQUE'), `${from} -> EN_EMPAQUE`).toBe(false)
+      }
+      if (from !== 'EN_EMPAQUE') {
+        expect(isAllowedTransition(from, 'ENTREGADO'), `${from} -> ENTREGADO`).toBe(false)
+      }
     }
   })
 
