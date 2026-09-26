@@ -2400,7 +2400,7 @@
     {
       "epic": "QC-105",
       "epic_name": "Documentos e IA",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "branch": "feature/QC-159-formula-desde-pdf",
       "spec_path": "specs/QC-159-formula-desde-pdf",

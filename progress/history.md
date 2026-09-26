@@ -4890,3 +4890,19 @@ podar.
   nada que podar).
 - **Incidencia:** `wt.sh done` desenganchó el worktree, pero la carpeta quedó en disco con archivos bloqueados (ver
   *Deudas*). La base `QuimiCloude_QC155` sigue creada.
+
+## 2026-09-26 — QC-159-formula-desde-pdf
+
+- **Qué:** lo que la IA lee de un PDF de fórmula se convierte en una **receta** tras una revisión humana en
+  `/produccion/formulas/importar/[documentoId]`: nombre, ingredientes en porcentaje con suma exacta 100,00 % y pasos
+  editables. Ingrediente sin producto: el revisor elige uno existente o lo crea como materia prima (exige además
+  `inventario.modificar`); receta con el mismo nombre: reemplazar o renombrar; nunca un producto terminado; confirmar
+  exige `recetas.modificar`. La confirmación relee el archivo (empresa, estado y tanda) antes de escribir.
+- **PR #128**, merge `a16b8baa`. Spec R1–R39, T0–T14. P1 aprobada en F1.4: la materia prima creada en la revisión
+  **nace sin lote**, excepción a QC-90 limitada a esta revisión. Sin migraciones.
+- **Review:** vuelta 1 rechazada (B1: la relectura del archivo al confirmar sin test), vuelta 2 OK con mutación.
+  Gate completo verde (756/756). E2E verde en Chromium y WebKit.
+- **Deuda (menores del review):** m1 el arreglo de hidratación cubre solo el nombre; m3 `formulas/importar/**` fuera
+  de la lista cerrada de acciones de las guardias; m5 los dos casos del E2E van encadenados en un solo `test`;
+  m6 `isValidNewName` repite a mano el recorte y los límites 1..200.
+- **Pendiente local:** borrar la base `QuimiCloude_QC159`.
