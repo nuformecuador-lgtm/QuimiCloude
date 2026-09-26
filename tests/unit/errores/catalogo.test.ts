@@ -39,11 +39,11 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 54 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 60 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 54 y no 51: entran `insufficient_material`, `recipe_without_lines` y
-      // `user_cannot_be_responsible`.
-      expect(ERROR_CODES).toHaveLength(54)
+      // 60 y no 56: entran `customer_not_found` (QC-154), `order_packing_taken`,
+      // `order_not_packable` y `order_produced_frozen` (QC-168).
+      expect(ERROR_CODES).toHaveLength(60)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -280,6 +280,95 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     it('la cabecera de error-codes.ts redacta la decima enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
       expect(source).toContain('**Decima enmienda, el 2026-09-22 (fix directo)**')
+    })
+  })
+
+  describe('R34 — customer_not_found tiene clave y texto no vacio', () => {
+    it('customer_not_found esta en el catalogo con su clave y su texto exacto', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('customer_not_found')
+      expect(ERROR_MESSAGE_KEY.customer_not_found).toBe('errors.customer_not_found')
+      expect(errorMessage('customer_not_found')).toBe('El cliente solicitado no existe.')
+      expect(errorMessage('customer_not_found').trim().length).toBeGreaterThan(0)
+    })
+
+    it('se distingue de supplier_not_found, invalid_input y unexpected', () => {
+      const texto = errorMessage('customer_not_found')
+      expect(texto).not.toBe(errorMessage('supplier_not_found'))
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('unexpected'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decimotercera enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decimotercera enmienda, 2026-09-24**')
+    })
+  })
+
+  describe('QC-150 R18, R19 — presentation_without_content y no_whole_package son la duodecima enmienda', () => {
+    it('los dos codigos estan en el catalogo con su clave y su texto propios', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('presentation_without_content')
+      expect(codigos).toContain('no_whole_package')
+      expect(ERROR_MESSAGE_KEY.presentation_without_content).toBe('errors.presentation_without_content')
+      expect(ERROR_MESSAGE_KEY.no_whole_package).toBe('errors.no_whole_package')
+      expect(errorMessage('presentation_without_content')).toBe(
+        'La presentacion del pedido no indica su contenido: completala en Presentaciones antes de finalizar.',
+      )
+      expect(errorMessage('no_whole_package')).toBe(
+        'La cantidad del pedido no llena ni un envase de su presentacion.',
+      )
+    })
+
+    it('se distinguen entre si y de invalid_input y action_not_allowed', () => {
+      const sinContenido = errorMessage('presentation_without_content')
+      const sinEnvase = errorMessage('no_whole_package')
+      expect(sinContenido).not.toBe(sinEnvase)
+      expect(sinContenido).not.toBe(errorMessage('invalid_input'))
+      expect(sinContenido).not.toBe(errorMessage('action_not_allowed'))
+      expect(sinEnvase).not.toBe(errorMessage('invalid_input'))
+      expect(sinEnvase).not.toBe(errorMessage('action_not_allowed'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la duodecima enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Duodecima enmienda, 2026-09-24**')
+    })
+  })
+
+  describe('decimocuarta enmienda, 2026-09-25 — order_packing_taken, order_not_packable, order_produced_frozen', () => {
+    it('los tres codigos estan en el catalogo con su clave y su texto exactos', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('order_packing_taken')
+      expect(codigos).toContain('order_not_packable')
+      expect(codigos).toContain('order_produced_frozen')
+      expect(ERROR_MESSAGE_KEY.order_packing_taken).toBe('errors.order_packing_taken')
+      expect(ERROR_MESSAGE_KEY.order_not_packable).toBe('errors.order_not_packable')
+      expect(ERROR_MESSAGE_KEY.order_produced_frozen).toBe('errors.order_produced_frozen')
+      expect(errorMessage('order_packing_taken')).toBe('Otro empacador esta empacando este pedido.')
+      expect(errorMessage('order_not_packable')).toBe(
+        'El pedido no esta en un estado que admita esa accion de empaque.',
+      )
+      expect(errorMessage('order_produced_frozen')).toBe(
+        'Un pedido ya producido conserva sus responsables tal como estaban.',
+      )
+    })
+
+    it('se distinguen entre si y de order_not_found, invalid_transition y order_delivered_frozen', () => {
+      const tomado = errorMessage('order_packing_taken')
+      const noEmpacable = errorMessage('order_not_packable')
+      const congelado = errorMessage('order_produced_frozen')
+      expect(tomado).not.toBe(noEmpacable)
+      expect(tomado).not.toBe(congelado)
+      expect(noEmpacable).not.toBe(congelado)
+      expect(tomado).not.toBe(errorMessage('order_not_found'))
+      expect(noEmpacable).not.toBe(errorMessage('invalid_transition'))
+      expect(congelado).not.toBe(errorMessage('order_delivered_frozen'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decimocuarta enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decimocuarta enmienda, 2026-09-25**')
     })
   })
 

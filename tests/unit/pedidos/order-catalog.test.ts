@@ -198,6 +198,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       status: 'PENDIENTE',
       presentationId: 'p-1',
       finishedAt: null,
+      packedBy: null,
     })
     expect(conPresentacion.presentationId).toBe('p-1')
 
@@ -211,6 +212,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       status: 'PENDIENTE',
       presentationId: null,
       finishedAt: null,
+      packedBy: null,
     })
     expect(sinPresentacion.presentationId).toBeNull()
   })
@@ -227,6 +229,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       status: 'ENTREGADO',
       presentationId: null,
       finishedAt: fecha,
+      packedBy: null,
     })
     expect(conFecha.finishedAt).toBe(fecha)
 
@@ -240,8 +243,39 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       status: 'ENTREGADO',
       presentationId: null,
       finishedAt: null,
+      packedBy: null,
     })
     expect(sinFecha.finishedAt).toBeNull()
+  })
+
+  it('R14, R17: copia packedBy tal cual, con y sin empacador', () => {
+    const conEmpacador = toAssignedOrderSummary({
+      id: 'o-5',
+      orderYear: 2026,
+      orderSequence: 11,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'EN_EMPAQUE',
+      presentationId: null,
+      finishedAt: null,
+      packedBy: 'u-1',
+    })
+    expect(conEmpacador.packedBy).toBe('u-1')
+
+    const sinEmpacador = toAssignedOrderSummary({
+      id: 'o-6',
+      orderYear: 2026,
+      orderSequence: 12,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'POR_EMPACAR',
+      presentationId: null,
+      finishedAt: null,
+      packedBy: null,
+    })
+    expect(sinEmpacador.packedBy).toBeNull()
   })
 })
 
@@ -439,6 +473,7 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
         status: 'ENTREGADO',
         presentationId: null,
         finishedAt: new Date('2026-09-23T10:00:00.000Z'),
+        packedBy: null,
       },
     ])
     count.mockResolvedValue(1)

@@ -173,3 +173,22 @@ export class RecipeWithoutLinesError extends PedidosError {
     super('recipe_without_lines', diagnostic);
   }
 }
+
+/** Al Finalizar, ni el pedido ni su presentacion tienen un contenido con el que calcular los
+ *  envases del lote de producto terminado. */
+export class PresentationWithoutContentError extends PedidosError {
+  readonly code = 'presentation_without_content';
+
+  constructor(diagnostic?: string) {
+    super('presentation_without_content', diagnostic);
+  }
+}
+
+/** Al Finalizar, la cantidad del pedido no llena ni un envase de su presentacion. */
+export class NoWholePackageError extends PedidosError {
+  readonly code = 'no_whole_package';
+
+  constructor(diagnostic?: string) {
+    super('no_whole_package', diagnostic);
+  }
+}

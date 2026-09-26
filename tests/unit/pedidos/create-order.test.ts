@@ -58,6 +58,7 @@ function filaCreada(): OrderRow {
     createdBy: ACTOR_A.id,
     updatedBy: ACTOR_A.id,
     presentationId: PRESENTACION_DE_A,
+    presentationContent: null,
   };
 }
 
@@ -100,7 +101,7 @@ function catalogoDeProductos(batches: readonly CostingBatch[] = [], refs?: reado
   const refsPorDefecto =
     refs ??
     [...new Map(batches.map((batch) => [batch.productId, batch.unitId])).entries()].map(
-      ([id, unitId]): ProductRef => ({ id, name: 'producto', unitId, stockByUnit: [] }),
+      ([id, unitId]): ProductRef => ({ id, name: 'producto', unitId, stockByUnit: [], type: 'PRODUCT' }),
     );
   const findCostingBatches = vi.fn(async () => batches);
   const findRefs = vi.fn(async () => refsPorDefecto);
@@ -119,10 +120,13 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
   return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
 }
 
-/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A. */
-function catalogoDePresentaciones(): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
+/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
+ *  contenido que le pase el test -`null` por defecto, para el caso sin copia-. */
+function catalogoDePresentaciones(
+  content: string | null = null,
+): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
   const findRefs = vi.fn(async (ids: readonly string[]) =>
-    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L' }] : [],
+    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L', content }] : [],
   );
   return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
@@ -312,6 +316,46 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
     // `resolveIngredientsCost`: firma de esa funcion en `resolve-ingredients-cost.ts`.
     const dataUno = (repo1.create.mock.calls[0] as unknown as readonly unknown[])[0] as { presentationId: string };
     expect(dataUno.presentationId).toBe(PRESENTACION_DE_A);
+  });
+
+  it('R38: copia el contenido que la presentacion tiene en ese instante', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('5.0000').presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+
+    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
+      presentationContent: string | null;
+    };
+    expect(data.presentationContent).toBe('5.0000');
+  });
+
+  it('R38: sin contenido en la presentacion, el pedido no lleva copia', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones(null).presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+
+    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
+      presentationContent: string | null;
+    };
+    expect(data.presentationContent).toBeNull();
   });
 });
 

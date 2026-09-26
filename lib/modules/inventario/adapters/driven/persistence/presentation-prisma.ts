@@ -18,6 +18,16 @@ import type { Page } from '../../../domain/page';
 import type { PresentationView } from '../../../domain/presentation-view';
 import type { PresentationData } from '../../../ports/presentation-repository';
 
+/** `presentations.content` -> cadena decimal, nunca `Prisma.Decimal` fuera del
+ *  adaptador. Mismo camino que `fromDecimal`/`toDecimalInput` de `supplier-catalog-line-prisma.ts`. */
+function fromContent(value: Prisma.Decimal | null): string | null {
+  return value === null ? null : value.toFixed(4);
+}
+
+function toContentInput(value: string | null): Prisma.Decimal | null {
+  return value === null ? null : new Prisma.Decimal(value);
+}
+
 /**
  * Implementa los cuatro metodos de `PresentationRepository` (`design.md > 7`, T10). Unico
  * sitio del modulo que importa `@prisma/client` y `@/lib/shared/db/prisma`, y el unico que
@@ -176,6 +186,7 @@ export const presentationSelect = {
   name: true,
   nameNormalized: true,
   unitId: true,
+  content: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -188,6 +199,7 @@ export function toPresentationView(row: {
   name: string;
   nameNormalized: string;
   unitId: string;
+  content: Prisma.Decimal | null;
   createdAt: Date;
   updatedAt: Date;
 }): PresentationView {
@@ -196,6 +208,7 @@ export function toPresentationView(row: {
     name: row.name,
     nameNormalized: row.nameNormalized,
     unitId: row.unitId,
+    content: fromContent(row.content),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -218,6 +231,7 @@ export async function createPresentation(
         name: data.name,
         nameNormalized: data.nameNormalized,
         unitId: data.unitId,
+        content: toContentInput(data.content),
         ...companyScopeColumns(scope),
       },
       select: { id: true },
@@ -247,7 +261,12 @@ export async function replacePresentation(
       // Editar una presentacion de otra empresa deja `count` en 0 -o sea `'not_found'`- y NO
       // modifica la fila ajena. La empresa NO se reescribe: una presentacion no cambia de dueno.
       where: { AND: [presentationCompanyScope(scope), { id }] },
-      data: { name: data.name, nameNormalized: data.nameNormalized, unitId: data.unitId },
+      data: {
+        name: data.name,
+        nameNormalized: data.nameNormalized,
+        unitId: data.unitId,
+        content: toContentInput(data.content),
+      },
     });
     return result.count === 0 ? 'not_found' : 'ok';
   } catch (error) {

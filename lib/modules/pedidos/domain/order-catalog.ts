@@ -33,6 +33,13 @@ export type OrderAssignmentTarget = {
  *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
+/** Lo que entro al inventario cuando un Finalizar dio de alta un lote de producto terminado:
+ *  el nombre de quien lo recibio y cuantos envases enteros. */
+export type FinishedGoodsReceipt = {
+  readonly productName: string;
+  readonly packages: string;
+};
+
 export interface OrderCatalog {
   /**
    * `null` = no existe, esta dado de baja, o NO ES DE ESA EMPRESA: para quien pregunta son el
@@ -85,9 +92,19 @@ export interface OrderCatalog {
    * empresa, pero su estado ya no es `from` porque alguien lo movio entre la lectura y esta
    * llamada.
    *
-   * Si `to` es `'ENTREGADO'`, la misma llamada consume el material apartado:
+   * Si `to` es `'POR_EMPACAR'`, la misma llamada consume el material apartado:
    * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
    * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
+   *
+   * Yendo a `'POR_EMPACAR'`, la misma llamada da tambien de alta el lote de producto terminado
+   * de la combinacion del pedido: el exito lleva `finishedGoods` con lo que entro;
+   * `'presentation_without_content'`, `'no_whole_package'` y `'recipe_not_found'` deshacen la
+   * operacion entera igual que los dos casos de arriba. El `'ok'` sin `finishedGoods` sigue
+   * siendo el unico resultado posible cuando `to` no es `'POR_EMPACAR'`.
+   *
+   * `'EN_EMPAQUE'` y `'ENTREGADO'` no son destino valido de este metodo: se rechazan con
+   * `InvalidTransitionError`, aunque la matriz de transiciones los admita, porque solo los
+   * alcanzan las dos acciones de empaque, que si conocen a quien empaca.
    */
   transitionAliveById(
     id: string,
@@ -96,7 +113,45 @@ export interface OrderCatalog {
     to: OrderStatus,
     actorId: string,
     now: Date,
-  ): Promise<'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines'>;
+  ): Promise<
+    | 'ok'
+    | { readonly kind: 'ok'; readonly finishedGoods: FinishedGoodsReceipt }
+    | 'not_found'
+    | 'stale'
+    | 'insufficient_material'
+    | 'recipe_without_lines'
+    | 'presentation_without_content'
+    | 'no_whole_package'
+    | 'recipe_not_found'
+  >;
+
+  /**
+   * Comenzar el empaque: `POR_EMPACAR -> EN_EMPAQUE` con `packerId` como quien empaca, en una
+   * sola escritura con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
+   * empacador repitiendo Comenzar sobre su propio `EN_EMPAQUE`, sin escribir nada;
+   * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'not_packable'` es cualquier otro estado;
+   * `'not_found'` es el mismo caso que en `findAliveById` -no existe, esta de baja o es de
+   * otra empresa-.
+   */
+  startPackingAliveById(
+    id: string,
+    companyId: string,
+    packerId: string,
+    now: Date,
+  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'>;
+
+  /**
+   * Terminar el empaque: `EN_EMPAQUE -> ENTREGADO`, con `finishedAt` en la MISMA escritura que
+   * el cambio de estado, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
+   * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
+   * `'not_found'` es el mismo caso que en `findAliveById`.
+   */
+  finishPackingAliveById(
+    id: string,
+    companyId: string,
+    packerId: string,
+    now: Date,
+  ): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'>;
 }
 
 /**
@@ -116,4 +171,9 @@ export type AssignedOrderSummary = {
   /** `null` = sin fecha de terminado: un pedido entregado antes de que la columna existiera, o
    *  uno que no esta ENTREGADO. */
   readonly finishedAt: Date | null;
+  /** Quien tiene el pedido en empaque: obligatorio en `EN_EMPAQUE`, `null` en `PENDIENTE`,
+   *  `EN_CURSO`, `POR_EMPACAR` y `CANCELADO`, y opcional en `ENTREGADO` (los entregados antiguos
+   *  no lo tienen, los nuevos lo conservan). El identificador viaja en crudo, igual que
+   *  `recipeId`; el nombre lo resuelve quien consulta con el directorio de personas. */
+  readonly packedBy: string | null;
 };

@@ -93,6 +93,19 @@ function fuentesBajo(carpetaRelativa: string): string[] {
 
 const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
 
+/**
+ * `importar/[documentoId]` es una ruta HERMANA bajo el mismo `FORMULAS_ROUTE`, con su propio
+ * `page.tsx`, su propio `components/index.ts` y su propio contrato -probado en
+ * `formula-import-page.test.tsx` y `formula-import-review.test.tsx`-. Las comprobaciones de ESTE
+ * archivo hablan de las TRES paginas de listar/crear/editar receta; las dos que asumen que solo
+ * existe UN barrel bajo `formulas/` (el reexport compartido y la lista cerrada de acciones)
+ * quedan fuera de esa ruta hermana para no mezclar dos contratos en un mismo aserto.
+ */
+const CARPETA_IMPORTAR_FORMULA = `${enRutaDePosix(CARPETA_RUTA)}/importar/`;
+const FUENTES_DE_LA_RUTA_SIN_IMPORTAR = FUENTES_DE_LA_RUTA.filter(
+  (ruta) => !ruta.startsWith(CARPETA_IMPORTAR_FORMULA),
+);
+
 const ARCHIVOS_DE_LA_LISTA = [
   join(COMPONENTES_PATH, 'recipe-columns.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
@@ -536,11 +549,41 @@ describe('contrato de la ruta de recetas', () => {
       'requireAdmin',
       // No casa con `requirePagePermission`, que es lo que las paginas deben llamar.
       'requirePermission(',
-      'getSessionUser',
+      'assertPermission',
       'ADMIN_ROLE_NAME',
       'decideRouteAccess',
       'next/headers',
     ]);
+
+    // Ampliacion estrecha: el listado consulta la sesion SOLO para decidir si monta la subida de
+    // documentos, nunca para autorizar datos de recetas. Cualquier otro archivo de la ruta sigue
+    // sin poder tocar la sesion.
+    const PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR = enRutaDePosix(PAGE_PATH);
+
+    ningunArchivoContiene(
+      ['getSessionUser'],
+      FUENTES_DE_LA_RUTA.filter((ruta) => ruta !== PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR),
+    );
+
+    const paginaDeListado = fuenteSinComentarios(PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR);
+    expect(
+      paginaDeListado.split('getSessionUser').length - 1,
+      `${PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR} usa getSessionUser mas de una vez`,
+    ).toBe(1);
+    expect(
+      paginaDeListado,
+      `${PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR} solo puede usar la sesion para decidir si monta la subida`,
+    ).toMatch(/canUploadDocuments\(\s*await\s+identity\.getSessionUser\(\)\s*\)/);
+    // La linea que llama a la sesion no puede llevar ademas un permiso de recetas: eso volveria a
+    // ser autorizar datos, no decidir si se monta la subida.
+    const lineaConSesion = paginaDeListado
+      .split('\n')
+      .find((linea) => linea.includes('getSessionUser'));
+    expect(lineaConSesion, `no se encontro la linea con getSessionUser`).toBeDefined();
+    expect(
+      lineaConSesion,
+      `${PAGINA_QUE_CONSULTA_SESION_PARA_SUBIR}: la linea de la sesion no puede llevar un permiso de recetas`,
+    ).not.toMatch(/recetas\.\w+/);
   });
 
   // El permiso que exigen las pantallas y el de su item de menu tienen que ser el mismo codigo: se
@@ -688,7 +731,7 @@ describe('contrato de la ruta de recetas', () => {
       'listUnitsAction',
     ]);
 
-    for (const ruta of FUENTES_DE_LA_RUTA) {
+    for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
       const codigo = fuenteSinComentarios(ruta);
       const patron = /([A-Za-z][A-Za-z0-9_]*Action)\(/g;
       let encaje: RegExpExecArray | null;
@@ -838,7 +881,7 @@ describe('contrato de la ruta de recetas', () => {
     // Regla de `docs/architecture.md > Componentes`.
     const barrel = fuenteSinComentarios(BARREL_PATH.split('\\').join('/'));
 
-    for (const ruta of FUENTES_DE_LA_RUTA) {
+    for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
       if (!ruta.includes('/components/') || ruta.endsWith('/index.ts')) continue;
       const nombreDeArchivo = ruta.split('/').pop() as string;
       if (FUERA_DEL_BARREL.includes(nombreDeArchivo)) {
@@ -875,7 +918,7 @@ describe('contrato de la ruta de recetas', () => {
     // La frontera cliente/servidor se declara en cada componente, no en el barrel.
     expect(barrel).not.toContain('use client');
 
-    const CARPETAS_LEGITIMAS = ['components', 'nueva', '[id]'];
+    const CARPETAS_LEGITIMAS = ['components', 'nueva', '[id]', 'importar'];
     const raizDeLaRuta = readdirSync(join(RAIZ, CARPETA_RUTA), { withFileTypes: true });
     const archivosDeAppRouter = ['page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx'];
 
@@ -1103,6 +1146,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
       [
         'ASSIGNED_ORDERS_ROUTE',
         'CREDENTIAL_SETUP_ROUTE',
+        // Alta: la pantalla de clientes. No es una ruta ni una funcion de ruta del asistente de
+        // lectura -no la marca el patron de arriba ni apunta a ninguna URL del asistente-.
+        'CUSTOMERS_ROUTE',
         'DASHBOARD_ROUTE',
         // Alta el 2026-09-17: la trae el aviso de entrega de QC-63. NO es una ruta ni una funcion
         // de ruta: es el NOMBRE DE UN PARAMETRO DE CONSULTA de la lista de pedidos asignados
@@ -1112,6 +1158,15 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // R12 de QC-64 sigue INTACTA. La lista sigue siendo CERRADA y por igualdad exacta: una
         // constante mas vuelve a ponerla en rojo.
         'DELIVERED_ORDER_PARAM',
+        // Altas junto a `DELIVERED_ORDER_PARAM`: los nombres de los
+        // parametros de consulta que la pantalla de ejecucion pone al Finalizar -cuantos envases
+        // enteros de producto terminado y el nombre del producto- y que la confirmacion lee.
+        // Tampoco son rutas ni funciones de ruta ni estrenan ninguna del asistente de lectura -no
+        // las marca el patron de arriba ni apuntan a ninguna URL-, asi que ese contrato sigue
+        // INTACTO. La lista sigue siendo CERRADA y por igualdad exacta: una constante mas vuelve
+        // a ponerla en rojo.
+        'DELIVERED_ORDER_PACKAGES_PARAM',
+        'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
         'INVENTORY_ROUTE',
@@ -1120,6 +1175,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'LOGIN_ROUTE_SESSION_ENDED',
         'NEW_RECIPE_ROUTE',
         'ORDERS_ROUTE',
+        // Alta junto con `packingOrderRoute`: el nombre del parametro de consulta que la pantalla
+        // de empaque, dentro de /asignacion, no es un detalle de Pedidos.
+        'PACKED_ORDER_PARAM',
         'PRESENTATIONS_ROUTE',
         'PRIVATE_ROUTE_PREFIXES',
         // No es una ruta: el nombre del parametro de LOGIN_ROUTE_SESSION_ENDED.
@@ -1128,9 +1186,22 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'UNITS_ROUTE',
         'assignedOrderRoute',
         'credentialSetupRoute',
+        // Vive en /asignacion (pantalla de empaque), no en Pedidos: no estrena ninguna ruta del
+        // asistente de lectura.
+        'packingOrderRoute',
         'USERS_ROUTE',
         'recipeEditRoute',
+        // Alta el 2026-09-24: la revision de un catalogo importado desde PDF, derivada de
+        // `supplierDetailRoute` (`/proveedores/<id>/importar/<archivo>`). No es del asistente de
+        // lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue
+        // CERRADA.
+        'supplierCatalogImportRoute',
         'supplierDetailRoute',
+        // Alta QC-159: la revision de una formula importada desde PDF, derivada de
+        // `FORMULAS_ROUTE` (`/produccion/formulas/importar/<archivo>`). No es del asistente de
+        // lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue
+        // CERRADA.
+        'formulaImportRoute',
       ].sort(),
     );
   });

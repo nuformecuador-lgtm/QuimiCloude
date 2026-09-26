@@ -16,7 +16,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { calculateIngredientsCost, type CostInput, type RecipeCostLine } from '@/lib/modules/pedidos/domain/order-cost';
+import {
+  calculateIngredientsCost,
+  calculateLotIngredientsCost,
+  type CostInput,
+  type RecipeCostLine,
+} from '@/lib/modules/pedidos/domain/order-cost';
 
 import type { CostingBatch } from '@/lib/modules/inventario';
 import type { UnitConversion } from '@/lib/modules/unidades';
@@ -462,5 +467,91 @@ describe('calculateIngredientsCost', () => {
     );
 
     expect(resultado).toBeNull();
+  });
+});
+
+// `calculateLotIngredientsCost`: el costo del LOTE de producto terminado cuenta cero
+// cada ingrediente sin costo, en vez de dejar el total entero sin importe como hace
+// `calculateIngredientsCost`. Nunca devuelve `null`.
+describe('calculateLotIngredientsCost', () => {
+  it('R42: un ingrediente sin lotes -sin costo- cuenta como cero y el resto compone el total', () => {
+    const resultado = calculateLotIngredientsCost(
+      input({
+        orderQuantity: '10.0000',
+        lines: [
+          linea({ productId: PRODUCT_A }),
+          linea({ productId: PRODUCT_B }),
+        ],
+        batches: [
+          // Solo el primer ingrediente tiene lotes: el segundo cuenta cero.
+          lote({ productId: PRODUCT_A, stock: '10', unitCost: '100.0000' }),
+        ],
+        units: unitsMap(LITRO),
+      }),
+    );
+
+    // Con calculateIngredientsCost este mismo insumo sin costo habria invalidado el total
+    // entero; aqui el ingrediente A solo aporta 10 * 100 = 1000,0000.
+    expect(resultado).toBe('1000.0000');
+  });
+
+  it('R42: ningun ingrediente con costo da 0.0000, no null', () => {
+    const resultado = calculateLotIngredientsCost(
+      input({
+        orderQuantity: '10.0000',
+        lines: [linea({ productId: PRODUCT_A })],
+        // Existencia de sobra pero disponible cero: el unico ingrediente no tiene costo.
+        batches: [lote({ productId: PRODUCT_A, stock: '1000', available: '0.0000' })],
+        units: unitsMap(LITRO),
+      }),
+    );
+
+    expect(resultado).toBe('0.0000');
+  });
+
+  it('R42: receta sin lineas da 0.0000', () => {
+    const resultado = calculateLotIngredientsCost(input({ lines: [] }));
+
+    expect(resultado).toBe('0.0000');
+  });
+
+  it('R42: con todos los ingredientes con costo da el mismo total que calculateIngredientsCost', () => {
+    const datos = input({
+      orderQuantity: '200.0000',
+      lines: [linea({ percentage: '10.00' })],
+      batches: [lote({ stock: '50', unitCost: '2.0000' })],
+      units: unitsMap(LITRO),
+    });
+
+    expect(calculateLotIngredientsCost(datos)).toBe(calculateIngredientsCost(datos));
+    expect(calculateLotIngredientsCost(datos)).toBe('40.0000');
+  });
+
+  it('R43: en los mismos insumos que R42, calculateIngredientsCost sigue devolviendo null sin cambios', () => {
+    const datos = input({
+      orderQuantity: '10.0000',
+      lines: [
+        linea({ productId: PRODUCT_A }),
+        linea({ productId: PRODUCT_B }),
+      ],
+      batches: [lote({ productId: PRODUCT_A, stock: '10', unitCost: '100.0000' })],
+      units: unitsMap(LITRO),
+    });
+
+    expect(calculateIngredientsCost(datos)).toBeNull();
+    expect(calculateLotIngredientsCost(datos)).toBe('1000.0000');
+  });
+
+  it('el importe viaja como cadena decimal de cuatro decimales y nunca como numero', () => {
+    const resultado = calculateLotIngredientsCost(
+      input({
+        orderQuantity: '3.0000',
+        batches: [lote({ stock: '3', unitCost: '2.5000' })],
+        units: unitsMap(LITRO),
+      }),
+    );
+
+    expect(typeof resultado).toBe('string');
+    expect(resultado).toMatch(/^\d+\.\d{4}$/);
   });
 });

@@ -76,6 +76,8 @@ function lineaDe(id: string, name: string): CatalogLineView {
     cost: '10.0000',
     minPurchase: null,
     deliveryTime: null,
+    material: null,
+    measurements: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     createdBy: 'user-1',

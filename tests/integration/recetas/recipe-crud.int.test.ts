@@ -639,6 +639,9 @@ const realProductCatalog: ProductCatalog = {
   findCostingBatches: () => {
     throw new Error('recetas no debe costear nada');
   },
+  findFinishedGoodsReceipts: () => {
+    throw new Error('recetas no debe leer envases de empaque');
+  },
 };
 
 const imagenesMudas: RecipeImageStorage = {

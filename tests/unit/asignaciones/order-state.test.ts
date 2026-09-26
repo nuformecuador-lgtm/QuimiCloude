@@ -12,7 +12,7 @@
 //
 // La consulta (R13) NO pasa por esta tabla y no se prueba aqui: es T9.
 //
-// Cubre R8, R9, R10, R11, R12.
+// Cubre R8, R9, R10, R11, R12, R33.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -104,13 +104,15 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
   const TABLA: readonly (readonly [OrderStatus | 'no existe', string])[] = [
     ['PENDIENTE', 'sin error'],
     ['EN_CURSO', 'sin error'],
+    ['POR_EMPACAR', 'order_produced_frozen'],
+    ['EN_EMPAQUE', 'order_produced_frozen'],
     ['ENTREGADO', 'order_delivered_frozen'],
     ['CANCELADO', 'order_cancelled_not_assignable'],
     ['no existe', 'order_not_found'],
   ];
 
   for (const [estado, esperado] of TABLA) {
-    it(`pedido ${estado} -> ${esperado} (R8, R9, R10, R11)`, async () => {
+    it(`pedido ${estado} -> ${esperado} (R8, R9, R10, R11, R33)`, async () => {
       const order =
         estado === 'no existe' ? null : ({ id: PEDIDO, status: estado } as OrderAssignmentTarget);
       expect(await codigoDe(order)).toBe(esperado);
@@ -127,8 +129,10 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     }
   });
 
-  it('los tres estados que NO admiten escritura no tocan el puerto de escritura (R10, R11, R8)', async () => {
+  it('los estados que NO admiten escritura no tocan el puerto de escritura (R10, R11, R8, R33)', async () => {
     const casos: readonly (OrderAssignmentTarget | null)[] = [
+      { id: PEDIDO, status: 'POR_EMPACAR' },
+      { id: PEDIDO, status: 'EN_EMPAQUE' },
       { id: PEDIDO, status: 'ENTREGADO' },
       { id: PEDIDO, status: 'CANCELADO' },
       null,
@@ -196,10 +200,10 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     /**
      * El mapa de `order-state.ts` es TOTAL sobre `OrderStatus` (`satisfies Record<...>`), asi que
      * un estado nuevo en QC-34 rompe el TYPECHECK en vez de colarse como «admitida». Aqui se
-     * comprueba lo unico que un test en tiempo de ejecucion puede comprobar: que los CUATRO
+     * comprueba lo unico que un test en tiempo de ejecucion puede comprobar: que los SEIS
      * estados que hoy existen estan clasificados, ninguno de ellos por defecto.
      */
-    it('los cuatro estados de hoy estan clasificados, ninguno por descuido', () => {
+    it('los seis estados de hoy estan clasificados, ninguno por descuido (R33)', () => {
       const clasificado = (status: OrderStatus): 'admite' | string => {
         try {
           assertOrderAcceptsWrites({ id: PEDIDO, status });
@@ -212,11 +216,15 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
       expect({
         PENDIENTE: clasificado('PENDIENTE'),
         EN_CURSO: clasificado('EN_CURSO'),
+        POR_EMPACAR: clasificado('POR_EMPACAR'),
+        EN_EMPAQUE: clasificado('EN_EMPAQUE'),
         ENTREGADO: clasificado('ENTREGADO'),
         CANCELADO: clasificado('CANCELADO'),
       }).toEqual({
         PENDIENTE: 'admite',
         EN_CURSO: 'admite',
+        POR_EMPACAR: 'order_produced_frozen',
+        EN_EMPAQUE: 'order_produced_frozen',
         ENTREGADO: 'order_delivered_frozen',
         CANCELADO: 'order_cancelled_not_assignable',
       });

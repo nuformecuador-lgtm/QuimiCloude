@@ -153,12 +153,17 @@ function funcionesConStatusEnData(fuente: string): string[] {
   return nombres.sort();
 }
 
-describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus', () => {
+describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus y en Terminar (QC-168)', () => {
   // `setStatus` de `OrderWriteRepository` -implementada como `setAliveOrderStatus` en
   // order-prisma.ts- escribe `finishedAt` en el mismo `UPDATE` que mueve a ENTREGADO, para que
   // el estado y la fecha de terminado queden atomicos con el consumo. `transitionAliveOrder`
   // (order-catalog-prisma.ts), que llevaba su propio `data:` con finishedAt y se habia quedado
   // sin llamantes, se retiro: ya no queda ningun bloque `data:` de ese archivo.
+  //
+  // QC-168 anade una SEGUNDA escritura legitima: `finishPackingAliveOrder` (Terminar el empaque)
+  // escribe `finishedAt` en la misma sentencia que mueve `EN_EMPAQUE -> ENTREGADO`, porque
+  // `setAliveOrderStatus` ya no es el unico camino hacia ENTREGADO: Terminar conoce a quien
+  // empaca y `setAliveOrderStatus` no.
   it('ningun bloque `data:` de lib/** fuera de order-prisma.ts nombra finishedAt/finished_at', () => {
     const conLaColumna = findDataBlockMatches(repoRoot, (block) => /finishedAt|finished_at/.test(block));
     const rutas = conLaColumna.map((hallazgo) => hallazgo.ruta).sort();
@@ -168,16 +173,17 @@ describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus',
       rutas.length === 1 && rutas[0] === ORDER_PRISMA
         ? undefined
         : 'finishedAt/finished_at solo puede escribirse en `data:` de order-prisma.ts ' +
-            `(setAliveOrderStatus). Se encontro en: ${JSON.stringify(conLaColumna)}.`,
+            `(setAliveOrderStatus, finishPackingAliveOrder). Se encontro en: ${JSON.stringify(conLaColumna)}.`,
     ).toEqual([ORDER_PRISMA]);
   });
 
-  it('order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt (el de setAliveOrderStatus)', () => {
+  it('order-prisma.ts tiene exactamente dos bloques `data:` que nombran finishedAt: setAliveOrderStatus y finishPackingAliveOrder', () => {
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
     const bloques = extractDataBlocks(fuente).filter((block) => /finishedAt/.test(block));
 
-    expect(bloques).toHaveLength(1);
-    expect(bloques[0]).toMatch(/status\s*:\s*to\b/);
+    expect(bloques).toHaveLength(2);
+    expect(bloques.some((block) => /status\s*:\s*to\b/.test(block))).toBe(true);
+    expect(bloques.some((block) => /status\s*:\s*['"`]ENTREGADO['"`]/.test(block))).toBe(true);
   });
 
   it('las escrituras conocidas que R5 nombra -insertAliveOrder, updateAliveOrder, cancelAliveOrder, softDeleteAliveOrder- no llevan finishedAt', () => {
@@ -210,30 +216,44 @@ describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus',
   });
 });
 
-describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus; updateAliveOrder ya no escribe status', () => {
-  it('ningun bloque `data:` de lib/** fija status a mano en EN_CURSO ni ENTREGADO', () => {
+describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus o Terminar; updateAliveOrder ya no escribe status', () => {
+  it('ningun bloque `data:` de lib/** fija status a EN_CURSO a mano, y ENTREGADO solo lo fija finishPackingAliveOrder (Terminar, QC-168)', () => {
     // El patron busca `status: 'EN_CURSO'` o `status: 'ENTREGADO'` como VALOR escrito, no
     // cualquier mencion del literal: `...(to === 'ENTREGADO' ? { finishedAt: now } : {})` de
     // setAliveOrderStatus es una COMPARACION dentro del mismo bloque `data:`, no una escritura
     // de `status` a mano, y no debe disparar esta regla (el caso simetrico, mas abajo, lo fija).
+    //
+    // QC-168: Terminar (`finishPackingAliveOrder`) es la UNICA excepcion nombrada que SI fija
+    // `ENTREGADO` como literal -conoce a quien empaca, que `setAliveOrderStatus` no sabe-, y solo
+    // en la misma sentencia que escribe `finishedAt` (R21). Ninguna otra funcion puede fijar
+    // EN_CURSO ni ENTREGADO a mano.
     const conElLiteral = findDataBlockMatches(repoRoot, (block) =>
       /\bstatus\s*:\s*['"`](EN_CURSO|ENTREGADO)['"`]/.test(block),
+    ).flatMap((hallazgo) =>
+      hallazgo.ruta === ORDER_PRISMA
+        ? hallazgo.bloques
+            .filter((block) => !/status\s*:\s*['"`]ENTREGADO['"`][\s\S]*finishedAt/.test(block))
+            .map((block) => ({ ruta: hallazgo.ruta, bloques: [block] }))
+        : [{ ruta: hallazgo.ruta, bloques: hallazgo.bloques }],
     );
 
     expect(
       conElLiteral,
       conElLiteral.length === 0
         ? undefined
-        : 'Ningun `data:` de lib/** debe fijar EN_CURSO/ENTREGADO como literal: ' +
-            'setAliveOrderStatus los recibe parametrizados (`status: to`), nunca a mano. ' +
+        : 'Ningun `data:` de lib/** debe fijar EN_CURSO/ENTREGADO como literal, salvo ' +
+            'finishPackingAliveOrder (Terminar) escribiendo ENTREGADO junto con finishedAt: ' +
+            'setAliveOrderStatus recibe el estado parametrizado (`status: to`), nunca a mano. ' +
             `Se encontro en: ${JSON.stringify(conElLiteral)}.`,
     ).toEqual([]);
   });
 
-  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es setAliveOrderStatus y cancelAliveOrder', () => {
+  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es cancelAliveOrder, finishPackingAliveOrder, setAliveOrderStatus y startPackingAliveOrder', () => {
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
 
-    expect(funcionesConStatusEnData(fuente)).toEqual(['cancelAliveOrder', 'setAliveOrderStatus']);
+    expect(funcionesConStatusEnData(fuente)).toEqual(
+      ['cancelAliveOrder', 'finishPackingAliveOrder', 'setAliveOrderStatus', 'startPackingAliveOrder'].sort(),
+    );
   });
 
   it('dispara con una escritura nueva `status: <variable>` en otra funcion de order-prisma.ts', () => {
@@ -313,12 +333,15 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus; updat
 });
 
 // -------------------------------------------------------------------------------------------
-// El catalogo sigue en 18 permisos
+// El catalogo no gana ningun permiso propio de pedidos
 // -------------------------------------------------------------------------------------------
 
-describe('R16 — el catalogo de permisos sigue en dieciocho codigos', () => {
-  it('PERMISSIONS tiene exactamente 18 entradas', () => {
-    expect(PERMISSIONS).toHaveLength(18);
+describe('R16 — el catalogo de permisos no gana ningun codigo pedidos.* nuevo', () => {
+  it('pedidos.* sigue siendo exactamente consultar y modificar', () => {
+    const codigosDePedidos = PERMISSIONS.filter((permiso) => permiso.module === 'pedidos').map(
+      (permiso) => permiso.code,
+    );
+    expect(codigosDePedidos.sort()).toEqual(['pedidos.consultar', 'pedidos.modificar']);
   });
 
   it('PERMISSIONS no repite ningun codigo', () => {

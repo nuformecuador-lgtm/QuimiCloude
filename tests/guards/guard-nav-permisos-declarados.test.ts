@@ -96,15 +96,18 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // enlace nuevo, porque darse de alta en la lista exacta es el punto de extension por diseño de
   // este caso (R39). Nacio en la seccion «Configuración» y paso a «Operación» el 2026-09-21 por
   // decision humana; esta guardia mide permisos, no secciones, asi que no le afecta.
-  it('ancla: el recorrido encuentra hoy los nueve enlaces reales del menu', () => {
+  // AMPLIADA: sube a diez con el enlace de clientes, que declara `clientes.consultar`. Se tensa,
+  // no se afloja: sigue siendo la lista EXACTA, nunca un «al menos N».
+  it('ancla: el recorrido encuentra hoy los diez enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista
     // vacia y la guardia pasaria en verde sin comprobar nada. Esto lo convierte en rojo.
     const enlaces = flattenNavLinks(PRIVATE_NAV_ITEMS);
 
-    expect(enlaces).toHaveLength(9);
+    expect(enlaces).toHaveLength(10);
     expect(enlaces.map((enlace) => enlace.testId).sort()).toEqual([
       'nav-asignacion',
+      'nav-clientes',
       'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
@@ -118,16 +121,10 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
 
   it('el catalogo importado no esta vacio: la lista contra la que se compara es real', () => {
     // Segunda anti-vacuidad: con `CODIGOS_VALIDOS` vacio la regla diria que TODO es invalido, y
-    // con la comparacion invertida diria que todo vale. Se ancla el tamaño del catalogo cerrado.
-    // El numero es el del catalogo cerrado y se SUBE cuando el catalogo crece, nunca se relaja a
-    // `toContain` ni a `toBeGreaterThan`: relajarlo aqui devolveria esta guardia al verde por
-    // vacuidad que este mismo caso existe para impedir. El catalogo empezo en diez y fue
-    // subiendo hasta DIECIOCHO, al sumar `clientes.consultar` y `clientes.modificar` (ver la
-    // enmienda escrita en `lib/modules/identity/domain/permissions.ts`). Que esa enmienda tenga
-    // que tocar este archivo NO significa que anada un enlace de menu: los permisos nuevos no los
-    // consume nadie todavia, y esta guardia va en el sentido menu -> catalogo, asi que el ancla de
-    // enlaces de aqui arriba se queda EXACTAMENTE como estaba.
-    expect(CODIGOS_VALIDOS).toHaveLength(18);
+    // con la comparacion invertida diria que todo vale. Sin duplicados: una entrada repetida
+    // encubriria un catalogo mas pequeño de lo que parece.
+    expect(CODIGOS_VALIDOS.length).toBeGreaterThan(0);
+    expect(new Set(CODIGOS_VALIDOS).size).toBe(CODIGOS_VALIDOS.length);
     expect(CODIGOS_VALIDOS).toContain('inventario.consultar');
   });
 

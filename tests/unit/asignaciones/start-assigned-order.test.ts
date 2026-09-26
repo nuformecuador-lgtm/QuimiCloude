@@ -13,6 +13,7 @@ import {
   AsignacionesError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
+  OrderProducedFrozenError,
   UnauthorizedError,
 } from '@/lib/modules/asignaciones/domain/errors';
 
@@ -46,6 +47,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     status: 'PENDIENTE',
     presentationId: null,
     finishedAt: null,
+    packedBy: null,
     ...overrides,
   };
 }
@@ -109,11 +111,12 @@ function montar(options?: {
     } as UnitCatalog,
     products: {
       findRefs: vi.fn(async () => [
-        { id: PRODUCTO, name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+        { id: PRODUCTO, name: 'Sosa caustica', unitId: null, stockByUnit: [], type: 'PRODUCT' as const },
       ]),
       findCostingBatches: vi.fn(async () => {
         throw new Error('arrancar un pedido asignado no costea nada');
       }),
+      findFinishedGoodsReceipts: vi.fn(async () => []),
     } as ProductCatalog,
     presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
     now: () => new Date('2026-09-17T10:00:00.000Z'),
@@ -195,6 +198,28 @@ describe('startAssignedOrder — `stale`: se relee y se sigue', () => {
     // `getAssignedOrderExecution`, que compone la vista final.
     expect(findAliveById).toHaveBeenCalledTimes(3);
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('startAssignedOrder — R11: POR_EMPACAR y EN_EMPAQUE no se pueden abrir', () => {
+  it('POR_EMPACAR rechaza con `order_produced_frozen` sin escribir', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['POR_EMPACAR'] });
+    const startAssignedOrder = createStartAssignedOrder(deps);
+
+    await expect(startAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderProducedFrozenError,
+    );
+    expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+
+  it('EN_EMPAQUE rechaza con `order_produced_frozen` sin escribir', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['EN_EMPAQUE'] });
+    const startAssignedOrder = createStartAssignedOrder(deps);
+
+    await expect(startAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderProducedFrozenError,
+    );
+    expect(transitionAliveById).not.toHaveBeenCalled();
   });
 });
 

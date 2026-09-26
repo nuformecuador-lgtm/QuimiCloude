@@ -19,6 +19,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
+import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -58,6 +59,7 @@ function filaExistente(): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: PRESENTACION_DE_A,
+    presentationContent: '1.0000',
   };
 }
 
@@ -97,7 +99,7 @@ function catalogoDeProductos(batches: readonly CostingBatch[] = [], refs?: reado
   const refsPorDefecto =
     refs ??
     [...new Map(batches.map((batch) => [batch.productId, batch.unitId])).entries()].map(
-      ([id, unitId]): ProductRef => ({ id, name: 'producto', unitId, stockByUnit: [] }),
+      ([id, unitId]): ProductRef => ({ id, name: 'producto', unitId, stockByUnit: [], type: 'PRODUCT' }),
     );
   const findCostingBatches = vi.fn(async () => batches);
   const findRefs = vi.fn(async () => refsPorDefecto);
@@ -116,10 +118,13 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
   return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
 }
 
-/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A. */
-function catalogoDePresentaciones(): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
+/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
+ *  contenido que le pase el test -`null` por defecto, para el caso sin copia-. */
+function catalogoDePresentaciones(
+  content: string | null = null,
+): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
   const findRefs = vi.fn(async (ids: readonly string[]) =>
-    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L' }] : [],
+    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L', content }] : [],
   );
   return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
@@ -167,7 +172,7 @@ const EDICION_HACIA_B = {
 
 /** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar la edicion sobre
  *  pedidos en distintos estados. */
-function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO') {
+function repositorioConEstado(status: OrderStatus) {
   const filaVista = {
     ...filaExistente(),
     status,
@@ -332,7 +337,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
       const pres = catalogoDePresentaciones();
       const OTRA_PRESENTACION = '99999999-9999-4999-8999-999999999999';
       pres.findRefs.mockImplementation(async (ids: readonly string[]) =>
-        ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L' }] : [],
+        ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L', content: '2.0000' }] : [],
       );
       const updateOrder = createUpdateOrder({
         orders: repo.orders,
@@ -356,8 +361,8 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     }
   });
 
-  it('R10: ENTREGADO y CANCELADO rechazan con invalid_transition sin consultar el catalogo de presentaciones', async () => {
-    for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
+  it('R10: ENTREGADO, CANCELADO, POR_EMPACAR y EN_EMPAQUE rechazan con invalid_transition sin consultar el catalogo de presentaciones', async () => {
+    for (const status of ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const) {
       const cat = catalogoDeRecetas();
       const repo = repositorioConEstado(status);
       const pres = catalogoDePresentaciones();
@@ -409,6 +414,78 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     expect(pres.findRefs).not.toHaveBeenCalled();
     expect(repo.updateAlive).not.toHaveBeenCalled();
   });
+
+  it('R39: cambiar de presentacion sustituye la copia por el contenido nuevo', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const OTRA_PRESENTACION = '99999999-9999-4999-8999-999999999999';
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: {
+        findRefs: vi.fn(async (ids: readonly string[]) =>
+          ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L', content: '7.0000' }] : [],
+        ),
+      } as unknown as PresentationCatalog,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationId: OTRA_PRESENTACION },
+      ACTOR_A,
+    );
+
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
+    expect(dataEscrita.presentationContent).toBe('7.0000');
+  });
+
+  it('R39: no cambiar de presentacion conserva la copia de la fila leida', async () => {
+    const cat = catalogoDeRecetas();
+    // La fila leida trae `presentationContent: '1.0000'` (`filaExistente`); la presentacion
+    // vigente contesta OTRO contenido, y aun asi la copia NO se toca porque el id no cambia.
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('9.0000').presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
+
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
+    expect(dataEscrita.presentationContent).toBe('1.0000');
+  });
+
+  it('R39: editar cantidad, prioridad o receta sin cambiar presentacion no toca la copia', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('9.0000').presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { recipeId: RECETA_DE_A, quantity: '99.0000', priority: 'CRITICA', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
+
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
+    expect(dataEscrita.presentationContent).toBe('1.0000');
+  });
 });
 
 describe('QC-145 R6 — la edicion no mueve el estado', () => {
@@ -459,9 +536,90 @@ describe('QC-145 R6 — la edicion no mueve el estado', () => {
   });
 });
 
-describe('QC-145 R8 — un pedido ENTREGADO o CANCELADO rechaza toda edicion, sin escribir', () => {
-  it('ENTREGADO y CANCELADO -> `invalid_transition`, aunque la entrada no traiga ningun `status`', async () => {
-    for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
+describe('QC-150 — la edicion no da de alta producto terminado', () => {
+  it('R27: un status ENTREGADO en la entrada de un pedido EN_CURSO no lo deja ENTREGADO y no llama a scope.finishedGoods', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioConEstado('EN_CURSO');
+    const receiveFromOrder = vi.fn();
+    const { unitOfWork, finishedGoods } = fakeUnitOfWork({
+      orders: { lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt },
+      reservations: { syncForOrder: repo.syncForOrder, consumeForOrder: repo.consumeForOrder },
+      finishedGoods: { receiveFromOrder },
+    });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' },
+      ACTOR_A,
+    );
+
+    expect(repo.updateAlive).toHaveBeenCalledTimes(1);
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(dataEscrita).not.toHaveProperty('status');
+    expect(finishedGoods.receiveFromOrder).not.toHaveBeenCalled();
+  });
+
+  it('R27: scope.finishedGoods.receiveFromOrder nunca se llama en una edicion, ni siquiera con status ENTREGADO en la entrada', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      // `fakeUnitOfWork` por defecto (helper compartido) explota si algo llama a
+      // `finishedGoods.receiveFromOrder`: que la edicion termine sin lanzar demuestra que no lo hizo.
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await expect(
+      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A),
+    ).resolves.toBeUndefined();
+  });
+
+  it('R27: un pedido ya ENTREGADO rechaza la edicion con invalid_transition -la transicion a ENTREGADO no se ofrece- y no llama a scope.finishedGoods', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioConEstado('ENTREGADO');
+    const receiveFromOrder = vi.fn();
+    const { unitOfWork, finishedGoods } = fakeUnitOfWork({
+      orders: { lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt },
+      reservations: { syncForOrder: repo.syncForOrder, consumeForOrder: repo.consumeForOrder },
+      finishedGoods: { receiveFromOrder },
+    });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A }, ACTOR_A),
+    );
+
+    expect(codigo).toBe('invalid_transition');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+    expect(finishedGoods.receiveFromOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE rechaza toda edicion, sin escribir', () => {
+  it('ENTREGADO, CANCELADO, POR_EMPACAR y EN_EMPAQUE -> `invalid_transition`, aunque la entrada no traiga ningun `status` (R32)', async () => {
+    for (const status of ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const) {
       const cat = catalogoDeRecetas();
       const repo = repositorioConEstado(status);
       const pres = catalogoDePresentaciones();

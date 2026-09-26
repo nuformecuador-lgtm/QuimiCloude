@@ -201,11 +201,19 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     )
       .split(sep)
       .join('/')
+    // 2026-09-24 (importacion de catalogo desde PDF): CUARTO falso positivo por nombre, y se
+    // excluye un ARCHIVO, no una carpeta. La revision de la importacion elige la unidad de cada
+    // presentacion NUEVA en `new-presentation-units.tsx`; casa con `screenPattern` solo por llamarse
+    // `*presentation*`. No lista ni edita el catalogo de productos: es un selector de unidad dentro
+    // de la pantalla de proveedores. Cualquier otro archivo de esa carpeta que case sigue en rojo.
+    const SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION =
+      '(private)/proveedores/[id]/importar/[documentoId]/components/new-presentation-units.tsx'
     const fueraDeSuCarpeta = appMatches.filter(
       (relPath) =>
         !relPath.startsWith(`${CATALOG_ROUTE_DIR}/`) &&
         !relPath.startsWith(`${RECIPES_ROUTE_DIR}/`) &&
-        !relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`),
+        !relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`) &&
+        relPath !== SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION,
     )
     expect(
       fueraDeSuCarpeta,
@@ -346,12 +354,20 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // es la pantalla que esta ficha añade -el alta del catalogo la sigue cubriendo
     // `inventario.spec.ts` y esta ficha no la toca-. La guardia no se afloja; se le añade un
     // renglon.
+    // ACTUALIZADO: entra un CUARTO nombre, `producto-terminado.spec.ts`, en el orden que el
+    // matcher devuelve (alfabetico). Casa con `screenPattern` por la palabra «producto» en el
+    // nombre del archivo. No es una segunda pantalla del catalogo: lo que ejercita es el
+    // recorrido de un pedido que se finaliza y hace nacer un producto terminado con su lote en
+    // la pestaña «Producto terminado» de Inventario -el alta del catalogo la sigue cubriendo
+    // `inventario.spec.ts` y esta ficha no la toca-. La guardia no se afloja; se le añade un
+    // renglon.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
       E2E_DE_AISLAMIENTO,
       'ajuste-de-inventario.spec.ts',
       'inventario.spec.ts',
+      'producto-terminado.spec.ts',
     ])
 
     // Defensa extra, para que el renglon nuevo no sea una puerta trasera: el spec de QC-49 tiene

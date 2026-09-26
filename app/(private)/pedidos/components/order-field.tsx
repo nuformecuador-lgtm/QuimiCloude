@@ -38,7 +38,8 @@ import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
  * cantidad y el cero admitido en el precio son del esquema del contrato publico, y ese esquema no
  * exporta su expresion regular. Escribirla aqui seria la segunda copia de la regla que R33
  * prohibe. Quien valida es `createOrderSchema`/`updateOrderSchema`, en el cliente y en el
- * servidor.
+ * servidor. `min` SI se declara -es del navegador, no una copia de la regex- para que el control
+ * numerico no ofrezca negativos ni cero; la validacion real sigue siendo la del esquema.
  *
  * **`key={defaultValue}`** por lo mismo que en `supplier-field.tsx` y `product-field.tsx`: Base UI
  * avisa cuando el `defaultValue` de un campo no controlado cambia despues de montarse, y la clave
@@ -88,6 +89,12 @@ export type OrderFieldProps = {
    */
   readonly step?: string;
   /**
+   * Minimo del control numerico. El navegador lo usa para no ofrecer negativos ni cero, pero
+   * quien valida sigue siendo el esquema del contrato: un valor tecleado a mano igual pasa por
+   * `createOrderSchema`/`updateOrderSchema` al enviar. Se ignora con `type` de texto.
+   */
+  readonly min?: string;
+  /**
    * Avisa de lo tecleado. El campo SIGUE SIN ESTAR CONTROLADO -no se le pasa `value`-: esto es un
    * espia para quien necesite reflejar el valor en otro sitio, como el titulo del panel.
    */
@@ -110,6 +117,7 @@ export function OrderField({
   inputMode,
   type = 'text',
   step,
+  min,
   onValueChange,
   roundDecimals,
 }: OrderFieldProps) {
@@ -127,6 +135,7 @@ export function OrderField({
         name={name}
         type={type}
         step={type === 'number' ? step : undefined}
+        min={type === 'number' ? min : undefined}
         inputMode={inputMode}
         autoComplete="off"
         required={required}

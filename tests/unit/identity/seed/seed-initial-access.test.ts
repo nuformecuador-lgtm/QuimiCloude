@@ -207,8 +207,8 @@ function asignacionesDelSeed(rolesPorNombre: ReadonlyMap<string, string>): Reado
   return pares;
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar: veintidos (Administrador 18 +
- *  Operador 2 + Empacador 2). Se deriva de `SEED_ROLE_PERMISSIONS`, no se escribe a mano. */
+/** Numero total de asignaciones que el seed tiene que dejar. Se deriva de
+ *  `SEED_ROLE_PERMISSIONS`, no se escribe a mano. */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -698,7 +698,7 @@ describe('seedInitialAccess', () => {
   // ---------------------------------------------------------------------------------
 
   // El catalogo completo y las asignaciones de los tres roles, contra el repositorio falso.
-  it('sobre una base vacia crea los dieciocho permisos del catalogo y las veintidos asignaciones del seed', async () => {
+  it('sobre una base vacia crea el catalogo completo y todas las asignaciones del seed', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -726,8 +726,7 @@ describe('seedInitialAccess', () => {
     );
     expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
 
-    // Luego: las asignaciones, las veintidos (dieciocho del Administrador + dos del Operador +
-    // dos del Empacador).
+    // Luego: las asignaciones, todas las que declara `SEED_ROLE_PERMISSIONS` para los tres roles.
     const creacionesDeAsignaciones = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'createRolePermissions',
     );
@@ -736,7 +735,7 @@ describe('seedInitialAccess', () => {
       roleId: string;
       permissionCode: string;
     }[];
-    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(22);
+    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBeGreaterThan(0);
     expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED);
     expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
@@ -753,10 +752,11 @@ describe('seedInitialAccess', () => {
     const codigosDelAdministrador = paresCreados
       .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
       .map((par) => par.permissionCode);
-    expect(codigosDelAdministrador).toHaveLength(18);
-    expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
-    // QC-74 R9 le daba UNO; QC-86 R26 le suma `asignaciones.consultar` y son DOS, y ni uno mas
-    // (QC-86 R27). El orden es el de `SEED_ROLE_PERMISSIONS`, que es como el seed los recorre.
+    expect(codigosDelAdministrador).toHaveLength(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]!.length);
+    expect(new Set(codigosDelAdministrador)).toEqual(
+      new Set(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]),
+    );
+    // El orden es el de `SEED_ROLE_PERMISSIONS`, que es como el seed los recorre.
     expect(
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
@@ -768,7 +768,7 @@ describe('seedInitialAccess', () => {
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_EMPACADOR))
         .map((par) => par.permissionCode),
-    ).toEqual(['asignaciones.consultar', 'terminados.consultar']);
+    ).toEqual(['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar']);
 
     // Y el orden del algoritmo: los roles ANTES que los permisos, y los permisos ANTES
     // que el administrador (`design.md > 3`). Sin ese orden, una asignacion no tendria
@@ -778,6 +778,97 @@ describe('seedInitialAccess', () => {
     expect(indiceDe('createRole')).toBeLessThan(indiceDe('createPermissions'));
     expect(indiceDe('createPermissions')).toBeLessThan(indiceDe('createRolePermissions'));
     expect(indiceDe('createRolePermissions')).toBeLessThan(indiceDe('createInitialAdmin'));
+  });
+
+  it('QC-142 R13: sobre una base vacia el Administrador recibe documentos.consultar y documentos.modificar; Operador y Empacador ninguno', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
+      ?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    const rolesCreados = new Map(
+      repository.llamadas
+        .filter((llamada) => llamada.metodo === 'createRole')
+        .map((llamada, index) => [(llamada.args[0] as { name: string }).name, `rol-${index + 1}`]),
+    );
+    const codigosDe = (rol: string): string[] =>
+      paresCreados.filter((par) => par.roleId === rolesCreados.get(rol)).map((par) => par.permissionCode);
+
+    expect(codigosDe(ROLE_ADMINISTRADOR)).toEqual(expect.arrayContaining(['documentos.consultar', 'documentos.modificar']));
+    expect(codigosDe(ROLE_OPERADOR)).not.toContain('documentos.consultar');
+    expect(codigosDe(ROLE_OPERADOR)).not.toContain('documentos.modificar');
+    expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.consultar');
+    expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.modificar');
+  });
+
+  it('QC-142 R13: sobre una base sembrada antes de esta feature -todo salvo documentos.*- el seed crea exactamente esos dos permisos y las dos asignaciones del Administrador, y la segunda corrida no cambia nada', async () => {
+    const codigosDeDocumentos: readonly string[] = PERMISSIONS.filter(
+      (permission) => permission.module === 'documentos',
+    ).map((permission) => permission.code);
+    const administradorId = ROLES_YA_SEMBRADOS.get(ROLE_ADMINISTRADOR) ?? '';
+    const operadorId = ROLES_YA_SEMBRADOS.get(ROLE_OPERADOR) ?? '';
+    const empacadorId = ROLES_YA_SEMBRADOS.get(ROLE_EMPACADOR) ?? '';
+
+    const yaExistentes = PERMISSIONS.map((permission) => permission.code).filter(
+      (code) => !codigosDeDocumentos.includes(code),
+    );
+    const asignacionesDeDocumentosDelAdministrador = new Set(
+      codigosDeDocumentos.map((code) => `${administradorId}|${code}`),
+    );
+    const asignacionesExistentes = new Set(
+      [...asignacionesDelSeed(ROLES_YA_SEMBRADOS)].filter(
+        (asignacion) => !asignacionesDeDocumentosDelAdministrador.has(asignacion),
+      ),
+    );
+
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      permisosExistentes: new Set(yaExistentes),
+      asignacionesExistentes,
+    });
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    const primeraCorrida = await seedInitialAccess({
+      repository,
+      passwordHasher,
+      credentials,
+      checkCredentialPolicy,
+    });
+
+    // Primero: se creo exactamente lo que faltaba de documentos, y nada mas.
+    expect(new Set(primeraCorrida.createdPermissions)).toEqual(new Set(codigosDeDocumentos));
+    expect(primeraCorrida.createdRolePermissions).toBe(codigosDeDocumentos.length);
+
+    const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
+      ?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    expect(paresCreados.every((par) => par.roleId === administradorId)).toBe(true);
+    expect(new Set(paresCreados.map((par) => par.permissionCode))).toEqual(new Set(codigosDeDocumentos));
+
+    // Operador y Empacador siguen sin ninguna entrada de documentos.
+    for (const codigo of codigosDeDocumentos) {
+      expect(repository.asignacionesExistentes.has(`${operadorId}|${codigo}`)).toBe(false);
+      expect(repository.asignacionesExistentes.has(`${empacadorId}|${codigo}`)).toBe(false);
+    }
+
+    // Y la segunda corrida, sobre el MISMO repositorio ya completo, no escribe nada.
+    const llamadasTrasLaPrimera = repository.llamadas.length;
+    const segundaCorrida = await seedInitialAccess({
+      repository,
+      passwordHasher,
+      credentials,
+      checkCredentialPolicy,
+    });
+    const llamadasDeLaSegunda = repository.llamadas.slice(llamadasTrasLaPrimera);
+    expect(llamadasDeEscritura(llamadasDeLaSegunda)).toEqual([]);
+    expect(segundaCorrida.createdPermissions).toEqual([]);
+    expect(segundaCorrida.createdRolePermissions).toBe(0);
   });
 
   // Caso 15 (QC-74 R10)

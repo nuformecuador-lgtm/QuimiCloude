@@ -201,11 +201,10 @@ export type RecipeStepInput = z.infer<typeof recipeStepSchema>;
 /** Alias de lectura: el documento de un paso es el mismo dentro y fuera (`design.md > 2`). */
 export type RecipeStepDocument = RecipeStepInput;
 
-/**
- * Pasos: hasta 50 por receta, y ninguno vacio (R13; se mantiene lo vigente de QC-24/QC-25).
- * `.default([])`: sin pasos se persiste la lista vacia, no `undefined`.
- */
-const recipeStepsSchema = z.array(recipeStepSchema).max(50).default([]);
+export const MAX_RECIPE_STEPS = 50;
+
+/** `.default([])`: sin pasos se persiste la lista vacia, no `undefined`. */
+const recipeStepsSchema = z.array(recipeStepSchema).max(MAX_RECIPE_STEPS).default([]);
 
 /** Rechaza que la lista de lineas repita el mismo `productId` (R16). */
 function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {

@@ -57,20 +57,19 @@ describe('createProductSchema', () => {
     expect(parsed.type).toBe(PRODUCT_TYPES.PRODUCT);
   });
 
-  it('rechaza el nombre de producto de mas de 120 caracteres y el de presentacion de mas de 60', () => {
-    // R11
-    const productName121 = 'a'.repeat(121);
-    const productName120 = 'a'.repeat(120);
+  it('D22 — rechaza el nombre de producto de mas de 200 caracteres y acepta hasta 200', () => {
+    const productName201 = 'a'.repeat(201);
+    const productName200 = 'a'.repeat(200);
     expect(
       createProductSchema.safeParse({
         ...ALTA_PRODUCTO,
-        name: productName121,
+        name: productName201,
       }).success,
     ).toBe(false);
     expect(
       createProductSchema.safeParse({
         ...ALTA_PRODUCTO,
-        name: productName120,
+        name: productName200,
       }).success,
     ).toBe(true);
 
@@ -84,6 +83,24 @@ describe('createProductSchema', () => {
       createPresentationSchema.safeParse({ name: presentationName60, unitId: UNIDAD_FIXTURE })
         .success,
     ).toBe(true);
+  });
+
+  it('D22 — un nombre de 183 caracteres se acepta completo en alta y edicion, y uno de 201 se rechaza en ambas', () => {
+    const productName183 = 'c'.repeat(183);
+    const productName201 = 'd'.repeat(201);
+
+    const alta = createProductSchema.parse({ ...ALTA_PRODUCTO, name: productName183 });
+    expect(alta.name).toBe(productName183);
+    expect(alta.name.length).toBe(183);
+    expect(
+      createProductSchema.safeParse({ ...ALTA_PRODUCTO, name: productName201 }).success,
+    ).toBe(false);
+
+    const edicion = updateProductSchema.parse({ ...EDICION_PRODUCTO, name: productName183 });
+    expect(edicion.name).toBe(productName183);
+    expect(
+      updateProductSchema.safeParse({ ...EDICION_PRODUCTO, name: productName201 }).success,
+    ).toBe(false);
   });
 
   it('rechaza un numero o un tamano de pagina que no sea entero mayor o igual a 1', () => {

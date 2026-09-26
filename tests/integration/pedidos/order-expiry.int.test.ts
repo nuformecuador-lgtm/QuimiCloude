@@ -22,9 +22,13 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
-import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   createOrderWriteRepository,
   findExpirableOrders,
@@ -33,6 +37,7 @@ import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/pers
 import {
   createRecipeExecutionReader,
   findRecipeExecutionContentById,
+  findAliveRecipeByNormalizedName,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
@@ -77,6 +82,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        finishedGoods: createFinishedGoodsIntake(tx),
       };
       return work(scope);
     }),
@@ -86,10 +92,14 @@ const recipes: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
 
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
-const presentations: PresentationCatalog = { findRefs: findPresentationRefs };
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts };
+const presentations: PresentationCatalog = {
+  findRefs: findPresentationRefs,
+  findByNormalizedNames: findPresentationsByNormalizedNames,
+};
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
@@ -217,7 +227,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
 }
 
 function nuevoPedido(recipeId: string, presentationId: string, quantity: string): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', presentationId };
+  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
 }
 
 /** Crea un pedido reservado y lo hace CADUCADO a proposito: `reserved_at` pasa a un instante

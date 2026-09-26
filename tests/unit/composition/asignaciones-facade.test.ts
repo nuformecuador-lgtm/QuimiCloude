@@ -16,25 +16,29 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63 y QC-145) — la fachada de `asignaciones` lista sus DOCE operaciones', () => {
-  // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion y luego
+describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de `asignaciones` lista sus DIECISEIS operaciones', () => {
+  // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
-  // `listResponsibleCandidates`-. Siguen nombradas UNA A UNA y comparadas por igualdad exacta: una
-  // operacion futura que nadie declare aqui pone el caso en rojo, que es justo lo que este censo
-  // promete.
-  it('expone las nueve anteriores mas las TRES de QC-145, y ninguna mas', () => {
+  // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
+  // UNA y comparadas por igualdad exacta: una operacion futura que nadie declare aqui pone el caso
+  // en rojo, que es justo lo que este censo promete.
+  it('expone las doce anteriores mas las CUATRO de QC-168, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'finishAssignedOrder',
+      'finishPacking',
       'getAssignedOrderExecution',
+      'getPackingOrder',
       'listAssignedOrders',
       'listCompanyOrders',
       'listFinishedOrders',
       'listOrderResponsibles',
+      'listPackingOrders',
       'listResponsibleCandidates',
       'listResponsiblesForOrders',
       'removeWorkGroupFromOrder',
       'startAssignedOrder',
+      'startPacking',
       'unassignResponsible',
     ]);
   });
@@ -119,6 +123,40 @@ describe('QC-88 T8 (censo crecido por QC-63 y QC-145) — la fachada de `asignac
   it('`listResponsibleCandidates` rechaza sin `asignaciones.modificar` sin llegar a la base', async () => {
     const error = await asignaciones
       .listResponsibleCandidates({ id: 'u', companyId: 'c', permissions: [] }, {})
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  // Las CUATRO operaciones de QC-168: mismo criterio, el cliente Prisma doblado es `{}`, asi que
+  // `unauthorized` demuestra el cableado sin llegar a ningun puerto.
+  it('`listPackingOrders` rechaza sin `empaque.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listPackingOrders({ id: 'u', companyId: 'c', permissions: [] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`getPackingOrder` rechaza sin `empaque.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .getPackingOrder({ id: 'u', companyId: 'c', permissions: [] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`startPacking` rechaza sin `empaque.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .startPacking({ id: 'u', companyId: 'c', permissions: [] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`finishPacking` rechaza sin `empaque.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .finishPacking({ id: 'u', companyId: 'c', permissions: [] }, { orderId: 'o' })
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');

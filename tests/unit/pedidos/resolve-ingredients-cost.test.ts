@@ -6,7 +6,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveIngredientsCost } from '@/lib/modules/pedidos/domain/resolve-ingredients-cost';
+import { resolveIngredientsCost, resolveLotIngredientsCost } from '@/lib/modules/pedidos/domain/resolve-ingredients-cost';
 
 import type { CostingBatch, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
@@ -33,19 +33,30 @@ function catalogoDeRecetas(content: RecipeExecutionContent | null = contenido())
   const findExecutionContentById = vi.fn(async () => content);
   const findRefsIncludingDeleted = vi.fn(async () => []);
   const findIdsMatchingName = vi.fn(async () => null);
+  const findAliveByNormalizedName = vi.fn(async () => null);
   return {
-    recipes: { findExecutionContentById, findRefsIncludingDeleted, findIdsMatchingName } as RecipeCatalog,
+    recipes: {
+      findExecutionContentById,
+      findRefsIncludingDeleted,
+      findIdsMatchingName,
+      findAliveByNormalizedName,
+    } as RecipeCatalog,
     findExecutionContentById,
   };
 }
 
 function catalogoDeProductos(
-  refs: readonly ProductRef[] = [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+  refs: readonly ProductRef[] = [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
   batches: readonly CostingBatch[] = [],
 ) {
   const findRefs = vi.fn(async () => refs);
   const findCostingBatches = vi.fn(async () => batches);
-  return { products: { findRefs, findCostingBatches } as ProductCatalog, findRefs, findCostingBatches };
+  const findFinishedGoodsReceipts = vi.fn(async () => []);
+  return {
+    products: { findRefs, findCostingBatches, findFinishedGoodsReceipts } as ProductCatalog,
+    findRefs,
+    findCostingBatches,
+  };
 }
 
 function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new Map([[LITRO.id, LITRO]])) {
@@ -79,7 +90,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '50.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -118,7 +129,7 @@ describe('resolveIngredientsCost', () => {
   it('existencia insuficiente devuelve sin importe (R16)', async () => {
     const cat = catalogoDeRecetas();
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '1.0000', unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -160,7 +171,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: GRAMO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: GRAMO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ unitId: KILOGRAMO.id, stock: '2.0000', unitCost: '5.0000' })],
     );
     const uni = catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILOGRAMO.id, KILOGRAMO]]));
@@ -189,6 +200,7 @@ describe('resolveIngredientsCost', () => {
       name: `producto ${i}`,
       unitId: LITRO.id,
       stockByUnit: [],
+      type: 'PRODUCT' as const,
     }));
     const batches = Array.from({ length: 4 }, (_, i) =>
       lote({ productId: `${PRODUCT_A}-${i}`, stock: '1000.0000', unitCost: '1.0000' }),
@@ -210,7 +222,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
       [lote({ stock: '1000.0000', unitCost: '1.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -226,7 +238,7 @@ describe('resolveIngredientsCost', () => {
 
   it('sin `options.orderId` pide los lotes sin excluir ningun pedido; con el, lo reenvia como `excludeOrderId` (R65)', async () => {
     const cat = catalogoDeRecetas();
-    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }], [lote()]);
+    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }], [lote()]);
     const uni = catalogoDeUnidades();
 
     await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
@@ -241,6 +253,91 @@ describe('resolveIngredientsCost', () => {
       COMPANY_ID,
       { orderId: 'pedido-1' },
     );
+    expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: 'pedido-1' });
+  });
+});
+
+// `resolveLotIngredientsCost`: la hermana que orquesta las mismas lecturas pero
+// termina en `calculateLotIngredientsCost` -un ingrediente sin costo cuenta cero- en vez de
+// `calculateIngredientsCost`. Comparte firma completa, incluido `options.orderId`: el
+// pedido que se finaliza tiene su propio material apartado, que cuenta como disponible para si.
+describe('resolveLotIngredientsCost', () => {
+  it('pedido 200, 10 % de un insumo en L con un lote de 50 L a 2,0000 -> 40,0000, igual que resolveIngredientsCost', async () => {
+    const cat = catalogoDeRecetas(
+      contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
+    );
+    const prod = catalogoDeProductos(
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
+      [lote({ stock: '50.0000', unitCost: '2.0000' })],
+    );
+    const uni = catalogoDeUnidades();
+
+    const resultado = await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+    );
+
+    expect(resultado).toBe('40.0000');
+  });
+
+  it('un insumo sin existencia disponible cuenta cero y el resultado nunca es nulo (R42)', async () => {
+    const cat = catalogoDeRecetas();
+    const prod = catalogoDeProductos(
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
+      [lote({ stock: '1.0000', unitCost: '2.0000' })],
+    );
+    const uni = catalogoDeUnidades();
+
+    // El disponible (1) no cubre lo necesario (200): resolveIngredientsCost da null, la hermana
+    // cuenta cero y devuelve '0.0000'.
+    const resultado = await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+    );
+
+    expect(resultado).toBe('0.0000');
+  });
+
+  it('receta sin lineas da 0.0000, no null', async () => {
+    const cat = catalogoDeRecetas(contenido({ lines: [] }));
+    const prod = catalogoDeProductos();
+    const uni = catalogoDeUnidades();
+
+    const resultado = await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+    );
+
+    expect(resultado).toBe('0.0000');
+  });
+
+  it('reenvia options.orderId a findCostingBatches como excludeOrderId (C5: el pedido a finalizar cuenta su propio apartado como disponible)', async () => {
+    const cat = catalogoDeRecetas();
+    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }], [lote()]);
+    const uni = catalogoDeUnidades();
+
+    await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+      { orderId: 'pedido-1' },
+    );
+
     expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: 'pedido-1' });
   });
 });

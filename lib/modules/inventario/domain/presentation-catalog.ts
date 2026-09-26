@@ -1,10 +1,21 @@
 /** Identificador de una presentacion visto DESDE FUERA de `inventario`. */
 export type PresentationId = string;
 
-/** Lo que otro modulo puede saber de una presentacion: identidad y nombre. */
+/** Lo que otro modulo puede saber de una presentacion: identidad, nombre y contenido. */
 export type PresentationRef = {
   readonly id: PresentationId;
   readonly name: string;
+  /** Lo que `pedidos` copia al crear o cambiar de presentacion. `null` = sin declarar. */
+  readonly content: string | null;
+};
+
+/** Lo que otro modulo necesita para resolver una presentacion por su nombre: la unidad
+ *  incluida, porque quien resuelve por nombre lo hace para decidir si hace falta crearla. */
+export type PresentationByName = {
+  readonly id: PresentationId;
+  readonly name: string;
+  readonly nameNormalized: string;
+  readonly unitId: string;
 };
 
 /** Servicio que `inventario` ofrece a los demas modulos (`docs/architecture.md > Dominio`
@@ -18,4 +29,11 @@ export interface PresentationCatalog {
     ids: readonly PresentationId[],
     companyId: string,
   ): Promise<readonly PresentationRef[]>;
+
+  /** Las presentaciones de esa empresa entre los nombres normalizados pedidos. Uno que no
+   *  existe o que es de otra empresa simplemente no vuelve. Con `names` vacio no consulta. */
+  findByNormalizedNames(
+    names: readonly string[],
+    companyId: string,
+  ): Promise<readonly PresentationByName[]>;
 }

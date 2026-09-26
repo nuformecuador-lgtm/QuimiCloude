@@ -4,6 +4,14 @@
  */
 
 export {
+  DOCUMENT_UPLOAD_CLOSE_TESTID,
+  DOCUMENT_UPLOAD_DIALOG_TESTID,
+  DOCUMENT_UPLOAD_OPEN_TESTID,
+  DocumentUploadDialog,
+  type DocumentUploadDialogProps,
+} from './document-upload-dialog';
+
+export {
   DocumentUpload,
   DOCUMENT_UPLOAD_CLEAR_TESTID,
   DOCUMENT_UPLOAD_ERROR_TESTID,
@@ -24,6 +32,7 @@ export {
   rowNameTestId,
   rowPhaseTestId,
   rowReasonTestId,
+  rowReviewLinkTestId,
   rowStatusTestId,
   rowTestId,
   type DocumentUploadRowProps,
@@ -31,7 +40,12 @@ export {
 
 export {
   BROWSER_PHASE_LABELS,
+  CLOSE_LABEL,
+  DIALOG_TITLE,
   FILE_STATUS_LABELS,
+  OPEN_LABEL,
+  REVIEW_LABEL,
+  dialogDescription,
   fileErrorMessage,
   tooManyFilesMessage,
   type BrowserPhase,

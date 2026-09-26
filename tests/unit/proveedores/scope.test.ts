@@ -456,6 +456,10 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       'cost',
       'minPurchase',
       'deliveryTime',
+      // Ampliacion nombrada: la importacion de catalogo desde PDF suma material y medidas a la
+      // linea; siguen sin `@relation` hacia otro modulo.
+      'material',
+      'measurements',
       // La linea guarda su propia empresa en vez de heredarla por su proveedor: es lo que
       // permite acotar cada consulta sin atravesar la relacion.
       'companyId',
@@ -528,6 +532,9 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       // nombran alli uno a uno. Se anade el nombre concreto y no un comodin: cualquier otra
       // migracion que toque estas tablas sigue poniendo esto rojo.
       '20260917120000_suppliers_company_scope',
+      // Ampliacion nombrada: material y medidas de la linea, con los mismos
+      // dos campos añadidos al censo de `SupplierCatalogLine` de arriba.
+      '20260924180000_supplier_catalog_line_material_and_measurements',
     ])
   })
 

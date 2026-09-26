@@ -38,7 +38,7 @@ import {
 import {
   ORDER_PRIORITY_VALUES,
   ORDER_QUERYABLE,
-  ORDER_STATUS_VALUES,
+  ORDER_STATUS_FLOW,
   formatOrderNumber,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
@@ -180,10 +180,11 @@ describe('los filtros son los tres de la decision cerrada y ninguno mas (R14)', 
   it('estado y prioridad como seleccion de los conjuntos cerrados, fecha como rango', () => {
     const porId = new Map(ORDER_COLUMNS.map((column) => [column.id, column]));
 
+    // R41: en orden de flujo (`ORDER_STATUS_FLOW`), no en el orden crudo del enum.
     const estado = porId.get(STATUS_COLUMN_ID)?.filter;
     expect(estado?.kind).toBe('select');
     expect(estado?.kind === 'select' ? estado.options.map((o) => o.value) : []).toEqual([
-      ...ORDER_STATUS_VALUES,
+      ...ORDER_STATUS_FLOW,
     ]);
 
     const prioridad = porId.get(PRIORITY_COLUMN_ID)?.filter;

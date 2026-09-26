@@ -30,7 +30,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PRESENTATION_CREATE_OPEN_TESTID,
+  PRESENTATION_CONTENT_FIELD,
+  PRESENTATION_ERROR_CONTENT_TESTID,
   PRESENTATION_ERROR_NAME_TESTID,
+  PRESENTATION_FIELD_CONTENT_TESTID,
   PRESENTATION_FIELD_NAME_TESTID,
   PRESENTATION_FORM_CANCEL_TESTID,
   PRESENTATION_FORM_ERROR_CODE_TESTID,
@@ -140,6 +143,7 @@ const PRESENTACION: PresentationSheetTarget = {
   id: crypto.randomUUID(),
   name: 'Tambor 200 L',
   unitId: UNIDAD_LITRO.id,
+  content: '15.0000',
 };
 
 /**
@@ -569,6 +573,111 @@ describe('QC-121 — presentation_unit_locked', () => {
     expect(selector).toHaveTextContent(UNIDAD_KG.symbol!);
     expect(toastExito).not.toHaveBeenCalled();
     expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('el contenido de la presentacion (R8)', () => {
+  it('R8 — el alta introduce un contenido y lo envia junto al resto de campos', async () => {
+    const user = setupUser();
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_CONTENT_TESTID), '1.5');
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(createPresentationActionMock.mock.calls[0]![1].get(PRESENTATION_CONTENT_FIELD)).toBe(
+      '1.5',
+    );
+  });
+
+  it('R8 — una coma escrita en el contenido viaja como punto', async () => {
+    const user = setupUser();
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_CONTENT_TESTID), '1,5');
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(createPresentationActionMock.mock.calls[0]![1].get(PRESENTATION_CONTENT_FIELD)).toBe(
+      '1.5',
+    );
+  });
+
+  it('R8 — el alta se puede enviar sin contenido: viaja vacio, no bloquea el envio', async () => {
+    const user = setupUser();
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createPresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(createPresentationActionMock.mock.calls[0]![1].get(PRESENTATION_CONTENT_FIELD)).toBe(
+      '',
+    );
+  });
+
+  it('R8 — un contenido invalido no llega a la operacion y se marca en el campo', async () => {
+    const user = setupUser();
+    await abrirAlta(user);
+
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID), NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
+    await user.type(screen.getByTestId(PRESENTATION_FIELD_CONTENT_TESTID), '0');
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    const errorDelCampo = await screen.findByTestId(PRESENTATION_ERROR_CONTENT_TESTID);
+    expect(errorDelCampo).toHaveAttribute('role', 'alert');
+    const campo = screen.getByTestId(PRESENTATION_FIELD_CONTENT_TESTID);
+    expect(campo).toHaveAttribute('aria-invalid', 'true');
+    expect(campo).toHaveAttribute('aria-describedby', errorDelCampo.id);
+    expect(createPresentationActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R8 — la edicion precarga el contenido guardado, sin los ceros de relleno', async () => {
+    const user = setupUser();
+    render(<FilaConPanel presentation={PRESENTACION} />);
+    await user.click(screen.getByTestId(ROW_EDIT_TESTID));
+    await screen.findByTestId(PRESENTATION_FORM_TESTID);
+
+    // `PRESENTACION.content` es '15.0000'; la precarga lo muestra sin los ceros de relleno.
+    expect(screen.getByTestId(PRESENTATION_FIELD_CONTENT_TESTID)).toHaveValue('15');
+  });
+
+  it('R8 — la edicion cambia el contenido y envia el nuevo valor', async () => {
+    const user = setupUser();
+    render(<FilaConPanel presentation={PRESENTACION} />);
+    await user.click(screen.getByTestId(ROW_EDIT_TESTID));
+    await screen.findByTestId(PRESENTATION_FORM_TESTID);
+
+    const campo = screen.getByTestId(PRESENTATION_FIELD_CONTENT_TESTID);
+    await user.clear(campo);
+    await user.type(campo, '2.25');
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updatePresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(updatePresentationActionMock.mock.calls[0]![2].get(PRESENTATION_CONTENT_FIELD)).toBe(
+      '2.25',
+    );
+  });
+
+  it('R8 — la edicion vacia el contenido y lo envia vacio', async () => {
+    const user = setupUser();
+    render(<FilaConPanel presentation={PRESENTACION} />);
+    await user.click(screen.getByTestId(ROW_EDIT_TESTID));
+    await screen.findByTestId(PRESENTATION_FORM_TESTID);
+
+    await user.clear(screen.getByTestId(PRESENTATION_FIELD_CONTENT_TESTID));
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updatePresentationActionMock).toHaveBeenCalledTimes(1));
+    expect(updatePresentationActionMock.mock.calls[0]![2].get(PRESENTATION_CONTENT_FIELD)).toBe(
+      '',
+    );
   });
 });
 

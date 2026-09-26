@@ -59,6 +59,9 @@ function dobles() {
     readBatch: vi.fn(async () => {
       throw new Error('enqueue-batch no lee ninguna tanda');
     }),
+    readFileForReview: vi.fn(async () => {
+      throw new Error('enqueue-batch no lee para revision');
+    }),
   };
 
   let contadorDeMensajes = 0;
@@ -179,5 +182,43 @@ describe('documentos — enqueueBatch', () => {
     const entrada = doble.createBatch.mock.calls[0]?.[0];
     expect(entrada?.strategy).toBe('formula');
     expect(Object.keys(entrada ?? {}).sort()).toEqual(['companyId', 'createdBy', 'paths', 'strategy']);
+  });
+
+  describe('documentos.modificar decide, nunca proveedores.* (R14, R15, R16)', () => {
+    it('R15 — proveedores.modificar y proveedores.consultar, sin documentos.modificar, rechazan sin escribir ni publicar', async () => {
+      const doble = dobles();
+      const enqueueBatch = createEnqueueBatch(doble);
+      const actor: Actor = {
+        id: PERSONA,
+        companyId: EMPRESA,
+        permissions: ['proveedores.modificar', 'proveedores.consultar'],
+      };
+
+      await expect(
+        enqueueBatch(actor, { strategy: 'catalogo', paths: rutas(1) }),
+      ).rejects.toThrow(UnauthorizedError);
+      expect(doble.llamadas).toEqual([]);
+    });
+
+    it('R15 — solo documentos.consultar, sin documentos.modificar, tambien rechaza', async () => {
+      const doble = dobles();
+      const enqueueBatch = createEnqueueBatch(doble);
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.consultar'] };
+
+      await expect(
+        enqueueBatch(actor, { strategy: 'catalogo', paths: rutas(1) }),
+      ).rejects.toThrow(UnauthorizedError);
+      expect(doble.llamadas).toEqual([]);
+    });
+
+    it('R16 — documentos.modificar sin ningun permiso de proveedores autoriza la operacion', async () => {
+      const doble = dobles();
+      const enqueueBatch = createEnqueueBatch(doble);
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] };
+
+      const { batchId } = await enqueueBatch(actor, { strategy: 'catalogo', paths: rutas(1) });
+
+      expect(batchId).toBe('tanda-1');
+    });
   });
 });

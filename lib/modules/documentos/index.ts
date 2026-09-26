@@ -20,7 +20,7 @@
 // El actor entra por PARAMETRO en cada caso de uso: el dominio no lee sesion, cookie ni cabecera.
 // `requirePermission` se publica porque es la definicion UNICA de como este modulo exige un
 // permiso, no para que la repita nadie. El CODIGO del permiso se queda dentro del modulo.
-export { requirePermission, type Actor } from './domain/actor';
+export { canUploadDocuments, requirePermission, type Actor } from './domain/actor';
 
 // La jerarquia de errores con `code` estable del catalogo unico: quien traduzca decide POR el
 // `code` —nunca por el texto del mensaje— y reconoce el caso con un solo `instanceof` sobre la
@@ -153,3 +153,85 @@ export {
   type CropCatalogImagesInput,
   type CropCatalogImagesResult,
 } from './domain/crop-catalog-images';
+
+// El esquema del borde de la vista previa y de la confirmacion de una importacion de catalogo, y
+// sus tipos inferidos: una sola definicion de la entrada, reutilizada por las dos Server Actions
+// de importacion.
+export {
+  confirmCatalogImportInputSchema,
+  newPresentationUnitSchema,
+  previewCatalogImportInputSchema,
+  type ConfirmCatalogImportInput,
+  type NewPresentationUnitInput,
+  type PreviewCatalogImportInput,
+  type ReviewedLineInput,
+} from './domain/catalog-import-input';
+
+// La vista previa de una importacion de catalogo, publicada como FABRICA por el mismo motivo que
+// el resto: quien la usa recibe el caso de uso ya construido y nunca ve a sus puertos ni a los
+// casos de uso de `proveedores` e `inventario` que trae inyectados. `CatalogImportDeps` se
+// publica porque la confirmacion (`confirm-catalog-import.ts`) comparte el MISMO tipo, y quien cablea los dos
+// (`lib/composition`) necesita nombrarlo una sola vez.
+export {
+  createPreviewCatalogImport,
+  type CatalogImportDeps,
+  type CatalogImportNewPresentation,
+  type CatalogImportPreview,
+  type CatalogImportPreviewCrop,
+  type CatalogImportPreviewRow,
+} from './domain/preview-catalog-import';
+
+// La confirmacion, publicada por el mismo motivo y con el mismo `CatalogImportDeps`: quien
+// cablea los dos casos de uso (`lib/composition`) los nombra una sola vez.
+export { createConfirmCatalogImport, type CatalogImportSummary } from './domain/confirm-catalog-import';
+
+// La sugerencia de unidad por nombre o simbolo normalizado, funcion pura sin fabrica porque no
+// tiene dependencias que inyectar.
+export { suggestUnitId } from './domain/suggest-unit';
+
+// La interpretacion tolerante del texto que la IA dejo guardado para un archivo de formula, y
+// el paso de un texto de paso a documento: dominio puro, sin base ni framework. La pantalla de
+// revision los necesita para pintar «leido: ...» sin volver a interpretar en el cliente lo que
+// ya interpreto el servidor.
+export {
+  extractFormulaFromText,
+  type ExtractedIngredient,
+  type FormulaExtraction,
+} from './domain/formula-extraction';
+export { stepTextToDocument } from './domain/formula-step-text';
+
+// Las reglas PURAS de la revision de una formula: las usa tanto el servidor -vista previa y
+// confirmacion, mas abajo- como la pantalla, para habilitar «Confirmar» sin ir y volver.
+export {
+  reviewFormulaImport,
+  type DraftLine,
+  type FormulaDraft,
+  type FormulaReviewIssues,
+  type RowProblem,
+} from './domain/review-formula-import';
+
+// El esquema del borde de la vista previa y de la confirmacion de una importacion de formula, y
+// sus tipos inferidos: mismo criterio que el resto de esquemas de arriba, una sola definicion.
+export {
+  confirmFormulaImportInputSchema,
+  previewFormulaImportInputSchema,
+  type ConfirmFormulaImportInput,
+  type PreviewFormulaImportInput,
+} from './domain/formula-import-input';
+
+// La vista previa de una importacion de formula, publicada como FABRICA por el mismo motivo que
+// el resto: quien la usa recibe el caso de uso ya construido y nunca ve a sus puertos ni a los
+// casos de uso de `recetas` e `inventario` que trae inyectados. `FormulaImportDeps` se publica
+// porque la confirmacion (`confirm-formula-import.ts`) comparte el MISMO tipo, y quien cablea los
+// dos (`lib/composition`) necesita nombrarlo una sola vez.
+export {
+  createPreviewFormulaImport,
+  type FormulaImportDeps,
+  type FormulaImportIngredientMatch,
+  type FormulaImportPreview,
+  type FormulaImportPreviewIngredient,
+} from './domain/preview-formula-import';
+
+// La confirmacion, publicada por el mismo motivo y con el mismo `FormulaImportDeps`: quien
+// cablea los dos casos de uso (`lib/composition`) los nombra una sola vez.
+export { createConfirmFormulaImport, type FormulaImportSummary } from './domain/confirm-formula-import';

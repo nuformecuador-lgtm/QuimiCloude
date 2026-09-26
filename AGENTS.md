@@ -135,17 +135,18 @@ Lo hace cumplir `tests/guards/guard-modelos-de-agentes.test.ts`.
 
 ## Paralelismo
 
-Se permite un maximo de **2 features concurrentes en `frontend` y en `backend`, y de 3 en
+Se permite un maximo de **2 features concurrentes en `frontend`, y de 3 en `backend` y en
 `fullstack`**, siempre que no haya conflicto de archivos con las que ya estan `in_progress`.
 El cupo de `fullstack` subio de 2 a 3 el 2026-09-22: las fullstack no se parten (criterio de
 QC-121/QC-145/QC-147) y esa zona era el cuello; el caso que lo destapo fue QC-146, aprobada y
-parada con QC-121 y QC-147 en curso.
+parada con QC-121 y QC-147 en curso. El cupo de `backend` subio de 2 a 3 el 2026-09-24 por el
+mismo motivo: QC-142 quedo aprobada y parada con QC-131 y QC-153 en curso.
 
 | Feature A | Feature B | Paralelo? |
 | --- | --- | --- |
 | `frontend` | `backend` | Si |
 | `frontend` | `frontend` | Si (max 2, validando sin conflicto de archivos) |
-| `backend` | `backend` | Si (max 2, validando sin conflicto de archivos) |
+| `backend` | `backend` | Si (max 3, validando sin conflicto de archivos) |
 | `fullstack` | `fullstack` | Si (max 3, validando sin conflicto de archivos) |
 
 ### Validacion de conflicto entre features de la misma zona
@@ -214,8 +215,8 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
    - Agrupa las features `in_progress` por `zone` y cuenta cuantas hay en cada una.
    - Recorre las `pending` (ya evaluadas) en orden de `id` y selecciona la
      **primera** que cumpla **ambas** condiciones:
-     a. Su zona tiene **menos features `in_progress` que su cupo** (2 en `frontend` y
-        `backend`, 3 en `fullstack`).
+     a. Su zona tiene **menos features `in_progress` que su cupo** (2 en `frontend`, 3 en
+        `backend` y en `fullstack`).
      b. Pasa la **validacion de conflicto** de archivos (ver `## Paralelismo`):
         ningun archivo de `specs/<feature>/tasks.md` intersecta con los archivos
         que estan tocando las features `in_progress` de la misma zona.

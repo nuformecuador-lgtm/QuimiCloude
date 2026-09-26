@@ -127,14 +127,14 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los DIECIOCHO campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
+/** Los VEINTE campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
  *  quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id` y
  *  `unit_price` de la tabla
  *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
  *  se anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las
- *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete y `finishedAt` a
- *  dieciocho. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
- *  test rojo. */
+ *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete, `finishedAt` a
+ *  dieciocho, `presentationContent` a diecinueve y `packedBy` a veinte. La lista sigue siendo
+ *  cerrada: anadir o quitar cualquier otra columna pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -154,6 +154,8 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['reservedAt', 'reserved_at'],
   ['presentationId', 'presentation_id'], // el envase en que se entrega, opcional
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
+  ['presentationContent', 'presentation_content'], // copia del contenido de la presentacion, opcional
+  ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -299,10 +301,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Los DOS unicos decimales del modelo: la cantidad y el importe de ingredientes.
+    // Los TRES unicos decimales del modelo: la cantidad, el importe de ingredientes y la copia
+    // del contenido de la presentacion.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['ingredientsCost', 'quantity'])
+    ).toEqual(['ingredientsCost', 'presentationContent', 'quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -358,20 +361,21 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toMatch(/@@index\(\[recipeId\],\s*map:\s*"orders_recipe_id_idx"\)/)
   })
 
-  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas', () => {
+  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
     // R16 y decision cerrada 4: dos conjuntos CERRADOS del propio esquema, con esos valores
     // exactos. EL ORDEN DE DECLARACION DE LA PRIORIDAD ES SU ORDEN, de menor a mayor: Postgres
     // ordena un enum por declaracion, no alfabeticamente, asi que reordenar cambia el dato.
     //
-    // `CANCELADO` es el CUARTO estado y lo anade QC-34 (su decision cerrada 3, R48). Va el
-    // ULTIMO y eso NO es indiferente: `ALTER TYPE ... ADD VALUE` anade al final, y ponerlo en
-    // otra posicion obligaria a recrear el tipo. La lista sigue siendo cerrada: un quinto valor
-    // pone este test rojo.
+    // `POR_EMPACAR` y `EN_EMPAQUE` van al FINAL y eso NO es indiferente: `ALTER TYPE ... ADD
+    // VALUE` anade al final, y ponerlos en otra posicion obligaria a recrear el tipo. La lista
+    // sigue siendo cerrada: un septimo valor pone este test rojo.
     expect(parseEnum('OrderStatus')).toEqual([
       'PENDIENTE',
       'EN_CURSO',
       'ENTREGADO',
       'CANCELADO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
     ])
     expect(parseEnum('OrderPriority')).toEqual(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'])
 
@@ -654,6 +658,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_created_by_idx',
       'orders_updated_by_idx',
       'orders_presentation_id_idx',
+      'orders_packed_by_idx',
     ])
     // `finished_at` no gana `@@index` en el esquema: su indice parcial vive solo en la
     // migracion, como los de `list_query_indexes`.
@@ -706,6 +711,17 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(finishedAt.attributes).toContain('@db.Timestamptz(6)')
     expect(finishedAt.attributes).not.toMatch(/@default\(/)
     expect(order.body).not.toMatch(/@@index\(\[finishedAt\]/)
+  })
+
+  it('packedBy es uuid anulable, sin @relation y con su indice (R1, R46)', () => {
+    const packedBy = field(order, 'packedBy')
+    expect(packedBy.type).toBe('String')
+    expect(packedBy.isOptional).toBe(true)
+    expect(packedBy.attributes).toContain('@db.Uuid')
+    expect(packedBy.attributes).toContain('@map("packed_by")')
+    expect(packedBy.attributes).not.toMatch(/@default\(/)
+    expect(packedBy.attributes).not.toMatch(/@relation/)
+    expect(order.body).toMatch(/@@index\(\[packedBy\],\s*map:\s*"orders_packed_by_idx"\)/)
   })
 
   it('no nace ninguna columna de moneda (R16)', () => {

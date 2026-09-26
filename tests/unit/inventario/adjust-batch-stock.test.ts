@@ -10,6 +10,7 @@ import type { PeopleDirectory } from '@/lib/modules/identity';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createAdjustBatchStock } from '@/lib/modules/inventario/domain/adjust-batch-stock';
 import {
+  ActionNotAllowedError,
   BatchNotFoundError,
   ProductNotFoundError,
   UnauthorizedError,
@@ -234,6 +235,30 @@ describe('QC-92 R18 — el lote ajeno y el inexistente salen por el mismo camino
   });
 });
 
+describe('R31 — un ajuste que suma sobre un producto terminado se rechaza', () => {
+  it("R31: el puerto devuelve 'increase_not_allowed' y el caso de uso lanza ActionNotAllowedError", async () => {
+    const dobles = montarDobles();
+    dobles.adjustBatchStock.mockResolvedValue('increase_not_allowed');
+    const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+    await expect(
+      ajustar({ batchId: LOTE, delta: '1', reason: 'merma' }, ADMINISTRADOR),
+    ).rejects.toBeInstanceOf(ActionNotAllowedError);
+  });
+});
+
+describe('R32 — un ajuste que resta sobre un producto terminado sigue las reglas de cualquier lote', () => {
+  it('R32: con delta negativo el puerto no devuelve el sentinela y el resultado se propaga', async () => {
+    const dobles = montarDobles();
+    dobles.adjustBatchStock.mockResolvedValue({ stock: 4 });
+    const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+    await expect(
+      ajustar({ batchId: LOTE, delta: '-1', reason: 'merma' }, ADMINISTRADOR),
+    ).resolves.toEqual({ stock: 4 });
+  });
+});
+
 describe('QC-92 R18 — el ambito sale del actor', () => {
   it('R18: cambiar de actor cambia la empresa que llega al puerto', async () => {
     const dobles = montarDobles();
@@ -271,6 +296,7 @@ describe('QC-92 R21 — listar los lotes de un producto exige inventario.consult
         unitId: 'unidad-1',
         purchaseDate: '2026-09-01',
         expiryDate: null,
+        packageContent: null,
       },
     ];
     dobles.findBatchesOfAliveProduct.mockResolvedValue(lotes);

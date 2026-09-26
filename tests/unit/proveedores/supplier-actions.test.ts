@@ -581,6 +581,86 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
       }
     }
   })
+
+  it('R28 (QC-158) — el alta y la edicion llevan material y medidas al caso de uso', async () => {
+    createCatalogLineMock.mockResolvedValue({ id: LINE_ID })
+    updateCatalogLineMock.mockResolvedValue(undefined)
+
+    const CAMPOS_CON_MEDIDAS = {
+      ...VALID_LINE_FIELDS,
+      material: 'Vidrio',
+      diameterValue: '7.5',
+      diameterUnit: 'cm',
+      heightValue: '12',
+      heightUnit: 'mm',
+      mouth: '28/410',
+    }
+
+    await createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(CAMPOS_CON_MEDIDAS))
+    expect(createCatalogLineMock.mock.calls[0]?.[0]).toMatchObject({
+      material: 'Vidrio',
+      measurements: {
+        diameter: { value: '7.5', unit: 'cm' },
+        height: { value: '12', unit: 'mm' },
+        mouth: '28/410',
+      },
+    })
+
+    await updateCatalogLineAction(LINE_ID, LINE_MUTATION_INITIAL, formDataOf(CAMPOS_CON_MEDIDAS))
+    expect(updateCatalogLineMock.mock.calls[0]?.[1]).toMatchObject({
+      material: 'Vidrio',
+      measurements: {
+        diameter: { value: '7.5', unit: 'cm' },
+        height: { value: '12', unit: 'mm' },
+        mouth: '28/410',
+      },
+    })
+
+    // Los tres campos de medidas en blanco -> el objeto entero no viaja (ausencia, no
+    // `{ diameter: null, height: null, mouth: null }` a medio armar desde el borde: eso lo
+    // decide `measurementsSchema` del dominio).
+    vi.clearAllMocks()
+    createCatalogLineMock.mockResolvedValue({ id: LINE_ID })
+    await createCatalogLineAction(
+      CREATE_LINE_INITIAL,
+      formDataOf({ ...VALID_LINE_FIELDS, material: '', diameterValue: '', heightValue: '', mouth: '' }),
+    )
+    expect(createCatalogLineMock.mock.calls[0]?.[0]).toMatchObject({
+      material: undefined,
+      measurements: undefined,
+    })
+  })
+
+  it('R29 (QC-158) — editar solo el costo con imagePath/material/medidas precargados los conserva', async () => {
+    updateCatalogLineMock.mockResolvedValue(undefined)
+
+    // La pantalla precarga los campos ocultos con lo que YA tiene la linea; el revisor solo
+    // toca `cost`. Backend se limita a leer y reenviar: si el formulario trae los valores
+    // previos intactos, el caso de uso los recibe intactos.
+    const PRECARGADO = {
+      ...VALID_LINE_FIELDS,
+      imagePath: 'catalogo/imagen-existente.png',
+      material: 'Aluminio',
+      diameterValue: '10',
+      diameterUnit: 'cm',
+      heightValue: '20',
+      heightUnit: 'cm',
+      mouth: '24 mm',
+      cost: '99.9900',
+    }
+
+    await updateCatalogLineAction(LINE_ID, LINE_MUTATION_INITIAL, formDataOf(PRECARGADO))
+    expect(updateCatalogLineMock.mock.calls[0]?.[1]).toMatchObject({
+      cost: '99.9900',
+      imagePath: 'catalogo/imagen-existente.png',
+      material: 'Aluminio',
+      measurements: {
+        diameter: { value: '10', unit: 'cm' },
+        height: { value: '20', unit: 'cm' },
+        mouth: '24 mm',
+      },
+    })
+  })
 })
 
 describe('las dos Server Actions de la vista de catalogo visual', () => {

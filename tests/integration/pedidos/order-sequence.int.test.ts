@@ -144,6 +144,7 @@ function pedido(presentationId: string, overrides: Partial<NewOrder> = {}): NewO
     priority: 'BAJA',
     status: 'PENDIENTE',
     presentationId,
+    presentationContent: null,
     ...overrides,
   };
 }

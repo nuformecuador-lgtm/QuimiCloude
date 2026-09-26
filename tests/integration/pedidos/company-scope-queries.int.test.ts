@@ -170,6 +170,7 @@ function pedidoNuevo(overrides: Partial<NewOrder> & { readonly presentationId: s
     quantity: '7.0000',
     priority: 'BAJA',
     status: 'PENDIENTE',
+    presentationContent: null,
     ...overrides,
   };
 }

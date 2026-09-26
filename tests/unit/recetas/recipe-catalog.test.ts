@@ -24,6 +24,7 @@ const findFirst = vi.fn()
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { recipe: { findMany, findFirst } } }))
 
 const {
+  findAliveRecipeByNormalizedName,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -91,6 +92,10 @@ describe('contrato RecipeCatalog', () => {
     // a secas que se pudiera confundir con los de `inventario`/`unidades`, que devuelven
     // solo lo vivo.
     expect(catalogoFuente).not.toMatch(/\bfindRefs\(/)
+    // QC-159 T1: el choque de nombre de la revision de formula.
+    expect(catalogoFuente).toMatch(
+      /findAliveByNormalizedName\(\s*name: string,\s*companyId: string,\s*\): Promise<\{ id: RecipeId; name: string \} \| null>/,
+    )
     // Contrato puro: ni Prisma ni implementacion en el dominio.
     expect(catalogoFuente).not.toMatch(/@prisma\/client|prisma\./)
   })
@@ -317,6 +322,41 @@ describe('findRecipeIdsMatchingName', () => {
     const args = findMany.mock.calls[0]?.[0]
     expect(JSON.stringify(args.where)).not.toContain('deletedAt')
     expect(args.select).toEqual({ id: true })
+  })
+})
+
+describe('findAliveRecipeByNormalizedName (QC-159 T1, R17, R20)', () => {
+  it('un nombre que normaliza a vacio devuelve null sin consultar la base', async () => {
+    const receta = await findAliveRecipeByNormalizedName('   %%%   ', EMPRESA)
+
+    expect(receta).toBeNull()
+    expect(findFirst).not.toHaveBeenCalled()
+  })
+
+  it('filtra por nombre normalizado, empresa y solo lo vivo', async () => {
+    findFirst.mockResolvedValue(null)
+
+    await findAliveRecipeByNormalizedName('Desengrasante 5%', EMPRESA)
+
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.where).toEqual({
+      AND: [{ companyId: EMPRESA }, { nameNormalized: 'desengrasante5', deletedAt: null }],
+    })
+    expect(args.select).toEqual({ id: true, name: true })
+  })
+
+  it('devuelve id y nombre cuando hay receta viva con ese nombre', async () => {
+    findFirst.mockResolvedValue({ id: 'r-1', name: 'Desengrasante 5%' })
+
+    const receta = await findAliveRecipeByNormalizedName('desengrasante-5%', EMPRESA)
+
+    expect(receta).toEqual({ id: 'r-1', name: 'Desengrasante 5%' })
+  })
+
+  it('ninguna receta viva con ese nombre devuelve null', async () => {
+    findFirst.mockResolvedValue(null)
+
+    await expect(findAliveRecipeByNormalizedName('inexistente', EMPRESA)).resolves.toBeNull()
   })
 })
 

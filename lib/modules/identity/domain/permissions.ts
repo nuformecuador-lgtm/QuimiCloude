@@ -5,8 +5,7 @@
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
 
 /**
- * El catalogo cerrado: dieciocho permisos, ni uno mas ni uno menos. El codigo tiene la forma
- * `<modulo>.<accion>`, con modulo y accion en
+ * El catalogo cerrado: el codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en
  * español y en minusculas, siguiendo los nombres de modulo del repositorio (R1). Un modulo con
  * escritura declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un
  * modulo sin escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva
@@ -42,6 +41,13 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
  * mantener los clientes de la empresa. Cambia el recuento; como `asignaciones`, su modulo si es una
  * carpeta de `lib/modules/`, y declara las dos acciones porque tiene escritura. Solo los recibe el
  * Administrador.
+ *
+ * `documentos` suma `documentos.consultar` y `documentos.modificar`: declara sus dos acciones
+ * porque tiene escritura, y solo las recibe el Administrador.
+ *
+ * `empaque` suma `empaque.modificar`, sin `empaque.consultar`: es el primer modulo del catalogo
+ * que solo escribe, porque quien lo tiene ya ve el pedido por otra via y no necesita una consulta
+ * propia. Lo recibe unicamente el Empacador.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -155,6 +161,24 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Crear, editar y borrar clientes de la empresa.',
   },
+  {
+    code: 'documentos.consultar',
+    module: 'documentos',
+    action: 'consultar',
+    description: 'Consultar los documentos de la empresa y el estado de su procesamiento.',
+  },
+  {
+    code: 'documentos.modificar',
+    module: 'documentos',
+    action: 'modificar',
+    description: 'Subir documentos PDF y encolar su procesamiento.',
+  },
+  {
+    code: 'empaque.modificar',
+    module: 'empaque',
+    action: 'modificar',
+    description: 'Comenzar y terminar el empaque de los pedidos de la empresa.',
+  },
 ] as const;
 
 /**
@@ -172,8 +196,8 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
  * mas: al Operador NO se le da `recetas.consultar` ni ningun otro (QC-86 R27)—. Las claves salen de
  * `./roles`, nunca del literal. Sin empresa: el permiso cuelga del rol y de nada mas (R6).
  *
- * El Empacador nace con exactamente `asignaciones.consultar` y `terminados.consultar`, sin
- * `inventario.consultar` ni `asignaciones.modificar`.
+ * El Empacador nace con exactamente `asignaciones.consultar`, `terminados.consultar` y
+ * `empaque.modificar`, sin `inventario.consultar` ni `asignaciones.modificar`.
  */
 export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionCode[]>> = {
   [ROLE_ADMINISTRADOR]: [
@@ -195,7 +219,16 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'terminados.consultar',
     'clientes.consultar',
     'clientes.modificar',
+    'documentos.consultar',
+    'documentos.modificar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
-  [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar'],
+  [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
 };
+
+/**
+ * Los codigos del catalogo que el Administrador NO recibe, aunque exista un modulo que los
+ * declare. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
+ * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
+ */
+export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = ['empaque.modificar'];

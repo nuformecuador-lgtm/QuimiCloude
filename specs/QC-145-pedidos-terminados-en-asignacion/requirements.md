@@ -49,6 +49,10 @@
   sistema DEBE guardar como fecha de terminado el instante de esa operación **en la misma escritura**
   que cambia el estado. SI esa escritura falla, ENTONCES NO DEBE quedar guardado ni el estado nuevo
   ni la fecha. `[D3]` `[D8]`
+
+  > *Enmendado el 2026-09-25 por QC-168: Finalizar deja el pedido `POR_EMPACAR`, no `ENTREGADO`, y
+  > ya no escribe fecha de terminado. La fecha de terminado la escribe Terminar, la acción de
+  > empaque que deja el pedido `ENTREGADO` (QC-168 R8, R21).*
 - **R4**: SI una escritura, venga de la aplicación o de cualquier otra vía, deja con fecha de
   terminado un pedido cuyo estado no es `ENTREGADO`, ENTONCES la base DEBE rechazarla. `[D3]`
 - **R5**: El sistema NO DEBE escribir, cambiar ni borrar la fecha de terminado de un pedido al
@@ -153,6 +157,10 @@
 - **R30**: CUANDO un pedido se entrega con **Finalizar** después de esta ficha, DEBE aparecer en
   «Terminados» con su fecha de terminado **sin ninguna otra acción**. Un pedido entregado antes de
   esta ficha DEBE aparecer marcado «Sin fecha». `[D2]` `[D3]` `[D8]`
+
+  > *Enmendado el 2026-09-25 por QC-168: quien deja el pedido `ENTREGADO` con su fecha de terminado
+  > ya no es Finalizar sino Terminar, la acción de empaque; Finalizar solo lo deja `POR_EMPACAR`
+  > (QC-168 R21, R27).*
 
 ### Quién puede ser responsable
 

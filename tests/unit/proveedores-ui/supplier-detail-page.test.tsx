@@ -271,6 +271,8 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
     cost: '1234.5678',
     minPurchase: '0.1005',
     deliveryTime: 5,
+    material: null,
+    measurements: null,
     createdAt: new Date('2026-03-01T10:00:00.000Z'),
     updatedAt: new Date('2026-03-05T10:00:00.000Z'),
     createdBy: AUTOR_QUE_NO_DEBE_VERSE,
@@ -309,6 +311,7 @@ function paginaDePresentaciones(): PresentationListResult {
           // QC-80 (R15): `PresentationView` declara su unidad. Un uuid cualquiera: esta
           // pantalla no la pinta -la unidad de la LINEA de catalogo es propia (R26)-.
           unitId: '11111111-1111-4111-8111-111111111111',
+          content: null,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
           updatedAt: new Date('2026-01-01T00:00:00.000Z'),
         },
@@ -587,10 +590,11 @@ describe('catalogo — los tres estados (R23, R24, R25)', () => {
 });
 
 describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
-  it('presenta las ocho columnas de negocio de la linea, mas imagen y acciones', async () => {
+  it('presenta las columnas de negocio de la linea, mas imagen y acciones', async () => {
     // R21. MIGRADO 2026-09-07: la declaracion es una FACTORIA y los `data-testid` de cabecera y
-    // celda los pone la tabla compartida (`data-table-head-<id>` / `data-table-cell-<id>`). Las
-    // ocho de negocio siguen siendo las ocho; la imagen y las acciones son columnas de MARCADO.
+    // celda los pone la tabla compartida (`data-table-head-<id>` / `data-table-cell-<id>`). La
+    // imagen y las acciones son columnas de MARCADO. Material y medidas se agregaron sin ganar
+    // ordenamiento ni filtro propio.
     await renderPantalla();
 
     const columnas = buildCatalogColumns({
@@ -606,10 +610,18 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
       'cost',
       'minPurchase',
       'deliveryTime',
+      'material',
+      'measurements',
       'createdAt',
       'updatedAt',
       'actions',
     ]);
+    for (const columna of columnas) {
+      if (columna.id === 'material' || columna.id === 'measurements') {
+        expect(columna.sortable, columna.id).toBeFalsy();
+        expect(columna.filter, columna.id).toBeUndefined();
+      }
+    }
 
     for (const columna of columnas) {
       expect(

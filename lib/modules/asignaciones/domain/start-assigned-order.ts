@@ -19,9 +19,10 @@ export type StartAssignedOrderDeps = GetAssignedOrderExecutionDeps & {
 };
 
 /**
- * `PENDIENTE` transiciona a `EN_CURSO`; `EN_CURSO` no escribe nada y sigue; `ENTREGADO` y
- * `CANCELADO` rechazan con el error de `order-state.ts`. La legalidad de la escritura la decide
- * `pedidos` dentro de `transitionAliveById`, nunca esta funcion.
+ * `PENDIENTE` transiciona a `EN_CURSO`; `EN_CURSO` no escribe nada y sigue; cualquier otro estado
+ * -`POR_EMPACAR`, `EN_EMPAQUE`, `ENTREGADO`, `CANCELADO`- rechaza con el error de `order-state.ts`.
+ * La legalidad de la escritura la decide `pedidos` dentro de `transitionAliveById`, nunca esta
+ * funcion.
  */
 export function createStartAssignedOrder(
   deps: StartAssignedOrderDeps,
@@ -71,7 +72,7 @@ export function createStartAssignedOrder(
     }
     if (order === null) throw new OrderNotFoundError();
 
-    if (order.status === 'ENTREGADO' || order.status === 'CANCELADO') {
+    if (order.status !== 'EN_CURSO') {
       assertOrderAcceptsWrites(order);
     }
 

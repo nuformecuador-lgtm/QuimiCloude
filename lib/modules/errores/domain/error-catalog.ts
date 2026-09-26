@@ -59,6 +59,12 @@ export const ERROR_MESSAGE_KEY = {
   insufficient_material: 'errors.insufficient_material',
   recipe_without_lines: 'errors.recipe_without_lines',
   user_cannot_be_responsible: 'errors.user_cannot_be_responsible',
+  customer_not_found: 'errors.customer_not_found',
+  presentation_without_content: 'errors.presentation_without_content',
+  no_whole_package: 'errors.no_whole_package',
+  order_packing_taken: 'errors.order_packing_taken',
+  order_not_packable: 'errors.order_not_packable',
+  order_produced_frozen: 'errors.order_produced_frozen',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -146,4 +152,13 @@ export const ERROR_MESSAGES_ES = {
   'errors.recipe_without_lines':
     'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
   'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
+  'errors.customer_not_found': 'El cliente solicitado no existe.',
+  'errors.presentation_without_content':
+    'La presentacion del pedido no indica su contenido: completala en Presentaciones antes de finalizar.',
+  'errors.no_whole_package':
+    'La cantidad del pedido no llena ni un envase de su presentacion.',
+  'errors.order_packing_taken': 'Otro empacador esta empacando este pedido.',
+  'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
+  'errors.order_produced_frozen':
+    'Un pedido ya producido conserva sus responsables tal como estaban.',
 } as const satisfies Record<ErrorMessageKey, string>;

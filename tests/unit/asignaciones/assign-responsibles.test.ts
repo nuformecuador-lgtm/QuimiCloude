@@ -780,6 +780,12 @@ function montarSobreBase(
       transitionAliveById: async () => {
         throw new Error('QC-87: no lo usa `assignResponsibles`');
       },
+      startPackingAliveById: async () => {
+        throw new Error('QC-168: no lo usa `assignResponsibles`');
+      },
+      finishPackingAliveById: async () => {
+        throw new Error('QC-168: no lo usa `assignResponsibles`');
+      },
     },
     people: {
       findAliveRefsInCompany: async (_companyId: string, ids: readonly string[]) =>

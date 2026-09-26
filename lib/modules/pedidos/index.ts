@@ -11,6 +11,7 @@ export type { OrderId, OrderNumber } from './domain/order-number';
 export {
   ORDER_PRIORITY_VALUES,
   ORDER_STATUS_VALUES,
+  ORDER_STATUS_FLOW,
   DEFAULT_ORDER_PRIORITY,
   DEFAULT_ORDER_STATUS,
 } from './domain/order-classification';
@@ -26,6 +27,7 @@ export type {
   OrderCatalog,
   AssignedOrderSummary,
   OrderSummaryOrdering,
+  FinishedGoodsReceipt,
 } from './domain/order-catalog';
 
 // ---------------------------------------------------------------------------------------
@@ -138,6 +140,12 @@ export type { DeleteOrderDeps } from './domain/delete-order';
  *  la cablea en el lugar de la funcion cruda del driven. */
 export { createTransitionOrder } from './domain/transition-order';
 export type { TransitionOrderDeps } from './domain/transition-order';
+
+/** Implementan `OrderCatalog['startPackingAliveById']` y `['finishPackingAliveById']`: Comenzar
+ *  y Terminar el empaque, cada uno un `UPDATE` condicional sin abrir la unidad de trabajo de
+ *  `inventario`. `lib/composition` las cablea sobre el adaptador driven de `pedidos`. */
+export { createStartPacking, createFinishPacking } from './domain/order-packing';
+export type { OrderPackingDeps } from './domain/order-packing';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
