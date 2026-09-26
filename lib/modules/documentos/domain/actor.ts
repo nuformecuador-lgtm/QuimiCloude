@@ -45,6 +45,13 @@ export const DOCUMENT_UPLOAD_PERMISSION: PermissionCode = 'documentos.modificar'
 export const CATALOG_IMPORT_PERMISSION: PermissionCode = 'proveedores.modificar';
 
 /**
+ * El permiso de la importacion de formula desde PDF (vista previa y confirmacion). Escribe en
+ * `recetas`, asi que es el permiso de escribir una receta, el mismo que editarla a mano. NO es el
+ * de subida: quien revisa una formula no necesita poder subir archivos.
+ */
+export const FORMULA_IMPORT_PERMISSION: PermissionCode = 'recetas.modificar';
+
+/**
  * Primera linea de cada caso de uso: ANTES de validar la entrada y ANTES de tocar ningun puerto.
  *
  * Falla cerrado: actor ausente (`null`/`undefined`), sin conjunto de permisos, con el conjunto

@@ -73,6 +73,9 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
       findIdsMatchingName: async () => {
         throw new Error('QC-145: listCompanyOrders no busca recetas por nombre');
       },
+      findAliveByNormalizedName: async () => {
+        throw new Error('QC-145: listCompanyOrders no busca la receta viva por su nombre');
+      },
     },
     people: assignmentDirectoryPrisma,
     presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },

@@ -358,6 +358,19 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/clientes/adapters/driving/customer-actions')
       ).listCustomersAction({ page: 1 }),
   },
+  {
+    // Anadida por QC-159: su archivo de `driving/` resuelve las dos caras de la sesion, asi que
+    // el censo tiene que cubrirlo. Entrada VALIDA para que la resolucion de actor llegue a ocurrir
+    // -una entrada invalida rechaza antes de `currentActor()`, que es justo lo que esta lista mide-.
+    archivo: 'lib/modules/documentos/adapters/driving/formula-import-actions.ts',
+    nombre: 'previewFormulaImportAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/documentos/adapters/driving/formula-import-actions')
+      ).previewFormulaImportAction({
+        documentFileId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      }),
+  },
 ];
 
 /**

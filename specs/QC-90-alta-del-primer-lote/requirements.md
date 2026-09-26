@@ -216,3 +216,12 @@ existente en el autocomplete el selector de presentación queda **vacío** y se 
 | 2026-09-10 | Dónde se autoriza | **En el service**, con **`inventario.modificar`**, antes de zod y antes de tocar el puerto. Heredado de **QC-20** (`docs/architecture.md > Acceso a datos y autorizacion`) |
 | 2026-09-10 | Idioma de los identificadores y borrado | Identificadores de base **en inglés**; el borrado del producto sigue siendo **lógico**. Heredado de la **feature 4** y **QC-14**. Esta ficha no borra lotes |
 | 2026-09-10 | ¿Hace falta E2E? | **Sí.** `CHECKPOINTS.md` lo pide para movimientos de inventario e importes, y esto es las dos cosas: alta con presentación y costo total, y verificación de que el lote quedó con su **costo unitario derivado** |
+
+### Nota fechada — 2026-09-25, excepción de QC-159 a «el alta SIEMPRE crea lote»
+
+Aprobada por el humano en el F1.4 de QC-159 (P1, 2026-09-25), en
+[`specs/QC-159-formula-desde-pdf/design.md > 11.1`](../QC-159-formula-desde-pdf/design.md): la **materia
+prima** que se crea desde la revisión de una fórmula importada de PDF nace **sin lote**, como producto
+«Producto», sin unidad, existencia 0 y sin cantidad de alerta. La excepción está **limitada a esa
+revisión**: el alta manual de inventario sigue creando siempre su lote, y la decisión de la tabla de
+arriba no cambia para ella. Ni los requisitos ni la tabla de arriba se reescriben.

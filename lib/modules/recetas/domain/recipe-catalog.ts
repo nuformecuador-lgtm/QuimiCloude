@@ -51,6 +51,14 @@ export interface RecipeCatalog {
    *  busqueda -no queda nada al normalizarlo-, y por tanto no filtra nada; `[]` significa que
    *  ninguna receta casa. Los dos casos son distintos y no deben fundirse. */
   findIdsMatchingName(search: string, companyId: string): Promise<readonly RecipeId[] | null>;
+
+  /** La receta VIVA de esa empresa cuyo nombre normalizado es el de `name`, o `null`. Normaliza
+   *  con `normalizeRecipeName` -la misma que escribe la columna `name_normalized`-, y un `name`
+   *  que normaliza a `''` devuelve `null` sin consultar la base: no hay nada que buscar. */
+  findAliveByNormalizedName(
+    name: string,
+    companyId: string,
+  ): Promise<{ id: RecipeId; name: string } | null>;
 }
 
 /** Linea de receta tal como la ve la ejecucion: sin `id` propio, sin autoria, sin marcas de

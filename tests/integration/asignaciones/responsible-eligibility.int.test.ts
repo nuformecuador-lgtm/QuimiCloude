@@ -86,6 +86,7 @@ const recipes: RecipeCatalog = {
   findRefsIncludingDeleted: async () => noLlamar('recipes.findRefsIncludingDeleted'),
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: async () => noLlamar('recipes.findIdsMatchingName'),
+  findAliveByNormalizedName: async () => noLlamar('recipes.findAliveByNormalizedName'),
 };
 
 /**

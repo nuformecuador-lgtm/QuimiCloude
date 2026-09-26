@@ -266,6 +266,9 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           findIdsMatchingName: async () => {
             throw new Error('QC-144: listAssignedOrders no busca recetas por nombre');
           },
+          findAliveByNormalizedName: async () => {
+            throw new Error('QC-144: listAssignedOrders no busca la receta viva por su nombre');
+          },
         },
         presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
         people: assignmentDirectoryPrisma,
