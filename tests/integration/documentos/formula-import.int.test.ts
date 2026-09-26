@@ -23,7 +23,7 @@ import {
   normalizeProductName,
   PRODUCT_TYPES,
 } from '@/lib/modules/inventario';
-import { createProduct, createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { createProduct, createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import {
   findProductRefs,
   findCostingBatches,
@@ -78,7 +78,7 @@ function token(): string {
 // El cableado REAL: los mismos adaptadores que `lib/composition`, sin componer la app entera.
 // ---------------------------------------------------------------------------
 
-const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts };
 
 const productNameLookup: ProductNameLookup = {
   findAliveByNormalizedNames: findProductsByNormalizedNames,

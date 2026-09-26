@@ -137,6 +137,9 @@ la use `[D3]`.
 el sistema NO DEBE dejar escrito ni el cambio del pedido ni ningún cambio de lo apartado o de la
 existencia `[D1]` `[D13]`.
 
+> *Enmendado el 2026-09-25 por QC-168: «entregar» pasa a ser «finalizar»: el paso que puede fallar
+> es el Finalizar que deja el pedido `POR_EMPACAR`, no un entregar directo a `ENTREGADO`.*
+
 **R16.** MIENTRAS dos operaciones aparten sobre lotes del mismo producto, el sistema DEBE
 serializarlas de modo que la suma apartada sobre un lote nunca supere su existencia en el instante
 de apartar: con 2.000 disponibles y dos pedidos simultáneos de 1.500, exactamente uno aparta y el
@@ -166,6 +169,9 @@ como caducidad, todo en la misma operación por pedido `[D6]` `[D7]` `[D11]`.
 **R22.** El proceso diario NO DEBE cancelar ni liberar un pedido `EN_CURSO`, `ENTREGADO`,
 `CANCELADO` o borrado `[D6]`, ni un pedido `PENDIENTE` sin material apartado (pregunta 1).
 
+> *Enmendado el 2026-09-25 por QC-168: la lista gana `POR_EMPACAR` y `EN_EMPAQUE` (QC-168 R30):
+> el proceso diario tampoco los toca.*
+
 **R23.** El sistema DEBE tener declarado el proceso diario como tarea programada de la plataforma
 de despliegue, con una ejecución al día `[D8]` `[D18]`.
 
@@ -190,6 +196,10 @@ la cantidad apartada, registrar una **salida** en el libro de movimientos de inv
 cantidad en negativo y el pedido que la causa, y registrar el **consumo** en el historial de
 reservas `[D1]` `[D11]` `[D12]` `[D21]`.
 
+> *Enmendado el 2026-09-25 por QC-168: el Finalizar deja el pedido `POR_EMPACAR`, no `ENTREGADO`;
+> el consumo ocurre en esa misma operación. Llegar a `ENTREGADO` con su fecha de terminado pasa a
+> ser Terminar, la acción de empaque del Empacador (QC-168 R6, R21).*
+
 **R28.** CUANDO el sistema consuma material, DEBE recalcular la existencia de cada producto afectado
 en la misma transacción `[D14]`.
 
@@ -202,12 +212,18 @@ ENTONCES el sistema DEBE completar lo que falte desde otros lotes con disponible
 y SI ni así alcanza, ENTONCES DEBE rechazar la entrega con `insufficient_material` sin cambiar el
 pedido ni el inventario `[D9]` `[D12]` (pregunta 2).
 
+> *Enmendado el 2026-09-25 por QC-168: «entregar» es el Finalizar que deja el pedido `POR_EMPACAR`;
+> el rechazo impide ese paso, no un paso a `ENTREGADO`.*
+
 **R31.** SI el pedido que se entrega no tiene material apartado, ENTONCES el sistema DEBE calcular
 su cantidad necesaria con su receta actual y consumirla de los lotes con disponible con la regla de
 R8 a R11, y SI no alcanza, ENTONCES DEBE rechazar la entrega con `insufficient_material` sin
 cambiar el pedido ni el inventario `[D2]` `[D12]` (pregunta N2). *(Enmendado el
 2026-09-23: la cantidad necesaria es la de la fórmula de D19; si la receta actual no tiene líneas,
 aplica R50.)*
+
+> *Enmendado el 2026-09-25 por QC-168: «se entrega» es el Finalizar que deja el pedido
+> `POR_EMPACAR`; el rechazo impide ese paso.*
 
 **R32.** El sistema NO DEBE consumir dos veces el material de un mismo pedido `[D12]`.
 
@@ -277,6 +293,9 @@ DEBE borrar físicamente ninguna fila de reserva, movimiento o pedido `[D16]`.
 segundo no aparta; cancelar el primero libera su material; entregar un pedido consume y baja la
 existencia `[D17]`.
 
+> *Enmendado el 2026-09-25 por QC-168: el paso que «entrega un pedido» pasa a ser el Finalizar que
+> lo deja `POR_EMPACAR`; sigue consumiendo material y bajando la existencia en ese mismo paso.*
+
 ### J. Receta sin líneas (enmienda del 2026-09-23)
 
 **R49.** SI la receta de un pedido no tiene ninguna línea al crearlo o editarlo, ENTONCES el
@@ -288,12 +307,20 @@ sin material apartado cuya receta actual no tiene ninguna línea, ENTONCES el si
 la entrega con `recipe_without_lines`, sin cambiar el pedido —ni su estado ni su fecha de
 terminado— ni el inventario `[D12]` `[D19]` `[D21]` (decisión E2).
 
+> *Enmendado el 2026-09-25 por QC-168: el rechazo impide el paso a `POR_EMPACAR` (ya no a
+> `ENTREGADO`); la fecha de terminado nunca se toca aquí porque ahora la escribe Terminar.*
+
 ### K. Enmienda del review (2026-09-23)
 
 **R51.** CUANDO el Finalizar de la planta entregue un pedido, el sistema DEBE guardar en la misma
 transacción el paso a `ENTREGADO`, la fecha de terminado del pedido y el consumo de su material, y
 SI cualquiera de las tres cosas falla —incluidos `insufficient_material` y
 `recipe_without_lines`—, ENTONCES NO DEBE quedar escrita ninguna de ellas `[D12]` `[D13]` `[D21]`.
+
+> *Enmendado el 2026-09-25 por QC-168: este requisito se parte. El Finalizar guarda en una sola
+> transacción el paso a `POR_EMPACAR` y el consumo de material —sin la fecha de terminado—, y SI
+> cualquiera de las dos falla, ENTONCES no queda escrita ninguna. La fecha de terminado pasa a
+> escribirla Terminar, la acción de empaque que deja el pedido `ENTREGADO` (QC-168 R21).*
 
 **R52.** CUANDO se edite un pedido en Pedidos, el sistema NO DEBE consumir material ni escribir
 ninguna salida de inventario ni ningún consumo en el historial de reservas `[D12]` `[D21]`.

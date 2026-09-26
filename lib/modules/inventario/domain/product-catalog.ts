@@ -53,4 +53,13 @@ export interface ProductCatalog {
     companyId: string,
     options?: { readonly excludeOrderId?: string },
   ): Promise<readonly CostingBatch[]>;
+
+  /** Envases enteros que de verdad entraron por cada pedido, leidos del asiento `production` de
+   *  `inventory_movements` y divididos por el contenido guardado en su lote. Un pedido sin ese
+   *  asiento -o de otra empresa- simplemente no aparece: mismo criterio que `findRefs`. No exige
+   *  ningun permiso de `inventario`: la autorizacion la hace quien llama, con su propio permiso. */
+  findFinishedGoodsReceipts(
+    orderIds: readonly string[],
+    companyId: string,
+  ): Promise<readonly { readonly orderId: string; readonly packages: string }[]>;
 }

@@ -142,6 +142,15 @@ export const E2E_ESPERADOS = [
   // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
   'documentos.spec.ts',
   'ejecucion-receta.spec.ts',
+  // Alta el 2026-09-25 (QC-168) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. El recorrido que ejercita: el Operario finaliza y el
+  // pedido queda «Por empacar» sin verlo entre sus propias pestanas, Pedidos no deja cancelarlo
+  // en ese estado, y un Empacador lo comienza, lo termina y lo ve despues en «Terminados». NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'empaque.spec.ts',
   'errores.spec.ts',
   // Alta el 2026-09-25 (QC-159) por el MISMO motivo y en el MISMO sitio que las demas: la
   // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO
@@ -361,6 +370,10 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: anade las tres columnas normalizadas de `customers` para la busqueda sin
   // acentos; no toca el identificador de peticion.
   '20260924200000_customers_search_normalized',
+  // Ninguna de las dos toca el identificador de peticion: una anade los dos estados de empaque
+  // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
+  '20260925120000_order_packing_states',
+  '20260925120100_packing_permission',
 ] as const
 
 export function hallazgosDeMigraciones(

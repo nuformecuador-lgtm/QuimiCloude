@@ -141,6 +141,12 @@ del dominio.
    el libro lo asienta como `production` con el pedido que lo causa. Un producto terminado no se
    crea a mano, no admite alta manual de lotes, no es ingrediente de receta y solo admite ajustes
    que restan. Detalle en `specs/QC-150-producto-terminado/requirements.md`.
+   **Enmendado el 2026-09-25 por QC-168: Finalizar y "entregar" dejan de ser el mismo paso.**
+   Finalizar (el Operario, en `/asignacion/[id]`) sigue consumiendo el material y dando de alta el
+   lote de producto terminado en la misma operación, pero ahora deja el pedido `POR_EMPACAR`, no
+   `ENTREGADO`. El Empacador lo **comienza** (`EN_EMPAQUE`, a su nombre) y lo **termina**, y es
+   Terminar quien deja el pedido `ENTREGADO` con su fecha de terminado, sin tocar inventario.
+   Detalle en `specs/QC-168-estado-por-empacar/requirements.md`.
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.

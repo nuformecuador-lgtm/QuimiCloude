@@ -31,6 +31,7 @@ import {
 import {
   addBatchToAlive,
   createWithFirstBatch,
+  findFinishedGoodsReceipts,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 import {
   createOrderWriteRepository,
@@ -112,7 +113,7 @@ const recipes: RecipeCatalog = {
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 }
 
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches }
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts }
 
 const presentations: PresentationCatalog = {
   findRefs: findPresentationRefs,

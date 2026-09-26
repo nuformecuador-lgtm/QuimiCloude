@@ -46,6 +46,8 @@ export const COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS: readonly string[] = [
 export const COMPANY_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   PENDIENTE: 'Pendiente',
   EN_CURSO: 'En curso',
+  POR_EMPACAR: 'Por empacar',
+  EN_EMPAQUE: 'En empaque',
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
 };

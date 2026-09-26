@@ -10,6 +10,8 @@
  * | ------------------- | ----------------------------------------- |
  * | `PENDIENTE`         | admitida (R9)                             |
  * | `EN_CURSO`          | admitida (R9)                             |
+ * | `POR_EMPACAR`       | `order_produced_frozen`                   |
+ * | `EN_EMPAQUE`        | `order_produced_frozen`                   |
  * | `ENTREGADO`         | `order_delivered_frozen` (R10)            |
  * | `CANCELADO`         | `order_cancelled_not_assignable` (R11)    |
  * | no existe / de baja | `order_not_found` (R8)                    |
@@ -38,14 +40,17 @@ import {
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
   OrderNotFoundError,
+  OrderProducedFrozenError,
   type AsignacionesError,
 } from './errors';
 
-/** `null` = ese estado ADMITE las escrituras. Los dos que no, con su error propio y distinto
- *  (R10, R11): son dos frases distintas para quien las lee, no un matiz de redaccion. */
+/** `null` = ese estado ADMITE las escrituras. Los que no, con su error propio y distinto:
+ *  son frases distintas para quien las lee, no un matiz de redaccion. */
 const ERROR_POR_ESTADO = {
   PENDIENTE: null,
   EN_CURSO: null,
+  POR_EMPACAR: (): AsignacionesError => new OrderProducedFrozenError(),
+  EN_EMPAQUE: (): AsignacionesError => new OrderProducedFrozenError(),
   ENTREGADO: (): AsignacionesError => new OrderDeliveredFrozenError(),
   CANCELADO: (): AsignacionesError => new OrderCancelledNotAssignableError(),
 } satisfies Record<OrderStatus, (() => AsignacionesError) | null>;

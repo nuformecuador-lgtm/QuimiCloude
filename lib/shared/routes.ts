@@ -233,6 +233,23 @@ export const DELIVERED_ORDER_PACKAGES_PARAM = 'entregado_envases';
 export const DELIVERED_ORDER_PRODUCT_PARAM = 'entregado_producto';
 
 /**
+ * Pantalla del pedido de empaque, derivada de `ASSIGNED_ORDERS_ROUTE` como `assignedOrderRoute`.
+ * No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la comparacion por segmentos de
+ * `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/empaque/<id>`.
+ */
+export function packingOrderRoute(id: string): string {
+  return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
+}
+
+/**
+ * Nombre del parametro de consulta con el que Terminar anuncia, al volver a la pestaña «Por
+ * empacar», que un pedido acaba de quedar `ENTREGADO`: `?vista=por_empacar&empacado=<numero>`.
+ * Mismo patron que `DELIVERED_ORDER_PARAM`, con su propio nombre porque son dos confirmaciones
+ * en dos pestañas distintas.
+ */
+export const PACKED_ORDER_PARAM = 'empacado';
+
+/**
  * Pantalla de clientes.
  *
  * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de

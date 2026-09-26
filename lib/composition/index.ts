@@ -85,6 +85,7 @@ import {
   findAliveIdByNameInPresentationUnit,
   findAliveProductById,
   findBatchesOfAliveProduct,
+  findFinishedGoodsReceipts,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -207,22 +208,27 @@ import {
   createDeleteOrder,
   createExpireStaleOrders,
   createFindCoverage,
+  createFinishPacking,
   createGetOrder,
   createListOrders,
   createQuoteOrderCost,
+  createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
+  finishPackingAliveOrder,
   findAliveOrderById,
   findExpirableOrders,
   listAliveOrders,
+  startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
+import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
@@ -312,15 +318,19 @@ import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-grou
 import {
   createAssignResponsibles,
   createFinishAssignedOrder,
+  createFinishPacking as createFinishPackingOrder,
   createGetAssignedOrderExecution,
+  createGetPackingOrder,
   createListAssignedOrders,
   createListCompanyOrders,
   createListFinishedOrders,
   createListOrderResponsibles,
+  createListPackingOrders,
   createListResponsibleCandidates,
   createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
+  createStartPacking as createStartPackingOrder,
   createUnassignResponsible,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -820,7 +830,11 @@ export const inventario = {
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
-const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+const productCatalog: ProductCatalog = {
+  findRefs: findProductRefs,
+  findCostingBatches,
+  findFinishedGoodsReceipts,
+};
 
 const presentationCatalog: PresentationCatalog = {
   findRefs: findPresentationRefs,
@@ -1186,6 +1200,14 @@ export const observabilidad = {
  *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
  *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
  *  consume el material en la misma transaccion. */
+/** `OrderPackingRepository` cableado con las dos escrituras crudas de `order-prisma.ts`: cada
+ *  una un `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida
+ *  con `inventario`. */
+const orderPackingRepository: OrderPackingRepository = {
+  startPackingAlive: startPackingAliveOrder,
+  finishPackingAlive: finishPackingAliveOrder,
+};
+
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
@@ -1196,6 +1218,8 @@ const orderCatalog: OrderCatalog = {
     products: productCatalog,
     units: unitCatalog,
   }),
+  startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
+  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository }),
 };
 
 /**
@@ -1331,6 +1355,37 @@ export const asignaciones = {
   }),
   listResponsibleCandidates: createListResponsibleCandidates({
     people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  // `listPackingOrders` y `getPackingOrder` comparten los MISMOS `orderCatalog`,
+  // `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog` y `peopleDirectory` del
+  // resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y la ejecucion, arriba-
+  // para los envases. `startPacking` y `finishPacking` solo necesitan `orderCatalog`: ningun
+  // adaptador nuevo.
+  listPackingOrders: createListPackingOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    products: productCatalog,
+    now: () => new Date(),
+  }),
+  getPackingOrder: createGetPackingOrder({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    products: productCatalog,
+    now: () => new Date(),
+  }),
+  startPacking: createStartPackingOrder({
+    orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  finishPacking: createFinishPackingOrder({
+    orders: orderCatalog,
     now: () => new Date(),
   }),
 } as const;

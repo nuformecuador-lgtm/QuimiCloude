@@ -792,10 +792,9 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const catalogoEnBase = await tx.permission.findMany({ orderBy: { code: 'asc' } });
       expect(catalogoEnBase.map((permission) => permission.code)).toEqual(CODIGOS_DEL_CATALOGO);
 
-      // El Administrador tiene el catalogo completo, escrito uno a uno — sin comodin ni regla
-      // implicita: se leen de `role_permissions`, no de su nombre de rol.
-      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
-      expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+      // El Administrador tiene el catalogo menos los codigos excluidos, escrito uno a uno — sin
+      // comodin ni regla implicita: se leen de `role_permissions`, no de su nombre de rol.
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
       // R9 (enmendado por QC-86 R26): el Operador, exactamente DOS, ni uno mas (QC-86 R27).
       // Los dos helpers devuelven la lista ORDENADA alfabeticamente, de ahi el orden de aqui.
       expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
@@ -832,7 +831,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       // Comparacion fila a fila, `created_at`/`updated_at` incluidos: un `upsert` que
       // reescribiera el catalogo se veria aqui aunque el conteo no se moviera.
       expect(await tx.permission.findMany({ orderBy: { code: 'asc' } })).toEqual(catalogoEnBase);
-      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
       expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
         'asignaciones.consultar',
         'inventario.consultar',
@@ -869,7 +868,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(first.createdRolePermissions).toBe(codigosDeDocumentos.length);
       expect(await tx.permission.count()).toBe(permisosAntes + codigosDeDocumentos.length);
       expect(await tx.rolePermission.count()).toBe(asignacionesAntes + codigosDeDocumentos.length);
-      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
       // Operador y Empacador, intactos: ninguno gana documentos.*.
       expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual(operadorAntes);
       expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).toEqual(empacadorAntes);
@@ -911,6 +910,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       // Y el Empacador, nombrado, en negativo: ni inventario ni asignaciones.modificar.
       expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).toEqual([
         'asignaciones.consultar',
+        'empaque.modificar',
         'terminados.consultar',
       ]);
       expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).not.toContain('inventario.consultar');
@@ -1035,7 +1035,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         }
 
         // R28/R26: los roles siguen resueltos POR NOMBRE y con exactamente lo suyo.
-        expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
+        expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
         expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
           'asignaciones.consultar',
           'inventario.consultar',

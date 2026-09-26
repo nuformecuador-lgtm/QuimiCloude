@@ -80,8 +80,13 @@ const EMPACADOR_SEED_ROW = SEED_ROLES.find((role) => role.name === ROLE_EMPACADO
 /** La entrada `terminados.consultar` del catalogo REAL. No se copia aqui. */
 const TERMINADOS_CONSULTAR = PERMISSIONS.find((permission) => permission.code === 'terminados.consultar')
 
-/** Los codigos que el seed asigna al Empacador, del dominio REAL, en su orden. */
-const CODIGOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? []
+/**
+ * Los codigos que ESTA migracion asigna al Empacador: el PREFIJO de dos que trajo `packer_role`,
+ * no el total que el seed le declara hoy -una migracion posterior le suma un tercero-. Se deriva
+ * del dominio REAL en vez de copiarse a mano, recortado a los dos primeros porque ese es el
+ * alcance de este SQL.
+ */
+const CODIGOS_DEL_EMPACADOR = (SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? []).slice(0, 2)
 
 // --- Predicados puros ----------------------------------------------------------------------
 

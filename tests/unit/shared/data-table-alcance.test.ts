@@ -499,13 +499,21 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // VEINTIDOS; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla
   // en rojo.
   //
+  // 2026-09-25: entra `e2e/empaque.spec.ts` (QC-168), y no afloja la lista. No estrena pantalla:
+  // recorre las de pedidos y asignacion, ya en esta lista -localiza la fila de «Mis asignados» y
+  // la de «Terminados» por `data-table-row-<id>` y `data-table-cell-orderNumber`, y la de Pedidos
+  // por las mismas celdas y `data-table-next` para hojear hasta encontrar el pedido-. La pantalla
+  // de «Por empacar» que SI estrena usa sus propios `packing-order-row`/`packing-order-link`, no
+  // la tabla compartida. El centinela vuelve de VEINTIDOS a VEINTITRES; la lista sigue CERRADA, y
+  // un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  //
   // Entra la pantalla de clientes como NOVENA pantalla que consume la tabla compartida, y su E2E
   // `e2e/clientes.spec.ts` entra con ella. Su recorrido localiza `data-table-search`,
   // `data-table-cell-lastNames`, `data-table-cell-city` y `data-table-row-<id>` porque la lista
   // de clientes ES la tabla compartida, y el recorrido busca, edita y da de baja sobre la fila
-  // que ella sirve. El centinela vuelve de VEINTIDOS a VEINTITRES; la lista sigue CERRADA, y un
+  // que ella sirve. El centinela vuelve de VEINTITRES a VEINTICUATRO; la lista sigue CERRADA, y un
   // spec mas que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintitres', () => {
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veinticuatro', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -515,7 +523,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos veintitres E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos veinticuatro E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -535,6 +543,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
       // tabla por la lista de pedidos asignados, que ya la consumia.
       'e2e/ejecucion-receta.spec.ts',
+      // Ver la nota de arriba (2026-09-25, QC-168). Va antes que `grupos-de-trabajo` porque la
+      // lista esta ORDENADA y 'e' precede a 'g'.
+      'e2e/empaque.spec.ts',
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
       'e2e/inventario.spec.ts',

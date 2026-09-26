@@ -15,12 +15,13 @@ export type DeleteOrderDeps = {
 };
 
 /**
- * Los dos estados que NO se borran (R32, decision cerrada 9): se cancela para dejar
- * constancia, asi que borrar despues la borraria de las consultas. Esta lista es la mitad de
- * APLICACION; la otra mitad es el `CHECK orders_delivered_not_deleted`, ampliado en la base
- * por la migracion de esta ficha.
+ * Los estados que NO se borran: se cancela o se entrega para dejar constancia, asi que borrar
+ * despues los borraria de las consultas. `POR_EMPACAR` y `EN_EMPAQUE` se suman porque el
+ * material ya se consumio al llegar a `POR_EMPACAR` -borrarlos ocultaria ese consumo y el lote
+ * de producto terminado ya dado de alta-. Esta lista es la mitad de APLICACION; la otra mitad
+ * es el `CHECK orders_delivered_not_deleted`, que nombra los mismos cuatro estados.
  */
-const NO_BORRABLES: readonly OrderStatus[] = ['ENTREGADO', 'CANCELADO'];
+const NO_BORRABLES: readonly OrderStatus[] = ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'];
 
 /**
  * Borrado de pedido. Borrado LOGICO y sin restaurar: `softDeleteAlive`, jamas un borrado

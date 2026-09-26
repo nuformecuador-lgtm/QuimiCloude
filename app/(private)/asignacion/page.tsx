@@ -9,6 +9,7 @@ import {
   DELIVERED_ORDER_PACKAGES_PARAM,
   DELIVERED_ORDER_PARAM,
   DELIVERED_ORDER_PRODUCT_PARAM,
+  PACKED_ORDER_PARAM,
 } from '@/lib/shared/routes';
 
 import {
@@ -20,6 +21,9 @@ import {
   CompanyOrdersSkeleton,
   FinishedOrdersListSection,
   FinishedOrdersSkeleton,
+  PackedOrderNotice,
+  PackingOrdersListSection,
+  PackingOrdersSkeleton,
   VIEW_PARAM,
   isExactlyDelivered,
   parseAssignedOrdersListParams,
@@ -64,6 +68,7 @@ export default async function AsignacionPage({
   const deliveredOrderProductName = firstSearchParamValue(
     resolvedSearchParams[DELIVERED_ORDER_PRODUCT_PARAM],
   );
+  const packedOrderNumber = firstSearchParamValue(resolvedSearchParams[PACKED_ORDER_PARAM]);
 
   const assignedOrdersParams = parseAssignedOrdersListParams(resolvedSearchParams);
   const genericListParams = parseAssignmentListParams(resolvedSearchParams);
@@ -82,6 +87,9 @@ export default async function AsignacionPage({
           packages={deliveredOrderPackages}
           productName={deliveredOrderProductName}
         />
+      ) : null}
+      {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
+        <PackedOrderNotice orderNumber={packedOrderNumber} />
       ) : null}
       {views.length > 1 ? <AssignmentViewTabs current={vista} views={views} /> : null}
       {vista === 'asignados' ? (
@@ -104,6 +112,11 @@ export default async function AsignacionPage({
           }
         >
           <CompanyOrdersListSection params={genericListParams} statuses={statuses} />
+        </Suspense>
+      ) : null}
+      {vista === 'por_empacar' ? (
+        <Suspense fallback={<PackingOrdersSkeleton rows={genericListParams.pageSize} />}>
+          <PackingOrdersListSection params={genericListParams} />
         </Suspense>
       ) : null}
     </div>

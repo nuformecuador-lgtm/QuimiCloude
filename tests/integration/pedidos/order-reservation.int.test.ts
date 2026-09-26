@@ -20,7 +20,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
@@ -98,7 +98,7 @@ const recipes: RecipeCatalog = {
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
 
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts };
 const presentations: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,
@@ -557,12 +557,13 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('100.0000');
+      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultado = await transitionAliveById(
         creado.id,
         fixture.companyId,
-        'PENDIENTE',
-        'ENTREGADO',
+        'EN_CURSO',
+        'POR_EMPACAR',
         fixture.actorId,
         new Date(),
       );
@@ -575,8 +576,9 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
       expect(movimientos.at(-1)).toMatchObject({ kind: 'consume', quantity: '10.0000' });
       expect(await reservedAtDe(creado.id)).toBeNull();
       const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
-      expect(row.status).toBe('ENTREGADO');
-      expect(await finishedAtDe(creado.id)).not.toBeNull();
+      expect(row.status).toBe('POR_EMPACAR');
+      // `finished_at` lo escribe Terminar, no Finalizar (R8).
+      expect(await finishedAtDe(creado.id)).toBeNull();
     } finally {
       await borrarFixture(fixture, [productId]);
     }
@@ -591,11 +593,12 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
 
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'ENTREGADO', fixture.actorId, new Date());
-      // ENTREGADO no admite ninguna transicion: un segundo intento, con
-      // ENTREGADO como `from`, es ilegal por construccion y no vuelve a tocar el inventario.
+      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+      // POR_EMPACAR solo admite EN_EMPAQUE: un segundo intento, con POR_EMPACAR como `from` y
+      // `to`, es ilegal por construccion y no vuelve a tocar el inventario.
       await expect(
-        transitionAliveById(creado.id, fixture.companyId, 'ENTREGADO', 'ENTREGADO', fixture.actorId, new Date()),
+        transitionAliveById(creado.id, fixture.companyId, 'POR_EMPACAR', 'POR_EMPACAR', fixture.actorId, new Date()),
       ).rejects.toThrow();
 
       expect(await stockDe(batchId)).toBe('90.0000');
@@ -621,12 +624,13 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       // La existencia merma por fuera de la reserva (una merma de otro camino), y al Finalizar
       // ya no alcanza lo apartado ni el resto de lotes con disponible.
       await prisma.productBatch.update({ where: { id: batchId }, data: { stock: '0' } });
+      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultado = await transitionAliveById(
         creado.id,
         fixture.companyId,
-        'PENDIENTE',
-        'ENTREGADO',
+        'EN_CURSO',
+        'POR_EMPACAR',
         fixture.actorId,
         new Date(),
       );
@@ -636,7 +640,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos.map((m) => m.kind)).toEqual(['reserve']);
       const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
-      expect(row.status).toBe('PENDIENTE');
+      expect(row.status).toBe('EN_CURSO');
       expect(await finishedAtDe(creado.id)).toBeNull();
     } finally {
       await borrarFixture(fixture, [productId]);
@@ -656,12 +660,13 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       const creado = await createOrder(nuevoPedido(recipeVacia, fixture.presentationId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
       await prisma.order.update({ where: { id: creado.id }, data: { recipeId } });
+      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultado = await transitionAliveById(
         creado.id,
         fixture.companyId,
-        'PENDIENTE',
-        'ENTREGADO',
+        'EN_CURSO',
+        'POR_EMPACAR',
         fixture.actorId,
         new Date(),
       );
@@ -685,12 +690,13 @@ describe('QC-141 T10 — Finalizar de un pedido sin apartado y receta sin lineas
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
+      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultado = await transitionAliveById(
         creado.id,
         fixture.companyId,
-        'PENDIENTE',
-        'ENTREGADO',
+        'EN_CURSO',
+        'POR_EMPACAR',
         fixture.actorId,
         new Date(),
       );
@@ -698,7 +704,7 @@ describe('QC-141 T10 — Finalizar de un pedido sin apartado y receta sin lineas
       expect(resultado).toBe('recipe_without_lines');
       expect(await movimientosDe(creado.id)).toEqual([]);
       const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
-      expect(row.status).toBe('PENDIENTE');
+      expect(row.status).toBe('EN_CURSO');
       expect(await finishedAtDe(creado.id)).toBeNull();
     } finally {
       await borrarFixture(fixture, []);

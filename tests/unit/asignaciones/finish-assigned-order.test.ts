@@ -7,10 +7,12 @@ import {
 } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
 import {
   AsignacionesError,
+  InvalidTransitionError,
   MaterialShortageError,
   NoWholePackageError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
+  OrderProducedFrozenError,
   PresentationWithoutContentError,
   RecipeNotFoundError,
   RecipeWithoutLinesError,
@@ -33,9 +35,9 @@ const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.
 
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
 
-/** El exito por defecto de `transitionAliveById` yendo a `ENTREGADO`: un objeto
+/** El exito por defecto de `transitionAliveById` yendo a `POR_EMPACAR`: un objeto
  *  con el lote de producto terminado que entro, no el literal `'ok'` -ese solo sale de una
- *  transicion que no es `ENTREGADO`, y `finishAssignedOrder` siempre pide esa-. */
+ *  transicion que no es `POR_EMPACAR`, y `finishAssignedOrder` siempre pide esa-. */
 const OK_CON_PRODUCCION = {
   kind: 'ok' as const,
   finishedGoods: { productName: 'Desengrasante industrial · Botella 1L', packages: '5' },
@@ -132,8 +134,8 @@ describe('finishAssignedOrder — R6: no es tuyo', () => {
   });
 });
 
-describe('finishAssignedOrder — R11: EN_CURSO transiciona a ENTREGADO', () => {
-  it('llama a `transitionAliveById` con el estado leido y `ENTREGADO`', async () => {
+describe('finishAssignedOrder — R5: EN_CURSO transiciona a POR_EMPACAR', () => {
+  it('llama a `transitionAliveById` con el estado leido y `POR_EMPACAR`', async () => {
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['EN_CURSO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
@@ -143,7 +145,7 @@ describe('finishAssignedOrder — R11: EN_CURSO transiciona a ENTREGADO', () => 
       PEDIDO,
       EMPRESA,
       'EN_CURSO',
-      'ENTREGADO',
+      'POR_EMPACAR',
       ANA,
       new Date('2026-09-17T12:00:00.000Z'),
     );
@@ -203,7 +205,7 @@ describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES 
     });
   });
 
-  it('lee el numero ANTES de transicionar: el pedido ya no aparece en los estados de trabajo despues de ENTREGADO', async () => {
+  it('lee el numero ANTES de transicionar: el pedido ya no aparece en los estados de trabajo despues de POR_EMPACAR', async () => {
     const { deps, listAliveSummariesByIds, transitionAliveById } = montar({
       ordenDeEstados: ['EN_CURSO'],
     });
@@ -217,7 +219,7 @@ describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES 
   });
 });
 
-describe('finishAssignedOrder — R14: ENTREGADO y CANCELADO no admiten un segundo Finalizar', () => {
+describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () => {
   it('ENTREGADO rechaza con `order_delivered_frozen` sin escribir', async () => {
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['ENTREGADO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
@@ -234,6 +236,36 @@ describe('finishAssignedOrder — R14: ENTREGADO y CANCELADO no admiten un segun
 
     await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
       OrderCancelledNotAssignableError,
+    );
+    expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+
+  it('POR_EMPACAR rechaza con `order_produced_frozen` sin escribir -un segundo Finalizar no da segundo lote-', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['POR_EMPACAR'] });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderProducedFrozenError,
+    );
+    expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+
+  it('EN_EMPAQUE rechaza con `order_produced_frozen` sin escribir', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['EN_EMPAQUE'] });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderProducedFrozenError,
+    );
+    expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+
+  it('PENDIENTE rechaza con `invalid_transition` sin escribir (A-1)', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['PENDIENTE'] });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      InvalidTransitionError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
   });

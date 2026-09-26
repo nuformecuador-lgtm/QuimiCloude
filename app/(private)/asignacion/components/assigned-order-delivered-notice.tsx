@@ -2,7 +2,7 @@ export const ASSIGNED_ORDER_DELIVERED_TESTID = 'assigned-order-delivered-notice'
 
 /** Funcion y no literal, para que un test no pueda comparar contra una copia del texto. */
 export function assignedOrderDeliveredNoticeText(orderNumber: string): string {
-  return `Pedido ${orderNumber} entregado`;
+  return `Pedido ${orderNumber} por empacar`;
 }
 
 /**

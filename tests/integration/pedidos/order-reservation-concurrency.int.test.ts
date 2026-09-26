@@ -19,7 +19,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { adjustBatchStock, createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustBatchStock, createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
@@ -98,7 +98,7 @@ const recipes: RecipeCatalog = {
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
 
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts };
 const presentations: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,
@@ -354,12 +354,21 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
         return creado.id;
       }
 
+      // El Finalizar de esta ficha solo sale de `EN_CURSO`: la orden que va a competir con
+      // `finalizar` llega ya EN_CURSO, fuera de la carrera, igual que si el Operario hubiera
+      // abierto la pantalla antes de que arranque el combo.
+      async function nuevaOrdenEnCurso(): Promise<string> {
+        const id = await nuevaOrden();
+        await transitionAliveById(id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+        return id;
+      }
+
       const crear = () => createOrder(nuevoPedido(recipeId, fixture.presentationId, '1.0000'), actorDe(fixture));
       const editar = (orderId: string) => updateOrder(orderId, nuevoPedido(recipeId, fixture.presentationId, '2.0000'), actorDe(fixture));
       const cancelar = (orderId: string) => cancelOrder(orderId, { reason: 'vuelta de concurrencia' }, actorDe(fixture));
       const borrar = (orderId: string) => deleteOrder(orderId, actorDe(fixture));
       const finalizar = (orderId: string) =>
-        transitionAliveById(orderId, fixture.companyId, 'PENDIENTE', 'ENTREGADO', fixture.actorId, new Date());
+        transitionAliveById(orderId, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
 
       // Cada constructor de combo prepara lo que haga falta (secuencial, fuera de la carrera) y
       // devuelve las DOS promesas ya lanzadas -sin `await` entre ellas- para que compitan de
@@ -379,7 +388,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
           return [crear(), borrar(id)];
         },
         async () => {
-          const id = await nuevaOrden();
+          const id = await nuevaOrdenEnCurso();
           return [crear(), finalizar(id)];
         },
         async () => {
@@ -391,7 +400,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
           return [editar(a), borrar(b)];
         },
         async () => {
-          const [a, b] = await Promise.all([nuevaOrden(), nuevaOrden()]);
+          const [a, b] = await Promise.all([nuevaOrden(), nuevaOrdenEnCurso()]);
           return [editar(a), finalizar(b)];
         },
         async () => {
@@ -399,7 +408,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
           return [cancelar(a), borrar(b)];
         },
         async () => {
-          const [a, b] = await Promise.all([nuevaOrden(), nuevaOrden()]);
+          const [a, b] = await Promise.all([nuevaOrdenEnCurso(), nuevaOrden()]);
           return [finalizar(a), cancelar(b)];
         },
         async () => {

@@ -204,7 +204,10 @@ if (TERMINADOS_CONSULTAR_ENTRY === undefined) {
   throw new Error('PERMISSIONS no declara terminados.consultar: este archivo no puede afirmar sobre su fila');
 }
 
-const CODIGOS_DEL_EMPACADOR = [...(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? [])].sort();
+// Los codigos que ESTA migracion asigna al Empacador: el PREFIJO de dos que trajo `packer_role`,
+// no la lista completa de `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]` (que la migracion posterior
+// `packing_permission` amplia a tres). Se recorta del dominio REAL, no se copia a mano.
+const CODIGOS_DEL_EMPACADOR = [...(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? [])].slice(0, 2).sort();
 if (CODIGOS_DEL_EMPACADOR.length === 0) {
   throw new Error('SEED_ROLE_PERMISSIONS no declara al Empacador: este archivo no puede afirmar sobre sus permisos');
 }
@@ -313,7 +316,8 @@ describe('migracion packer_role contra Postgres real', () => {
       expect(permisoDespues).toEqual(permisoAntes);
       expect(empacadorDespues).toEqual(empacadorAntes);
       expect(administradorDespues).toEqual(administradorAntes);
-      expect(empacadorDespues).toHaveLength(CODIGOS_DEL_EMPACADOR.length);
+      // Sanity extra sobre la propia comparacion de arriba: ademas de identicas, no crecieron.
+      expect(empacadorDespues).toHaveLength(empacadorAntes.length);
     });
   });
 
