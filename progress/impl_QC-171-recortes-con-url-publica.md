@@ -318,3 +318,47 @@ tocaron**.
 **Veredicto T5: hecho.** Las tres pantallas pintan `imageUrl` (R15), caen al marcador sin ruta o
 si la carga falla (R16, R24), la edicion sigue reenviando la ruta y no la URL (R3), y ningun
 archivo de las tres pantallas compone una direccion por su cuenta (R8, R11 intacto).
+
+## Consolidado del implementer (2026-09-25)
+
+Commits: `dee26c0c` feat(documentos) (T1, T2, T6) · `9ff325cb` feat(proveedores) (T3, T4, T5, censo de aislamiento).
+
+Archivos fuera del reparto de `tasks.md`, solo de tipo o censo: `lib/modules/proveedores/adapters/driving/supplier-catalog-actions.ts`
+(`Page<CatalogLineListItem>`), `tests/unit/proveedores-ui/{catalog-line-form,delete-catalog-line-dialog}.test.tsx`,
+`tests/unit/documentos-ui/supplier-detail-upload.test.tsx` (fixtures con `imageUrl`), `tests/integration/aislamiento.json`
+(entrada `commit` del int test nuevo, mismo modo que `supplier-showcase.int.test.ts`).
+
+Frontera `[D8]`: ningún archivo de la lista aparece en el diff (comprobado con `git status` antes del commit).
+
+### Mapa R1…R24 -> test
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/documentos/crop-storage-config.test.ts` «R1 — .env.example…»; `tests/unit/composition/proveedores-image-url.test.ts` «R1 — sin los dobles…» |
+| R2 | `tests/unit/documentos/preview-catalog-import.test.ts` «QC-171 R2 — imagePath sigue siendo la ruta…» |
+| R3 | `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` «R3 — una linea con imagen reenvia… la RUTA…» |
+| R4, R5, R6, R7 | `tests/unit/documentos/crop-catalog-supabase.test.ts` (casos R4…R7); R5 también en `tests/unit/proveedores/catalog-image-url.test.ts` |
+| R8 | `tests/unit/proveedores-ui/image-url-screens.test.ts` |
+| R9, R10, R12 | `tests/unit/documentos/preview-catalog-import.test.ts` «QC-171 R9/R10/R12…» |
+| R11 | `tests/unit/proveedores-ui/catalog-import-review.test.tsx` sin cambios |
+| R13, R14, R16 | `tests/unit/proveedores/catalog-image-url.test.ts`; `tests/integration/proveedores/catalog-image-url.int.test.ts` |
+| R15, R24 | `tests/unit/proveedores-ui/{showcase-line-card,catalog-columns,supplier-detail-page}.test.tsx` |
+| R16 (UI) | mismos tres archivos, casos R16 |
+| R17 | `tests/integration/proveedores/catalog-image-url.int.test.ts` «QC-171 R17 — ruta ya existente…» |
+| R18, R20, R21 | `tests/unit/documentos/qc171-alcance.test.ts`; R21 también `storage-config.test.ts` sin cambios (censo = 4) |
+| R19 | `tests/unit/documentos/catalog-import-authorization.test.ts` «R31, R19…»; `tests/unit/proveedores/authorization.test.ts` |
+| R22 | `tests/unit/documentos/crop-catalog-memory.test.ts`; `tests/unit/composition/proveedores-image-url.test.ts` «R22…»; E2E `catalogo-desde-pdf` pendiente (T7) |
+| R23 | `crop-pairing`, `crop-catalog-images`, `crop-coordinates` verdes sin cambios; `git diff --stat dev` sin archivos `[D8]` (T7) |
+
+### Gate
+
+- `./init.sh --rapido` con los cambios sin commitear (el diff vs `origin/dev` aún no los veía): **verde**
+  — typecheck y lint ok, guardias 51 archivos / 646 pasan / 11 skipped.
+- `./init.sh --rapido` tras los commits: typecheck **ok**, lint **ok**; la fase `vitest related` (49 archivos
+  del diff, incluye `lib/composition/index.ts`) la **mató el sistema por falta de memoria** antes de terminar.
+  No se relanzó. Las corridas dirigidas de cada subagente están en sus secciones (todas verdes).
+
+### Pendiente
+
+- T7 (gate completo `./init.sh`, E2E `catalogo-desde-pdf` en Chromium, `git diff --stat dev`): del leader.
+- T8: humana.
