@@ -374,6 +374,10 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
+  // Igual patron: una anade el estado BLOQUEADO al enum, la otra el indice parcial de
+  // pedidos bloqueados. Ninguna toca el identificador de peticion.
+  '20260926120000_order_status_blocked',
+  '20260926120100_orders_blocked_index',
 ] as const
 
 export function hallazgosDeMigraciones(

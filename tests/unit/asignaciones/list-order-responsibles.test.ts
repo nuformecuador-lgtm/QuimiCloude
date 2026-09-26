@@ -210,8 +210,9 @@ describe('QC-87 — consultar los responsables de un pedido', () => {
     const rows = [filaSuelta(ANA), filaDeGrupo(BRUNO)];
     const refs = [persona(ANA, 'Ana Perez'), persona(BRUNO, 'Bruno Diaz')];
 
-    it('los SEIS estados son exactamente estos seis', () => {
+    it('los SIETE estados son exactamente estos siete', () => {
       expect([...ESTADOS].sort()).toEqual([
+        'BLOQUEADO',
         'CANCELADO',
         'ENTREGADO',
         'EN_CURSO',

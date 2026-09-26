@@ -182,8 +182,8 @@ describe('QC-145 — listCompanyOrders: la entrada', () => {
   });
 });
 
-describe('QC-145 — listCompanyOrders: R22 sin filtro trae los seis estados', () => {
-  it('sin `statuses`, consulta con los seis estados en el orden del flujo (R41)', async () => {
+describe('QC-145 — listCompanyOrders: R22 sin filtro trae los siete estados', () => {
+  it('sin `statuses`, consulta con los siete estados en el orden del flujo (R41)', async () => {
     const { deps, listAliveSummariesInCompany } = montar();
     const listCompanyOrders = createListCompanyOrders(deps);
 
@@ -191,7 +191,7 @@ describe('QC-145 — listCompanyOrders: R22 sin filtro trae los seis estados', (
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO'],
+      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO', 'BLOQUEADO'],
       'work_queue',
       1,
       undefined,
@@ -326,7 +326,7 @@ describe('QC-145 — listCompanyOrders: R27 paginacion delegada al catalogo', ()
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO'],
+      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO', 'BLOQUEADO'],
       'work_queue',
       2,
       25,
