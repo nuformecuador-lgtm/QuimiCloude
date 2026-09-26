@@ -29,7 +29,7 @@ const PRESENTATION_ID = '22222222-2222-4222-8222-222222222222'
 const UNIT_ID = '55555555-5555-4555-8555-555555555555'
 const PRODUCTO_INVENTARIO = '66666666-6666-4666-8666-666666666666'
 
-/** Los siete campos de negocio, validos. Cada caso cambia solo lo que quiere probar. */
+/** Los nueve campos de negocio, validos. Cada caso cambia solo lo que quiere probar. */
 const CAMPOS_VALIDOS = {
   name: 'Acido citrico anhidro',
   presentationId: PRESENTATION_ID,
@@ -38,12 +38,14 @@ const CAMPOS_VALIDOS = {
   cost: '1250.5000',
   minPurchase: null,
   deliveryTime: null,
+  material: null,
+  measurements: null,
 }
 
 /** Alta valida minima. */
 const ALTA_VALIDA = { supplierId: SUPPLIER_ID, ...CAMPOS_VALIDOS }
 
-/** Edicion valida minima: los mismos siete campos, sin proveedor. */
+/** Edicion valida minima: los mismos nueve campos, sin proveedor. */
 const EDICION_VALIDA = { ...CAMPOS_VALIDOS }
 
 describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
@@ -249,16 +251,18 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
     expect(Object.keys(updateCatalogLineSchema.shape).some((k) => /product/i.test(k))).toBe(false)
   })
 
-  it('la edicion reemplaza los siete campos de negocio y no puede cambiar el proveedor', () => {
+  it('la edicion reemplaza los nueve campos de negocio y no puede cambiar el proveedor', () => {
     // R24, P6 (cerrada por el humano el 2026-09-04). La edicion es REEMPLAZO COMPLETO,
     // nombre y presentacion incluidos: al desaparecer la referencia al articulo del
     // inventario, la identidad de la linea pasa a ser un texto escrito a mano y una errata
     // seria incorregible. Lo UNICO que nunca cambia es el proveedor, y no porque se filtre
-    // sino porque el tipo no lo tiene.
+    // sino porque el tipo no lo tiene. `material` y `measurements` se suman como ampliacion nombrada.
     expect(Object.keys(updateCatalogLineSchema.shape).sort()).toEqual([
       'cost',
       'deliveryTime',
       'imagePath',
+      'material',
+      'measurements',
       'minPurchase',
       'name',
       'presentationId',
@@ -277,7 +281,7 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
       ).toBe(false)
     }
 
-    // Y la edicion sin campos de mas si pasa, con los siete.
+    // Y la edicion sin campos de mas si pasa, con los nueve.
     expect(
       updateCatalogLineSchema.parse({
         name: 'Sosa caustica',
@@ -287,6 +291,8 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
         cost: '99.9900',
         minPurchase: '5',
         deliveryTime: 3,
+        material: 'Polietileno',
+        measurements: { diameter: null, height: null, mouth: '28/410' },
       }),
     ).toEqual({
       name: 'Sosa caustica',
@@ -296,19 +302,139 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
       cost: '99.9900',
       minPurchase: '5',
       deliveryTime: 3,
+      material: 'Polietileno',
+      measurements: { diameter: null, height: null, mouth: '28/410' },
     })
 
-    // El alta lleva los siete MAS el proveedor, y nada mas.
+    // El alta lleva los nueve MAS el proveedor, y nada mas.
     expect(Object.keys(createCatalogLineSchema.shape).sort()).toEqual([
       'cost',
       'deliveryTime',
       'imagePath',
+      'material',
+      'measurements',
       'minPurchase',
       'name',
       'presentationId',
       'supplierId',
       'unitId',
     ])
+  })
+
+  describe('material y measurements (QC-158, R27, R35)', () => {
+    it('recorta material, lo deja en blanco -> ausente, y exige hasta 120 caracteres', () => {
+      expect(createCatalogLineSchema.parse({ ...ALTA_VALIDA, material: '  Polietileno  ' }).material).toBe(
+        'Polietileno',
+      )
+      for (const material of ['', '   ', null, undefined]) {
+        const { material: _omitido, ...sinMaterial } = { ...ALTA_VALIDA, material }
+        void _omitido
+        expect(
+          createCatalogLineSchema.parse({ ...sinMaterial, material }).material,
+          `material ${JSON.stringify(material)} debe quedar ausente`,
+        ).toBeNull()
+      }
+      expect(
+        createCatalogLineSchema.safeParse({ ...ALTA_VALIDA, material: 'a'.repeat(120) }).success,
+      ).toBe(true)
+      expect(
+        createCatalogLineSchema.safeParse({ ...ALTA_VALIDA, material: 'a'.repeat(121) }).success,
+      ).toBe(false)
+      // Nunca un numero.
+      expect(createCatalogLineSchema.safeParse({ ...ALTA_VALIDA, material: 7 }).success).toBe(false)
+    })
+
+    it('measurements: las tres ausentes colapsan a null entero', () => {
+      for (const measurements of [
+        null,
+        undefined,
+        { diameter: null, height: null, mouth: null },
+        {},
+      ]) {
+        expect(
+          createCatalogLineSchema.parse({ ...ALTA_VALIDA, measurements }).measurements,
+          `measurements ${JSON.stringify(measurements)} debe colapsar a null`,
+        ).toBeNull()
+      }
+    })
+
+    it('diametro y alto exigen la MISMA cadena decimal que el costo, mayor que cero y sin number', () => {
+      for (const value of ['0', '0.0000', '-1', '1,5', '10.00001', '12345678901']) {
+        expect(
+          createCatalogLineSchema.safeParse({
+            ...ALTA_VALIDA,
+            measurements: { diameter: { value, unit: 'cm' }, height: null, mouth: null },
+          }).success,
+          `diameter.value ${value} debe caer`,
+        ).toBe(false)
+      }
+      // Un numero JSON en vez de cadena tambien cae.
+      expect(
+        createCatalogLineSchema.safeParse({
+          ...ALTA_VALIDA,
+          measurements: { diameter: { value: 7.5, unit: 'cm' }, height: null, mouth: null },
+        }).success,
+      ).toBe(false)
+
+      const valido = createCatalogLineSchema.parse({
+        ...ALTA_VALIDA,
+        measurements: { diameter: { value: '7.5000', unit: 'cm' }, height: { value: '12', unit: 'mm' }, mouth: null },
+      }).measurements
+      expect(valido).toEqual({
+        diameter: { value: '7.5000', unit: 'cm' },
+        height: { value: '12', unit: 'mm' },
+        mouth: null,
+      })
+    })
+
+    it('la unidad de una medida solo admite mm o cm', () => {
+      for (const unit of ['m', 'in', 'MM', '']) {
+        expect(
+          createCatalogLineSchema.safeParse({
+            ...ALTA_VALIDA,
+            measurements: { diameter: { value: '5', unit }, height: null, mouth: null },
+          }).success,
+          `unit ${JSON.stringify(unit)} debe caer`,
+        ).toBe(false)
+      }
+      for (const unit of ['mm', 'cm'] as const) {
+        expect(
+          createCatalogLineSchema.safeParse({
+            ...ALTA_VALIDA,
+            measurements: { diameter: { value: '5', unit }, height: null, mouth: null },
+          }).success,
+        ).toBe(true)
+      }
+    })
+
+    it('la boca es texto libre recortado, en blanco -> ausente, hasta 40 caracteres', () => {
+      expect(
+        createCatalogLineSchema.parse({
+          ...ALTA_VALIDA,
+          measurements: { diameter: null, height: null, mouth: '  28/410  ' },
+        }).measurements,
+      ).toEqual({ diameter: null, height: null, mouth: '28/410' })
+
+      expect(
+        createCatalogLineSchema.parse({
+          ...ALTA_VALIDA,
+          measurements: { diameter: null, height: null, mouth: '   ' },
+        }).measurements,
+      ).toBeNull()
+
+      expect(
+        createCatalogLineSchema.safeParse({
+          ...ALTA_VALIDA,
+          measurements: { diameter: null, height: null, mouth: 'a'.repeat(40) },
+        }).success,
+      ).toBe(true)
+      expect(
+        createCatalogLineSchema.safeParse({
+          ...ALTA_VALIDA,
+          measurements: { diameter: null, height: null, mouth: 'a'.repeat(41) },
+        }).success,
+      ).toBe(false)
+    })
   })
 
   it('rechaza la entrada que no cumple el esquema antes de llamar al caso de uso', () => {

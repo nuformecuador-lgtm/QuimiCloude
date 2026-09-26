@@ -5,8 +5,9 @@
  * `beforeAll` -cada uno inicia su propia sesion, asi que no hay estado de un caso que otro
  * necesite-:
  *   A. el Operador entra y ve SOLO «Mis asignados», sin pestañas;
- *   B. el Empacador ve «Mis asignados» + «Terminados» -con el pedido ENTREGADO ajeno, su fecha y
- *      sus responsables, y el ENTREGADO sin fecha al final marcado «Sin fecha»- y no ve «Todos»;
+ *   B. el Empacador ve «Mis asignados» + «Terminados» + «Por empacar» -con el pedido ENTREGADO
+ *      ajeno, su fecha y sus responsables, y el ENTREGADO sin fecha al final marcado «Sin fecha»-
+ *      y no ve «Todos»;
  *   C. el Administrador ve SOLO «Todos», con los cuatro estados; al filtrar exactamente por
  *      Entregado aparece la columna de fecha y el orden de terminados; sin ninguna entrada a
  *      ejecucion; y `/asignacion/<id>` de un pedido al que no esta asignado le responde
@@ -146,10 +147,13 @@ const MISSING_DATE_TEXT = 'Sin fecha';
 /** `data-testid` de la pantalla `/asignacion` y sus partes. Constantes locales (ver cabecera). */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const ASSIGNMENT_VIEW_TABS_TESTID = 'assignment-view-tabs';
-const ASSIGNMENT_VIEW_TAB_TESTID: Readonly<Record<'asignados' | 'terminados' | 'todos', string>> = {
+const ASSIGNMENT_VIEW_TAB_TESTID: Readonly<
+  Record<'asignados' | 'terminados' | 'todos' | 'por_empacar', string>
+> = {
   asignados: 'assignment-view-tab-asignados',
   terminados: 'assignment-view-tab-terminados',
   todos: 'assignment-view-tab-todos',
+  por_empacar: 'assignment-view-tab-por_empacar',
 };
 const ASSIGNED_ORDERS_EMPTY_TESTID = 'assigned-orders-empty';
 const FINISHED_ORDERS_SECTION_TESTID = 'finished-orders-list-section';
@@ -455,7 +459,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toHaveCount(0);
   });
 
-  test('el Empacador ve «Terminados» con el pedido ajeno, su fecha y sus responsables, el «sin fecha» al final, y no ve «Todos» (R28, R30)', async ({
+  test('el Empacador ve «Terminados» con el pedido ajeno, su fecha y sus responsables, el «sin fecha» al final, ve «Por empacar» y no ve «Todos» (R28, R30)', async ({
     page,
   }) => {
     const withDateNumber = orderDeliveredWithDateNumber;
@@ -481,10 +485,12 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await loginAndLand(page, empacadorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Dos pestañas exactas: «Mis asignados» y «Terminados». Nunca «Todos».
+    // Tres pestañas exactas: «Mis asignados», «Terminados» y «Por empacar» -el Empacador del seed
+    // tambien tiene `empaque.modificar`-. Nunca «Todos».
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
+    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.todos)).toHaveCount(0);
 
     await page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados).click();

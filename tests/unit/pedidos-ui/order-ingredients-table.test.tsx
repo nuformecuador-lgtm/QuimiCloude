@@ -79,6 +79,17 @@ describe('R17 — la cantidad requerida y el restante escalan con la cantidad de
     const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('0');
   });
+
+  it.each([
+    ['negativa', '-200'],
+    ['cero', '0'],
+    ['no numerica', 'abc'],
+  ])('con una cantidad %s, la requerida no se calcula y queda en 0', (_caso, cantidad) => {
+    renderTabla({ quantity: cantidad });
+
+    const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('0');
+  });
 });
 
 describe('R24 — un insumo sin unidad resoluble se muestra sin unidad', () => {

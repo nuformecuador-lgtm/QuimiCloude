@@ -16,44 +16,61 @@ import {
   findProductRefs,
   toProductRef,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { productCompanyScope } from '@/lib/modules/inventario/adapters/driven/persistence/company-scope';
+import { findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { productCompanyScope, movementCompanyScope } from '@/lib/modules/inventario/adapters/driven/persistence/company-scope';
 
 /**
- * Doble del cliente Prisma, SOLO para el bloque QC-50 R29 de mas abajo: cuenta invocaciones y
- * deja inspeccionar el `where` que de verdad viaja a `findMany`, que es lo unico observable sin
- * tocar Postgres -misma tecnica que `tests/unit/recetas/recipe-catalog.test.ts`-.
+ * Doble del cliente Prisma, SOLO para el bloque QC-50 R29 de mas abajo (y, desde QC-168, para
+ * `findFinishedGoodsReceipts`): cuenta invocaciones y deja inspeccionar el `where` que de verdad
+ * viaja a `findMany`, que es lo unico observable sin tocar Postgres -misma tecnica que
+ * `tests/unit/recetas/recipe-catalog.test.ts`-.
  */
-const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
-vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { product: { findMany } } }));
+const { findMany, movementFindMany } = vi.hoisted(() => ({ findMany: vi.fn(), movementFindMany: vi.fn() }));
+vi.mock('@/lib/shared/db/prisma', () => ({
+  prisma: { product: { findMany }, inventoryMovement: { findMany: movementFindMany } },
+}));
 
 describe('toProductRef', () => {
-  it('mapea id, name, unitId y stockByUnit tal cual', () => {
+  it('mapea id, name, unitId, stockByUnit y type tal cual', () => {
     const ref = toProductRef({
       id: 'p-1',
       name: 'Acido sulfurico',
       unitId: 'kg',
       stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
+      type: 'PRODUCT',
     });
     expect(ref).toEqual({
       id: 'p-1',
       name: 'Acido sulfurico',
       unitId: 'kg',
       stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
+      type: 'PRODUCT',
     });
   });
 
   it('sin lotes, stockByUnit es un array vacio', () => {
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [], type: 'PRODUCT' });
     expect(ref.stockByUnit).toEqual([]);
   });
 
   it('la referencia publica NO lleva existencia total del producto (R11)', () => {
     // R11 — `products.stock` ya no existe: la existencia sale UNICAMENTE de `stockByUnit`, que
     // agrupa por unidad (R5) y no es lo mismo que el producto declarando SU unidad.
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
-    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit', 'unitId']);
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [], type: 'PRODUCT' });
+    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit', 'type', 'unitId']);
     expect(Object.keys(ref)).not.toContain('stock');
     expect(Object.keys(ref)).not.toContain('latestBatchUnitId');
+  });
+
+  it('R5 (QC-150) — un producto terminado se mapea con su tipo', () => {
+    const ref = toProductRef({
+      id: 'p-1',
+      name: 'Desengrasante · Botella 1L',
+      unitId: 'l',
+      stockByUnit: [{ unitId: 'l', quantity: '50.0000' }],
+      type: 'FINISHED_PRODUCT',
+    });
+    expect(ref.type).toBe('FINISHED_PRODUCT');
   });
 });
 
@@ -63,7 +80,7 @@ describe('R14 — findRefs lee la existencia y la unidad de las columnas del pro
   });
 
   it('con unidad guardada, unitId y stockByUnit traen esa unidad', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(12), unitId: 'kg' }]);
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(12), unitId: 'kg', type: 'PRODUCT' }]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
@@ -72,7 +89,7 @@ describe('R14 — findRefs lee la existencia y la unidad de las columnas del pro
   });
 
   it('sin unidad guardada (sin lotes), unitId es null y stockByUnit es un array vacio', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null, type: 'PRODUCT' }]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
@@ -135,7 +152,7 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
     // despues: devuelve tal cual lo que el `where` (ya acotado) dejo pasar. Si `findMany`
     // filtro por empresa, un producto ajeno simplemente no aparece en la fila -mismo camino que
     // un id que no existe, sin distincion posible para quien pregunta.
-    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
+    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null, type: 'PRODUCT' }]);
 
     const refs = await findProductRefs(['p-propio', 'p-de-otra-empresa'], 'empresa-1');
 
@@ -148,5 +165,57 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
 
     expect(refs).toEqual([]);
     expect(findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('R14 — findFinishedGoodsReceipts divide la cantidad del asiento production por el contenido del lote', () => {
+  beforeEach(() => {
+    movementFindMany.mockReset();
+  });
+
+  it('con 5.0000 entrados y 1.0000 de contenido, devuelve 5 envases', async () => {
+    movementFindMany.mockResolvedValue([
+      { orderId: 'o-1', quantity: new Prisma.Decimal('5.0000'), batch: { packageContent: new Prisma.Decimal('1.0000') } },
+    ]);
+
+    const receipts = await findFinishedGoodsReceipts(['o-1'], 'empresa-1');
+
+    expect(receipts).toEqual([{ orderId: 'o-1', packages: '5' }]);
+  });
+
+  it('con un contenido distinto de uno, divide exacto (12.0000 / 4.0000 = 3)', async () => {
+    movementFindMany.mockResolvedValue([
+      { orderId: 'o-1', quantity: new Prisma.Decimal('12.0000'), batch: { packageContent: new Prisma.Decimal('4.0000') } },
+    ]);
+
+    const receipts = await findFinishedGoodsReceipts(['o-1'], 'empresa-1');
+
+    expect(receipts).toEqual([{ orderId: 'o-1', packages: '3' }]);
+  });
+
+  it('la consulta compone el ambito con movementCompanyScope y filtra kind production por los ids pedidos', async () => {
+    movementFindMany.mockResolvedValue([]);
+
+    await findFinishedGoodsReceipts(['o-1', 'o-2'], 'empresa-1');
+
+    const args = movementFindMany.mock.calls[0]?.[0];
+    expect(args.where).toEqual({
+      AND: [movementCompanyScope({ companyId: 'empresa-1' }), { kind: 'production', orderId: { in: ['o-1', 'o-2'] } }],
+    });
+  });
+
+  it('sin ids no consulta la base y devuelve una lista vacia', async () => {
+    const receipts = await findFinishedGoodsReceipts([], 'empresa-1');
+
+    expect(receipts).toEqual([]);
+    expect(movementFindMany).not.toHaveBeenCalled();
+  });
+
+  it('un pedido sin asiento production simplemente no aparece: mismo camino que "no existe"', async () => {
+    movementFindMany.mockResolvedValue([]);
+
+    const receipts = await findFinishedGoodsReceipts(['o-sin-produccion'], 'empresa-1');
+
+    expect(receipts).toEqual([]);
   });
 });

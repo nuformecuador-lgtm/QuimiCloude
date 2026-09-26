@@ -4775,3 +4775,134 @@ podar.
 - **Deuda:** T14 (dispositivos reales), R51 de `proveedores.spec.ts` rojo heredado de `dev`
   (`682d3e3b`), y los menores de la segunda revisión (tres aserciones sin sucesor en los tests
   recuperados, citas en comentarios de tests).
+
+## 2026-09-24 — QC-153-modelo-de-clientes
+
+- **Qué:** tabla `customers` (nombres, apellidos y ciudad obligatorios; teléfono, correo, dirección opcionales;
+  duplicados permitidos; borrado lógico; `company_id` con unicidad `(company_id, id)`; RLS) y enmienda al
+  catálogo de permisos: `clientes.consultar`/`clientes.modificar`, solo Administrador (16→18, seed 20→22).
+  Módulo `clientes` solo con armazón. Primera ficha de la épica nueva **QC-152 Clientes**.
+- **PR #117**, merge `cf99cc2b`. Spec R1–R29. Review OK. Gate completo verde (674/9418).
+- **Decisiones humanas sobre tests ajenos:** el guardián de modelos de QC-145 se fija a su propio merge (PR
+  #112) en vez del merge-base de cada rama; `pedidos-schema` deroga solo la prohibición del modelo `Customer`
+  (la de que `Order` no tenga cliente sigue hasta QC-156). **Desbloquea QC-154.**
+
+## 2026-09-24 — QC-158-catalogo-desde-pdf
+
+- **Qué:** lo que la IA lee de un PDF de catálogo se convierte en líneas del catálogo del proveedor tras una
+  revisión en `/proveedores/[id]/importar/[documentoId]`: producto existente solo actualiza `cost`, presentación
+  nueva se crea (unidad elegida por el revisor, exige `inventario.modificar`), imagen recortada por página y orden,
+  campos nuevos `material` y `measurements`. Primera ficha que interpreta la salida de la IA; enmienda R10 de
+  QC-129. R29: editar una línea ya no borra su imagen.
+- **PR #119**, merge `6962dac9`. Spec R1–R38. Review: vuelta 1 rechazada (B1, R28 «mostrar» sin test), vuelta 2 OK.
+  El E2E de QC-107 (`documentos.spec.ts`), rojo en dev desde QC-110, vuelve a verde.
+- **Incidencia:** el `implementer` se cortó ~15 h sin entregar informe; se detectó al preguntar el humano y se
+  reanudó sin pérdida. **Lección:** comprobar el último commit antes de estimar.
+- **Quedan:** imagen en pantalla con URL firmada → **QC-140** (encargo en su issue); R37 en móvil real (humano);
+  prompt de catálogo en Vercel y firma → **QC-131** (humano).
+
+## 2026-09-24 — QC-142-permiso-propio-de-documentos
+
+- **Qué:** `documentos` deja de pedir prestado `proveedores.modificar`: nacen `documentos.consultar` y `documentos.modificar`, solo para el Administrador; la migración hace heredar `documentos.modificar` a todo rol con `proveedores.modificar`. Los tres casos de uso de subida exigen el permiso nuevo; las lecturas siguen sin permiso.
+- **PR #120**, merge `5d3e90d9`. Spec R1–R21, D1–D8. Review: rechazado por 1 mayor (el test anti-total no veía aserciones multilínea ni un `/*` dentro de un string), aprobado en la segunda. Gate completo verde (688/688).
+- **Ningún test fija ya el total del catálogo de permisos**, y un test nuevo lo impide: QC-161 y QC-168 también lo amplían.
+- **Para arrancarla se subió el cupo de `backend` a 3** con `/afinar-regla` (`cdfc6bb`).
+- **Quinto test de alcance que compara contra la rama y rompe fichas ajenas** (QC-140 R29, QC-158 R36a): corregidos. La clase entera es **QC-99**.
+- **Deuda:** el recorrido E2E de subida de PDFs sigue en rojo, heredado de `dev`.
+
+## 2026-09-25 — QC-160-boton-de-subida-de-pdf
+
+- **Qué:** la subida de PDFs de QC-107 deja de estar siempre a la vista: un botón «Subir PDFs» la abre en una
+  ventana (diálogo) con el estado por archivo dentro. En `/proveedores/[id]` (estrategia catálogo) y, montaje nuevo,
+  en el listado `/produccion/formulas` (estrategia fórmula). El botón solo lo ve quien tiene `documentos.modificar` (QC-142).
+- **PR #122**, merge `685845f2`. Spec R1–R22. Review: vuelta 1 rechazada (M1 caso del manifiesto en el test de
+  convenciones; M2 E2E sin WebKit), vuelta 2 OK. Gate completo 715/715; E2E de documentos 3/3 en Chromium y WebKit.
+- **Decisión:** el arreglo de `catalog-import-isolation` (rojo en dev por el choque QC-158 × QC-142) se revirtió de
+  esta rama y se dejó a **QC-169**; sigue en el baseline de rojos hasta entonces.
+
+## 2026-09-25 — QC-150-producto-terminado
+
+- **Qué:** nace el tipo `FINISHED_PRODUCT`. Al Finalizar un pedido entra, en la misma operación, un lote del producto
+  terminado de su receta + presentación, en envases enteros redondeando hacia abajo y con coste = ingredientes / cantidad.
+  La presentación gana su «contenido» (absorbe QC-130). Se prohíbe crearlo o darle lotes a mano, usarlo de ingrediente y
+  ajustarlo sumando; los ajustes que restan se permiten.
+- **PR #121**, merge `3d6f817b`. Spec R1–R44. Review: vueltas 1 y 2 rechazadas, vuelta 3 OK. Decisiones humanas en F2.1:
+  D22 (nombre de producto hasta 200), D23 (terminado editable), D24 (receta de otra empresa se rechaza en pedidos).
+- **Gate:** completo en `bdaa2fc3` verde salvo el rojo heredado de `catalog-import-isolation` (baseline, lo arregla
+  **QC-169**) y un flake de module-contract. El merge de `origin/dev` (QC-160) previo al merge del PR se subió **sin gate**
+  por decisión del humano (conflicto solo en `tests/baseline-rojos.json`).
+- **Desbloquea QC-168** (estado Por empacar), y tras ella QC-82.
+
+## 2026-09-25 — QC-169-permiso-de-la-confirmacion-del-catalogo
+
+- **Qué:** la vista previa y la confirmación de la importación del catálogo desde PDF exigen `proveedores.modificar`
+  (constante `CATALOG_IMPORT_PERMISSION` en `documentos`), no el permiso de subida. Devuelve `dev` a verde: el rojo de
+  `catalog-import-isolation.int.test.ts` nació del choque entre QC-158 (#119) y QC-142 (#120), dos PR mergeados sin
+  cruzarse. Se corrigió el código, no el test; `tests/baseline-rojos.json` queda vacío.
+- **PR #123.** Spec R1–R13, P1 ratificada (la vista previa también `proveedores.modificar`). Review OK con 3 menores de
+  tests abiertos (orden permiso→validación sin test, barrel sin comprobar la constante, un `describe` con nombre viejo).
+- **Incidencia:** el primer gate completo lo mató la falta de memoria de la máquina (varias sesiones a la vez); se
+  relanzó solo y salió verde (727/9978). **Lección:** un gate completo a la vez.
+
+## 2026-09-25 — QC-154-crud-de-clientes
+
+- **Qué:** casos de uso y Server Actions de `clientes` (alta, edición, baja lógica, detalle, listado paginado) con
+  autorización en el service (`clientes.consultar`/`clientes.modificar`, solo Administrador), aislamiento por empresa
+  e id no uuid = `customer_not_found`. **Búsqueda sin acentos** (decisión F1.4) con migración propia: tres columnas
+  normalizadas, relleno y GIN trigram. `customer_not_found` es la **decimotercera** enmienda del catálogo (QC-150 la
+  duodécima). Catálogo de errores en 57.
+- **PR #124.** Spec R1–R47. Review: vuelta 1 rechazada (B1 citas en comentarios, **B2 tests que escribían en lib/ y
+  app/ y provocaban ENOENT intermitentes en otras guardias**, B3 claves exactas contra la base), vuelta 2 OK. Deuda m1:
+  limpiar a la vez las siete copias de `list-query.ts`.
+- **Incidencias:** el implementer se cortó dos veces sin informe (se reanudó sin pérdida); un gate lo mató la falta de
+  memoria. Rojos ajenos del gate (catálogo de QC-158, infra y concurrencia bajo carga) pasaron aislados.
+- **Desbloquea QC-155 y QC-156.**
+
+## 2026-09-26 — QC-168-estado-por-empacar
+
+- **Qué:** el pedido gana **POR_EMPACAR** y **EN_EMPAQUE** entre EN_CURSO y ENTREGADO. Finalizar la producción deja el
+  pedido Por empacar (consume material de QC-141 y da entrada al lote de producto terminado de QC-150); cualquier
+  Empacador de la empresa lo comienza (se lo queda, columna `orders.packed_by`; Comenzar repetido es idempotente) y
+  solo él lo termina (ENTREGADO, `finished_at`). Ninguno de los dos se cancela. Permiso nuevo `empaque.modificar`, solo
+  del Empacador (catálogo «previo + 1»; `ADMIN_EXCLUDED_PERMISSIONS`). Pestaña «Por empacar» al final de `/asignacion`
+  y pantalla `/asignacion/empaque/[id]`. Se retira PENDIENTE→ENTREGADO; Finalizar sobre PENDIENTE = `invalid_transition`
+  (A-1, decisión humana). Catálogo de errores 56→59.
+- **PR #129**, merge `6b1cb4ee`. Spec R1–R48, T1–T17. Review: vuelta 1 rechazada (citas R<n> en 19 archivos + 8
+  menores), vuelta 2 OK. E2E 20/20 (Chromium + WebKit). Gate completo verde en `f4e758e9` (789/789, baseline vacío,
+  nada que podar).
+- **Incidencias:** dos sincronizaciones con `dev` (QC-154; luego QC-155 y QC-159). La segunda dejó el PR `CONFLICTING`:
+  tres listas cerradas resueltas por unión con centinelas tensados, y un **cuarto archivo auto-mergeado que no
+  compilaba** (`formula-import.int.test.ts` de QC-159, puerto `ProductCatalog` sin `findFinishedGoodsReceipts`).
+  **Lección:** tras un merge limpio, el typecheck manda, no la ausencia de conflictos. Dos gates los mató la falta de
+  memoria. La base `QuimiCloude_QC168` queda por borrar (a mano) y la carpeta del worktree en disco.
+- **Desbloquea QC-82** (con las 6 enmiendas de `design.md` §9), **QC-138** y **QC-170**.
+
+## 2026-09-26 — QC-155-pantalla-de-clientes
+
+- **Qué:** la pantalla `/clientes` sobre el CRUD de QC-154: tabla compartida (búsqueda `?q=`, paginación y orden),
+  panel lateral de alta y edición, baja con confirmación, y la entrada del menú en «Cadena», visible solo con
+  `clientes.consultar`. Zona `frontend`, `complexity: medium`.
+- **PR #127**, mergeado el 2026-09-26 (`6a957fe8`). Spec R1–R42 / T0–T9, aprobado el 2026-09-25 (todas las columnas).
+  Review: vuelta 1 rechazada (B1 citas en comentarios, B2 página fuera de rango con término de búsqueda), vuelta 2
+  rechazada (B3, un test que afirmaba sobre el texto de la UI, contra R40), y B3 cerrado. Menores que quedan abiertos:
+  m1 (el reintento del error solo se prueba por su `href`), m4 parcial (R6 se deduce del seed), n1 y n2.
+- **Verificación:** E2E 4/4 en Chromium y WebKit; gate completo verde (754 archivos / 10323 tests, baseline vacío,
+  nada que podar).
+- **Incidencia:** `wt.sh done` desenganchó el worktree, pero la carpeta quedó en disco con archivos bloqueados (ver
+  *Deudas*). La base `QuimiCloude_QC155` sigue creada.
+
+## 2026-09-26 — QC-159-formula-desde-pdf
+
+- **Qué:** lo que la IA lee de un PDF de fórmula se convierte en una **receta** tras una revisión humana en
+  `/produccion/formulas/importar/[documentoId]`: nombre, ingredientes en porcentaje con suma exacta 100,00 % y pasos
+  editables. Ingrediente sin producto: el revisor elige uno existente o lo crea como materia prima (exige además
+  `inventario.modificar`); receta con el mismo nombre: reemplazar o renombrar; nunca un producto terminado; confirmar
+  exige `recetas.modificar`. La confirmación relee el archivo (empresa, estado y tanda) antes de escribir.
+- **PR #128**, merge `a16b8baa`. Spec R1–R39, T0–T14. P1 aprobada en F1.4: la materia prima creada en la revisión
+  **nace sin lote**, excepción a QC-90 limitada a esta revisión. Sin migraciones.
+- **Review:** vuelta 1 rechazada (B1: la relectura del archivo al confirmar sin test), vuelta 2 OK con mutación.
+  Gate completo verde (756/756). E2E verde en Chromium y WebKit.
+- **Deuda (menores del review):** m1 el arreglo de hidratación cubre solo el nombre; m3 `formulas/importar/**` fuera
+  de la lista cerrada de acciones de las guardias; m5 los dos casos del E2E van encadenados en un solo `test`;
+  m6 `isValidNewName` repite a mano el recorte y los límites 1..200.
+- **Pendiente local:** borrar la base `QuimiCloude_QC159`.

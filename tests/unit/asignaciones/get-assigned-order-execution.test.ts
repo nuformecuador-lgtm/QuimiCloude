@@ -40,6 +40,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     status: 'PENDIENTE',
     presentationId: null,
     finishedAt: null,
+    packedBy: null,
     ...overrides,
   };
 }
@@ -56,7 +57,7 @@ function contenido(overrides?: Partial<RecipeExecutionContent>): RecipeExecution
 }
 
 function producto(overrides?: Partial<ProductRef>): ProductRef {
-  return { id: PRODUCTO, name: 'Hipoclorito', unitId: LITRO, stockByUnit: [], ...overrides };
+  return { id: PRODUCTO, name: 'Hipoclorito', unitId: LITRO, stockByUnit: [], type: 'PRODUCT', ...overrides };
 }
 
 function unidad(overrides?: Partial<UnitRef>): UnitRef {
@@ -66,7 +67,7 @@ function unidad(overrides?: Partial<UnitRef>): UnitRef {
 const PRESENTACION = uuid('b');
 
 function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
-  return { id: PRESENTACION, name: 'Bidon 20L', ...overrides };
+  return { id: PRESENTACION, name: 'Bidon 20L', content: null, ...overrides };
 }
 
 type Dobles = {
@@ -149,6 +150,7 @@ function montar(options?: {
       findCostingBatches: vi.fn(async () => {
         throw new Error('la ejecucion de un pedido asignado no costea nada');
       }),
+      findFinishedGoodsReceipts: vi.fn(async () => []),
     } as ProductCatalog,
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
   };

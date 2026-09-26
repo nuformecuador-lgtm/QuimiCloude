@@ -2,6 +2,7 @@
 
 import type { ProductStockByUnit } from './product-stock';
 import type { CostingBatch } from './costing-batch';
+import type { ProductType } from './product-type';
 
 /** Identificador de un producto visto DESDE FUERA de `inventario`. Es lo unico que otro
  *  modulo guarda de un producto (p. ej. `recipe_lines.product_id`). */
@@ -19,6 +20,8 @@ export type ProductRef = {
   readonly unitId: string | null;
   /** Suma de lotes por unidad; array vacio cuando el producto no tiene ninguno. */
   readonly stockByUnit: readonly ProductStockByUnit[];
+  /** El tipo del producto: quien pide un ingrediente lo usa para rechazar un producto terminado. */
+  readonly type: ProductType;
 };
 
 /** Servicio que `inventario` ofrece a los demas modulos (`docs/architecture.md > Dominio`
@@ -50,4 +53,13 @@ export interface ProductCatalog {
     companyId: string,
     options?: { readonly excludeOrderId?: string },
   ): Promise<readonly CostingBatch[]>;
+
+  /** Envases enteros que de verdad entraron por cada pedido, leidos del asiento `production` de
+   *  `inventory_movements` y divididos por el contenido guardado en su lote. Un pedido sin ese
+   *  asiento -o de otra empresa- simplemente no aparece: mismo criterio que `findRefs`. No exige
+   *  ningun permiso de `inventario`: la autorizacion la hace quien llama, con su propio permiso. */
+  findFinishedGoodsReceipts(
+    orderIds: readonly string[],
+    companyId: string,
+  ): Promise<readonly { readonly orderId: string; readonly packages: string }[]>;
 }

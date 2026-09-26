@@ -127,7 +127,7 @@ async function dropFixture(fixture: Fixture): Promise<void> {
 }
 
 function pedidoNuevo(presentationId: string): NewOrder {
-  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId };
+  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
 }
 
 function altaDe(fixture: Fixture): Promise<OrderRow> {

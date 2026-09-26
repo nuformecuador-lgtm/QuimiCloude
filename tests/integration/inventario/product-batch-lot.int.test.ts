@@ -248,11 +248,15 @@ describe('R8, R9: el lote ausente lo genera el backend con la serie de la empres
       const base = await altaConLote(fixture, 'INICIAL-A-MANO');
 
       const primero = await addBatchToAlive(base.productId, newBatch(fixture), new Date(), ambito(fixture));
-      if (primero === null) throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      if (primero === null || primero === 'finished_product') {
+        throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      }
       expect(await lotOf(primero.batchId)).toBe('1');
 
       const segundo = await addBatchToAlive(base.productId, newBatch(fixture), new Date(), ambito(fixture));
-      if (segundo === null) throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      if (segundo === null || segundo === 'finished_product') {
+        throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      }
       expect(await lotOf(segundo.batchId)).toBe('2');
 
       expect(await lotsOfCompany(fixture)).toEqual(['1', '2', 'INICIAL-A-MANO']);
@@ -636,7 +640,9 @@ describe('R37: el alta de un lote y el borrado del mismo producto a la vez', () 
       }
 
       const escrito = resultadoAlta.value;
-      if (escrito === null) throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      if (escrito === null || escrito === 'finished_product') {
+        throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      }
       expect(resultadoBorrado.value).toBe(true);
       expect(await prisma.productBatch.count({ where: { id: escrito.batchId, productId: base.productId } })).toBe(1);
       const producto = await prisma.product.findUniqueOrThrow({
@@ -702,7 +708,9 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
         new Date(),
         ambito(fixture),
       );
-      if (agregado === null) throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      if (agregado === null || agregado === 'finished_product') {
+        throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      }
       expect(await purchaseDateOf({ batchId: agregado.batchId })).toBe('2025-12-31');
     } finally {
       await dropFixture(fixture);

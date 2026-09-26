@@ -16,6 +16,7 @@ const TYPE_LABELS: Record<ProductType, string> = {
   PRODUCT: 'Producto',
   MACHINE: 'Máquina',
   PACKAGING: 'Envase',
+  FINISHED_PRODUCT: 'Producto terminado',
 };
 
 export function ProductTypeTabs({ params, onNavigate }: ProductTypeTabsProps) {

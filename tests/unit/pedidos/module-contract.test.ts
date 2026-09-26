@@ -548,13 +548,15 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `> 8.3`): el duplicado no se evita, se VIGILA. Se compara valor a valor y EN ORDEN —el
     // orden de la prioridad ES el dato (decision cerrada 4)—, asi que un `toEqual` sobre el
     // array, no un `toContain` ni un conjunto.
-    // El CUARTO estado -`CANCELADO`- lo anadio QC-34 (su decision cerrada 3) a las DOS listas a
-    // la vez; que sigan cuadrando valor a valor y EN ORDEN es exactamente lo que R35 vigila.
+    // Cada valor nuevo se anade a las DOS listas a la vez; que sigan cuadrando valor a valor y
+    // EN ORDEN es exactamente lo que R35 vigila.
     expect(enumValues('OrderStatus')).toEqual([
       'PENDIENTE',
       'EN_CURSO',
       'ENTREGADO',
       'CANCELADO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
     ])
     expect([...ORDER_STATUS_VALUES]).toEqual(enumValues('OrderStatus'))
 
@@ -627,9 +629,14 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // Finalizar consume dentro de `createTransitionOrder`, que YA es quien cablea
     // `OrderCatalog.transitionAliveById`-, y con ella se fue la ultima razon para que ese
     // adaptador importara `order-transitions.ts`.
+    //
+    // `order-packing.ts` (QC-168) tambien la consume: Comenzar y Terminar llaman a
+    // `assertTransition` con la transicion fija que cada uno alcanza -`POR_EMPACAR -> EN_EMPAQUE`
+    // y `EN_EMPAQUE -> ENTREGADO`- antes de delegar en `OrderPackingRepository`.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
+      'lib/modules/pedidos/domain/order-packing.ts',
       DUENO,
       'lib/modules/pedidos/domain/transition-order.ts',
       'lib/modules/pedidos/domain/update-order.ts',

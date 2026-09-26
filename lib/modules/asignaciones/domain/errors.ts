@@ -175,6 +175,38 @@ export class RecipeWithoutLinesError extends AsignacionesError {
   }
 }
 
+/** El Finalizar de la planta intento entregar un pedido sin presentacion o sin contenido con
+ *  el que calcular los envases del lote de producto terminado. Mismo `code` que
+ *  `PresentationWithoutContentError` de `pedidos`. */
+export class PresentationWithoutContentError extends AsignacionesError {
+  readonly code = 'presentation_without_content';
+
+  constructor(diagnostic?: string) {
+    super('presentation_without_content', diagnostic);
+  }
+}
+
+/** El Finalizar de la planta intento entregar un pedido cuya cantidad no llena ni un envase de
+ *  su presentacion. Mismo `code` que `NoWholePackageError` de `pedidos`. */
+export class NoWholePackageError extends AsignacionesError {
+  readonly code = 'no_whole_package';
+
+  constructor(diagnostic?: string) {
+    super('no_whole_package', diagnostic);
+  }
+}
+
+/** El Finalizar de la planta intento entregar y `pedidos` respondio `'recipe_not_found'` -la
+ *  receta del pedido no existe para esa empresa-. Mismo `code` que `RecipeNotFoundError` de
+ *  `pedidos`. */
+export class RecipeNotFoundError extends AsignacionesError {
+  readonly code = 'recipe_not_found';
+
+  constructor(diagnostic?: string) {
+    super('recipe_not_found', diagnostic);
+  }
+}
+
 /**
  * La persona existe y su cuenta esta activa, pero supervisa los pedidos de toda la empresa: no
  * se le puede asignar la responsabilidad de ejecutar uno. Se distingue de
@@ -186,5 +218,44 @@ export class UserCannotBeResponsibleError extends AsignacionesError {
 
   constructor(diagnostic?: string) {
     super('user_cannot_be_responsible', diagnostic);
+  }
+}
+
+/** Comenzar o Terminar sobre un pedido de empaque que otro actor ya tiene tomado, o Terminar
+ *  activado por quien no es el que lo empaca. */
+export class OrderPackingTakenError extends AsignacionesError {
+  readonly code = 'order_packing_taken';
+
+  constructor(diagnostic?: string) {
+    super('order_packing_taken', diagnostic);
+  }
+}
+
+/** Comenzar o Terminar sobre un pedido cuyo estado actual no admite esa accion de empaque. */
+export class OrderNotPackableError extends AsignacionesError {
+  readonly code = 'order_not_packable';
+
+  constructor(diagnostic?: string) {
+    super('order_not_packable', diagnostic);
+  }
+}
+
+/** El pedido esta `POR_EMPACAR` o `EN_EMPAQUE`: sus responsables se congelan igual que en
+ *  `ENTREGADO`, con un codigo propio porque la frase que corresponde es otra. */
+export class OrderProducedFrozenError extends AsignacionesError {
+  readonly code = 'order_produced_frozen';
+
+  constructor(diagnostic?: string) {
+    super('order_produced_frozen', diagnostic);
+  }
+}
+
+/** Finalizar sobre un pedido `PENDIENTE`: aun no paso por `EN_CURSO`, asi que no hay nada que
+ *  terminar todavia. Mismo `code` que `InvalidTransitionError` de `pedidos`. */
+export class InvalidTransitionError extends AsignacionesError {
+  readonly code = 'invalid_transition';
+
+  constructor(diagnostic?: string) {
+    super('invalid_transition', diagnostic);
   }
 }

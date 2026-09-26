@@ -318,6 +318,7 @@ function paginaDePresentaciones(
         // QC-80 (R1): la presentacion declara unidad OBLIGATORIA. Aqui es solo relleno del
         // contrato -esta pantalla no la pinta-, con un uuid fijo para que el doble sea estable.
         unitId: UNIDAD_DE_LA_PRESENTACION,
+        content: null,
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
         updatedAt: new Date('2026-01-01T00:00:00.000Z'),
       })),
@@ -1073,6 +1074,43 @@ describe('pantalla de productos — lista', () => {
       cleanup();
     }
   });
+
+  it('R5 — ofrece una pestaña «Producto terminado» que filtra el listado por ese tipo', async () => {
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()], { total: 40 }));
+
+    await renderPantalla();
+
+    const pestana = screen.getByRole('tab', { name: 'Producto terminado' });
+    await user.click(pestana);
+
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalled());
+    const destino = new URLSearchParams(
+      String(routerMock.push.mock.calls.at(-1)?.[0]).split('?')[1],
+    );
+    expect(destino.get('type')).toBe(PRODUCT_TYPES.FINISHED_PRODUCT);
+    // Filtrar vuelve a la primera pagina, igual que la busqueda y el orden.
+    expect(destino.get(PAGE_PARAM)).toBe('1');
+  });
+
+  it('R5 — con el filtro de tipo en la URL, la pestaña llega marcada y la consulta lo lleva', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ type: PRODUCT_TYPES.FINISHED_PRODUCT })]),
+    );
+
+    await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
+
+    expect(screen.getByRole('tab', { name: 'Producto terminado', selected: true })).toBeInTheDocument();
+    expect(screen.getByText('Producto terminado', { selector: 'strong' })).toBeInTheDocument();
+
+    // La pantalla no filtra en el cliente: el backend ya recibio el filtro (el backend lo
+    // resuelve contra los cuatro valores del tipo, T6).
+    expect(listProductsActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: { type: { kind: 'select', values: [PRODUCT_TYPES.FINISHED_PRODUCT] } },
+      }),
+    );
+  });
 });
 
 describe('pantalla de productos — alta, edicion y borrado', () => {
@@ -1175,9 +1213,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     // ACOTADO EL 2026-09-03: el rechazo se provocaba con un costo no numerico. Ese campo ya no se
     // pinta, asi que el caso se muda al nombre, que sigue en pantalla y tiene su propia regla en
-    // el MISMO esquema del servidor: 120 caracteres como maximo. Lo que R20 vigila -el error va
-    // junto a SU campo, la operacion ni se llama y el panel sigue abierto- no cambia.
-    const nombreLargo = 'x'.repeat(121);
+    // el MISMO esquema del servidor: 200 caracteres como maximo. Lo que R20 vigila -el
+    // error va junto a SU campo, la operacion ni se llama y el panel sigue abierto- no cambia.
+    const nombreLargo = 'x'.repeat(201);
     await rellenarFormulario(user, { name: nombreLargo });
     await user.click(screen.getByTestId(testId.enviar));
 
@@ -1848,6 +1886,85 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
     expect(screen.getByTestId('product-field-lot')).toBeInTheDocument();
     expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+  });
+
+  it('R3 — el select de tipo del alta no ofrece «Producto terminado»', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByLabelText('Tipo'));
+    const opciones = await screen.findAllByRole('option');
+    expect(opciones).toHaveLength(3);
+    expect(screen.queryByRole('option', { name: 'Producto terminado' })).toBeNull();
+  });
+
+  it('R3 — el select de tipo de la edicion tampoco ofrece «Producto terminado»', async () => {
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ type: PRODUCT_TYPES.PRODUCT })]),
+    );
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByLabelText('Tipo'));
+    const opciones = await screen.findAllByRole('option');
+    expect(opciones).toHaveLength(3);
+    expect(screen.queryByRole('option', { name: 'Producto terminado' })).toBeNull();
+  });
+
+  it('R3 — editar un producto terminado muestra su tipo de solo lectura y sin select', async () => {
+    const user = setupUser();
+    const productoTerminado = producto({
+      name: 'Desengrasante industrial · Botella 1L',
+      type: PRODUCT_TYPES.FINISHED_PRODUCT,
+    });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([productoTerminado]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.getByTestId('product-field-type-readonly')).toHaveTextContent(
+      'Producto terminado',
+    );
+    expect(screen.queryByTestId('shared-select-type')).toBeNull();
+    expect(screen.queryByLabelText('Tipo')).toBeNull();
+
+    // El resto del formulario sigue siendo el de la edicion: solo nombre y alerta ademas del
+    // tipo, sin ningun campo del lote.
+    expect(screen.getByTestId('product-field-name')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    for (const campo of ['presentationId', 'stock', 'unitCost', 'totalCost', 'lot', 'expiryDate', 'purchaseDate']) {
+      expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
+    }
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+  });
+
+  it('R3 — editar un producto terminado reenvía su tipo aunque no haya select', async () => {
+    const user = setupUser();
+    const productoTerminado = producto({
+      name: 'Desengrasante industrial · Botella 1L',
+      type: PRODUCT_TYPES.FINISHED_PRODUCT,
+      qtyAlert: '2',
+    });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([productoTerminado]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateProductActionMock).toHaveBeenCalledTimes(1));
+    const [, , enviado] = updateProductActionMock.mock.calls[0];
+    expect(enviado.get('type')).toBe(PRODUCT_TYPES.FINISHED_PRODUCT);
+    expect(enviado.get('name')).toBe(productoTerminado.name);
+    expect(enviado.get('qtyAlert')).toBe('2');
   });
 
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {

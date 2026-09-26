@@ -15,6 +15,7 @@ export {
   BatchDuplicateLotError,
   BatchNotFoundError,
   BatchStockNegativeError,
+  ActionNotAllowedError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 export {
@@ -29,7 +30,11 @@ export {
   sanitizeListQuery,
 } from './domain/list-query';
 export { PRESENTATION_QUERYABLE } from './domain/presentation-queryable';
-export { PRODUCT_QUERYABLE, PRODUCT_TYPE_VALUES } from './domain/product-queryable';
+export {
+  PRODUCT_QUERYABLE,
+  PRODUCT_TYPE_VALUES,
+  MANUAL_PRODUCT_TYPE_VALUES,
+} from './domain/product-queryable';
 export { PRODUCT_TYPES, type ProductType } from './domain/product-type';
 export { normalizePresentationName } from './domain/presentation-name';
 export { normalizeProductName } from './domain/product-name';
@@ -42,6 +47,8 @@ export {
 export {
   createProductSchema,
   updateProductSchema,
+  productNameSchema,
+  PRODUCT_NAME_MAX_LENGTH,
   type CreateProductInput,
   type UpdateProductInput,
 } from './domain/product-input';
@@ -61,6 +68,10 @@ export { type InventoryMovementView, type NewInventoryMovement } from './domain/
 export { MOVEMENT_REASONS, type MovementReason } from './domain/movement-reason';
 
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
+export {
+  createCreateRawMaterial,
+  type CreateRawMaterialDeps,
+} from './domain/create-raw-material';
 export { createUpdateProduct, type UpdateProductDeps } from './domain/update-product';
 export { createDeleteProduct, type DeleteProductDeps } from './domain/delete-product';
 export { createGetProduct, type GetProductDeps } from './domain/get-product';
@@ -91,11 +102,25 @@ export {
   ceilToScale4,
 } from './domain/decimal-quantity';
 export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
+export {
+  planFinishedGoods,
+  type FinishedGoodsPlan,
+  type FinishedGoodsOutcome,
+  type FinishedGoodsIntake,
+} from './domain/finished-goods';
 
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
-export type { PresentationCatalog, PresentationId, PresentationRef } from './domain/presentation-catalog';
+// Resolver ingredientes POR NOMBRE: interfaz nueva, no un metodo mas de ProductCatalog, para no
+// pisarse con otro cambio en paralelo sobre este ultimo.
+export type { ProductNameLookup, ProductNameMatch } from './domain/product-name-lookup';
+export type {
+  PresentationByName,
+  PresentationCatalog,
+  PresentationId,
+  PresentationRef,
+} from './domain/presentation-catalog';
 
 // La reserva de material: tipos y las dos interfaces que consume o implementa quien llama
 // desde fuera de `inventario`. La implementacion (Prisma, la transaccion) vive en los

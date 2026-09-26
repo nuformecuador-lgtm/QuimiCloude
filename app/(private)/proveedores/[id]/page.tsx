@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
-import { DocumentUpload } from '@/components/shared/document-upload';
+import { identity } from '@/lib/composition';
+import { canUploadDocuments } from '@/lib/modules/documentos';
 import type { ErrorCode } from '@/lib/modules/errores';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getSupplierAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
@@ -11,6 +12,7 @@ import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-na
 import {
   CatalogListError,
   CatalogListSection,
+  CatalogPdfUpload,
   CatalogTableSkeleton,
   SupplierDetailHeader,
   SupplierNotFound,
@@ -84,6 +86,7 @@ export default async function ProveedorDetallePage({
   const listParams = parseCatalogListParams(resolvedSearchParams);
 
   const [supplierResult, unitsResult] = await Promise.all([getSupplierAction(id), listUnitsAction()]);
+  const canUpload = canUploadDocuments(await identity.getSessionUser());
 
   if (supplierResult.status === 'error') {
     return (
@@ -111,6 +114,11 @@ export default async function ProveedorDetallePage({
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <SupplierDetailHeader supplier={supplierResult.data} />
+      {canUpload ? (
+        <div className="flex justify-end">
+          <CatalogPdfUpload supplierId={supplierResult.data.id} />
+        </div>
+      ) : null}
       {/*
         SIN `key`: este limite no se remonta en cada cambio de consulta -eso destruia la barra de
         filtros y con ella el foco-. La senal de R24 llega desde dentro de `CatalogTable` mientras
@@ -123,7 +131,6 @@ export default async function ProveedorDetallePage({
           units={unitsResult.data}
         />
       </Suspense>
-      <DocumentUpload strategy="catalogo" />
     </div>
   );
 }

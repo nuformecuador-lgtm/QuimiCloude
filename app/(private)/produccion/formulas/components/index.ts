@@ -1,6 +1,7 @@
 // Sin `'use client'`: la frontera la declara cada componente, y así `page.tsx` sigue siendo de
 // servidor aunque importe de aquí.
 export { DeleteRecipeDialog } from './delete-recipe-dialog';
+export { FormulaPdfUpload } from './formula-pdf-upload';
 export {
   ACTIONS_COLUMN_ID,
   IMAGE_COLUMN_ID,

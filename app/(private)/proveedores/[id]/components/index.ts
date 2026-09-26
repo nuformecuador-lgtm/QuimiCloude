@@ -51,6 +51,7 @@ export {
   type CatalogPageSize,
 } from './catalog-list-params';
 export { CatalogListSection } from './catalog-list-section';
+export { CatalogPdfUpload, type CatalogPdfUploadProps } from './catalog-pdf-upload';
 export {
   CATALOG_TABLE_ID,
   CATALOG_TABLE_TEXTS,

@@ -359,15 +359,17 @@ expect(SIN_RESTAURAR_EL_GLOBAL.length, 'la mutacion del CREATE INDEX no encontro
  * y se leen del disco, nunca se copian a mano; si hubiera mas de una, se ejecutan de la mas
  * reciente a la mas antigua, que es el mismo orden inverso.
  */
-const REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS = 'REFERENCES "presentations" ("company_id", "id")';
+/** Tolerante al espacio entre la tabla y el parentesis: distintas migraciones lo escriben distinto. */
+const REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS =
+  /REFERENCES\s+"presentations"\s*\(\s*"company_id"\s*,\s*"id"\s*\)/;
 const timestampDe = (nombreDeMigracion: string): string => nombreDeMigracion.split('_')[0] as string;
 const esteTimestamp = timestampDe(scopeDirs[0] as string);
 const migracionesPosterioresDependientes = readdirSync(migrationsDir)
   .filter((nombre) => timestampDe(nombre) > esteTimestamp)
   .filter((nombre) => {
     try {
-      return readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8').includes(
-        REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS,
+      return REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS.test(
+        readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8'),
       );
     } catch {
       return false;
@@ -378,6 +380,10 @@ expect(
   migracionesPosterioresDependientes,
   'se esperaba encontrar la migracion de la presentacion del pedido como dependiente',
 ).toContain('20260922130000_orders_presentation');
+expect(
+  migracionesPosterioresDependientes,
+  'se esperaba encontrar la migracion de productos terminados como dependiente',
+).toContain('20260924190100_finished_products_and_content_copies');
 
 const SENTENCIAS_DE_DEPENDIENTES_POSTERIORES = migracionesPosterioresDependientes.flatMap((nombre) =>
   sentenciasSql(readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8')),

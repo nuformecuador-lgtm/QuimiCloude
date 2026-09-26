@@ -367,6 +367,21 @@ describe('QC-87 — removeWorkGroupFromOrder', () => {
       expect(assignments.deleteByWorkGroup).not.toHaveBeenCalled();
     });
 
+    it('POR_EMPACAR y EN_EMPAQUE congelan: `order_produced_frozen` sin quitar a nadie (R33)', async () => {
+      for (const estado of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+        filas = estadoInicial();
+        const quitar = crearCasoDeUso(estado);
+
+        const error = await quitar(ACTOR, { orderId: PEDIDO, workGroupId: GRUPO_DE_BAJA }).catch(
+          (e: unknown) => e,
+        );
+
+        expect((error as AsignacionesError).code).toBe('order_produced_frozen');
+        expect(assignments.deleteByWorkGroup).not.toHaveBeenCalled();
+        expect(filas).toEqual(estadoInicial());
+      }
+    });
+
     it('R12: «no existe» NO es «entregado»', async () => {
       const inexistente = crearCasoDeUso(null);
       const noExiste = await inexistente(ACTOR, {

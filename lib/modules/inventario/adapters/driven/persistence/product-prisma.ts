@@ -5,6 +5,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { compareQuantities } from '../../../domain/decimal-quantity';
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
+import { planFinishedGoods } from '../../../domain/finished-goods';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
 
@@ -12,6 +13,7 @@ import { writeMovement } from './batch-movement-prisma';
 import {
   batchCompanyScope,
   companyScopeColumns,
+  movementCompanyScope,
   presentationCompanyScope,
   productCompanyScope,
 } from './company-scope';
@@ -25,6 +27,7 @@ import {
   type NumberRangeCondition,
 } from './list-query-sql';
 
+import type { FinishedGoodsOutcome } from '../../../domain/finished-goods';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { MovementReason } from '../../../domain/movement-reason';
@@ -101,23 +104,51 @@ export async function findAliveProductById(
   return row === null ? null : toProductView(row);
 }
 
-/** `updateMany` y no `update`: sin fila viva `count` sale 0 y se devuelve `false` en vez de lanzar. */
+type ProductTypeRow = { readonly type: ProductType };
+
+/**
+ * Bloquea la fila para decidir el tipo antes de escribir, sin dos consultas sueltas que dejen
+ * hueco a una carrera: `FOR NO KEY UPDATE` retiene la fila hasta que la transaccion cierra.
+ * Devuelve `false` sin fila viva de la empresa, `'type_locked'` si la edicion cambiaria el tipo
+ * a o desde `FINISHED_PRODUCT`, y `true` tras escribir. El tipo en si nunca se escribe: la
+ * edicion no lo cambia, ni para un producto terminado ni para ningun otro.
+ */
 export async function updateAliveProduct(
   id: string,
   data: NewProduct,
   now: Date,
   scope: InventoryScope,
-): Promise<boolean> {
-  const { count } = await prisma.product.updateMany({
-    where: { AND: [productCompanyScope(scope), { id, deletedAt: null }] },
-    data: {
-      name: data.name,
-      nameNormalized: normalizeProductName(data.name),
-      qtyAlert: data.qtyAlert ?? null,
-      updatedAt: now,
-    },
+): Promise<boolean | 'type_locked'> {
+  const { companyId } = companyScopeColumns(scope);
+
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<ReadonlyArray<ProductTypeRow>>(Prisma.sql`
+      SELECT "type"
+        FROM "products"
+       WHERE "id" = ${id}::uuid
+         AND "company_id" = ${companyId}::uuid
+         AND "deleted_at" IS NULL
+         FOR NO KEY UPDATE
+    `);
+    const alive = rows[0];
+    if (alive === undefined) return false;
+
+    const requestedType = data.type ?? PRODUCT_TYPES.PRODUCT;
+    const wasFinished = alive.type === PRODUCT_TYPES.FINISHED_PRODUCT;
+    const staysFinished = requestedType === PRODUCT_TYPES.FINISHED_PRODUCT;
+    if (wasFinished !== staysFinished) return 'type_locked';
+
+    const { count } = await tx.product.updateMany({
+      where: { id, companyId, deletedAt: null },
+      data: {
+        name: data.name,
+        nameNormalized: normalizeProductName(data.name),
+        qtyAlert: data.qtyAlert ?? null,
+        updatedAt: now,
+      },
+    });
+    return count === 1;
   });
-  return count === 1;
 }
 
 export async function softDeleteAliveProduct(
@@ -294,7 +325,7 @@ export async function findAliveIdByNameInPresentationUnit(
   name: string,
   presentationId: string | null,
   scope: InventoryScope,
-): Promise<string | null> {
+): Promise<{ id: string; type: ProductType } | null> {
   let unitId: string | null | undefined;
 
   if (presentationId === null) {
@@ -320,9 +351,9 @@ export async function findAliveIdByNameInPresentationUnit(
       ],
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: { id: true },
+    select: { id: true, type: true },
   });
-  return row === null ? null : row.id;
+  return row === null ? null : { id: row.id, type: row.type as ProductType };
 }
 
 /**
@@ -668,7 +699,7 @@ export async function createWithFirstBatch(
   });
 }
 
-type AliveProductRow = { readonly id: string };
+type AliveProductRow = { readonly id: string; readonly type: string };
 
 /** Con `productId` escalar y no como escritura anidada desde `product`, que dispararia el
  *  `@updatedAt` de `products`. */
@@ -677,14 +708,14 @@ export async function addBatchToAlive(
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
-): Promise<{ batchId: string; lot: string } | null> {
+): Promise<{ batchId: string; lot: string } | null | 'finished_product'> {
   const { companyId } = companyScopeColumns(scope);
 
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
     // El borrado logico toma este mismo lock sobre la fila, asi que uno espera al otro. En READ
     // COMMITTED, el SELECT que espera vuelve a evaluar el WHERE y ya no ve la fila borrada.
     const rows = await tx.$queryRaw<ReadonlyArray<AliveProductRow>>(Prisma.sql`
-      SELECT "id"
+      SELECT "id", "type"
         FROM "products"
        WHERE "id" = ${productId}::uuid
          AND "company_id" = ${companyId}::uuid
@@ -693,6 +724,10 @@ export async function addBatchToAlive(
     `);
     const alive = rows[0];
     if (alive === undefined) return null;
+
+    // Bajo la misma fila bloqueada, cierra la carrera con un alta manual que naciera
+    // terminado despues de que `findAliveIdByNameInPresentationUnit` ya lo hubiera leido.
+    if (alive.type === PRODUCT_TYPES.FINISHED_PRODUCT) return 'finished_product';
 
     // Despues de la fila: un alta que no va a escribir no pide el lock de aviso. Y con la fila ya
     // tomada arriba, esta funcion pide siempre los dos locks en ese orden: fila y luego aviso.
@@ -729,6 +764,7 @@ const BATCH_VIEW_SELECT = {
   stock: true,
   purchaseDate: true,
   expiryDate: true,
+  packageContent: true,
   presentation: { select: { unitId: true } },
 } satisfies Prisma.ProductBatchSelect;
 
@@ -747,6 +783,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
     unitId: row.presentation?.unitId ?? null,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
+    packageContent: row.packageContent === null ? null : row.packageContent.toFixed(4),
   };
 }
 
@@ -786,7 +823,7 @@ function isBatchNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
 
-type AdjustProductRow = { readonly id: string };
+type AdjustProductRow = { readonly id: string; readonly type: string };
 
 /**
  * `stock: { increment: delta } }` es un `UPDATE ... SET stock = stock + $delta` relativo: dos
@@ -808,13 +845,13 @@ export async function adjustBatchStock(
   actorId: string,
   now: Date,
   scope: InventoryScope,
-): Promise<{ stock: string; reserved: string; overReserved: boolean } | null> {
+): Promise<{ stock: string; reserved: string; overReserved: boolean } | null | 'increase_not_allowed'> {
   const { companyId } = companyScopeColumns(scope);
 
   try {
     return await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<ReadonlyArray<AdjustProductRow>>(Prisma.sql`
-        SELECT p."id"
+        SELECT p."id", p."type"
           FROM "products" p
           JOIN "product_batches" b ON b."product_id" = p."id"
          WHERE b."id" = ${batchId}::uuid
@@ -823,6 +860,12 @@ export async function adjustBatchStock(
       `);
       const product = rows[0];
       if (product === undefined) return null;
+
+      // Un ajuste que suma sobre un producto terminado se rechaza aqui, con la fila ya
+      // bloqueada, antes de tocar el lote o el libro.
+      if (product.type === PRODUCT_TYPES.FINISHED_PRODUCT && compareQuantities(delta, '0') > 0) {
+        return 'increase_not_allowed';
+      }
 
       const updated = await tx.productBatch.update({
         where: { id: batchId, companyId },
@@ -913,4 +956,168 @@ export async function consumeBatchStock(
     select: { stock: true },
   });
   return { kind: 'consumed', stock: (updated?.stock ?? new Prisma.Decimal(0)).toFixed(4) };
+}
+
+type PresentationForShareRow = { readonly name: string; readonly unitId: string; readonly content: string | null };
+
+/**
+ * La entrada de un lote de produccion al Finalizar un pedido: presentacion `FOR SHARE`,
+ * producto terminado (nace si falta, `ON CONFLICT ... DO NOTHING` sobre el indice parcial de
+ * la combinacion), lote, asiento `production` y recalculo, todo sobre la MISMA transaccion que
+ * el resto del Finalizar -no abre la suya, a diferencia de `createWithFirstBatch`-.
+ */
+export async function receiveFinishedGoods(
+  tx: Prisma.TransactionClient,
+  input: {
+    readonly orderId: string;
+    readonly recipeId: string;
+    readonly recipeName: string;
+    readonly presentationId: string;
+    readonly orderQuantity: string;
+    readonly orderContent: string | null;
+    readonly lotCost: string;
+    readonly actorId: string;
+    readonly now: Date;
+  },
+  scope: InventoryScope,
+): Promise<FinishedGoodsOutcome> {
+  const { companyId } = companyScopeColumns(scope);
+
+  const presentationRows = await tx.$queryRaw<ReadonlyArray<PresentationForShareRow>>(Prisma.sql`
+    SELECT "name", "unit_id" AS "unitId", "content"::text AS "content"
+      FROM "presentations"
+     WHERE "id" = ${input.presentationId}::uuid
+       AND "company_id" = ${companyId}::uuid
+       FOR SHARE
+  `);
+  const presentation = presentationRows[0];
+  if (presentation === undefined) return { kind: 'presentation_without_content' };
+
+  const content = input.orderContent ?? presentation.content;
+  if (content === null) return { kind: 'presentation_without_content' };
+
+  const plan = planFinishedGoods({ orderQuantity: input.orderQuantity, content, lotCost: input.lotCost });
+  if (plan.kind === 'no_content') return { kind: 'presentation_without_content' };
+  if (plan.kind === 'no_whole_package') return { kind: 'no_whole_package' };
+
+  const name = `${input.recipeName} · ${presentation.name}`;
+  // El arbitro de `ON CONFLICT ... WHERE` lo resuelve Postgres en el analisis de la sentencia,
+  // antes de que un parametro tenga valor: esa clausula necesita el texto tal cual, no un bind.
+  const finishedProductTypeSql = Prisma.raw(`'${PRODUCT_TYPES.FINISHED_PRODUCT}'`);
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "products"
+      ("name", "name_normalized", "type", "unit_id", "company_id", "recipe_id", "presentation_id", "created_at", "updated_at")
+    VALUES
+      (${name}, ${normalizeProductName(name)}, ${PRODUCT_TYPES.FINISHED_PRODUCT}::"ProductType", ${presentation.unitId}::uuid, ${companyId}::uuid,
+       ${input.recipeId}::uuid, ${input.presentationId}::uuid, ${input.now}, ${input.now})
+    ON CONFLICT (company_id, recipe_id, presentation_id) WHERE type = ${finishedProductTypeSql} AND deleted_at IS NULL
+    DO NOTHING
+  `);
+
+  const productRows = await tx.$queryRaw<ReadonlyArray<{ id: string; name: string }>>(Prisma.sql`
+    SELECT "id", "name"
+      FROM "products"
+     WHERE "company_id" = ${companyId}::uuid
+       AND "recipe_id" = ${input.recipeId}::uuid
+       AND "presentation_id" = ${input.presentationId}::uuid
+       AND "type" = ${PRODUCT_TYPES.FINISHED_PRODUCT}::"ProductType"
+       AND "deleted_at" IS NULL
+       FOR NO KEY UPDATE
+  `);
+  const product = productRows[0];
+  if (product === undefined) {
+    throw new Error('receiveFinishedGoods: el producto terminado no aparecio tras el INSERT ON CONFLICT');
+  }
+
+  const batch: NewProductBatch = {
+    presentationId: input.presentationId,
+    stock: plan.quantity,
+    unitCost: plan.unitCost,
+    lot: null,
+    purchaseDate: toCivilDate(input.now),
+    expiryDate: null,
+    createdBy: input.actorId,
+  };
+  const lot = await resolveLot(tx, batch, scope);
+
+  const createdBatch = await tx.productBatch.create({
+    data: {
+      ...toBatchCreateData(product.id, batch, lot, input.now, scope),
+      packageContent: new Prisma.Decimal(plan.content),
+    },
+    select: { id: true },
+  });
+
+  await writeMovement(
+    tx,
+    {
+      batchId: createdBatch.id,
+      kind: 'production',
+      quantity: plan.quantity,
+      reason: null,
+      orderId: input.orderId,
+      createdBy: input.actorId,
+    },
+    input.now,
+    scope,
+  );
+
+  await recalculateProductStock(tx, product.id, scope);
+
+  return { kind: 'received', productId: product.id, productName: product.name, packages: plan.packages };
+}
+
+/** `quantity / packageContent`, como entero: `receiveFinishedGoods` siempre escribe la cantidad
+ *  del asiento `production` como un multiplo exacto del contenido del lote (`planFinishedGoods`),
+ *  asi que la division nunca deja resto. */
+function packagesFromReceipt(quantity: Prisma.Decimal, packageContent: Prisma.Decimal): string {
+  const scaledQuantity = BigInt(quantity.toFixed(4).replace('.', ''));
+  const scaledContent = BigInt(packageContent.toFixed(4).replace('.', ''));
+  return (scaledQuantity / scaledContent).toString();
+}
+
+/**
+ * La consulta real. Vive aparte de `findFinishedGoodsReceipts` por el mismo motivo que
+ * `findAliveProducts`: declara el `scope` como `InventoryScope` y lo lleva hasta
+ * `movementCompanyScope`, el punto unico del modulo.
+ */
+async function findProductionMovements(
+  orderIds: readonly string[],
+  scope: InventoryScope,
+): Promise<
+  readonly { readonly orderId: string | null; readonly quantity: Prisma.Decimal; readonly batch: { readonly packageContent: Prisma.Decimal | null } }[]
+> {
+  return prisma.inventoryMovement.findMany({
+    where: {
+      AND: [movementCompanyScope(scope), { kind: 'production', orderId: { in: [...orderIds] } }],
+    },
+    select: { orderId: true, quantity: true, batch: { select: { packageContent: true } } },
+  });
+}
+
+/**
+ * Implementa `ProductCatalog['findFinishedGoodsReceipts']`: los envases que de verdad entraron
+ * por cada pedido, leidos del asiento `production` -uno por pedido, porque el Finalizar solo se
+ * escribe una vez- y divididos por el contenido guardado en su lote. Un `orderId` sin ese
+ * asiento, con lote sin contenido de envase, o de otra empresa, simplemente no aparece en la
+ * respuesta: quien compone la fila del pedido trata la ausencia como `packages: null`.
+ *
+ * No exige `inventario.consultar`: quien llama ya autorizo con su propio permiso. Por eso NO es
+ * un caso de uso de `inventario`, sino una lectura directa que `asignaciones` compone dentro de
+ * la suya.
+ */
+export async function findFinishedGoodsReceipts(
+  orderIds: readonly string[],
+  companyId: string,
+): Promise<readonly { orderId: string; packages: string }[]> {
+  if (orderIds.length === 0) return [];
+
+  const rows = await findProductionMovements(orderIds, { companyId });
+
+  return rows
+    .filter(
+      (row): row is typeof row & { orderId: string; batch: { packageContent: Prisma.Decimal } } =>
+        row.orderId !== null && row.batch.packageContent !== null,
+    )
+    .map((row) => ({ orderId: row.orderId, packages: packagesFromReceipt(row.quantity, row.batch.packageContent) }));
 }

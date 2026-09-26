@@ -111,6 +111,7 @@ vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () =
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
 import {
   DOCUMENT_UPLOAD_INPUT_TESTID,
+  DOCUMENT_UPLOAD_OPEN_TESTID,
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   DOCUMENT_UPLOAD_TESTID,
 } from '@/components/shared/document-upload';
@@ -171,18 +172,24 @@ async function renderPantalla() {
   return render(await resolverServerComponents(arbol));
 }
 
+function sesionCon(permissions: readonly string[]) {
+  return {
+    id: 'u-test-42',
+    username: 'carla.duarte',
+    displayName: 'Carla Duarte Salas',
+    roleName: 'Administrador',
+    permissions,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockResolvedValue(okResponse());
 
-  getSessionUserMock.mockResolvedValue({
-    id: 'u-test-42',
-    username: 'carla.duarte',
-    displayName: 'Carla Duarte Salas',
-    roleName: 'Administrador',
-    permissions: PERMISSIONS.map((permiso) => permiso.code),
-  });
+  getSessionUserMock.mockResolvedValue(
+    sesionCon(PERMISSIONS.map((permiso) => permiso.code)),
+  );
   usePathnameMock.mockReturnValue(supplierDetailRoute(PROVEEDOR_ID));
   getSupplierActionMock.mockResolvedValue({
     status: 'success',
@@ -212,6 +219,8 @@ beforeEach(() => {
           cost: '1234.5678',
           minPurchase: '0.1005',
           deliveryTime: 5,
+          material: null,
+          measurements: null,
           createdAt: new Date('2026-03-01T10:00:00.000Z'),
           updatedAt: new Date('2026-03-05T10:00:00.000Z'),
           createdBy: 'autor',
@@ -246,20 +255,22 @@ afterEach(() => {
 });
 
 describe('el montaje en la pantalla de proveedores', () => {
-  it('la pantalla de detalle de proveedor monta el componente en modo catalogo (R17)', async () => {
+  it('con permiso de subida hay boton, la subida esta oculta hasta pulsarlo, y al subir se encola catalogo (R1, R5, R10)', async () => {
+    // Conjunto minimo (R10): si el boton exigiera un permiso de mas, este caso lo detectaria.
+    getSessionUserMock.mockResolvedValue(
+      sesionCon(['proveedores.consultar', 'documentos.modificar']),
+    );
+
     await renderPantalla();
 
-    const subida = screen.getByTestId(DOCUMENT_UPLOAD_TESTID);
-    const catalogo = screen.getByTestId('catalog-list');
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeVisible();
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeVisible();
 
-    // Debajo del catalogo y colgando del mismo contenedor de la pagina.
-    expect(catalogo.compareDocumentPosition(subida) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    expect(subida.parentElement?.contains(catalogo)).toBe(true);
-
-    // La estrategia de la tanda es la de catalogo, y se ve donde importa: al encolar.
     const user = setupUser();
+    await user.click(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID));
+
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_TESTID)).toBeVisible();
+
     await user.upload(screen.getByTestId(DOCUMENT_UPLOAD_INPUT_TESTID), [pdf('catalogo.pdf')]);
     await user.click(screen.getByTestId(DOCUMENT_UPLOAD_SUBMIT_TESTID));
 
@@ -271,13 +282,41 @@ describe('el montaje en la pantalla de proveedores', () => {
     });
   });
 
-  it('el montaje no anade ningun corte de permiso propio a la pantalla (R14, R17)', async () => {
+  it('sin documentos.modificar, con proveedores.consultar y proveedores.modificar, no hay boton ni subida (R11)', async () => {
+    getSessionUserMock.mockResolvedValue(
+      sesionCon(['proveedores.consultar', 'proveedores.modificar']),
+    );
+
     await renderPantalla();
 
-    // La pagina sigue exigiendo lo suyo y nada mas: quien decide si se puede SUBIR es el caso de
-    // uso, no la pantalla, asi que el componente se monta entero.
-    expect(screen.getByTestId(DOCUMENT_UPLOAD_TESTID)).toBeVisible();
-    expect(screen.getByTestId(DOCUMENT_UPLOAD_INPUT_TESTID)).toBeEnabled();
-    expect(issueUploadLinksActionMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeInTheDocument();
+  });
+
+  it('proveedor inexistente: sin boton (R7)', async () => {
+    getSupplierActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'supplier_not_found',
+      message: 'Proveedor no encontrado',
+    });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+  });
+
+  it('el boton va despues de la cabecera y antes del catalogo (R22)', async () => {
+    await renderPantalla();
+
+    const cabecera = screen.getByTestId('supplier-detail');
+    const boton = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    const catalogo = screen.getByTestId('catalog-list');
+
+    expect(cabecera.compareDocumentPosition(boton) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(boton.compareDocumentPosition(catalogo) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 });

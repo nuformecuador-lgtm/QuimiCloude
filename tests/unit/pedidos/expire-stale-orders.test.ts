@@ -94,6 +94,28 @@ describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
 
+  it('un candidato POR_EMPACAR o EN_EMPAQUE bajo el candado no se cancela ni se libera (R30)', async () => {
+    for (const status of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      const d = fakeUnitOfWork({
+        orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ status })) },
+      })
+      const listCompanyIds = vi.fn(async () => [EMPRESA_A])
+      const findExpirable = vi.fn(async () => [candidato(PEDIDO_A_ID)])
+
+      const resultado = await createExpireStaleOrders({
+        listCompanyIds,
+        findExpirable,
+        unitOfWork: d.unitOfWork,
+        now: () => AHORA,
+      })()
+
+      expect(d.orders.cancelAlive, status).not.toHaveBeenCalled()
+      expect(d.reservations.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.orders.setReservedAt, status).not.toHaveBeenCalled()
+      expect(resultado, status).toEqual({ expired: 0, failed: [] })
+    }
+  })
+
   it('si el candidato ya no existe (borrado o de otra empresa) al bloquearlo, no hace nada', async () => {
     const d = fakeUnitOfWork({ orders: { lockAliveById: vi.fn(async () => null) } })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])

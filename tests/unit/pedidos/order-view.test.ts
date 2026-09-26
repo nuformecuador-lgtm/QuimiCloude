@@ -26,6 +26,7 @@ const NEW_ORDER: NewOrder = {
   priority: 'ALTA',
   status: 'EN_CURSO',
   presentationId: '22222222-2222-4222-8222-222222222222',
+  presentationContent: null,
 }
 
 /** `true` si el tipo declara esa clave. Se evalua en COMPILACION; el `expect` de abajo solo

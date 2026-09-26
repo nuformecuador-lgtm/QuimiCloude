@@ -247,7 +247,9 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       productIds.push(primero.id);
 
       const agregado = await addBatchToAlive(primero.id, newBatch(fixture, { stock: '8' }), new Date(), ambito(fixture));
-      if (agregado === null) throw new Error('el producto deberia seguir vivo');
+      if (agregado === null || agregado === 'finished_product') {
+        throw new Error('el producto deberia seguir vivo');
+      }
 
       await assertLedgerBalances(primero.batchId);
       await assertLedgerBalances(agregado.batchId);
@@ -265,11 +267,15 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       productIds.push(creado.id);
 
       const sumado = await adjustBatchStock(creado.batchId, '6', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture));
-      if (sumado === null) throw new Error('el lote deberia existir');
+      if (sumado === null || sumado === 'increase_not_allowed') {
+        throw new Error('el lote deberia existir');
+      }
       expect(sumado.stock).toBe('26.0000');
 
       const restado = await adjustBatchStock(creado.batchId, '-9', 'merma', fixture.actorId, new Date(), ambito(fixture));
-      if (restado === null) throw new Error('el lote deberia existir');
+      if (restado === null || restado === 'increase_not_allowed') {
+        throw new Error('el lote deberia existir');
+      }
       expect(restado.stock).toBe('17.0000');
 
       await assertLedgerBalances(creado.batchId);

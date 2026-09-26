@@ -24,7 +24,10 @@ import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adap
 import { createListAssignedOrders } from '@/lib/modules/asignaciones/domain/list-assigned-orders';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { ROLE_EMPACADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
-import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import {
   findAliveOrderTargetById,
@@ -248,6 +251,12 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           transitionAliveById: async () => {
             throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
           },
+          startPackingAliveById: async () => {
+            throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
+          },
+          finishPackingAliveById: async () => {
+            throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
+          },
         },
         recipes: {
           findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
@@ -257,8 +266,11 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           findIdsMatchingName: async () => {
             throw new Error('QC-144: listAssignedOrders no busca recetas por nombre');
           },
+          findAliveByNormalizedName: async () => {
+            throw new Error('QC-144: listAssignedOrders no busca la receta viva por su nombre');
+          },
         },
-        presentations: { findRefs: findPresentationRefs },
+        presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
         people: assignmentDirectoryPrisma,
         now: () => NOW,
       });

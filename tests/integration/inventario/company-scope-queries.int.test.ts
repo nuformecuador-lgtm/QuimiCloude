@@ -34,6 +34,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { batchWritten } from '../../helpers/product-batch-result';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
@@ -431,7 +432,7 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
     ).toBeNull();
     expect(
       await findAliveIdByNameInPresentationUnit(nombreDeB, B.presentaciones[0] ?? '', ambitoDe(B)),
-    ).toBe(B.productos[0]);
+    ).toEqual({ id: B.productos[0], type: 'PRODUCT' });
   });
 });
 
@@ -527,7 +528,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await replacePresentation(
       ajena,
-      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema },
+      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema, content: null },
       ambitoDe(A),
     );
 
@@ -541,7 +542,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await replacePresentation(
       propia,
-      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema },
+      { name: nombre, nameNormalized: normalizePresentationName(nombre), unitId: unidadDeSistema, content: null },
       ambitoDe(B),
     );
 
@@ -641,7 +642,7 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
     );
 
     expect(resultado).not.toBeNull();
-    const batchId = resultado?.batchId ?? '';
+    const batchId = batchWritten(resultado).batchId;
     A.lotes.push(batchId);
     const lote = await prisma.productBatch.findUniqueOrThrow({
       where: { id: batchId },
@@ -655,8 +656,8 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
     const name = `${MARCA} Bidon doble ${token().slice(0, 8)}`;
     const normalizado = normalizePresentationName(name);
 
-    const enA = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema }, ambitoDe(A));
-    const enB = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema }, ambitoDe(B));
+    const enA = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema, content: null }, ambitoDe(A));
+    const enB = await createPresentation({ name, nameNormalized: normalizado, unitId: unidadDeSistema, content: null }, ambitoDe(B));
 
     expect(enA).not.toBe('duplicate');
     expect(enB).not.toBe('duplicate');

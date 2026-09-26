@@ -69,6 +69,7 @@ const ORDER_SELECT = {
   createdBy: true,
   updatedBy: true,
   presentationId: true,
+  presentationContent: true,
 } satisfies Prisma.OrderSelect;
 
 type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
@@ -103,6 +104,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
     presentationId: row.presentationId,
+    presentationContent: row.presentationContent === null ? null : fromDecimal(row.presentationContent),
   };
 }
 
@@ -440,6 +442,8 @@ export async function updateAliveOrder(
       updatedAt: now,
       updatedBy: actorId,
       presentationId: data.presentationId,
+      presentationContent:
+        data.presentationContent === null ? null : toDecimalInput(data.presentationContent),
     },
   });
   return count === 1 ? 'ok' : 'not_found';
@@ -565,7 +569,7 @@ async function insertAliveOrder(
     INSERT INTO "orders" (
       "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
       "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
-      "updated_at", "presentation_id"
+      "updated_at", "presentation_id", "presentation_content"
     ) VALUES (
       ${companyId}::uuid,
       ${year}::integer,
@@ -582,7 +586,8 @@ async function insertAliveOrder(
       ${actorId}::uuid,
       ${now}::timestamptz,
       ${now}::timestamptz,
-      ${data.presentationId}::uuid
+      ${data.presentationId}::uuid,
+      ${data.presentationContent}::numeric
     )
     RETURNING "id", "order_year", "order_sequence"
   `);
@@ -608,6 +613,8 @@ async function insertAliveOrder(
     createdBy: actorId,
     updatedBy: actorId,
     presentationId: data.presentationId,
+    presentationContent:
+      data.presentationContent === null ? null : fromDecimal(toDecimalInput(data.presentationContent)),
   };
 }
 
@@ -736,4 +743,68 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
   };
+}
+
+/** Fila minima que las dos escrituras de empaque releen para clasificar el resultado cuando el
+ *  `UPDATE` condicional no movio ninguna fila. */
+type PackingStatusRow = { readonly status: OrderStatus; readonly packedBy: string | null };
+
+async function findAlivePackingStatus(
+  id: string,
+  scope: OrderScope,
+): Promise<PackingStatusRow | null> {
+  return prisma.order.findFirst({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    select: { status: true, packedBy: true },
+  });
+}
+
+/**
+ * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar): un `UPDATE` condicional
+ * `WHERE status = 'POR_EMPACAR'`. `count = 1` es el unico camino de exito; cualquier otro caso
+ * relee la fila para distinguir «no existe» de «ya la tiene otro» de «ya es mia» de «no admite
+ * Comenzar».
+ */
+export async function startPackingAliveOrder(
+  id: string,
+  packerId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'> {
+  const { count } = await prisma.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_EMPACAR' }] },
+    data: { status: 'EN_EMPAQUE', packedBy: packerId, updatedAt: now, updatedBy: packerId },
+  });
+  if (count === 1) return 'ok';
+
+  const row = await findAlivePackingStatus(id, scope);
+  if (row === null) return 'not_found';
+  if (row.status === 'EN_EMPAQUE') return row.packedBy === packerId ? 'already_mine' : 'taken';
+  return 'not_packable';
+}
+
+/**
+ * Implementa `OrderPackingRepository['finishPackingAlive']` (Terminar): el `UPDATE` condicional
+ * exige ademas `packed_by = packerId`, y escribe `finished_at` en la MISMA sentencia que el
+ * estado. Cualquier caso que no mueva la fila relee para distinguir «no existe» de «lo tiene
+ * otro empacador» de «no admite Terminar».
+ */
+export async function finishPackingAliveOrder(
+  id: string,
+  packerId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'> {
+  const { count } = await prisma.order.updateMany({
+    where: {
+      AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'EN_EMPAQUE', packedBy: packerId }],
+    },
+    data: { status: 'ENTREGADO', finishedAt: now, updatedAt: now, updatedBy: packerId },
+  });
+  if (count === 1) return 'ok';
+
+  const row = await findAlivePackingStatus(id, scope);
+  if (row === null) return 'not_found';
+  if (row.status === 'EN_EMPAQUE' && row.packedBy !== packerId) return 'not_packer';
+  return 'not_packable';
 }

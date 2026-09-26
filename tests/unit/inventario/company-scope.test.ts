@@ -193,6 +193,7 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       name: 'Bidon 20 L',
       nameNormalized: 'bidon20l',
       unitId: '33333333-3333-4333-8333-333333333333',
+      content: null,
       createdAt: new Date('2026-09-11T10:00:00.000Z'),
       updatedAt: new Date('2026-09-11T10:00:00.000Z'),
       companyId: AMBITO.companyId,
@@ -203,6 +204,7 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
     expect(Object.keys(vista)).not.toContain('companyId');
     expect(JSON.stringify(vista)).not.toContain(AMBITO.companyId);
     expect(Object.keys(vista).sort()).toEqual([
+      'content',
       'createdAt',
       'id',
       'name',

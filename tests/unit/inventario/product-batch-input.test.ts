@@ -101,6 +101,10 @@ describe('createProductWithFirstBatchSchema', () => {
     expect(camposRechazados({ ...VALIDA, lot: '   ' })).toEqual(['lot']);
   });
 
+  it('R2 — rechaza el alta manual con type FINISHED_PRODUCT senalando type', () => {
+    expect(camposRechazados({ ...VALIDA, type: 'FINISHED_PRODUCT' })).toEqual(['type']);
+  });
+
   it('rechaza la presentacion ausente o sin forma de uuid senalando presentationId', () => {
     // Solo se valida la FORMA: que exista lo garantiza la clave foranea, no zod.
     expect(camposRechazados({ ...VALIDA, presentationId: undefined })).toEqual(['presentationId']);

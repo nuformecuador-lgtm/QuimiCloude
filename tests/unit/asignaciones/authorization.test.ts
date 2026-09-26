@@ -32,6 +32,10 @@ import {
   createListCompanyOrders,
   type ListCompanyOrdersDeps,
 } from '@/lib/modules/asignaciones/domain/list-company-orders';
+import { createListPackingOrders, type ListPackingOrdersDeps } from '@/lib/modules/asignaciones/domain/list-packing-orders';
+import { createGetPackingOrder, type GetPackingOrderDeps } from '@/lib/modules/asignaciones/domain/get-packing-order';
+import { createStartPacking, type StartPackingDeps } from '@/lib/modules/asignaciones/domain/start-packing';
+import { createFinishPacking, type FinishPackingDeps } from '@/lib/modules/asignaciones/domain/finish-packing';
 
 import type { PermissionCode } from '@/lib/modules/identity';
 
@@ -450,5 +454,206 @@ describe('QC-145 — `listCompanyOrders` (R23)', () => {
     await listCompanyOrders(conPermisos(PERMISO_CONSULTA), { page: 1 });
 
     expect(todos[0]).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// QC-168 R13 — los CUATRO casos de uso del empaque exigen `empaque.modificar` como PRIMERA
+// linea: antes de `zod` y antes de tocar ningun puerto. Misma matriz `ACTORES_DENEGADOS` que el
+// resto del archivo, mas un actor con OTRO permiso cualquiera (`asignaciones.consultar` no
+// sustituye a `empaque.modificar`).
+// ---------------------------------------------------------------------------------------
+const PERMISO_EMPAQUE: PermissionCode = 'empaque.modificar';
+const PEDIDO = '77777777-7777-4777-8777-777777777777';
+
+describe('QC-168 — `listPackingOrders` (R13, R14)', () => {
+  function montarDeps(): { deps: ListPackingOrdersDeps; todos: readonly ReturnType<typeof vi.fn>[] } {
+    const listAliveSummariesInCompany = vi.fn(async () => ({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    }));
+    const listByOrdersInCompany = vi.fn(async () => []);
+    const findRefsIncludingDeleted = vi.fn(async () => []);
+    const findRefsIncludingDeletedInCompany = vi.fn(async () => []);
+    const findRefsPresentations = vi.fn(async () => []);
+    const findFinishedGoodsReceipts = vi.fn(async () => []);
+
+    const deps = {
+      assignments: { listByOrdersInCompany },
+      orders: { listAliveSummariesInCompany },
+      recipes: { findRefsIncludingDeleted },
+      people: { findRefsIncludingDeletedInCompany },
+      presentations: { findRefs: findRefsPresentations },
+      products: { findFinishedGoodsReceipts },
+    } as unknown as ListPackingOrdersDeps;
+
+    return {
+      deps,
+      todos: [
+        listAliveSummariesInCompany,
+        listByOrdersInCompany,
+        findRefsIncludingDeleted,
+        findRefsIncludingDeletedInCompany,
+        findRefsPresentations,
+        findFinishedGoodsReceipts,
+      ],
+    };
+  }
+
+  it('R13: sin `empaque.modificar` lanza `unauthorized` ANTES de validar la entrada y sin leer nada', async () => {
+    const { deps, todos } = montarDeps();
+    const listPackingOrders = createListPackingOrders(deps);
+
+    for (const [, actor] of ACTORES_DENEGADOS) {
+      await expect(listPackingOrders(actor, { page: 0 })).rejects.toThrow(UnauthorizedError);
+    }
+    await expect(
+      listPackingOrders(conPermisos('asignaciones.consultar'), { page: 1 }),
+    ).rejects.toThrow(UnauthorizedError);
+
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('con `empaque.modificar` SI llega al repositorio', async () => {
+    const { deps, todos } = montarDeps();
+    const listPackingOrders = createListPackingOrders(deps);
+
+    await listPackingOrders(conPermisos(PERMISO_EMPAQUE), { page: 1 });
+
+    expect(todos[0]).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('QC-168 — `getPackingOrder` (R13, R17)', () => {
+  function montarDeps(): { deps: GetPackingOrderDeps; todos: readonly ReturnType<typeof vi.fn>[] } {
+    const listAliveSummariesByIds = vi.fn(async () => ({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 1,
+      totalPages: 1,
+    }));
+    const listByOrdersInCompany = vi.fn(async () => []);
+    const findRefsIncludingDeleted = vi.fn(async () => []);
+    const findRefsIncludingDeletedInCompany = vi.fn(async () => []);
+    const findRefsPresentations = vi.fn(async () => []);
+    const findFinishedGoodsReceipts = vi.fn(async () => []);
+
+    const deps = {
+      assignments: { listByOrdersInCompany },
+      orders: { listAliveSummariesByIds },
+      recipes: { findRefsIncludingDeleted },
+      people: { findRefsIncludingDeletedInCompany },
+      presentations: { findRefs: findRefsPresentations },
+      products: { findFinishedGoodsReceipts },
+    } as unknown as GetPackingOrderDeps;
+
+    return {
+      deps,
+      todos: [
+        listAliveSummariesByIds,
+        listByOrdersInCompany,
+        findRefsIncludingDeleted,
+        findRefsIncludingDeletedInCompany,
+        findRefsPresentations,
+        findFinishedGoodsReceipts,
+      ],
+    };
+  }
+
+  it('R13: sin `empaque.modificar` lanza `unauthorized` ANTES de validar la entrada y sin leer nada', async () => {
+    const { deps, todos } = montarDeps();
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    for (const [, actor] of ACTORES_DENEGADOS) {
+      await expect(getPackingOrder(actor, { orderId: 'no-es-uuid' })).rejects.toThrow(UnauthorizedError);
+    }
+    await expect(
+      getPackingOrder(conPermisos('asignaciones.consultar'), { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-168 — `startPacking` (R13, R18-R24)', () => {
+  function montarDeps(): { deps: StartPackingDeps; startPackingAliveById: ReturnType<typeof vi.fn> } {
+    const startPackingAliveById = vi.fn(async () => 'ok' as const);
+    const deps = { orders: { startPackingAliveById } } as unknown as StartPackingDeps;
+    return { deps, startPackingAliveById };
+  }
+
+  it('R13: sin `empaque.modificar` lanza `unauthorized` ANTES de validar la entrada y sin tocar el puerto', async () => {
+    const { deps, startPackingAliveById } = montarDeps();
+    const startPacking = createStartPacking(deps);
+
+    for (const [, actor] of ACTORES_DENEGADOS) {
+      await expect(startPacking(actor, { orderId: 'no-es-uuid' })).rejects.toThrow(UnauthorizedError);
+    }
+    await expect(
+      startPacking(conPermisos('asignaciones.consultar'), { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+
+    expect(startPackingAliveById).not.toHaveBeenCalled();
+  });
+
+  it('con `empaque.modificar` SI llega al puerto', async () => {
+    const { deps, startPackingAliveById } = montarDeps();
+    const startPacking = createStartPacking(deps);
+
+    await startPacking(conPermisos(PERMISO_EMPAQUE), { orderId: PEDIDO });
+
+    expect(startPackingAliveById).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
+  function montarDeps(): {
+    deps: FinishPackingDeps;
+    findAliveById: ReturnType<typeof vi.fn>;
+    listAliveSummariesByIds: ReturnType<typeof vi.fn>;
+    finishPackingAliveById: ReturnType<typeof vi.fn>;
+  } {
+    const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: 'EN_EMPAQUE' }));
+    const listAliveSummariesByIds = vi.fn(async () => ({
+      items: [{ id: PEDIDO, number: { year: 2026, sequence: 1 } }],
+      total: 1,
+      page: 1,
+      pageSize: 1,
+      totalPages: 1,
+    }));
+    const finishPackingAliveById = vi.fn(async () => 'ok' as const);
+    const deps = {
+      orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById },
+    } as unknown as FinishPackingDeps;
+    return { deps, findAliveById, listAliveSummariesByIds, finishPackingAliveById };
+  }
+
+  it('R13: sin `empaque.modificar` lanza `unauthorized` ANTES de validar la entrada y sin tocar ningun puerto', async () => {
+    const { deps, findAliveById, listAliveSummariesByIds, finishPackingAliveById } = montarDeps();
+    const finishPacking = createFinishPacking(deps);
+
+    for (const [, actor] of ACTORES_DENEGADOS) {
+      await expect(finishPacking(actor, { orderId: 'no-es-uuid' })).rejects.toThrow(UnauthorizedError);
+    }
+    await expect(
+      finishPacking(conPermisos('asignaciones.consultar'), { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(finishPackingAliveById).not.toHaveBeenCalled();
+  });
+
+  it('con `empaque.modificar` SI llega al puerto', async () => {
+    const { deps, finishPackingAliveById } = montarDeps();
+    const finishPacking = createFinishPacking(deps);
+
+    await finishPacking(conPermisos(PERMISO_EMPAQUE), { orderId: PEDIDO });
+
+    expect(finishPackingAliveById).toHaveBeenCalledTimes(1);
   });
 });

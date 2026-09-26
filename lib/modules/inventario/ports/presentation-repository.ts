@@ -16,6 +16,8 @@ export type PresentationData = {
   readonly name: string;
   readonly nameNormalized: string;
   readonly unitId: string;
+  /** Opcional y anulable, y SIEMPRE se reescribe -no hay edicion parcial-. */
+  readonly content: string | null;
 };
 
 /**

@@ -46,14 +46,9 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Los dieciocho codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que este test
- * congela.
- * Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`, enmendando
- * QC-74 R2; QC-66 sumo `usuarios.consultar` y `usuarios.modificar`, enmendando QC-74 R1; QC-86 suma
- * `asignaciones.consultar` y `asignaciones.modificar`, volviendo a enmendar la regla del numero
- * cerrado; la siguiente enmienda suma `terminados.consultar`, volviendo a enmendar la regla de
- * nombres de modulo; la ultima suma `clientes.consultar` y `clientes.modificar` (las cinco
- * enmiendas estan escritas en `lib/modules/identity/domain/permissions.ts`).
+ * Los codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que este test congela.
+ * Cada enmienda del catalogo (escritas en `lib/modules/identity/domain/permissions.ts`) suma sus
+ * codigos al final de esta lista.
  */
 export const CODIGOS_QC74 = [
   'dashboard.consultar',
@@ -74,10 +69,12 @@ export const CODIGOS_QC74 = [
   'terminados.consultar',
   'clientes.consultar',
   'clientes.modificar',
+  'documentos.consultar',
+  'documentos.modificar',
+  'empaque.modificar',
 ] as const;
 
-/** Los siete modulos de negocio del ERP. Eran cinco hasta que se sumo `asignaciones`, y ahora se
- *  suma `clientes`. */
+/** Los modulos de negocio del ERP, en el orden en que cada uno entro al catalogo. */
 export const MODULOS_DE_NEGOCIO = [
   'inventario',
   'recetas',
@@ -86,6 +83,7 @@ export const MODULOS_DE_NEGOCIO = [
   'unidades',
   'asignaciones',
   'clientes',
+  'documentos',
 ] as const;
 
 /**
@@ -126,9 +124,10 @@ export function comodinesDe(permisos: readonly PermisoLeido[]): string[] {
 describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', () => {
   const catalogo: readonly PermisoLeido[] = PERMISSIONS;
 
-  it('tiene exactamente dieciocho codigos, los dieciocho del catalogo', () => {
-    expect(catalogo).toHaveLength(18);
-    expect(catalogo.map((permiso) => permiso.code).sort()).toEqual([...CODIGOS_QC74].sort());
+  it('tiene exactamente los codigos de CODIGOS_QC74, sin duplicados', () => {
+    const codigos = catalogo.map((permiso) => permiso.code);
+    expect(new Set(codigos).size).toBe(codigos.length);
+    expect(codigos.sort()).toEqual([...CODIGOS_QC74].sort());
   });
 
   it('ningun permiso es un comodin ni de modulo ni de accion', () => {
@@ -142,14 +141,14 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     ).toEqual([]);
   });
 
-  it('los modulos son exactamente los siete de negocio mas dashboard y usuarios', () => {
+  it('los modulos son exactamente los de negocio mas dashboard y usuarios', () => {
     const modulos = [...new Set(catalogo.map((permiso) => permiso.module))].sort();
-    // `unidades`, `asignaciones` y `clientes` ya estan entre los de negocio; el catalogo suma
-    // `dashboard`, que es una pantalla y no un modulo del ERP (solo lleva `consultar`),
-    // `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
-    // `identity`-, y `terminados`, que tampoco es carpeta de `lib/modules/`: la misma enmienda
-    // que ya se hizo con `usuarios`.
-    const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios', 'terminados'])].sort();
+    // `dashboard` es una pantalla y no un modulo del ERP (solo lleva `consultar`); `usuarios`,
+    // `terminados` y `empaque` no son carpetas de `lib/modules/` -viven dentro de `identity`-.
+    // `empaque` ademas es solo de escritura: unicamente lleva `modificar`.
+    const esperados = [
+      ...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios', 'terminados', 'empaque']),
+    ].sort();
     expect(modulos).toEqual(esperados);
     expect(modulos).toContain('unidades');
   });

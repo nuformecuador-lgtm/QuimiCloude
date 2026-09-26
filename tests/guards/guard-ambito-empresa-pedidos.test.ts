@@ -485,7 +485,23 @@ const PUERTOS = [
  * adaptador», que asume un adaptador que lee `prisma.order` directamente.
  */
 const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
-  ['transitionAliveById', /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*\}\s*\)$/],
+  [
+    'transitionAliveById',
+    // Gana `recipes`, `products` y `units` -las lecturas globales del coste del lote y del
+    // nombre de la receta-, ademas de `unitOfWork`.
+    /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,?\s*\}\s*\)$/,
+  ],
+  // Comenzar y Terminar (empaque): cada uno cablea un caso de uso de `pedidos/domain` sobre
+  // `OrderPackingRepository`, implementado en `order-prisma.ts` con `scope: OrderScope` -las dos
+  // SI estan en el barrido sin lista de excepciones de mas abajo-.
+  [
+    'startPackingAliveById',
+    /^createStartPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,?\s*\}\s*\)$/,
+  ],
+  [
+    'finishPackingAliveById',
+    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,?\s*\}\s*\)$/,
+  ],
 ])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {

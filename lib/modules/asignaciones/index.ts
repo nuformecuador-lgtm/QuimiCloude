@@ -54,6 +54,11 @@ export {
   WorkGroupNotFoundError,
   MaterialShortageError,
   RecipeWithoutLinesError,
+  PresentationWithoutContentError,
+  NoWholePackageError,
+  OrderPackingTakenError,
+  OrderNotPackableError,
+  OrderProducedFrozenError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -180,3 +185,17 @@ export {
   type ListResponsibleCandidatesDeps,
   type ResponsibleCandidate,
 } from './domain/list-responsible-candidates';
+
+// ---------------------------------------------------------------------------------------
+// El empaque: la fila comun y los cuatro casos de uso. Bloque NUEVO al final: no reordena ni
+// reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export type { PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
+export { createListPackingOrders, type ListPackingOrdersDeps } from './domain/list-packing-orders';
+export { createGetPackingOrder, type GetPackingOrderDeps } from './domain/get-packing-order';
+export { createStartPacking, type StartPackingDeps } from './domain/start-packing';
+export {
+  createFinishPacking,
+  type FinishPackingDeps,
+  type FinishPackingResult,
+} from './domain/finish-packing';

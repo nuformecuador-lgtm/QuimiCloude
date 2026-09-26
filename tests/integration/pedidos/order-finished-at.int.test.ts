@@ -143,6 +143,7 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     priority: 'MEDIA',
     status: 'PENDIENTE',
     presentationId,
+    presentationContent: null,
     ...overrides,
   }
 }
@@ -161,8 +162,8 @@ async function seedOrder(overrides: Partial<NewOrder> = {}): Promise<string> {
  *  sin `tx`, valido fuera de una transaccion compartida): el camino vivo de transicion de estado. */
 function setStatus(
   id: string,
-  from: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO',
-  to: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO',
+  from: 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'ENTREGADO' | 'CANCELADO',
+  to: 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'ENTREGADO' | 'CANCELADO',
   now: Date,
 ): Promise<'ok' | 'not_found' | 'stale'> {
   return createOrderWriteRepository().setStatus(id, from, to, actorId, now, scope())
@@ -194,12 +195,15 @@ afterAll(async () => {
   await prisma.$disconnect()
 })
 
-describe('R3 — Finalizar deja ENTREGADO y finished_at = now, en la misma escritura', () => {
-  it('setAliveOrderStatus de EN_CURSO a ENTREGADO escribe la fecha del reloj inyectado', async () => {
+describe('R3 — Terminar deja ENTREGADO y finished_at = now, en la misma escritura', () => {
+  it('setAliveOrderStatus de EN_EMPAQUE a ENTREGADO escribe la fecha del reloj inyectado', async () => {
     const id = await seedOrder({ status: 'EN_CURSO' })
     try {
+      // `orders_packed_by_matches_status` exige `packed_by` en `EN_EMPAQUE`: los dos metodos
+      // de empaque que lo escriben son de T8; aqui se fija a mano solo para sembrar la fixture.
+      await prisma.order.update({ where: { id }, data: { status: 'EN_EMPAQUE', packedBy: actorId } })
       const now = new Date(Date.UTC(YEAR, 6, 1, 9, 30, 0, 0))
-      const resultado = await setStatus(id, 'EN_CURSO', 'ENTREGADO', now)
+      const resultado = await setStatus(id, 'EN_EMPAQUE', 'ENTREGADO', now)
       expect(resultado).toBe('ok')
 
       const stored = await readFinishedAt(id)
@@ -219,6 +223,21 @@ describe('R3 — Finalizar deja ENTREGADO y finished_at = now, en la misma escri
 
       const stored = await readFinishedAt(id)
       expect(stored.status).toBe('EN_CURSO')
+      expect(stored.finishedAt).toBeNull()
+    } finally {
+      await prisma.order.delete({ where: { id } })
+    }
+  })
+
+  it('R8: setAliveOrderStatus de EN_CURSO a POR_EMPACAR -lo que hace Finalizar- NO escribe finished_at', async () => {
+    const id = await seedOrder({ status: 'EN_CURSO' })
+    try {
+      const now = new Date(Date.UTC(YEAR, 6, 3, 9, 30, 0, 0))
+      const resultado = await setStatus(id, 'EN_CURSO', 'POR_EMPACAR', now)
+      expect(resultado).toBe('ok')
+
+      const stored = await readFinishedAt(id)
+      expect(stored.status).toBe('POR_EMPACAR')
       expect(stored.finishedAt).toBeNull()
     } finally {
       await prisma.order.delete({ where: { id } })
@@ -272,6 +291,7 @@ describe('R5, R9 — editar y cancelar no tocan finished_at', () => {
         quantity: '20.0000',
         priority: 'ALTA',
         presentationId,
+        presentationContent: null,
       }
       const resultado = await updateAliveOrder(id, edit, actorId, instant(20), null, scope())
       expect(resultado).toBe('ok')

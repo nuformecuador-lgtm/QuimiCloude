@@ -6,6 +6,8 @@ export type ProductBatchView = {
   readonly unitId: string | null;
   readonly purchaseDate: string;
   readonly expiryDate: string | null;
+  /** Contenido con el que se contaron los envases del lote; `null` si no es de produccion. */
+  readonly packageContent: string | null;
   /** Lo apartado por pedidos vivos en este lote. Opcional: solo lo rellena
    *  `findBatchesOfAliveProduct`; las demas lecturas no la traen. */
   readonly reserved?: string;

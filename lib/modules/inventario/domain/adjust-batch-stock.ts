@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { compareQuantities } from './decimal-quantity';
-import { BatchNotFoundError, ValidationError } from './errors';
+import { ActionNotAllowedError, BatchNotFoundError, ValidationError } from './errors';
 import { MOVEMENT_REASONS } from './movement-reason';
 
 import type { ProductRepository } from '../ports/product-repository';
@@ -77,6 +77,7 @@ export function createAdjustBatchStock(
     // El lote ajeno y el inexistente salen por el mismo camino: distinguirlos convertiria esto en
     // un oraculo de existencia sobre los lotes de las demas empresas.
     if (resultado === null) throw new BatchNotFoundError();
+    if (resultado === 'increase_not_allowed') throw new ActionNotAllowedError();
 
     return resultado;
   };

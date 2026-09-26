@@ -86,6 +86,7 @@ const recipes: RecipeCatalog = {
   findRefsIncludingDeleted: async () => noLlamar('recipes.findRefsIncludingDeleted'),
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: async () => noLlamar('recipes.findIdsMatchingName'),
+  findAliveByNormalizedName: async () => noLlamar('recipes.findAliveByNormalizedName'),
 };
 
 /**
@@ -104,9 +105,16 @@ async function transitionAliveByIdReal(
   to: OrderStatus,
   actorId: string,
   now: Date,
-): Promise<'ok' | 'not_found' | 'stale'> {
+): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
-  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
+  const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
+  // Yendo a `POR_EMPACAR`, el exito real lleva `finishedGoods` -aqui no hay producto
+  // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
+  // reconoce el exito por esta forma, no por el literal `'ok'`.
+  if (resultado === 'ok' && to === 'POR_EMPACAR') {
+    return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
+  }
+  return resultado;
 }
 
 /** El `OrderCatalog` REAL: los tres metodos de escritura y lectura que la ejecucion necesita. */
@@ -116,6 +124,8 @@ function ordersReales(): OrderCatalog {
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
     transitionAliveById: transitionAliveByIdReal,
+    startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
+    finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),
   };
 }
 
@@ -251,7 +261,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
     });
   });
 
-  it('R37: un Administrador con una fila SEMBRADA directamente sigue pudiendo abrir, arrancar y finalizar ese pedido', async () => {
+  it('R37: un Administrador con una fila SEMBRADA directamente sigue pudiendo abrir, arrancar y finalizar ese pedido -que queda POR_EMPACAR-', async () => {
     await inRolledBackTransaction(async (fixture) => {
       const administradorRoleId = await createRoleWithPermission(fixture, 'pedidos.consultar');
       const administradorId = await createPerson(
@@ -291,7 +301,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
         where: { id: pedido },
         select: { status: true },
       });
-      expect(filaFinal.status).toBe('ENTREGADO');
+      expect(filaFinal.status).toBe('POR_EMPACAR');
     });
   });
 });

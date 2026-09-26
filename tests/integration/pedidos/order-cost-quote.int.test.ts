@@ -16,7 +16,7 @@ import {
   findProductRefs,
   findCostingBatches,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma'
-import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
+import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 import {
   createOrderWriteRepository,
   findAliveOrderById,
@@ -24,14 +24,19 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma'
 import {
   createRecipeExecutionReader,
   findRecipeExecutionContentById,
+  findAliveRecipeByNormalizedName,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
-import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma'
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma'
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
@@ -75,6 +80,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        finishedGoods: createFinishedGoodsIntake(tx),
       }
       return work(scope)
     }),
@@ -84,11 +90,15 @@ const recipes: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 }
 
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches }
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts }
 
-const presentations: PresentationCatalog = { findRefs: findPresentationRefs }
+const presentations: PresentationCatalog = {
+  findRefs: findPresentationRefs,
+  findByNormalizedNames: findPresentationsByNormalizedNames,
+}
 
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
@@ -409,7 +419,7 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
-      const sinCambios: NewOrder = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId }
+      const sinCambios: NewOrder = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
       await edicion(orderId, sinCambios, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 

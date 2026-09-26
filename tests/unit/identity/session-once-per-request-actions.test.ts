@@ -260,6 +260,20 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).startAssignedOrderAction('no-es-un-uuid'),
   },
   {
+    // Anadida por QC-168, que estrena la pantalla de empaque: su archivo de `driving/` resuelve
+    // las dos caras de la sesion, asi que el censo tiene que cubrirlo. La accion captura los
+    // errores y devuelve un estado, asi que un `orderId` que no exista no rompe la invocacion.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-packing-actions.ts',
+    nombre: 'startPackingAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.set('orderId', 'no-es-un-uuid');
+      return (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-packing-actions')
+      ).startPackingAction({ status: 'success' }, formData);
+    },
+  },
+  {
     // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe
     // el caso: lo que esta lista mide es cuantas veces se lee la sesion por invocacion.
     archivo: 'lib/modules/documentos/adapters/driving/document-upload-actions.ts',
@@ -319,6 +333,43 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       (
         await import('@/lib/modules/documentos/adapters/driving/document-batch-actions')
       ).getBatchStatusAction('4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742'),
+  },
+  {
+    // Su archivo de `driving/` resuelve las dos caras de la sesion, asi que el
+    // censo tiene que cubrirlo. Entrada VALIDA para que la resolucion de actor llegue a ocurrir
+    // -una entrada invalida rechaza antes de `currentActor()`, que es justo lo que esta lista mide-.
+    archivo: 'lib/modules/documentos/adapters/driving/catalog-import-actions.ts',
+    nombre: 'previewCatalogImportAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/documentos/adapters/driving/catalog-import-actions')
+      ).previewCatalogImportAction({
+        supplierId: '4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742',
+        documentFileId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      }),
+  },
+  {
+    // Anadida por QC-154: su archivo de `driving/` resuelve las dos caras de la sesion, asi que
+    // el censo tiene que cubrirlo. Se invoca la LECTURA, que es la mas barata.
+    archivo: 'lib/modules/clientes/adapters/driving/customer-actions.ts',
+    nombre: 'listCustomersAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/clientes/adapters/driving/customer-actions')
+      ).listCustomersAction({ page: 1 }),
+  },
+  {
+    // Anadida por QC-159: su archivo de `driving/` resuelve las dos caras de la sesion, asi que
+    // el censo tiene que cubrirlo. Entrada VALIDA para que la resolucion de actor llegue a ocurrir
+    // -una entrada invalida rechaza antes de `currentActor()`, que es justo lo que esta lista mide-.
+    archivo: 'lib/modules/documentos/adapters/driving/formula-import-actions.ts',
+    nombre: 'previewFormulaImportAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/documentos/adapters/driving/formula-import-actions')
+      ).previewFormulaImportAction({
+        documentFileId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      }),
   },
 ];
 

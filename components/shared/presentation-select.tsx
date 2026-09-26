@@ -9,6 +9,7 @@ import {
 } from '@/components/shared/presentation-unit-select';
 import {
   Autocomplete,
+  AutocompleteClear,
   AutocompleteContent,
   AutocompleteInput,
   AutocompleteInputGroup,
@@ -293,6 +294,19 @@ export function PresentationSelect({
     setOpen(false);
   }
 
+  /**
+   * Vaciar el campo -a mano o con el boton de borrar- retira tambien la eleccion: dejar el id
+   * elegido viajando en el `input` espejo mientras el campo visible queda en blanco divergiria
+   * entre lo que se ve y lo que se envia.
+   */
+  function handleValueChange(next: string) {
+    setDraft(next);
+    if (next === '') {
+      setSelectedId('');
+      setSelectedName('');
+    }
+  }
+
   async function handleCreate() {
     const name = createFieldRef.current?.value ?? '';
     // Misma regla que valida el servidor, importada del contrato publico: no se reescribe aqui.
@@ -429,7 +443,7 @@ export function PresentationSelect({
         mode="none"
         itemToStringValue={(option: PresentationOption) => option.name}
         value={displayValue}
-        onValueChange={setDraft}
+        onValueChange={handleValueChange}
         open={open}
         onOpenChange={setOpen}
         openOnInputClick
@@ -440,9 +454,13 @@ export function PresentationSelect({
             aria-labelledby={labelId}
             aria-invalid={error === undefined ? undefined : true}
             aria-describedby={error === undefined ? undefined : errorId}
-            className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+            className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT} pr-8`}
             placeholder={PLACEHOLDER}
             data-testid="presentation-select"
+          />
+          <AutocompleteClear
+            aria-label="Borrar presentación"
+            data-testid="presentation-select-clear"
           />
         </AutocompleteInputGroup>
 

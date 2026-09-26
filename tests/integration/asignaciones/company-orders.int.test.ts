@@ -21,7 +21,10 @@ import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adap
 import { createListCompanyOrders } from '@/lib/modules/asignaciones/domain/list-company-orders';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { ROLE_ADMINISTRADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
-import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import {
   findAliveOrderTargetById,
@@ -50,6 +53,12 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     transitionAliveById: async () => {
       throw new Error('listCompanyOrders no ejecuta ninguna transicion');
     },
+    startPackingAliveById: async () => {
+      throw new Error('listCompanyOrders no ejecuta ninguna transicion');
+    },
+    finishPackingAliveById: async () => {
+      throw new Error('listCompanyOrders no ejecuta ninguna transicion');
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 
@@ -64,9 +73,12 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
       findIdsMatchingName: async () => {
         throw new Error('QC-145: listCompanyOrders no busca recetas por nombre');
       },
+      findAliveByNormalizedName: async () => {
+        throw new Error('QC-145: listCompanyOrders no busca la receta viva por su nombre');
+      },
     },
     people: assignmentDirectoryPrisma,
-    presentations: { findRefs: findPresentationRefs },
+    presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
     now: () => NOW,
   });
 }

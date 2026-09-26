@@ -89,10 +89,17 @@ migración**: no DEBE guardar quién entró, cuándo entró, ni cuántos están 
 **R11.** CUANDO se activa **Finalizar** en el último paso, el sistema DEBE dejar el pedido en
 **`ENTREGADO`**. `[D6]`
 
+> *Enmendado el 2026-09-25 por QC-168: Finalizar deja el pedido en `POR_EMPACAR`, no en
+> `ENTREGADO`. Llegar a `ENTREGADO` pasa a ser exclusivo de Terminar, la acción de empaque del
+> Empacador.*
+
 **R12.** El sistema DEBE **preguntar al contrato público de `pedidos`** si cada transición
 (`→ EN_CURSO`, `→ ENTREGADO`) es legal, y **NO DEBE** contener ninguna segunda tabla, lista o
 condición de estados que decida lo mismo. SI `pedidos` declara la transición ilegal, ENTONCES el
 sistema **NO DEBE** escribir el estado y DEBE propagar ese rechazo. `[D14]`
+
+> *Enmendado el 2026-09-25 por QC-168: la transición que esta pantalla pregunta al pasar el
+> último paso es `→ POR_EMPACAR`, no `→ ENTREGADO`.*
 
 **R13.** El sistema DEBE escribir el estado del pedido **a través de un servicio publicado por
 `pedidos`**; ningún adaptador de `asignaciones` DEBE consultar ni actualizar el modelo `Order` con
@@ -102,8 +109,15 @@ Prisma. `[D6] [D14]`
 estado desde esta pantalla, y DEBE responder con el error correspondiente al estado
 —`order_delivered_frozen` para el entregado— sin escribir nada. `[D17]`
 
+> *Enmendado el 2026-09-25 por QC-168: la lista de estados congelados gana `POR_EMPACAR` y
+> `EN_EMPAQUE`, con `order_produced_frozen` como error propio de esos dos.*
+
 **R15.** CUANDO el pedido queda en `ENTREGADO`, el sistema DEBE mostrar una **confirmación visible
 en pantalla** y devolver a quien la usa a **la lista de pedidos asignados** (`/asignacion`). `[D5]`
+
+> *Enmendado el 2026-09-25 por QC-168: cuando el pedido queda en `POR_EMPACAR` (no `ENTREGADO`),
+> la confirmación dice que el pedido queda «por empacar», con los mismos datos de envases y
+> producto terminado.*
 
 **R16.** El sistema **NO DEBE** persistir nada de lo marcado durante el recorrido: ni qué elemento
 se marcó, ni quién lo marcó, ni cuándo. Al volver a abrir la pantalla, el marcado DEBE estar

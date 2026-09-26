@@ -46,6 +46,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     status: 'PENDIENTE',
     presentationId: null,
     finishedAt: null,
+    packedBy: null,
     ...overrides,
   };
 }
@@ -61,7 +62,7 @@ function persona(id: string): PersonRef {
 const PRESENTACION = uuid('7');
 
 function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
-  return { id: PRESENTACION, name: 'Bidon 20L', ...overrides };
+  return { id: PRESENTACION, name: 'Bidon 20L', content: null, ...overrides };
 }
 
 function filaSuelta(orderId: string, userId: string): OrderAssignmentRowWithOrder {
@@ -238,7 +239,7 @@ describe('QC-88 — listAssignedOrders: R7 la empresa y la persona salen del ACT
     expect(listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, ANA);
   });
 
-  it('llama a `listAliveSummariesByIds` con la empresa del ACTOR, y SOLO los dos estados de trabajo', async () => {
+  it('llama a `listAliveSummariesByIds` con la empresa del ACTOR, y SOLO los dos estados de trabajo (R12)', async () => {
     const { deps, listAliveSummariesByIds } = montar({ ids: [pedidoId(1)] });
     const listAssignedOrders = createListAssignedOrders(deps);
 
