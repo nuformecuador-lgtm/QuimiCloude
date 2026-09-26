@@ -96,15 +96,18 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // enlace nuevo, porque darse de alta en la lista exacta es el punto de extension por diseño de
   // este caso (R39). Nacio en la seccion «Configuración» y paso a «Operación» el 2026-09-21 por
   // decision humana; esta guardia mide permisos, no secciones, asi que no le afecta.
-  it('ancla: el recorrido encuentra hoy los nueve enlaces reales del menu', () => {
+  // AMPLIADA: sube a diez con el enlace de clientes, que declara `clientes.consultar`. Se tensa,
+  // no se afloja: sigue siendo la lista EXACTA, nunca un «al menos N».
+  it('ancla: el recorrido encuentra hoy los diez enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista
     // vacia y la guardia pasaria en verde sin comprobar nada. Esto lo convierte en rojo.
     const enlaces = flattenNavLinks(PRIVATE_NAV_ITEMS);
 
-    expect(enlaces).toHaveLength(9);
+    expect(enlaces).toHaveLength(10);
     expect(enlaces.map((enlace) => enlace.testId).sort()).toEqual([
       'nav-asignacion',
+      'nav-clientes',
       'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
