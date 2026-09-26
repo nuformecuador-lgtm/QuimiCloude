@@ -109,8 +109,8 @@ describe('R41 - las etiquetas de estado cubren los seis valores del contrato', (
   });
 });
 
-describe('R24, R41 - la columna Estado declara el filtro select de los seis estados, en orden de flujo', () => {
-  it('la columna Estado trae `filter: select` con las seis opciones', () => {
+describe('R24, R41 - la columna Estado declara el filtro select de los siete estados, en orden de flujo', () => {
+  it('la columna Estado trae `filter: select` con las siete opciones', () => {
     const columns = buildCompanyOrdersColumns({ showFinishedAt: false });
     const status = columns.find((column) => column.id === COMPANY_ORDER_STATUS_COLUMN_ID);
 
@@ -122,6 +122,7 @@ describe('R24, R41 - la columna Estado declara el filtro select de los seis esta
       'EN_EMPAQUE',
       'ENTREGADO',
       'CANCELADO',
+      'BLOQUEADO',
     ]);
   });
 

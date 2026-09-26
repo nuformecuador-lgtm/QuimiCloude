@@ -11,7 +11,7 @@ export const STATUS_PARAM = 'status';
 export const FIRST_PAGE = 1;
 
 /** El mismo formato que `/pedidos`, duplicado a proposito: esta ruta no importa el dominio de
- *  `pedidos` solo para reconocer seis palabras en una cadena de consulta. Orden de `ORDER_STATUS_FLOW`. */
+ *  `pedidos` solo para reconocer siete palabras en una cadena de consulta. Orden de `ORDER_STATUS_FLOW`. */
 export const ROUTE_ORDER_STATUS_VALUES = [
   'PENDIENTE',
   'EN_CURSO',
@@ -19,6 +19,7 @@ export const ROUTE_ORDER_STATUS_VALUES = [
   'EN_EMPAQUE',
   'ENTREGADO',
   'CANCELADO',
+  'BLOQUEADO',
 ] as const;
 export type RouteOrderStatus = (typeof ROUTE_ORDER_STATUS_VALUES)[number];
 

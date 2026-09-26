@@ -104,7 +104,7 @@ describe('parseStatusFilter descarta lo que no es un estado conocido (R24)', () 
     expect(parseStatusFilter({ [STATUS_PARAM]: 'ENTREGADO,PENDIENTE' })).not.toEqual(['ENTREGADO']);
   });
 
-  it('R41 - las seis palabras validas son exactamente las de `/pedidos`, en orden de flujo', () => {
+  it('R41 - las siete palabras validas son exactamente las de `/pedidos`, en orden de flujo', () => {
     expect([...ROUTE_ORDER_STATUS_VALUES]).toEqual([
       'PENDIENTE',
       'EN_CURSO',
@@ -112,6 +112,7 @@ describe('parseStatusFilter descarta lo que no es un estado conocido (R24)', () 
       'EN_EMPAQUE',
       'ENTREGADO',
       'CANCELADO',
+      'BLOQUEADO',
     ]);
   });
 });
