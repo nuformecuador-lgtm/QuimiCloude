@@ -43,16 +43,11 @@ export async function listCrops(companyId: string, documentFileId: string): Prom
 }
 
 /**
- * `createSignedReadUrl` del puerto: la misma operacion de la libreria que ya usa el almacenamiento
- * de los PDF, contra el bucket de recortes.
+ * `publicUrl` del puerto: compone la URL PUBLICA de lectura -sin firma ni caducidad- a partir de
+ * la ruta y la configuracion del bucket de recortes, mismo cuerpo que `recipeImagePublicUrl`.
  */
-export async function createCropSignedReadUrl(path: string, expiresInSeconds: number): Promise<string> {
+export function cropPublicUrl(path: string): string {
   const api = bucketApi();
-
-  const { data, error } = await api.createSignedUrl(path, expiresInSeconds);
-  if (error) {
-    throw new Error(`fallo al firmar la lectura del recorte en la ruta ${path}: ${error.message}`);
-  }
-
-  return data.signedUrl;
+  const { data } = api.getPublicUrl(path);
+  return data.publicUrl;
 }
