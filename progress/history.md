@@ -4857,3 +4857,22 @@ podar.
 - **Incidencias:** el implementer se cortó dos veces sin informe (se reanudó sin pérdida); un gate lo mató la falta de
   memoria. Rojos ajenos del gate (catálogo de QC-158, infra y concurrencia bajo carga) pasaron aislados.
 - **Desbloquea QC-155 y QC-156.**
+
+## 2026-09-26 — QC-168-estado-por-empacar
+
+- **Qué:** el pedido gana **POR_EMPACAR** y **EN_EMPAQUE** entre EN_CURSO y ENTREGADO. Finalizar la producción deja el
+  pedido Por empacar (consume material de QC-141 y da entrada al lote de producto terminado de QC-150); cualquier
+  Empacador de la empresa lo comienza (se lo queda, columna `orders.packed_by`; Comenzar repetido es idempotente) y
+  solo él lo termina (ENTREGADO, `finished_at`). Ninguno de los dos se cancela. Permiso nuevo `empaque.modificar`, solo
+  del Empacador (catálogo «previo + 1»; `ADMIN_EXCLUDED_PERMISSIONS`). Pestaña «Por empacar» al final de `/asignacion`
+  y pantalla `/asignacion/empaque/[id]`. Se retira PENDIENTE→ENTREGADO; Finalizar sobre PENDIENTE = `invalid_transition`
+  (A-1, decisión humana). Catálogo de errores 56→59.
+- **PR #129**, merge `6b1cb4ee`. Spec R1–R48, T1–T17. Review: vuelta 1 rechazada (citas R<n> en 19 archivos + 8
+  menores), vuelta 2 OK. E2E 20/20 (Chromium + WebKit). Gate completo verde en `f4e758e9` (789/789, baseline vacío,
+  nada que podar).
+- **Incidencias:** dos sincronizaciones con `dev` (QC-154; luego QC-155 y QC-159). La segunda dejó el PR `CONFLICTING`:
+  tres listas cerradas resueltas por unión con centinelas tensados, y un **cuarto archivo auto-mergeado que no
+  compilaba** (`formula-import.int.test.ts` de QC-159, puerto `ProductCatalog` sin `findFinishedGoodsReceipts`).
+  **Lección:** tras un merge limpio, el typecheck manda, no la ausencia de conflictos. Dos gates los mató la falta de
+  memoria. La base `QuimiCloude_QC168` queda por borrar (a mano) y la carpeta del worktree en disco.
+- **Desbloquea QC-82** (con las 6 enmiendas de `design.md` §9), **QC-138** y **QC-170**.
