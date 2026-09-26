@@ -4876,3 +4876,17 @@ podar.
   **Lección:** tras un merge limpio, el typecheck manda, no la ausencia de conflictos. Dos gates los mató la falta de
   memoria. La base `QuimiCloude_QC168` queda por borrar (a mano) y la carpeta del worktree en disco.
 - **Desbloquea QC-82** (con las 6 enmiendas de `design.md` §9), **QC-138** y **QC-170**.
+
+## 2026-09-26 — QC-155-pantalla-de-clientes
+
+- **Qué:** la pantalla `/clientes` sobre el CRUD de QC-154: tabla compartida (búsqueda `?q=`, paginación y orden),
+  panel lateral de alta y edición, baja con confirmación, y la entrada del menú en «Cadena», visible solo con
+  `clientes.consultar`. Zona `frontend`, `complexity: medium`.
+- **PR #127**, mergeado el 2026-09-26 (`6a957fe8`). Spec R1–R42 / T0–T9, aprobado el 2026-09-25 (todas las columnas).
+  Review: vuelta 1 rechazada (B1 citas en comentarios, B2 página fuera de rango con término de búsqueda), vuelta 2
+  rechazada (B3, un test que afirmaba sobre el texto de la UI, contra R40), y B3 cerrado. Menores que quedan abiertos:
+  m1 (el reintento del error solo se prueba por su `href`), m4 parcial (R6 se deduce del seed), n1 y n2.
+- **Verificación:** E2E 4/4 en Chromium y WebKit; gate completo verde (754 archivos / 10323 tests, baseline vacío,
+  nada que podar).
+- **Incidencia:** `wt.sh done` desenganchó el worktree, pero la carpeta quedó en disco con archivos bloqueados (ver
+  *Deudas*). La base `QuimiCloude_QC155` sigue creada.
