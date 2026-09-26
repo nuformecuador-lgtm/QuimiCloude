@@ -376,3 +376,34 @@ sin tocar código de producción de `pedidos`/`asignaciones`/`app`.
 `./init.sh` completo en `867e9c9f` (tras el merge de origin/dev): **verde**. 755/755 archivos, 10312 tests
 (122 omitidos), baseline vacío, sin rojos nuevos; todas las migraciones con `down.sql`. E2E de empaque,
 ejecucion-receta, producto-terminado, reserva-de-material y pedidos-terminados: 20/20 (Chromium+WebKit).
+
+## F2.3 (bis) — resincronizacion con `dev` (leader, 2026-09-25)
+
+`origin/dev` avanzo con **QC-155** (PR #127, `6a957fe8`) y **QC-159** (PR #128, `a16b8baa`) desde el
+merge anterior. Git dio **tres conflictos de contenido**, los tres en listas cerradas, y los tres
+resueltos como **union** — verificado por comparacion de conjuntos contra los dos lados, no a ojo:
+ninguna entrada perdida, ninguna duplicada.
+
+| Archivo | Lado QC-168 | Lado `dev` | Union |
+| --- | --- | --- | --- |
+| `lib/shared/routes.ts` | `packingOrderRoute`, `PACKED_ORDER_PARAM` | `formulaImportRoute`, `CUSTOMERS_ROUTE` + su fila en `PRIVATE_ROUTE_PREFIXES` | 28 exports: los dos de cada lado |
+| `tests/guards/guard-pantallas-exigen-permiso.test.ts` | `/asignacion/empaque/[id]` (quince) | `/produccion/formulas/importar/[documentoId]` y `/clientes` (dieciseis) | **diecisiete** |
+| `tests/unit/shared/data-table-alcance.test.ts` | `e2e/empaque.spec.ts` (ocho pantallas / veintitres specs) | `CUSTOMERS_ROUTE` y `e2e/clientes.spec.ts` | **nueve** pantallas / **veinticuatro** specs |
+
+Los centinelas de cifra se tensaron en los dos sentidos, no se aflojaron: «de quince a dieciseis» mas
+«de dieciseis a diecisiete», «ocho» a «nueve», y el ancla `toBeGreaterThan(7)` a `toBeGreaterThan(8)`.
+El orden alfabetico de las dos listas se comprobo entrada por entrada.
+
+**Un cuarto archivo NO era conflicto y si era breakage**: `tests/integration/documentos/formula-import.int.test.ts`
+—que llega con QC-159— cablea `const productCatalog: ProductCatalog = { findRefs, findCostingBatches }`,
+y el puerto de QC-168 le anade `findFinishedGoodsReceipts`. Auto-mergeado sin conflicto y **sin
+compilar**. Se le sumo el miembro, en el estilo del archivo: literal plano, sin comentario, porque
+aqui el centinela es TypeScript. `lib/composition/index.ts`, que si auto-mergeo, tenia el mismo
+literal y quedo bien por su cuenta.
+
+`dev` **no trae migraciones** en este merge, asi que no hubo `prisma migrate deploy` que aplicar
+(F2.3 lo pide solo cuando el merge las trae).
+
+`./init.sh` completo en `f4e758e9`: **verde**, 789/789 archivos, 10778 tests (128 omitidos), baseline
+vacio, sin rojos nuevos, todas las migraciones con `down.sql`. Merge pusheado; PR #129 pasa de
+`CONFLICTING` a `MERGEABLE`/`CLEAN`.
