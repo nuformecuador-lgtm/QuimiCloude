@@ -1,28 +1,22 @@
 // lib/modules/inventario/domain/finished-goods.ts
 //
-// Dominio PURO: sin base de datos, sin framework, sin reloj. `planFinishedGoods` calcula, a
-// partir de la cantidad del pedido y el contenido de su presentacion, cuantos envases enteros
-// entran, la cantidad exacta que representan y el costo unitario del lote. Comparte la
-// aritmetica en `BigInt` escalado a cuatro decimales del resto del modulo (`unit-cost.ts`,
-// `decimal-quantity.ts`): ningun importe ni cantidad pasa por coma flotante binaria.
-
-import { deriveUnitCost } from './unit-cost';
+// Dominio PURO: sin base de datos, sin framework, sin reloj. `planFinishedGoodsLine` calcula,
+// a partir de los envases de UNA linea del reparto y el contenido de su presentacion,
+// la cantidad exacta que entra. Comparte la aritmetica en `BigInt` escalado a cuatro decimales
+// del resto del modulo (`unit-cost.ts`, `decimal-quantity.ts`): ningun importe ni cantidad pasa
+// por coma flotante binaria.
 
 import type { ProductId } from './product-catalog';
 
-export type FinishedGoodsPlan =
-  | {
-      readonly kind: 'planned';
-      readonly packages: string;
-      readonly quantity: string;
-      readonly content: string;
-      readonly unitCost: string;
-    }
-  | { readonly kind: 'no_content' }
-  | { readonly kind: 'no_whole_package' };
+/** R1: los envases ya no se calculan aqui -los da la linea del reparto, entero y positivo
+ *  por construccion-, asi que no hay division que pueda dejar `no_whole_package`: ese caso
+ *  desaparece del tipo. `unitCost` es el UNICO del pedido entero (R18), ya resuelto por quien
+ *  llama; esta funcion no lo recalcula, solo decide si hay contenido con que entrar. */
+export type FinishedGoodsLinePlan =
+  | { readonly kind: 'planned'; readonly quantity: string }
+  | { readonly kind: 'no_content' };
 
 const SCALE = 4;
-const ZERO = BigInt(0);
 
 /** La forma exacta de `decimal(14,4)` no negativo: hasta diez enteros y cuatro decimales. */
 const DECIMAL_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
@@ -49,55 +43,36 @@ function fromScaledInteger(scaled: bigint): string {
 }
 
 /**
- * Envases enteros y cantidad que entra de un lote de producto terminado.
- *
- *  - `packages = floor(orderQuantity / content)`, con enteros escalados: la division de
- *    `BigInt` trunca hacia cero, y los dos operandos son siempre positivos, asi que truncar
- *    hacia cero es truncar hacia abajo.
- *  - `quantity = packages * content`, exacta.
- *  - `unitCost = deriveUnitCost(lotCost, quantity)`, HALF_UP a cuatro decimales; cuando
- *    `deriveUnitCost` devuelve `null` -el costo del lote es cero, o el unitario redondea a
- *    cero- el plan entra a costo `'0.0000'`: un lote de produccion es el unico que puede
- *    costar cero.
+ * Cantidad que entra de UNA linea del reparto: `quantity = packages * content`, exacta -ya no
+ * hay division que hacer, los envases son entrada validada rio arriba (R1)-. `unitCost` viaja
+ * en la entrada porque el contrato lo necesita (es el mismo para todas las lineas del pedido,
+ * R18), pero esta funcion no lo usa: quien reciba `'planned'` escribe el lote con el `unitCost`
+ * que ya tenia, no con nada que salga de aqui.
  */
-export function planFinishedGoods(input: {
-  readonly orderQuantity: string;
+export function planFinishedGoodsLine(input: {
+  readonly packages: number;
   readonly content: string | null;
-  readonly lotCost: string;
-}): FinishedGoodsPlan {
+  readonly unitCost: string;
+}): FinishedGoodsLinePlan {
   if (input.content === null) {
     return { kind: 'no_content' };
   }
 
-  const orderScaled = toScaledInteger(input.orderQuantity);
   const contentScaled = toScaledInteger(input.content);
-  const packages = orderScaled / contentScaled;
-  if (packages === ZERO) {
-    return { kind: 'no_whole_package' };
-  }
+  const quantity = fromScaledInteger(BigInt(input.packages) * contentScaled);
 
-  const quantity = fromScaledInteger(packages * contentScaled);
-  const unitCost = deriveUnitCost(input.lotCost, quantity) ?? '0.0000';
-
-  return {
-    kind: 'planned',
-    packages: packages.toString(),
-    quantity,
-    content: fromScaledInteger(contentScaled),
-    unitCost,
-  };
+  return { kind: 'planned', quantity };
 }
 
 /** Lo que `inventario` devuelve al terminar (o rechazar) la entrada de un lote de produccion. */
 export type FinishedGoodsOutcome =
   | { readonly kind: 'received'; readonly productId: ProductId; readonly productName: string; readonly packages: string }
-  | { readonly kind: 'presentation_without_content' }
-  | { readonly kind: 'no_whole_package' };
+  | { readonly kind: 'presentation_without_content' };
 
-/** Servicio que `inventario` ofrece a `pedidos` para el Finalizar: da de alta el producto
- *  terminado de una combinacion (si no existia), su lote y su asiento, y recalcula la
- *  existencia. Lo implementa un adaptador driven de `inventario` sobre la transaccion
- *  compartida y lo cablea `lib/composition`. */
+/** Servicio que `inventario` ofrece a `pedidos` para Terminar el empaque: da de alta el
+ *  producto terminado de una combinacion (si no existia), su lote y su asiento -uno por linea
+ *  del reparto, R17-, y recalcula la existencia. Lo implementa un adaptador driven de
+ *  `inventario` sobre la transaccion compartida y lo cablea `lib/composition`. */
 export interface FinishedGoodsIntake {
   receiveFromOrder(input: {
     readonly orderId: string;
@@ -105,9 +80,10 @@ export interface FinishedGoodsIntake {
     readonly recipeId: string;
     readonly recipeName: string;
     readonly presentationId: string;
-    readonly orderQuantity: string;
+    readonly orderPresentationLineId: string;
+    readonly packages: number;
     readonly orderContent: string | null;
-    readonly lotCost: string;
+    readonly unitCost: string;
     readonly actorId: string;
     readonly now: Date;
   }): Promise<FinishedGoodsOutcome>;

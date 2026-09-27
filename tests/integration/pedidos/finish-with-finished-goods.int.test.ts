@@ -112,7 +112,10 @@ const orderCatalog: OrderCatalog = {
   listAliveSummariesInCompany: async () => {
     throw new Error('este archivo no ejercita listAliveSummariesInCompany');
   },
-  transitionAliveById: createTransitionOrder({ unitOfWork, recipes, products, units }),
+  // R15, R16: `createTransitionOrder` ya no necesita `recipes`/`products`/`units` -el
+  // alta de producto terminado se traslada a Terminar (T14)-. Puente mecanico para que este
+  // archivo siga compilando; T14 lo reescribe entero.
+  transitionAliveById: createTransitionOrder({ unitOfWork }),
   startPackingAliveById: async () => {
     throw new Error('este archivo no ejercita el empaque');
   },
@@ -512,12 +515,10 @@ describe('R20 — un fallo forzado tras el lote deshace la transaccion entera', 
           return work(scope);
         }),
     };
-    const transitionAliveByIdConFallo = createTransitionOrder({
-      unitOfWork: unitOfWorkQueForzaFallo,
-      recipes,
-      products,
-      units,
-    });
+    // R15, R16: `transitionAliveById` ya no llama a `scope.finishedGoods.receiveFromOrder`
+    // -T14 traslada esa llamada a Terminar-, asi que este doble ya no puede forzar el fallo
+    // aqui. Puente mecanico para que compile; T14 reescribe este caso entero.
+    const transitionAliveByIdConFallo = createTransitionOrder({ unitOfWork: unitOfWorkQueForzaFallo });
 
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
@@ -576,9 +577,8 @@ describe('R21 — un solo lote por pedido, tambien a la vez', () => {
         orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date()),
         orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date()),
       ]);
-      const exitos = resultados.filter(
-        (r) => r.status === 'fulfilled' && typeof r.value === 'object' && r.value.kind === 'ok',
-      );
+      // R15, R16: el exito ya no es un objeto con `finishedGoods`, es el literal `'ok'`.
+      const exitos = resultados.filter((r) => r.status === 'fulfilled' && r.value === 'ok');
       expect(exitos).toHaveLength(1);
 
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
@@ -603,9 +603,10 @@ describe('R24, R26 — el Finalizar de asignaciones devuelve el lote y exige el 
 
       const resultado = await finishAssignedOrderPara(creado.id)(asignacionesActorDe(fixture), { orderId: creado.id });
 
-      expect(resultado.packages).toBe('10');
-      const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
-      expect(resultado.productName).toBe(producto?.name);
+      // R15, R16: puente mecanico para que compile -Finalizar ya no da de alta el
+      // lote, asi que el resultado ya no lleva `packages`/`productName`-. T14 reescribe este
+      // caso entero (el numero de envases y el producto pasan a Terminar el empaque).
+      expect(resultado.numberText).toMatch(/^\d{4}-\d+$/);
     } finally {
       await borrarFixture(fixture, [productId]);
     }

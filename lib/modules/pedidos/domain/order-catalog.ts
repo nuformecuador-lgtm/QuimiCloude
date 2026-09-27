@@ -96,11 +96,11 @@ export interface OrderCatalog {
    * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
    * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
    *
-   * Yendo a `'POR_EMPACAR'`, la misma llamada da tambien de alta el lote de producto terminado
-   * de la combinacion del pedido: el exito lleva `finishedGoods` con lo que entro;
-   * `'presentation_without_content'`, `'no_whole_package'` y `'recipe_not_found'` deshacen la
-   * operacion entera igual que los dos casos de arriba. El `'ok'` sin `finishedGoods` sigue
-   * siendo el unico resultado posible cuando `to` no es `'POR_EMPACAR'`.
+   * R15, R16: yendo a `'POR_EMPACAR'` esta llamada YA NO da de alta ningun lote de
+   * producto terminado -eso se traslada a Terminar el empaque, una vez por linea del reparto-,
+   * asi que el `'ok'` es siempre el literal, sin `finishedGoods` ni los resultados que solo
+   * existian para esa alta (`'presentation_without_content'`, `'no_whole_package'`,
+   * `'recipe_not_found'`).
    *
    * `'EN_EMPAQUE'` y `'ENTREGADO'` no son destino valido de este metodo: se rechazan con
    * `InvalidTransitionError`, aunque la matriz de transiciones los admita, porque solo los
@@ -113,17 +113,7 @@ export interface OrderCatalog {
     to: OrderStatus,
     actorId: string,
     now: Date,
-  ): Promise<
-    | 'ok'
-    | { readonly kind: 'ok'; readonly finishedGoods: FinishedGoodsReceipt }
-    | 'not_found'
-    | 'stale'
-    | 'insufficient_material'
-    | 'recipe_without_lines'
-    | 'presentation_without_content'
-    | 'no_whole_package'
-    | 'recipe_not_found'
-  >;
+  ): Promise<'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines'>;
 
   /**
    * Comenzar el empaque: `POR_EMPACAR -> EN_EMPAQUE` con `packerId` como quien empaca, en una

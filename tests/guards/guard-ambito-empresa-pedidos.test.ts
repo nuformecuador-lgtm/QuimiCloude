@@ -487,9 +487,10 @@ const PUERTOS = [
 const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
   [
     'transitionAliveById',
-    // Gana `recipes`, `products` y `units` -las lecturas globales del coste del lote y del
-    // nombre de la receta-, ademas de `unitOfWork`.
-    /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,?\s*\}\s*\)$/,
+    // R15, R16: Finalizar ya no da de alta ningun lote, asi que ya no necesita
+    // `recipes`/`products`/`units` -las lecturas globales del coste del lote y del nombre de
+    // la receta se trasladan a Terminar-. Solo `unitOfWork`.
+    /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,?\s*\}\s*\)$/,
   ],
   // Comenzar y Terminar (empaque): cada uno cablea un caso de uso de `pedidos/domain` sobre
   // `OrderPackingRepository`, implementado en `order-prisma.ts` con `scope: OrderScope` -las dos

@@ -11,7 +11,8 @@ export type InventoryMovementView = {
 
 /** En tipos del dominio y no de Prisma: convertir es del adaptador driven. `orderId` solo lo
  *  llevan los asientos `consumption` y `production`: el `CHECK` de la migracion exige que vaya
- *  junto o ninguno. */
+ *  junto o ninguno. `orderPresentationLineId` solo lo lleva `production`: el reparto
+ *  puede dar varios asientos `production` por pedido, uno por linea. */
 export type NewInventoryMovement = {
   readonly batchId: string;
   readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production';
@@ -19,4 +20,5 @@ export type NewInventoryMovement = {
   readonly reason: MovementReason | null;
   readonly createdBy: string;
   readonly orderId: string | null;
+  readonly orderPresentationLineId: string | null;
 };

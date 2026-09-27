@@ -67,7 +67,7 @@ function unidad(overrides?: Partial<UnitRef>): UnitRef {
 const PRESENTACION = uuid('b');
 
 function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
-  return { id: PRESENTACION, name: 'Bidon 20L', content: null, ...overrides };
+  return { id: PRESENTACION, name: 'Bidon 20L', content: null, unitId: LITRO, ...overrides };
 }
 
 type Dobles = {

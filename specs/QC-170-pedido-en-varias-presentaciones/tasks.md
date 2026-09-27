@@ -58,7 +58,7 @@ casos.
 
 ## Dominio de `unidades`/`inventario`: lo que otros necesitan leer
 
-### T4 — `PresentationRef` gana `unitId` [P]
+### [x] T4 — `PresentationRef` gana `unitId` [P]
 
 **Archivos**: `lib/modules/inventario/domain/presentation-catalog.ts`,
 `lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma.ts`,
@@ -66,7 +66,7 @@ casos.
 Depende de: T0.
 **Hecho cuando**: `findRefs` devuelve `unitId` y el test lo comprueba; ningún otro campo cambia.
 
-### T5 — `planFinishedGoods` → `planFinishedGoodsLine` (recibe envases, no los calcula) [P]
+### [x] T5 — `planFinishedGoods` → `planFinishedGoodsLine` (recibe envases, no los calcula) [P]
 
 **Archivos**: `lib/modules/inventario/domain/finished-goods.ts`,
 `tests/unit/inventario/finished-goods.test.ts`.
@@ -75,7 +75,7 @@ Depende de: T0.
 `no_content` cuando falta el contenido, y el caso `no_whole_package` deja de existir en su tipo; los
 casos de test de QC-150 que probaban la división se reescriben o se retiran con una nota de por qué.
 
-### T6 — `receiveFromOrder` pasa a recibir una línea (no el pedido entero)
+### [x] T6 — `receiveFromOrder` pasa a recibir una línea (no el pedido entero)
 
 **Archivos**: `lib/modules/inventario/domain/finished-goods.ts` (tipo `FinishedGoodsIntake`),
 `lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma.ts`,
@@ -152,7 +152,7 @@ unidades convertibles, unidades incompatibles, reparto igual al total (disponibl
 reparto que excede el total (disponible negativo + marca `exceeds_quantity` para el aviso de R39;
 es solo lectura, el rechazo lo hace T9/T21).
 
-### T12 — `transition-order.ts`: retira el lote, conserva el consumo
+### [x] T12 — `transition-order.ts`: retira el lote, conserva el consumo
 
 **Archivos**: `lib/modules/pedidos/domain/transition-order.ts`,
 `tests/unit/pedidos/transition-order.test.ts`.
@@ -270,7 +270,7 @@ Comenzar, la acción «Reparto y unidad» ya no aparece en `/pedidos` y un enví
 
 ## Tasks nuevas de F1.4 (2026-09-26)
 
-### T20 — `validateDistribution`: dominio puro del total y la conversión [P]
+### [x] T20 — `validateDistribution`: dominio puro del total y la conversión [P]
 
 **Archivos**: `lib/modules/pedidos/domain/order-distribution.ts` (nuevo),
 `tests/unit/pedidos/order-distribution.test.ts` (nuevo).

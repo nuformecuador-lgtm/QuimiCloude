@@ -103,7 +103,7 @@ async function sembrarPresentacion(unitId: string, content: string | null = null
 
 let sequenceDelArchivo = 1;
 
-async function sembrarPedido(recipeId: string, presentationId: string): Promise<string> {
+async function sembrarPedido(recipeId: string): Promise<string> {
   const now = new Date();
   const { id } = await prisma.order.create({
     data: {
@@ -112,10 +112,17 @@ async function sembrarPedido(recipeId: string, presentationId: string): Promise<
       recipeId,
       quantity: '10',
       companyId: empresaDelArchivo,
-      presentationId,
-      presentationContent: null,
       createdAt: now,
     },
+    select: { id: true },
+  });
+  return id;
+}
+
+/** La linea del reparto que `receiveFinishedGoods` exige por `orderPresentationLineId`. */
+async function sembrarLinea(orderId: string, presentationId: string, packages: number): Promise<string> {
+  const { id } = await prisma.orderPresentationLine.create({
+    data: { orderId, companyId: empresaDelArchivo, presentationId, packages, presentationContent: '1' },
     select: { id: true },
   });
   return id;
@@ -237,8 +244,10 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(unitId, '1');
     const recipeId = await sembrarReceta();
-    const orderId1 = await sembrarPedido(recipeId, presentationId);
-    const orderId2 = await sembrarPedido(recipeId, presentationId);
+    const orderId1 = await sembrarPedido(recipeId);
+    const orderId2 = await sembrarPedido(recipeId);
+    const lineId1 = await sembrarLinea(orderId1, presentationId, 10);
+    const lineId2 = await sembrarLinea(orderId2, presentationId, 5);
     let productId: string | null = null;
 
     try {
@@ -250,9 +259,10 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
             recipeId,
             recipeName: 'Receta renombrable',
             presentationId,
-            orderQuantity: '10',
+            orderPresentationLineId: lineId1,
+            packages: 10,
             orderContent: '1',
-            lotCost: '10',
+            unitCost: '1.0000',
             actorId: actorDelArchivo,
             now: new Date(),
           },
@@ -279,9 +289,10 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
             recipeId,
             recipeName: 'Receta renombrable',
             presentationId,
-            orderQuantity: '5',
+            orderPresentationLineId: lineId2,
+            packages: 5,
             orderContent: '1',
-            lotCost: '5',
+            unitCost: '1.0000',
             actorId: actorDelArchivo,
             now: new Date(),
           },
@@ -305,6 +316,7 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
         await prisma.productBatch.deleteMany({ where: { productId } });
         await prisma.product.deleteMany({ where: { id: productId } });
       }
+      await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [orderId1, orderId2] } } });
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });

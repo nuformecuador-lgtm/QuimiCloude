@@ -114,13 +114,11 @@ const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date(
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 
 /** El camino del Finalizar de la planta: `OrderCatalog['transitionAliveById']` cableado igual
- *  que `lib/composition`, sin pasar por `asignaciones`. */
-const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({
-  unitOfWork,
-  recipes,
-  products,
-  units,
-});
+ *  que `lib/composition`, sin pasar por `asignaciones`.
+ *
+ *  R15, R16: `createTransitionOrder` ya no necesita `recipes`/`products`/`units` -el
+ *  alta de producto terminado se traslada a Terminar (T14)-. */
+const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
 // ---------------------------------------------------------------------------
 // Empresa efimera
@@ -568,8 +566,9 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
         new Date(),
       );
 
-      // El exito de un Finalizar lleva el lote de producto terminado que entro.
-      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: { packages: '10' } });
+      // R15, R16: el Finalizar ya no da de alta ningun lote -eso se traslada a
+      // Terminar (T14)-, asi que el exito vuelve a ser el literal `'ok'`.
+      expect(resultado).toBe('ok');
       expect(await stockDe(batchId)).toBe('90.0000');
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos.map((m) => m.kind)).toEqual(['reserve', 'consume']);
@@ -671,7 +670,8 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
         new Date(),
       );
 
-      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: { packages: '10' } });
+      // R15, R16: sin lote que dar de alta, el exito vuelve a ser el literal `'ok'`.
+      expect(resultado).toBe('ok');
       expect(await stockDe(batchId)).toBe('90.0000');
       // Sin apartado previo no hay nada que resolver en `reservation_movements` -la salida
       // fisica queda en `inventory_movements`, asentada por `consumeBatchStock`-.

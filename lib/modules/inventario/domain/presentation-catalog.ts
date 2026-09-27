@@ -1,12 +1,15 @@
 /** Identificador de una presentacion visto DESDE FUERA de `inventario`. */
 export type PresentationId = string;
 
-/** Lo que otro modulo puede saber de una presentacion: identidad, nombre y contenido. */
+/** Lo que otro modulo puede saber de una presentacion: identidad, nombre, contenido y unidad. */
 export type PresentationRef = {
   readonly id: PresentationId;
   readonly name: string;
   /** Lo que `pedidos` copia al crear o cambiar de presentacion. `null` = sin declarar. */
   readonly content: string | null;
+  /** La unidad en que se declara el contenido: `pedidos` la necesita para convertir el reparto
+   *  a la unidad del pedido (`convertQuantity`). */
+  readonly unitId: string;
 };
 
 /** Lo que otro modulo necesita para resolver una presentacion por su nombre: la unidad

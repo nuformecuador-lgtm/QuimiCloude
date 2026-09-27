@@ -112,12 +112,9 @@ const createOrder = createCreateOrder({ recipes, products, units, presentations,
 const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
-const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({
-  unitOfWork,
-  recipes,
-  products,
-  units,
-});
+// R15, R16: `createTransitionOrder` ya no necesita `recipes`/`products`/`units` -el
+// alta de producto terminado se traslada a Terminar (T14)-.
+const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
 // ---------------------------------------------------------------------------
 // Empresa efimera

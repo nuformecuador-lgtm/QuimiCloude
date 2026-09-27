@@ -1,6 +1,10 @@
 /**
  * `receiveFinishedGoods` contra Postgres real.
  *
+ * La firma recibe una LINEA del reparto (`orderPresentationLineId`, `packages`
+ * entero ya dado) y `unitCost` YA RESUELTO -no `orderQuantity`/`lotCost` del pedido entero-, asi
+ * que cada caso siembra su propia fila de `order_presentation_lines` antes de llamar.
+ *
  * AISLAMIENTO: `receiveFinishedGoods` recibe el `tx` de quien llama y no abre transaccion
  * propia -a diferencia de `createWithFirstBatch`-, asi que cada caso la envuelve con
  * `prisma.$transaction` sobre el cliente GLOBAL, igual que hara `withOrderTransaction` en
@@ -8,8 +12,9 @@
  * mentira: la escritura necesita CONFIRMAR para que una segunda llamada choque de verdad
  * contra el indice, y la prueba de concurrencia necesita dos conexiones reales a la vez. Cada
  * caso fabrica su propia empresa (y, cuando hace falta, una segunda) con randomUUID y limpia
- * en un `finally` en el orden que exigen las FK: asientos -> lotes -> productos -> pedidos -> receta ->
- * presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa.
+ * en un `finally` en el orden que exigen las FK: asientos -> lotes -> productos -> lineas de
+ * reparto -> pedidos -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento
+ * -> empresa.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -128,12 +133,7 @@ async function sembrarReceta(companyId: string, name?: string): Promise<string> 
 
 let sequenceCounter = 1;
 
-async function sembrarPedido(
-  companyId: string,
-  recipeId: string,
-  presentationId: string | null,
-  presentationContent: string | null = null,
-): Promise<string> {
+async function sembrarPedido(companyId: string, recipeId: string): Promise<string> {
   const now = new Date();
   const { id } = await prisma.order.create({
     data: {
@@ -142,13 +142,30 @@ async function sembrarPedido(
       recipeId,
       quantity: '10',
       companyId,
-      presentationId,
-      presentationContent,
       createdAt: now,
     },
     select: { id: true },
   });
   return id;
+}
+
+/** La linea del reparto que `receiveFinishedGoods` exige por `orderPresentationLineId`. */
+async function sembrarLinea(
+  orderId: string,
+  companyId: string,
+  presentationId: string,
+  packages: number,
+  presentationContent: string | null,
+): Promise<string> {
+  const { id } = await prisma.orderPresentationLine.create({
+    data: { orderId, companyId, presentationId, packages, presentationContent },
+    select: { id: true },
+  });
+  return id;
+}
+
+async function borrarLineas(orderId: string): Promise<void> {
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId } });
 }
 
 async function limpiarProducto(productId: string): Promise<void> {
@@ -164,9 +181,10 @@ function recibir(
     readonly recipeId: string;
     readonly recipeName: string;
     readonly presentationId: string;
-    readonly orderQuantity: string;
+    readonly orderPresentationLineId: string;
+    readonly packages: number;
     readonly orderContent: string | null;
-    readonly lotCost: string;
+    readonly unitCost: string;
     readonly actorId: string;
     readonly now: Date;
   },
@@ -174,13 +192,14 @@ function recibir(
   return prisma.$transaction((tx) => receiveFinishedGoods(tx, input, ambito(companyId)));
 }
 
-describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada', () => {
-  it('R11, R13, R16, R17, R41, R43: nace el producto, su lote y su asiento', async () => {
+describe('receiveFinishedGoods — R11, R13, R17, R41, R43: primera entrada', () => {
+  it('R11, R13, R17, R41, R43: nace el producto, su lote y su asiento con order_presentation_line_id', async () => {
     const empresa = await nuevaEmpresa();
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { name: 'Botella 1L', content: '1' });
     const recipeId = await sembrarReceta(empresa.companyId, 'Desengrasante industrial');
-    const orderId = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId = await sembrarLinea(orderId, empresa.companyId, presentationId, 50, '1');
     const now = new Date();
 
     try {
@@ -189,9 +208,10 @@ describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada
         recipeId,
         recipeName: 'Desengrasante industrial',
         presentationId,
-        orderQuantity: '50.5',
+        orderPresentationLineId: lineId,
+        packages: 50,
         orderContent: '1',
-        lotCost: '100',
+        unitCost: '2.0000',
         actorId: empresa.userId,
         now,
       });
@@ -220,11 +240,12 @@ describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada
 
       const movements = await prisma.inventoryMovement.findMany({ where: { batchId: batch.id } });
       expect(movements).toHaveLength(1);
-      expect(movements[0]).toMatchObject({ kind: 'production', orderId, createdBy: empresa.userId });
+      expect(movements[0]).toMatchObject({ kind: 'production', orderId, orderPresentationLineId: lineId, createdBy: empresa.userId });
       expect(movements[0]!.quantity.toFixed(4)).toBe('50.0000');
 
       await limpiarProducto(outcome.productId);
     } finally {
+      await borrarLineas(orderId);
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -237,8 +258,10 @@ describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { content: '1' });
     const recipeId = await sembrarReceta(empresa.companyId);
-    const orderId1 = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
-    const orderId2 = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId1 = await sembrarPedido(empresa.companyId, recipeId);
+    const orderId2 = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId1 = await sembrarLinea(orderId1, empresa.companyId, presentationId, 10, '1');
+    const lineId2 = await sembrarLinea(orderId2, empresa.companyId, presentationId, 5, '1');
     let productId: string | null = null;
 
     try {
@@ -247,9 +270,10 @@ describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada
         recipeId,
         recipeName: 'Receta compartida',
         presentationId,
-        orderQuantity: '10',
+        orderPresentationLineId: lineId1,
+        packages: 10,
         orderContent: '1',
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       });
@@ -258,9 +282,10 @@ describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada
         recipeId,
         recipeName: 'Receta compartida',
         presentationId,
-        orderQuantity: '5',
+        orderPresentationLineId: lineId2,
+        packages: 5,
         orderContent: '1',
-        lotCost: '5',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       });
@@ -277,6 +302,8 @@ describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada
       expect(product.stock.toFixed(4)).toBe('15.0000');
     } finally {
       if (productId !== null) await limpiarProducto(productId);
+      await borrarLineas(orderId1);
+      await borrarLineas(orderId2);
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -285,13 +312,14 @@ describe('receiveFinishedGoods — R11, R13, R16, R17, R41, R43: primera entrada
   });
 });
 
-describe('receiveFinishedGoods — R21: idempotencia por pedido', () => {
-  it('una segunda llamada con el mismo pedido la rechaza el indice unico, sin dejar un segundo lote', async () => {
+describe('receiveFinishedGoods — R21: idempotencia por linea del reparto', () => {
+  it('una segunda llamada con la misma linea la rechaza el indice unico, sin dejar un segundo lote', async () => {
     const empresa = await nuevaEmpresa();
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { content: '1' });
     const recipeId = await sembrarReceta(empresa.companyId);
-    const orderId = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId = await sembrarLinea(orderId, empresa.companyId, presentationId, 10, '1');
     let productId: string | null = null;
 
     const input = {
@@ -299,9 +327,10 @@ describe('receiveFinishedGoods — R21: idempotencia por pedido', () => {
       recipeId,
       recipeName: 'Receta idempotente',
       presentationId,
-      orderQuantity: '10',
+      orderPresentationLineId: lineId,
+      packages: 10,
       orderContent: '1',
-      lotCost: '10',
+      unitCost: '1.0000',
       actorId: empresa.userId,
       now: new Date(),
     };
@@ -315,10 +344,11 @@ describe('receiveFinishedGoods — R21: idempotencia por pedido', () => {
 
       const batches = await prisma.productBatch.findMany({ where: { productId } });
       expect(batches).toHaveLength(1);
-      const movements = await prisma.inventoryMovement.findMany({ where: { orderId, kind: 'production' } });
+      const movements = await prisma.inventoryMovement.findMany({ where: { orderPresentationLineId: lineId, kind: 'production' } });
       expect(movements).toHaveLength(1);
     } finally {
       if (productId !== null) await limpiarProducto(productId);
+      await borrarLineas(orderId);
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -327,14 +357,16 @@ describe('receiveFinishedGoods — R21: idempotencia por pedido', () => {
   });
 });
 
-describe('receiveFinishedGoods — R22: dos pedidos de la misma combinacion, a la vez', () => {
+describe('receiveFinishedGoods — R22: dos lineas de la misma combinacion, a la vez', () => {
   it('dos conexiones reales sin producto previo terminan con UN producto y DOS lotes', async () => {
     const empresa = await nuevaEmpresa();
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { content: '1' });
     const recipeId = await sembrarReceta(empresa.companyId);
-    const orderId1 = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
-    const orderId2 = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId1 = await sembrarPedido(empresa.companyId, recipeId);
+    const orderId2 = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId1 = await sembrarLinea(orderId1, empresa.companyId, presentationId, 10, '1');
+    const lineId2 = await sembrarLinea(orderId2, empresa.companyId, presentationId, 20, '1');
     let productId: string | null = null;
 
     try {
@@ -344,9 +376,10 @@ describe('receiveFinishedGoods — R22: dos pedidos de la misma combinacion, a l
           recipeId,
           recipeName: 'Receta concurrente',
           presentationId,
-          orderQuantity: '10',
+          orderPresentationLineId: lineId1,
+          packages: 10,
           orderContent: '1',
-          lotCost: '10',
+          unitCost: '1.0000',
           actorId: empresa.userId,
           now: new Date(),
         }),
@@ -355,9 +388,10 @@ describe('receiveFinishedGoods — R22: dos pedidos de la misma combinacion, a l
           recipeId,
           recipeName: 'Receta concurrente',
           presentationId,
-          orderQuantity: '20',
+          orderPresentationLineId: lineId2,
+          packages: 20,
           orderContent: '1',
-          lotCost: '20',
+          unitCost: '1.0000',
           actorId: empresa.userId,
           now: new Date(),
         }),
@@ -376,6 +410,8 @@ describe('receiveFinishedGoods — R22: dos pedidos de la misma combinacion, a l
       expect(batches).toHaveLength(2);
     } finally {
       if (productId !== null) await limpiarProducto(productId);
+      await borrarLineas(orderId1);
+      await borrarLineas(orderId2);
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -394,8 +430,10 @@ describe('receiveFinishedGoods — R23: acotado por empresa', () => {
     const presentationB = await sembrarPresentacion(empresaB.companyId, unitB, { content: '1', name: 'Homonima' });
     const recipeA = await sembrarReceta(empresaA.companyId, 'Receta homonima');
     const recipeB = await sembrarReceta(empresaB.companyId, 'Receta homonima');
-    const orderA = await sembrarPedido(empresaA.companyId, recipeA, presentationA, null);
-    const orderB = await sembrarPedido(empresaB.companyId, recipeB, presentationB, null);
+    const orderA = await sembrarPedido(empresaA.companyId, recipeA);
+    const orderB = await sembrarPedido(empresaB.companyId, recipeB);
+    const lineA = await sembrarLinea(orderA, empresaA.companyId, presentationA, 10, '1');
+    const lineB = await sembrarLinea(orderB, empresaB.companyId, presentationB, 10, '1');
     let productIdA: string | null = null;
     let productIdB: string | null = null;
 
@@ -405,9 +443,10 @@ describe('receiveFinishedGoods — R23: acotado por empresa', () => {
         recipeId: recipeA,
         recipeName: 'Receta homonima',
         presentationId: presentationA,
-        orderQuantity: '10',
+        orderPresentationLineId: lineA,
+        packages: 10,
         orderContent: '1',
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresaA.userId,
         now: new Date(),
       });
@@ -416,9 +455,10 @@ describe('receiveFinishedGoods — R23: acotado por empresa', () => {
         recipeId: recipeB,
         recipeName: 'Receta homonima',
         presentationId: presentationB,
-        orderQuantity: '10',
+        orderPresentationLineId: lineB,
+        packages: 10,
         orderContent: '1',
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresaB.userId,
         now: new Date(),
       });
@@ -438,6 +478,8 @@ describe('receiveFinishedGoods — R23: acotado por empresa', () => {
     } finally {
       if (productIdA !== null) await limpiarProducto(productIdA);
       if (productIdB !== null) await limpiarProducto(productIdB);
+      await borrarLineas(orderA);
+      await borrarLineas(orderB);
       await prisma.order.deleteMany({ where: { id: { in: [orderA, orderB] } } });
       await prisma.recipe.deleteMany({ where: { id: { in: [recipeA, recipeB] } } });
       await prisma.presentation.deleteMany({ where: { id: { in: [presentationA, presentationB] } } });
@@ -453,9 +495,13 @@ describe('receiveFinishedGoods — R23 — acceso cruzado: presentacion de otra 
     const unitA = await sembrarUnidad();
     const presentationA = await sembrarPresentacion(empresaA.companyId, unitA, { content: '1', name: 'Solo de A' });
     const recipeB = await sembrarReceta(empresaB.companyId, 'Receta de B');
-    // El pedido de B no puede guardar la presentacion de A (la FK compuesta lo impide): el
-    // ataque va directo al argumento de `receiveFinishedGoods`, no a la fila del pedido.
-    const orderB = await sembrarPedido(empresaB.companyId, recipeB, null);
+    const orderB = await sembrarPedido(empresaB.companyId, recipeB);
+    // La linea SI tiene que ser de la empresa B -la FK compuesta de `order_presentation_lines`
+    // hacia `presentations(company_id, id)` lo exige, asi que no se puede sembrar con la
+    // presentacion de A-, propia con una presentacion CUALQUIERA de B. El ataque va al
+    // ARGUMENTO `presentationId` de `receiveFinishedGoods` (el de A), no a la fila de la linea.
+    const presentationB = await sembrarPresentacion(empresaB.companyId, unitA, { content: '1', name: 'De B' });
+    const lineB = await sembrarLinea(orderB, empresaB.companyId, presentationB, 10, null);
 
     const contarTodo = () =>
       Promise.all([
@@ -472,9 +518,10 @@ describe('receiveFinishedGoods — R23 — acceso cruzado: presentacion de otra 
         recipeId: recipeB,
         recipeName: 'Receta de B',
         presentationId: presentationA,
-        orderQuantity: '10',
+        orderPresentationLineId: lineB,
+        packages: 10,
         orderContent: null,
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresaB.userId,
         now: new Date(),
       });
@@ -484,9 +531,10 @@ describe('receiveFinishedGoods — R23 — acceso cruzado: presentacion de otra 
       const despues = await contarTodo();
       expect(despues).toEqual(antes);
     } finally {
+      await borrarLineas(orderB);
       await prisma.order.deleteMany({ where: { id: orderB } });
       await prisma.recipe.deleteMany({ where: { id: recipeB } });
-      await prisma.presentation.deleteMany({ where: { id: presentationA } });
+      await prisma.presentation.deleteMany({ where: { id: { in: [presentationA, presentationB] } } });
       await prisma.unit.deleteMany({ where: { id: unitA } });
     }
   });
@@ -498,8 +546,10 @@ describe('receiveFinishedGoods — R35: producto dado de baja', () => {
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { content: '1' });
     const recipeId = await sembrarReceta(empresa.companyId);
-    const orderId1 = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
-    const orderId2 = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId1 = await sembrarPedido(empresa.companyId, recipeId);
+    const orderId2 = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId1 = await sembrarLinea(orderId1, empresa.companyId, presentationId, 10, '1');
+    const lineId2 = await sembrarLinea(orderId2, empresa.companyId, presentationId, 10, '1');
     let productId1: string | null = null;
     let productId2: string | null = null;
 
@@ -509,9 +559,10 @@ describe('receiveFinishedGoods — R35: producto dado de baja', () => {
         recipeId,
         recipeName: 'Receta dada de baja',
         presentationId,
-        orderQuantity: '10',
+        orderPresentationLineId: lineId1,
+        packages: 10,
         orderContent: '1',
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       });
@@ -525,9 +576,10 @@ describe('receiveFinishedGoods — R35: producto dado de baja', () => {
         recipeId,
         recipeName: 'Receta dada de baja',
         presentationId,
-        orderQuantity: '10',
+        orderPresentationLineId: lineId2,
+        packages: 10,
         orderContent: '1',
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       });
@@ -542,6 +594,8 @@ describe('receiveFinishedGoods — R35: producto dado de baja', () => {
     } finally {
       if (productId1 !== null) await limpiarProducto(productId1);
       if (productId2 !== null) await limpiarProducto(productId2);
+      await borrarLineas(orderId1);
+      await borrarLineas(orderId2);
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -551,12 +605,13 @@ describe('receiveFinishedGoods — R35: producto dado de baja', () => {
 });
 
 describe('receiveFinishedGoods — R44: contenido del pedido', () => {
-  it('sin copia del pedido usa el contenido vigente de la presentacion', async () => {
+  it('sin copia en la linea usa el contenido vigente de la presentacion', async () => {
     const empresa = await nuevaEmpresa();
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { content: '2' });
     const recipeId = await sembrarReceta(empresa.companyId);
-    const orderId = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId = await sembrarLinea(orderId, empresa.companyId, presentationId, 5, null);
     let productId: string | null = null;
 
     try {
@@ -565,9 +620,10 @@ describe('receiveFinishedGoods — R44: contenido del pedido', () => {
         recipeId,
         recipeName: 'Receta sin copia',
         presentationId,
-        orderQuantity: '10',
+        orderPresentationLineId: lineId,
+        packages: 5,
         orderContent: null,
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       });
@@ -576,6 +632,7 @@ describe('receiveFinishedGoods — R44: contenido del pedido', () => {
       if (outcome.kind === 'received') productId = outcome.productId;
     } finally {
       if (productId !== null) await limpiarProducto(productId);
+      await borrarLineas(orderId);
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -583,12 +640,13 @@ describe('receiveFinishedGoods — R44: contenido del pedido', () => {
     }
   });
 
-  it('sin copia y sin contenido vigente rechaza el Finalizar sin escribir nada', async () => {
+  it('sin copia y sin contenido vigente rechaza Terminar sin escribir nada', async () => {
     const empresa = await nuevaEmpresa();
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { content: null });
     const recipeId = await sembrarReceta(empresa.companyId);
-    const orderId = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId = await sembrarLinea(orderId, empresa.companyId, presentationId, 10, null);
 
     try {
       const outcome = await recibir(empresa.companyId, {
@@ -596,9 +654,10 @@ describe('receiveFinishedGoods — R44: contenido del pedido', () => {
         recipeId,
         recipeName: 'Receta sin contenido',
         presentationId,
-        orderQuantity: '10',
+        orderPresentationLineId: lineId,
+        packages: 10,
         orderContent: null,
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       });
@@ -609,6 +668,7 @@ describe('receiveFinishedGoods — R44: contenido del pedido', () => {
       const movements = await prisma.inventoryMovement.findMany({ where: { orderId } });
       expect(movements).toHaveLength(0);
     } finally {
+      await borrarLineas(orderId);
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -625,7 +685,8 @@ describe('receiveFinishedGoods — D22: el nombre completo, sin recortar', () =>
     const nombrePresentacion = 'P'.repeat(60);
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, { content: '1', name: nombrePresentacion });
     const recipeId = await sembrarReceta(empresa.companyId, nombreReceta);
-    const orderId = await sembrarPedido(empresa.companyId, recipeId, presentationId, null);
+    const orderId = await sembrarPedido(empresa.companyId, recipeId);
+    const lineId = await sembrarLinea(orderId, empresa.companyId, presentationId, 10, '1');
     let productId: string | null = null;
 
     try {
@@ -634,9 +695,10 @@ describe('receiveFinishedGoods — D22: el nombre completo, sin recortar', () =>
         recipeId,
         recipeName: nombreReceta,
         presentationId,
-        orderQuantity: '10',
+        orderPresentationLineId: lineId,
+        packages: 10,
         orderContent: '1',
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       });
@@ -652,6 +714,7 @@ describe('receiveFinishedGoods — D22: el nombre completo, sin recortar', () =>
       expect(product.name).toHaveLength(183);
     } finally {
       if (productId !== null) await limpiarProducto(productId);
+      await borrarLineas(orderId);
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });

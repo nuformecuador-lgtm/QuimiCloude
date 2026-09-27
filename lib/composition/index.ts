@@ -1212,12 +1212,10 @@ const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveById: createTransitionOrder({
-    unitOfWork: orderUnitOfWork,
-    recipes: recipeCatalog,
-    products: productCatalog,
-    units: unitCatalog,
-  }),
+  // R15, R16: Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
+  // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
+  // cableados mas abajo para quien todavia los usa-.
+  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
   startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
   finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository }),
 };

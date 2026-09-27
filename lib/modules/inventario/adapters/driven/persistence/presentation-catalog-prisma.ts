@@ -26,11 +26,17 @@ type PresentationCatalogRow = {
   readonly id: string;
   readonly name: string;
   readonly content: Prisma.Decimal | null;
+  readonly unitId: string;
 };
 
 /** Fila de Prisma -> `PresentationRef` del contrato publico. Funcion pura, testeable sin base. */
 export function toPresentationRef(row: PresentationCatalogRow): PresentationRef {
-  return { id: row.id, name: row.name, content: row.content === null ? null : row.content.toFixed(4) };
+  return {
+    id: row.id,
+    name: row.name,
+    content: row.content === null ? null : row.content.toFixed(4),
+    unitId: row.unitId,
+  };
 }
 
 /**
@@ -47,7 +53,7 @@ async function findScopedPresentations(
     where: {
       AND: [presentationCompanyScope(scope), { id: { in: [...ids] } }],
     },
-    select: { id: true, name: true, content: true },
+    select: { id: true, name: true, content: true, unitId: true },
   });
 }
 

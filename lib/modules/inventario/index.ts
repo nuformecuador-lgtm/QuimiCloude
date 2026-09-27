@@ -103,8 +103,8 @@ export {
 } from './domain/decimal-quantity';
 export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
 export {
-  planFinishedGoods,
-  type FinishedGoodsPlan,
+  planFinishedGoodsLine,
+  type FinishedGoodsLinePlan,
   type FinishedGoodsOutcome,
   type FinishedGoodsIntake,
 } from './domain/finished-goods';

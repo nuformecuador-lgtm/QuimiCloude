@@ -90,7 +90,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
   it('con importe: la cotizacion coincide con el ingredientsCost del alta y de la edicion', async () => {
     const d = crearDobles()
     const presentations: PresentationCatalog = {
-      findRefs: vi.fn(async () => [{ id: PRESENTATION_ID, name: 'Presentacion de prueba', content: null }]),
+      findRefs: vi.fn(async () => [{ id: PRESENTATION_ID, name: 'Presentacion de prueba', content: null, unitId: 'unidad-1' }]),
       findByNormalizedNames: vi.fn(async () => []),
     }
     const recipesConVigencia = {

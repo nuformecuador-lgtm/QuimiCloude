@@ -700,7 +700,7 @@ describe('listOrders — la presentacion del pedido (R21, R22)', () => {
     ]
     const d = dobles({
       pagina: pagina(filas, { total: 3 }),
-      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L', content: null }],
+      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L', content: null, unitId: 'unidad-1' }],
     })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)

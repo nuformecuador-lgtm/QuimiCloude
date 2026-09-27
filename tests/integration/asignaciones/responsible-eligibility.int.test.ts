@@ -107,14 +107,9 @@ async function transitionAliveByIdReal(
   now: Date,
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
-  const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
-  // Yendo a `POR_EMPACAR`, el exito real lleva `finishedGoods` -aqui no hay producto
-  // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
-  // reconoce el exito por esta forma, no por el literal `'ok'`.
-  if (resultado === 'ok' && to === 'POR_EMPACAR') {
-    return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
-  }
-  return resultado;
+  // R15, R16: yendo a `POR_EMPACAR` el exito real vuelve a ser el literal `'ok'` -ya
+  // no da de alta ningun lote-, asi que este doble no necesita distinguir el destino.
+  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
 }
 
 /** El `OrderCatalog` REAL: los tres metodos de escritura y lectura que la ejecucion necesita. */
