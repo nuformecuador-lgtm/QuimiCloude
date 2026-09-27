@@ -1,5 +1,10 @@
 # QC-146 — presentacion-del-pedido · design.md
 
+> **Enmienda del 2026-09-26 (QC-170).** Este diseño queda derogado entero por R4/R22-R25 de QC-170:
+> la presentación única del pedido (`orders.presentation_id`/`presentation_content`) se sustituye
+> por el reparto en `order_presentation_lines` y la migración de datos la absorbe. Se conserva sin
+> reescribir como rastro. Detalle en `specs/QC-170-pedido-en-varias-presentaciones/design.md > 8`.
+
 > Diseño técnico de `R1`–`R30` de `requirements.md`. El Alcance y las trece decisiones cerradas
 > (`[D1]`–`[D13]`, citadas por su orden en la tabla) vienen de `/afinar-feature` (2026-09-22) y
 > aquí no se reabren. Lo que este archivo decide es lo que la acotación dejó al diseño: cómo habla
