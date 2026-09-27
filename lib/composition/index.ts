@@ -1332,6 +1332,8 @@ export const asignaciones = {
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
+    people: peopleDirectory,
+    groups: workGroupDirectory,
     now: () => new Date(),
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
