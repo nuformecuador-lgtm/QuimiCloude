@@ -371,12 +371,17 @@ model InventoryMovement {
   createdBy String?               @map("created_by") @db.Uuid
   createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  /// El asiento `production` de una linea del reparto de QC-170 (uno por linea, R17). Sin
+  /// `@relation`: `OrderPresentationLine` es de `pedidos`; su FK esta escrita a mano y es drift.
+  orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
+
   batch ProductBatch @relation(fields: [batchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([batchId], map: "inventory_movements_batch_id_idx")
   @@index([companyId], map: "inventory_movements_company_id_idx")
   @@index([createdBy], map: "inventory_movements_created_by_idx")
   @@index([orderId], map: "inventory_movements_order_id_idx")
+  @@index([orderPresentationLineId], map: "inventory_movements_order_presentation_line_id_idx")
   @@map("inventory_movements")
 }
 
@@ -641,6 +646,12 @@ model Order {
   /// nuevos lo conservan), lo exige el CHECK `orders_packed_by_matches_status`. Sin `@relation`:
   /// es drift, con FK COMPUESTA `(packed_by, company_id)` escrita a mano en la migracion.
   packedBy            String?       @map("packed_by") @db.Uuid
+  /// La unidad en que se expresa `quantity` (QC-170, deroga QC-35bis en la unidad). Sin
+  /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
+  /// presentacion; la aplicacion la exige en el alta y en la edicion.
+  unitId              String?       @map("unit_id") @db.Uuid
+
+  presentationLines OrderPresentationLine[]
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
@@ -649,7 +660,36 @@ model Order {
   @@index([updatedBy], map: "orders_updated_by_idx")
   @@index([presentationId], map: "orders_presentation_id_idx")
   @@index([packedBy], map: "orders_packed_by_idx")
+  @@index([unitId], map: "orders_unit_id_idx")
   @@map("orders")
+}
+
+/// El reparto de un pedido: en que presentaciones se entrega lo fabricado y cuantos envases de
+/// cada una. Sustituye a la presentacion unica de QC-146. `companyId` es COPIA de la del pedido
+/// -no se deriva por JOIN- por el mismo motivo que en `product_batches`: la unicidad y el ambito
+/// de esta tabla no pueden depender de otra. `presentationId` no lleva `@relation`: `Presentation`
+/// es de `inventario`, es drift, con FK COMPUESTA `(company_id, presentation_id)` igual que
+/// `orders.presentation_id` la tenia.
+/// @module pedidos
+model OrderPresentationLine {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String   @map("order_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  presentationId String   @map("presentation_id") @db.Uuid
+  /// Numero de envases enteros de esta linea. Entero, no Decimal: no hay "0.5 envases".
+  packages       Int
+  /// Copia del contenido de la presentacion al anadir la linea o al cambiar su presentacion.
+  /// NULL = la presentacion no tenia contenido en ese instante.
+  presentationContent Decimal? @map("presentation_content") @db.Decimal(14, 4)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([orderId, presentationId], map: "order_presentation_lines_order_id_presentation_id_key")
+  @@index([companyId], map: "order_presentation_lines_company_id_idx")
+  @@index([presentationId], map: "order_presentation_lines_presentation_id_idx")
+  @@map("order_presentation_lines")
 }
 
 /// Las tres FK y el CHECK van escritos a mano y sin `@relation`, porque los padres son de otros

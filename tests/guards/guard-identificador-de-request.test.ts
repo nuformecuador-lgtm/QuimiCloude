@@ -374,6 +374,10 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
+  // Tampoco estas dos: una crea la tabla del reparto por presentacion y la columna de unidad del
+  // pedido, la otra enlaza los movimientos de produccion con esa linea de reparto.
+  '20260927120000_order_presentation_lines',
+  '20260927120100_inventory_movements_production_per_line',
 ] as const
 
 export function hallazgosDeMigraciones(

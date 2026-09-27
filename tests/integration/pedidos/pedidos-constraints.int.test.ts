@@ -526,6 +526,10 @@ describe('el pedido como fila completa', () => {
       // el pedido no tiene material apartado.
       'reserved_at',
       'status',
+      // `unit_id` es la unidad en que se expresa `quantity`: no es un total, un impuesto ni un
+      // cliente. Entre `status` y `updated_at` por el mismo `sort()` lexicografico ('status' <
+      // 'unit_id' < 'updated_at').
+      'unit_id',
       'updated_at',
       'updated_by',
     ])

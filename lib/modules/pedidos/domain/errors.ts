@@ -192,3 +192,41 @@ export class NoWholePackageError extends PedidosError {
     super('no_whole_package', diagnostic);
   }
 }
+
+/** El pedido no tiene ninguna linea de reparto: no se puede empezar el empaque sin saber en que
+ *  presentaciones se entrega. */
+export class OrderWithoutDistributionError extends PedidosError {
+  readonly code = 'order_without_distribution';
+
+  constructor(diagnostic?: string) {
+    super('order_without_distribution', diagnostic);
+  }
+}
+
+/** El reparto de un pedido intenta cambiarse cuando el empaque ya comenzo o el pedido esta
+ *  cerrado. */
+export class OrderPresentationLineNotEditableError extends PedidosError {
+  readonly code = 'order_presentation_line_not_editable';
+
+  constructor(diagnostic?: string) {
+    super('order_presentation_line_not_editable', diagnostic);
+  }
+}
+
+/** La suma de envases (en la unidad del pedido) del reparto pasa de la cantidad del pedido. */
+export class OrderDistributionExceedsQuantityError extends PedidosError {
+  readonly code = 'order_distribution_exceeds_quantity';
+
+  constructor(diagnostic?: string) {
+    super('order_distribution_exceeds_quantity', diagnostic);
+  }
+}
+
+/** El pedido no tiene unidad asignada: no se puede repartir en presentaciones sin ella. */
+export class OrderWithoutUnitError extends PedidosError {
+  readonly code = 'order_without_unit';
+
+  constructor(diagnostic?: string) {
+    super('order_without_unit', diagnostic);
+  }
+}

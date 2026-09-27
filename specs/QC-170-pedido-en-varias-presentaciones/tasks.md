@@ -11,7 +11,7 @@
 > reescrita** (pantalla del Empacador en solo lectura), T19, T21, T22, y **T25 nueva** (edición
 > acotada en `POR_EMPACAR`).
 
-## T0 — Recontraste contra `dev` en el momento de implementar [bloqueante, no paralelizable]
+## [x] T0 — Recontraste contra `dev` en el momento de implementar [bloqueante, no paralelizable]
 
 Repetir las lecturas de `design.md > 1` contra el `dev` real en ese instante (nombres de CHECK,
 línea exacta de `transition-order.ts`, forma de `PresentationRef`, conteo de `ERROR_CODES`). Anotar
@@ -21,7 +21,7 @@ tasks pueden citar líneas reales.
 
 ## Migraciones (bloquean todo lo demás; en orden, no paralelizables entre sí)
 
-### T1 — `order_presentation_lines`, `orders.unit_id`, RLS
+### [x] T1 — `order_presentation_lines`, `orders.unit_id`, RLS
 
 **Archivos**: `db/schema.prisma` (modelos `OrderPresentationLine`, `Order.unitId`),
 `db/migrations/<ts1>_order_presentation_lines/{migration.sql,down.sql}`.
@@ -31,7 +31,7 @@ estático de la migración (nuevo, `tests/unit/pedidos/schema/order-presentation
 comprueba tabla, `CHECK`, únicos, índices y RLS `ENABLE`+`FORCE`; `guard-empresa-en-esquema` y
 `guard-rls-force` en verde.
 
-### T2 — `inventory_movements`: columna, FK y unicidad por línea
+### [x] T2 — `inventory_movements`: columna, FK y unicidad por línea
 
 **Archivos**: `db/schema.prisma` (`InventoryMovement.orderPresentationLineId`),
 `db/migrations/<ts2>_inventory_movements_production_per_line/{migration.sql,down.sql}`.
@@ -226,7 +226,7 @@ muestran «5 × Botella 200 ml +1» (primera línea + «+N», R26); con una sola
 
 ## Catálogo de errores y permisos
 
-### T17 — Altas del catálogo de errores [P]
+### [x] T17 — Altas del catálogo de errores [P]
 
 **Archivos**: `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts`,
 `tests/unit/errores/catalogo.test.ts` (el `toHaveLength`).
@@ -238,7 +238,7 @@ Depende de: T0.
 
 ## Documentación de specs ya cerrados
 
-### T18 — Anotar las enmiendas en QC-168, QC-150 y QC-146 [P]
+### [x] T18 — Anotar las enmiendas en QC-168, QC-150 y QC-146 [P]
 
 **Archivos**: `specs/QC-168-estado-por-empacar/design.md`, `specs/QC-150-producto-terminado/design.md`,
 `specs/QC-146-presentacion-del-pedido/design.md` (cabecera con fecha y referencia a `design.md > 8`
@@ -326,7 +326,7 @@ se invierte o se ajusta con un comentario «QC-170 [Q4] deroga QC-35bis» (no se
 `order-contents.ts` sigue sin importar `unidades`; `guard-arquitectura-modulos` en verde (solo el
 barrel `@/lib/modules/unidades`, nunca rutas profundas).
 
-### T24 — Nota de derogación en QC-35 (y referencia en QC-123) [P]
+### [x] T24 — Nota de derogación en QC-35 (y referencia en QC-123) [P]
 
 **Archivos**: `specs/QC-35-pantalla-de-pedidos/requirements.md` (tras la «ENMIENDA DEL 2026-09-07»
 de `### Importes`), `specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/design.md`

@@ -351,31 +351,68 @@ expect(SIN_RESTAURAR_EL_GLOBAL.length, 'la mutacion del CREATE INDEX no encontro
 );
 
 /**
- * Los `down.sql` de migraciones POSTERIORES cuyo `migration.sql` referencia la clave compuesta
- * de `presentations` que este `down.sql` quita (`DROP CONSTRAINT
- * "presentations_company_id_id_key"`). Un rollback real las revierte en el orden inverso al de
- * aplicacion, es decir ANTES que esta: sin ejecutarlas primero, ese `DROP CONSTRAINT` choca con
- * 2BP01 porque la FK compuesta que dejaron sigue dependiendo de la clave. Se detectan por texto
- * y se leen del disco, nunca se copian a mano; si hubiera mas de una, se ejecutan de la mas
- * reciente a la mas antigua, que es el mismo orden inverso.
+ * Los `down.sql` de migraciones POSTERIORES cuyo `migration.sql` referencia, directa o
+ * transitivamente, la clave compuesta de `presentations` que este `down.sql` quita (`DROP
+ * CONSTRAINT "presentations_company_id_id_key"`). Un rollback real las revierte en el orden
+ * inverso al de aplicacion, es decir ANTES que esta: sin ejecutarlas primero, ese `DROP
+ * CONSTRAINT` choca con 2BP01 porque la FK compuesta que dejaron sigue dependiendo de la clave -o,
+ * transitivamente, porque una migracion aun mas posterior deja una FK hacia una tabla que una de
+ * estas se lleva por delante-. Se detectan por texto y se leen del disco, nunca se copian a mano;
+ * se ejecutan de la mas reciente a la mas antigua, que es el mismo orden inverso.
  */
 /** Tolerante al espacio entre la tabla y el parentesis: distintas migraciones lo escriben distinto. */
 const REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS =
   /REFERENCES\s+"presentations"\s*\(\s*"company_id"\s*,\s*"id"\s*\)/;
 const timestampDe = (nombreDeMigracion: string): string => nombreDeMigracion.split('_')[0] as string;
 const esteTimestamp = timestampDe(scopeDirs[0] as string);
-const migracionesPosterioresDependientes = readdirSync(migrationsDir)
-  .filter((nombre) => timestampDe(nombre) > esteTimestamp)
-  .filter((nombre) => {
-    try {
-      return REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS.test(
-        readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8'),
-      );
-    } catch {
-      return false;
+const migracionesPosteriores = readdirSync(migrationsDir).filter(
+  (nombre) => timestampDe(nombre) > esteTimestamp,
+);
+
+/** Las tablas que crea un `migration.sql`: lo que un dependiente de SEGUNDO GRADO puede referenciar. */
+function tablasCreadas(sql: string): readonly string[] {
+  return [...sql.matchAll(/CREATE TABLE "(\w+)"/g)].map((match) => match[1] as string);
+}
+
+/** ¿Este `migration.sql` tiene una FK hacia alguna de estas tablas? */
+function referenciaAlgunaTabla(sql: string, tablas: readonly string[]): boolean {
+  return tablas.some((tabla) => new RegExp(`REFERENCES\\s+"${tabla}"`).test(sql));
+}
+
+/**
+ * Punto fijo: parte de quien referencia la clave compuesta de `presentations` (primer grado) y
+ * suma quien referencia una tabla que crea alguno de los ya encontrados (segundo grado, tercero,
+ * ...). Hace falta cuando una migracion crea una tabla nueva (primer grado, por su FK a
+ * `presentations`) y otra posterior solo referencia esa tabla nueva sin tocar `presentations`
+ * (segundo grado): sin el segundo grado el DOWN de la primera choca con 2BP01 contra la FK que la
+ * segunda deja viva.
+ */
+function migracionesDependientes(): readonly string[] {
+  const encontradas = new Set<string>();
+  const tablasProtegidas = new Set<string>();
+  let siguioCreciendo = true;
+  while (siguioCreciendo) {
+    siguioCreciendo = false;
+    for (const nombre of migracionesPosteriores) {
+      if (encontradas.has(nombre)) continue;
+      let sql: string;
+      try {
+        sql = readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8');
+      } catch {
+        continue;
+      }
+      const esPrimerGrado = REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS.test(sql);
+      const esGradoPosterior = referenciaAlgunaTabla(sql, [...tablasProtegidas]);
+      if (!esPrimerGrado && !esGradoPosterior) continue;
+      encontradas.add(nombre);
+      for (const tabla of tablasCreadas(sql)) tablasProtegidas.add(tabla);
+      siguioCreciendo = true;
     }
-  })
-  .sort((a, b) => (timestampDe(a) < timestampDe(b) ? 1 : -1));
+  }
+  return [...encontradas].sort((a, b) => (timestampDe(a) < timestampDe(b) ? 1 : -1));
+}
+
+const migracionesPosterioresDependientes = migracionesDependientes();
 expect(
   migracionesPosterioresDependientes,
   'se esperaba encontrar la migracion de la presentacion del pedido como dependiente',

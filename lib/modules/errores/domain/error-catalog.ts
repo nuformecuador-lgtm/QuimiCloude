@@ -65,6 +65,10 @@ export const ERROR_MESSAGE_KEY = {
   order_packing_taken: 'errors.order_packing_taken',
   order_not_packable: 'errors.order_not_packable',
   order_produced_frozen: 'errors.order_produced_frozen',
+  order_without_distribution: 'errors.order_without_distribution',
+  order_presentation_line_not_editable: 'errors.order_presentation_line_not_editable',
+  order_distribution_exceeds_quantity: 'errors.order_distribution_exceeds_quantity',
+  order_without_unit: 'errors.order_without_unit',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -161,4 +165,12 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
   'errors.order_produced_frozen':
     'Un pedido ya producido conserva sus responsables tal como estaban.',
+  'errors.order_without_distribution':
+    'El pedido no tiene ningun reparto: anade al menos una presentacion antes de comenzar el empaque.',
+  'errors.order_presentation_line_not_editable':
+    'El reparto de este pedido ya no se puede cambiar: el empaque ya comenzo o el pedido esta cerrado.',
+  'errors.order_distribution_exceeds_quantity':
+    'El reparto pasa de la cantidad del pedido: quita envases o elige presentaciones mas pequenas.',
+  'errors.order_without_unit':
+    'El pedido no tiene unidad: asignale una desde la edicion del pedido antes de repartirlo.',
 } as const satisfies Record<ErrorMessageKey, string>;

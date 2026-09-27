@@ -660,3 +660,19 @@ Cada `R<n>` de `requirements.md` se prueba al menos una vez en unidad y, cuando 
 una transacción con inventario, también en integración; R33 es el único E2E. El implementer escribe
 el mapa exacto `R<n> → test` al abrir la implementación; este diseño no lo repite para no
 desincronizarse de los nombres reales de los casos.
+
+## 13. Contraste con `dev` al implementar (T0, 2026-09-27)
+
+Leído en el worktree `QC-170-pedido-en-varias-presentaciones` (`946b16ca`, al día con `origin/dev`
+`0736e1ff`). **Sin divergencias que cambien ningún requisito ni ninguna task**: todo lo citado en
+`design.md > 1` y en las tasks se confirma tal cual contra el código real.
+
+| # | Lo que dice el diseño | Lo que hay en el worktree | Efecto |
+|---|---|---|---|
+| C1 | `orders_presentation_content_positive`, `orders_presentation_content_requires_presentation`, `orders_presentation_id_idx`, `orders_company_id_presentation_id_fkey` (§2.4 paso 3.2) | Confirmados tal cual: los dos `CHECK` nacen en `20260924190100_finished_products_and_content_copies/migration.sql:43,45`; el índice y la FK compuesta nacen en `20260922130000_orders_presentation/migration.sql:18,20`; ningún nombre cambió desde entonces | Ninguno; T3 puede citar estos cuatro nombres literalmente en el `DROP` |
+| C2 | `transition-order.ts`, rama `to === 'POR_EMPACAR'` retira `finishedGoods` de las líneas 84-85 y 111-155 (§1, §4.4) | El archivo mide 170 líneas; el `if (to === 'POR_EMPACAR')` abre en la línea 81; la llamada a `scope.finishedGoods.receiveFromOrder` está en la línea 128 y el bloque de resultado en 141-155; el rango citado por el diseño sigue siendo correcto | Ninguno; T12 recorta ese mismo tramo |
+| C3 | `PresentationRef` solo tiene `id`, `name`, `content`; no `unitId` (§3) | Confirmado (`lib/modules/inventario/domain/presentation-catalog.ts:5-10`): `{ id, name, content }` | Ninguno; T4 añade `unitId` tal como describe el diseño |
+| C4 | Conteo de `ERROR_CODES` = 60 antes de las cuatro altas de R28 (§7) | `tests/unit/errores/catalogo.test.ts:46` afirma `expect(ERROR_CODES).toHaveLength(60)` | Ninguno; T17 sube el `toHaveLength` a 64 |
+| C5 | `enum OrderStatus` no tiene `BLOQUEADO` todavía (QC-138 no ha entrado); `REPARTO_EDITABLE_STATUSES` no incluye ese valor (§4.2) | `db/schema.prisma:575-583`: `PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE`, sin `BLOQUEADO`. No hay ninguna referencia a `BLOQUEADO` en `order-transitions.ts` ni `order-classification.ts` | Ninguno; `REPARTO_EDITABLE_STATUSES` queda `['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR']`, sin condicional para T0 futuro |
+| C6 | La pantalla del Empacador vive en `app/(private)/asignacion/**` (T0 fija la ruta exacta, T15) | Es `app/(private)/asignacion/empaque/[id]/page.tsx` y `.../components/packing-order-screen.tsx`; ese subárbol también resuelve la ejecución en `order-execution-lines.tsx` | T15/T16/T22 citan esta ruta, no una genérica |
+| C7 | `asignaciones` ya importa el barrel de `unidades` (relevante para si T15/T16 disparan `guard-arquitectura-modulos`, §«Guardias») | Ningún archivo bajo `lib/modules/asignaciones/**` importa `@/lib/modules/unidades` hoy | T15/T16 son quienes introducen esa importación por primera vez en `asignaciones`; la guardia se revisa en esas tasks, no antes |
