@@ -2,8 +2,14 @@
 
 > F1.4 (2026-09-26): las 4 preguntas de `design.md > 0` están **CERRADAS por el humano** ([Q1]-[Q4]).
 > Ninguna task queda bloqueada por ellas. Tasks nuevas de F1.4: T20-T24 (al final, antes del E2E en
-> el orden). Queda abierta la pregunta 5 (`requirements.md`, R44): si el humano la cambia, solo
-> afecta a T12 y T21.
+> el orden).
+>
+> **F1.4 bis (2026-09-26): el humano sustituyó D2/D3 por `[D2']`/`[D3']`.** Solo `pedidos.modificar`
+> edita reparto y unidad, hasta Comenzar empaque; el Empacador solo lo ve. Pregunta 5 cerrada, **R44
+> retirado**, nuevos R46-R49. Tasks afectadas: T3 (R49), T9 (ventana y `unitId`), T10 (sin método de
+> escritura para `asignaciones`), T12 (sin R44), T13 (serializa con el guardado, R48), **T15
+> reescrita** (pantalla del Empacador en solo lectura), T19, T21, T22, y **T25 nueva** (edición
+> acotada en `POR_EMPACAR`).
 
 ## T0 — Recontraste contra `dev` en el momento de implementar [bloqueante, no paralelizable]
 
@@ -42,7 +48,9 @@ Depende de: T1, T2.
 contenido, sin presentación, con resto que da cero envases), cada uno migra según R22-R25; cada
 pedido con presentación queda con `unit_id` = unidad de esa presentación y el que no tenía queda en
 `NULL` (R43); con un pedido `POR_EMPACAR` o `EN_EMPAQUE` sin presentación la migración aborta entera
-con `RAISE` (R45, caso propio en el test); aplicarla
+con `RAISE` (R45, caso propio en el test); con un pedido `EN_EMPAQUE` que quedaría sin ninguna línea
+(sin contenido o ⌊q/c⌋ = 0) también aborta entera (R49, caso propio), y el mismo caso en
+`POR_EMPACAR` con presentación NO aborta (queda sin líneas, recuperable por R46); aplicarla
 dos veces falla en el segundo `DROP COLUMN` (se documenta y se prueba, no se evita); `down.sql`
 falla con `RAISE` si algún pedido tiene más de una línea (se prueba con un caso que sí y uno que no).
 Test de integración `tests/integration/pedidos/qc170-backfill.int.test.ts` (nuevo) cubre los cuatro
@@ -108,21 +116,27 @@ QC-150 y no se toca ese test).
 `lib/modules/pedidos/ports/order-write-repository.ts` (o el puerto que corresponda tras T0),
 `tests/unit/pedidos/update-order-presentation-lines.test.ts` (nuevo).
 Depende de: T7, T8, T20.
-**Hecho cuando**: acepta `PENDIENTE`/`EN_CURSO`/`POR_EMPACAR`/`EN_EMPAQUE` y rechaza
-`ENTREGADO`/`CANCELADO` con `order_presentation_line_not_editable` (R11-R14); bloquea la fila del
-pedido (`FOR UPDATE`) antes de validar; devuelve `without_unit` (R42), `presentation_without_content`
-(R35), `incompatible_units` (R7), `exceeds_quantity` (R36) en el orden de `design.md > 4.2` sin
-escribir nada; acepta un reparto exactamente igual al total y uno menor (R8); reemplaza el conjunto
-de líneas; no toca `assertTransition`.
+**Hecho cuando**: recibe `{ unitId, lines }` (R46); acepta `PENDIENTE`/`EN_CURSO`/`POR_EMPACAR` (y
+`BLOQUEADO` solo si T0 lo encontró en el enum) y rechaza `EN_EMPAQUE`/`ENTREGADO`/`CANCELADO` con
+`order_presentation_line_not_editable` sin escribir ni la unidad ni las líneas (R11, R13, R14,
+`[D3']`, un caso por estado); bloquea la fila del pedido (`FOR UPDATE`) antes de validar; devuelve
+`unit_not_found` (R41), `without_unit` (R42), `presentation_without_content` (R35),
+`incompatible_units` (R7, también cuando la unidad NUEVA deja el reparto inconvertible, R38),
+`exceeds_quantity` (R36) en el orden de `design.md > 4.2` sin escribir nada; acepta un reparto
+exactamente igual al total y uno menor (R8); guarda unidad y líneas juntas; reemplaza el conjunto
+de líneas; no toca `quantity`, receta ni reserva (R46, R30: el puerto de reservas no recibe ninguna
+llamada); no toca `assertTransition`.
 
-### T10 — `OrderCatalog`: `presentationId` → `presentationLines`, nuevo método de reparto
+### T10 — `OrderCatalog`: `presentationId` → `presentationLines` (solo lectura)
 
-**Archivos**: `lib/modules/pedidos/domain/order-catalog.ts` (tipo `AssignedOrderSummary`, método
-`updatePresentationLinesAliveById`), `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts`,
+**Archivos**: `lib/modules/pedidos/domain/order-catalog.ts` (tipo `AssignedOrderSummary`),
+`lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts`,
 `tests/unit/pedidos/order-catalog.test.ts`.
-Depende de: T9.
-**Hecho cuando**: el resumen publicado lleva `presentationLines`; el método nuevo delega en T9 con
-ámbito de empresa.
+Depende de: T1, T7.
+**Hecho cuando**: el resumen publicado lleva `presentationLines` (orden de alta) y `unitId`;
+`OrderCatalog` **no** gana ningún método que escriba el reparto (`[D2']`: F1.2 proponía
+`updatePresentationLinesAliveById` para la puerta del Empacador; se retira) — un test de contrato
+afirma que el puerto no expone escritura de reparto.
 
 ### T11 — «Cuánto queda disponible»: conversión de unidades en el borde de `pedidos`
 
@@ -144,9 +158,11 @@ es solo lectura, el rechazo lo hace T9/T21).
 `tests/unit/pedidos/transition-order.test.ts`.
 Depende de: T0.
 **Hecho cuando**: `to === 'POR_EMPACAR'` ya no llama a `finishedGoods`, ya no exige presentación ni
-`recipeRef`; con `unit_id NULL` rechaza con `order_without_unit` ANTES de consumir y el pedido sigue
-`EN_CURSO` sin material consumido (R44); el `'ok'` del método vuelve a ser sin `finishedGoods`; los
-tests de QC-150 que afirmaban el lote en este punto se retiran o se mueven a T14.
+`recipeRef`; consume el material igual que hoy (R15) y no da de alta ningún lote (R16); un pedido
+con `unit_id NULL` y sin reparto **sí** finaliza y queda `POR_EMPACAR` (R44 retirado: caso de test
+explícito para que nadie reintroduzca la condición); el `'ok'` del método vuelve a ser sin
+`finishedGoods` y no hay resultado `'without_unit'`; los tests de QC-150 que afirmaban el lote en
+este punto se retiran o se mueven a T14.
 
 ### T13 — `order-packing.ts`: `startPackingAliveById` exige reparto
 
@@ -155,9 +171,12 @@ tests de QC-150 que afirmaban el lote en este punto se retiran o se mueven a T14
 `lib/modules/pedidos/adapters/driven/persistence/order-packing-prisma.ts` (o el nombre real tras T0),
 `tests/unit/pedidos/order-packing.test.ts`.
 Depende de: T1, T0.
-**Hecho cuando**: `startPackingAliveById` devuelve `'without_distribution'` cuando el pedido está
-`POR_EMPACAR` sin ninguna línea (R10), y `'ok'`/`'taken'`/`'already_mine'`/`'not_packable'` sin
-cambios en los demás casos; el `EXISTS` no rompe la idempotencia ya probada de Comenzar.
+**Hecho cuando**: `startPackingAliveById` abre una transacción corta con `SELECT ... FOR UPDATE` de
+la fila del pedido, cuenta las líneas en una sentencia posterior y solo entonces hace el `UPDATE`
+(`design.md > 4.5`, R48); devuelve `'without_distribution'` cuando el pedido está `POR_EMPACAR` sin
+ninguna línea (R10), y `'ok'`/`'taken'`/`'already_mine'`/`'not_packable'` sin cambios en los demás
+casos; no rompe la idempotencia ya probada de Comenzar. La prueba de carrera con el guardado del
+reparto (R48) vive en T21.
 
 ### T14 — `order-packing.ts`: `finishPackingAliveById` da de alta un lote por línea
 
@@ -172,20 +191,25 @@ Depende de: T6, T10, T12, T13.
 (R19), y el `'ok'` lleva `finishedGoods: readonly FinishedGoodsReceipt[]`; dos Terminar simultáneos
 no duplican lotes (prueba de carrera, R21).
 
-## `asignaciones`: la puerta del Empacador
+## `asignaciones`: la pantalla del Empacador (solo lectura, `[D2']`)
 
-### T15 — Puerta de reparto para el Empacador
+### T15 — Pantalla del Empacador: reparto en solo lectura (REESCRITA en F1.4 bis)
 
-**Archivos**: `lib/modules/asignaciones/domain/update-packing-presentation-lines.ts` (nuevo),
-`app/(private)/asignacion/empaque/[id]/components/*` (control de reparto en la pantalla de empaque),
-Server Action en `asignaciones/adapters/driving/order-packing-actions.ts`,
-`tests/unit/asignaciones/update-packing-presentation-lines.test.ts` (nuevo).
-Depende de: T10.
-**Hecho cuando**: exige `empaque.modificar` (R12); llama a `OrderCatalog.updatePresentationLinesAliveById`;
-rechaza fuera de `POR_EMPACAR`/`EN_EMPAQUE` con el mismo código que T9; traduce
-`exceeds_quantity`/`presentation_without_content`/`incompatible_units`/`without_unit` a sus códigos
-(R35, R36, R7, R42). El disponible y el aviso de R39 en la pantalla del Empacador se montan en T22
-(mismo control compartido), no aquí.
+> Sustituye a la T15 de F1.2 («Puerta de reparto para el Empacador»): ese caso de uso
+> (`update-packing-presentation-lines.ts`), su Server Action y su control de edición **no se
+> construyen**.
+
+**Archivos**: la pantalla de empaque real de `app/(private)/asignacion/**` (T0 fija la ruta; hoy la
+de QC-168), su vista en `asignaciones` (`assigned-order-view.ts`/`list-assigned-orders.ts`, lo que
+T16 ya toca), tests de componente de esa pantalla,
+`tests/unit/asignaciones/module-contract.test.ts` (o el test de contrato equivalente).
+Depende de: T10, T16.
+**Hecho cuando**: la pantalla pinta todas las líneas del reparto y la cantidad con su unidad en solo
+lectura (R47, R26); el test de componente afirma que no hay selector de presentación, ni botón de
+añadir/quitar línea, ni campo de envases, ni selector de unidad; con un pedido `POR_EMPACAR` sin
+líneas muestra «Falta el reparto: lo define quien edita pedidos» (R47); un test de contrato afirma
+que `asignaciones` no expone ninguna Server Action ni caso de uso que escriba el reparto o la unidad
+(R12). El disponible y el aviso de R39 **no** aparecen en esta pantalla.
 
 ### T16 — Listados y ejecución: `presentationLines` en vez de `presentationId` [P]
 
@@ -232,12 +256,17 @@ archivos cambia. (La nota de QC-35/QC-123 por [Q4] es T24.)
 Terminar, y `e2e/pedidos-terminados.spec.ts`/`pedidos-asignados.spec.ts` si asumen
 `presentationId`/`presentationName` de un pedido (QC-168 §10 ya los daba por rojos por otro motivo;
 esta ficha añade el suyo).
-Depende de: T1-T17 y T20-T23 (es el último paso; solo corre con todo lo demás en verde).
+Depende de: T1-T17 y T20-T23, T25 (es el último paso; solo corre con todo lo demás en verde).
 **Hecho cuando**: R33 se cumple: alta con unidad y reparto de dos presentaciones, producción,
 empaque, Terminar, y las afirmaciones de dos lotes con la cantidad y el coste unitario esperados y la
 existencia del inventario subiendo por las dos combinaciones. Además, en el mismo recorrido o uno
 hermano: intentar guardar un reparto que pasa del total muestra el aviso y, forzado, el servidor lo
-rechaza sin cambiar el reparto (R36, R39).
+rechaza sin cambiar el reparto (R36, R39). **F1.4 bis (`[D2']`/`[D3']`)**: el pedido llega a
+`POR_EMPACAR` sin reparto; el Empacador ve el aviso de «Falta el reparto» sin ningún control de
+edición y Comenzar se rechaza (R47, R10); el administrador define reparto y unidad con la edición
+acotada en `POR_EMPACAR` (R46); el Empacador ve el reparto en solo lectura y comienza; tras
+Comenzar, la acción «Reparto y unidad» ya no aparece en `/pedidos` y un envío forzado se rechaza con
+`order_presentation_line_not_editable` (R13, R14).
 
 ## Tasks nuevas de F1.4 (2026-09-26)
 
@@ -257,20 +286,25 @@ menor (válido), mayor por 0,0001 (rechazo), conversión L↔ml, unidades sin ba
 **Archivos**: `lib/modules/pedidos/domain/update-order.ts`,
 `lib/modules/pedidos/adapters/driven/persistence/*` (el `FOR UPDATE` del reparto),
 `tests/integration/pedidos/qc170-distribution-concurrency.int.test.ts` (nuevo).
-Depende de: T8, T9, T20.
+Depende de: T8, T9, T13, T20.
 **Hecho cuando**: una edición que baja la cantidad o cambia la unidad y deja el reparto vigente por
 encima del total o sin conversión se rechaza con `order_distribution_exceeds_quantity` /
 `incompatible_units` y el pedido queda igual (R38); dos guardados simultáneos del reparto que por
 separado caben y juntos no, y un guardado del reparto simultáneo con una bajada de cantidad, dejan
 siempre un estado con suma ≤ cantidad (R37, prueba de carrera con dos conexiones reales); un pedido
 con `unit_id NULL` rechaza el reparto con `order_without_unit` y lo acepta tras asignarle unidad
-desde la edición (R42).
+desde la edición (R42), **también en `POR_EMPACAR` con la edición acotada** (R46, el antiguo caso de
+la pregunta 5). **F1.4 bis**: carrera Comenzar vs guardado del reparto (R48) con dos conexiones
+reales, en los dos órdenes: guardado primero que VACÍA el reparto → Comenzar da
+`without_distribution` y el pedido sigue `POR_EMPACAR`; Comenzar primero → el guardado da
+`order_presentation_line_not_editable` y las líneas son las de antes; en `POR_EMPACAR` un cambio de
+unidad no altera reservas ni asientos de inventario (R46, R30: se compara el censo antes y después).
 
-### T22 — Formulario del reparto: selector, disponible y aviso (alta/edición y Empacador)
+### T22 — Formulario del reparto: selector, disponible y aviso (alta y edición en `/pedidos`)
 
 **Archivos**: `app/(private)/pedidos/components/*` (formulario de alta/edición: selector de unidad
-del pedido y control de reparto), componente compartido del control de reparto que reutiliza T15,
-tests de componente.
+del pedido y control de reparto), control de reparto como componente propio de `/pedidos` que
+reutiliza T25 (ya **no** lo usa la pantalla del Empacador, `[D2']`), tests de componente.
 Depende de: T11, T16.
 **Hecho cuando**: la unidad del pedido es obligatoria en el alta y editable (R41); el selector
 muestra las presentaciones sin contenido marcadas con aviso y no deja añadirlas (R34); el disponible
@@ -302,15 +336,33 @@ Depende de: ninguna (documental).
 pedido (`orders.unit_id`) y remiten a `specs/QC-170-pedido-en-varias-presentaciones/design.md > 0.6`;
 el precio unitario sigue fuera; ningún otro contenido de esos archivos cambia.
 
+### T25 — Edición acotada «Reparto y unidad» en `POR_EMPACAR` (nueva en F1.4 bis, `[D2']`/`[D3']`)
+
+**Archivos**: `lib/modules/pedidos/adapters/driving/order-actions.ts` (Server Action nueva
+`updateOrderDistributionAction`), su esquema de entrada (solo `unitId` + `presentationLines`, en
+`order-input.ts`), `app/(private)/pedidos/components/*` (acción de fila y formulario acotado que
+reutiliza el control de T22), `tests/unit/pedidos/order-actions*.test.ts` y tests de componente.
+Depende de: T9, T22.
+**Hecho cuando**: la acción exige `pedidos.modificar` y rechaza con `unauthorized` a un actor con
+solo `empaque.modificar` sin escribir nada (R12); traduce los resultados de T9 a sus códigos (R7,
+R13, R35, R36, R41, R42); el esquema rechaza cualquier campo que no sea `unitId`/`presentationLines`
+(cantidad, receta, responsables…) (R46); la acción de fila «Reparto y unidad» se pinta solo con
+`pedidos.modificar` y solo en `POR_EMPACAR` (y `BLOQUEADO` si aplica, T0), nunca en
+`EN_EMPAQUE`/`ENTREGADO`/`CANCELADO` (R11, R13); el formulario muestra el disponible y el aviso de
+R39; `guard-pantallas-exigen-permiso` en verde.
+
 ## Guardias que se ponen rojas y quién las arregla
 
-`guard-catalogo-de-errores` (T17: cuatro altas, 60 → 64), `guard-empresa-en-esquema` y
-`guard-rls-force` (T1), `guard-arquitectura-modulos` (T15 por el contrato nuevo entre `asignaciones`
-y `pedidos`; T23 por `get-order`/`list-orders` volviendo a importar el barrel de `unidades`),
-`guard-ambito-empresa-pedidos` (T8, T9, T21: nuevos archivos o consultas en
-`adapters/driven/persistence/`, incluido el `FOR UPDATE`), `guard-libro-de-inventario` (T6: nuevo
-camino de escritura si `receiveFinishedGoods` cambia de archivo o de firma de forma que el censo lo
-note), `guard-pantallas-exigen-permiso` (T15, T22: control nuevo con permiso). Además, no guardias
+`guard-catalogo-de-errores` (T17: cuatro altas, 60 → 64; sin cambio en F1.4 bis: R44 retirado no
+quita ningún código, `order_without_unit` sigue emitido por R42), `guard-empresa-en-esquema` y
+`guard-rls-force` (T1), `guard-arquitectura-modulos` (T23 por `get-order`/`list-orders` volviendo a
+importar el barrel de `unidades`; T16/T15 si `asignaciones` no importaba ya ese barrel para la
+etiqueta de la unidad — T0 lo mira; **ya no** T15 por un contrato de escritura `asignaciones →
+pedidos`, que `[D2']` retira), `guard-ambito-empresa-pedidos` (T8, T9, T13, T21: nuevos archivos o
+consultas en `adapters/driven/persistence/`, incluidos los `FOR UPDATE` de T9 y de Comenzar),
+`guard-libro-de-inventario` (T6: nuevo camino de escritura si `receiveFinishedGoods` cambia de
+archivo o de firma de forma que el censo lo note), `guard-pantallas-exigen-permiso` (T22, T25:
+controles nuevos con `pedidos.modificar`; T15 ya no añade control con permiso). Además, no guardias
 pero rojas por diseño: las pruebas de QC-35bis de `design.md > 0.6` (T23) y
 `tests/unit/errores/catalogo.test.ts:46` (T17). Cada una se arregla en la task que la rompe, no al
 final.
@@ -323,11 +375,13 @@ T0 → T4 [P] , T5 [P] (no dependen de T1-T3)
 T5 → T6 (depende tambien de T2)
 T0 → T7 → T8 (depende tambien de T1 y T20)
 T0 → T20 [P]
-T7,T8,T20 → T9 → T10 → T11 (depende tambien de T4), T13 (depende tambien de T1)
-T8,T9,T20 → T21
+T7,T8,T20 → T9 → T11 (depende tambien de T4)
+T1,T7 → T10
+T0,T1 → T13
+T8,T9,T13,T20 → T21
 T1,T7 → T23
 T6,T10,T12,T13 → T14
-T10 → T15 → T16 (desbloqueada, [Q1]) → T22 (depende tambien de T11)
+T10 → T16 (desbloqueada, [Q1]) → T15 (solo lectura) ; T16,T11 → T22 → T25 (depende tambien de T9)
 T0 → T17 [P]
 cualquier momento → T18 [P], T24 [P]
 todo → T19

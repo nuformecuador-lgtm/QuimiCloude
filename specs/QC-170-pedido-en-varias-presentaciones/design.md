@@ -13,6 +13,15 @@
 | Q3 | **CERRADA 2026-09-26 por el humano** (**CAMBIA** la recomendación) | Pasar del total se **rechaza al guardar**, en servidor, dentro de la transacción que reescribe el reparto con la fila del pedido bloqueada. Igual o menor sí. La UI muestra el disponible y avisa antes. | R8, R36-R39 |
 | Q4 | **CERRADA 2026-09-26 por el humano** (= opción A) | `orders.unit_id` (FK a `units`), obligatorio en el alta, editable; conversión por línea con `convertQuantity`. **Deroga QC-35bis** en la unidad (§0.6). | R6, R7, R40-R45 |
 
+**D2/D3 sustituidas por el humano (F1.4, 2026-09-26) → `[D2']`/`[D3']`.** Solo quien tiene
+`pedidos.modificar` define o cambia el reparto y la unidad, y solo hasta pulsar Comenzar empaque
+(`PENDIENTE`, `EN_CURSO`, `POR_EMPACAR`; `BLOQUEADO` si QC-138 ya lo añadió al enum cuando T0
+recontraste — hoy no existe en `db/schema.prisma`). El Empacador solo ve el reparto. Efectos en este
+diseño: §0.5 (R44 retirado, pregunta 5 cerrada), §2.2 (guardia R49), §4.2 (ventana y entrada con
+`unitId`), §4.3 (una sola puerta, dos formularios), §4.4 (sin condición nueva en Finalizar), §4.5
+(Comenzar serializa con el guardado, R48), §7 (significado de `order_presentation_line_not_editable`),
+§10.5 (alternativa descartada).
+
 Lo que sigue en §0.1-§0.4 es el razonamiento de F1.2, conservado para que se vea qué se propuso;
 donde el humano cambió la propuesta (Q3) se dice en el propio punto. §0.5 y §0.6 son nuevos de F1.4.
 
@@ -46,8 +55,16 @@ donde el humano cambió la propuesta (Q3) se dice en el propio punto. §0.5 y §
    derivar la unidad del pedido de la primera línea de reparto que se añada — frágil (si esa línea se
    borra, el pedido se queda sin unidad de referencia a mitad de edición) y no resuelve el caso de un
    pedido sin ninguna línea todavía, que R9 permite.
-5. **Pedidos sin unidad tras la migración (nuevo en F1.4, decisión de `spec_author`, pregunta
-   abierta 5).** La columna es **anulable en la base y obligatoria en la aplicación** (alta siempre;
+5. **Pedidos sin unidad tras la migración — pregunta 5 CERRADA 2026-09-26 por el humano vía
+   `[D2']`/`[D3']`; R44 RETIRADO.** Estado vigente: un pedido con `unit_id NULL` que llegue a
+   `POR_EMPACAR` lo desatasca quien tiene `pedidos.modificar` con la edición acotada de reparto y
+   unidad (R46, §4.3). Finalizar (`EN_CURSO → POR_EMPACAR`) **no** gana ninguna condición: queda
+   exactamente como en QC-168 (R31). R45 se mantiene (la migración aborta si un `POR_EMPACAR`/
+   `EN_EMPAQUE` quedaría sin unidad): en `POR_EMPACAR` ya sería recuperable, pero en `dev` no debe
+   existir ninguno y abortar ante lo inesperado es más barato que migrar a ciegas; en `EN_EMPAQUE`
+   sigue siendo imprescindible porque ahí el reparto y la unidad ya están fijos (R13). Por el mismo
+   motivo nace **R49**: la migración aborta si un `EN_EMPAQUE` quedaría sin ninguna línea. El texto
+   de F1.2 que sigue se conserva como histórico. ~~La columna es **anulable en la base y obligatoria en la aplicación** (alta siempre;
    edición la exige si falta, R41). Un pedido con `unit_id NULL` (solo los antiguos sin
    presentación, R43) no puede repartirse (`order_without_unit`, R42) hasta que la edición del pedido
    le asigne una. Para que no quede varado, **Finalizar (`EN_CURSO → POR_EMPACAR`) exige unidad**
@@ -56,8 +73,9 @@ donde el humano cambió la propuesta (Q3) se dice en el propio punto. §0.5 y §
    contenido (`transitionAliveById` → `presentation_without_content`), y toda presentación tiene
    `unit_id NOT NULL` (`db/schema.prisma:252`). Alternativa descartada: que el Empacador asigne la
    unidad en su pantalla — abre una segunda puerta de edición de un dato del pedido que QC-168 R32
-   cerró en `POR_EMPACAR`, sólo para un caso que la migración ya garantiza que no existe. Otra
-   descartada: `NOT NULL` con un valor por defecto inventado — rompe la regla 6 (no inventar).
+   cerró en `POR_EMPACAR`, sólo para un caso que la migración ya garantiza que no existe.~~ (Fin del
+   texto histórico.) Sigue descartado: `NOT NULL` con un valor por defecto inventado — rompe la
+   regla 6 (no inventar).
 6. **Derogación explícita de QC-35bis (enmienda de QC-35 del 2026-09-07).** Aquella decisión quitó
    la unidad del pedido («el pedido ya no tiene unidad ni precio unitario»,
    `specs/QC-35-pantalla-de-pedidos/requirements.md > Importes`, `order-view.ts:13-17`,
@@ -90,10 +108,10 @@ donde el humano cambió la propuesta (Q3) se dice en el propio punto. §0.5 y §
 | `order-packing.ts` `createStartPacking`/`createFinishPacking` (33 líneas, un `UPDATE` cada uno, **sin** unidad de trabajo de inventario) | no tocan inventario | `createStartPacking` gana el rechazo de R10 (§5.1); `createFinishPacking` pasa a abrir la unidad de trabajo y da de alta un lote por línea (R17, §5.2) |
 | `finished-goods.ts` `planFinishedGoods` (una presentación) | recibe una cantidad y un contenido, calcula envases con `floor` | **ya no calcula envases**: el reparto los da directos (R1); pasa a calcular solo `unitCost` compartido (§5.3) y a repetirse una vez por línea |
 | `inventory_movements_one_production_per_order` (único parcial por `order_id`, `20260924190100_*`) | un asiento `production` por pedido | **no sirve**: ahora puede haber varios asientos `production` por pedido, uno por línea. Se sustituye por unicidad por línea (§2.4) |
-| `OrderCatalog.transitionAliveById` (`order-catalog.ts:109-126`) | el `'ok'` a `POR_EMPACAR` lleva `finishedGoods` | pierde ese campo: `to === 'POR_EMPACAR'` vuelve a devolver `'ok'` sin nada más; gana `'without_unit'` (R44) |
+| `OrderCatalog.transitionAliveById` (`order-catalog.ts:109-126`) | el `'ok'` a `POR_EMPACAR` lleva `finishedGoods` | pierde ese campo: `to === 'POR_EMPACAR'` vuelve a devolver `'ok'` sin nada más (R44 retirado: **no** gana `'without_unit'`) |
 | `OrderCatalog.finishPackingAliveById` (`order-catalog.ts:149-154`) | `'ok' \| 'not_packer' \| 'not_packable' \| 'not_found'` | gana `finishedGoods: FinishedGoodsReceipt` en el `'ok'` (R17) y el caso `presentation_without_content` (R19, por línea) |
-| `OrderCatalog.startPackingAliveById` (`:136-141`) | `'ok' \| 'already_mine' \| 'taken' \| 'not_packable' \| 'not_found'` | gana `'without_distribution'` (R10) |
-| Matriz `ALLOWED` (`order-transitions.ts:30-37`) | `POR_EMPACAR: ['EN_EMPAQUE']` sin «quedarse igual» ⇒ nada editable en `POR_EMPACAR`/`EN_EMPAQUE` (QC-168 R32) | **sin cambios en la matriz**: el reparto no usa `updateOrder`/`assertTransition`, tiene su propio caso de uso y su propia guardia de estado (§3.3), así que R11-R14 no reabren R32 de QC-168 |
+| `OrderCatalog.startPackingAliveById` (`:136-141`) | `'ok' \| 'already_mine' \| 'taken' \| 'not_packable' \| 'not_found'` | gana `'without_distribution'` (R10) y serializa con el guardado del reparto sobre la fila del pedido (R48, §4.5) |
+| Matriz `ALLOWED` (`order-transitions.ts:30-37`) | `POR_EMPACAR: ['EN_EMPAQUE']` sin «quedarse igual» ⇒ nada editable en `POR_EMPACAR`/`EN_EMPAQUE` (QC-168 R32) | **sin cambios en la matriz**: el reparto no usa `updateOrder`/`assertTransition`, tiene su propio caso de uso y su propia guardia de estado (§4.2), así que R11-R14 y R46 no reabren R32 de QC-168: en `POR_EMPACAR` solo se abre el reparto y la unidad, el resto del pedido sigue cerrado |
 | `AssignedOrderSummary.presentationId` (`order-catalog.ts:170`) | un id o `null` | pasa a `presentationLines: readonly { presentationId; packages }[]` (R26) |
 | `findFinishedGoodsReceipts(orderIds)` (QC-168 §4, `product-catalog.ts`) | un texto de envases por pedido, de UN asiento `production` | agrega los asientos `production` de TODAS las líneas de ese pedido (§6) |
 
@@ -183,6 +201,11 @@ model Order {
 - **Migración de datos** (R43, R45) — en `<ts3>` (§2.4), ANTES del `DROP COLUMN presentation_id`:
   1. `DO $$ ... IF EXISTS (SELECT 1 FROM orders WHERE status IN ('POR_EMPACAR','EN_EMPAQUE') AND
      presentation_id IS NULL) THEN RAISE EXCEPTION ...` (R45: aborta toda la migración).
+  1 bis. **R49 [D3']**: en el mismo bloque, `IF EXISTS (SELECT 1 FROM orders WHERE status =
+     'EN_EMPAQUE' AND deleted_at IS NULL AND (presentation_id IS NULL OR presentation_content IS NULL
+     OR FLOOR(quantity / presentation_content) < 1)) THEN RAISE EXCEPTION ...`: mismo predicado que
+     excluye filas en el `INSERT` de §2.4 paso 1, restringido a `EN_EMPAQUE`, donde el reparto ya no
+     se puede corregir (R13). (T0 confirma si `orders` tiene `deleted_at`; si no, se omite.)
   2. `UPDATE orders o SET unit_id = p.unit_id FROM presentations p WHERE p.id = o.presentation_id
      AND p.company_id = o.company_id` (R43). Incluye pedidos `ENTREGADO`/`CANCELADO`: el dato se
      conserva aunque ya no se edite. Los que no tenían presentación quedan en `NULL`.
@@ -192,8 +215,8 @@ model Order {
 La regla: `Σ convertQuantity(packages_i × content_i, unidad(presentation_i), orders.unit_id) ≤
 orders.quantity`, con aritmética `Decimal` exacta (R5). Igual se acepta (D4, R8).
 
-- **Dónde se decide**: en el servidor, en `updateOrderPresentationLines` (§4.2, lo usan las dos
-  puertas de §4.3), en `createOrder` (el alta con reparto) y en `updateOrder` cuando cambia
+- **Dónde se decide**: en el servidor, en `updateOrderPresentationLines` (§4.2, la edición acotada
+  de §4.3; también valida la unidad nueva si cambia, R46), en `createOrder` (el alta con reparto) y en `updateOrder` cuando cambia
   `quantity` o `unitId` (R38). El formulario repite el cálculo solo para avisar (R39); nunca decide.
 - **Concurrencia (R37)**: dentro de la transacción que reescribe el reparto, lo primero es
   `SELECT quantity, unit_id, status FROM orders WHERE id = $1 AND company_id = $2 AND deleted_at IS
@@ -242,7 +265,7 @@ uno por línea del reparto—, así que esa unicidad es ahora **falsa** y hay qu
    migraciones separadas porque tocan módulos distintos y porque el `ADD VALUE` de ningún enum entra
    aquí (no hace falta ninguno nuevo).
 3. `<ts3>_order_presentation_lines_backfill_and_drop` — **con datos** (R22-R25, R43, R45):
-   0. Guardia de R45 y `UPDATE orders SET unit_id` de R43 (§2.2), antes de todo lo demás.
+   0. Guardias de R45 y R49 y `UPDATE orders SET unit_id` de R43 (§2.2), antes de todo lo demás.
    1. `INSERT INTO order_presentation_lines (id, order_id, company_id, presentation_id, packages,
       presentation_content, created_at, updated_at) SELECT gen_random_uuid(), o.id, o.company_id,
       o.presentation_id, FLOOR(o.quantity / o.presentation_content)::int, o.presentation_content,
@@ -314,7 +337,7 @@ export const presentationLinesSchema = z
 
 ### 4.2 Caso de uso dedicado: `updateOrderPresentationLines` (nuevo)
 
-R11-R14 exigen que el reparto se pueda editar en estados (`POR_EMPACAR`, `EN_EMPAQUE`) donde
+R11 y R46 (`[D2']`/`[D3']`) exigen que el reparto y la unidad se puedan editar en `POR_EMPACAR`, donde
 `updateOrder` **no** deja tocar nada (QC-168 R32, `ALLOWED.POR_EMPACAR = ['EN_EMPAQUE']` sin
 «quedarse igual»). Reabrir esa matriz para permitir una edición parcial sería mezclar dos preguntas
 —¿puede cambiar el PEDIDO? ¿puede cambiar su REPARTO?— en una sola respuesta. Se separa en un caso de
@@ -322,30 +345,36 @@ uso propio, que NO pasa por `assertTransition`:
 
 ```ts
 // pedidos/domain/update-order-presentation-lines.ts
+// [D3'] hasta Comenzar empaque. 'BLOQUEADO' se añade SOLO si T0 lo encuentra en el enum (QC-138).
 const REPARTO_EDITABLE_STATUSES: readonly OrderStatus[] =
-  ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE'];
+  ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR'];
 
 export function createUpdateOrderPresentationLines(deps: {...}) {
   return async function updateOrderPresentationLines(
     orderId: string, companyId: string, actorId: string,
-    lines: readonly PresentationLineInput[],
+    input: { readonly unitId: string; readonly lines: readonly PresentationLineInput[] }, // R46
   ): Promise<
     | 'ok' | 'not_found' | 'not_editable' | 'presentation_not_found'
+    | 'unit_not_found'                 // R41 [Q4], unidad nueva no visible
     | 'presentation_without_content'   // R35 [Q2]
     | 'incompatible_units'             // R7  [Q4]
-    | 'without_unit'                   // R42 [Q4]
+    | 'without_unit'                   // R42 [Q4] (solo si la entrada no trae unidad; el esquema la exige)
     | 'exceeds_quantity'               // R36 [Q3]
   > { ... };
 }
 ```
 
 Orden de comprobación dentro de la transacción (con la fila del pedido `FOR UPDATE`, §2.2 bis):
-`not_found` → `not_editable` → `without_unit` → `presentation_not_found` →
-`presentation_without_content` → `incompatible_units` → `exceeds_quantity` → escribir. El primer
-fallo aborta sin escribir ninguna línea.
+`not_found` → `not_editable` → `unit_not_found` → `without_unit` → `presentation_not_found` →
+`presentation_without_content` → `incompatible_units` → `exceeds_quantity` → escribir (`UPDATE
+orders SET unit_id` si cambió + `DELETE`/`INSERT` de líneas). El primer fallo aborta sin escribir
+nada, ni la unidad ni las líneas. La unidad y el reparto se guardan juntos porque R38 los valida
+juntos: cambiar la unidad sin revalidar el reparto vigente podría dejarlo inconvertible o por encima
+del total. **No** se toca `quantity`, la receta ni la reserva (R46, R30): este caso de uso no abre la
+unidad de trabajo de inventario.
 
 - Autorización: la comprueba QUIEN LLAMA (§4.3), no este caso de uso — como `finishAssignedOrder` no
-  repite el permiso de `startAssignedOrder`.
+  repite el permiso de `startAssignedOrder`. Solo hay un llamador, con `pedidos.modificar` (R12).
 - Reemplazo completo del conjunto de líneas (mismo criterio que `updateOrderSchema`, §4.1 de
   QC-33/34): un `DELETE` de las líneas vigentes + `INSERT` de las nuevas, en una transacción corta
   (sin la unidad de trabajo de inventario: no toca material ni existencia), precedida del
@@ -356,19 +385,33 @@ fallo aborta sin escribir ninguna línea.
   fila del pedido para la reserva de QC-141.
 - `REPARTO_EDITABLE_STATUSES` es una constante NUEVA, deliberadamente distinta de `ALLOWED` de
   `order-transitions.ts`: no es una transición, es una ventana de estados en la que el reparto se
-  deja tocar. `ENTREGADO` y `CANCELADO` quedan fuera (R13).
+  deja tocar. `EN_EMPAQUE`, `ENTREGADO` y `CANCELADO` quedan fuera (R13, `[D3']`): el reparto se
+  fija al Comenzar (R14), no al Terminar.
 
-### 4.3 Dos puertas hacia el mismo caso de uso
+### 4.3 Una sola puerta (`pedidos.modificar`), dos formularios — `[D2']`
 
-| Quien llama | Módulo | Permiso | Estados que puede tocar |
+| Formulario | Estados | Qué guarda | Por dónde |
 |---|---|---|---|
-| Edición del pedido en `/pedidos` | `pedidos` (Server Action de `order-actions.ts`) | `pedidos.modificar` | `PENDIENTE`, `EN_CURSO` (el formulario de edición ya no se muestra en `POR_EMPACAR`/`EN_EMPAQUE`, QC-168 R32) |
-| Pantalla del Empacador | `asignaciones` (caso de uso nuevo `updatePackingPresentationLines`, que llama a `pedidos.updateOrderPresentationLines` por su contrato público) | `empaque.modificar` | `POR_EMPACAR`, `EN_EMPAQUE` |
+| Edición general del pedido en `/pedidos` | `PENDIENTE`, `EN_CURSO` (los de `ALLOWED` que admiten «quedarse igual») | todo el pedido, incluidos `unitId` y `presentationLines` | `updateOrder` (T8), que usa `validateDistribution` bajo su propio bloqueo |
+| **Edición acotada «Reparto y unidad»** en `/pedidos` (acción nueva de la fila) | `POR_EMPACAR` (y `BLOQUEADO` si existe y la edición general está cerrada en él) | solo `unitId` + `presentationLines` (R46) | Server Action nueva `updateOrderDistributionAction` en `order-actions.ts` → `updateOrderPresentationLines` (§4.2) |
 
-`asignaciones` no importa `pedidos/domain/*`: llama al mismo método a través de un contrato nuevo,
-`OrderCatalog.updatePresentationLinesAliveById` (mismo patrón que `startPackingAliveById`), para no
-violar `guard-arquitectura-modulos`. El caso de `pedidos` (fila 1) sí puede llamar a su propio
-dominio directamente.
+- Ambas exigen `pedidos.modificar` en el servidor (R12, `unauthorized`); la guardia de pantallas y
+  permisos exige además que la acción de la fila solo se pinte con ese permiso.
+- La edición acotada **no** pinta cantidad, receta, responsables ni ningún otro campo: no es un
+  formulario general con campos deshabilitados, es otro formulario (así ningún campo cerrado viaja
+  por error). Reutiliza el control de reparto de T22.
+- **El Empacador no tiene ninguna puerta de escritura** (R12, R47): `asignaciones` no gana ningún
+  caso de uso ni Server Action que escriba el reparto, y `OrderCatalog` **no** gana
+  `updatePresentationLinesAliveById` (lo que F1.2 proponía para esa puerta desaparece). La pantalla de
+  empaque recibe `presentationLines` en `AssignedOrderSummary` (§6) y los pinta en solo lectura con la
+  unidad; si el pedido está `POR_EMPACAR` sin líneas, pinta el aviso de R47 («Falta el reparto: lo
+  define quien edita pedidos») y el rechazo de Comenzar sigue siendo el de R10 en servidor.
+- **Qué se puede tocar en `POR_EMPACAR` y qué no (R46)**: se puede el reparto (añadir, quitar,
+  cambiar envases, vaciarlo — R9/R10 solo exigen líneas al Comenzar) y la unidad del pedido (sujeta a
+  R38 contra el reparto que se guarda en la misma operación). No se puede: `quantity`, receta,
+  responsables ni ningún otro campo de `updateOrder` (sigue el rechazo de QC-168 R32 con el mismo
+  código que hoy; esta ficha no lo cambia). Cambiar la unidad no reconsume ni reserva: el material ya se
+  consumió al Finalizar con `quantity` y la receta, que no cambian.
 
 ### 4.4 `transition-order.ts`: se simplifica (R15, R16)
 
@@ -398,18 +441,26 @@ if (to === 'POR_EMPACAR') {
 `recipe_not_found` de sus resultados (R16): esos tres pasan a ser resultados de
 `finishPackingAliveById` (§4.5), no de este método.
 
-**R44 [Q4] (pregunta abierta 5):** antes de `consumeForOrder`, `if (locked.unitId === null) throw new
-OrderWithoutUnitError()` → resultado `'without_unit'` de `transitionAliveById`, código
-`order_without_unit`. Va antes del consumo para no consumir material de un pedido que después no
-podría empacarse. `locked` ya es la fila bloqueada, así que no hay carrera con una edición que le
-asigne unidad.
+~~**R44 [Q4] (pregunta abierta 5):** antes de `consumeForOrder`, `if (locked.unitId === null) throw
+new OrderWithoutUnitError()` → resultado `'without_unit'` de `transitionAliveById`.~~ **Retirado
+2026-09-26** (R44 retirado por `[D2']`/`[D3']`, §0.5): Finalizar no mira la unidad; el bloque de
+código de arriba es el definitivo.
 
 ### 4.5 `order-packing.ts`: donde se mueve el trabajo
 
-**`startPackingAliveById`** (R10): antes de su `UPDATE`, o dentro del mismo `WHERE` con un
-`EXISTS`, comprueba que el pedido tiene al menos una línea de reparto. Igual que hoy distingue
-`taken` de `not_packable` con una relectura tras un `UPDATE` en 0 filas, distingue ahora
-`without_distribution` (estado correcto, cero líneas) de `not_packable` (estado incorrecto).
+**`startPackingAliveById`** (R10, R14, R48): pasa de un `UPDATE` suelto a una transacción corta (sin
+la unidad de trabajo de inventario): (1) `SELECT status, packed_by FROM orders WHERE id AND company
+... FOR UPDATE`; (2) en una sentencia NUEVA (en `READ COMMITTED` ve lo que el guardado del reparto
+confirmó mientras esperaba el bloqueo) cuenta las líneas de reparto; cero → `without_distribution`;
+(3) el `UPDATE` condicional de hoy. Se descarta el `EXISTS` dentro del `WHERE` del `UPDATE` que
+proponía F1.2: al reevaluar tras esperar un bloqueo, Postgres relee la fila de `orders` pero la
+subconsulta sobre `order_presentation_lines` puede usar la foto del inicio de la sentencia, y un
+guardado que vació el reparto dejaría comenzar con cero líneas — justo lo que R48 prohíbe.
+`updateOrderPresentationLines` toma el MISMO `FOR UPDATE` (§2.2 bis), así que Comenzar y el guardado
+del reparto se serializan: el que llega segundo ve el estado que dejó el primero (el guardado ve
+`EN_EMPAQUE` → `not_editable`; Comenzar ve las líneas nuevas). Se sigue distinguiendo `taken`/
+`already_mine`/`not_packable` como hoy, y `without_distribution` (estado correcto, cero líneas) de
+`not_packable` (estado incorrecto).
 
 **`finishPackingAliveById`** (R17-R21): pasa de un `UPDATE` suelto a abrir
 `deps.unitOfWork.run(...)` (la misma unidad de trabajo de QC-141/QC-150, con `finishedGoods` en su
@@ -485,7 +536,11 @@ rompe menos si se mantiene esa granularidad.
   desempate por `id`) y pinta «<packages> × <presentationName>» de la primera + « +N» si hay N > 0
   más; con `[]` pinta «Sin presentación». Patrón «+N» ya usado por los avatares de
   `company-orders-columns.tsx` (QC-102). El `title`/tooltip lista todas las líneas. El formulario y
-  la pantalla del Empacador pintan la lista completa, no este resumen.
+  la pantalla del Empacador pintan la lista completa, no este resumen; **en la del Empacador es una
+  lista de solo lectura** (R47, `[D2']`), sin selector, sin botones de añadir/quitar y sin
+  disponible editable. `AssignedOrderSummary` gana también la unidad del pedido (`unitId` + etiqueta
+  resuelta por `asignaciones` con el barrel de `unidades`, o la cifra sola si es `NULL`) para que la
+  pantalla muestre «5 × Botella 200 ml» junto a la cantidad con su unidad.
 - **Cantidad con unidad**: donde se muestra `quantity` se muestra al lado el símbolo (o el nombre si
   no hay símbolo) de `orders.unit_id`; sin unidad (R42), la cifra sola.
 
@@ -494,9 +549,9 @@ rompe menos si se mantiene esa granularidad.
 | Código | Mensaje | Lo lanza |
 |---|---|---|
 | `order_without_distribution` | «El pedido no tiene ningún reparto: añade al menos una presentación antes de comenzar el empaque.» | `pedidos` (`startPackingAliveById`, R10) |
-| `order_presentation_line_not_editable` | «El reparto de este pedido ya no se puede cambiar.» | `pedidos` (`updateOrderPresentationLines`, R13) |
+| `order_presentation_line_not_editable` | «El reparto de este pedido ya no se puede cambiar: el empaque ya comenzó o el pedido está cerrado.» | `pedidos` (`updateOrderPresentationLines`, R13, R48). **Cambia de significado en F1.4 (`[D3']`)**: antes era «pedido `ENTREGADO`/`CANCELADO`»; ahora es «empaque ya comenzado (`EN_EMPAQUE`) o pedido cerrado (`ENTREGADO`/`CANCELADO`)», y cubre también la unidad del pedido. El código aún no existe en `dev`, así que el cambio no rompe nada publicado. |
 | `order_distribution_exceeds_quantity` | «El reparto pasa de la cantidad del pedido: quita envases o elige presentaciones más pequeñas.» | `pedidos` (`updateOrderPresentationLines`, `createOrder`, `updateOrder`; R36, R38) — **nuevo en F1.4 [Q3]** |
-| `order_without_unit` | «El pedido no tiene unidad: asígnale una desde la edición del pedido antes de repartirlo o de finalizar la producción.» | `pedidos` (`updateOrderPresentationLines` R42, `transitionAliveById` R44) — **nuevo en F1.4 [Q4]** |
+| `order_without_unit` | «El pedido no tiene unidad: asígnale una desde la edición del pedido antes de repartirlo.» | `pedidos` (`updateOrderPresentationLines`, R42) — **nuevo en F1.4 [Q4]**; ya **no** lo emite `transitionAliveById` (R44 retirado) |
 | `presentation_without_content` | (ya existe, QC-150) — se reusa para R19 (línea en el DIAGNÓSTICO, nunca en el mensaje) y para R35 [Q2] | `pedidos` |
 | `presentation_not_found` | (ya existe, QC-146) — se reusa cuando una línea nombra una presentación inexistente o ajena | `pedidos` |
 | `incompatible_units` | (ya existe, QC-76) — se reusa para R7/R38 [Q4] | `pedidos` |
@@ -582,6 +637,17 @@ Conteo actual (60) leído en `tests/unit/errores/catalogo.test.ts:46`.
    convertir unidades con los factores del catálogo de `unidades` (otro módulo) dentro de SQL,
    duplicando `convertQuantity`; y un trigger por fila vería estados intermedios del
    `DELETE`+`INSERT`. El bloqueo de fila de §2.2 bis da la misma garantía en el dominio.
+5. **[D2'] Conservar la puerta del Empacador en solo lectura por permiso** (dejar el control de
+   edición en la pantalla de empaque y mostrarlo solo a quien, además de `empaque.modificar`, tenga
+   `pedidos.modificar`). Descartada: duplica en `asignaciones` una escritura que ya vive en `/pedidos`,
+   obliga a mantener el contrato `OrderCatalog.updatePresentationLinesAliveById` y la dependencia
+   `asignaciones → pedidos` de escritura para un caso que el humano quitó, y mezcla en una pantalla de
+   ejecución una edición administrativa. El administrador que también empaca usa `/pedidos`.
+6. **[D3'] Reabrir la edición general del pedido en `POR_EMPACAR` con campos deshabilitados** en vez
+   de un formulario acotado. Descartada: exigiría abrir `ALLOWED.POR_EMPACAR` a «quedarse igual»
+   (contradice QC-168 R32) y confiar en que el servidor ignore los campos deshabilitados; con un
+   caso de uso y un esquema propios (solo `unitId` + `presentationLines`) ningún otro campo puede
+   llegar ni por error.
 
 ## 11. Dependencias
 

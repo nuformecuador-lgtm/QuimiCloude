@@ -22,6 +22,12 @@
 > supone. Cada `R<n>` cita entre corchetes la fila de la tabla de decisiones que cubre, `[D1]`–`[D9]`
 > por su orden en ella, y `[Q1]`–`[Q4]` para las cuatro preguntas que el humano cerró en F1.4
 > (2026-09-26, tabla «Decisiones cerradas en F1.4» al final). Ningún requisito queda provisional.
+>
+> **Cambio del humano en F1.4 (2026-09-26).** El humano reabrió y sustituyó D2 y D3 (filas `[D2']` y
+> `[D3']` de la tabla de decisiones): el reparto y la unidad los define y cambia **solo quien tiene
+> `pedidos.modificar`**, y son editables **hasta pulsar Comenzar empaque**. El Empacador ya no edita el
+> reparto, solo lo ve. Reescritos por ello: R6, R11-R14, R35, R36, R42, R31; **retirado R44** (sin
+> renumerar); nuevos R46-R49. Ningún `R<n>` cita ya `[D2]` ni `[D3]`.
 
 ### Modelo del reparto (sustituye a la presentación única de QC-146)
 
@@ -41,8 +47,8 @@
 
 ### Cuánto queda disponible
 
-- **R6**: MIENTRAS se edita el reparto de un pedido (alta, edición del pedido o pantalla del
-  Empacador), el sistema DEBE mostrar cuánto de la cantidad del pedido no está aún cubierto por el
+- **R6**: MIENTRAS se edita el reparto de un pedido (alta, edición del pedido o edición acotada de
+  reparto y unidad en `POR_EMPACAR`, R46), el sistema DEBE mostrar cuánto de la cantidad del pedido no está aún cubierto por el
   reparto, expresado en la unidad del pedido (`orders.unit_id`, R40), convirtiendo la cantidad de
   cada línea (envases × contenido, en la unidad de su presentación) a esa unidad con la conversión
   de QC-76 cuando la unidad de la presentación no sea ya esa unidad. [Alcance] [Q4]
@@ -64,15 +70,22 @@
 
 ### Quién define el reparto y cuándo se puede cambiar
 
-- **R11**: El sistema DEBE permitir definir o cambiar el reparto de un pedido a quien tenga
-  `pedidos.modificar`, desde la edición del pedido, mientras el pedido esté en un estado editable
-  por edición general (`PENDIENTE`, `EN_CURSO`). [D2] [D3]
-- **R12**: El sistema DEBE permitir definir o cambiar el reparto de un pedido al Empacador que lo
-  tiene en curso, desde su pantalla, mientras el pedido esté `POR_EMPACAR` o `EN_EMPAQUE`. [D2] [D3]
-- **R13**: SI el pedido está `ENTREGADO` o `CANCELADO`, ENTONCES el sistema DEBE rechazar cualquier
-  cambio de su reparto. [D3]
-- **R14**: CUANDO el pedido pasa a `ENTREGADO` (Terminar empaque), el sistema DEBE fijar el reparto
-  tal como quedó: ningún cambio posterior a ese instante es posible (ya lo cierra R13). [D3]
+> Reescrito en F1.4 por `[D2']`/`[D3']` (2026-09-26). La versión anterior (Empacador editando en
+> `POR_EMPACAR`/`EN_EMPAQUE`, fijado al Terminar) queda sustituida entera.
+
+- **R11**: El sistema DEBE permitir definir o cambiar el reparto de un pedido y su unidad a quien
+  tenga `pedidos.modificar`, desde `/pedidos`, mientras el pedido esté en un estado anterior a
+  comenzar el empaque: `PENDIENTE`, `EN_CURSO`, `POR_EMPACAR` (y `BLOQUEADO` si existe en el enum al
+  implementar, R9). [D2'] [D3']
+- **R12**: SI quien intenta definir o cambiar el reparto o la unidad de un pedido no tiene
+  `pedidos.modificar` (en particular, un Empacador que solo tiene `empaque.modificar`), ENTONCES el
+  sistema DEBE rechazarlo en el servidor con `unauthorized` sin escribir nada. [D2']
+- **R13**: SI el pedido está `EN_EMPAQUE`, `ENTREGADO` o `CANCELADO`, ENTONCES el sistema DEBE
+  rechazar cualquier cambio de su reparto o de su unidad con `order_presentation_line_not_editable`,
+  también a quien tiene `pedidos.modificar`. [D3']
+- **R14**: CUANDO el pedido pasa a `EN_EMPAQUE` (Comenzar empaque), el sistema DEBE fijar el reparto
+  y la unidad tal como quedaron: ningún cambio posterior a ese instante es posible (lo cierra R13) y
+  Terminar da de alta los lotes de ese reparto fijado (R17). [D3']
 
 ### Producto terminado: un lote por línea, al terminar el empaque
 
@@ -143,7 +156,8 @@
   en la reserva.
 - **R31**: El sistema NO DEBE alterar el flujo ni los estados de empaque de QC-168
   (`POR_EMPACAR`/`EN_EMPAQUE`, quién empaca, los dos métodos de un `UPDATE` condicional) salvo lo que
-  R10, R17, R21 y R44 exigen explícitamente.
+  R10, R14, R17, R21 y R48 exigen explícitamente (R44, que añadía una condición a Finalizar, está
+  retirado).
 - **R32**: El sistema NO DEBE registrar el reparto en el log de ejecución de QC-82: esa ficha decide
   por su cuenta si lo incorpora.
 
@@ -161,15 +175,15 @@
   contenido y no deja confirmarla. [Q2]
 - **R35**: SI llega al servidor un reparto con una línea cuya presentación no tiene contenido
   vigente, ENTONCES el sistema DEBE rechazar el reparto entero con `presentation_without_content`
-  sin escribir ninguna línea, venga de la edición del pedido, del alta o de la pantalla del
-  Empacador. [Q2]
+  sin escribir ninguna línea, venga del alta, de la edición del pedido o de la edición acotada de
+  reparto y unidad (R46). [Q2]
 
 ### El reparto no puede pasar del total (F1.4, Q3)
 
 - **R36**: SI la suma de las líneas de un reparto, convertida a la unidad del pedido (R6), es mayor
   que la cantidad del pedido, ENTONCES el sistema DEBE rechazar guardar ese reparto con
   `order_distribution_exceeds_quantity` sin escribir ninguna línea, tanto desde el alta y la edición
-  del pedido como desde la pantalla del Empacador. [Q3]
+  del pedido como desde la edición acotada de reparto y unidad (R46). [Q3]
 - **R37**: CUANDO el servidor valida R36, el sistema DEBE hacerlo dentro de la misma transacción que
   reescribe el reparto, releyendo la cantidad, la unidad y el estado del pedido con la fila del
   pedido bloqueada, de modo que dos guardados simultáneos del reparto (o un guardado del reparto y
@@ -195,16 +209,39 @@
   exigirse si el pedido no la tenía. [Q4]
 - **R42**: SI un pedido no tiene unidad (solo posible en pedidos anteriores a esta ficha, R43),
   ENTONCES el sistema DEBE rechazar definir o cambiar su reparto con `order_without_unit` hasta que
-  alguien le asigne una unidad desde la edición del pedido, y DEBE mostrar su cantidad sin unidad.
-  [Q4]
+  quien tiene `pedidos.modificar` le asigne una unidad (desde la edición del pedido o, en
+  `POR_EMPACAR`, desde la edición acotada de R46), y DEBE mostrar su cantidad sin unidad. [Q4] [D2']
 - **R43**: La migración DEBE asignar a cada pedido existente la unidad de la presentación que tenía
   antes del retiro de R4; un pedido sin presentación DEBE quedar sin unidad. [Q4]
-- **R44**: CUANDO alguien finaliza la producción (`EN_CURSO → POR_EMPACAR`) de un pedido sin unidad,
-  el sistema DEBE rechazarlo con `order_without_unit` y el pedido DEBE seguir `EN_CURSO`, de modo
-  que ningún pedido llegue a empaque sin unidad (y por tanto sin poder repartirse, R10 + R42).
-  **Decisión de `spec_author`, no del humano** (ver pregunta abierta 5). [Q4]
+- ~~**R44**: CUANDO alguien finaliza la producción (`EN_CURSO → POR_EMPACAR`) de un pedido sin
+  unidad, el sistema DEBE rechazarlo con `order_without_unit` y el pedido DEBE seguir `EN_CURSO`.~~
+  **RETIRADO 2026-09-26 (F1.4).** Motivo: con `[D2']`/`[D3']` quien tiene `pedidos.modificar` puede
+  asignar unidad y reparto en `POR_EMPACAR` (R11, R46), así que un pedido sin unidad ya no queda
+  varado allí y Finalizar no necesita ninguna condición nueva. Finalizar queda como en QC-168 (R15,
+  R16, R31). No se renumera.
 - **R45**: La migración DEBE fallar (sin aplicar nada) SI encuentra algún pedido en `POR_EMPACAR` o
   `EN_EMPAQUE` que quedaría sin unidad, en vez de dejarlo varado. [Q4]
+
+### Edición acotada y pantalla del Empacador (F1.4, `[D2']` `[D3']`)
+
+- **R46**: MIENTRAS un pedido está `POR_EMPACAR`, el sistema DEBE permitir a quien tiene
+  `pedidos.modificar` cambiar SOLO su reparto y su unidad (edición acotada), con las mismas
+  validaciones que en la edición general (R2, R7, R35, R36, R38, R42), y DEBE seguir rechazando
+  cualquier otro cambio del pedido (cantidad, receta, responsables y demás campos de la edición
+  general) como hoy (QC-168 R32). Cambiar la unidad en `POR_EMPACAR` NO DEBE consumir, reservar ni
+  liberar material (R30). [D2'] [D3']
+- **R47**: La pantalla del Empacador DEBE mostrar el reparto del pedido (todas sus líneas, R26) y su
+  unidad en modo solo lectura, sin ningún control para añadir, quitar o cambiar líneas ni la unidad;
+  SI el pedido está `POR_EMPACAR` sin ninguna línea de reparto, ENTONCES DEBE indicar que falta el
+  reparto y que lo define quien edita pedidos. [D2']
+- **R48**: SI un Comenzar empaque y un guardado del reparto o de la unidad del mismo pedido ocurren a
+  la vez, ENTONCES el sistema DEBE serializarlos sobre la fila del pedido: o el guardado entra antes
+  y Comenzar evalúa R10 sobre el reparto ya guardado, o Comenzar entra antes y el guardado se rechaza
+  con `order_presentation_line_not_editable` (R13); nunca comienza un empaque con un reparto vacío ni
+  queda cambiado un reparto después de comenzado. [D3'] [D1]
+- **R49**: La migración DEBE fallar (sin aplicar nada) SI algún pedido en `EN_EMPAQUE` quedaría sin
+  ninguna línea de reparto (R23, R24), porque su reparto ya está fijado (R13) y nadie podría
+  corregirlo. [D3'] [D7]
 
 ## Preguntas abiertas
 
@@ -212,7 +249,10 @@
 2. ~~Una línea cuya presentación no tiene contenido.~~ **CERRADA 2026-09-26 [Q2]** → R34, R35.
 3. ~~¿Se puede pasar del total?~~ **CERRADA 2026-09-26 [Q3]** → R8, R36-R39.
 4. ~~Unidad de `orders.quantity`.~~ **CERRADA 2026-09-26 [Q4]** → R6, R7, R40-R45.
-5. **Nueva (F1.4, `spec_author`).** Para que un pedido sin unidad (R43) no quede varado en
+5. ~~Pedido antiguo sin unidad atascado en `POR_EMPACAR`.~~ **CERRADA 2026-09-26 por el humano**
+   (F1.4, vía `[D2']`/`[D3']`): quien tiene `pedidos.modificar` asigna unidad y reparto en
+   `POR_EMPACAR` (R11, R46), así que el pedido no se atasca. **R44 retirado.** Texto original,
+   conservado: Para que un pedido sin unidad (R43) no quede varado en
    `POR_EMPACAR` —sin reparto no se puede Comenzar (R10), sin unidad no se puede repartir (R42), y en
    `POR_EMPACAR` la edición general está cerrada (QC-168 R32)— R44 bloquea Finalizar sin unidad. Eso
    añade una condición a una transición de QC-168/QC-141 que R31 no lista. Alternativa: dejar que el
@@ -228,16 +268,21 @@
 | Q3 | ¿Se puede pasar del total? | **CERRADA 2026-09-26 por el humano.** **No**: un reparto cuya suma convertida a la unidad del pedido supera `quantity` se rechaza al guardar, en servidor (edición del pedido y pantalla del Empacador), dentro de la transacción que reescribe el reparto con la fila del pedido bloqueada. Igual o menor sí (D4). La UI muestra el disponible y avisa antes de guardar. Motivo: al terminar el empaque entraría producto que no se produjo. |
 | Q4 | Unidad de `orders.quantity` | **CERRADA 2026-09-26 por el humano.** `orders.unit_id` nuevo (FK a `units`), obligatorio en el alta, editable; cada línea convierte envases × contenido a esa unidad con `convertQuantity`; sin base común la línea se rechaza. Deroga QC-35bis en la unidad. Pedidos existentes toman la unidad de su presentación; sin presentación quedan con `NULL`. |
 
+> Nota 2026-09-26: donde la fila Q3 dice «pantalla del Empacador», rige `[D2']`: el Empacador ya no
+> guarda repartos; la puerta equivalente es la edición acotada de R46. La regla del tope no cambia.
+
 ## Decisiones cerradas (no reabrir)
 
 | Fecha | Pregunta | Decisión |
 |---|---|---|
 | 2026-09-25 | ¿Cuándo se reparte? | **Opcional al crear el pedido, obligatorio para comenzar el empaque**: sin reparto no se puede pulsar Comenzar. |
-| 2026-09-25 | ¿Quién lo define? | Quien edita pedidos (`pedidos.modificar`) en la edición del pedido, y el **Empacador** en su pantalla. |
-| 2026-09-25 | ¿Se puede cambiar en empaque? | **Sí, hasta pulsar Terminar**; ahí queda fijo. |
+| 2026-09-25 | ¿Quién lo define? | ~~Quien edita pedidos (`pedidos.modificar`) en la edición del pedido, y el **Empacador** en su pantalla.~~ **SUSTITUIDA el 2026-09-26 (F1.4), ver D2'.** |
+| 2026-09-25 | ¿Se puede cambiar en empaque? | ~~**Sí, hasta pulsar Terminar**; ahí queda fijo.~~ **SUSTITUIDA el 2026-09-26 (F1.4), ver D3'.** |
 | 2026-09-25 | ¿Tiene que cubrir todo? | **No**: lo que no llena un envase es **merma** y no entra al inventario (igual que los envases enteros de QC-150). |
 | 2026-09-25 | ¿Cuándo entra el producto terminado? | **Al terminar el empaque**: un lote por línea del reparto (producto receta + presentación, QC-150 D2). **Enmienda QC-168 y QC-150**: el material se sigue consumiendo al terminar la producción, pero el producto terminado ya no entra en ese momento. |
 | 2026-09-25 | ¿Coste de cada lote? | El coste del pedido se reparte **por la cantidad de cada lote**: mismo coste por unidad en todos. |
 | 2026-09-25 | ¿Y la presentación única del pedido (QC-146)? | **Desaparece.** Los pedidos existentes **convierten su presentación en su reparto** (⌊cantidad / contenido⌋ × esa presentación); sin contenido, quedan sin reparto. |
 | 2026-09-25 | Identificadores y cifras | En inglés; decimal exacto (QC-4, QC-141). |
 | 2026-09-25 | ¿E2E? | **Sí**: mueve inventario (`CHECKPOINTS.md`). |
+| 2026-09-26 | D2' — ¿Quién lo define? (sustituye a D2) | **Solo quien tiene `pedidos.modificar`** («el administrador»). El **Empacador ya no define ni cambia el reparto**: solo lo ve. Sin permiso nuevo. |
+| 2026-09-26 | D3' — ¿Se puede cambiar en empaque? (sustituye a D3) | **Editable hasta pulsar Comenzar empaque**; una vez comenzado, el reparto queda fijo (ni el administrador lo edita). Quien tiene `pedidos.modificar` puede definir/cambiar el reparto **y la unidad** en cualquier estado anterior a comenzar el empaque, incluido `POR_EMPACAR`. El tope de Q3 se reafirma. |
