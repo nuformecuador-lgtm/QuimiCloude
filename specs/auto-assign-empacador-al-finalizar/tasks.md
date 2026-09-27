@@ -21,5 +21,8 @@
   `order_assignments` trae su fila (patrón de las aserciones directas que ya usa ese spec).
   **Escrito y verificado por tipos; SIN EJECUTAR** (sin navegadores Playwright en esta máquina;
   lo corre el humano o el CI).
-- [ ] **T6. Gate.** `./init.sh --rapido` tras T1-T3; `./init.sh` completo antes del PR.
+- [x] **T6. Gate.** `./init.sh --rapido` tras T1-T3; `./init.sh` completo antes del PR.
+  **Desviación registrada:** `test:json` monolitico se cuelga en esta máquina; verificado por
+  bloques (unit completo, guardias, integración por carpetas, lint completo, typecheck,
+  validate-features). Detalle en `progress/impl_auto-assign-empacador.md`.
 - [ ] **T7. PR.** `gh pr create --base dev`, URL reportada; nota de cruce para QC-82.

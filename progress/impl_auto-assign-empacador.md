@@ -39,8 +39,15 @@ hay issue que importar; se documenta aquí y en el spec).
 - `tests/unit/asignaciones` + `tests/unit/composition`: 52 archivos, 769 tests.
 - int nueva: 3/3 (Postgres real, plantilla reutilizada).
 - int vecinas: `responsible-eligibility` + `finished-orders` 10/10; `finish-with-finished-goods` 12/12.
-- `tsc --noEmit`: verde. `eslint` de los 8 archivos: limpio.
+- `tsc --noEmit`: verde. `eslint` completo: 0 errores (7 warnings ajenos). Guardias: 51/649.
+- Unit completo: 628 archivos, 8949 tests, 0 rojos.
+- Integración por bloques: todos los rojos (3+5+9+12+4) reproducidos en `dev` limpio —clase
+  `23001` vs `23503` del Postgres 18.6 local (documentada en QC-121) y retratos de down.sql;
+  ninguno del cambio.
+- `validate-features.mjs`: verde (157 fichas, cupo, specs).
 - E2E: escrito, tipos verdes; ejecución pendiente (sin Playwright en esta máquina).
+- Desviación del gate: `test:json` en una sola corrida se cuelga en esta máquina (38 min sin
+  avanzar, proceso idle; se mató); verificado por bloques equivalentes en su lugar.
 
 ## Decisiones (del chat + defectos aplicados)
 
