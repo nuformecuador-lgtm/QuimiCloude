@@ -20,8 +20,18 @@ import {
 } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
-import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import type {
+  AssignmentRow,
+  OrderAssignmentRepository,
+} from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import type {
+  PeopleDirectory,
+  PermissionCode,
+  PersonRef,
+  WorkGroupDirectory,
+  WorkGroupSnapshot,
+} from '@/lib/modules/identity';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -30,6 +40,10 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
+const OPERARIO = uuid('2');
+const EMPACADOR = uuid('4');
+const OTRO_EMPACADOR = uuid('5');
+const GRUPO = uuid('6');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
 
@@ -59,15 +73,44 @@ type Dobles = {
   readonly findAliveById: ReturnType<typeof vi.fn>;
   readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
   readonly transitionAliveById: ReturnType<typeof vi.fn>;
+  readonly listByOrderInCompany: ReturnType<typeof vi.fn>;
+  readonly insertMissing: ReturnType<typeof vi.fn>;
+  readonly deleteOne: ReturnType<typeof vi.fn>;
+  readonly findAliveRefsInCompany: ReturnType<typeof vi.fn>;
+  readonly findSnapshotAliveInCompany: ReturnType<typeof vi.fn>;
 };
+
+function filaSuelta(userId: string): AssignmentRow {
+  return { userId, workGroupId: null, workGroupName: null };
+}
+
+function filaDeGrupo(userId: string, workGroupId: string, workGroupName: string): AssignmentRow {
+  return { userId, workGroupId, workGroupName };
+}
+
+function persona(
+  id: string,
+  permissions: readonly PermissionCode[],
+  isActive = true,
+): PersonRef {
+  return { id, displayName: `Persona ${id.slice(0, 8)}`, isActive, permissions };
+}
+
+function grupo(id: string, name: string, activeMemberIds: readonly string[]): WorkGroupSnapshot {
+  return { id, name, activeMemberIds };
+}
 
 function montar(options?: {
   readonly ordenDeEstados?: readonly OrderStatus[];
   readonly transitionResults?: readonly TransitionResult[];
   readonly ids?: readonly string[];
+  readonly filas?: readonly AssignmentRow[];
+  readonly snapshots?: readonly (WorkGroupSnapshot | null)[];
+  readonly personas?: readonly PersonRef[];
 }): Dobles {
   const estados = [...(options?.ordenDeEstados ?? ['EN_CURSO'])];
   const resultados = [...(options?.transitionResults ?? [OK_CON_PRODUCCION])];
+  const snapshots = [...(options?.snapshots ?? [])];
 
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: estados.shift() ?? 'ENTREGADO' }));
@@ -79,13 +122,18 @@ function montar(options?: {
     totalPages: 1,
   }));
   const transitionAliveById = vi.fn(async () => resultados.shift() ?? OK_CON_PRODUCCION);
+  const listByOrderInCompany = vi.fn(async () => options?.filas ?? []);
+  const insertMissing = vi.fn(async () => 1);
+  const deleteOne = vi.fn(async () => 'ok' as const);
+  const findAliveRefsInCompany = vi.fn(async () => options?.personas ?? []);
+  const findSnapshotAliveInCompany = vi.fn(async () => snapshots.shift() ?? null);
 
   const deps: FinishAssignedOrderDeps = {
     assignments: {
-      insertMissing: vi.fn(),
-      listByOrderInCompany: vi.fn(),
+      insertMissing,
+      listByOrderInCompany,
       listByOrdersInCompany: vi.fn(),
-      deleteOne: vi.fn(),
+      deleteOne,
       deleteByWorkGroup: vi.fn(),
       listOrderIdsByUserInCompany,
     } as unknown as OrderAssignmentRepository,
@@ -94,10 +142,23 @@ function montar(options?: {
       listAliveSummariesByIds,
       transitionAliveById,
     } as unknown as OrderCatalog,
+    people: { findAliveRefsInCompany } as unknown as PeopleDirectory,
+    groups: { findSnapshotAliveInCompany } as unknown as WorkGroupDirectory,
     now: () => new Date('2026-09-17T12:00:00.000Z'),
   };
 
-  return { deps, listOrderIdsByUserInCompany, findAliveById, listAliveSummariesByIds, transitionAliveById };
+  return {
+    deps,
+    listOrderIdsByUserInCompany,
+    findAliveById,
+    listAliveSummariesByIds,
+    transitionAliveById,
+    listByOrderInCompany,
+    insertMissing,
+    deleteOne,
+    findAliveRefsInCompany,
+    findSnapshotAliveInCompany,
+  };
 }
 
 describe('finishAssignedOrder — autorizacion', () => {
@@ -353,5 +414,235 @@ describe('finishAssignedOrder — R16: no admite ningun dato de marcado', () => 
     await expect(
       finishAssignedOrder(ACTOR, { orderId: PEDIDO, checkedItems: ['a', 'b'] } as unknown),
     ).rejects.toMatchObject({ code: 'invalid_input' });
+  });
+});
+
+const PERMISO_EMPAQUE: PermissionCode = 'empaque.modificar';
+const PERMISO_OPERARIO: PermissionCode = 'asignaciones.consultar';
+
+describe('finishAssignedOrder — auto-asignacion del empacador', () => {
+  it('R1: un empacador del equipo vinculado sin fila queda asignado con el origen del grupo', async () => {
+    const { deps, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_OPERARIO, PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    expect(insertMissing).toHaveBeenCalledWith(
+      [
+        {
+          orderId: PEDIDO,
+          userId: EMPACADOR,
+          companyId: EMPRESA,
+          workGroupId: GRUPO,
+          workGroupName: 'Turno noche',
+        },
+      ],
+      new Date('2026-09-17T12:00:00.000Z'),
+    );
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R1: a todos los encontrados, no solo al primero', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR, OTRO_EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(OTRO_EMPACADOR, [PERMISO_EMPAQUE]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    const filas = insertMissing.mock.calls[0]?.[0] as readonly { userId: string }[];
+    expect(filas.map((fila) => fila.userId).sort()).toEqual([EMPACADOR, OTRO_EMPACADOR].sort());
+  });
+
+  it('R1: una persona suelta con permiso de empaque ya asignada no se reinserta', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaSuelta(OPERARIO), filaSuelta(EMPACADOR)],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_OPERARIO, PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R2: sin empacadores vinculados no se escribe nada', async () => {
+    const { deps, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO])],
+      personas: [persona(OPERARIO, [PERMISO_OPERARIO])],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R2: sin responsables no se toca ni el directorio ni la escritura', async () => {
+    const { deps, insertMissing, findAliveRefsInCompany, findSnapshotAliveInCompany } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(findSnapshotAliveInCompany).not.toHaveBeenCalled();
+    expect(findAliveRefsInCompany).not.toHaveBeenCalled();
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R3: decide por el permiso, nunca por el nombre del rol', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      // OPERARIO trae todos los permisos menos el de empaque: aunque se llamara Empacador,
+      // sin el codigo no es candidato.
+      filas: [filaSuelta(OPERARIO)],
+      personas: [persona(OPERARIO, [PERMISO_OPERARIO, 'terminados.consultar'])],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R3: un empacador inactivo no se asigna', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_OPERARIO, PERMISO_EMPAQUE], false),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R4: el nombre congelado es el vivo del snapshot, no el de la fila vieja', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno viejo')],
+      snapshots: [grupo(GRUPO, 'Turno nuevo', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).toHaveBeenCalledWith(
+      [
+        {
+          orderId: PEDIDO,
+          userId: EMPACADOR,
+          companyId: EMPRESA,
+          workGroupId: GRUPO,
+          workGroupName: 'Turno nuevo',
+        },
+      ],
+      expect.any(Date),
+    );
+  });
+
+  it('R6: si la transicion falla, compensa lo creado y propaga el error original', async () => {
+    const { deps, insertMissing, deleteOne } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      transitionResults: ['insufficient_material'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      MaterialShortageError,
+    );
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    expect(deleteOne).toHaveBeenCalledTimes(1);
+    expect(deleteOne).toHaveBeenCalledWith(EMPRESA, PEDIDO, EMPACADOR);
+  });
+
+  it('R6: si la transicion falla sin nada creado, no hay compensacion', async () => {
+    const { deps, deleteOne } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      transitionResults: ['insufficient_material'],
+      filas: [filaSuelta(OPERARIO)],
+      personas: [persona(OPERARIO, [PERMISO_OPERARIO])],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      MaterialShortageError,
+    );
+    expect(deleteOne).not.toHaveBeenCalled();
+  });
+
+  it('R7: el reintento `stale` no repite el auto-asignado', async () => {
+    const { deps, listByOrderInCompany, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO', 'EN_CURSO'],
+      transitionResults: ['stale', OK_CON_PRODUCCION],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(transitionAliveById).toHaveBeenCalledTimes(2);
+    expect(listByOrderInCompany).toHaveBeenCalledTimes(1);
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+  });
+
+  it('R8: un rechazo previo no lee ni escribe asignaciones nuevas', async () => {
+    const { deps, listByOrderInCompany, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['PENDIENTE'],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      InvalidTransitionError,
+    );
+    expect(listByOrderInCompany).not.toHaveBeenCalled();
+    expect(insertMissing).not.toHaveBeenCalled();
+    expect(transitionAliveById).not.toHaveBeenCalled();
   });
 });
