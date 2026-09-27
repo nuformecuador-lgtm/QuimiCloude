@@ -2584,7 +2584,7 @@
       "epic_name": "Pedidos",
       "name": "pedido-en-varias-presentaciones",
       "description": "Un pedido se REPARTE EN VARIAS PRESENTACIONES (100 L de crema en botellas de 1 L, 200 ml...): lineas de N envases x presentacion, y el sistema dice CUANTO QUEDA DISPONIBLE (de 100 L, 5 x 200 ml -> 99 L) con el contenido de la presentacion (QC-150) y la conversion de unidades (QC-76). NACE DEL CHAT y se ACOTA el 2026-09-25: reparto opcional al crear y OBLIGATORIO para comenzar el empaque; lo define pedidos.modificar y el Empacador, cambiable hasta Terminar; el sobrante es merma; el producto terminado entra AL TERMINAR EL EMPAQUE, un lote por linea, coste repartido por cantidad (ENMIENDA QC-168 y QC-150); la presentacion unica de QC-146 DESAPARECE y los pedidos existentes la convierten en su reparto; E2E si. Detalle en specs/QC-170-pedido-en-varias-presentaciones/requirements.md. NO ENTRA: flujo de empaque (QC-168), log (QC-82), ventas. BLOQUEADA POR QC-168.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
