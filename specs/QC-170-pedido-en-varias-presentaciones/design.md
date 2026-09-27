@@ -4,31 +4,40 @@
 > Incluye QC-121, QC-146, QC-150 y QC-168 ya mergeadas. Todo lo que se cita de código existe ahí;
 > donde no se pudo confirmar queda dicho.
 
-## 0. Las 4 preguntas abiertas: opción recomendada (sin cerrarlas)
+## 0. Las 4 preguntas de F1.2: CERRADAS por el humano en F1.4 (2026-09-26)
 
-Ninguna de las cuatro está cerrada. Lo que sigue es la propuesta de `spec_author` para que el humano
-decida en F1.4; el diseño de abajo (§§1-9) **da por hecho la opción recomendada** para poder escribir
-algo concreto, y cada sitio que depende de ella lo dice.
+| Id | Estado | Decisión | Requisitos |
+|---|---|---|---|
+| Q1 | **CERRADA 2026-09-26 por el humano** (= recomendada) | Primera línea + «+N»; sin reparto, «Sin presentación». | R26, R27 |
+| Q2 | **CERRADA 2026-09-26 por el humano** (= recomendada) | Se prohíbe añadir una línea sin contenido: aviso en el selector y rechazo en servidor. | R19, R34, R35 |
+| Q3 | **CERRADA 2026-09-26 por el humano** (**CAMBIA** la recomendación) | Pasar del total se **rechaza al guardar**, en servidor, dentro de la transacción que reescribe el reparto con la fila del pedido bloqueada. Igual o menor sí. La UI muestra el disponible y avisa antes. | R8, R36-R39 |
+| Q4 | **CERRADA 2026-09-26 por el humano** (= opción A) | `orders.unit_id` (FK a `units`), obligatorio en el alta, editable; conversión por línea con `convertQuantity`. **Deroga QC-35bis** en la unidad (§0.6). | R6, R7, R40-R45 |
 
-1. **Cómo se muestra el reparto en los listados.** Recomendado: **la primera línea + «+N»** (p. ej.
+Lo que sigue en §0.1-§0.4 es el razonamiento de F1.2, conservado para que se vea qué se propuso;
+donde el humano cambió la propuesta (Q3) se dice en el propio punto. §0.5 y §0.6 son nuevos de F1.4.
+
+1. **Cómo se muestra el reparto en los listados.** **CERRADA [Q1] tal cual.** Recomendado: **la primera línea + «+N»** (p. ej.
    «5 × Botella 200 ml +1»), igual que hacen ya los avatares de responsables en
    `company-orders-columns.tsx` (QC-102) — patrón existente, sin componente nuevo de truncado. Sin
    reparto: «Sin presentación» (R27). Alternativa descartada: «3 presentaciones» a secas, sin nombrar
    ninguna — se pierde la única información que alguien mirando la lista necesita para reconocer el
    pedido de un vistazo.
-2. **Línea sin contenido.** Recomendado: **se prohíbe añadirla** al reparto (mismo criterio que
+2. **Línea sin contenido.** **CERRADA [Q2] tal cual**, con rechazo también en servidor (R35). Recomendado: **se prohíbe añadirla** al reparto (mismo criterio que
    `no_content` de QC-150 §4.1): un envase sin contenido no es una cantidad, es un dato incompleto de
    Presentaciones, y `PresentationCatalog.findRefs` ya devuelve el contenido (§2). Se avisa en el
    selector, no al guardar. Alternativa: dejarla entrar y calcular «disponible» solo con las líneas
    que sí tienen contenido — descartada porque esconde una línea del cálculo sin decir cuál.
-3. **¿Se puede pasar del total?** Recomendado: **se permite**, sin bloquear ni avisar más que con la
+3. **¿Se puede pasar del total?** **CERRADA [Q3] EN CONTRA de esta propuesta: se RECHAZA** (motivo del
+   humano: al terminar el empaque entraría al inventario producto que no se produjo). La carrera que
+   la propuesta temía se resuelve con la relectura bajo bloqueo de §3.1. Se conserva abajo el texto
+   descartado. Propuesta original (descartada): **se permite**, sin bloquear ni avisar más que con la
    cifra en negativo («-10 L» de disponible): el reparto de QC-170 no es una restricción de
    inventario (esa la pone D4, que ya acepta que el reparto no cubra todo) y forzar que nunca exceda
    obligaría a decidir qué línea se recorta cuando dos personas editan el reparto a la vez. Es
    simétrico con D4 (tampoco tiene que llegar). Alternativa descartada: rechazar la línea que hace
    exceder el total — introduce una carrera entre "cuánto llevas repartido" y "cuánto añades" que
    solo el servidor puede arbitrar con una relectura, y la ficha ya tiene bastante superficie nueva.
-4. **Unidad de `quantity`.** Recomendado: **`orders` gana `unit_id`** (nullable, mismo patrón drift
+4. **Unidad de `quantity`.** **CERRADA [Q4] = esta opción (A)**; migración y nulos en §2.2 y §0.5. Recomendado: **`orders` gana `unit_id`** (nullable, mismo patrón drift
    que `recipe_id`/`presentation_id`), copiado del catálogo de `unidades` (`UnitCatalog`, QC-76) al
    crear el pedido, obligatorio en el alta y conservado en la edición salvo que se cambie a mano.
    `quantity` se interpreta siempre en esa unidad, con o sin reparto. Cada línea de reparto convierte
@@ -37,6 +46,38 @@ algo concreto, y cada sitio que depende de ella lo dice.
    derivar la unidad del pedido de la primera línea de reparto que se añada — frágil (si esa línea se
    borra, el pedido se queda sin unidad de referencia a mitad de edición) y no resuelve el caso de un
    pedido sin ninguna línea todavía, que R9 permite.
+5. **Pedidos sin unidad tras la migración (nuevo en F1.4, decisión de `spec_author`, pregunta
+   abierta 5).** La columna es **anulable en la base y obligatoria en la aplicación** (alta siempre;
+   edición la exige si falta, R41). Un pedido con `unit_id NULL` (solo los antiguos sin
+   presentación, R43) no puede repartirse (`order_without_unit`, R42) hasta que la edición del pedido
+   le asigne una. Para que no quede varado, **Finalizar (`EN_CURSO → POR_EMPACAR`) exige unidad**
+   (R44), y la migración **aborta** si algún pedido `POR_EMPACAR`/`EN_EMPAQUE` quedaría sin unidad
+   (R45) — en `dev` no debería haber ninguno, porque hasta hoy Finalizar exigía presentación con
+   contenido (`transitionAliveById` → `presentation_without_content`), y toda presentación tiene
+   `unit_id NOT NULL` (`db/schema.prisma:252`). Alternativa descartada: que el Empacador asigne la
+   unidad en su pantalla — abre una segunda puerta de edición de un dato del pedido que QC-168 R32
+   cerró en `POR_EMPACAR`, sólo para un caso que la migración ya garantiza que no existe. Otra
+   descartada: `NOT NULL` con un valor por defecto inventado — rompe la regla 6 (no inventar).
+6. **Derogación explícita de QC-35bis (enmienda de QC-35 del 2026-09-07).** Aquella decisión quitó
+   la unidad del pedido («el pedido ya no tiene unidad ni precio unitario»,
+   `specs/QC-35-pantalla-de-pedidos/requirements.md > Importes`, `order-view.ts:13-17`,
+   `get-order.ts:12-17`, `create-order.ts:34-35`). **Q4 la deroga en lo que toca a la UNIDAD**; el
+   precio unitario sigue fuera. Consecuencias en código y pruebas:
+   - `create-order.ts`/`update-order.ts` ya tienen `units: UnitCatalog` (lo recuperó QC-123 para el
+     coste, `specs/QC-123-*/design.md:327`); ahora además validan `unitId` con
+     `UnitCatalog.findRefs` (`unit_not_found`, R41) y lo usan para R6/R36/R38.
+   - `get-order.ts` y `list-orders.ts` **vuelven a depender de `UnitCatalog`** para resolver nombre
+     y símbolo de la unidad a mostrar junto a la cantidad (una sola llamada por página, ids únicos).
+   - Pruebas que afirman la ausencia de la unidad y hay que invertir (cada una con nota «QC-170
+     deroga QC-35bis»): `tests/unit/pedidos/module-contract.test.ts:526-537` (hoy exige que
+     `order-contents.ts` NO importe `unidades` — se mantiene para ese archivo, pero la nota del
+     comentario deja de ser cierta a nivel de módulo), `tests/unit/pedidos/list-orders.test.ts:183`
+     (número de consultas), `tests/unit/pedidos/authorization.test.ts:17` (número de puertos),
+     `tests/unit/pedidos/order-service.test.ts:269,516`, `tests/unit/pedidos/order-input.test.ts:61`,
+     `tests/unit/pedidos-ui/order-columns.test.tsx:105` (número de columnas si la unidad vuelve como
+     columna o dentro de la de cantidad), `tests/integration/pedidos/pedidos-constraints.int.test.ts:599`.
+   - En `specs/QC-35-pantalla-de-pedidos/requirements.md` se añade una nota de derogación fechada
+     tras la enmienda del 2026-09-07 (T24), sin reescribirla.
 
 ## 1. Lo que hoy hace el código (medido, no supuesto)
 
@@ -49,7 +90,7 @@ algo concreto, y cada sitio que depende de ella lo dice.
 | `order-packing.ts` `createStartPacking`/`createFinishPacking` (33 líneas, un `UPDATE` cada uno, **sin** unidad de trabajo de inventario) | no tocan inventario | `createStartPacking` gana el rechazo de R10 (§5.1); `createFinishPacking` pasa a abrir la unidad de trabajo y da de alta un lote por línea (R17, §5.2) |
 | `finished-goods.ts` `planFinishedGoods` (una presentación) | recibe una cantidad y un contenido, calcula envases con `floor` | **ya no calcula envases**: el reparto los da directos (R1); pasa a calcular solo `unitCost` compartido (§5.3) y a repetirse una vez por línea |
 | `inventory_movements_one_production_per_order` (único parcial por `order_id`, `20260924190100_*`) | un asiento `production` por pedido | **no sirve**: ahora puede haber varios asientos `production` por pedido, uno por línea. Se sustituye por unicidad por línea (§2.4) |
-| `OrderCatalog.transitionAliveById` (`order-catalog.ts:109-126`) | el `'ok'` a `POR_EMPACAR` lleva `finishedGoods` | pierde ese campo: `to === 'POR_EMPACAR'` vuelve a devolver `'ok'` sin nada más |
+| `OrderCatalog.transitionAliveById` (`order-catalog.ts:109-126`) | el `'ok'` a `POR_EMPACAR` lleva `finishedGoods` | pierde ese campo: `to === 'POR_EMPACAR'` vuelve a devolver `'ok'` sin nada más; gana `'without_unit'` (R44) |
 | `OrderCatalog.finishPackingAliveById` (`order-catalog.ts:149-154`) | `'ok' \| 'not_packer' \| 'not_packable' \| 'not_found'` | gana `finishedGoods: FinishedGoodsReceipt` en el `'ok'` (R17) y el caso `presentation_without_content` (R19, por línea) |
 | `OrderCatalog.startPackingAliveById` (`:136-141`) | `'ok' \| 'already_mine' \| 'taken' \| 'not_packable' \| 'not_found'` | gana `'without_distribution'` (R10) |
 | Matriz `ALLOWED` (`order-transitions.ts:30-37`) | `POR_EMPACAR: ['EN_EMPAQUE']` sin «quedarse igual» ⇒ nada editable en `POR_EMPACAR`/`EN_EMPAQUE` (QC-168 R32) | **sin cambios en la matriz**: el reparto no usa `updateOrder`/`assertTransition`, tiene su propio caso de uso y su propia guardia de estado (§3.3), así que R11-R14 no reabren R32 de QC-168 |
@@ -116,26 +157,58 @@ model OrderPresentationLine {
   (`guard-empresa-en-esquema`, `guard-rls-force`).
 - **Migración propia**, después de la última migración de `dev` en el momento de escribirla.
 
-### 2.2 `orders.unit_id` (pregunta abierta 4, §0.4 — el diseño de abajo la asume)
+### 2.2 `orders.unit_id` (CERRADA [Q4], R40-R45)
 
 ```prisma
 model Order {
   // ...
-  /// La unidad en que se expresa `quantity`. Sin `@relation`: `Unit` es de `unidades`, es drift,
-  /// con FK simple (una unidad no tiene ambito de empresa propio en `units`, ver `unidades`).
+  /// La unidad en que se expresa `quantity` (QC-170 Q4, deroga QC-35bis en la unidad). Sin
+  /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
+  /// presentacion (R43); la aplicacion la exige en el alta y en la edicion (R41).
   unitId String? @map("unit_id") @db.Uuid
 }
 ```
 
-- **Anulable en la base, obligatorio en la aplicación** desde esta ficha (mismo patrón que QC-146
-  hizo con `presentation_id`): los pedidos anteriores quedan en `NULL`, el alta y la edición lo
-  exigen. `CHECK` no hace falta porque no hay ninguna fila vieja que romper y la obligatoriedad es
-  de `order-input.ts`, no de la base (mismo motivo que QC-146 `design.md > 1.1`).
-- **FK simple** `orders_unit_id_fkey → units(id) ON DELETE RESTRICT ON UPDATE CASCADE`: a diferencia
-  de `presentation_id`, `units` no tiene ámbito de empresa (`unidades` es catálogo compartido, según
-  `convert-quantity.ts` que recibe `UnitConversion` sin `companyId`); T0 de la implementación lo
-  reconfirma contra el esquema de `unidades` antes de escribir la migración.
+- **Anulable en la base, obligatoria en la aplicación** (R41): el alta la exige siempre; la edición
+  la exige también (el formulario siempre la envía), así que un pedido antiguo en `NULL` la gana en
+  cuanto alguien lo edita. No hay `CHECK NOT NULL` porque R43 deja filas legítimas en `NULL`.
+- **FK simple** `orders_unit_id_fkey → units(id) ON DELETE RESTRICT ON UPDATE CASCADE`. `units`
+  **sí tiene ámbito** (`units.company_id` anulable: `NULL` = unidad del sistema, valor = unidad de
+  una empresa; `db/schema.prisma:558-572`), así que la FK compuesta con `company_id` no sirve (una
+  unidad del sistema tiene `company_id NULL`). La visibilidad para la empresa del pedido la garantiza
+  la aplicación con `UnitCatalog.findRefs(ids, companyId)` antes de escribir (`unit_not_found`,
+  R41), mismo patrón que `products.unit_id` y `presentations.unit_id` (FK simple también). T0 lo
+  reconfirma leyendo esas dos migraciones.
 - **Índice** `orders_unit_id_idx` para el `RESTRICT`.
+- **Migración de datos** (R43, R45) — en `<ts3>` (§2.4), ANTES del `DROP COLUMN presentation_id`:
+  1. `DO $$ ... IF EXISTS (SELECT 1 FROM orders WHERE status IN ('POR_EMPACAR','EN_EMPAQUE') AND
+     presentation_id IS NULL) THEN RAISE EXCEPTION ...` (R45: aborta toda la migración).
+  2. `UPDATE orders o SET unit_id = p.unit_id FROM presentations p WHERE p.id = o.presentation_id
+     AND p.company_id = o.company_id` (R43). Incluye pedidos `ENTREGADO`/`CANCELADO`: el dato se
+     conserva aunque ya no se edite. Los que no tenían presentación quedan en `NULL`.
+
+### 2.2 bis Validación del reparto contra el total (CERRADA [Q3], R36-R39)
+
+La regla: `Σ convertQuantity(packages_i × content_i, unidad(presentation_i), orders.unit_id) ≤
+orders.quantity`, con aritmética `Decimal` exacta (R5). Igual se acepta (D4, R8).
+
+- **Dónde se decide**: en el servidor, en `updateOrderPresentationLines` (§4.2, lo usan las dos
+  puertas de §4.3), en `createOrder` (el alta con reparto) y en `updateOrder` cuando cambia
+  `quantity` o `unitId` (R38). El formulario repite el cálculo solo para avisar (R39); nunca decide.
+- **Concurrencia (R37)**: dentro de la transacción que reescribe el reparto, lo primero es
+  `SELECT quantity, unit_id, status FROM orders WHERE id = $1 AND company_id = $2 AND deleted_at IS
+  NULL FOR UPDATE`. Con la fila bloqueada: se comprueba estado (R13) y unidad (R42), se leen los
+  contenidos vigentes de las presentaciones (R3, R35), se convierte y se suma, se compara contra la
+  `quantity` releída, y solo entonces `DELETE` + `INSERT` de las líneas. `updateOrder` toma el mismo
+  bloqueo (hoy ya lo toma para la reserva de QC-141, T0 lo confirma) y relee las líneas vigentes
+  antes de aceptar una `quantity`/`unitId` nueva. Como ambos caminos serializan en la MISMA fila,
+  ningún intercalado deja un reparto que pase del total: el segundo en llegar ve lo que escribió
+  el primero.
+- **Conversión**: las `UnitConversion` de la unidad del pedido y de las presentaciones salen de UNA
+  llamada a `UnitCatalog.findRefs` (ids únicos). `IncompatibleUnitsError` → `incompatible_units`
+  (R7); la unidad del pedido no visible → `unit_not_found`.
+- **Error**: `order_distribution_exceeds_quantity` (§7). El diagnóstico (no el mensaje) lleva la
+  suma convertida y la cantidad.
 
 ### 2.3 `inventory_movements`: de un asiento de producción por pedido a uno por línea
 
@@ -168,7 +241,8 @@ uno por línea del reparto—, así que esa unicidad es ahora **falsa** y hay qu
    **Depende de (1)**: la FK a `order_presentation_lines` no existe hasta esa migración. Van en
    migraciones separadas porque tocan módulos distintos y porque el `ADD VALUE` de ningún enum entra
    aquí (no hace falta ninguno nuevo).
-3. `<ts3>_order_presentation_lines_backfill_and_drop` — **con datos** (R22-R25):
+3. `<ts3>_order_presentation_lines_backfill_and_drop` — **con datos** (R22-R25, R43, R45):
+   0. Guardia de R45 y `UPDATE orders SET unit_id` de R43 (§2.2), antes de todo lo demás.
    1. `INSERT INTO order_presentation_lines (id, order_id, company_id, presentation_id, packages,
       presentation_content, created_at, updated_at) SELECT gen_random_uuid(), o.id, o.company_id,
       o.presentation_id, FLOOR(o.quantity / o.presentation_content)::int, o.presentation_content,
@@ -185,6 +259,9 @@ uno por línea del reparto—, así que esa unicidad es ahora **falsa** y hay qu
       con «column does not exist», que es el fallo correcto (no hay «duplicar filas» posible una vez
       que la fuente desapareció). Se prueba con `db:migrate` dos veces sobre la base propia de la
       ficha y se documenta que el segundo intento debe fallar así, no en silencio.
+   3 bis. **El backfill nunca pasa del total (R36)**: `⌊q / c⌋ × c ≤ q`, y la unidad de la línea
+      (la de la presentación) es la que el paso 0 copia a `orders.unit_id`, así que no hace falta
+      conversión ni validación extra en la migración.
    4. `down.sql`: repone `presentation_id`/`presentation_content` con sus `CHECK` e índice
       (recuperando SOLO el caso de una única línea por pedido — un pedido con más de una línea no
       puede volver a tener una sola presentación, así que el `down.sql` **falla con `RAISE`** si
@@ -229,7 +306,9 @@ export const presentationLinesSchema = z
 ```
 
 - `createOrderSchema` y `updateOrderSchema` ganan `presentationLines: presentationLinesSchema` (R9:
-  `[]` es válido) y `unitId: z.string().uuid()` (obligatorio, §2.2).
+  `[]` es válido) y `unitId: z.string().uuid()` (obligatorio en los dos, R41, §2.2).
+- El esquema **no** valida contenido (R35) ni total (R36): necesitan datos de la base leídos bajo
+  bloqueo (§2.2 bis). Solo forma: UUID, entero positivo, sin duplicados.
 - `presentationId` deja de existir en el esquema de un pedido: **rompe** cualquier código que aún lo
   lea de `createOrderSchema`/`updateOrderSchema` — es la limpieza de R4.
 
@@ -250,15 +329,31 @@ export function createUpdateOrderPresentationLines(deps: {...}) {
   return async function updateOrderPresentationLines(
     orderId: string, companyId: string, actorId: string,
     lines: readonly PresentationLineInput[],
-  ): Promise<'ok' | 'not_found' | 'not_editable' | 'presentation_not_found'> { ... };
+  ): Promise<
+    | 'ok' | 'not_found' | 'not_editable' | 'presentation_not_found'
+    | 'presentation_without_content'   // R35 [Q2]
+    | 'incompatible_units'             // R7  [Q4]
+    | 'without_unit'                   // R42 [Q4]
+    | 'exceeds_quantity'               // R36 [Q3]
+  > { ... };
 }
 ```
+
+Orden de comprobación dentro de la transacción (con la fila del pedido `FOR UPDATE`, §2.2 bis):
+`not_found` → `not_editable` → `without_unit` → `presentation_not_found` →
+`presentation_without_content` → `incompatible_units` → `exceeds_quantity` → escribir. El primer
+fallo aborta sin escribir ninguna línea.
 
 - Autorización: la comprueba QUIEN LLAMA (§4.3), no este caso de uso — como `finishAssignedOrder` no
   repite el permiso de `startAssignedOrder`.
 - Reemplazo completo del conjunto de líneas (mismo criterio que `updateOrderSchema`, §4.1 de
   QC-33/34): un `DELETE` de las líneas vigentes + `INSERT` de las nuevas, en una transacción corta
-  (sin la unidad de trabajo de inventario: no toca material ni existencia).
+  (sin la unidad de trabajo de inventario: no toca material ni existencia), precedida del
+  `SELECT ... FOR UPDATE` de la fila del pedido y de las validaciones de §2.2 bis (R37).
+- `createOrder` y `updateOrder` hacen la misma validación (mismo helper de dominio puro
+  `validateDistribution(quantity, orderUnit, lines, conversions)`, en
+  `pedidos/domain/order-distribution.ts`) dentro de su propia unidad de trabajo, que ya bloquea la
+  fila del pedido para la reserva de QC-141.
 - `REPARTO_EDITABLE_STATUSES` es una constante NUEVA, deliberadamente distinta de `ALLOWED` de
   `order-transitions.ts`: no es una transición, es una ventana de estados en la que el reparto se
   deja tocar. `ENTREGADO` y `CANCELADO` quedan fuera (R13).
@@ -302,6 +397,12 @@ if (to === 'POR_EMPACAR') {
 `OrderCatalog.transitionAliveById` pierde `presentation_without_content`, `no_whole_package` y
 `recipe_not_found` de sus resultados (R16): esos tres pasan a ser resultados de
 `finishPackingAliveById` (§4.5), no de este método.
+
+**R44 [Q4] (pregunta abierta 5):** antes de `consumeForOrder`, `if (locked.unitId === null) throw new
+OrderWithoutUnitError()` → resultado `'without_unit'` de `transitionAliveById`, código
+`order_without_unit`. Va antes del consumo para no consumir material de un pedido que después no
+podría empacarse. `locked` ya es la fila bloqueada, así que no hay carrera con una edición que le
+asigne unidad.
 
 ### 4.5 `order-packing.ts`: donde se mueve el trabajo
 
@@ -378,9 +479,15 @@ rompe menos si se mantiene esa granularidad.
 - `findFinishedGoodsReceipts` (QC-168 §4) sigue devolviendo un texto por pedido para «Por empacar»:
   ahora agrega (`SUM(quantity)`) sobre los varios asientos `production` de ese pedido, y sigue siendo
   la cifra que de verdad entró (no la que el reparto dice).
-- La representación exacta del reparto en cada pantalla es lo que la pregunta abierta 1 deja sin
-  cerrar (§0.1): el mecanismo de datos (una lista de `{ presentationName, packages }` por pedido) es
-  el mismo cualquiera que sea el formato visual que el humano elija.
+- **Formato cerrado [Q1] (R26, R27)**: un único componente compartido
+  `components/shared/order-distribution-label.tsx` (sustituye a `order-presentation-label.tsx`)
+  recibe `readonly { presentationName, packages }[]` en el orden de alta de las líneas (`created_at`,
+  desempate por `id`) y pinta «<packages> × <presentationName>» de la primera + « +N» si hay N > 0
+  más; con `[]` pinta «Sin presentación». Patrón «+N» ya usado por los avatares de
+  `company-orders-columns.tsx` (QC-102). El `title`/tooltip lista todas las líneas. El formulario y
+  la pantalla del Empacador pintan la lista completa, no este resumen.
+- **Cantidad con unidad**: donde se muestra `quantity` se muestra al lado el símbolo (o el nombre si
+  no hay símbolo) de `orders.unit_id`; sin unidad (R42), la cifra sola.
 
 ## 7. Errores nuevos (amplían el catálogo cerrado, sin citar ninguna ficha)
 
@@ -388,8 +495,12 @@ rompe menos si se mantiene esa granularidad.
 |---|---|---|
 | `order_without_distribution` | «El pedido no tiene ningún reparto: añade al menos una presentación antes de comenzar el empaque.» | `pedidos` (`startPackingAliveById`, R10) |
 | `order_presentation_line_not_editable` | «El reparto de este pedido ya no se puede cambiar.» | `pedidos` (`updateOrderPresentationLines`, R13) |
-| `presentation_without_content` | (ya existe, QC-150) — se reusa para R19, ahora identificando la línea en el DIAGNÓSTICO (nunca en el mensaje) | `pedidos` |
+| `order_distribution_exceeds_quantity` | «El reparto pasa de la cantidad del pedido: quita envases o elige presentaciones más pequeñas.» | `pedidos` (`updateOrderPresentationLines`, `createOrder`, `updateOrder`; R36, R38) — **nuevo en F1.4 [Q3]** |
+| `order_without_unit` | «El pedido no tiene unidad: asígnale una desde la edición del pedido antes de repartirlo o de finalizar la producción.» | `pedidos` (`updateOrderPresentationLines` R42, `transitionAliveById` R44) — **nuevo en F1.4 [Q4]** |
+| `presentation_without_content` | (ya existe, QC-150) — se reusa para R19 (línea en el DIAGNÓSTICO, nunca en el mensaje) y para R35 [Q2] | `pedidos` |
 | `presentation_not_found` | (ya existe, QC-146) — se reusa cuando una línea nombra una presentación inexistente o ajena | `pedidos` |
+| `incompatible_units` | (ya existe, QC-76) — se reusa para R7/R38 [Q4] | `pedidos` |
+| `unit_not_found` | (ya existe, QC-76) — se reusa para la unidad del pedido inexistente o no visible (R41) [Q4] | `pedidos` |
 
 `no_whole_package` (QC-150) **se retira del catálogo activo**: ya no hay ninguna operación que
 pueda producir «la cantidad no llena ni un envase» (el humano ya no divide, elige envases enteros
@@ -397,7 +508,10 @@ directamente). Se decide DEJARLO en el catálogo (no borrarlo: `ERROR_CODES` es 
 en la práctica del repo, y quitarlo bajaría el conteo que otra ficha en curso podría estar asumiendo)
 pero sin ningún emisor: el test de cobertura de errores (`guard-catalogo-de-errores`, si exige que
 todo código tenga al menos un emisor) es el primer sitio a mirar en T-implementación; si lo exige,
-se retira del array en la misma tarea. `ERROR_CODES` pasa de 60 a 62 (dos altas: R28).
+se retira del array en la misma tarea. `ERROR_CODES` pasa de **60 a 64** (cuatro altas, R28:
+`order_without_distribution`, `order_presentation_line_not_editable`,
+`order_distribution_exceeds_quantity`, `order_without_unit`); 63 si T17 retira `no_whole_package`.
+Conteo actual (60) leído en `tests/unit/errores/catalogo.test.ts:46`.
 
 ## 8. Enmiendas a specs ya cerrados
 
@@ -415,7 +529,11 @@ se retira del array en la misma tarea. `ERROR_CODES` pasa de 60 a 62 (dos altas:
   `package_content` §2.5, el catálogo de errores §6 salvo lo dicho en §7) sigue vigente sin cambios.
 - **QC-146** (`specs/QC-146-presentacion-del-pedido/design.md`): entero derogado por R4/R22-R25 de
   esta ficha — la columna que creó desaparece y la migración de datos la absorbe. Se anota con fecha
-  en la cabecera de ese `design.md` en la tarea de documentación (`tasks.md` T-doc), sin reescribirlo.
+  en la cabecera de ese `design.md` en la tarea de documentación (`tasks.md` T18), sin reescribirlo.
+- **QC-35 / QC-35bis** (`specs/QC-35-pantalla-de-pedidos/requirements.md > Importes`, enmienda del
+  2026-09-07): **derogada en la unidad** por [Q4] (§0.6). Nota fechada tras esa enmienda en T24.
+  QC-123 (`design.md:327-333`, «lo que NO vuelve es la unidad del pedido») queda también superado en
+  esa frase; la nota de T24 lo menciona.
 
 ## 9. Cruce de archivos con fichas en curso o a punto de entrar
 
@@ -458,6 +576,12 @@ se retira del array en la misma tarea. `ERROR_CODES` pasa de 60 a 62 (dos altas:
    contenido.** Descartada por R22: la decisión cerrada es `⌊quantity / content⌋`, no `quantity`
    directo — un pedido de 100 L con presentación de 1 L de contenido migra a 100 envases, no a un
    envase de 100 L inexistente.
+
+4. **[Q3] Validar el total con una restricción de base de datos** (trigger sobre
+   `order_presentation_lines` que sume y compare con `orders.quantity`). Descartada: la suma exige
+   convertir unidades con los factores del catálogo de `unidades` (otro módulo) dentro de SQL,
+   duplicando `convertQuantity`; y un trigger por fila vería estados intermedios del
+   `DELETE`+`INSERT`. El bloqueo de fila de §2.2 bis da la misma garantía en el dominio.
 
 ## 11. Dependencias
 
