@@ -17,7 +17,12 @@ import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-
 import type { Page } from '../../../domain/page';
 import type { OrderScope } from '../../../domain/order-scope';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../../../domain/order-view';
-import type { LockedOrderRow, OrderWriteRepository } from '../../../ports/order-write-repository';
+import type {
+  FinishPackingLine,
+  FinishPackingUpdateOutcome,
+  LockedOrderRow,
+  OrderWriteRepository,
+} from '../../../ports/order-write-repository';
 
 /** Cliente global o el transaccional que abra quien llama: los metodos de mas abajo no
  *  distinguen, mismo patron que `createOrderAssignmentRepository`. */
@@ -823,6 +828,8 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
     updatePresentationLinesAlive: (id, unitId, lines, actorId, now, scope) =>
       updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),
+    finishPackingAlive: (id, packerId, now, scope) => finishPackingAliveOrder(id, packerId, now, scope, tx),
+    findPresentationLinesForFinish: (id, scope) => findPresentationLinesForFinishOrder(id, scope, tx),
   };
 }
 
@@ -833,8 +840,9 @@ type PackingStatusRow = { readonly status: OrderStatus; readonly packedBy: strin
 async function findAlivePackingStatus(
   id: string,
   scope: OrderScope,
+  tx: PrismaLike = prisma,
 ): Promise<PackingStatusRow | null> {
-  return prisma.order.findFirst({
+  return tx.order.findFirst({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     select: { status: true, packedBy: true },
   });
@@ -902,27 +910,75 @@ export async function startPackingAliveOrder(
 }
 
 /**
- * Implementa `OrderPackingRepository['finishPackingAlive']` (Terminar): el `UPDATE` condicional
- * exige ademas `packed_by = packerId`, y escribe `finished_at` en la MISMA sentencia que el
- * estado. Cualquier caso que no mueva la fila relee para distinguir «no existe» de «lo tiene
- * otro empacador» de «no admite Terminar».
+ * Implementa `OrderWriteRepository['finishPackingAlive']` (Terminar, T14, `design.md > 4.5`,
+ * R17-R21): el `UPDATE` condicional exige ademas `packed_by = packerId`, y escribe
+ * `finished_at` en la MISMA sentencia que el estado. Corre sobre `tx` -la transaccion
+ * compartida de `OrderUnitOfWork`, no el cliente global- para que el alta de los lotes que hace
+ * el dominio despues comparta la MISMA transaccion y un fallo posterior deshaga tambien este
+ * `UPDATE`. Si `count === 1`, relee la receta/cantidad/coste guardado que Terminar necesita, ya
+ * de esta transaccion -la fila sigue bloqueada desde el `UPDATE` de arriba, ninguna otra
+ * conexion pudo moverla-; si no, relee para clasificar «no existe» de «lo tiene otro empacador»
+ * de «no admite Terminar».
  */
-export async function finishPackingAliveOrder(
+async function finishPackingAliveOrder(
   id: string,
   packerId: string,
   now: Date,
   scope: OrderScope,
-): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
+  tx: PrismaLike,
+): Promise<FinishPackingUpdateOutcome> {
+  const { count } = await tx.order.updateMany({
     where: {
       AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'EN_EMPAQUE', packedBy: packerId }],
     },
     data: { status: 'ENTREGADO', finishedAt: now, updatedAt: now, updatedBy: packerId },
   });
-  if (count === 1) return 'ok';
+  if (count === 1) {
+    const row = await tx.order.findUniqueOrThrow({
+      where: { id },
+      select: { recipeId: true, quantity: true, ingredientsCost: true },
+    });
+    return {
+      kind: 'ok',
+      recipeId: row.recipeId,
+      quantity: fromDecimal(row.quantity),
+      ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
+    };
+  }
 
-  const row = await findAlivePackingStatus(id, scope);
-  if (row === null) return 'not_found';
-  if (row.status === 'EN_EMPAQUE' && row.packedBy !== packerId) return 'not_packer';
-  return 'not_packable';
+  const row = await findAlivePackingStatus(id, scope, tx);
+  if (row === null) return { kind: 'not_found' };
+  if (row.status === 'EN_EMPAQUE' && row.packedBy !== packerId) return { kind: 'not_packer' };
+  return { kind: 'not_packable' };
+}
+
+/** Fila cruda de una linea del reparto para Terminar el empaque (R17, R19): `FOR SHARE`, en el
+ *  orden de alta, dentro de la MISMA transaccion que el `UPDATE` de `finishPackingAliveOrder`. */
+type FinishPackingLineRow = {
+  readonly id: string;
+  readonly presentation_id: string;
+  readonly packages: number;
+  readonly presentation_content: string | null;
+};
+
+async function findPresentationLinesForFinishOrder(
+  id: string,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<readonly FinishPackingLine[]> {
+  const { companyId } = companyScopeColumns(scope);
+  const rows = await tx.$queryRaw<ReadonlyArray<FinishPackingLineRow>>(Prisma.sql`
+    SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content"
+      FROM "order_presentation_lines"
+     WHERE "order_id" = ${id}::uuid
+       AND "company_id" = ${companyId}::uuid
+     ORDER BY "created_at" ASC, "id" ASC
+     FOR SHARE
+  `);
+  return rows.map((row) => ({
+    id: row.id,
+    presentationId: row.presentation_id,
+    packages: row.packages,
+    presentationContent: row.presentation_content,
+  }));
 }

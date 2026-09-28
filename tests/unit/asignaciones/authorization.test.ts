@@ -625,7 +625,7 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
       pageSize: 1,
       totalPages: 1,
     }));
-    const finishPackingAliveById = vi.fn(async () => 'ok' as const);
+    const finishPackingAliveById = vi.fn(async () => ({ kind: 'ok' as const, finishedGoods: [] }));
     const deps = {
       orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById },
     } as unknown as FinishPackingDeps;

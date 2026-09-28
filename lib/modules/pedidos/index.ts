@@ -94,6 +94,8 @@ export {
   cancelOrderSchema,
   quoteOrderCostSchema,
   presentationLinesSchema,
+  orderPresentationAvailabilitySchema,
+  updateOrderDistributionSchema,
   EDITABLE_STATUS_VALUES,
 } from './domain/order-input';
 export type {
@@ -101,6 +103,8 @@ export type {
   UpdateOrderInput,
   CancelOrderInput,
   QuoteOrderCostInput,
+  OrderPresentationAvailabilityInput,
+  UpdateOrderDistributionInput,
   EditableOrderStatus,
 } from './domain/order-input';
 
@@ -161,7 +165,7 @@ export type { TransitionOrderDeps } from './domain/transition-order';
  *  y Terminar el empaque, cada uno un `UPDATE` condicional sin abrir la unidad de trabajo de
  *  `inventario`. `lib/composition` las cablea sobre el adaptador driven de `pedidos`. */
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
-export type { OrderPackingDeps } from './domain/order-packing';
+export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
@@ -192,3 +196,11 @@ export type {
   UpdateOrderPresentationLinesInput,
   UpdateOrderPresentationLinesResult,
 } from './domain/update-order-presentation-lines';
+
+/** T11 (`design.md > 3`): «cuanto queda disponible», de solo lectura -no persiste, no rechaza-.
+ *  La Server Action de T25/T22 la llama en cada cambio de cantidad, unidad o reparto. */
+export { createQuoteOrderPresentationAvailability } from './domain/order-presentation-availability';
+export type {
+  OrderPresentationAvailability,
+  OrderPresentationAvailabilityDeps,
+} from './domain/order-presentation-availability';

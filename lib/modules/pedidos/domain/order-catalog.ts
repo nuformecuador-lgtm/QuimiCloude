@@ -33,8 +33,8 @@ export type OrderAssignmentTarget = {
  *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
-/** Lo que entro al inventario cuando un Finalizar dio de alta un lote de producto terminado:
- *  el nombre de quien lo recibio y cuantos envases enteros. */
+/** Lo que entro al inventario por UNA linea del reparto cuando Terminar el empaque dio de alta
+ *  su lote (R17): el nombre del producto terminado que lo recibio y cuantos envases enteros. */
 export type FinishedGoodsReceipt = {
   readonly productName: string;
   readonly packages: string;
@@ -135,13 +135,27 @@ export interface OrderCatalog {
    * el cambio de estado, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
    * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
    * `'not_found'` es el mismo caso que en `findAliveById`.
+   *
+   * R17-R21: da de alta, por cada linea del reparto, un lote de producto terminado -mismo
+   * coste unitario para todas, R18-, en la MISMA transaccion que el cambio de estado: si
+   * cualquier linea falla, se deshace TODO. `'recipe_not_found'` es la receta del pedido,
+   * ausente o de otra empresa (mismo caso que antes emitia Finalizar); `'presentation_without_content'`
+   * identifica -por `diagnostic`, nunca en el resultado- la primera linea sin contenido ni
+   * copiado ni vigente (R19, defensa en profundidad).
    */
   finishPackingAliveById(
     id: string,
     companyId: string,
     packerId: string,
     now: Date,
-  ): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'>;
+  ): Promise<
+    | { readonly kind: 'ok'; readonly finishedGoods: readonly FinishedGoodsReceipt[] }
+    | 'not_packer'
+    | 'not_packable'
+    | 'not_found'
+    | 'recipe_not_found'
+    | 'presentation_without_content'
+  >;
 }
 
 /**

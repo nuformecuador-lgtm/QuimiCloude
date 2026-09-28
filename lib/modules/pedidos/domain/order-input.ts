@@ -178,3 +178,32 @@ export const quoteOrderCostSchema = createOrderSchema
   .extend({ orderId: z.string().uuid().optional() });
 
 export type QuoteOrderCostInput = z.infer<typeof quoteOrderCostSchema>;
+
+/**
+ * T11 (`design.md > 3`): «cuanto queda disponible», de solo lectura. Comparte forma con el
+ * alta -misma cantidad, misma unidad, mismo reparto- porque el calculo se hace ANTES de
+ * guardar, con los mismos tres datos que `createOrderSchema` ya valida.
+ */
+export const orderPresentationAvailabilitySchema = createOrderSchema.pick({
+  quantity: true,
+  unitId: true,
+  presentationLines: true,
+});
+
+export type OrderPresentationAvailabilityInput = z.infer<typeof orderPresentationAvailabilitySchema>;
+
+/**
+ * T25 (`design.md > 4.3`, R46): la edicion ACOTADA «Reparto y unidad» en `POR_EMPACAR`. A
+ * diferencia de `createOrderSchema`/`updateOrderSchema` -que cubren el pedido ENTERO y
+ * descartan las claves de mas en silencio-, este esquema es `.strict()`: la cantidad, la
+ * receta o los responsables no se ignoran, RECHAZAN la entrada entera, porque este formulario
+ * no tiene permiso para tocarlos (R46).
+ */
+export const updateOrderDistributionSchema = z
+  .object({
+    unitId: unitIdSchema,
+    presentationLines: presentationLinesSchema,
+  })
+  .strict();
+
+export type UpdateOrderDistributionInput = z.infer<typeof updateOrderDistributionSchema>;

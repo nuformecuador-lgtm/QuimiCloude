@@ -66,6 +66,8 @@ const {
   deleteOrderMock,
   findCoverageMock,
   quoteOrderCostMock,
+  quoteOrderPresentationAvailabilityMock,
+  updateOrderPresentationLinesMock,
   getSessionUserMock,
   getSessionContextMock,
 } = vi.hoisted(() => ({
@@ -78,6 +80,9 @@ const {
   // La cobertura de la pagina.
   findCoverageMock: vi.fn(),
   quoteOrderCostMock: vi.fn(),
+  // T11, T25: el disponible de solo lectura y la edicion acotada del reparto y la unidad.
+  quoteOrderPresentationAvailabilityMock: vi.fn(),
+  updateOrderPresentationLinesMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
   getSessionContextMock: vi.fn(),
@@ -103,6 +108,8 @@ vi.mock('@/lib/composition', () => ({
     deleteOrder: deleteOrderMock,
     findCoverage: findCoverageMock,
     quoteOrderCost: quoteOrderCostMock,
+    quoteOrderPresentationAvailability: quoteOrderPresentationAvailabilityMock,
+    updateOrderPresentationLines: updateOrderPresentationLinesMock,
   },
 }))
 
@@ -233,10 +240,26 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // valida con los esquemas del dominio, no conoce los estados ni las transiciones, no mide
     // el motivo, no reimplementa la paginacion y no habla con el ORM.
     const source = readActionsSource()
-    expect(source, 'repite la comprobacion de permiso').not.toMatch(/requirePermission/)
+    // T25 (R12): `updateOrderDistributionAction` es la UNICA excepcion, y a proposito -su caso
+    // de uso (`updateOrderPresentationLines`) no comprueba el permiso porque solo tiene ESTE
+    // llamador (`design.md > 4.2`)-. Las diez restantes siguen sin repetirlo: se cuenta, no se
+    // prohibe en bloque.
+    const llamadasARequirePermission = source.match(/requirePermission\(/g) ?? []
+    expect(llamadasARequirePermission.length, 'solo updateOrderDistributionAction la llama').toBe(1)
+    expect(
+      source.slice(0, source.indexOf('requirePermission(')),
+      'requirePermission solo aparece dentro de updateOrderDistributionAction',
+    ).toContain('export async function updateOrderDistributionAction(')
     expect(source, 'incrusta el nombre del rol').not.toMatch(/Administrador/)
     expect(source, 'incrusta ROLE_ADMINISTRADOR').not.toMatch(/ROLE_ADMINISTRADOR/)
-    expect(source, 'valida con el esquema del dominio').not.toMatch(/Schema\b/)
+    // T25 (R46): `updateOrderDistributionAction` es la OTRA excepcion deliberada -su caso de uso
+    // (`updateOrderPresentationLines`) no valida, porque recibe `{ unitId, lines }` YA TIPADO
+    // (`design.md > 4.2`): la unica manera de que la cantidad, la receta o los responsables no
+    // lleguen ni como candidato es que ESTA action los rechace con `.strict()` antes de llamarlo.
+    // Se retira SOLO ese nombre del texto antes de comprobar que ninguna de las otras nueve
+    // repite un esquema del dominio.
+    const sinEsquemaDeT25 = source.replaceAll('updateOrderDistributionSchema', '')
+    expect(sinEsquemaDeT25, 'valida con el esquema del dominio').not.toMatch(/Schema\b/)
     expect(source, 'decide sobre el estado o la transicion').not.toMatch(
       /PENDIENTE|EN_CURSO|ENTREGADO|CANCELADO|assertTransition|isAllowedTransition/,
     )
@@ -551,17 +574,18 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       'quoteOrderCostAction',
     )
 
-    // Y no hay ni un `catch` que se quede callado: los OCHO `catch` del archivo -uno por
-    // Server Action, incluidas `listOrderCoverageAction` y `quoteOrderCostAction`- devuelven
-    // `toErrorState`, que o traduce el error de dominio o registra el ajeno y devuelve el
-    // codigo generico. Ninguno se lo traga sin dejar rastro.
+    // Y no hay ni un `catch` que se quede callado: los DIEZ `catch` del archivo -uno por
+    // Server Action, incluidas `listOrderCoverageAction`, `quoteOrderCostAction`,
+    // `quoteOrderPresentationAvailabilityAction` (T11) y `updateOrderDistributionAction`
+    // (T25)- devuelven `toErrorState`, que o traduce el error de dominio o registra el ajeno y
+    // devuelve el codigo generico. Ninguno se lo traga sin dejar rastro.
     const source = readActionsSource()
     const catches = source.match(/catch\s*\(/g) ?? []
     const traducciones = source.match(/return toErrorState\(error\)/g) ?? []
     expect(catches.length).toBeGreaterThan(0)
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
-    expect(catches.length).toBe(8)
+    expect(catches.length).toBe(10)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -789,8 +813,8 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
   })
 })
 
-describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14 y QC-151 T7', () => {
-  it('el modulo exporta exactamente las ocho actions, con su aridad de siempre', () => {
+describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14, QC-151 T7 y QC-170 T11/T25', () => {
+  it('el modulo exporta exactamente las diez actions, con su aridad de siempre', () => {
     const exportadas = Object.entries(orderActions)
       .filter(([, valor]) => typeof valor === 'function')
       .map(([nombre, valor]) => [nombre, (valor as (...args: never[]) => unknown).length] as const)
@@ -805,7 +829,11 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
       ['quoteOrderCostAction', 1],
+      // T11: el disponible de solo lectura, argumento ya tipado.
+      ['quoteOrderPresentationAvailabilityAction', 1],
+      // T25: la edicion acotada, `id` + argumento ya tipado, ningun `FormData`.
       ['updateOrderAction', 3],
+      ['updateOrderDistributionAction', 2],
     ])
   })
 
@@ -820,6 +848,8 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       listOrdersAction: 'query: unknown',
       listOrderCoverageAction: 'orderIds: readonly string[]',
       quoteOrderCostAction: 'input: unknown',
+      quoteOrderPresentationAvailabilityAction: 'input: unknown',
+      updateOrderDistributionAction: 'id: string, input: unknown',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {
       const desde = source.indexOf(`export async function ${nombre}(`)

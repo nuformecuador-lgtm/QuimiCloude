@@ -6,6 +6,31 @@ import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '
  *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
 export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
 
+/** Lo que Terminar el empaque (`design.md > 4.5`, R17, R18) necesita del pedido cuando el
+ *  `UPDATE` condicional SI lo mueve: la receta para el nombre del lote y el coste guardado -o
+ *  su ausencia, que hace recalcularlo-. */
+export type FinishPackingOrderRow = {
+  readonly recipeId: string;
+  readonly quantity: string;
+  readonly ingredientsCost: string | null;
+};
+
+/** `finishPackingAlive` clasifica en la MISMA llamada: si el `UPDATE` movio la fila, la fila que
+ *  Terminar necesita; si no, por que -relectura interna, mismo criterio que hoy-. */
+export type FinishPackingUpdateOutcome =
+  | ({ readonly kind: 'ok' } & FinishPackingOrderRow)
+  | { readonly kind: 'not_packer' | 'not_packable' | 'not_found' };
+
+/** Una linea del reparto tal como Terminar el empaque la necesita (R17, R19): la presentacion,
+ *  sus envases y el contenido copiado -`null` es la defensa en profundidad de R19, solo
+ *  alcanzable con una fila escrita fuera de la aplicacion-. */
+export type FinishPackingLine = {
+  readonly id: string;
+  readonly presentationId: string;
+  readonly packages: number;
+  readonly presentationContent: string | null;
+};
+
 /**
  * Puerto de escritura del pedido DENTRO de una transaccion compartida con `inventario`
  * (`OrderUnitOfWork`, `ports/order-unit-of-work.ts`). No reemplaza a `OrderRepository`: ese
@@ -82,4 +107,20 @@ export interface OrderWriteRepository {
     now: Date,
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
+
+  /** Terminar el empaque (`design.md > 4.5`, R17-R21): `UPDATE` condicional `WHERE
+   *  status = 'EN_EMPAQUE' AND packed_by = packerId`, con `finished_at` en la MISMA sentencia.
+   *  Dentro de `OrderUnitOfWork.run` para que el alta de los lotes de las lineas viva en la
+   *  MISMA transaccion y un fallo posterior deshaga tambien este `UPDATE`. */
+  finishPackingAlive(
+    id: string,
+    packerId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<FinishPackingUpdateOutcome>;
+
+  /** Las lineas del reparto de un pedido, `FOR SHARE`, en el orden de alta (R17): la MISMA
+   *  transaccion de `finishPackingAlive`, para que un fallo tras leerlas deshaga tambien el
+   *  `UPDATE`. */
+  findPresentationLinesForFinish(id: string, scope: OrderScope): Promise<readonly FinishPackingLine[]>;
 }

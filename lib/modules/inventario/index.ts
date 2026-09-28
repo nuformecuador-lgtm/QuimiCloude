@@ -108,6 +108,9 @@ export {
   type FinishedGoodsOutcome,
   type FinishedGoodsIntake,
 } from './domain/finished-goods';
+// R18: `pedidos` deriva el coste unitario unico del pedido con la MISMA division que ya usa
+// este modulo para un lote sin costo de compra -mismo criterio de redondeo, misma escala-.
+export { deriveUnitCost } from './domain/unit-cost';
 
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.

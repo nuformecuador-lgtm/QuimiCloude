@@ -212,6 +212,7 @@ import {
   createGetOrder,
   createListOrders,
   createQuoteOrderCost,
+  createQuoteOrderPresentationAvailability,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
@@ -219,7 +220,6 @@ import {
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
-  finishPackingAliveOrder,
   findAliveOrderById,
   findExpirableOrders,
   listAliveOrders,
@@ -1182,6 +1182,12 @@ export const pedidos = {
     units: unitCatalog,
     transaction: orderDistributionTransaction,
   }),
+  // T11 (`design.md > 3`, R6, R7): «cuanto queda disponible», de solo lectura. Mismos DOS
+  // catalogos que `updateOrderPresentationLines`, sin transaccion: no escribe nada.
+  quoteOrderPresentationAvailability: createQuoteOrderPresentationAvailability({
+    presentations: presentationCatalog,
+    units: unitCatalog,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1226,12 +1232,11 @@ export const observabilidad = {
  *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
  *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
  *  consume el material en la misma transaccion. */
-/** `OrderPackingRepository` cableado con las dos escrituras crudas de `order-prisma.ts`: cada
- *  una un `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida
- *  con `inventario`. */
+/** `OrderPackingRepository` cableado con la escritura cruda de Comenzar (`order-prisma.ts`): un
+ *  `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida con
+ *  `inventario`. Terminar (T14) YA NO vive aqui: abre `orderUnitOfWork` directamente. */
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
-  finishPackingAlive: finishPackingAliveOrder,
 };
 
 const orderCatalog: OrderCatalog = {
@@ -1243,7 +1248,17 @@ const orderCatalog: OrderCatalog = {
   // cableados mas abajo para quien todavia los usa-.
   transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
   startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository }),
+  // T14 (R17-R21): Terminar SI necesita los tres catalogos globales -receta y coste del lote,
+  // mismo criterio que Finalizar usaba antes de R15/R16- y `presentationCatalog`, para la
+  // defensa en profundidad de R19.
+  finishPackingAliveById: createFinishPacking({
+    packing: orderPackingRepository,
+    unitOfWork: orderUnitOfWork,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+    presentations: presentationCatalog,
+  }),
 };
 
 /**

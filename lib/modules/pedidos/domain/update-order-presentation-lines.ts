@@ -14,6 +14,7 @@
 // receta ni la reserva. La transaccion la abre `OrderDistributionTransaction`, mas corta que
 // `OrderUnitOfWork`.
 
+import type { Actor } from './actor';
 import { validateDistribution, type DistributionLine } from './order-distribution';
 import type { OrderStatus } from './order-classification';
 import type { OrderScope } from './order-scope';
@@ -75,13 +76,14 @@ export function createUpdateOrderPresentationLines(
   deps: UpdateOrderPresentationLinesDeps,
 ): (
   orderId: string,
-  companyId: string,
-  actorId: string,
+  actor: Actor,
   input: UpdateOrderPresentationLinesInput,
 ) => Promise<UpdateOrderPresentationLinesResult> {
   const now = deps.now ?? (() => new Date());
 
-  return async function updateOrderPresentationLines(orderId, companyId, actorId, input) {
+  return async function updateOrderPresentationLines(orderId, actor, input) {
+    const companyId = actor.companyId;
+    const actorId = actor.id;
     const scope: OrderScope = { companyId };
     const instant = now();
 

@@ -16,6 +16,7 @@ import {
   type UpdateOrderPresentationLinesDeps,
 } from '@/lib/modules/pedidos/domain/update-order-presentation-lines';
 
+import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
@@ -24,7 +25,8 @@ import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const PEDIDO = '11111111-1111-4111-8111-111111111111';
-const ACTOR = 'admin-a';
+const ACTOR_ID = 'admin-a';
+const ACTOR: Actor = { id: ACTOR_ID, companyId: EMPRESA, permissions: ['pedidos.modificar'] };
 const UNIT_ID = '77777777-7777-4777-8777-777777777777';
 const OTRA_UNIDAD_COMPATIBLE = '10101010-1010-4101-8101-101010101010';
 const OTRA_UNIDAD_INCOMPATIBLE = '20202020-2020-4202-8202-202020202020';
@@ -45,8 +47,8 @@ function filaBloqueada(overrides: Partial<OrderRow> = {}): LockedOrderRow {
     ingredientsCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
-    createdBy: ACTOR,
-    updatedBy: ACTOR,
+    createdBy: ACTOR_ID,
+    updatedBy: ACTOR_ID,
     presentationId: null,
     presentationContent: null,
     unitId: UNIT_ID,
@@ -147,7 +149,7 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       const update = montar({ orders });
 
       await expect(
-        update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+        update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
       ).resolves.toBe('ok');
     },
   );
@@ -159,7 +161,7 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       const update = montar({ orders });
 
       await expect(
-        update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+        update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
       ).resolves.toBe('not_editable');
       expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
     },
@@ -170,7 +172,7 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
     const update = montar({ orders });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [] }),
     ).resolves.toBe('not_found');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -182,7 +184,7 @@ describe('updateOrderPresentationLines — bloquea antes de validar (R37, R48)',
     const cat = catalogoDePresentaciones();
     const update = montar({ orders, presentations: cat.presentations });
 
-    await update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [] });
+    await update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [] });
 
     expect(orders.lockAliveById).toHaveBeenCalledWith(PEDIDO, { companyId: EMPRESA });
   });
@@ -194,7 +196,7 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
     const update = montar({ orders, units: catalogoDeUnidades().units, presentations: catalogoDePresentaciones().presentations });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: 'unidad-inexistente', lines: [] }),
+      update(PEDIDO, ACTOR, { unitId: 'unidad-inexistente', lines: [] }),
     ).resolves.toBe('unit_not_found');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -204,7 +206,7 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
     const update = montar({ orders, presentations: catalogoDePresentaciones(new Map()).presentations });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
     ).resolves.toBe('presentation_not_found');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -215,7 +217,7 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
     const update = montar({ orders, presentations: cat.presentations });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
     ).resolves.toBe('presentation_without_content');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -233,7 +235,7 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
     const update = montar({ orders, units, presentations });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
     ).resolves.toBe('incompatible_units');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -243,7 +245,7 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
     const update = montar({ orders });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 3 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 3 }] }),
     ).resolves.toBe('exceeds_quantity');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -255,7 +257,7 @@ describe('updateOrderPresentationLines — R8, R9: igual al total, menor, y vaci
     const update = montar({ orders });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 2 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 2 }] }),
     ).resolves.toBe('ok');
     expect(updatePresentationLinesAlive).toHaveBeenCalledTimes(1);
   });
@@ -265,7 +267,7 @@ describe('updateOrderPresentationLines — R8, R9: igual al total, menor, y vaci
     const update = montar({ orders });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
     ).resolves.toBe('ok');
     expect(updatePresentationLinesAlive).toHaveBeenCalledTimes(1);
   });
@@ -274,8 +276,8 @@ describe('updateOrderPresentationLines — R8, R9: igual al total, menor, y vaci
     const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada());
     const update = montar({ orders });
 
-    await expect(update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [] })).resolves.toBe('ok');
-    expect(updatePresentationLinesAlive).toHaveBeenCalledWith(PEDIDO, UNIT_ID, [], ACTOR, AHORA, {
+    await expect(update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [] })).resolves.toBe('ok');
+    expect(updatePresentationLinesAlive).toHaveBeenCalledWith(PEDIDO, UNIT_ID, [], ACTOR_ID, AHORA, {
       companyId: EMPRESA,
     });
   });
@@ -300,7 +302,7 @@ describe('updateOrderPresentationLines — escritura conjunta y reemplazo comple
     const update = montar({ orders, units, presentations });
 
     await expect(
-      update(PEDIDO, EMPRESA, ACTOR, {
+      update(PEDIDO, ACTOR, {
         unitId: OTRA_UNIDAD_COMPATIBLE,
         lines: [
           { presentationId: PRESENTACION_A, packages: 1 },
@@ -316,7 +318,7 @@ describe('updateOrderPresentationLines — escritura conjunta y reemplazo comple
         { presentationId: PRESENTACION_A, packages: 1, content: '3.0000' },
         { presentationId: PRESENTACION_B, packages: 1, content: '2.0000' },
       ],
-      ACTOR,
+      ACTOR_ID,
       AHORA,
       { companyId: EMPRESA },
     );
@@ -340,6 +342,6 @@ describe('updateOrderPresentationLines — R46, R30: no toca quantity, receta ni
 
     // Si este caso de uso llamara a cualquier otro metodo del puerto, los dobles configurados en
     // `ordersDoble` lanzarian, y esta llamada rechazaria en vez de resolver 'ok'.
-    await expect(update(PEDIDO, EMPRESA, ACTOR, { unitId: UNIT_ID, lines: [] })).resolves.toBe('ok');
+    await expect(update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [] })).resolves.toBe('ok');
   });
 });

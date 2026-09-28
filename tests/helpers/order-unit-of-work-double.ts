@@ -38,6 +38,8 @@ export function fakeOrderWriteRepository(
     softDeleteAlive: vi.fn(explota('softDeleteAlive')),
     setStatus: vi.fn(explota('setStatus')),
     setReservedAt: vi.fn(explota('setReservedAt')),
+    finishPackingAlive: vi.fn(explota('finishPackingAlive')),
+    findPresentationLinesForFinish: vi.fn(explota('findPresentationLinesForFinish')),
     ...overrides,
   } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
 }

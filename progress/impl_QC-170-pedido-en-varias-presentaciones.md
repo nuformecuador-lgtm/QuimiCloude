@@ -13,7 +13,7 @@ Base propia: `QuimiCloude_QC170` (58 migraciones aplicadas tras la tanda A). Wor
 | B (resto) | T7 | cerrada en la tanda C (junto con T8) |
 | C | T7, T8, T9, T10, T13, T23 | cerradas (ver §Tanda C) |
 | C (fuera) | T3 | pendiente: tras T16 (tanda E); T8, T10 y T23 ya cerradas |
-| D | T11, T14, T21, T25 (Server Action) | pendiente |
+| D | T11, T14, T21, T25 (Server Action) | cerradas (T25 solo servidor; su UI va en E) |
 | E | T16, T15, T22, T25 (UI) | pendiente |
 | final | T19 (E2E escrito) | pendiente |
 
@@ -404,3 +404,270 @@ final, un cierre de ripple (asignaciones, fixtures de UI, prueba de esquema, fix
 Tras esta tanda, T3 solo depende de T16 (T8, T10 y T23 cerradas): `asignaciones` aún tiene el
 puente transitorio y la UI lee `presentationId`/`presentationName` de `OrderView`.
 
+## Tanda D (2026-09-27) — T11 y T25 (SOLO servidor) cerradas
+
+En paralelo, otro subagente trabajaba T14 (`order-packing.ts`, `finish-with-finished-goods.int.test.ts`);
+no se tocó ninguno de sus archivos (`order-packing.ts`, `order-packing-repository.ts`,
+`order-catalog.ts`, `order-prisma.ts`, `finish-packing.ts` de `asignaciones`).
+
+### T11 — «Cuánto queda disponible»
+- `lib/modules/pedidos/domain/order-presentation-availability.ts` (nuevo):
+  `createQuoteOrderPresentationAvailability`. Mismo patrón de resolución que
+  `update-order-presentation-lines.ts` (una llamada a `units.findRefs` para la unidad del
+  pedido, otra con los ids únicos que faltan de las presentaciones) y REUTILIZA
+  `validateDistribution` (T20) para el cálculo — no repite ninguna aritmética. Devuelve
+  `DistributionResult` más dos fallos propios de la RESOLUCIÓN (`unit_not_found`,
+  `presentation_not_found`) que `validateDistribution` no puede dar porque recibe
+  `UnitConversion` ya resueltas, no ids. `requirePermission(actor, 'pedidos.modificar')` es la
+  primera línea (mismo criterio que `quoteOrderCost`); nunca lanza por el reparto en sí —es de
+  solo lectura, R39: `exceeds_quantity` con `available` negativo vuelve como dato, no como
+  excepción.
+- `lib/modules/pedidos/domain/order-input.ts`: `orderPresentationAvailabilitySchema` (`pick` de
+  `quantity`/`unitId`/`presentationLines` de `createOrderSchema`, mismos tres datos que hacen
+  falta ANTES de guardar).
+- `lib/modules/pedidos/index.ts`: exporta el esquema, el tipo de entrada, la factoría y sus dos
+  tipos (`OrderPresentationAvailability`, `OrderPresentationAvailabilityDeps`).
+- `lib/composition/index.ts`: `pedidos.quoteOrderPresentationAvailability`, cableada con los
+  mismos dos catálogos que `updateOrderPresentationLines` (sin transacción: no escribe nada).
+- `lib/modules/pedidos/adapters/driving/order-actions.ts`: Server Action
+  `quoteOrderPresentationAvailabilityAction(input: unknown)`, mismo patrón que
+  `quoteOrderCostAction` — devuelve `{ status: 'success', data }` siempre que el actor y la
+  entrada sean válidos, pasando el resultado del dominio tal cual (el formulario de T22 decide
+  qué pintar según `data.kind`).
+- Test: `tests/unit/pedidos/order-presentation-availability.test.ts` (nuevo), 13 casos: R12
+  (sin actor / sin el permiso), R55 (cantidad inválida), unidades iguales, convertibles
+  (L↔ml), incompatibles (R7), igual al total (R8), excede (R36/R39), y la resolución de
+  catálogos (`unit_not_found`, `presentation_not_found`, `presentation_without_content`/R35,
+  reparto vacío, una sola llamada por unidad única).
+
+### T25 — Edición acotada «Reparto y unidad» (SOLO la Server Action; formulario y acción de
+fila de la tabla son T22/tanda E)
+- `lib/modules/pedidos/domain/order-input.ts`: `updateOrderDistributionSchema` — `z.object({
+  unitId, presentationLines }).strict()`. A diferencia de `createOrderSchema`/
+  `updateOrderSchema` (que descartan en silencio cualquier clave de más porque cubren el
+  pedido ENTERO), este esquema RECHAZA la entrada entera si trae cualquier otro campo
+  (cantidad, receta, responsables…), R46.
+- `lib/modules/pedidos/index.ts`: exporta el esquema nuevo y su tipo.
+- `lib/modules/pedidos/adapters/driving/order-actions.ts`: Server Action
+  `updateOrderDistributionAction(id: string, input: unknown)`. Es la ÚNICA de las diez
+  Server Actions del archivo que llama `requirePermission` directamente: su caso de uso
+  (`updateOrderPresentationLines`, T9) NO comprueba el permiso —lo decidió T9, ver
+  `design.md > 4.2`: «la autorización la comprueba QUIEN LLAMA, no este caso de uso», porque
+  solo hay un llamador—, así que la frontera de R12 tiene que ponerla esta action. Por el mismo
+  motivo es la única que valida con un esquema del dominio ANTES de llamar a la fachada (T9
+  recibe `{ unitId, lines }` ya tipado, no `unknown`). Traduce los NUEVE resultados discriminados
+  de T9 a las clases de error del catálogo con un `switch`, mismo patrón que
+  `resolve-distribution.ts`: `not_found→OrderNotFoundError`,
+  `not_editable→OrderPresentationLineNotEditableError` (R13),
+  `unit_not_found→UnitNotFoundError` (R41), `without_unit→OrderWithoutUnitError` (R42),
+  `presentation_not_found→PresentationNotFoundError`,
+  `presentation_without_content→PresentationWithoutContentError` (R35),
+  `incompatible_units→IncompatibleUnitsError` (R7),
+  `exceeds_quantity→OrderDistributionExceedsQuantityError` (R36). Sin `revalidatePath`: la
+  pantalla que lo pinta es de T22 (tanda E), y adivinar su ruta sería inventarla.
+- `lib/composition/index.ts`: sin cambio nuevo para T25 —`pedidos.updateOrderPresentationLines`
+  ya estaba cableada desde T9 (tanda C); T25 solo la LLAMA desde la action.
+- Tests: `tests/unit/pedidos/order-actions-distribution.test.ts` (nuevo, 17 casos: 4 de T11 y 13
+  de T25 —R12 sin permiso, R46 esquema `.strict()` rechaza `quantity` de más, la llamada a la
+  fachada con los tres argumentos correctos, las ocho traducciones de resultado con `it.each`,
+  reparto vacío válido (R9), error ajeno sin detalle—); `tests/unit/pedidos/order-actions.test.ts`
+  (ajustado): las diez Server Actions y su aridad exacta, los DIEZ `catch`/`toErrorState` (antes
+  ocho), y las DOS excepciones documentadas y ACOTADAS con `replaceAll`/conteo exacto —en vez de
+  aflojar la regla en bloque— a la comprobación «la action no repite `requirePermission`» y «la
+  action no valida con un esquema del dominio»: ambas siguen protegiendo a las OTRAS nueve
+  Server Actions, con el nombre exacto de la única que se sale del patrón.
+
+### Mapa R<n> -> test (tanda D)
+
+| R | Test |
+|---|---|
+| R6, R7 (disponible convertido, marca la línea incompatible) | `tests/unit/pedidos/order-presentation-availability.test.ts` |
+| R39 (aviso de solo lectura, no rechaza) | `order-presentation-availability.test.ts`, `order-actions-distribution.test.ts` |
+| R7, R13, R35, R36, R41, R42 (traducción de T25) | `tests/unit/pedidos/order-actions-distribution.test.ts` (`it.each` de las ocho traducciones) |
+| R12 (`unauthorized` sin escribir nada) | `order-actions-distribution.test.ts` |
+| R46 (esquema `.strict()`, solo `unitId`+`presentationLines`) | `order-actions-distribution.test.ts` |
+
+### Salida de tests (tanda D, 2026-09-27)
+- `pnpm run typecheck`: **verde para mis archivos.** Al cerrar la tanda, `tsc --noEmit` mostraba
+  errores en `tests/integration/pedidos/order-packing.int.test.ts` y
+  `tests/unit/pedidos/order-packing.test.ts` (`finishPackingAlive`/`FinishPackingDeps` sin las
+  propiedades nuevas) — **no son míos**: son el ripple a medio terminar de T14 (otro subagente,
+  en paralelo, sobre `order-packing.ts`/`order-packing-repository.ts`), confirmado por `git
+  status` (esos archivos no están en mi lista de tocados) y por que mi build estaba verde ANTES
+  de que ese trabajo empezara a aparecer en el árbol compartido.
+- `pnpm run lint` (acotado a mis archivos): 0 errores, 0 avisos nuevos.
+- `pnpm exec vitest run` de mis archivos: `order-presentation-availability.test.ts` (13/13),
+  `order-actions-distribution.test.ts` (17/17), `order-actions.test.ts` (16/16),
+  `update-order-presentation-lines.test.ts` (14/14, sin cambio, confirma que no rompí T9),
+  `order-distribution.test.ts` (10/10, sin cambio, confirma que no rompí T20),
+  `order-input.test.ts` y `tests/unit/errores` (verdes). `tests/guards` completo: 44 archivos,
+  584/589, 5 `skipped` preexistentes, 0 rojos.
+
+## Tanda D — T14 (2026-09-27) cerrada
+
+`finishPackingAliveById` (Terminar) da de alta un lote de producto terminado por línea del
+reparto, en la MISMA transacción que el cambio de estado (R17-R21). El ripple que el subagente
+de T11/T25 vio a medio terminar en su tanda es este trabajo, ya completo.
+
+- `lib/modules/pedidos/ports/order-write-repository.ts`: `FinishPackingOrderRow`,
+  `FinishPackingUpdateOutcome`, `FinishPackingLine` (nuevos); dos métodos nuevos en
+  `OrderWriteRepository`: `finishPackingAlive` (el `UPDATE` condicional de Terminar, DENTRO de
+  la transacción compartida) y `findPresentationLinesForFinish` (`FOR SHARE`, orden de alta).
+- `lib/modules/pedidos/ports/order-packing-repository.ts`: pierde `finishPackingAlive` — Terminar
+  ya no es un `UPDATE` suelto fuera de la unidad de trabajo, `startPackingAlive` (Comenzar) es
+  el único método que queda.
+- `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`: `finishPackingAliveOrder`
+  (privada, ya no exportada) reescrita sobre `tx` -no el cliente global-, devuelve
+  `FinishPackingUpdateOutcome` con `recipeId`/`quantity`/`ingredientsCost` cuando el `UPDATE` sí
+  mueve la fila; `findAlivePackingStatus` acepta `tx` (antes solo hablaba con el cliente global);
+  `findPresentationLinesForFinishOrder` (nueva, `FOR SHARE`); las dos se cablean en
+  `createOrderWriteRepository`.
+- `lib/modules/pedidos/domain/order-packing.ts`: `OrderPackingDeps` se separa en
+  `StartPackingDeps` (solo `packing`) y `FinishPackingDeps` (`packing`, `unitOfWork`, `recipes`,
+  `products`, `units`, `presentations`). `createFinishPacking` abre `unitOfWork.run`, mueve el
+  estado, lee las líneas; con `[]` responde `{kind:'ok', finishedGoods:[]}` sin tocar ningún
+  catálogo; si no, resuelve la receta (global, `recipe_not_found` si no existe), el coste del
+  lote (`ingredientsCost` guardado o `resolveLotIngredientsCost`), el contenido de cada línea
+  (copiado, o -defensa en profundidad de R19- el vigente de la presentación vía
+  `presentations.findRefs`; si ninguno existe, `PresentationWithoutContentError` con el id de la
+  línea, ANTES de llamar a `receiveFromOrder` de cualquier línea) y el `unitCost` único
+  (`deriveUnitCost(lotCost, sumaDeCantidades)`, R18); llama a `receiveFromOrder` una vez por
+  línea con ese `unitCost` fijo; cualquier `presentation_without_content` de esa llamada también
+  aborta todo.
+- `lib/modules/pedidos/domain/order-catalog.ts`: `finishPackingAliveById` devuelve
+  `{kind:'ok', finishedGoods: readonly FinishedGoodsReceipt[]} | 'not_packer' | 'not_packable' |
+  'not_found' | 'recipe_not_found' | 'presentation_without_content'`.
+- `lib/modules/inventario/index.ts`: exporta `deriveUnitCost` (ya existía en
+  `domain/unit-cost.ts`; R18 lo necesita desde `pedidos`, y el contrato del módulo no lo daba
+  todavía — no se reinventa la división).
+- `lib/composition/index.ts`: `orderPackingRepository` pierde `finishPackingAlive`;
+  `finishPackingAliveById: createFinishPacking({packing, unitOfWork: orderUnitOfWork, recipes:
+  recipeCatalog, products: productCatalog, units: unitCatalog, presentations:
+  presentationCatalog})`.
+- Traducción hasta el borde de `asignaciones` (pedido explícito de la tanda, el tipo cambió):
+  `lib/modules/asignaciones/domain/finish-packing.ts` distingue `typeof result === 'object'`
+  (éxito, solo devuelve `numberText`: la pantalla de asignaciones no pinta el lote todavía, T22
+  la reutiliza si algún día hace falta) de los cinco códigos de cadena, con
+  `RecipeNotFoundError`/`PresentationWithoutContentError` (ya existían en
+  `asignaciones/domain/errors.ts` desde QC-150, sin llamante desde el ripple de T12 — vuelven a
+  tener uno). Su Server Action (`order-packing-actions.ts`) no cambia: solo lee `numberText`.
+- `tests/helpers/order-unit-of-work-double.ts`: `fakeOrderWriteRepository` gana los dos métodos
+  nuevos en su lista de `explota(...)`.
+- Tests nuevos/reescritos: `tests/unit/pedidos/order-packing.test.ts` (15 casos: Comenzar sin
+  cambio + Terminar con doble de `OrderUnitOfWork`/catálogos globales — not_packer/not_packable/
+  not_found, `[]` sin tocar catálogos, un lote por línea, el mismo `unitCost` en las dos líneas,
+  recálculo sin importe guardado, `presentation_without_content` con y sin rescate vigente,
+  ninguna línea nace si `receiveFromOrder` rechaza, `recipe_not_found`);
+  `tests/unit/asignaciones/finish-packing.test.ts` (dos casos nuevos, `recipe_not_found`/
+  `presentation_without_content`; el resto adaptado a `{kind:'ok', finishedGoods:[]}`);
+  `tests/unit/asignaciones/authorization.test.ts` (ajuste mecánico del mismo doble).
+- Integración: `tests/integration/pedidos/order-packing.int.test.ts` (cableado real con
+  `unitOfWork`+catálogos; los dos casos `'ok'` de Terminar sin reparto ahora esperan
+  `{kind:'ok', finishedGoods:[]}`, el resto sin cambio); **REESCRITO por completo**
+  `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` (13 casos, todos verdes):
+  el lote nace tras Terminar (no tras Finalizar), reparto de dos líneas → dos lotes con el MISMO
+  `unitCost`, R19 con una fila escrita a mano (`prisma.orderPresentationLine.updateMany` +
+  presentación sin contenido vigente), `recipe_not_found` con un `recipeId` cambiado a mano a
+  uno de otra empresa justo antes de Terminar (el caso que hasta QC-150 probaba Finalizar: sigue
+  teniendo sentido, ahora contra Terminar, que es quien necesita el nombre de la receta), rollback
+  si `receiveFromOrder` lanza tras escribir, idempotencia simple y a la vez, R20 sin cambio de
+  comportamiento (edición no da de alta nada), y las tres variantes de coste (guardado,
+  recalculado, ingrediente sin costo) con la misma aritmética de antes, ahora tras Comenzar+
+  Terminar.
+- `tests/integration/asignaciones/finished-orders.int.test.ts`: su doble de
+  `finishPackingAliveById` (antes wireado directo a la función cruda `finishPackingAliveOrder`,
+  ya no exportada) pasa a `createOrderWriteRepository().finishPackingAlive(...)` traducido al
+  `'ok'`/string que `OrderCatalog` exige; no ejercita el alta de lotes (fuera de su alcance),
+  así que `'ok'` vuelve con `finishedGoods: []`.
+
+### Mapa R<n> -> test (T14)
+
+| R | Test |
+|---|---|
+| R17 (un lote por línea) | `order-packing.test.ts`, `finish-with-finished-goods.int.test.ts` («R17») |
+| R18 (coste unitario único) | `order-packing.test.ts` («R18»), `finish-with-finished-goods.int.test.ts` («R18 — el coste del lote») |
+| R19 (rollback si falta contenido) | `order-packing.test.ts` («R19»), `finish-with-finished-goods.int.test.ts` («R19») |
+| R20 (edición no da de alta nada) | `finish-with-finished-goods.int.test.ts` («R20») |
+| R21 (idempotencia, también a la vez) | `finish-with-finished-goods.int.test.ts` («R21») |
+
+### Salida de tests (T14, 2026-09-27)
+- `pnpm run typecheck`: verde (repo completo).
+- `pnpm run lint`: 0 errores, mismos 7 avisos preexistentes.
+- `pnpm exec vitest run tests/unit/pedidos/order-packing.test.ts`: 15/15.
+- `pnpm exec vitest run` `tests/unit/asignaciones/{finish-packing,authorization,start-packing}.test.ts`
+  `tests/unit/pedidos/{transition-order,order-catalog}.test.ts`: 97/97.
+- `pnpm exec vitest run tests/integration/pedidos/{order-packing,finish-with-finished-goods}.int.test.ts`: 25/25.
+- `pnpm exec vitest run tests/integration/asignaciones/{finished-orders,responsible-eligibility}.int.test.ts
+  tests/integration/pedidos/{order-reservation,order-reservation-concurrency}.int.test.ts`: 29/29.
+- `pnpm exec vitest related --run` de los 10 archivos de código tocados: 321 archivos, 317
+  verdes, 4714/4741 casos, 20 rojos — TODOS ajenos: `tests/unit/pedidos/company-scope.test.ts`
+  (ripple de `order-actions.ts`, el otro subagente T11/T25, en curso en paralelo) y
+  `tests/unit/pedidos-ui/{order-form,order-form-quote,order-sheet}.test.tsx` (19 casos, ya
+  documentados en la tanda C como rojos de T22 — el formulario de `/pedidos` sigue mandando
+  `presentationId`). Ninguno toca `order-packing.ts`, `inventario` ni `asignaciones/finish-packing.ts`.
+- `pnpm exec vitest run tests/guards`: 44 archivos, 584/589, 5 `skipped` preexistentes, 0 rojos.
+
+## Tanda D — T21 (2026-09-27) cerrada
+
+Sin cambio de código de producción: `update-order.ts` (T8), `update-order-presentation-lines.ts`
+(T9) y `startPackingAliveOrder` (T13) ya serializaban sobre el `FOR UPDATE` de la fila del pedido;
+la prueba lo confirma con dos conexiones reales sin destapar ningún hueco.
+
+- `tests/integration/pedidos/qc170-distribution-concurrency.int.test.ts` (nuevo, 9 casos, Postgres
+  real, empresa efímera por caso con limpieza en `finally`).
+- `tests/integration/aislamiento.json`: entrada nueva bajo `commit` (exigida por
+  `guard-aislamiento-integracion`).
+
+| R | Test (todos en `qc170-distribution-concurrency.int.test.ts`) |
+|---|---|
+| R38 (bajar cantidad / cambiar a unidad inconvertible con reparto vigente → rechazo, pedido intacto) | «R38» (2 casos) |
+| R37 (dos guardados simultáneos; guardado vs bajada de cantidad → suma ≤ cantidad) | «R37» (2 casos, 8 vueltas con `Promise.all`) |
+| R42, R46 (sin unidad: acepta tras asignarla, en edición general y en la acotada en `POR_EMPACAR`) | «R42, R46» (2 casos) |
+| R48 (Comenzar vs guardado, los dos órdenes forzados con `pg.Client` que retiene el `FOR UPDATE`) | «R48» (2 casos) |
+| R30, R46 (cambio de unidad en `POR_EMPACAR` no altera reservas ni asientos) | «R30, R46» (censo antes/después) |
+
+Hallazgo para el reviewer (no bloqueante): la mitad de **rechazo** de R42 (`order_without_unit`)
+no tiene camino de entrada real: los tres esquemas exigen `unitId` UUID y un id que no resuelve da
+`unit_not_found`; `'without_unit'` solo sale de `validateDistribution` con `orderUnit: null`, que
+ningún llamador de producción pasa. `design.md > 4.2` ya lo anota («solo si la entrada no trae
+unidad; el esquema la exige»). Esa rama queda probada solo en dominio puro
+(`order-distribution.test.ts`, T20) y en la traducción de la action (`order-actions-distribution.test.ts`).
+
+Salida: typecheck verde; lint 0/0 en el archivo nuevo; el int test corrido 3 veces, 9/9 las tres
+(23-27 s); `tests/guards` 584/589 (5 skipped preexistentes).
+
+### Bloqueos / decisiones de esta tanda
+- `recipe_not_found` en Terminar: SÍ tiene sentido (decidido, no bloqueado). Terminar necesita el
+  nombre de la receta para el producto terminado (`receiveFromOrder.recipeName`), lectura que
+  Finalizar ya no hace desde T12 (R15/R16). El caso "receta de otra empresa" de QC-150 (antes
+  probado contra Finalizar) se traslada íntegro a Terminar en
+  `finish-with-finished-goods.int.test.ts`.
+- Ningún caso del spec exige qué pasa si `deriveUnitCost` devuelve `null` (coste que redondea a
+  cero unidades): se usa `'0.0000'` como respaldo, documentado en el comentario de
+  `order-packing.ts`; no hay requisito que lo pida ni test que lo ejercite -no es una decisión de
+  producto, es el mismo criterio que ya usa `calculateLotIngredientsCost` («nunca sin importe»)-.
+
+
+## Tanda D — cierre y verificación consolidada (2026-09-28)
+
+Sesión interrumpida y retomada: el subagente de T14 se colgó (watchdog) tras dejar su trabajo verde
+en disco; se verificó a mano. Todos los `backend_dev` de esta tanda con override `model: sonnet`.
+
+Ajustes del cierre:
+- `updateOrderPresentationLines` recibe `actor: Actor` (como `updateOrder`) en vez de
+  `companyId`/`actorId` sueltos: `tests/unit/pedidos/company-scope.test.ts` exige que `companyId`
+  no aparezca en `order-actions.ts` fuera de `currentActor`. Tocados: `update-order-presentation-lines.ts`,
+  `order-actions.ts` y sus tests (`update-order-presentation-lines`, `order-actions-distribution`,
+  `qc170-distribution-concurrency.int`).
+- Retiradas dos citas de ficha en comentarios (`order-catalog.ts`, `finish-with-finished-goods.int.test.ts`).
+
+Salida real:
+- `pnpm run typecheck`: verde. `pnpm run lint`: 0 errores, 7 avisos preexistentes.
+- `pnpm exec vitest related --run <12 fuentes de lib tocadas>` (antes del ajuste de `actor`): 320
+  archivos, 316 verdes; 4703/4730, 7 skipped, 20 rojos = 19 de `pedidos-ui/{order-form,order-form-quote,order-sheet}`
+  (T22, tanda E) + 1 de `company-scope.test.ts` (arreglado después).
+- Tras el ajuste: `finish-with-finished-goods.int` + `order-packing.int` + `company-scope` +
+  `order-presentation-availability` + `order-packing` + `asignaciones/finish-packing`: 74/74;
+  `company-scope`, `order-actions`, `order-actions-distribution`, `update-order-presentation-lines`,
+  `module-contract` + `tests/guards`: 655 verdes, 5 skipped; `qc170-distribution-concurrency.int`: 9/9.
+- Rojos que deja la tanda: solo los 19 de T22 (`tests/unit/pedidos-ui/{order-form,order-form-quote,order-sheet}.test.tsx`).

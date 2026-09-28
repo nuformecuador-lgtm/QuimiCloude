@@ -7,9 +7,21 @@ import {
   type ErrorState,
 } from '@/lib/modules/errores';
 import {
+  IncompatibleUnitsError,
+  OrderDistributionExceedsQuantityError,
+  OrderNotFoundError,
+  OrderPresentationLineNotEditableError,
+  OrderWithoutUnitError,
   PedidosError,
+  PresentationNotFoundError,
+  PresentationWithoutContentError,
+  UnitNotFoundError,
+  ValidationError,
+  requirePermission,
+  updateOrderDistributionSchema,
   type Actor,
   type OrderCostQuote,
+  type OrderPresentationAvailability,
   type OrderSummary,
   type OrderView,
   type Page,
@@ -350,6 +362,88 @@ export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuo
   try {
     const data = await pedidos.quoteOrderCost(input, actor);
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// T11 (`design.md > 3`, R6, R7, R39): «cuanto queda disponible», de solo lectura. Bloque nuevo
+// al final: no reordena ni reformatea nada de arriba.
+// ---------------------------------------------------------------------------------------------
+
+export type OrderPresentationAvailabilityResult =
+  | { status: 'success'; data: OrderPresentationAvailability }
+  | ErrorState;
+
+/**
+ * El disponible en vivo del formulario de reparto, en la unidad del pedido -mismo patron que
+ * `quoteOrderCostAction` para el coste-. Argumento tipado, no `FormData`: no hay `<form>` que
+ * enviar, se recalcula con cada tecla. Nunca rechaza por el reparto: `data.kind` puede ser
+ * `'exceeds_quantity'` con `available` negativo (R39, el aviso), y sigue siendo un `'success'`
+ * -el rechazo lo hace el guardado, no esta consulta.
+ */
+export async function quoteOrderPresentationAvailabilityAction(
+  input: unknown,
+): Promise<OrderPresentationAvailabilityResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.quoteOrderPresentationAvailability(input, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// T25 (`design.md > 4.3`, R7, R12, R13, R35, R36, R41, R42, R46): la edicion ACOTADA «Reparto y
+// unidad» en `POR_EMPACAR`. Bloque nuevo al final: no reordena ni reformatea nada de arriba.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * `updateOrderPresentationLines` (T9) NO comprueba el permiso: su unico llamador es esta
+ * action, y por eso -a diferencia de las diez de arriba, que no repiten `requirePermission`
+ * porque su caso de uso ya es la primera linea que lo hace- esta SI lo llama, aqui, antes de
+ * `zod` y antes de tocar la fachada (R12, `design.md > 4.2`).
+ */
+export async function updateOrderDistributionAction(
+  id: string,
+  input: unknown,
+): Promise<OrderMutationFormState> {
+  const actor = await currentActor();
+
+  try {
+    requirePermission(actor, 'pedidos.modificar');
+
+    const parsed = updateOrderDistributionSchema.safeParse(input);
+    if (!parsed.success) throw new ValidationError();
+
+    const result = await pedidos.updateOrderPresentationLines(id, actor, {
+      unitId: parsed.data.unitId,
+      lines: parsed.data.presentationLines,
+    });
+
+    switch (result) {
+      case 'ok':
+        return { status: 'success' };
+      case 'not_found':
+        throw new OrderNotFoundError();
+      case 'not_editable':
+        throw new OrderPresentationLineNotEditableError();
+      case 'unit_not_found':
+        throw new UnitNotFoundError();
+      case 'without_unit':
+        throw new OrderWithoutUnitError();
+      case 'presentation_not_found':
+        throw new PresentationNotFoundError();
+      case 'presentation_without_content':
+        throw new PresentationWithoutContentError();
+      case 'incompatible_units':
+        throw new IncompatibleUnitsError();
+      case 'exceeds_quantity':
+        throw new OrderDistributionExceedsQuantityError();
+    }
   } catch (error) {
     return toErrorState(error);
   }

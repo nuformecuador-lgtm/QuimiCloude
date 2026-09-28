@@ -138,7 +138,7 @@ Depende de: T1, T7.
 `updatePresentationLinesAliveById` para la puerta del Empacador; se retira) — un test de contrato
 afirma que el puerto no expone escritura de reparto.
 
-### T11 — «Cuánto queda disponible»: conversión de unidades en el borde de `pedidos`
+### [x] T11 — «Cuánto queda disponible»: conversión de unidades en el borde de `pedidos`
 
 **Archivos**: `lib/modules/pedidos/domain/order-cost.ts` o un archivo nuevo
 `order-presentation-availability.ts`, `lib/modules/pedidos/adapters/driving/*` (Server Action que
@@ -178,7 +178,7 @@ ninguna línea (R10), y `'ok'`/`'taken'`/`'already_mine'`/`'not_packable'` sin c
 casos; no rompe la idempotencia ya probada de Comenzar. La prueba de carrera con el guardado del
 reparto (R48) vive en T21.
 
-### T14 — `order-packing.ts`: `finishPackingAliveById` da de alta un lote por línea
+### [x] T14 — `order-packing.ts`: `finishPackingAliveById` da de alta un lote por línea
 
 **Archivos**: `lib/modules/pedidos/domain/order-packing.ts`,
 `lib/modules/pedidos/ports/order-unit-of-work.ts` (si `finishPackingAliveById` necesita el ámbito de
@@ -281,7 +281,7 @@ exacto (`Decimal`, R5, R6) o el primer fallo: `without_unit` (R42), `presentatio
 (R35), `incompatible_units` con la línea (R7), `exceeds_quantity` (R36). Casos: igual (válido, R8),
 menor (válido), mayor por 0,0001 (rechazo), conversión L↔ml, unidades sin base común.
 
-### T21 — Concurrencia y edición de cantidad/unidad contra el reparto vigente
+### [x] T21 — Concurrencia y edición de cantidad/unidad contra el reparto vigente
 
 **Archivos**: `lib/modules/pedidos/domain/update-order.ts`,
 `lib/modules/pedidos/adapters/driven/persistence/*` (el `FOR UPDATE` del reparto),
@@ -337,6 +337,13 @@ pedido (`orders.unit_id`) y remiten a `specs/QC-170-pedido-en-varias-presentacio
 el precio unitario sigue fuera; ningún otro contenido de esos archivos cambia.
 
 ### T25 — Edición acotada «Reparto y unidad» en `POR_EMPACAR` (nueva en F1.4 bis, `[D2']`/`[D3']`)
+
+> Tanda D (2026-09-27): la Server Action `updateOrderDistributionAction` y su esquema en
+> `order-input.ts` están cerrados (R7, R12, R13, R35, R36, R41, R42, R46, ver
+> `progress/impl_QC-170-pedido-en-varias-presentaciones.md > Tanda D`). Sigue abierta la mitad
+> de UI: la acción de fila y el formulario acotado de `app/(private)/pedidos/components/*`
+> (T22, tanda E) — sin ellos, `guard-pantallas-exigen-permiso` todavía no tiene nada nuevo que
+> vigilar para esta task.
 
 **Archivos**: `lib/modules/pedidos/adapters/driving/order-actions.ts` (Server Action nueva
 `updateOrderDistributionAction`), su esquema de entrada (solo `unitId` + `presentationLines`, en

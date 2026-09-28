@@ -500,8 +500,12 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     /^createStartPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,?\s*\}\s*\)$/,
   ],
   [
+    // T14 (R17-R21): Terminar da de alta un lote por linea, asi que `createFinishPacking`
+    // abre `orderUnitOfWork` directamente -ya no cablea `OrderPackingRepository.finishPackingAlive`,
+    // que T13 retiro del puerto- y necesita los mismos catalogos globales que `transitionAliveById`
+    // usaba antes de R15/R16, mas `presentationCatalog` para la defensa en profundidad de R19.
     'finishPackingAliveById',
-    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,?\s*\}\s*\)$/,
+    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,?\s*\}\s*\)$/,
   ],
 ])
 

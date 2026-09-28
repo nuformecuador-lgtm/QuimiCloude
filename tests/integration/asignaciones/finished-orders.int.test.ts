@@ -39,7 +39,6 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   createOrderWriteRepository,
-  finishPackingAliveOrder,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
@@ -87,8 +86,13 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.
     startPackingAliveById: (id, companyId, packerId, now) =>
       startPackingAliveOrder(id, packerId, now, { companyId }),
-    finishPackingAliveById: (id, companyId, packerId, now) =>
-      finishPackingAliveOrder(id, packerId, now, { companyId }),
+    // T14: `finishPackingAlive` ya vive en `OrderWriteRepository`, dentro de la unidad de
+    // trabajo. Este archivo no ejercita el alta de producto terminado (T14 la prueba entera en
+    // `finish-with-finished-goods.int.test.ts`), asi que el `'ok'` vuelve sin lineas.
+    finishPackingAliveById: async (id, companyId, packerId, now) => {
+      const outcome = await createOrderWriteRepository().finishPackingAlive(id, packerId, now, { companyId });
+      return outcome.kind === 'ok' ? { kind: 'ok', finishedGoods: [] } : outcome.kind;
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 
