@@ -23,7 +23,6 @@ export {
   ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_LABELS,
-  ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS,
   MISSING_VALUE_MARK,
   buildAssignedOrdersColumns,
 } from './assigned-orders-columns';
@@ -82,7 +81,6 @@ export {
   COMPANY_ORDER_STATUS_COLUMN_ID,
   COMPANY_ORDER_STATUS_FILTER_OPTIONS,
   COMPANY_ORDER_STATUS_LABELS,
-  COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS,
   buildCompanyOrdersColumns,
   type CompanyOrdersColumnsDeps,
 } from './company-orders-columns';
@@ -106,7 +104,6 @@ export {
   FINISHED_ORDER_QUANTITY_COLUMN_ID,
   FINISHED_ORDER_RECIPE_NAME_COLUMN_ID,
   FINISHED_ORDER_RESPONSIBLES_COLUMN_ID,
-  FINISHED_ORDERS_DEFAULT_PINNED_COLUMNS,
   buildFinishedOrdersColumns,
 } from './finished-orders-columns';
 export { FinishedOrdersEmpty, type FinishedOrdersEmptyProps } from './finished-orders-empty';

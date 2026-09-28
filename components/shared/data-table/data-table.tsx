@@ -18,6 +18,7 @@ import {
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
+import { DataTableColumnDivider } from './data-table-divider';
 import { DataTableFilters } from './data-table-filters';
 import { DataTableHeaderCell, DataTableHeaderMenu } from './data-table-header-menu';
 import { DataTablePagination } from './data-table-pagination';
@@ -122,16 +123,25 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
     emptyAction,
     toolbarActions,
     searchable,
-    defaultPinnedColumns,
   } = props;
 
   const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
   /*
-    `defaultPinnedColumns` es un defecto, no una imposicion: el hook lo aplica dentro de su efecto
-    de restauracion y SOLO si no hay nada persistido para este `tableId` (QC-35 `design.md > 6.3`),
-    asi que soltar la columna sigue recordandose (R25, R26).
+    El defecto por columna (`column.defaultPinned`, `data-table-types.ts`) en el orden en que
+    las columnas se declaran. Sigue siendo un defecto, no una imposicion: el hook lo aplica
+    dentro de su efecto de restauracion y SOLO si no hay nada persistido para este `tableId`
+    (QC-35 `design.md > 6.3`), asi que soltar la columna sigue recordandose (R25, R26).
   */
-  const pinnedColumns = usePinnedColumns(tableId, columnIds, defaultPinnedColumns);
+  const defaultPinning = useMemo(
+    () => ({
+      left: columns.filter((column) => column.defaultPinned === 'left').map((column) => column.id),
+      right: columns
+        .filter((column) => column.defaultPinned === 'right')
+        .map((column) => column.id),
+    }),
+    [columns],
+  );
+  const pinnedColumns = usePinnedColumns(tableId, columnIds, defaultPinning);
 
   const columnPinningState = useMemo(
     () => toColumnPinningState(pinnedColumns.pinning),
@@ -155,6 +165,9 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
    * `columnDef` de la libreria. Columnas "display": el contenido de la celda lo pinta
    * `column.cell(row.original)` directamente (abajo), no `table.FlexRender`, porque `cell`
    * devuelve `ReactNode` y no necesita el contexto de celda de la libreria.
+   *
+   * `defaultPinned` implica fijable: una columna que nace fijada ofrece soltarla en su menu
+   * aunque `pinnable` sea `false` (el defecto no es una imposicion, `data-table-types.ts`).
    */
   const tableColumns = useMemo(
     () =>
@@ -163,7 +176,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
           id: column.id,
           header: column.label,
           enableSorting: column.sortable === true,
-          enablePinning: column.pinnable !== false,
+          enablePinning: column.pinnable !== false || column.defaultPinned !== undefined,
         }),
       ),
     [columns, columnHelper],
@@ -291,7 +304,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
           <Table>
             <TableHeader>
               <TableRow>
-                {columns.map((column: DataTableColumn<TRow>) => {
+                {columns.map((column: DataTableColumn<TRow>, columnIndex: number) => {
                   const pinnedSide = getPinnedSide(column.id);
                   return (
                     <DataTableHeaderCell
@@ -304,6 +317,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
                         pinnedSide === false ? undefined : getStickyStyle(column.id, pinnedSide),
                         toWidthStyle(column),
                       )}
+                      divider={columnIndex < columns.length - 1}
                     >
                       <DataTableHeaderMenu
                         column={column}
@@ -330,8 +344,10 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
               */}
               {table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-testid={`data-table-row-${row.id}`}>
-                  {columns.map((column: DataTableColumn<TRow>) => {
+                  {columns.map((column: DataTableColumn<TRow>, columnIndex: number) => {
                     const pinnedSide = getPinnedSide(column.id);
+                    // Divisor en todas salvo la ultima: marca donde termina cada columna.
+                    const divider = columnIndex < columns.length - 1;
                     return (
                       <TableCell
                         key={column.id}
@@ -345,9 +361,13 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
                           columnAlign(column.align),
                           pinnedSide !== false && 'bg-background',
                           toColumnTextClass(column),
+                          divider && 'relative',
                         )}
                       >
                         {column.cell(row.original as TRow)}
+                        {divider ? (
+                          <DataTableColumnDivider testId={`data-table-cell-divider-${column.id}`} />
+                        ) : null}
                       </TableCell>
                     );
                   })}

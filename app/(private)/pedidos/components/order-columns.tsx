@@ -91,13 +91,6 @@ export const COVERAGE_COLUMN_ID = 'coverage';
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
 export const ACTIONS_COLUMN_ID = 'actions';
 
-/**
- * Columnas que nacen fijadas al borde izquierdo (R19, `design.md > 6.3`). Es un **defecto**: en
- * cuanto el usuario tenga preferencia guardada para este `tableId` gana la suya, incluida la de
- * no tener nada fijado.
- */
-export const ORDER_DEFAULT_PINNED_COLUMNS: readonly string[] = [ORDER_NUMBER_COLUMN_ID];
-
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
 export const MISSING_VALUE_MARK = '—';
 
@@ -175,6 +168,9 @@ export function buildOrderColumns({
       label: 'Nº de pedido',
       align: 'start',
       sortable: true,
+      // Nace fijada al borde izquierdo (R19): es un defecto, con preferencia guardada gana
+      // la del usuario.
+      defaultPinned: 'left',
       // R10: el correlativo SIEMPRE sale de la funcion de formato del contrato. Ni aqui ni en
       // ningun otro archivo se compone `${year}-${sequence}` a mano.
       cell: (order) => formatOrderNumber(order.number),
@@ -182,7 +178,7 @@ export function buildOrderColumns({
     {
       id: STATUS_COLUMN_ID,
       label: 'Estado',
-      align: 'start',
+      align: 'center',
       sortable: true,
       filter: { kind: 'select', options: ORDER_STATUS_FILTER_OPTIONS },
       cell: (order) => <OrderStatusBadge status={order.status} />,
@@ -190,7 +186,7 @@ export function buildOrderColumns({
     {
       id: PRIORITY_COLUMN_ID,
       label: 'Prioridad',
-      align: 'start',
+      align: 'center',
       sortable: true,
       filter: { kind: 'select', options: ORDER_PRIORITY_FILTER_OPTIONS },
       cell: (order) => <OrderPriorityBadge priority={order.priority} />,
@@ -199,15 +195,15 @@ export function buildOrderColumns({
       id: RECIPE_NAME_COLUMN_ID,
       label: 'Receta',
       align: 'start',
-      // R9: el nombre viene RESUELTO en la propia fila (alternativa M, descartada). Si no viene,
-      // marcador — nunca `order.recipeId`.
+      width: 500,
+      hideText: false,
       cell: (order) =>
         order.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />,
     },
     {
       id: QUANTITY_COLUMN_ID,
       label: 'Cantidad',
-      align: 'end',
+      align: 'center',
       // Se pinta redondeada a dos decimales y el `title` lleva el valor exacto, para el caso
       // en que el redondeo esconda una diferencia real.
       cell: (order) => (
@@ -219,7 +215,7 @@ export function buildOrderColumns({
     {
       id: PRESENTATION_NAME_COLUMN_ID,
       label: 'Presentación',
-      align: 'start',
+      align: 'center',
       // Solo informa, como el importe: sin `sortable` y sin `filter`.
       cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
     },
