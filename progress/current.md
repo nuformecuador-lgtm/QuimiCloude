@@ -710,6 +710,12 @@ requests (not your usage limit)») sin escribir nada. Decision del humano, sabie
 spec en el modelo de la sesion. Solo esta llamada; el frontmatter no cambia. Riesgo a vigilar: mas
 rondas de revision en F1.4.
 
+**2026-09-27, QC-170 F2.1: `implementer` con override `model: opus` y `backend_dev` con `sonnet`.**
+Motivo: el arbol principal tiene sin commitear `model: qwen2.5-coder:7b` / `:3b` en los siete
+agentes (modelos de Ollama). Claude Code habla con la API de Anthropic, que devuelve
+`404 model_not_found`: el implementer de la tanda C murio al arrancar sin escribir nada. El
+override devuelve a cada agente lo que declara la version commiteada. Solo estas llamadas.
+
 ## Deudas y cosas abiertas
 
 - **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-142-permiso-propio-de-documentos`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` y `.worktrees/QC-160-boton-de-subida-de-pdf` (2026-09-25) y `.worktrees/QC-150-producto-terminado` (2026-09-25) y `.worktrees/QC-168-estado-por-empacar` (2026-09-26) y `.worktrees/QC-155-pantalla-de-clientes` (2026-09-26) ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC142`, `QuimiCloude_QC145` y `QuimiCloude_QC147` y `QuimiCloude_QC160` y `QuimiCloude_QC150` y `QuimiCloude_QC168` y `QuimiCloude_QC155` y `QuimiCloude_QC159` (2026-09-26) sobran y se puede borrar.
