@@ -710,6 +710,10 @@ requests (not your usage limit)») sin escribir nada. Decision del humano, sabie
 spec en el modelo de la sesion. Solo esta llamada; el frontmatter no cambia. Riesgo a vigilar: mas
 rondas de revision en F1.4.
 
+**2026-09-28, QC-170 F2.1 (reanudacion): `implementer` murio al arrancar por cuota del proveedor**
+(`Rate limit exceeded: free-models-per-day`), sin escribir nada. Orden del humano: sin overrides,
+modelo de la sesion. Se reintentara cuando la cuota se libere (o el humano agregue creditos).
+
 **2026-09-27, QC-170 F2.1: `implementer` con override `model: opus` y `backend_dev` con `sonnet`.**
 Motivo: el arbol principal tiene sin commitear `model: qwen2.5-coder:7b` / `:3b` en los siete
 agentes (modelos de Ollama). Claude Code habla con la API de Anthropic, que devuelve
