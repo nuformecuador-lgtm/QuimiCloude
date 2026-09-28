@@ -33,6 +33,7 @@ vi.mock('@/lib/shared/db/prisma', async () => {
 
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
+import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { createGetAssignedOrderExecution } from '@/lib/modules/asignaciones/domain/get-assigned-order-execution';
 import { createStartAssignedOrder } from '@/lib/modules/asignaciones/domain/start-assigned-order';
 import { findRecipeExecutionContentById } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
@@ -146,7 +147,13 @@ function wireExecutionUseCases(fixture: Fixture) {
   return {
     get: createGetAssignedOrderExecution(deps),
     start: createStartAssignedOrder({ ...deps, now: () => NOW }),
-    finish: createFinishAssignedOrder({ assignments, orders, now: () => NOW }),
+    finish: createFinishAssignedOrder({
+      assignments,
+      orders,
+      people: assignmentDirectoryPrisma,
+      groups: assignmentDirectoryPrisma,
+      now: () => NOW,
+    }),
   };
 }
 
