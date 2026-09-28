@@ -1,6 +1,6 @@
 import type { OrderStatus } from '../domain/order-classification';
 import type { OrderScope } from '../domain/order-scope';
-import type { NewOrder, OrderEdit, OrderRow } from '../domain/order-view';
+import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../domain/order-view';
 
 /** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
  *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
@@ -70,4 +70,16 @@ export interface OrderWriteRepository {
   /** Escribe `reserved_at` SIN mover `updated_at`: apartar o liberar material no es una edicion
    *  que el usuario deba ver en esa columna. */
   setReservedAt(id: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
+
+  /** `updateOrderPresentationLines` (`design.md > 4.2`, R46): escribe SOLO la unidad y el
+   *  reparto, nunca `quantity`, la receta ni la prioridad -eso es `updateAlive`, del formulario
+   *  general-. Reemplazo completo del conjunto de lineas, igual que `updateAlive`. */
+  updatePresentationLinesAlive(
+    id: string,
+    unitId: string,
+    lines: readonly OrderPresentationLineWrite[],
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 }

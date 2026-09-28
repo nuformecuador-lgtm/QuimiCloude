@@ -98,8 +98,8 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId,
-    presentationContent: null,
+    unitId,
+    presentationLines: [],
     ...overrides,
   }
 }

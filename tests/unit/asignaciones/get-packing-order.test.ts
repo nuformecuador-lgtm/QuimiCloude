@@ -24,7 +24,8 @@ const RESUMEN = {
   quantity: '10.0000',
   priority: 'ALTA',
   status: 'POR_EMPACAR',
-  presentationId: 'presentacion-1',
+  presentationLines: [{ presentationId: 'presentacion-1', packages: 1 }],
+  unitId: null,
   finishedAt: null,
   packedBy: null,
 };

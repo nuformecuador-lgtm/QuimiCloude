@@ -416,7 +416,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
       const sembrada = await crearRecetaSembrada(empresa, { lines: [{ productId: ingrediente, percentage: '100.00' }] });
 
       const pedido = await createOrderUseCase(
-        { recipeId: sembrada.id, quantity: '6.0000', priority: 'MEDIA', presentationId },
+        { recipeId: sembrada.id, quantity: '6.0000', priority: 'MEDIA', unitId: empresa.unitId },
         { id: empresa.userId, companyId: empresa.companyId, permissions: ['pedidos.modificar'] } satisfies OrderActor,
       );
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } });

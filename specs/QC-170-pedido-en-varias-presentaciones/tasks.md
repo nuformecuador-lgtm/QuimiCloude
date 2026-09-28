@@ -88,7 +88,7 @@ resuelto; el lote nace con `package_content` de la línea y el asiento `producti
 
 ## Dominio de `pedidos`: el reparto
 
-### T7 — Esquema de entrada: `presentationLinesSchema`, retiro de `presentationId` del pedido
+### [x] T7 — Esquema de entrada: `presentationLinesSchema`, retiro de `presentationId` del pedido
 
 **Archivos**: `lib/modules/pedidos/domain/order-input.ts`, `lib/modules/pedidos/domain/order-view.ts`
 (`NewOrder`, `OrderEdit`), `tests/unit/pedidos/order-input.test.ts`.
@@ -97,7 +97,7 @@ Depende de: T0.
 `unitId` obligatorio; ya no existe `presentationId` en ninguno de los dos; un envío con una
 presentación repetida se rechaza en el borde.
 
-### T8 — `create-order.ts` / `update-order.ts`: escriben el reparto, ya no la presentación única
+### [x] T8 — `create-order.ts` / `update-order.ts`: escriben el reparto, ya no la presentación única
 
 **Archivos**: `lib/modules/pedidos/domain/create-order.ts`, `update-order.ts`,
 `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (repositorio de escritura: crea
@@ -110,7 +110,7 @@ y `update-order.test.ts` existentes se adaptan (pierden los casos de `presentati
 un único id, ganan los del reparto); ninguno da de alta producto terminado (R20, ya lo garantizaba
 QC-150 y no se toca ese test).
 
-### T9 — Caso de uso `updateOrderPresentationLines` + `REPARTO_EDITABLE_STATUSES`
+### [x] T9 — Caso de uso `updateOrderPresentationLines` + `REPARTO_EDITABLE_STATUSES`
 
 **Archivos**: `lib/modules/pedidos/domain/update-order-presentation-lines.ts` (nuevo),
 `lib/modules/pedidos/ports/order-write-repository.ts` (o el puerto que corresponda tras T0),
@@ -127,7 +127,7 @@ exactamente igual al total y uno menor (R8); guarda unidad y líneas juntas; ree
 de líneas; no toca `quantity`, receta ni reserva (R46, R30: el puerto de reservas no recibe ninguna
 llamada); no toca `assertTransition`.
 
-### T10 — `OrderCatalog`: `presentationId` → `presentationLines` (solo lectura)
+### [x] T10 — `OrderCatalog`: `presentationId` → `presentationLines` (solo lectura)
 
 **Archivos**: `lib/modules/pedidos/domain/order-catalog.ts` (tipo `AssignedOrderSummary`),
 `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts`,
@@ -164,7 +164,7 @@ explícito para que nadie reintroduzca la condición); el `'ok'` del método vue
 `finishedGoods` y no hay resultado `'without_unit'`; los tests de QC-150 que afirmaban el lote en
 este punto se retiran o se mueven a T14.
 
-### T13 — `order-packing.ts`: `startPackingAliveById` exige reparto
+### [x] T13 — `order-packing.ts`: `startPackingAliveById` exige reparto
 
 **Archivos**: `lib/modules/pedidos/domain/order-packing.ts`,
 `lib/modules/pedidos/ports/order-packing-repository.ts`,
@@ -312,7 +312,7 @@ se muestra en la unidad del pedido tras cada cambio (R6); si pasa del total, cif
 aviso visible y el guardado deshabilitado (R39); con un pedido sin unidad el control de reparto
 muestra que falta la unidad (R42); la guardia de pantallas y permisos sigue verde.
 
-### T23 — `pedidos` vuelve a leer `UnitCatalog` en lectura; inversión de las pruebas de QC-35bis
+### [x] T23 — `pedidos` vuelve a leer `UnitCatalog` en lectura; inversión de las pruebas de QC-35bis
 
 **Archivos**: `lib/modules/pedidos/domain/get-order.ts`, `list-orders.ts`, `order-view.ts`
 (`OrderView`/`OrderListItem` ganan `unitId`/`unitLabel`), su cableado en `adapters/driving/*`, y los

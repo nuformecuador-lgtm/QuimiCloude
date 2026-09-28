@@ -117,18 +117,18 @@ export interface OrderCatalog {
 
   /**
    * Comenzar el empaque: `POR_EMPACAR -> EN_EMPAQUE` con `packerId` como quien empaca, en una
-   * sola escritura con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
+   * transaccion corta con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
    * empacador repitiendo Comenzar sobre su propio `EN_EMPAQUE`, sin escribir nada;
-   * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'not_packable'` es cualquier otro estado;
-   * `'not_found'` es el mismo caso que en `findAliveById` -no existe, esta de baja o es de
-   * otra empresa-.
+   * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'without_distribution'` es un `POR_EMPACAR` sin
+   * ninguna linea de reparto (R10); `'not_packable'` es cualquier otro estado; `'not_found'` es
+   * el mismo caso que en `findAliveById` -no existe, esta de baja o es de otra empresa-.
    */
   startPackingAliveById(
     id: string,
     companyId: string,
     packerId: string,
     now: Date,
-  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'>;
+  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'>;
 
   /**
    * Terminar el empaque: `EN_EMPAQUE -> ENTREGADO`, con `finishedAt` en la MISMA escritura que
@@ -145,6 +145,17 @@ export interface OrderCatalog {
 }
 
 /**
+ * Una linea del reparto tal como `pedidos` la publica: la presentacion elegida y sus envases,
+ * en el orden de alta (`created_at`, desempate `id`). Solo LECTURA: `OrderCatalog` no gana
+ * ningun metodo que escriba el reparto (`[D2']`), asi que este tipo no lleva el contenido
+ * copiado ni nada mas que quien reparte no necesite para pintarlo.
+ */
+export type AssignedOrderPresentationLine = {
+  readonly presentationId: string;
+  readonly packages: number;
+};
+
+/**
  * Sin autoria, sin motivo de cancelacion y sin marcas de tiempo: lo que no esta en el tipo no se
  * filtra por descuido. `quantity` es cadena decimal, nunca `number`
  * (`docs/architecture.md > Anti-patrones`).
@@ -156,8 +167,11 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
-  /** `null` = sin presentacion: el contrato que `asignaciones` usa para pintarla. */
-  readonly presentationId: string | null;
+  /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo (R26, R27). */
+  readonly presentationLines: readonly AssignedOrderPresentationLine[];
+  /** La unidad en que se expresa `quantity` [Q4]; `null` en los pedidos que no la tienen
+   *  todavia (R43). */
+  readonly unitId: string | null;
   /** `null` = sin fecha de terminado: un pedido entregado antes de que la columna existiera, o
    *  uno que no esta ENTREGADO. */
   readonly finishedAt: Date | null;

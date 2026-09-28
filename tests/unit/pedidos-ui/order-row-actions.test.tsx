@@ -67,6 +67,8 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
     updatedBy: null,
     presentationId: null,
     presentationName: null,
+    unitId: null,
+    unitLabel: null,
     ...overrides,
   };
 }

@@ -75,9 +75,18 @@ const TODOS_LOS_PERMISOS = ['pedidos.consultar', 'pedidos.modificar']
 const ACTOR_A: Actor = { id: 'u-a', companyId: EMPRESA_A, permissions: TODOS_LOS_PERMISOS }
 
 const PRESENTACION = '77777777-7777-4777-8777-777777777777'
+/** QC-170 [Q4]: la unidad del pedido, obligatoria. `almacen()` la deja SIEMPRE resoluble. */
+const UNIDAD = '88888888-8888-4888-8888-888888888888'
 
-const ENTRADA_ALTA = { recipeId: RECETA, quantity: '10.0000', presentationId: PRESENTACION }
+const ENTRADA_ALTA = { recipeId: RECETA, quantity: '10.0000', unitId: UNIDAD }
 const ENTRADA_EDICION = { ...ENTRADA_ALTA, status: 'EN_CURSO' }
+/** El mismo alta, con UNA linea de reparto: para los casos que ejercitan el catalogo de
+ *  presentaciones -si `ENTRADA_ALTA` no tuviera ninguna, `resolveDistribution` no lo llamaria. */
+const ENTRADA_ALTA_CON_REPARTO = {
+  ...ENTRADA_ALTA,
+  presentationLines: [{ presentationId: PRESENTACION, packages: 1 }],
+}
+const ENTRADA_EDICION_CON_REPARTO = { ...ENTRADA_ALTA_CON_REPARTO, status: 'EN_CURSO' }
 
 function fila(id: string): OrderRow {
   return {
@@ -95,6 +104,7 @@ function fila(id: string): OrderRow {
     updatedBy: 'u-0',
     presentationId: null,
     presentationContent: null,
+    unitId: UNIDAD,
   }
 }
 
@@ -199,7 +209,9 @@ function almacen() {
   })
   const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
   const units = {
-    findRefs: vi.fn(async () => []),
+    findRefs: vi.fn(async (ids: readonly string[]) =>
+      ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'Unidad', symbol: null, baseUnitId: null, factor: null }] : [],
+    ),
     findRefsSharingBaseInCompany: vi.fn(async () => []),
   }
   const presentations = {
@@ -241,8 +253,8 @@ function casosDeUso(a: Almacen) {
   const now = () => new Date('2026-09-15T10:00:00.000Z')
   return {
     createOrder: createCreateOrder({ recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, unitOfWork: a.unitOfWork, now }),
-    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes, presentations: a.presentations }),
-    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, log: a.log }),
+    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, units: a.units }),
+    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, units: a.units, log: a.log }),
     updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, unitOfWork: a.unitOfWork, now }),
     cancelOrder: createCancelOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
     deleteOrder: createDeleteOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
@@ -539,7 +551,7 @@ describe('R8: una presentación de otra empresa se rechaza como inexistente', ()
       now: () => new Date('2026-09-15T10:00:00.000Z'),
     })
 
-    const error = await capturar(createOrder(ENTRADA_ALTA, ACTOR_A))
+    const error = await capturar(createOrder(ENTRADA_ALTA_CON_REPARTO, ACTOR_A))
     expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
     expect((error as { code: string }).code).toBe('presentation_not_found')
     expect(a.espias.create).not.toHaveBeenCalled()
@@ -558,7 +570,7 @@ describe('R8: una presentación de otra empresa se rechaza como inexistente', ()
       now: () => new Date('2026-09-15T10:00:00.000Z'),
     })
 
-    const error = await capturar(updateOrder(PEDIDO_DE_A, ENTRADA_EDICION, ACTOR_A))
+    const error = await capturar(updateOrder(PEDIDO_DE_A, ENTRADA_EDICION_CON_REPARTO, ACTOR_A))
     expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
     expect((error as { code: string }).code).toBe('presentation_not_found')
     expect(a.espias.updateAlive).not.toHaveBeenCalled()

@@ -38,7 +38,8 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '200',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: null,
     packedBy: null,
     ...overrides,
@@ -322,7 +323,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
 describe('getAssignedOrderExecution — la presentacion del pedido asignado', () => {
   it('R25: la vista lleva el nombre de la presentacion cuando el pedido tiene una', async () => {
     const { deps, findRefsPresentations } = montar({
-      summary: resumen({ presentationId: PRESENTACION }),
+      summary: resumen({ presentationLines: [{ presentationId: PRESENTACION, packages: 1 }] }),
       presentations: [presentacion()],
     });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
@@ -334,7 +335,7 @@ describe('getAssignedOrderExecution — la presentacion del pedido asignado', ()
   });
 
   it('R25: un pedido sin presentacion devuelve `presentationName: null`, sin consultar el catalogo', async () => {
-    const { deps, findRefsPresentations } = montar({ summary: resumen({ presentationId: null }) });
+    const { deps, findRefsPresentations } = montar({ summary: resumen({ presentationLines: [] }) });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
 
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });

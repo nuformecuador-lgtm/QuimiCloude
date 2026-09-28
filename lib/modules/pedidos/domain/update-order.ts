@@ -1,12 +1,8 @@
 import { requirePermission, type Actor } from './actor';
-import {
-  OrderNotFoundError,
-  PresentationNotFoundError,
-  RecipeNotFoundError,
-  ValidationError,
-} from './errors';
+import { OrderNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
 import { updateOrderSchema } from './order-input';
 import { buildRequirement } from './order-requirement';
+import { resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
@@ -27,7 +23,8 @@ export type UpdateOrderDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
-  /** Ver el comentario identico de `create-order.ts` sobre por que no se le pasa al coste. */
+  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto (R3). No se le pasan al
+   *  coste, ver el comentario identico de `create-order.ts`. */
   readonly presentations: PresentationCatalog;
   readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
@@ -97,17 +94,6 @@ export function createUpdateOrder(
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
 
-    // La presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y evita una
-    // rama «si cambio» que habria que probar aparte. Con un pedido viejo sin presentacion,
-    // `row.presentationId` es `null` y la entrada trae una: la comprobacion es la misma.
-    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
-    if (presentation === undefined) throw new PresentationNotFoundError();
-
-    // La copia solo se sustituye si la presentacion CAMBIA. Si no cambia, se conserva la
-    // de la fila ya leida -editar cantidad, prioridad o receta no la toca-.
-    const presentationContent =
-      data.presentationId === row.presentationId ? row.presentationContent : presentation.content;
-
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
     // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
     // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
@@ -133,6 +119,18 @@ export function createUpdateOrder(
       // arriba y este bloqueo.
       assertTransition(locked.status, locked.status);
 
+      // R41, R6-R8, R35, R36, R38, R42: la unidad y el reparto se resuelven y se validan contra
+      // el total con la fila del pedido YA BLOQUEADA, para que dos ediciones simultaneas no
+      // dejen ninguna pasar del total (R37, la carrera completa la cierra T21).
+      const presentationLines = await resolveDistribution(
+        deps.presentations,
+        deps.units,
+        actor.companyId,
+        data.quantity,
+        data.unitId,
+        data.presentationLines,
+      );
+
       // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado
       // por otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las
       // lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido-. Se lee con
@@ -143,7 +141,7 @@ export function createUpdateOrder(
 
       const result = await transaction.orders.updateAlive(
         id,
-        { ...data, presentationContent },
+        { ...data, presentationLines },
         actor.id,
         instant,
         ingredientsCost,

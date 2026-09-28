@@ -10,8 +10,9 @@ Base propia: `QuimiCloude_QC170` (58 migraciones aplicadas tras la tanda A). Wor
 | A | T0, T1, T2, T17, T18, T24 | cerradas |
 | A (resto) | T3 (backfill + drop) | **BLOQUEADA, ver §Tanda B** |
 | B | T4, T5, T6, T12, T20 | cerradas |
-| B (resto) | T7 | **BLOQUEADA, ver §Tanda B** |
-| C | T8, T9, T10, T13, T23 | pendiente |
+| B (resto) | T7 | cerrada en la tanda C (junto con T8) |
+| C | T7, T8, T9, T10, T13, T23 | cerradas (ver §Tanda C) |
+| C (fuera) | T3 | pendiente: tras T16 (tanda E); T8, T10 y T23 ya cerradas |
 | D | T11, T14, T21, T25 (Server Action) | pendiente |
 | E | T16, T15, T22, T25 (UI) | pendiente |
 | final | T19 (E2E escrito) | pendiente |
@@ -270,3 +271,134 @@ sin test nuevo esta tanda; entran cuando T8 (que las desbloquea) se ejecute.
   `tests/integration/asignaciones/responsible-eligibility.int.test.ts` (no estaban en la lista de
   «5 rojos», rotos por el mismo cambio de firma): **verdes** tras quitarles el doble que inventaba
   un `finishedGoods` falso.
+
+## Tanda C (2026-09-27) — T7, T8, T9, T10, T13, T23 cerradas
+
+Modelo de los subagentes: los `.claude/agents/*.md` del árbol principal declaran modelos de Ollama
+que la API no tiene (404 `model_not_found`); todos los `backend_dev`/`frontend_dev` de esta tanda
+se lanzaron con override `model: sonnet`.
+
+Orden: T7+T8 juntas (levanta el bloqueo de la tanda B); luego en paralelo T9+T13 y T10+T23; al
+final, un cierre de ripple (asignaciones, fixtures de UI, prueba de esquema, fixture de integración).
+
+### T7 — esquema de entrada
+- `lib/modules/pedidos/domain/order-input.ts`: `presentationLinesSchema` (UUID, entero positivo, sin
+  duplicados, `[]` por defecto); `createOrderSchema`/`updateOrderSchema` ganan `unitId` obligatorio y
+  `presentationLines`, pierden `presentationId`.
+- `lib/modules/pedidos/domain/order-view.ts`: `OrderPresentationLineWrite`; `NewOrder`/`OrderEdit`
+  ganan `unitId`/`presentationLines`.
+
+### T8 — alta y edición escriben el reparto
+- `lib/modules/pedidos/domain/resolve-distribution.ts` (nuevo): resuelve unidad y presentaciones
+  contra los catálogos, corre `validateDistribution` (T20) y traduce el primer fallo.
+- `create-order.ts`, `update-order.ts` (esta dentro de `unitOfWork.run` tras `lockAliveById`).
+- `lib/modules/pedidos/domain/errors.ts`: `UnitNotFoundError`, `IncompatibleUnitsError` (reusan
+  códigos existentes del catálogo).
+- `adapters/driven/persistence/order-prisma.ts`: escribe `unit_id`; ya NO escribe
+  `presentation_id`/`presentation_content` (las columnas siguen hasta T3); `replacePresentationLines`
+  (DELETE+INSERT con `company_id` en el WHERE).
+- `adapters/driving/order-actions.ts`: sin cambio funcional (solo comentario). El formulario sigue
+  mandando `presentationId`: el borde del reparto en `FormData` es de T22.
+
+### T9 — `updateOrderPresentationLines`
+- `lib/modules/pedidos/domain/update-order-presentation-lines.ts` (nuevo),
+  `REPARTO_EDITABLE_STATUSES = ['PENDIENTE','EN_CURSO','POR_EMPACAR']` (no hay `BLOQUEADO`, §13).
+- `ports/order-distribution-transaction.ts` (nuevo), `ports/order-write-repository.ts`
+  (`updatePresentationLinesAlive`), `order-prisma.ts` (`updatePresentationLinesAliveOrder`).
+- `order-unit-of-work-prisma.ts`: `createOrderDistributionTransaction()`. Va en este archivo porque es
+  el único de `pedidos` exento de `guard-ambito-empresa-pedidos` para abrir `prisma.$transaction`
+  (excepción ya aprobada); no se añadió ninguna excepción nueva.
+- Cableado en `lib/composition/index.ts` (fachada `pedidos.updateOrderPresentationLines`). La Server
+  Action es T25.
+
+### T13 — Comenzar exige reparto
+- `order-prisma.ts` (`startPackingAliveOrder`): transacción corta `SELECT ... FOR UPDATE` → conteo de
+  líneas en sentencia nueva → `UPDATE` condicional; `'without_distribution'` (R10).
+- `ports/order-packing-repository.ts`, `domain/order-catalog.ts` (tipo de retorno),
+  `order-packing.ts` (comentario).
+- `lib/modules/asignaciones/domain/start-packing.ts` + `errors.ts` + `index.ts`: traducción a
+  `OrderWithoutDistributionError` (`order_without_distribution`).
+
+### T10 — `AssignedOrderSummary.presentationLines` + `unitId`
+- `domain/order-catalog.ts` (`AssignedOrderPresentationLine`), `order-catalog-prisma.ts` (lectura en
+  orden `created_at`, `id`), barrel.
+- **Puente transitorio hasta T16** en `lib/modules/asignaciones/domain/{compose-order-rows,
+  get-assigned-order-execution}.ts`: el nombre de presentación se resuelve con la PRIMERA línea del
+  reparto (o ninguna), sin cambiar vistas ni tipos públicos de `asignaciones`; T16 lo sustituye por
+  el reparto entero y el formato «+N».
+
+### T23 — unidad en la lectura de `pedidos`
+- `order-view.ts` (`OrderRow.unitId`, `OrderView.unitId`/`unitLabel`), `get-order.ts`
+  (`unitLabelOf`: símbolo o nombre, `null` sin unidad), `list-orders.ts` (una sola `findRefs` por
+  página), cableado `units` en `lib/composition/index.ts`. `order-contents.ts` sigue sin importar
+  `unidades`.
+- Pruebas de QC-35bis invertidas o ajustadas con rastro: `module-contract`, `list-orders`,
+  `order-service`, `pedidos-constraints.int` y `tests/unit/pedidos/schema/pedidos-schema.test.ts`
+  (6 casos: censo de columnas de `Order`, `unitId` vuelve, `OrderPresentationLine` como única lista,
+  índices). `authorization.test.ts` y `order-input.test.ts` no necesitaron cambio por T23.
+- La UI todavía no pinta la unidad (T16/T22).
+
+### Ripple de la tanda C (tests; sin cambio de lo que afirman salvo lo indicado)
+- Unit pedidos: `order-service`, `quote-order-cost`, `company-scope`, `company-isolation-service`,
+  `cancel-order`, `delete-order`, `transition-order`, helper `tests/helpers/order-unit-of-work-double.ts`.
+- Unit asignaciones: `get-assigned-order-execution`, `list-assigned-orders`, `list-company-orders`,
+  `list-finished-orders`, `start-assigned-order`, `get-packing-order`, `list-packing-orders`,
+  `start-packing` (caso nuevo).
+- Unit pedidos-ui (solo `unitId: null, unitLabel: null` en fixtures de `OrderView`, por
+  frontend_dev): 14 archivos `tests/unit/pedidos-ui/*.test.tsx`.
+- Integración pedidos: `order-content-copy` (reescrito: la copia del contenido es por línea),
+  `order-repository` (arreglada además la limpieza: borrar líneas antes que pedidos, FK RESTRICT),
+  `order-packing` (caso R10 nuevo; R18/R19 siembran una línea), y mecánico en
+  `company-scope-queries`, `list-query-orders`, `order-catalog-company-summary`, `order-cost-quote`,
+  `order-duplicate-number`, `order-expiry`, `order-finished-at`, `order-ingredients-cost`,
+  `order-reservation(-concurrency)`, `order-sequence(-race)`, `order-unit-of-work`,
+  `finish-with-finished-goods` (solo compilar), `documentos/formula-import`.
+- Integración asignaciones: `prisma-tx-holder.ts` reenvía ahora `$transaction(fn)` interactivo a la
+  `tx` del test (Comenzar abre su propia transacción, que caía en otra conexión y no veía el pedido
+  sin commit → `not_found`); `use-case-fixture.ts` gana `crearLinea`; `finished-orders.int` siembra
+  una línea antes de Comenzar.
+
+### Mapa R<n> -> test (tanda C)
+
+| R | Test |
+|---|---|
+| R1, R2, R4, R9 (forma del reparto, sin duplicados, sin `presentationId`, `[]` válido) | `tests/unit/pedidos/order-input.test.ts`, `create-order.test.ts` |
+| R3 (copia del contenido por línea) | `tests/integration/pedidos/order-content-copy.int.test.ts`, `resolve-distribution.test.ts` |
+| R6, R7, R8 (disponible, `incompatible_units`, igual o menor se acepta) | `create-order.test.ts`, `update-order.test.ts`, `resolve-distribution.test.ts`, `update-order-presentation-lines.test.ts` |
+| R10 (Comenzar sin reparto → `without_distribution`) | `tests/unit/pedidos/order-packing.test.ts`, `tests/integration/pedidos/order-packing.int.test.ts`, `tests/unit/asignaciones/start-packing.test.ts` |
+| R11, R13, R14, [D3'] (ventana editable, `not_editable` por estado) | `tests/unit/pedidos/update-order-presentation-lines.test.ts` |
+| R12, [D2'] (`OrderCatalog` sin escritura de reparto) | `tests/unit/pedidos/order-catalog.test.ts` (contrato) |
+| R20 (alta/edición no dan de alta producto terminado) | `create-order.test.ts` |
+| R26, R27 (reparto en el resumen, orden de alta) | `tests/unit/pedidos/order-catalog.test.ts`, `tests/integration/pedidos/order-repository.int.test.ts` |
+| R30, R46 (no toca cantidad, receta ni reserva) | `update-order-presentation-lines.test.ts` |
+| R35 (`presentation_without_content`) | `create-order.test.ts`, `update-order.test.ts`, `update-order-presentation-lines.test.ts`, `order-content-copy.int.test.ts` |
+| R36 (`order_distribution_exceeds_quantity`) | `create-order.test.ts`, `update-order.test.ts`, `update-order-presentation-lines.test.ts` |
+| R37, R48 (bloqueo antes de validar; la carrera real es T21) | `update-order-presentation-lines.test.ts`, `order-packing.int.test.ts` |
+| R38 (unidad nueva deja el reparto inconvertible) | `update-order.test.ts`, `update-order-presentation-lines.test.ts` |
+| R41 (`unit_not_found`, unidad obligatoria) | `order-input.test.ts`, `create-order.test.ts`, `update-order.test.ts`, `update-order-presentation-lines.test.ts` |
+| R42 (unidad en ficha/listado, cifra sola sin unidad; `without_unit`) | `order-service.test.ts`, `list-orders.test.ts`, `update-order-presentation-lines.test.ts` |
+| R41, R43 (FK y anulable de `orders.unit_id`) | `tests/integration/pedidos/pedidos-constraints.int.test.ts`, `tests/unit/pedidos/schema/pedidos-schema.test.ts` |
+
+### Salida de tests (tanda C, 2026-09-27)
+- `pnpm run typecheck`: verde.
+- `pnpm run lint`: 0 errores, 7 avisos preexistentes (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run <23 archivos de lib tocados> tests/guards`: 274 archivos, 268
+  verdes; 3892/3920 casos, 27 rojos, 1 skipped. Rojos:
+  - `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`: 6 (T14, ya conocidos).
+  - `tests/unit/pedidos-ui/order-form.test.tsx` (12), `order-form-quote.test.tsx` (5),
+    `order-sheet.test.tsx` (2): **nuevos de esta tanda, adjudicados a T22.** El servidor exige
+    `unitId`/`presentationLines` y el formulario aún manda `presentationId`; hasta T22 el alta y la
+    edición desde la UI de `/pedidos` se rechazan por validación.
+  - `user-table.test.tsx` (1) y `product-page.test.tsx` (1): flakes de carga; aislados, 103/103 verdes.
+- Errores por ruta (`tests/unit/errores`, `start-packing`): 64/64 verdes.
+- Integración `tests/integration/asignaciones` + `tests/integration/pedidos`: todo verde salvo los 6
+  de `finish-with-finished-goods` (T14).
+- `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` («no modifica los módulos…») atribuye a QC-35
+  los cambios si hay commits con «QC-35» en `origin/dev..HEAD` (aquí 946b16ca y 91bcf2c5,
+  documentales de esta ficha) y lee `git status`: con el árbol sucio sale rojo. Verificado tras el
+  commit en la sección siguiente.
+
+### T3
+Tras esta tanda, T3 solo depende de T16 (T8, T10 y T23 cerradas): `asignaciones` aún tiene el
+puente transitorio y la UI lee `presentationId`/`presentationName` de `OrderView`.
+

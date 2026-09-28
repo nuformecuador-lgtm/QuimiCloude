@@ -215,6 +215,7 @@ import {
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
+  createUpdateOrderPresentationLines,
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
@@ -225,7 +226,10 @@ import {
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
-import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import {
+  createOrderDistributionTransaction,
+  withOrderTransaction,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
@@ -1080,6 +1084,14 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 
+/**
+ * `OrderDistributionTransaction` (T9, `design.md > 4.2`): la transaccion CORTA propia de
+ * `updateOrderPresentationLines`, sin `inventario` en su ambito -este caso de uso no toca
+ * material ni reserva-. NO reutiliza `orderUnitOfWork`: son dos transacciones con un alcance
+ * distinto a proposito.
+ */
+const orderDistributionTransaction = createOrderDistributionTransaction();
+
 /** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
  *  `findCoverage` la usa una vez por pagina. */
 const reservationQueries: ReservationQueries = createReservationQueries();
@@ -1111,10 +1123,11 @@ const expireStaleOrders = createExpireStaleOrders({
  *
  * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
  * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
- * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben SOLO el
- * catalogo de recetas, por el mismo motivo: no calculan ningun importe ni apartan nada.
- * `createOrder` y `updateOrder` son los dos que si costean y aparta, asi que son los dos que
- * reciben tambien `products`, `units` y `unitOfWork`.
+ * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben `recipes`,
+ * `presentations` y, desde [Q4], `units` -para la etiqueta de `unitId`, R42-, pero no
+ * `products` ni `unitOfWork`: no calculan ningun importe ni apartan nada. `createOrder` y
+ * `updateOrder` son los dos que si costean y aparta, asi que son los dos que reciben tambien
+ * `products` y `unitOfWork`.
  */
 export const pedidos = {
   createOrder: createCreateOrder({
@@ -1128,11 +1141,15 @@ export const pedidos = {
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    // [Q4] devuelve la unidad al pedido: `getOrder` vuelve a necesitar `units`.
+    units: unitCatalog,
   }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    // [Q4]: mismo motivo que `getOrder`, una llamada por pagina.
+    units: unitCatalog,
     log: pedidosListQueryLog,
   }),
   updateOrder: createUpdateOrder({
@@ -1156,6 +1173,15 @@ export const pedidos = {
   // orden por su cuenta.
   verifyCronSecret,
   expireStaleOrders,
+  // T9 (`design.md > 4.2`, R46): la edicion ACOTADA del reparto y la unidad. Clave NUEVA al
+  // final: ninguna de las de arriba se toca. Recibe `presentations`/`units` -mismos catalogos
+  // que `createOrder`/`updateOrder`- y su PROPIA transaccion, mas corta: no la unidad de trabajo
+  // compartida con `inventario`, porque este caso de uso no toca material ni reserva.
+  updateOrderPresentationLines: createUpdateOrderPresentationLines({
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    transaction: orderDistributionTransaction,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------

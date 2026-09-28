@@ -164,13 +164,14 @@ async function sembrarPedido(empresa: Empresa, datos: SiembraDePedido): Promise<
   return id;
 }
 
-function pedidoNuevo(overrides: Partial<NewOrder> & { readonly presentationId: string }): NewOrder {
+function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
   return {
     recipeId: recetaId,
     quantity: '7.0000',
     priority: 'BAJA',
     status: 'PENDIENTE',
-    presentationContent: null,
+    unitId,
+    presentationLines: [],
     ...overrides,
   };
 }
@@ -179,7 +180,7 @@ function pedidoNuevo(overrides: Partial<NewOrder> & { readonly presentationId: s
 async function alta(empresa: Empresa): Promise<OrderRow> {
   const resultado = await withOrderTransaction((tx) =>
     createOrderWriteRepository(tx).create(
-      pedidoNuevo({ presentationId: empresa.presentationId }),
+      pedidoNuevo(),
       ANO,
       empresa.userId,
       new Date(),
@@ -439,7 +440,7 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
 
     const resultado = await updateAliveOrder(
       ajeno,
-      pedidoNuevo({ quantity: '1.0000', presentationId: A.presentationId }),
+      pedidoNuevo({ quantity: '1.0000' }),
       A.userId,
       new Date(),
       null,
@@ -460,7 +461,7 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
 
     const resultado = await updateAliveOrder(
       propio,
-      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', presentationId: B.presentationId }),
+      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA' }),
       B.userId,
       new Date(),
       null,
@@ -607,7 +608,7 @@ async function retrato(empresa: Empresa, ajena: Empresa): Promise<string> {
   const catalogoAjeno = await findAliveOrderTargetById(ajena.pedidos[0] ?? '', empresa.companyId);
   const escrituraAjena = await updateAliveOrder(
     ajena.pedidos[0] ?? '',
-    pedidoNuevo({ quantity: '2.0000', presentationId: empresa.presentationId }),
+    pedidoNuevo({ quantity: '2.0000' }),
     empresa.userId,
     new Date(),
     null,

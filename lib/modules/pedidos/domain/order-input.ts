@@ -15,12 +15,11 @@ import {
  */
 
 /**
- * QC-35bis (decision humana del 2026-09-07): **el precio unitario y la unidad SALIERON del
- * pedido**, y con ellos `unitPriceSchema` y `unitIdSchema`. Un pedido es receta + cantidad +
- * prioridad (+ estado en la edicion). No hay «campo opcional» ni «valor por defecto» para
- * ninguno de los dos: lo que el esquema no declara no puede llegar, asi que un formulario o un
- * cliente que siga enviando `unitId` o `unitPrice` no consigue nada -`z.object` descarta las
- * claves desconocidas- y no hay forma de reintroducirlos por descuido.
+ * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio sigue fuera,
+ * pero la UNIDAD vuelve (`unitId`, obligatoria en el alta y en la edicion): la cantidad se
+ * interpreta siempre en ella, con o sin reparto, y cada linea del reparto la usa para convertir
+ * `envases x contenido` de la unidad de su presentacion a la del pedido. `unitPriceSchema` sigue
+ * sin existir: lo que el esquema no declara no puede llegar.
  */
 
 /**
@@ -57,14 +56,34 @@ const recipeIdSchema = z.string().uuid();
 const prioritySchema = z.enum(ORDER_PRIORITY_VALUES);
 
 /**
- * La presentacion en que se entrega lo fabricado: aqui solo se valida la FORMA -un UUID-. La
- * EXISTENCIA y que sea de la empresa de quien escribe las comprueba el caso de uso a traves
- * del contrato publico `@/lib/modules/inventario`, nunca consultando su tabla.
- *
- * Obligatoria en el alta y heredada por la edicion: un pedido viejo sin presentacion se edita
- * enviando una, sin rama especial.
+ * La unidad en que se expresa `quantity` ([Q4]): aqui solo se valida la FORMA -un UUID-.
+ * La EXISTENCIA y que sea visible para la empresa de quien escribe las comprueba el caso de uso
+ * contra el contrato publico `@/lib/modules/unidades`. Obligatoria en el alta y en la edicion.
  */
-const presentationIdSchema = z.string().uuid();
+const unitIdSchema = z.string().uuid();
+
+/**
+ * Una linea del reparto: la presentacion en que se entrega parte de lo fabricado y cuantos
+ * envases ENTEROS de ella (R1). Aqui solo la FORMA; la existencia, el contenido copiado y el
+ * total contra la cantidad del pedido los comprueba el caso de uso.
+ */
+const presentationLineSchema = z.object({
+  presentationId: z.string().uuid(),
+  packages: z.coerce.number().int().positive(),
+});
+
+/** Dos veces la MISMA presentacion en el reparto no son dos lineas: son la misma linea con los
+ *  envases repetidos, y eso lo rechaza el borde en vez de sumarlos por su cuenta (R2). */
+function hasNoDuplicatePresentation(lines: readonly { readonly presentationId: string }[]): boolean {
+  return new Set(lines.map((line) => line.presentationId)).size === lines.length;
+}
+
+/** El reparto completo. `[]` es un pedido sin reparto todavia, valido (R9): quien no reparte
+ *  nada al dar de alta lo reparte despues, hasta que empieza el empaque. */
+export const presentationLinesSchema = z
+  .array(presentationLineSchema)
+  .refine(hasNoDuplicatePresentation, { message: 'Cada presentación aparece una sola vez.' })
+  .default([]);
 
 /**
  * Alta (R8, R9). Lo que este esquema NO declara, no puede llegar: no hay `status`, ni
@@ -83,7 +102,8 @@ export const createOrderSchema = z.object({
   recipeId: recipeIdSchema,
   quantity: quantitySchema,
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
-  presentationId: presentationIdSchema,
+  unitId: unitIdSchema,
+  presentationLines: presentationLinesSchema,
 });
 
 /**

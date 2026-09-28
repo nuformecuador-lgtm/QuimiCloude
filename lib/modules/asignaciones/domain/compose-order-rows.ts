@@ -41,8 +41,13 @@ export async function composeOrderRows(
     recipeIds.length === 0 ? [] : await deps.recipes.findRefsIncludingDeleted(recipeIds, companyId);
   const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
+  // Transitorio: solo la primera linea del reparto hasta que este listado pinte el reparto entero.
   const presentationIds = [
-    ...new Set(orders.map((row) => row.presentationId).filter((id): id is string => id !== null)),
+    ...new Set(
+      orders
+        .map((row) => row.presentationLines[0]?.presentationId ?? null)
+        .filter((id): id is string => id !== null),
+    ),
   ];
   const presentations =
     presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, companyId);
@@ -73,10 +78,12 @@ export async function composeOrderRows(
 
   const result = new Map<string, ComposedOrderRow>();
   for (const row of orders) {
+    // Transitorio: solo la primera linea del reparto hasta que este listado pinte el reparto entero.
+    const firstPresentationId = row.presentationLines[0]?.presentationId ?? null;
     result.set(row.id, {
       recipeName: recipeNames.get(row.recipeId) ?? null,
       presentationName:
-        row.presentationId === null ? null : presentationNames.get(row.presentationId) ?? null,
+        firstPresentationId === null ? null : presentationNames.get(firstPresentationId) ?? null,
       responsibles: responsiblesByOrder.get(row.id) ?? [],
     });
   }

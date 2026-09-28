@@ -116,10 +116,12 @@ export function createGetAssignedOrderExecution(
       };
     });
 
+    // Transitorio: solo la primera linea del reparto hasta que la ejecucion pinte el reparto entero.
+    const firstPresentationId = summary.presentationLines[0]?.presentationId ?? null;
     const presentations =
-      summary.presentationId === null
+      firstPresentationId === null
         ? []
-        : await deps.presentations.findRefs([summary.presentationId], actor.companyId);
+        : await deps.presentations.findRefs([firstPresentationId], actor.companyId);
     const presentationName = presentations[0]?.name ?? null;
 
     return {

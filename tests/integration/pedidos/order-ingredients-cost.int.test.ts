@@ -341,7 +341,7 @@ describe('el alta lo deja guardado en la fila (R10)', () => {
 
     try {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
       // necesaria = 6.0000 * 100 % = 6.0000, cubierta por el unico lote (stock 10, coste 5.0000).
@@ -366,19 +366,19 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
       const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
 
-      const creado = await alta({ recipeId, quantity: '4.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '4.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
       // necesaria = 4 * 100 % = 4, cubierta -> 4 * 5 = 20.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('20.0000')
 
       // Edicion #1: sube la cantidad sin desbordar la existencia. Recalcula a OTRO numero.
-      const editadoInput: NewOrder = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
+      const editadoInput: NewOrder = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editadoInput, actorDe(A))
       // necesaria = 8 * 100 % = 8, cubierta (stock 10) -> 8 * 5 = 40.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('40.0000')
 
       // Edicion #2: sube la cantidad hasta que la existencia YA NO cubre -> sustituye por NULL.
-      const editadoSinCubrir: NewOrder = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
+      const editadoSinCubrir: NewOrder = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editadoSinCubrir, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
     } finally {
@@ -397,7 +397,7 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
 
     try {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-03T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
@@ -428,7 +428,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
 
     try {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-05T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
@@ -486,7 +486,7 @@ describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21
 
     try {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-06T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
       expect(await orders.findAliveById(orderId, ambitoDe(Q))).toBeNull()
@@ -515,14 +515,14 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
       const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
 
-      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
       const despuesDeAlta = await fotoDeInventario(A)
       expect(despuesDeAlta.batches).toBe(antesDeAlta.batches)
       expect(despuesDeAlta.movements).toBe(antesDeAlta.movements)
 
-      const editado: NewOrder = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
+      const editado: NewOrder = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editado, actorDe(A))
 
       const despuesDeEdicion = await fotoDeInventario(A)
@@ -569,7 +569,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
 
     try {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-09T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '30.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '30.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
       // promedio simple (10 + 12 + 15) / 3 = 12,333333333333; * 30 = 369,99999999999 -> 370,0000.
@@ -615,12 +615,12 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
 
       // El primer pedido necesita exactamente lo del lote mas antiguo: lo aparta entero, y ese
       // lote queda con disponible cero para cualquier OTRO pedido.
-      const primero = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const primero = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', unitId }, actorDe(A))
       ordenQueApartaTodo = primero.id
       // Al crearse, los dos lotes siguen enteros: promedio (3+9)/2=6; 10 * 6 = 60.
       expect(await ingredientsCostCrudo(ordenQueApartaTodo)).toBe('60.0000')
 
-      const segundo = await alta({ recipeId, quantity: '5.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const segundo = await alta({ recipeId, quantity: '5.0000', priority: 'MEDIA', unitId }, actorDe(A))
       ordenBajoPrueba = segundo.id
 
       // Si el lote agotado entrara en el promedio, saldria (3+9)/2=6 -> 30.0000. Al quedar fuera,
@@ -650,10 +650,10 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-11T12:00:00.000Z') })
 
       // Aparta 8 de los 10: quedan solo 2 disponibles, aunque la existencia total siga siendo 10.
-      const primero = await alta({ recipeId, quantity: '8.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const primero = await alta({ recipeId, quantity: '8.0000', priority: 'MEDIA', unitId }, actorDe(A))
       ordenQueAparta = primero.id
 
-      const segundo = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const segundo = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA', unitId }, actorDe(A))
       ordenBajoPrueba = segundo.id
 
       expect(await ingredientsCostCrudo(ordenBajoPrueba)).toBeNull()
@@ -690,7 +690,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
 
     try {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-12T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
       // Si el lote de maquina entrara en el promedio, sobraria disponible de sobra (10 + 1000) y
@@ -735,7 +735,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
 
     try {
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-13T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
       // El lote de maquina, sin coste, tiene disponible de sobra (1000) para cubrir la necesidad
@@ -763,7 +763,7 @@ describe('el pedido queda creado con el importe en blanco y la base no lanza 220
 
       // necesaria = 100 * 100 % = 100, cubierta EXACTAMENTE por el lote (stock 100).
       // importe = 100 * 9999999999.9999 = 999999999999.9900, muy por encima de 9999999999.9999.
-      const creado = await alta({ recipeId, quantity: '100.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '100.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
       expect(await ingredientsCostCrudo(orderId)).toBeNull()

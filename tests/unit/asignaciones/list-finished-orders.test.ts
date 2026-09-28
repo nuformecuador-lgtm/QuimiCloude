@@ -43,7 +43,8 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'ENTREGADO',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: new Date('2026-09-20T10:00:00.000Z'),
     packedBy: null,
     ...overrides,
@@ -237,7 +238,7 @@ describe('QC-145 — listFinishedOrders: R21 la fila y sus responsables', () => 
   });
 
   it('sin presentacion ni receta resueltas, salen `null` y no el identificador', async () => {
-    const items = [resumen(pedidoId(1), { presentationId: null })];
+    const items = [resumen(pedidoId(1), { presentationLines: [] })];
     const { deps } = montar({ page: { items, total: 1 }, refs: [] });
     const listFinishedOrders = createListFinishedOrders(deps);
 

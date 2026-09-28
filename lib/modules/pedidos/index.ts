@@ -26,6 +26,7 @@ export type {
   OrderAssignmentTarget,
   OrderCatalog,
   AssignedOrderSummary,
+  AssignedOrderPresentationLine,
   OrderSummaryOrdering,
   FinishedGoodsReceipt,
 } from './domain/order-catalog';
@@ -71,6 +72,13 @@ export {
   ValidationError,
   InsufficientMaterialError,
   RecipeWithoutLinesError,
+  PresentationWithoutContentError,
+  UnitNotFoundError,
+  IncompatibleUnitsError,
+  OrderWithoutUnitError,
+  OrderDistributionExceedsQuantityError,
+  OrderWithoutDistributionError,
+  OrderPresentationLineNotEditableError,
 } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los
@@ -85,6 +93,7 @@ export {
   updateOrderSchema,
   cancelOrderSchema,
   quoteOrderCostSchema,
+  presentationLinesSchema,
   EDITABLE_STATUS_VALUES,
 } from './domain/order-input';
 export type {
@@ -102,7 +111,14 @@ export { assertTransition, isAllowedTransition } from './domain/order-transition
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
  *  `OrderEdit` es lo que acepta `updateAlive`, sin `status`. */
-export type { NewOrder, OrderEdit, OrderRow, OrderView, OrderSummary } from './domain/order-view';
+export type {
+  NewOrder,
+  OrderEdit,
+  OrderPresentationLineWrite,
+  OrderRow,
+  OrderView,
+  OrderSummary,
+} from './domain/order-view';
 
 /** QC-57 (R25, R31): el contrato generico de consulta de lista y la lista blanca de pedidos.
  *  `listOrdersSchema`, `ListOrdersInput` y `OrderFilters` se fueron con el: el listado de
@@ -163,3 +179,16 @@ export { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './domain/order
 
 export { createQuoteOrderCost } from './domain/quote-order-cost';
 export type { QuoteOrderCostDeps, OrderCostQuote } from './domain/quote-order-cost';
+
+/** T9 (`design.md > 4.2`, R46): la edicion ACOTADA del reparto y la unidad, aparte de
+ *  `updateOrder`. `REPARTO_EDITABLE_STATUSES` se publica porque T25 (la accion de fila) la
+ *  necesita para decidir cuando pintar «Reparto y unidad». */
+export {
+  createUpdateOrderPresentationLines,
+  REPARTO_EDITABLE_STATUSES,
+} from './domain/update-order-presentation-lines';
+export type {
+  UpdateOrderPresentationLinesDeps,
+  UpdateOrderPresentationLinesInput,
+  UpdateOrderPresentationLinesResult,
+} from './domain/update-order-presentation-lines';

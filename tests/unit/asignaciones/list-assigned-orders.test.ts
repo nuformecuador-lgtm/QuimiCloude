@@ -44,7 +44,8 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: null,
     packedBy: null,
     ...overrides,
@@ -418,8 +419,8 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
   it('R24: cada fila lleva el nombre de la presentacion, o null, con una sola llamada al catalogo', async () => {
     const ids = [pedidoId(1), pedidoId(2)];
     const items = [
-      resumen(pedidoId(1), { presentationId: PRESENTACION }),
-      resumen(pedidoId(2), { presentationId: null }),
+      resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1 }] }),
+      resumen(pedidoId(2), { presentationLines: [] }),
     ];
     const { deps, findRefsPresentations } = montar({
       ids,
@@ -439,7 +440,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
   it('R24: ninguna llamada al catalogo si ningun pedido de la pagina tiene presentacion', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationId: null })];
+    const items = [resumen(pedidoId(1), { presentationLines: [] })];
     const { deps, findRefsPresentations } = montar({
       ids,
       page: { items, total: 1 },
@@ -455,7 +456,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
   it('R26: un actor con solo asignaciones.consultar recibe la presentacion de sus pedidos asignados', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationId: PRESENTACION })];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1 }] })];
     const { deps } = montar({
       ids,
       page: { items, total: 1 },

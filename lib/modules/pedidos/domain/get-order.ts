@@ -6,21 +6,29 @@ import type { OrderRow, OrderView } from './order-view';
 
 import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
 /**
- * QC-35bis (2026-09-07): `units` YA NO ES UNA DEPENDENCIA de este caso de uso. Al salir la
- * unidad del pedido no queda ningun id que resolver contra el catalogo de `unidades`, asi que
- * pedirlo aqui seria cablear una dependencia falsa -exactamente lo que `design.md > 9` evita en
- * `cancelOrder` y `deleteOrder`-. Es tambien una consulta menos por ficha y por pagina.
+ * [Q4] devuelve la unidad al pedido: `units` VUELVE a ser una dependencia de este caso de uso,
+ * porque `quantity` se interpreta siempre en `unitId` y la ficha muestra su etiqueta. Sigue sin
+ * haber ningun `unitPrice` que costear aqui.
  */
 export type GetOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve el nombre de la presentacion. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de `unitId` (R42). */
+  readonly units: UnitCatalog;
 };
+
+/** El simbolo de la unidad, o su nombre si no lo tiene (R42). Se exporta porque
+ *  `list-orders.ts` la reutiliza para no divergir en el criterio. */
+export function unitLabelOf(unit: { readonly name: string; readonly symbol: string | null }): string {
+  return unit.symbol ?? unit.name;
+}
 
 /**
  * Compone la salida de una fila con los nombres ya resueltos (R42, R43, R44, R46).
@@ -42,6 +50,7 @@ export function toOrderView(
   row: OrderRow,
   recipeNames: ReadonlyMap<string, string>,
   presentationNames: ReadonlyMap<string, string> = new Map(),
+  unitLabels: ReadonlyMap<string, string> = new Map(),
 ): OrderView {
   return {
     id: row.id,
@@ -64,14 +73,17 @@ export function toOrderView(
     // `null` si el pedido esta sin presentacion; la FK compuesta con RESTRICT hace imposible
     // el caso «tiene id pero no vuelve del catalogo».
     presentationName: row.presentationId === null ? null : presentationNames.get(row.presentationId) ?? null,
+    unitId: row.unitId,
+    // `null` si el pedido esta sin unidad (R42); la FK con RESTRICT hace imposible el caso
+    // «tiene id pero no vuelve del catalogo».
+    unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,
   };
 }
 
 /**
  * Ficha de un pedido (R42). Consultar exige `pedidos.consultar` (QC-74 R16): quien no lo tiene
- * ni siquiera lee, y el `requirePermission` va antes de tocar el repositorio y el catalogo de
- * recetas (QC-74 R12). Era UN paso por DOS catalogos hasta QC-35bis: el de `unidades` se fue
- * con la unidad del pedido.
+ * ni siquiera lee, y el `requirePermission` va antes de tocar el repositorio y los catalogos
+ * de recetas, presentaciones y unidades (R12).
  */
 export function createGetOrder(
   deps: GetOrderDeps,
@@ -97,10 +109,13 @@ export function createGetOrder(
         ? []
         : await deps.presentations.findRefs([row.presentationId], actor.companyId);
 
+    const units = row.unitId === null ? [] : await deps.units.findRefs([row.unitId], actor.companyId);
+
     return toOrderView(
       row,
       new Map(recipes.map((recipe) => [recipe.id, recipe.name])),
       new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
+      new Map(units.map((unit) => [unit.id, unitLabelOf(unit)])),
     );
   };
 }

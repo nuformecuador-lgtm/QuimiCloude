@@ -54,11 +54,13 @@ const RECETA_DE_BAJA: RecipeRef = { id: RECIPE_ID, name: 'Formula retirada', isD
 const OTRA_VIVA: RecipeRef = { id: OTRA_RECETA, name: 'Detergente neutro', isDeleted: false }
 const OTRA_DE_BAJA: RecipeRef = { id: OTRA_RECETA, name: 'Formula vieja', isDeleted: true }
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
+/** QC-170 [Q4]: la unidad del pedido. `dobles()` la deja SIEMPRE resoluble. */
+const UNIT_ID = '77777777-7777-4777-8777-777777777777'
 
 const ENTRADA_ALTA = {
   recipeId: RECIPE_ID,
   quantity: '10.0000',
-  presentationId: PRESENTATION_ID,
+  unitId: UNIT_ID,
 }
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
@@ -77,6 +79,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedBy: 'admin-0',
     presentationId: PRESENTATION_ID,
     presentationContent: null,
+    unitId: UNIT_ID,
     ...overrides,
   }
 }
@@ -143,12 +146,18 @@ function dobles(opciones: {
     reservations: { syncForOrder },
   })
 
+  // La unidad del pedido SIEMPRE resuelve: `createOrder`/`updateOrder` la exigen (R41), y este
+  // archivo no ejercita el reparto -eso lo cubren `create-order.test.ts`/`update-order.test.ts`-.
+  const findUnitRefs = vi.fn(async (ids: readonly string[]) =>
+    ids.includes(UNIT_ID) ? [{ id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }] : [],
+  )
+
   return {
     orders,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
     products: { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) } as unknown as ProductCatalog,
     units: {
-      findRefs: vi.fn(async () => []),
+      findRefs: findUnitRefs,
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
@@ -196,7 +205,8 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',
-      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      presentationLines: [],
     })
   })
 
@@ -235,12 +245,12 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     const [data, , actorId] = d.create.mock.calls[0] as [Record<string, unknown>, number, string]
     expect(actorId).toBe(ADMIN.id)
     expect(Object.keys(data).sort()).toEqual([
-      'presentationContent',
-      'presentationId',
+      'presentationLines',
       'priority',
       'quantity',
       'recipeId',
       'status',
+      'unitId',
     ])
     expect(data.status).toBe('PENDIENTE')
   })
@@ -318,6 +328,9 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       // R23: la ficha devuelve id y nombre de la presentacion, resueltos por el contrato.
       presentationId: PRESENTATION_ID,
       presentationName: 'Bidon 20L',
+      // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
+      unitId: UNIT_ID,
+      unitLabel: 'L',
     })
   })
 
@@ -329,6 +342,27 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     expect(vista.presentationId).toBeNull()
     expect(vista.presentationName).toBeNull()
     expect(d.findPresentationRefs).not.toHaveBeenCalled()
+  })
+
+  it('R42: un pedido sin unidad devuelve su ausencia, sin consultar el catalogo', async () => {
+    const d = dobles({ fila: fila({ unitId: null }) })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.unitId).toBeNull()
+    expect(vista.unitLabel).toBeNull()
+  })
+
+  it('[Q4]: sin simbolo, la etiqueta cae al nombre de la unidad', async () => {
+    const d = dobles({ fila: fila() })
+    const findUnitRefsSinSimbolo = vi.fn(async (ids: readonly string[]) =>
+      ids.includes(UNIT_ID) ? [{ id: UNIT_ID, name: 'Litro', symbol: null, baseUnitId: null, factor: null }] : [],
+    )
+    const conUnitsSinSimbolo = { ...d, units: { ...d.units, findRefs: findUnitRefsSinSimbolo } }
+
+    const vista = await createGetOrder(conUnitsSinSimbolo)(ORDER_ID, ADMIN)
+
+    expect(vista.unitLabel).toBe('Litro')
   })
 
   it('devuelve el motivo de un pedido cancelado (R29, R40)', async () => {
@@ -383,6 +417,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       orders,
       recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
       presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
+      units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
       log,
     })({ page: 1 }, ADMIN)
 
@@ -416,8 +451,8 @@ describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', (
       recipeId: RECIPE_ID,
       quantity: '10.0000',
       priority: 'ALTA',
-      presentationId: PRESENTATION_ID,
-      presentationContent: null,
+      unitId: UNIT_ID,
+      presentationLines: [],
     })
     expect(actorId).toBe(ADMIN.id)
     expect(instante).toBe(AHORA)

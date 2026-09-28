@@ -1,9 +1,10 @@
 import { requirePermission, type Actor } from './actor';
-import { PresentationNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
+import { RecipeNotFoundError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { buildRequirement } from './order-requirement';
+import { resolveDistribution } from './resolve-distribution';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
@@ -36,11 +37,12 @@ export type CreateOrderDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: los lotes con existencia con los que se costea. */
   readonly products: ProductCatalog;
-  /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
+  /** Contrato PUBLICO de `unidades`: la unidad del pedido (R41) y las de cada presentacion del
+   *  reparto, para convertir y para el coste. */
   readonly units: UnitCatalog;
-  /** Contrato PUBLICO de `inventario`: la presentacion que se elige, solo para comprobar que
-   *  existe en la empresa de quien escribe. No se le pasa al coste: la presentacion no cambia
-   *  nada de lo que se calcula. */
+  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto, para comprobar que
+   *  existen en la empresa de quien escribe y copiar su contenido (R3). No se le pasan al
+   *  coste: el reparto no cambia nada de lo que ese calculo hace. */
   readonly presentations: PresentationCatalog;
   /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
    *  `reserved_at`, las tres o ninguna. */
@@ -108,12 +110,6 @@ export function createCreateOrder(
     const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
 
-    // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
-    // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
-    // `presentation.content` es lo que se copia en el pedido: `null` si aun no lo tiene.
-    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
-    if (presentation === undefined) throw new PresentationNotFoundError();
-
     const ingredientsCost = await resolveIngredientsCost(
       deps.recipes,
       deps.products,
@@ -123,13 +119,24 @@ export function createCreateOrder(
       actor.companyId,
     );
 
+    // R41, R6-R8, R35, R36, R42: la unidad y el reparto se resuelven y se validan contra el
+    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido (R9).
+    const presentationLines = await resolveDistribution(
+      deps.presentations,
+      deps.units,
+      actor.companyId,
+      data.quantity,
+      data.unitId,
+      data.presentationLines,
+    );
+
     const instant = now();
 
     // R9: el estado de alta es siempre `PENDIENTE` y lo pone este caso de uso, no la
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
     const created = await deps.unitOfWork.run(async (transaction) => {
       const order = await transaction.orders.create(
-        { ...data, status: STATUS_DE_ALTA, presentationContent: presentation.content },
+        { ...data, status: STATUS_DE_ALTA, presentationLines },
         instant.getUTCFullYear(),
         actor.id,
         instant,

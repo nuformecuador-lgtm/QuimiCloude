@@ -285,8 +285,8 @@ async function crearProductoConLote(fixture: Fixture, stock: string, unitCost = 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, presentationId: string, quantity: string): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
+function nuevoPedido(recipeId: string, unitId: string, quantity: string): NewOrder {
+  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', unitId, presentationLines: [] };
 }
 
 async function finishedProductDe(companyId: string, recipeId: string, presentationId: string) {
@@ -308,7 +308,7 @@ describe('R4-R8 — Finalizar deja el pedido POR_EMPACAR, consume material y da 
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultado = await orderCatalog.transitionAliveById(
@@ -360,7 +360,7 @@ describe('R18, R20 — sin contenido, el Finalizar rechaza sin cambiar nada', ()
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultado = await orderCatalog.transitionAliveById(
@@ -448,7 +448,7 @@ describe('R27 — la edicion en Pedidos no da de alta producto terminado', () =>
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       const aEnCurso = await orderCatalog.transitionAliveById(
         creado.id,
@@ -464,7 +464,7 @@ describe('R27 — la edicion en Pedidos no da de alta producto terminado', () =>
       // esta entrada nunca podria mover el pedido a `ENTREGADO` aunque el dato viaje aqui.
       await updateOrder(
         creado.id,
-        { recipeId, quantity: '20.0000', presentationId: fixture.presentationId, status: 'ENTREGADO' },
+        { recipeId, quantity: '20.0000', unitId: fixture.unitId, presentationLines: [], status: 'ENTREGADO' },
         actorDe(fixture),
       );
 
@@ -521,7 +521,7 @@ describe('R20 — un fallo forzado tras el lote deshace la transaccion entera', 
     const transitionAliveByIdConFallo = createTransitionOrder({ unitOfWork: unitOfWorkQueForzaFallo });
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       await transitionAliveByIdConFallo(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       await expect(
@@ -547,7 +547,7 @@ describe('R21 — un solo lote por pedido, tambien a la vez', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
@@ -570,7 +570,7 @@ describe('R21 — un solo lote por pedido, tambien a la vez', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultados = await Promise.allSettled([
@@ -598,7 +598,7 @@ describe('R24, R26 — el Finalizar de asignaciones devuelve el lote y exige el 
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
       const resultado = await finishAssignedOrderPara(creado.id)(asignacionesActorDe(fixture), { orderId: creado.id });
@@ -619,7 +619,7 @@ describe('R24, R26 — el Finalizar de asignaciones devuelve el lote y exige el 
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       await expect(
         finishAssignedOrderPara(creado.id)({ id: fixture.actorId, companyId: fixture.companyId, permissions: [] }, { orderId: creado.id }),
@@ -642,7 +642,7 @@ describe('R42, R43 — el coste del lote', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
       expect(antes.ingredientsCost?.toFixed(4)).toBe('20.0000');
 
@@ -673,7 +673,7 @@ describe('R42, R43 — el coste del lote', () => {
       // que tampoco aparta nada-; se recarga con la receta con linea por fuera del caso de uso,
       // igual que el patron de `order-reservation.int.test.ts`: el pedido llega al Finalizar sin
       // nada apartado y sin importe guardado.
-      const creado = await createOrder(nuevoPedido(recipeVacia, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeVacia, fixture.unitId, '10.0000'), actorDe(fixture));
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
       expect(antes.ingredientsCost).toBeNull();
       await prisma.order.update({ where: { id: creado.id }, data: { recipeId: recipeConLinea } });
@@ -707,7 +707,7 @@ describe('R42, R43 — el coste del lote', () => {
     await crearLinea(recipeId, maquinaSinCosto, '40.00');
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
       // El ingrediente MACHINE sin costo invalida el importe del pedido entero.
       expect(antes.ingredientsCost).toBeNull();

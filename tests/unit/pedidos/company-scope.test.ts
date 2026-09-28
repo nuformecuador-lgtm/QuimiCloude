@@ -45,6 +45,8 @@ const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
 const PEDIDO = '11111111-1111-4111-8111-111111111111'
 const RECETA = '22222222-2222-4222-8222-222222222222'
 const PRESENTACION = '66666666-6666-4666-8666-666666666666'
+/** QC-170 [Q4]: la unidad del pedido, obligatoria en el alta. */
+const UNIDAD = '77777777-7777-4777-8777-777777777777'
 
 const ACTOR: Actor = {
   id: 'u-1',
@@ -81,6 +83,7 @@ function filaConEmpresa(): OrderRow {
     companyId: EMPRESA,
     presentationId: null,
     presentationContent: null,
+    unitId: null,
   }
   return row as OrderRow
 }
@@ -199,22 +202,25 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       findCostingBatches: vi.fn(async () => []),
     } as unknown as ProductCatalog
     const units = {
-      findRefs: vi.fn(async () => []),
+      findRefs: vi.fn(async (ids: readonly string[]) =>
+        ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'Unidad', symbol: null, baseUnitId: null, factor: null }] : [],
+      ),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as unknown as UnitCatalog
     const presentations = {
       findRefs: vi.fn(async () => [{ id: PRESENTACION, name: 'Bidon 20L' }]),
     } as unknown as PresentationCatalog
 
-    const ficha = await createGetOrder({ orders, recipes, presentations })(PEDIDO, ACTOR)
+    const ficha = await createGetOrder({ orders, recipes, presentations, units })(PEDIDO, ACTOR)
     const lista = await createListOrders({
       orders,
       recipes,
       presentations,
+      units,
       log: { ignoredFields: vi.fn() },
     })({ page: 1 }, ACTOR)
     const alta = await createCreateOrder({ recipes, products, units, presentations, unitOfWork })(
-      { recipeId: RECETA, quantity: '10.0000', presentationId: PRESENTACION },
+      { recipeId: RECETA, quantity: '10.0000', unitId: UNIDAD },
       ACTOR,
     )
 

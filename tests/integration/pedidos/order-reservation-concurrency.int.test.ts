@@ -234,8 +234,8 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, presentationId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status, presentationId, presentationContent: null };
+function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
+  return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
 }
 
 type ReservaResumen = { readonly kind: string; readonly quantity: string; readonly createdBy: string | null };
@@ -274,8 +274,8 @@ describe('R16 — dos altas simultaneas de 1.500 sobre 2.000 disponibles dejan e
       try {
         // Sin `await` entre las dos llamadas: compiten de verdad por el bloqueo del producto.
         const [primero, segundo] = await Promise.all([
-          createOrder(nuevoPedido(recipeId, fixture.presentationId, '1500.0000'), actorDe(fixture)),
-          createOrder(nuevoPedido(recipeId, fixture.presentationId, '1500.0000'), actorDe(fixture)),
+          createOrder(nuevoPedido(recipeId, fixture.unitId, '1500.0000'), actorDe(fixture)),
+          createOrder(nuevoPedido(recipeId, fixture.unitId, '1500.0000'), actorDe(fixture)),
         ]);
 
         const [reservedAtPrimero, reservedAtSegundo, movimientosPrimero, movimientosSegundo] = await Promise.all([
@@ -316,7 +316,7 @@ describe('una merma simultanea a un apartado sobre el mismo producto no deja el 
       // camino hacia negativo es la propia merma; lo que aqui se comprueba es que el bloqueo del
       // producto deja a la merma leer el `stock` comprometido, gane quien gane la carrera.
       const [creado] = await Promise.all([
-        createOrder(nuevoPedido(recipeId, fixture.presentationId, '50.0000'), actorDe(fixture)),
+        createOrder(nuevoPedido(recipeId, fixture.unitId, '50.0000'), actorDe(fixture)),
         adjustBatchStock(batchId, '-50', 'merma', fixture.actorId, new Date(), ambitoDe(fixture)),
       ]);
 
@@ -347,7 +347,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
 
     try {
       async function nuevaOrden(): Promise<string> {
-        const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '1.0000'), actorDe(fixture));
+        const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '1.0000'), actorDe(fixture));
         return creado.id;
       }
 
@@ -360,8 +360,8 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
         return id;
       }
 
-      const crear = () => createOrder(nuevoPedido(recipeId, fixture.presentationId, '1.0000'), actorDe(fixture));
-      const editar = (orderId: string) => updateOrder(orderId, nuevoPedido(recipeId, fixture.presentationId, '2.0000'), actorDe(fixture));
+      const crear = () => createOrder(nuevoPedido(recipeId, fixture.unitId, '1.0000'), actorDe(fixture));
+      const editar = (orderId: string) => updateOrder(orderId, nuevoPedido(recipeId, fixture.unitId, '2.0000'), actorDe(fixture));
       const cancelar = (orderId: string) => cancelOrder(orderId, { reason: 'vuelta de concurrencia' }, actorDe(fixture));
       const borrar = (orderId: string) => deleteOrder(orderId, actorDe(fixture));
       const finalizar = (orderId: string) =>

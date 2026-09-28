@@ -9,7 +9,7 @@
  * test con ROLLBACK impediria que dos llamadas reales compitan por el bloqueo de la misma fila
  * (R19). Cada caso fabrica su propia empresa efimera con randomUUID y la limpia en un `finally`.
  *
- * Requisitos cubiertos: R18, R19, R20, R21, R22, R23, R24, R25, R27, R28.
+ * Requisitos cubiertos: R10, R18, R19, R20, R21, R22, R23, R24, R25, R27, R28.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -54,6 +54,10 @@ type Fixture = {
   readonly packerId: string;
   readonly otherPackerId: string;
   readonly documentTypeCodes: readonly string[];
+  /** Una presentacion viva de la empresa, para poder darle al menos una linea de reparto a un
+   *  pedido `POR_EMPACAR` que tenga que Comenzar de verdad (R18, R19). */
+  readonly presentationId: string;
+  readonly unitId: string;
 };
 
 async function createCompany(label: string): Promise<string> {
@@ -104,18 +108,50 @@ async function crearFixture(): Promise<Fixture> {
   });
   const packer = await createUser(companyId);
   const otherPacker = await createUser(companyId);
+  const unit = await prisma.unit.create({
+    data: { name: `unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca}` },
+    select: { id: true },
+  });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: `Presentacion ${marca}`,
+      nameNormalized: `presentacion${marca}`,
+      unitId: unit.id,
+      companyId,
+      content: '1',
+    },
+    select: { id: true },
+  });
   return {
     companyId,
     recipeId: recipe.id,
     packerId: packer.id,
     otherPackerId: otherPacker.id,
     documentTypeCodes: [packer.documentTypeCode, otherPacker.documentTypeCode],
+    presentationId: presentation.id,
+    unitId: unit.id,
   };
 }
 
+/** Una linea de reparto para que un pedido `POR_EMPACAR` pueda Comenzar de verdad (R10). */
+async function crearLinea(fixture: Fixture, orderId: string, packages = 1): Promise<void> {
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId,
+      companyId: fixture.companyId,
+      presentationId: fixture.presentationId,
+      packages,
+      presentationContent: '1',
+    },
+  });
+}
+
 async function borrarFixture(fixture: Fixture, orderIds: readonly string[]): Promise<void> {
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [...orderIds] } } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } });
+  await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
+  await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
   await prisma.recipe.deleteMany({ where: { id: fixture.recipeId } });
   const userIds = [fixture.packerId, fixture.otherPackerId];
   const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { roleId: true } });
@@ -191,10 +227,27 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('startPackingAliveById — R18, R19, R20, R23, R24, R25', () => {
+describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
+  it('R10: Comenzar sobre POR_EMPACAR sin ninguna linea de reparto es without_distribution, sin escribir nada', async () => {
+    const fixture = await crearFixture();
+    const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
+    try {
+      const antes = await readOrder(pedido);
+      const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+      expect(resultado).toBe('without_distribution');
+
+      const despues = await readOrder(pedido);
+      expect(despues).toEqual(antes);
+    } finally {
+      await borrarFixture(fixture, [pedido]);
+    }
+  });
+
+
   it('R18: Comenzar sobre POR_EMPACAR deja EN_EMPAQUE con ese empacador, en una sola escritura', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
+    await crearLinea(fixture, pedido);
     try {
       const antes = await movementCountDe(fixture.companyId);
       const ahora = new Date();
@@ -213,6 +266,7 @@ describe('startPackingAliveById — R18, R19, R20, R23, R24, R25', () => {
   it('R19: dos Comenzar reales a la vez sobre el mismo pedido dejan a uno ok y al otro taken', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
+    await crearLinea(fixture, pedido);
     try {
       // Sin `await` entre las dos llamadas: compiten de verdad por el bloqueo de la fila.
       const [resultadoUno, resultadoDos] = await Promise.all([

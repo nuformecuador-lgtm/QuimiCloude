@@ -49,8 +49,11 @@ function dobles() {
     findRefs: vi.fn(async () => [PRODUCT_REF]),
   } as unknown as ProductCatalog
 
+  // Devuelve el mismo `UNIT_REF` con el id PEDIDO: asi resuelve tanto la unidad de costeo -que
+  // pide 'u-1'- como la unidad del pedido -que pide un UUID, exigido por `unitIdSchema`-, sin
+  // ninguna conversion real entre las dos (las dos declaran `baseUnitId: null`).
   const units = {
-    findRefs: vi.fn(async () => [UNIT_REF]),
+    findRefs: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ ...UNIT_REF, id }))),
     findRefsSharingBaseInCompany: vi.fn(),
   } as unknown as UnitCatalog
 
@@ -83,6 +86,7 @@ function filaExistente(): OrderRow {
     updatedBy: 'admin-0',
     presentationId: PRESENTATION_ID,
     presentationContent: null,
+    unitId: null,
   }
 }
 
@@ -110,7 +114,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       now: () => new Date('2026-05-01T00:00:00.000Z'),
     })
     await alta(
-      { recipeId: RECIPE_ID, quantity: '4.0000', presentationId: PRESENTATION_ID },
+      { recipeId: RECIPE_ID, quantity: '4.0000', unitId: '99999999-9999-4999-8999-999999999999' },
       actorCon('pedidos.modificar'),
     )
     const ingredientsCostDelAlta = (create.mock.calls[0] as unknown as readonly unknown[])[4] as string | null
@@ -142,7 +146,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       {
         recipeId: RECIPE_ID,
         quantity: '4.0000',
-        presentationId: PRESENTATION_ID,
+        unitId: '99999999-9999-4999-8999-999999999999',
       },
       actorCon('pedidos.modificar'),
     )

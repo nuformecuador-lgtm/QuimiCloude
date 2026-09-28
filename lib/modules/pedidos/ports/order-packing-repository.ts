@@ -9,14 +9,17 @@ import type { OrderScope } from '../domain/order-scope';
  * parametro (`tests/guards/guard-ambito-empresa-pedidos.test.ts`).
  */
 export interface OrderPackingRepository {
-  /** `UPDATE ... WHERE status = 'POR_EMPACAR'`: `count = 1` es `'ok'`. Si no, relee la fila para
-   *  clasificar `'not_found'`, `'already_mine'`, `'taken'` o `'not_packable'`. */
+  /** Transaccion corta con `SELECT ... FOR UPDATE` de la fila, conteo del reparto en una
+   *  sentencia aparte y solo entonces el `UPDATE` (`design.md > 4.5`, R10, R48): `'ok'` si el
+   *  `UPDATE` mueve la fila; `'without_distribution'` si esta `POR_EMPACAR` sin ninguna linea de
+   *  reparto; si no, `'not_found'`, `'already_mine'`, `'taken'` o `'not_packable'` segun la fila
+   *  bloqueada. */
   startPackingAlive(
     id: string,
     packerId: string,
     now: Date,
     scope: OrderScope,
-  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'>;
+  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'>;
 
   /** `UPDATE ... WHERE status = 'EN_EMPAQUE' AND packed_by = packerId`, con `finished_at` en la
    *  MISMA sentencia. Si no: relee para clasificar `'not_found'`, `'not_packer'` o

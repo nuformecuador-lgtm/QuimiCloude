@@ -219,6 +219,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedBy: null,
     presentationId: PRESENTACION.id,
     presentationName: PRESENTACION.name,
+    unitId: null,
+    unitLabel: null,
     ...overrides,
   };
 }

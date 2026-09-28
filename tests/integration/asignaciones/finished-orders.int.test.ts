@@ -48,7 +48,7 @@ import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 
-import { NOW, actorOf, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
+import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransaction } from './use-case-fixture';
 
 const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
 if (PERMISOS_DEL_EMPACADOR === undefined) {
@@ -268,6 +268,10 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       // Finalizar: EN_CURSO -> POR_EMPACAR. Todavia no aparece en «Terminados».
       await finishAssignedOrder(actorOperario, { orderId: pedido });
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+
+      // R10: Comenzar exige al menos una linea de reparto real, o el pedido queda
+      // `'without_distribution'` y no puede avanzar.
+      await crearLinea(fixture.tx, fixture.companyA, pedido);
 
       // Comenzar: POR_EMPACAR -> EN_EMPAQUE, a nombre del Empacador. Sigue sin aparecer.
       await startPacking(actorEmpacador, { orderId: pedido });

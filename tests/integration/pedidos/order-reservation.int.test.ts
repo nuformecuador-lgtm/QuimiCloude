@@ -246,8 +246,8 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, presentationId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status, presentationId, presentationContent: null };
+function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
+  return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
 }
 
 type ReservaResumen = { readonly kind: string; readonly quantity: string; readonly createdBy: string | null };
@@ -288,7 +288,7 @@ describe('R7, R20 — crear aparta y fija reserved_at', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos).toEqual([{ kind: 'reserve', quantity: '10.0000', createdBy: fixture.actorId }]);
@@ -307,10 +307,10 @@ describe('R12 — editar a la baja deja solo la diferencia', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       const primeraReservedAt = await reservedAtDe(creado.id);
 
-      await updateOrder(creado.id, nuevoPedido(recipeId, fixture.presentationId, '4.0000'), actorDe(fixture));
+      await updateOrder(creado.id, nuevoPedido(recipeId, fixture.unitId, '4.0000'), actorDe(fixture));
 
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos).toEqual([
@@ -335,9 +335,9 @@ describe('R13 — editar que ya no cabe libera todo', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
-      await updateOrder(creado.id, nuevoPedido(recipeId, fixture.presentationId, '1000.0000'), actorDe(fixture));
+      await updateOrder(creado.id, nuevoPedido(recipeId, fixture.unitId, '1000.0000'), actorDe(fixture));
 
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos).toEqual([
@@ -359,7 +359,7 @@ describe('R14 — editar la receta no toca lo apartado de un pedido existente', 
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       const antes = await movimientosDe(creado.id);
 
       // La receta se recarga con otra proporcion, POR FUERA del caso de uso de pedidos: nadie
@@ -382,7 +382,7 @@ describe('R18 — cancelar libera con autor', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       await cancelOrder(creado.id, { reason: 'el cliente desistio' }, actorDe(fixture));
 
@@ -406,7 +406,7 @@ describe('R19 — borrar libera', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       await deleteOrder(creado.id, actorDe(fixture));
 
@@ -430,12 +430,12 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '4.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '4.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('100.0000');
 
       await updateOrder(
         creado.id,
-        nuevoPedido(recipeId, fixture.presentationId, '8.0000', 'ENTREGADO'),
+        nuevoPedido(recipeId, fixture.unitId, '8.0000', 'ENTREGADO'),
         actorDe(fixture),
       );
 
@@ -459,14 +459,14 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '5.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '5.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('5.0000');
 
       // Subir por encima de la existencia no rechaza: la edicion nunca consume, asi que
       // `insufficient_material` no puede salir de aqui.
       await updateOrder(
         creado.id,
-        nuevoPedido(recipeId, fixture.presentationId, '500.0000', 'ENTREGADO'),
+        nuevoPedido(recipeId, fixture.unitId, '500.0000', 'ENTREGADO'),
         actorDe(fixture),
       );
 
@@ -489,7 +489,7 @@ describe('R49 — receta sin lineas: crear y editar guardan sin error y sin apar
     const recipeId = await crearReceta(fixture);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       expect(await movimientosDe(creado.id)).toEqual([]);
       expect(await reservedAtDe(creado.id)).toBeNull();
@@ -506,9 +506,9 @@ describe('R49 — receta sin lineas: crear y editar guardan sin error y sin apar
     const recipeVacia = await crearReceta(fixture);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeConLineas, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeConLineas, fixture.unitId, '10.0000'), actorDe(fixture));
 
-      await updateOrder(creado.id, nuevoPedido(recipeVacia, fixture.presentationId, '10.0000'), actorDe(fixture));
+      await updateOrder(creado.id, nuevoPedido(recipeVacia, fixture.unitId, '10.0000'), actorDe(fixture));
 
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos).toEqual([
@@ -528,11 +528,11 @@ describe('R52 — un pedido sin apartado y receta vacia no rechaza la edicion au
     const recipeId = await crearReceta(fixture);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
 
       // `status` muere en el esquema: esto es una edicion cualquiera, nunca una entrega.
-      await updateOrder(creado.id, nuevoPedido(recipeId, fixture.presentationId, '20.0000', 'ENTREGADO'), actorDe(fixture));
+      await updateOrder(creado.id, nuevoPedido(recipeId, fixture.unitId, '20.0000', 'ENTREGADO'), actorDe(fixture));
 
       expect(await movimientosDe(creado.id)).toEqual([]);
       const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
@@ -553,7 +553,7 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('100.0000');
       await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
@@ -590,7 +590,7 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
       await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
@@ -617,7 +617,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '5.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '5.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('5.0000');
 
       // La existencia merma por fuera de la reserva (una merma de otro camino), y al Finalizar
@@ -656,7 +656,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
     try {
       // Se crea con la receta VACIA -no aparta nada- y se recarga con lineas por fuera del
       // caso de uso: el pedido llega al Finalizar sin nada apartado.
-      const creado = await createOrder(nuevoPedido(recipeVacia, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeVacia, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
       await prisma.order.update({ where: { id: creado.id }, data: { recipeId } });
       await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
@@ -688,7 +688,7 @@ describe('QC-141 T10 — Finalizar de un pedido sin apartado y receta sin lineas
     const recipeId = await crearReceta(fixture);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
       await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 

@@ -119,6 +119,8 @@ function pedido(status: OrderStatus): OrderSummary {
     updatedBy: null,
     presentationId: null,
     presentationName: null,
+    unitId: null,
+    unitLabel: null,
   };
 }
 

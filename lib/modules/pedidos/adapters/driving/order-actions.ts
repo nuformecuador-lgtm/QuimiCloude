@@ -159,8 +159,18 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
   return typeof value === 'string' ? value : undefined;
 }
 
-/** El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
- *  correlativo, ni autores: lo que el esquema no declara no puede llegar (R6, R9). */
+/**
+ * El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
+ * correlativo, ni autores: lo que el esquema no declara no puede llegar (R6, R9).
+ *
+ * El dominio ya no acepta `presentationId` -gano `unitId` y `presentationLines`- pero
+ * esta action SIGUE leyendo el campo viejo: el formulario que le da forma al `FormData`
+ * (`app/(private)/pedidos/components/order-form.tsx`) es de otra tarea (T22, reparto y unidad
+ * en el formulario). Hasta que ese formulario cambie, toda alta o edicion enviada por el
+ * formulario ACTUAL falla en el borde con `invalid_input` -falta `unitId`-, a proposito: es el
+ * ripple documentado, no un intento de adivinar aqui la forma que el formulario todavia no
+ * tiene.
+ */
 function buildCreateCandidate(formData: FormData): unknown {
   return {
     recipeId: readFormString(formData, 'recipeId'),

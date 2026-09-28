@@ -15,7 +15,8 @@ export type OrderPackingDeps = {
   readonly packing: OrderPackingRepository;
 };
 
-/** Firma exacta de `OrderCatalog['startPackingAliveById']`. */
+/** Firma exacta de `OrderCatalog['startPackingAliveById']`. `'without_distribution'` (R10) sale
+ *  tal cual del puerto: este dominio no distingue ese caso de los demas, solo delega. */
 export function createStartPacking(deps: OrderPackingDeps): OrderCatalog['startPackingAliveById'] {
   return async function startPackingAliveById(id, companyId, packerId, now) {
     // La unica transicion que alcanza este metodo: falla rapido si algun dia dejara de ser legal.

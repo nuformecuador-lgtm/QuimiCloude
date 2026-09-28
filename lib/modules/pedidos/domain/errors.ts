@@ -81,12 +81,15 @@ export class RecipeNotFoundError extends PedidosError {
   }
 }
 
-/*
- * QC-35bis (2026-09-07): `UnitNotFoundError` (code `unit_not_found`) DESAPARECIO junto con la
- * unidad del pedido. No queda ningun caso de uso que pueda emitirlo, asi que dejar la clase
- * publicada seria ofrecer un codigo de error que nada produce -y que el traductor de la pantalla
- * tendria que seguir mapeando por si acaso-.
- */
+/** La unidad del pedido no existe en el catalogo de la empresa de quien escribe, o es de otra
+ *  empresa. Reusa el codigo compartido con `unidades` (R41). */
+export class UnitNotFoundError extends PedidosError {
+  readonly code = 'unit_not_found';
+
+  constructor(diagnostic?: string) {
+    super('unit_not_found', diagnostic);
+  }
+}
 
 /**
  * La presentacion indicada no existe en el catalogo de la empresa de quien escribe -incluida
@@ -228,5 +231,15 @@ export class OrderWithoutUnitError extends PedidosError {
 
   constructor(diagnostic?: string) {
     super('order_without_unit', diagnostic);
+  }
+}
+
+/** Una linea del reparto pide convertir su presentacion a la unidad del pedido y las dos
+ *  unidades no comparten unidad base. Reusa el codigo compartido con `unidades`. */
+export class IncompatibleUnitsError extends PedidosError {
+  readonly code = 'incompatible_units';
+
+  constructor(diagnostic?: string) {
+    super('incompatible_units', diagnostic);
   }
 }

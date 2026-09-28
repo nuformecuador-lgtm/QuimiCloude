@@ -27,7 +27,7 @@ function packingDoble(overrides: Partial<OrderPackingRepository> = {}): OrderPac
   };
 }
 
-describe('createStartPacking (R18-R20, R23, R24)', () => {
+describe('createStartPacking (R10, R18-R20, R23, R24)', () => {
   it('R18: ok delega en startPackingAlive con el companyId como scope, y devuelve ok', async () => {
     const startPackingAlive = vi.fn(async () => 'ok' as const);
     const packing = packingDoble({ startPackingAlive });
@@ -58,6 +58,17 @@ describe('createStartPacking (R18-R20, R23, R24)', () => {
     const startPackingAliveById = createStartPacking({ packing });
 
     await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('not_packable');
+  });
+
+  it('R10: without_distribution (POR_EMPACAR sin ninguna linea de reparto) se devuelve tal cual', async () => {
+    const packing = packingDoble({
+      startPackingAlive: vi.fn(async () => 'without_distribution' as const),
+    });
+    const startPackingAliveById = createStartPacking({ packing });
+
+    await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe(
+      'without_distribution',
+    );
   });
 
   it('R24: not_found (no existe, esta de baja o es de otra empresa) se devuelve tal cual', async () => {

@@ -25,7 +25,8 @@ const RESUMEN_1 = {
   quantity: '10.0000',
   priority: 'ALTA',
   status: 'POR_EMPACAR',
-  presentationId: 'presentacion-1',
+  presentationLines: [{ presentationId: 'presentacion-1', packages: 1 }],
+  unitId: null,
   finishedAt: null,
   packedBy: null,
 };
@@ -37,7 +38,8 @@ const RESUMEN_2 = {
   quantity: '20.0000',
   priority: 'MEDIA',
   status: 'EN_EMPAQUE',
-  presentationId: 'presentacion-1',
+  presentationLines: [{ presentationId: 'presentacion-1', packages: 1 }],
+  unitId: null,
   finishedAt: null,
   packedBy: BETO,
 };

@@ -331,6 +331,7 @@ interface OrderSeed {
   readonly createdBy?: string | null
   readonly updatedBy?: string | null
   readonly presentationId?: string | null
+  readonly unitId?: string | null
 }
 
 /**
@@ -352,6 +353,7 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
       createdBy: seed.createdBy ?? null,
       updatedBy: seed.updatedBy ?? null,
       presentationId: seed.presentationId ?? null,
+      unitId: seed.unitId ?? null,
     },
     select: { id: true },
   })
@@ -373,6 +375,7 @@ type WritableColumn =
   | 'created_at'
   | 'deleted_at'
   | 'presentation_id'
+  | 'unit_id'
 
 /**
  * `INSERT` crudo en `orders`. `columns` decide que se escribe: omitir una entrada es
@@ -600,13 +603,50 @@ describe('la cantidad', () => {
 })
 
 describe('la unidad y la receta', () => {
-  // QC-35bis (2026-09-07): aqui vivian los dos casos de la UNIDAD -«rechaza un pedido sin
-  // unidad (23502) y con unit_id inexistente (23503)» y «rechaza el borrado de una unidad usada
-  // por un pedido con 23503»-. La columna `unit_id` y su FK `orders_unit_id_fkey` se fueron con
-  // la decision humana, y con ellas la unica frontera de `orders` hacia `units`. Los dos casos
-  // equivalentes de la RECETA -NOT NULL, FK y ON DELETE RESTRICT- siguen debajo y son los que
-  // sostienen ahora esa clase de garantia.
+  // `unit_id` volvio con [Q4]: `orders.unit_id` es anulable EN LA BASE -la aplicacion la
+  // exige, R41-, asi que aqui no hay caso de «unidad ausente» -eso es NULL y la base lo acepta-,
+  // solo el de la referencia inexistente y el del borrado con RESTRICT.
 
+  it('rechaza un pedido con unit_id inexistente (23503); NULL sigue aceptado', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+
+      const inexistente = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertOrder(tx, { ...baseColumns(f, freshSequence()), unit_id: asUuid(randomUUID()) }),
+        'pedido con unit_id inexistente',
+      )
+      expect(inexistente).toBe(FOREIGN_KEY_VIOLATION)
+
+      // Sin `unit_id` en absoluto -como cualquier pedido de antes de esta ficha, R43- la base
+      // lo acepta: la columna nace en NULL y no hay ningun CHECK que lo impida.
+      const conteo = await rawInsertOrder(tx, baseColumns(f, freshSequence()))
+      expect(conteo).toBe(1)
+    })
+  })
+
+  it('rechaza el borrado de una unidad usada por un pedido con 23503', async () => {
+    // El RESTRICT existe para que un DELETE por consola no deje un pedido apuntando al vacio.
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const orderId = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        unitId: f.unitId,
+      })
+
+      const fisico = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = CAST(${f.unitId} AS uuid)`,
+        'borrado fisico de una unidad usada por un pedido',
+      )
+      expect(fisico).toBe(FOREIGN_KEY_VIOLATION)
+
+      const stored = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      expect(stored.unitId).toBe(f.unitId)
+    })
+  })
 
   it('rechaza un pedido sin receta (23502) y con recipe_id inexistente (23503)', async () => {
     // R14: la receta es obligatoria y tiene que existir.
@@ -1198,8 +1238,8 @@ describe('las cuatro fronteras que Prisma no declara', () => {
     // aqui de una vez: si una migracion futura borrara alguna por drift, este caso la caza.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      // `unit_id` estaba en esta lista hasta el 2026-09-07: se fue con la columna.
-      const columnas: WritableColumn[] = ['recipe_id', 'created_by', 'updated_by']
+      // `unit_id` volvio a esta lista: [Q4] deroga QC-35bis en la unidad.
+      const columnas: WritableColumn[] = ['recipe_id', 'unit_id', 'created_by', 'updated_by']
 
       for (const columna of columnas) {
         const estado = await expectRejectedByDatabase(

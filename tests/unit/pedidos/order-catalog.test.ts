@@ -171,6 +171,19 @@ describe('contrato OrderCatalog', () => {
     expect(catalogoFuente).not.toMatch(/order-repository|OrderRepository/)
     expect(adaptadorFuente).not.toMatch(/order-repository|OrderRepository/)
   })
+
+  it("[D2'] OrderCatalog NO gana ningun metodo que escriba el reparto o la unidad", () => {
+    // F1.2 proponia `updatePresentationLinesAliveById` para la puerta del Empacador; `[D2']` la
+    // retira: quien tiene `pedidos.modificar` edita por `updateOrderPresentationLines` (T9), no
+    // por este contrato. Se afirma por NEGACION del nombre, no de la lista completa de metodos,
+    // para que un metodo de lectura nuevo manana no rompa este test sin motivo.
+    expect(catalogoFuente).not.toMatch(/updatePresentationLines|updateDistribution|writeDistribution/)
+    for (const metodo of catalogoFuente.matchAll(/^\s{2}(\w+)\(/gm)) {
+      expect(metodo[1], 'ningun metodo de OrderCatalog escribe el reparto').not.toMatch(
+        /presentationLine|[Dd]istribution/,
+      )
+    }
+  })
 })
 
 describe('toOrderAssignmentTarget', () => {
@@ -186,9 +199,9 @@ describe('toOrderAssignmentTarget', () => {
   })
 })
 
-describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion y la fecha de terminado', () => {
-  it('R27: copia presentationId tal cual, con y sin presentacion', () => {
-    const conPresentacion = toAssignedOrderSummary({
+describe('toAssignedOrderSummary — el resumen publicado lleva el reparto, la unidad y la fecha de terminado', () => {
+  it('T10: copia presentationLines EN EL ORDEN de la fila (createdAt, desempate id), con y sin reparto', () => {
+    const conReparto = toAssignedOrderSummary({
       id: 'o-1',
       orderYear: 2026,
       orderSequence: 7,
@@ -196,13 +209,20 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'PENDIENTE',
-      presentationId: 'p-1',
+      unitId: 'u-1',
+      presentationLines: [
+        { presentationId: 'p-1', packages: 5 },
+        { presentationId: 'p-2', packages: 1 },
+      ],
       finishedAt: null,
       packedBy: null,
     })
-    expect(conPresentacion.presentationId).toBe('p-1')
+    expect(conReparto.presentationLines).toEqual([
+      { presentationId: 'p-1', packages: 5 },
+      { presentationId: 'p-2', packages: 1 },
+    ])
 
-    const sinPresentacion = toAssignedOrderSummary({
+    const sinReparto = toAssignedOrderSummary({
       id: 'o-2',
       orderYear: 2026,
       orderSequence: 8,
@@ -210,11 +230,30 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'PENDIENTE',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: null,
     })
-    expect(sinPresentacion.presentationId).toBeNull()
+    expect(sinReparto.presentationLines).toEqual([])
+  })
+
+  it('T10: copia unitId tal cual, con y sin unidad (R43)', () => {
+    const filaBase = {
+      id: 'o-1b',
+      orderYear: 2026,
+      orderSequence: 7,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'PENDIENTE',
+      presentationLines: [],
+      finishedAt: null,
+      packedBy: null,
+    } as const
+
+    expect(toAssignedOrderSummary({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
+    expect(toAssignedOrderSummary({ ...filaBase, id: 'o-1c', unitId: null }).unitId).toBeNull()
   })
 
   it('R20: copia finishedAt tal cual, con y sin fecha', () => {
@@ -227,7 +266,8 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'ENTREGADO',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: fecha,
       packedBy: null,
     })
@@ -241,7 +281,8 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'ENTREGADO',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: null,
     })
@@ -257,7 +298,8 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'EN_EMPAQUE',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: 'u-1',
     })
@@ -271,7 +313,8 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'POR_EMPACAR',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: null,
     })
@@ -471,7 +514,8 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
         quantity: { toFixed: () => '10.0000' },
         priority: 'MEDIA',
         status: 'ENTREGADO',
-        presentationId: null,
+        unitId: null,
+        presentationLines: [],
         finishedAt: new Date('2026-09-23T10:00:00.000Z'),
         packedBy: null,
       },
@@ -481,5 +525,18 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
 
     expect(pagina.items[0]?.finishedAt).toEqual(new Date('2026-09-23T10:00:00.000Z'))
+  })
+
+  it('T10: el select pide unitId y las lineas del reparto en el orden de alta (createdAt, desempate id)', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE'], 'work_queue', 1)
+
+    const seleccion = findMany.mock.calls[0]?.[0]?.select
+    expect(seleccion.unitId).toBe(true)
+    expect(seleccion.presentationLines).toEqual({
+      select: { presentationId: true, packages: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    })
+    // Y ya no pide la columna que retiro T10: el reparto vive en `order_presentation_lines`.
+    expect(seleccion).not.toHaveProperty('presentationId')
   })
 })
