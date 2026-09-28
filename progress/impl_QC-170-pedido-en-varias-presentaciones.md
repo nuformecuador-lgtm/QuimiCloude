@@ -395,8 +395,10 @@ final, un cierre de ripple (asignaciones, fixtures de UI, prueba de esquema, fix
   de `finish-with-finished-goods` (T14).
 - `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` («no modifica los módulos…») atribuye a QC-35
   los cambios si hay commits con «QC-35» en `origin/dev..HEAD` (aquí 946b16ca y 91bcf2c5,
-  documentales de esta ficha) y lee `git status`: con el árbol sucio sale rojo. Verificado tras el
-  commit en la sección siguiente.
+  documentales de esta ficha) y lee `git status`: con el árbol sucio sale rojo. Tras el commit
+  32de4aa3 (árbol limpio salvo `progress/current.md`): 23/23 verde.
+- Guardias completas (`tests/guards`) + `module-contract` de pedidos y asignaciones tras la limpieza de
+  citas en comentarios: 46 archivos, 616 verdes, 5 skipped preexistentes.
 
 ### T3
 Tras esta tanda, T3 solo depende de T16 (T8, T10 y T23 cerradas): `asignaciones` aún tiene el
