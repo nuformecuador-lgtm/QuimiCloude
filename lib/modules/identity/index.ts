@@ -316,7 +316,7 @@ export {
 // (`adapters/driven/persistence/assignment-directory-prisma.ts`) NO sale por aqui: lo ve solo
 // `lib/composition`, el unico sitio que ata puerto -> implementacion (R47).
 // ---------------------------------------------------------------------------------------
-export type { PersonRef, PeopleDirectory } from './domain/people-directory';
+export type { PersonRef, PeopleDirectory, PeopleRefFilters } from './domain/people-directory';
 export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------

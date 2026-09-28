@@ -36,11 +36,13 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { listMembersAliveInCompany } from './work-group-prisma';
 
+import { USER_ACCOUNT_STATUSES } from '../../../domain/account-status';
 import { buildDisplayName } from '../../../domain/display-name';
 import { effectiveAccountStatus } from '../../../domain/effective-account-status';
 
+import type { UserAccountStatus } from '../../../domain/account-status';
 import type { AccountStatusView } from '../../../domain/effective-account-status';
-import type { PeopleDirectory, PersonRef } from '../../../domain/people-directory';
+import type { PeopleDirectory, PeopleRefFilters, PersonRef } from '../../../domain/people-directory';
 import type { PermissionCode } from '../../../domain/permissions';
 import type { WorkGroupDirectory, WorkGroupSnapshot } from '../../../domain/work-group-directory';
 
@@ -82,6 +84,22 @@ type PersonRefPayload = Prisma.UserGetPayload<{ select: typeof PERSON_REF_SELECT
  */
 function isEffectivelyActive(account: AccountStatusView, now: Date): boolean {
   return effectiveAccountStatus(account, now) === 'active';
+}
+
+/**
+ * El array abierto de estados a conjunto cerrado, o `null` si no acota nada (ausente, vacio
+ * o sin ningun literal valido). Lo que no es un estado de QC-65 se descarta en vez de romper
+ * la consulta, igual que `userFilterWhere`.
+ */
+function sanitizeAccountStatuses(
+  values: readonly UserAccountStatus[] | undefined,
+): ReadonlySet<UserAccountStatus> | null {
+  if (values === undefined || values.length === 0) return null;
+  const allowed = new Set<UserAccountStatus>();
+  for (const value of values) {
+    if ((USER_ACCOUNT_STATUSES as readonly string[]).includes(value)) allowed.add(value);
+  }
+  return allowed.size === 0 ? null : allowed;
 }
 
 /**
@@ -151,11 +169,21 @@ export async function findRefsIncludingDeletedInCompany(
 /**
  * Las personas VIVAS de la empresa, sin filtrar por identificador, para poblar un selector. El
  * orden y el tope son los que ya tenia el selector de responsables antes de este archivo.
+ *
+ * `filters?.accountStatus` se aplica AQUI, en memoria y contra el estado EFECTIVO
+ * (`effectiveAccountStatus`), nunca como `WHERE` sobre la columna: la columna miente en los
+ * dos sentidos de QC-78 y R21 prohibe la segunda definicion. Los literales que no son estados
+ * se descartan y, si no queda ninguno, el filtro se omite (mismo criterio QC-57 R5 que
+ * `userFilterWhere` en `user-admin-prisma.ts`).
+ *
+ * El `take` va ANTES del filtro: con filtro la respuesta puede traer menos de `limit` filas.
+ * Es la decision consciente del contrato (`people-directory.ts`).
  */
 export async function listAliveInCompany(
   companyId: string,
   now: Date,
   limit: number,
+  filters?: PeopleRefFilters,
 ): Promise<readonly PersonRef[]> {
   const rows = await prisma.user.findMany({
     where: { companyId, deletedAt: null },
@@ -164,7 +192,11 @@ export async function listAliveInCompany(
     take: limit,
   });
 
-  return rows.map((row) => toPersonRef(row, now));
+  const allowed = sanitizeAccountStatuses(filters?.accountStatus);
+  const inScope =
+    allowed === null ? rows : rows.filter((row) => allowed.has(effectiveAccountStatus(row, now)));
+
+  return inScope.map((row) => toPersonRef(row, now));
 }
 
 // ---------------------------------------------------------------------------------------------
