@@ -374,6 +374,23 @@ function tablasCreadas(sql: string): readonly string[] {
   return [...sql.matchAll(/CREATE TABLE "(\w+)"/g)].map((match) => match[1] as string);
 }
 
+/**
+ * ACTUALIZADO 2026-10-01: los objetos que un `down.sql` retira por nombre (restricciones e
+ * indices). Las columnas no entran: su nombre se repite entre tablas y daria falsos positivos.
+ */
+function objetosQueRetiraElDown(sql: string): readonly string[] {
+  return [...sql.matchAll(/DROP\s+(?:CONSTRAINT|INDEX)\s+"(\w+)"/g)].map(
+    (match) => match[1] as string,
+  );
+}
+
+/** ¿Este `migration.sql` retira alguno de estos objetos? */
+function retiraAlgunObjeto(sql: string, objetos: readonly string[]): boolean {
+  return objetos.some((objeto) =>
+    new RegExp(`DROP\\s+(?:CONSTRAINT|INDEX)\\s+"${objeto}"`).test(sql),
+  );
+}
+
 /** ¿Este `migration.sql` tiene una FK hacia alguna de estas tablas? */
 function referenciaAlgunaTabla(sql: string, tablas: readonly string[]): boolean {
   return tablas.some((tabla) => new RegExp(`REFERENCES\\s+"${tabla}"`).test(sql));
@@ -386,10 +403,20 @@ function referenciaAlgunaTabla(sql: string, tablas: readonly string[]): boolean 
  * `presentations`) y otra posterior solo referencia esa tabla nueva sin tocar `presentations`
  * (segundo grado): sin el segundo grado el DOWN de la primera choca con 2BP01 contra la FK que la
  * segunda deja viva.
+ *
+ * ACTUALIZADO 2026-10-01: tercer criterio. Una migracion posterior que RETIRA una restriccion o
+ * un indice que el `down.sql` de una ya encontrada da por existente tambien entra: un rollback
+ * real la revierte antes -su `down.sql` repone el objeto- y sin ella ese `DROP` choca con 42704.
+ * Es el caso de la migracion que quita la presentacion unica del pedido
+ * (`orders_presentation_content_requires_presentation` y compania), que el `down.sql` de
+ * productos terminados retira. No se filtra ninguna sentencia: el DOWN bajo prueba y los de sus
+ * dependientes se siguen ejecutando enteros, en el mismo orden inverso que un rollback real, asi
+ * que R10 sigue afirmando lo mismo sobre el esquema.
  */
 function migracionesDependientes(): readonly string[] {
   const encontradas = new Set<string>();
   const tablasProtegidas = new Set<string>();
+  const objetosQueLosDownsRetiran = new Set<string>();
   let siguioCreciendo = true;
   while (siguioCreciendo) {
     siguioCreciendo = false;
@@ -403,9 +430,15 @@ function migracionesDependientes(): readonly string[] {
       }
       const esPrimerGrado = REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS.test(sql);
       const esGradoPosterior = referenciaAlgunaTabla(sql, [...tablasProtegidas]);
-      if (!esPrimerGrado && !esGradoPosterior) continue;
+      const deshaceLoQueOtroDownRetira = retiraAlgunObjeto(sql, [...objetosQueLosDownsRetiran]);
+      if (!esPrimerGrado && !esGradoPosterior && !deshaceLoQueOtroDownRetira) continue;
       encontradas.add(nombre);
       for (const tabla of tablasCreadas(sql)) tablasProtegidas.add(tabla);
+      for (const objeto of objetosQueRetiraElDown(
+        readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8'),
+      )) {
+        objetosQueLosDownsRetiran.add(objeto);
+      }
       siguioCreciendo = true;
     }
   }
@@ -421,6 +454,10 @@ expect(
   migracionesPosterioresDependientes,
   'se esperaba encontrar la migracion de productos terminados como dependiente',
 ).toContain('20260924190100_finished_products_and_content_copies');
+expect(
+  migracionesPosterioresDependientes,
+  'se esperaba encontrar la migracion que retira la presentacion unica del pedido como dependiente',
+).toContain('20260927120200_order_presentation_lines_backfill_and_drop');
 
 const SENTENCIAS_DE_DEPENDIENTES_POSTERIORES = migracionesPosterioresDependientes.flatMap((nombre) =>
   sentenciasSql(readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8')),
