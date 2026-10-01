@@ -12,9 +12,9 @@ Base propia: `QuimiCloude_QC170` (58 migraciones aplicadas tras la tanda A). Wor
 | B | T4, T5, T6, T12, T20 | cerradas |
 | B (resto) | T7 | cerrada en la tanda C (junto con T8) |
 | C | T7, T8, T9, T10, T13, T23 | cerradas (ver §Tanda C) |
-| C (fuera) | T3 | pendiente: tras T16 (tanda E); T8, T10 y T23 ya cerradas |
+| C (fuera) | T3 | cerrada en la tanda E (quedó libre tras T16) |
 | D | T11, T14, T21, T25 (Server Action) | cerradas (T25 solo servidor; su UI va en E) |
-| E | T16, T15, T22, T25 (UI) | pendiente |
+| E | T16, T15, T22, T25 (UI), T3 | cerradas (ver §Tanda E) |
 | final | T19 (E2E escrito) | pendiente |
 
 ## Tanda B (2026-09-27) — T4, T5, T6, T12, T20 cerradas; T7 y T3 BLOQUEADAS
@@ -671,3 +671,127 @@ Salida real:
   `company-scope`, `order-actions`, `order-actions-distribution`, `update-order-presentation-lines`,
   `module-contract` + `tests/guards`: 655 verdes, 5 skipped; `qc170-distribution-concurrency.int`: 9/9.
 - Rojos que deja la tanda: solo los 19 de T22 (`tests/unit/pedidos-ui/{order-form,order-form-quote,order-sheet}.test.tsx`).
+
+## Tanda E (2026-10-01) — T16, T15, T22, T25 (UI) y T3 cerradas
+
+Un subagente a la vez, commit por task (sin push). Commits: `35fb675d`, `b12ea2fa` (T16 dominio),
+`19424cf5` (T16 UI), `84e87682` (T15), `fa03b2bf` + `f1600e50` (T22 UI + borde FormData),
+`844c19a0` (T25 UI), `8126ac16` (T3), `4b7d37e3` y `8048340b` (ripples de test de T16 y T3).
+
+### T16 — listados y ejecución leen el reparto
+- `asignaciones`: tipo nuevo `OrderDistributionLineView {presentationId, presentationName|null, packages}`
+  en `domain/order-distribution-view.ts` (con `unitLabelOf`); las cinco vistas (`assigned-order-view`,
+  `assigned-order-execution-view`, `company-order-view`, `finished-order-view`, `packing-order-view`)
+  pierden `presentationName` y ganan `presentationLines`, `unitId`, `unitLabel` (`PackingOrderRow`
+  además `quantity`). Casos de uso `compose-order-rows`, `list-assigned-orders`, `list-company-orders`,
+  `list-finished-orders`, `get-assigned-order-execution`: una sola llamada a presentaciones y otra a
+  unidades por página; se retira el puente transitorio. `index.ts`, `lib/composition/index.ts`
+  (`units: unitCatalog`).
+- `pedidos`: `OrderRow` cambia `presentationId/presentationContent` por
+  `presentationLines: OrderPresentationLineRow[]`; `OrderView` cambia `presentationId/presentationName`
+  por `presentationLines: OrderPresentationLineView[]` (orden de alta). `get-order.ts`,
+  `list-orders.ts`, `order-prisma.ts`, `index.ts`.
+- UI: `components/shared/order-presentation-label.tsx` → `order-distribution-label.tsx`
+  (`OrderDistributionLabel`); columnas `app/(private)/asignacion/components/{assigned,company,finished,packing}-orders-columns.tsx`,
+  `app/(private)/pedidos/components/order-columns.tsx`, `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`.
+- Tests: `tests/unit/asignaciones/{order-distribution-view (nuevo),list-assigned-orders,get-assigned-order-execution,list-company-orders,list-finished-orders,list-packing-orders,get-packing-order}.test.ts`,
+  12 de `tests/unit/pedidos/`, `tests/helpers/order-unit-of-work-double.ts`,
+  `tests/integration/asignaciones/{assigned-orders,company-orders,finished-orders}.int.test.ts`,
+  `tests/integration/pedidos/order-repository.int.test.ts`, `tests/unit/shared/order-distribution-label.test.tsx`,
+  fixtures de `tests/unit/asignaciones-ui/*` y `tests/unit/pedidos-ui/*`; `tests/unit/inventario/scope.test.ts`
+  retira la exclusión del label renombrado (ya no casa con `screenPattern`).
+
+### T15 — pantalla del Empacador en solo lectura
+- `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx` (+ `index.ts`): cantidad con
+  unidad, lista de todas las líneas, «Sin presentación» con reparto vacío, aviso «Falta el reparto: lo
+  define quien edita pedidos» solo en `POR_EMPACAR` sin líneas; ningún control.
+- Tests: `tests/unit/asignaciones-ui/packing-order-screen.test.tsx` (nuevo), `packing-order-page.test.tsx`.
+  R12 (contrato sin escritura) en `tests/unit/asignaciones/order-distribution-view.test.ts`.
+
+### T22 — formulario del pedido con unidad y reparto
+- `app/(private)/pedidos/components/order-distribution-field.tsx` (nuevo, reutilizable),
+  `use-order-distribution-availability.ts` (nuevo; llama a `quoteOrderPresentationAvailabilityAction`
+  con 400 ms de espera y descarta respuestas superadas), `order-form.tsx` (unidad obligatoria y
+  controlada, reparto en lugar de presentación única, precarga en edición, Guardar deshabilitado si
+  el disponible bloquea), `index.ts`; `components/shared/presentation-select.tsx` gana
+  `name`/`onSelect`/`requireContent` opcionales (sin contenido = deshabilitada y marcada).
+- Borde FormData: `lib/modules/pedidos/adapters/driving/order-actions.ts` (`buildCreateCandidate` lee
+  `unitId` y une por posición `presentationLines.presentationId`/`presentationLines.packages`;
+  longitudes distintas → `invalid_input`), constantes en `order-input.ts` exportadas por el barrel.
+- Tests: `tests/unit/pedidos-ui/{order-form,order-form-quote,order-sheet,pedidos-viewport}.test.tsx`
+  (los 19 rojos heredados, ahora verdes), `order-distribution-field.test.tsx` (nuevo),
+  `tests/unit/pedidos/order-actions.test.ts` (bloque nuevo con el esquema real).
+
+### T25 (UI) — «Reparto y unidad» en `POR_EMPACAR`
+- `app/(private)/pedidos/components/order-distribution-dialog.tsx` (nuevo); permiso resuelto en
+  servidor en `order-list-section.tsx` (`pedidos.modificar` → `canEditDistribution`) y bajado por
+  `order-table.tsx`, `order-columns.tsx`, `order-row-actions.tsx`, `order-sheet.tsx`. `BLOQUEADO` no
+  entra (design §13: no existe en el enum). Refresca con `router.refresh()`.
+  `order-distribution-field.tsx` importa los nombres de campo de `@/lib/modules/pedidos`.
+- Tests: `tests/unit/pedidos-ui/order-distribution-dialog.test.tsx` (nuevo), `order-list-section.test.tsx`.
+- `guard-pantallas-exigen-permiso` verde sin cambio (solo censa páginas con `requirePagePermission`).
+
+### T3 — backfill y retiro de `orders.presentation_id`/`presentation_content`
+- `db/migrations/20260927120200_order_presentation_lines_backfill_and_drop/{migration.sql,down.sql}`,
+  `db/schema.prisma` (`Order` sin las dos columnas ni su índice). Aplicada en `QuimiCloude_QC170`
+  (59 migraciones; la base no tenía pedidos).
+- Tests: `tests/integration/pedidos/qc170-backfill.int.test.ts` (nuevo, 9 casos, transacción
+  revertida con DDL); ajustados `order-crud.int`, `pedidos-constraints.int`,
+  `presentation-content.int`, `tests/unit/pedidos/schema/pedidos-schema.test.ts`, comentarios en
+  `inventario-constraints.int`, `company-scope-queries.int`, `list-query-orders.int`,
+  `order-repository.int`; censos `tests/integration/aislamiento.json` y `MIGRACIONES_ESPERADAS`
+  (`guard-identificador-de-request`); `tests/integration/proveedores/company-scope.int.test.ts`
+  (`migracionesDependientes` gana el criterio «la posterior retira una restricción que el down
+  elegido espera»). E2E ajustados para compilar, SIN correr:
+  `e2e/{ejecucion-receta,empaque,pedidos,producto-terminado}.spec.ts` (revisar en T19).
+- **Desvíos frente a `design.md > 2.4` que el reviewer debe mirar** (no decididos aquí: copiados del
+  diseño o forzados por el esquema):
+  1. `down.sql` no hace `DROP TABLE order_presentation_lines` (la FK de `inventory_movements` de
+     `20260927120100` lo impide y la tabla la borra el down de `20260927120000`): solo devuelve la
+     línea única a las columnas y borra las líneas.
+  2. La segunda aplicación falla en el guardia del paso 0 (también lee `presentation_id`), no en el
+     `DROP COLUMN`; mismo 42703. El test prueba además que cada `DROP COLUMN` suelto falla.
+  3. Copiado tal cual del diseño: el guardia de R45 no filtra `deleted_at` y el de R49 sí; el
+     `INSERT` crea líneas también para pedidos borrados/entregados/cancelados aunque R22 dice «pedido vivo».
+  4. No estaba en el spec: up y down abren y cierran `NO FORCE`/`FORCE` RLS (patrón de
+     `reserve_existing_orders`) para ver las filas si la migración no corre como superusuario.
+
+### Mapa R<n> -> test (tanda E)
+
+| R | Test |
+|---|---|
+| R26 (primera línea + «+N», cantidad con unidad) | `tests/unit/shared/order-distribution-label.test.tsx`, `tests/unit/pedidos-ui/order-columns.test.tsx`, `tests/unit/asignaciones-ui/*-columns.test.tsx`, `tests/unit/asignaciones/list-*.test.ts`, `order-repository.int.test.ts` |
+| R27 («Sin presentación» con reparto vacío) | mismos archivos que R26 |
+| R47 (Empacador: todo el reparto en solo lectura, aviso «Falta el reparto») | `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`, `tests/unit/asignaciones/get-packing-order.test.ts` |
+| R12 (`asignaciones` sin escritura; acción oculta sin `pedidos.modificar`) | `tests/unit/asignaciones/order-distribution-view.test.ts`, `tests/unit/pedidos-ui/order-distribution-dialog.test.tsx`, `order-list-section.test.tsx` |
+| R34 (presentación sin contenido marcada, no se añade) | `tests/unit/pedidos-ui/order-distribution-field.test.tsx` |
+| R6 (disponible en la unidad del pedido tras cada cambio) | `order-distribution-field.test.tsx`, `order-form.test.tsx` |
+| R39 (negativo, aviso, Guardar deshabilitado) | `order-distribution-field.test.tsx`, `order-form.test.tsx`, `order-distribution-dialog.test.tsx` |
+| R7 (línea incompatible marcada) | `order-distribution-field.test.tsx` |
+| R41 (unidad obligatoria en alta, editable) | `order-form.test.tsx`, `tests/unit/pedidos/order-actions.test.ts` |
+| R42 (sin unidad: falta la unidad, sin líneas ni disponible) | `order-distribution-field.test.tsx`, `order-form.test.tsx`, `order-distribution-dialog.test.tsx`, `tests/unit/asignaciones/list-*.test.ts` |
+| R11, R13 (acción solo en `POR_EMPACAR`) | `order-distribution-dialog.test.tsx` (`it.each` EN_EMPAQUE/ENTREGADO/CANCELADO) |
+| R46 (el diálogo envía solo `unitId`+`presentationLines`) | `order-distribution-dialog.test.tsx` |
+| R36 (rechazo del servidor junto al reparto, sin perder lo escrito) | `order-form.test.tsx`, `order-distribution-dialog.test.tsx` |
+| R1, R9 (borde FormData del reparto) | `tests/unit/pedidos/order-actions.test.ts` |
+| R22, R23, R24, R43 (backfill y `unit_id`) | `tests/integration/pedidos/qc170-backfill.int.test.ts` |
+| R45, R49 (abortos, y no-aborto en `POR_EMPACAR`) | `qc170-backfill.int.test.ts` |
+| R25 (doble aplicación falla), down con más de una línea | `qc170-backfill.int.test.ts` |
+
+### Salida real (2026-10-01)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores (exit 0).
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, todos preexistentes
+  (`tests/unit/documentos/confirm-catalog-import.test.ts`, `tests/unit/pedidos/order-service.test.ts`).
+- `./init.sh --rapido`, 1.ª corrida: `Test Files 1 failed | 542 passed (543)`, `Tests 3 failed | 7755
+  passed | 30 skipped` — los 3 de R10 en `tests/integration/proveedores/company-scope.int.test.ts`
+  (ripple de T3: `42704` al soltar `orders_presentation_content_requires_presentation`). Arreglado en `8048340b`.
+- `./init.sh --rapido`, 2.ª corrida: `Test Files 1 failed | 542 passed (543)`, `Tests 1 failed | 7757
+  passed | 30 skipped` — `tests/unit/configuracion-ui/user-table.test.tsx` «la accion de editar de una
+  fila abre el panel SOBRE ESE usuario (R26)» (`findByTestId` agotado bajo carga). Ajeno a esta tanda
+  (ningún commit toca `configuracion`); corrido solo 3 veces: 27/27 las tres.
+- `./init.sh --rapido`, 3.ª corrida (HEAD `8048340b`): **verde, `== init OK ==`**. Relacionados:
+  `Test Files 543 passed (543)`, `Tests 7758 passed | 30 skipped (7788)`; todas las guardias:
+  `Test Files 51 passed (51)`, `Tests 652 passed | 11 skipped (663)`; «todas las migraciones tienen down.sql».
+- Pendiente fuera de esta tanda: T19 (E2E) y `./init.sh` completo antes del PR. El rojo
+  `pedidos-convenciones › no cambia package.json` que vieron los subagentes en corridas acotadas no
+  aparece en el gate (deriva de `origin/dev`, a mirar al sincronizar).

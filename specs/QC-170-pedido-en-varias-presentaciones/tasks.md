@@ -40,7 +40,7 @@ Depende de: T1.
 `tests/unit/inventario/schema/inventory-movements-migration.test.ts` (existente, se amplía) refleja
 el nuevo censo de columnas y restricciones.
 
-### T3 — Backfill y retiro de `orders.presentation_id`/`presentation_content`
+### [x] T3 — Backfill y retiro de `orders.presentation_id`/`presentation_content`
 
 **Archivos**: `db/migrations/<ts3>_order_presentation_lines_backfill_and_drop/{migration.sql,down.sql}`.
 Depende de: T1, T2.
@@ -193,7 +193,7 @@ no duplican lotes (prueba de carrera, R21).
 
 ## `asignaciones`: la pantalla del Empacador (solo lectura, `[D2']`)
 
-### T15 — Pantalla del Empacador: reparto en solo lectura (REESCRITA en F1.4 bis)
+### [x] T15 — Pantalla del Empacador: reparto en solo lectura (REESCRITA en F1.4 bis)
 
 > Sustituye a la T15 de F1.2 («Puerta de reparto para el Empacador»): ese caso de uso
 > (`update-packing-presentation-lines.ts`), su Server Action y su control de edición **no se
@@ -211,7 +211,7 @@ líneas muestra «Falta el reparto: lo define quien edita pedidos» (R47); un te
 que `asignaciones` no expone ninguna Server Action ni caso de uso que escriba el reparto o la unidad
 (R12). El disponible y el aviso de R39 **no** aparecen en esta pantalla.
 
-### T16 — Listados y ejecución: `presentationLines` en vez de `presentationId` [P]
+### [x] T16 — Listados y ejecución: `presentationLines` en vez de `presentationId` [P]
 
 **Archivos**: `lib/modules/asignaciones/domain/list-assigned-orders.ts`,
 `get-assigned-order-execution.ts`, `assigned-order-view.ts`, `assigned-order-execution-view.ts`,
@@ -300,7 +300,7 @@ reales, en los dos órdenes: guardado primero que VACÍA el reparto → Comenzar
 `order_presentation_line_not_editable` y las líneas son las de antes; en `POR_EMPACAR` un cambio de
 unidad no altera reservas ni asientos de inventario (R46, R30: se compara el censo antes y después).
 
-### T22 — Formulario del reparto: selector, disponible y aviso (alta y edición en `/pedidos`)
+### [x] T22 — Formulario del reparto: selector, disponible y aviso (alta y edición en `/pedidos`)
 
 **Archivos**: `app/(private)/pedidos/components/*` (formulario de alta/edición: selector de unidad
 del pedido y control de reparto), control de reparto como componente propio de `/pedidos` que
@@ -336,7 +336,7 @@ Depende de: ninguna (documental).
 pedido (`orders.unit_id`) y remiten a `specs/QC-170-pedido-en-varias-presentaciones/design.md > 0.6`;
 el precio unitario sigue fuera; ningún otro contenido de esos archivos cambia.
 
-### T25 — Edición acotada «Reparto y unidad» en `POR_EMPACAR` (nueva en F1.4 bis, `[D2']`/`[D3']`)
+### [x] T25 — Edición acotada «Reparto y unidad» en `POR_EMPACAR` (nueva en F1.4 bis, `[D2']`/`[D3']`)
 
 > Tanda D (2026-09-27): la Server Action `updateOrderDistributionAction` y su esquema en
 > `order-input.ts` están cerrados (R7, R12, R13, R35, R36, R41, R42, R46, ver
