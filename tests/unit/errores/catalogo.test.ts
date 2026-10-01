@@ -473,3 +473,17 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     })
   })
 })
+
+describe('QC-161 R41 — el nombre de usuario duplicado ya no se acota a la empresa', () => {
+  it('R41 — duplicate_username dice el choque sin nombrar la empresa', () => {
+    expect(errorMessage('duplicate_username')).toBe('Ya existe un usuario con ese nombre de usuario.')
+    expect(errorMessage('duplicate_username').toLowerCase()).not.toContain('empresa')
+  })
+
+  it('R41 — duplicate_email y duplicate_document siguen diciendo que el choque es en la empresa', () => {
+    expect(errorMessage('duplicate_email')).toBe('Ya existe un usuario con ese correo en la empresa.')
+    expect(errorMessage('duplicate_document')).toBe(
+      'Ya existe un usuario con ese documento en la empresa.',
+    )
+  })
+})

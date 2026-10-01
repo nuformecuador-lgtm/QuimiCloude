@@ -207,7 +207,7 @@
 
 ## Bloque 5 — El selector de roles y el alta/edición
 
-- [ ] **T12. [P con T9] El Maestro nunca se asigna; el nombre de usuario choca en todo el sistema.**
+- [x] **T12. [P con T9] El Maestro nunca se asigna; el nombre de usuario choca en todo el sistema.**
       (`design.md > 7, 7.1`; R1, R23, R24, R25, R36, R37, R40, R41.)
       - Archivos: `lib/modules/identity/adapters/driven/persistence/role-catalog-prisma.ts`,
         `lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts` (alta y edición

@@ -21,7 +21,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { USER_ACCOUNT_STATUSES } from '@/lib/modules/identity/domain/account-status';
 import { createCreateUser } from '@/lib/modules/identity/domain/create-user';
 import { createDeleteUser } from '@/lib/modules/identity/domain/delete-user';
-import { IdentityError } from '@/lib/modules/identity/domain/errors';
+import { errorMessage } from '@/lib/modules/errores';
+import { DuplicateUsernameError, IdentityError } from '@/lib/modules/identity/domain/errors';
 import { createGetUser } from '@/lib/modules/identity/domain/get-user';
 import { createListUsers } from '@/lib/modules/identity/domain/list-users';
 import { createSetUserAccountStatus } from '@/lib/modules/identity/domain/set-user-account-status';
@@ -543,6 +544,43 @@ describe('alta de usuario (R13, R14, R16, R17, R18, R49; QC-79 R1-R7, R30)', () 
     expect(await codeDeFallo(d.updateUser(ACTOR, TARGET_ID, ENTRADA_USUARIO))).toBe(
       'action_not_allowed',
     );
+  });
+});
+
+describe('QC-161 R40 — el nombre de usuario que ya tiene otro usuario vivo, de cualquier empresa o sin ella', () => {
+  /** Lo unico que el error deja ver: su `code`, el texto del catalogo y ningun diagnostico. */
+  async function falloDuplicado(operacion: Promise<unknown>) {
+    const fallo = await operacion.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(fallo).toBeInstanceOf(DuplicateUsernameError);
+    const error = fallo as DuplicateUsernameError;
+    expect(error.code).toBe('duplicate_username');
+    expect(error.message).toBe(errorMessage('duplicate_username'));
+    expect(error.diagnostic).toBeUndefined();
+  }
+
+  it('R40 — el alta, con y sin contrasena, lanza DuplicateUsernameError sin datos del otro usuario y no emite enlace ni correo', async () => {
+    for (const entrada of [ENTRADA_USUARIO, { ...ENTRADA_USUARIO, credential: CREDENCIAL }]) {
+      const d = montar({ create: 'username' });
+
+      await falloDuplicado(d.createUser(ACTOR, entrada));
+
+      expect(d.users.create).toHaveBeenCalledTimes(1);
+      expect(d.links.issueForPendingUser).not.toHaveBeenCalled();
+      expect(d.mailer.sendCredentialSetupLink).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R40 — la edicion lanza DuplicateUsernameError sin datos del otro usuario y no hace ninguna otra escritura', async () => {
+    const d = montar({ update: 'username' });
+
+    await falloDuplicado(d.updateUser(ACTOR, TARGET_ID, ENTRADA_USUARIO));
+
+    expect(d.users.updateAliveInCompany).toHaveBeenCalledTimes(1);
+    expect(d.users.create).not.toHaveBeenCalled();
+    expect(d.users.applyGuardedChange).not.toHaveBeenCalled();
   });
 });
 

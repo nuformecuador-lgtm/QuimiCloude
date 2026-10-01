@@ -685,3 +685,65 @@ Base huerfana `qct_qc161_95232936_mupt4gy0_o5o`: estaba en HOLD («su worktree s
 conexiones abiertas en ese instante, y se borro a mano con `DROP DATABASE`. Despues se vio que el gate
 anterior que la habia creado todavia seguia corriendo (termino a las ~13:18 con 8 rojos conocidos y 44
 errores de pool), asi que ese resultado tardio no cuenta. `db:test list` al cerrar: ninguna `qct_qc161_*`.
+
+## T12 — El Maestro nunca se asigna; el nombre de usuario choca en todo el sistema
+
+### Archivos
+
+- `lib/modules/identity/adapters/driven/persistence/role-catalog-prisma.ts`: `notIn
+  [ROLE_ADMINISTRADOR, ROLE_MAESTRO]` (R23). JSDoc reescrito sin citas de fichas.
+- `lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts`: `readUnassignableRoles`
+  (una lectura `findMany` por nombre de los dos roles, con el cliente global en el alta y con `tx`
+  dentro de la transaccion en la edicion). Alta y edicion responden `'action_not_allowed'` si el
+  `roleId` es cualquiera de los dos, antes de escribir; en la edicion va despues del bloqueo y antes
+  de la guarda del ultimo administrador, que sigue usando el id del Administrador (`leavesTheSet`
+  sin cambios). JSDoc de las marcas con los cinco `target` medidos. Logica de duplicados intacta.
+- `lib/modules/errores/domain/error-catalog.ts`: `errors.duplicate_username` → «Ya existe un usuario
+  con ese nombre de usuario.»; correo y documento sin cambios. El texto no aparece en UI, tests de UI
+  ni `e2e/` (grep); `user-form.tsx` mapea solo el `code` al campo, sin cambios.
+- `tests/integration/identity/role-catalog.int.test.ts`: filtro de referencia con `notIn` y caso R23.
+- `tests/integration/identity/user-crud.int.test.ts`: `:509-523` y `:525-542` reescritos como R36
+  (mismo nombre en otra empresa, tambien en mayusculas → `username`, cero filas) y R37 (correo en
+  mayusculas y documento iguales en otra empresa → se crea); caso nuevo R36 de baja; `withMaestro`
+  (Maestro propio, sin empresa, borrado en `finally`); bloques R1, R24/R25, R40. Cabecera y titulo
+  del bloque R17 ajustados al indice global.
+- `tests/unit/errores/catalogo.test.ts` (R41), `tests/unit/identity/usuarios/user-service.test.ts` (R40).
+- Unitarios de adaptador que enumeren la exclusion: no hay (ningun unitario mockea `role.findFirst`
+  ni el filtro del catalogo).
+
+### `target` medido (P2002, `@prisma/client@6.19.3`, contra `QuimiCloude_QC161`)
+
+Script de un solo uso con empresas y usuarios propios, borrados al final (`limpio 0 0`):
+
+```
+username global (otra empresa): P2002 {"modelName":"User","target":["lower(username)"]}
+email por empresa: P2002 {"modelName":"User","target":["company_id","lower(email)"]}
+documento por empresa: P2002 {"modelName":"User","target":["company_id","document_type_code","document_number"]}
+username global (Maestro vs empresa): P2002 {"modelName":"User","target":["lower(username)"]}
+email sin empresa: P2002 {"modelName":"User","target":["lower(email)"]}
+documento sin empresa: P2002 {"modelName":"User","target":["document_type_code","document_number"]}
+```
+
+Las tres marcas (`email`, `username`, `document_number`) siguen siendo disjuntas entre los cinco.
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R1 | `user-crud.int` «R1 — la lista de una empresa no lo incluye, ni buscandolo por su nombre de usuario»; «R1 — editarlo, darlo de baja y cambiarle el estado responden `not_found` y su fila no cambia» |
+| R23 | `role-catalog.int` «QC-161 R23 — el rol Maestro existe en la base y NO se ofrece en el selector»; «QC-161 R23 — no omite ninguna fila salvo las del Administrador y el Maestro» |
+| R24 | `user-crud.int` «R24 — el alta con el rol Maestro se rechaza como accion no permitida…» (actor con `usuarios.modificar` y con todo el catalogo); «R24 — el adaptador responde `action_not_allowed` antes de escribir» |
+| R25 | `user-crud.int` «R25 — la edicion hacia el rol Maestro se rechaza como accion no permitida y la fila no cambia…» |
+| R36 | `user-crud.int` «QC-161 R36 — el MISMO nombre de usuario en OTRA empresa devuelve `username`…»; «QC-161 R36 — un usuario dado de baja NO ocupa su nombre de usuario en otra empresa» |
+| R37 | `user-crud.int` «QC-161 R37 — los MISMOS correo y documento en OTRA empresa SI se crean…» |
+| R40 | `user-crud.int` «R40 — el alta con el nombre de un usuario de OTRA empresa o del Maestro…», «R40 — la edicion hacia el nombre…», «R40 — por el caso de uso llega como `DuplicateUsernameError` y el error no lleva ningun dato del otro usuario»; `user-service.test` «R40 — el alta, con y sin contrasena…», «R40 — la edicion lanza DuplicateUsernameError…» |
+| R41 | `catalogo.test` «R41 — duplicate_username dice el choque sin nombrar la empresa»; «R41 — duplicate_email y duplicate_document siguen diciendo que el choque es en la empresa» |
+
+### Salida
+
+- `.env` con `QuimiCloude_QC161` en `DATABASE_URL` y `DIRECT_URL` comprobado antes de cada corrida.
+- `pnpm exec tsc --noEmit`: verde.
+- `vitest run user-crud.int.test.ts role-catalog.int.test.ts`: 2 archivos, 58 passed (los dos rojos
+  conocidos de `:509`/`:525` cerrados).
+- `vitest run tests/unit/errores/catalogo.test.ts tests/unit/identity/usuarios tests/unit/identity/roles`:
+  18 archivos, 342 passed, 9 skipped.

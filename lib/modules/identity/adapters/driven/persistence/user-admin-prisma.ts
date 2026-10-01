@@ -7,7 +7,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import { USER_ACCOUNT_STATUSES } from '../../../domain/account-status';
 import { NO_CREDENTIAL_SENTINEL } from '../../../domain/credential-setup-link';
 import { buildDisplayName } from '../../../domain/display-name';
-import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
+import { ROLE_ADMINISTRADOR, ROLE_MAESTRO } from '../../../domain/roles';
 import { changeRevokesSessions, floorToSecond } from '../../../domain/session-revocation';
 
 import { insensitiveContainsCondition, selectCondition } from './list-query-sql';
@@ -150,29 +150,21 @@ function toUserDetail(row: UserDetailPayload): UserDetail {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Columnas que identifican a cada uno de los tres indices unicos de QC-47
- * (`users_email_unique`, `users_username_unique`, `users_document_unique`; ver
- * `db/migrations/20260904180600_companies_and_user_company/migration.sql`).
+ * Columnas que identifican a cada indice unico de `users`. Se discrimina por columna y nunca por el
+ * nombre del indice: el nombre no llega fiable en `meta.target`.
  *
- * **Se discrimina por COLUMNA, nunca por el nombre del indice** (R17): comparar contra el nombre del
- * indice fue el defecto real que QC-38 solo vio con integracion
- * (`progress/impl_QC-38-crud-de-unidades.md > El hallazgo importante`), y es el mismo hallazgo que
- * QC-25 dejo escrito en `recipe-prisma.ts` y QC-43 en `supplier-prisma.ts`.
+ * Los indices son funcionales y parciales (`lower(...)`, `WHERE deleted_at IS NULL`), y esto es lo
+ * que Postgres anuncia en `meta.target`, medido con `@prisma/client@6.19.3`:
  *
- * **MEDIDO contra la base real de esta feature** (`QuimiCloude_QC66`, `@prisma/client@6.19.3`), que es
- * lo unico que vale aqui porque los tres indices son FUNCIONALES y PARCIALES
- * (`lower(...)`, `WHERE deleted_at IS NULL`) y el diseno no podia suponer como se anuncian:
+ *   - correo, por empresa        -> `["company_id","lower(email)"]`
+ *   - documento, por empresa     -> `["company_id","document_type_code","document_number"]`
+ *   - usuario, en todo el sistema -> `["lower(username)"]`
+ *   - correo, sin empresa        -> `["lower(email)"]`
+ *   - documento, sin empresa     -> `["document_type_code","document_number"]`
  *
- *   - correo     -> `meta.target = ["company_id","lower(email)"]`
- *   - usuario    -> `meta.target = ["company_id","lower(username)"]`
- *   - documento  -> `meta.target = ["company_id","document_type_code","document_number"]`
- *
- * Es decir: **el `target` de los dos indices funcionales trae la EXPRESION `lower(email)` /
- * `lower(username)`, no el nombre pelado de la columna**. Por eso la comparacion es por SUBCADENA y
- * no por igualdad: asi acierta con las dos grafias posibles —`lower(email)` y un hipotetico `email`—
- * sin depender de como el motor decida anunciarlo manana. Las tres marcas son disjuntas: ninguna
- * aparece en el `target` de otro de los tres indices, asi que el orden en que se comprueban no
- * cambia el resultado.
+ * El `target` trae la expresion `lower(...)`, no el nombre pelado de la columna; por eso se compara
+ * por subcadena. Las tres marcas son disjuntas entre esos cinco `target`, asi que el orden en que se
+ * comprueban no cambia el resultado. Ni la marca ni el resultado llevan datos del otro usuario.
  */
 const EMAIL_UNIQUE_MARKER = 'email';
 const USERNAME_UNIQUE_MARKER = 'username';
@@ -240,6 +232,23 @@ function writeFailureOutcome(error: unknown): DuplicateKey | 'role_not_found' | 
   return null;
 }
 
+/**
+ * Los roles que la gestion de usuarios no concede, con una sola lectura por nombre. Devuelve aparte
+ * el id del Administrador porque la edicion lo necesita para la guarda del ultimo administrador.
+ */
+async function readUnassignableRoles(
+  client: Pick<Prisma.TransactionClient, 'role'>,
+): Promise<{ administratorId: string | undefined; unassignableIds: ReadonlySet<string> }> {
+  const roles = await client.role.findMany({
+    where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_MAESTRO] } },
+    select: { id: true, name: true },
+  });
+  return {
+    administratorId: roles.find((role) => role.name === ROLE_ADMINISTRADOR)?.id,
+    unassignableIds: new Set(roles.map((role) => role.id)),
+  };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Alta y ficha
 // ---------------------------------------------------------------------------------------------
@@ -274,12 +283,9 @@ function writeFailureOutcome(error: unknown): DuplicateKey | 'role_not_found' | 
  * La unicidad la garantizan **SOLO** los tres indices de QC-47, sin ningun `SELECT` previo —que seria
  * una carrera— (R17): por eso dos altas simultaneas con el mismo correo acaban con una sola fila.
  *
- * **Fix directo (2026-09-22): la UNICA excepcion a ese «sin `SELECT` previo» es resolver el id del
- * rol administrador** para rechazar el rol antes de escribir (`data.roleId === adminRole?.id` →
- * `'action_not_allowed'`, y no se escribe ninguna fila). No es una comprobacion de unicidad y por
- * eso sigue sin ser una carrera: el rol administrador solo cambia por migracion o seed, asi que
- * entre esta lectura y el `INSERT` no hay ninguna escritura que pueda invalidarla. La unicidad
- * sigue garantizada solo por los tres indices.
+ * La unica lectura previa es la de los roles que no se asignan por esta via (Administrador y
+ * Maestro): si el `roleId` pedido es uno de ellos se responde `'action_not_allowed'` sin escribir.
+ * No es una comprobacion de unicidad ni una carrera: esos roles solo cambian por migracion o seed.
  */
 export async function create(
   companyId: string,
@@ -288,15 +294,8 @@ export async function create(
   accountStatus: 'pending',
   now: Date,
 ): Promise<{ id: string } | DuplicateKey | 'role_not_found' | 'action_not_allowed'> {
-  // Fix directo (2026-09-22): el rol administrador no se concede por esta via. Se resuelve el id
-  // del rol (la MISMA lectura por nombre que usa la transaccion de la edicion) y si el `roleId`
-  // pedido es el suyo, se responde `'action_not_allowed'` sin escribir. `ROLE_ADMINISTRADOR` viene
-  // importado del dominio (R24): ni literal ni constante nueva.
-  const adminRole = await prisma.role.findFirst({
-    where: { name: ROLE_ADMINISTRADOR },
-    select: { id: true },
-  });
-  if (data.roleId === adminRole?.id) return 'action_not_allowed';
+  const { unassignableIds } = await readUnassignableRoles(prisma);
+  if (unassignableIds.has(data.roleId)) return 'action_not_allowed';
 
   try {
     const created = await prisma.user.create({
@@ -677,17 +676,11 @@ export async function updateAliveInCompany(
     // rol pedido saca al objetivo del conjunto. Si el rol no existiera, el conjunto bloqueado estaria
     // vacio y la guarda no se dispara; que el `roleId` pedido no exista lo traduce el `P2003` de
     // abajo.
-    const adminRole = await tx.role.findFirst({
-      where: { name: ROLE_ADMINISTRADOR },
-      select: { id: true },
-    });
-    // Fix directo (2026-09-22): el rol administrador no se concede por esta via. Se decide DENTRO
-    // de la transaccion, justo despues de resolver `adminRole`, y se aborta antes de escribir:
-    // cuando el dominio recibe `'action_not_allowed'`, no se escribio nada. Va ANTES de la guardia
-    // de R22: ningun alta puede crear un administrador, luego ningun rol administrador llega a
-    // «sacar al objetivo del conjunto».
-    if (data.roleId === adminRole?.id) return 'action_not_allowed';
-    const leavesTheSet = data.roleId !== adminRole?.id;
+    const { administratorId, unassignableIds } = await readUnassignableRoles(tx);
+    // Ni el Administrador ni el Maestro se conceden por esta via. Se decide antes de la guarda del
+    // ultimo administrador y antes de escribir: con `'action_not_allowed'` no se escribio nada.
+    if (unassignableIds.has(data.roleId)) return 'action_not_allowed';
+    const leavesTheSet = data.roleId !== administratorId;
     if (wouldLeaveNoAdministrator(activeAdministratorIds, id, leavesTheSet)) {
       // Se aborta ANTES de escribir: cuando el dominio recibe esto, no se escribio nada.
       return 'last_administrator';
