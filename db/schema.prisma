@@ -87,8 +87,9 @@ enum UserAccountStatus {
 /// funcionales (`lower(...)`) y parciales (`WHERE deleted_at IS NULL`), escritos a mano en la
 /// migracion. El nombre de usuario es unico en todo el sistema; correo y documento, por empresa
 /// (`company_id` delante), mas un indice aparte para las filas sin empresa. Un `@unique` aqui
-/// distinguiria mayusculas y quemaria el valor de los usuarios dados de baja. `users_company_id_idx` no sobra: el RESTRICT al borrar una empresa
-/// tiene que ver tambien a los dados de baja, que esos indices parciales no cubren.
+/// distinguiria mayusculas y quemaria el valor de los usuarios dados de baja.
+/// `users_company_id_idx` no sobra: el RESTRICT al borrar una empresa tiene que ver tambien a los
+/// dados de baja, que esos indices parciales no cubren.
 /// @module identity
 model User {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
