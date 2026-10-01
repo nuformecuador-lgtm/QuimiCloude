@@ -381,3 +381,12 @@ Valores ficticios (`getPublicUrl` compone la URL sin red): `https://proyecto-tes
 Verificación: `vitest run` de los tres archivos → 3 archivos, 18/18 pasan. `eslint` sobre los tres: 0
 errores. `typecheck`: solo los errores ajenos de `pino` (`logger.ts`, `run-document-job-log.test.ts`);
 ninguno en estos archivos.
+
+
+## T7 — Gate completo y E2E (2026-10-01, leader)
+
+- Merge de `origin/dev` con #132 (`450d0852`): un conflicto en `catalog-columns.tsx`. Se conservan `defaultPinned: 'left'` de dev e `imageUrl` de esta rama, y se quita el comentario que daba la imagen por siempre vacia.
+- `./init.sh` completo: typecheck y lint verdes; 800 archivos de test, 795 verdes; 7 tests rojos en 5 archivos, **todos ajenos y rojos igual en `origin/dev` puro**. Tres ya estaban en el baseline; los dos nuevos (`product-page`, `recipe-page`, desde `a543c84d`) se anotan en `tests/baseline-rojos.json` y en QC-177. La comparacion queda en `sin rojos nuevos (5 rojos, todos en el baseline de 5)`.
+- Frontera [D8]: ningun archivo de la lista en `git diff --name-only origin/dev...HEAD` (**R23**).
+- E2E `catalogo-desde-pdf` en Chromium: **ROJO, y rojo igual en `origin/dev` puro** (`b07fab8b`). Falla en el paso 1, antes de la importacion: `getByTestId('document-upload')` resuelve pero queda `hidden`. Desde `3e976515`/`b03f4811` (QC-160) la subida vive en una ventana con `keepMounted` que se abre con un boton, y el E2E no se actualizo. **R22 queda sin demostrar** mas alla de ese punto: el spec prohibe tocar el E2E desde esta ficha.
+- Base local compartida `QuimiCloude` puesta al dia (11 migraciones). `20260923150000` y `20260923150100` se marcaron `--applied`: son identicas byte a byte a las `20260922160000`/`20260922160100` que QC-141 aplico antes de renumerarlas.
