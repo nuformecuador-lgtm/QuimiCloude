@@ -660,3 +660,28 @@ borrar. La segunda corrida borro la suya.
 - Primera corrida: 3 rojos esperados (`tx.user.count()` = 2 por el Maestro). Tras el ajuste:
   `vitest run identity-seed.int.test.ts`: 1 archivo, 25 passed (8 nuevos).
 - `pnpm exec tsc --noEmit` verde; `eslint` del archivo limpio.
+
+## Cierre de la tanda T7, T8 — `./init.sh --rapido`
+
+Punta `cdbc41d9`. Entorno, fichas, cupo, specs, `QuimiCloude_QC161` al dia (57 migraciones),
+**typecheck** y **lint** en verde. `test:rapido` (`vitest related` sobre el diff; 489 archivos):
+**7 archivos / 15 casos rojos, 6911 passed, 26 skipped, 10 errores** de pool (`Timeout waiting for
+worker to respond`, `Failed to start forks worker`). La corrida coincidio con otra del gate anterior
+(arrancada a las 12:27 y que seguia viva, escribiendo en el mismo log) y la maquina estuvo saturada.
+Reclasificacion, cada archivo vuelto a correr aislado sobre la misma punta:
+
+- `pedidos/company-scope`, `recetas/company-scope`, `identity-constraints`,
+  `inventario/reserve-existing-orders-migration`, `pedidos/pedidos-constraints`: 5 archivos, 108 passed.
+- `pedidos/order-reservation-concurrency` (timeout de hook en el gate): verde aislado.
+- Los seis de UI cuyo worker no arranco (`presentation-sheet`, `user-form`, `order-form`,
+  `catalog-line-sheet`, `supplier-detail-page`, `recipe-form`): 184 passed.
+- Quedan solo los conocidos: `user-crud.int.test.ts` `:509`/`:525` (T12); `unidades-viewport`,
+  `usuarios-viewport` (baseline); `inventario/product-page`, `recetas-ui/recipe-page` (deuda de `dev`).
+
+Guardias aparte (el gate no llega a ellas con rojos relacionados): `vitest run guard` → 51 archivos,
+654 passed, 11 skipped.
+
+Base huerfana `qct_qc161_95232936_mupt4gy0_o5o`: estaba en HOLD («su worktree sigue vivo»), sin
+conexiones abiertas en ese instante, y se borro a mano con `DROP DATABASE`. Despues se vio que el gate
+anterior que la habia creado todavia seguia corriendo (termino a las ~13:18 con 8 rojos conocidos y 44
+errores de pool), asi que ese resultado tardio no cuenta. `db:test list` al cerrar: ninguna `qct_qc161_*`.
