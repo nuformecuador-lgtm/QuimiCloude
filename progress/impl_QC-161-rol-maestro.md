@@ -747,3 +747,17 @@ Las tres marcas (`email`, `username`, `document_number`) siguen siendo disjuntas
   conocidos de `:509`/`:525` cerrados).
 - `vitest run tests/unit/errores/catalogo.test.ts tests/unit/identity/usuarios tests/unit/identity/roles`:
   18 archivos, 342 passed, 9 skipped.
+- `eslint` de los archivos tocados: limpio.
+
+## Cierre de T12 — `./init.sh --rapido`
+
+Punta `7cd43e68`. Entorno, fichas, cupo, specs, `QuimiCloude_QC161` al dia (57 migraciones),
+**typecheck** y **lint** en verde. `test:rapido` (relacionados con 60 archivos del diff vs
+`origin/dev`): **4 archivos / 6 casos rojos, 7890 passed, 44 skipped**, sin errores de pool. Los
+cuatro son los conocidos y ajenos a esta tanda: `unidades-viewport`, `usuarios-viewport` (baseline),
+`inventario/product-page`, `recetas-ui/recipe-page` (deuda de `dev`). Los dos de `user-crud.int`
+(`:509`/`:525`) ya no estan. En una corrida previa de `vitest related` (maquina cargada),
+`session-once-per-request-render.test.tsx` cayo a nivel de archivo; aislado: 9 passed.
+
+Guardias aparte (el gate no llega a ellas con rojos relacionados): `vitest run guard` → 51 archivos,
+654 passed, 11 skipped. `db:test list`: ninguna `qct_qc161_*`.
