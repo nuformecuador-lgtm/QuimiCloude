@@ -81,8 +81,7 @@ function filaConEmpresa(): OrderRow {
     createdBy: 'u-1',
     updatedBy: 'u-1',
     companyId: EMPRESA,
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
     unitId: null,
   }
   return row as OrderRow
@@ -155,8 +154,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       createdBy: 'u-1',
       updatedBy: 'u-1',
       companyId: EMPRESA,
-      presentationId: null,
-      presentationContent: null,
+      presentationLines: [],
     }
     const row = toOrderRow(prismaRow as unknown as Parameters<typeof toOrderRow>[0])
     expect(row).not.toHaveProperty('companyId')

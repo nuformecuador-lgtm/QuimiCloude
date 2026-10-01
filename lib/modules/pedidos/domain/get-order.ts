@@ -18,7 +18,7 @@ import type { OrderRepository } from '../ports/order-repository';
 export type GetOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
-  /** Contrato PUBLICO de `inventario`: resuelve el nombre de la presentacion. */
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de las presentaciones del reparto. */
   readonly presentations: PresentationCatalog;
   /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de `unitId` (R42). */
   readonly units: UnitCatalog;
@@ -28,6 +28,12 @@ export type GetOrderDeps = {
  *  `list-orders.ts` la reutiliza para no divergir en el criterio. */
 export function unitLabelOf(unit: { readonly name: string; readonly symbol: string | null }): string {
   return unit.symbol ?? unit.name;
+}
+
+/** Los ids unicos de las presentaciones de todo el reparto de las filas, para resolverlos
+ *  en una sola llamada al catalogo. */
+export function orderPresentationIds(rows: readonly Pick<OrderRow, 'presentationLines'>[]): string[] {
+  return [...new Set(rows.flatMap((row) => row.presentationLines.map((line) => line.presentationId)))];
 }
 
 /**
@@ -69,10 +75,11 @@ export function toOrderView(
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
-    presentationId: row.presentationId,
-    // `null` si el pedido esta sin presentacion; la FK compuesta con RESTRICT hace imposible
-    // el caso «tiene id pero no vuelve del catalogo».
-    presentationName: row.presentationId === null ? null : presentationNames.get(row.presentationId) ?? null,
+    presentationLines: row.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      presentationName: presentationNames.get(line.presentationId) ?? null,
+      packages: line.packages,
+    })),
     unitId: row.unitId,
     // `null` si el pedido esta sin unidad (R42); la FK con RESTRICT hace imposible el caso
     // «tiene id pero no vuelve del catalogo».
@@ -104,10 +111,9 @@ export function createGetOrder(
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId], actor.companyId);
 
+    const presentationIds = orderPresentationIds([row]);
     const presentations =
-      row.presentationId === null
-        ? []
-        : await deps.presentations.findRefs([row.presentationId], actor.companyId);
+      presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
 
     const units = row.unitId === null ? [] : await deps.units.findRefs([row.unitId], actor.companyId);
 

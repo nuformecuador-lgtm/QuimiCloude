@@ -64,8 +64,7 @@ function filaExistente(): OrderRow {
     updatedAt: AHORA,
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
     unitId: null,
   };
 }

@@ -51,8 +51,7 @@ function fila(status: OrderStatus): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
     unitId: null,
   }
 }

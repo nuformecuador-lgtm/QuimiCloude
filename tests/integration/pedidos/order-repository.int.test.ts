@@ -733,3 +733,33 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
     }
   })
 })
+
+describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentation_lines`', () => {
+  it('`findAliveOrderById` y `listAliveOrders` devuelven las lineas, y `[]` sin reparto', async () => {
+    const creados: string[] = []
+    try {
+      const conReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 10), {
+        presentationLines: [{ presentationId, packages: 4, content: null }],
+      })
+      const sinReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11))
+
+      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4 }])
+
+      const ficha = await findAliveOrderById(conReparto.id, scope())
+      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4 }])
+      // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
+      expect(ficha).toEqual(conReparto)
+
+      const fichaSin = await findAliveOrderById(sinReparto.id, scope())
+      expect(fichaSin?.presentationLines).toEqual([])
+
+      const todos = await recorrerTodo()
+      expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
+        { presentationId, packages: 4 },
+      ])
+      expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
+    } finally {
+      await limpiar(creados)
+    }
+  })
+})

@@ -77,8 +77,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: PRESENTATION_ID,
-    presentationContent: null,
+    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5 }],
     unitId: UNIT_ID,
     ...overrides,
   }
@@ -304,7 +303,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
 })
 
 describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
-  it('R23: la ficha devuelve id y nombre de la presentacion, con los nombres resueltos por los contratos (R42, R43)', async () => {
+  it('R26: la ficha devuelve el reparto con el nombre de cada presentacion, resuelto por los contratos (R42, R43)', async () => {
     const d = dobles({ fila: fila() })
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
@@ -325,23 +324,43 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       // R46: los dos autores salen como IDENTIFICADORES; resolver sus nombres es de QC-35.
       createdBy: 'admin-0',
       updatedBy: 'admin-0',
-      // R23: la ficha devuelve id y nombre de la presentacion, resueltos por el contrato.
-      presentationId: PRESENTATION_ID,
-      presentationName: 'Bidon 20L',
+      // R26: el reparto, con el nombre de cada presentacion resuelto por el contrato.
+      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5 }],
       // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
       unitId: UNIT_ID,
       unitLabel: 'L',
     })
   })
 
-  it('R23: un pedido sin presentacion devuelve su ausencia, sin consultar el catalogo', async () => {
-    const d = dobles({ fila: fila({ presentationId: null }) })
+  it('R27: un pedido sin reparto devuelve la lista vacia, sin consultar el catalogo', async () => {
+    const d = dobles({ fila: fila({ presentationLines: [] }) })
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.presentationId).toBeNull()
-    expect(vista.presentationName).toBeNull()
+    expect(vista.presentationLines).toEqual([])
     expect(d.findPresentationRefs).not.toHaveBeenCalled()
+  })
+
+  it('R26: varias lineas conservan el orden de alta y sus presentaciones se resuelven en una sola llamada', async () => {
+    const OTRA = '88888888-8888-4888-8888-888888888888'
+    const d = dobles({
+      fila: fila({
+        presentationLines: [
+          { presentationId: OTRA, packages: 2 },
+          { presentationId: PRESENTATION_ID, packages: 5 },
+        ],
+      }),
+    })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(d.findPresentationRefs).toHaveBeenCalledTimes(1)
+    expect(d.findPresentationRefs.mock.calls[0]?.[0]).toEqual([OTRA, PRESENTATION_ID])
+    // `OTRA` no vuelve del doble del catalogo: la linea sigue saliendo, con el nombre a `null`.
+    expect(vista.presentationLines).toEqual([
+      { presentationId: OTRA, presentationName: null, packages: 2 },
+      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5 },
+    ])
   })
 
   it('R42: un pedido sin unidad devuelve su ausencia, sin consultar el catalogo', async () => {

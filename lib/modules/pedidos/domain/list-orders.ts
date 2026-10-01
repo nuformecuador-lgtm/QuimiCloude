@@ -14,7 +14,7 @@ import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-import { unitLabelOf } from './get-order';
+import { orderPresentationIds, unitLabelOf } from './get-order';
 
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { OrderRepository } from '../ports/order-repository';
@@ -169,13 +169,8 @@ export function createListOrders(
 
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
-    const presentationIds = [
-      ...new Set(
-        page.items
-          .map((row) => row.presentationId)
-          .filter((id): id is string => id !== null),
-      ),
-    ];
+    // Las presentaciones de TODAS las lineas de la pagina, deduplicadas: una sola llamada.
+    const presentationIds = orderPresentationIds(page.items);
     const presentations =
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
     const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));

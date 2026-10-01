@@ -49,8 +49,7 @@ function filaBloqueada(overrides: Partial<OrderRow> = {}): LockedOrderRow {
     updatedAt: AHORA,
     createdBy: ACTOR_ID,
     updatedBy: ACTOR_ID,
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
     unitId: UNIT_ID,
   };
   return { ...base, ...overrides, reservedAt: null };

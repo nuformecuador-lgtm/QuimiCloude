@@ -84,8 +84,7 @@ function filaExistente(): OrderRow {
     updatedAt: new Date('2026-05-01T00:00:00.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: PRESENTATION_ID,
-    presentationContent: null,
+    presentationLines: [],
     unitId: null,
   }
 }

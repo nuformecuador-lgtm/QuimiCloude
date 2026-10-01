@@ -37,8 +37,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     updatedAt: AHORA,
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: 'p-1',
-    presentationContent: '1.0000',
+    presentationLines: [],
     unitId: null,
     reservedAt: null,
     ...overrides,
@@ -154,7 +153,7 @@ describe('createTransitionOrder', () => {
     const orden: string[] = [];
     // Sin presentacion ni contenido: antes esto rechazaba con
     // `presentation_without_content`; ahora Finalizar ni lo mira (R15, R16).
-    const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO', presentationId: null, presentationContent: null }));
+    const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO', presentationLines: [] }));
     const consumeForOrder = vi.fn(async () => {
       orden.push('consumeForOrder');
       return { kind: 'consumed' as const };

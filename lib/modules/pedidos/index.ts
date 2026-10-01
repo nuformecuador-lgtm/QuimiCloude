@@ -118,6 +118,8 @@ export { assertTransition, isAllowedTransition } from './domain/order-transition
 export type {
   NewOrder,
   OrderEdit,
+  OrderPresentationLineRow,
+  OrderPresentationLineView,
   OrderPresentationLineWrite,
   OrderRow,
   OrderView,

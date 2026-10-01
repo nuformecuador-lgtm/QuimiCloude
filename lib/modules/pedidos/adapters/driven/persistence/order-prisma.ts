@@ -72,9 +72,11 @@ const ORDER_SELECT = {
   updatedAt: true,
   createdBy: true,
   updatedBy: true,
-  presentationId: true,
-  presentationContent: true,
   unitId: true,
+  presentationLines: {
+    select: { presentationId: true, packages: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
 } satisfies Prisma.OrderSelect;
 
 type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
@@ -108,9 +110,11 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
-    presentationId: row.presentationId,
-    presentationContent: row.presentationContent === null ? null : fromDecimal(row.presentationContent),
     unitId: row.unitId,
+    presentationLines: row.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      packages: line.packages,
+    })),
   };
 }
 
@@ -694,11 +698,11 @@ async function insertAliveOrder(
     updatedAt: now,
     createdBy: actorId,
     updatedBy: actorId,
-    // `orders.presentation_id`/`presentation_content` se retiran del alta y de la edicion en
-    // esta ficha (T3 les da de baja la columna): el reparto vive en `order_presentation_lines`.
-    presentationId: null,
-    presentationContent: null,
     unitId: data.unitId,
+    presentationLines: data.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      packages: line.packages,
+    })),
   };
 }
 

@@ -30,6 +30,21 @@ export type OrderPresentationLineWrite = {
   readonly content: string | null;
 };
 
+/** Una linea del reparto tal como la lee el puerto: sin el contenido copiado, que solo
+ *  necesita Terminar y lo lee por su propio camino. */
+export type OrderPresentationLineRow = {
+  readonly presentationId: string;
+  readonly packages: number;
+};
+
+/** Una linea del reparto en la ficha y el listado. */
+export type OrderPresentationLineView = {
+  readonly presentationId: string;
+  /** `null` solo si la presentacion no vuelve del catalogo. */
+  readonly presentationName: string | null;
+  readonly packages: number;
+};
+
 /**
  * Datos de negocio de un pedido, ya validados por `order-input.ts` y listos para el puerto.
  *
@@ -86,12 +101,8 @@ export type OrderRow = {
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** `null` = pedido viejo, sin presentacion. */
-  readonly presentationId: string | null;
-  /** Copia del contenido de `presentationId` al crear el pedido o al cambiarle la
-   *  presentacion. `null` = sin copia: presentacion sin contenido entonces, o
-   *  pedido anterior a esta columna. */
-  readonly presentationContent: string | null;
+  /** El reparto en orden de alta (`created_at`, desempate `id`); `[]` = sin reparto. */
+  readonly presentationLines: readonly OrderPresentationLineRow[];
   /** La unidad en que se expresa `quantity` ([Q4], devuelve la unidad al pedido).
    *  `null` solo en los pedidos anteriores sin presentacion (R43). */
   readonly unitId: string | null;
@@ -130,11 +141,9 @@ export type OrderView = {
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** `null` = sin presentacion; viaja para precargar el selector en la edicion. */
-  readonly presentationId: string | null;
-  /** `null` cuando el pedido esta sin presentacion, nunca cuando el id no vuelve del
-   *  catalogo: la FK compuesta con `RESTRICT` hace ese caso imposible por construccion. */
-  readonly presentationName: string | null;
+  /** El reparto en orden de alta; `[]` = sin reparto (R27). Cada linea lleva lo que
+   *  `presentationLinesSchema` acepta, asi que la edicion lo precarga tal cual. */
+  readonly presentationLines: readonly OrderPresentationLineView[];
   /** La unidad en que se expresa `quantity` ([Q4]); `null` en los pedidos que no la
    *  tienen todavia (R43). */
   readonly unitId: string | null;

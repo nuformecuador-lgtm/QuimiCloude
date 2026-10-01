@@ -102,8 +102,7 @@ function fila(id: string): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'u-0',
     updatedBy: 'u-0',
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
     unitId: UNIDAD,
   }
 }

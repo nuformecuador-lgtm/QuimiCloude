@@ -77,8 +77,7 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
     unitId: null,
     ...overrides,
   }
@@ -691,36 +690,52 @@ describe('listOrders — el importe no es consultable (R17)', () => {
   })
 })
 
-describe('listOrders — la presentacion del pedido (R21, R22)', () => {
+describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
   const PRESENTACION_A = '77777777-7777-4777-8777-777777777777'
+  const PRESENTACION_B = '99999999-9999-4999-8999-999999999999'
 
-  it('R22: una sola llamada al catalogo de presentaciones por pagina, con alguna presentacion en la pagina', async () => {
+  it('R26: una sola llamada al catalogo de presentaciones por pagina, con los ids unicos de TODAS las lineas', async () => {
     const filas = [
-      fila({ id: 'o-1', presentationId: PRESENTACION_A }),
-      fila({ id: 'o-2', presentationId: PRESENTACION_A }),
-      fila({ id: 'o-3', presentationId: null }),
+      fila({
+        id: 'o-1',
+        presentationLines: [
+          { presentationId: PRESENTACION_A, packages: 5 },
+          { presentationId: PRESENTACION_B, packages: 1 },
+        ],
+      }),
+      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3 }] }),
+      fila({ id: 'o-3', presentationLines: [] }),
     ]
     const d = dobles({
       pagina: pagina(filas, { total: 3 }),
-      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L', content: null, unitId: 'unidad-1' }],
+      presentaciones: [
+        { id: PRESENTACION_A, name: 'Bidon 20L', content: null, unitId: 'unidad-1' },
+        { id: PRESENTACION_B, name: 'Botella 1L', content: null, unitId: 'unidad-1' },
+      ],
     })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(d.findRefs).toHaveBeenCalledTimes(1)
-    expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A])
-    expect(salida.items[0]?.presentationName).toBe('Bidon 20L')
-    expect(salida.items[1]?.presentationName).toBe('Bidon 20L')
-    expect(salida.items[2]?.presentationName).toBeNull()
+    expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A, PRESENTACION_B])
+    expect(salida.items[0]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5 },
+      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1 },
+    ])
+    expect(salida.items[1]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3 },
+    ])
+    // R27: sin reparto, lista vacia; no es un error de carga.
+    expect(salida.items[2]?.presentationLines).toEqual([])
   })
 
-  it('R22: ninguna llamada al catalogo de presentaciones si ningun pedido de la pagina tiene presentacion', async () => {
+  it('R27: ninguna llamada al catalogo de presentaciones si ningun pedido de la pagina tiene reparto', async () => {
     const d = dobles({ pagina: pagina([fila({ id: 'o-1' }), fila({ id: 'o-2' })], { total: 2 }) })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(d.findRefs).not.toHaveBeenCalled()
-    expect(salida.items.every((item) => item.presentationName === null)).toBe(true)
+    expect(salida.items.every((item) => item.presentationLines.length === 0)).toBe(true)
   })
 
   it('R21: ordenar o filtrar por presentacion se OMITE y se anota, como cualquier campo no declarado', async () => {
