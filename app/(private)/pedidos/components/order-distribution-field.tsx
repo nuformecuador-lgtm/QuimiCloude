@@ -11,6 +11,10 @@ import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-noti
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import {
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+} from '@/lib/modules/pedidos';
 import { formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { MISSING_VALUE_MARK } from './order-columns';
@@ -19,8 +23,7 @@ import type {
   OrderDistributionLine,
 } from './use-order-distribution-availability';
 
-export const ORDER_DISTRIBUTION_PRESENTATION_FIELD = 'presentationLines.presentationId';
-export const ORDER_DISTRIBUTION_PACKAGES_FIELD = 'presentationLines.packages';
+export { ORDER_DISTRIBUTION_PACKAGES_FIELD, ORDER_DISTRIBUTION_PRESENTATION_FIELD };
 
 export const ORDER_DISTRIBUTION_TESTID = 'order-distribution-field';
 export const ORDER_DISTRIBUTION_LINE_TESTID = 'order-distribution-line';

@@ -760,3 +760,32 @@ describe('QC-145 — el catalogo de personas sale de listResponsibleCandidatesAc
     expect(screen.queryByTestId(testId.error)).toBeNull();
   });
 });
+
+describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () => {
+  const ACCION = 'order-action-distribution';
+
+  it('R11: con pedidos.modificar, la fila en POR_EMPACAR la ofrece', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar', 'pedidos.modificar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(ACCION)).toBeInTheDocument();
+  });
+
+  it('R12: con solo empaque.modificar, la fila en POR_EMPACAR no la ofrece', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar', 'empaque.modificar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+    expect(screen.queryByTestId(ACCION)).toBeNull();
+  });
+});

@@ -153,6 +153,8 @@ export type OrderColumnsDeps = {
    * —marcador de ausencia, igual que responsables— y la lista se sigue viendo entera.
    */
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
+  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
+  readonly canEditDistribution?: boolean;
 };
 
 /**
@@ -168,6 +170,7 @@ export function buildOrderColumns({
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
+  canEditDistribution = false,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -297,6 +300,7 @@ export function buildOrderColumns({
           responsiblesCatalog={responsiblesCatalog}
           // La hoja pinta la cobertura de ESTA fila, ya traida por el lote.
           coverage={coverageByOrder[order.id]}
+          canEditDistribution={canEditDistribution}
         />
       ),
     },

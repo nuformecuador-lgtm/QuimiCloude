@@ -120,6 +120,8 @@ export type OrderTableProps = {
    * `responsiblesByOrder`. La tabla solo lo atraviesa hasta la celda.
    */
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
+  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
+  readonly canEditDistribution?: boolean;
   /**
    * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
    * DENTRO de la tabla, con la caja montada, en vez del vacio de `order-list-empty.tsx`.
@@ -136,6 +138,7 @@ export function OrderTable({
   responsiblesByOrder,
   responsiblesCatalog,
   coverageByOrder,
+  canEditDistribution,
   noMatches,
 }: OrderTableProps) {
   const router = useRouter();
@@ -172,8 +175,15 @@ export function OrderTable({
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
     () =>
-      buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder }),
-    [recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder],
+      buildOrderColumns({
+        recipes,
+        units,
+        responsiblesByOrder,
+        responsiblesCatalog,
+        coverageByOrder,
+        canEditDistribution,
+      }),
+    [recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder, canEditDistribution],
   );
 
   /*

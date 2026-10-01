@@ -94,6 +94,14 @@ export {
   type OrderDistributionFieldProps,
 } from './order-distribution-field';
 export {
+  ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_TESTID,
+  OrderDistributionDialog,
+  type OrderDistributionDialogProps,
+} from './order-distribution-dialog';
+export {
   ORDER_DISTRIBUTION_DEBOUNCE_MS,
   availabilityBlocksSave,
   fromOrderPresentationLines,
@@ -145,7 +153,9 @@ export { OrderListSection } from './order-list-section';
 export { ORDER_SKELETON_COLUMN_COUNT, OrderListSkeleton } from './order-list-skeleton';
 export {
   FINAL_ORDER_REASON,
+  ORDER_ACTION_DISTRIBUTION_TESTID,
   OrderRowActions,
+  acceptsDistributionEdit,
   isFinalOrderStatus,
   type OrderRowActionsProps,
 } from './order-row-actions';
