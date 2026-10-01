@@ -228,6 +228,10 @@ versión y no a las de la original. [D13]
 
 ## Preguntas abiertas
 
+Ninguna pendiente. **Las tres, RESUELTAS en F1.4 (2026-10-01) por el humano con la opción (a)
+recomendada**, que es con la que ya estaban escritos los requisitos marcados ⚑. Se conservan abajo como
+registro.
+
 Nuevas de F1.2; ninguna reabre la tabla de decisiones. Cada una lleva la opción recomendada, que es
 con la que están escritos los requisitos marcados ⚑.
 
