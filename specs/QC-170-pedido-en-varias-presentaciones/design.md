@@ -291,6 +291,26 @@ uno por línea del reparto—, así que esa unicidad es ahora **falsa** y hay qu
       algún pedido tiene más de una línea vigente) y hace `DROP TABLE order_presentation_lines`.
       Es destructivo a conciencia, igual que QC-146 lo fue con la columna que ahora se retira.
 
+> **Nota de enmienda (2026-10-01) — decisión humana 2026-10-01**, al cerrar T3. Ajusta el paso 3
+> anterior; el resto de §2.4 queda como estaba.
+>
+> - **Backfill solo de pedidos vivos (R22).** El `INSERT` del paso 1 añade `o.deleted_at IS NULL`
+>   y excluye los estados `ENTREGADO` y `CANCELADO` (valores reales de `OrderStatus`). Un pedido
+>   borrado, entregado o cancelado queda sin líneas. El guardia de R45 sigue mirando
+>   `POR_EMPACAR`/`EN_EMPAQUE`, pero solo de pedidos no borrados (`deleted_at IS NULL`), igual que
+>   ya hacía el de R49. El `UPDATE` de `orders.unit_id` (R43) no cambia: sigue alcanzando a todos.
+> - **Desviación aceptada 1 — el `down.sql` no borra la tabla.** No hace `DROP TABLE
+>   order_presentation_lines`: la FK de `inventory_movements` (migración (2)) lo impide, y la tabla
+>   la borra el `down.sql` de la migración (1). Solo devuelve la línea única a las columnas y borra
+>   las líneas.
+> - **Desviación aceptada 2 — dónde falla la segunda aplicación (R25).** Falla en el guardia del
+>   paso 0, que también lee `presentation_id`, no en el `DROP COLUMN`; el error es el mismo
+>   (42703, columna inexistente) y sigue sin duplicar líneas.
+> - **Desviación aceptada 3 — paréntesis de RLS.** `up` y `down` abren `NO FORCE ROW LEVEL
+>   SECURITY` sobre las tablas que leen y lo cierran con `ENABLE`+`FORCE` al final, para ver las
+>   filas aunque la migración no corra como superusuario. Si un guardia aborta, la transacción lo
+>   deshace.
+
 Los tres timestamps son estrictamente posteriores al último de `db/migrations/` en el momento de
 crear cada uno (hoy `20260925120100_packing_permission`, QC-168 T2). Ninguna comparte prefijo con
 QC-138 ni QC-82 (ninguna de las dos toca migraciones nuevas de `orders`, según sus specs).
