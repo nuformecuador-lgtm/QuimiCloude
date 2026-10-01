@@ -371,3 +371,45 @@ disparador `users_check_company_by_role_trigger`; rol `Maestro` con `empresas.co
   compartida) y el caso paso: 1 passed, 16 skipped.
 - La base huerfana `qct_qc161_95232936_mupntzdx_mx4` ya no existia al ir a borrarla (ninguna
   `qct_qc161_*` en `pg_database`): la limpio el arnes al arrancar esta corrida.
+
+## T6 — La base garantiza empresa segun rol y la unicidad nueva
+
+### Archivos (solo tests)
+
+- `tests/integration/identity/maestro-migration.int.test.ts` (nuevo). UP y DOWN leidos del archivo
+  y troceados respetando los bloques `$tag$`. «Antes de la migracion» se reconstruye en la
+  transaccion: borra los usuarios Maestro que haya y aplica el DOWN. Prisma resume todo `23505`
+  como «Unique constraint failed» y pierde el texto, asi que el mensaje de la guardia (R39) se lee
+  ejecutandola dentro de un `DO` que la relanza como `P0001` con `SQLERRM`; el `23505` y las filas
+  intactas se afirman ademas sobre la ejecucion directa.
+- `tests/integration/identity/identity-constraints.int.test.ts`: el caso de `:1433` reescrito como
+  R36 (mismo nombre en la misma empresa **y** en otra, en otras mayusculas → `23505`; nombre
+  `ana.global`, no `admin`). Correo (`:1380`) y documento (`:1483`) intactos (R37). `:1194` sigue
+  con su `23502` sin tocarse (R26). **No previsto en el design**: «una cuenta inactive sigue
+  ocupando su correo, su nombre de usuario y su documento en su empresa» (`:1884`) creaba en otra
+  empresa un usuario con el mismo nombre; ahora afirma que el nombre choca tambien en otra empresa
+  (R36) y que correo y documento siguen libres alli (R37). Cabeceras del archivo y del bloque
+  «unicidad DENTRO de la empresa» con una frase sobre el cambio.
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R21 | `maestro-migration.int` «R21: el UP sobre una base sembrada crea el rol Maestro…»; «R21: el UP sobre una base donde el seed ya creo esas filas no falla…»; «R21: dos ciclos DOWN -> UP seguidos dejan los mismos conteos» |
+| R22 | «R22: el DOWN sin ningun Maestro deja la base como antes del UP…»; «R22: el DOWN con un Maestro vivo / dado de baja falla con 23502 y no borra ni reasigna nada» |
+| R26 | «R26: un usuario sin empresa con un rol de empresa se rechaza con 23502 al insertar y al pasar su empresa a NULL» (los tres roles de empresa; tambien Maestro→Operador sin empresa); caso simetrico «R26, R27: …se aceptan»; `identity-constraints.int` `:1194` «rechaza un usuario sin empresa o con una empresa inexistente» (sin cambios) |
+| R27 | «R27: un Maestro con empresa se rechaza con 23514 al insertar, al darle empresa y al pasar a Maestro a un usuario con empresa» |
+| R28 | «R28: dos Maestros vivos con el mismo correo en otras mayusculas o el mismo documento se rechazan, al crear y al cambiar»; «R28: un Maestro dado de baja no ocupa su correo ni su documento» |
+| R36 | «R36: el mismo nombre de usuario se rechaza entre dos empresas, entre una empresa y un Maestro, y al renombrar»; «R36: un usuario dado de baja no ocupa su nombre de usuario…»; `identity-constraints.int` «QC-161 R36: rechaza el mismo nombre de usuario en la misma empresa y en otra…» y el caso de `:1884` |
+| R37 | «R37: el mismo correo y el mismo documento entre un usuario de empresa y un Maestro se aceptan»; `identity-constraints.int` `:1380`, `:1483` (sin cambios) y el caso de `:1884` |
+| R38 | «R38: el UP sobre una base sin nombres de usuario repetidos no cambia ninguna fila de users» |
+| R39 | «R39: con dos usuarios vivos de empresas distintas con el mismo nombre en otras mayusculas, la guardia falla, nombra el repetido con su numero y no cambia ninguna fila»; simetrico «R39: … sin repetidos, o con el repetido dado de baja, la guardia pasa» |
+
+### Salida
+
+- `.env` con `QuimiCloude_QC161` comprobado (`grep -c` = 2). Base efimera copiada de
+  `qct_tpl_fa76230db33c`, borrada al terminar.
+- `vitest run maestro-migration.int.test.ts identity-constraints.int.test.ts`: 2 archivos, 64 passed.
+- `pnpm run typecheck`: solo los dos errores de `session-user-prisma.ts` (T9). `eslint` limpio.
+- Rojos conocidos que quedan para T12 (design §10.1): `user-crud.int.test.ts:509-542`, que crean
+  el mismo nombre de usuario en otra empresa.

@@ -122,7 +122,7 @@
         misma tanda.
       - Depende de: T1, T2.
 
-- [ ] **T6. La base garantiza empresa según rol y la unicidad nueva.** (R21, R22, R26–R28, R36–R39.)
+- [x] **T6. La base garantiza empresa según rol y la unicidad nueva.** (R21, R22, R26–R28, R36–R39.)
       - Archivos (solo tests): `tests/integration/identity/maestro-migration.int.test.ts` (nuevo: UP
         leído del archivo sobre base sembrada en transacción revertida, dos veces; DOWN sin Maestro y
         con Maestro; `23502` y `23514` al insertar y al actualizar; R28 correo y documento entre
