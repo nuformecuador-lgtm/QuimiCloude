@@ -69,6 +69,6 @@ describe('documentos — forma de los puertos de almacenamiento (R13)', () => {
 
   it('`CropCatalog` declara EXACTAMENTE sus dos operaciones de lectura', () => {
     const fuente = readFileSync(CROP_CATALOG, 'utf8');
-    expect(operacionesDe(fuente, 'CropCatalog')).toEqual(['list', 'createSignedReadUrl']);
+    expect(operacionesDe(fuente, 'CropCatalog')).toEqual(['list', 'publicUrl']);
   });
 });

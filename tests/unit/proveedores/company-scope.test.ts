@@ -43,6 +43,7 @@ import type { Actor } from '@/lib/modules/proveedores/domain/actor';
 import type { CatalogLineView } from '@/lib/modules/proveedores/domain/catalog-line-view';
 import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 import type { SupplierView } from '@/lib/modules/proveedores/domain/supplier-view';
+import type { CatalogImageUrl } from '@/lib/modules/proveedores/ports/catalog-image-url';
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 
@@ -243,9 +244,15 @@ describe('R31 — ninguna salida publica lleva la empresa', () => {
 
     const log = { ignoredFields: vi.fn() };
 
+    const images: CatalogImageUrl = { publicUrl: vi.fn((path: string) => `https://cdn.test/${path}`) };
+
     const ficha = await createGetSupplier({ suppliers })(PROVEEDOR, ACTOR);
     const lista = await createListSuppliers({ suppliers, log })({ page: 1 }, ACTOR);
-    const catalogo = await createListCatalogLines({ catalog, log })(PROVEEDOR, { page: 1 }, ACTOR);
+    const catalogo = await createListCatalogLines({ catalog, log, images })(
+      PROVEEDOR,
+      { page: 1 },
+      ACTOR,
+    );
 
     // Controles: las salidas SON las de la fila.
     expect(ficha.id).toBe(PROVEEDOR);

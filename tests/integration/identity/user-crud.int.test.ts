@@ -5,8 +5,8 @@
  * QUE SE EJERCITA: el ADAPTADOR de produccion directamente —los CINCO metodos de
  * `lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts`—, no la fachada ni las
  * Server Actions. Es el mismo reparto que `tests/integration/proveedores/supplier-crud.int.test.ts`
- * con `supplier-prisma.ts`: lo que aqui se prueba es lo que solo la base puede contestar (los tres
- * indices unicos POR EMPRESA de QC-47, el orden con desempate, lo que queda escrito en la FILA), y
+ * con `supplier-prisma.ts`: lo que aqui se prueba es lo que solo la base puede contestar (los
+ * indices unicos de `users`, el orden con desempate, lo que queda escrito en la FILA), y
  * la autorizacion, los esquemas y las dos guardas del administrador ya tienen sus tests propios
  * (`tests/unit/identity/usuarios/**`, `tests/integration/identity/last-administrator.int.test.ts`).
  *
@@ -37,9 +37,9 @@
  * maquina el servidor responde en espanol—. Se afirma sobre el RESULTADO DISCRIMINADO del puerto
  * (`'email' | 'username' | 'document'`, `'not_found'`), que es justamente lo que el adaptador
  * traduce desde el `P2002`/`23505`. El `meta.target` de los dos indices FUNCIONALES trae la
- * EXPRESION (`["company_id","lower(email)"]`, `["company_id","lower(username)"]`) y el del
- * documento las tres columnas: lo traduce el adaptador por subcadena, y este archivo solo comprueba
- * el resultado.
+ * EXPRESION (`["company_id","lower(email)"]`; el de usuario es global,
+ * `["lower(username)"]`) y el del documento sus columnas: lo traduce el adaptador por subcadena, y
+ * este archivo solo comprueba el resultado.
  *
  * NINGUNA CREDENCIAL REAL: `FAKE_CREDENTIAL_HASH` es un marcador evidentemente ficticio; ninguna
  * operacion de este archivo lee ni verifica credenciales.
@@ -54,7 +54,13 @@ import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { identity } from '@/lib/composition';
-import { DOCUMENT_TYPE_CC, normalizeCompanyName, UnauthorizedError } from '@/lib/modules/identity';
+import {
+  ActionNotAllowedError,
+  DOCUMENT_TYPE_CC,
+  DuplicateUsernameError,
+  normalizeCompanyName,
+  UnauthorizedError,
+} from '@/lib/modules/identity';
 import {
   applyGuardedChange,
   create,
@@ -64,7 +70,12 @@ import {
 } from '@/lib/modules/identity/adapters/driven/persistence/user-admin-prisma';
 import { PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
 import { clearedLockState } from '@/lib/modules/identity/domain/effective-account-status';
-import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
+import {
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  ROLE_OPERADOR,
+} from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { Actor } from '@/lib/modules/identity';
@@ -92,6 +103,7 @@ const FAKE_CREDENTIAL_HASH = {
 let operadorRoleId = '';
 let administradorRoleId = '';
 let empacadorRoleId = '';
+let maestroRoleId = '';
 
 /** Las empresas que este archivo creo, para comprobar en `afterAll` que no quedo ninguna. */
 const createdCompanyIds = new Set<string>();
@@ -135,6 +147,37 @@ async function withTwoCompanies(
   } finally {
     await dropCompany(companyB);
     await dropCompany(companyA);
+  }
+}
+
+/**
+ * Un Maestro propio, sin empresa, que se borra siempre. No se usa el del seed: el caso no depende de
+ * que exista ni de su nombre.
+ */
+async function withMaestro(body: (maestroId: string, username: string) => Promise<void>): Promise<void> {
+  const tag = randomUUID();
+  const username = `qc161.maestro.${tag}`;
+  const maestro = await prisma.user.create({
+    data: {
+      firstNames: 'QC161',
+      lastNames: `Maestro${tag.slice(0, 8)}`,
+      birthDate: new Date('1990-01-01T00:00:00.000Z'),
+      email: `qc161.maestro.${tag}@example.test`,
+      phone: '000000000',
+      documentTypeCode: DOCUMENT_TYPE_CC,
+      documentNumber: documentNumberFrom(tag),
+      username,
+      passwordHash: FAKE_CREDENTIAL_HASH.value,
+      roleId: maestroRoleId,
+      companyId: null,
+      accountStatus: 'active',
+    },
+    select: { id: true },
+  });
+  try {
+    await body(maestro.id, username);
+  } finally {
+    await prisma.user.delete({ where: { id: maestro.id } });
   }
 }
 
@@ -325,21 +368,29 @@ beforeAll(async () => {
   }
 
   const roles = await prisma.role.findMany({
-    where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR] } },
+    where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO] } },
     select: { id: true, name: true },
   });
   const administrador = roles.find((role) => role.name === ROLE_ADMINISTRADOR);
   const operador = roles.find((role) => role.name === ROLE_OPERADOR);
   const empacador = roles.find((role) => role.name === ROLE_EMPACADOR);
-  if (administrador === undefined || operador === undefined || empacador === undefined) {
+  const maestro = roles.find((role) => role.name === ROLE_MAESTRO);
+  if (
+    administrador === undefined ||
+    operador === undefined ||
+    empacador === undefined ||
+    maestro === undefined
+  ) {
     throw new Error(
-      `faltan los roles base (${ROLE_ADMINISTRADOR} / ${ROLE_OPERADOR} / ${ROLE_EMPACADOR}) en la ` +
-        'base: corre `pnpm run db:seed` antes de correr este archivo.',
+      `faltan los roles base (${ROLE_ADMINISTRADOR} / ${ROLE_OPERADOR} / ${ROLE_EMPACADOR} / ` +
+        `${ROLE_MAESTRO}) en la base: corre \`pnpm run db:migrate\` y \`pnpm run db:seed\` antes ` +
+        'de correr este archivo.',
     );
   }
   administradorRoleId = administrador.id;
   operadorRoleId = operador.id;
   empacadorRoleId = empacador.id;
+  maestroRoleId = maestro.id;
 });
 
 afterAll(async () => {
@@ -412,7 +463,7 @@ describe('R13 + R49 — el alta persiste la empresa del argumento, el rol, `pend
 // R17 — los tres duplicados, POR EMPRESA
 // ---------------------------------------------------------------------------
 
-describe('R17 — correo, nombre de usuario y pareja tipo+numero de documento son unicos DENTRO de la empresa', () => {
+describe('R17 — correo y pareja tipo+numero de documento son unicos DENTRO de la empresa; el nombre de usuario, en todo el sistema (QC-161)', () => {
   it('el correo repetido devuelve `email` y NO crea ninguna fila', async () => {
     await withCompany(async (companyId) => {
       const primero = newUserData();
@@ -506,38 +557,68 @@ describe('R17 — correo, nombre de usuario y pareja tipo+numero de documento so
     });
   });
 
-  it('EL CASO QUE LO HACE VALIOSO — los MISMOS correo, nombre de usuario y documento en OTRA empresa SI se crean: los tres indices son POR EMPRESA (QC-47), no globales', async () => {
-    await withTwoCompanies(async (companyA, companyB) => {
-      const data = newUserData();
-      const enA = await createUser(companyA, data);
-
-      // Exactamente los mismos nueve campos, otra empresa.
-      const enB = await createUser(companyB, data);
-
-      expect(enB).not.toBe(enA);
-      expect((await rawUser(enA)).company_id).toBe(companyA);
-      expect((await rawUser(enB)).company_id).toBe(companyB);
-      expect(await countRowsOf(companyA)).toBe(1);
-      expect(await countRowsOf(companyB)).toBe(1);
-    });
-  });
-
-  it('tampoco choca por mayusculas entre empresas distintas: el indice lleva `company_id` delante de `lower(...)`', async () => {
+  it('QC-161 R36 — el MISMO nombre de usuario en OTRA empresa devuelve `username` y NO crea ninguna fila, tambien cambiando mayusculas', async () => {
     await withTwoCompanies(async (companyA, companyB) => {
       const data = newUserData();
       await createUser(companyA, data);
 
-      const id = await createUser(
+      for (const username of [data.username, data.username.toUpperCase()]) {
+        const outcome = await create(
+          companyB,
+          newUserData({ username }),
+          FAKE_CREDENTIAL_HASH,
+          'pending',
+          new Date(),
+        );
+        expect(outcome, username).toBe('username');
+      }
+
+      expect(await countRowsOf(companyA)).toBe(1);
+      expect(await countRowsOf(companyB)).toBe(0);
+    });
+  });
+
+  it('QC-161 R37 — los MISMOS correo y documento en OTRA empresa SI se crean, tambien cambiando mayusculas: esos dos siguen siendo por empresa', async () => {
+    await withTwoCompanies(async (companyA, companyB) => {
+      const data = newUserData();
+      const enA = await createUser(companyA, data);
+
+      const enB = await createUser(
         companyB,
         newUserData({
           email: data.email.toUpperCase(),
-          username: data.username.toUpperCase(),
           documentTypeCode: data.documentTypeCode,
           documentNumber: data.documentNumber,
         }),
       );
 
-      expect((await rawUser(id)).company_id).toBe(companyB);
+      expect(enB).not.toBe(enA);
+      expect((await rawUser(enA)).company_id).toBe(companyA);
+      const filaB = await rawUser(enB);
+      expect(filaB.company_id).toBe(companyB);
+      expect(filaB.email).toBe(data.email.toUpperCase());
+      expect(filaB.document_number).toBe(data.documentNumber);
+      expect(await countRowsOf(companyB)).toBe(1);
+    });
+  });
+
+  it('QC-161 R36 — un usuario dado de baja NO ocupa su nombre de usuario en otra empresa', async () => {
+    await withTwoCompanies(async (companyA, companyB) => {
+      const data = newUserData();
+      const enA = await createUser(companyA, data);
+      expect(
+        await applyGuardedChange({
+          kind: 'delete',
+          companyId: companyA,
+          id: enA,
+          adminRoleName: ROLE_ADMINISTRADOR,
+          now: new Date(),
+        }),
+      ).toBe('ok');
+
+      const enB = await createUser(companyB, newUserData({ username: data.username }));
+
+      expect((await rawUser(enB)).username).toBe(data.username);
     });
   });
 });
@@ -1291,5 +1372,202 @@ describe('el escenario de este archivo no roza la guarda del ultimo administrado
     // (`last-administrator.int.test.ts`) y no se duplican aqui.
     expect(administradorRoleId).not.toBe('');
     expect(operadorRoleId).not.toBe(administradorRoleId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El Maestro no pertenece a ninguna empresa ni se asigna desde la gestion de usuarios
+// ---------------------------------------------------------------------------
+
+/** Todos los permisos del catalogo: el rechazo del rol Maestro no depende de lo que tenga el actor. */
+const TODOS_LOS_PERMISOS: readonly string[] = PERMISSIONS.map((entry) => entry.code);
+
+/** Usuarios vivos o borrados con ese nombre de usuario en toda la base, sin distinguir mayusculas. */
+async function countByUsername(username: string): Promise<number> {
+  return prisma.user.count({ where: { username: { equals: username, mode: 'insensitive' } } });
+}
+
+describe('QC-161 R1 — el Maestro no aparece en ninguna operacion con ambito de empresa', () => {
+  it('R1 — la lista de una empresa no lo incluye, ni buscandolo por su nombre de usuario', async () => {
+    await withMaestro(async (maestroId, username) => {
+      await withCompany(async (companyId) => {
+        const actorId = await seedUser(companyId);
+        const otro = await seedUser(companyId);
+
+        expect(await listIds(companyId, actorId, { pageSize: 25 })).toEqual([otro]);
+        expect(await listIds(companyId, actorId, { search: username })).toEqual([]);
+        expect(await findAliveInCompany(companyId, maestroId)).toBeNull();
+      });
+    });
+  });
+
+  it('R1 — editarlo, darlo de baja y cambiarle el estado responden `not_found` y su fila no cambia', async () => {
+    await withMaestro(async (maestroId) => {
+      await withCompany(async (companyId) => {
+        const actorId = await seedUser(companyId, { accountStatus: 'active' });
+        const antes = await rawUser(maestroId);
+
+        expect(
+          await updateAliveInCompany(companyId, maestroId, newUserData(), new Date()),
+        ).toBe('not_found');
+        expect(
+          await applyGuardedChange({
+            kind: 'delete',
+            companyId,
+            id: maestroId,
+            adminRoleName: ROLE_ADMINISTRADOR,
+            now: new Date(),
+          }),
+        ).toBe('not_found');
+        expect(
+          await applyGuardedChange({
+            kind: 'account_status',
+            companyId,
+            id: maestroId,
+            adminRoleName: ROLE_ADMINISTRADOR,
+            now: new Date(),
+            accountStatus: 'blocked',
+            changedBy: actorId,
+            lockState: null,
+          }),
+        ).toBe('not_found');
+
+        expect(await rawUser(maestroId)).toEqual(antes);
+      });
+    });
+  });
+});
+
+describe('QC-161 R24, R25 — el rol Maestro no se concede en el alta ni en la edicion', () => {
+  it('R24 — el alta con el rol Maestro se rechaza como accion no permitida y no escribe ninguna fila, con `usuarios.modificar` o con todo el catalogo', async () => {
+    await withCompany(async (companyId) => {
+      for (const permisos of [['usuarios.modificar'], TODOS_LOS_PERMISOS]) {
+        const actor = actorWithPermissions(companyId, permisos);
+        const entrada = createUserInputData(maestroRoleId);
+
+        await expect(identity.createUser(actor, entrada)).rejects.toBeInstanceOf(
+          ActionNotAllowedError,
+        );
+        expect(await countByUsername(entrada.username)).toBe(0);
+      }
+      expect(await countRowsOf(companyId)).toBe(0);
+    });
+  });
+
+  it('R24 — el adaptador responde `action_not_allowed` antes de escribir', async () => {
+    await withCompany(async (companyId) => {
+      const outcome = await create(
+        companyId,
+        newUserData({ roleId: maestroRoleId }),
+        FAKE_CREDENTIAL_HASH,
+        'pending',
+        new Date(),
+      );
+
+      expect(outcome).toBe('action_not_allowed');
+      expect(await countRowsOf(companyId)).toBe(0);
+    });
+  });
+
+  it('R25 — la edicion hacia el rol Maestro se rechaza como accion no permitida y la fila no cambia, con `usuarios.modificar` o con todo el catalogo', async () => {
+    await withCompany(async (companyId) => {
+      const owner = actorWithPermissions(companyId, ['usuarios.modificar']);
+      const created = await identity.createUser(owner, createUserInputData(operadorRoleId));
+      const antes = await rawUser(created.id);
+
+      for (const permisos of [['usuarios.modificar'], TODOS_LOS_PERMISOS]) {
+        const actor = actorWithPermissions(companyId, permisos);
+        await expect(
+          identity.updateUser(actor, created.id, updateUserInputData(maestroRoleId)),
+        ).rejects.toBeInstanceOf(ActionNotAllowedError);
+      }
+
+      expect(
+        await updateAliveInCompany(
+          companyId,
+          created.id,
+          newUserData({ roleId: maestroRoleId }),
+          new Date(),
+        ),
+      ).toBe('action_not_allowed');
+      expect(await rawUser(created.id)).toEqual(antes);
+      expect(await countRowsOf(companyId)).toBe(1);
+    });
+  });
+});
+
+describe('QC-161 R40 — el nombre de usuario de otra empresa o del Maestro choca en el alta y en la edicion', () => {
+  it('R40 — el alta con el nombre de un usuario de OTRA empresa o del Maestro devuelve `username` y no escribe nada', async () => {
+    await withMaestro(async (_maestroId, nombreDelMaestro) => {
+      await withTwoCompanies(async (companyA, companyB) => {
+        const deA = newUserData();
+        await createUser(companyA, deA);
+
+        for (const username of [deA.username, nombreDelMaestro, nombreDelMaestro.toUpperCase()]) {
+          const outcome = await create(
+            companyB,
+            newUserData({ username }),
+            FAKE_CREDENTIAL_HASH,
+            'pending',
+            new Date(),
+          );
+          expect(outcome, username).toBe('username');
+        }
+        expect(await countRowsOf(companyB)).toBe(0);
+      });
+    });
+  });
+
+  it('R40 — la edicion hacia el nombre de un usuario de OTRA empresa o del Maestro devuelve `username` y la fila no cambia', async () => {
+    await withMaestro(async (_maestroId, nombreDelMaestro) => {
+      await withTwoCompanies(async (companyA, companyB) => {
+        const deA = newUserData();
+        await createUser(companyA, deA);
+        const datosB = newUserData();
+        const enB = await createUser(companyB, datosB);
+        const antes = await rawUser(enB);
+
+        for (const username of [deA.username, nombreDelMaestro]) {
+          expect(
+            await updateAliveInCompany(companyB, enB, { ...datosB, username }, new Date()),
+            username,
+          ).toBe('username');
+        }
+        expect(await rawUser(enB)).toEqual(antes);
+      });
+    });
+  });
+
+  it('R40 — por el caso de uso llega como `DuplicateUsernameError` y el error no lleva ningun dato del otro usuario', async () => {
+    await withMaestro(async (maestroId, nombreDelMaestro) => {
+      await withTwoCompanies(async (companyA, companyB) => {
+        const deA = newUserData();
+        const idDeA = await createUser(companyA, deA);
+        const actor = actorWithPermissions(companyB, ['usuarios.modificar']);
+
+        for (const [username, idDelOtro, empresaDelOtro] of [
+          [deA.username, idDeA, companyA],
+          [nombreDelMaestro, maestroId, null],
+        ] as const) {
+          const error: unknown = await identity
+            .createUser(actor, createUserInputData(operadorRoleId, { username }))
+            .then(
+              () => null,
+              (fallo: unknown) => fallo,
+            );
+
+          expect(error, username).toBeInstanceOf(DuplicateUsernameError);
+          const visto = JSON.stringify({
+            message: (error as DuplicateUsernameError).message,
+            diagnostic: (error as DuplicateUsernameError).diagnostic,
+            props: { ...(error as object) },
+          });
+          expect(visto).not.toContain(idDelOtro);
+          if (empresaDelOtro !== null) expect(visto).not.toContain(empresaDelOtro);
+          expect(visto.toLowerCase()).not.toContain(username.toLowerCase());
+        }
+        expect(await countRowsOf(companyB)).toBe(0);
+      });
+    });
   });
 });

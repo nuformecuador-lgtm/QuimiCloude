@@ -4,6 +4,10 @@
 // la configuracion se lea EN LA INVOCACION —de modo que importar el adaptador con todo vacio no
 // falle—, y que el error nombre lo que falta sin filtrar ningun valor.
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { readCropStorageConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/crop-storage-config-env';
@@ -11,6 +15,8 @@ import { readCropStorageConfigFromEnv } from '@/lib/modules/documentos/adapters/
 const ADAPTADOR = '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
 
 const REQUIRED_VARS = ['SUPABASE_STORAGE_URL', 'SUPABASE_CROPS_BUCKET', 'SUPABASE_STORAGE_KEY'] as const;
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 describe('documentos — configuracion del almacenamiento de los recortes', () => {
   const originalEnv = { ...process.env };
@@ -56,5 +62,19 @@ describe('documentos — configuracion del almacenamiento de los recortes', () =
       bucket: 'recortes',
       key: 'credencial-de-prueba',
     });
+  });
+
+  it('R1 — .env.example: SUPABASE_CROPS_BUCKET sigue vacia, su comentario dice PUBLICO y sigue compartiendo direccion y credencial', () => {
+    const envExample = readFileSync(join(repoRoot, '.env.example'), 'utf8');
+
+    expect(envExample).toMatch(/^SUPABASE_CROPS_BUCKET=$/m);
+
+    const bloque = envExample.match(/(?:^#.*\n)*^SUPABASE_CROPS_BUCKET=$/m)?.[0] ?? '';
+    expect(bloque).toMatch(/PUBLICO/);
+    expect(bloque).not.toMatch(/SUPABASE_CROPS_URL|SUPABASE_CROPS_KEY/);
+
+    const declaradas = [...envExample.matchAll(/^([A-Z0-9_]+)=/gm)].map((m) => m[1] as string);
+    expect(declaradas.filter((nombre) => nombre === 'SUPABASE_STORAGE_URL')).toHaveLength(1);
+    expect(declaradas.filter((nombre) => nombre === 'SUPABASE_STORAGE_KEY')).toHaveLength(1);
   });
 });

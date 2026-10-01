@@ -13,7 +13,7 @@ import type { UnitView } from '@/lib/modules/unidades';
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
-import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
+import { buildOrderColumns } from './order-columns';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
 import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
@@ -261,7 +261,6 @@ export function OrderTable({
             </div>
           )
         }
-        defaultPinnedColumns={ORDER_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

@@ -4,7 +4,7 @@
 // las dos que R28 anadio, montando la tabla compartida directamente con `buildCatalogColumns`
 // -el mismo patron que ese archivo usa para inspeccionar columnas- sin pasar por toda la pagina.
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,14 +14,15 @@ import {
   buildCatalogColumns,
 } from '@/app/(private)/proveedores/[id]/components';
 import { DataTable, type DataTableParams } from '@/components/shared/data-table';
-import type { CatalogLineView } from '@/lib/modules/proveedores';
+import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
+import type { CatalogLineListItem } from '@/lib/modules/proveedores';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
 function parametros(): DataTableParams {
   return { page: 1, pageSize: DEFAULT_PAGE_SIZE, sort: null, filters: {}, search: '' };
 }
 
-function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
+function linea(overrides: Partial<CatalogLineListItem> = {}): CatalogLineListItem {
   return {
     id: 'linea-1',
     supplierId: 'proveedor-1',
@@ -29,6 +30,7 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
     presentationId: 'PRESENTACION-ID',
     unitId: null,
     imagePath: null,
+    imageUrl: null,
     cost: '10.0000',
     minPurchase: null,
     deliveryTime: null,
@@ -42,7 +44,7 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
   };
 }
 
-function montar(lineas: readonly CatalogLineView[]) {
+function montar(lineas: readonly CatalogLineListItem[]) {
   const columnas = buildCatalogColumns({
     directories: EMPTY_CATALOG_DIRECTORIES,
     rowActions: () => null,
@@ -149,5 +151,32 @@ describe('catalogo del proveedor — celdas de material y medidas (R28)', () => 
 
     expect(await screen.findByTestId('data-table-cell-material')).toHaveTextContent(EMPTY_CELL);
     expect(screen.getByTestId('data-table-cell-measurements')).toHaveTextContent(EMPTY_CELL);
+  });
+});
+
+describe('catalogo del proveedor — columna de imagen (R15, R16, R24)', () => {
+  it('R15 — con imageUrl, la miniatura de la tabla lleva esa URL en su src', async () => {
+    montar([linea({ imageUrl: 'https://cdn.example/crops/envase.png' })]);
+
+    const miniatura = await screen.findByTestId('catalog-image');
+    expect(miniatura).toHaveAttribute('src', 'https://cdn.example/crops/envase.png');
+  });
+
+  it('R16 — sin imageUrl, la miniatura de la tabla cae al marcador con data-missing', async () => {
+    montar([linea({ imageUrl: null })]);
+
+    const miniatura = await screen.findByTestId('catalog-image');
+    expect(miniatura).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(miniatura).toHaveAttribute('data-missing', 'true');
+  });
+
+  it('R24 — si la imagen de la tabla no resuelve al cargarse, cae al marcador con data-missing', async () => {
+    montar([linea({ imageUrl: 'https://cdn.example/crops/rota.png' })]);
+
+    const miniatura = await screen.findByTestId('catalog-image');
+    fireEvent.error(miniatura);
+
+    expect(miniatura).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(miniatura).toHaveAttribute('data-missing', 'true');
   });
 });

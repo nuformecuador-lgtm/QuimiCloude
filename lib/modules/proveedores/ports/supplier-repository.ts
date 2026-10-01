@@ -1,7 +1,7 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { SupplierScope } from '../domain/supplier-scope';
-import type { ShowcasePage, ShowcaseQuery } from '../domain/supplier-showcase';
+import type { ShowcasePageRecord, ShowcaseQuery } from '../domain/supplier-showcase';
 import type { NewSupplier, SupplierView } from '../domain/supplier-view';
 
 /**
@@ -78,5 +78,5 @@ export interface SupplierRepository {
    * constantes del dominio (`supplier-showcase.ts`), no entrada, y cada fila trae ademas su
    * primera tanda de lineas del catalogo.
    */
-  listShowcaseAlive(query: ShowcaseQuery, scope: SupplierScope): Promise<ShowcasePage>;
+  listShowcaseAlive(query: ShowcaseQuery, scope: SupplierScope): Promise<ShowcasePageRecord>;
 }

@@ -174,7 +174,7 @@ async function crearArchivoListo(companyId: string): Promise<string> {
 }
 
 function dobleDeRecortes(paths: readonly string[] = []): CropCatalog {
-  return { list: async () => paths, createSignedReadUrl: async (path) => `https://firmada.invalid/${path}` };
+  return { list: async () => paths, publicUrl: (path) => `https://publica.invalid/${path}` };
 }
 
 const presentationRepository: PresentationRepository = {

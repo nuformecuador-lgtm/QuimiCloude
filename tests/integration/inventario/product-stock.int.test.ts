@@ -85,6 +85,7 @@ async function deleteTestUser(userId: string): Promise<void> {
   await prisma.user.delete({ where: { id: userId } });
   await prisma.role.delete({ where: { id: user.roleId } });
   await prisma.documentType.delete({ where: { code: user.documentTypeCode } });
+  if (user.companyId === null) throw new Error('el usuario de prueba se creo con empresa');
   await prisma.company.delete({ where: { id: user.companyId } });
 }
 

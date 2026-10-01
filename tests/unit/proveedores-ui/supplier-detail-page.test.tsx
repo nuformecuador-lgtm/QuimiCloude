@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
@@ -29,7 +29,7 @@ import {
   buildCatalogColumns,
 } from '@/app/(private)/proveedores/[id]/components';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
-import type { CatalogLineView, SupplierView } from '@/lib/modules/proveedores';
+import type { CatalogLineListItem, SupplierView } from '@/lib/modules/proveedores';
 import type {
   CatalogLineListResult,
   CatalogLineMutationFormState,
@@ -231,7 +231,8 @@ const PROVEEDOR_ID = 'PROVEEDOR-ID-NO-VISIBLE';
 const AUTOR_QUE_NO_DEBE_VERSE = 'AUTOR-CREADOR-NO-VISIBLE';
 const EDITOR_QUE_NO_DEBE_VERSE = 'AUTOR-EDITOR-NO-VISIBLE';
 const LINEA_ID_QUE_NO_DEBE_VERSE = 'LINEA-ID-NO-VISIBLE';
-const IMAGEN_QUE_NO_DEBE_VERSE = 'IMAGEN-DE-LA-LINEA-NO-VISIBLE';
+const RUTA_QUE_NO_DEBE_VERSE = 'RUTA-DE-LA-LINEA-NO-VISIBLE';
+const URL_DE_LA_IMAGEN = 'https://cdn.example/crops/linea.png';
 
 const PRESENTACION = { id: 'PRESENTACION-ID-NO-VISIBLE', name: 'Tambor 200 L' };
 // QC-39 (T1): el listado devuelve `UnitView`; el fixture se completa con sus tres campos
@@ -260,14 +261,15 @@ function proveedor(overrides: Partial<SupplierView> = {}): SupplierView {
   };
 }
 
-function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
+function linea(overrides: Partial<CatalogLineListItem> = {}): CatalogLineListItem {
   return {
     id: LINEA_ID_QUE_NO_DEBE_VERSE,
     supplierId: PROVEEDOR_ID,
     name: 'Sosa cáustica escamas',
     presentationId: PRESENTACION.id,
     unitId: UNIDAD.id,
-    imagePath: IMAGEN_QUE_NO_DEBE_VERSE,
+    imagePath: RUTA_QUE_NO_DEBE_VERSE,
+    imageUrl: URL_DE_LA_IMAGEN,
     cost: '1234.5678',
     minPurchase: '0.1005',
     deliveryTime: 5,
@@ -282,7 +284,7 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
 }
 
 function paginaDeLineas(
-  items: readonly CatalogLineView[],
+  items: readonly CatalogLineListItem[],
   extra: { page?: number; pageSize?: number; total?: number; totalPages?: number } = {},
 ): CatalogLineListResult {
   const pageSize = extra.pageSize ?? DEFAULT_PAGE_SIZE;
@@ -780,20 +782,18 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     }
   });
 
-  it('la primera columna es la imagen de la linea, y la RUTA no se pinta como texto', async () => {
-    // Enmienda a R30 del 2026-09-07. Se afirma sobre la miniatura -no sobre la lista de
-    // columnas- porque la imagen es marcado y por eso la declara la tabla, no `CATALOG_COLUMNS`.
+  it('R15 — la primera columna es la imagen de la linea, pintada con imageUrl, y la RUTA no se pinta como texto', async () => {
+    // Se afirma sobre la miniatura -no sobre la lista de columnas- porque la imagen es marcado y
+    // por eso la declara la tabla, no `CATALOG_COLUMNS`.
     await renderPantalla();
 
     const tabla = within(screen.getByTestId(testId.tabla));
     const miniatura = tabla.getAllByTestId('catalog-image')[0] as HTMLImageElement;
 
-    // La ruta de la fixture NO resuelve, asi que arranca en marcador; lo que nunca puede pasar
-    // es que la ruta se lea como texto en la celda.
     expect(miniatura).toBeInTheDocument();
-    expect(miniatura).toHaveAttribute('src', IMAGEN_QUE_NO_DEBE_VERSE);
-    expect(document.body.textContent, IMAGEN_QUE_NO_DEBE_VERSE).not.toContain(
-      IMAGEN_QUE_NO_DEBE_VERSE,
+    expect(miniatura).toHaveAttribute('src', URL_DE_LA_IMAGEN);
+    expect(document.body.textContent, RUTA_QUE_NO_DEBE_VERSE).not.toContain(
+      RUTA_QUE_NO_DEBE_VERSE,
     );
 
     // Y la columna de imagen es la PRIMERA de la cabecera.
@@ -801,15 +801,27 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     expect(cabeceras[0]).toHaveAttribute('data-testid', 'data-table-head-image');
   });
 
-  it('sin ruta de imagen, la miniatura cae al marcador de `public/`', async () => {
-    // El caso NORMAL hoy: nadie llena `image_path`, asi que todas las filas ensennan el marcador.
-    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea({ imagePath: null })]));
+  it('R16 — sin imageUrl, la miniatura cae al marcador de `public/`', async () => {
+    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea({ imageUrl: null })]));
 
     await renderPantalla();
 
     const miniatura = within(screen.getByTestId(testId.tabla)).getAllByTestId(
       'catalog-image',
     )[0] as HTMLImageElement;
+
+    expect(miniatura).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(miniatura).toHaveAttribute('data-missing', 'true');
+  });
+
+  it('R24 — si la imagen de la tabla no resuelve al cargarse, cae al marcador con data-missing', async () => {
+    await renderPantalla();
+
+    const miniatura = within(screen.getByTestId(testId.tabla)).getAllByTestId(
+      'catalog-image',
+    )[0] as HTMLImageElement;
+
+    fireEvent.error(miniatura);
 
     expect(miniatura).toHaveAttribute('src', MISSING_IMAGE_SRC);
     expect(miniatura).toHaveAttribute('data-missing', 'true');

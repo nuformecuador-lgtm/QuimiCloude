@@ -22,7 +22,6 @@ import {
   type RouteOrderStatus,
 } from './assignment-view-params';
 import {
-  COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS,
   COMPANY_ORDER_STATUS_COLUMN_ID,
   buildCompanyOrdersColumns,
 } from './company-orders-columns';
@@ -130,7 +129,6 @@ export function CompanyOrdersTable({ rows, params, totalPages, statuses }: Compa
         status="idle"
         texts={COMPANY_ORDERS_TABLE_TEXTS}
         searchable={false}
-        defaultPinnedColumns={COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

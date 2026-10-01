@@ -22,7 +22,6 @@ import {
   CREATED_AT_COLUMN_ID,
   MISSING_VALUE_MARK,
   ORDER_COVERAGE_LABELS,
-  ORDER_DEFAULT_PINNED_COLUMNS,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_LABELS,
   ORDER_SKELETON_COLUMN_COUNT,
@@ -204,8 +203,11 @@ describe('los filtros son los tres de la decision cerrada y ninguno mas (R14)', 
 });
 
 describe('el fijado por defecto y la columna de acciones (R19, `design.md > 6.1`)', () => {
-  it('el correlativo es la unica columna fijada por defecto', () => {
-    expect(ORDER_DEFAULT_PINNED_COLUMNS).toEqual([ORDER_NUMBER_COLUMN_ID]);
+  it('el correlativo es la unica columna fijada por defecto, al borde izquierdo', () => {
+    const fijadas = ORDER_COLUMNS.filter((column) => column.defaultPinned !== undefined);
+
+    expect(fijadas.map((column) => column.id)).toEqual([ORDER_NUMBER_COLUMN_ID]);
+    expect(fijadas[0]?.defaultPinned).toBe('left');
   });
 
   it('la columna de acciones no se puede fijar, para que no tape la del correlativo', () => {

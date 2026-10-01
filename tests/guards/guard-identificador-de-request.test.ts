@@ -374,10 +374,13 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
-  // Igual patron: una anade el estado BLOQUEADO al enum, la otra el indice parcial de
+  // El rol Maestro: empresa opcional segun rol y nombre de usuario unico en todo el sistema; no
+  // toca el identificador de peticion.
+  '20261001160815_platform_maestro_role',
+  // El estado BLOQUEADO: una lo anade al enum, la otra crea el indice parcial de
   // pedidos bloqueados. Ninguna toca el identificador de peticion.
-  '20260926120000_order_status_blocked',
-  '20260926120100_orders_blocked_index',
+  '20261001170000_order_status_blocked',
+  '20261001170100_orders_blocked_index',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -432,13 +435,15 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-09-23 entro `react-intersection-observer` -el hook que detecta cuando el final de una
 // lista entra en pantalla-, tambien con los cuatro checks, con aprobacion humana en la puerta F1.4
 // y con su fila en `docs/dependencias.md`: de 36 a 37 con esa misma aprobacion.
+// El 2026-10-01 entro `pino` -el logger general del servidor-, con los cuatro checks, aprobacion
+// humana y su fila en `docs/dependencias.md`: de 37 a 38.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 37
+export const DEPENDENCIAS_ESPERADAS = 38
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

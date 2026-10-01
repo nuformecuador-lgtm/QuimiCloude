@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const list = vi.fn();
 const createSignedUrl = vi.fn();
-const from = vi.fn(() => ({ list, createSignedUrl }));
+const getPublicUrl = vi.fn();
+const from = vi.fn(() => ({ list, createSignedUrl, getPublicUrl }));
 
 vi.mock('@supabase/storage-js', () => ({
   StorageClient: vi.fn(function StorageClientDouble() {
@@ -32,6 +33,7 @@ describe('documentos — CropCatalog contra Supabase', () => {
     Object.assign(process.env, originalEnv);
     list.mockReset();
     createSignedUrl.mockReset();
+    getPublicUrl.mockReset();
     from.mockClear();
   });
 
@@ -85,37 +87,66 @@ describe('documentos — CropCatalog contra Supabase', () => {
     await expect(listCrops(EMPRESA, ARCHIVO)).rejects.not.toThrow(/credencial-secreta/);
   });
 
-  it('createSignedReadUrl — firma con el TTL pedido', async () => {
+  it('R4 — publicUrl usa getPublicUrl, nunca createSignedUrl', async () => {
     configurarEnv();
-    createSignedUrl.mockResolvedValueOnce({
-      data: { signedUrl: 'https://proyecto.supabase.co/signed/1-1.png' },
-      error: null,
+    getPublicUrl.mockReturnValueOnce({
+      data: { publicUrl: 'https://proyecto.supabase.co/storage/v1/object/public/recortes/1-1.png' },
     });
 
-    const { createCropSignedReadUrl } = await import(
+    const { cropPublicUrl } = await import(
       '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase'
     );
 
-    await expect(createCropSignedReadUrl(`${EMPRESA}/${ARCHIVO}/1-1.png`, 900)).resolves.toBe(
-      'https://proyecto.supabase.co/signed/1-1.png',
+    expect(cropPublicUrl(`${EMPRESA}/${ARCHIVO}/1-1.png`)).toBe(
+      'https://proyecto.supabase.co/storage/v1/object/public/recortes/1-1.png',
     );
-    expect(createSignedUrl).toHaveBeenCalledWith(`${EMPRESA}/${ARCHIVO}/1-1.png`, 900);
+    expect(getPublicUrl).toHaveBeenCalledWith(`${EMPRESA}/${ARCHIVO}/1-1.png`);
+    expect(createSignedUrl).not.toHaveBeenCalled();
   });
 
-  it('createSignedReadUrl — si la libreria devuelve error, lo envuelve sin ningun secreto', async () => {
+  it('R5 — publicUrl recibe solo la ruta, sin la empresa aparte', async () => {
     configurarEnv();
-    createSignedUrl.mockResolvedValueOnce({ data: null, error: { message: 'ruta inexistente' } });
+    getPublicUrl.mockReturnValueOnce({
+      data: { publicUrl: 'https://proyecto.supabase.co/storage/v1/object/public/recortes/1-1.png' },
+    });
 
-    const { createCropSignedReadUrl } = await import(
+    const { cropPublicUrl } = await import(
+      '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase'
+    );
+    cropPublicUrl(`${EMPRESA}/${ARCHIVO}/1-1.png`);
+
+    expect(getPublicUrl).toHaveBeenCalledWith(`${EMPRESA}/${ARCHIVO}/1-1.png`);
+    expect(getPublicUrl.mock.calls[0]).toHaveLength(1);
+  });
+
+  it('R6 — la URL compuesta no lleva token ni caducidad', async () => {
+    configurarEnv();
+    getPublicUrl.mockReturnValueOnce({
+      data: { publicUrl: 'https://proyecto.supabase.co/storage/v1/object/public/recortes/1-1.png' },
+    });
+
+    const { cropPublicUrl } = await import(
       '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase'
     );
 
-    await expect(createCropSignedReadUrl(`${EMPRESA}/${ARCHIVO}/1-1.png`, 900)).rejects.toThrow(
-      /firmar.*ruta inexistente/,
+    expect(cropPublicUrl(`${EMPRESA}/${ARCHIVO}/1-1.png`)).not.toMatch(/token=|signature=|expires=|Expires=/i);
+  });
+
+  it('R7 — sin las variables de configuracion, publicUrl falla nombrandolas sin ningun valor', async () => {
+    for (const name of REQUIRED_VARS) delete process.env[name];
+
+    const { cropPublicUrl } = await import(
+      '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase'
     );
-    await expect(createCropSignedReadUrl(`${EMPRESA}/${ARCHIVO}/1-1.png`, 900)).rejects.not.toThrow(
-      /credencial-secreta/,
-    );
+
+    let mensaje = '';
+    try {
+      cropPublicUrl(`${EMPRESA}/${ARCHIVO}/1-1.png`);
+    } catch (error) {
+      mensaje = error instanceof Error ? error.message : String(error);
+    }
+    for (const name of REQUIRED_VARS) expect(mensaje).toContain(name);
+    expect(getPublicUrl).not.toHaveBeenCalled();
   });
 
   it('importar el adaptador con las variables vacias no lanza', async () => {
@@ -126,6 +157,6 @@ describe('documentos — CropCatalog contra Supabase', () => {
     );
 
     expect(typeof adaptador.listCrops).toBe('function');
-    expect(typeof adaptador.createCropSignedReadUrl).toBe('function');
+    expect(typeof adaptador.cropPublicUrl).toBe('function');
   });
 });

@@ -106,8 +106,8 @@ export async function findActiveSessionUserById(
     lastNames: usuario.lastNames,
     roleName: usuario.role.name,
     companyId: usuario.companyId,
-    // QC-48 R15: la marca cruda. Quien decide si «esta viva» es el dominio, no este adaptador.
-    companyDeletedAt: usuario.company.deletedAt,
+    // La marca cruda; sin empresa no hay marca. Quien decide si «esta viva» es el dominio.
+    companyDeletedAt: usuario.company?.deletedAt ?? null,
     // QC-74 R7: los permisos salen de la ASIGNACION rol-permiso, nunca del nombre del rol.
     permissions: usuario.role.permissions.map((asignacion) => asignacion.permissionCode),
     // QC-78 R7, R20: los dos crudos. Quien traduce «lo que la columna dice» a «lo que significa

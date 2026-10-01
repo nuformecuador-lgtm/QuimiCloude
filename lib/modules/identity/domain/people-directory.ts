@@ -13,6 +13,7 @@
  * implementa es `adapters/driven/persistence/assignment-directory-prisma.ts`, y quien lo ata a
  * su implementacion es `lib/composition` (R47).
  */
+import type { UserAccountStatus } from './account-status';
 import type { PermissionCode } from './permissions';
 
 /**
@@ -41,6 +42,21 @@ export type PersonRef = {
   readonly displayName: string;
   readonly isActive: boolean;
   readonly permissions: readonly PermissionCode[];
+};
+
+/**
+ * Filtros ABIERTOS del directorio de personas: un solo llamado, sin un metodo por
+ * combinacion. Cada filtro nuevo es un campo opcional mas aqui, no un metodo nuevo en la
+ * interfaz (misma idea que `ListQueryable` de QC-57, pero para este contrato).
+ *
+ * `accountStatus` son estados de cuenta EFECTIVOS y multivalor (`['active']`,
+ * `['active', 'blocked']`, ...). Ausente o vacio = todos. Nunca es la columna cruda: se
+ * compara contra `effectiveAccountStatus(view, now)` en la implementacion (R21, QC-78),
+ * asi que una `blocked` con plazo vencido cuenta como activa y una `active` con bloqueo
+ * vigente no.
+ */
+export type PeopleRefFilters = {
+  readonly accountStatus?: readonly UserAccountStatus[];
 };
 
 export interface PeopleDirectory {
@@ -87,6 +103,16 @@ export interface PeopleDirectory {
    *
    * `now` entra por parametro por el mismo motivo que en los dos metodos de arriba: aqui tampoco
    * hay reloj propio.
+   *
+   * `filters` es opcional y abierto (`PeopleRefFilters`): quien necesita acotar —p. ej. solo
+   * cuentas efectivas `['active']`— lo pide aqui en vez de filtrar fuera o de exigir un metodo
+   * nuevo. El tope se aplica ANTES de filtrar en memoria, asi que con filtro la respuesta puede
+   * traer menos de `limit` filas (decision consciente: simple y predecible).
    */
-  listAliveInCompany(companyId: string, now: Date, limit: number): Promise<readonly PersonRef[]>;
+  listAliveInCompany(
+    companyId: string,
+    now: Date,
+    limit: number,
+    filters?: PeopleRefFilters,
+  ): Promise<readonly PersonRef[]>;
 }

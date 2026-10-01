@@ -38,6 +38,7 @@ import { createUpdateSupplier } from '@/lib/modules/proveedores/domain/update-su
 
 import type { PermissionCode } from '@/lib/modules/identity'
 import type { Actor } from '@/lib/modules/proveedores/domain/actor'
+import type { CatalogImageUrl } from '@/lib/modules/proveedores/ports/catalog-image-url'
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository'
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -118,16 +119,21 @@ function dobles() {
   // exigen el permiso antes de preguntarle nada al catalogo de unidades.
   const units = { findRefs: explota('units.findRefs') }
 
+  // R19 — la vitrina y el catalogo tampoco pueden componer ninguna URL sin autorizacion.
+  const images = { publicUrl: explota('images.publicUrl') }
+
   return {
     suppliers: suppliers as unknown as SupplierRepository,
     catalog: catalog as unknown as SupplierCatalogRepository,
     log,
     units: units as unknown as UnitCatalog,
+    images: images as unknown as CatalogImageUrl,
     espias: [
       ...Object.values(suppliers),
       ...Object.values(catalog),
       ...Object.values(log),
       ...Object.values(units),
+      ...Object.values(images),
     ],
   }
 }
@@ -219,27 +225,39 @@ const CASOS_DE_USO: readonly Caso[] = [
     archivo: 'list-catalog-lines.ts',
     permiso: CONSULTAR,
     ejecutar: (d, actor) =>
-      createListCatalogLines({ catalog: d.catalog, log: d.log })(SUPPLIER_ID, { page: 1 }, actor),
+      createListCatalogLines({ catalog: d.catalog, log: d.log, images: d.images })(
+        SUPPLIER_ID,
+        { page: 1 },
+        actor,
+      ),
     ejecutarConBasura: (d, actor) =>
-      createListCatalogLines({ catalog: d.catalog, log: d.log })(SUPPLIER_ID, BASURA, actor),
+      createListCatalogLines({ catalog: d.catalog, log: d.log, images: d.images })(
+        SUPPLIER_ID,
+        BASURA,
+        actor,
+      ),
   },
   {
     nombre: 'listSupplierShowcase',
     archivo: 'list-supplier-showcase.ts',
     permiso: CONSULTAR,
     ejecutar: (d, actor) =>
-      createListSupplierShowcase({ suppliers: d.suppliers })({ page: 1 }, actor),
+      createListSupplierShowcase({ suppliers: d.suppliers, images: d.images })({ page: 1 }, actor),
     ejecutarConBasura: (d, actor) =>
-      createListSupplierShowcase({ suppliers: d.suppliers })(BASURA, actor),
+      createListSupplierShowcase({ suppliers: d.suppliers, images: d.images })(BASURA, actor),
   },
   {
     nombre: 'listShowcaseLines',
     archivo: 'list-showcase-lines.ts',
     permiso: CONSULTAR,
     ejecutar: (d, actor) =>
-      createListShowcaseLines({ catalog: d.catalog })(SUPPLIER_ID, { page: 2 }, actor),
+      createListShowcaseLines({ catalog: d.catalog, images: d.images })(
+        SUPPLIER_ID,
+        { page: 2 },
+        actor,
+      ),
     ejecutarConBasura: (d, actor) =>
-      createListShowcaseLines({ catalog: d.catalog })(SUPPLIER_ID, BASURA, actor),
+      createListShowcaseLines({ catalog: d.catalog, images: d.images })(SUPPLIER_ID, BASURA, actor),
   },
 ]
 

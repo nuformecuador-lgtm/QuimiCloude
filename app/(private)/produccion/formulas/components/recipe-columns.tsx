@@ -32,9 +32,6 @@ export type RecipeColumnId =
 
 export type RecipeColumn = DataTableColumn<RecipeSummary> & { readonly id: RecipeColumnId };
 
-/** Defecto: si el usuario ya guardo su propio fijado para esta tabla, gana el suyo. */
-export const RECIPE_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_ID];
-
 /**
  * UTC y no `toLocaleDateString`: servidor y navegador tienen husos distintos y la fecha local
  * provoca un desajuste de hidratacion.
@@ -59,6 +56,8 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
       align: 'start',
+      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       // La URL se usa tal cual; sin ella el componente pinta el marcador, nunca un `src` vacio.
       cell: (recipe) => (
         <EntityImage
@@ -73,12 +72,14 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       label: 'Nombre',
       align: 'start',
       sortable: true,
+      width: 500,
+      hideText: false,
       cell: (recipe) => recipe.name,
     },
     {
       id: 'stepCount',
       label: 'Pasos',
-      align: 'end',
+      align: 'center',
       cell: (recipe) => String(recipe.stepCount),
     },
     {
@@ -100,8 +101,8 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       id: ACTIONS_COLUMN_ID,
       label: ACTIONS_COLUMN_LABEL,
       align: 'end',
-      // Fijarla dejaria las acciones tapando las columnas de datos en pantallas angostas.
       pinnable: false,
+      defaultPinned: 'right',
       cell: (recipe) => <div className="flex justify-end gap-1">{rowActions(recipe)}</div>,
     },
   ];
