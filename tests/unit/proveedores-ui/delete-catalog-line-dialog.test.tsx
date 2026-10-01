@@ -9,7 +9,7 @@ import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 
 
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
 import type { PresentationListResult } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
-import type { CatalogLineView, SupplierView } from '@/lib/modules/proveedores';
+import type { CatalogLineListItem, SupplierView } from '@/lib/modules/proveedores';
 import type {
   CatalogLineListResult,
   CatalogLineMutationFormState,
@@ -204,7 +204,7 @@ function proveedor(): SupplierView {
   };
 }
 
-function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
+function linea(overrides: Partial<CatalogLineListItem> = {}): CatalogLineListItem {
   return {
     id: LINEA_ID,
     supplierId: PROVEEDOR_ID,
@@ -212,6 +212,7 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
     presentationId: PRESENTACION.id,
     unitId: UNIDAD.id,
     imagePath: null,
+    imageUrl: null,
     cost: '99.5000',
     minPurchase: '2.5000',
     deliveryTime: 3,
@@ -225,7 +226,7 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
   };
 }
 
-function paginaDeLineas(items: readonly CatalogLineView[]): CatalogLineListResult {
+function paginaDeLineas(items: readonly CatalogLineListItem[]): CatalogLineListResult {
   return {
     status: 'success',
     data: {

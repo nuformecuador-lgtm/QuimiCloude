@@ -4,7 +4,11 @@ import type { ReactNode } from 'react';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
-import type { CatalogLineMeasurements, CatalogLineView } from '@/lib/modules/proveedores';
+import type {
+  CatalogLineListItem,
+  CatalogLineMeasurements,
+  CatalogLineView,
+} from '@/lib/modules/proveedores';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import {
@@ -88,7 +92,7 @@ export type CatalogColumnId =
   | typeof ACTIONS_COLUMN_ID;
 
 /** Columna de esta tabla: la de la tabla compartida, con el id acotado. */
-export type CatalogColumn = DataTableColumn<CatalogLineView> & { readonly id: CatalogColumnId };
+export type CatalogColumn = DataTableColumn<CatalogLineListItem> & { readonly id: CatalogColumnId };
 
 /** Encabezado de la columna de imagen. Constante para que ningun test dependa del literal. */
 export const CATALOG_IMAGE_COLUMN_LABEL = 'Imagen';
@@ -153,7 +157,7 @@ export type CatalogColumnsDeps = {
    * Acciones de la fila (editar, dar de baja). Es un **slot**: la declaracion de columnas no
    * importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
    */
-  readonly rowActions: (line: CatalogLineView) => ReactNode;
+  readonly rowActions: (line: CatalogLineListItem) => ReactNode;
 };
 
 export function buildCatalogColumns({
@@ -167,10 +171,8 @@ export function buildCatalogColumns({
       align: 'start',
       // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
       defaultPinned: 'left',
-      // Enmienda a R30 (2026-09-07). Hoy `supplier_catalog_lines.image_path` esta vacia en todas
-      // las filas -el formulario sigue sin ofrecer subirla-, asi que lo que se ve es el marcador.
       cell: (line) => (
-        <EntityImage path={line.imagePath} name={line.name} testId="catalog-image" />
+        <EntityImage path={line.imageUrl} name={line.name} testId="catalog-image" />
       ),
     },
     {

@@ -2,7 +2,12 @@
 
 import { identity, observabilidad, proveedores } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
-import { ProveedoresError, type Actor, type CatalogLineView, type Page } from '@/lib/modules/proveedores';
+import {
+  ProveedoresError,
+  type Actor,
+  type CatalogLineListItem,
+  type Page,
+} from '@/lib/modules/proveedores';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
@@ -42,7 +47,7 @@ export type CatalogLineMutationFormState =
   | ErrorState;
 
 export type CatalogLineListResult =
-  | { status: 'success'; data: Page<CatalogLineView> }
+  | { status: 'success'; data: Page<CatalogLineListItem> }
   | ErrorState;
 
 const NUMERIC_FIELD_ERROR = 'El tiempo de entrega no es un numero entero valido.';

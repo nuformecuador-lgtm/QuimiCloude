@@ -55,7 +55,7 @@ function dobleDeRepositorio(archivo: FileForReview | null = ARCHIVO_LISTO): Docu
 function dobleDeRecortes(paths: readonly string[] = []): CropCatalog {
   return {
     list: vi.fn(async () => paths),
-    createSignedReadUrl: vi.fn(async (path: string) => `https://firmada.invalid/${path}`),
+    publicUrl: vi.fn((path: string) => `https://publica.invalid/${path}`),
   };
 }
 
