@@ -27,6 +27,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_BUSINESS_FIELDS,
+  ORDER_DISTRIBUTION_ADD_TESTID,
+  ORDER_DISTRIBUTION_AVAILABLE_TESTID,
+  ORDER_DISTRIBUTION_ERROR_TESTID,
+  ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
+  ORDER_DISTRIBUTION_LINE_TESTID,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  ORDER_DISTRIBUTION_TESTID,
+  ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_TITLE_TESTID,
   ORDER_INGREDIENTS_EMPTY_TESTID,
@@ -76,6 +85,7 @@ const {
   listRecipesActionMock,
   getRecipeActionMock,
   listPresentationsActionMock,
+  quoteAvailabilityMock,
 } = vi.hoisted(() => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse desde el formulario`);
@@ -95,6 +105,7 @@ const {
     listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
     getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
     listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
+    quoteAvailabilityMock: vi.fn<(input: unknown) => Promise<unknown>>(),
   };
 });
 
@@ -141,6 +152,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   quoteOrderCostAction: vi.fn(() =>
     Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
   ),
+  quoteOrderPresentationAvailabilityAction: quoteAvailabilityMock,
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -162,16 +174,28 @@ const RECETA_CON_IMAGEN = {
 };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
-/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del panel. */
-const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
+/** Catalogo de unidades: resuelve la unidad de los ingredientes y es el de la unidad del pedido. */
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Litro',
+  symbol: 'L',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
+
+/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del reparto. */
+const PRESENTACION = {
+  id: crypto.randomUUID(),
+  name: 'Bidón 20L',
+  unitId: UNIDAD.id,
+  content: '20.0000',
+};
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta. */
 const CANTIDAD = '0.1005';
 
-/** Catalogo de unidades que resuelve la unidad de los ingredientes. */
-const UNIDADES: readonly UnitView[] = [
-  { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
-];
+const UNIDADES: readonly UnitView[] = [UNIDAD];
 
 /** Linea del detalle de la receta elegida, con los datos del producto ya unidos. */
 const LINEA_INGREDIENTE = {
@@ -179,7 +203,7 @@ const LINEA_INGREDIENTE = {
   productId: crypto.randomUUID(),
   productName: 'Sosa cáustica',
   percentage: '10.00',
-  productUnitId: 'u-litro',
+  productUnitId: UNIDAD.id,
   productStock: '40.0000',
 };
 
@@ -220,8 +244,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [
       { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
     ],
-    unitId: null,
-    unitLabel: null,
+    unitId: UNIDAD.id,
+    unitLabel: UNIDAD.symbol,
     ...overrides,
   };
 }
@@ -242,10 +266,16 @@ async function elegirCatalogos(user: ReturnType<typeof setupUser>) {
   await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
 }
 
-/** Elige la presentacion del catalogo que trae `listPresentationsAction`. */
-async function elegirPresentacion(user: ReturnType<typeof setupUser>) {
+async function elegirUnidad(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId('presentation-unit-select'));
+  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
+}
+
+/** Anade al reparto la presentacion del catalogo que trae `listPresentationsAction`. */
+async function anadirLinea(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId('presentation-select'));
   await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
+  await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
 }
 
 /** El control de cantidad, tipado: sus asserts miran la CADENA del DOM, no `valueAsNumber`. */
@@ -255,7 +285,7 @@ function cantidad(): HTMLInputElement {
 
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await elegirCatalogos(user);
-  await elegirPresentacion(user);
+  await elegirUnidad(user);
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 
@@ -272,6 +302,10 @@ beforeEach(() => {
     status: 'success',
     data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
   });
+  quoteAvailabilityMock.mockResolvedValue({
+    status: 'success',
+    data: { kind: 'ok', available: '0.1005' },
+  });
 });
 
 afterEach(() => {
@@ -279,7 +313,7 @@ afterEach(() => {
 });
 
 describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
-  it('captura los TRES campos de negocio y los envia a la operacion de alta', async () => {
+  it('R41: captura los campos de negocio, unidad incluida, y los envia a la operacion de alta', async () => {
     // El `FormData` lleva exactamente los nombres que el adaptador driving lee. La lista se
     // deriva de `ORDER_BUSINESS_FIELDS`, no de literales sueltos.
     const user = setupUser();
@@ -295,9 +329,11 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
       expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
     }
     expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
-    // Y lo que ya no existe NO viaja: ni unidad ni precio, aunque el backend los ignorase.
-    expect(enviado.get('unitId')).toBeNull();
+    // La unidad vuelve al pedido; el precio unitario sigue fuera.
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
     expect(enviado.get('unitPrice')).toBeNull();
+    // Sin lineas el reparto viaja vacio, que es valido en el alta.
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([]);
     expect(updateOrderActionMock).not.toHaveBeenCalled();
   });
 
@@ -427,48 +463,122 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
   });
 });
 
-describe('la presentación del pedido (R16, R17, R18, R19)', () => {
-  it('R16: el alta ofrece el campo Presentación obligatorio', () => {
+describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
+  it('R41: el alta exige la unidad: sin ella no se llama a la operacion y el error va junto al selector', async () => {
+    const user = setupUser();
     renderFormulario();
 
-    const campo = screen.getByTestId('presentation-select');
-    expect(campo).toBeInTheDocument();
-    expect(screen.getByTestId('presentation-value')).toBeRequired();
+    await elegirCatalogos(user);
+    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    expect(await screen.findByTestId('presentation-error-unit')).toBeInTheDocument();
+    expect(createOrderActionMock).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('R17: el selector de presentación no ofrece crear', () => {
+  it('R42: sin unidad, el control de reparto dice que falta y no ofrece anadir lineas', () => {
     renderFormulario();
 
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    expect(screen.queryByTestId(ORDER_DISTRIBUTION_ADD_TESTID)).toBeNull();
+  });
+
+  it('R4: el selector del reparto no ofrece crear presentaciones ni manda el campo de presentacion unica', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    await elegirUnidad(user);
+
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
     expect(screen.queryByTestId('presentation-create-open')).toBeNull();
+    const formulario = screen.getByTestId(ORDER_FORM_TESTID) as HTMLFormElement;
+    expect([...new FormData(formulario).keys()]).not.toContain('presentationId');
   });
 
-  it('R18: la edición precarga la presentación; sin presentación el campo arranca vacío y no guarda', async () => {
+  it('R41: las lineas anadidas viajan en el alta como pares de presentacion y envases', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    await rellenarAlta(user);
+    await anadirLinea(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([PRESENTACION.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['1']);
+  });
+
+  it('R41: la edicion precarga unidad y reparto, y permite cambiar los envases', async () => {
     const user = setupUser();
     const elPedido = pedido();
     renderFormulario(elPedido);
 
-    expect(screen.getByTestId('presentation-value')).toHaveValue(
-      elPedido.presentationLines[0]?.presentationId,
-    );
+    const linea = screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID);
+    expect(linea).toHaveAttribute('data-presentation-id', PRESENTACION.id);
+    const envases = within(linea).getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
+    expect(envases).toHaveValue(1);
 
-    cleanup();
-    const sinPresentacion = pedido({ presentationLines: [] });
-    renderFormulario(sinPresentacion);
-
-    const campo = screen.getByTestId('presentation-value') as HTMLInputElement;
-    expect(campo).toHaveValue('');
-    // El campo espejo conserva la validacion nativa de `required` (mismo primitivo que el
-    // selector de producto), aunque el formulario tiene `noValidate` y quien de verdad decide
-    // si el envio procede es el esquema del contrato en `save()`.
-    expect(campo.validity.valid).toBe(false);
-
+    await user.clear(envases);
+    await user.type(envases, '3');
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    expect(updateOrderActionMock).not.toHaveBeenCalled();
-    expect(onSaved).not.toHaveBeenCalled();
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([PRESENTACION.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['3']);
   });
 
-  it('R19: presentation_not_found se pinta junto al campo y conserva lo escrito', async () => {
+  it('R41: un pedido sin unidad exige elegirla al editar; con ella elegida se guarda', async () => {
+    const user = setupUser();
+    renderFormulario(pedido({ unitId: null, unitLabel: null, presentationLines: [] }));
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    expect(await screen.findByTestId('presentation-error-unit')).toBeInTheDocument();
+    expect(updateOrderActionMock).not.toHaveBeenCalled();
+
+    await elegirUnidad(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
+  });
+
+  it('R6: el disponible se pide con la cantidad, la unidad y el reparto vigentes', async () => {
+    renderFormulario(pedido());
+
+    await waitFor(() =>
+      expect(quoteAvailabilityMock).toHaveBeenCalledWith({
+        quantity: CANTIDAD,
+        unitId: UNIDAD.id,
+        presentationLines: [{ presentationId: PRESENTACION.id, packages: 1 }],
+      }),
+    );
+    expect(await screen.findByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveTextContent(
+      '0.1005 L',
+    );
+  });
+
+  it('R39: si el reparto pasa del total, Guardar queda deshabilitado', async () => {
+    quoteAvailabilityMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'exceeds_quantity', available: '-19.8995' },
+    });
+    renderFormulario(pedido());
+
+    await waitFor(() => expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled());
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveAttribute(
+      'data-negative',
+      'true',
+    );
+  });
+
+  it('R36: el rechazo del servidor por el reparto se pinta junto al reparto y conserva lo escrito', async () => {
     const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -480,10 +590,11 @@ describe('la presentación del pedido (R16, R17, R18, R19)', () => {
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => {
-      expect(screen.getByTestId('presentation-select-error')).toBeInTheDocument();
+      expect(screen.getByTestId(ORDER_DISTRIBUTION_ERROR_TESTID)).toBeInTheDocument();
       expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
     });
     expect(cantidad().value).toBe(CANTIDAD);
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID)).toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
   });
 });

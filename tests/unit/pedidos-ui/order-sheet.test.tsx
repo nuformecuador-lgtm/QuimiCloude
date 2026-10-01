@@ -186,6 +186,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   quoteOrderCostAction: vi.fn(() =>
     Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
   ),
+  quoteOrderPresentationAvailabilityAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { kind: 'ok', available: '0' } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -207,14 +210,26 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
-const UNIDADES: readonly UnitView[] = [
-  { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
-];
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Litro',
+  symbol: 'L',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
+
+const UNIDADES: readonly UnitView[] = [UNIDAD];
 
 const CANTIDAD = '12.5000';
 
 /** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del panel. */
-const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
+const PRESENTACION = {
+  id: crypto.randomUUID(),
+  name: 'Bidón 20L',
+  unitId: UNIDAD.id,
+  content: '20.0000',
+};
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -237,8 +252,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
       { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
 
     ],
-    unitId: null,
-    unitLabel: null,
+    unitId: UNIDAD.id,
+    unitLabel: UNIDAD.symbol,
     ...overrides,
   };
 }
@@ -320,10 +335,8 @@ beforeEach(() => {
       totalPages: 1,
     },
   });
-  // La pantalla de pedidos pide unidades de nuevo desde el 2026-09-09: el panel muestra los
-  // ingredientes de la receta y resuelve con ellas la unidad de cada linea. El doble devuelve
-  // una lista vacia: ningun caso de este archivo afirma sobre la unidad de un ingrediente.
-  listUnitsActionMock.mockResolvedValue({ status: 'success', data: [] });
+  // El catalogo de unidades alimenta el selector de unidad del pedido, obligatorio en el alta.
+  listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
   getRecipeActionMock.mockResolvedValue({
     status: 'success',
     data: {
@@ -366,8 +379,8 @@ afterEach(() => {
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
   await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
-  await user.click(screen.getByTestId('presentation-select'));
-  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
+  await user.click(screen.getByTestId('presentation-unit-select'));
+  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 
