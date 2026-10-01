@@ -73,7 +73,7 @@
         verde.
       - Depende de: T1.
 
-- [ ] **T3. Las demás listas a mano y «Administrador = catálogo entero».** (`design.md > 2.4`; R5, R9.)
+- [x] **T3. Las demás listas a mano y «Administrador = catálogo entero».** (`design.md > 2.4`; R5, R9.)
       - Archivos (solo tests): `tests/unit/navegacion/qc75-convenciones.test.ts` (`CODIGOS_QC74` +
         módulos esperados con `empresas`), `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`
         (`CODIGOS_DE_FICHAS_POSTERIORES`), `tests/unit/identity/seed/seed-initial-access.test.ts`

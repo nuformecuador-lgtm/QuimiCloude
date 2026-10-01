@@ -15,7 +15,15 @@ import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
 import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
+import {
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  SEED_ROLES,
+} from '@/lib/modules/identity/domain/roles';
+
+const NOMBRES_DE_SEED_ROLES: readonly string[] = SEED_ROLES.map((role) => role.name);
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import type { CredentialRule } from '@/lib/modules/identity/domain/credential-policy';
 import type { InitialAdminCredentials } from '@/lib/modules/identity/ports/initial-access-credentials';
@@ -250,7 +258,7 @@ describe('seedInitialAccess', () => {
   });
 
   // Caso 1 (R2, R4)
-  it('sobre una base vacia crea los tres roles y el usuario inicial con rol Administrador', async () => {
+  it('sobre una base vacia crea todos los roles de SEED_ROLES y el usuario inicial con rol Administrador', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -259,10 +267,8 @@ describe('seedInitialAccess', () => {
     const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
-    // El seed asegura los tres roles de `SEED_ROLES`, no solo los dos historicos.
-    expect(outcome.createdRoles.slice().sort()).toEqual(
-      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
-    );
+    // El seed asegura todos los roles de `SEED_ROLES`, no solo los historicos.
+    expect(outcome.createdRoles.slice().sort()).toEqual([...NOMBRES_DE_SEED_ROLES].sort());
     expect(outcome.createdAdmin).toBe(true);
 
     const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
@@ -325,9 +331,8 @@ describe('seedInitialAccess', () => {
     expect(input.passwordHash).not.toBe(CREDENCIAL_DE_PRUEBA);
   });
 
-  // Con tres roles de semilla, faltar el Administrador deja faltando tambien a Operador y
-  // Empacador.
-  it('si el rol Operador falta y el Administrador ya existe, crea Operador y Empacador', async () => {
+  // Si solo existe el Administrador, faltan todos los demas roles de semilla.
+  it('si el rol Operador falta y el Administrador ya existe, crea los demas roles de SEED_ROLES', async () => {
     const repository = crearRepositorioFalso({
       rolesExistentes: new Map([[ROLE_ADMINISTRADOR, 'rol-admin-existente']]),
       usuariosVivosConAdministrador: 1,
@@ -340,10 +345,12 @@ describe('seedInitialAccess', () => {
 
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
     expect(creacionesDeRol.length).toBeGreaterThan(0);
-    expect(outcome.createdRoles.slice().sort()).toEqual([ROLE_OPERADOR, ROLE_EMPACADOR].sort());
-    expect(creacionesDeRol).toHaveLength(2);
+    const faltantes = NOMBRES_DE_SEED_ROLES.filter((nombre) => nombre !== ROLE_ADMINISTRADOR);
+    expect(faltantes).toEqual(expect.arrayContaining([ROLE_OPERADOR, ROLE_EMPACADOR]));
+    expect(outcome.createdRoles.slice().sort()).toEqual([...faltantes].sort());
+    expect(creacionesDeRol).toHaveLength(faltantes.length);
     expect(creacionesDeRol.map((llamada) => (llamada.args[0] as { name: string }).name).sort()).toEqual(
-      [ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
+      [...faltantes].sort(),
     );
   });
 
@@ -440,7 +447,7 @@ describe('seedInitialAccess', () => {
   });
 
   // Caso 7b (R13) — por que los pasos 4 y 5 tienen que ir en una transaccion.
-  it('si createInitialAdmin lanza DESPUES de crear los roles, los tres roles ya quedaron creados y el error se propaga', async () => {
+  it('si createInitialAdmin lanza DESPUES de crear los roles, todos los roles de SEED_ROLES ya quedaron creados y el error se propaga', async () => {
     const repository = crearRepositorioFalso();
     const mensajeDeError = 'fallo simulado del alta del usuario inicial';
     repository.createInitialAdmin = async () => {
@@ -457,10 +464,12 @@ describe('seedInitialAccess', () => {
       errorCapturado = error as Error;
     }
 
-    // Primero: que los roles SI se crearon (los tres, exactamente). Ocurrio ANTES de
-    // afirmar cualquier otra cosa, siguiendo el orden en que el dominio los crea.
+    // Primero: que los roles SI se crearon (todos los de `SEED_ROLES`, exactamente). Ocurrio
+    // ANTES de afirmar cualquier otra cosa, siguiendo el orden en que el dominio los crea.
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
-    expect(creacionesDeRol).toHaveLength(3);
+    expect(creacionesDeRol.map((llamada) => (llamada.args[0] as { name: string }).name)).toEqual(
+      NOMBRES_DE_SEED_ROLES,
+    );
 
     // Luego: que el error se propaga.
     expect(errorCapturado).not.toBeNull();
@@ -803,6 +812,34 @@ describe('seedInitialAccess', () => {
     expect(codigosDe(ROLE_OPERADOR)).not.toContain('documentos.modificar');
     expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.consultar');
     expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.modificar');
+  });
+
+  it('QC-161 R8, R9: sobre una base vacia el Maestro recibe exactamente empresas.consultar y empresas.modificar; el Administrador, el Operador y el Empacador ningun empresas.*', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
+      ?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    const rolesCreados = new Map(
+      repository.llamadas
+        .filter((llamada) => llamada.metodo === 'createRole')
+        .map((llamada, index) => [(llamada.args[0] as { name: string }).name, `rol-${index + 1}`]),
+    );
+    const codigosDe = (rol: string): string[] =>
+      paresCreados.filter((par) => par.roleId === rolesCreados.get(rol)).map((par) => par.permissionCode);
+    const deEmpresas = (codigos: readonly string[]): string[] =>
+      codigos.filter((codigo) => codigo.startsWith('empresas.'));
+
+    expect(codigosDe(ROLE_MAESTRO)).toEqual(['empresas.consultar', 'empresas.modificar']);
+    expect(codigosDe(ROLE_ADMINISTRADOR)).toEqual([...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])]);
+    expect(codigosDe(ROLE_ADMINISTRADOR).length).toBeGreaterThan(0);
+    expect(deEmpresas(codigosDe(ROLE_ADMINISTRADOR))).toEqual([]);
+    expect(deEmpresas(codigosDe(ROLE_OPERADOR))).toEqual([]);
+    expect(deEmpresas(codigosDe(ROLE_EMPACADOR))).toEqual([]);
   });
 
   it('QC-142 R13: sobre una base sembrada antes de esta feature -todo salvo documentos.*- el seed crea exactamente esos dos permisos y las dos asignaciones del Administrador, y la segunda corrida no cambia nada', async () => {

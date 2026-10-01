@@ -918,6 +918,37 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
+  it('QC-161 R9 — tras sembrar sobre base vacia, el Administrador, el Operador y el Empacador no tienen ningun empresas.* en `role_permissions`', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      const repository = createInitialAccessRepository(tx);
+
+      await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+
+      const deEmpresas = (codigos: readonly string[]): string[] =>
+        codigos.filter((codigo) => codigo.startsWith('empresas.'));
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
+      expect((await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).length).toBeGreaterThan(0);
+      for (const rol of [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR]) {
+        expect(deEmpresas(await codigosEnBaseDe(tx, rol)), `empresas.* del rol «${rol}»`).toEqual([]);
+      }
+      // Anti-cegado: los dos codigos si existen en la base, en `permissions`.
+      const empresasEnCatalogo = await tx.permission.findMany({
+        where: { module: 'empresas' },
+        orderBy: { code: 'asc' },
+      });
+      expect(empresasEnCatalogo.map((permiso) => permiso.code)).toEqual([
+        'empresas.consultar',
+        'empresas.modificar',
+      ]);
+    });
+  });
+
   // Caso 11 (QC-65 R7, R10): el estado de cuenta del administrador inicial, contra Postgres
   // REAL. El unitario de `tests/unit/identity/seed/seed-initial-access.test.ts` afirma que el
   // dominio PASA el valor; este afirma que llega a la fila. Es el riesgo n.o 1 de

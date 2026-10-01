@@ -195,3 +195,45 @@ Nota: `pnpm run typecheck` ya pasa en la rama (el rojo de `pino` de T0 lo resolv
     recibe `Hipoclorito`) y `tests/unit/recetas-ui/recipe-page.test.tsx` («R21: las acciones van en
     una columna que no se puede fijar…»). Comprobado: los dos fallan igual en `40d0dea2` (punta de
     la rama antes de T1), en un worktree temporal desprendido. No tocan permisos ni roles.
+
+## T3 — Las demas listas a mano y «Administrador = catalogo menos los excluidos»
+
+Reducida segun T0: las igualdades del Administrador ya se derivan del dominio
+(`SEED_ROLE_PERMISSIONS`, `codigosSembradosDe`) y siguen verdes sin tocarse.
+
+### Archivos (solo tests)
+
+- `tests/unit/navegacion/qc75-convenciones.test.ts`: `CODIGOS_QC74` suma los dos codigos; los
+  modulos esperados suman `empresas` (con `usuarios`, `terminados`, `empaque`).
+- `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`:
+  `CODIGOS_DE_FICHAS_POSTERIORES` suma los dos.
+- `tests/unit/identity/seed/seed-initial-access.test.ts`: los tres casos que listaban los roles a
+  mano o contaban «tres» (rojos desde T1) derivan la lista de `SEED_ROLES` (`design.md > 10.1`;
+  el caso del fallo de `createInitialAdmin` pasa de `toHaveLength(3)` a igualdad exacta, en
+  orden, con los nombres de `SEED_ROLES`; el de «solo existe el Administrador» exige ademas que
+  Operador y Empacador esten entre los faltantes). Caso nuevo de R8/R9 contra el doble.
+- `tests/integration/identity/identity-seed.int.test.ts`: caso nuevo de R9 contra Postgres. El
+  caso existente «R25 — cada rol de semilla…» ya recorre `SEED_ROLES` y cubre al Maestro sin
+  tocarlo.
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R5 | `qc75-convenciones.test.ts` «tiene exactamente los codigos de CODIGOS_QC74, sin duplicados»; `order-assignments-migration.test.ts` «revertir devuelve el catalogo persistido al de QC-66 (R34)» |
+| R8, R9 | `seed-initial-access.test.ts` «QC-161 R8, R9: sobre una base vacia el Maestro recibe exactamente empresas.consultar y empresas.modificar; el Administrador, el Operador y el Empacador ningun empresas.*» |
+| R9 | `identity-seed.int.test.ts` «QC-161 R9 — tras sembrar sobre base vacia, el Administrador, el Operador y el Empacador no tienen ningun empresas.* en `role_permissions`» (con anti-cegado: los dos codigos estan en `permissions`) |
+| R8 (y R18 parcial) | `identity-seed.int.test.ts` «R25 — cada rol de semilla tiene en `role_permissions` exactamente los permisos que declara SEED_ROLE_PERMISSIONS» (sin cambios; ahora incluye al Maestro) |
+
+### Salida
+
+- `pnpm run typecheck`: verde.
+- `vitest run seed-initial-access qc75-convenciones order-assignments-migration catalogo-sin-total-fijo`:
+  4 archivos, 98 passed, 3 skipped.
+- `vitest run tests/integration/identity/identity-seed.int.test.ts -t "QC-161 R9|R25 — cada rol"`
+  (`.env` con `QuimiCloude_QC161` comprobado; base efimera desde la plantilla
+  `qct_tpl_4295644d322f`, borrada al terminar): 2 passed, 15 skipped. El resto del archivo es de
+  T8 (necesita las `SEED_MAESTRO_*` y el seed del Maestro) y no se corrio.
+- Queda en pie `qct_qc161_95232936_mupntzdx_mx4`, base efimera de una corrida de `vitest related`
+  que se corto en T1; `db:test clean` la retiene porque el worktree sigue vivo. Cae al desmontar
+  el worktree.
