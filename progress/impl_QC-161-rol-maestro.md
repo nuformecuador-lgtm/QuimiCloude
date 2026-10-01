@@ -556,3 +556,21 @@ transaccion sin confirmar. El fixture se crea dentro del propio caso y se borra 
   `qct_qc161_…` (copia de `qct_tpl_fa76230db33c`), borrada al terminar.
 - `vitest run login.int.test.ts session-user.int.test.ts`: 2 archivos, 37 passed.
 - `pnpm run typecheck` verde; `eslint` de los dos limpio.
+
+## Cierre de la tanda T9, T10, T11 — `./init.sh --rapido`
+
+Punta `c980c6ad`. Entorno, fichas, cupo, specs, `QuimiCloude_QC161` al dia (57 migraciones),
+**typecheck verde** (cerrado por T9) y lint (0 errores, 8 warnings ajenos) en verde.
+`test:rapido` (`vitest related` sobre 43 archivos del diff; 494 archivos): **5 archivos / 8 casos
+rojos, 7167 passed, 26 skipped**, todos conocidos y ninguno de esta tanda:
+
+- Baseline: `unidades-viewport.test.tsx` (2), `usuarios-viewport.test.tsx` (2).
+- Deuda de `dev`: `inventario/product-page.test.tsx` (1), `recetas-ui/recipe-page.test.tsx` (1).
+- Esperados para T12: `user-crud.int.test.ts` (2), los casos de `:509` y `:525`.
+
+Como `test:rapido` no llega a las guardias si los relacionados fallan, se corrieron aparte sobre la
+misma punta: `vitest run guard` → 51 archivos, 654 passed, 11 skipped.
+
+Una primera corrida del gate se corto a los 10 min por el limite de la herramienta (no por un
+fallo) durante `vitest related`; su base efimera `qct_qc161_95232936_mupt4gy0_o5o` pudo quedar sin
+borrar. La segunda corrida borro la suya.
