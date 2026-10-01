@@ -42,3 +42,22 @@ aprobación. Es el mismo arreglo que cuando entraron `sharp` y `react-intersecti
 La regla es push solo con el gate completo en verde, y ninguna corrida terminó. Para cerrar:
 cuando haya memoria libre, relanzar `./init.sh` en este worktree y, si sale verde, hacer
 `git push -u origin fix/pino-logger`. No toqué `fix/logger-pino-en-dev`.
+
+## Actualizacion 2026-10-01: baseline y `./init.sh --rapido`
+
+- El leader corrio el gate completo: 10817 tests en verde y 5 en rojo, en 3 archivos heredados
+  de `dev` (`3018853a` y `0dbcd68f`). Ninguno toca archivos de esta rama.
+- `9aabdfc1` (de otra mano, ya en `origin`) anota los tres en `tests/baseline-rojos.json`.
+  `8af0b374` anade en cada motivo «Salida limpia: QC-177 borra esta entrada».
+- `./init.sh --rapido` sobre `8af0b374`: **ROJO**. typecheck y lint en verde; tests: 215
+  archivos en verde y 2 en rojo (4 tests de 3182).
+  - Los rojos son `unidades-viewport.test.tsx` (R27) y `usuarios-viewport.test.tsx` (R21),
+    los dos del baseline. No hay ningun rojo fuera del baseline.
+  - **Causa:** `--rapido` corre `pnpm run test:rapido` con `run_if` y **no consulta el
+    baseline**. La comparacion con `scripts/comparar-baseline-rojos.mjs` solo esta en el modo
+    completo (`init.sh`, rama `else`). Mientras esos archivos sigan rojos y el grafo los
+    seleccione, el rapido no puede salir verde.
+- **No hay push de `8af0b374`.** La condicion era que el rapido saliera verde. `origin` ya tiene
+  `9aabdfc1`, que pusheo otra mano.
+- Para cerrar hay dos salidas: que el leader acepte este rapido (rojo solo por archivos del
+  baseline) y se haga push, o correr el gate completo, que si aplica el baseline.
