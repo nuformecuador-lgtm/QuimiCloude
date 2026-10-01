@@ -80,3 +80,24 @@ Grafo MCP: no usado (no cargado en esta sesion); exploracion con Grep/Read/git.
 **RECHAZADO** — unico bloqueante B1 (citas `QC-171`, `R<n>` y `design.md` en comentarios nuevos de produccion,
 6 archivos). Funcionalmente la ficha cumple R1..R24 y los puntos pedidos (frontera [D8], R22, merge, stubEnv,
 baseline) estan bien. Vuelve al implementer solo para limpiar esos comentarios (y marcar T7, M1); tras eso, OK.
+
+## Vuelta 2 (2026-10-01)
+
+Alcance: 31c353b4 (B1), dd55b818 (M1), db1191a5 (merge de origin/dev). Sin gate ni suite (el leader corre
+`./init.sh` completo en paralelo).
+
+- [x] **B1 cerrado.** Barrido de `git diff origin/dev...HEAD -- lib app components`, lineas añadidas, por
+  `QC-<n>`, `R<n>`, `design.md`, `[D<n>]` y «decision cerrada»: cero coincidencias. 31c353b4 toca solo lineas de
+  comentario (ninguna linea de codigo cambia) en los seis archivos señalados, mas la bitacora.
+- [x] **M1 cerrado.** T7 marcada `[x]`; su viñeta y su «Hecho cuando» dicen ya que el E2E solo toca el paso 1
+  (abrir la ventana de subida), coherente con R22 enmendado. No queda ninguna tarea sin marcar en tasks.md.
+- [x] **Merge limpio.** db1191a5 solo trae `progress/fix-pino-logger.md` y `tests/baseline-rojos.json`
+  (redaccion de motivos hacia QC-177). origin/dev queda contenido en HEAD. Baseline: 5 entradas, todas de
+  archivos que la rama no toca; las dos que añade la rama (product-page, recipe-page, de 3c47ffad) ya se
+  revisaron en la vuelta 1.
+- M2 (sin cambio, lo exige R7; decision humana), M3 (a la descripcion del PR) y M4 (sin accion): siguen como
+  `menor`, no bloquean.
+
+Hallazgos nuevos: ninguno.
+
+**Veredicto vuelta 2: APROBADO (OK)**, condicionado a que el `./init.sh` completo que corre el leader termine verde.
