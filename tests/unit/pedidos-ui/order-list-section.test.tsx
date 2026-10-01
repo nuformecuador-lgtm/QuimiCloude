@@ -117,6 +117,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: listRecipesActionMock,
   // El panel de edicion monta `OrderForm` por fila y su efecto pide el detalle de la receta para
   // los ingredientes: sin este doble, la llamada iria a la sesion real (R43).

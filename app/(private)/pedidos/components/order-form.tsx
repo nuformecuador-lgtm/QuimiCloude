@@ -50,6 +50,7 @@ import {
   type RecipePickerOption,
   type RecipePickerPage,
 } from './recipe-picker';
+import { RECIPE_VERSION_FIELD, RecipeVersionSelect } from './recipe-version-select';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
   OrderResponsibles,
@@ -127,15 +128,18 @@ export const ORDER_SHEET_COVERAGE_TESTID = 'order-sheet-coverage';
  * al envio.
  */
 
-/** Los CINCO campos de negocio, con el MISMO nombre que el adaptador driving lee del `FormData`. */
 /**
- * QC-35bis (decision humana del 2026-09-07): eran CINCO. La unidad y el precio unitario salieron
- * del pedido -del formulario, del contrato del modulo y de la tabla `orders`-, asi que esta lista
- * tiene CUATRO campos. Sigue siendo la unica fuente: `readValues` la recorre para armar el
- * `FormData` que la action lee, de modo que anadir un campo aqui y no en el formulario -o al
- * reves- no es posible sin que algo se note.
+ * Los campos de negocio, con el mismo nombre que el adaptador driving lee del `FormData`. Es la
+ * unica fuente: `readValues` la recorre, asi que un campo aqui y no en el formulario -o al reves-
+ * se nota.
  */
-export const ORDER_BUSINESS_FIELDS = [RECIPE_FIELD, 'quantity', PRESENTATION_FIELD, 'priority'] as const;
+export const ORDER_BUSINESS_FIELDS = [
+  RECIPE_FIELD,
+  'quantity',
+  PRESENTATION_FIELD,
+  'priority',
+  RECIPE_VERSION_FIELD,
+] as const;
 
 /**
  * El estado ya no tiene control propio en este formulario: ninguna de las tres constantes de
@@ -190,6 +194,7 @@ const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
   quantity: 'Escribe una cantidad decimal mayor que cero.',
   presentationId: 'Elige una presentación de la lista.',
   priority: 'Elige una de las prioridades disponibles.',
+  recipeVersionId: 'Elige una versión de la lista.',
 };
 
 const FIELD_LABELS = {
@@ -361,11 +366,22 @@ export function OrderForm({
     se sabe desde el principio -viene en el resumen del pedido- pero la imagen no: `OrderSummary`
     no la trae, asi que hasta que se elija una receta se ve el marcador.
   */
+  // Con version, el selector de receta muestra la original y la version va en su propio selector.
   const [recipe, setRecipe] = useState<RecipePickerOption | null>(
     order === undefined
       ? null
-      : { id: order.recipeId, name: order.recipeName ?? '', imageUrl: null },
+      : {
+          id: order.recipeVersion?.originalId ?? order.recipeId,
+          name: order.recipeVersion?.originalName ?? order.recipeName ?? '',
+          imageUrl: null,
+        },
   );
+  const [versionId, setVersionId] = useState<string | null>(
+    order === undefined || order.recipeVersion === null ? null : order.recipeId,
+  );
+  // Cada eleccion de receta remonta el selector de version: vuelve a «Original» y suelta la
+  // version del pedido editado, aunque se elija otra vez la misma receta.
+  const [recipeChoice, setRecipeChoice] = useState(0);
   // La cantidad guardada llega con la escala de la columna («15.0000») y aqui se precarga SIN
   // sus ceros de relleno: `trimDecimal` deja «15», no «15.00». NO redondea, y la diferencia
   // importa porque este valor es el que se vuelve a guardar: recortar ceros no cambia el
@@ -381,6 +397,8 @@ export function OrderForm({
   const recipeImageUrl = recipe?.imageUrl ?? null;
   /** Id de la receta elegida: decide si la tabla de ingredientes se monta. */
   const recipeId = recipe?.id ?? '';
+  /** La receta cuyas lineas valen: la version elegida o, sin ella, la original. */
+  const effectiveRecipeId = recipe === null ? null : (versionId ?? recipe.id);
   /** Guardar solo se habilita con una receta elegida: sin receta no hay pedido (decision 2026-09-09). */
   const canSave = recipe !== null;
 
@@ -440,6 +458,8 @@ export function OrderForm({
 
   /** `null` = el selector retiro la eleccion (lo escrito deja de coincidir): se apaga todo. */
   function chooseRecipe(option: RecipePickerOption | null) {
+    setVersionId(null);
+    setRecipeChoice((count) => count + 1);
     if (option === null) {
       setRecipe(null);
       setIngredients([]);
@@ -452,6 +472,16 @@ export function OrderForm({
     setIngredientsError(null);
     loadIngredients(option.id);
     quote.onRecipeChange(option.id, quantity);
+  }
+
+  function chooseVersion(nextVersionId: string | null) {
+    if (recipe === null) return;
+    const nextRecipeId = nextVersionId ?? recipe.id;
+    setVersionId(nextVersionId);
+    setIngredientsLoading(true);
+    setIngredientsError(null);
+    loadIngredients(nextRecipeId);
+    quote.onRecipeChange(nextRecipeId, quantity);
   }
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
@@ -606,9 +636,24 @@ export function OrderForm({
             <RecipePicker
               initialPage={recipes}
               onSelect={chooseRecipe}
-              defaultValue={initialValue(RECIPE_FIELD, order?.recipeId ?? '')}
-              defaultLabel={order?.recipeName ?? ''}
+              defaultValue={initialValue(
+                RECIPE_FIELD,
+                order?.recipeVersion?.originalId ?? order?.recipeId ?? '',
+              )}
+              defaultLabel={order?.recipeVersion?.originalName ?? order?.recipeName ?? ''}
               error={fieldErrors.recipeId}
+            />
+
+            <RecipeVersionSelect
+              key={recipeChoice}
+              recipeId={recipe?.id ?? null}
+              initialVersion={
+                recipeChoice === 0 && order !== undefined && order.recipeVersion !== null
+                  ? { id: order.recipeId, name: order.recipeVersion.versionName }
+                  : null
+              }
+              onChange={chooseVersion}
+              error={fieldErrors.recipeVersionId}
             />
 
             {/*
@@ -653,7 +698,7 @@ export function OrderForm({
                   defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
                   onValueChange={(value) => {
                     setQuantity(value);
-                    quote.onQuantityChange(recipe?.id ?? null, value);
+                    quote.onQuantityChange(effectiveRecipeId, value);
                   }}
                   error={fieldErrors.quantity}
                 />

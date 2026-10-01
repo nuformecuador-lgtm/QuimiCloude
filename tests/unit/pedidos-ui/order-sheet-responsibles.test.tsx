@@ -86,6 +86,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', 
 });
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: vi.fn(() => {
     throw new Error('listRecipesAction no debe invocarse: la primera pagina llega por props');
   }),
