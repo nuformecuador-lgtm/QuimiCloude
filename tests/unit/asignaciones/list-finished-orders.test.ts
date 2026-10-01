@@ -245,7 +245,7 @@ describe('QC-145 — listFinishedOrders: R21 la fila y sus responsables', () => 
     const pagina = await listFinishedOrders(ACTOR, { page: 1 });
 
     expect(pagina.items[0]?.recipeName).toBeNull();
-    expect(pagina.items[0]?.presentationName).toBeNull();
+    expect(pagina.items[0]?.presentationLines).toEqual([]);
   });
 
   it('la fila expone exactamente las claves del contrato, sin importe ni otros datos', async () => {
@@ -256,7 +256,17 @@ describe('QC-145 — listFinishedOrders: R21 la fila y sus responsables', () => 
     const pagina = await listFinishedOrders(ACTOR, { page: 1 });
 
     expect(Object.keys(pagina.items[0] ?? {}).sort()).toEqual(
-      ['id', 'numberText', 'recipeName', 'quantity', 'presentationName', 'finishedAt', 'responsibles'].sort(),
+      [
+        'id',
+        'numberText',
+        'recipeName',
+        'quantity',
+        'presentationLines',
+        'unitId',
+        'unitLabel',
+        'finishedAt',
+        'responsibles',
+      ].sort(),
     );
   });
 });

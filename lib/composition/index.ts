@@ -1346,6 +1346,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
@@ -1382,6 +1383,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   listCompanyOrders: createListCompanyOrders({
@@ -1390,6 +1392,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   listResponsibleCandidates: createListResponsibleCandidates({
@@ -1407,6 +1410,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     products: productCatalog,
     now: () => new Date(),
   }),
@@ -1416,6 +1420,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     products: productCatalog,
     now: () => new Date(),
   }),

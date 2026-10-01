@@ -1,14 +1,15 @@
 // lib/modules/asignaciones/domain/packing-order-view.ts
 /**
- * La fila comun de «Por empacar»: numero, receta, presentacion, envases enteros, estado y quien
- * empaca. La usan `listPackingOrders` y `getPackingOrder`, para que las dos consultas nunca puedan
+ * La fila comun de «Por empacar»: numero, receta, cantidad con su unidad, reparto, envases
+ * enteros, estado y quien empaca. La usan `listPackingOrders` y `getPackingOrder`, para que las dos consultas nunca puedan
  * mostrar datos distintos de un mismo pedido.
  *
- * Reutiliza `composeOrderRows` para receta y presentacion aunque tambien calcule responsables: esta
+ * Reutiliza `composeOrderRows` para receta, reparto y unidad aunque tambien calcule responsables: esta
  * vista no los necesita, pero una segunda composicion paralela es la que podria divergir el dia que
- * cambie el criterio de nombre de receta o presentacion.
+ * cambie el criterio de nombre de receta, de presentacion o de etiqueta de la unidad.
  */
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
+import type { OrderDistributionLineView } from './order-distribution-view';
 
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
 import { formatOrderNumber, type OrderStatus } from '@/lib/modules/pedidos';
@@ -24,7 +25,13 @@ export type PackingOrderRow = {
   readonly id: string;
   readonly numberText: string;
   readonly recipeName: string | null;
-  readonly presentationName: string | null;
+  /** Cadena decimal, nunca `number`. */
+  readonly quantity: string;
+  /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */
+  readonly presentationLines: readonly OrderDistributionLineView[];
+  /** La unidad de `quantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
+  readonly unitId: string | null;
+  readonly unitLabel: string | null;
   /** Cadena decimal, nunca `number` (`docs/architecture.md > Anti-patrones`). `null` si el asiento
    *  de produccion todavia no aparece en la lectura -no deberia ocurrir para un pedido que ya paso
    *  por Finalizar, pero la fila sigue saliendo, mismo criterio que una receta borrada. */
@@ -61,7 +68,10 @@ export async function composePackingOrderRows(
       id: order.id,
       numberText: formatOrderNumber(order.number),
       recipeName: rowComposed?.recipeName ?? null,
-      presentationName: rowComposed?.presentationName ?? null,
+      quantity: order.quantity,
+      presentationLines: rowComposed?.presentationLines ?? [],
+      unitId: order.unitId,
+      unitLabel: rowComposed?.unitLabel ?? null,
       packages: packagesByOrder.get(order.id) ?? null,
       status: order.status,
       packedByName: order.packedBy === null ? null : packerNames.get(order.packedBy) ?? order.packedBy,

@@ -32,6 +32,7 @@ import {
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
@@ -116,6 +117,12 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       },
       people: assignmentDirectoryPrisma,
       presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+      units: {
+        findRefs: findUnitRefs,
+        findRefsSharingBaseInCompany: async () => {
+          throw new Error('el listado solo resuelve la etiqueta de la unidad del pedido');
+        },
+      },
       now: () => NOW,
     }),
     finishAssignedOrder: createFinishAssignedOrder({

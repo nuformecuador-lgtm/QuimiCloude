@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError, ValidationError } from './errors';
+import { toDistributionLines, unitLabelOf } from './order-distribution-view';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -116,13 +117,18 @@ export function createGetAssignedOrderExecution(
       };
     });
 
-    // Transitorio: solo la primera linea del reparto hasta que la ejecucion pinte el reparto entero.
-    const firstPresentationId = summary.presentationLines[0]?.presentationId ?? null;
+    const presentationIds = [...new Set(summary.presentationLines.map((line) => line.presentationId))];
     const presentations =
-      firstPresentationId === null
+      presentationIds.length === 0
         ? []
-        : await deps.presentations.findRefs([firstPresentationId], actor.companyId);
-    const presentationName = presentations[0]?.name ?? null;
+        : await deps.presentations.findRefs(presentationIds, actor.companyId);
+    const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
+
+    const orderUnitId = summary.unitId;
+    const orderUnit =
+      orderUnitId === null
+        ? undefined
+        : (await deps.units.findRefs([orderUnitId], actor.companyId)).find((unit) => unit.id === orderUnitId);
 
     return {
       orderId: summary.id,
@@ -132,7 +138,9 @@ export function createGetAssignedOrderExecution(
       orderQuantity: summary.quantity,
       steps,
       lines: executionLines,
-      presentationName,
+      presentationLines: toDistributionLines(summary.presentationLines, presentationNames),
+      unitId: summary.unitId,
+      unitLabel: orderUnit === undefined ? null : unitLabelOf(orderUnit),
     };
   };
 }

@@ -2,6 +2,8 @@
 import type { RecipeStepView } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 
+import type { OrderDistributionLineView } from './order-distribution-view';
+
 /**
  * Proyeccion cerrada de la pantalla de ejecucion. Sin autoria, sin marcas de tiempo y sin
  * existencia de producto: lo que no esta en el tipo no se puede filtrar por descuido.
@@ -16,8 +18,11 @@ export type AssignedOrderExecutionView = {
   readonly orderQuantity: string;
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly ExecutionLineView[];
-  /** `null` = sin presentacion. Solo lectura: el Operador no tiene forma de cambiarla. */
-  readonly presentationName: string | null;
+  /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */
+  readonly presentationLines: readonly OrderDistributionLineView[];
+  /** La unidad de `orderQuantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
+  readonly unitId: string | null;
+  readonly unitLabel: string | null;
 };
 
 export type ExecutionLineView = {

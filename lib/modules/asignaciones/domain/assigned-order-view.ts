@@ -2,6 +2,7 @@
 import type { OrderPriority } from '@/lib/modules/pedidos';
 
 import type { OrderResponsible } from './assignment-view';
+import type { OrderDistributionLineView } from './order-distribution-view';
 
 export type AssignedOrderView = {
   readonly id: string;
@@ -15,6 +16,9 @@ export type AssignedOrderView = {
   readonly status: 'PENDIENTE' | 'EN_CURSO';
   /** Sin el propio actor. */
   readonly otherResponsibles: readonly OrderResponsible[];
-  /** `null` = sin presentacion. Solo lectura: el Operador no tiene forma de cambiarla. */
-  readonly presentationName: string | null;
+  /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */
+  readonly presentationLines: readonly OrderDistributionLineView[];
+  /** La unidad de `quantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
+  readonly unitId: string | null;
+  readonly unitLabel: string | null;
 };

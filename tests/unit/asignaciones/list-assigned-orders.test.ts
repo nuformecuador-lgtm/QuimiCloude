@@ -18,6 +18,7 @@ import type { PersonRef } from '@/lib/modules/identity';
 import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
+import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 /** Un uuid valido y legible a partir de un solo digito hexadecimal. */
 function uuid(seed: string): string {
@@ -67,6 +68,12 @@ function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
   return { id: PRESENTACION, name: 'Bidon 20L', content: null, unitId: UNIDAD, ...overrides };
 }
 
+const SEGUNDA_PRESENTACION = uuid('9');
+
+function unidad(overrides?: Partial<UnitRef>): UnitRef {
+  return { id: UNIDAD, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, ...overrides };
+}
+
 function filaSuelta(orderId: string, userId: string): OrderAssignmentRowWithOrder {
   return { orderId, userId, workGroupId: null, workGroupName: null };
 }
@@ -79,6 +86,7 @@ type Dobles = {
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>;
   readonly findRefsIncludingDeletedInCompany: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
+  readonly findRefsUnits: ReturnType<typeof vi.fn>;
   /** TODOS los metodos de puerto del montaje: lo que hace verificable «sin tocar ningun puerto» y
    *  «el mismo numero de llamadas con 1 fila que con 25». */
   readonly todos: readonly ReturnType<typeof vi.fn>[];
@@ -91,6 +99,7 @@ function montar(options?: {
   readonly rows?: readonly OrderAssignmentRowWithOrder[];
   readonly people?: readonly PersonRef[];
   readonly presentations?: readonly PresentationRef[];
+  readonly units?: readonly UnitRef[];
 }): Dobles {
   const idsDeLaPersona = options?.ids ?? [];
   const paginaDePedidos = options?.page ?? { items: [], total: 0 };
@@ -126,6 +135,7 @@ function montar(options?: {
   });
   const findRefsIncludingDeletedInCompany = vi.fn(async () => options?.people ?? []);
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
+  const findRefsUnits = vi.fn(async () => options?.units ?? []);
 
   const deps: ListAssignedOrdersDeps = {
     assignments: {
@@ -140,6 +150,7 @@ function montar(options?: {
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     people: { findAliveRefsInCompany, findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
+    units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
     now: () => new Date('2026-09-16T10:00:00.000Z'),
   } as unknown as ListAssignedOrdersDeps;
 
@@ -151,6 +162,7 @@ function montar(options?: {
     findRefsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
     findRefsPresentations,
+    findRefsUnits,
     todos: [
       listOrderIdsByUserInCompany,
       listByOrderInCompany,
@@ -164,6 +176,7 @@ function montar(options?: {
       findAliveRefsInCompany,
       findRefsIncludingDeletedInCompany,
       findRefsPresentations,
+      findRefsUnits,
     ],
   };
 }
@@ -408,7 +421,9 @@ describe('QC-123 — el pedido asignado no lleva importe (R15)', () => {
         'priority',
         'status',
         'otherResponsibles',
-        'presentationName',
+        'presentationLines',
+        'unitId',
+        'unitLabel',
       ].sort(),
     );
     expect(Object.keys(fila ?? {})).not.toContain('ingredientsCost');
@@ -434,8 +449,8 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([PRESENTACION], EMPRESA);
-    expect(pagina.items[0]?.presentationName).toBe('Bidon 20L');
-    expect(pagina.items[1]?.presentationName).toBeNull();
+    expect(pagina.items[0]?.presentationLines[0]?.presentationName).toBe('Bidon 20L');
+    expect(pagina.items[1]?.presentationLines).toEqual([]);
   });
 
   it('R24: ninguna llamada al catalogo si ningun pedido de la pagina tiene presentacion', async () => {
@@ -451,7 +466,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(findRefsPresentations).not.toHaveBeenCalled();
-    expect(pagina.items[0]?.presentationName).toBeNull();
+    expect(pagina.items[0]?.presentationLines).toEqual([]);
   });
 
   it('R26: un actor con solo asignaciones.consultar recibe la presentacion de sus pedidos asignados', async () => {
@@ -468,6 +483,109 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(ACTOR.permissions).toEqual(['asignaciones.consultar']);
-    expect(pagina.items[0]?.presentationName).toBe('Bidon 20L');
+    expect(pagina.items[0]?.presentationLines[0]?.presentationName).toBe('Bidon 20L');
+  });
+});
+
+describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asignado', () => {
+  it('R26: cada fila lleva todas las lineas del reparto en orden de alta, con nombre y envases, con una sola llamada al catalogo', async () => {
+    const ids = [pedidoId(1), pedidoId(2)];
+    const items = [
+      resumen(pedidoId(1), {
+        presentationLines: [
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5 },
+          { presentationId: PRESENTACION, packages: 1 },
+        ],
+      }),
+      resumen(pedidoId(2), { presentationLines: [{ presentationId: PRESENTACION, packages: 2 }] }),
+    ];
+    const { deps, findRefsPresentations } = montar({
+      ids,
+      page: { items, total: 2 },
+      refs: [receta()],
+      presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
+    });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsPresentations).toHaveBeenCalledTimes(1);
+    expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
+    expect(pagina.items[0]?.presentationLines).toEqual([
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5 },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1 },
+    ]);
+    expect(pagina.items[1]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2 },
+    ]);
+  });
+
+  it('R27: un pedido sin reparto sale con `presentationLines: []` y sin llamada al catalogo', async () => {
+    const ids = [pedidoId(1)];
+    const items = [resumen(pedidoId(1), { presentationLines: [] })];
+    const { deps, findRefsPresentations } = montar({
+      ids,
+      page: { items, total: 1 },
+      refs: [receta()],
+    });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsPresentations).not.toHaveBeenCalled();
+    expect(pagina.items[0]?.presentationLines).toEqual([]);
+  });
+
+  it('R26: una presentacion que no vuelve del catalogo deja la linea con `presentationName: null`, no la descarta', async () => {
+    const ids = [pedidoId(1)];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 3 }] })];
+    const { deps } = montar({ ids, page: { items, total: 1 }, refs: [receta()] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(pagina.items[0]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION, presentationName: null, packages: 3 },
+    ]);
+  });
+
+  it('R26: la cantidad viaja con la etiqueta de su unidad (simbolo, o nombre si no lo tiene), una sola llamada por pagina', async () => {
+    const OTRA_UNIDAD = uuid('b');
+    const ids = [pedidoId(1), pedidoId(2), pedidoId(3)];
+    const items = [
+      resumen(pedidoId(1), { unitId: UNIDAD }),
+      resumen(pedidoId(2), { unitId: OTRA_UNIDAD }),
+      resumen(pedidoId(3), { unitId: UNIDAD }),
+    ];
+    const { deps, findRefsUnits } = montar({
+      ids,
+      page: { items, total: 3 },
+      refs: [receta()],
+      units: [unidad(), unidad({ id: OTRA_UNIDAD, name: 'Garrafa', symbol: null })],
+    });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsUnits).toHaveBeenCalledTimes(1);
+    expect(findRefsUnits).toHaveBeenCalledWith([UNIDAD, OTRA_UNIDAD], EMPRESA);
+    expect(pagina.items.map((fila) => [fila.unitId, fila.unitLabel])).toEqual([
+      [UNIDAD, 'L'],
+      [OTRA_UNIDAD, 'Garrafa'],
+      [UNIDAD, 'L'],
+    ]);
+  });
+
+  it('R42: un pedido sin unidad sale con `unitId` y `unitLabel` a null, sin llamada al catalogo de unidades', async () => {
+    const ids = [pedidoId(1)];
+    const items = [resumen(pedidoId(1), { unitId: null })];
+    const { deps, findRefsUnits } = montar({ ids, page: { items, total: 1 }, refs: [receta()] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsUnits).not.toHaveBeenCalled();
+    expect(pagina.items[0]?.unitId).toBeNull();
+    expect(pagina.items[0]?.unitLabel).toBeNull();
   });
 });
