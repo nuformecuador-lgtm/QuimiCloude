@@ -39,7 +39,10 @@ describe('la ruta de pedidos se declara una sola vez (R2)', () => {
 
     // `assignedOrderRoute` es el detalle de `ASSIGNED_ORDERS_ROUTE`, otra pantalla: casa con el
     // patron solo por su nombre. Se exceptua por nombre para no aflojar el patron.
-    const EXCEPCIONES = new Set(['assignedOrderRoute']);
+    //
+    // `packingOrderRoute` vive en /asignacion: es la pantalla de empaque, no un detalle de
+    // Pedidos. Casa con el patron solo por mencionar "order" en el nombre.
+    const EXCEPCIONES = new Set(['assignedOrderRoute', 'packingOrderRoute']);
 
     // Ni `orderDetailRoute` ni ninguna otra funcion cuyo nombre hable de un pedido.
     const funcionesDePedido = Object.entries(rutas).filter(

@@ -45,6 +45,10 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
  * `documentos` suma `documentos.consultar` y `documentos.modificar`: declara sus dos acciones
  * porque tiene escritura, y solo las recibe el Administrador.
  *
+ * `empaque` suma `empaque.modificar`, sin `empaque.consultar`: es el primer modulo del catalogo
+ * que solo escribe, porque quien lo tiene ya ve el pedido por otra via y no necesita una consulta
+ * propia. Lo recibe unicamente el Empacador.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -169,6 +173,12 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Subir documentos PDF y encolar su procesamiento.',
   },
+  {
+    code: 'empaque.modificar',
+    module: 'empaque',
+    action: 'modificar',
+    description: 'Comenzar y terminar el empaque de los pedidos de la empresa.',
+  },
 ] as const;
 
 /**
@@ -186,8 +196,8 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
  * mas: al Operador NO se le da `recetas.consultar` ni ningun otro (QC-86 R27)—. Las claves salen de
  * `./roles`, nunca del literal. Sin empresa: el permiso cuelga del rol y de nada mas (R6).
  *
- * El Empacador nace con exactamente `asignaciones.consultar` y `terminados.consultar`, sin
- * `inventario.consultar` ni `asignaciones.modificar`.
+ * El Empacador nace con exactamente `asignaciones.consultar`, `terminados.consultar` y
+ * `empaque.modificar`, sin `inventario.consultar` ni `asignaciones.modificar`.
  */
 export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionCode[]>> = {
   [ROLE_ADMINISTRADOR]: [
@@ -213,5 +223,12 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'documentos.modificar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
-  [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar'],
+  [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
 };
+
+/**
+ * Los codigos del catalogo que el Administrador NO recibe, aunque exista un modulo que los
+ * declare. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
+ * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
+ */
+export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = ['empaque.modificar'];

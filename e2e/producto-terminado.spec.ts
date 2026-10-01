@@ -568,18 +568,22 @@ test.describe('producto terminado', () => {
       { timeout: 60_000 },
     );
 
+    // Finalizar deja el pedido «por empacar»: el consumo y el alta del lote ya ocurrieron en esa
+    // misma operacion, sin que haga falta que un Empacador lo entregue.
     const deliveredOrder = await prisma.order.findUniqueOrThrow({
       where: { id: order.id },
       select: { status: true },
     });
-    expect(deliveredOrder.status).toBe('ENTREGADO');
+    expect(deliveredOrder.status).toBe('POR_EMPACAR');
 
     const finishedProductName = `${RECIPE_NAME} · ${PRESENTATION_NAME}`;
 
-    // La confirmacion dice los envases enteros y el nombre del producto terminado.
+    // La confirmacion dice que queda por empacar, los envases enteros y el nombre del producto
+    // terminado.
     const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderNumber);
+    await expect(aviso).toContainText('por empacar');
     await expect(aviso).toContainText(EXPECTED_PACKAGES_LABEL);
     await expect(aviso).toContainText(finishedProductName);
 

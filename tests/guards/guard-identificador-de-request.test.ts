@@ -127,11 +127,42 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
   'catalogo-desde-pdf.spec.ts',
+  // Por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto de
+  // extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
+  // uno a uno-. El recorrido que ejercita: el Administrador ve el item de menu, llega a la
+  // pantalla vacia, da de alta un cliente con apellido acentuado, lo encuentra en la caja de
+  // busqueda escribiendo el mismo apellido SIN tilde, lo edita y ve la celda cambiar, y lo da de
+  // baja tras lo cual la busqueda muestra «sin coincidencias»; y una sesion sin
+  // `clientes.consultar` recibe 404 dentro del layout privado sin ver ni el item ni un solo dato
+  // de clientes. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no
+  // lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
+  // sigue INTACTO.
+  'clientes.spec.ts',
   // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
   // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
   'documentos.spec.ts',
   'ejecucion-receta.spec.ts',
+  // Alta el 2026-09-25 (QC-168) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. El recorrido que ejercita: el Operario finaliza y el
+  // pedido queda «Por empacar» sin verlo entre sus propias pestanas, Pedidos no deja cancelarlo
+  // en ese estado, y un Empacador lo comienza, lo termina y lo ve despues en «Terminados». NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'empaque.spec.ts',
   'errores.spec.ts',
+  // Alta el 2026-09-25 (QC-159) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO
+  // se relaja -el archivo se nombra, uno a uno-. Lo que ejercita: sube un PDF de formula desde
+  // el listado de formulas, abre su revision, preselecciona un ingrediente, crea otro como
+  // materia prima, rellena un porcentaje que llego vacio hasta sumar 100 %, edita los pasos,
+  // ve el aviso de choque de nombre con una receta sembrada, reemplaza y confirma; y luego
+  // reabre la misma revision, cambia el nombre y confirma para crear una receta nueva sin tocar
+  // la reemplazada. NO ejercita el cruce borde -> accion del identificador de peticion: el spec
+  // no lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
+  // sigue INTACTO.
+  'formula-desde-pdf.spec.ts',
   'grupos-de-trabajo.spec.ts',
   'inventario.spec.ts',
   'login-skin.spec.ts',
@@ -339,6 +370,10 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: anade las tres columnas normalizadas de `customers` para la busqueda sin
   // acentos; no toca el identificador de peticion.
   '20260924200000_customers_search_normalized',
+  // Ninguna de las dos toca el identificador de peticion: una anade los dos estados de empaque
+  // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
+  '20260925120000_order_packing_states',
+  '20260925120100_packing_permission',
 ] as const
 
 export function hallazgosDeMigraciones(

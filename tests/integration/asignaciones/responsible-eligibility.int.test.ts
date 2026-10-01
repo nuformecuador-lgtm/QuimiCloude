@@ -33,6 +33,7 @@ vi.mock('@/lib/shared/db/prisma', async () => {
 
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
+import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { createGetAssignedOrderExecution } from '@/lib/modules/asignaciones/domain/get-assigned-order-execution';
 import { createStartAssignedOrder } from '@/lib/modules/asignaciones/domain/start-assigned-order';
 import { findRecipeExecutionContentById } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
@@ -86,6 +87,7 @@ const recipes: RecipeCatalog = {
   findRefsIncludingDeleted: async () => noLlamar('recipes.findRefsIncludingDeleted'),
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: async () => noLlamar('recipes.findIdsMatchingName'),
+  findAliveByNormalizedName: async () => noLlamar('recipes.findAliveByNormalizedName'),
 };
 
 /**
@@ -107,10 +109,10 @@ async function transitionAliveByIdReal(
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
   const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
-  // Yendo a `ENTREGADO`, el exito real lleva `finishedGoods` -aqui no hay producto
+  // Yendo a `POR_EMPACAR`, el exito real lleva `finishedGoods` -aqui no hay producto
   // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
   // reconoce el exito por esta forma, no por el literal `'ok'`.
-  if (resultado === 'ok' && to === 'ENTREGADO') {
+  if (resultado === 'ok' && to === 'POR_EMPACAR') {
     return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
   }
   return resultado;
@@ -123,6 +125,8 @@ function ordersReales(): OrderCatalog {
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
     transitionAliveById: transitionAliveByIdReal,
+    startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
+    finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),
   };
 }
 
@@ -143,7 +147,13 @@ function wireExecutionUseCases(fixture: Fixture) {
   return {
     get: createGetAssignedOrderExecution(deps),
     start: createStartAssignedOrder({ ...deps, now: () => NOW }),
-    finish: createFinishAssignedOrder({ assignments, orders, now: () => NOW }),
+    finish: createFinishAssignedOrder({
+      assignments,
+      orders,
+      people: assignmentDirectoryPrisma,
+      groups: assignmentDirectoryPrisma,
+      now: () => NOW,
+    }),
   };
 }
 
@@ -258,7 +268,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
     });
   });
 
-  it('R37: un Administrador con una fila SEMBRADA directamente sigue pudiendo abrir, arrancar y finalizar ese pedido', async () => {
+  it('R37: un Administrador con una fila SEMBRADA directamente sigue pudiendo abrir, arrancar y finalizar ese pedido -que queda POR_EMPACAR-', async () => {
     await inRolledBackTransaction(async (fixture) => {
       const administradorRoleId = await createRoleWithPermission(fixture, 'pedidos.consultar');
       const administradorId = await createPerson(
@@ -298,7 +308,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
         where: { id: pedido },
         select: { status: true },
       });
-      expect(filaFinal.status).toBe('ENTREGADO');
+      expect(filaFinal.status).toBe('POR_EMPACAR');
     });
   });
 });

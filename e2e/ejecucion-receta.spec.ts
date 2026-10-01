@@ -482,7 +482,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('la ejecucion de la receta de un pedido asignado', () => {
-  test('R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base, recorre los pasos hasta Finalizar y el pedido queda ENTREGADO en base', async ({
+  test('R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base, recorre los pasos hasta Finalizar y el pedido queda POR_EMPACAR en base', async ({
     page,
   }) => {
     expect(orderPendingId, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
@@ -524,12 +524,15 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
       { timeout: 60_000 },
     );
 
-    expect(await orderStatus(orderPendingId)).toBe('ENTREGADO');
+    // Finalizar deja el pedido «por empacar», no «entregado»: el empaque lo termina un Empacador
+    // en otra pantalla.
+    expect(await orderStatus(orderPendingId)).toBe('POR_EMPACAR');
 
     // La confirmacion se pinta EN LA LISTA al volver, nunca en la pantalla de ejecucion.
     const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderPendingNumber);
+    await expect(aviso).toContainText('por empacar');
   });
 
   test('R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404', async ({

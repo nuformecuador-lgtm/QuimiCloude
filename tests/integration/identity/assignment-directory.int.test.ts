@@ -492,4 +492,85 @@ describe('listAliveInCompany — personas vivas de la empresa, ordenadas y acota
       expect(refs).toHaveLength(25);
     });
   });
+
+  it('con `accountStatus: [\'active\']` filtra por estado EFECTIVO, no por la columna', async () => {
+    await withCompany(async (companyId) => {
+      const activa = await seedUser(companyId, { lastNames: 'Aaa', accountStatus: 'active' });
+      // Efectivamente activa aunque la columna diga `blocked`: el plazo ya vencio (QC-78 R8).
+      const vencida = await seedUser(companyId, {
+        lastNames: 'Bbb',
+        accountStatus: 'blocked',
+        lockedUntil: new Date('2026-09-13T11:00:00.000Z'),
+      });
+      await seedUser(companyId, { lastNames: 'Ccc', accountStatus: 'inactive' });
+      await seedUser(companyId, { lastNames: 'Ddd', accountStatus: 'pending' });
+      await seedUser(companyId, {
+        lastNames: 'Eee',
+        accountStatus: 'blocked',
+        lockedUntil: PLAZO_VIGENTE,
+      });
+      // El gemelo de QC-78 R11: la columna dice `active` pero el plazo sigue vigente.
+      await seedUser(companyId, {
+        lastNames: 'Fff',
+        accountStatus: 'active',
+        lockedUntil: PLAZO_VIGENTE,
+      });
+
+      const refs = await listAliveInCompany(companyId, AHORA, 25, { accountStatus: ['active'] });
+
+      // Ordenadas por `last_names`: la activa y la vencida, y nadie mas. Un `WHERE
+      // account_status = 'active'` a secas traeria a `Fff` y dejaria fuera a `Bbb`.
+      expect(refs.map((ref) => ref.id)).toEqual([activa, vencida]);
+    });
+  });
+
+  it('con varios estados trae la union, y sin filtro o con array vacio trae todas las vivas', async () => {
+    await withCompany(async (companyId) => {
+      const activa = await seedUser(companyId, { lastNames: 'Aaa', accountStatus: 'active' });
+      const pendiente = await seedUser(companyId, { lastNames: 'Bbb', accountStatus: 'pending' });
+      await seedUser(companyId, { lastNames: 'Ccc', accountStatus: 'inactive' });
+
+      const union = await listAliveInCompany(companyId, AHORA, 25, {
+        accountStatus: ['active', 'pending'],
+      });
+      expect(union.map((ref) => ref.id)).toEqual([activa, pendiente]);
+
+      const sinFiltro = await listAliveInCompany(companyId, AHORA, 25);
+      expect(sinFiltro).toHaveLength(3);
+
+      const vacio = await listAliveInCompany(companyId, AHORA, 25, { accountStatus: [] });
+      expect(vacio).toHaveLength(3);
+    });
+  });
+
+  it('los literales desconocidos se descartan; si no queda ninguno, el filtro se omite', async () => {
+    await withCompany(async (companyId) => {
+      await seedUser(companyId, { lastNames: 'Aaa', accountStatus: 'active' });
+      await seedUser(companyId, { lastNames: 'Bbb', accountStatus: 'inactive' });
+
+      const refs = await listAliveInCompany(companyId, AHORA, 25, {
+        accountStatus: ['inexistente' as UserAccountStatus, 'active'],
+      });
+      expect(refs.map((ref) => ref.displayName)).toHaveLength(1);
+
+      const soloBasura = await listAliveInCompany(companyId, AHORA, 25, {
+        accountStatus: ['inexistente' as UserAccountStatus],
+      });
+      expect(soloBasura).toHaveLength(2);
+    });
+  });
+
+  it('el `take` va antes del filtro: con filtro la respuesta puede traer menos del tope', async () => {
+    await withCompany(async (companyId) => {
+      // Las dos primeras por orden estan inactivas: el `take: 2` las trae a ellas y el
+      // filtro las saca a las dos, aunque mas abajo haya una activa.
+      await seedUser(companyId, { lastNames: 'Aaa', accountStatus: 'inactive' });
+      await seedUser(companyId, { lastNames: 'Bbb', accountStatus: 'inactive' });
+      await seedUser(companyId, { lastNames: 'Ccc', accountStatus: 'active' });
+
+      const refs = await listAliveInCompany(companyId, AHORA, 2, { accountStatus: ['active'] });
+
+      expect(refs).toEqual([]);
+    });
+  });
 });

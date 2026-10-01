@@ -14,6 +14,7 @@ import type { CompanyOrderView } from './company-order-view';
 
 import {
   formatOrderNumber,
+  ORDER_STATUS_FLOW,
   ORDER_STATUS_VALUES,
   type OrderCatalog,
   type OrderStatus,
@@ -51,7 +52,10 @@ export function createListCompanyOrders(
     if (!parsed.success) throw new ValidationError();
     const { page, pageSize, statuses } = parsed.data;
 
-    const statusesEfectivos = [...new Set(statuses ?? ORDER_STATUS_VALUES)];
+    // Sin filtro, los estados que viajan al catalogo son los del flujo de trabajo y no los de
+    // declaracion del enum, aunque el orden de la lista no depende de este array: solo
+    // `resolveOrdering` decide, y unicamente cuando el filtro es exactamente `['ENTREGADO']`.
+    const statusesEfectivos = [...new Set(statuses ?? ORDER_STATUS_FLOW)];
     const ordering = resolveOrdering(statusesEfectivos);
 
     const ordersPage = await deps.orders.listAliveSummariesInCompany(

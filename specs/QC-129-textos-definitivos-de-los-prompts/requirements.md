@@ -176,3 +176,13 @@ líneas». Un costo, una compra mínima o un valor de medida **numérico** se tr
 como cadena decimal. El texto de R10 de arriba **no se reescribe**; esta nota lo enmienda. El texto
 del prompt sigue **fuera del repositorio** (R9, `[D13]`): el humano ajusta el borrador de QC-131 a
 esta forma. Precedente: la nota fechada que QC-129 dejó en el `requirements.md` de QC-109.
+
+### Nota fechada — 2026-09-25, enmienda de R11 por QC-159
+
+La forma JSON de la estrategia `formula` la fija ahora
+[`specs/QC-159-formula-desde-pdf/design.md > 3`](../QC-159-formula-desde-pdf/design.md): `name`,
+`description`, `ingredients` (cada uno con `name`, **`percentage`**, `quantity`, `unit`) y `steps` (una
+cadena por paso). El ingrediente se pide en **porcentaje**, en la línea que ya decidió QC-157; `quantity`
+y `unit` quedan solo como referencia de lo que dice el PDF y la IA no debe deducir porcentajes a partir de
+ellas. El texto de R11 de arriba **no se reescribe**; esta nota lo enmienda. El texto del prompt sigue
+**fuera del repositorio** (R9, `[D13]`): el borrador de QC-157 se ajusta a esta forma.

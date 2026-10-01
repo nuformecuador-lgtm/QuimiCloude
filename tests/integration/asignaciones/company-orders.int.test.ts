@@ -53,6 +53,12 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     transitionAliveById: async () => {
       throw new Error('listCompanyOrders no ejecuta ninguna transicion');
     },
+    startPackingAliveById: async () => {
+      throw new Error('listCompanyOrders no ejecuta ninguna transicion');
+    },
+    finishPackingAliveById: async () => {
+      throw new Error('listCompanyOrders no ejecuta ninguna transicion');
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 
@@ -66,6 +72,9 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
       },
       findIdsMatchingName: async () => {
         throw new Error('QC-145: listCompanyOrders no busca recetas por nombre');
+      },
+      findAliveByNormalizedName: async () => {
+        throw new Error('QC-145: listCompanyOrders no busca la receta viva por su nombre');
       },
     },
     people: assignmentDirectoryPrisma,

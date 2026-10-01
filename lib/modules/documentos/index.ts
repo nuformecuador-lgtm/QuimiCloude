@@ -188,3 +188,50 @@ export { createConfirmCatalogImport, type CatalogImportSummary } from './domain/
 // La sugerencia de unidad por nombre o simbolo normalizado, funcion pura sin fabrica porque no
 // tiene dependencias que inyectar.
 export { suggestUnitId } from './domain/suggest-unit';
+
+// La interpretacion tolerante del texto que la IA dejo guardado para un archivo de formula, y
+// el paso de un texto de paso a documento: dominio puro, sin base ni framework. La pantalla de
+// revision los necesita para pintar «leido: ...» sin volver a interpretar en el cliente lo que
+// ya interpreto el servidor.
+export {
+  extractFormulaFromText,
+  type ExtractedIngredient,
+  type FormulaExtraction,
+} from './domain/formula-extraction';
+export { stepTextToDocument } from './domain/formula-step-text';
+
+// Las reglas PURAS de la revision de una formula: las usa tanto el servidor -vista previa y
+// confirmacion, mas abajo- como la pantalla, para habilitar «Confirmar» sin ir y volver.
+export {
+  reviewFormulaImport,
+  type DraftLine,
+  type FormulaDraft,
+  type FormulaReviewIssues,
+  type RowProblem,
+} from './domain/review-formula-import';
+
+// El esquema del borde de la vista previa y de la confirmacion de una importacion de formula, y
+// sus tipos inferidos: mismo criterio que el resto de esquemas de arriba, una sola definicion.
+export {
+  confirmFormulaImportInputSchema,
+  previewFormulaImportInputSchema,
+  type ConfirmFormulaImportInput,
+  type PreviewFormulaImportInput,
+} from './domain/formula-import-input';
+
+// La vista previa de una importacion de formula, publicada como FABRICA por el mismo motivo que
+// el resto: quien la usa recibe el caso de uso ya construido y nunca ve a sus puertos ni a los
+// casos de uso de `recetas` e `inventario` que trae inyectados. `FormulaImportDeps` se publica
+// porque la confirmacion (`confirm-formula-import.ts`) comparte el MISMO tipo, y quien cablea los
+// dos (`lib/composition`) necesita nombrarlo una sola vez.
+export {
+  createPreviewFormulaImport,
+  type FormulaImportDeps,
+  type FormulaImportIngredientMatch,
+  type FormulaImportPreview,
+  type FormulaImportPreviewIngredient,
+} from './domain/preview-formula-import';
+
+// La confirmacion, publicada por el mismo motivo y con el mismo `FormulaImportDeps`: quien
+// cablea los dos casos de uso (`lib/composition`) los nombra una sola vez.
+export { createConfirmFormulaImport, type FormulaImportSummary } from './domain/confirm-formula-import';

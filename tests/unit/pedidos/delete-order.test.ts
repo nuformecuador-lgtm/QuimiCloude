@@ -131,6 +131,19 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     expect(d.softDeleteAlive).not.toHaveBeenCalled()
   })
 
+  it('no borra un POR_EMPACAR ni un EN_EMPAQUE: el material ya se consumio (R32)', async () => {
+    for (const status of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      const d = dobles({ fila: fila(status) })
+
+      expect(
+        await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN)),
+        status,
+      ).toBe('not_deletable')
+      expect(d.softDeleteAlive, status).not.toHaveBeenCalled()
+      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+    }
+  })
+
   it('borrar un pedido inexistente o ya borrado responde order_not_found (R33)', async () => {
     const d = dobles({ fila: null })
 

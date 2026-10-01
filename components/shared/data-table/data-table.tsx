@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useRef, type CSSProperties } from 'react';
 import {
   columnPinningFeature,
   columnSizingFeature,
@@ -21,7 +21,13 @@ import { cn } from '@/lib/utils';
 import { DataTableFilters } from './data-table-filters';
 import { DataTableHeaderCell, DataTableHeaderMenu } from './data-table-header-menu';
 import { DataTablePagination } from './data-table-pagination';
+import { mergeCellStyle, toColumnTextClass, toWidthStyle } from './data-table-column-style';
 import { withSort } from './data-table-params';
+import {
+  DataTableScrollNav,
+  SCROLL_LEFT_FALLBACK,
+  SCROLL_RIGHT_FALLBACK,
+} from './data-table-scroll-nav';
 import { DataTableEmpty, DataTableError, DataTableLoading, resolveDataTableState } from './data-table-states';
 import type { DataTableColumn, DataTableProps, DataTableSort } from './data-table-types';
 import { usePinnedColumns } from './use-pinned-columns';
@@ -240,6 +246,27 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
   const visibleState = resolveDataTableState(status, rowCount);
   const showToolbars = visibleState !== 'error';
 
+  /**
+   * Envoltorio del scroll interno (R28): el `overflow-x-auto` sigue viviendo en el
+   * `div[data-slot="table-container"]` de `components/ui/table.tsx`; este `div` solo aporta
+   * el `relative` donde se anclan las flechas overlay (`DataTableScrollNav`) y la ref con la
+   * que las flechas localizan el contenedor con scroll sin abrir la primitiva (R33).
+   */
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  // Lo que puede hacer desbordar la tabla: si cambia, las flechas re-evaluan sin esperar a
+  // un `resize` (ver `contentKey` en `DataTableScrollNav`).
+  const scrollContentKey = `${columns.length}:${rowCount}:${visibleState}`;
+
+  const columnAlign = (align: 'start' | 'end' | 'center') => {
+    if (align === 'end') {
+      return 'text-right';
+    }
+    if (align === 'center') {
+      return 'text-center';
+    }
+    return '';
+  };
+
   return (
     <div data-testid="data-table" className="flex flex-col gap-4">
       {showToolbars ? (
@@ -260,66 +287,81 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
       ) : visibleState === 'empty' ? (
         <DataTableEmpty texts={texts} emptyAction={emptyAction} />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column: DataTableColumn<TRow>) => {
-                const pinnedSide = getPinnedSide(column.id);
-                return (
-                  <DataTableHeaderCell
-                    key={column.id}
-                    column={column}
-                    sort={params.sort}
-                    onSortChange={handleSortChange}
-                    pinned={pinnedSide}
-                    style={pinnedSide === false ? undefined : getStickyStyle(column.id, pinnedSide)}
-                  >
-                    <DataTableHeaderMenu
-                      column={column}
-                      sort={params.sort}
-                      isPinned={pinnedSide !== false}
-                      texts={texts}
-                      onSortChange={handleSortChange}
-                      onTogglePin={() => pinnedColumns.togglePin(column.id)}
-                      onOpenFilter={() => focusColumnFilter(column.id)}
-                    />
-                  </DataTableHeaderCell>
-                );
-              })}
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {/*
-              R13: se pinta `table.getRowModel().rows` TAL CUAL llega. Ninguna capacidad de
-              orden/filtro/paginacion de cliente esta registrada en `DATA_TABLE_FEATURES` (R32),
-              asi que `getRowModel()` encadena hasta `getCoreRowModel()` sin transformar `data`
-              (verificado en `coreRowModelsFeature.utils.js`): ni reordena, ni filtra, ni recorta,
-              ni pagina, aunque `params` diga otra cosa.
-            */}
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} data-testid={`data-table-row-${row.id}`}>
+        <div ref={tableWrapRef} className="relative">
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {columns.map((column: DataTableColumn<TRow>) => {
                   const pinnedSide = getPinnedSide(column.id);
                   return (
-                    <TableCell
+                    <DataTableHeaderCell
                       key={column.id}
-                      data-testid={`data-table-cell-${column.id}`}
-                      data-pinned={pinnedSide === false ? undefined : pinnedSide}
-                      style={pinnedSide === false ? undefined : getStickyStyle(column.id, pinnedSide)}
-                      className={cn(
-                        column.align === 'end' && 'text-right',
-                        pinnedSide !== false && 'bg-background',
+                      column={column}
+                      sort={params.sort}
+                      onSortChange={handleSortChange}
+                      pinned={pinnedSide}
+                      style={mergeCellStyle(
+                        pinnedSide === false ? undefined : getStickyStyle(column.id, pinnedSide),
+                        toWidthStyle(column),
                       )}
                     >
-                      {column.cell(row.original as TRow)}
-                    </TableCell>
+                      <DataTableHeaderMenu
+                        column={column}
+                        sort={params.sort}
+                        isPinned={pinnedSide !== false}
+                        texts={texts}
+                        onSortChange={handleSortChange}
+                        onTogglePin={() => pinnedColumns.togglePin(column.id)}
+                        onOpenFilter={() => focusColumnFilter(column.id)}
+                      />
+                    </DataTableHeaderCell>
                   );
                 })}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+
+            <TableBody>
+              {/*
+                R13: se pinta `table.getRowModel().rows` TAL CUAL llega. Ninguna capacidad de
+                orden/filtro/paginacion de cliente esta registrada en `DATA_TABLE_FEATURES` (R32),
+                asi que `getRowModel()` encadena hasta `getCoreRowModel()` sin transformar `data`
+                (verificado en `coreRowModelsFeature.utils.js`): ni reordena, ni filtra, ni recorta,
+                ni pagina, aunque `params` diga otra cosa.
+              */}
+              {table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} data-testid={`data-table-row-${row.id}`}>
+                  {columns.map((column: DataTableColumn<TRow>) => {
+                    const pinnedSide = getPinnedSide(column.id);
+                    return (
+                      <TableCell
+                        key={column.id}
+                        data-testid={`data-table-cell-${column.id}`}
+                        data-pinned={pinnedSide === false ? undefined : pinnedSide}
+                        style={mergeCellStyle(
+                          pinnedSide === false ? undefined : getStickyStyle(column.id, pinnedSide),
+                          toWidthStyle(column),
+                        )}
+                        className={cn(
+                          columnAlign(column.align),
+                          pinnedSide !== false && 'bg-background',
+                          toColumnTextClass(column),
+                        )}
+                      >
+                        {column.cell(row.original as TRow)}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <DataTableScrollNav
+            containerRef={tableWrapRef}
+            contentKey={scrollContentKey}
+            scrollLeftLabel={texts.scrollLeft ?? SCROLL_LEFT_FALLBACK}
+            scrollRightLabel={texts.scrollRight ?? SCROLL_RIGHT_FALLBACK}
+          />
+        </div>
       )}
 
       {showToolbars ? (

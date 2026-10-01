@@ -735,6 +735,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createAdjustBatchStock',
       'createCreatePresentation',
       'createCreateProduct',
+      'createCreateRawMaterial',
       'createDeletePresentation',
       'createDeleteProduct',
       'createGetProduct',

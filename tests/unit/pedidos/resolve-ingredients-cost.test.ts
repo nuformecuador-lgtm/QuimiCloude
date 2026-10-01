@@ -33,8 +33,14 @@ function catalogoDeRecetas(content: RecipeExecutionContent | null = contenido())
   const findExecutionContentById = vi.fn(async () => content);
   const findRefsIncludingDeleted = vi.fn(async () => []);
   const findIdsMatchingName = vi.fn(async () => null);
+  const findAliveByNormalizedName = vi.fn(async () => null);
   return {
-    recipes: { findExecutionContentById, findRefsIncludingDeleted, findIdsMatchingName } as RecipeCatalog,
+    recipes: {
+      findExecutionContentById,
+      findRefsIncludingDeleted,
+      findIdsMatchingName,
+      findAliveByNormalizedName,
+    } as RecipeCatalog,
     findExecutionContentById,
   };
 }
@@ -45,7 +51,12 @@ function catalogoDeProductos(
 ) {
   const findRefs = vi.fn(async () => refs);
   const findCostingBatches = vi.fn(async () => batches);
-  return { products: { findRefs, findCostingBatches } as ProductCatalog, findRefs, findCostingBatches };
+  const findFinishedGoodsReceipts = vi.fn(async () => []);
+  return {
+    products: { findRefs, findCostingBatches, findFinishedGoodsReceipts } as ProductCatalog,
+    findRefs,
+    findCostingBatches,
+  };
 }
 
 function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new Map([[LITRO.id, LITRO]])) {

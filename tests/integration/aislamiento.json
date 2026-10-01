@@ -8,6 +8,7 @@
     "asignaciones/batch-states.int.test.ts",
     "asignaciones/company-orders.int.test.ts",
     "asignaciones/company-scope.int.test.ts",
+    "asignaciones/finish-auto-assign-packers.int.test.ts",
     "asignaciones/finished-orders.int.test.ts",
     "asignaciones/frozen-name.int.test.ts",
     "asignaciones/list-order-responsibles.int.test.ts",
@@ -25,6 +26,7 @@
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
     "identity/packer-role-migration.int.test.ts",
+    "identity/packing-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
@@ -36,6 +38,8 @@
     "inventario/reserve-existing-orders-migration.int.test.ts",
     "pedidos/company-scope.int.test.ts",
     "pedidos/order-crud.int.test.ts",
+    "pedidos/order-packing-constraints.int.test.ts",
+    "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
     "proveedores/catalog-line.int.test.ts",
     "proveedores/company-scope.int.test.ts",
@@ -64,6 +68,11 @@
       "archivo": "inventario/presentation-catalog-by-name.int.test.ts",
       "motivo": "QC-158 T7: ejercita `findPresentationsByNormalizedNames` de `presentation-catalog-prisma.ts`, que usa el cliente Prisma GLOBAL (mismo criterio que `findPresentationRefs` en `company-scope-queries.int.test.ts`), asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso fabrica su empresa y presentaciones efimeras con randomUUID y las limpia en `afterAll` por su id.",
       "desde": "2026-09-23"
+    },
+    {
+      "archivo": "documentos/formula-import.int.test.ts",
+      "motivo": "T6 (QC-159): ejercita `createConfirmFormulaImport` con los adaptadores de Prisma reales de `documentos`, `recetas`, `inventario` y `pedidos` cableados a mano -el mismo cableado que hara `lib/composition`, sin pasar por el-. `replaceAliveRecipe` y `createOrder` abren SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, y R18 necesita ver la receta EXACTAMENTE como quedo tras un fallo REAL del CHECK `recipe_lines_percentage_check` -envolver la corrida en una transaccion de test con ROLLBACK ocultaria justo eso, igual que ya razona `catalog-import-isolation.int.test.ts`-. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento y unidad incluidos) y la limpia en el `afterAll`, en el orden que exigen las FK: reservas -> pedidos -> recetas (sus lineas caen con ON DELETE CASCADE) -> archivos y tandas de documento -> asientos de inventario -> lotes -> productos -> presentaciones -> unidad propia -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
     },
     {
       "archivo": "documentos/document-batch-claim-concurrency.int.test.ts",
@@ -151,9 +160,24 @@
       "desde": "2026-09-24"
     },
     {
+      "archivo": "inventario/finished-goods-receipts.int.test.ts",
+      "motivo": "QC-168 T9 (R14): 'findFinishedGoodsReceipts' (product-prisma.ts) lee con el cliente Prisma GLOBAL (no acepta 'tx'), asi que el asiento 'production' que alimenta la lectura tiene que quedar CONFIRMADO; una transaccion del test con ROLLBACK no la alimentaria. Cada caso escribe el asiento con 'receiveFinishedGoods' -misma ruta que produccion, envuelta en su propia 'prisma.$transaction' que CONFIRMA, igual que 'finished-goods.int.test.ts'- y limpia lo suyo en un 'finally', en el orden que exigen las FK (asientos -> lotes -> productos -> pedidos -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
+    },
+    {
       "archivo": "inventario/finished-product-prohibitions.int.test.ts",
       "motivo": "QC-150 T10 (R28, R31, R32): llama a 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' con un 'FOR NO KEY UPDATE' dentro, igual que 'product-type-lock.int.test.ts'; una transaccion del test no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (unidad, presentacion, receta, producto terminado -que exige el CHECK 'products_finished_identity_matches_type'-, usuario, rol y tipo de documento) y la limpia en un 'finally' en el orden que exigen las FK (asientos -> lotes -> producto -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-24"
+    },
+    {
+      "archivo": "inventario/create-raw-material.int.test.ts",
+      "motivo": "QC-159 T3: ejercita `createCreateRawMaterial` con el adaptador `createProduct` REAL de `product-prisma.ts`, que usa el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. Empresa efimera propia del archivo (randomUUID), sin usuario ni rol -el alta de materia prima no escribe autoria-; se limpia en `afterAll` por su id exacto (productos -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
+    },
+    {
+      "archivo": "inventario/product-name-lookup.int.test.ts",
+      "motivo": "QC-159 T2: ejercita `findProductsByNormalizedNames` de `product-catalog-prisma.ts`, que usa el cliente Prisma GLOBAL (mismo criterio que `findProductRefs` en `company-scope-queries.int.test.ts`), asi que una transaccion del test con ROLLBACK no lo envolveria. Empresa efimera propia del archivo (randomUUID); se limpia en `afterAll` por su id exacto (productos -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
     },
     {
       "archivo": "inventario/company-scope-queries.int.test.ts",
@@ -266,6 +290,11 @@
       "desde": "2026-09-24"
     },
     {
+      "archivo": "pedidos/order-packing.int.test.ts",
+      "motivo": "QC-168 T8 (R18-R25, R28): 'startPackingAliveOrder'/'finishPackingAliveOrder' (order-prisma.ts) usan el cliente Prisma GLOBAL con un 'updateMany' condicional, sin 'tx'; una transaccion del test con ROLLBACK impediria que dos Comenzar reales compitan por el bloqueo de la misma fila (R19). Cada caso fabrica su propia empresa efimera con randomUUID (usuario(s), receta y pedido) y la limpia en un 'finally', en el orden que exigen las FK (asientos -> pedidos -> receta -> usuarios -> roles -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
+    },
+    {
       "archivo": "pedidos/order-reservation-concurrency.int.test.ts",
       "motivo": "QC-141 T15: la carrera del apartado (R16), la merma simultanea a un apartado, y cien vueltas de combinaciones de crear/editar/cancelar/borrar/Finalizar, todas cableadas igual que 'order-reservation.int.test.ts' -'withOrderTransaction' y 'adjustBatchStock' abren cada uno SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL-, asi que una transaccion del test no las envolveria y ademas necesitan que cada rama CONFIRME para que la otra la vea. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta, producto y lote) y la limpia en un 'finally'. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"
@@ -309,6 +338,11 @@
       "archivo": "proveedores/supplier-showcase.int.test.ts",
       "motivo": "El adaptador 'listShowcaseAliveSuppliers' llama al cliente Prisma GLOBAL, no a un 'tx' inyectado, asi que una transaccion del test no lo envolveria -correria en otra conexion del pool y veria una base vacia-. Encadena tanda inicial, siguiente tanda de proveedores y 'cargar mas' de una fila para demostrar el prefijo exacto sobre el conjunto completo, que solo Postgres puede confirmar. Siembra dos empresas efimeras (randomUUID) con sus proveedores, lineas y presentacion, reutilizando la unidad de sistema ya existente, y COMMITEA; el afterAll borra lineas, proveedores, presentacion y las dos empresas por su id exacto, en el orden que exigen las claves foraneas. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"
+    },
+    {
+      "archivo": "recetas/recipe-catalog-by-name.int.test.ts",
+      "motivo": "QC-159 T1: ejercita `findAliveRecipeByNormalizedName` de `recipe-catalog-prisma.ts`, que usa el cliente Prisma GLOBAL (mismo criterio que `findRecipeRefsIncludingDeleted` en `company-scope-queries.int.test.ts`), asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol y tipo de documento incluidos) y la limpia en el `afterAll`, en el orden que exigen las FK: recetas (sus lineas caen con ON DELETE CASCADE) -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-25"
     },
     {
       "archivo": "recetas/company-scope-queries.int.test.ts",

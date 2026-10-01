@@ -40,6 +40,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     status: 'PENDIENTE',
     presentationId: null,
     finishedAt: null,
+    packedBy: null,
     ...overrides,
   };
 }
@@ -149,6 +150,7 @@ function montar(options?: {
       findCostingBatches: vi.fn(async () => {
         throw new Error('la ejecucion de un pedido asignado no costea nada');
       }),
+      findFinishedGoodsReceipts: vi.fn(async () => []),
     } as ProductCatalog,
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
   };

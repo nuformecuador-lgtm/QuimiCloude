@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { buttonVariants } from '@/components/ui/button';
-import { DocumentUploadDialog } from '@/components/shared/document-upload';
 import { cn } from '@/lib/utils';
 import { identity } from '@/lib/composition';
 import { canUploadDocuments } from '@/lib/modules/documentos';
@@ -11,7 +10,7 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
-import { parseRecipeListParams, RecipeListSection, RecipeTableSkeleton } from './components';
+import { FormulaPdfUpload, parseRecipeListParams, RecipeListSection, RecipeTableSkeleton } from './components';
 
 export const metadata: Metadata = {
   title: `${RECIPES_LABEL} · ${BRAND_LABEL}`,
@@ -46,7 +45,7 @@ export default async function FormulasPage({
           >
             Nueva fórmula
           </Link>
-          {canUpload ? <DocumentUploadDialog strategy="formula" /> : null}
+          {canUpload ? <FormulaPdfUpload /> : null}
         </div>
       </div>
       {/* Sin `key`: remontar el límite en cada consulta borraría el foco del campo de búsqueda. */}

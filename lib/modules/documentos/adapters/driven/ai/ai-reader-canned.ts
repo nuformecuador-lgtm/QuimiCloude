@@ -3,16 +3,17 @@ import { CROP_COORDINATES_PROMPT } from '../../../domain/crop-prompt';
 import type { AiReader } from '../../../ports/ai-reader';
 
 /**
- * Implementa el puerto de la lectura con IA devolviendo SIEMPRE uno de dos textos fijos, para que
+ * Implementa el puerto de la lectura con IA devolviendo SIEMPRE uno de tres textos fijos, para que
  * el recorrido de extremo a extremo pueda correr sin cuenta ni cuota de ningun proveedor.
  *
  * No se cablea nunca por defecto: el punto de composicion solo lo elige cuando
  * `DOCUMENTS_E2E_DOUBLES` esta puesta, y ningun archivo versionado la pone salvo la configuracion
  * de Playwright.
  *
- * Es la UNICA parte de la peticion que mira: distingue el prompt del recorte del resto por
- * comparacion EXACTA con `CROP_COORDINATES_PROMPT`, y devuelve coordenadas de recorte o el catalogo
- * segun cual sea. Ni las partes ni el plazo cambian lo que devuelve.
+ * Distingue el prompt del recorte del resto por comparacion EXACTA con `CROP_COORDINATES_PROMPT`
+ * (coordenadas de recorte); del resto, distingue la formula del catalogo por la FORMA de las
+ * partes: si todas son `kind: 'pdf'` (la fórmula se lee por texto, sin recortar) devuelve el texto
+ * de fórmula, y si no, el catalogo. No mira el prompt ni el entorno para esa segunda distincion.
  */
 
 /** Prefijo neutro de los nombres que trae el catalogo de guion, para que otros especificadores lo reutilicen. */
@@ -78,7 +79,66 @@ export const CANNED_CATALOG_TEXT = JSON.stringify({
   ],
 });
 
-export const readCannedText: AiReader['read'] = (request) =>
-  Promise.resolve(
-    request.prompt === CROP_COORDINATES_PROMPT ? CANNED_CROP_COORDINATES_TEXT : CANNED_CATALOG_TEXT,
-  );
+/** Prefijo neutro de los nombres que trae el guion de formula, para que el E2E no repita cadenas. */
+export const CANNED_FORMULA_PREFIX = 'guion-e2e-formula';
+
+/** Nombre fijo de la receta leida; el E2E siembra una receta viva con este mismo nombre (reemplazar). */
+export const CANNED_FORMULA_RECIPE_NAME = `${CANNED_FORMULA_PREFIX}-nombre`;
+
+/** Nombre del ingrediente que preselecciona: el E2E siembra un producto vivo con este mismo nombre. */
+export const CANNED_FORMULA_EXISTING_PRODUCT_NAME = `${CANNED_FORMULA_PREFIX}-preseleccion`;
+/** Porcentaje leido para ese ingrediente preseleccionado. */
+export const CANNED_FORMULA_PRESELECTED_PERCENTAGE = '25';
+
+/** Nombre del ingrediente que no existe: se crea como materia prima nueva al confirmar. */
+export const CANNED_FORMULA_NEW_INGREDIENT_NAME = `${CANNED_FORMULA_PREFIX}-materia-prima-nueva`;
+/** Porcentaje leido para la materia prima nueva. */
+export const CANNED_FORMULA_NEW_INGREDIENT_PERCENTAGE = '60';
+
+/** Cantidad y unidad de referencia del ingrediente sin porcentaje leido. */
+export const CANNED_FORMULA_UNASSIGNED_QUANTITY = '250';
+export const CANNED_FORMULA_UNASSIGNED_UNIT = 'g';
+
+/** Lo que falta para llegar a 100 %: el E2E lo teclea en el ingrediente sin porcentaje leido. */
+export const CANNED_FORMULA_MISSING_PERCENTAGE = '15';
+
+/**
+ * El JSON de una formula: tres ingredientes -uno preseleccionable, uno de materia prima nueva y uno
+ * sin porcentaje leido (solo cantidad y unidad de referencia)- y tres pasos, el segundo de dos
+ * lineas.
+ */
+export const CANNED_FORMULA_TEXT = JSON.stringify({
+  name: CANNED_FORMULA_RECIPE_NAME,
+  description: null,
+  ingredients: [
+    {
+      name: CANNED_FORMULA_EXISTING_PRODUCT_NAME,
+      percentage: CANNED_FORMULA_PRESELECTED_PERCENTAGE,
+      quantity: null,
+      unit: null,
+    },
+    {
+      name: CANNED_FORMULA_NEW_INGREDIENT_NAME,
+      percentage: CANNED_FORMULA_NEW_INGREDIENT_PERCENTAGE,
+      quantity: null,
+      unit: null,
+    },
+    {
+      name: null,
+      percentage: null,
+      quantity: CANNED_FORMULA_UNASSIGNED_QUANTITY,
+      unit: CANNED_FORMULA_UNASSIGNED_UNIT,
+    },
+  ],
+  steps: [
+    `${CANNED_FORMULA_PREFIX}-paso-1`,
+    `${CANNED_FORMULA_PREFIX}-paso-2-linea-a\n${CANNED_FORMULA_PREFIX}-paso-2-linea-b`,
+    `${CANNED_FORMULA_PREFIX}-paso-3`,
+  ],
+});
+
+export const readCannedText: AiReader['read'] = (request) => {
+  if (request.prompt === CROP_COORDINATES_PROMPT) return Promise.resolve(CANNED_CROP_COORDINATES_TEXT);
+  const isFormulaRead = request.parts.length > 0 && request.parts.every((part) => part.kind === 'pdf');
+  return Promise.resolve(isFormulaRead ? CANNED_FORMULA_TEXT : CANNED_CATALOG_TEXT);
+};

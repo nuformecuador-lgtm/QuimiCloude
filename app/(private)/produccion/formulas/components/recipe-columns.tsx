@@ -73,12 +73,14 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       label: 'Nombre',
       align: 'start',
       sortable: true,
+      width: 500,
+      hideText: false,
       cell: (recipe) => recipe.name,
     },
     {
       id: 'stepCount',
       label: 'Pasos',
-      align: 'end',
+      align: 'center',
       cell: (recipe) => String(recipe.stepCount),
     },
     {

@@ -16,6 +16,7 @@ import { describe, expect, it, type TestContext } from 'vitest'
 // literal escrito a mano: asi un cambio de ruta arrastra esta prueba con el mismo commit.
 import {
   ASSIGNED_ORDERS_ROUTE,
+  CUSTOMERS_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
@@ -179,6 +180,12 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   //
   // AMPLIADO el 2026-09-15 (QC-56): entra la pantalla de recetas como SEPTIMO consumidor
   // declarado. El caso que la dejaba fuera se invierte; una OCTAVA pantalla sigue en rojo.
+  //
+  // Entra la NOVENA pantalla declarada -clientes-: su lista se monta sobre la tabla compartida
+  // por su barrel publico, sin tocar ni un archivo de `components/shared/data-table/`. Se anade
+  // la fila y se TENSA el resto del centinela -el ancla de consumidores minimos sube de siete a
+  // ocho-, nunca se afloja: la lista sigue CERRADA y una DECIMA pantalla vuelve a poner esto en
+  // rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
@@ -190,6 +197,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
    * sobre la tabla compartida por decision cerrada del 2026-09-08 y sus acciones de fila van como
    * columna normal `pinnable: false`, sin anadirle nada a `components/shared/data-table/`. La
    * SEXTA -`USERS_ROUTE`- la trae QC-67 (R9) con el mismo criterio y por la misma via.
+   * La NOVENA -`CUSTOMERS_ROUTE`- la trae la pantalla de clientes con el mismo criterio.
    */
   const carpetasAutorizadas = [
     ORDERS_ROUTE,
@@ -202,6 +210,8 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     FORMULAS_ROUTE,
     // 2026-09-16: la lista de pedidos asignados pasa a montarse sobre la tabla compartida.
     ASSIGNED_ORDERS_ROUTE,
+    // 2026-09-25: la pantalla de clientes se monta sobre la tabla compartida.
+    CUSTOMERS_ROUTE,
   ].map(carpetaDeRuta)
 
   function carpetaDeRuta(ruta: string): string {
@@ -214,7 +224,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las ocho pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las nueve pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -222,15 +232,15 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las ocho pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion): migrar una novena es una decision, no un descuido (R29, R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las nueve pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes): migrar una decima es una decision, no un descuido (R29, R34)`,
         ).toBe(true)
         consumidores += 1
       }
     }
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
-    // TENSA con cada alta: hoy son OCHO pantallas autorizadas, asi que se exige al menos un
-    // consumidor por pantalla (2026-09-16; antes eran siete).
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(7)
+    // TENSA con cada alta: hoy son NUEVE pantallas autorizadas, asi que se exige al menos un
+    // consumidor por pantalla (2026-09-25; antes eran ocho).
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(8)
   })
 
   it('la pantalla de recetas SI consume la tabla compartida (R29)', () => {
@@ -488,7 +498,22 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // lee de las listas que monta la tabla compartida. El centinela vuelve de VEINTIUNO a
   // VEINTIDOS; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla
   // en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintidos', () => {
+  //
+  // 2026-09-25: entra `e2e/empaque.spec.ts` (QC-168), y no afloja la lista. No estrena pantalla:
+  // recorre las de pedidos y asignacion, ya en esta lista -localiza la fila de «Mis asignados» y
+  // la de «Terminados» por `data-table-row-<id>` y `data-table-cell-orderNumber`, y la de Pedidos
+  // por las mismas celdas y `data-table-next` para hojear hasta encontrar el pedido-. La pantalla
+  // de «Por empacar» que SI estrena usa sus propios `packing-order-row`/`packing-order-link`, no
+  // la tabla compartida. El centinela vuelve de VEINTIDOS a VEINTITRES; la lista sigue CERRADA, y
+  // un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // Entra la pantalla de clientes como NOVENA pantalla que consume la tabla compartida, y su E2E
+  // `e2e/clientes.spec.ts` entra con ella. Su recorrido localiza `data-table-search`,
+  // `data-table-cell-lastNames`, `data-table-cell-city` y `data-table-row-<id>` porque la lista
+  // de clientes ES la tabla compartida, y el recorrido busca, edita y da de baja sobre la fila
+  // que ella sirve. El centinela vuelve de VEINTITRES a VEINTICUATRO; la lista sigue CERRADA, y un
+  // spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veinticuatro', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -498,7 +523,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos veintidos E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos veinticuatro E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -510,11 +535,17 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Las filas servidas de la lista de recetas con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-recetas.spec.ts',
       // Ver la nota de arriba (2026-09-24). Va antes
-      // que `e2e/ejecucion-receta.spec.ts` porque la lista esta ORDENADA y 'c' precede a 'e'.
+      // que `e2e/clientes.spec.ts` porque la lista esta ORDENADA y 'a' precede a 'l'.
       'e2e/catalogo-desde-pdf.spec.ts',
+      // Ver la nota de arriba. Va antes que `e2e/ejecucion-receta.spec.ts` porque la lista esta
+      // ORDENADA y 'c' precede a 'e'.
+      'e2e/clientes.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
       // tabla por la lista de pedidos asignados, que ya la consumia.
       'e2e/ejecucion-receta.spec.ts',
+      // Ver la nota de arriba (2026-09-25, QC-168). Va antes que `grupos-de-trabajo` porque la
+      // lista esta ORDENADA y 'e' precede a 'g'.
+      'e2e/empaque.spec.ts',
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
       'e2e/inventario.spec.ts',

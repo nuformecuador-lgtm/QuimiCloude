@@ -131,8 +131,8 @@ describe('las tres acciones estan SIEMPRE visibles (R23, R45)', () => {
   });
 });
 
-describe('con el pedido en estado final las tres acciones estan deshabilitadas (R24)', () => {
-  it.each(['ENTREGADO', 'CANCELADO'] as const)(
+describe('con el pedido en estado final las tres acciones estan deshabilitadas (R24, R42)', () => {
+  it.each(['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const)(
     'con un pedido %s: los tres controles `disabled`, el motivo visible y ninguna operacion invocada',
     async (status) => {
       const user = setupUser();
@@ -171,11 +171,11 @@ describe('con el pedido en estado final las tres acciones estan deshabilitadas (
   );
 });
 
-describe('el predicado de estado final es UNO solo y sale del contrato (R24)', () => {
-  it('exactamente `ENTREGADO` y `CANCELADO` de los valores que publica `pedidos`', () => {
+describe('el predicado de estado final es UNO solo y sale del contrato (R24, R42)', () => {
+  it('exactamente `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` de los valores que publica `pedidos`', () => {
     const finales = ORDER_STATUS_VALUES.filter((status) => isFinalOrderStatus(status));
 
-    expect(finales).toEqual(['ENTREGADO', 'CANCELADO']);
+    expect(finales).toEqual(['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE']);
   });
 });
 

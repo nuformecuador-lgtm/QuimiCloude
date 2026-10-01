@@ -84,6 +84,9 @@ function catalogoProductosVacio(): ProductCatalog {
     findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
       throw new Error('recetas no debe costear nada');
     }),
+    findFinishedGoodsReceipts: vi.fn<ProductCatalog['findFinishedGoodsReceipts']>(() => {
+      throw new Error('recetas no debe leer envases de empaque');
+    }),
   };
 }
 

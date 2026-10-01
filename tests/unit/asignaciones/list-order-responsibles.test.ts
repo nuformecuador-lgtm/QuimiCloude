@@ -22,7 +22,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/list-order-responsibles';
 import type { AssignmentRow } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { PersonRef } from '@/lib/modules/identity';
-import type { OrderStatus } from '@/lib/modules/pedidos';
+import { ORDER_STATUS_VALUES, type OrderStatus } from '@/lib/modules/pedidos';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const OTRA_EMPRESA = '99999999-9999-4999-8999-999999999999';
@@ -39,10 +39,11 @@ const NOMBRE_CONGELADO = 'Turno de manana';
 const NOMBRE_ACTUAL_DEL_GRUPO = 'Turno de manana (renombrado en marzo)';
 
 /**
- * Los cuatro estados del pedido, sacados del CONTRATO de `pedidos` y no escritos a mano: si QC-34
- * anadiera un quinto, este test lo recorreria solo en vez de quedarse callado.
+ * Los estados del pedido, sacados del CONTRATO de `pedidos` y no escritos a mano: si QC-34
+ * anade uno mas, este test lo recorre solo en vez de quedarse callado. QC-168 los llevo de
+ * cuatro a seis (R33: `POR_EMPACAR` y `EN_EMPAQUE` tambien dejan pasar la consulta).
  */
-const ESTADOS: readonly OrderStatus[] = ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO'];
+const ESTADOS: readonly OrderStatus[] = ORDER_STATUS_VALUES;
 
 function actorCon(...permissions: readonly string[]): Actor {
   return { id: ANA, companyId: EMPRESA, permissions };
@@ -203,14 +204,21 @@ describe('QC-87 — consultar los responsables de un pedido', () => {
   });
 
   // -------------------------------------------------------------------------------------
-  // R13 — los cuatro estados devuelven lo mismo.
+  // R13, R33 — los seis estados devuelven lo mismo.
   // -------------------------------------------------------------------------------------
-  describe('el estado del pedido NO cambia el resultado (R13)', () => {
+  describe('el estado del pedido NO cambia el resultado (R13, R33)', () => {
     const rows = [filaSuelta(ANA), filaDeGrupo(BRUNO)];
     const refs = [persona(ANA, 'Ana Perez'), persona(BRUNO, 'Bruno Diaz')];
 
-    it('los CUATRO estados son exactamente estos cuatro', () => {
-      expect([...ESTADOS].sort()).toEqual(['CANCELADO', 'ENTREGADO', 'EN_CURSO', 'PENDIENTE']);
+    it('los SEIS estados son exactamente estos seis', () => {
+      expect([...ESTADOS].sort()).toEqual([
+        'CANCELADO',
+        'ENTREGADO',
+        'EN_CURSO',
+        'EN_EMPAQUE',
+        'PENDIENTE',
+        'POR_EMPACAR',
+      ]);
     });
 
     it.each(ESTADOS)('%s: no se rechaza y devuelve la misma lista', async (status) => {

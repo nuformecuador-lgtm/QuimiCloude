@@ -87,6 +87,9 @@ contenido y NO DEBE cambiar ningún otro dato de ellas `[D6]`.
 en la misma operación que el cambio de estado y el consumo de material, dar de alta un lote del
 producto terminado de la combinación del pedido `[D3]` `[D4]`.
 
+> *Enmendado el 2026-09-25 por QC-168: el Finalizar deja el pedido `POR_EMPACAR`, no `ENTREGADO`;
+> el alta del lote sigue en esa misma operación, junto con el consumo de material.*
+
 **R11.** SI la empresa del pedido no tiene un producto terminado vivo de esa combinación, ENTONCES el
 sistema DEBE crearlo en esa misma operación, con tipo `FINISHED_PRODUCT`, con el nombre
 «`<nombre de la receta>` · `<nombre de la presentación>`» vigentes en ese instante y con la unidad de
@@ -104,6 +107,9 @@ contenido `3` da `3` envases y `9`; un pedido de `50` con contenido `0.75` da `6
 generado por el backend con el mismo correlativo por empresa que el alta de lotes, la fecha civil
 UTC del Finalizar como fecha de compra, sin fecha de vencimiento y con quien finaliza como autor
 `[D4]`.
+
+> *Enmendado el 2026-09-25 por QC-168: sin cambios. La fecha civil del Finalizar sigue siendo la
+> del paso a `POR_EMPACAR`, no la de Terminar el empaque.*
 
 **R14.** *(Enmendado el 2026-09-23: deja de ser provisional por D12; el coste que se divide es el de
 R42.)* El sistema DEBE guardar como coste unitario del lote el coste del lote de R42 dividido entre
@@ -150,6 +156,9 @@ o nombre `[D2]` `[D10]`.
 **R24.** CUANDO el Finalizar termine bien, el sistema DEBE mostrar en la confirmación cuántos envases
 enteros entraron y el nombre del producto terminado que los recibió `[D5]`.
 
+> *Enmendado el 2026-09-25 por QC-168: la confirmación dice que el pedido queda «por empacar»,
+> no «entregado»; los envases y el producto terminado se siguen mostrando igual.*
+
 **R25.** *(Enmendado el 2026-09-23 por D16: los envases salen del contenido guardado en el lote, no
 del vigente de la presentación.)* MIENTRAS un lote pertenezca a un producto terminado, el sistema
 DEBE mostrar en el panel de lotes, junto a la cantidad en la unidad de la presentación, el número de
@@ -160,9 +169,15 @@ entero, ENTONCES NO DEBE mostrar ninguna cifra de envases `[D5]` `[D16]`.
 que el Finalizar ya exige, validado en el service antes de leer o escribir nada, y NO DEBE añadir
 ningún permiso al catálogo `[D3]` `[D7]`.
 
+> *Enmendado el 2026-09-25 por QC-168: el Finalizar sigue siendo el único punto de alta, pero deja
+> el pedido `POR_EMPACAR` en vez de `ENTREGADO`.*
+
 **R27.** *(Enmendado el 2026-09-23 por D15: pasa a requisito negativo.)* CUANDO un pedido pase a
 `ENTREGADO` por la edición en Pedidos, el sistema NO DEBE dar de alta ningún producto terminado, lote
 ni asiento de producción `[D3]` `[D15]`.
+
+> *Enmendado el 2026-09-25 por QC-168: sigue siendo cierto. La edición en Pedidos tampoco puede
+> dejar el pedido `POR_EMPACAR`, `EN_EMPAQUE` ni `ENTREGADO` (QC-168 R32).*
 
 ### D. Lo que se prohíbe
 
@@ -202,6 +217,9 @@ nada `[D10]`.
 **R37.** El sistema DEBE tener un test E2E que recorra: dar contenido a una presentación, crear y
 asignar un pedido con esa presentación, finalizarlo en `/asignacion/[id]` y ver en inventario el
 producto terminado con su lote, su cantidad y sus envases `[D9]`.
+
+> *Enmendado el 2026-09-25 por QC-168: finalizar deja el pedido `POR_EMPACAR`; el E2E comprueba el
+> lote justo tras el Finalizar, sin esperar a que el Empacador lo entregue.*
 
 ### F. Enmienda de F1.4 (2026-09-23): copia del contenido y coste del lote
 

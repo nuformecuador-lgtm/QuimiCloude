@@ -17,7 +17,12 @@ export {
 export { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, SEED_ROLES } from './domain/roles';
 // QC-74 T1 — el catalogo cerrado de permisos (R1, R2) y lo que el seed asigna a cada rol (R8, R9).
 // `PermissionCode` es union de literales: exigir un codigo inexistente no compila.
-export { PERMISSIONS, SEED_ROLE_PERMISSIONS, type PermissionCode } from './domain/permissions';
+export {
+  PERMISSIONS,
+  SEED_ROLE_PERMISSIONS,
+  ADMIN_EXCLUDED_PERMISSIONS,
+  type PermissionCode,
+} from './domain/permissions';
 // QC-74 T2 — la UNICA implementacion de «el actor tiene este permiso» (R12-R14); cada modulo
 // delega aqui desde su propio `requirePermission` y pone su propio error (R15).
 export { assertPermission, type PermissionBearer } from './domain/require-permission';
@@ -311,7 +316,7 @@ export {
 // (`adapters/driven/persistence/assignment-directory-prisma.ts`) NO sale por aqui: lo ve solo
 // `lib/composition`, el unico sitio que ata puerto -> implementacion (R47).
 // ---------------------------------------------------------------------------------------
-export type { PersonRef, PeopleDirectory } from './domain/people-directory';
+export type { PersonRef, PeopleDirectory, PeopleRefFilters } from './domain/people-directory';
 export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------

@@ -16,15 +16,19 @@ import {
   findProductRefs,
   toProductRef,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { productCompanyScope } from '@/lib/modules/inventario/adapters/driven/persistence/company-scope';
+import { findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { productCompanyScope, movementCompanyScope } from '@/lib/modules/inventario/adapters/driven/persistence/company-scope';
 
 /**
- * Doble del cliente Prisma, SOLO para el bloque QC-50 R29 de mas abajo: cuenta invocaciones y
- * deja inspeccionar el `where` que de verdad viaja a `findMany`, que es lo unico observable sin
- * tocar Postgres -misma tecnica que `tests/unit/recetas/recipe-catalog.test.ts`-.
+ * Doble del cliente Prisma, SOLO para el bloque QC-50 R29 de mas abajo (y, desde QC-168, para
+ * `findFinishedGoodsReceipts`): cuenta invocaciones y deja inspeccionar el `where` que de verdad
+ * viaja a `findMany`, que es lo unico observable sin tocar Postgres -misma tecnica que
+ * `tests/unit/recetas/recipe-catalog.test.ts`-.
  */
-const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
-vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { product: { findMany } } }));
+const { findMany, movementFindMany } = vi.hoisted(() => ({ findMany: vi.fn(), movementFindMany: vi.fn() }));
+vi.mock('@/lib/shared/db/prisma', () => ({
+  prisma: { product: { findMany }, inventoryMovement: { findMany: movementFindMany } },
+}));
 
 describe('toProductRef', () => {
   it('mapea id, name, unitId, stockByUnit y type tal cual', () => {
@@ -161,5 +165,57 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
 
     expect(refs).toEqual([]);
     expect(findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('R14 — findFinishedGoodsReceipts divide la cantidad del asiento production por el contenido del lote', () => {
+  beforeEach(() => {
+    movementFindMany.mockReset();
+  });
+
+  it('con 5.0000 entrados y 1.0000 de contenido, devuelve 5 envases', async () => {
+    movementFindMany.mockResolvedValue([
+      { orderId: 'o-1', quantity: new Prisma.Decimal('5.0000'), batch: { packageContent: new Prisma.Decimal('1.0000') } },
+    ]);
+
+    const receipts = await findFinishedGoodsReceipts(['o-1'], 'empresa-1');
+
+    expect(receipts).toEqual([{ orderId: 'o-1', packages: '5' }]);
+  });
+
+  it('con un contenido distinto de uno, divide exacto (12.0000 / 4.0000 = 3)', async () => {
+    movementFindMany.mockResolvedValue([
+      { orderId: 'o-1', quantity: new Prisma.Decimal('12.0000'), batch: { packageContent: new Prisma.Decimal('4.0000') } },
+    ]);
+
+    const receipts = await findFinishedGoodsReceipts(['o-1'], 'empresa-1');
+
+    expect(receipts).toEqual([{ orderId: 'o-1', packages: '3' }]);
+  });
+
+  it('la consulta compone el ambito con movementCompanyScope y filtra kind production por los ids pedidos', async () => {
+    movementFindMany.mockResolvedValue([]);
+
+    await findFinishedGoodsReceipts(['o-1', 'o-2'], 'empresa-1');
+
+    const args = movementFindMany.mock.calls[0]?.[0];
+    expect(args.where).toEqual({
+      AND: [movementCompanyScope({ companyId: 'empresa-1' }), { kind: 'production', orderId: { in: ['o-1', 'o-2'] } }],
+    });
+  });
+
+  it('sin ids no consulta la base y devuelve una lista vacia', async () => {
+    const receipts = await findFinishedGoodsReceipts([], 'empresa-1');
+
+    expect(receipts).toEqual([]);
+    expect(movementFindMany).not.toHaveBeenCalled();
+  });
+
+  it('un pedido sin asiento production simplemente no aparece: mismo camino que "no existe"', async () => {
+    movementFindMany.mockResolvedValue([]);
+
+    const receipts = await findFinishedGoodsReceipts(['o-sin-produccion'], 'empresa-1');
+
+    expect(receipts).toEqual([]);
   });
 });

@@ -53,6 +53,43 @@ describe('R14 — la decisión depende solo de los permisos, nunca del rol', () 
   });
 });
 
+describe('R39 (QC-168) — `por_empacar` se anade AL FINAL, solo con `empaque.modificar`', () => {
+  it('sin `empaque.modificar` no se ofrece la pestana, en ninguna de las tres combinaciones de arriba', () => {
+    expect(resolveAssignmentViews({ permissions: ['asignaciones.consultar'] })).toEqual(['asignados']);
+    expect(
+      resolveAssignmentViews({ permissions: ['asignaciones.consultar', 'terminados.consultar'] }),
+    ).toEqual(['asignados', 'terminados']);
+    expect(resolveAssignmentViews({ permissions: ['pedidos.consultar'] })).toEqual(['todos']);
+  });
+
+  it('con `empaque.modificar` se anade al final sin cambiar la vista por defecto (`asignados`)', () => {
+    expect(resolveAssignmentViews({ permissions: ['asignaciones.consultar', 'empaque.modificar'] })).toEqual([
+      'asignados',
+      'por_empacar',
+    ]);
+  });
+
+  it('con `empaque.modificar` y `terminados.consultar`, `por_empacar` sigue siendo la ULTIMA', () => {
+    expect(
+      resolveAssignmentViews({
+        permissions: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
+      }),
+    ).toEqual(['asignados', 'terminados', 'por_empacar']);
+  });
+
+  it('con `pedidos.consultar` y `empaque.modificar`, la vista por defecto sigue siendo `todos`', () => {
+    expect(resolveAssignmentViews({ permissions: ['pedidos.consultar', 'empaque.modificar'] })).toEqual([
+      'todos',
+      'por_empacar',
+    ]);
+  });
+
+  it('un bearer `null` o `undefined` sigue sin `por_empacar`', () => {
+    expect(resolveAssignmentViews(null)).toEqual(['asignados']);
+    expect(resolveAssignmentViews(undefined)).toEqual(['asignados']);
+  });
+});
+
 describe('R15 — una vista inexistente o no permitida cae a la primera permitida, sin error', () => {
   it('la vista pedida, si está permitida, se devuelve tal cual', () => {
     expect(resolveAssignmentView('terminados', ['asignados', 'terminados'])).toBe('terminados');

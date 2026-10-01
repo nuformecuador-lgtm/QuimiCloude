@@ -2,27 +2,37 @@ import { InvalidTransitionError } from './errors';
 import type { OrderStatus } from './order-classification';
 
 /**
- * Lo que la decision cerrada 5 permite, escrito UNA SOLA VEZ (`design.md > 5`). Cancelar NO
- * esta aqui: es `cancelOrder` y solo el (decision cerrada 7, R24, R26), asi que `CANCELADO`
- * no es destino de ningun par. Quedarse en el mismo estado SI es legal mientras el pedido no
- * sea final: editar la cantidad de un pedido sin moverlo de `PENDIENTE` no es una transicion.
+ * Lo unico que permite, escrito UNA SOLA VEZ. Cancelar NO esta aqui: es `cancelOrder` y solo
+ * el, asi que `CANCELADO` no es destino de ningun par. Quedarse en el mismo estado SI es legal
+ * mientras el pedido no sea final o de empaque: editar la cantidad de un pedido sin moverlo de
+ * `PENDIENTE` no es una transicion.
  *
- * Los dos estados finales tienen la lista VACIA a proposito: R21 dice que un pedido
- * `ENTREGADO` o `CANCELADO` no admite NINGUNA edicion, ni siquiera la que solo cambia la
- * prioridad, asi que ni siquiera «quedarse igual» es legal. La comprobacion de R21 y la de R22
- * caen sobre esta misma tabla y no hay dos verdades.
+ * `PENDIENTE` ya NO llega a `ENTREGADO`: abrir la pantalla del pedido ya lo deja `EN_CURSO`, asi
+ * que el unico origen del Finalizar es `EN_CURSO`. `EN_CURSO` pasa a `POR_EMPACAR`, no a
+ * `ENTREGADO`: el material se consume ahi.
  *
- * ESTO NO BAJA A LA BASE, y el resto de la ficha hace lo contrario (`design.md > 5`): un
- * `CHECK` evalua la fila RESULTANTE y no sabe de donde venia el pedido; un trigger si podria,
- * pero QC-33 R19 fijo que la base no restringe las transiciones, no distinguiria `updateOrder`
- * de `cancelOrder`, y seria el primer trigger del repositorio. Coste asumido y escrito: un
+ * `POR_EMPACAR -> EN_EMPAQUE` y `EN_EMPAQUE -> ENTREGADO` SI estan en esta tabla -son transiciones
+ * legales del pedido-, pero `transitionAliveById` (el puerto que usa `asignaciones` para el
+ * Finalizar) rechaza esos dos destinos igual: solo se alcanzan por las dos acciones de empaque,
+ * que usan su propio puerto. Ninguno de los dos admite «quedarse igual»: sin esa entrada, `POR_
+ * EMPACAR` y `EN_EMPAQUE` no son editables desde Pedidos.
+ *
+ * `ENTREGADO` y `CANCELADO` tienen la lista VACIA porque un pedido final no admite NINGUNA
+ * edicion, ni siquiera la que solo cambia la prioridad.
+ *
+ * ESTO NO BAJA A LA BASE: un `CHECK` evalua la fila RESULTANTE y no sabe de donde venia el
+ * pedido; un trigger si podria, pero seria el primero del repositorio y no distinguiria
+ * `updateOrder` de `cancelOrder` ni de las acciones de empaque. Coste asumido y escrito: un
  * `UPDATE` por consola puede retroceder un pedido. Lo caro de deshacer -que un entregado o un
- * cancelado no se borre, y que un cancelado tenga motivo- si lo garantiza la base.
+ * cancelado no se borre, que un cancelado tenga motivo, y que solo `EN_EMPAQUE` pueda llevar
+ * quien empaca- si lo garantiza la base.
  */
 const ALLOWED: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
-  PENDIENTE: ['PENDIENTE', 'EN_CURSO', 'ENTREGADO'],
-  EN_CURSO: ['EN_CURSO', 'ENTREGADO'],
-  ENTREGADO: [], // final: ni siquiera 'ENTREGADO', porque un ENTREGADO no admite EDICION (R21)
+  PENDIENTE: ['PENDIENTE', 'EN_CURSO'],
+  EN_CURSO: ['EN_CURSO', 'POR_EMPACAR'],
+  POR_EMPACAR: ['EN_EMPAQUE'],
+  EN_EMPAQUE: ['ENTREGADO'],
+  ENTREGADO: [], // final: ni siquiera 'ENTREGADO', porque un ENTREGADO no admite EDICION
   CANCELADO: [], // final, por el mismo motivo
 };
 

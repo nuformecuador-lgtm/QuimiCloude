@@ -247,6 +247,8 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       label: 'Nombre',
       align: 'start',
       sortable: true,
+      width: 500,
+      hideText: false,
       cell: (product) => nameCell(product, units),
     },
     {

@@ -11,8 +11,15 @@ export const STATUS_PARAM = 'status';
 export const FIRST_PAGE = 1;
 
 /** El mismo formato que `/pedidos`, duplicado a proposito: esta ruta no importa el dominio de
- *  `pedidos` solo para reconocer cuatro palabras en una cadena de consulta. */
-export const ROUTE_ORDER_STATUS_VALUES = ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO'] as const;
+ *  `pedidos` solo para reconocer seis palabras en una cadena de consulta. Orden de `ORDER_STATUS_FLOW`. */
+export const ROUTE_ORDER_STATUS_VALUES = [
+  'PENDIENTE',
+  'EN_CURSO',
+  'POR_EMPACAR',
+  'EN_EMPAQUE',
+  'ENTREGADO',
+  'CANCELADO',
+] as const;
 export type RouteOrderStatus = (typeof ROUTE_ORDER_STATUS_VALUES)[number];
 
 /** El App Router entrega un array cuando el parametro viene repetido: la primera basta aqui. */

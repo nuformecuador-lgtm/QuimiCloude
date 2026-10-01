@@ -93,6 +93,32 @@ describe('createTransitionOrder', () => {
     expect(lockAliveById).not.toHaveBeenCalled();
   });
 
+  it('R2: rechaza EN_EMPAQUE como destino, aunque la matriz lo admita, SIN abrir la unidad de trabajo', async () => {
+    const lockAliveById = vi.fn();
+    const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById } });
+    const { recipes, products, units } = catalogosGlobales();
+    const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
+
+    await expect(
+      transitionAliveById('o-1', EMPRESA, 'POR_EMPACAR', 'EN_EMPAQUE', 'actor-1', AHORA),
+    ).rejects.toBeInstanceOf(InvalidTransitionError);
+
+    expect(lockAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R2: rechaza ENTREGADO como destino, aunque la matriz lo admita, SIN abrir la unidad de trabajo', async () => {
+    const lockAliveById = vi.fn();
+    const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById } });
+    const { recipes, products, units } = catalogosGlobales();
+    const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
+
+    await expect(
+      transitionAliveById('o-1', EMPRESA, 'EN_EMPAQUE', 'ENTREGADO', 'actor-1', AHORA),
+    ).rejects.toBeInstanceOf(InvalidTransitionError);
+
+    expect(lockAliveById).not.toHaveBeenCalled();
+  });
+
   it('not_found: el pedido no existe, esta borrado o es de otra empresa', async () => {
     const lockAliveById = vi.fn(async () => null);
     const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById } });
@@ -168,7 +194,7 @@ describe('createTransitionOrder', () => {
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('presentation_without_content');
 
     expect(consumeForOrder).not.toHaveBeenCalled();
@@ -208,7 +234,7 @@ describe('createTransitionOrder', () => {
     const { recipes, products, units, findRefsIncludingDeleted } = catalogosGlobales();
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
-    const resultado = await transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA);
+    const resultado = await transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA);
 
     expect(resultado).toEqual({
       kind: 'ok',
@@ -266,7 +292,7 @@ describe('createTransitionOrder', () => {
 
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
-    const resultado = await transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA);
+    const resultado = await transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA);
 
     expect(resultado).toEqual({
       kind: 'ok',
@@ -315,7 +341,7 @@ describe('createTransitionOrder', () => {
     const { recipes, products, units } = catalogosGlobales();
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
-    const resultado = await transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA);
+    const resultado = await transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA);
 
     expect(resultado).toEqual({
       kind: 'ok',
@@ -352,7 +378,7 @@ describe('createTransitionOrder', () => {
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('presentation_without_content');
 
     expect(vioLaExcepcion).toBe(true);
@@ -376,7 +402,7 @@ describe('createTransitionOrder', () => {
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('no_whole_package');
 
     expect(setReservedAt).not.toHaveBeenCalled();
@@ -400,7 +426,7 @@ describe('createTransitionOrder', () => {
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('recipe_not_found');
 
     expect(consumeForOrder).not.toHaveBeenCalled();
@@ -425,7 +451,7 @@ describe('createTransitionOrder', () => {
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes: globalRecipes, products, units });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('insufficient_material');
 
     // Si el consumo falla, ni el estado ni `finishedAt` quedan escritos, y el producto terminado
@@ -463,7 +489,7 @@ describe('createTransitionOrder', () => {
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes: globalRecipes, products, units });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('stale');
 
     expect(vioLaExcepcion).toBe(true);
@@ -489,7 +515,7 @@ describe('createTransitionOrder', () => {
     const transitionAliveById = createTransitionOrder({ unitOfWork, recipes: globalRecipes, products, units });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('recipe_without_lines');
 
     // Si el consumo falla, ni el estado ni `finishedAt` quedan escritos.

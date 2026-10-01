@@ -265,3 +265,12 @@ Se añade sin tocar R38 ni las tablas de arriba (detalle en `design.md > 16`).
 | Fecha | Pregunta | Decisión |
 |---|---|---|
 | 2026-09-24 | ¿Cómo comprueba R38 la imagen de la línea nueva, si la pantalla del catálogo aún no sabe pintar la clave del recorte? | R38 comprueba la imagen **solo en la base**; pintarla con URL firmada es de **QC-140**. Material, medidas, presentación y costo se comprueban en la base y en la pantalla. |
+
+### Nota fechada — 2026-09-25, R2 superado en parte por QC-159
+
+La primera mitad de R2 («SI la tanda es `formula` ENTONCES no ofrecer revisión») queda **superada** por
+[`specs/QC-159-formula-desde-pdf/`](../QC-159-formula-desde-pdf/requirements.md): un archivo de fórmula
+tiene revisión, pero en **su** pantalla (`/produccion/formulas/importar/[documentoId]`), a la que se llega
+desde la ventana de subida del listado de fórmulas. La pantalla de revisión del catálogo **sigue
+rechazando** un archivo `formula` (R3, intacto), y sin `reviewHrefFor` la fila sigue sin enlace. Ni R2 ni
+las tablas de arriba se reescriben.

@@ -100,8 +100,11 @@ const {
 // El usuario lleva el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito a mano: aqui no
 // se prueba autorizacion -eso es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, se
 // prueba lo que se ve cuando SI se puede ver.
+// El arbol de la pagina arrastra el barrel de fórmulas entero, que ahora incluye `FormulaPdfUpload`
+// (subida de PDF); sin `observabilidad` en el doble el import de esa rama no carga.
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
+  observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({

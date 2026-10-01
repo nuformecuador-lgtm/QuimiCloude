@@ -1,16 +1,36 @@
 // lib/modules/pedidos/domain/order-classification.ts
-/** Los CUATRO estados, EN SU ORDEN DE DECLARACION del esquema. El dominio NO puede importar
+/** Los SEIS estados, EN SU ORDEN DE DECLARACION del esquema. El dominio NO puede importar
  *  `@prisma/client` (`docs/architecture.md > La regla de dependencias`), asi que estos valores
  *  son un DUPLICADO del `enum OrderStatus` de `db/schema.prisma`. Es el punto fragil del
- *  modulo, y por eso QC-33 R35 existe: `module-contract.test.ts` lee el esquema y compara las
- *  dos listas, valor a valor y en orden.
+ *  modulo: `module-contract.test.ts` lee el esquema y compara las dos listas, valor a valor y
+ *  en orden.
  *
- *  `CANCELADO` lo anade QC-34 (decision cerrada 3) y va el CUARTO, igual que en el esquema: en
- *  este conjunto el orden no significa nada de negocio -a diferencia del de la prioridad-, pero
- *  tiene que coincidir con el del `enum`, y anadir al final es lo unico que Postgres sabe hacer
- *  con un `ALTER TYPE ... ADD VALUE` sin recrear el tipo. */
-export const ORDER_STATUS_VALUES = ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO'] as const;
+ *  En este conjunto el orden no significa nada de negocio -a diferencia del de la prioridad-,
+ *  pero tiene que coincidir con el del `enum`, y anadir al final es lo unico que Postgres sabe
+ *  hacer con un `ALTER TYPE ... ADD VALUE` sin recrear el tipo. Para pintar en el orden del
+ *  flujo de trabajo existe `ORDER_STATUS_FLOW`, mas abajo. */
+export const ORDER_STATUS_VALUES = [
+  'PENDIENTE',
+  'EN_CURSO',
+  'ENTREGADO',
+  'CANCELADO',
+  'POR_EMPACAR',
+  'EN_EMPAQUE',
+] as const;
 export type OrderStatus = (typeof ORDER_STATUS_VALUES)[number];
+
+/** El mismo conjunto, en el orden del FLUJO de trabajo: `PENDIENTE -> EN_CURSO -> POR_EMPACAR
+ *  -> EN_EMPAQUE -> ENTREGADO`, con `CANCELADO` al final porque no es un paso del flujo sino
+ *  una salida lateral. Lo usan las pantallas que pintan filtros o columnas de estado; ninguna
+ *  lectura de la base ni ninguna regla de transicion depende de este orden. */
+export const ORDER_STATUS_FLOW: readonly OrderStatus[] = [
+  'PENDIENTE',
+  'EN_CURSO',
+  'POR_EMPACAR',
+  'EN_EMPAQUE',
+  'ENTREGADO',
+  'CANCELADO',
+];
 
 /** Las cuatro prioridades, DE MENOR A MAYOR. El orden es el dato: es lo que fijo la decision
  *  cerrada 4 y lo que ordena Postgres al comparar dos valores del enum. */

@@ -744,3 +744,67 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
   };
 }
+
+/** Fila minima que las dos escrituras de empaque releen para clasificar el resultado cuando el
+ *  `UPDATE` condicional no movio ninguna fila. */
+type PackingStatusRow = { readonly status: OrderStatus; readonly packedBy: string | null };
+
+async function findAlivePackingStatus(
+  id: string,
+  scope: OrderScope,
+): Promise<PackingStatusRow | null> {
+  return prisma.order.findFirst({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    select: { status: true, packedBy: true },
+  });
+}
+
+/**
+ * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar): un `UPDATE` condicional
+ * `WHERE status = 'POR_EMPACAR'`. `count = 1` es el unico camino de exito; cualquier otro caso
+ * relee la fila para distinguir «no existe» de «ya la tiene otro» de «ya es mia» de «no admite
+ * Comenzar».
+ */
+export async function startPackingAliveOrder(
+  id: string,
+  packerId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'> {
+  const { count } = await prisma.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_EMPACAR' }] },
+    data: { status: 'EN_EMPAQUE', packedBy: packerId, updatedAt: now, updatedBy: packerId },
+  });
+  if (count === 1) return 'ok';
+
+  const row = await findAlivePackingStatus(id, scope);
+  if (row === null) return 'not_found';
+  if (row.status === 'EN_EMPAQUE') return row.packedBy === packerId ? 'already_mine' : 'taken';
+  return 'not_packable';
+}
+
+/**
+ * Implementa `OrderPackingRepository['finishPackingAlive']` (Terminar): el `UPDATE` condicional
+ * exige ademas `packed_by = packerId`, y escribe `finished_at` en la MISMA sentencia que el
+ * estado. Cualquier caso que no mueva la fila relee para distinguir «no existe» de «lo tiene
+ * otro empacador» de «no admite Terminar».
+ */
+export async function finishPackingAliveOrder(
+  id: string,
+  packerId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'> {
+  const { count } = await prisma.order.updateMany({
+    where: {
+      AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'EN_EMPAQUE', packedBy: packerId }],
+    },
+    data: { status: 'ENTREGADO', finishedAt: now, updatedAt: now, updatedBy: packerId },
+  });
+  if (count === 1) return 'ok';
+
+  const row = await findAlivePackingStatus(id, scope);
+  if (row === null) return 'not_found';
+  if (row.status === 'EN_EMPAQUE' && row.packedBy !== packerId) return 'not_packer';
+  return 'not_packable';
+}

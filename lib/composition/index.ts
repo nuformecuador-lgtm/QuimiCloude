@@ -60,6 +60,7 @@ import {
   createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
+  createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
@@ -73,6 +74,7 @@ import {
 import {
   findCostingBatches,
   findProductRefs,
+  findProductsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
@@ -83,6 +85,7 @@ import {
   findAliveIdByNameInPresentationUnit,
   findAliveProductById,
   findBatchesOfAliveProduct,
+  findFinishedGoodsReceipts,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -109,6 +112,7 @@ import type {
   OrderNumberDirectory,
   PresentationCatalog,
   ProductCatalog,
+  ProductNameLookup,
   ReservationQueries,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
@@ -205,26 +209,32 @@ import {
   createDeleteOrder,
   createExpireStaleOrders,
   createFindCoverage,
+  createFinishPacking,
   createGetOrder,
   createListOrders,
   createQuoteOrderCost,
+  createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
+  finishPackingAliveOrder,
   findAliveOrderById,
   findExpirableOrders,
   listAliveOrders,
+  startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
+import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
   createRecipeExecutionReader,
+  findAliveRecipeByNormalizedName,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -309,15 +319,19 @@ import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-grou
 import {
   createAssignResponsibles,
   createFinishAssignedOrder,
+  createFinishPacking as createFinishPackingOrder,
   createGetAssignedOrderExecution,
+  createGetPackingOrder,
   createListAssignedOrders,
   createListCompanyOrders,
   createListFinishedOrders,
   createListOrderResponsibles,
+  createListPackingOrders,
   createListResponsibleCandidates,
   createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
+  createStartPacking as createStartPackingOrder,
   createUnassignResponsible,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -336,6 +350,7 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
 import {
   createConfirmCatalogImport,
+  createConfirmFormulaImport,
   createConvertPdfs,
   createCropCatalogImages,
   createDownloadDocument,
@@ -344,10 +359,12 @@ import {
   createIssueReadLink,
   createIssueUploadLinks,
   createPreviewCatalogImport,
+  createPreviewFormulaImport,
   createProcessPdfByStrategy,
   createReadPdfWithAi,
   createRunDocumentJob,
   type CatalogImportDeps,
+  type FormulaImportDeps,
 } from '@/lib/modules/documentos';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
@@ -774,6 +791,7 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  */
 export const inventario = {
   createProduct: createCreateProduct({ products: productRepository }),
+  createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
   getProduct: createGetProduct({ products: productRepository }),
@@ -813,11 +831,21 @@ export const inventario = {
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
-const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
+const productCatalog: ProductCatalog = {
+  findRefs: findProductRefs,
+  findCostingBatches,
+  findFinishedGoodsReceipts,
+};
 
 const presentationCatalog: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,
+};
+
+/** `ProductNameLookup` cableado con el adaptador driven DE INVENTARIO: resolucion de
+ *  ingredientes POR NOMBRE. Interfaz propia, no un metodo mas de `ProductCatalog`. */
+const productNameLookup: ProductNameLookup = {
+  findAliveByNormalizedNames: findProductsByNormalizedNames,
 };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
@@ -1036,6 +1064,7 @@ const recipeCatalog: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
   findIdsMatchingName: findRecipeIdsMatchingName,
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
 
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
@@ -1190,6 +1219,14 @@ export const observabilidad = {
  *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
  *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
  *  consume el material en la misma transaccion. */
+/** `OrderPackingRepository` cableado con las dos escrituras crudas de `order-prisma.ts`: cada
+ *  una un `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida
+ *  con `inventario`. */
+const orderPackingRepository: OrderPackingRepository = {
+  startPackingAlive: startPackingAliveOrder,
+  finishPackingAlive: finishPackingAliveOrder,
+};
+
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
@@ -1200,6 +1237,8 @@ const orderCatalog: OrderCatalog = {
     products: productCatalog,
     units: unitCatalog,
   }),
+  startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
+  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository }),
 };
 
 /**
@@ -1312,6 +1351,8 @@ export const asignaciones = {
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
+    people: peopleDirectory,
+    groups: workGroupDirectory,
     now: () => new Date(),
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
@@ -1335,6 +1376,37 @@ export const asignaciones = {
   }),
   listResponsibleCandidates: createListResponsibleCandidates({
     people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  // `listPackingOrders` y `getPackingOrder` comparten los MISMOS `orderCatalog`,
+  // `orderAssignmentRepository`, `recipeCatalog`, `presentationCatalog` y `peopleDirectory` del
+  // resto del modulo, mas `productCatalog` -el mismo que usa `recetas` y la ejecucion, arriba-
+  // para los envases. `startPacking` y `finishPacking` solo necesitan `orderCatalog`: ningun
+  // adaptador nuevo.
+  listPackingOrders: createListPackingOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    products: productCatalog,
+    now: () => new Date(),
+  }),
+  getPackingOrder: createGetPackingOrder({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    products: productCatalog,
+    now: () => new Date(),
+  }),
+  startPacking: createStartPackingOrder({
+    orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  finishPacking: createFinishPackingOrder({
+    orders: orderCatalog,
     now: () => new Date(),
   }),
 } as const;
@@ -1551,6 +1623,26 @@ const previewCatalogImport = createPreviewCatalogImport(catalogImportDeps);
 const confirmCatalogImport = createConfirmCatalogImport(catalogImportDeps);
 
 /**
+ * Compartido por la vista previa y la confirmacion de una importacion de formula.
+ * `recipeCatalog` y `productCatalog` son los MISMOS que ya usan `recetas` y `pedidos`
+ * mas arriba -dos instancias del mismo puerto serian dos cableados que pueden divergir-;
+ * `inventario.createRawMaterial`, `recetas.createRecipe` y `recetas.updateRecipe` son los
+ * casos de uso ya cableados en sus propias fachadas.
+ */
+const formulaImportDeps: FormulaImportDeps = {
+  repository: documentBatchRepository,
+  recipes: recipeCatalog,
+  products: productCatalog,
+  productNames: productNameLookup,
+  createRawMaterial: inventario.createRawMaterial,
+  createRecipe: recetas.createRecipe,
+  updateRecipe: recetas.updateRecipe,
+};
+
+const previewFormulaImport = createPreviewFormulaImport(formulaImportDeps);
+const confirmFormulaImport = createConfirmFormulaImport(formulaImportDeps);
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1604,6 +1696,10 @@ export const documentos = {
   // de arriba. Claves NUEVAS al final: ninguna de las de arriba se toca.
   previewCatalogImport,
   confirmCatalogImport,
+  // Las DOS operaciones de la revision de formula, ya cableadas con
+  // `formulaImportDeps` de arriba. Claves NUEVAS al final, mismo criterio.
+  previewFormulaImport,
+  confirmFormulaImport,
 } as const;
 
 // ---------------------------------------------------------------------------------------
