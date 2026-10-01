@@ -120,3 +120,39 @@ Para pasar a OK: quitar `(QC-9 R28)` y `(QC-23 R6)` de las dos lineas modificada
 `tests/unit/identity/session-claims.test.ts` y `./init.sh --rapido`). Para cerrar la feature, ademas,
 T14 tiene que quedar `[x]` con el `./init.sh` completo verde del leader y la confirmacion humana de las
 `SEED_MAESTRO_*` en Vercel (produccion y preview). Los menores no bloquean.
+
+---
+
+## Vuelta 2 (2026-10-01)
+
+Revisado solo lo que cambia entre `914456fc` y `37432923` (commits `efe4a8d7`, `03b6bf5b`,
+`fd67991c`, `52dd90b3` y la bitacora). Gate completo de `b2749955` verde segun el leader (5 rojos,
+todos en el baseline): no lo vuelvo a correr. Corri `tsc --noEmit` (verde) y `vitest run`
+de `session-claims`, `tests/unit/identity/schema`, `permissions` y `tests/unit/identity/roles`
+(377 passed, 4 skipped).
+
+- [x] **B1, cerrado.** `session-claims.ts:84-85` ya no lleva `(QC-9 R28)` ni `(QC-23 R6)`. Vuelvo a
+  barrer las lineas `+` de `git diff -U0 origin/dev...HEAD` en `lib/`, `app/`, `components/`,
+  `hooks/` y `db/`: 0 citas.
+- [x] **m1, cerrado.** Barrido por script de los comentarios (`//`, `/*`, ` *`) que anade la rama en
+  `tests/`: 240 lineas de comentario, **0** citan `QC-<n>`, `R<n>`, `design.md` o «decision cerrada».
+  Las excepciones aceptadas (`permissions.test.ts:635` y `:731-733`, mensaje de `maestro-rol.test.ts:207`)
+  son codigo, no comentarios: la regex y los casos sinteticos que la guardia necesita. Los cambios
+  de `fd67991c` en `tests/` son solo de comentarios: ningun `expect`, nombre de caso ni linea de codigo
+  cambia. Correccion mia: las «148 lineas» de la vuelta 1 estaban infladas. Mi `grep -E` no
+  entendia `\s` y conto tambien nombres de caso (`it('QC-161 R…')`), que si deben llevar la cita. Los
+  42 que quito el implementer eran los comentarios reales.
+- [x] **m2, cerrado.** El «Hecho» de T7 en `tasks.md` dice ahora «la segunda imprime
+  "db:seed: nada que crear"», que es la salida real.
+- [x] **m3, cerrado; la linea correcta era la 90.** El «:165» de la vuelta 1 era mi error: era la
+  linea del archivo de salida del diff, no la de `db/schema.prisma`. En `b2749955` la linea que
+  tocaba la rama y medía 145 caracteres es la 90. Partida en `52dd90b3`, ahora ninguna de las lineas
+  de comentario que toca la rama pasa de 98 columnas. Las demas lineas largas del archivo (7, 45,
+  69-70, 121, 127, 131-133) son preexistentes o de codigo: no son hallazgo.
+
+Pendiente fuera del alcance del reviewer: T14 `[ ]` hasta que el leader la marque con el gate
+verde y la confirmacion humana de las `SEED_MAESTRO_*` en Vercel (produccion y preview).
+
+### Veredicto de la vuelta 2
+
+**OK** — 0 bloqueantes, 0 menores abiertos.
