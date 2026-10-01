@@ -371,10 +371,17 @@ Depende de: T4, T14, T20 (reutiliza la misma conversión que `validateDistributi
 **Hecho cuando**: el total que entra en `deriveUnitCost` es la suma de `packages × content` de cada
 línea convertida con `convertQuantity` a la unidad del pedido (sin convertir si coinciden), una sola
 vez (R18); un test con un pedido en L y un reparto con una línea en L y otra en ml comprueba que
-todos los lotes del pedido salen con el MISMO `unit_cost`, igual a `lotCost / total convertido a L`
-(cifra exacta en `Decimal`, no la de la suma sin convertir); otro test con una línea cuya unidad no
+todos los lotes del pedido llevan el MISMO coste real, `lotCost / total convertido a L`, expresado
+en la unidad de cada lote: el de L lleva el coste por L y el de ml el coste por ml (cifras exactas en
+`Decimal`, no las de la suma sin convertir); otro test con una línea cuya unidad no
 comparte base con la del pedido comprueba `incompatible_units`, que ningún lote nace y que el pedido
 sigue `EN_EMPAQUE` (R7, R18); los tests ya existentes de T14 (R17, R19, R21) siguen en verde.
+
+> **Enmienda (decisión humana 2026-10-01).** Este «Hecho cuando» decía que todos los lotes salían
+> con el MISMO `unit_cost`, igual a `lotCost / total convertido a L`. Se corrige: el coste por unidad
+> de cada lote **se queda en la unidad de su presentación**, tal como está en el código. Lo que se
+> comprueba es el mismo coste real, expresado en la unidad de cada lote (lo que fija
+> `tests/unit/pedidos/order-packing.test.ts` › «R18: con un reparto en L y en ml…»). El código no cambia.
 
 ## Guardias que se ponen rojas y quién las arregla
 
