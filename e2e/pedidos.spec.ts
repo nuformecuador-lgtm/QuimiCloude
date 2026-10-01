@@ -100,6 +100,9 @@ const LIST_SORT = 'createdAt:desc';
 /** Cantidad y precio DECIMALES (R39, R48): viajan como cadena de punta a punta. */
 const ORDER_QUANTITY = '12.5';
 
+const PRESENTATION_CONTENT = '1';
+const ORDER_PACKAGES = '12';
+
 type Credentials = { readonly username: string; readonly password: string };
 
 const adminUser: Credentials = {
@@ -130,6 +133,7 @@ let companyId: string | null = null;
 let adminUserId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
+let unitId: string | null = null;
 
 async function createUserWithRole(user: Credentials, roleName: string): Promise<string> {
   if (!companyId) {
@@ -238,6 +242,9 @@ test.beforeAll(async () => {
   // Por eso van primero, y por eso este borrado no puede alcanzar ningun pedido que no sea de un
   // E2E viejo de esta ficha.
   if (orphanRecipeIds.length > 0) {
+    await prisma.orderPresentationLine.deleteMany({
+      where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
   }
   await prisma.recipe.deleteMany({
@@ -301,6 +308,7 @@ test.beforeAll(async () => {
     data: { name: unitName, nameNormalized: normalizeUnitName(unitName), symbol: null },
     select: { id: true },
   });
+  unitId = unit.id;
 
   // Presentacion de la MISMA empresa que el Administrador: el selector del panel solo ofrece las
   // de su propia empresa, y elegir una de otra la dejaria fuera de la busqueda.
@@ -310,6 +318,8 @@ test.beforeAll(async () => {
         name: presentationName,
         nameNormalized: normalizePresentationName(presentationName),
         unitId: unit.id,
+        // Sin contenido el selector del reparto no deja anadirla.
+        content: PRESENTATION_CONTENT,
         companyId: empresaDelWorker,
       },
       select: { id: true },
@@ -331,6 +341,7 @@ test.afterAll(async () => {
   // la fila contando en los tests de integracion de otras features.
   try {
     if (recipeId !== null) {
+      await prisma.orderPresentationLine.deleteMany({ where: { order: { recipeId } } });
       await prisma.order.deleteMany({ where: { recipeId } });
     }
   } finally {
@@ -391,9 +402,14 @@ test.describe('pantalla de pedidos', () => {
     // Lo que viaja en el `FormData` es el id elegido, no el texto escrito.
     await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-    // --- 3b. Presentacion, tomada del mismo tipo de selector con busqueda: se escribe el nombre
-    // y se elige la opcion que trae el servidor.
-    const presentationPicker = page.getByTestId('presentation-select');
+    // --- 4. Cantidad DECIMAL, escrita como texto (R39), y la unidad del pedido.
+    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
+    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+    await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+
+    // --- 4b. Una linea de reparto con la presentacion, tomada del selector con busqueda.
+    const distribution = page.getByTestId('order-distribution-field');
+    const presentationPicker = distribution.getByTestId('presentation-select');
     await presentationPicker.click();
     await presentationPicker.fill(presentationName);
     const presentationOption = page
@@ -401,11 +417,18 @@ test.describe('pantalla de pedidos', () => {
       .filter({ hasText: presentationName });
     await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
     await presentationOption.click();
-    await expect(page.getByTestId('presentation-value')).toHaveValue(presentationId ?? '');
-
-    // --- 4. Cantidad DECIMAL, escrita como texto (R39). El precio unitario y el selector de
-    // unidad salieron del formulario el 2026-09-07 (decision humana).
-    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
+    await distribution.getByTestId('order-distribution-add-packages').fill(ORDER_PACKAGES);
+    await distribution.getByTestId('order-distribution-add').click();
+    await expect(
+      distribution.locator(
+        `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
+      ),
+    ).toHaveCount(1);
+    await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
+      'data-state',
+      'ready',
+      { timeout: 60_000 },
+    );
 
     // --- 5. La prioridad por defecto esta VISIBLE y preseleccionada (R27): no se toca el
     // desplegable, solo se comprueba que muestra algo. Que ese algo sea el defecto del contrato
@@ -455,9 +478,9 @@ test.describe('pantalla de pedidos', () => {
     });
     await expect(row.getByTestId('data-table-cell-recipeName')).toHaveText(recipeName);
     await expect(
-      row.getByTestId('order-presentation'),
-      'la fila del listado muestra el nombre de la presentacion elegida (R29)',
-    ).toHaveText(presentationName);
+      row.getByTestId('order-distribution'),
+      'la fila del listado muestra el reparto con la presentacion elegida (R29)',
+    ).toHaveText(`${ORDER_PACKAGES} × ${presentationName}`);
 
     // --- 11. Cancelacion con motivo (R37): el dialogo pide el motivo y solo entonces confirma.
     await row.getByTestId('order-action-cancel').click();

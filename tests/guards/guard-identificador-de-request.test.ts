@@ -229,6 +229,9 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que el diferimiento sigue INTACTO.
   'producto-terminado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el pedido repartido en varias presentaciones
+  // de punta a punta; no lee ni afirma nada sobre el identificador de peticion.
+  'pedido-en-varias-presentaciones.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
