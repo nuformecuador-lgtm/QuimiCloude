@@ -35,7 +35,7 @@
 
 ## Bloque 0 — Preparación
 
-- [ ] **T0. Base propia, entorno del worktree y re-medición contra `origin/dev`.**
+- [x] **T0. Base propia, entorno del worktree y re-medición contra `origin/dev`.**
       - Archivos: `.env` del worktree (git-ignorado; no entra en el diff).
       - Proceso: traer `origin/dev` a la rama; crear `QuimiCloude_QC161`, apuntar `DATABASE_URL` y
         `DIRECT_URL` a ella, `db:migrate` y `db:seed` con el estado de `dev`; añadir las tres

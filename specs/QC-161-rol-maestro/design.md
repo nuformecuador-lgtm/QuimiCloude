@@ -205,6 +205,12 @@ cambian), `components/**`, `middleware.ts`, `route-guard-middleware.ts`,
 
 ## 2. El catálogo de permisos
 
+> **Desviación aprobada (humano, 2026-10-01).** `dev` ya trae `ADMIN_EXCLUDED_PERMISSIONS`
+> (`permissions.ts`, hoy `['empaque.modificar']`), que este design no conocía. `empresas.consultar`
+> y `empresas.modificar` se **añaden a esa constante**: el Administrador sigue siendo «catálogo menos
+> los excluidos», y las comparaciones de 2.4 se apoyan en ella en vez de reescribirse. El ordinal del
+> párrafo de 2.2 es «Octava» contra `dev` del 2026-10-01.
+
 ### 2.1 Las dos entradas
 
 Al final de `PERMISSIONS`:
