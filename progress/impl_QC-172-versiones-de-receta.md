@@ -698,3 +698,61 @@ Commit `abd762f3`. Sin codigo de produccion.
 - `pnpm exec vitest run tests/integration/documentos/formula-import-versions.int.test.ts tests/integration/inventario/finished-goods-version.int.test.ts tests/guards/guard-aislamiento-integracion.test.ts`
   (base efimera `qct_qc172_8c9cfd3f_muq22bfp_dk4`, borrada al terminar): `Test Files 3 passed (3)`, `Tests 9 passed (9)`.
 - No corridos: suite completa, `./init.sh`, `vitest related`. La base `QuimiCloude` del `.env` no se ha tocado.
+
+## T11 — selector de version en el formulario de pedido
+
+Commit `4f8dc417`.
+
+### Archivos
+Produccion:
+- `app/(private)/pedidos/components/recipe-version-select.tsx` (nuevo, `'use client'`): `Select` de
+  `components/ui/select.tsx` controlado y sin `name`, mas `input` oculto `recipeVersionId` que viaja
+  siempre (T0.4). Pide `listRecipeVersionsAction` al cambiar `recipeId`; la respuesta superada se
+  descarta con el flag de limpieza del efecto. Opciones: «Original» (`''`) + versiones con
+  `isUnderReview === false`. Deshabilitado sin receta o con solo «Original». La version del pedido
+  editado se conserva como opcion mientras la receta sea la inicial, con nota deducida del listado
+  («por revisar» si vuelve marcada, «dada de baja» si no vuelve; `note` la puede forzar). Trigger e
+  items `min-h-11 min-w-11` y `text-base md:text-base`. Textos por defecto sobreescribibles (`texts`).
+  Un fallo del listado se trata como «sin versiones» (no se guarda el mensaje: no suma superficie al
+  censo de `guard-identificador-de-request`).
+- `index.ts` (CRLF respetado): exporta `RecipeVersionSelect`, `RECIPE_VERSION_FIELD`,
+  `RECIPE_VERSION_SELECT_TESTID`, `ORIGINAL_VERSION_VALUE` y los tipos.
+- `order-form.tsx`: `ORDER_BUSINESS_FIELDS` solo anade `RECIPE_VERSION_FIELD` al final;
+  `FIELD_MESSAGES.recipeVersionId`; estado `versionId` (ver desviacion) y `effectiveRecipeId`;
+  `chooseRecipe` lo pone a `null` y remonta el selector por `key` (asi elegir otra vez la misma
+  receta tambien vuelve a «Original»); `chooseVersion` pide ingredientes y cotizacion con
+  `versionId ?? recipe.id`; `onQuantityChange` usa `effectiveRecipeId`. Edicion: `RecipePicker` con
+  `originalId`/`originalName`, selector con `{ id: order.recipeId, name: versionName }`; la carga
+  inicial de ingredientes sigue con `order.recipeId` (ya es el id efectivo). Se reescribio el
+  comentario de `ORDER_BUSINESS_FIELDS` (citaba QC-35bis y decia «CUATRO»).
+
+Tests:
+- `tests/unit/pedidos-ui/recipe-version-select.test.tsx` (nuevo, 11 casos).
+- `order-form.test.tsx` (+6 casos), `order-form-quote.test.tsx` (+2 casos; dos nombres «CUATRO
+  campos» pasan a «los campos»; el `toEqual` de claves contra `ORDER_BUSINESS_FIELDS` sigue igual).
+- Doble `listRecipeVersionsAction` (lista vacia) anadido al `vi.mock` de `recipe-actions` en 8 tests
+  de `pedidos-ui` que montan `OrderForm` y no estan en «Toca»: `order-list-section`,
+  `order-row-wiring`, `order-sheet`, `order-sheet-coverage`, `order-sheet-responsibles`,
+  `order-table`, `pedidos-viewport`, `read-only`. Sin el, el mock de vitest lanza al acceder a la
+  exportacion (65 rojos). No cambia ninguna asercion.
+
+### Desviacion menor del design
+- §7 dice estado `version: { id; name } | null`; se guarda solo `versionId`, porque el nombre no lo
+  usa nada del formulario. Las props del componente son las de §7 (`onChange(versionId)`), mas
+  `texts` opcional.
+
+### R -> test
+| R | Test |
+|---|---|
+| R26 | `recipe-version-select` › `R26: «Original» primero, despues las versiones vivas y ninguna por revisar`; `order-form` › `R26, R27: elegir la receta pide sus versiones; sin ninguna ofrecible sigue deshabilitado` |
+| R27 | `recipe-version-select` › `R27: sin receta esta deshabilitado en «Original» y no pide nada`, `R27: una receta sin versiones ofrecibles (solo por revisar)…`, `R27: el input oculto viaja en el FormData aunque el control este deshabilitado`; `order-form` › `R27: en el alta sin receta el selector esta deshabilitado y su campo viaja vacio` |
+| R28 | `recipe-version-select` › `R28: elegir una version la deja en el FormData…`, `R28: cambiar de receta pide sus versiones y vuelve a «Original»`, `R28: la respuesta de una receta ya superada se descarta…`; `order-form` › `R28: elegir una version pide sus ingredientes y volver a «Original» los de la original`, `R28: el alta con version envia la original como receta y la version en su campo`; `order-form-quote` › `R28: elegir una version cotiza con su id, la cantidad tambien, y «Original» vuelve a la original`, `R28: cambiar de receta devuelve el selector a «Original» y cotiza con la receta nueva` |
+| R29 | `recipe-version-select` › `R29: una version por revisar sale elegida…`, `R29: una version dada de baja…`, `R29: tras pasar a «Original», la version del pedido sigue ofrecida…`; `order-form` › `R29: la edicion de un pedido con una version {por revisar, dada de baja} la muestra elegida y el FormData la conserva` |
+| Tactil / 16 px | `recipe-version-select` › `el control mide al menos 44 px de objetivo tactil y usa texto de 16 px` |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes).
+- `pnpm exec vitest run tests/unit/pedidos-ui tests/guards/guard-pantalla-pedidos-se-amplia.test.ts tests/guards/guard-identificador-de-request.test.ts tests/guards/guard-catalogo-de-errores.test.ts`:
+  `Test Files 34 passed (34)`, `Tests 512 passed | 5 skipped (517)`.
+- No corridos (por indicacion): suite completa, `./init.sh`, `vitest related`, `next dev`.

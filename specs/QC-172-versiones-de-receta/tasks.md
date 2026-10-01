@@ -153,7 +153,7 @@ confirmar crea una original nueva (R37).
 
 ## Tanda 4 — formulario
 
-### T11 [ ] — Selector de versión en el formulario de pedido
+### T11 [x] — Selector de versión en el formulario de pedido
 Tras T7, T8, T9. **Toca:** `app/(private)/pedidos/components/{recipe-version-select.tsx (nuevo),order-form.tsx,index.ts}`,
 `tests/unit/pedidos-ui/recipe-version-select.test.tsx` (nuevo),
 `tests/unit/pedidos-ui/{order-form,order-form-quote}.test.tsx` y los que fijen `ORDER_BUSINESS_FIELDS` (T0.2).
