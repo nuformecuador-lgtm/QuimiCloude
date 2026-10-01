@@ -207,6 +207,8 @@ describe('R17 — ningun archivo de produccion fuera del catalogo nombra los per
         'Si eres QC-162 (o la ficha que empiece a exigir estos permisos), relaja este barrido ' +
         'abriendo aqui las rutas exactas que los exigen, como hizo empacador-rol.test.ts.',
     ).toEqual([]);
+    // Anti-cegado: el barrido si ve el catalogo, que declara los dos codigos.
+    expect(conElCodigo).toEqual([CATALOGO_DE_PERMISOS]);
   });
 
   it('R17: dispara con un fuente sintetico que exige cualquiera de los dos codigos', () => {

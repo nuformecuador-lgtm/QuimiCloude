@@ -59,7 +59,7 @@
       - **Hecho**: typecheck y el test nuevo en verde.
       - Depende de: T0.
 
-- [ ] **T2. Los dos permisos y quién los recibe.** (`design.md > 2.1–2.3`; R5–R9.)
+- [x] **T2. Los dos permisos y quién los recibe.** (`design.md > 2.1–2.3`; R5–R9.)
       - Archivos: `lib/modules/identity/domain/permissions.ts` (dos entradas al final, párrafo de
         enmienda con su ordinal contra `dev` —hoy «Séptima»—, clave `[ROLE_MAESTRO]` y su frase en el
         JSDoc; la frase del recuento **no** se toca: ya no tiene número).

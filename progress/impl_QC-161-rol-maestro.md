@@ -146,3 +146,52 @@ Nota: `pnpm run typecheck` ya pasa en la rama (el rojo de `pino` de T0 lo resolv
   `ROLE_EMPACADOR` (15 archivos). Rojos esperados que cierran tasks posteriores:
   `guard-permisos-sembrados` (el Maestro aun sin permisos: T2) y cuatro casos de
   `seed-initial-access.test.ts` con listas de roles escritas a mano o `toHaveLength(3)` (T3).
+
+## T2 — Los dos permisos y quien los recibe
+
+### Archivos
+
+- `lib/modules/identity/domain/permissions.ts`: `empresas.consultar` y `empresas.modificar` al
+  final de `PERMISSIONS`; parrafo «**Octava enmienda al catalogo cerrado**» (3 lineas, sin citas,
+  sin nombrar `empaque.modificar`); `[ROLE_MAESTRO]: ['empresas.consultar', 'empresas.modificar']`
+  y su frase en el JSDoc de `SEED_ROLE_PERMISSIONS`; `ADMIN_EXCLUDED_PERMISSIONS` suma los dos
+  (desviacion aprobada, `design.md > 2`) y su JSDoc dice por que excluye cada cosa. La frase del
+  recuento no se toca.
+- `tests/unit/identity/permissions.test.ts`: `CODIGOS_DEL_REQUISITO` suma los dos;
+  `MODULOS`/`MODULOS_CON_ESCRITURA` suman `empresas`; los tres casos de orden que daban por hecho
+  que `empaque.modificar` era el ultimo (`QC-142 R2`, `R21`, `R35`) filtran `empresas.*` del
+  previo y exigen exactamente `empresas.consultar`, `empresas.modificar` detras de
+  `empaque.modificar` (siguen siendo igualdades exactas de la lista entera; ningun total);
+  `R6: el seed asigna permisos SOLO a roles` suma `ROLE_MAESTRO` a las claves exactas.
+  `CODIGOS_DEL_ADMINISTRADOR` y sus cuatro comparaciones no cambian: siguen verdes gracias a
+  `ADMIN_EXCLUDED_PERMISSIONS`. Bloque nuevo `QC-161 — los permisos de empresas y el Maestro`.
+- `tests/unit/identity/roles/maestro-rol.test.ts`: el barrido de R17 afirma ademas que ve el
+  catalogo (anti-cegado real, ahora que los codigos existen).
+
+### Mapa R<n> -> test (`tests/unit/identity/permissions.test.ts`, bloque «QC-161 — …»)
+
+| R | Casos |
+|---|---|
+| R5 | «R5: el catalogo contiene empresas.consultar y empresas.modificar y ningun otro empresas.*»; «R5: todo codigo que el catalogo tenia antes sigue en el, en el mismo orden»; ademas «R2: contiene exactamente los codigos del requisito» |
+| R6 | «R6: los dos codigos tienen modulo empresas, su accion y descripcion no vacia»; «R6: la descripcion de empresas.modificar nombra el alta, la edicion y la baja»; ademas «R1: cada codigo es `<modulo>.<accion>`…» y «R3: cada modulo con escritura declara consultar Y modificar» con `empresas` |
+| R7 | «R7: el JSDoc del catalogo tiene el parrafo de la enmienda de empresas, con ordinal y sin citas»; caso simetrico «R7: el caso simetrico: el detector rechaza parrafos sinteticos que citan, no tienen ordinal o pasan de cinco lineas» |
+| R8 | «R8: el Maestro recibe exactamente empresas.consultar y empresas.modificar, escritos uno a uno» |
+| R9 | «R9: el Administrador no tiene ningun empresas.* y sigue siendo el catalogo menos los excluidos» (igualdad exacta con el catalogo sin `empresas.*` ni `empaque.modificar`, independiente de `ADMIN_EXCLUDED_PERMISSIONS`); «R9: Operador y Empacador conservan exactamente sus permisos y ninguno tiene empresas.*» |
+| R17 | `maestro-rol.test.ts` «R17: empresas.consultar y empresas.modificar solo aparecen en el catalogo de permisos» (ahora con `toEqual([permissions.ts])`) |
+
+### Salida
+
+- `pnpm run typecheck`: verde.
+- `vitest run permissions.test.ts roles/ guard-permisos-sembrados catalogo-sin-total-fijo`:
+  9 archivos, 133 passed, 4 skipped.
+- Barrido de todo test unitario o guardia que nombra el catalogo (`PERMISSIONS`,
+  `empaque.modificar`, `PermissionCode`, `ADMIN_EXCLUDED_PERMISSIONS`, `SEED_ROLES`; 91 archivos):
+  8 rojos.
+  - De T3: `qc75-convenciones.test.ts` (2), `order-assignments-migration.test.ts` (1),
+    `seed-initial-access.test.ts` (3; el cuarto que salia en T1 ya esta verde con los permisos del
+    Maestro).
+  - **Deuda de `dev` no listada en `tests/baseline-rojos.json`**: `tests/unit/inventario/product-page.test.tsx`
+    («R18 — el nombre del producto se pinta junto a la unidad guardada»: espera `Hipoclorito · kg`,
+    recibe `Hipoclorito`) y `tests/unit/recetas-ui/recipe-page.test.tsx` («R21: las acciones van en
+    una columna que no se puede fijar…»). Comprobado: los dos fallan igual en `40d0dea2` (punta de
+    la rama antes de T1), en un worktree temporal desprendido. No tocan permisos ni roles.
