@@ -84,9 +84,10 @@ enum UserAccountStatus {
 }
 
 /// Las unicidades de correo, nombre de usuario y documento no son `@unique`: son indices unicos
-/// funcionales (`lower(...)`), parciales (`WHERE deleted_at IS NULL`) y con `company_id` delante,
-/// escritos a mano en la migracion. Un `@unique` aqui distinguiria mayusculas y quemaria el valor
-/// de los usuarios dados de baja. `users_company_id_idx` no sobra: el RESTRICT al borrar una empresa
+/// funcionales (`lower(...)`) y parciales (`WHERE deleted_at IS NULL`), escritos a mano en la
+/// migracion. El nombre de usuario es unico en todo el sistema; correo y documento, por empresa
+/// (`company_id` delante), mas un indice aparte para las filas sin empresa. Un `@unique` aqui
+/// distinguiria mayusculas y quemaria el valor de los usuarios dados de baja. `users_company_id_idx` no sobra: el RESTRICT al borrar una empresa
 /// tiene que ver tambien a los dados de baja, que esos indices parciales no cubren.
 /// @module identity
 model User {
@@ -102,7 +103,8 @@ model User {
   passwordHash     String    @map("password_hash")
   roleId           String    @map("role_id") @db.Uuid
   /// Con `@relation`, a diferencia de otras FK: `User` y `Company` son del mismo modulo.
-  companyId        String    @map("company_id") @db.Uuid
+  /// Vacia solo para el Maestro: lo exige el disparador "users_check_company_by_role".
+  companyId        String?   @map("company_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -128,7 +130,7 @@ model User {
 
   documentType          DocumentType           @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role                  Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  company               Company                @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  company               Company?               @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   credentialSetupTokens CredentialSetupToken[]
   revokedSessions       RevokedSession[]
 

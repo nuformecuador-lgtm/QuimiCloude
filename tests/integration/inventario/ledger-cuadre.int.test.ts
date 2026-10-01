@@ -106,6 +106,7 @@ async function deleteTestUser(db: Db, userId: string): Promise<void> {
   await db.user.delete({ where: { id: userId } });
   await db.role.delete({ where: { id: user.roleId } });
   await db.documentType.delete({ where: { code: user.documentTypeCode } });
+  if (user.companyId === null) throw new Error('el usuario de prueba se creo con empresa');
   await db.company.delete({ where: { id: user.companyId } });
 }
 

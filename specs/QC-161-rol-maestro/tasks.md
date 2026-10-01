@@ -93,7 +93,7 @@
 
 ## Bloque 2 — Base de datos
 
-- [ ] **T5. Esquema y migración.** (`design.md > 4`; R20–R22, R26–R28, R36–R39.)
+- [x] **T5. Esquema y migración.** (`design.md > 4`; R20–R22, R26–R28, R36–R39.)
       - Archivos: `db/schema.prisma` (`User.companyId String?`, `company Company?`, comentario del
         porqué; comentario de `:86-89` reescrito: nombre de usuario global, correo y documento por
         empresa más sin empresa), `db/migrations/<ts>_platform_maestro_role/migration.sql` y

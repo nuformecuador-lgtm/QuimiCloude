@@ -288,3 +288,86 @@ failed (el de T5).
 
 Guardias (`test:rapido` no las llega a correr cuando la seleccion sale roja; corridas aparte con
 `vitest run guard` en `2fc68340`): 51 archivos, 652 passed, 11 skipped, ninguna roja.
+
+## T5 — Esquema y migracion
+
+### Archivos
+
+- `db/schema.prisma`: `User.companyId String?` con su `///` (el disparador lo exige), `company
+  Company?`; comentario de cabecera del modelo reescrito (nombre de usuario global; correo y
+  documento por empresa mas un indice aparte sin empresa).
+- `db/migrations/20261001160815_platform_maestro_role/migration.sql` y `down.sql` (nuevos). El
+  `<ts>` va despues de `20260925120100_packing_permission`, la ultima de `dev` (comprobado con
+  `ls db/migrations`). `db:migrate:create` genero ademas 49 `DROP CONSTRAINT` de FK escritas a
+  mano y 10 `DROP INDEX` de indices escritos a mano (drift conocido): borrados y dicho en la
+  cabecera; solo queda el `DROP NOT NULL`. La guardia del paso 0 es literal la de `design.md >
+  4.1` (decision del humano 2026-10-01: con nombres, sin repetidos en la base de desarrollo).
+  Mensajes del disparador: `users_platform_role_without_company: …` (23514) y
+  `users_company_required: …` (23502).
+- `tests/unit/identity/schema/maestro-migration.test.ts` (nuevo, estatico, predicados con mutacion).
+- `tests/unit/identity/schema/identity-schema.test.ts`: `companyId` y `company` pasan a opcionales
+  (`isOptional` verdadero, `@db.Uuid`, `@map`, sin `@default`).
+- `tests/guards/guard-identificador-de-request.test.ts`: la migracion nueva entra en
+  `MIGRACIONES_ESPERADAS` (la guardia lo pide a toda ficha con migracion; no listado en el design).
+- Siete teardowns de integracion (`inventario/ledger-cuadre`, `product-batch-write`,
+  `product-stock`, `reservation`, `proveedores/catalog-line`, `supplier-crud`, `recetas/recipe-crud`):
+  `db.company.delete({ where: { id: user.companyId } })` no compila con `companyId` anulable; una
+  linea antes que lanza si el usuario de prueba no tiene empresa. Consecuencia directa del esquema,
+  no listada en el design.
+
+### Mapa R<n> -> test
+
+| R | Test (`maestro-migration.test.ts` salvo indicacion) |
+|---|---|
+| R20 | «R20: es la unica carpeta de la migracion del Maestro y no crea ninguna tabla» |
+| R21 | «R21, R26-R28, R36: las sentencias del UP van exactamente en este orden»; «R21: el rol insertado…»; «R21: los permisos insertados…»; «R21: el Maestro recibe exactamente SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]…»; «R21: ninguna sentencia ejecutable nombra a otro rol…» |
+| R22 | «R22: las sentencias del DOWN van exactamente en orden inverso»; «R22: users_username_unique del DOWN es el texto leido de la migracion de empresas»; «R22: el SET NOT NULL va antes de cualquier DELETE…»; «R22: sin CASCADE…»; «R22: el DOWN borra solo el rol Maestro y los empresas.*» |
+| R26, R27 | «R26, R27: 23514 para el Maestro con empresa y 23502…»; «R26, R27: salta al insertar y al cambiar company_id o role_id…»; `identity-schema.test.ts` «QC-161 R26, R27: companyId es opcional solo en la columna…» |
+| R28 | «R28: dos indices parciales sin empresa (correo y documento) y ninguno de nombre de usuario» |
+| R36 | «R36: users_username_unique del UP es el texto leido de la migracion de usuarios y roles» |
+| R37 | «R37: el UP no toca los indices por empresa de correo y documento» |
+| R38, R39 | «R39: la guardia es la PRIMERA sentencia…»; «R39: el mensaje lista cada nombre con su numero…»; «R38, R39: el UP no escribe filas de users…» |
+
+### Ciclo real contra `QuimiCloude_QC161`
+
+`grep -cE '^(DATABASE_URL|DIRECT_URL)=.*QuimiCloude_QC161' .env` = 2 antes de cada paso.
+
+```
+--- migrate 1
+The following migration(s) have been applied:
+migrations/
+  └─ 20261001160815_platform_maestro_role/
+    └─ migration.sql
+All migrations have been successfully applied.
+--- rollback
+db:rollback: aplicando down.sql de 20261001160815_platform_maestro_role y borrando su fila de _prisma_migrations
+db:rollback: 20261001160815_platform_maestro_role revertida.
+--- migrate 2
+The following migration(s) have been applied:
+migrations/
+  └─ 20261001160815_platform_maestro_role/
+    └─ migration.sql
+All migrations have been successfully applied.
+```
+
+Estado tras el segundo `migrate` (consulta a `pg_indexes`/`pg_trigger`/`information_schema`):
+`users_username_unique` = `(lower(username)) WHERE deleted_at IS NULL`; `users_email_unique` y
+`users_document_unique` siguen con `company_id` delante; `users_email_without_company_unique` y
+`users_document_without_company_unique` con `WHERE company_id IS NULL AND deleted_at IS NULL`;
+disparador `users_check_company_by_role_trigger`; rol `Maestro` con `empresas.consultar` y
+`empresas.modificar`; `users.company_id` admite NULL. Despues, `prisma generate`.
+
+### Salida
+
+- `pnpm run typecheck`: **rojo, esperado para T9**, dos errores en
+  `lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts` (`:108` TS2322
+  `string | null` a `string`; `:110` TS18047 `usuario.company` posiblemente `null`). El seed no
+  da error de tipos (T7 lo cambia igualmente).
+- `vitest run tests/unit/identity/schema guard`: 64 archivos, 898 passed, 11 skipped.
+- Todo test unitario o guardia que lee `db/migrations` (55 archivos): 831 passed.
+- `eslint` de los archivos tocados: limpio.
+- Plantilla de integracion: la huella cambio. `vitest run identity-seed.int.test.ts -t "QC-142 R13"`
+  construyo `qct_tpl_fa76230db33c` (la anterior era `qct_tpl_4295644d322f`, no se borro: es
+  compartida) y el caso paso: 1 passed, 16 skipped.
+- La base huerfana `qct_qc161_95232936_mupntzdx_mx4` ya no existia al ir a borrarla (ninguna
+  `qct_qc161_*` en `pg_database`): la limpio el arnes al arrancar esta corrida.
