@@ -156,7 +156,8 @@
         `tests/unit/identity/seed/deploy-hook.test.ts` (R14), `tests/guards/guard-password-never-plaintext.test.ts`
         y `tests/guards/guard-rol-administrador-unico.test.ts` sin tocar y en verde.
       - **Hecho**: typecheck del seed y estos tests en verde; `db:seed` contra `QuimiCloude_QC161`
-        crea el Maestro la primera vez y dice «ya existia» la segunda (salida pegada en `progress/`).
+        crea el Maestro la primera vez y la segunda imprime «db:seed: nada que crear» (salida pegada
+        en `progress/`).
       - Depende de: T1, T2, T5.
 
 - [x] **T8. El seed contra Postgres.** (R4, R10, R15, R18, R42, R43.)
