@@ -19,6 +19,7 @@
 | QC-138 | estado-bloqueado-por-inventario-insuficiente | Pedidos | fullstack | spec_ready | feature/QC-138-estado-bloqueado-por-inventario-insuficiente | leader. **Spec APROBADO; QC-168 mergeada el 2026-09-26 (#129): lista para F2.0** (rebasar migracion y orden del enum). Ver Evaluaciones. |
 
 ## Evaluaciones
+**2026-10-01 · QC-161 F2.1-F2.4:** T0-T14 cerradas; review vuelta 1 RECHAZADO (B1 citas en JSDoc de produccion + 3 menores), vuelta 2 OK; gate completo verde (5 rojos, todos del baseline de QC-177); **PR #135 abierto**, tarjeta en *En revision*. Decisiones humanas: `empresas.*` en `ADMIN_EXCLUDED_PERMISSIONS`; R39 sin cambios (base de desarrollo, sin repetidos); `SEED_MAESTRO_*` en Vercel confirmadas. De paso: fix de `pino` (#132/#133, mergeados) y nace **QC-177** (5 rojos heredados de dev por la tabla compartida y el filtro de usuarios).
 
 **2026-10-01:** QC-171 cerrada (PR #134, merge `d17242a9`; tarjeta a Finalizado; resumen en history). Desbloquea QC-176. **T8 pendiente del humano**: bucket de recortes a publico antes de desplegar. Base local `QuimiCloude` migrada al dia (11 migraciones; `20260923150000`/`150100` marcadas `--applied` por ser identicas a las que QC-141 aplico antes de renumerarlas).
 
