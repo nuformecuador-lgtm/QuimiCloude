@@ -238,7 +238,7 @@
       - **Hecho**: guardia en verde, lista de exentas idéntica.
       - Depende de: T5.
 
-- [ ] **T14. Gate completo y trazabilidad.**
+- [x] **T14. Gate completo y trazabilidad.**
       - Archivos: `progress/impl_QC-161-rol-maestro.md` (mapa `R1..R44 → test` completo según
         `design.md > 10.3`; salida del ciclo de migración; salida de `db:seed`; `target` medido;
         **precondiciones de despliegue**: las tres `SEED_MAESTRO_*` en Vercel producción y preview y
