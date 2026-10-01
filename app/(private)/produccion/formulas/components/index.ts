@@ -5,7 +5,6 @@ export { FormulaPdfUpload } from './formula-pdf-upload';
 export {
   ACTIONS_COLUMN_ID,
   IMAGE_COLUMN_ID,
-  RECIPE_DEFAULT_PINNED_COLUMNS,
   buildRecipeColumns,
   type RecipeColumn,
   type RecipeColumnId,

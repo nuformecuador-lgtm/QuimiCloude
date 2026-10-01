@@ -43,8 +43,8 @@ import { presentationListHref } from './presentation-list-params';
  * edicion. Las columnas se memoizan por `units` -mismo mecanismo que `OrderTable` de QC-35- para
  * no reconstruir la declaracion en cada render y perder el estado interno de `<DataTable>`.
  *
- * **Sin `defaultPinnedColumns`**: con dos columnas no hay nada que fijar por defecto. La de
- * acciones ademas declara `pinnable: false` y no puede tapar a la del nombre.
+  * **Sin `defaultPinned` en ninguna columna**: con dos columnas no hay nada que fijar por
+  * defecto. La de acciones ademas declara `pinnable: false` y no puede tapar a la del nombre.
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R18): `components/ui/table.tsx` ya
  * envuelve la tabla en un contenedor con `overflow-x-auto`, asi que el documento no se desplaza y
