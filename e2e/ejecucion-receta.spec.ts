@@ -200,6 +200,10 @@ async function seedOrder(params: {
   if (!recipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
   if (!presentationId) throw new Error('la presentacion del fixture no existe: fallo el beforeAll');
 
+  const { unitId } = await prisma.presentation.findUniqueOrThrow({
+    where: { id: presentationId },
+    select: { unitId: true },
+  });
   const year = new Date().getUTCFullYear();
   const order = await prisma.order.create({
     data: {
@@ -208,8 +212,17 @@ async function seedOrder(params: {
       orderSequence: params.sequence,
       recipeId,
       quantity: ORDER_QUANTITY,
-      presentationId,
-      presentationContent: PRESENTATION_CONTENT,
+      unitId,
+      presentationLines: {
+        create: [
+          {
+            companyId,
+            presentationId,
+            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+            presentationContent: PRESENTATION_CONTENT,
+          },
+        ],
+      },
       status: params.status,
     },
     select: { id: true },

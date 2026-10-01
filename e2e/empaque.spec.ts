@@ -409,8 +409,17 @@ test.beforeAll(async () => {
       orderSequence: BASE_SEQUENCE,
       recipeId,
       quantity: ORDER_QUANTITY,
-      presentationId,
-      presentationContent: PRESENTATION_CONTENT,
+      unitId: unit.id,
+      presentationLines: {
+        create: [
+          {
+            companyId,
+            presentationId,
+            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+            presentationContent: PRESENTATION_CONTENT,
+          },
+        ],
+      },
       status: 'EN_CURSO',
     },
     select: { id: true },

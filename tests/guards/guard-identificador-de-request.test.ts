@@ -378,6 +378,8 @@ export const MIGRACIONES_ESPERADAS = [
   // pedido, la otra enlaza los movimientos de produccion con esa linea de reparto.
   '20260927120000_order_presentation_lines',
   '20260927120100_inventory_movements_production_per_line',
+  // Ni esta: pasa la presentacion unica de cada pedido a su reparto y retira esas columnas.
+  '20260927120200_order_presentation_lines_backfill_and_drop',
 ] as const
 
 export function hallazgosDeMigraciones(

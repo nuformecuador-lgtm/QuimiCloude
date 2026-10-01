@@ -229,7 +229,7 @@ afterAll(async () => {
   // La receta ANTES que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
   await prisma.recipe.delete({ where: { id: recipeId } })
   // La presentacion TAMBIEN antes que la empresa, y despues de los pedidos que la usan (arriba):
-  // `orders_company_id_presentation_id_fkey` es RESTRICT (QC-146).
+  // `order_presentation_lines_company_id_presentation_id_fkey` es RESTRICT.
   await prisma.presentation.delete({ where: { id: presentationId } })
   await prisma.company.delete({ where: { id: companyId } })
   await prisma.unit.delete({ where: { id: unitId } })

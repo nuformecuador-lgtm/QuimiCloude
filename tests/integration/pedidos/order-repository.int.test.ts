@@ -216,7 +216,7 @@ async function dropFixtures(): Promise<void> {
   // La receta TAMBIEN antes que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
   await prisma.recipe.delete({ where: { id: recipeId } })
   // La presentacion TAMBIEN antes que la empresa, y despues de todo pedido que la use -cada
-  // caso ya borro los suyos en su `finally` (`limpiar`)-: `orders_company_id_presentation_id_fkey`
+  // caso ya borro los suyos en su `finally` (`limpiar`)-: `order_presentation_lines_company_id_presentation_id_fkey`
   // es `ON DELETE RESTRICT` (QC-146).
   await prisma.presentation.delete({ where: { id: presentationId } })
   // La empresa DESPUES del usuario y de la receta: `users_company_id_fkey` y

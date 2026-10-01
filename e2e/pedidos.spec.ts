@@ -431,7 +431,7 @@ test.describe('pantalla de pedidos', () => {
         orderSequence: true,
         priority: true,
         quantity: true,
-        presentationId: true,
+        presentationLines: { select: { presentationId: true } },
       },
     });
     const numberText = formatOrderNumber({
@@ -443,9 +443,10 @@ test.describe('pantalla de pedidos', () => {
     // (R39): ni el formulario ni la pantalla los pasaron por coma flotante.
     expect(created.priority).toBe(DEFAULT_ORDER_PRIORITY);
     expect(Number(created.quantity)).toBe(Number(ORDER_QUANTITY));
-    expect(created.presentationId, 'la fila de la base guarda la presentacion elegida (R29)').toBe(
-      presentationId,
-    );
+    expect(
+      created.presentationLines.map((line) => line.presentationId),
+      'el reparto guardado lleva la presentacion elegida (R29)',
+    ).toContain(presentationId);
 
     // --- 10. Y el pedido esta en la lista, localizado POR SU CORRELATIVO (R7, R10).
     const row = await findOrderRow(page, numberText);

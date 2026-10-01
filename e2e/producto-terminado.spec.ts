@@ -526,7 +526,12 @@ test.describe('producto terminado', () => {
     const order = await prisma.order.findFirstOrThrow({
       where: { recipeId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, orderYear: true, orderSequence: true, presentationContent: true },
+      select: {
+        id: true,
+        orderYear: true,
+        orderSequence: true,
+        presentationLines: { select: { presentationContent: true } },
+      },
     });
     const orderNumber = formatOrderNumber({
       year: order.orderYear,
@@ -535,8 +540,8 @@ test.describe('producto terminado', () => {
     // Igualdad NUMERICA, no de texto: el valor vuelve de un `DECIMAL(14,4)` y como se serialicen
     // sus ceros de relleno es cosa de la libreria, no del dato.
     expect(
-      order.presentationContent?.equals(PRESENTATION_CONTENT_INITIAL) ?? false,
-      'el pedido deberia copiar el contenido de la presentacion al crearse (R38)',
+      order.presentationLines[0]?.presentationContent?.equals(PRESENTATION_CONTENT_INITIAL) ?? false,
+      'la linea del reparto deberia copiar el contenido de la presentacion al crearse (R38)',
     ).toBe(true);
 
     // --- 3. Se asigna al Operador por Prisma: la asignacion no es lo que este recorrido demuestra

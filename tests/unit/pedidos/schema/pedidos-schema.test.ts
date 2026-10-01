@@ -129,7 +129,7 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los VEINTIUN campos escalares de `Order`, con la columna en ingles que le toca. Fueron
+/** Los DIECINUEVE campos escalares de `Order`, con la columna en ingles que le toca. Fueron
  *  catorce y quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id`
  *  y `unit_price` de la tabla
  *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
@@ -137,7 +137,8 @@ const user = parseModel('User')
  *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete, `finishedAt` a
  *  dieciocho, `presentationContent` a diecinueve y `packedBy` a veinte. `unitId` vuelve a la
  *  tabla y las lleva a veintiuno: la decision [Q4] deroga la salida del 2026-09-07 (`design.md`
- *  seccion 0.6). La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
+ *  seccion 0.6). El reparto por presentacion retira `presentationId` y `presentationContent`
+ *  (pasan a `OrderPresentationLine`) y quedan diecinueve. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
  *  test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
@@ -156,9 +157,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
   ['ingredientsCost', 'ingredients_cost'],
   ['reservedAt', 'reserved_at'],
-  ['presentationId', 'presentation_id'], // el envase en que se entrega, opcional
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
-  ['presentationContent', 'presentation_content'], // copia del contenido de la presentacion, opcional
   ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
   ['unitId', 'unit_id'], // la unidad en que se expresa quantity, opcional [Q4]
 ]
@@ -311,11 +310,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Los TRES unicos decimales del modelo: la cantidad, el importe de ingredientes y la copia
-    // del contenido de la presentacion.
+    // Los DOS unicos decimales del modelo: la cantidad y el importe de ingredientes. La copia del
+    // contenido de la presentacion vive en la linea de reparto.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['ingredientsCost', 'presentationContent', 'quantity'])
+    ).toEqual(['ingredientsCost', 'quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -678,7 +677,6 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_recipe_id_idx',
       'orders_created_by_idx',
       'orders_updated_by_idx',
-      'orders_presentation_id_idx',
       'orders_packed_by_idx',
       'orders_unit_id_idx',
     ])
@@ -714,17 +712,12 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
   })
 
-  it('presentationId es uuid anulable, sin @relation y con su indice (R1, R2, R5)', () => {
-    const presentationId = field(order, 'presentationId')
-    expect(presentationId.type).toBe('String')
-    expect(presentationId.isOptional).toBe(true)
-    expect(presentationId.attributes).toContain('@db.Uuid')
-    expect(presentationId.attributes).toContain('@map("presentation_id")')
-    expect(presentationId.attributes).not.toMatch(/@default\(/)
-    expect(presentationId.attributes).not.toMatch(/@relation/)
-    expect(order.body).toMatch(
-      /@@index\(\[presentationId\],\s*map:\s*"orders_presentation_id_idx"\)/,
-    )
+  it('la presentacion unica ya no existe en el pedido: ni presentationId, ni presentationContent, ni su indice', () => {
+    expect(has(order, 'presentationId')).toBe(false)
+    expect(has(order, 'presentationContent')).toBe(false)
+    expect(order.body).not.toContain('presentation_id')
+    expect(order.body).not.toContain('presentation_content')
+    expect(order.body).not.toContain('orders_presentation_id_idx')
   })
 
   it('finishedAt es timestamptz anulable, sin default y sin indice en el esquema (R1)', () => {

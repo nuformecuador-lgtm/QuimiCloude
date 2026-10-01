@@ -259,7 +259,7 @@ afterAll(async () => {
   }
   if (recetaId !== undefined) await prisma.recipe.deleteMany({ where: { id: recetaId } });
   // Las presentaciones DESPUES de borrar los pedidos (arriba) y ANTES que las empresas:
-  // `orders_company_id_presentation_id_fkey` y `presentations_company_id_fkey` son RESTRICT.
+  // `order_presentation_lines_company_id_presentation_id_fkey` y `presentations_company_id_fkey` son RESTRICT.
   for (const empresa of empresas) {
     await prisma.presentation.deleteMany({ where: { id: empresa.presentationId } });
   }

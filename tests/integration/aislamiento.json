@@ -40,6 +40,7 @@
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
+    "pedidos/qc170-backfill.int.test.ts",
     "proveedores/catalog-line.int.test.ts",
     "proveedores/company-scope.int.test.ts",
     "proveedores/material-measurements-migration.int.test.ts",

@@ -630,17 +630,10 @@ model Order {
   /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
   /// entregar lo vacian.
   reservedAt          DateTime?     @map("reserved_at") @db.Timestamptz(6)
-  /// El envase en que se entrega lo fabricado, del catalogo de `inventario`. NULL en los
-  /// pedidos que existian antes de esta columna. Sin `@relation`: es drift, con FK COMPUESTA
-  /// `(company_id, presentation_id)` escrita a mano en la migracion.
-  presentationId      String?       @map("presentation_id") @db.Uuid
   /// Instante en que el pedido paso a ENTREGADO al finalizarlo en planta. NULL en los entregados
   /// antes de existir la columna. Solo puede tener valor si el estado es ENTREGADO, lo exige el
   /// CHECK `orders_finished_at_requires_delivered`.
   finishedAt          DateTime?     @map("finished_at") @db.Timestamptz(6)
-  /// Copia del contenido de la presentacion al crear el pedido o al cambiarle la presentacion.
-  /// NULL = la presentacion no tenia contenido entonces, o el pedido es anterior a esta columna.
-  presentationContent Decimal?      @map("presentation_content") @db.Decimal(14, 4)
   /// Quien tiene el pedido en empaque. Obligatorio en EN_EMPAQUE, NULL en PENDIENTE, EN_CURSO,
   /// POR_EMPACAR y CANCELADO, y opcional en ENTREGADO (los entregados antiguos no lo tienen, los
   /// nuevos lo conservan), lo exige el CHECK `orders_packed_by_matches_status`. Sin `@relation`:
@@ -658,7 +651,6 @@ model Order {
   @@index([recipeId], map: "orders_recipe_id_idx")
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
-  @@index([presentationId], map: "orders_presentation_id_idx")
   @@index([packedBy], map: "orders_packed_by_idx")
   @@index([unitId], map: "orders_unit_id_idx")
   @@map("orders")
