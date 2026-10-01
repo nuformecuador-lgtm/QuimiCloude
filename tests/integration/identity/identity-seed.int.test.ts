@@ -56,13 +56,20 @@ import {
   withInitialAccessTransaction,
 } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import {
+  DOCUMENT_TYPE_CC,
   INITIAL_COMPANY_NAME,
   INITIAL_USER_ACCOUNT_STATUS,
   SEED_ADMIN_ACCOUNT_STATUS,
   normalizeCompanyName,
 } from '@/lib/modules/identity';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
-import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
+import {
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  ROLE_OPERADOR,
+  SEED_ROLES,
+} from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -124,6 +131,7 @@ const fakeMaestroCredentialsProvider: InitialAdminCredentialsProvider = () => ({
 
 /** Las tres variables que lee el adaptador de entorno (`design.md > 6`). */
 const SEED_ADMIN_ENV_VAR_NAMES = ['SEED_ADMIN_USERNAME', 'SEED_ADMIN_PASSWORD', 'SEED_ADMIN_EMAIL'] as const;
+const SEED_MAESTRO_ENV_VAR_NAMES = ['SEED_MAESTRO_USERNAME', 'SEED_MAESTRO_PASSWORD', 'SEED_MAESTRO_EMAIL'] as const;
 
 /**
  * Ejecuta `run` con las tres `SEED_ADMIN_*` borradas del entorno del proceso de test, y
@@ -132,8 +140,10 @@ const SEED_ADMIN_ENV_VAR_NAMES = ['SEED_ADMIN_USERNAME', 'SEED_ADMIN_PASSWORD', 
  * local, y el entorno del test es el unico que se toca.
  */
 async function withSeedAdminEnvVarsCleared<T>(run: () => Promise<T>): Promise<T> {
-  const saved = new Map(SEED_ADMIN_ENV_VAR_NAMES.map((name) => [name, process.env[name]]));
-  for (const name of SEED_ADMIN_ENV_VAR_NAMES) delete process.env[name];
+  // QC-161: tambien las del Maestro, guardadas y restauradas igual.
+  const names = [...SEED_ADMIN_ENV_VAR_NAMES, ...SEED_MAESTRO_ENV_VAR_NAMES];
+  const saved = new Map(names.map((name) => [name, process.env[name]]));
+  for (const name of names) delete process.env[name];
   try {
     return await run();
   } finally {
@@ -426,7 +436,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(adminAfterFirst.role.name).toBe(ROLE_ADMINISTRADOR);
 
       const usersAfterFirst = await tx.user.count();
-      expect(usersAfterFirst).toBe(1);
+      expect(usersAfterFirst).toBe(2); // QC-161: el Administrador y el Maestro.
 
       // Segunda corrida: no debe duplicar ni modificar nada.
       const second = await seedInitialAccess({
@@ -459,7 +469,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       // y must_change_credential incluidos (design.md > 11).
       expect(adminAfterSecond).toEqual(adminAfterFirst);
 
-      expect(await tx.user.count()).toBe(1);
+      expect(await tx.user.count()).toBe(2); // QC-161: el Administrador y el Maestro.
       expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(SEED_ROLE_NAMES.length);
     });
   });
@@ -671,7 +681,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       expect(outcome.createdRoles).toEqual([]);
       expect(outcome.createdAdmin).toBe(false);
-      expect(await tx.user.count()).toBe(1);
+      expect(await tx.user.count()).toBe(2); // QC-161: el Administrador y el Maestro.
       expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(SEED_ROLE_NAMES.length);
     });
   });
@@ -790,7 +800,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(second.createdAdmin).toBe(false);
       expect(second.createdCompany).toBeNull();
       expect(await tx.company.findMany()).toEqual(empresas);
-      expect(await tx.user.count()).toBe(1);
+      expect(await tx.user.count()).toBe(2); // QC-161: el Administrador y el Maestro.
     });
   });
 
@@ -1109,6 +1119,303 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         ]);
         expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).not.toContain('recetas.consultar');
       }
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-161 — el primer Maestro contra Postgres
+// ---------------------------------------------------------------------------
+
+/** Una foto de las filas que el seed podria escribir, para afirmar «base intacta». */
+async function fotoDeLoQueSiembra(tx: Prisma.TransactionClient) {
+  return {
+    usuarios: await tx.user.findMany({ orderBy: { id: 'asc' } }),
+    roles: await tx.role.findMany({ orderBy: { id: 'asc' } }),
+    empresas: await tx.company.findMany({ orderBy: { id: 'asc' } }),
+    ...(await fotoDePermisos(tx)),
+  };
+}
+
+async function findLiveMaestros(tx: Prisma.TransactionClient) {
+  return tx.user.findMany({ where: { deletedAt: null, role: { name: ROLE_MAESTRO } } });
+}
+
+/**
+ * Deja la base sembrada con Administrador y SIN Maestro: corrida completa y luego se borra
+ * fisicamente el Maestro recien creado (nada le apunta todavia). Todo dentro del `tx`.
+ */
+async function sembradaSinMaestro(tx: Prisma.TransactionClient) {
+  await resetIdentityToEmptyState(tx);
+  const repository = createInitialAccessRepository(tx);
+  await seedInitialAccess({
+    repository,
+    passwordHasher: identity.passwordHasher,
+    checkCredentialPolicy: identity.checkCredentialPolicy,
+    credentials: fakeCredentialsProvider,
+    maestroCredentials: fakeMaestroCredentialsProvider,
+  });
+  await tx.user.deleteMany({ where: { role: { name: ROLE_MAESTRO } } });
+  expect(await findLiveMaestros(tx)).toEqual([]);
+  return repository;
+}
+
+/** Un usuario de una empresa B propia del caso, con el rol Operador ya sembrado. */
+async function crearUsuarioDeOtraEmpresa(
+  tx: Prisma.TransactionClient,
+  datos: { username: string; email: string },
+) {
+  const sufijo = randomUUID();
+  const empresa = await tx.company.create({
+    data: { name: `QC161 B ${sufijo}`, nameNormalized: normalizeCompanyName(`QC161 B ${sufijo}`) },
+  });
+  const operador = await tx.role.findUniqueOrThrow({ where: { name: ROLE_OPERADOR } });
+  return tx.user.create({
+    data: {
+      firstNames: 'Usuaria',
+      lastNames: 'De Empresa',
+      birthDate: new Date('1990-01-01T00:00:00.000Z'),
+      email: datos.email,
+      phone: '+57 300 000 0000',
+      documentTypeCode: DOCUMENT_TYPE_CC,
+      documentNumber: sufijo.replaceAll('-', '').slice(0, 20),
+      username: datos.username,
+      passwordHash: 'hash-de-fixture-no-usable',
+      roleId: operador.id,
+      companyId: empresa.id,
+    },
+  });
+}
+
+describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', () => {
+  it('QC-161 R10, R18, R4: dos corridas sobre base vacia dejan una sola fila Maestro, un solo Maestro sin empresa y activo, y cada rol con sus permisos', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      const repository = createInitialAccessRepository(tx);
+      const deps = {
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      };
+
+      const first = await seedInitialAccess(deps);
+      expect(first.createdMaestro).toBe(true);
+      expect(first.createdAdmin).toBe(true);
+      const fotoTrasLaPrimera = await fotoDeLoQueSiembra(tx);
+
+      const second = await seedInitialAccess(deps);
+      expect(second).toEqual({
+        createdRoles: [],
+        createdAdmin: false,
+        createdMaestro: false,
+        createdCompany: null,
+        createdPermissions: [],
+        createdRolePermissions: 0,
+      });
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(fotoTrasLaPrimera);
+
+      // R4: una sola fila Maestro en el catalogo, sin campo de empresa.
+      const filasMaestro = await tx.role.findMany({ where: { name: ROLE_MAESTRO } });
+      expect(filasMaestro).toHaveLength(1);
+      expect(Object.keys(filasMaestro[0] ?? {})).not.toContain('companyId');
+
+      // R10: exactamente un Maestro, sin empresa, activo, con los marcadores.
+      const maestros = await findLiveMaestros(tx);
+      expect(maestros).toHaveLength(1);
+      const maestro = maestros[0]!;
+      const admin = (await findLiveAdmin(tx))!;
+      expect(maestro.companyId).toBeNull();
+      expect(maestro.accountStatus).toBe('active');
+      expect(maestro.username).toBe(FAKE_MAESTRO_USERNAME);
+      expect(maestro.email).toBe(FAKE_MAESTRO_EMAIL);
+      expect(maestro.firstNames).toBe('Plataforma');
+      expect(maestro.lastNames).toBe('Inicial');
+      expect(maestro.birthDate).toEqual(admin.birthDate);
+      expect(maestro.phone).toBe(admin.phone);
+      expect(maestro.documentTypeCode).toBe(admin.documentTypeCode);
+      expect(maestro.documentNumber).toBe(admin.documentNumber);
+      // Solo el hash: el texto en claro no esta y el hash lo verifica.
+      expect(maestro.passwordHash).not.toBe(FAKE_MAESTRO_CREDENTIAL);
+      expect(await identity.passwordHasher.verify(FAKE_MAESTRO_CREDENTIAL, maestro.passwordHash)).toBe(true);
+
+      // R18: CADA rol del catalogo sembrado con exactamente los permisos del dominio.
+      for (const role of SEED_ROLES) {
+        expect(await codigosEnBaseDe(tx, role.name), `permisos en base del rol «${role.name}»`).toEqual(
+          codigosSembradosDe(role.name),
+        );
+      }
+    });
+  });
+
+  it('QC-161 R15: con el Administrador y la empresa ya creados y sin Maestro, solo se crea el Maestro', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repository = await sembradaSinMaestro(tx);
+      const antes = await fotoDeLoQueSiembra(tx);
+
+      const outcome = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+
+      expect(outcome.createdMaestro).toBe(true);
+      expect(outcome.createdAdmin).toBe(false);
+      expect(outcome.createdCompany).toBeNull();
+      const despues = await fotoDeLoQueSiembra(tx);
+      expect(despues.usuarios).toHaveLength(antes.usuarios.length + 1);
+      expect(despues.empresas).toEqual(antes.empresas);
+      expect(despues.roles).toEqual(antes.roles);
+    });
+  });
+
+  it('QC-161 R42: un usuario vivo de otra empresa con el nombre del Maestro en otras mayusculas hace fallar el seed y la base queda igual', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repository = await sembradaSinMaestro(tx);
+      await crearUsuarioDeOtraEmpresa(tx, {
+        username: FAKE_MAESTRO_USERNAME.toUpperCase(),
+        email: `qc161.otro.${randomUUID()}@example.test`,
+      });
+      const antes = await fotoDeLoQueSiembra(tx);
+
+      let mensaje = '';
+      try {
+        await seedInitialAccess({
+          repository,
+          passwordHasher: identity.passwordHasher,
+          checkCredentialPolicy: identity.checkCredentialPolicy,
+          credentials: fakeCredentialsProvider,
+          maestroCredentials: fakeMaestroCredentialsProvider,
+        });
+      } catch (error) {
+        mensaje = error instanceof Error ? error.message : String(error);
+      }
+
+      expect(mensaje).toBe('el nombre de usuario del maestro inicial ya esta en uso');
+      expect(mensaje.toLowerCase()).not.toContain(FAKE_MAESTRO_USERNAME);
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(antes);
+      expect(await findLiveMaestros(tx)).toEqual([]);
+    });
+  });
+
+  it('QC-161 R42: si ese usuario esta dado de baja, el seed crea el Maestro', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repository = await sembradaSinMaestro(tx);
+      const otro = await crearUsuarioDeOtraEmpresa(tx, {
+        username: FAKE_MAESTRO_USERNAME.toUpperCase(),
+        email: `qc161.otro.${randomUUID()}@example.test`,
+      });
+      await tx.user.update({ where: { id: otro.id }, data: { deletedAt: new Date() } });
+
+      const outcome = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+
+      expect(outcome.createdMaestro).toBe(true);
+      expect((await findLiveMaestros(tx)).map((maestro) => maestro.username)).toEqual([FAKE_MAESTRO_USERNAME]);
+    });
+  });
+
+  it('QC-161 R43: si el correo del Maestro es el de un usuario de una empresa, el seed lo crea', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repository = await sembradaSinMaestro(tx);
+      await crearUsuarioDeOtraEmpresa(tx, {
+        username: `qc161.otro.${randomUUID()}`,
+        email: FAKE_MAESTRO_EMAIL.toUpperCase(),
+      });
+
+      const outcome = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+
+      expect(outcome.createdMaestro).toBe(true);
+      const maestros = await findLiveMaestros(tx);
+      expect(maestros).toHaveLength(1);
+      expect(maestros[0]?.email).toBe(FAKE_MAESTRO_EMAIL);
+      expect(maestros[0]?.companyId).toBeNull();
+    });
+  });
+
+  it('QC-161 R43: el contador de correo sin empresa cuenta un usuario vivo sin empresa y no uno de empresa', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await sembradaSinMaestro(tx);
+      const repository = createInitialAccessRepository(tx);
+      await crearUsuarioDeOtraEmpresa(tx, {
+        username: `qc161.otro.${randomUUID()}`,
+        email: FAKE_MAESTRO_EMAIL,
+      });
+      expect(await repository.countLiveUsersWithoutCompanyWithEmail(FAKE_MAESTRO_EMAIL)).toBe(0);
+
+      await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+      expect(await repository.countLiveUsersWithoutCompanyWithEmail(FAKE_MAESTRO_EMAIL.toUpperCase())).toBe(1);
+      expect(await repository.countLiveUsersWithUsername(FAKE_MAESTRO_USERNAME.toUpperCase())).toBe(1);
+    });
+  });
+
+  it('QC-161 R11: con el Maestro ya creado y sin ninguna SEED_MAESTRO_* el seed termina sin crear nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      const repository = createInitialAccessRepository(tx);
+      await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+      const antes = await fotoDeLoQueSiembra(tx);
+
+      const outcome = await withSeedAdminEnvVarsCleared(() =>
+        seedInitialAccess({
+          repository,
+          passwordHasher: identity.passwordHasher,
+          checkCredentialPolicy: identity.checkCredentialPolicy,
+          credentials: readInitialAdminCredentialsFromEnv,
+          maestroCredentials: readInitialMaestroCredentialsFromEnv,
+        }),
+      );
+
+      expect(outcome.createdMaestro).toBe(false);
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(antes);
+    });
+  });
+
+  it('QC-161 R12: sin Maestro y sin las SEED_MAESTRO_*, lanza nombrandolas y no escribe nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repository = await sembradaSinMaestro(tx);
+      const antes = await fotoDeLoQueSiembra(tx);
+
+      await expect(
+        withSeedAdminEnvVarsCleared(() =>
+          seedInitialAccess({
+            repository,
+            passwordHasher: identity.passwordHasher,
+            checkCredentialPolicy: identity.checkCredentialPolicy,
+            credentials: readInitialAdminCredentialsFromEnv,
+            maestroCredentials: readInitialMaestroCredentialsFromEnv,
+          }),
+        ),
+      ).rejects.toThrow(
+        'faltan las variables de entorno: SEED_MAESTRO_USERNAME, SEED_MAESTRO_PASSWORD, SEED_MAESTRO_EMAIL',
+      );
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(antes);
     });
   });
 });

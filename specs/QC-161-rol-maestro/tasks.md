@@ -159,7 +159,7 @@
         crea el Maestro la primera vez y dice «ya existia» la segunda (salida pegada en `progress/`).
       - Depende de: T1, T2, T5.
 
-- [ ] **T8. El seed contra Postgres.** (R4, R10, R15, R18, R42, R43.)
+- [x] **T8. El seed contra Postgres.** (R4, R10, R15, R18, R42, R43.)
       - Archivos (solo tests): `tests/integration/identity/identity-seed.int.test.ts` (dos corridas;
         para **cada** rol de `SEED_ROLES`, permisos en base = permisos del dominio; una sola fila
         `Maestro`; Maestro sin empresa, `active`, «Plataforma»/«Inicial»; R42 con un usuario vivo de

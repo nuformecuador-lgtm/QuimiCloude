@@ -630,3 +630,33 @@ borrar. La segunda corrida borro la suya.
   («nada que crear»); «usuario maestro: ya existia» solo sale cuando la misma corrida crea otra cosa.
   No se cambio esa rama. Fila resultante (consulta de lectura): 1 rol `Maestro`, 1 usuario Maestro
   con `companyId: null`, `active`, «Plataforma»/«Inicial», vivo, `mustChangeCredential: true`.
+
+## T8 — El seed contra Postgres
+
+### Archivos (solo tests)
+
+- `tests/integration/identity/identity-seed.int.test.ts`: bloque «el primer Maestro (QC-161)» con
+  `sembradaSinMaestro` (corrida completa dentro del `tx` y borrado fisico del Maestro recien creado),
+  `crearUsuarioDeOtraEmpresa` (empresa B propia del caso, rol Operador) y `fotoDeLoQueSiembra`
+  (usuarios, roles, empresas, permisos y asignaciones, filas completas). `withSeedAdminEnvVarsCleared`
+  guarda y restaura tambien las `SEED_MAESTRO_*`. Cuatro conteos `tx.user.count()` de casos previos
+  pasan de 1 a 2 (el Administrador y el Maestro). Todo en transaccion revertida.
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R4, R10, R18 | «QC-161 R10, R18, R4: dos corridas sobre base vacia dejan una sola fila Maestro, un solo Maestro sin empresa y activo, y cada rol con sus permisos» (marcadores iguales a los del Administrador salvo nombres; hash verificable, nunca el texto; la segunda corrida devuelve todo vacio y la foto no cambia) |
+| R11 | «QC-161 R11: con el Maestro ya creado y sin ninguna SEED_MAESTRO_* el seed termina sin crear nada» |
+| R12 | «QC-161 R12: sin Maestro y sin las SEED_MAESTRO_*, lanza nombrandolas y no escribe nada» |
+| R15 | «QC-161 R15: con el Administrador y la empresa ya creados y sin Maestro, solo se crea el Maestro» |
+| R42 | «QC-161 R42: un usuario vivo de otra empresa con el nombre del Maestro en otras mayusculas hace fallar el seed y la base queda igual», «QC-161 R42: si ese usuario esta dado de baja, el seed crea el Maestro» |
+| R43 | «QC-161 R43: si el correo del Maestro es el de un usuario de una empresa, el seed lo crea», «QC-161 R43: el contador de correo sin empresa cuenta un usuario vivo sin empresa y no uno de empresa» |
+
+### Salida
+
+- `.env` con `QuimiCloude_QC161` comprobado (`grep -c` = 2). Plantilla nueva `qct_tpl_0f74965b392b`
+  (huella de migraciones cambiada); corridas sobre `qct_qc161_…` copiadas de ella y borradas al terminar.
+- Primera corrida: 3 rojos esperados (`tx.user.count()` = 2 por el Maestro). Tras el ajuste:
+  `vitest run identity-seed.int.test.ts`: 1 archivo, 25 passed (8 nuevos).
+- `pnpm exec tsc --noEmit` verde; `eslint` del archivo limpio.
