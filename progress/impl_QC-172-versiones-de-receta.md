@@ -309,3 +309,51 @@ Ademas (sin R): `parent_recipe_id = id → 23514`, FK RESTRICT ante borrado fisi
 - `company-scope.int.test.ts:800-840` (down de `recipes_company_scope` sobre el esquema vivo) pasa con
   `recipes_version_name_unique` presente, como preveia T0.
 - Nota: Postgres devuelve 23503 (no 23001) para la FK `ON DELETE RESTRICT`.
+
+## T2 — codigo de error recipe_version_under_review
+
+Commit `28d193f0`.
+
+### Archivos
+- `lib/modules/errores/domain/error-codes.ts`: `recipe_version_under_review` al final de `ERROR_CODES`.
+- `lib/modules/errores/domain/error-catalog.ts`: clave `errors.recipe_version_under_review` y texto
+  literal del design §6.2 («La versión elegida está por revisar: ajústala antes de usarla en un
+  pedido.»). Nota: es el primer texto del catalogo con tildes; ninguna guardia exige ASCII.
+- `lib/modules/pedidos/domain/errors.ts`: `RecipeVersionUnderReviewError` (`PedidosError`). No se
+  publica aun en `pedidos/index.ts`: lo lanza `create-order`/`update-order` (T8), dentro del modulo.
+- `tests/unit/errores/catalogo.test.ts`: conteo literal 60 → 61 y caso nuevo por el traductor.
+
+### R → test
+| R | Test |
+|---|---|
+| R33 | `catalogo.test.ts` › `QC-172 R33: recipe_version_under_review sale por el traductor con su texto, distinto de recipe_not_found` (`createErrorStateTranslator(PedidosError, …)` → `{status, code, message}` exacto) |
+
+## T3 — reglas puras de version
+
+Commit `a09d92d3`.
+
+### Archivos
+- `lib/modules/recetas/domain/recipe-version.ts` (nuevo): `VERSION_NAME_SEPARATOR`,
+  `recipeDisplayName`, `isVersionUnderReview`, `propagateLines` (§2). Comparacion por centesimas
+  con `percentageToHundredths`; salida en orden de `A` y luego lineas propias de `V`.
+- `lib/modules/recetas/index.ts`: exporta las cuatro.
+- `tests/unit/recetas/recipe-version.test.ts` (nuevo, 24 casos, importa del barrel).
+
+### R → test (todos en `recipe-version.test.ts`)
+| R | Casos |
+|---|---|
+| R11 | `R11: una version se muestra como «original · version»`; `R11: una original (sin original) se muestra con su nombre tal cual` |
+| R15 | Filas de §2.3: `V igual a B → toma A`; `V igual a B y A ausente → la linea desaparece`; `V y B ausentes (⊥ = ⊥) → toma A`; `V distinto de B → se queda V`; `V ausente y B presente → sigue ausente`. Casos enumerados: sube un % no tocado; quita uno conservado igual; quita uno ya quitado; anade uno nuevo; anade uno ya anadido por la version (gana la version); la version cambio el %; `"5"` = `"5.00"`; orden de salida; no muta entradas |
+| R20 | `R20: el resultado no suma 100 → por revisar`; `R20: el resultado queda vacio → por revisar` |
+| R21 | original sin lineas → `false`; original que no suma 100 → `false`; version sin lineas → `true`; 99,99 → `true`; 100,01 → `true`; 100,00 → `false` |
+
+## Verificacion T2 + T3 (salida real)
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes de T1).
+- `pnpm exec vitest run tests/unit/recetas/recipe-version.test.ts tests/unit/errores tests/guards/guard-catalogo-de-errores.test.ts tests/unit/recetas/module-contract.test.ts tests/guards/guard-arquitectura-modulos.test.ts`:
+  `Test Files 6 passed (6)`, `Tests 177 passed (177)`.
+- `pnpm exec vitest related --run <7 archivos tocados>` (arrastra casi toda la suite por los barrels
+  de `errores` y `recetas`): `Test Files 4 failed | 521 passed (525)`, `Tests 6 failed | 7446 passed
+  | 30 skipped (7482)`. Los 6 rojos son de UI (`configuracion-ui/{unidades,usuarios}-viewport`,
+  `inventario/product-page`, `recetas-ui/recipe-page`) y **fallan igual en `14aae6d4` (T1)**: 4
+  archivos, 6 tests rojos, sin los cambios de T2/T3. Preexistentes, no de esta tanda.

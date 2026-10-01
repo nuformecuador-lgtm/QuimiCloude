@@ -7,7 +7,7 @@
 
 ## Tanda 0 — medición
 
-### T0 [ ] — Medir antes de tocar
+### T0 [x] — Medir antes de tocar
 **Toca:** solo `progress/impl_QC-172-versiones-de-receta.md` (nuevo). Ningún archivo de producción.
 **Hacer:**
 1. Volver a verificar cada fila de `design.md > 0` con archivo:línea en el árbol de la rama (puede
@@ -25,7 +25,7 @@ discrepancia con `design.md` está escrita y avisada al leader antes de T1.
 
 ## Tanda 1 — base de datos y errores
 
-### T1 [ ] — Migración `recipe_versions`
+### T1 [x] — Migración `recipe_versions`
 Tras T0. **Toca:** `db/schema.prisma` (`model Recipe`), `db/migrations/<ts>_recipe_versions/{migration.sql,down.sql}`
 (nuevo), `tests/unit/recetas/schema/recipe-versions-migration.test.ts` (nuevo),
 `tests/integration/recetas/recipe-versions-constraints.int.test.ts` (nuevo), y los tests que T0.3 señale.
@@ -38,7 +38,7 @@ versión con el nombre de una original o de una versión de otra original → ac
 nombre de una versión → aceptada; `parent_recipe_id = id` → 23514; la migración no cambia filas
 existentes (R12, R13, R42, R43).
 
-### T2 [ ] [P] — Código de error `recipe_version_under_review`
+### T2 [x] [P] — Código de error `recipe_version_under_review`
 Tras T0. **Toca:** `lib/modules/errores/domain/error-codes.ts`, `lib/modules/errores/domain/error-catalog.ts`,
 `lib/modules/pedidos/domain/errors.ts`, tests de `errores` que cuenten códigos (T0).
 **Hacer:** §6.2, último párrafo.
@@ -47,7 +47,7 @@ errores (R33).
 
 ## Tanda 2 — `recetas`
 
-### T3 [ ] [P] — Reglas puras de versión
+### T3 [x] [P] — Reglas puras de versión
 Tras T0. **Toca:** `lib/modules/recetas/domain/recipe-version.ts` (nuevo), `lib/modules/recetas/index.ts`,
 `tests/unit/recetas/recipe-version.test.ts` (nuevo).
 **Hacer:** §2.
