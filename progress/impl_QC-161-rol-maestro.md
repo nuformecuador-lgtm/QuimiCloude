@@ -111,3 +111,38 @@ Ninguno del spec: lo que se movio se acomoda con el mismo tipo de arreglo que ya
 
 El «Hecho» de T0 pide `--rapido` verde antes de tocar nada: **no se cumple por deuda de `dev`**. Lo
 tiene que resolver `dev` (o el leader decidir); no se arregla en esta rama.
+
+## T1 — El rol Maestro
+
+Nota: `pnpm run typecheck` ya pasa en la rama (el rojo de `pino` de T0 lo resolvio el merge de
+`origin/dev` con el fix #132).
+
+### Archivos
+
+- `lib/modules/identity/domain/roles.ts`: `ROLE_MAESTRO = 'Maestro'`, fila al final de
+  `SEED_ROLES` («Dueno de la plataforma: gestiona las empresas.»), cabecera «cuatro literales».
+- `lib/modules/identity/index.ts`: reexporta `ROLE_MAESTRO`.
+- `tests/unit/identity/roles/maestro-rol.test.ts` (nuevo).
+- `tests/unit/identity/roles/empacador-rol.test.ts`: el caso «SEED_ROLES tiene exactamente tres
+  filas» se puso rojo con la fila nueva; sigue siendo una igualdad exacta, ahora con el Maestro
+  al final (no se relaja a `slice`/`toContain`).
+
+### Mapa R<n> -> test (`tests/unit/identity/roles/maestro-rol.test.ts`)
+
+| R | Casos |
+|---|---|
+| R2 | «R2: SEED_ROLES tiene una fila Maestro con descripcion no vacia»; «R2: Administrador, Operador y Empacador conservan su nombre y su descripcion exactos» (Administrador = «Acceso total al sistema.»); «R2: el Maestro va al final y los tres roles de antes conservan su orden» |
+| R3 | «R3: solo aparece en lib/modules/identity/domain/roles.ts»; anti-cegado «R3: dispara con un fuente sintetico…»; «R3: el caso simetrico: importar la constante o nombrar el literal en un comentario no dispara» |
+| R4 | «R4: el modelo Role de db/schema.prisma no declara ninguna columna de empresa»; «R4: SEED_ROLES declara una sola fila Maestro» |
+| R17 | «R17: empresas.consultar y empresas.modificar solo aparecen en el catalogo de permisos» (mensaje de fallo que avisa a QC-162); «R17: dispara con un fuente sintetico…»; «R17: el caso simetrico…» |
+
+### Salida
+
+- `pnpm run typecheck`: verde (sin salida de `tsc`).
+- `vitest run tests/unit/identity/roles`: 6 archivos, 60 passed, 4 skipped. `maestro-rol.test.ts`:
+  11 passed.
+- `vitest related` sobre `index.ts` arrastra casi toda la suite (el barrel lo importa todo): se
+  corto y se corrio en su lugar todo test unitario o guardia que nombra `SEED_ROLES` o
+  `ROLE_EMPACADOR` (15 archivos). Rojos esperados que cierran tasks posteriores:
+  `guard-permisos-sembrados` (el Maestro aun sin permisos: T2) y cuatro casos de
+  `seed-initial-access.test.ts` con listas de roles escritas a mano o `toHaveLength(3)` (T3).

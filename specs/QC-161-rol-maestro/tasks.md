@@ -49,7 +49,7 @@
 
 ## Bloque 1 — Rol y catálogo (dominio puro)
 
-- [ ] **T1. El rol Maestro.** (`design.md > 3`; R2, R3, R4, R17.)
+- [x] **T1. El rol Maestro.** (`design.md > 3`; R2, R3, R4, R17.)
       - Archivos: `lib/modules/identity/domain/roles.ts` (`ROLE_MAESTRO`, fila al final de
         `SEED_ROLES`, cabecera «cuatro literales»), `lib/modules/identity/index.ts` (reexporta).
       - Tests: `tests/unit/identity/roles/maestro-rol.test.ts` (nuevo: R2 —incluida la descripción

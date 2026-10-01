@@ -14,7 +14,13 @@ export {
   type CredentialPolicyResult,
   type CredentialRule,
 } from './domain/credential-policy';
-export { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, SEED_ROLES } from './domain/roles';
+export {
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  SEED_ROLES,
+} from './domain/roles';
 // QC-74 T1 — el catalogo cerrado de permisos (R1, R2) y lo que el seed asigna a cada rol (R8, R9).
 // `PermissionCode` es union de literales: exigir un codigo inexistente no compila.
 export {
