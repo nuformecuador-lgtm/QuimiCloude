@@ -197,7 +197,7 @@
         hace falta, se para y se vuelve al design.
       - Depende de: T9.
 
-- [ ] **T11. [P con T10] Login y sesión contra Postgres.** (R30, R31, R44.)
+- [x] **T11. [P con T10] Login y sesión contra Postgres.** (R30, R31, R44.)
       - Archivos (solo tests): `tests/integration/identity/login.int.test.ts` (R30, R44: un usuario de
         la empresa B y un Maestro, cada uno entra con su nombre en otras mayúsculas y recibe su
         sesión), `tests/integration/identity/session-user.int.test.ts` (fixture propio: un usuario

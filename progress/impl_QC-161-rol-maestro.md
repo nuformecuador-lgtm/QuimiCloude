@@ -526,3 +526,33 @@ R44 se prueba contra Postgres en T11.
 - `vitest run maestro-rol.test.ts guard`: 52 archivos, 665 passed, 11 skipped (el barrido R17 de
   `empresas.*` sigue verde: solo mira produccion).
 - `git diff HEAD -- lib app components`: vacio.
+
+## T11 — Login y sesion contra Postgres
+
+### Archivos (solo tests)
+
+- `tests/integration/identity/login.int.test.ts`: bloque «login sin empresa y nombre de usuario
+  global (QC-161)». Fixture propio por caso: un Maestro (rol `ROLE_MAESTRO`, `companyId: null`) y
+  un usuario de una empresa B efimera, con nombres `qc161_*_<uuid>`.
+- `tests/integration/identity/session-user.int.test.ts`: bloque «findActiveSessionUserById sin
+  empresa (QC-161)», con un Maestro propio por caso.
+
+**Nota sobre «creado en la transaccion del test»** (tasks.md T11): los dos archivos estan en el
+censo como `commit` y los adaptadores leen con el cliente Prisma global, que no ve filas de una
+transaccion sin confirmar. El fixture se crea dentro del propio caso y se borra en su `finally`
+(mismo patron del archivo); nunca se usa el Maestro del seed. El censo `aislamiento.json` no cambia.
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R30 | `login.int` «QC-161 R30: el LEFT JOIN encuentra al Maestro sin empresa, con empresa y marca de baja en null», «QC-161 R30: el Maestro entra con su sesion sin empresa, firmada con cid null y verificable», «QC-161 R30: al Maestro se le aplican los mismos cortes: contrasena mala cuenta, bloqueo y estado» |
+| R31 | `session-user.int` «QC-161 R31: resuelve la ficha del Maestro sin empresa, con sus permisos, en una sola consulta», «QC-161 R31: la cadena real de resolucion da usuario con permisos y ningun contexto de empresa» |
+| R44 | `login.int` «QC-161 R44: un usuario de la empresa B y el Maestro entran con su nombre en otras mayusculas y cada uno recibe su sesion», «QC-161 R44: no puede haber un segundo usuario vivo con el mismo nombre en otra empresa, y el login sigue entrando en el unico» |
+
+### Salida
+
+- `.env` con `QuimiCloude_QC161` comprobado (`grep -c` = 2). Corrida sobre
+  `qct_qc161_…` (copia de `qct_tpl_fa76230db33c`), borrada al terminar.
+- `vitest run login.int.test.ts session-user.int.test.ts`: 2 archivos, 37 passed.
+- `pnpm run typecheck` verde; `eslint` de los dos limpio.

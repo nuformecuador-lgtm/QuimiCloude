@@ -47,6 +47,7 @@ import {
   createVerifyCredentials,
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
+  ROLE_MAESTRO,
   type SessionTicket,
 } from '@/lib/modules/identity';
 import {
@@ -743,6 +744,259 @@ describe('login contra Postgres real', () => {
         lockLevel: 0,
         lockedUntil: null,
       });
+    }
+  });
+});
+
+// QC-161 — el login de quien no tiene empresa (el Maestro) y el nombre de usuario unico en todo
+// el sistema. Fixture propio, creado y borrado dentro de cada caso: nunca el Maestro del seed.
+// El adaptador usa el cliente global, asi que las filas se confirman y se limpian en `finally`
+// (mismo motivo que el resto de este archivo).
+describe('login sin empresa y nombre de usuario global (QC-161)', () => {
+  type Fixture = {
+    maestroId: string;
+    maestroNombre: string;
+    empresaBId: string;
+    usuarioBId: string;
+    usuarioBNombre: string;
+  };
+
+  async function crearFixture(): Promise<Fixture> {
+    const marca = randomUUID();
+    const { id: rolMaestroId } = await prisma.role.findUniqueOrThrow({
+      where: { name: ROLE_MAESTRO },
+      select: { id: true },
+    });
+    const hash = await createPasswordHash(CLAVE_CORRECTA);
+
+    const maestroNombre = `qc161_maestro_${marca}`;
+    const { id: maestroId } = await prisma.user.create({
+      data: {
+        firstNames: 'Plataforma',
+        lastNames: 'Inicial',
+        birthDate: new Date('1990-01-01T00:00:00.000Z'),
+        email: `qc161.maestro.${marca}@example.test`,
+        phone: '+57 300 000 0000',
+        documentTypeCode: DOCUMENT_TYPE_CC,
+        documentNumber: `61${marca.replaceAll('-', '').slice(0, 18)}`,
+        username: maestroNombre,
+        passwordHash: hash,
+        roleId: rolMaestroId,
+        companyId: null,
+        accountStatus: 'active',
+      },
+      select: { id: true },
+    });
+
+    const nombreEmpresaB = `qc161-login-b-${marca}`;
+    const { id: empresaBId } = await prisma.company.create({
+      data: { name: nombreEmpresaB, nameNormalized: normalizeCompanyName(nombreEmpresaB) },
+      select: { id: true },
+    });
+    const usuarioBNombre = `qc161_b_${marca}`;
+    const { id: usuarioBId } = await prisma.user.create({
+      data: {
+        firstNames: 'Bea',
+        lastNames: 'Empresa B',
+        birthDate: new Date('1992-02-02T00:00:00.000Z'),
+        email: `qc161.b.${marca}@example.test`,
+        phone: '+57 300 000 0001',
+        documentTypeCode: DOCUMENT_TYPE_CC,
+        documentNumber: `62${marca.replaceAll('-', '').slice(0, 18)}`,
+        username: usuarioBNombre,
+        passwordHash: hash,
+        roleId: rolId,
+        companyId: empresaBId,
+        accountStatus: 'active',
+      },
+      select: { id: true },
+    });
+
+    return { maestroId, maestroNombre, empresaBId, usuarioBId, usuarioBNombre };
+  }
+
+  async function borrarFixture(fixture: Fixture | null): Promise<void> {
+    if (fixture === null) return;
+    try {
+      await prisma.user.deleteMany({
+        where: { id: { in: [fixture.maestroId, fixture.usuarioBId] } },
+      });
+    } finally {
+      await prisma.company.deleteMany({ where: { id: fixture.empresaBId } });
+    }
+  }
+
+  it('QC-161 R30: el LEFT JOIN encuentra al Maestro sin empresa, con empresa y marca de baja en null', TIEMPO_HOLGADO, async () => {
+    let fixture: Fixture | null = null;
+    try {
+      fixture = await crearFixture();
+
+      const encontrado = await findActiveByUsername(fixture.maestroNombre);
+
+      expect(encontrado?.id).toBe(fixture.maestroId);
+      expect(encontrado?.roleName).toBe(ROLE_MAESTRO);
+      expect(encontrado?.companyId).toBeNull();
+      expect(encontrado?.companyDeletedAt).toBeNull();
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('QC-161 R30: el Maestro entra con su sesion sin empresa, firmada con cid null y verificable', TIEMPO_HOLGADO, async () => {
+    let fixture: Fixture | null = null;
+    try {
+      fixture = await crearFixture();
+      const { verificar, sesion } = montarLogin();
+
+      expect(
+        await verificar({ username: fixture.maestroNombre, password: CLAVE_CORRECTA }),
+      ).toEqual({ ok: true });
+
+      expect(sesion.tickets).toHaveLength(1);
+      const ticket = sesion.tickets[0] as SessionTicket;
+      expect(ticket.userId).toBe(fixture.maestroId);
+      expect(ticket.roleName).toBe(ROLE_MAESTRO);
+      expect(ticket.companyId).toBeNull();
+
+      // Lo que leera el middleware: el valor firmado con el codec real vuelve a ser una sesion.
+      const claims = await verifySessionValue(
+        await buildSessionValue(ticket, SECRETO_DE_PRUEBAS),
+        SECRETO_DE_PRUEBAS,
+      );
+      expect(claims).not.toBeNull();
+      expect(claims?.sub).toBe(fixture.maestroId);
+      expect(claims?.companyId).toBeNull();
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('QC-161 R30: al Maestro se le aplican los mismos cortes: contrasena mala cuenta, bloqueo y estado', TIEMPO_HOLGADO, async () => {
+    let fixture: Fixture | null = null;
+    try {
+      fixture = await crearFixture();
+      const maestroId = fixture.maestroId;
+      const leer = () =>
+        prisma.user.findUniqueOrThrow({
+          where: { id: maestroId },
+          select: { failedLoginAttempts: true, lockLevel: true, lockedUntil: true },
+        });
+
+      // Contrasena incorrecta: no entra y el fallo queda escrito en su fila.
+      const malo = montarLogin();
+      expect(
+        await malo.verificar({ username: fixture.maestroNombre, password: CLAVE_INCORRECTA }),
+      ).toEqual({ ok: false });
+      expect(malo.sesion.tickets).toHaveLength(0);
+      expect((await leer()).failedLoginAttempts).toBe(1);
+
+      // Bloqueado: ni con la correcta, y la fila no se mueve.
+      const fin = new Date(Date.now() + 60_000);
+      await prisma.user.update({
+        where: { id: maestroId },
+        data: { failedLoginAttempts: 0, lockLevel: 1, lockedUntil: fin },
+      });
+      const bloqueado = montarLogin();
+      expect(
+        await bloqueado.verificar({ username: fixture.maestroNombre, password: CLAVE_CORRECTA }),
+      ).toEqual({ ok: false });
+      expect(bloqueado.sesion.tickets).toHaveLength(0);
+      expect(await leer()).toEqual({ failedLoginAttempts: 0, lockLevel: 1, lockedUntil: fin });
+
+      // Cuenta no activa: ni con la correcta.
+      await prisma.user.update({
+        where: { id: maestroId },
+        data: { lockLevel: 0, lockedUntil: null, accountStatus: 'inactive' },
+      });
+      const inactivo = montarLogin();
+      expect(
+        await inactivo.verificar({ username: fixture.maestroNombre, password: CLAVE_CORRECTA }),
+      ).toEqual({ ok: false });
+      expect(inactivo.sesion.tickets).toHaveLength(0);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('QC-161 R44: un usuario de la empresa B y el Maestro entran con su nombre en otras mayusculas y cada uno recibe su sesion', TIEMPO_HOLGADO, async () => {
+    let fixture: Fixture | null = null;
+    try {
+      fixture = await crearFixture();
+
+      const deB = montarLogin();
+      expect(
+        await deB.verificar({
+          username: fixture.usuarioBNombre.toUpperCase(),
+          password: CLAVE_CORRECTA,
+        }),
+      ).toEqual({ ok: true });
+      expect(deB.sesion.tickets).toHaveLength(1);
+      expect(deB.sesion.tickets[0]?.userId).toBe(fixture.usuarioBId);
+      expect(deB.sesion.tickets[0]?.companyId).toBe(fixture.empresaBId);
+
+      const maestro = montarLogin();
+      expect(
+        await maestro.verificar({
+          username: `  ${fixture.maestroNombre.toUpperCase()} `,
+          password: CLAVE_CORRECTA,
+        }),
+      ).toEqual({ ok: true });
+      expect(maestro.sesion.tickets).toHaveLength(1);
+      expect(maestro.sesion.tickets[0]?.userId).toBe(fixture.maestroId);
+      expect(maestro.sesion.tickets[0]?.companyId).toBeNull();
+
+      // La busqueda es solo por nombre, sin empresa: con el nombre unico en todo el sistema hay
+      // exactamente una cuenta viva que casa con cada uno.
+      const pares: ReadonlyArray<readonly [string, string]> = [
+        [fixture.usuarioBNombre, fixture.usuarioBId],
+        [fixture.maestroNombre, fixture.maestroId],
+      ];
+      for (const [nombre, id] of pares) {
+        const filas = await prisma.$queryRaw<{ id: string }[]>`
+          SELECT id FROM users
+          WHERE lower(username) = lower(${nombre.toUpperCase()}) AND deleted_at IS NULL
+        `;
+        expect(filas).toEqual([{ id }]);
+      }
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('QC-161 R44: no puede haber un segundo usuario vivo con el mismo nombre en otra empresa, y el login sigue entrando en el unico', TIEMPO_HOLGADO, async () => {
+    let fixture: Fixture | null = null;
+    try {
+      fixture = await crearFixture();
+      const marca = randomUUID();
+
+      // El nombre del usuario de B, en mayusculas, en la empresa del fixture del archivo: lo
+      // rechaza el indice global, asi que el login nunca tiene que elegir entre dos filas.
+      await expect(
+        prisma.user.create({
+          data: {
+            firstNames: 'Copia',
+            lastNames: 'Otra Empresa',
+            birthDate: new Date('1993-03-03T00:00:00.000Z'),
+            email: `qc161.copia.${marca}@example.test`,
+            phone: '+57 300 000 0002',
+            documentTypeCode: DOCUMENT_TYPE_CC,
+            documentNumber: `63${marca.replaceAll('-', '').slice(0, 18)}`,
+            username: fixture.usuarioBNombre.toUpperCase(),
+            passwordHash: 'no-se-usa',
+            roleId: rolId,
+            companyId: empresaId,
+            accountStatus: 'active',
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      const { verificar, sesion } = montarLogin();
+      expect(
+        await verificar({ username: fixture.usuarioBNombre, password: CLAVE_CORRECTA }),
+      ).toEqual({ ok: true });
+      expect(sesion.tickets[0]?.userId).toBe(fixture.usuarioBId);
+    } finally {
+      await borrarFixture(fixture);
     }
   });
 });
