@@ -78,15 +78,37 @@ describe('parseSessionClaims', () => {
   // QC-48 R9 — sin empresa con forma valida no hay sesion: ni se consulta la base ni se supone
   // ninguna empresa por defecto. `.uuid()` y no `.min(1)` porque este valor acaba comparandose
   // contra una columna `@db.Uuid`: un texto sin forma de UUID muere aqui, no en Prisma.
-  it('un cid ausente, vacio, que no es texto o sin forma de UUID devuelve null', () => {
+  // `null` explicito deja de estar en esta lista: es «sin empresa» (caso de abajo).
+  it('QC-161 R32: un cid ausente, vacio, que no es texto ni null o sin forma de UUID devuelve null', () => {
     expect(
       parseSessionClaims(JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP, role: ROL })),
     ).toBeNull();
+    // Ausente con todo lo demas presente: lo unico que falta es `cid`.
+    expect(
+      parseSessionClaims(
+        JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP, role: ROL, sid: SID_CLAIMS }),
+      ),
+    ).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: undefined }))).toBeNull();
     expect(parseSessionClaims(jsonValido({ cid: '' }))).toBeNull();
     expect(parseSessionClaims(jsonValido({ cid: 42 }))).toBeNull();
-    expect(parseSessionClaims(jsonValido({ cid: null }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: false }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: 'null' }))).toBeNull();
     expect(parseSessionClaims(jsonValido({ cid: [CID_VALIDO] }))).toBeNull();
+    expect(parseSessionClaims(jsonValido({ cid: [null] }))).toBeNull();
     expect(parseSessionClaims(jsonValido({ cid: 'no-es-un-uuid' }))).toBeNull();
+  });
+
+  // `null` EXPLICITO es «esta persona no tiene empresa»: la sesion es valida y la
+  // empresa llega como `null`, sin inventar ninguna. Solo `null`: su ausencia sigue invalidando.
+  it('QC-161 R32: un cid null explicito produce claims validos con companyId null', () => {
+    const claims = parseSessionClaims(jsonValido({ cid: null }));
+
+    expect(claims).not.toBeNull();
+    expect(claims?.companyId).toBeNull();
+    expect(claims?.sub).toBe(SUB_VALIDO);
+    expect(claims?.roleName).toBe(ROL);
+    expect(claims?.sessionId).toBe(SID_CLAIMS);
   });
 
   // R6

@@ -374,6 +374,9 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
+  // El rol Maestro: empresa opcional segun rol y nombre de usuario unico en todo el sistema; no
+  // toca el identificador de peticion.
+  '20261001160815_platform_maestro_role',
 ] as const
 
 export function hallazgosDeMigraciones(

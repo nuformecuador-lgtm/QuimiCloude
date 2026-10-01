@@ -35,15 +35,15 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
-import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
+import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
 /** El orden que la BASE considera correcto entre lo que el catalogo devuelve, preguntado a la base.
- *  Ver la cabecera. Comparte con `listAllRoles` el filtro que excluye al administrador (fix directo
- *  del 2026-09-22), asi que la comparacion no depende de como el motor resuelva el `<>`. */
+ *  Ver la cabecera. Comparte con `listAllRoles` el filtro que excluye al Administrador y al Maestro,
+ *  asi que la comparacion no depende de como el motor resuelva el `NOT IN`. */
 async function ordenSegunLaBase(): Promise<readonly string[]> {
   const filas = await prisma.role.findMany({
-    where: { name: { not: ROLE_ADMINISTRADOR } },
+    where: { name: { notIn: [ROLE_ADMINISTRADOR, ROLE_MAESTRO] } },
     select: { name: true },
     orderBy: { name: 'asc' },
   });
@@ -80,10 +80,19 @@ describe('QC-94 — listAllRoles devuelve el catalogo sin el rol administrador (
     expect(roles.find((rol) => rol.name === ROLE_ADMINISTRADOR)).toBeUndefined();
   });
 
-  it('no omite ninguna fila salvo la del rol administrador', async () => {
+  it('QC-161 R23 — el rol Maestro existe en la base y NO se ofrece en el selector', async () => {
+    // Ancla: si la fila no existiera, el `toBeUndefined` de abajo pasaria por la razon equivocada.
+    expect(await prisma.role.count({ where: { name: ROLE_MAESTRO } })).toBe(1);
+
+    const roles = await listAllRoles();
+
+    expect(roles.find((rol) => rol.name === ROLE_MAESTRO)).toBeUndefined();
+  });
+
+  it('QC-161 R23 — no omite ninguna fila salvo las del Administrador y el Maestro', async () => {
     const roles = await listAllRoles();
     const total = await prisma.role.count({
-      where: { name: { not: ROLE_ADMINISTRADOR } },
+      where: { name: { notIn: [ROLE_ADMINISTRADOR, ROLE_MAESTRO] } },
     });
 
     expect(roles).toHaveLength(total);

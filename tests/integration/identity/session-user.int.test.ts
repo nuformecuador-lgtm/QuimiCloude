@@ -38,7 +38,13 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
-import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity';
+import {
+  DOCUMENT_TYPE_CC,
+  normalizeCompanyName,
+  ROLE_MAESTRO,
+  SEED_ROLE_PERMISSIONS,
+} from '@/lib/modules/identity';
+import { createResolveSession } from '@/lib/modules/identity/domain/resolve-session';
 import { prisma } from '@/lib/shared/db/prisma';
 
 const sufijo = randomUUID();
@@ -329,6 +335,103 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       expect(espia).toHaveBeenCalledTimes(1);
     } finally {
       espia.mockRestore();
+    }
+  });
+});
+
+// La ficha de quien no tiene empresa (el Maestro). Fixture propio, creado y borrado en el
+// propio caso: nunca el Maestro del seed. Se confirma y se limpia en `finally` porque el adaptador
+// lee con el cliente global, igual que el resto de este archivo.
+describe('findActiveSessionUserById sin empresa (QC-161)', () => {
+  async function crearMaestro(): Promise<{ id: string; username: string }> {
+    const marca = randomUUID();
+    const { id: rolMaestroId } = await prisma.role.findUniqueOrThrow({
+      where: { name: ROLE_MAESTRO },
+      select: { id: true },
+    });
+    const username = `qc161_session_${marca}`;
+    const { id } = await prisma.user.create({
+      data: {
+        firstNames: 'Plataforma',
+        lastNames: 'Inicial',
+        birthDate: new Date('1990-01-01T00:00:00.000Z'),
+        email: `qc161.session.${marca}@example.test`,
+        phone: '+57 300 000 0000',
+        documentTypeCode: DOCUMENT_TYPE_CC,
+        documentNumber: `64${marca.replaceAll('-', '').slice(0, 18)}`,
+        username,
+        passwordHash: 'no-se-usa-en-este-test',
+        roleId: rolMaestroId,
+        companyId: null,
+        accountStatus: 'active',
+      },
+      select: { id: true },
+    });
+    return { id, username };
+  }
+
+  it('QC-161 R31: resuelve la ficha del Maestro sin empresa, con sus permisos, en una sola consulta', async () => {
+    const maestro = await crearMaestro();
+    const espia = vi.spyOn(prisma.user, 'findFirst');
+
+    try {
+      const resultado = await findActiveSessionUserById(maestro.id, SID_SIN_CERRAR);
+
+      expect(resultado).toEqual({
+        id: maestro.id,
+        username: maestro.username,
+        firstNames: 'Plataforma',
+        lastNames: 'Inicial',
+        roleName: ROLE_MAESTRO,
+        companyId: null,
+        companyDeletedAt: null,
+        permissions: expect.arrayContaining([...(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? [])]),
+        accountStatus: 'active',
+        lockedUntil: null,
+        sessionsValidFrom: expect.any(Date),
+        sessionRevokedAt: null,
+      });
+      expect(resultado?.permissions).toHaveLength(
+        (SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).length,
+      );
+      expect(espia).toHaveBeenCalledTimes(1);
+    } finally {
+      espia.mockRestore();
+      await prisma.user.deleteMany({ where: { id: maestro.id } });
+    }
+  });
+
+  it('QC-161 R31: la cadena real de resolucion da usuario con permisos y ningun contexto de empresa', async () => {
+    const maestro = await crearMaestro();
+
+    try {
+      const ahora = new Date();
+      const resolveSession = createResolveSession({
+        session: {
+          readClaims: async () => ({
+            sub: maestro.id,
+            roleName: ROLE_MAESTRO,
+            companyId: null,
+            sessionId: SID_SIN_CERRAR,
+            // Emitida un minuto en el futuro respecto del sello `DEFAULT now()` de la fila.
+            issuedAt: new Date(ahora.getTime() + 60_000),
+            expiresAt: new Date(ahora.getTime() + 3_600_000),
+          }),
+        },
+        users: { findActiveById: findActiveSessionUserById },
+        log: { log: () => undefined },
+      });
+
+      const resuelta = await resolveSession(new Date(ahora.getTime() + 120_000));
+
+      expect(resuelta?.user.id).toBe(maestro.id);
+      expect(resuelta?.user.roleName).toBe(ROLE_MAESTRO);
+      expect([...(resuelta?.user.permissions ?? [])].sort()).toEqual(
+        [...(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? [])].sort(),
+      );
+      expect(resuelta?.context).toBeNull();
+    } finally {
+      await prisma.user.deleteMany({ where: { id: maestro.id } });
     }
   });
 });

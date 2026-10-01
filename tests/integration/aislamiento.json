@@ -25,6 +25,7 @@
     "identity/documents-permissions-migration.int.test.ts",
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
+    "identity/maestro-migration.int.test.ts",
     "identity/packer-role-migration.int.test.ts",
     "identity/packing-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",

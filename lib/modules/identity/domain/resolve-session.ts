@@ -35,10 +35,14 @@ export type ResolveSessionDeps = {
   readonly log: SessionCheckLog;
 };
 
-/** Las dos proyecciones de la MISMA resolucion, compuestas de una sola pasada (R21). */
+/**
+ * Las dos proyecciones de la MISMA resolucion, compuestas de una sola pasada. `context` es `null`
+ * cuando la ficha no tiene empresa: quien opera con ambito de empresa ya falla cerrado ante un
+ * contexto ausente, asi que esa persona tiene sesion pero ninguna operacion de empresa.
+ */
 export type ResolvedSession = {
   readonly user: SessionUser;
-  readonly context: SessionContext;
+  readonly context: SessionContext | null;
 };
 
 /**
@@ -159,15 +163,17 @@ export function createResolveSession(
         // la tiene; eso lo decide `assertPermission` en cada caso de uso.
         permissions: record.permissions,
       },
-      context: {
-        userId: record.id,
-        // R20 — `companyId` sale de `record`, o sea de la BASE, y NO de `claims`. Tras el corte 4
-        // los dos valores son iguales por construccion, asi que la eleccion no cambia el valor:
-        // cambia de quien es la culpa el dia que dejen de serlo. El valor firmado queda reducido
-        // a lo unico que es, material de comparacion (`design.md > 6`).
-        companyId: record.companyId,
-        roleName: record.roleName,
-      },
+      context:
+        record.companyId === null
+          ? null
+          : {
+              userId: record.id,
+              // `companyId` sale de la base y no de `claims`. Tras el corte 4 son iguales por
+              // construccion: la eleccion no cambia el valor, cambia de quien es la culpa el dia
+              // que dejen de serlo. El valor firmado es solo material de comparacion.
+              companyId: record.companyId,
+              roleName: record.roleName,
+            },
     };
   };
 }
