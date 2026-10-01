@@ -116,6 +116,7 @@ import type {
   ReservationQueries,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
+import { forModule } from '@/lib/shared/observability/logger';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findUnitRefsSharingBaseInCompany,
@@ -409,6 +410,7 @@ import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signat
 import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
+import type { DocumentJobLog } from '@/lib/modules/documentos/ports/document-job-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 // `clientes`. Imports al final del bloque, bloque de cableado al final del archivo: no
 // reordena ni reformatea nada de lo que hay arriba.
@@ -1546,11 +1548,14 @@ const cropCatalogImages = createCropCatalogImages({
  * que lo ejecuta en este mismo proceso en vez de publicar nada. Dos construcciones serian dos
  * cableados que pueden divergir.
  */
+const documentJobLog: DocumentJobLog = forModule('documentos');
+
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
   processPdfByStrategy,
   cropCatalogImages,
+  log: documentJobLog,
 });
 
 const processingQueue: ProcessingQueue = {
