@@ -15,7 +15,7 @@ Base propia: `QuimiCloude_QC170` (58 migraciones aplicadas tras la tanda A). Wor
 | C (fuera) | T3 | cerrada en la tanda E (quedó libre tras T16) |
 | D | T11, T14, T21, T25 (Server Action) | cerradas (T25 solo servidor; su UI va en E) |
 | E | T16, T15, T22, T25 (UI), T3 | cerradas (ver §Tanda E) |
-| final | T19 (E2E escrito) | pendiente |
+| final | ajuste T3 + T19 | cerradas (ver §Cierre: ajuste T3 + T19) |
 
 ## Tanda B (2026-09-27) — T4, T5, T6, T12, T20 cerradas; T7 y T3 BLOQUEADAS
 
@@ -795,3 +795,74 @@ Un subagente a la vez, commit por task (sin push). Commits: `35fb675d`, `b12ea2f
 - Pendiente fuera de esta tanda: T19 (E2E) y `./init.sh` completo antes del PR. El rojo
   `pedidos-convenciones › no cambia package.json` que vieron los subagentes en corridas acotadas no
   aparece en el gate (deriva de `origin/dev`, a mirar al sincronizar).
+
+## Cierre: ajuste T3 + T19 (2026-10-01)
+
+Decisión humana 2026-10-01 sobre los puntos abiertos de T3 (§Tanda E): backfill solo de pedidos
+vivos; se aceptan como están el `down.sql` sin `DROP TABLE`, la segunda aplicación fallando en el
+guardia (42703) y el paréntesis `NO FORCE`/`FORCE` RLS. Documentado como nota de enmienda en
+`design.md > 2.4` (única edición del spec; `requirements.md` intacto).
+
+### Commits
+
+- `76a6276e` fix: T3 backfill solo de pedidos vivos (`backend_dev`).
+- `45b68785` docs: nota de enmienda en `design.md > 2.4`.
+- `3320fa7a` test: T19 E2E de pedido en varias presentaciones (`frontend_dev`).
+
+### Archivos
+
+- `db/migrations/20260927120200_order_presentation_lines_backfill_and_drop/migration.sql`: el
+  `INSERT` filtra `deleted_at IS NULL` y `status NOT IN ('ENTREGADO','CANCELADO')`; el guardia de
+  R45 cuenta solo pedidos no borrados. Sin cambios en el `UPDATE` de `unit_id`, RLS ni `down.sql`.
+- `tests/integration/pedidos/qc170-backfill.int.test.ts`: dos tests nuevos y uno ajustado (su
+  `CANCELADO` esperaba línea; ahora `[]`). El test de R45 con pedido borrado retira dentro de su
+  transacción el CHECK `orders_delivered_not_deleted`, que en una base real impide ese caso: el
+  filtro es defensivo.
+- `specs/QC-170-pedido-en-varias-presentaciones/design.md` (nota de enmienda §2.4).
+- `e2e/pedido-en-varias-presentaciones.spec.ts` (nuevo).
+- `e2e/pedidos.spec.ts` (alta con unidad y una línea de reparto; limpieza de líneas),
+  `e2e/producto-terminado.spec.ts` (lote tras Terminar, no tras Finalizar; `gotoSettled` para
+  WebKit), `e2e/ejecucion-receta.spec.ts` y `e2e/empaque.spec.ts` (solo limpieza: borrar
+  `order_presentation_lines` antes que los pedidos por la FK RESTRICT).
+- `tests/guards/guard-identificador-de-request.test.ts`: el spec nuevo en `E2E_ESPERADOS`.
+- `pedidos-terminados.spec.ts` y `pedidos-asignados.spec.ts`: revisados, sin cambios (no usan la
+  presentación del pedido).
+
+### Mapa R<n> -> test (cierre)
+
+| R | Test |
+|---|------|
+| R22 | `qc170-backfill.int.test.ts` › «R22: solo los pedidos vivos ganan reparto; borrado, ENTREGADO y CANCELADO quedan sin lineas» (+ el de R22, R23, R24, R43 ajustado) |
+| R45 | `qc170-backfill.int.test.ts` › «R45: un pedido POR_EMPACAR sin presentacion pero borrado NO aborta la migracion» (+ los abortos previos) |
+| R33, R36, R39 | `e2e/pedido-en-varias-presentaciones.spec.ts` › «R33, R36, R39 - alta con unidad y dos lineas de reparto, aviso y rechazo del reparto que pasa del total, produccion, empaque y un lote por linea con el mismo coste unitario» |
+| R47, R10, R46, R13, R14 | `e2e/pedido-en-varias-presentaciones.spec.ts` › «R47, R10, R46, R13, R14 - sin reparto en Por empacar el Empacador lo ve sin controles y no puede comenzar, el administrador reparte con la edicion acotada y, tras Comenzar, el reparto queda fijado» |
+| R37 (QC-150, enmendado) | `e2e/producto-terminado.spec.ts`: Finalizar no crea lote; Terminar sí |
+
+### Salida real
+
+- `qc170-backfill.int.test.ts`: 1 archivo, 11 passed, 0 failed.
+- E2E, `--workers=1`, 7 archivos (`pedido-en-varias-presentaciones`, `ejecucion-receta`,
+  `empaque`, `pedidos`, `producto-terminado`, `pedidos-terminados`, `pedidos-asignados`):
+  - Chromium: **14 passed, 0 failed**.
+  - WebKit: 1a corrida 12/2 y 2a 13/1, todos por «navigation interrupted» (`page.goto` contra el
+    `router.refresh()` de un guardado previo); corregido en los tests con reintento / `gotoSettled`;
+    `--repeat-each=2` de los dos archivos afectados: **6/6 passed**. No hay re-corrida completa de
+    los 7 en WebKit tras el último ajuste.
+  - Ninguno de los 11 rojos heredados de dev está en estos archivos; ningún rojo nuevo.
+- `./init.sh --rapido` (sobre `3320fa7a`): typecheck y lint verdes (0 errores, 7 avisos
+  previos); related `Test Files 543 passed (543)`, `Tests 7760 passed | 30 skipped (7790)`;
+  guardias `Test Files 51 passed (51)`, `Tests 652 passed | 11 skipped (663)`; `init OK`.
+
+### Pendiente para el leader
+
+1. **E2E que crean pedidos por pantalla sin tocar ni correr**: `pedidos-cotizacion`,
+   `reserva-de-material`, `recetas-porcentaje`, `aislamiento-pedidos` (y revisar los demás que
+   nombran presentaciones). El alta exige ahora unidad (R41) y el reparto sustituye al selector de
+   presentación, así que probablemente fallen; si eligen presentación, también su limpieza por la
+   FK de `order_presentation_lines`. Aparecerán en el E2E completo / `./init.sh` antes del PR.
+2. **Posible hueco de spec en R18**: `finishPackingAliveById` suma `envases × contenido` de todas
+   las líneas sin convertirlas a una misma unidad; con presentaciones en l y ml el coste unitario
+   saldría mal. El E2E usa dos presentaciones en litros. Código sin tocar: decide el humano.
+3. Detalle de UI: reabrir «Reparto y unidad» justo tras guardar, antes de que acabe
+   `router.refresh()`, muestra los valores anteriores.
+4. `./init.sh` completo antes del PR.

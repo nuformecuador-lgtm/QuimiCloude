@@ -249,7 +249,7 @@ archivos cambia. (La nota de QC-35/QC-123 por [Q4] es T24.)
 
 ## E2E
 
-### T19 — `e2e/pedido-en-varias-presentaciones.spec.ts` (nuevo)
+### [x] T19 — `e2e/pedido-en-varias-presentaciones.spec.ts` (nuevo)
 
 **Archivos**: `e2e/pedido-en-varias-presentaciones.spec.ts`, y el ajuste de
 `e2e/producto-terminado.spec.ts` (QC-150) para que ya no espere el lote tras Finalizar sino tras
