@@ -23,7 +23,7 @@ export type UpdateOrderDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
-  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto (R3). No se le pasan al
+  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto. No se le pasan al
    *  coste, ver el comentario identico de `create-order.ts`. */
   readonly presentations: PresentationCatalog;
   readonly unitOfWork: OrderUnitOfWork;
@@ -119,9 +119,9 @@ export function createUpdateOrder(
       // arriba y este bloqueo.
       assertTransition(locked.status, locked.status);
 
-      // R41, R6-R8, R35, R36, R38, R42: la unidad y el reparto se resuelven y se validan contra
+      // La unidad y el reparto se resuelven y se validan contra
       // el total con la fila del pedido YA BLOQUEADA, para que dos ediciones simultaneas no
-      // dejen ninguna pasar del total (R37, la carrera completa la cierra T21).
+      // dejen ninguna pasar del total.
       const presentationLines = await resolveDistribution(
         deps.presentations,
         deps.units,

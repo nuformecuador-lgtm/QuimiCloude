@@ -62,7 +62,7 @@ function finishFromFormData(formData: FormData): unknown {
 /**
  * Deja el pedido `POR_EMPACAR` y vuelve a la lista de pedidos asignados.
  *
- * R15, R16: Finalizar ya no da de alta ningun lote, asi que la confirmacion ya no
+ * Finalizar ya no da de alta ningun lote, asi que la confirmacion ya no
  * lleva envases ni producto -esa notificacion pasa a Terminar el empaque-.
  */
 export async function finishAssignedOrderAction(

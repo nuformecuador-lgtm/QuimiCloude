@@ -1085,7 +1085,7 @@ const orderUnitOfWork: OrderUnitOfWork = {
 };
 
 /**
- * `OrderDistributionTransaction` (T9, `design.md > 4.2`): la transaccion CORTA propia de
+ * `OrderDistributionTransaction`: la transaccion CORTA propia de
  * `updateOrderPresentationLines`, sin `inventario` en su ambito -este caso de uso no toca
  * material ni reserva-. NO reutiliza `orderUnitOfWork`: son dos transacciones con un alcance
  * distinto a proposito.
@@ -1124,7 +1124,7 @@ const expireStaleOrders = createExpireStaleOrders({
  * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
  * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
  * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben `recipes`,
- * `presentations` y, desde [Q4], `units` -para la etiqueta de `unitId`, R42-, pero no
+ * `presentations` y `units` -para la etiqueta de `unitId`-, pero no
  * `products` ni `unitOfWork`: no calculan ningun importe ni apartan nada. `createOrder` y
  * `updateOrder` son los dos que si costean y aparta, asi que son los dos que reciben tambien
  * `products` y `unitOfWork`.
@@ -1173,8 +1173,7 @@ export const pedidos = {
   // orden por su cuenta.
   verifyCronSecret,
   expireStaleOrders,
-  // T9 (`design.md > 4.2`, R46): la edicion ACOTADA del reparto y la unidad. Clave NUEVA al
-  // final: ninguna de las de arriba se toca. Recibe `presentations`/`units` -mismos catalogos
+  // La edicion ACOTADA del reparto y la unidad. Recibe `presentations`/`units` -mismos catalogos
   // que `createOrder`/`updateOrder`- y su PROPIA transaccion, mas corta: no la unidad de trabajo
   // compartida con `inventario`, porque este caso de uso no toca material ni reserva.
   updateOrderPresentationLines: createUpdateOrderPresentationLines({
@@ -1182,7 +1181,7 @@ export const pedidos = {
     units: unitCatalog,
     transaction: orderDistributionTransaction,
   }),
-  // T11 (`design.md > 3`, R6, R7): «cuanto queda disponible», de solo lectura. Mismos DOS
+  // «Cuanto queda disponible», de solo lectura. Mismos DOS
   // catalogos que `updateOrderPresentationLines`, sin transaccion: no escribe nada.
   quoteOrderPresentationAvailability: createQuoteOrderPresentationAvailability({
     presentations: presentationCatalog,
@@ -1243,14 +1242,14 @@ const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  // R15, R16: Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
+  // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
   transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
   startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  // T14 (R17-R21): Terminar SI necesita los tres catalogos globales -receta y coste del lote,
-  // mismo criterio que Finalizar usaba antes de R15/R16- y `presentationCatalog`, para la
-  // defensa en profundidad de R19.
+  // Terminar SI necesita los tres catalogos globales -receta y coste del lote, mismo criterio
+  // que Finalizar usaba antes de dejar de dar de alta el lote- y `presentationCatalog`, para
+  // rechazar en profundidad una linea sin contenido copiado ni vigente.
   finishPackingAliveById: createFinishPacking({
     packing: orderPackingRepository,
     unitOfWork: orderUnitOfWork,

@@ -280,7 +280,7 @@ export class InvalidTransitionError extends AsignacionesError {
   }
 }
 
-/** Comenzar sobre un pedido `POR_EMPACAR` sin ninguna linea de reparto (R10). Mismo `code` que
+/** Comenzar sobre un pedido `POR_EMPACAR` sin ninguna linea de reparto. Mismo `code` que
  *  `OrderWithoutDistributionError` de `pedidos`. */
 export class OrderWithoutDistributionError extends AsignacionesError {
   readonly code = 'order_without_distribution';

@@ -82,7 +82,7 @@ export class RecipeNotFoundError extends PedidosError {
 }
 
 /** La unidad del pedido no existe en el catalogo de la empresa de quien escribe, o es de otra
- *  empresa. Reusa el codigo compartido con `unidades` (R41). */
+ *  empresa. Reusa el codigo compartido con `unidades`. */
 export class UnitNotFoundError extends PedidosError {
   readonly code = 'unit_not_found';
 

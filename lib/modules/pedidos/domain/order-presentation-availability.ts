@@ -1,11 +1,11 @@
-// lib/modules/pedidos/domain/order-presentation-availability.ts — R6, R7, R39, `design.md > 3`.
+// lib/modules/pedidos/domain/order-presentation-availability.ts
 //
 // «Cuanto queda disponible»: lectura pura para el formulario de `/pedidos` (alta, edicion y la
 // edicion acotada de T25). Resuelve unidad y presentaciones contra los catalogos -mismo patron
 // de dos llamadas de `resolve-distribution.ts`-, y REUTILIZA `validateDistribution` (T20) para
 // el calculo. A diferencia de `resolveDistribution` (que lanza y detiene el guardado), esta
 // funcion NUNCA lanza por el reparto: es de solo lectura, el rechazo lo hacen `createOrder`,
-// `updateOrder` y `updateOrderPresentationLines` al guardar (R39).
+// `updateOrder` y `updateOrderPresentationLines` al guardar.
 
 import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
@@ -54,7 +54,7 @@ export function createQuoteOrderPresentationAvailability(
     const presentationById = new Map(presentationRefs.map((ref) => [ref.id, ref] as const));
 
     // Unidades de las presentaciones: UNA sola llamada mas, con los ids UNICOS que le falten al
-    // mapa que ya tiene la unidad del pedido (mismo patron que T9, `design.md > 2.2 bis`).
+    // mapa que ya tiene la unidad del pedido (mismo patron que `updateOrderPresentationLines`).
     const missingUnitIds = [
       ...new Set(presentationRefs.map((ref) => ref.unitId).filter((id) => id !== data.unitId)),
     ];
@@ -82,7 +82,7 @@ export function createQuoteOrderPresentationAvailability(
       });
     }
 
-    // R6, R7, R39: el disponible exacto o la marca de la linea que falla, nunca un rechazo -eso
+    // El disponible exacto o la marca de la linea que falla, nunca un rechazo -eso
     // lo hace quien guarda, con la fila del pedido bloqueada.
     return validateDistribution(data.quantity, orderUnitRef, distributionLines);
   };

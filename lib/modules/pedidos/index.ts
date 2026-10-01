@@ -188,7 +188,7 @@ export { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './domain/order
 export { createQuoteOrderCost } from './domain/quote-order-cost';
 export type { QuoteOrderCostDeps, OrderCostQuote } from './domain/quote-order-cost';
 
-/** T9 (`design.md > 4.2`, R46): la edicion ACOTADA del reparto y la unidad, aparte de
+/** La edicion ACOTADA del reparto y la unidad, aparte de
  *  `updateOrder`. `REPARTO_EDITABLE_STATUSES` se publica porque T25 (la accion de fila) la
  *  necesita para decidir cuando pintar «Reparto y unidad». */
 export {
@@ -201,7 +201,7 @@ export type {
   UpdateOrderPresentationLinesResult,
 } from './domain/update-order-presentation-lines';
 
-/** T11 (`design.md > 3`): «cuanto queda disponible», de solo lectura -no persiste, no rechaza-.
+/** «Cuanto queda disponible», de solo lectura -no persiste, no rechaza-.
  *  La Server Action de T25/T22 la llama en cada cambio de cantidad, unidad o reparto. */
 export { createQuoteOrderPresentationAvailability } from './domain/order-presentation-availability';
 export type {

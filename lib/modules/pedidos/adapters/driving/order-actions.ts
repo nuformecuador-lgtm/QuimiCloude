@@ -194,7 +194,7 @@ function readPresentationLines(formData: FormData): unknown[] {
 
 /**
  * El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
- * correlativo, ni autores: lo que el esquema no declara no puede llegar (R6, R9).
+ * correlativo, ni autores: lo que el esquema no declara no puede llegar.
  */
 function buildCreateCandidate(formData: FormData): unknown {
   return {
@@ -382,8 +382,7 @@ export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuo
 }
 
 // ---------------------------------------------------------------------------------------------
-// T11 (`design.md > 3`, R6, R7, R39): «cuanto queda disponible», de solo lectura. Bloque nuevo
-// al final: no reordena ni reformatea nada de arriba.
+// «Cuanto queda disponible», de solo lectura.
 // ---------------------------------------------------------------------------------------------
 
 export type OrderPresentationAvailabilityResult =
@@ -394,7 +393,7 @@ export type OrderPresentationAvailabilityResult =
  * El disponible en vivo del formulario de reparto, en la unidad del pedido -mismo patron que
  * `quoteOrderCostAction` para el coste-. Argumento tipado, no `FormData`: no hay `<form>` que
  * enviar, se recalcula con cada tecla. Nunca rechaza por el reparto: `data.kind` puede ser
- * `'exceeds_quantity'` con `available` negativo (R39, el aviso), y sigue siendo un `'success'`
+ * `'exceeds_quantity'` con `available` negativo (el aviso), y sigue siendo un `'success'`
  * -el rechazo lo hace el guardado, no esta consulta.
  */
 export async function quoteOrderPresentationAvailabilityAction(
@@ -411,15 +410,14 @@ export async function quoteOrderPresentationAvailabilityAction(
 }
 
 // ---------------------------------------------------------------------------------------------
-// T25 (`design.md > 4.3`, R7, R12, R13, R35, R36, R41, R42, R46): la edicion ACOTADA «Reparto y
-// unidad» en `POR_EMPACAR`. Bloque nuevo al final: no reordena ni reformatea nada de arriba.
+// La edicion ACOTADA «Reparto y unidad» en `POR_EMPACAR`.
 // ---------------------------------------------------------------------------------------------
 
 /**
  * `updateOrderPresentationLines` (T9) NO comprueba el permiso: su unico llamador es esta
  * action, y por eso -a diferencia de las diez de arriba, que no repiten `requirePermission`
  * porque su caso de uso ya es la primera linea que lo hace- esta SI lo llama, aqui, antes de
- * `zod` y antes de tocar la fachada (R12, `design.md > 4.2`).
+ * `zod` y antes de tocar la fachada.
  */
 export async function updateOrderDistributionAction(
   id: string,

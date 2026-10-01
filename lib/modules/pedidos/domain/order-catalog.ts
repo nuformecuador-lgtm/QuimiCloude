@@ -34,7 +34,7 @@ export type OrderAssignmentTarget = {
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
 /** Lo que entro al inventario por UNA linea del reparto cuando Terminar el empaque dio de alta
- *  su lote (R17): el nombre del producto terminado que lo recibio y cuantos envases enteros. */
+ *  su lote: el nombre del producto terminado que lo recibio y cuantos envases enteros. */
 export type FinishedGoodsReceipt = {
   readonly productName: string;
   readonly packages: string;
@@ -96,7 +96,7 @@ export interface OrderCatalog {
    * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
    * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
    *
-   * R15, R16: yendo a `'POR_EMPACAR'` esta llamada YA NO da de alta ningun lote de
+   * Yendo a `'POR_EMPACAR'` esta llamada YA NO da de alta ningun lote de
    * producto terminado -eso se traslada a Terminar el empaque, una vez por linea del reparto-,
    * asi que el `'ok'` es siempre el literal, sin `finishedGoods` ni los resultados que solo
    * existian para esa alta (`'presentation_without_content'`, `'no_whole_package'`,
@@ -120,7 +120,7 @@ export interface OrderCatalog {
    * transaccion corta con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
    * empacador repitiendo Comenzar sobre su propio `EN_EMPAQUE`, sin escribir nada;
    * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'without_distribution'` es un `POR_EMPACAR` sin
-   * ninguna linea de reparto (R10); `'not_packable'` es cualquier otro estado; `'not_found'` es
+   * ninguna linea de reparto; `'not_packable'` es cualquier otro estado; `'not_found'` es
    * el mismo caso que en `findAliveById` -no existe, esta de baja o es de otra empresa-.
    */
   startPackingAliveById(
@@ -136,12 +136,12 @@ export interface OrderCatalog {
    * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
    * `'not_found'` es el mismo caso que en `findAliveById`.
    *
-   * R17-R21: da de alta, por cada linea del reparto, un lote de producto terminado -mismo
-   * coste unitario para todas, R18-, en la MISMA transaccion que el cambio de estado: si
+   * Da de alta, por cada linea del reparto, un lote de producto terminado -mismo
+   * coste unitario para todas-, en la MISMA transaccion que el cambio de estado: si
    * cualquier linea falla, se deshace TODO. `'recipe_not_found'` es la receta del pedido,
    * ausente o de otra empresa (mismo caso que antes emitia Finalizar); `'presentation_without_content'`
    * identifica -por `diagnostic`, nunca en el resultado- la primera linea sin contenido ni
-   * copiado ni vigente (R19, defensa en profundidad).
+   * copiado ni vigente (defensa en profundidad).
    *
    * `'incompatible_units'` y `'order_without_unit'` son defensa en profundidad: el coste se
    * reparte en la unidad del pedido, y una linea que no se puede pasar a ella -o un pedido sin
@@ -187,10 +187,10 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
-  /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo (R26, R27). */
+  /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo. */
   readonly presentationLines: readonly AssignedOrderPresentationLine[];
-  /** La unidad en que se expresa `quantity` [Q4]; `null` en los pedidos que no la tienen
-   *  todavia (R43). */
+  /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la tienen
+   *  todavia. */
   readonly unitId: string | null;
   /** `null` = sin fecha de terminado: un pedido entregado antes de que la columna existiera, o
    *  uno que no esta ENTREGADO. */

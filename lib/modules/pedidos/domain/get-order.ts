@@ -20,11 +20,11 @@ export type GetOrderDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve los nombres de las presentaciones del reparto. */
   readonly presentations: PresentationCatalog;
-  /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de `unitId` (R42). */
+  /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de `unitId`. */
   readonly units: UnitCatalog;
 };
 
-/** El simbolo de la unidad, o su nombre si no lo tiene (R42). Se exporta porque
+/** El simbolo de la unidad, o su nombre si no lo tiene. Se exporta porque
  *  `list-orders.ts` la reutiliza para no divergir en el criterio. */
 export function unitLabelOf(unit: { readonly name: string; readonly symbol: string | null }): string {
   return unit.symbol ?? unit.name;
@@ -81,7 +81,7 @@ export function toOrderView(
       packages: line.packages,
     })),
     unitId: row.unitId,
-    // `null` si el pedido esta sin unidad (R42); la FK con RESTRICT hace imposible el caso
+    // `null` si el pedido esta sin unidad; la FK con RESTRICT hace imposible el caso
     // «tiene id pero no vuelve del catalogo».
     unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,
   };
@@ -90,7 +90,7 @@ export function toOrderView(
 /**
  * Ficha de un pedido (R42). Consultar exige `pedidos.consultar` (QC-74 R16): quien no lo tiene
  * ni siquiera lee, y el `requirePermission` va antes de tocar el repositorio y los catalogos
- * de recetas, presentaciones y unidades (R12).
+ * de recetas, presentaciones y unidades.
  */
 export function createGetOrder(
   deps: GetOrderDeps,

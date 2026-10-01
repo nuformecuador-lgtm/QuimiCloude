@@ -46,7 +46,7 @@ export function createStartPacking(
     // Repetir Comenzar sobre el propio `EN_EMPAQUE` es exito, sin escribir nada.
     if (result === 'ok' || result === 'already_mine') return;
     if (result === 'taken') throw new OrderPackingTakenError();
-    // R10: `POR_EMPACAR` sin ninguna linea de reparto. `pedidos` ya distingue este caso
+    // `POR_EMPACAR` sin ninguna linea de reparto. `pedidos` ya distingue este caso
     // de `'not_packable'` -es un estado CORRECTO, solo que sin nada que empacar todavia-.
     if (result === 'without_distribution') throw new OrderWithoutDistributionError();
     if (result === 'not_packable') throw new OrderNotPackableError();

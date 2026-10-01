@@ -26,7 +26,7 @@ export type ListOrdersDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina. */
   readonly presentations: PresentationCatalog;
-  /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de unidad de la pagina (R42). */
+  /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de unidad de la pagina. */
   readonly units: UnitCatalog;
   readonly log: ListQueryLog;
 };
@@ -106,8 +106,8 @@ function pruneClosedSelects(query: ListQuery): {
  *   4. el log de lo podado (R6).
  *   5. UNA llamada al repositorio, con la consulta YA SANEADA (R13).
  *   6. Ids DEDUPLICADOS con `Set` y UNA llamada al catalogo de recetas, con todos los ids de la
- *      pagina a la vez (R45); lo mismo con las presentaciones y, desde [Q4], con las
- *      unidades (R42): una llamada por catalogo y por pagina, nunca por fila.
+ *      pagina a la vez; lo mismo con las presentaciones y con las
+ *      unidades: una llamada por catalogo y por pagina, nunca por fila.
  *
  * El repositorio, el catalogo de recetas, el de presentaciones y el de unidades se llaman UNA
  * vez cada uno por pagina, tenga 1 fila o 25 -mas el catalogo de ids si hay busqueda-. El test
@@ -175,7 +175,7 @@ export function createListOrders(
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
     const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
-    // R42: una sola llamada al catalogo de unidades por pagina, con los ids UNICOS.
+    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS.
     const unitIds = [
       ...new Set(page.items.map((row) => row.unitId).filter((id): id is string => id !== null)),
     ];

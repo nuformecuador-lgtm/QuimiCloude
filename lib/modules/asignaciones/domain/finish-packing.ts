@@ -69,7 +69,7 @@ export function createFinishPacking(
     const now = deps.now?.() ?? new Date();
     const result = await deps.orders.finishPackingAliveById(orderId, actor.companyId, actor.id, now);
 
-    // R17-R21: el `'ok'` de Terminar trae el lote por linea del reparto; esta pantalla solo
+    // El `'ok'` de Terminar trae el lote por linea del reparto; esta pantalla solo
     // confirma el numero del pedido, asi que no hace falta devolverlo mas alla de este metodo.
     if (typeof result === 'object') return { numberText };
     if (result === 'not_packer') throw new OrderPackingTakenError();

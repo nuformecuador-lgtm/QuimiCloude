@@ -414,11 +414,11 @@ export async function listAliveOrders(
 }
 
 /**
- * Reemplazo COMPLETO del reparto de un pedido (R2, R9, R46): borra las lineas vigentes e
+ * Reemplazo COMPLETO del reparto de un pedido: borra las lineas vigentes e
  * inserta las nuevas, dentro de la MISMA transaccion que escribe el pedido. `[]` deja el pedido
  * sin ninguna linea, y es un caso valido -no todo pedido tiene que repartirse ya-.
  *
- * El ambito viaja como `scope: OrderScope`, no como `companyId` suelto (R18): la empresa que se
+ * El ambito viaja como `scope: OrderScope`, no como `companyId` suelto: la empresa que se
  * escribe en cada linea nueva sale de `companyScopeColumns(scope)`, igual que el resto del
  * archivo, nunca de un parametro que un llamante pudiera fabricar aparte.
  */
@@ -430,7 +430,7 @@ async function replacePresentationLines(
   now: Date,
 ): Promise<void> {
   const { companyId } = companyScopeColumns(scope);
-  // El `company_id` en el `WHERE` es defensa en profundidad (R18): quien llama ya releyo o
+  // El `company_id` en el `WHERE` es defensa en profundidad: quien llama ya releyo o
   // escribio la fila de `orders` bajo el mismo ambito, pero ninguna sentencia cruda de este
   // archivo filtra por id sin nombrar tambien la empresa.
   await tx.$executeRaw(
@@ -474,7 +474,7 @@ async function replacePresentationLines(
  * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`: la edicion recalcula, y
  * el valor nuevo reemplaza al anterior aunque sea `null`.
  *
- * `presentationId`/`presentationContent` de la fila YA NO SE ESCRIBEN ([Q4]/[R4]): el
+ * `presentationId`/`presentationContent` de la fila YA NO SE ESCRIBEN: el
  * reparto vive en `order_presentation_lines` (`replacePresentationLines`, misma transaccion) y
  * la columna se retira de `orders` en una migracion aparte -hasta entonces, sencillamente se
  * deja de tocar-. `unit_id` ocupa su lugar como dato propio del pedido.
@@ -507,7 +507,7 @@ export async function updateAliveOrder(
 }
 
 /**
- * `updatePresentationLinesAlive` (`design.md > 4.2`, R46): escribe SOLO `unit_id` y el reparto.
+ * `updatePresentationLinesAlive`: escribe SOLO `unit_id` y el reparto.
  * A diferencia de `updateAliveOrder`, `data` no lleva `quantity`, `recipeId` ni `priority` -el
  * TIPO de este metodo no puede ni expresarlos-, asi que esta sentencia no puede escribirlos ni
  * por accidente. Sin filtro de `status` en el `where`: quien llama ya bloqueo la fila con
@@ -681,7 +681,7 @@ async function insertAliveOrder(
     throw new Error('El INSERT de pedido no devolvio ninguna fila.');
   }
 
-  // Las lineas del reparto (R2, R9) nacen en la MISMA transaccion que el pedido: no hay
+  // Las lineas del reparto nacen en la MISMA transaccion que el pedido: no hay
   // conjunto previo que borrar -es un `INSERT` de alta, no un reemplazo-.
   await replacePresentationLines(tx, row.id, scope, data.presentationLines, now);
 
@@ -857,15 +857,15 @@ async function findAlivePackingStatus(
 type LockedPackingStatusRow = { readonly status: OrderStatus; readonly packed_by: string | null };
 
 /**
- * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar, `design.md > 4.5`, R10,
- * R48): transaccion CORTA con `SELECT ... FOR UPDATE` de la fila, y solo con ella bloqueada se
+ * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar): transaccion CORTA con
+ * `SELECT ... FOR UPDATE` de la fila, y solo con ella bloqueada se
  * cuenta el reparto -en una sentencia NUEVA, para que la cuenta vea lo que confirmo un guardado
  * del reparto que esperaba el MISMO bloqueo (`updateOrderPresentationLines` toma el mismo `FOR
  * UPDATE`, asi que las dos escrituras se serializan)- y solo entonces se escribe. Se descarta un
  * `EXISTS` dentro del `WHERE` del `UPDATE`: al reevaluar tras esperar el bloqueo, Postgres relee
  * `orders` pero la subconsulta sobre `order_presentation_lines` puede seguir usando la foto del
- * inicio de la sentencia, y un guardado que vacio el reparto dejaria Comenzar con cero lineas -
- * justo lo que R48 prohibe-.
+ * inicio de la sentencia, y un guardado que vacio el reparto dejaria Comenzar
+ * empacando un pedido con cero lineas.
  */
 export async function startPackingAliveOrder(
   id: string,
@@ -894,7 +894,7 @@ export async function startPackingAliveOrder(
       return 'not_packable';
     }
 
-    // Sentencia NUEVA, tras el bloqueo (R48): cuenta las lineas vigentes del reparto.
+    // Sentencia NUEVA, tras el bloqueo: cuenta las lineas vigentes del reparto.
     const [conteo] = await tx.$queryRaw<ReadonlyArray<{ total: bigint }>>(Prisma.sql`
       SELECT count(*)::bigint AS total
         FROM "order_presentation_lines"
@@ -914,8 +914,8 @@ export async function startPackingAliveOrder(
 }
 
 /**
- * Implementa `OrderWriteRepository['finishPackingAlive']` (Terminar, T14, `design.md > 4.5`,
- * R17-R21): el `UPDATE` condicional exige ademas `packed_by = packerId`, y escribe
+ * Implementa `OrderWriteRepository['finishPackingAlive']` (Terminar): el `UPDATE`
+ * condicional exige ademas `packed_by = packerId`, y escribe
  * `finished_at` en la MISMA sentencia que el estado. Corre sobre `tx` -la transaccion
  * compartida de `OrderUnitOfWork`, no el cliente global- para que el alta de los lotes que hace
  * el dominio despues comparta la MISMA transaccion y un fallo posterior deshaga tambien este
@@ -957,7 +957,7 @@ async function finishPackingAliveOrder(
   return { kind: 'not_packable' };
 }
 
-/** Fila cruda de una linea del reparto para Terminar el empaque (R17, R19): `FOR SHARE`, en el
+/** Fila cruda de una linea del reparto para Terminar el empaque: `FOR SHARE`, en el
  *  orden de alta, dentro de la MISMA transaccion que el `UPDATE` de `finishPackingAliveOrder`. */
 type FinishPackingLineRow = {
   readonly id: string;

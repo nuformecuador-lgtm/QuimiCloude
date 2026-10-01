@@ -1,4 +1,4 @@
-// lib/modules/pedidos/domain/resolve-distribution.ts — R6, R7, R35, R36, R41, R42.
+// lib/modules/pedidos/domain/resolve-distribution.ts
 //
 // El paso compartido de `createOrder` y `updateOrder`: resuelve las lineas del reparto que
 // llegaron del borde contra el catalogo de presentaciones y el de unidades, corre
@@ -29,7 +29,7 @@ export type PresentationLineInput = {
 
 /**
  * Resuelve, valida y traduce. Sin fallo, devuelve las lineas YA con el contenido copiado en
- * este instante (R3) y listas para el puerto de escritura. Con fallo, lanza sin haber devuelto
+ * este instante y listas para el puerto de escritura. Con fallo, lanza sin haber devuelto
  * nada: quien llama no escribe ni la unidad ni las lineas.
  */
 export async function resolveDistribution(
@@ -47,7 +47,7 @@ export async function resolveDistribution(
   const presentationById = new Map(presentationRefs.map((ref) => [ref.id, ref] as const));
 
   // UNA sola llamada al catalogo de unidades, con los ids UNICOS que hacen falta: la del pedido
-  // y la de cada presentacion distinta del reparto (`design.md > 2.2 bis`).
+  // y la de cada presentacion distinta del reparto.
   const unitIds = [...new Set([unitId, ...presentationRefs.map((ref) => ref.unitId)])];
   const unitById = new Map((await units.findRefs(unitIds, companyId)).map((ref) => [ref.id, ref] as const));
 

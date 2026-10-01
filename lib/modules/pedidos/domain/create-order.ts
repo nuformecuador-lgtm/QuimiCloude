@@ -37,11 +37,11 @@ export type CreateOrderDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: los lotes con existencia con los que se costea. */
   readonly products: ProductCatalog;
-  /** Contrato PUBLICO de `unidades`: la unidad del pedido (R41) y las de cada presentacion del
+  /** Contrato PUBLICO de `unidades`: la unidad del pedido y las de cada presentacion del
    *  reparto, para convertir y para el coste. */
   readonly units: UnitCatalog;
   /** Contrato PUBLICO de `inventario`: las presentaciones del reparto, para comprobar que
-   *  existen en la empresa de quien escribe y copiar su contenido (R3). No se le pasan al
+   *  existen en la empresa de quien escribe y copiar su contenido. No se le pasan al
    *  coste: el reparto no cambia nada de lo que ese calculo hace. */
   readonly presentations: PresentationCatalog;
   /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
@@ -119,8 +119,8 @@ export function createCreateOrder(
       actor.companyId,
     );
 
-    // R41, R6-R8, R35, R36, R42: la unidad y el reparto se resuelven y se validan contra el
-    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido (R9).
+    // La unidad y el reparto se resuelven y se validan contra el
+    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido.
     const presentationLines = await resolveDistribution(
       deps.presentations,
       deps.units,

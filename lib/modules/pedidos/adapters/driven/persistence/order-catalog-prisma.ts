@@ -59,7 +59,7 @@ export async function findAliveOrderTargetById(
   return row === null ? null : toOrderAssignmentTarget(row);
 }
 
-/** Una fila de `order_presentation_lines`, ya en el orden de alta (`design.md > 6`): la
+/** Una fila de `order_presentation_lines`, ya en el orden de alta: la
  *  consulta pide `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
 type AssignedOrderPresentationLineRow = {
   readonly presentationId: string;

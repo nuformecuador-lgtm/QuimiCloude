@@ -6,7 +6,7 @@ import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '
  *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
 export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
 
-/** Lo que Terminar el empaque (`design.md > 4.5`, R17, R18) necesita del pedido cuando el
+/** Lo que Terminar el empaque necesita del pedido cuando el
  *  `UPDATE` condicional SI lo mueve: la receta para el nombre del lote y el coste guardado -o
  *  su ausencia, que hace recalcularlo-. */
 export type FinishPackingOrderRow = {
@@ -24,9 +24,9 @@ export type FinishPackingUpdateOutcome =
   | ({ readonly kind: 'ok' } & FinishPackingOrderRow)
   | { readonly kind: 'not_packer' | 'not_packable' | 'not_found' };
 
-/** Una linea del reparto tal como Terminar el empaque la necesita (R17, R19): la presentacion,
- *  sus envases y el contenido copiado -`null` es la defensa en profundidad de R19, solo
- *  alcanzable con una fila escrita fuera de la aplicacion-. */
+/** Una linea del reparto tal como Terminar el empaque la necesita: la presentacion,
+ *  sus envases y el contenido copiado -`null` hace que Terminar recurra al vigente, y sin el
+ *  rechace; solo alcanzable con una fila escrita fuera de la aplicacion-. */
 export type FinishPackingLine = {
   readonly id: string;
   readonly presentationId: string;
@@ -99,7 +99,7 @@ export interface OrderWriteRepository {
    *  que el usuario deba ver en esa columna. */
   setReservedAt(id: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
 
-  /** `updateOrderPresentationLines` (`design.md > 4.2`, R46): escribe SOLO la unidad y el
+  /** `updateOrderPresentationLines`: escribe SOLO la unidad y el
    *  reparto, nunca `quantity`, la receta ni la prioridad -eso es `updateAlive`, del formulario
    *  general-. Reemplazo completo del conjunto de lineas, igual que `updateAlive`. */
   updatePresentationLinesAlive(
@@ -111,7 +111,7 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
-  /** Terminar el empaque (`design.md > 4.5`, R17-R21): `UPDATE` condicional `WHERE
+  /** Terminar el empaque: `UPDATE` condicional `WHERE
    *  status = 'EN_EMPAQUE' AND packed_by = packerId`, con `finished_at` en la MISMA sentencia.
    *  Dentro de `OrderUnitOfWork.run` para que el alta de los lotes de las lineas viva en la
    *  MISMA transaccion y un fallo posterior deshaga tambien este `UPDATE`. */
@@ -122,7 +122,7 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<FinishPackingUpdateOutcome>;
 
-  /** Las lineas del reparto de un pedido, `FOR SHARE`, en el orden de alta (R17): la MISMA
+  /** Las lineas del reparto de un pedido, `FOR SHARE`, en el orden de alta: la MISMA
    *  transaccion de `finishPackingAlive`, para que un fallo tras leerlas deshaga tambien el
    *  `UPDATE`. */
   findPresentationLinesForFinish(id: string, scope: OrderScope): Promise<readonly FinishPackingLine[]>;

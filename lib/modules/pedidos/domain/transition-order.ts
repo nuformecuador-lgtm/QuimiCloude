@@ -6,7 +6,7 @@
 // `ENTREGADO` no son destino de este metodo: solo los alcanzan los dos metodos de empaque, que
 // conocen a quien empaca. `asignaciones` solo conoce la firma del puerto, nunca este archivo.
 //
-// R15, R16: Finalizar (`EN_CURSO -> POR_EMPACAR`) YA NO da de alta ningun lote de
+// Finalizar (`EN_CURSO -> POR_EMPACAR`) YA NO da de alta ningun lote de
 // producto terminado -eso se traslada a Terminar el empaque, una vez por linea del reparto- ni
 // exige presentacion ni receta viva: solo consume el material apartado, exactamente como antes
 // de que Finalizar diera de alta el lote de producto terminado.
@@ -62,7 +62,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
 
         // Consume ANTES de mover el estado: si falta material o la receta no tiene lineas, la
         // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos
-        // -`finishedAt` no lo escribe este destino de todos modos, solo Terminar-. R15, R16: ya
+        // -`finishedAt` no lo escribe este destino de todos modos, solo Terminar-. Ya
         // no hay presentacion, receta viva ni coste de lote que resolver aqui -eso es
         // de Terminar (T14)-, solo el consumo de siempre.
         if (to === 'POR_EMPACAR') {
@@ -85,7 +85,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           const result = await scope.orders.setStatus(id, from, to, actorId, now, { companyId });
           if (result !== 'ok') throw new StatusChangeAfterConsumptionFailedError(result);
 
-          // R30: el ciclo de reserva no cambia -el material ya se consumio arriba-,
+          // El ciclo de reserva no cambia -el material ya se consumio arriba-,
           // solo se retira lo que colgaba aqui del alta de producto terminado.
           await scope.orders.setReservedAt(id, null, { companyId });
           return 'ok' as const;

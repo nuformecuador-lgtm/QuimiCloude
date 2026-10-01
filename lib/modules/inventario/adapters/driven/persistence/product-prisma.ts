@@ -972,12 +972,12 @@ export async function consumeBatchStock(
 type PresentationForShareRow = { readonly name: string; readonly unitId: string; readonly content: string | null };
 
 /**
- * La entrada de un lote de produccion al Terminar el empaque, por UNA linea del reparto
- * (R17): presentacion `FOR SHARE`, producto terminado (nace si falta, `ON CONFLICT ...
+ * La entrada de un lote de produccion al Terminar el empaque, por UNA linea del reparto:
+ * presentacion `FOR SHARE`, producto terminado (nace si falta, `ON CONFLICT ...
  * DO NOTHING` sobre el indice parcial de la combinacion), lote, asiento `production` -con
  * `order_id` Y `order_presentation_line_id`- y recalculo, todo sobre la MISMA transaccion que
  * el resto de Terminar -no abre la suya, a diferencia de `createWithFirstBatch`-. `unitCost` ya
- * llega resuelto (R18): el mismo para todas las lineas de un pedido, no se recalcula aqui.
+ * llega resuelto: el mismo para todas las lineas de un pedido, no se recalcula aqui.
  */
 export async function receiveFinishedGoods(
   tx: Prisma.TransactionClient,

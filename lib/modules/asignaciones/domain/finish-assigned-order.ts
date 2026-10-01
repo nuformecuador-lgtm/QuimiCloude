@@ -26,7 +26,7 @@ export type FinishAssignedOrderDeps = {
 };
 
 /**
- * R15, R16: Finalizar ya no da de alta ningun lote de producto terminado -eso se
+ * Finalizar ya no da de alta ningun lote de producto terminado -eso se
  * traslada a Terminar el empaque-, asi que ya no hay envases ni producto que devolver aqui.
  */
 export type FinishAssignedOrderResult = {

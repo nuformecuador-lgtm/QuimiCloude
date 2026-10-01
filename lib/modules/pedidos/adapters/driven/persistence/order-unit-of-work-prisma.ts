@@ -35,7 +35,7 @@ export async function withOrderTransaction<T>(
 }
 
 /**
- * Implementa `OrderDistributionTransaction` (T9, `design.md > 4.2`): la transaccion CORTA propia
+ * Implementa `OrderDistributionTransaction`: la transaccion CORTA propia
  * de `updateOrderPresentationLines`, sin la unidad de trabajo compartida con `inventario` -este
  * caso de uso no toca material ni reserva-. Vive en ESTE archivo, y no en `order-prisma.ts`, por
  * el mismo motivo que `withOrderTransaction`: es el UNICO archivo de `pedidos` que abre un

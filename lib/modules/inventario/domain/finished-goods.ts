@@ -8,9 +8,9 @@
 
 import type { ProductId } from './product-catalog';
 
-/** R1: los envases ya no se calculan aqui -los da la linea del reparto, entero y positivo
+/** Los envases ya no se calculan aqui -los da la linea del reparto, entero y positivo
  *  por construccion-, asi que no hay division que pueda dejar `no_whole_package`: ese caso
- *  desaparece del tipo. `unitCost` es el UNICO del pedido entero (R18), ya resuelto por quien
+ *  desaparece del tipo. `unitCost` es el UNICO del pedido entero, ya resuelto por quien
  *  llama; esta funcion no lo recalcula, solo decide si hay contenido con que entrar. */
 export type FinishedGoodsLinePlan =
   | { readonly kind: 'planned'; readonly quantity: string }
@@ -44,9 +44,9 @@ function fromScaledInteger(scaled: bigint): string {
 
 /**
  * Cantidad que entra de UNA linea del reparto: `quantity = packages * content`, exacta -ya no
- * hay division que hacer, los envases son entrada validada rio arriba (R1)-. `unitCost` viaja
- * en la entrada porque el contrato lo necesita (es el mismo para todas las lineas del pedido,
- * R18), pero esta funcion no lo usa: quien reciba `'planned'` escribe el lote con el `unitCost`
+ * hay division que hacer, los envases son entrada validada rio arriba-. `unitCost` viaja
+ * en la entrada porque el contrato lo necesita (es el mismo para todas las lineas del pedido),
+ * pero esta funcion no lo usa: quien reciba `'planned'` escribe el lote con el `unitCost`
  * que ya tenia, no con nada que salga de aqui.
  */
 export function planFinishedGoodsLine(input: {
@@ -71,7 +71,7 @@ export type FinishedGoodsOutcome =
 
 /** Servicio que `inventario` ofrece a `pedidos` para Terminar el empaque: da de alta el
  *  producto terminado de una combinacion (si no existia), su lote y su asiento -uno por linea
- *  del reparto, R17-, y recalcula la existencia. Lo implementa un adaptador driven de
+ *  del reparto-, y recalcula la existencia. Lo implementa un adaptador driven de
  *  `inventario` sobre la transaccion compartida y lo cablea `lib/composition`. */
 export interface FinishedGoodsIntake {
   receiveFromOrder(input: {

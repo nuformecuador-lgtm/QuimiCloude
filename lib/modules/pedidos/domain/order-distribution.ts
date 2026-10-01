@@ -1,7 +1,7 @@
-// lib/modules/pedidos/domain/order-distribution.ts — R5-R8, R35, R36, R42.
+// lib/modules/pedidos/domain/order-distribution.ts
 //
 // Dominio PURO: sin Prisma, sin framework, sin reloj. `validateDistribution` es la unica regla
-// del reparto contra el total del pedido (design.md > 2.2 bis): cuanto queda disponible, o el
+// del reparto contra el total del pedido: cuanto queda disponible, o el
 // primer fallo. La llaman `createOrder`, `updateOrder` y `updateOrderPresentationLines`, cada
 // una dentro de su propia transaccion con la fila del pedido bloqueada -esta funcion no bloquea
 // nada, solo calcula sobre lo que quien llama ya releyo.
@@ -9,10 +9,10 @@
 import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades';
 
 /** Una linea del reparto, con su presentacion ya resuelta: el contenido copiado (o vigente,
- *  `null` si falta, R35) y la conversion de la unidad de esa presentacion. */
+ *  `null` si falta) y la conversion de la unidad de esa presentacion. */
 export type DistributionLine = {
   readonly presentationId: string;
-  /** Entero positivo (R1): validado rio arriba, esta funcion no lo repite. */
+  /** Entero positivo: validado rio arriba, esta funcion no lo repite. */
   readonly packages: number;
   readonly content: string | null;
   readonly unit: UnitConversion;
@@ -90,10 +90,10 @@ function formatDecimal(value: Scaled): string {
 }
 
 /**
- * Cuanto queda disponible (R6) o el primer fallo, en el orden de `design.md > 4.2`:
- * `without_unit` (R42, sin unidad no hay a que convertir) -> por cada linea, en el orden dado,
- * `presentation_without_content` (R35) o `incompatible_units` (R7) -> `exceeds_quantity` (R36)
- * si la suma convertida pasa de `quantity`. Igual o menor SI se acepta (R8): `available` puede
+ * Cuanto queda disponible o el primer fallo, en este orden:
+ * `without_unit` (sin unidad no hay a que convertir) -> por cada linea, en el orden dado,
+ * `presentation_without_content` o `incompatible_units` -> `exceeds_quantity`
+ * si la suma convertida pasa de `quantity`. Igual o menor SI se acepta: `available` puede
  * ser `'0'`.
  */
 export function validateDistribution(

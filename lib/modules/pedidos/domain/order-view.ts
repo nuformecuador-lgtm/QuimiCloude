@@ -21,8 +21,8 @@ import type { OrderNumber } from './order-number';
 
 /**
  * Una linea del reparto ya resuelta y lista para el puerto de escritura: la presentacion, los
- * envases enteros (R1) y el contenido que se le copia en este instante (`null` = la
- * presentacion no lo tiene, R3).
+ * envases enteros y el contenido que se le copia en este instante (`null` = la
+ * presentacion no lo tiene).
  */
 export type OrderPresentationLineWrite = {
   readonly presentationId: string;
@@ -63,9 +63,9 @@ export type NewOrder = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: EditableOrderStatus;
-  /** Obligatoria (R41): toda escritura de `NewOrder` la lleva. */
+  /** Obligatoria: toda escritura de `NewOrder` la lleva. */
   readonly unitId: string;
-  /** El reparto, ya resuelto y validado contra el total (R2, R9: puede ser `[]`). */
+  /** El reparto, ya resuelto y validado contra el total (puede ser `[]`). */
   readonly presentationLines: readonly OrderPresentationLineWrite[];
 };
 
@@ -104,7 +104,7 @@ export type OrderRow = {
   /** El reparto en orden de alta (`created_at`, desempate `id`); `[]` = sin reparto. */
   readonly presentationLines: readonly OrderPresentationLineRow[];
   /** La unidad en que se expresa `quantity` ([Q4], devuelve la unidad al pedido).
-   *  `null` solo en los pedidos anteriores sin presentacion (R43). */
+   *  `null` solo en los pedidos anteriores sin presentacion. */
   readonly unitId: string | null;
 };
 
@@ -141,13 +141,13 @@ export type OrderView = {
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** El reparto en orden de alta; `[]` = sin reparto (R27). Cada linea lleva lo que
+  /** El reparto en orden de alta; `[]` = sin reparto. Cada linea lleva lo que
    *  `presentationLinesSchema` acepta, asi que la edicion lo precarga tal cual. */
   readonly presentationLines: readonly OrderPresentationLineView[];
   /** La unidad en que se expresa `quantity` ([Q4]); `null` en los pedidos que no la
-   *  tienen todavia (R43). */
+   *  tienen todavia. */
   readonly unitId: string | null;
-  /** El simbolo de la unidad, o su nombre si no tiene simbolo (R42); `null` cuando `unitId`
+  /** El simbolo de la unidad, o su nombre si no tiene simbolo; `null` cuando `unitId`
    *  es `null`, nunca cuando el id no vuelve del catalogo -la FK con `RESTRICT` hace ese caso
    *  imposible por construccion-. */
   readonly unitLabel: string | null;

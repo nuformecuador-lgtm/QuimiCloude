@@ -4,7 +4,7 @@
 // `OrderPackingRepository`: un `UPDATE` condicional fuera de la unidad de trabajo compartida con
 // `inventario`, sin tocar material ni producto terminado.
 //
-// `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar, R17-R21):
+// `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar):
 // abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive` -en la
 // MISMA transaccion- y da de alta, por cada linea del reparto, un lote de producto terminado con
 // un unico coste por unidad del pedido, expresado en la unidad de cada lote. `asignaciones` solo
@@ -43,7 +43,7 @@ export type FinishPackingDeps = {
   /** Nombre de la receta y coste del lote cuando el pedido no tiene importe guardado: las dos
    *  lecturas van por los catalogos publicos, sobre el cliente global -la misma foto que veria
    *  una edicion en ese instante-, nunca sobre `scope.recipes`. Mismo criterio que tenia
-   *  `transition-order.ts` antes de R15/R16. */
+   *  `transition-order.ts` cuando Finalizar daba de alta el lote. */
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
@@ -53,7 +53,7 @@ export type FinishPackingDeps = {
   readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
 };
 
-/** Firma exacta de `OrderCatalog['startPackingAliveById']`. `'without_distribution'` (R10) sale
+/** Firma exacta de `OrderCatalog['startPackingAliveById']`. `'without_distribution'` sale
  *  tal cual del puerto: este dominio no distingue ese caso de los demas, solo delega. */
 export function createStartPacking(deps: StartPackingDeps): OrderCatalog['startPackingAliveById'] {
   return async function startPackingAliveById(id, companyId, packerId, now) {

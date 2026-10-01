@@ -371,7 +371,7 @@ model InventoryMovement {
   createdBy String?               @map("created_by") @db.Uuid
   createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  /// El asiento `production` de una linea del reparto de QC-170 (uno por linea, R17). Sin
+  /// El asiento `production` de una linea del reparto (uno por linea). Sin
   /// `@relation`: `OrderPresentationLine` es de `pedidos`; su FK esta escrita a mano y es drift.
   orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
 
@@ -639,7 +639,7 @@ model Order {
   /// nuevos lo conservan), lo exige el CHECK `orders_packed_by_matches_status`. Sin `@relation`:
   /// es drift, con FK COMPUESTA `(packed_by, company_id)` escrita a mano en la migracion.
   packedBy            String?       @map("packed_by") @db.Uuid
-  /// La unidad en que se expresa `quantity` (QC-170, deroga QC-35bis en la unidad). Sin
+  /// La unidad en que se expresa `quantity`. Sin
   /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
   /// presentacion; la aplicacion la exige en el alta y en la edicion.
   unitId              String?       @map("unit_id") @db.Uuid
@@ -657,7 +657,7 @@ model Order {
 }
 
 /// El reparto de un pedido: en que presentaciones se entrega lo fabricado y cuantos envases de
-/// cada una. Sustituye a la presentacion unica de QC-146. `companyId` es COPIA de la del pedido
+/// cada una. Sustituye a la presentacion unica por pedido. `companyId` es COPIA de la del pedido
 /// -no se deriva por JOIN- por el mismo motivo que en `product_batches`: la unicidad y el ambito
 /// de esta tabla no pueden depender de otra. `presentationId` no lleva `@relation`: `Presentation`
 /// es de `inventario`, es drift, con FK COMPUESTA `(company_id, presentation_id)` igual que

@@ -64,7 +64,7 @@ const unitIdSchema = z.string().uuid();
 
 /**
  * Una linea del reparto: la presentacion en que se entrega parte de lo fabricado y cuantos
- * envases ENTEROS de ella (R1). Aqui solo la FORMA; la existencia, el contenido copiado y el
+ * envases ENTEROS de ella. Aqui solo la FORMA; la existencia, el contenido copiado y el
  * total contra la cantidad del pedido los comprueba el caso de uso.
  */
 const presentationLineSchema = z.object({
@@ -73,12 +73,12 @@ const presentationLineSchema = z.object({
 });
 
 /** Dos veces la MISMA presentacion en el reparto no son dos lineas: son la misma linea con los
- *  envases repetidos, y eso lo rechaza el borde en vez de sumarlos por su cuenta (R2). */
+ *  envases repetidos, y eso lo rechaza el borde en vez de sumarlos por su cuenta. */
 function hasNoDuplicatePresentation(lines: readonly { readonly presentationId: string }[]): boolean {
   return new Set(lines.map((line) => line.presentationId)).size === lines.length;
 }
 
-/** El reparto completo. `[]` es un pedido sin reparto todavia, valido (R9): quien no reparte
+/** El reparto completo. `[]` es un pedido sin reparto todavia, valido: quien no reparte
  *  nada al dar de alta lo reparte despues, hasta que empieza el empaque. */
 export const presentationLinesSchema = z
   .array(presentationLineSchema)
@@ -184,7 +184,7 @@ export const quoteOrderCostSchema = createOrderSchema
 export type QuoteOrderCostInput = z.infer<typeof quoteOrderCostSchema>;
 
 /**
- * T11 (`design.md > 3`): «cuanto queda disponible», de solo lectura. Comparte forma con el
+ * «Cuanto queda disponible», de solo lectura. Comparte forma con el
  * alta -misma cantidad, misma unidad, mismo reparto- porque el calculo se hace ANTES de
  * guardar, con los mismos tres datos que `createOrderSchema` ya valida.
  */
@@ -197,11 +197,11 @@ export const orderPresentationAvailabilitySchema = createOrderSchema.pick({
 export type OrderPresentationAvailabilityInput = z.infer<typeof orderPresentationAvailabilitySchema>;
 
 /**
- * T25 (`design.md > 4.3`, R46): la edicion ACOTADA «Reparto y unidad» en `POR_EMPACAR`. A
+ * La edicion ACOTADA «Reparto y unidad» en `POR_EMPACAR`. A
  * diferencia de `createOrderSchema`/`updateOrderSchema` -que cubren el pedido ENTERO y
  * descartan las claves de mas en silencio-, este esquema es `.strict()`: la cantidad, la
  * receta o los responsables no se ignoran, RECHAZAN la entrada entera, porque este formulario
- * no tiene permiso para tocarlos (R46).
+ * no tiene permiso para tocarlos.
  */
 export const updateOrderDistributionSchema = z
   .object({
