@@ -413,6 +413,9 @@ beforeEach(() => {
       updatedBy: null,
       steps: [],
       lines: [],
+      original: null,
+      isUnderReview: false,
+      displayName: RECETA.name,
     },
   });
   clearSidebarStateCookie();

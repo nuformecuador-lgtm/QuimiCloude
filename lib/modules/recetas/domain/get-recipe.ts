@@ -1,6 +1,7 @@
 import { requirePermission, type Actor } from './actor';
 import { RecipeNotFoundError } from './errors';
 import type { RecipeScope } from './recipe-scope';
+import { isVersionUnderReview, recipeDisplayName } from './recipe-version';
 import type { RecipeDetail } from './recipe-view';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
@@ -53,18 +54,27 @@ export function createGetRecipe(
     const namesById = new Map(refs.map((ref) => [ref.id, ref.name]));
     const refsById = new Map(refs.map((ref) => [ref.id, ref]));
 
+    // Una version no guarda pasos, descripcion ni imagen: muestra los de su original.
+    const shared = row.original ?? row;
+
     return {
       id: row.id,
       name: row.name,
-      description: row.description,
-      // R24: la ruta se compone a URL solo al leer, nunca se persiste la URL completa.
-      imageUrl: row.imagePath !== null ? deps.images.publicUrl(row.imagePath) : null,
-      stepCount: row.steps.length,
+      description: shared.description,
+      // La ruta se compone a URL solo al leer; nunca se persiste la URL completa.
+      imageUrl: shared.imagePath !== null ? deps.images.publicUrl(shared.imagePath) : null,
+      stepCount: shared.steps.length,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       createdBy: row.createdBy,
       updatedBy: row.updatedBy,
-      steps: row.steps,
+      steps: shared.steps,
+      original: row.original === null ? null : { id: row.original.id, name: row.original.name },
+      isUnderReview: isVersionUnderReview(
+        row.original !== null,
+        row.lines.map((line) => line.percentage),
+      ),
+      displayName: recipeDisplayName(row.name, row.original?.name ?? null),
       lines: row.lines.map((line) => {
         const ref = refsById.get(line.productId);
         return {

@@ -218,7 +218,7 @@ function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {
  * `.default([])`: un payload sin la clave `lines` se trata como lista vacia y se rechaza
  * igual, en alta y en edicion.
  */
-const recipeLinesSchema = z
+export const recipeLinesSchema = z
   .array(recipeLineSchema)
   .default([])
   .refine(sinProductoRepetido, {
@@ -271,7 +271,27 @@ export const updateRecipeSchema = z.object({
   steps: recipeStepsSchema,
   lines: recipeLinesSchema,
   image: recipeImageUploadSchema.nullable().optional(),
+  propagateToVersionIds: z
+    .array(z.string().uuid())
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: 'No puede haber dos versiones repetidas.',
+    })
+    .default([]),
+});
+
+// Sin `lines`, la version nace con una copia de las de su original, que el caso de uso valida con
+// este mismo `recipeLinesSchema`.
+export const createRecipeVersionSchema = z.object({
+  name: recipeNameSchema,
+  lines: recipeLinesSchema.optional(),
+});
+
+export const updateRecipeVersionSchema = z.object({
+  name: recipeNameSchema,
+  lines: recipeLinesSchema,
 });
 
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;
 export type UpdateRecipeInput = z.infer<typeof updateRecipeSchema>;
+export type CreateRecipeVersionInput = z.infer<typeof createRecipeVersionSchema>;
+export type UpdateRecipeVersionInput = z.infer<typeof updateRecipeVersionSchema>;

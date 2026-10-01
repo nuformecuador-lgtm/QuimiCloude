@@ -78,15 +78,20 @@ export {
   recipeLineSchema,
   createRecipeSchema,
   updateRecipeSchema,
+  createRecipeVersionSchema,
+  updateRecipeVersionSchema,
   type RecipeLineInput,
   type CreateRecipeInput,
   type UpdateRecipeInput,
+  type CreateRecipeVersionInput,
+  type UpdateRecipeVersionInput,
 } from './domain/recipe-input';
 export {
   type RecipeSummary,
   type RecipeLineView,
   type RecipeStepView,
   type RecipeDetail,
+  type RecipeVersionSummary,
 } from './domain/recipe-view';
 
 // Las cinco factories de caso de uso (`design.md > 3`).
@@ -100,3 +105,15 @@ export {
   type StorageWarning,
 } from './domain/update-recipe';
 export { createDeleteRecipe, type DeleteRecipeDeps } from './domain/delete-recipe';
+export {
+  createCreateRecipeVersion,
+  type CreateRecipeVersionDeps,
+} from './domain/create-recipe-version';
+export {
+  createUpdateRecipeVersion,
+  type UpdateRecipeVersionDeps,
+} from './domain/update-recipe-version';
+export {
+  createListRecipeVersions,
+  type ListRecipeVersionsDeps,
+} from './domain/list-recipe-versions';

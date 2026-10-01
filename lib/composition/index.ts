@@ -142,10 +142,13 @@ import {
 } from '@/lib/modules/unidades';
 import {
   createCreateRecipe,
+  createCreateRecipeVersion,
   createDeleteRecipe,
   createGetRecipe,
+  createListRecipeVersions,
   createListRecipes,
   createUpdateRecipe,
+  createUpdateRecipeVersion,
 } from '@/lib/modules/recetas';
 import {
   createRecipe,
@@ -919,6 +922,9 @@ export const recetas = {
     images: recipeImageStorage,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
+  createRecipeVersion: createCreateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
+  updateRecipeVersion: createUpdateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
+  listRecipeVersions: createListRecipeVersions({ recipes: recipeRepository }),
 } as const;
 
 // ---------------------------------------------------------------------------------------

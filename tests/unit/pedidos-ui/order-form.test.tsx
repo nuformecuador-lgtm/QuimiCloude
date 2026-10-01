@@ -197,6 +197,9 @@ function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [],
     lines: [LINEA_INGREDIENTE],
+    original: null,
+    isUnderReview: false,
+    displayName: RECETA.name,
     ...overrides,
   };
 }
