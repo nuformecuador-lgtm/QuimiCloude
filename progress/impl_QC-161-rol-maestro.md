@@ -437,3 +437,21 @@ de exentas no cambie.
 ### Salida
 
 - `vitest run guard`: 51 archivos, 652 passed, 11 skipped (incluye `guard-empresa-en-esquema`).
+
+## Cierre de la tanda T5, T6, T13 — `./init.sh --rapido`
+
+Punta `e1c6d548`. Entorno, fichas, cupo, specs y `QuimiCloude_QC161` al dia (**57** migraciones)
+en verde. **`pnpm run typecheck` rojo y el gate se para ahi**: solo los dos errores esperados de
+`session-user-prisma.ts` (`:108` TS2322, `:110` TS18047), que cierra T9. El resto se corrio a mano:
+
+- `pnpm run lint`: 0 errores, 8 warnings (ninguno en archivos de esta tanda).
+- `vitest run guard`: 51 archivos, 652 passed, 11 skipped.
+- `pnpm run test:rapido` (`vitest related` sobre el diff; 484 archivos): 5 archivos / 8 casos
+  rojos, 6927 passed, 26 skipped.
+  - Baseline: `unidades-viewport.test.tsx` (2), `usuarios-viewport.test.tsx` (2).
+  - Deuda de `dev` fuera del baseline (ver T2): `inventario/product-page.test.tsx` (1),
+    `recetas-ui/recipe-page.test.tsx` (1).
+  - De esta rama, **esperados para T12** (`design.md > 10.1`): `user-crud.int.test.ts` (2), «los
+    MISMOS correo, nombre de usuario y documento en OTRA empresa SI se crean» y «tampoco choca por
+    mayusculas entre empresas distintas». Los rompe el indice global del nombre de usuario.
+  - `identity-seed.int.test.ts` entero en verde (el «QC-142 R13» que esperaba T5 incluido).
