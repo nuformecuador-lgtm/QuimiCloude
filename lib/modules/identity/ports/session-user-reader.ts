@@ -12,10 +12,10 @@ export type SessionUserRecord = {
   readonly lastNames: string;
   readonly roleName: string;
   /**
-   * QC-48 (T6, R13): la empresa de la ficha, tal y como esta HOY en la base. Es una columna de
-   * `users`, asi que sale en la misma fila que ya se leia y no cuesta nada traerla.
+   * La empresa de la ficha, tal y como esta hoy en la base. Es una columna de `users`, asi que
+   * sale en la misma fila que ya se leia y no cuesta nada traerla. `null` solo para el Maestro.
    */
-  readonly companyId: string;
+  readonly companyId: string | null;
   /**
    * QC-48 (T6, R15): `null` = empresa viva (QC-47 R6). Se trae la marca cruda y no un
    * `companyIsAlive` ya cocinado: «viva» es una regla de dominio y cocinarla aqui la mudaria

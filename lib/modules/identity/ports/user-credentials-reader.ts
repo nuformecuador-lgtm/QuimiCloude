@@ -38,8 +38,9 @@ export type AuthenticatableUser = {
   readonly id: string;
   readonly passwordHash: string;
   readonly roleName: string;
-  readonly companyId: string;
-  /** `null` = la empresa sigue viva (QC-47 R6: `companies.deleted_at IS NULL`). */
+  /** `null` = la ficha no tiene empresa; solo el Maestro, la base lo impide a los demas roles. */
+  readonly companyId: string | null;
+  /** `null` = la empresa sigue viva (`companies.deleted_at IS NULL`) o no hay empresa. */
   readonly companyDeletedAt: Date | null;
   /**
    * QC-78 R1 — el estado ALMACENADO, tal cual esta en la columna. Lo que significa en el instante

@@ -171,7 +171,7 @@
 
 ## Bloque 4 — La sesión sin empresa
 
-- [ ] **T9. Del login a la resolución de la sesión.** (`design.md > 6.1–6.4`; R30, R31, R32, R35, R44.)
+- [x] **T9. Del login a la resolución de la sesión.** (`design.md > 6.1–6.4`; R30, R31, R32, R35, R44.)
       - Archivos: `lib/modules/identity/domain/session.ts`, `domain/session-claims.ts`,
         `domain/resolve-session.ts`, `ports/user-credentials-reader.ts`, `ports/session-user-reader.ts`,
         `ports/session-provider.ts` (JSDoc del contrato enmendado),

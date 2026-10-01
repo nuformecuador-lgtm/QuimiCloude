@@ -205,9 +205,9 @@ describe('createResolveSession', () => {
 
     const resultado = await resolveSession(AHORA);
 
-    expect(resultado?.context.roleName).toBe(RECORD.roleName);
-    expect(resultado?.context.roleName).not.toBe(CLAIMS_VIGENTES.roleName);
-    expect(resultado?.context.companyId).toBe(RECORD.companyId);
+    expect(resultado?.context?.roleName).toBe(RECORD.roleName);
+    expect(resultado?.context?.roleName).not.toBe(CLAIMS_VIGENTES.roleName);
+    expect(resultado?.context?.companyId).toBe(RECORD.companyId);
   });
 
   // R22 — lo expuesto se limita a empresa, usuario y rol. Ni permisos, ni capacidades, ni
@@ -483,7 +483,7 @@ describe('createResolveSession — corte por sello (QC-23 R8)', () => {
     const resultado = await createResolveSession({ session, users, ...REGISTRO_QC23 })(AHORA);
 
     expect(resultado?.user.id).toBe(SUB);
-    expect(resultado?.context.companyId).toBe(COMPANY_ID);
+    expect(resultado?.context?.companyId).toBe(COMPANY_ID);
   });
 });
 
@@ -682,5 +682,86 @@ describe('createResolveSession — fallar cerrado (QC-23 R16, R17)', () => {
     await createResolveSession({ session, users, ...registroEspia() })(AHORA);
 
     expect(users.findActiveById).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ================================================================================================
+// QC-161 — la sesion de quien no tiene empresa (el Maestro).
+// ================================================================================================
+
+describe('createResolveSession — sesion sin empresa (QC-161)', () => {
+  const CLAIMS_SIN_EMPRESA: SessionClaims = { ...CLAIMS_VIGENTES, companyId: null };
+  const RECORD_SIN_EMPRESA: SessionUserRecord = {
+    ...RECORD,
+    roleName: 'Maestro',
+    companyId: null,
+    companyDeletedAt: null,
+    permissions: ['empresas.consultar', 'empresas.modificar'],
+  };
+
+  it('QC-161 R31: ficha sin empresa y firma null exponen el usuario con sus permisos y ningun contexto de empresa', async () => {
+    const session = fakeSessionReader(CLAIMS_SIN_EMPRESA);
+    const users = fakeUserReader(RECORD_SIN_EMPRESA);
+
+    const resultado = await createResolveSession({ session, users, ...REGISTRO_QC23 })(AHORA);
+
+    expect(resultado).toEqual({
+      user: {
+        id: SUB,
+        username: 'ana.perez',
+        displayName: 'Ana Perez',
+        roleName: 'Maestro',
+        permissions: ['empresas.consultar', 'empresas.modificar'],
+      },
+      context: null,
+    });
+    expect(users.findActiveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('QC-161 R32: firma sin empresa y ficha con empresa resuelve null', async () => {
+    const session = fakeSessionReader(CLAIMS_SIN_EMPRESA);
+    const users = fakeUserReader(RECORD);
+
+    await expect(
+      createResolveSession({ session, users, ...REGISTRO_QC23 })(AHORA),
+    ).resolves.toBeNull();
+  });
+
+  it('QC-161 R32: firma con empresa y ficha sin empresa resuelve null', async () => {
+    const session = fakeSessionReader(CLAIMS_VIGENTES);
+    const users = fakeUserReader(RECORD_SIN_EMPRESA);
+
+    await expect(
+      createResolveSession({ session, users, ...REGISTRO_QC23 })(AHORA),
+    ).resolves.toBeNull();
+  });
+
+  // Sin empresa no se salta ningun otro corte: la cuenta, el sello y el registro de cerradas
+  // siguen mandando igual que para cualquiera.
+  it('QC-161 R31: sin empresa, la cuenta no activa, el sello y la sesion cerrada siguen cortando', async () => {
+    const session = fakeSessionReader(CLAIMS_SIN_EMPRESA);
+    const casos: SessionUserRecord[] = [
+      { ...RECORD_SIN_EMPRESA, accountStatus: 'inactive' },
+      { ...RECORD_SIN_EMPRESA, sessionsValidFrom: CLAIMS_SIN_EMPRESA.issuedAt },
+      { ...RECORD_SIN_EMPRESA, sessionRevokedAt: AHORA },
+    ];
+
+    for (const record of casos) {
+      await expect(
+        createResolveSession({ session, users: fakeUserReader(record), ...REGISTRO_QC23 })(AHORA),
+      ).resolves.toBeNull();
+    }
+  });
+
+  it('QC-161 R31: sin claims o caducada no consulta la base, igual con firma sin empresa', async () => {
+    const users = fakeUserReader(RECORD_SIN_EMPRESA);
+    const caducados: SessionClaims = { ...CLAIMS_CADUCADOS, companyId: null };
+
+    await expect(
+      createResolveSession({ session: fakeSessionReader(caducados), users, ...REGISTRO_QC23 })(
+        AHORA,
+      ),
+    ).resolves.toBeNull();
+    expect(users.findActiveById).not.toHaveBeenCalled();
   });
 });

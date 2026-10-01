@@ -364,6 +364,44 @@ describe('la empresa firmada y el portero de rutas (QC-48)', () => {
   });
 });
 
+// La sesion de quien no tiene empresa se firma con `cid: null` explicito. El borde la reconoce
+// como sesion: deja pasar las rutas privadas y saca del login, igual que con empresa.
+describe('la sesion sin empresa y el portero de rutas (QC-161)', () => {
+  it('QC-161 R31: una cookie firmada por el emisor real con cid null deja pasar una ruta privada', async () => {
+    const sinEmpresa = await buildSessionValue(
+      createSessionTicket(USER_ID, 'Maestro', null, SESSION_ID, new Date()),
+      SECRETO,
+    );
+    const payload = JSON.parse(
+      Buffer.from(sinEmpresa.split('.')[1] ?? '', 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
+    // La version no sube: es la vigente, y el `cid` va presente y a `null`.
+    expect(sinEmpresa.startsWith(`${SESSION_VALUE_VERSION}.`)).toBe(true);
+    expect(SESSION_VALUE_VERSION).toBe('v4');
+    expect(payload).toHaveProperty('cid', null);
+
+    const privada = await middleware(peticion('/dashboard/reportes?pagina=2', sinEmpresa));
+    const login = await middleware(peticion('/login', sinEmpresa));
+
+    expect(dejaPasar(privada)).toBe(true);
+    expect(login.status).toBe(307);
+    expect(destino(login)).toBe('/dashboard');
+  });
+
+  it('QC-161 R32: con cid ausente sigue siendo anonima; solo el null explicito vale', async () => {
+    const ausente = await middleware(
+      peticion('/dashboard/reportes', cookieConPayload({ role: 'Maestro' })),
+    );
+    const nulo = await middleware(
+      peticion('/dashboard/reportes', cookieConPayload({ role: 'Maestro', cid: null })),
+    );
+
+    expect(ausente.status).toBe(307);
+    expect(destino(ausente)).toBe('/login?next=%2Fdashboard%2Freportes');
+    expect(dejaPasar(nulo)).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // QC-78 T22 — el adaptador declara la marca de sesion cortada (R29, R30 b)
 // ---------------------------------------------------------------------------

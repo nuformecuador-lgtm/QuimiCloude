@@ -455,3 +455,45 @@ en verde. **`pnpm run typecheck` rojo y el gate se para ahi**: solo los dos erro
     MISMOS correo, nombre de usuario y documento en OTRA empresa SI se crean» y «tampoco choca por
     mayusculas entre empresas distintas». Los rompe el indice global del nombre de usuario.
   - `identity-seed.int.test.ts` entero en verde (el «QC-142 R13» que esperaba T5 incluido).
+
+## T9 — Del login a la resolucion de la sesion
+
+### Archivos
+
+- Produccion: `domain/session.ts` (`SessionTicket.companyId` y `createSessionTicket` con
+  `string | null`), `domain/session-claims.ts` (`cid: z.string().uuid().nullable()`; `null`
+  explicito = sin empresa, ausente/vacio/numero/no-UUID siguen invalidando), `domain/resolve-session.ts`
+  (`ResolvedSession.context: SessionContext | null`; `null` cuando la ficha no tiene empresa;
+  los cortes 4 y 5 sin cambio de texto), `ports/user-credentials-reader.ts`,
+  `ports/session-user-reader.ts` (`companyId: string | null`), `ports/session-provider.ts`
+  (contrato de `getSessionContext` enmendado), `adapters/driven/session/session-token.ts`
+  (`cid: string | null` en el payload; **`SESSION_VALUE_VERSION` sigue en `v4`**),
+  `adapters/driven/persistence/user-credentials-prisma.ts` (`LEFT JOIN companies`; JSDoc del
+  `INNER JOIN` y del indice global corregidos; el `WHERE` no cambia),
+  `adapters/driven/persistence/session-user-prisma.ts` (`company?.deletedAt ?? null`).
+  `SessionContext`, `lib/composition` y `verify-credentials.ts` no cambian.
+- Tests: `session-claims.test.ts`, `resolve-session.test.ts`, `verify-credentials.test.ts`,
+  `route-guard-middleware.test.ts`, `end-session.test.ts`. Ningun test de `session-token` /
+  `session-user-prisma` / `user-credentials-prisma` se puso rojo por los tipos (los
+  `?.context.` de `resolve-session.test.ts` pasan a `?.context?.`).
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R30 | `verify-credentials.test.ts` «QC-161 R30: sin empresa y con credenciales correctas emite un ticket con companyId null», «…contrasena incorrecta se rechaza con el mismo objeto y cuenta el fallo», «…cuenta bloqueada no entra…», «…cuenta que no esta activa no entra…» |
+| R31 | `resolve-session.test.ts` «QC-161 R31: ficha sin empresa y firma null exponen el usuario con sus permisos y ningun contexto de empresa», «…la cuenta no activa, el sello y la sesion cerrada siguen cortando», «…sin claims o caducada no consulta la base…»; `route-guard-middleware.test.ts` «QC-161 R31: una cookie firmada por el emisor real con cid null deja pasar una ruta privada» (afirma tambien `v4` y `cid: null` en el payload) |
+| R32 | `session-claims.test.ts` «QC-161 R32: un cid null explicito produce claims validos con companyId null», «QC-161 R32: un cid ausente, vacio, que no es texto ni null o sin forma de UUID devuelve null»; `resolve-session.test.ts` «QC-161 R32: firma sin empresa y ficha con empresa…», «…firma con empresa y ficha sin empresa…»; `route-guard-middleware.test.ts` «QC-161 R32: con cid ausente sigue siendo anonima; solo el null explicito vale» |
+| R35 | `end-session.test.ts` «QC-161 R35: con companyId null registra el cierre de ese sid, borra la cookie y la sesion deja de valer» |
+
+R44 se prueba contra Postgres en T11.
+
+### Salida
+
+- `pnpm run typecheck`: verde en todo el repo (los dos errores de `session-user-prisma.ts` cerrados).
+- `eslint` de los archivos tocados: limpio.
+- `vitest run` de los cinco archivos: 157 passed.
+- `vitest related --run` sobre los nueve de produccion (480 archivos): 8 rojos, todos conocidos —
+  `unidades-viewport` (2), `usuarios-viewport` (2), `inventario/product-page` (1),
+  `recetas-ui/recipe-page` (1), `user-crud.int.test.ts` «los MISMOS correo, nombre de usuario y
+  documento en OTRA empresa…» y «tampoco choca por mayusculas…» (T12)—; 6966 passed.
