@@ -217,8 +217,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: PRESENTACION.id,
-    presentationName: PRESENTACION.name,
+    presentationLines: [
+      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
+    ],
     unitId: null,
     unitLabel: null,
     ...overrides,
@@ -446,10 +447,12 @@ describe('la presentación del pedido (R16, R17, R18, R19)', () => {
     const elPedido = pedido();
     renderFormulario(elPedido);
 
-    expect(screen.getByTestId('presentation-value')).toHaveValue(elPedido.presentationId);
+    expect(screen.getByTestId('presentation-value')).toHaveValue(
+      elPedido.presentationLines[0]?.presentationId,
+    );
 
     cleanup();
-    const sinPresentacion = pedido({ presentationId: null, presentationName: null });
+    const sinPresentacion = pedido({ presentationLines: [] });
     renderFormulario(sinPresentacion);
 
     const campo = screen.getByTestId('presentation-value') as HTMLInputElement;

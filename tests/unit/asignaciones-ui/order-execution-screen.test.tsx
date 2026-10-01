@@ -66,7 +66,9 @@ const EXECUTION: AssignedOrderExecutionView = {
       alternativeUnits: [MILILITRO],
     },
   ],
-  presentationName: 'Caja x 12',
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  unitId: null,
+  unitLabel: null,
 };
 
 function marcarTodo(): void {
@@ -134,6 +136,23 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
     const cantidadPedido = screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID);
     expect(cantidadPedido.textContent).toBe('Pedido 0.13');
     expect(cantidadPedido).toHaveAttribute('title', '0.1255');
+  });
+
+  it('QC-170 R42: la cantidad del pedido lleva su unidad; sin unidad va la cifra sola', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{ ...EXECUTION, orderQuantity: '200.0000', unitId: 'unit-l', unitLabel: 'L' }}
+      />,
+    );
+    expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID).textContent).toBe(
+      'Pedido 200 L',
+    );
+    cleanup();
+
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+    expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID).textContent).toBe(
+      'Pedido 200',
+    );
   });
 
   it('QC-132 R4: sin title cuando el valor pintado coincide con el exacto', () => {
@@ -313,16 +332,34 @@ describe('pantalla de ejecucion — QC-150 R18, R19: los errores nuevos del Fina
 });
 
 describe('pantalla de ejecucion — R25: muestra la presentación o Sin presentación', () => {
-  it('con presentationName pinta el nombre en su propia linea', () => {
+  it('QC-170 R26: pinta la primera linea del reparto en su propia linea', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
     const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
     expect(linea).toHaveTextContent('Presentación:');
-    expect(linea).toHaveTextContent('Caja x 12');
+    expect(linea).toHaveTextContent('5 × Caja x 12');
   });
 
-  it('con presentationName null pinta «Sin presentación»', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, presentationName: null }} />);
+  it('QC-170 R26: con varias lineas pinta la primera y «+N»', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{
+          ...EXECUTION,
+          presentationLines: [
+            { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packages: 5 },
+            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packages: 1 },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
+      'Presentación: 5 × Botella 200 ml +1',
+    );
+  });
+
+  it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, presentationLines: [] }} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID)).toHaveTextContent(
       'Sin presentación',

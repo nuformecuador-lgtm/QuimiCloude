@@ -1,7 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
@@ -213,6 +213,7 @@ export function buildOrderColumns({
       cell: (order) => (
         <span title={exactDecimalTitle(order.quantity)}>
           {formatDecimalDisplay(order.quantity)}
+          {order.unitLabel === null ? null : ` ${order.unitLabel}`}
         </span>
       ),
     },
@@ -221,7 +222,7 @@ export function buildOrderColumns({
       label: 'Presentación',
       align: 'start',
       // Solo informa, como el importe: sin `sortable` y sin `filter`.
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: CREATED_AT_COLUMN_ID,

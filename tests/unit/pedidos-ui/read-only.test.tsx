@@ -193,8 +193,7 @@ const PEDIDO: OrderSummary = {
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   createdBy: null,
   updatedBy: null,
-  presentationId: null,
-  presentationName: null,
+  presentationLines: [],
   unitId: null,
   unitLabel: null,
 };

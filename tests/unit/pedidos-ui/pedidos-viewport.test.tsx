@@ -294,8 +294,11 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: PRESENTACION.id,
-    presentationName: PRESENTACION.name,
+    presentationLines: [
+
+      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
+
+    ],
     unitId: null,
     unitLabel: null,
     ...overrides,
