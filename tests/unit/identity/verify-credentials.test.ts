@@ -1144,7 +1144,7 @@ describe('QC-78 — el estado de cuenta manda en el login', () => {
 });
 
 // ================================================================================================
-// QC-161 — el login de quien no tiene empresa (el Maestro).
+// El login de quien no tiene empresa (el Maestro).
 // ================================================================================================
 
 describe('verificacion de credenciales — sin empresa (QC-161)', () => {

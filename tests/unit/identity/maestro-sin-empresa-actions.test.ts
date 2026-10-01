@@ -1,6 +1,6 @@
-// QC-161 T10 — la sesion de quien no tiene empresa (el Maestro) llega a las Server Actions con
+// La sesion de quien no tiene empresa (el Maestro) llega a las Server Actions con
 // el usuario resuelto y SIN contexto de empresa. Toda operacion con ambito de empresa tiene que
-// rechazarla como no autorizada antes de tocar el repositorio (R29).
+// rechazarla como no autorizada antes de tocar el repositorio.
 //
 // El usuario de la sesion lleva a proposito TODO el catalogo de permisos: asi lo unico que le
 // falta es la empresa, y si alguna action dejara pasar al actor por tener el permiso, este test

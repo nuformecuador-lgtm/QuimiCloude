@@ -38,7 +38,7 @@ const CREDENCIALES_POR_DEFECTO: InitialAdminCredentials = {
   email: 'admin.inicial@example.test',
 };
 
-/** QC-161: credencial del Maestro, distinta de la del Administrador para poder rastrearla. */
+/** Credencial del Maestro, distinta de la del Administrador para poder rastrearla. */
 const CREDENCIAL_DEL_MAESTRO_DE_PRUEBA = 'credencial-del-maestro-de-prueba-no-real';
 
 const CREDENCIALES_DEL_MAESTRO: InitialAdminCredentials = {
@@ -69,13 +69,13 @@ function crearRepositorioFalso(options: {
   /** QC-74 R10: asignaciones ya existentes, codificadas `${roleId}|${permissionCode}`. */
   asignacionesExistentes?: ReadonlySet<string>;
   /**
-   * QC-161: usuarios vivos con rol Maestro. Por defecto, los mismos que con Administrador: los
-   * casos anteriores a QC-161 describen una instalacion «completa» o «vacia» entera.
+   * Usuarios vivos con rol Maestro. Por defecto, los mismos que con Administrador: los
+   * casos anteriores al Maestro describen una instalacion «completa» o «vacia» entera.
    */
   usuariosVivosConMaestro?: number;
-  /** QC-161 R42: lo que responde `countLiveUsersWithUsername`. */
+  /** Lo que responde `countLiveUsersWithUsername`. */
   usuariosVivosConElNombreDelMaestro?: number;
-  /** QC-161 R43: lo que responde `countLiveUsersWithoutCompanyWithEmail`. */
+  /** Lo que responde `countLiveUsersWithoutCompanyWithEmail`. */
   usuariosSinEmpresaConElCorreoDelMaestro?: number;
 } = {}): InitialAccessRepository & {
   readonly llamadas: LlamadaRegistrada[];
@@ -359,7 +359,7 @@ describe('seedInitialAccess', () => {
 
     await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
-    // QC-161: una vez por usuario inicial, el Administrador y el Maestro.
+    // Una vez por usuario inicial, el Administrador y el Maestro.
     expect(passwordHasher.hash).toHaveBeenCalledTimes(2);
     expect(passwordHasher.hash).toHaveBeenCalledWith(CREDENCIAL_DE_PRUEBA);
 
@@ -633,7 +633,7 @@ describe('seedInitialAccess', () => {
     );
     expect(rolAdministrador).toBeDefined();
     expect(input.roleId).toBeTruthy();
-    // QC-161: despues solo puede venir el alta del Maestro, que no toca al Administrador.
+    // Despues solo puede venir el alta del Maestro, que no toca al Administrador.
     const llamadasSinElMaestro = repository.llamadas.filter((llamada) => llamada.metodo !== 'createInitialMaestro');
     expect(llamadasSinElMaestro.at(-1)?.metodo).toBe('createInitialAdmin');
 
@@ -724,7 +724,7 @@ describe('seedInitialAccess', () => {
 
     // Primero: la lectura SI ocurrio, exactamente una vez y con el nombre del rol
     // Administrador. Es la unica fuente de `needsAdmin`.
-    // QC-161: la otra lectura es la del Maestro, que decide `needsMaestro` y no `needsAdmin`.
+    // La otra lectura es la del Maestro, que decide `needsMaestro` y no `needsAdmin`.
     const conteos = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'countLiveUsersWithRole' && llamada.args[0] !== ROLE_MAESTRO,
     );
@@ -1117,7 +1117,7 @@ describe('seedInitialAccess', () => {
   });
 
   // ---------------------------------------------------------------------------------
-  // QC-161 — el primer Maestro. Mismo orden: PRIMERO que algo ocurrio, luego lo que no.
+// El primer Maestro. Mismo orden: PRIMERO que algo ocurrio, luego lo que no.
   // ---------------------------------------------------------------------------------
 
   /** Instalacion completa con Administrador y sin Maestro, salvo lo que el caso cambie. */

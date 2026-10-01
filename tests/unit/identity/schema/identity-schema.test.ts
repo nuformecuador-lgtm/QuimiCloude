@@ -550,7 +550,7 @@ describe('db/schema.prisma — la empresa (QC-47)', () => {
 
 describe('db/schema.prisma — la columna de empresa del usuario (QC-47)', () => {
   it('QC-161 R26, R27: companyId es opcional solo en la columna, uuid, mapea a company_id y sin @default', () => {
-    // Antes QC-47 R9 lo exigia obligatorio. Ahora la columna admite NULL para el Maestro y la
+    // Antes la columna era obligatoria. Ahora admite NULL para el Maestro y la
     // obligacion para el resto la pone el disparador `users_check_company_by_role`, no Prisma.
     const companyId = field(user, 'companyId')
     expect(companyId.type).toBe('String')

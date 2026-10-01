@@ -140,7 +140,7 @@ const SEED_MAESTRO_ENV_VAR_NAMES = ['SEED_MAESTRO_USERNAME', 'SEED_MAESTRO_PASSW
  * local, y el entorno del test es el unico que se toca.
  */
 async function withSeedAdminEnvVarsCleared<T>(run: () => Promise<T>): Promise<T> {
-  // QC-161: tambien las del Maestro, guardadas y restauradas igual.
+  // Tambien las del Maestro, guardadas y restauradas igual.
   const names = [...SEED_ADMIN_ENV_VAR_NAMES, ...SEED_MAESTRO_ENV_VAR_NAMES];
   const saved = new Map(names.map((name) => [name, process.env[name]]));
   for (const name of names) delete process.env[name];
@@ -436,7 +436,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(adminAfterFirst.role.name).toBe(ROLE_ADMINISTRADOR);
 
       const usersAfterFirst = await tx.user.count();
-      expect(usersAfterFirst).toBe(2); // QC-161: el Administrador y el Maestro.
+      expect(usersAfterFirst).toBe(2); // el Administrador y el Maestro.
 
       // Segunda corrida: no debe duplicar ni modificar nada.
       const second = await seedInitialAccess({
@@ -469,7 +469,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       // y must_change_credential incluidos (design.md > 11).
       expect(adminAfterSecond).toEqual(adminAfterFirst);
 
-      expect(await tx.user.count()).toBe(2); // QC-161: el Administrador y el Maestro.
+      expect(await tx.user.count()).toBe(2); // el Administrador y el Maestro.
       expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(SEED_ROLE_NAMES.length);
     });
   });
@@ -681,7 +681,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       expect(outcome.createdRoles).toEqual([]);
       expect(outcome.createdAdmin).toBe(false);
-      expect(await tx.user.count()).toBe(2); // QC-161: el Administrador y el Maestro.
+      expect(await tx.user.count()).toBe(2); // el Administrador y el Maestro.
       expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(SEED_ROLE_NAMES.length);
     });
   });
@@ -800,7 +800,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(second.createdAdmin).toBe(false);
       expect(second.createdCompany).toBeNull();
       expect(await tx.company.findMany()).toEqual(empresas);
-      expect(await tx.user.count()).toBe(2); // QC-161: el Administrador y el Maestro.
+      expect(await tx.user.count()).toBe(2); // el Administrador y el Maestro.
     });
   });
 
@@ -1124,7 +1124,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 });
 
 // ---------------------------------------------------------------------------
-// QC-161 — el primer Maestro contra Postgres
+// El primer Maestro contra Postgres
 // ---------------------------------------------------------------------------
 
 /** Una foto de las filas que el seed podria escribir, para afirmar «base intacta». */
@@ -1216,12 +1216,12 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       });
       expect(await fotoDeLoQueSiembra(tx)).toEqual(fotoTrasLaPrimera);
 
-      // R4: una sola fila Maestro en el catalogo, sin campo de empresa.
+      // Una sola fila Maestro en el catalogo, sin campo de empresa.
       const filasMaestro = await tx.role.findMany({ where: { name: ROLE_MAESTRO } });
       expect(filasMaestro).toHaveLength(1);
       expect(Object.keys(filasMaestro[0] ?? {})).not.toContain('companyId');
 
-      // R10: exactamente un Maestro, sin empresa, activo, con los marcadores.
+      // Exactamente un Maestro, sin empresa, activo, con los marcadores.
       const maestros = await findLiveMaestros(tx);
       expect(maestros).toHaveLength(1);
       const maestro = maestros[0]!;
@@ -1240,7 +1240,7 @@ describe('seedInitialAccess contra base real — el primer Maestro (QC-161)', ()
       expect(maestro.passwordHash).not.toBe(FAKE_MAESTRO_CREDENTIAL);
       expect(await identity.passwordHasher.verify(FAKE_MAESTRO_CREDENTIAL, maestro.passwordHash)).toBe(true);
 
-      // R18: CADA rol del catalogo sembrado con exactamente los permisos del dominio.
+      // CADA rol del catalogo sembrado con exactamente los permisos del dominio.
       for (const role of SEED_ROLES) {
         expect(await codigosEnBaseDe(tx, role.name), `permisos en base del rol «${role.name}»`).toEqual(
           codigosSembradosDe(role.name),

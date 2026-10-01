@@ -37,7 +37,7 @@
  * maquina el servidor responde en espanol—. Se afirma sobre el RESULTADO DISCRIMINADO del puerto
  * (`'email' | 'username' | 'document'`, `'not_found'`), que es justamente lo que el adaptador
  * traduce desde el `P2002`/`23505`. El `meta.target` de los dos indices FUNCIONALES trae la
- * EXPRESION (`["company_id","lower(email)"]`; desde QC-161 el de usuario es global,
+ * EXPRESION (`["company_id","lower(email)"]`; el de usuario es global,
  * `["lower(username)"]`) y el del documento sus columnas: lo traduce el adaptador por subcadena, y
  * este archivo solo comprueba el resultado.
  *
@@ -1376,7 +1376,7 @@ describe('el escenario de este archivo no roza la guarda del ultimo administrado
 });
 
 // ---------------------------------------------------------------------------
-// QC-161 — el Maestro no pertenece a ninguna empresa ni se asigna desde la gestion de usuarios
+// El Maestro no pertenece a ninguna empresa ni se asigna desde la gestion de usuarios
 // ---------------------------------------------------------------------------
 
 /** Todos los permisos del catalogo: el rechazo del rol Maestro no depende de lo que tenga el actor. */

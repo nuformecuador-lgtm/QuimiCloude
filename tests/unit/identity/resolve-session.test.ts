@@ -686,7 +686,7 @@ describe('createResolveSession — fallar cerrado (QC-23 R16, R17)', () => {
 });
 
 // ================================================================================================
-// QC-161 — la sesion de quien no tiene empresa (el Maestro).
+// La sesion de quien no tiene empresa (el Maestro).
 // ================================================================================================
 
 describe('createResolveSession — sesion sin empresa (QC-161)', () => {

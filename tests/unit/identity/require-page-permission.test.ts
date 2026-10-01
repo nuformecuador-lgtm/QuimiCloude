@@ -112,7 +112,7 @@ describe('requirePagePermission', () => {
   });
 });
 
-// QC-161 — quien solo tiene los permisos del Maestro pide pantallas privadas de empresa.
+// Quien solo tiene los permisos del Maestro pide pantallas privadas de empresa.
 describe('requirePagePermission con los permisos del Maestro (QC-161)', () => {
   const PERMISOS_DEL_MAESTRO = ['empresas.consultar', 'empresas.modificar'];
 

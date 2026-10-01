@@ -171,7 +171,7 @@ export function usernameIndexOf(sql: string): string | undefined {
   return statements(sql).find((s) => /^CREATE UNIQUE INDEX "users_username_unique"/i.test(s))
 }
 
-// --- Predicados de la guardia (R38, R39) -------------------------------------------------------
+// --- Predicados de la guardia ------------------------------------------------------------------
 
 /** ¿La PRIMERA sentencia es la guardia de nombres repetidos, con la condicion del indice global? */
 export function guardIsFirstAndChecksDuplicates(sql: string): boolean {
@@ -199,7 +199,7 @@ export function writesUserRows(sql: string): boolean {
   return statements(sql).some((s) => /^(UPDATE "users"|DELETE FROM "users")(\s|$)/i.test(s))
 }
 
-// --- Predicados de los literales (R21) ---------------------------------------------------------
+// --- Predicados de los literales ---------------------------------------------------------------
 
 const MAESTRO_ROW = SEED_ROLES.find((role) => role.name === ROLE_MAESTRO)
 const EMPRESAS_PERMISSIONS = PERMISSIONS.filter((permission) => permission.module === 'empresas')
@@ -255,7 +255,7 @@ export function mentionsCompanyRole(sql: string): boolean {
   return [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR].some((rol) => ejecutable.includes(`'${rol}'`))
 }
 
-// --- Predicados del disparador (R26, R27) -------------------------------------------------------
+// --- Predicados del disparador ------------------------------------------------------------------
 
 /** El codigo de error de cada rama del disparador, leido del cuerpo de la funcion. */
 export function triggerErrorCodes(sql: string): { maestroConEmpresa?: string; otroSinEmpresa?: string } {
@@ -279,7 +279,7 @@ export function triggerFiresOnCompanyAndRole(sql: string): boolean {
   )
 }
 
-// --- Predicados de los indices (R28, R36, R37) ---------------------------------------------------
+// --- Predicados de los indices -------------------------------------------------------------------
 
 /** Los indices unicos nuevos que filtran por `company_id IS NULL`, con su definicion. */
 export function withoutCompanyIndexes(sql: string): Record<string, string> {
@@ -291,7 +291,7 @@ export function withoutCompanyIndexes(sql: string): Record<string, string> {
   return out
 }
 
-// --- Predicados del DOWN (R22) -----------------------------------------------------------------
+// --- Predicados del DOWN -----------------------------------------------------------------------
 
 /** ¿El `SET NOT NULL` va antes de cualquier `DELETE`? */
 export function setNotNullBeforeAnyDelete(sql: string): boolean {

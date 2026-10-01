@@ -41,7 +41,7 @@
  * ficha añade es la otra mitad, la que solo pasa con la empresa dentro del indice: el mismo
  * correo, el mismo `username` y el mismo documento SI se aceptan en empresas distintas.
  *
- * QC-161 — el nombre de usuario vuelve a ser unico en todo el sistema
+ * Hoy el nombre de usuario vuelve a ser unico en todo el sistema
  * (`lower(username) WHERE deleted_at IS NULL`); correo y documento siguen por empresa.
  */
 import { randomUUID } from 'node:crypto'
@@ -1372,8 +1372,8 @@ describe('la empresa a la que pertenece el usuario', () => {
 // ---------------------------------------------------------------------------
 // EL CORAZON DE LA FICHA (R16, R17, R18, R19).
 //
-// QC-161: el nombre de usuario dejo de ser por empresa (R36); su caso ya rechaza tambien en otra
-// empresa. Correo y documento siguen como abajo (R37).
+// El nombre de usuario dejo de ser por empresa: su caso ya rechaza tambien en otra
+// empresa. Correo y documento siguen como abajo.
 //
 // Cada uno de los tres va en los DOS sentidos: dentro de la misma empresa la base rechaza
 // con 23505, y en empresas distintas la base ACEPTA. La mitad que rechaza ya pasaba con los
@@ -1437,7 +1437,7 @@ describe('unicidad DENTRO de la empresa', () => {
   })
 
   it('QC-161 R36: rechaza el mismo nombre de usuario en la misma empresa y en otra, en otras mayusculas', async () => {
-    // Antes (QC-47 R17) el mismo nombre se aceptaba en otra empresa. Ahora el nombre de usuario
+    // Antes el mismo nombre se aceptaba en otra empresa. Ahora el nombre de usuario
     // es unico en todo el sistema. Nombre propio del caso: `admin` puede ser el del
     // Administrador de la instalacion y el choque no mediria lo que el caso quiere.
     await inRolledBackTransaction(async (tx) => {
@@ -1963,7 +1963,7 @@ describe('el estado de cuenta del usuario', () => {
       )
       expect(porDocumento).toBe(UNIQUE_VIOLATION)
 
-      // QC-161 R36: el nombre de usuario de la cuenta apagada tambien esta ocupado en OTRA
+      // El nombre de usuario de la cuenta apagada tambien esta ocupado en OTRA
       // empresa (es unico en todo el sistema); el estado no le quita nada.
       const porUsuarioEnB = await expectRejectedByDatabase(
         tx,
@@ -1978,7 +1978,7 @@ describe('el estado de cuenta del usuario', () => {
       )
       expect(porUsuarioEnB).toBe(UNIQUE_VIOLATION)
 
-      // QC-161 R37: en OTRA empresa el correo y el documento siguen libres: esos van por empresa
+      // En OTRA empresa el correo y el documento siguen libres: esos van por empresa
       // y el estado no les anade ni les quita nada.
       const { id: enB } = await createUser(tx, roleId, {
         ...seed,

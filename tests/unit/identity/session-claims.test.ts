@@ -78,7 +78,7 @@ describe('parseSessionClaims', () => {
   // QC-48 R9 — sin empresa con forma valida no hay sesion: ni se consulta la base ni se supone
   // ninguna empresa por defecto. `.uuid()` y no `.min(1)` porque este valor acaba comparandose
   // contra una columna `@db.Uuid`: un texto sin forma de UUID muere aqui, no en Prisma.
-  // QC-161 R32 — `null` explicito deja de estar en esta lista: es «sin empresa» (caso de abajo).
+  // `null` explicito deja de estar en esta lista: es «sin empresa» (caso de abajo).
   it('QC-161 R32: un cid ausente, vacio, que no es texto ni null o sin forma de UUID devuelve null', () => {
     expect(
       parseSessionClaims(JSON.stringify({ sub: SUB_VALIDO, iat: IAT, exp: EXP, role: ROL })),
@@ -99,7 +99,7 @@ describe('parseSessionClaims', () => {
     expect(parseSessionClaims(jsonValido({ cid: 'no-es-un-uuid' }))).toBeNull();
   });
 
-  // QC-161 R32 — `null` EXPLICITO es «esta persona no tiene empresa»: la sesion es valida y la
+  // `null` EXPLICITO es «esta persona no tiene empresa»: la sesion es valida y la
   // empresa llega como `null`, sin inventar ninguna. Solo `null`: su ausencia sigue invalidando.
   it('QC-161 R32: un cid null explicito produce claims validos con companyId null', () => {
     const claims = parseSessionClaims(jsonValido({ cid: null }));

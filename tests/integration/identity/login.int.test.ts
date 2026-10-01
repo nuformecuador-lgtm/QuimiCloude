@@ -748,7 +748,7 @@ describe('login contra Postgres real', () => {
   });
 });
 
-// QC-161 — el login de quien no tiene empresa (el Maestro) y el nombre de usuario unico en todo
+// El login de quien no tiene empresa (el Maestro) y el nombre de usuario unico en todo
 // el sistema. Fixture propio, creado y borrado dentro de cada caso: nunca el Maestro del seed.
 // El adaptador usa el cliente global, asi que las filas se confirman y se limpian en `finally`
 // (mismo motivo que el resto de este archivo).

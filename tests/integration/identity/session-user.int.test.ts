@@ -339,7 +339,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
   });
 });
 
-// QC-161 — la ficha de quien no tiene empresa (el Maestro). Fixture propio, creado y borrado en el
+// La ficha de quien no tiene empresa (el Maestro). Fixture propio, creado y borrado en el
 // propio caso: nunca el Maestro del seed. Se confirma y se limpia en `finally` porque el adaptador
 // lee con el cliente global, igual que el resto de este archivo.
 describe('findActiveSessionUserById sin empresa (QC-161)', () => {

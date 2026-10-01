@@ -364,7 +364,7 @@ describe('loginAction', () => {
   });
 });
 
-// QC-161 — el aterrizaje de quien solo tiene los permisos del Maestro. Mientras ningun enlace del
+// El aterrizaje de quien solo tiene los permisos del Maestro. Mientras ningun enlace del
 // menu exija `empresas.*`, el menu filtrado queda vacio y el destino es el respaldo de siempre:
 // `/dashboard`, que le responde el 404 dentro de la zona privada.
 describe('aterrizaje del Maestro (QC-161)', () => {
