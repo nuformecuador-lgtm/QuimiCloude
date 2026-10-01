@@ -132,7 +132,7 @@ por revisar → `recipe_version_under_review` (R33); edición que cambia a versi
 rechazo (R34); edición que conserva una versión por revisar o de baja → aceptada y recalculada (R35,
 R25); los permisos exigidos son los de hoy (R39).
 
-### T9 [ ] [P] — Salida del pedido y producto terminado
+### T9 [x] [P] — Salida del pedido y producto terminado
 Tras T6. **Toca:** `lib/modules/pedidos/domain/{order-view.ts,get-order.ts,list-orders.ts}`,
 `tests/unit/pedidos/{get-order,list-orders,transition-order}.test.ts`,
 `tests/unit/asignaciones/get-assigned-order-execution.test.ts`,
@@ -144,7 +144,7 @@ Finalizar un pedido con versión llama al alta de producto terminado con el id d
 nombre compuesto, y en integración nace un producto distinto del de la original para la misma
 presentación, llamado «Original · Versión · Presentación» (R36).
 
-### T10 [ ] [P] — Importación de fórmula frente a versiones
+### T10 [x] [P] — Importación de fórmula frente a versiones
 Tras T6. **Toca:** `tests/unit/documentos/{confirm-formula-import,preview-formula-import}.test.ts`,
 `tests/integration/documentos/formula-import-versions.int.test.ts` (nuevo). Sin código de producción
 (el cambio está en T6).

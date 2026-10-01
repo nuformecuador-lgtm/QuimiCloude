@@ -633,3 +633,68 @@ Commit `cfd98d6d`.
   `Test Files 47 passed (47)`, `Tests 699 passed | 5 skipped (704)`.
 - No corridos: integracion de `pedidos` (piden base; no se toca la del `.env`), suite completa,
   `./init.sh`, `vitest related`.
+
+## T9 — salida del pedido y producto terminado
+
+Commit `dd25e22e`.
+
+### Archivos
+Produccion:
+- `lib/modules/pedidos/domain/order-view.ts`: `OrderView` (y su alias `OrderSummary`) gana
+  `recipeVersion: { originalId; originalName; versionName } | null`; `recipeName` es el nombre mostrado.
+- `lib/modules/pedidos/domain/get-order.ts`: `toOrderView` recibe `ReadonlyMap<string, RecipeRef>` y
+  compone `recipeVersion` desde `ref.original` y `ref.ownName`; `getOrder` le pasa el `Map` de refs.
+- `lib/modules/pedidos/domain/list-orders.ts`: solo el `Map` de refs en vez de id→nombre.
+- `transition-order.ts` NO cambia (como preveia §6.4).
+
+Tests nuevos:
+- `tests/unit/pedidos/get-order.test.ts` (6 casos; enmienda punto 3).
+- `tests/integration/inventario/finished-goods-version.int.test.ts` (1 caso; registrado en
+  `tests/integration/aislamiento.json > commit`, como `finished-goods.int.test.ts`).
+
+Tests ampliados: `tests/unit/pedidos/list-orders.test.ts` (+1 caso, +1 aserto en el de «id que no
+vuelve»), `tests/unit/pedidos/transition-order.test.ts` (+1), `tests/unit/asignaciones/get-assigned-order-execution.test.ts` (+1).
+
+Dobles de la enmienda (punto 1), sin cambiar lo que comprueban:
+- 14 de `tests/unit/pedidos-ui/` con fixture `OrderSummary`: `recipeVersion: null` tras `recipeName`
+  (respetando CRLF en `pedidos-viewport`, `order-sheet`, `order-list-section`, `order-columns`).
+- `tests/unit/pedidos/order-service.test.ts`: el `toEqual` de la ficha gana `recipeVersion: null`.
+- `tests/unit/pedidos/company-scope.test.ts`: `toOrderView` recibe un `Map` con un `RecipeRef`.
+
+### R -> test
+| R | Test |
+|---|---|
+| R11 | `get-order` › `R11: la ficha de un pedido con version da el nombre compuesto y recipeVersion…`, `R11: …con original sigue dando su nombre y recipeVersion null`, `toOrderView` › `R11: compone recipeVersion desde la referencia…`; `list-orders` › `R11: un pedido con version sale con el nombre compuesto y su recipeVersion; uno con original, con null`; `get-assigned-order-execution` › `R8, R11: …` |
+| R8 | `get-assigned-order-execution` › `R8, R11: la ejecucion de un pedido con version muestra el nombre compuesto, los pasos de la original y las lineas de la version` |
+| R25 | `get-order` › `R25: una version dada de baja sigue saliendo con su nombre compuesto` |
+| R36 | `transition-order` › `R36: Finalizar un pedido con version llama al alta de producto terminado con el id de la version y el nombre compuesto`; int `finished-goods-version` › `R36: nace un producto distinto del de la original para la misma presentacion, llamado «Original · Version · Presentacion», con su propio stock` (nombre resuelto con el catalogo real; segundo pedido de la version suma al mismo producto y no toca el de la original) |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes).
+- `pnpm exec vitest run tests/unit/pedidos tests/unit/pedidos-ui tests/unit/asignaciones`:
+  `Test Files 121 passed (121)`, `Tests 1882 passed | 3 skipped (1885)`.
+- `pnpm exec vitest run tests/integration/inventario/finished-goods-version.int.test.ts tests/guards/guard-aislamiento-integracion.test.ts`
+  (base efimera `qct_qc172_8c9cfd3f_muq1wt52_sow`, borrada al terminar): `Test Files 2 passed (2)`, `Tests 7 passed (7)`.
+
+## T10 — importacion de formula frente a versiones
+
+Commit `abd762f3`. Sin codigo de produccion.
+
+### Archivos
+- `tests/unit/documentos/preview-formula-import.test.ts` (+1 caso).
+- `tests/unit/documentos/confirm-formula-import.test.ts` (+1 caso).
+- `tests/integration/documentos/formula-import-versions.int.test.ts` (nuevo, 2 casos; cableado real de
+  adaptadores como `formula-import.int.test.ts`; registrado en `aislamiento.json > commit`).
+
+### R -> test
+| R | Test |
+|---|---|
+| R37 | unit `preview-formula-import` › `R37: un nombre que solo coincide con una version no vuelve del catalogo y no marca choque`; unit `confirm-formula-import` › `R37: un nombre que solo coincide con una version no choca y confirmar crea una receta original nueva`; int `formula-import-versions` › `R37: en la vista previa un nombre que solo coincide con una version no marca choque; el de una original si`, `R37: confirmar con el nombre de una version crea una receta original nueva y deja la version intacta` |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio. `pnpm run lint`: `0 errors, 8 warnings` (preexistentes).
+- `pnpm exec vitest run tests/unit/documentos`: `Test Files 85 passed (85)`, `Tests 849 passed | 30 skipped (879)`.
+- `pnpm exec vitest run tests/integration/documentos/formula-import-versions.int.test.ts tests/integration/inventario/finished-goods-version.int.test.ts tests/guards/guard-aislamiento-integracion.test.ts`
+  (base efimera `qct_qc172_8c9cfd3f_muq22bfp_dk4`, borrada al terminar): `Test Files 3 passed (3)`, `Tests 9 passed (9)`.
+- No corridos: suite completa, `./init.sh`, `vitest related`. La base `QuimiCloude` del `.env` no se ha tocado.
