@@ -587,3 +587,49 @@ Commit `e9298bb0`.
   `Test Files 1 failed | 92 passed (93)`, `Tests 1 failed | 1375 passed | 5 skipped (1381)`. El rojo
   es `recetas-ui/recipe-page.test.tsx` R21, preexistente.
 - No corridos (por indicacion): suite completa, `./init.sh`, `vitest related`.
+
+## T8 — pedido con version en el servidor
+
+Commit `cfd98d6d`.
+
+### Archivos
+- `lib/modules/pedidos/domain/order-input.ts`: `createOrderSchema` (y `updateOrderSchema`, mismo
+  objeto) gana `recipeVersionId` con `preprocess('' -> null)`, `uuid().nullable()`, `default(null)`.
+- `lib/modules/pedidos/domain/order-recipe.ts` (nuevo, sin puertos): `resolveOrderRecipe(refs,
+  recipeId, recipeVersionId)` -> `{ effectiveId } | 'not_found' | 'under_review'` segun §6.2;
+  `orderRecipeIds` (los ids de la unica lectura) y `requireOrderRecipe` (traduce a
+  `RecipeNotFoundError` / `RecipeVersionUnderReviewError`), compartidos por alta y edicion.
+- `create-order.ts`: una sola `findRefsIncludingDeleted([recipeId, versionId?])`; `effectiveId` en
+  coste, `orders.create`, `findExecutionContentById` y la necesidad. `orders.create` recibe los
+  campos de `NewOrder` uno a uno (antes `...data`), para que `recipeVersionId` no viaje al puerto.
+- `update-order.ts`: candidato `recipeVersionId ?? recipeId`; igual a `row.recipeId` -> se acepta sin
+  leer el catalogo; si difiere -> misma resolucion que el alta. `effectiveId` en coste, necesidad y
+  `updateAlive` (campos de `OrderEdit` uno a uno).
+- `adapters/driving/order-actions.ts` (T0.5 lo exige: sin esto el formulario no puede enviar la
+  version): `buildCreateCandidate` anade `recipeVersionId: readOptionalFormString(...)`. Con
+  `readOptional…` el campo ausente llega como `undefined` y `toEqual` de `order-actions.test.ts` no
+  cambia; `''` lo convierte el esquema en `null`. Se reescribio el comentario de
+  `readOptionalFormString`, que decia que solo lo usaba la prioridad.
+- Tests: `order-recipe.test.ts` (nuevo); bloques nuevos al final de `create-order.test.ts` y
+  `update-order.test.ts`; `order-input.test.ts` suma `recipeVersionId` a las dos listas cerradas de
+  claves y un `describe` nuevo.
+
+### R -> test
+| R | Casos |
+|---|---|
+| R30 | `create-order` › `alta con version de receta` › `R30: guarda la version como receta y calcula necesidad y coste con SUS lineas…` (coste 50 con las de la version frente a 30 de la original, `syncForOrder` con el producto de la version, una sola lectura del catalogo); `order-recipe` › `R30: …`; `order-input` › `R30: un UUID de version se conserva tal cual` |
+| R31 | `create-order` › `R31: sin version, o con version vacia…`; `update-order` › `R31: sin version y sin cambiar la original…`; `order-input` › `R31: …` (dos casos); `order-recipe` › `R31: …` |
+| R32 | `create-order` › `R32: %s -> recipe_not_found sin abrir la unidad de trabajo` x5 (receta que es version, version de otra receta, de baja, de otra empresa, original de baja); `order-recipe` › siete casos `R32`; `order-input` › `R32: una version que no es UUID…` |
+| R33 | `create-order` › `R33: una version por revisar -> recipe_version_under_review…` (sin `unitOfWork.run`); `order-recipe` › `R33` y `requireOrderRecipe` |
+| R34 | `update-order` › `edicion con version de receta` › `R34: pasar de la original a una version viva…`, `R34: volver de una version a «Original»…`, `R34, R33: cambiar a una version por revisar…`, `R34, R32: cambiar %s…` x4, `R34: cambiar de una version a otra por revisar…` |
+| R35, R25 | `update-order` › `R35, R25: conservar una version {por revisar, de baja} se acepta sin preguntar al catalogo y recalcula con sus lineas` |
+| R39 | `create-order` y `update-order` › `R39: con version se exige el mismo permiso de hoy y sin el no se lee nada` |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes).
+- `pnpm exec vitest run tests/unit/pedidos`: `Test Files 71 passed (71)`, `Tests 1139 passed | 3 skipped (1142)`.
+- `pnpm exec vitest run tests/guards tests/unit/identity/session-once-per-request-actions.test.ts tests/unit/pedidos-ui/order-form.test.tsx tests/unit/pedidos-ui/order-form-quote.test.tsx`:
+  `Test Files 47 passed (47)`, `Tests 699 passed | 5 skipped (704)`.
+- No corridos: integracion de `pedidos` (piden base; no se toca la del `.env`), suite completa,
+  `./init.sh`, `vitest related`.

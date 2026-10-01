@@ -120,7 +120,7 @@ con entrada inválida; el test de lectura única de sesión las incluye y está 
 
 ## Tanda 3 — `pedidos`, producto terminado e importación
 
-### T8 [ ] — Pedido con versión en el servidor
+### T8 [x] — Pedido con versión en el servidor
 Tras T2, T6. **Toca:** `lib/modules/pedidos/domain/{order-input.ts,order-recipe.ts (nuevo),create-order.ts,update-order.ts}`,
 `lib/modules/pedidos/adapters/driving/order-actions.ts` (si T0.5 lo exige),
 `tests/unit/pedidos/{order-recipe (nuevo),create-order,update-order,order-input}.test.ts`.
