@@ -85,7 +85,7 @@
       - **Hecho**: esos archivos en verde; `catalogo-sin-total-fijo` en verde.
       - Depende de: T2.
 
-- [ ] **T4. [P con T3] La guardia de autorización por permiso.** (`design.md > 8`; R16.)
+- [x] **T4. [P con T3] La guardia de autorización por permiso.** (`design.md > 8`; R16.)
       - Archivos: `tests/guards/guard-autorizacion-por-permiso.test.ts` (literal e identificador de
         `ROLE_MAESTRO` en `buildForbiddenPatterns`, ancla tensada, casos «dispara»/«no dispara»).
       - **Hecho**: la guardia en verde y sus casos nuevos mordiendo.

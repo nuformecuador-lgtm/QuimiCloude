@@ -237,3 +237,26 @@ Reducida segun T0: las igualdades del Administrador ya se derivan del dominio
 - Queda en pie `qct_qc161_95232936_mupntzdx_mx4`, base efimera de una corrida de `vitest related`
   que se corto en T1; `db:test clean` la retiene porque el worktree sigue vivo. Cae al desmontar
   el worktree.
+
+## T4 — La guardia de autorizacion por permiso
+
+### Archivos (solo tests)
+
+- `tests/guards/guard-autorizacion-por-permiso.test.ts`: `buildForbiddenPatterns()` suma el
+  literal derivado de `ROLE_MAESTRO` y el identificador `ROLE_MAESTRO` (y su JSDoc dice por que);
+  el ancla de patrones se tensa con los dos y con `ROLE_MAESTRO === 'Maestro'`; tres casos
+  sinteticos nuevos.
+
+### Mapa R<n> -> test (`tests/guards/guard-autorizacion-por-permiso.test.ts`)
+
+| R | Casos |
+|---|---|
+| R16 | «QC-161 R16: los patrones se derivan de los roles reales de identity, que siguen siendo Administrador, Operador, Empacador y Maestro» (ancla); «QC-161 R16: dispara con un actor.ts sintetico que compara el literal del rol Maestro» (tres comillas); «QC-161 R16: dispara con un actor.ts sintetico que importa y usa ROLE_MAESTRO»; «QC-161 R16: el caso simetrico — el rol Maestro dentro de un comentario NO dispara»; y el barrido real «ningun archivo de los seis modulos de negocio usa el rol para autorizar», ahora con el Maestro |
+
+### Salida
+
+- `pnpm run typecheck`: verde.
+- `vitest run guard-autorizacion-por-permiso`: 16 passed.
+- Mordida comprobada a mano (copia de respaldo, mutacion, restaurado): sin el patron del literal
+  caen el ancla y «dispara … literal del rol Maestro»; sin el del identificador caen el ancla y
+  «dispara … importa y usa ROLE_MAESTRO» (2 failed / 14 passed en cada mutacion).
