@@ -73,6 +73,15 @@ export type DataTableColumn<TRow> = {
   /** Ausente = el usuario puede fijarla (R23); `false` la excluye del fijado. */
   readonly pinnable?: boolean;
   /**
+   * Borde al que nace fijada cuando el usuario **no** tiene todavia ninguna preferencia
+   * guardada para ese `tableId` (QC-35 `design.md > 6.3`). Ausente = nace sin fijar.
+   *
+   * Es un valor **por defecto**, no una imposicion: en cuanto hay algo persistido gana lo
+   * persistido, incluida la decision de soltarla (R25, R26). Declarar `defaultPinned`
+   * implica fijable: la columna ofrece soltarla en su menu aunque `pinnable` sea `false`.
+   */
+  readonly defaultPinned?: 'left' | 'right';
+  /**
    * Ancho fijo de la columna (`th` + `td`), como estilo `width` en linea. Numero = px,
    * cadena = cualquier valor CSS (`'12rem'`, `'200px'`). Ausente = sin ancho declarado, el
    * layout automatico reparte por contenido como siempre.
@@ -182,14 +191,4 @@ export type DataTableProps<TRow> = {
    * una cadena.
    */
   readonly searchable?: boolean;
-  /**
-   * Ids de columna que nacen fijadas al borde izquierdo cuando el usuario **no** tiene todavia
-   * ninguna preferencia guardada para este `tableId` (QC-35 `design.md > 6.3`). Ausente = nada
-   * fijado por defecto, el comportamiento de siempre.
-   *
-   * Es un valor **por defecto**, no una imposicion: en cuanto hay algo persistido para ese
-   * `tableId` gana lo persistido, asi que el usuario puede soltar la columna y su decision se
-   * recuerda (R25, R26).
-   */
-  readonly defaultPinnedColumns?: readonly string[];
 };

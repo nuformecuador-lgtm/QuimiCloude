@@ -43,16 +43,14 @@ export const ASSIGNED_ORDER_STATUS_COLUMN_ID = 'status';
 export const ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
 export const ASSIGNED_ORDER_ENTER_COLUMN_ID = 'enter';
 
-export const ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS: readonly string[] = [
-  ASSIGNED_ORDER_NUMBER_COLUMN_ID,
-];
-
 export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedOrderView>[] {
   return [
     {
       id: ASSIGNED_ORDER_NUMBER_COLUMN_ID,
       label: 'Nº de pedido',
       align: 'start',
+      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       cell: (order) => order.numberText,
     },
     {

@@ -9,7 +9,6 @@ import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { PAGE_PARAM, PAGE_SIZE_PARAM, VIEW_PARAM } from './assignment-view-params';
 import {
-  FINISHED_ORDERS_DEFAULT_PINNED_COLUMNS,
   buildFinishedOrdersColumns,
 } from './finished-orders-columns';
 
@@ -84,7 +83,6 @@ export function FinishedOrdersTable({ rows, params, totalPages }: FinishedOrders
         status="idle"
         texts={FINISHED_ORDERS_TABLE_TEXTS}
         searchable={false}
-        defaultPinnedColumns={FINISHED_ORDERS_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

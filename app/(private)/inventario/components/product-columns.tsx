@@ -76,15 +76,6 @@ export const IMAGE_COLUMN_LABEL = 'Imagen';
 /** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
 export const ACTIONS_COLUMN_LABEL = 'Acciones';
 
-/**
- * Columnas que nacen fijadas al borde izquierdo. Es un **defecto**: en cuanto el usuario tenga
- * preferencia guardada para este `tableId` gana la suya, incluida la de no tener nada fijado.
- *
- * Se fija la miniatura y no el nombre porque es la que identifica la fila de un vistazo y la que
- * menos ancho ocupa.
- */
-export const PRODUCT_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_ID];
-
 /** `null` no tiene cifra exacta que anunciar: el `aria-label` queda sin poner. */
 function decimalAriaLabel(value: string | null): string | undefined {
   return value === null ? undefined : trimDecimal(value);
@@ -142,11 +133,6 @@ function existenceAriaLabel(product: ProductView, units: readonly UnitRef[] | un
   const label = productUnitLabel(product, units);
   const amount = trimDecimal(product.stock);
   return label === null ? amount : `${amount} ${label}`;
-}
-
-/** «nombre · unidad», o solo el nombre sin unidad o sin catalogo. */
-function nameCell(product: ProductView, units: readonly UnitRef[] | undefined): string {
-  return productDisplayName(product.name, productUnitLabel(product, units));
 }
 
 /**
@@ -235,6 +221,9 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
       align: 'start',
+      // Nace fijada: es la que identifica la fila de un vistazo y la que menos ancho ocupa.
+      // Es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       // La miniatura sale de `products.image_path`. Hoy esa columna esta vacia en todas las
       // filas -nada la llena todavia-, asi que lo que se ve es el marcador; ese caso NO es un
       // hueco: es el estado normal por ahora.
@@ -249,12 +238,12 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       sortable: true,
       width: 500,
       hideText: false,
-      cell: (product) => nameCell(product, units),
+      cell: (product) => product.name
     },
     {
       id: 'stock',
       label: 'Existencia',
-      align: 'end',
+      align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (product) => stockCell(product, units),
@@ -262,7 +251,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
-      align: 'end',
+      align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (product) => qtyAlertCell(product),
@@ -270,14 +259,14 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: 'reserved',
       label: 'Reservado',
-      align: 'end',
+      align: 'center',
       // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
       cell: (product) => aggregateQuantityCell(product.reserved, 'product-reserved', product, units),
     },
     {
       id: 'available',
       label: 'Disponible',
-      align: 'end',
+      align: 'center',
       cell: (product) => aggregateQuantityCell(product.available, 'product-available', product, units),
     },
     {
@@ -285,7 +274,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       label: ACTIONS_COLUMN_LABEL,
       align: 'end',
       // No ordena, no filtra y no se fija: no es un dato de la fila.
-      pinnable: false,
+      defaultPinned: 'right',
       cell: (product) => <div className="flex justify-end gap-1">{rowActions(product)}</div>,
     },
   ];

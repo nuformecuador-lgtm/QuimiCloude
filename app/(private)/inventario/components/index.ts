@@ -17,7 +17,6 @@ export {
   EMPTY_CELL,
   IMAGE_COLUMN_ID,
   IMAGE_COLUMN_LABEL,
-  PRODUCT_DEFAULT_PINNED_COLUMNS,
   buildProductColumns,
   productUnitLabel,
   type ProductColumn,

@@ -97,12 +97,6 @@ export const CATALOG_IMAGE_COLUMN_LABEL = 'Imagen';
 export const CATALOG_ACTIONS_COLUMN_LABEL = 'Acciones';
 
 /**
- * Columnas que nacen fijadas al borde izquierdo. Es un **defecto**: en cuanto el usuario tenga
- * preferencia guardada para este `tableId` gana la suya.
- */
-export const CATALOG_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_ID];
-
-/**
  * Fecha en `YYYY-MM-DD` y en UTC, **no con `toLocaleDateString`**: el Server Component y el
  * navegador tienen husos y locales distintos, y una fecha formateada con el local del entorno
  * produce una discrepancia de hidratacion que nadie relaciona con la tabla.
@@ -171,6 +165,8 @@ export function buildCatalogColumns({
       id: IMAGE_COLUMN_ID,
       label: CATALOG_IMAGE_COLUMN_LABEL,
       align: 'start',
+      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       // Enmienda a R30 (2026-09-07). Hoy `supplier_catalog_lines.image_path` esta vacia en todas
       // las filas -el formulario sigue sin ofrecer subirla-, asi que lo que se ve es el marcador.
       cell: (line) => (
