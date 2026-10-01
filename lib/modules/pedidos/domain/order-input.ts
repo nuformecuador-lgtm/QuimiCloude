@@ -85,6 +85,10 @@ export const presentationLinesSchema = z
   .refine(hasNoDuplicatePresentation, { message: 'Cada presentación aparece una sola vez.' })
   .default([]);
 
+/** Nombres de los campos repetidos con que el formulario envia el reparto, en orden. */
+export const ORDER_DISTRIBUTION_PRESENTATION_FIELD = 'presentationLines.presentationId';
+export const ORDER_DISTRIBUTION_PACKAGES_FIELD = 'presentationLines.packages';
+
 /**
  * Alta (R8, R9). Lo que este esquema NO declara, no puede llegar: no hay `status`, ni
  * `cancellationReason`, ni `orderYear`/`orderSequence`, ni `createdAt`, ni `createdBy` /

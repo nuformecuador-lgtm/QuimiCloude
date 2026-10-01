@@ -7,6 +7,8 @@ import {
   type ErrorState,
 } from '@/lib/modules/errores';
 import {
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   IncompatibleUnitsError,
   OrderDistributionExceedsQuantityError,
   OrderNotFoundError,
@@ -171,24 +173,36 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
   return typeof value === 'string' ? value : undefined;
 }
 
+function readFormStrings(formData: FormData, name: string): string[] {
+  return formData.getAll(name).map((value) => (typeof value === 'string' ? value : ''));
+}
+
+/**
+ * Las lineas llegan como dos listas de campos repetidos, unidas por posicion. Si las longitudes
+ * difieren, la posicion sin pareja queda `undefined` y la rechaza `presentationLinesSchema`:
+ * el borde no rellena ni descarta.
+ */
+function readPresentationLines(formData: FormData): unknown[] {
+  const presentationIds = readFormStrings(formData, ORDER_DISTRIBUTION_PRESENTATION_FIELD);
+  const packages = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGES_FIELD);
+  const length = Math.max(presentationIds.length, packages.length);
+  return Array.from({ length }, (_, index) => ({
+    presentationId: presentationIds[index],
+    packages: packages[index],
+  }));
+}
+
 /**
  * El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
  * correlativo, ni autores: lo que el esquema no declara no puede llegar (R6, R9).
- *
- * El dominio ya no acepta `presentationId` -gano `unitId` y `presentationLines`- pero
- * esta action SIGUE leyendo el campo viejo: el formulario que le da forma al `FormData`
- * (`app/(private)/pedidos/components/order-form.tsx`) es de otra tarea (T22, reparto y unidad
- * en el formulario). Hasta que ese formulario cambie, toda alta o edicion enviada por el
- * formulario ACTUAL falla en el borde con `invalid_input` -falta `unitId`-, a proposito: es el
- * ripple documentado, no un intento de adivinar aqui la forma que el formulario todavia no
- * tiene.
  */
 function buildCreateCandidate(formData: FormData): unknown {
   return {
     recipeId: readFormString(formData, 'recipeId'),
     quantity: readFormString(formData, 'quantity'),
     priority: readOptionalFormString(formData, 'priority'),
-    presentationId: readFormString(formData, 'presentationId'),
+    unitId: readFormString(formData, 'unitId'),
+    presentationLines: readPresentationLines(formData),
   };
 }
 

@@ -29,6 +29,10 @@ import {
   RecipeNotFoundError,
   UnauthorizedError,
   ValidationError,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  createOrderSchema,
+  updateOrderSchema,
 } from '@/lib/modules/pedidos'
 import {
   cancelOrderAction,
@@ -129,6 +133,7 @@ const SESSION_CONTEXT = { companyId: '33333333-3333-4333-8333-333333333333' }
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
+const UNIT_ID = '77777777-7777-4777-8777-777777777777'
 
 function formDataOf(fields: Record<string, string>): FormData {
   const formData = new FormData()
@@ -143,7 +148,7 @@ const VALID_CREATE_FIELDS = {
   recipeId: RECIPE_ID,
   quantity: '12.5000',
   priority: 'ALTA',
-  presentationId: PRESENTATION_ID,
+  unitId: UNIT_ID,
 }
 
 const VALID_UPDATE_FIELDS = { ...VALID_CREATE_FIELDS, status: 'EN_CURSO' }
@@ -294,15 +299,15 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     cancelOrderMock.mockResolvedValue(undefined)
     deleteOrderMock.mockResolvedValue(undefined)
 
-    // 1. El alta traslada los TRES campos del formulario SIN tocarlos: la cantidad sigue siendo
-    //    cadena y el recorte/los rangos son de `zod`, no del borde. (Eran cinco hasta el
-    //    2026-09-07: la unidad y el precio unitario salieron del pedido.)
+    // 1. El alta traslada los campos del formulario SIN tocarlos: la cantidad sigue siendo
+    //    cadena y el recorte/los rangos son de `zod`, no del borde.
     await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
     expect(createOrderMock.mock.calls[0]?.[0]).toEqual({
       recipeId: RECIPE_ID,
       quantity: '12.5000',
       priority: 'ALTA',
-      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      presentationLines: [],
     })
     // Y lo que el esquema no declara NO se envia: ni estado, ni motivo, ni correlativo, ni
     // autores (R6, R9). La action no puede colar por el formulario lo que el alta no acepta.
@@ -338,7 +343,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       recipeId: RECIPE_ID,
       quantity: '12.5000',
       priority: 'ALTA',
-      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      presentationLines: [],
     })
     expect(updateOrderMock.mock.calls[0]?.[1]).not.toHaveProperty('status')
     // Y NUNCA lleva motivo: cancelar es `cancelOrder` y solo el (R24, R26).
@@ -863,5 +869,116 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       expect(firma, nombre).toBe(parametros)
       expect(firma, `${nombre} recibe la empresa`).not.toMatch(/company|actor|session/i)
     }
+  })
+})
+
+describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData', () => {
+  const OTRA_PRESENTATION_ID = '88888888-8888-4888-8888-888888888888'
+
+  function formDataWithLines(
+    fields: Record<string, string>,
+    presentationIds: readonly string[],
+    packages: readonly string[],
+  ): FormData {
+    const formData = formDataOf(fields)
+    for (const id of presentationIds) formData.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, id)
+    for (const count of packages) formData.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, count)
+    return formData
+  }
+
+  // El doble valida con el esquema REAL y lanza lo que lanza el caso de uso: asi la entrada
+  // invalida se mide hasta el `code` que ve el formulario.
+  function validatingWith(schema: { safeParse(input: unknown): { success: boolean } }) {
+    return (...args: unknown[]) => {
+      if (!schema.safeParse(args.at(-2)).success) throw new ValidationError()
+      return { id: ORDER_ID, number: { year: 2026, sequence: 1 }, numberText: '2026-0000001' }
+    }
+  }
+
+  beforeEach(() => {
+    createOrderMock.mockImplementation((input: unknown, actor: unknown) =>
+      validatingWith(createOrderSchema)(input, actor),
+    )
+    updateOrderMock.mockImplementation((id: unknown, input: unknown, actor: unknown) => {
+      validatingWith(updateOrderSchema)(id, input, actor)
+    })
+  })
+
+  const LINEAS_ESPERADAS = [
+    { presentationId: PRESENTATION_ID, packages: '3' },
+    { presentationId: OTRA_PRESENTATION_ID, packages: '5' },
+  ]
+
+  it('R1 R41: el alta con unidad y dos lineas construye el candidato en orden y el esquema lo acepta', async () => {
+    const result = await createOrderAction(
+      CREATE_INITIAL,
+      formDataWithLines(VALID_CREATE_FIELDS, [PRESENTATION_ID, OTRA_PRESENTATION_ID], ['3', '5']),
+    )
+
+    expect(createOrderMock.mock.calls[0]?.[0]).toEqual({
+      recipeId: RECIPE_ID,
+      quantity: '12.5000',
+      priority: 'ALTA',
+      unitId: UNIT_ID,
+      presentationLines: LINEAS_ESPERADAS,
+    })
+    expect(result.status).toBe('success')
+    expect(createOrderSchema.parse(createOrderMock.mock.calls[0]?.[0]).presentationLines).toEqual([
+      { presentationId: PRESENTATION_ID, packages: 3 },
+      { presentationId: OTRA_PRESENTATION_ID, packages: 5 },
+    ])
+  })
+
+  it('R1 R41: la edicion con unidad y dos lineas construye el mismo candidato, sin estado', async () => {
+    const result = await updateOrderAction(
+      ORDER_ID,
+      MUTATION_INITIAL,
+      formDataWithLines(VALID_UPDATE_FIELDS, [PRESENTATION_ID, OTRA_PRESENTATION_ID], ['3', '5']),
+    )
+
+    expect(updateOrderMock.mock.calls[0]?.[0]).toBe(ORDER_ID)
+    expect(updateOrderMock.mock.calls[0]?.[1]).toEqual({
+      recipeId: RECIPE_ID,
+      quantity: '12.5000',
+      priority: 'ALTA',
+      unitId: UNIT_ID,
+      presentationLines: LINEAS_ESPERADAS,
+    })
+    expect(result).toEqual({ status: 'success' })
+  })
+
+  it('R9: sin lineas el reparto llega vacio y el alta es valida', async () => {
+    const result = await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
+
+    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ presentationLines: [] })
+    expect(result.status).toBe('success')
+  })
+
+  it('R1: longitudes desiguales del reparto terminan en invalid_input, en alta y en edicion', async () => {
+    const masIds = await createOrderAction(
+      CREATE_INITIAL,
+      formDataWithLines(VALID_CREATE_FIELDS, [PRESENTATION_ID, OTRA_PRESENTATION_ID], ['3']),
+    )
+    expect(masIds).toMatchObject({ status: 'error', code: 'invalid_input' })
+
+    const masEnvases = await updateOrderAction(
+      ORDER_ID,
+      MUTATION_INITIAL,
+      formDataWithLines(VALID_UPDATE_FIELDS, [PRESENTATION_ID], ['3', '5']),
+    )
+    expect(masEnvases).toMatchObject({ status: 'error', code: 'invalid_input' })
+  })
+
+  it('R41: un presentationId suelto ya no se lee, y sin unidad el alta es invalid_input', async () => {
+    const result = await createOrderAction(
+      CREATE_INITIAL,
+      formDataOf({ recipeId: RECIPE_ID, quantity: '12.5000', presentationId: PRESENTATION_ID }),
+    )
+
+    const candidato = createOrderMock.mock.calls[0]?.[0]
+    expect(candidato).not.toHaveProperty('presentationId')
+    expect(candidato).toMatchObject({ unitId: '', presentationLines: [] })
+    expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
+    expect(readActionsSource()).not.toMatch(/['"]presentationId['"]/)
   })
 })

@@ -94,6 +94,8 @@ export {
   cancelOrderSchema,
   quoteOrderCostSchema,
   presentationLinesSchema,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
   orderPresentationAvailabilitySchema,
   updateOrderDistributionSchema,
   EDITABLE_STATUS_VALUES,
