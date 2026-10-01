@@ -149,9 +149,12 @@ import {
 } from '@/lib/modules/recetas';
 import {
   createRecipe,
+  createRecipeVersion,
   findAliveRecipeById,
   listAliveRecipes,
+  listAliveRecipeVersions,
   replaceAliveRecipe,
+  replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
@@ -864,6 +867,9 @@ const recipeRepository: RecipeRepository = {
   listAlive: listAliveRecipes,
   replaceAlive: replaceAliveRecipe,
   softDeleteAlive: softDeleteAliveRecipe,
+  createVersion: createRecipeVersion,
+  listAliveVersions: listAliveRecipeVersions,
+  replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
 /** `RecipeImageStorage` cableado con el adaptador de Supabase Storage (T11). Ninguna de
