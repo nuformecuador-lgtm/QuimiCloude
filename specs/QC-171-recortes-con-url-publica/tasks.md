@@ -158,7 +158,8 @@ Archivos: `progress/impl_QC-171-recortes-con-url-publica.md`.
 - `pnpm run e2e -- catalogo-desde-pdf` en Chromium, **sin modificar** el spec.
 - Mapa `R1…R24 → test` en la bitácora.
 
-**Hecho cuando:** gate completo verde; el E2E de QC-158 pasa sin cambios (**R22**); cada `R<n>` tiene al
+**Hecho cuando:** gate completo verde; el E2E de QC-158 pasa, con su paso 1 abriendo la ventana de
+subida y ningún otro cambio (**R22**, enmendado el 2026-10-01); cada `R<n>` tiene al
 menos un test nombrado en la bitácora; `git diff --stat dev` no incluye ningún archivo de la frontera
 `[D8]` listado arriba (**R23**).
 

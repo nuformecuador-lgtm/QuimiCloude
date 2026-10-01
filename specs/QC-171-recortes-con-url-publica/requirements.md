@@ -125,8 +125,10 @@ de almacenamiento ya aprobada, y el número de archivos de producción que la im
 
 **R22.** Mientras el almacenamiento corre simulado para el E2E, el sistema DEBE componer la URL del
 recorte en el mismo origen simulado que usa hoy la revisión, de modo que `e2e/catalogo-desde-pdf.spec.ts`
-siga pasando **sin modificarse**; esta ficha NO DEBE añadir E2E, y su cobertura DEBE ser unitaria y de
-integración. `[D9]`
+siga pasando; esta ficha NO DEBE añadir E2E, y su cobertura DEBE ser unitaria y de integración. El
+único cambio admitido en ese E2E es el **paso 1**: abrir la ventana de subida con su botón antes de
+esperar la sección de subida, porque desde QC-160 la subida vive en esa ventana y el E2E ya estaba rojo
+en `dev` por eso. Ningún otro paso ni ninguna aserción DEBE cambiar. `[D9]`
 
 **R23.** Esta ficha NO DEBE cambiar cómo se generan ni cómo se emparejan los recortes: la subida de
 recortes, la llamada de coordenadas y el emparejamiento DEBEN conservar su comportamiento y sus tests
@@ -154,4 +156,4 @@ Ninguna pendiente.
 | 2026-09-25 | ¿Permisos? | **Sin cambios**: cada pantalla conserva el suyo (`proveedores.consultar`, heredado de QC-140 D10; los de documentos, de QC-142 y QC-169). La URL pública no pasa por ningún permiso. |
 | 2026-09-25 | ¿Librería? | **Ninguna nueva**: `getPublicUrl` de `@supabase/storage-js`, ya aprobada y en uso en recetas. |
 | 2026-09-25 | ¿Frontera con QC-176? | **Esta ficha solo cambia dónde viven los recortes y cómo se muestran.** Cómo se generan y cómo se emparejan con las filas (llamada de coordenadas, recorte y subida, `crop-pairing.ts`, emparejamiento por orden en la revisión) es de **QC-176** y aquí no se toca: la revisión conserva el emparejamiento actual y solo cambia la URL con la que pinta. QC-171 va **antes** que QC-176 (link *Blocks* en el board). |
-| 2026-09-25 | ¿Hace falta E2E? | **No, se difiere con motivo.** No es flujo crítico según `CHECKPOINTS.md`, y en el E2E el almacenamiento es simulado, así que no puede demostrar que la imagen se ve. Cobertura unitaria y de integración de que la URL se compone y llega a cada pantalla; el E2E de QC-158 sigue en verde. |
+| 2026-09-25 | ¿Hace falta E2E? | **No, se difiere con motivo.** No es flujo crítico según `CHECKPOINTS.md`, y en el E2E el almacenamiento es simulado, así que no puede demostrar que la imagen se ve. Cobertura unitaria y de integración de que la URL se compone y llega a cada pantalla; el E2E de QC-158 sigue en verde. **ENMENDADA el 2026-10-01 por el humano (T7):** el E2E de QC-158 estaba rojo en `dev` porque QC-160 metió la subida en una ventana con botón y nadie lo actualizó. Esta ficha lo arregla tocando **solo el paso 1** (abrir la ventana) y nada más del E2E (R22). |
