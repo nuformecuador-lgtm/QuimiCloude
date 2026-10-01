@@ -260,3 +260,28 @@ Reducida segun T0: las igualdades del Administrador ya se derivan del dominio
 - Mordida comprobada a mano (copia de respaldo, mutacion, restaurado): sin el patron del literal
   caen el ancla y «dispara … literal del rol Maestro»; sin el del identificador caen el ancla y
   «dispara … importa y usa ROLE_MAESTRO» (2 failed / 14 passed en cada mutacion).
+
+## Cierre de la tanda T1-T4 — `./init.sh --rapido`
+
+Primera corrida (punta `4bdf15dc`): entorno, fichas, cupo, specs, `QuimiCloude_QC161` al dia (56
+migraciones), typecheck y lint en verde. `test:rapido`: el diff toca el barrel
+`lib/modules/identity/index.ts`, asi que `vitest related` selecciona 480 archivos (incluida
+integracion): 5 archivos / 12 casos rojos, 6848 passed, 26 skipped (846 s).
+
+- Baseline (`tests/baseline-rojos.json`): `unidades-viewport.test.tsx` (2) y
+  `usuarios-viewport.test.tsx` (2). `account-status-scope.test.ts` no salio seleccionado.
+- **Deuda de `dev` fuera del baseline** (rojos en `40d0dea2`, antes de T1; ver T2):
+  `inventario/product-page.test.tsx` (1) y `recetas-ui/recipe-page.test.tsx` (1).
+- **De esta rama**: `tests/integration/identity/identity-seed.int.test.ts` (6). Cinco contaban
+  los roles con un `3` escrito a mano (`:405, 434, 448, 521, 577, 637, 652, 701`): ahora
+  `SEED_ROLE_NAMES.length` (commit aparte de T3). El sexto, «QC-142 R13: sobre la base ya
+  sembrada salvo documentos.*…», sigue rojo y **cierra en T5**: la base de la corrida sale de la
+  plantilla `qct_tpl_4295644d322f`, cuya huella (migraciones + `seed.ts` +
+  `seed-initial-access.ts`) no cambia con `permissions.ts`, asi que se reutiliza sembrada con el
+  catalogo de antes, sin `empresas.*` ni rol Maestro; el seed del caso los crea y el recuento
+  sale `documentos.*` + 2. La migracion de T5 inserta rol, permisos y asignaciones y cambia la
+  huella: la plantilla nueva ya los trae. No se fuerza la reconstruccion: la plantilla es
+  compartida con otras ramas de la misma huella.
+
+`vitest run tests/integration/identity/identity-seed.int.test.ts` tras el arreglo: 16 passed, 1
+failed (el de T5).

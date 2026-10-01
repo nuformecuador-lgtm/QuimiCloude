@@ -377,7 +377,7 @@ afterAll(async () => {
 
 describe('seedInitialAccess contra base real — la doble corrida', () => {
   // Doble corrida sobre base vacia, ahora con los TRES roles de `SEED_ROLES`.
-  it('la primera corrida sobre base vacia crea los tres roles y el administrador; la segunda no cambia nada', async () => {
+  it('la primera corrida sobre base vacia crea todos los roles de SEED_ROLES y el administrador; la segunda no cambia nada', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       expect(await seedRoleNames(tx)).toEqual([]);
@@ -402,7 +402,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const rolesAfterFirst = await tx.role.findMany({
         where: { name: { in: SEED_ROLE_NAMES } },
       });
-      expect(rolesAfterFirst).toHaveLength(3);
+      expect(rolesAfterFirst).toHaveLength(SEED_ROLE_NAMES.length);
       // El Empacador es global y una sola fila lo representa.
       expect(rolesAfterFirst.filter((role) => role.name === ROLE_EMPACADOR)).toHaveLength(1);
 
@@ -431,7 +431,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         where: { name: { in: SEED_ROLE_NAMES } },
         orderBy: { name: 'asc' },
       });
-      expect(rolesAfterSecond).toHaveLength(3);
+      expect(rolesAfterSecond).toHaveLength(SEED_ROLE_NAMES.length);
       expect(rolesAfterSecond).toEqual(
         [...rolesAfterFirst].sort((a, b) => a.name.localeCompare(b.name)),
       );
@@ -445,7 +445,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(adminAfterSecond).toEqual(adminAfterFirst);
 
       expect(await tx.user.count()).toBe(1);
-      expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(3);
+      expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(SEED_ROLE_NAMES.length);
     });
   });
 
@@ -518,7 +518,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         credentials: fakeCredentialsProvider,
       });
       expect(first.createdAdmin).toBe(true);
-      expect(first.createdRoles.length).toBe(3);
+      expect(first.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
 
       const adminBeforeEdit = await findLiveAdmin(tx);
       expect(adminBeforeEdit).not.toBeNull();
@@ -559,7 +559,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
-  // Ahora conviven tres roles y solo falta uno.
+  // Conviven todos los roles de semilla y solo falta uno.
   it('si solo falta el rol Operador, la corrida crea unicamente ese y deja Administrador y Empacador intactos', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
@@ -574,7 +574,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      expect(first.createdRoles.length).toBe(3);
+      expect(first.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
       expect(first.createdAdmin).toBe(true);
 
       const administradorBeforeDelete = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
@@ -634,7 +634,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      expect(bootstrap.createdRoles.length).toBe(3);
+      expect(bootstrap.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
       expect(bootstrap.createdAdmin).toBe(true);
 
       const outcome = await withSeedAdminEnvVarsCleared(() =>
@@ -649,7 +649,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(outcome.createdRoles).toEqual([]);
       expect(outcome.createdAdmin).toBe(false);
       expect(await tx.user.count()).toBe(1);
-      expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(3);
+      expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(SEED_ROLE_NAMES.length);
     });
   });
 
@@ -698,7 +698,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      expect(first.createdRoles.length).toBe(3);
+      expect(first.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
       expect(first.createdAdmin).toBe(true);
 
       const second = await seedInitialAccess({
