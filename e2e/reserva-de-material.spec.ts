@@ -140,6 +140,7 @@ let productId: string | null = null;
 let batchId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
+let unitId: string | null = null;
 let adminUserId: string | null = null;
 let operatorUserId: string | null = null;
 
@@ -205,7 +206,13 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
   await recipeOption.click();
   await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-  const presentationPicker = page.getByTestId('presentation-select');
+  await page.getByTestId('order-field-quantity').fill(quantity);
+  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+
+  // Toda la cantidad en una sola linea: con contenido 1, un envase por unidad del pedido.
+  const distribution = page.getByTestId('order-distribution-field');
+  const presentationPicker = distribution.getByTestId('presentation-select');
   await presentationPicker.click();
   await presentationPicker.fill(PRESENTATION_NAME);
   const presentationOption = page
@@ -213,9 +220,18 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
     .filter({ hasText: PRESENTATION_NAME });
   await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
   await presentationOption.click();
-  await expect(page.getByTestId('presentation-value')).toHaveValue(presentationId ?? '');
-
-  await page.getByTestId('order-field-quantity').fill(quantity);
+  await distribution.getByTestId('order-distribution-add-packages').fill(quantity);
+  await distribution.getByTestId('order-distribution-add').click();
+  await expect(
+    distribution.locator(
+      `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
+    ),
+  ).toHaveCount(1);
+  await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
+    'data-state',
+    'ready',
+    { timeout: 60_000 },
+  );
 
   await page.getByTestId('order-form-submit').click();
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
@@ -301,12 +317,18 @@ test.beforeAll(async () => {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({
+      where: { companyId: { in: orphanCompanyIds } },
+    });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
+    await prisma.orderPresentationLine.deleteMany({
+      where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
@@ -375,6 +397,7 @@ test.beforeAll(async () => {
     where: { nameNormalized: 'litro', companyId: null },
     select: { id: true },
   });
+  unitId = unit.id;
 
   // `products.unit_id` se fija a mano: el disparador que valida el lote de mas abajo exige que el
   // producto ya tenga unidad antes de insertarlo.
@@ -462,6 +485,10 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
