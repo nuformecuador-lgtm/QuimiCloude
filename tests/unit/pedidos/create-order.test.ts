@@ -69,8 +69,8 @@ function filaCreada(): OrderRow {
  */
 function catalogoDeRecetas(lineasPorReceta: ReadonlyMap<string, readonly RecipeExecutionLine[]> = new Map()) {
   const recetas = new Map<string, { companyId: string; ref: RecipeRef }>([
-    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', isDeleted: false } }],
-    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', isDeleted: false } }],
+    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false } }],
+    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', ownName: 'Formula de B', isUnderReview: false, original: null, isDeleted: false } }],
   ]);
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
     ids.flatMap((id) => {
@@ -653,7 +653,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       lines: lineas,
     }));
     const recipesGlobal = {
-      findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'x', isDeleted: false }))),
+      findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'x', ownName: 'x', isUnderReview: false, original: null, isDeleted: false }))),
       findExecutionContentById: findExecutionContentByIdGlobal,
     } as unknown as RecipeCatalog;
     // El lector de `scope.recipes` -sobre el cliente de LA transaccion- es el UNICO que puede

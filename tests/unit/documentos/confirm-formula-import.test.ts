@@ -76,7 +76,7 @@ function dobleDeRecetas(
   return {
     findRefsIncludingDeleted: vi.fn(async () => {
       bitacora.push('recipes.findRefsIncludingDeleted');
-      return refsIncludingDeleted;
+      return refsIncludingDeleted.map((ref) => ({ ...ref, ownName: ref.name, isUnderReview: false, original: null }));
     }),
     findExecutionContentById: vi.fn(),
     findIdsMatchingName: vi.fn(),

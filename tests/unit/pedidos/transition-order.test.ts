@@ -61,7 +61,10 @@ function catalogoDeRecetas(lines: readonly RecipeExecutionLine[] = [{ productId:
  *  unidades, que ningun test de este archivo necesita distintos de vacios. */
 function catalogosGlobales(overrides: { readonly recipeName?: string } = {}) {
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) =>
-    ids.map((id) => ({ id, name: overrides.recipeName ?? 'Desengrasante industrial', isDeleted: false })),
+    ids.map((id) => {
+      const name = overrides.recipeName ?? 'Desengrasante industrial';
+      return { id, name, ownName: name, isUnderReview: false, original: null, isDeleted: false };
+    }),
   );
   const recipes = {
     findRefsIncludingDeleted,

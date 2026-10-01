@@ -58,10 +58,10 @@ const RECETA_A = '22222222-2222-4222-8222-222222222222'
 const RECETA_B = '44444444-4444-4444-8444-444444444444'
 
 const REFS_RECETA: readonly RecipeRef[] = [
-  { id: RECETA_A, name: 'Acido citrico 50%', isDeleted: false },
+  { id: RECETA_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
   // R44: dada de baja y CON nombre. Un pedido conserva su receta aunque la retiren, y la fila
   // tiene que seguir diciendo que se pidio.
-  { id: RECETA_B, name: 'Formula retirada', isDeleted: true },
+  { id: RECETA_B, name: 'Formula retirada', ownName: 'Formula retirada', isUnderReview: false, original: null, isDeleted: true },
 ]
 function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow {
   return {
