@@ -150,12 +150,12 @@ usando `createSignedUrl`; `recipe-image-supabase.ts` y la lectura de `products` 
 `read-document.test.ts`, `recipe-image-scope.test.ts` y `guard-dependencias-aprobadas.test.ts` verdes
 sin cambios.
 
-## [ ] T7 — Cierre y trazabilidad `[depende de T1–T6]`
+## [x] T7 — Cierre y trazabilidad `[depende de T1–T6]`
 
 Archivos: `progress/impl_QC-171-recortes-con-url-publica.md`.
 
 - `./init.sh` completo.
-- `pnpm run e2e -- catalogo-desde-pdf` en Chromium, **sin modificar** el spec.
+- `pnpm exec playwright test e2e/catalogo-desde-pdf.spec.ts --project=chromium`, tocando del E2E solo su paso 1 (abrir la ventana de subida, R22 enmendado).
 - Mapa `R1…R24 → test` en la bitácora.
 
 **Hecho cuando:** gate completo verde; el E2E de QC-158 pasa, con su paso 1 abriendo la ventana de
