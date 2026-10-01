@@ -15,7 +15,7 @@ import { recipeEditRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
 import { DeleteRecipeDialog } from './delete-recipe-dialog';
-import { RECIPE_DEFAULT_PINNED_COLUMNS, buildRecipeColumns } from './recipe-columns';
+import { buildRecipeColumns } from './recipe-columns';
 import { recipeListHref } from './recipe-list-params';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -166,7 +166,6 @@ export function RecipeTable({ recipes, params, totalPages, noResults }: RecipeTa
             : { ...RECIPE_TABLE_TEXTS, empty: RECIPE_NO_RESULTS_TEXT }
         }
         emptyAction={emptyAction}
-        defaultPinnedColumns={RECIPE_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

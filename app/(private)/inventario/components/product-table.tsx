@@ -25,7 +25,6 @@ import { AdjustBatchDialog } from './adjust-batch-dialog';
 import { BatchHistory } from './batch-history';
 import { DeleteProductDialog } from './delete-product-dialog';
 import {
-  PRODUCT_DEFAULT_PINNED_COLUMNS,
   buildProductColumns,
   productUnitLabel,
 } from './product-columns';
@@ -275,7 +274,6 @@ export function ProductTable({
         onParamsChange={(next) => navigate(productListHref(next))}
         status="idle"
         texts={PRODUCT_TABLE_TEXTS}
-        defaultPinnedColumns={PRODUCT_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

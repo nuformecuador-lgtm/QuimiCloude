@@ -349,19 +349,25 @@ describe('DataTable: toolbarActions (R30)', () => {
 })
 
 /**
- * QC-35 T4 (`design.md > 6.3`, R19): la prop `defaultPinnedColumns`. Casos NUEVOS; ningun test
- * previo de este archivo cambia, porque sin la prop el comportamiento es el de siempre.
+ * QC-35 T4 (`design.md > 6.3`, R19): la columna que nace fijada se declara POR COLUMNA con
+ * `defaultPinned: 'left' | 'right'`. Casos NUEVOS; ningun test previo de este archivo cambia,
+ * porque sin el campo el comportamiento es el de siempre.
  *
  * Se renderiza con props propias (no con `renderTabla`) para no tocar el helper existente, y
  * cada caso usa su propio `tableId` para no compartir estado de `localStorage`.
  */
 describe('DataTable: columna fijada por defecto (QC-35 R19)', () => {
-  const columnas: readonly DataTableColumn<Producto>[] = [
-    { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => row.nombre },
-    { id: 'stock', label: 'Stock', align: 'end', cell: (row) => String(row.stock) },
-  ]
+  function columnasConDefecto(): readonly DataTableColumn<Producto>[] {
+    return [
+      { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => row.nombre, defaultPinned: 'left' },
+      { id: 'stock', label: 'Stock', align: 'end', cell: (row) => String(row.stock) },
+    ]
+  }
 
-  function renderConDefecto(tableId: string, defaultPinnedColumns?: readonly string[]) {
+  function renderConDefecto(
+    tableId: string,
+    columnas: readonly DataTableColumn<Producto>[] = columnasConDefecto(),
+  ) {
     const props: DataTableProps<Producto> = {
       tableId,
       columns: columnas,
@@ -372,7 +378,6 @@ describe('DataTable: columna fijada por defecto (QC-35 R19)', () => {
       onParamsChange: vi.fn<(next: DataTableParams) => void>(),
       status: 'idle',
       texts,
-      defaultPinnedColumns,
     }
     render(<DataTable {...props} />)
   }
@@ -381,13 +386,30 @@ describe('DataTable: columna fijada por defecto (QC-35 R19)', () => {
     window.localStorage.clear()
   })
 
-  it('sin nada persistido, la columna declarada nace fijada al borde izquierdo', () => {
-    renderConDefecto('qc35-defecto-limpio', ['nombre'])
+  it('sin nada persistido, la columna declarada nace fijada al borde que pide', () => {
+    renderConDefecto('qc35-defecto-limpio')
 
     expect(screen.getByTestId('data-table-head-nombre')).toHaveAttribute('data-pinned', 'left')
     expect(screen.getAllByTestId('data-table-cell-nombre')[0]).toHaveAttribute('data-pinned', 'left')
     // Solo la declarada: el resto sigue sin fijar.
     expect(screen.getByTestId('data-table-head-stock')).not.toHaveAttribute('data-pinned')
+  })
+
+  it('el defecto admite el borde derecho', () => {
+    renderConDefecto('qc35-defecto-derecha', [
+      { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => row.nombre },
+      {
+        id: 'stock',
+        label: 'Stock',
+        align: 'end',
+        cell: (row) => String(row.stock),
+        defaultPinned: 'right',
+      },
+    ])
+
+    expect(screen.getByTestId('data-table-head-stock')).toHaveAttribute('data-pinned', 'right')
+    expect(screen.getAllByTestId('data-table-cell-stock')[0]).toHaveAttribute('data-pinned', 'right')
+    expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
   })
 
   it('con algo persistido para ese tableId gana lo persistido, no el defecto (R25, R26)', () => {
@@ -396,7 +418,7 @@ describe('DataTable: columna fijada por defecto (QC-35 R19)', () => {
       JSON.stringify({ left: ['stock'], right: [] }),
     )
 
-    renderConDefecto('qc35-defecto-con-persistido', ['nombre'])
+    renderConDefecto('qc35-defecto-con-persistido')
 
     expect(screen.getByTestId('data-table-head-stock')).toHaveAttribute('data-pinned', 'left')
     expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
@@ -408,21 +430,24 @@ describe('DataTable: columna fijada por defecto (QC-35 R19)', () => {
       JSON.stringify({ left: [], right: [] }),
     )
 
-    renderConDefecto('qc35-defecto-soltado', ['nombre'])
+    renderConDefecto('qc35-defecto-soltado')
 
     expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
     expect(screen.getByTestId('data-table-head-stock')).not.toHaveAttribute('data-pinned')
   })
 
-  it('sin la prop no hay nada fijado al montar (comportamiento de siempre)', () => {
-    renderConDefecto('qc35-sin-defecto')
+  it('sin el campo no hay nada fijado al montar (comportamiento de siempre)', () => {
+    renderConDefecto('qc35-sin-defecto', [
+      { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => row.nombre },
+      { id: 'stock', label: 'Stock', align: 'end', cell: (row) => String(row.stock) },
+    ])
 
     expect(screen.getByTestId('data-table-head-nombre')).not.toHaveAttribute('data-pinned')
     expect(screen.getByTestId('data-table-head-stock')).not.toHaveAttribute('data-pinned')
   })
 
   it('la columna fijada por defecto se puede soltar desde el menu de su cabecera (R25)', async () => {
-    renderConDefecto('qc35-defecto-soltable', ['nombre'])
+    renderConDefecto('qc35-defecto-soltable')
 
     expect(screen.getByTestId('data-table-head-nombre')).toHaveAttribute('data-pinned', 'left')
 
@@ -433,5 +458,78 @@ describe('DataTable: columna fijada por defecto (QC-35 R19)', () => {
     expect(
       JSON.parse(window.localStorage.getItem(buildPinningStorageKey('qc35-defecto-soltable')) as string),
     ).toEqual({ left: [], right: [] })
+  })
+})
+
+/**
+ * Delimitador vertical entre columnas: linea de 1 px al 50% del alto de la fila sobre el
+ * borde derecho de cada celda, en todas las columnas salvo la ultima.
+ */
+describe('DataTable: delimitador de columnas', () => {
+  const columnas: readonly DataTableColumn<Producto>[] = [
+    { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => row.nombre },
+    { id: 'stock', label: 'Stock', align: 'end', cell: (row) => String(row.stock) },
+  ]
+
+  function renderTabla(tableId: string, columns: readonly DataTableColumn<Producto> [] = columnas) {
+    render(
+      <DataTable
+        tableId={tableId}
+        columns={columns}
+        rows={PRODUCTOS}
+        getRowId={(row) => row.id}
+        params={createDefaultParams()}
+        totalPages={1}
+        onParamsChange={vi.fn<(next: DataTableParams) => void>()}
+        status="idle"
+        texts={texts}
+      />,
+    )
+  }
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('todas las columnas salvo la ultima pintan divisor en cabecera y en celdas', () => {
+    renderTabla('divisor-todas')
+
+    const divisorCabecera = screen.getByTestId('data-table-head-divider-nombre')
+    expect(divisorCabecera).toHaveAttribute('aria-hidden', 'true')
+    for (const clase of ['absolute', 'top-1/4', 'h-1/2', 'w-px', 'bg-border']) {
+      expect(divisorCabecera.className).toContain(clase)
+    }
+
+    const divisoresCeldas = screen.getAllByTestId('data-table-cell-divider-nombre')
+    expect(divisoresCeldas.length).toBe(PRODUCTOS.length)
+    for (const divisor of divisoresCeldas) {
+      expect(divisor).toHaveAttribute('aria-hidden', 'true')
+    }
+
+    // La ultima columna no delimita nada.
+    expect(screen.queryByTestId('data-table-head-divider-stock')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('data-table-cell-divider-stock')).not.toBeInTheDocument()
+  })
+
+  it('la celda con divisor es relativa para anclarlo a su borde derecho', () => {
+    renderTabla('divisor-relativa')
+
+    expect(screen.getByTestId('data-table-head-nombre').className).toMatch(/relative/)
+    expect(screen.getByTestId('data-table-head-stock').className).not.toMatch(/(^|\s)relative(\s|$)/)
+    for (const celda of screen.getAllByTestId('data-table-cell-nombre')) {
+      expect(celda.className).toMatch(/relative/)
+    }
+    for (const celda of screen.getAllByTestId('data-table-cell-stock')) {
+      expect(celda.className).not.toMatch(/(^|\s)relative(\s|$)/)
+    }
+  })
+
+  it('con una sola columna no hay ningun divisor', () => {
+    renderTabla('divisor-una', [
+      { id: 'nombre', label: 'Nombre', align: 'start', cell: (row) => row.nombre },
+    ])
+
+    expect(screen.queryByTestId('data-table-head-divider-nombre')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('data-table-cell-divider-nombre')).not.toBeInTheDocument()
   })
 })

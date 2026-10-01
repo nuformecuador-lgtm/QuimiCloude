@@ -39,10 +39,6 @@ export const COMPANY_ORDER_STATUS_COLUMN_ID = 'status';
 export const COMPANY_ORDER_DATE_COLUMN_ID = 'finishedAt';
 export const COMPANY_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
 
-export const COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS: readonly string[] = [
-  COMPANY_ORDER_NUMBER_COLUMN_ID,
-];
-
 export const COMPANY_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   PENDIENTE: 'Pendiente',
   EN_CURSO: 'En curso',
@@ -95,6 +91,8 @@ export function buildCompanyOrdersColumns({
       id: COMPANY_ORDER_NUMBER_COLUMN_ID,
       label: 'Nº de pedido',
       align: 'start',
+      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       cell: (order) => order.numberText,
     },
     {
