@@ -5,7 +5,7 @@ import type { OrderScope } from './order-scope';
 import type { OrderRow, OrderView } from './order-view';
 
 import type { PresentationCatalog } from '@/lib/modules/inventario';
-import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 
 import type { OrderRepository } from '../ports/order-repository';
 
@@ -40,15 +40,20 @@ export type GetOrderDeps = {
  */
 export function toOrderView(
   row: OrderRow,
-  recipeNames: ReadonlyMap<string, string>,
+  recipes: ReadonlyMap<string, RecipeRef>,
   presentationNames: ReadonlyMap<string, string> = new Map(),
 ): OrderView {
+  const recipe = recipes.get(row.recipeId);
   return {
     id: row.id,
     number: row.number,
     numberText: formatOrderNumber(row.number),
     recipeId: row.recipeId,
-    recipeName: recipeNames.get(row.recipeId) ?? null,
+    recipeName: recipe?.name ?? null,
+    recipeVersion:
+      recipe?.original == null
+        ? null
+        : { originalId: recipe.original.id, originalName: recipe.original.name, versionName: recipe.ownName },
     quantity: row.quantity,
     priority: row.priority,
     status: row.status,
@@ -99,7 +104,7 @@ export function createGetOrder(
 
     return toOrderView(
       row,
-      new Map(recipes.map((recipe) => [recipe.id, recipe.name])),
+      new Map(recipes.map((recipe) => [recipe.id, recipe])),
       new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
     );
   };

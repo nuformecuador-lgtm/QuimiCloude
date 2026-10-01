@@ -161,6 +161,11 @@
       "desde": "2026-09-24"
     },
     {
+      "archivo": "inventario/finished-goods-version.int.test.ts",
+      "motivo": "QC-172 T9 (R36): resuelve el nombre con 'findRecipeRefsIncludingDeleted' (recipe-catalog-prisma.ts), que lee con el cliente Prisma GLOBAL, y da la entrada con 'receiveFinishedGoods' envuelta en su propia 'prisma.$transaction' que CONFIRMA, igual que 'finished-goods.int.test.ts'; una transaccion del test no envolveria la lectura del catalogo. Fabrica su empresa con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, original, version y pedidos) y la limpia en un 'finally' y en el 'afterAll' en el orden de las FK (asientos -> lotes -> productos -> pedidos -> version -> original -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-01"
+    },
+    {
       "archivo": "inventario/finished-goods-receipts.int.test.ts",
       "motivo": "QC-168 T9 (R14): 'findFinishedGoodsReceipts' (product-prisma.ts) lee con el cliente Prisma GLOBAL (no acepta 'tx'), asi que el asiento 'production' que alimenta la lectura tiene que quedar CONFIRMADO; una transaccion del test con ROLLBACK no la alimentaria. Cada caso escribe el asiento con 'receiveFinishedGoods' -misma ruta que produccion, envuelta en su propia 'prisma.$transaction' que CONFIRMA, igual que 'finished-goods.int.test.ts'- y limpia lo suyo en un 'finally', en el orden que exigen las FK (asientos -> lotes -> productos -> pedidos -> receta -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"

@@ -159,7 +159,7 @@ export function createListOrders(
     // pidio. La vigencia se exige al ESCRIBIR (R15, R25), no al leer.
     const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
 
-    const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
+    const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
 
     const presentationIds = [
       ...new Set(
@@ -173,7 +173,7 @@ export function createListOrders(
     const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
     return {
-      items: page.items.map((row) => toOrderView(row, recipeNames, presentationNames)),
+      items: page.items.map((row) => toOrderView(row, recipesById, presentationNames)),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

@@ -99,6 +99,7 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     numberText: formatOrderNumber({ year: 2026, sequence }),
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: `Receta ${sequence}`,
+    recipeVersion: null,
     quantity: '1.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',

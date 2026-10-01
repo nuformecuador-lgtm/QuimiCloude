@@ -211,6 +211,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: CORRELATIVO_QUE_NO_DEBE_VERSE,
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: DATO_QUE_NO_DEBE_VERSE,
+    recipeVersion: null,
     quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',

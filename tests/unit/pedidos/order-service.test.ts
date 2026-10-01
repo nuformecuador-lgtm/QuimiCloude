@@ -305,6 +305,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       numberText: '2026-0000007',
       recipeId: RECIPE_ID,
       recipeName: 'Acido citrico 50%',
+      recipeVersion: null,
       quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',

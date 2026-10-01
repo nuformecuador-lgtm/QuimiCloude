@@ -184,6 +184,7 @@ const PEDIDO: OrderSummary = {
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
   recipeId: RECETA.id,
   recipeName: RECETA.name,
+  recipeVersion: null,
   quantity: '12.5000',
   priority: 'MEDIA',
   status: 'PENDIENTE',
