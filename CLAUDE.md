@@ -38,7 +38,7 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
    El reviewer rechaza si falta alguno.
 5. **Verificación ejecutable, en dos niveles.** Nada se da por "hecho" sin que pase el gate.
    Pero el gate tiene dos: **`./init.sh --rapido`** para cerrar una tanda (typecheck + lint +
-   los tests que el grafo relaciona con tu cambio + **todas** las guardias, ~1 min), y
+   los tests que importan directamente tu cambio o son de su módulo + **todas** las guardias), y
    **`./init.sh`** completo para cerrar la feature y **antes de cada PR, sin excepción**.
    Correr la suite entera en cada tanda no es rigor, es una sala de espera; correr solo los
    rápidos antes de un merge sí es un agujero. Detalle y límites en

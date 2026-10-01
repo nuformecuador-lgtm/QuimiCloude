@@ -70,8 +70,8 @@ cerrar tanda que no termina no es un gate.
 
 Y luego, como siempre, todas las guardias. `test:rapido` imprime cuántos entran por cada vía.
 
-**La medición.** Para el mismo diff de QC-172: **539 → 233 archivos**. Con solo la regla de
-import directo (sin la carpeta de módulo) serían 190.
+**La medición.** Para el mismo diff de QC-172 (96 archivos cambiados), con el script definitivo:
+**539 → 236 archivos**. Con solo la regla de import directo (sin la carpeta de módulo) serían 197.
 
 **El coste aceptado.** El rápido **deja de cazar regresiones a más de un import** del cambio: un
 test que llega a tu archivo a través de otro ya no entra. Las caza el gate completo, que es
