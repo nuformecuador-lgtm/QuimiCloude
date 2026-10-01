@@ -7,9 +7,10 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
+  createErrorStateTranslator,
   ERROR_CODES,
   ERROR_MESSAGE_KEY,
   ERROR_MESSAGES_ES,
@@ -17,6 +18,11 @@ import {
   UNEXPECTED_ERROR_CODE,
   type ErrorCode,
 } from '@/lib/modules/errores'
+import {
+  PedidosError,
+  RecipeNotFoundError,
+  RecipeVersionUnderReviewError,
+} from '@/lib/modules/pedidos/domain/errors'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -39,11 +45,12 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 60 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 61 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 60 y no 56: entran `customer_not_found` (QC-154), `order_packing_taken`,
-      // `order_not_packable` y `order_produced_frozen` (QC-168).
-      expect(ERROR_CODES).toHaveLength(60)
+      // 61 y no 56: entran `customer_not_found` (QC-154), `order_packing_taken`,
+      // `order_not_packable` y `order_produced_frozen` (QC-168) y `recipe_version_under_review`
+      // (QC-172).
+      expect(ERROR_CODES).toHaveLength(61)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -464,6 +471,20 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
       }
       expect(errorMessage('user_not_pending')).not.toBe(enlace)
       expect(errorMessage('user_not_pending')).not.toBe(errorMessage('user_not_found'))
+    })
+
+    it('QC-172 R33: recipe_version_under_review sale por el traductor con su texto, distinto de recipe_not_found', async () => {
+      const toErrorState = createErrorStateTranslator(PedidosError, async () => null, vi.fn())
+
+      expect(await toErrorState(new RecipeVersionUnderReviewError())).toEqual({
+        status: 'error',
+        code: 'recipe_version_under_review',
+        message: 'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
+      })
+      expect(await toErrorState(new RecipeNotFoundError())).not.toMatchObject({
+        code: 'recipe_version_under_review',
+      })
+      expect(errorMessage('recipe_version_under_review')).not.toBe(errorMessage('recipe_not_found'))
     })
 
     it('el modulo errores no importa identity ni lo nombra', () => {

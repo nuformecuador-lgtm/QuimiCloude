@@ -65,6 +65,7 @@ export const ERROR_MESSAGE_KEY = {
   order_packing_taken: 'errors.order_packing_taken',
   order_not_packable: 'errors.order_not_packable',
   order_produced_frozen: 'errors.order_produced_frozen',
+  recipe_version_under_review: 'errors.recipe_version_under_review',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -161,4 +162,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
   'errors.order_produced_frozen':
     'Un pedido ya producido conserva sus responsables tal como estaban.',
+  'errors.recipe_version_under_review':
+    'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
 } as const satisfies Record<ErrorMessageKey, string>;
