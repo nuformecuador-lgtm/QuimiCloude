@@ -1,4 +1,17 @@
 {
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Todo lo que NO este aqui y salga rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
-  "archivos": {}
+  "archivos": {
+    "tests/unit/configuracion-ui/unidades-viewport.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 3018853a (table adjustments): la celda de equivalencia ya no lleva overflow-hidden fuera del desplazador que el test exige. Ajeno a fix/pino-logger, que no toca configuracion.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/configuracion-ui/usuarios-viewport.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 3018853a (table adjustments): la celda de correo ya no lleva overflow-hidden fuera del desplazador que el test exige. Ajeno a fix/pino-logger, que no toca configuracion.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/identity/account-status-scope.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 0dbcd68f (user filter): lib/modules/asignaciones/domain/list-responsible-candidates.ts empezo a nombrar el estado de cuenta y no esta en la lista cerrada SITIOS_PERMITIDOS. Ajeno a fix/pino-logger, que no toca identity ni asignaciones.",
+      "desde": "2026-10-01"
+    }
+  }
 }
