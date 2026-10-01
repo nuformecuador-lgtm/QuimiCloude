@@ -20,6 +20,8 @@
 
 ## Evaluaciones
 
+**2026-10-01: QC-172** `versiones-de-receta`: F1.0 (worktree desde dev `81f1cd8e`) y F1.1 (`complexity:high`, en Jira; cupo `fullstack` 0 de 3). **ACOTADA** con `/afinar-feature`: 14 decisiones, ninguna abierta, en `specs/QC-172-versiones-de-receta/requirements.md`; board actualizado (description). F1.2: `spec_author` lanzado.
+
 **2026-10-01:** QC-171 cerrada (PR #134, merge `d17242a9`; tarjeta a Finalizado; resumen en history). Desbloquea QC-176. **T8 pendiente del humano**: bucket de recortes a publico antes de desplegar. Base local `QuimiCloude` migrada al dia (11 migraciones; `20260923150000`/`150100` marcadas `--applied` por ser identicas a las que QC-141 aplico antes de renumerarlas).
 
 **2026-10-01: se retoma QC-171 en T7** (worktree nuevo desde la rama remota; T0-T6 hechas). Merge de `origin/dev` (131 commits, conflicto solo en este archivo). **T7 BLOQUEADA por un rojo de `dev`, ajeno**: `1d85d170` (logger pino) deja `typecheck` en rojo con 8 errores -`pino` no esta en `package.json` ni en `docs/dependencias.md`, y `run-document-job-log.test.ts` usa un `log` que `RunDocumentJobDeps` no tiene-. Espera decision humana.
