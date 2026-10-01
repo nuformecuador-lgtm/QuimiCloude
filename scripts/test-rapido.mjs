@@ -3,22 +3,26 @@
  * `pnpm run test:rapido` — el gate de cerrar tanda (`docs/verification.md`).
  *
  * Corre DOS cosas, y las dos importan:
- *   1. Los tests que el GRAFO DE IMPORTS relaciona con el diff contra `origin/dev`,
- *      calculado con TRES puntos (merge-base), no contra el ultimo commit: una tanda de
- *      tres commits mirando solo el tercero es un agujero.
+ *   1. Los tests que tocan de cerca el diff contra `origin/dev`: los del propio diff, los que
+ *      IMPORTAN DIRECTAMENTE un archivo cambiado y los de la carpeta de cada modulo tocado
+ *      (reglas en `test-rapido-seleccion.mjs`). No el grafo de imports entero: eso arrastraba
+ *      media suite y el rapido dejaba de serlo. El diff va con TRES puntos (merge-base), no
+ *      contra el ultimo commit: una tanda de tres commits mirando solo el tercero es un agujero.
  *   2. TODAS las guardias (patron `guard`), siempre. Las guardias recorren el arbol de
- *      archivos en vez de importar lo que vigilan, asi que ningun grafo las selecciona.
+ *      archivos en vez de importar lo que vigilan, asi que ninguna seleccion por imports
+ *      las encuentra.
  *
- * Sale en verde cuando la seleccion esta vacia (`--passWithNoTests`): hoy no hay guardias
- * y el diff puede no tocar ningun archivo con tests. "Sin tests seleccionados" no es un
- * fallo; un fallo es un test rojo.
+ * Sale en verde cuando la seleccion esta vacia (`--passWithNoTests`): el diff puede no tocar
+ * ningun archivo con tests. "Sin tests seleccionados" no es un fallo; un fallo es un test rojo.
  *
  * Node y no bash a proposito: este repo se trabaja tambien desde Windows.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+
+import { porImportODiff, seleccionarTests } from './test-rapido-seleccion.mjs';
 
 // Se invoca el CLI de vitest con `node <bin>` y SIN shell a proposito: con `shell: true`,
 // cmd.exe parte las rutas con parentesis (`app/(public)/layout.tsx`) y el comando revienta.
@@ -53,6 +57,14 @@ function changedFiles() {
     .filter((file) => existsSync(file));
 }
 
+/** Todos los `*.test.ts` / `*.test.tsx` bajo `tests/`, en posix y relativos a la raiz. */
+function testFiles() {
+  if (!existsSync('tests')) return [];
+  return readdirSync('tests', { recursive: true })
+    .map((entry) => path.posix.join('tests', String(entry).replace(/\\/g, '/')))
+    .filter((file) => /\.test\.tsx?$/.test(file));
+}
+
 function runVitest(args, label) {
   console.log(`\n[test:rapido] ${label}`);
   console.log(`[test:rapido] -> vitest ${args.join(' ')}`);
@@ -65,12 +77,26 @@ const files = changedFiles();
 let status = 0;
 
 if (files.length === 0) {
-  console.log(`[test:rapido] el diff vs ${BASE_REF} no toca codigo con tests: nada que relacionar.`);
+  console.log(`[test:rapido] el diff vs ${BASE_REF} no toca codigo: nada que seleccionar.`);
 } else {
-  status = runVitest(
-    ['related', '--run', '--passWithNoTests', ...files],
-    `tests relacionados con ${files.length} archivo(s) del diff vs ${BASE_REF}`,
-  );
+  const tests = testFiles();
+  const leer = (file) => readFileSync(file, 'utf8');
+  const seleccion = seleccionarTests({ cambiados: files, tests, leer });
+  const directos = porImportODiff({ cambiados: files, tests, leer }).length;
+
+  if (seleccion.length === 0) {
+    console.log(
+      `[test:rapido] ningun test importa directamente los ${files.length} archivo(s) del diff vs ${BASE_REF}.`,
+    );
+  } else {
+    console.log(
+      `[test:rapido] ${seleccion.length} test(s): ${directos} por import directo o del diff + ${seleccion.length - directos} por carpeta de modulo`,
+    );
+    status = runVitest(
+      ['run', '--passWithNoTests', ...seleccion],
+      `tests seleccionados para ${files.length} archivo(s) del diff vs ${BASE_REF}`,
+    );
+  }
 }
 
 if (status === 0) {

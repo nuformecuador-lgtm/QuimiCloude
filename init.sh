@@ -10,12 +10,13 @@ warn() { echo "${YELLOW}! $1${NC}"; }
 
 # MODO DEL GATE. `--rapido` existe porque correr la suite completa al cerrar CADA tanda
 # convierte el arnes en una sala de espera (una feature de 9 tandas = media hora de reloj solo
-# esperando). En modo rapido se corre lo que el GRAFO DE IMPORTS relaciona con lo que has
-# tocado, MAS todas las guardias.
+# esperando). En modo rapido se corren los tests que IMPORTAN DIRECTAMENTE lo que has tocado
+# (y los de la carpeta de cada modulo tocado; `scripts/test-rapido-seleccion.mjs`), MAS todas
+# las guardias.
 #
 # Las guardias van SIEMPRE y no es un adorno: recorren el arbol de archivos (censo de tablas,
 # barridos de columnas sensibles, modulos puros) en vez de importar lo que vigilan, asi que
-# NINGUN grafo de imports las selecciona. Son justo las que se perderian.
+# NINGUNA seleccion por imports las encuentra. Son justo las que se perderian.
 #
 # `--rapido` NO sustituye al gate completo: es para cerrar tandas. Antes de abrir un PR se corre
 # `./init.sh` a secas. La leccion de dos PRs de un proyecto anterior con este arnes sigue en pie

@@ -6,7 +6,7 @@ verificada cuando hay evidencia ejecutable.
 ## El gate tiene DOS niveles — usa el que toca
 
 ```bash
-./init.sh --rapido   # CERRAR UNA TANDA: typecheck + lint + tests relacionados + guardias (~1 min)
+./init.sh --rapido   # CERRAR UNA TANDA: typecheck + lint + tests de import directo + guardias (~1 min)
 ./init.sh            # CERRAR LA FEATURE y ANTES DE CADA PR: la suite entera
 ```
 
@@ -16,7 +16,7 @@ Comandos sueltos, por si necesitas uno concreto:
 pnpm run typecheck        # TypeScript strict, cero errores
 pnpm run lint             # ESLint, cero errores
 pnpm test                 # la suite entera
-pnpm run test:rapido      # lo que el grafo relaciona con tu diff vs origin/dev + las guardias
+pnpm run test:rapido      # tests que importan directamente tu diff vs origin/dev + los del módulo + las guardias
 pnpm run test:guardias    # solo las guardias (van SIEMPRE, ver abajo)
 pnpm exec vitest related --run <archivos>   # que tests cubren ESTOS archivos
 ```
@@ -41,18 +41,52 @@ una medicion de este repo):
 
 ### Las guardias van SIEMPRE, y esta es la razon
 
-`--rapido` selecciona por el **grafo de imports**. Las guardias **no importan lo que vigilan**:
-recorren el arbol de archivos (censo de tablas, columnas sensibles, modulos puros, emisores de una
-categoria). **Ningun grafo de imports las selecciona**, asi que serian justo lo que se pierde. Por
+`--rapido` selecciona por **import directo** del diff (y por carpeta de módulo; ver la subsección
+siguiente). Las guardias **no importan lo que vigilan**: recorren el arbol de archivos (censo de
+tablas, columnas sensibles, modulos puros, emisores de una categoria). **Ninguna selección por
+imports las encuentra**, asi que serian justo lo que se pierde. Por
 eso `test:rapido` las corre enteras siempre; cuestan ~8 s.
 
 Se seleccionan por patron (`vitest run guard`), no por lista: una guardia nueva entra sola.
+
+### La selección del rápido: import directo, no el grafo entero (2026-10-01)
+
+**El incidente.** En QC-172, `test:rapido` seleccionaba con `vitest related`, que sigue el grafo
+de imports **entero**. El diff de la rama arrastró **539 archivos / 7.755 tests**: más de 10
+minutos de reloj, con el tiempo de importar módulos (**2.843 s** sumados) muy por encima del de
+correr los tests (**1.166 s** sumados), y dos cortes por memoria antes de terminar. Un gate de
+cerrar tanda que no termina no es un gate.
+
+**La regla.** `scripts/test-rapido-seleccion.mjs` (función pura, la prueba
+`tests/guards/guard-test-rapido-seleccion.test.ts`) elige un test si:
+
+1. está en el diff;
+2. **importa directamente** un archivo del diff (`from '…'`, `import '…'`, `import('…')`,
+   `vi.mock('…')`; `@/` es la raíz, las relativas cuentan desde el test, sin extensión y con
+   `/index` como la carpeta);
+3. el diff toca `lib/modules/<m>/…` y el test vive en `tests/unit/<m>/` o
+   `tests/integration/<m>/`: los tests del módulo, aunque lleguen a él por su contrato o por la
+   composición.
+
+Y luego, como siempre, todas las guardias. `test:rapido` imprime cuántos entran por cada vía.
+
+**La medición.** Para el mismo diff de QC-172: **539 → 233 archivos**. Con solo la regla de
+import directo (sin la carpeta de módulo) serían 190.
+
+**El coste aceptado.** El rápido **deja de cazar regresiones a más de un import** del cambio: un
+test que llega a tu archivo a través de otro ya no entra. Las caza el gate completo, que es
+obligatorio antes de cada PR.
+
+> Queda **fuera, sin decidir**, la otra palanca: medir el diff contra el último `--rapido` verde
+> en vez de contra toda la rama. No se ha aplicado.
 
 ### Lo que `--rapido` NO cubre — no te engañes
 
 - Acoplamientos que **no son imports**: SQL, nombres de archivo, lectura de `feature_list.json`.
 - Un cambio en un archivo **sin tests que lo importen** selecciona cero tests y sale verde.
 - Regresiones lejanas que solo aparecen con la suite entera.
+- Regresiones **a más de un import** del cambio: un test que llega a tu archivo a través de otro no
+  entra en la selección (ver «La selección del rápido» arriba). Las caza el gate completo.
 
 Por eso **antes de abrir un PR se corre `./init.sh` completo, sin excepcion**. La leccion viene de
 dos PRs de un proyecto anterior con este arnes y va justo en esa direccion: se mergeo mirando el
@@ -62,7 +96,7 @@ estado del PR —que es un build y **no corre tests**— y entro un guard rojo e
 con `dev`, no contra el ultimo commit, o una tanda de tres commits solo mira el tercero:
 
 ```bash
-pnpm exec vitest related --run $(git diff --name-only origin/dev...HEAD)   # tres puntos
+git diff --name-only origin/dev...HEAD   # tres puntos: la entrada de la selección de test:rapido
 ```
 
 > **Estado en QuimiCloude (2026-08-26):** ya hay suite y configuracion, asi que los dos modos
