@@ -866,3 +866,117 @@ guardia (42703) y el paréntesis `NO FORCE`/`FORCE` RLS. Documentado como nota d
 3. Detalle de UI: reabrir «Reparto y unidad» justo tras guardar, antes de que acabe
    `router.refresh()`, muestra los valores anteriores.
 4. `./init.sh` completo antes del PR.
+
+## Arreglos del review 1 (2026-10-01)
+
+Informe: `progress/review_QC-170-pedido-en-varias-presentaciones.md` (RECHAZADO, 4 bloqueantes y 6
+menores). Los puntos 1-3 de «Pendiente para el leader» de la sección anterior quedan resueltos aquí.
+
+### Commits
+
+- `931246ce` docs: enmienda R18 (decisión humana 2026-10-01) y task T26 (spec, sin otros cambios).
+- `7e3af322` fix: T26 / B3 — coste por unidad convertido a la unidad del pedido (`backend_dev`).
+- `f7df4103` test: B4 — aislamiento entre empresas en la edición del reparto y la unidad (`backend_dev`).
+- `888eaa16` fix: m1 — «Reparto y unidad» reabre con lo recién guardado (`frontend_dev`).
+- `0c6c770f` test: B2 — cuatro E2E adaptados al alta con unidad y reparto (`frontend_dev`).
+- `668aeb77` chore: B1 — limpia citas en comentarios de producción (`backend_dev`).
+
+### Por hallazgo
+
+**B3 / T26 — cerrado, con un punto a confirmar.**
+- `order-packing.ts`: el total es la suma de `packages × content` de cada línea convertida a
+  `orders.unit_id` con `convertQuantity` (sin convertir si coinciden). La suma vive en
+  `sumInOrderUnit` (`order-distribution.ts`), que también usa `validateDistribution`: guardar y
+  Terminar no pueden divergir.
+- No usa `deriveUnitCost` (solo admite 4 decimales y la cantidad convertida puede llevar hasta 12):
+  un `divideCost` con BigInt y redondeo half-up, una división por unidad de presentación.
+- `FinishPackingOrderRow` gana `unitId` (mismo select tras el `UPDATE`); `incompatible_units` y
+  `order_without_unit` se lanzan dentro de la transacción: ningún lote nace y el pedido sigue
+  `EN_EMPAQUE`. `asignaciones` traduce los dos resultados nuevos (`IncompatibleUnitsError`,
+  `OrderWithoutUnitError`, códigos ya en catálogo; sin códigos nuevos).
+- **Punto a confirmar (lectura de R18).** Cada lote guarda el coste por unidad del pedido
+  **expresado en la unidad de su presentación** (lote en L: 16,3934/L; lote en ml: 0,0164/ml), porque
+  el stock del lote está en la unidad de su presentación (`plan.quantity = packages × content`). La
+  lectura literal de T26 («todos los lotes salen con el MISMO `unit_cost`») valoraría el lote de
+  1000 ml a 16.393. Si el humano prefiere la literal, son pocas líneas en
+  `unitCostByPresentationUnit` y las cifras de los tests nuevos.
+- Efecto del redondeo a 4 decimales (`decimal(14,4)`): en el ejemplo los lotes valen 16,40 + 983,604
+  = 1000,004. Con unidades muy pequeñas y producto barato el coste por unidad puede redondear a
+  `0.0000` y el lote valdría 0: el spec no lo cubre (abierto).
+
+**B4 — cerrado.** `tests/integration/pedidos/qc170-distribution-company-scope.int.test.ts` (nuevo,
+8 casos, Postgres real, dos empresas efímeras), alta en `tests/integration/aislamiento.json`
+(`commit`, lo exige `guard-aislamiento-integracion`). Cubre la edición acotada en `POR_EMPACAR`
+(caso de uso y adaptador `updatePresentationLinesAlive` con el ámbito de B) y la general
+(`updateOrder` y adaptador `updateAlive`): `not_found` / `OrderNotFoundError`, foto completa del
+pedido de A y sus líneas igual antes y después; controles positivos desde A; y A no puede repartir
+en una presentación de B (`presentation_not_found`). No se comprobó el rojo quitando el filtro (el
+modo automático bloqueó tocar producción para el experimento).
+
+**m1 — cerrado.** Opción (a): `OrderRowSheetActions` guarda el último reparto guardado junto con el
+objeto `order` vigente y se lo pasa al diálogo (`saved?`, `onSaved?`) mientras siga siendo ese mismo
+objeto; el refresco trae otro objeto y lo local se descarta solo. Tests en
+`order-distribution-dialog.test.tsx` (`describe` «reabrir "Reparto y unidad" antes de que llegue el
+refresco»): reabre con lo guardado, el segundo guardado no reenvía los valores viejos, y tras el
+refresco manda el pedido nuevo. Supuesto: la fila mantiene el mismo objeto entre refrescos.
+
+**B2 — cerrado.** `pedidos-cotizacion`, `reserva-de-material`, `recetas-porcentaje` y
+`aislamiento-pedidos`: eligen unidad y añaden una línea de reparto donde guardan; los fixtures de
+presentación ganan `content: '1'`; las limpiezas borran `order_presentation_lines` antes que
+`orders`. Además `recetas-porcentaje` borra `reservation_movements`/`inventory_movements` antes que
+los pedidos (su `afterAll` fallaba por esa FK: hueco del fixture, no de producción). Nota:
+`aislamiento-pedidos.spec.ts` estaba en CRLF en el repo y queda normalizado a LF por
+`.gitattributes` (por eso su diff es de archivo entero; `git diff -w --ignore-cr-at-eol` da +42).
+
+**B1 — cerrado salvo migraciones.** 32 archivos (31 de `lib/` + `db/schema.prisma`), solo
+comentarios (`git diff -w` sin líneas de código). Grep final sobre `git diff -U0 0736e1ff -- lib app
+components db`: **0** citas fuera de migraciones; **5** dejadas a propósito en
+`db/migrations/20260927120000_order_presentation_lines/migration.sql:1,30,57,58` y
+`20260927120100_inventory_movements_production_per_line/migration.sql:1`: Prisma guarda el checksum
+de cada `migration.sql` aplicada y cambiar un byte obliga a resetear las bases que ya la tengan
+aplicada. Decide el humano/leader. Quedan referencias a tasks (`T9`, `T20`, `T25`) en algunos
+comentarios que el grep del informe no busca.
+
+**m2 — no se toca** (desfase con `dev`, se resuelve al sincronizar; no es de esta rama).
+**m3 — no se toca** (`user-table`, no es de esta rama).
+**m4 — anotado.** El rechazo `order_without_unit` sigue sin entrada real por formulario (los tres
+esquemas exigen `unitId`). Desde T26 tiene además un uso defensivo en Terminar, probado en
+`order-packing.test.ts` («R18: un pedido con reparto y sin unidad rechaza con order_without_unit...»).
+**m5 — anotado en el mapa de abajo.**
+**m6 — cerrado:** mapa consolidado debajo.
+
+### Mapa R<n> -> test consolidado
+
+El mapa entero, archivo a archivo, es el de `progress/review_QC-170-pedido-en-varias-presentaciones.md
+> Mapa de trazabilidad`, que se da por válido con estos cambios:
+
+| R | Cambio respecto al mapa del review |
+|---|---|
+| R18 | + `order-packing.test.ts` «R18: con un reparto en L y en ml, suma el total convertido...», «R18: una presentacion en la misma unidad que el pedido no se convierte», «R7, R18: ... incompatible_units y NO da de alta ningun lote», «R18: ... order_without_unit ...»; `finish-with-finished-goods.int.test.ts` › «R18 — reparto en dos unidades» (2 casos); `asignaciones/finish-packing.test.ts` (2 casos de traducción de errores) |
+| R7 | + los casos `incompatible_units` de Terminar arriba |
+| R29 | + `qc170-distribution-company-scope.int.test.ts` (8 casos) |
+| R11 | + `order-distribution-dialog.test.tsx` (3 casos de reabrir antes del refresco) |
+| R31 | indirecto: casos QC-168 de `order-packing.test.ts`/`.int` (aceptado por el reviewer, m5) |
+| R32 | sin test: no hay log de ejecución en el esquema (QC-82 no ha entrado); se cumple sin hacer nada (m5) |
+| R41, R42 | + E2E adaptados (`pedidos-cotizacion`, `reserva-de-material`, `recetas-porcentaje`, `aislamiento-pedidos`) ejercen el alta con unidad |
+
+### Salida real
+
+- T26: `vitest run` de `finish-with-finished-goods.int`, `order-packing`, `order-presentation-availability`,
+  `order-distribution` y `asignaciones/finish-packing`: **5 archivos, 71 passed**.
+  `pedidos-convenciones.test.ts`: 22 passed, 1 failed (`no cambia package.json`, desfase con `dev`).
+- B4: `qc170-distribution-company-scope.int.test.ts`: **8 passed**. Guardias: 42/44 archivos en la
+  corrida del subagente; los dos rojos (`guard-editor-aislado`, `guard-teclear-y-plazo`) fueron
+  timeout por carga y solos dan 13/13.
+- m1: `vitest related` de los 4 archivos: **32 archivos, 487 passed**.
+- B2: Playwright Chromium `--workers=1`, 2a corrida: `aislamiento-pedidos` 1/0, `pedidos-cotizacion`
+  2/0, `recetas-porcentaje` 4/0, `reserva-de-material` 1/0 → **8 passed (2.1m)**. 1a corrida 7/1
+  (el `afterAll` de `recetas-porcentaje`, arreglado). WebKit no corrido. Puerto 3117 libre antes y
+  después.
+- B1: typecheck 0 errores; lint 0 errores, 7 avisos previos; `vitest run tests/guards` 44/44, 584
+  passed, 5 skipped.
+- `./init.sh --rapido` (sobre `668aeb77`): typecheck verde; lint 0 errores, 7 avisos previos;
+  related `Test Files 544 passed (544)`, `Tests 7779 passed | 30 skipped (7809)`; guardias
+  `Test Files 51 passed (51)`, `Tests 652 passed | 11 skipped (663)`; `init OK`. Ningún rojo (el de
+  `pedidos-convenciones › no cambia package.json` no entró en la selección de related).
+- Pendiente: sincronizar con `dev`, `./init.sh` completo y E2E en WebKit antes del PR.
