@@ -940,13 +940,14 @@ async function finishPackingAliveOrder(
   if (count === 1) {
     const row = await tx.order.findUniqueOrThrow({
       where: { id },
-      select: { recipeId: true, quantity: true, ingredientsCost: true },
+      select: { recipeId: true, quantity: true, ingredientsCost: true, unitId: true },
     });
     return {
       kind: 'ok',
       recipeId: row.recipeId,
       quantity: fromDecimal(row.quantity),
       ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
+      unitId: row.unitId,
     };
   }
 

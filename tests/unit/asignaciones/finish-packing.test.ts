@@ -4,9 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { createFinishPacking, type FinishPackingDeps } from '@/lib/modules/asignaciones/domain/finish-packing';
 import {
   AsignacionesError,
+  IncompatibleUnitsError,
   OrderNotFoundError,
   OrderNotPackableError,
   OrderPackingTakenError,
+  OrderWithoutUnitError,
   PresentationWithoutContentError,
   RecipeNotFoundError,
   UnauthorizedError,
@@ -31,7 +33,9 @@ type Resultado =
   | 'not_packable'
   | 'not_found'
   | 'recipe_not_found'
-  | 'presentation_without_content';
+  | 'presentation_without_content'
+  | 'incompatible_units'
+  | 'order_without_unit';
 
 function montar(options?: {
   readonly target?: { readonly id: string; readonly status: string } | null;
@@ -139,6 +143,20 @@ describe('finishPacking — R17-R21: da de alta el lote por linea del reparto', 
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(PresentationWithoutContentError);
+  });
+
+  it('R7, R18: `incompatible_units` rechaza con `IncompatibleUnitsError`', async () => {
+    const { deps } = montar({ resultado: 'incompatible_units' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(IncompatibleUnitsError);
+  });
+
+  it('R18: `order_without_unit` rechaza con `OrderWithoutUnitError`', async () => {
+    const { deps } = montar({ resultado: 'order_without_unit' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderWithoutUnitError);
   });
 });
 

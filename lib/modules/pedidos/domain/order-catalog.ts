@@ -142,6 +142,10 @@ export interface OrderCatalog {
    * ausente o de otra empresa (mismo caso que antes emitia Finalizar); `'presentation_without_content'`
    * identifica -por `diagnostic`, nunca en el resultado- la primera linea sin contenido ni
    * copiado ni vigente (R19, defensa en profundidad).
+   *
+   * `'incompatible_units'` y `'order_without_unit'` son defensa en profundidad: el coste se
+   * reparte en la unidad del pedido, y una linea que no se puede pasar a ella -o un pedido sin
+   * unidad- solo llega aqui con una fila escrita fuera de la aplicacion. Tambien deshacen todo.
    */
   finishPackingAliveById(
     id: string,
@@ -155,6 +159,8 @@ export interface OrderCatalog {
     | 'not_found'
     | 'recipe_not_found'
     | 'presentation_without_content'
+    | 'incompatible_units'
+    | 'order_without_unit'
   >;
 }
 

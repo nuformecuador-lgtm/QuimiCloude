@@ -13,6 +13,9 @@ export type FinishPackingOrderRow = {
   readonly recipeId: string;
   readonly quantity: string;
   readonly ingredientsCost: string | null;
+  /** La unidad en que se reparte el coste entre los lotes; `null` solo con una fila escrita
+   *  fuera de la aplicacion. */
+  readonly unitId: string | null;
 };
 
 /** `finishPackingAlive` clasifica en la MISMA llamada: si el `UPDATE` movio la fila, la fila que

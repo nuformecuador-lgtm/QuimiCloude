@@ -836,3 +836,118 @@ describe('R18 — el coste del lote', () => {
     }
   });
 });
+
+describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del pedido', () => {
+  /** Unidad derivada de la de la fixture (1 = 0,001 de ella, como ml de L) y una presentacion
+   *  de 200 en esa unidad. */
+  async function crearMililitro(fixture: Fixture): Promise<{ readonly unitId: string; readonly presentationId: string }> {
+    const marca = token();
+    const unit = await prisma.unit.create({
+      data: { name: `Mili ${marca}`, nameNormalized: `mili${marca}`, symbol: `ml${marca}`, baseUnitId: fixture.unitId, factor: '0.0010' },
+      select: { id: true },
+    });
+    const presentation = await prisma.presentation.create({
+      data: { name: `Frasco ${marca}`, nameNormalized: normalizeForTest(`Frasco ${marca}`), unitId: unit.id, companyId: fixture.companyId, content: '200.0000' },
+      select: { id: true },
+    });
+    return { unitId: unit.id, presentationId: presentation.id };
+  }
+
+  async function borrarMililitro(fixture: Fixture, mililitro: { readonly unitId: string; readonly presentationId: string }): Promise<void> {
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+    await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+    await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, presentationId: mililitro.presentationId } } });
+    await prisma.product.deleteMany({ where: { companyId: fixture.companyId, presentationId: mililitro.presentationId } });
+    await prisma.presentation.deleteMany({ where: { id: mililitro.presentationId } });
+    await prisma.unit.deleteMany({ where: { id: mililitro.unitId } });
+  }
+
+  /** Pedido de 100 en la unidad de la fixture, coste guardado 1000 (100 x 10.0000), con 5 x 200
+   *  en la unidad derivada y 60 x 1 en la de la fixture: 61 en la unidad del pedido. */
+  async function pedidoMixto(fixture: Fixture, mililitro: { readonly presentationId: string }, recipeId: string): Promise<string> {
+    const creado = await createOrder(
+      {
+        recipeId,
+        quantity: '100.0000',
+        priority: 'BAJA',
+        status: 'PENDIENTE',
+        unitId: fixture.unitId,
+        presentationLines: [
+          { presentationId: mililitro.presentationId, packages: 5 },
+          { presentationId: fixture.presentationId, packages: 60 },
+        ],
+      },
+      actorDe(fixture),
+    );
+    await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+    await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+    return creado.id;
+  }
+
+  it('R18: cada lote lleva el coste por unidad del pedido expresado en su unidad, y entre los dos suman el coste del pedido', async () => {
+    const fixture = await crearFixture('1.0000');
+    const mililitro = await crearMililitro(fixture);
+    const { productId } = await crearProductoConLote(fixture, '200', '10.0000');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const orderId = await pedidoMixto(fixture, mililitro, recipeId);
+      const antes = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { ingredientsCost: true } });
+      expect(antes.ingredientsCost?.toFixed(4)).toBe('1000.0000');
+
+      const resultado = await empacarYTerminar(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok' });
+
+      const productoMl = await finishedProductDe(fixture.companyId, recipeId, mililitro.presentationId);
+      const productoL = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
+      const loteMl = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoMl?.id }, select: { stock: true, unitCost: true } });
+      const loteL = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoL?.id }, select: { stock: true, unitCost: true } });
+
+      // 1000 / 61 = 16.3934 por unidad del pedido; en la derivada, 1000 / 61000 = 0.0164.
+      expect(loteL.stock.toFixed(4)).toBe('60.0000');
+      expect(loteL.unitCost?.toFixed(4)).toBe('16.3934');
+      expect(loteMl.stock.toFixed(4)).toBe('1000.0000');
+      expect(loteMl.unitCost?.toFixed(4)).toBe('0.0164');
+
+      // 16.4000 + 983.6040: el resto es el redondeo a cuatro decimales del coste unitario.
+      const valorMl = loteMl.stock.mul(loteMl.unitCost ?? 0);
+      const valorL = loteL.stock.mul(loteL.unitCost ?? 0);
+      expect(valorMl.toFixed(2)).toBe('16.40');
+      expect(valorL.toFixed(2)).toBe('983.60');
+      expect(valorMl.add(valorL).toFixed(1)).toBe('1000.0');
+    } finally {
+      await borrarMililitro(fixture, mililitro);
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R7, R18: una linea que ya no se puede convertir a la unidad del pedido rechaza con incompatible_units, ningun lote nace y el pedido sigue EN_EMPAQUE', async () => {
+    const fixture = await crearFixture('1.0000');
+    const mililitro = await crearMililitro(fixture);
+    const { productId } = await crearProductoConLote(fixture, '200', '10.0000');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const orderId = await pedidoMixto(fixture, mililitro, recipeId);
+      expect(await orderCatalog.startPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
+
+      // Defensa en profundidad: la escritura normal no deja llegar aqui con un reparto
+      // inconvertible, asi que se rompe la derivacion de la unidad escribiendo en la base.
+      await prisma.unit.update({ where: { id: mililitro.unitId }, data: { baseUnitId: null, factor: null } });
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toBe('incompatible_units');
+
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true, finishedAt: true } });
+      expect(row.status).toBe('EN_EMPAQUE');
+      expect(row.finishedAt).toBeNull();
+      expect(await finishedProductDe(fixture.companyId, recipeId, mililitro.presentationId)).toBeNull();
+      expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).toBeNull();
+    } finally {
+      await borrarMililitro(fixture, mililitro);
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+});

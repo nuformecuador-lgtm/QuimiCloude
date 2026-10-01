@@ -24,6 +24,16 @@ const PEDIDO = 'o-1';
 const EMPACADOR = 'u-1';
 const RECETA = 'r-1';
 const AHORA = new Date('2026-09-25T12:00:00Z');
+const LITRO = 'unidad-litro';
+const MILILITRO = 'unidad-mililitro';
+const KILO = 'unidad-kilo';
+
+/** Litro como base, mililitro derivado (1 ml = 0,001 L) y kilo, que no comparte base con ellos. */
+const UNIDADES = [
+  { id: LITRO, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
+  { id: MILILITRO, name: 'Mililitro', symbol: 'ml', baseUnitId: LITRO, factor: '0.0010' },
+  { id: KILO, name: 'Kilo', symbol: 'kg', baseUnitId: null, factor: null },
+] as const;
 
 function packingDoble(overrides: Partial<OrderPackingRepository> = {}): OrderPackingRepository {
   return {
@@ -46,11 +56,12 @@ function lineaDe(overrides: Partial<FinishPackingLine> = {}): FinishPackingLine 
 
 /** `RecipeCatalog`/`ProductCatalog`/`UnitCatalog`/`PresentationCatalog` globales: por defecto
  *  una receta viva sin lineas (asi `resolveLotIngredientsCost` da `'0.0000'` sin inventar
- *  ingredientes) y ninguna presentacion vigente que rescatar. */
+ *  ingredientes) y cada presentacion pedida en litros con contenido `1.0000`, salvo las que
+ *  `presentationRefs` redefine. */
 function catalogosGlobales(overrides: {
   readonly recipeName?: string;
   readonly recipeFound?: boolean;
-  readonly presentationRefs?: readonly { readonly id: string; readonly content: string | null }[];
+  readonly presentationRefs?: readonly { readonly id: string; readonly content: string | null; readonly unitId?: string }[];
 } = {}): {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
@@ -63,8 +74,11 @@ function catalogosGlobales(overrides: {
     overrides.recipeFound === false ? [] : [{ id: RECETA, name: overrides.recipeName ?? 'Desengrasante', isDeleted: false }],
   );
   const findExecutionContentById = vi.fn(async () => ({ id: RECETA, name: 'Desengrasante', isDeleted: false, steps: [], lines: [] }));
-  const findPresentationRefs = vi.fn(async () =>
-    (overrides.presentationRefs ?? []).map((ref) => ({ id: ref.id, name: 'Presentacion', content: ref.content, unitId: 'unidad-1' })),
+  const findPresentationRefs = vi.fn(async (ids: readonly string[]) =>
+    ids.map((id) => {
+      const ref = overrides.presentationRefs?.find((candidate) => candidate.id === id);
+      return { id, name: 'Presentacion', content: ref === undefined ? '1.0000' : ref.content, unitId: ref?.unitId ?? LITRO };
+    }),
   );
 
   return {
@@ -86,7 +100,7 @@ function catalogosGlobales(overrides: {
       },
     } as unknown as ProductCatalog,
     units: {
-      findRefs: async () => [],
+      findRefs: async (ids: readonly string[]) => UNIDADES.filter((unit) => ids.includes(unit.id)),
       findRefsSharingBaseInCompany: async () => {
         throw new Error('sin uso en este test');
       },
@@ -165,7 +179,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     const catalogos = options.catalogos ?? catalogosGlobales();
     const finishPackingAlive = vi.fn(
       async (): Promise<FinishPackingUpdateOutcome> =>
-        options.finishPackingAlive ?? { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: '20.0000' },
+        options.finishPackingAlive ?? { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: '20.0000', unitId: LITRO },
     );
     const findPresentationLinesForFinish = vi.fn(async () => options.lines ?? [lineaDe()]);
     const receiveFromOrder =
@@ -245,7 +259,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     const lineas = [lineaDe({ id: 'linea-1', packages: 5, presentationContent: '1.0000' }), lineaDe({ id: 'linea-2', presentationId: 'p-2', packages: 5, presentationContent: '1.0000' })];
     const { finishPackingAliveById, receiveFromOrder } = montar({
       lines: lineas,
-      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: '20.0000' },
+      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: '20.0000', unitId: LITRO },
     });
 
     await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
@@ -255,11 +269,95 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     expect(receiveFromOrder.mock.calls[1]![0]).toMatchObject({ unitCost: '2.0000' });
   });
 
+  it('R18: con un reparto en L y en ml, suma el total convertido a la unidad del pedido y cada lote lleva ese coste en su unidad', async () => {
+    // Pedido de 100 L con coste 1000: 5 x 200 ml (= 1 L) y 60 x 1 L -> total 61 L.
+    const lineas = [
+      lineaDe({ id: 'linea-ml', presentationId: 'p-ml', packages: 5, presentationContent: '200.0000' }),
+      lineaDe({ id: 'linea-l', presentationId: 'p-l', packages: 60, presentationContent: '1.0000' }),
+    ];
+    const catalogos = catalogosGlobales({
+      presentationRefs: [
+        { id: 'p-ml', content: '200.0000', unitId: MILILITRO },
+        { id: 'p-l', content: '1.0000', unitId: LITRO },
+      ],
+    });
+    const { finishPackingAliveById, receiveFromOrder } = montar({
+      lines: lineas,
+      catalogos,
+      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '100.0000', ingredientsCost: '1000.0000', unitId: LITRO },
+    });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toMatchObject({ kind: 'ok' });
+
+    // 1000 / 61 L = 16.3934 por L; en ml, 1000 / 61000 ml = 0.0164 por ml. Sin convertir, el
+    // total habria sido 1000 + 60 = 1060 y el coste 0.9434 para los dos lotes.
+    const porMl = receiveFromOrder.mock.calls[0]![0] as { readonly unitCost: string };
+    const porLitro = receiveFromOrder.mock.calls[1]![0] as { readonly unitCost: string };
+    expect(porLitro.unitCost).toBe('16.3934');
+    expect(porMl.unitCost).toBe('0.0164');
+
+    // El valor de cada lote (existencia en su unidad x coste unitario) reparte el coste del
+    // pedido: 16.40 + 983.604 = 1000.004, el redondeo a cuatro decimales del coste unitario.
+    expect(1000 * Number(porMl.unitCost)).toBeCloseTo(16.39, 1);
+    expect(60 * Number(porLitro.unitCost)).toBeCloseTo(983.61, 1);
+    expect(1000 * Number(porMl.unitCost) + 60 * Number(porLitro.unitCost)).toBeCloseTo(1000, 1);
+  });
+
+  it('R18: una presentacion en la misma unidad que el pedido no se convierte', async () => {
+    const lineas = [
+      lineaDe({ id: 'linea-1', presentationId: 'p-1', packages: 3, presentationContent: '200.0000' }),
+      lineaDe({ id: 'linea-2', presentationId: 'p-2', packages: 2, presentationContent: '200.0000' }),
+    ];
+    const catalogos = catalogosGlobales({
+      presentationRefs: [
+        { id: 'p-1', content: '200.0000', unitId: MILILITRO },
+        { id: 'p-2', content: '200.0000', unitId: MILILITRO },
+      ],
+    });
+    const { finishPackingAliveById, receiveFromOrder } = montar({
+      lines: lineas,
+      catalogos,
+      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '1000.0000', ingredientsCost: '50.0000', unitId: MILILITRO },
+    });
+
+    await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
+
+    // 50 / (600 + 400) ml = 0.0500 por ml, el mismo en los dos lotes.
+    expect(receiveFromOrder.mock.calls[0]![0]).toMatchObject({ unitCost: '0.0500' });
+    expect(receiveFromOrder.mock.calls[1]![0]).toMatchObject({ unitCost: '0.0500' });
+  });
+
+  it('R7, R18: una linea cuya unidad no comparte base con la del pedido rechaza con incompatible_units y NO da de alta ningun lote', async () => {
+    const lineas = [
+      lineaDe({ id: 'linea-l', presentationId: 'p-l', packages: 5, presentationContent: '1.0000' }),
+      lineaDe({ id: 'linea-kg', presentationId: 'p-kg', packages: 5, presentationContent: '1.0000' }),
+    ];
+    const catalogos = catalogosGlobales({
+      presentationRefs: [
+        { id: 'p-l', content: '1.0000', unitId: LITRO },
+        { id: 'p-kg', content: '1.0000', unitId: KILO },
+      ],
+    });
+    const { finishPackingAliveById, receiveFromOrder } = montar({ lines: lineas, catalogos });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('incompatible_units');
+    expect(receiveFromOrder).not.toHaveBeenCalled();
+  });
+
+  it('R18: un pedido con reparto y sin unidad rechaza con order_without_unit y NO da de alta ningun lote', async () => {
+    const { finishPackingAliveById, receiveFromOrder } = montar({
+      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: '20.0000', unitId: null },
+    });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('order_without_unit');
+    expect(receiveFromOrder).not.toHaveBeenCalled();
+  });
+
   it('R18: sin importe guardado, recalcula el coste del lote con la receta que el pedido tiene AHORA', async () => {
     const catalogos = catalogosGlobales();
     const { finishPackingAliveById } = montar({
       lines: [lineaDe({ packages: 10, presentationContent: '1.0000' })],
-      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: null },
+      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: null, unitId: LITRO },
       catalogos,
     });
 

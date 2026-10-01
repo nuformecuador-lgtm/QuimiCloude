@@ -358,7 +358,7 @@ R13, R35, R36, R41, R42); el esquema rechaza cualquier campo que no sea `unitId`
 `EN_EMPAQUE`/`ENTREGADO`/`CANCELADO` (R11, R13); el formulario muestra el disponible y el aviso de
 R39; `guard-pantallas-exigen-permiso` en verde.
 
-### [ ] T26 — `finishPackingAliveById`: coste por unidad sobre la cantidad convertida a la unidad del pedido (R18 enmendado 2026-10-01)
+### [x] T26 — `finishPackingAliveById`: coste por unidad sobre la cantidad convertida a la unidad del pedido (R18 enmendado 2026-10-01)
 
 > Nueva el 2026-10-01 por la enmienda humana de R18 (hallazgo B3 de
 > `progress/review_QC-170-pedido-en-varias-presentaciones.md`). Ver `design.md > 4.5`, nota de

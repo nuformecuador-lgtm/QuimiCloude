@@ -7,12 +7,19 @@
 // `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar, R17-R21):
 // abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive` -en la
 // MISMA transaccion- y da de alta, por cada linea del reparto, un lote de producto terminado con
-// un unico coste unitario (R18). `asignaciones` solo conoce la firma de `OrderCatalog`, nunca
-// este archivo.
+// un unico coste por unidad del pedido, expresado en la unidad de cada lote. `asignaciones` solo
+// conoce la firma de `OrderCatalog`, nunca este archivo.
 
-import { addQuantities, deriveUnitCost, planFinishedGoodsLine } from '@/lib/modules/inventario';
+import { planFinishedGoodsLine } from '@/lib/modules/inventario';
+import { convertQuantity, type UnitConversion } from '@/lib/modules/unidades';
 
-import { PresentationWithoutContentError, RecipeNotFoundError } from './errors';
+import {
+  IncompatibleUnitsError,
+  OrderWithoutUnitError,
+  PresentationWithoutContentError,
+  RecipeNotFoundError,
+} from './errors';
+import { sumInOrderUnit } from './order-distribution';
 import { resolveLotIngredientsCost } from './resolve-ingredients-cost';
 import { assertTransition } from './order-transitions';
 
@@ -40,9 +47,9 @@ export type FinishPackingDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
-  /** Solo para la defensa en profundidad de R19: una linea sin contenido copiado -imposible por
-   *  la escritura normal (R22-R25, R34)- todavia puede rescatarse si la presentacion tiene HOY
-   *  contenido vigente. Lectura global, fuera de la transaccion, igual que `recipes`/`products`. */
+  /** La unidad de cada presentacion, para repartir el coste en la unidad del pedido, y el
+   *  contenido vigente con el que rescatar una linea sin contenido copiado. Lectura global,
+   *  fuera de la transaccion, igual que `recipes`/`products`. */
   readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
 };
 
@@ -56,25 +63,103 @@ export function createStartPacking(deps: StartPackingDeps): OrderCatalog['startP
   };
 }
 
-/** Contenido resuelto de una linea: el copiado, o -defensa en profundidad de R19- el vigente de
- *  la presentacion en este instante. `null` cuando ninguno de los dos existe. */
-async function resolveLineContents(
+type ResolvedLine = {
+  readonly line: FinishPackingLine;
+  readonly content: string;
+  readonly unitId: string;
+};
+
+/** Cada linea con su contenido -el copiado o, si falta, el vigente de la presentacion- y la
+ *  unidad de su presentacion. Una linea sin ninguno de los dos contenidos deshace todo. */
+async function resolveLines(
   presentations: Pick<PresentationCatalog, 'findRefs'>,
   companyId: string,
   lines: readonly FinishPackingLine[],
-): Promise<ReadonlyMap<string, string | null>> {
-  const missingIds = [...new Set(lines.filter((line) => line.presentationContent === null).map((line) => line.presentationId))];
-  const currentById =
-    missingIds.length === 0
-      ? new Map<string, string | null>()
-      : new Map((await presentations.findRefs(missingIds, companyId)).map((ref) => [ref.id, ref.content]));
+): Promise<readonly ResolvedLine[]> {
+  const presentationIds = [...new Set(lines.map((line) => line.presentationId))];
+  const refById = new Map((await presentations.findRefs(presentationIds, companyId)).map((ref) => [ref.id, ref] as const));
 
-  return new Map(
-    lines.map((line) => [
-      line.id,
-      line.presentationContent ?? currentById.get(line.presentationId) ?? null,
-    ]),
+  return lines.map((line) => {
+    const ref = refById.get(line.presentationId);
+    // La clave foranea de la linea garantiza la presentacion: si falta, la base esta rota.
+    if (ref === undefined) throw new Error(`finishPacking: la presentacion ${line.presentationId} no aparece`);
+    const content = line.presentationContent ?? ref.content;
+    if (content === null) throw new PresentationWithoutContentError(line.id);
+    const plan = planFinishedGoodsLine({ packages: line.packages, content, unitCost: '0.0000' });
+    if (plan.kind === 'no_content') throw new PresentationWithoutContentError(line.id);
+    return { line, content, unitId: ref.unitId };
+  });
+}
+
+const COST_SCALE = 4;
+const UNSIGNED_DECIMAL = /^\d+(?:\.\d+)?$/;
+
+function parseUnsigned(raw: string): { readonly unscaled: bigint; readonly scale: number } {
+  if (!UNSIGNED_DECIMAL.test(raw)) throw new Error(`finishPacking: no es un decimal valido: ${JSON.stringify(raw)}`);
+  const [whole = '', fraction = ''] = raw.split('.');
+  return { unscaled: BigInt(`${whole}${fraction}`), scale: fraction.length };
+}
+
+/**
+ * `totalCost / quantity` con cuatro decimales, mitad arriba, sin pasar por coma flotante. No
+ * usa `deriveUnitCost` porque la cantidad convertida puede traer hasta doce decimales y esa
+ * funcion solo acepta los cuatro de `decimal(14,4)`. Cantidad cero o coste que redondea a cero
+ * dan `'0.0000'`, el coste que ya aceptaba un lote de producto terminado.
+ */
+function divideCost(totalCost: string, quantity: string): string {
+  const cost = parseUnsigned(totalCost);
+  const amount = parseUnsigned(quantity);
+  if (amount.unscaled === BigInt(0)) return '0.0000';
+
+  const ten = BigInt(10);
+  const numerator = cost.unscaled * ten ** BigInt(amount.scale + COST_SCALE);
+  const denominator = amount.unscaled * ten ** BigInt(cost.scale);
+  const quotient = numerator / denominator;
+  const rounded = (numerator % denominator) * BigInt(2) >= denominator ? quotient + BigInt(1) : quotient;
+
+  const factor = ten ** BigInt(COST_SCALE);
+  return `${rounded / factor}.${(rounded % factor).toString().padStart(COST_SCALE, '0')}`;
+}
+
+/** Las claves foraneas de pedido y presentacion garantizan la unidad: si falta, la base esta rota. */
+function requireUnit(unitById: ReadonlyMap<string, UnitConversion>, unitId: string): UnitConversion {
+  const unit = unitById.get(unitId);
+  if (unit === undefined) throw new Error(`finishPacking: la unidad ${unitId} no aparece`);
+  return unit;
+}
+
+/**
+ * Coste unitario por cada unidad de presentacion del reparto. El total producido se suma en la
+ * unidad del pedido para que el coste por unidad del pedido sea uno solo; despues se expresa en
+ * la unidad de cada lote, porque su existencia se guarda en esa unidad y su valor es
+ * `existencia x coste unitario`. Una sola division por unidad: un lote en la unidad del pedido
+ * lleva exactamente `lotCost / total`.
+ */
+function unitCostByPresentationUnit(
+  lotCost: string,
+  orderUnit: UnitConversion,
+  unitById: ReadonlyMap<string, UnitConversion>,
+  lines: readonly ResolvedLine[],
+): ReadonlyMap<string, string> {
+  const summed = sumInOrderUnit(
+    orderUnit,
+    lines.map(({ line, content, unitId }) => ({
+      presentationId: line.presentationId,
+      packages: line.packages,
+      content,
+      unit: requireUnit(unitById, unitId),
+    })),
   );
+  if (summed.kind === 'incompatible_units') throw new IncompatibleUnitsError(summed.presentationId);
+  if (summed.kind === 'presentation_without_content') throw new PresentationWithoutContentError(summed.presentationId);
+
+  const costs = new Map<string, string>();
+  for (const unitId of new Set(lines.map((line) => line.unitId))) {
+    const totalInLotUnit =
+      unitId === orderUnit.id ? summed.total : convertQuantity(summed.total, orderUnit, requireUnit(unitById, unitId));
+    costs.set(unitId, divideCost(lotCost, totalInLotUnit));
+  }
+  return costs;
 }
 
 /** Firma exacta de `OrderCatalog['finishPackingAliveById']`. */
@@ -106,33 +191,15 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
                 { orderId: id },
               );
 
-        const contentByLineId = await resolveLineContents(deps.presentations, companyId, lines);
+        if (updated.unitId === null) throw new OrderWithoutUnitError(id);
+        const resolvedLines = await resolveLines(deps.presentations, companyId, lines);
 
-        // Se resuelve el contenido de CADA linea antes de escribir nada (R19: identifica la
-        // linea y deshace TODO), y se acumula la cantidad total para el coste unitario unico
-        // (R18) en la MISMA pasada.
-        let totalQuantity = '0.0000';
-        const resolvedLines: ReadonlyArray<{ readonly line: FinishPackingLine; readonly content: string }> = lines.map(
-          (line) => {
-            const content = contentByLineId.get(line.id) ?? null;
-            if (content === null) throw new PresentationWithoutContentError(line.id);
-            return { line, content };
-          },
-        );
-        for (const { line, content } of resolvedLines) {
-          const plan = planFinishedGoodsLine({ packages: line.packages, content, unitCost: '0.0000' });
-          if (plan.kind === 'no_content') throw new PresentationWithoutContentError(line.id);
-          totalQuantity = addQuantities(totalQuantity, plan.quantity);
-        }
-
-        // R18: un unico coste unitario para TODAS las lineas del pedido, derivado UNA sola vez
-        // de la cantidad total producida. `calculateLotIngredientsCost` nunca devuelve `null`
-        // (cuenta como cero cada ingrediente sin costo), asi que `lotCost` en `0.0000` es un
-        // coste legitimo -y `deriveUnitCost` lo refleja devolviendo `null`-.
-        const unitCost = deriveUnitCost(lotCost, totalQuantity) ?? '0.0000';
+        const unitIds = [...new Set([updated.unitId, ...resolvedLines.map((line) => line.unitId)])];
+        const unitById = new Map((await deps.units.findRefs(unitIds, companyId)).map((ref) => [ref.id, ref] as const));
+        const unitCosts = unitCostByPresentationUnit(lotCost, requireUnit(unitById, updated.unitId), unitById, resolvedLines);
 
         const finishedGoods: FinishedGoodsReceipt[] = [];
-        for (const { line, content } of resolvedLines) {
+        for (const { line, content, unitId } of resolvedLines) {
           const outcome = await scope.finishedGoods.receiveFromOrder({
             orderId: id,
             companyId,
@@ -142,7 +209,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
             orderPresentationLineId: line.id,
             packages: line.packages,
             orderContent: content,
-            unitCost,
+            unitCost: unitCosts.get(unitId) ?? '0.0000',
             actorId: packerId,
             now,
           });
@@ -158,6 +225,8 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
     } catch (err) {
       if (err instanceof RecipeNotFoundError) return 'recipe_not_found';
       if (err instanceof PresentationWithoutContentError) return 'presentation_without_content';
+      if (err instanceof IncompatibleUnitsError) return 'incompatible_units';
+      if (err instanceof OrderWithoutUnitError) return 'order_without_unit';
       throw err;
     }
   };

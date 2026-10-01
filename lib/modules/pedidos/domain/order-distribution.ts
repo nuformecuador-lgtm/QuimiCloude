@@ -60,6 +60,18 @@ function subtractDecimals(a: Scaled, b: Scaled): Scaled {
   return { unscaled: rescale(a, scale) - rescale(b, scale), scale };
 }
 
+/** Misma escala que devolveria `convertQuantity`, para que no convertir una linea no cambie
+ *  el texto del disponible. */
+function withoutTrailingZeros(value: Scaled): Scaled {
+  let { unscaled, scale } = value;
+  const ten = BigInt(10);
+  while (scale > 0 && unscaled % ten === BigInt(0)) {
+    unscaled /= ten;
+    scale -= 1;
+  }
+  return { unscaled, scale };
+}
+
 /** `envases * contenido`, exacto: `packages` es entero, asi que multiplicar no cambia la escala
  *  del contenido. */
 function multiplyByPackages(content: Scaled, packages: number): Scaled {
@@ -93,6 +105,29 @@ export function validateDistribution(
     return { kind: 'without_unit' };
   }
 
+  const summed = sumInOrderUnit(orderUnit, lines);
+  if (summed.kind !== 'ok') return summed;
+
+  const available = subtractDecimals(parseDecimal(quantity), parseDecimal(summed.total));
+  if (available.unscaled < BigInt(0)) {
+    return { kind: 'exceeds_quantity', available: formatDecimal(available) };
+  }
+  return { kind: 'ok', available: formatDecimal(available) };
+}
+
+export type SumInOrderUnitResult =
+  | { readonly kind: 'ok'; readonly total: string }
+  | { readonly kind: 'presentation_without_content'; readonly presentationId: string }
+  | { readonly kind: 'incompatible_units'; readonly presentationId: string };
+
+/**
+ * Suma de `envases * contenido` de cada linea, pasada de la unidad de su presentacion a la del
+ * pedido. La comparten el guardado del reparto y Terminar el empaque para que el total con el
+ * que se valida y el total con el que se reparte el coste no puedan divergir. Una linea ya en la
+ * unidad del pedido no se convierte. Se detiene en la primera linea sin contenido o
+ * inconvertible, en el orden dado.
+ */
+export function sumInOrderUnit(orderUnit: UnitConversion, lines: readonly DistributionLine[]): SumInOrderUnitResult {
   let total: Scaled = { unscaled: BigInt(0), scale: 0 };
   for (const line of lines) {
     if (line.content === null) {
@@ -100,6 +135,10 @@ export function validateDistribution(
     }
 
     const lineQuantity = multiplyByPackages(parseDecimal(line.content), line.packages);
+    if (line.unit.id === orderUnit.id) {
+      total = addDecimals(total, withoutTrailingZeros(lineQuantity));
+      continue;
+    }
 
     let converted: string;
     try {
@@ -113,10 +152,5 @@ export function validateDistribution(
 
     total = addDecimals(total, parseDecimal(converted));
   }
-
-  const available = subtractDecimals(parseDecimal(quantity), total);
-  if (available.unscaled < BigInt(0)) {
-    return { kind: 'exceeds_quantity', available: formatDecimal(available) };
-  }
-  return { kind: 'ok', available: formatDecimal(available) };
+  return { kind: 'ok', total: formatDecimal(total) };
 }

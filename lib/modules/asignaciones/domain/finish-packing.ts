@@ -13,9 +13,11 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import {
+  IncompatibleUnitsError,
   OrderNotFoundError,
   OrderNotPackableError,
   OrderPackingTakenError,
+  OrderWithoutUnitError,
   PresentationWithoutContentError,
   RecipeNotFoundError,
   ValidationError,
@@ -74,6 +76,8 @@ export function createFinishPacking(
     if (result === 'not_packable') throw new OrderNotPackableError();
     if (result === 'recipe_not_found') throw new RecipeNotFoundError();
     if (result === 'presentation_without_content') throw new PresentationWithoutContentError();
+    if (result === 'incompatible_units') throw new IncompatibleUnitsError();
+    if (result === 'order_without_unit') throw new OrderWithoutUnitError();
     throw new OrderNotFoundError(); // 'not_found'
   };
 }
