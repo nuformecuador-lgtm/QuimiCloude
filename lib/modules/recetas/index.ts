@@ -48,6 +48,12 @@ export {
   type PercentageTotal,
 } from './domain/recipe-percentage';
 export {
+  VERSION_NAME_SEPARATOR,
+  recipeDisplayName,
+  isVersionUnderReview,
+  propagateLines,
+} from './domain/recipe-version';
+export {
   MAX_IMAGE_BYTES,
   validateRecipeImage,
   type RecipeImageFormat,
