@@ -228,7 +228,7 @@
 
 ## Bloque 6 — Documentación y cierre
 
-- [ ] **T13. [P con T10–T12] Documentación de arquitectura.** (R26, R27, R36.)
+- [x] **T13. [P con T10–T12] Documentación de arquitectura.** (R26, R27, R36.)
       - Archivos: `docs/architecture.md` (`## Dominio` n.º 1: `users.company_id` obligatoria **salvo
         para el Maestro**, con el disparador como garantía; una frase: el nombre de usuario es único
         en todo el sistema, correo y documento por empresa), `tests/guards/guard-empresa-en-esquema.test.ts`

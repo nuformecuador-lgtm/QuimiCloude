@@ -413,3 +413,27 @@ disparador `users_check_company_by_role_trigger`; rol `Maestro` con `empresas.co
 - `pnpm run typecheck`: solo los dos errores de `session-user-prisma.ts` (T9). `eslint` limpio.
 - Rojos conocidos que quedan para T12 (design §10.1): `user-crud.int.test.ts:509-542`, que crean
   el mismo nombre de usuario en otra empresa.
+
+Fe de erratas de T6: `guard-aislamiento-integracion` pedia el archivo nuevo en el censo;
+`tests/integration/aislamiento.json` lo suma en `transaccion` (commit aparte).
+
+## T13 — Documentacion de arquitectura
+
+### Archivos
+
+- `docs/architecture.md` `## Dominio` n.º 1: `users.company_id` «obligatoria **salvo para el
+  Maestro**», con el disparador `users_check_company_by_role` como garantia; el nombre de usuario
+  es unico en todo el sistema, correo y documento por empresa (y aparte entre los usuarios sin
+  empresa). Sale la frase «dos empresas pueden tener cada una su `admin`», que deja de ser cierta.
+- `tests/guards/guard-empresa-en-esquema.test.ts`: solo el motivo de `credential_setup_tokens` y
+  `revoked_sessions` («cuelga de un usuario: la empresa es la de su ficha, o ninguna si es el
+  Maestro»). La lista de exentas no cambia (mismas ocho tablas, mismo orden).
+
+### Mapa R<n> -> test
+
+R26, R27, R36 son documentacion aqui; sus tests son los de T5/T6. La guardia vigila que la lista
+de exentas no cambie.
+
+### Salida
+
+- `vitest run guard`: 51 archivos, 652 passed, 11 skipped (incluye `guard-empresa-en-esquema`).
