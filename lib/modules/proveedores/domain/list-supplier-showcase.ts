@@ -38,7 +38,7 @@ function toShowcaseRow(row: ShowcaseRowRecord, images: CatalogImageUrl) {
  * Mismo orden que el resto del modulo: `requirePermission` primero, despues zod, despues el
  * puerto con `scope` construido a partir del actor. El tamano de tanda y el orden son
  * constantes del dominio, no entrada: el puerto los aplica solo, esta funcion no los pasa. La
- * URL de cada linea se compone AQUI, despues del puerto (R19): sin permiso no se llega a
+ * URL de cada linea se compone AQUI, despues del puerto: sin permiso no se llega a
  * `publicUrl`.
  */
 export function createListSupplierShowcase(

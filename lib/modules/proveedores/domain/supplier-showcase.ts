@@ -38,7 +38,7 @@ export type ShowcaseLinesPage = {
 };
 
 /**
- * Lo que el repositorio devuelve de verdad (`design.md > 4.2`): la ruta guardada, no la URL. El
+ * Lo que el repositorio devuelve de verdad: la ruta guardada, no la URL. El
  * dominio mapea esto a `ShowcaseLine` con `toImageUrl`; el puerto no conoce la URL publica.
  */
 export type ShowcaseLineRecord = {

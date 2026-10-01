@@ -62,8 +62,8 @@ export type CatalogLineView = CatalogLineFields & {
 };
 
 /**
- * Salida del listado del catalogo (`design.md > 4.2`): la vista de siempre mas la URL publica
- * del recorte. `imagePath` se conserva -el formulario de edicion la reenvia en su campo oculto
- * (R3)-, y `imageUrl` es `null` cuando la linea no tiene imagen.
+ * Salida del listado del catalogo: la vista de siempre mas la URL publica del recorte.
+ * `imagePath` se conserva -el formulario de edicion la reenvia en su campo oculto-, y
+ * `imageUrl` es `null` cuando la linea no tiene imagen.
  */
 export type CatalogLineListItem = CatalogLineView & { readonly imageUrl: string | null };

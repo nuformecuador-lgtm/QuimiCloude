@@ -949,7 +949,7 @@ const supplierCatalogRepository: SupplierCatalogRepository = {
 };
 
 /**
- * QC-171 (`design.md > 4.3`): la URL publica de un recorte sale del MISMO bucket que ya lee
+ * La URL publica de un recorte sale del MISMO bucket que ya lee
  * `cropCatalog`, mas abajo -mismo criterio de bifurcacion por `documentsE2EDoublesEnabled()`-.
  * Declarada AQUI, antes de la fachada de `proveedores`, porque sus tres casos de uso capturan
  * esta dependencia al construirse.
