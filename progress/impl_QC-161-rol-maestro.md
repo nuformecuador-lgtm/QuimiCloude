@@ -285,3 +285,6 @@ integracion): 5 archivos / 12 casos rojos, 6848 passed, 26 skipped (846 s).
 
 `vitest run tests/integration/identity/identity-seed.int.test.ts` tras el arreglo: 16 passed, 1
 failed (el de T5).
+
+Guardias (`test:rapido` no las llega a correr cuando la seleccion sale roja; corridas aparte con
+`vitest run guard` en `2fc68340`): 51 archivos, 652 passed, 11 skipped, ninguna roja.
