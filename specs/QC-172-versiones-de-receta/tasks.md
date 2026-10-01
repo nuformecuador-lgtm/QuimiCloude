@@ -4,6 +4,17 @@
 > en paralelo con las demás `[P]` de su tanda. Dependencias en «Tras». Cierre de tanda:
 > `./init.sh --rapido`; cierre de feature y antes del PR: `./init.sh`. Las secciones § son de
 > `design.md`. Los tests nombran el `R<n>` en el nombre del caso.
+>
+> **Enmienda del plan aprobada por el humano el 2026-10-01, tras la medición de T0** (detalle en la
+> bitácora, sección T0). No cambia ningún requisito ni lo que comprueba ningún test:
+> 1. **T9** absorbe los tests que dan typecheck rojo por `OrderView.recipeVersion` y no estaban en
+>    ninguna task: unos 14 de `pedidos-ui`, `order-service.test.ts` y `company-scope.test.ts`.
+>    **T6** absorbe los cinco de `asignaciones` que construyen `RecipeRef` y faltaban en §10.
+> 2. **T5** absorbe `tests/unit/recetas-ui/recipe-form.test.tsx` (construye un `RecipeDetail`).
+> 3. Los tests que este archivo cita y no existen (`pedidos/get-order.test.ts`,
+>    `recetas/get-recipe.test.ts`, `recetas/update-recipe.test.ts`) se **crean**.
+> 4. **T4** añade a `tests/unit/recetas/module-contract.test.ts` la lista cerrada de archivos de
+>    `lib/modules/recetas/` que toca esta ficha, como hicieron las anteriores.
 
 ## Tanda 0 — medición
 
