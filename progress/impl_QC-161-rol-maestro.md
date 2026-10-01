@@ -761,3 +761,23 @@ cuatro son los conocidos y ajenos a esta tanda: `unidades-viewport`, `usuarios-v
 
 Guardias aparte (el gate no llega a ellas con rojos relacionados): `vitest run guard` → 51 archivos,
 654 passed, 11 skipped. `db:test list`: ninguna `qct_qc161_*`.
+
+## Estado al cerrar T0-T13 (implementer)
+
+- **T0-T13 `[x]`. T14 queda abierta**: pide `./init.sh` completo, que corre el leader.
+- **R19 -> `git diff --stat $(git merge-base HEAD origin/dev) HEAD -- e2e/`**: vacio (medido
+  2026-10-01). Si se compara contra la punta de `origin/dev`, aparece `e2e/catalogo-desde-pdf.spec.ts`,
+  pero es dev que ha avanzado, no esta rama. **R20**: `package.json` sin cambios contra el merge-base.
+- Mapa R<n> -> test: repartido en las secciones de cada task; los R1..R44 aparecen todos en esta
+  bitacora (R19 en esta seccion). El mapa consolidado de `design.md > 10.3` es trabajo de T14.
+- Rojos ajenos en `--rapido`: `unidades-viewport`, `usuarios-viewport` (baseline);
+  `inventario/product-page.test.tsx` y `recetas-ui/recipe-page.test.tsx` (deuda de dev **fuera** del
+  baseline: fallan igual en `40d0dea2`, antes de T1, y la rama no toca `app/` ni esos modulos).
+- Puntos para el reviewer o el leader:
+  1. T11: el Maestro del fixture no se crea «en la transaccion del test» porque `login.int` y
+     `session-user.int` van como `commit` en el censo y los adaptadores leen con el cliente global.
+     Se crea en cada caso y se borra en su `finally`; nunca se usa el del seed.
+  2. T7: la segunda corrida de `db:seed` imprime «db:seed: nada que crear», no «ya existia» (es lo que
+     hace `scripts/seed.ts` cuando no crea nada). El Maestro nace con `mustChangeCredential: true`,
+     igual que el Administrador; el spec no lo fija.
+  3. La desviacion aprobada (`ADMIN_EXCLUDED_PERMISSIONS` con `empresas.*`) esta en `design.md > 2`.
