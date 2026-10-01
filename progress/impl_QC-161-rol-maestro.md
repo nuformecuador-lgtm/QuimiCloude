@@ -574,3 +574,59 @@ misma punta: `vitest run guard` → 51 archivos, 654 passed, 11 skipped.
 Una primera corrida del gate se corto a los 10 min por el limite de la herramienta (no por un
 fallo) durante `vitest related`; su base efimera `qct_qc161_95232936_mupt4gy0_o5o` pudo quedar sin
 borrar. La segunda corrida borro la suya.
+
+## T7 — El primer Maestro
+
+### Archivos
+
+- Produccion: `ports/initial-access-credentials.ts` (`InitialMaestroCredentialsProvider`),
+  `ports/initial-access-repository.ts` (`createInitialMaestro` sin `companyId`,
+  `countLiveUsersWithUsername`, `countLiveUsersWithoutCompanyWithEmail`),
+  `domain/account-status.ts` (`SEED_MAESTRO_ACCOUNT_STATUS = 'active'`),
+  `domain/seed-initial-access.ts` (`needsMaestro`; credenciales + politica + hash de los dos antes de
+  escribir; paso 3b con los dos choques y el del Administrador de la misma corrida; alta del Maestro
+  sin empresa al final; `SeedOutcome.createdMaestro`), `adapters/driven/config/initial-access-credentials-env.ts`
+  (`readInitialMaestroCredentialsFromEnv`, mismo formato de error), `adapters/driven/persistence/initial-access-repository-prisma.ts`
+  (`createInitialMaestro` sin `catch` de `P2002`, `mustChangeCredential: true` como el Administrador;
+  los dos contadores con `$queryRaw` sobre `lower(...)` y `deleted_at IS NULL`, mas `company_id IS NULL`
+  en el de correo), `lib/composition/index.ts` (solo `maestroCredentials`), `scripts/seed.ts`
+  («usuario maestro: creado / ya existia»), `.env.example` (las tres `SEED_MAESTRO_*` sin valor).
+- Tests: `seed-initial-access.test.ts` (doble con `usuariosVivosConMaestro` —por defecto igual al de
+  Administrador, para que los casos previos sigan describiendo instalacion «vacia» o «completa»—, los
+  dos contadores y `createInitialMaestro`; tres casos previos ajustados: el hash se llama 2 veces, la
+  ultima escritura del Administrador se mira sin el alta del Maestro, y el conteo por rol excluye el del
+  Maestro), `initial-access-credentials-env.test.ts`, `deploy-hook.test.ts`.
+- `identity-seed.int.test.ts`: solo el cableado de `maestroCredentials` para que compile (los casos
+  nuevos van en T8).
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R10 | `seed-initial-access.test.ts` «QC-161 R10: sin Maestro vivo crea exactamente uno, sin empresa, activo, con hash y con los marcadores Plataforma/Inicial», «QC-161 R10: sobre base vacia los marcadores del Maestro son los del Administrador salvo los nombres» |
+| R11 | `seed-initial-access.test.ts` «QC-161 R11: con un Maestro vivo el proveedor del Maestro no se invoca, aunque lanzara» |
+| R12 | `seed-initial-access.test.ts` «QC-161 R12: si faltan las variables del Maestro el error se propaga y no se escribe nada, ni roles»; `initial-access-credentials-env.test.ts` «QC-161 R12: …» (×3) |
+| R13 | `seed-initial-access.test.ts` «QC-161 R13: si la contrasena del Maestro no cumple la politica lanza con las reglas, sin la contrasena y sin escribir» |
+| R14 | `deploy-hook.test.ts` «QC-161 R14: las tres claves del Maestro estan declaradas una sola vez y sin valor» |
+| R15 | `seed-initial-access.test.ts` «QC-161 R15: con el Administrador ya creado y sin Maestro solo se crea el Maestro», «QC-161 R15: con el Maestro ya creado y sin Administrador el Administrador y su empresa se crean como siempre» |
+| R42 | `seed-initial-access.test.ts` «QC-161 R42: si el nombre del Maestro ya lo usa un usuario vivo…», «QC-161 R42: si coincide con el del Administrador de la misma corrida salvo mayusculas…» |
+| R43 | `seed-initial-access.test.ts` «QC-161 R43: si el correo del Maestro ya lo usa otro usuario sin empresa…», «QC-161 R43: con el mismo correo que el Administrador inicial se crean los dos» |
+
+### Salida
+
+- `pnpm exec tsc --noEmit`: verde. `eslint` de los 13 archivos: limpio.
+- `vitest run tests/unit/identity/seed guard-password-never-plaintext guard-rol-administrador-unico
+  identity-facade`: 6 archivos, 83 passed. Tras el ultimo ajuste, `tests/unit/identity/seed`: 55 passed.
+- `.env` del worktree: `DATABASE_URL` y `DIRECT_URL` nombran `QuimiCloude_QC161`; las tres
+  `SEED_MAESTRO_*` presentes. `pnpm run db:seed` dos veces:
+
+  ```
+  db:seed: roles creados: 0 - permisos creados: 0 - asignaciones permiso-rol creadas: 0 - empresa inicial: ya existia - usuario inicial: ya existia - usuario maestro: creado
+  ---segunda---
+  db:seed: nada que crear
+  ```
+
+  La segunda corrida no crea nada, asi que `scripts/seed.ts` cae en su rama de siempre
+  («nada que crear»); «usuario maestro: ya existia» solo sale cuando la misma corrida crea otra cosa.
+  No se cambio esa rama. Fila resultante (consulta de lectura): 1 rol `Maestro`, 1 usuario Maestro
+  con `companyId: null`, `active`, «Plataforma»/«Inicial», vivo, `mustChangeCredential: true`.

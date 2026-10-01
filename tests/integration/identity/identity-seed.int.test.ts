@@ -47,7 +47,10 @@ import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { identity } from '@/lib/composition';
-import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
+import {
+  readInitialAdminCredentialsFromEnv,
+  readInitialMaestroCredentialsFromEnv,
+} from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
 import {
   createInitialAccessRepository,
   withInitialAccessTransaction,
@@ -107,6 +110,16 @@ const fakeCredentialsProvider: InitialAdminCredentialsProvider = () => ({
   username: FAKE_ADMIN_USERNAME,
   credential: FAKE_ADMIN_CREDENTIAL,
   email: FAKE_ADMIN_EMAIL,
+});
+
+const FAKE_MAESTRO_USERNAME = 'qc161.maestro.test';
+const FAKE_MAESTRO_CREDENTIAL = 'QC161-credencial-del-maestro-de-prueba-no-real';
+const FAKE_MAESTRO_EMAIL = 'qc161.maestro.test@example.test';
+
+const fakeMaestroCredentialsProvider: InitialAdminCredentialsProvider = () => ({
+  username: FAKE_MAESTRO_USERNAME,
+  credential: FAKE_MAESTRO_CREDENTIAL,
+  email: FAKE_MAESTRO_EMAIL,
 });
 
 /** Las tres variables que lee el adaptador de entorno (`design.md > 6`). */
@@ -393,6 +406,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
 
       // Se afirma PRIMERO que la primera corrida encontro/creo algo real.
@@ -423,6 +437,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([]);
       expect(second.createdAdmin).toBe(false);
@@ -463,6 +478,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(outcome.createdAdmin).toBe(true);
 
@@ -488,6 +504,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(outcome.createdAdmin).toBe(true);
 
@@ -516,6 +533,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(first.createdAdmin).toBe(true);
       expect(first.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
@@ -544,6 +562,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([]);
       expect(second.createdAdmin).toBe(false);
@@ -573,6 +592,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(first.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
       expect(first.createdAdmin).toBe(true);
@@ -596,6 +616,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([ROLE_OPERADOR]);
       expect(second.createdAdmin).toBe(false);
@@ -633,6 +654,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(bootstrap.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
       expect(bootstrap.createdAdmin).toBe(true);
@@ -643,6 +665,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
           passwordHasher: identity.passwordHasher,
           checkCredentialPolicy: identity.checkCredentialPolicy,
           credentials: readInitialAdminCredentialsFromEnv,
+          maestroCredentials: readInitialMaestroCredentialsFromEnv,
         }),
       );
 
@@ -669,6 +692,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
             passwordHasher: identity.passwordHasher,
             checkCredentialPolicy: identity.checkCredentialPolicy,
             credentials: readInitialAdminCredentialsFromEnv,
+            maestroCredentials: readInitialMaestroCredentialsFromEnv,
           }),
         ),
       ).rejects.toThrow(/SEED_ADMIN_/);
@@ -697,6 +721,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(first.createdRoles.length).toBe(SEED_ROLE_NAMES.length);
       expect(first.createdAdmin).toBe(true);
@@ -709,6 +734,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         // dejara de cumplirla, este archivo se pone rojo, que es lo que se quiere.
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(second.createdRoles).toEqual([]);
       expect(second.createdAdmin).toBe(false);
@@ -732,6 +758,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(first.createdAdmin).toBe(true);
       // R21: el nombre sale de la UNICA constante del dominio, no de un literal ni del entorno.
@@ -758,6 +785,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(second.createdAdmin).toBe(false);
       expect(second.createdCompany).toBeNull();
@@ -780,6 +808,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
 
       // Primero: la corrida SI creo el catalogo entero y todas las asignaciones del seed.
@@ -822,6 +851,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(second.createdPermissions).toEqual([]);
       expect(second.createdRolePermissions).toBe(0);
@@ -861,6 +891,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
 
       // Primero: se creo exactamente lo que faltaba de documentos, y nada mas.
@@ -879,6 +910,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       expect(second.createdPermissions).toEqual([]);
       expect(second.createdRolePermissions).toBe(0);
@@ -899,6 +931,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
 
       for (const role of SEED_ROLES) {
@@ -928,6 +961,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
 
       const deEmpresas = (codigos: readonly string[]): string[] =>
@@ -963,6 +997,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
 
       // Primero: el administrador SI se creo (un caso que no crea nada no prueba nada).
@@ -1005,6 +1040,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         passwordHasher: identity.passwordHasher,
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
       });
       // La instalacion de partida es la de verdad: el catalogo completo y todas sus asignaciones.
       expect(bootstrap.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);

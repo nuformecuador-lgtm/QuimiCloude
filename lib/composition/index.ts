@@ -10,7 +10,10 @@ import {
   createVerifyCredentials,
   seedInitialAccess,
 } from '@/lib/modules/identity';
-import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
+import {
+  readInitialAdminCredentialsFromEnv,
+  readInitialMaestroCredentialsFromEnv,
+} from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
 import { withInitialAccessTransaction } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import {
@@ -650,6 +653,7 @@ export const identity = {
         repository,
         passwordHasher,
         credentials: readInitialAdminCredentialsFromEnv,
+        maestroCredentials: readInitialMaestroCredentialsFromEnv,
         // R18: el seed evalua la politica antes de hashear; aqui se le entrega la misma
         // funcion que expone la fachada.
         checkCredentialPolicy,

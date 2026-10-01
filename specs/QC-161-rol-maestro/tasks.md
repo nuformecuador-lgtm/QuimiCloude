@@ -137,7 +137,7 @@
 
 ## Bloque 3 — El seed
 
-- [ ] **T7. El primer Maestro.** (`design.md > 5`; R10–R15, R42, R43.)
+- [x] **T7. El primer Maestro.** (`design.md > 5`; R10–R15, R42, R43.)
       - Archivos: `lib/modules/identity/ports/initial-access-credentials.ts`,
         `lib/modules/identity/ports/initial-access-repository.ts` (`createInitialMaestro`,
         `countLiveUsersWithUsername`, `countLiveUsersWithoutCompanyWithEmail`),
