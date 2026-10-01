@@ -253,3 +253,59 @@ commit remoto es «implementer rebotado por cuota…». Choca con QC-172 en casi
    confirmados (punto 7) y son más de los previstos: también `get-order.ts`, `list-orders.ts`,
    `transition-order.ts`, `pedidos/domain/errors.ts`, `errores/domain/{error-codes,error-catalog}.ts`
    y `db/schema.prisma`, que coinciden con T1, T2 y T9.
+
+## T1 — migracion recipe_versions
+
+### Archivos
+
+Nuevos:
+- `db/migrations/20261001120000_recipe_versions/migration.sql` y `down.sql` (§1.2 literal; el
+  `RAISE` del down dice como localizarlas).
+- `tests/unit/recetas/schema/recipe-versions-migration.test.ts` (estatico, 7 casos).
+- `tests/integration/recetas/recipe-versions-constraints.int.test.ts` (Postgres, 9 casos, modo
+  `transaccion`).
+
+Modificados:
+- `db/schema.prisma`: `parentRecipeId`, `parent`, `versions` en `model Recipe` (§1.1); doc del modelo
+  ajustado al nuevo predicado del indice.
+- Los dos de T0.3, solo la regex: `WHERE \(deleted_at IS NULL\)` → `WHERE \(+deleted_at IS NULL\)`
+  - `tests/integration/inventario/list-query-indexes.int.test.ts:376`
+  - `tests/integration/recetas/company-scope.int.test.ts:598`
+- Rojos que T0 no listo (todos censos cerrados que ganan una entrada; no cambia lo que comprueban):
+  - `tests/unit/recetas/schema/recetas-schema.test.ts`: `RECIPE_COLUMNS` + `parentRecipeId`;
+    `scalarNames` excluye tambien el tipo `Recipe`; la lista de `@relation` pasa a
+    `['parent','versions','recipe']` (siguen siendo solo intra-modulo; las de otro modulo siguen sin
+    `@relation`).
+  - `tests/unit/recetas/schema/recipes-company-scope-migration.test.ts:826`: el recorrido de
+    restricciones de `recipes` incluye migraciones posteriores y ve las dos nuevas.
+  - `tests/integration/recetas/recetas-constraints.int.test.ts:854`: lista cerrada de FK + `recipes_parent_recipe_id_fkey`.
+  - `tests/guards/guard-identificador-de-request.test.ts`: `MIGRACIONES_ESPERADAS` + la nueva.
+  - `tests/integration/aislamiento.json`: el int nuevo en `transaccion`.
+
+### R → test
+
+| R | Test |
+|---|---|
+| R12 | int `R12: dos versiones vivas de la misma original con el mismo nombre → 23505 con name_normalized en meta.target`; `R12: una version dada de baja libera su nombre`; unit `R12, R13: parte la unicidad de nombre en dos indices parciales disjuntos` |
+| R13 | int `R13: una version con el nombre de una original viva…`, `R13: …version de OTRA original`, `R13: una original con el nombre de una version → aceptada; y dos originales iguales siguen chocando` |
+| R42 | int `R42, R43: sin versiones, down → up deja los datos intactos, todas originales, y el esquema igual` (retrato de `recipes`, `recipe_lines` y `orders` antes/despues del UP); unit `R42: anade la columna anulable sin DEFAULT y no toca ningun dato` |
+| R43 | int `R43: con una version guardada el down.sql aborta, dice como localizarlas y no cambia nada`; unit `R43: recrea recipes_company_name_unique igual que recipes_company_scope` (comparacion con la definicion de `20260916120000`, con mutacion en memoria), `R43: deshace todo lo del UP…`, `R43: la guardia de versiones es la PRIMERA sentencia…` |
+
+Ademas (sin R): `parent_recipe_id = id → 23514`, FK RESTRICT ante borrado fisico (23503).
+
+### Verificacion (salida real)
+
+- `db:migrate → db:rollback → db:migrate` en base EFIMERA (`qct_qc172_8c9cfd3f_mupuaxsa_twk`, copia
+  de la plantilla `qct_tpl_96e0013958f4` recien construida con todas las migraciones), con un script
+  temporal que usa `tests/helpers/test-database.ts` y pasa `DATABASE_URL`/`DIRECT_URL` por entorno
+  (`loadEnvFile` no pisa variables ya definidas: comprobado). Las cuatro salieron `exit 0`:
+  `migrate status` «Database schema is up to date!»; `db:rollback` «20261001120000_recipe_versions
+  revertida.»; `db:migrate` «All migrations have been successfully applied.»; `migrate status` «up to
+  date». Base borrada al terminar. La base `QuimiCloude` del `.env` no se ha tocado.
+- `pnpm exec vitest run tests/unit/recetas/schema tests/integration/recetas tests/integration/inventario/list-query-indexes.int.test.ts guard`:
+  `Test Files 68 passed (68)`, `Tests 856 passed | 11 skipped (867)`.
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `0 errors, 8 warnings` (todas preexistentes, en archivos no tocados).
+- `company-scope.int.test.ts:800-840` (down de `recipes_company_scope` sobre el esquema vivo) pasa con
+  `recipes_version_name_unique` presente, como preveia T0.
+- Nota: Postgres devuelve 23503 (no 23001) para la FK `ON DELETE RESTRICT`.

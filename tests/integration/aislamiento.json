@@ -51,6 +51,7 @@
     "recetas/recipe-crud.int.test.ts",
     "recetas/recipe-lines-percentage.int.test.ts",
     "recetas/recipe-lines.int.test.ts",
+    "recetas/recipe-versions-constraints.int.test.ts",
     "unidades/unidades-constraints.int.test.ts"
   ],
   "commit": [

@@ -426,7 +426,7 @@ enum ProductType {
   FINISHED_PRODUCT
 }
 
-/// `recipes_company_name_unique` (empresa, nombre) es PARCIAL por `deleted_at IS NULL` y por
+/// `recipes_company_name_unique` (empresa, nombre) es PARCIAL (vivas y solo originales) y por
 /// eso no se declara `@@unique` aqui: Prisma no modela indices parciales. Ese mismo indice
 /// hace de indice de `companyId`, asi que tampoco hay un `@@index([companyId])` propio. Los
 /// indices de busqueda siguen siendo parciales o GIN y viven en las migraciones.
@@ -444,8 +444,13 @@ model Recipe {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// No nulo = version de otra receta. Su unicidad de nombre es por original
+  /// (`recipes_version_name_unique`, parcial, solo en la migracion).
+  parentRecipeId String?   @map("parent_recipe_id") @db.Uuid
 
-  lines RecipeLine[]
+  lines    RecipeLine[]
+  parent   Recipe?      @relation("RecipeVersions", fields: [parentRecipeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  versions Recipe[]     @relation("RecipeVersions")
 
   @@index([createdBy], map: "recipes_created_by_idx")
   @@index([updatedBy], map: "recipes_updated_by_idx")

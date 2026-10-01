@@ -374,6 +374,8 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
+  // Anade `parent_recipe_id` a `recipes`; no toca el identificador de peticion.
+  '20261001120000_recipe_versions',
 ] as const
 
 export function hallazgosDeMigraciones(
