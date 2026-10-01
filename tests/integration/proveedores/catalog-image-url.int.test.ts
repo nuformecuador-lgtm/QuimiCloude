@@ -13,7 +13,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Prisma } from '@prisma/client';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { proveedores } from '@/lib/composition';
 import { normalizeCompanyName } from '@/lib/modules/identity';
@@ -49,6 +49,10 @@ let lineWithoutImageId: string;
 const linesCreated: string[] = [];
 
 beforeAll(async () => {
+  // `getPublicUrl` compone la URL sin red: valores ficticios bastan.
+  vi.stubEnv('SUPABASE_STORAGE_URL', 'https://proyecto-test.supabase.co');
+  vi.stubEnv('SUPABASE_CROPS_BUCKET', 'recortes');
+  vi.stubEnv('SUPABASE_STORAGE_KEY', 'credencial-ficticia');
   const nombre = `Empresa QC-171 ${token()}`;
   const company = await prisma.company.create({
     data: { name: nombre, nameNormalized: normalizeCompanyName(nombre) },
@@ -116,6 +120,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  vi.unstubAllEnvs();
   if (linesCreated.length > 0) {
     await prisma.supplierCatalogLine.deleteMany({ where: { id: { in: linesCreated } } });
   }

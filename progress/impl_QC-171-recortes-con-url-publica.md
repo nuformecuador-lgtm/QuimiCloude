@@ -362,3 +362,22 @@ Frontera `[D8]`: ningún archivo de la lista aparece en el diff (comprobado con 
 
 - T7 (gate completo `./init.sh`, E2E `catalogo-desde-pdf` en Chromium, `git diff --stat dev`): del leader.
 - T8: humana.
+
+## T7 — Tests independientes del `.env` de almacenamiento (2026-10-01)
+
+Causa: 9 casos rojos en `vitest related` porque `cropPublicUrl` lee `SUPABASE_STORAGE_URL`,
+`SUPABASE_CROPS_BUCKET` y `SUPABASE_STORAGE_KEY` al invocarse, y el `.env` local no las declara.
+Arreglo solo de tests (backend_dev), sin código de producción ni archivos `[D8]`:
+
+- `tests/unit/composition/proveedores-image-url.test.ts`: `vi.stubEnv` en el `beforeEach` del describe
+  «R1, R22» y `vi.unstubAllEnvs()` en su `afterEach`. El describe «importar la composición sin variables
+  no lanza» sigue sin stub.
+- `tests/integration/proveedores/catalog-image-url.int.test.ts` y `supplier-showcase.int.test.ts`:
+  `vi.stubEnv` al inicio del `beforeAll`, `vi.unstubAllEnvs()` en el `afterAll`.
+
+Valores ficticios (`getPublicUrl` compone la URL sin red): `https://proyecto-test.supabase.co`,
+`recortes`, `credencial-ficticia`. Ningún aserto compara contra una URL fija.
+
+Verificación: `vitest run` de los tres archivos → 3 archivos, 18/18 pasan. `eslint` sobre los tres: 0
+errores. `typecheck`: solo los errores ajenos de `pino` (`logger.ts`, `run-document-job-log.test.ts`);
+ninguno en estos archivos.

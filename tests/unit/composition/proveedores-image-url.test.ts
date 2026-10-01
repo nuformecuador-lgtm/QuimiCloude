@@ -69,11 +69,15 @@ describe('QC-171 T4 — importar la composicion sin variables de almacenamiento 
 describe('QC-171 R1, R22 — la URL de una linea de catalogo sale del MISMO bucket de recortes que la revision', () => {
   beforeEach(() => {
     delete process.env[E2E_DOUBLES_VAR];
+    vi.stubEnv('SUPABASE_STORAGE_URL', 'https://proyecto-test.supabase.co');
+    vi.stubEnv('SUPABASE_CROPS_BUCKET', 'recortes');
+    vi.stubEnv('SUPABASE_STORAGE_KEY', 'credencial-ficticia');
     listBySupplierAliveMock.mockClear();
   });
 
   afterEach(() => {
     delete process.env[E2E_DOUBLES_VAR];
+    vi.unstubAllEnvs();
   });
 
   it('R22 — con los dobles del E2E puestos, la URL sale en https://documentos-e2e.invalid/crops/<ruta>', async () => {
