@@ -187,7 +187,7 @@
       - **Hecho**: `pnpm run typecheck` en verde en todo el repo y estos tests en verde.
       - Depende de: T5.
 
-- [ ] **T10. [P con T11] El actor sin empresa, el aterrizaje y las pantallas.** (R29, R33, R34.)
+- [x] **T10. [P con T11] El actor sin empresa, el aterrizaje y las pantallas.** (R29, R33, R34.)
       - Archivos (solo tests): `tests/unit/identity/maestro-sin-empresa-actions.test.ts` (nuevo: acción
         representativa de `inventario`, `pedidos`, `unidades` e `identity` con usuario de catálogo
         completo y contexto `null` → no autorizada, repositorio sin llamar),

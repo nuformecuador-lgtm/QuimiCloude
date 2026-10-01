@@ -497,3 +497,32 @@ R44 se prueba contra Postgres en T11.
   `unidades-viewport` (2), `usuarios-viewport` (2), `inventario/product-page` (1),
   `recetas-ui/recipe-page` (1), `user-crud.int.test.ts` «los MISMOS correo, nombre de usuario y
   documento en OTRA empresa…» y «tampoco choca por mayusculas…» (T12)—; 6966 passed.
+
+## T10 — El actor sin empresa, el aterrizaje y las pantallas
+
+### Archivos (solo tests; ningun archivo de produccion tocado)
+
+- `tests/unit/identity/maestro-sin-empresa-actions.test.ts` (nuevo): `listProductsAction`
+  (inventario), `listOrdersAction` (pedidos), `listUnitsAction` (unidades) y `listUsersAction`
+  (identity) reales; la composicion doble cablea cada caso de uso REAL con puertos trampa (un
+  `Proxy` que anota y revienta). Sesion con todo `PERMISSIONS` y `getSessionContext` `null`.
+  Caso simetrico: mismo usuario con contexto → si llega al repositorio.
+- `tests/unit/identity/login-action.test.ts`: bloque «aterrizaje del Maestro»; el destino se
+  calcula con `filterNavItemsByPermissions` + `firstVisibleNavHref` y hoy es `DASHBOARD_ROUTE`.
+- `tests/unit/identity/require-page-permission.test.ts`: bloque con los permisos del Maestro.
+
+### Mapa R<n> -> test
+
+| R | Test |
+|---|---|
+| R29 | `maestro-sin-empresa-actions.test.ts` «QC-161 R29: inventario / pedidos / unidades / identity (usuarios) responde no autorizada con todo el catalogo y sin contexto, sin tocar el repositorio» (×4) y su simetrico «…con el mismo usuario y con empresa si llega al repositorio» (×4) |
+| R33 | `login-action.test.ts` «QC-161 R33: con solo empresas.* y sin destino de vuelta aterriza en el respaldo calculado con el menu», «QC-161 R33: un destino de vuelta interno valido sigue mandando tambien para el Maestro» |
+| R34 | `require-page-permission.test.ts` «QC-161 R34: una pagina de inventario.consultar responde el mismo 404, sin redirigir», «…cualquier permiso del catalogo que no sea empresas.* responde 404», simetrico «…con empresas.consultar la pagina que lo exige no corta» |
+
+### Salida
+
+- `vitest run` de los tres archivos: 8 + 22 + 9 passed.
+- `pnpm run typecheck` verde; `eslint` de los tres limpio.
+- `vitest run maestro-rol.test.ts guard`: 52 archivos, 665 passed, 11 skipped (el barrido R17 de
+  `empresas.*` sigue verde: solo mira produccion).
+- `git diff HEAD -- lib app components`: vacio.

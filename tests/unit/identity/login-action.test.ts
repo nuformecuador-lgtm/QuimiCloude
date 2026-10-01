@@ -5,7 +5,11 @@ import { redirect } from 'next/navigation';
 
 import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
-import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
+import {
+  PRIVATE_NAV_ITEMS,
+  filterNavItemsByPermissions,
+  firstVisibleNavHref,
+} from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE, FORMULAS_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
@@ -357,5 +361,44 @@ describe('loginAction', () => {
       expect(getSessionUserMock).not.toHaveBeenCalled();
       expect(redirect).not.toHaveBeenCalled();
     });
+  });
+});
+
+// QC-161 — el aterrizaje de quien solo tiene los permisos del Maestro. Mientras ningun enlace del
+// menu exija `empresas.*`, el menu filtrado queda vacio y el destino es el respaldo de siempre:
+// `/dashboard`, que le responde el 404 dentro de la zona privada.
+describe('aterrizaje del Maestro (QC-161)', () => {
+  const PERMISOS_DEL_MAESTRO = ['empresas.consultar', 'empresas.modificar'] as const;
+
+  it('QC-161 R33: con solo empresas.* y sin destino de vuelta aterriza en el respaldo calculado con el menu', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue({
+      ...usuarioCon(PERMISOS_DEL_MAESTRO),
+      roleName: 'Maestro',
+    });
+
+    await submit({ username: 'plataforma.inicial', password: 'clave', next: '' });
+
+    // El destino se calcula con las MISMAS funciones del menu que usa la action, no con un
+    // literal: el dia que un enlace del menu exija `empresas.consultar`, esto lo seguira.
+    const esperado =
+      firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_DEL_MAESTRO)) ??
+      DASHBOARD_ROUTE;
+
+    expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect).toHaveBeenCalledWith(esperado);
+    // Y hoy ese destino es el respaldo de siempre: ningun enlace del menu pide `empresas.*`.
+    expect(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_DEL_MAESTRO)).toEqual([]);
+    expect(esperado).toBe(DASHBOARD_ROUTE);
+  });
+
+  it('QC-161 R33: un destino de vuelta interno valido sigue mandando tambien para el Maestro', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue(usuarioCon(PERMISOS_DEL_MAESTRO));
+
+    await submit({ username: 'plataforma.inicial', password: 'clave', next: '/inventario' });
+
+    expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect).toHaveBeenCalledWith('/inventario');
   });
 });
