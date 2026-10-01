@@ -21,6 +21,8 @@
 
 ## Evaluaciones
 
+**2026-10-01: se retoma QC-171 en T7** (worktree nuevo desde la rama remota; T0-T6 hechas). Merge de `origin/dev` (131 commits, conflicto solo en este archivo). **T7 BLOQUEADA por un rojo de `dev`, ajeno**: `1d85d170` (logger pino) deja `typecheck` en rojo con 8 errores -`pino` no esta en `package.json` ni en `docs/dependencias.md`, y `run-document-job-log.test.ts` usa un `log` que `RunDocumentJobDeps` no tiene-. Espera decision humana.
+
 **2026-09-25: nacen QC-175** `modelo-de-respaldo-si-gemini-esta-saturado` y **QC-176** `procesamiento-de-pdf-por-lotes-con-avance-guardado` (epica Documentos e IA), del chat tras un `ai_unavailable` (503 "high demand" de Gemini) en un catalogo de 41 paginas. QC-176 lleva decidido: una sola llamada por lote con datos + coordenadas (adios a `crop-pairing.ts`). **QC-171 bloquea a QC-176** (link en el board); frontera escrita en las dos fichas. Sin acotar.
 
 **2026-09-25: nacen QC-172, QC-173 y QC-174** (epica Recetas), del chat: `versiones-de-receta` (fullstack; copia con vinculo, propagacion asistida, pasos compartidos; incluye el selector de version en el pedido, cruce con QC-168/QC-170/QC-164), `fases-en-los-pasos` (fullstack; lista de fases + fase en cada paso, sin migrar) y `crear-versiones-en-la-receta` (frontend, bloqueada por QC-172). Sin acotar; decisiones y abiertas en la descripcion de cada una.
