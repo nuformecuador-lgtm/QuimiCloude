@@ -4906,3 +4906,22 @@ podar.
   de la lista cerrada de acciones de las guardias; m5 los dos casos del E2E van encadenados en un solo `test`;
   m6 `isValidNewName` repite a mano el recorte y los límites 1..200.
 - **Pendiente local:** borrar la base `QuimiCloude_QC159`.
+
+## 2026-10-01 — QC-171-recortes-con-url-publica
+
+- **Qué:** los recortes de imagen de un catálogo en PDF se muestran con **URL pública** compuesta en el servidor, sin
+  solicitudes a Supabase, en la revisión de la importación, la vitrina de `/proveedores` y la tabla del catálogo.
+  Antes la vitrina y la tabla usaban la ruta como `src` y las imágenes importadas no se veían. Se sigue guardando la
+  ruta. Mismo bucket de recortes, que pasa a ser público: los recortes ya subidos siguen valiendo.
+- **PR #134**, merge `d17242a9`. Spec R1–R24, T0–T8. **R22 enmendado por el humano**: el E2E de QC-158 estaba
+  rojo en dev desde QC-160 y esta ficha arregló solo su paso 1 (abrir la ventana de subida). Sin migraciones ni
+  dependencias.
+- **Review:** vuelta 1 rechazada (B1: citas de ficha en comentarios de producción), vuelta 2 OK. Gate completo verde
+  sobre `8dbf0d9c`; el del HEAD final lo cortó la falta de memoria y el humano abrió el PR con `--rapido`.
+  E2E `catalogo-desde-pdf` verde en Chromium.
+- **Arrastre:** el arreglo de `pino` (PR #132) y dos rojos más de dev en el baseline (`product-page`,
+  `recipe-page`, desde `a543c84d`), que se suman a QC-177.
+- **Deuda (menores del review):** M2, aceptado por el humano: sin `SUPABASE_CROPS_BUCKET` la vitrina y la tabla dan
+  error en las líneas con imagen, en vez de mostrar el marcador.
+- **Pendiente humano (T8):** pasar a público el bucket de recortes en cada entorno ANTES de desplegar.
+- **Desbloquea:** QC-176.

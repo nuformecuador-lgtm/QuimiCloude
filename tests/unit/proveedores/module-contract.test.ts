@@ -258,12 +258,16 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
     // `ports/` o en `adapters/driven/` cae aqui.
     expect(
       sourcesIn(join(proveedoresDir, 'ports')).map((f) => toPosix(relative(proveedoresDir, f))),
-      'ports/ gano un archivo fuera de los puertos de QC-43 y QC-57',
+      'ports/ gano un archivo fuera de los puertos declarados',
       // ACTUALIZADO 2026-09-04 (QC-57, T7): `list-query-log.ts` es el TERCER puerto del
       // modulo -el log del campo omitido (R6)-, declarado en los CINCO modulos con listado
       // porque el dominio no puede importar `lib/shared/**`. La afirmacion sigue siendo la
       // lista EXACTA, que es lo que la hace falsable: un cuarto puerto cae aqui igual.
+      //
+      // ACTUALIZADO 2026-09-25: `catalog-image-url.ts` es el QUINTO -compone la URL publica
+      // de un recorte a partir de su ruta, y nada mas-. Sigue siendo la lista EXACTA.
     ).toEqual([
+      'ports/catalog-image-url.ts',
       'ports/list-query-log.ts',
       // Puerto NUEVO de la importacion por identidad; el de siempre
       // (`supplier-catalog-repository.ts`) no se toca.

@@ -20,6 +20,12 @@
 
 ## Evaluaciones
 
+**2026-10-01:** QC-171 cerrada (PR #134, merge `d17242a9`; tarjeta a Finalizado; resumen en history). Desbloquea QC-176. **T8 pendiente del humano**: bucket de recortes a publico antes de desplegar. Base local `QuimiCloude` migrada al dia (11 migraciones; `20260923150000`/`150100` marcadas `--applied` por ser identicas a las que QC-141 aplico antes de renumerarlas).
+
+**2026-10-01: se retoma QC-171 en T7** (worktree nuevo desde la rama remota; T0-T6 hechas). Merge de `origin/dev` (131 commits, conflicto solo en este archivo). **T7 BLOQUEADA por un rojo de `dev`, ajeno**: `1d85d170` (logger pino) deja `typecheck` en rojo con 8 errores -`pino` no esta en `package.json` ni en `docs/dependencias.md`, y `run-document-job-log.test.ts` usa un `log` que `RunDocumentJobDeps` no tiene-. Espera decision humana.
+
+**2026-09-25: nacen QC-175** `modelo-de-respaldo-si-gemini-esta-saturado` y **QC-176** `procesamiento-de-pdf-por-lotes-con-avance-guardado` (epica Documentos e IA), del chat tras un `ai_unavailable` (503 "high demand" de Gemini) en un catalogo de 41 paginas. QC-176 lleva decidido: una sola llamada por lote con datos + coordenadas (adios a `crop-pairing.ts`). **QC-171 bloquea a QC-176** (link en el board); frontera escrita en las dos fichas. Sin acotar.
+
 **2026-09-25: nacen QC-172, QC-173 y QC-174** (epica Recetas), del chat: `versiones-de-receta` (fullstack; copia con vinculo, propagacion asistida, pasos compartidos; incluye el selector de version en el pedido, cruce con QC-168/QC-170/QC-164), `fases-en-los-pasos` (fullstack; lista de fases + fase en cada paso, sin migrar) y `crear-versiones-en-la-receta` (frontend, bloqueada por QC-172). Sin acotar; decisiones y abiertas en la descripcion de cada una.
 
 **2026-09-25: nace QC-171** `recortes-con-url-publica` (backend, epica Documentos e IA), del chat: los recortes del catalogo pasan a URL publica por decision del humano. Hallazgo: las imagenes importadas hoy no se ven (se guarda la ruta y `EntityImage` la usa como `src`). **ACOTADA el 2026-09-25** con `/afinar-feature`: 8 decisiones, ninguna abierta, en `specs/QC-171-recortes-con-url-publica/requirements.md`. Board actualizado (description y `zone:backend` -> `zone:fullstack`).

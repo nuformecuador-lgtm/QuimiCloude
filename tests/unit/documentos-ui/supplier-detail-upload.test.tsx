@@ -216,6 +216,7 @@ beforeEach(() => {
           presentationId: '44444444-4444-4444-8444-444444444444',
           unitId: UNIDAD.id,
           imagePath: null,
+          imageUrl: null,
           cost: '1234.5678',
           minPurchase: '0.1005',
           deliveryTime: 5,
