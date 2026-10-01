@@ -177,7 +177,7 @@ selector está deshabilitado, elegir la original y su versión, presentación y 
 **Hecho cuando:** el pedido guardado tiene la versión como receta y lo reservado es de A y C en las
 proporciones de la versión, con B sin reservar (R44, R30).
 
-### T13 [ ] [P] — Enmiendas fechadas
+### T13 [x] [P] — Enmiendas fechadas
 Tras T1. **Toca:** `specs/QC-24*/requirements.md` o el spec donde viva la unicidad de nombre de receta,
 `specs/QC-50*/design.md` (índice `recipes_company_name_unique`), `specs/QC-34*/design.md` (`RecipeRef`).
 Solo una nota fechada al final de cada uno; T0 confirma rutas.
