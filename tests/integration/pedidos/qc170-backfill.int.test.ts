@@ -279,7 +279,7 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
 
 let nextSequence = 900_000;
 
-type LegacyStatus = 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'CANCELADO';
+type LegacyStatus = 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'ENTREGADO' | 'CANCELADO';
 
 /**
  * Un pedido con la forma de ANTES de la migracion. Prisma escribe lo que conoce y las dos
@@ -293,6 +293,7 @@ async function seedLegacyOrder(
     readonly status?: LegacyStatus;
     readonly presentationId?: string;
     readonly presentationContent?: string;
+    readonly deleted?: boolean;
   },
 ): Promise<string> {
   nextSequence += 1;
@@ -307,6 +308,7 @@ async function seedLegacyOrder(
       status,
       packedBy: status === 'EN_EMPAQUE' ? f.packerId : undefined,
       cancellationReason: status === 'CANCELADO' ? 'motivo de prueba' : undefined,
+      deletedAt: seed.deleted === true ? new Date() : undefined,
     },
     select: { id: true },
   });
@@ -376,7 +378,7 @@ describe('el UP sobre los cuatro tipos de pedido', () => {
         presentationId: f.withContent,
         presentationContent: '3',
       });
-      // R22, R43: un pedido cancelado tambien conserva su reparto y gana su unidad.
+      // R22, R43: un pedido cancelado no es vivo: no gana reparto, pero si su unidad.
       const cancelado = await seedLegacyOrder(tx, f, {
         quantity: '5',
         status: 'CANCELADO',
@@ -402,9 +404,7 @@ describe('el UP sobre los cuatro tipos de pedido', () => {
       expect(await linesOf(tx, conResto)).toEqual([
         { companyId: f.companyId, presentationId: f.withContent, packages: 3, presentationContent: '3.0000' },
       ]);
-      expect(await linesOf(tx, cancelado)).toEqual([
-        { companyId: f.companyId, presentationId: f.withContent, packages: 2, presentationContent: '2.5000' },
-      ]);
+      expect(await linesOf(tx, cancelado)).toEqual([]);
       expect(await linesOf(tx, sinContenido)).toEqual([]);
       expect(await linesOf(tx, sinPresentacion)).toEqual([]);
       expect(await linesOf(tx, resto0)).toEqual([]);
@@ -458,6 +458,33 @@ describe('el UP sobre los cuatro tipos de pedido', () => {
       expect(await orderColumnExists(tx, 'presentation_id')).toBe(false);
     });
   });
+
+  it('R22: solo los pedidos vivos ganan reparto; borrado, ENTREGADO y CANCELADO quedan sin lineas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx);
+      await expectNoForeignBlockers(tx, f.companyId);
+      await toStateBeforeMigration(tx);
+
+      // Todos con 10 / 2.5 = 4 envases: si alguno queda sin linea es por su estado, no por el contenido.
+      const conContenido = { quantity: '10', presentationId: f.withContent, presentationContent: '2.5' } as const;
+      const vivo = await seedLegacyOrder(tx, f, { ...conContenido, status: 'EN_CURSO' });
+      const borrado = await seedLegacyOrder(tx, f, { ...conContenido, deleted: true });
+      const entregado = await seedLegacyOrder(tx, f, { ...conContenido, status: 'ENTREGADO' });
+      const cancelado = await seedLegacyOrder(tx, f, { ...conContenido, status: 'CANCELADO' });
+
+      await runScript(tx, upSource);
+
+      expect(await linesOf(tx, vivo)).toEqual([
+        { companyId: f.companyId, presentationId: f.withContent, packages: 4, presentationContent: '2.5000' },
+      ]);
+      expect(await linesOf(tx, borrado)).toEqual([]);
+      expect(await linesOf(tx, entregado)).toEqual([]);
+      expect(await linesOf(tx, cancelado)).toEqual([]);
+
+      // La unidad del paso 1 sigue siendo para todos.
+      for (const id of [vivo, borrado, entregado, cancelado]) expect(await unitOf(tx, id)).toBe(f.unitA);
+    });
+  });
 });
 
 describe('los abortos: la migracion falla entera, sin aplicar nada', () => {
@@ -493,6 +520,26 @@ describe('los abortos: la migracion falla entera, sin aplicar nada', () => {
       });
     });
   }
+
+  it('R45: un pedido POR_EMPACAR sin presentacion pero borrado NO aborta la migracion', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx);
+      await expectNoForeignBlockers(tx, f.companyId);
+      await toStateBeforeMigration(tx);
+
+      // El CHECK `orders_delivered_not_deleted` ya impide borrar un POR_EMPACAR; para ver que el
+      // guardia no cuenta borrados hay que sembrar esa fila, asi que el CHECK se retira solo dentro
+      // de esta transaccion, que se deshace al final.
+      await tx.$executeRawUnsafe('ALTER TABLE "orders" DROP CONSTRAINT "orders_delivered_not_deleted"');
+      const borrado = await seedLegacyOrder(tx, f, { quantity: '10', status: 'POR_EMPACAR', deleted: true });
+
+      await runScript(tx, upSource);
+
+      expect(await orderColumnExists(tx, 'presentation_id')).toBe(false);
+      expect(await linesOf(tx, borrado)).toEqual([]);
+      expect(await unitOf(tx, borrado)).toBeNull();
+    });
+  });
 
   it('R49: un pedido EN_EMPAQUE con presentacion sin contenido aborta la migracion', async () => {
     await inRolledBackTransaction(async (tx) => {

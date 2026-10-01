@@ -30,6 +30,7 @@ BEGIN
   SELECT count(*) INTO sin_unidad
     FROM "orders"
    WHERE "status"::text IN ('POR_EMPACAR', 'EN_EMPAQUE')
+     AND "deleted_at" IS NULL
      AND "presentation_id" IS NULL;
   IF sin_unidad > 0 THEN
     RAISE EXCEPTION 'MIGRACION ABORTADA: hay % pedido(s) en POR_EMPACAR o EN_EMPAQUE sin presentacion. '
@@ -62,8 +63,10 @@ UPDATE "orders" o
    AND p."company_id" = o."company_id";
 
 -- ---------------------------------------------------------------------------------------
--- 2. Una linea por pedido con presentacion y contenido, con los envases enteros que caben en la
--- cantidad. Sin presentacion, sin contenido o sin llenar un envase: ninguna linea.
+-- 2. Una linea por pedido vivo (ni borrado, ni entregado, ni cancelado) con presentacion y
+-- contenido, con los envases enteros que caben en la cantidad. Los que no estan vivos conservan
+-- solo la unidad del paso 1. Sin presentacion, sin contenido o sin llenar un envase: ninguna
+-- linea.
 -- ---------------------------------------------------------------------------------------
 INSERT INTO "order_presentation_lines"
   ("id", "order_id", "company_id", "presentation_id", "packages", "presentation_content", "created_at", "updated_at")
@@ -71,7 +74,9 @@ SELECT gen_random_uuid(), o."id", o."company_id", o."presentation_id",
        FLOOR(o."quantity" / o."presentation_content")::int, o."presentation_content",
        now(), now()
   FROM "orders" o
- WHERE o."presentation_id" IS NOT NULL
+ WHERE o."deleted_at" IS NULL
+   AND o."status"::text NOT IN ('ENTREGADO', 'CANCELADO')
+   AND o."presentation_id" IS NOT NULL
    AND o."presentation_content" IS NOT NULL
    AND FLOOR(o."quantity" / o."presentation_content") >= 1;
 
