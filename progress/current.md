@@ -714,6 +714,47 @@ rondas de revision en F1.4.
 (`Rate limit exceeded: free-models-per-day`), sin escribir nada. Orden del humano: sin overrides,
 modelo de la sesion. Se reintentara cuando la cuota se libere (o el humano agregue creditos).
 
+**2026-09-28, QC-170 F2.1 (2a reanudacion): cuota libre pero en el modelo equivocado.** Causa
+raiz encontrada: el bloque `agent` de `opencode.json` manda el `implementer` a
+`openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` (OpenRouter, cuota diaria agotada)
+y el `reviewer` a `openrouter/nvidia/nemotron-3-super-120b-a12b:free` (mismo muro esperandolo en
+F2.2). Orden del humano («usa los modelos de nvidia como glm 5.3»): ambos pasan a `nvidia/z-ai/glm-5.3`
+(el de la sesion). Es un override en `opencode.json`, no en el frontmatter; se documenta aqui y se
+revertira si vuelve el modelo anterior cuando el humano lo diga.
+
+**2026-09-28, orden humana definitiva: FUERA OpenRouter y FUERA Ollama del arnes entero.** Los siete
+agentes van a `nvidia/z-ai/glm-5.3` (el modelo de la sesion en el proveedor NVIDIA), sin cadenas de
+respaldo. Motivos dados por el humano: la cuota `free-models-per-day` de OpenRouter mato al
+implementer de QC-170 dos dias seguidos, y el `qwen2.5-coder:3b` local (Ollama, 3B) — el modelo que
+escribio las tandas A-D — produjo codigo que su propia tanda califico de inservible. Lo cambiado en el
+arbol principal, SIN commitear (empujar `dev` es del humano):
+- `scripts/gen-opencode.mjs`: tabla `MODELOS` reencauzada (solo `nvidia/` y `opencode/`), valla nueva
+  que impide que un id de `openrouter/` o `ollama/` vuelva a colarse, bloque `provider` de
+  `opencode.json` vacio a proposito (el catalogo built-in de opencode resuelve el id con la clave de
+  la instalacion).
+- `scripts/check-modelos.mjs`: verificador reescrito — `openrouter/` y `ollama/` son rojo directo;
+  `nvidia/` se comprueba contra `https://integrate.api.nvidia.com/v1/models` con `NVIDIA_API_KEY`
+  (verificado: `z-ai/glm-5.3` existe); `opencode/` queda sin verificar (sesion).
+- `tests/guards/guard-modelos-de-agentes.test.ts`: `MODELO_EJECUTORES` pasa a `null` — ya nadie
+  declara `model:` en `.claude/agents` (Claude Code muere con 404 ante ids ajenos; incidente
+  `opus-4.8` 2026-07-31, repetido con `qwen2.5-coder:*` el 2026-09-27). Guardia 14/14 verde.
+- `opencode.json` y `.opencode/agents/*` regenerados: los siete agentes con
+  `model: nvidia/z-ai/glm-5.3` activo; cadena de respaldo del plugin reducida al mismo id.
+- `.env` reparado de paso: el path de `CODEBASE_MEMORY_MCP_BIN` quedo partido en dos lineas y
+  `./init.sh` moria en «-mcp.exe: command not found».
+- `./init.sh --rapido` verde tras todo lo anterior (guardias 650/650).
+Deroga la seccion `## Modelos` de `AGENTS.md` (qwen2.5-coder:3b para los tres ejecutores): pendiente
+de reescribir por `/afinar-regla`; mientras tanto, manda esta nota.
+
+**2026-10-01, QC-170 tanda E: intento del 2026-09-29 (opencode, `nvidia/z-ai/glm-5.3`) DESCARTADO.**
+El log de opencode muestra que toco ~50 archivos -entre ellos `design.md`, `tasks.md` y
+`requirements.md` del spec ya aprobado, y tests ajenos a la tanda (`customers-migration.int`,
+guardias)-, pero no dejo nada en disco: worktree limpio, sin commit, sin stash. Nada que revisar ni
+rescatar; editar el spec aprobado sin F1.4 ya bastaba para no rescatarlo. La tanda E se relanza
+desde `957cd9ec` con el modelo de la sesion (Claude Code). `origin/dev` va 9 commits por delante y
+toca `finish-assigned-order` (auto-asignar empacador): se integra en F2.3, no antes.
+
+
 **2026-09-27, QC-170 F2.1: `implementer` con override `model: opus` y `backend_dev` con `sonnet`.**
 Motivo: el arbol principal tiene sin commitear `model: qwen2.5-coder:7b` / `:3b` en los siete
 agentes (modelos de Ollama). Claude Code habla con la API de Anthropic, que devuelve
