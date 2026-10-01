@@ -239,7 +239,7 @@ describe('QC-88 — listAssignedOrders: R7 la empresa y la persona salen del ACT
     expect(listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, ANA);
   });
 
-  it('llama a `listAliveSummariesByIds` con la empresa del ACTOR, y SOLO los dos estados de trabajo (R12)', async () => {
+  it('llama a `listAliveSummariesByIds` con la empresa del ACTOR, y SOLO los estados de trabajo (R12; QC-138 R30 suma BLOQUEADO)', async () => {
     const { deps, listAliveSummariesByIds } = montar({ ids: [pedidoId(1)] });
     const listAssignedOrders = createListAssignedOrders(deps);
 
@@ -248,7 +248,7 @@ describe('QC-88 — listAssignedOrders: R7 la empresa y la persona salen del ACT
     expect(listAliveSummariesByIds).toHaveBeenCalledWith(
       EMPRESA,
       [pedidoId(1)],
-      ['PENDIENTE', 'EN_CURSO'],
+      ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'],
       1,
       undefined,
     );
@@ -379,6 +379,29 @@ describe('QC-88 — listAssignedOrders: la fila (R16, R17)', () => {
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(pagina.items[0]?.numberText).toBe('2026-0000007');
+  });
+});
+
+describe('QC-138 — el Operador ve sus pedidos bloqueados', () => {
+  it('R30 — la lista incluye el BLOQUEADO asignado junto a PENDIENTE y EN_CURSO, con su estado', async () => {
+    const ids = [pedidoId(1), pedidoId(2), pedidoId(3)];
+    const items = [
+      resumen(pedidoId(1), { status: 'PENDIENTE' }),
+      resumen(pedidoId(2), { status: 'EN_CURSO' }),
+      resumen(pedidoId(3), { status: 'BLOQUEADO' }),
+    ];
+    const { deps, listAliveSummariesByIds } = montar({ ids, page: { items, total: 3 }, refs: [receta()] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(listAliveSummariesByIds.mock.calls[0]?.[2]).toContain('BLOQUEADO');
+    expect(pagina.items.map((item) => [item.id, item.status])).toEqual([
+      [pedidoId(1), 'PENDIENTE'],
+      [pedidoId(2), 'EN_CURSO'],
+      [pedidoId(3), 'BLOQUEADO'],
+    ]);
+    expect(pagina.total).toBe(3);
   });
 });
 

@@ -37,6 +37,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
+  findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
@@ -89,6 +90,7 @@ function normalizeForTest(name: string): string {
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
+  findBlockedIds: findBlockedOrderIds,
 }
 
 // Mismo cableado que `lib/composition` para `orderUnitOfWork`: abre la transaccion compartida

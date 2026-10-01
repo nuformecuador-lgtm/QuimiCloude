@@ -71,6 +71,7 @@ export {
   ValidationError,
   InsufficientMaterialError,
   RecipeWithoutLinesError,
+  OrderWouldBlockError,
 } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los

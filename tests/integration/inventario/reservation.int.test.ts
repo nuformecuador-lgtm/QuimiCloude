@@ -404,7 +404,7 @@ describe('R13 — si tras editar ya no cubre, libera TODO lo que tenia apartado'
       });
       expect(primero).toEqual({ kind: 'reserved' });
 
-      // La edicion pide MAS de lo que el unico lote tiene en total: ya no cabe -> not_reserved.
+      // La edicion pide MAS de lo que el unico lote tiene en total: ya no cabe -> insufficient.
       const segundo = await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
@@ -412,7 +412,7 @@ describe('R13 — si tras editar ya no cubre, libera TODO lo que tenia apartado'
         actorId: fixture.actorId,
         now: new Date(),
       });
-      expect(segundo).toEqual({ kind: 'not_reserved' });
+      expect(segundo).toEqual({ kind: 'insufficient', productIds: [productId] });
 
       const movimientos = await reservationMovementsOf(orderId);
       expect(movimientos).toEqual([
@@ -421,6 +421,202 @@ describe('R13 — si tras editar ya no cubre, libera TODO lo que tenia apartado'
       ]);
     } finally {
       await dropFixture(fixture, [productId], [orderId]);
+    }
+  });
+});
+
+/** Un producto vivo SIN lotes: su unidad queda nula, que es lo que la reserva lee como «no
+ *  alcanza». `createWithFirstBatch` siempre crea un lote, asi que se inserta a mano. */
+async function createProductWithoutBatches(fixture: Fixture): Promise<string> {
+  const name = `Producto ${token()}`;
+  const product = await prisma.product.create({
+    data: { name, nameNormalized: normalizeForTest(name), companyId: fixture.companyId },
+    select: { id: true },
+  });
+  return product.id;
+}
+
+describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
+  it('R1, R5 — disponible insuficiente: insufficient con los productos que faltan, sin apartar nada', async () => {
+    const fixture = await createFixture();
+    const cubierto = await createProductWithBatch(fixture, { stock: '20' });
+    const corto = await createProductWithBatch(fixture, { stock: '3' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      const outcome = await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: [
+          { productId: cubierto.productId, quantity: '5' },
+          { productId: corto.productId, quantity: '4' },
+        ],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      expect(outcome).toEqual({ kind: 'insufficient', productIds: [corto.productId] });
+      expect(await reservationMovementsOf(orderId)).toEqual([]);
+    } finally {
+      await dropFixture(fixture, [cubierto.productId, corto.productId], [orderId]);
+    }
+  });
+
+  it('R1 — mide contra el disponible: lo apartado por otro pedido no cuenta', async () => {
+    const fixture = await createFixture();
+    const { productId } = await createProductWithBatch(fixture, { stock: '10' });
+    const otro = await createOrderRow(fixture);
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      expect(
+        await reservations.syncForOrder({
+          orderId: otro,
+          companyId: fixture.companyId,
+          requirement: requirementOf(productId, '8'),
+          actorId: fixture.actorId,
+          now: new Date(),
+        }),
+      ).toEqual({ kind: 'reserved' });
+
+      const outcome = await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(productId, '3'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      expect(outcome).toEqual({ kind: 'insufficient', productIds: [productId] });
+      expect(await reservationMovementsOf(orderId)).toEqual([]);
+    } finally {
+      await dropFixture(fixture, [productId], [otro, orderId]);
+    }
+  });
+
+  it('R1 — en la edicion, lo apartado por el propio pedido cuenta como disponible', async () => {
+    const fixture = await createFixture();
+    const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const otro = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      expect(
+        await reservations.syncForOrder({
+          orderId,
+          companyId: fixture.companyId,
+          requirement: requirementOf(productId, '6'),
+          actorId: fixture.actorId,
+          now: new Date(),
+        }),
+      ).toEqual({ kind: 'reserved' });
+      expect(
+        await reservations.syncForOrder({
+          orderId: otro,
+          companyId: fixture.companyId,
+          requirement: requirementOf(productId, '4'),
+          actorId: fixture.actorId,
+          now: new Date(),
+        }),
+      ).toEqual({ kind: 'reserved' });
+
+      // El lote ya no tiene disponible para nadie mas, pero los 6 del pedido siguen siendo suyos.
+      const edicion = await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(productId, '6'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      expect(edicion).toEqual({ kind: 'reserved' });
+      expect(await reservationMovementsOf(orderId)).toEqual([{ batchId, kind: 'reserve', quantity: '6.0000' }]);
+    } finally {
+      await dropFixture(fixture, [productId], [orderId, otro]);
+    }
+  });
+
+  it('R2 — una receta sin lineas devuelve not_reserved y no escribe nada', async () => {
+    const fixture = await createFixture();
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      const outcome = await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: [],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      expect(outcome).toEqual({ kind: 'not_reserved' });
+      expect(await reservationMovementsOf(orderId)).toEqual([]);
+    } finally {
+      await dropFixture(fixture, [], [orderId]);
+    }
+  });
+
+  it('R4 — un producto sin lotes, y por tanto sin unidad, cuenta como insufficient', async () => {
+    const fixture = await createFixture();
+    const sinLotes = await createProductWithoutBatches(fixture);
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      const outcome = await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(sinLotes, '1'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      expect(outcome).toEqual({ kind: 'insufficient', productIds: [sinLotes] });
+      expect(await reservationMovementsOf(orderId)).toEqual([]);
+    } finally {
+      await dropFixture(fixture, [sinLotes], [orderId]);
+    }
+  });
+
+  it('R5 — un pedido con material apartado que deja de alcanzar lo libera todo', async () => {
+    const fixture = await createFixture();
+    const { productId, batchId } = await createProductWithBatch(fixture, { stock: '5' });
+    const sinLotes = await createProductWithoutBatches(fixture);
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(productId, '5'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      // La edicion sigue pidiendo lo mismo del producto con lote, pero suma uno sin lotes.
+      const outcome = await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: [
+          { productId, quantity: '5' },
+          { productId: sinLotes, quantity: '1' },
+        ],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      expect(outcome).toEqual({ kind: 'insufficient', productIds: [sinLotes] });
+      expect(await reservationMovementsOf(orderId)).toEqual([
+        { batchId, kind: 'reserve', quantity: '5.0000' },
+        { batchId, kind: 'release', quantity: '5.0000' },
+      ]);
+    } finally {
+      await dropFixture(fixture, [productId, sinLotes], [orderId]);
     }
   });
 });

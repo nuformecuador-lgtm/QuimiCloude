@@ -39,11 +39,12 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 60 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 62 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       // 60 y no 56: entran `customer_not_found` (QC-154), `order_packing_taken`,
-      // `order_not_packable` y `order_produced_frozen` (QC-168).
-      expect(ERROR_CODES).toHaveLength(60)
+      // `order_not_packable` y `order_produced_frozen` (QC-168). 62 y no 60: entran
+      // `order_would_block` y `order_blocked` (QC-138).
+      expect(ERROR_CODES).toHaveLength(62)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -369,6 +370,36 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     it('la cabecera de error-codes.ts redacta la decimocuarta enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
       expect(source).toContain('**Decimocuarta enmienda, 2026-09-25**')
+    })
+  })
+
+  describe('decimoquinta enmienda, 2026-10-01 — QC-138 R6 y R32: order_would_block, order_blocked', () => {
+    it('R6, R32 — los dos codigos estan en el catalogo con su clave y su texto exactos', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('order_would_block')
+      expect(codigos).toContain('order_blocked')
+      expect(ERROR_MESSAGE_KEY.order_would_block).toBe('errors.order_would_block')
+      expect(ERROR_MESSAGE_KEY.order_blocked).toBe('errors.order_blocked')
+      expect(errorMessage('order_would_block')).toBe(
+        'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
+      )
+      expect(errorMessage('order_blocked')).toBe(
+        'Falta material: el pedido esta bloqueado y no se puede iniciar.',
+      )
+    })
+
+    it('R6, R32 — se distinguen entre si y de insufficient_material e invalid_transition', () => {
+      const bloquearia = errorMessage('order_would_block')
+      const bloqueado = errorMessage('order_blocked')
+      expect(bloquearia).not.toBe(bloqueado)
+      expect(bloquearia).not.toBe(errorMessage('insufficient_material'))
+      expect(bloqueado).not.toBe(errorMessage('insufficient_material'))
+      expect(bloqueado).not.toBe(errorMessage('invalid_transition'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decimoquinta enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decimoquinta enmienda, 2026-10-01**')
     })
   })
 

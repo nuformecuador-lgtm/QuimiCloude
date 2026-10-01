@@ -167,3 +167,22 @@ describe('R25 - la presentación, la prioridad, el estado y los responsables', (
     expect(screen.getByTestId('responsible-avatars')).toBeInTheDocument();
   });
 });
+
+describe('R34 - «Todos» muestra y filtra BLOQUEADO', () => {
+  it('la celda Estado pinta «Bloqueado» con `data-status`, no el literal del enum', () => {
+    renderCell(COMPANY_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status: 'BLOQUEADO' });
+
+    const cell = screen.getByTestId('company-order-status');
+    expect(cell).toHaveAttribute('data-status', 'BLOQUEADO');
+    expect(cell).toHaveTextContent('Bloqueado');
+    expect(cell).not.toHaveTextContent('BLOQUEADO');
+  });
+
+  it('el filtro de Estado ofrece la opcion «Bloqueado»', () => {
+    expect(COMPANY_ORDER_STATUS_FILTER_OPTIONS).toContainEqual({
+      value: 'BLOQUEADO',
+      label: COMPANY_ORDER_STATUS_LABELS.BLOQUEADO,
+    });
+    expect(COMPANY_ORDER_STATUS_LABELS.BLOQUEADO).toBe('Bloqueado');
+  });
+});

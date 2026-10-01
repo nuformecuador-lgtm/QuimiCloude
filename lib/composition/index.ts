@@ -225,6 +225,7 @@ import {
   createOrderWriteRepository,
   finishPackingAliveOrder,
   findAliveOrderById,
+  findBlockedOrderIds,
   findExpirableOrders,
   listAliveOrders,
   startPackingAliveOrder,
@@ -1082,6 +1083,7 @@ const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredList
 const orderRepository: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
+  findBlockedIds: findBlockedOrderIds,
 };
 
 /**

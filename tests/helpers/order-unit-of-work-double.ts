@@ -38,6 +38,7 @@ export function fakeOrderWriteRepository(
     softDeleteAlive: vi.fn(explota('softDeleteAlive')),
     setStatus: vi.fn(explota('setStatus')),
     setReservedAt: vi.fn(explota('setReservedAt')),
+    setIngredientsCost: vi.fn(explota('setIngredientsCost')),
     ...overrides,
   } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
 }

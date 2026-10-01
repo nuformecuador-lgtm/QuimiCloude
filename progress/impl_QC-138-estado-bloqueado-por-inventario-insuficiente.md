@@ -97,9 +97,19 @@ esta feature se **renumeraron** para ir detrás (ver «Merge de `dev` del 2026-1
 | T0 decisiones de F1.4 y estado de QC-168 | [x] | `2bf0e467` |
 | T1 enum `BLOQUEADO`, mapas, cancelación, borrado, asignación, UI | [x] | `e71ffac3`, `339b1c68` |
 | T2 índice parcial de bloqueados | [x] | `377d8272` |
-| T3 `ReservationOutcome` distingue `insufficient` | [ ] | |
-| T4 errores nuevos del catálogo | [ ] | |
-| T5-T15 | [ ] | |
+| T3 `ReservationOutcome` distingue `insufficient` | [x] | tanda A |
+| T4 errores nuevos del catálogo | [x] | tanda A |
+| T5 puertos de escritura y lectura de `pedidos` | [x] | tanda A |
+| T6 alta y edición bloquean con confirmación | [ ] | |
+| T7 caso de uso `reviewBlockedOrders` | [ ] | |
+| T8 disparo desde inventario y cableado | [ ] | |
+| T9 asignaciones: el Operador ve el bloqueado y no lo arranca | [x] | tanda A |
+| T10 proceso diario ignora los bloqueados | [ ] | |
+| T11 UI de Pedidos | [ ] | |
+| T12 UI de Asignación | [x] | tanda A |
+| T13 transversales | [ ] | |
+| T14 E2E | [ ] | lo corre el leader |
+| T15 cierre | [ ] | `./init.sh` completo lo corre el leader |
 
 `tasks.md` de esta feature no usa casillas de verificación: sus tareas son listas de
 `**Depende de**`, `**Archivos**` y `**Hecho**`, igual que el de QC-168. El estado por tarea se
@@ -167,3 +177,70 @@ búsqueda de cada identificador de `design.md` en el código. Nada contradice el
 Verificación del merge: `pnpm run typecheck` verde; `vitest run` de la guardia de
 identificador de request y de los dos tests de esquema/rollback de esta feature: 3 archivos,
 41 tests pasados.
+
+## Tanda A (2026-10-01): T3, T4, T5, T9 y T12
+
+**Archivos**
+- T3: `lib/modules/inventario/domain/reservation.ts` (`insufficient` con `productIds`),
+  `adapters/driven/persistence/reservation-prisma.ts`; `tests/integration/inventario/reservation.int.test.ts`.
+- T4: `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts`; `pedidos/domain/errors.ts`
+  (`OrderWouldBlockError`), `asignaciones/domain/errors.ts` (`OrderBlockedError`), exportados en los
+  `index.ts` de los dos módulos; `tests/unit/errores/catalogo.test.ts` (60 → 62 códigos).
+- T5: `pedidos/ports/order-write-repository.ts` (`setStatus` con `actorId` anulable,
+  `setIngredientsCost`), `ports/order-repository.ts` (`findBlockedIds`), `order-prisma.ts`,
+  `lib/composition/index.ts`; `tests/helpers/order-unit-of-work-double.ts`,
+  `tests/integration/pedidos/order-repository.int.test.ts`.
+- T9: `asignaciones/domain/assigned-order-view.ts`, `list-assigned-orders.ts`,
+  `get-assigned-order-execution.ts`, `start-assigned-order.ts`; tests unitarios de los tres casos de
+  uso y `tests/integration/asignaciones/batch-states.int.test.ts`.
+- T12: `app/(private)/asignacion/components/assigned-orders-columns.tsx`,
+  `assigned-order-enter-trigger.tsx` (botón deshabilitado de 44 px, sin enlace, motivo visible con
+  `aria-describedby`), `index.ts`; tests en `tests/unit/asignaciones-ui/`
+  (`assigned-order-enter-trigger`, `a11y-tactil`, `company-orders-columns`,
+  `assignment-view-params`, `assigned-orders-columns`). `company-orders-columns.tsx` y
+  `assignment-view-params.ts` ya traían `BLOQUEADO` desde T1.
+- Censo: `tests/integration/aislamiento.json` gana `pedidos/order-status-blocked-rollback.int.test.ts`
+  en `transaccion` (faltaba desde T1; cada caso corre en `inRolledBackTransaction`).
+
+**Desviaciones**
+1. El caso «R13 — si tras editar ya no cubre...» de `reservation.int.test.ts` esperaba
+   `not_reserved`; ahora espera `insufficient` con su producto, que es lo que pide T3. Los asientos
+   que comprueba no cambian.
+2. Para que compile el puerto nuevo, 6 tests de integración de pedidos que construyen un
+   `OrderRepository` a mano ganan `findBlockedIds` (`finish-with-finished-goods`,
+   `order-content-copy`, `order-cost-quote`, `order-ingredients-cost`,
+   `order-reservation-concurrency`, `order-reservation`) y `tests/unit/pedidos/order-view.test.ts`
+   gana la clave en su lista cerrada.
+3. `assigned-orders-columns.test.tsx` no estaba en la lista de T12; se amplió por la etiqueta nueva.
+
+**Mapa R → test (tanda A)**
+- R1: `reservation.int.test.ts` «R1, R5 — disponible insuficiente: insufficient con los productos que
+  faltan, sin apartar nada», «R1 — mide contra el disponible...», «R1 — en la edicion, lo apartado por
+  el propio pedido cuenta como disponible».
+- R2: `reservation.int.test.ts` «R2 — una receta sin lineas devuelve not_reserved y no escribe nada».
+- R4: `reservation.int.test.ts` «R4 — un producto sin lotes, y por tanto sin unidad, cuenta como insufficient».
+- R5: `reservation.int.test.ts` «R5 — un pedido con material apartado que deja de alcanzar lo libera todo».
+- R6, R32 (catálogo): `catalogo.test.ts` «R6, R32 — los dos codigos estan en el catalogo...» y
+  «R6, R32 — se distinguen entre si y de insufficient_material e invalid_transition».
+- R15: `order-repository.int.test.ts` «R15 — setIngredientsCost sustituye el importe, tambien por null...».
+- R16, R18: `order-repository.int.test.ts` «R16, R18 — solo BLOQUEADO vivos de la empresa, en orden (created_at, id)».
+- R22: `order-repository.int.test.ts` «R22 — setStatus admite actorId null y deja updated_by vacio».
+- R28, R32: `start-assigned-order.test.ts` «R28, R32 — arrancar un BLOQUEADO rechaza con `order_blocked`
+  sin escribir», «R32 — bloqueado por una edicion entre la lectura y la transicion...»;
+  `get-assigned-order-execution.test.ts` «R32 — abrir la ejecucion de un BLOQUEADO...»;
+  `batch-states.int.test.ts` «R28, R32 — arrancar un BLOQUEADO rechaza con order_blocked y el estado no cambia».
+- R30: `list-assigned-orders.test.ts` y `batch-states.int.test.ts` «R30 — la lista incluye el BLOQUEADO asignado...».
+- R31: `assigned-order-enter-trigger.test.tsx` bloque «R31 - BLOQUEADO: el disparador esta
+  deshabilitado y explica por que» (3 casos); `a11y-tactil.test.tsx` «R31 - el disparador
+  deshabilitado de un BLOQUEADO conserva el objetivo tactil».
+- R34 (Asignación): `company-orders-columns.test.tsx` «R34 - «Todos» muestra y filtra BLOQUEADO»;
+  `assignment-view-params.test.ts` «R34 - el filtro de estado de «Todos» admite BLOQUEADO»;
+  `assigned-orders-columns.test.tsx` «R31, R34 - un pedido BLOQUEADO se marca en la lista del Operador».
+
+**Gate `./init.sh --rapido`** (salida real): typecheck ok, lint ok (8 avisos ajenos), tests
+`4 failed | 282 passed (286)` archivos, `6 failed | 4179 passed | 1 skipped (4186)`. Los 6 rojos son
+de los 4 archivos de `tests/baseline-rojos.json`: `unidades-viewport` (2), `usuarios-viewport` (2),
+`product-page` R18 y `recipe-page` R21. Ningún rojo propio.
+
+**Pendiente de limpieza (no bloquea):** los JSDoc de `company-orders-columns.tsx` y de
+`isExactlyDelivered` en `assignment-view-params.ts` siguen hablando de «los cuatro estados».

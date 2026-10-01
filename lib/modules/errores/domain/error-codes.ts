@@ -18,6 +18,7 @@
  * **Decimotercera enmienda, 2026-09-24**: `customer_not_found`.
  * **Decimocuarta enmienda, 2026-09-25**: `order_packing_taken`, `order_not_packable`,
  * `order_produced_frozen`.
+ * **Decimoquinta enmienda, 2026-10-01**: `order_would_block`, `order_blocked`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -109,6 +110,12 @@ export const ERROR_CODES = [
   'order_not_packable',
   // Distinto de `order_delivered_frozen`: el pedido esta por empacar o en empaque, no entregado.
   'order_produced_frozen',
+  // Distinto de `insufficient_material`: no rechaza la operacion, pide confirmar que el pedido se
+  // guarde bloqueado porque el material disponible no lo cubre.
+  'order_would_block',
+  // Distinto de `invalid_transition`: el pedido esta bloqueado por falta de material y no se puede
+  // abrir ni iniciar hasta que se desbloquee.
+  'order_blocked',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

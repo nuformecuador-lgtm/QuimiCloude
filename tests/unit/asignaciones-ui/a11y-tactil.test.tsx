@@ -89,3 +89,17 @@ describe('el motivo del disparador deshabilitado se alcanza SIN el puntero (R21,
     expect(trigger.getAttribute('aria-describedby')).toBe(reason.id);
   });
 });
+
+describe('R31 - el disparador deshabilitado de un BLOQUEADO conserva el objetivo tactil', () => {
+  it('mide al menos 44x44 y su motivo es texto visible enlazado por aria-describedby', () => {
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-5', status: 'BLOQUEADO' }} />);
+
+    const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
+    expect(esObjetivoTactil(trigger)).toBe(true);
+    expect(trigger).toBeDisabled();
+    expect(trigger).not.toHaveAttribute('title');
+    expect(reason).toBeVisible();
+    expect(trigger.getAttribute('aria-describedby')).toBe(reason.id);
+  });
+});

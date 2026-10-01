@@ -5,7 +5,12 @@ import {
   createGetAssignedOrderExecution,
   type GetAssignedOrderExecutionDeps,
 } from '@/lib/modules/asignaciones/domain/get-assigned-order-execution';
-import { AsignacionesError, OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
+import {
+  AsignacionesError,
+  OrderBlockedError,
+  OrderNotFoundError,
+  UnauthorizedError,
+} from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/domain/assigned-order-execution-view';
@@ -85,7 +90,7 @@ type Dobles = {
 
 function montar(options?: {
   readonly ids?: readonly string[];
-  readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' } | null;
+  readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' } | null;
   readonly summary?: AssignedOrderSummary;
   readonly content?: RecipeExecutionContent | null;
   readonly products?: readonly ProductRef[];
@@ -236,6 +241,22 @@ describe('getAssignedOrderExecution — R7: la empresa', () => {
     await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
+  });
+});
+
+describe('QC-138 — getAssignedOrderExecution: un BLOQUEADO no se abre', () => {
+  it('R32 — abrir la ejecucion de un BLOQUEADO, tambien por la URL directa, rechaza con `order_blocked`', async () => {
+    const { deps, listAliveSummariesByIds, findExecutionContentById } = montar({
+      order: { id: PEDIDO, status: 'BLOQUEADO' },
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const error = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(OrderBlockedError);
+    expect((error as OrderBlockedError).code).toBe('order_blocked');
+    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(findExecutionContentById).not.toHaveBeenCalled();
   });
 });
 

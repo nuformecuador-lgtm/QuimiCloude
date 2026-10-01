@@ -2,7 +2,7 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, ValidationError } from './errors';
+import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -50,6 +50,7 @@ export function createGetAssignedOrderExecution(
 
     const target = await deps.orders.findAliveById(orderId, actor.companyId);
     if (target === null) throw new OrderNotFoundError();
+    if (target.status === 'BLOQUEADO') throw new OrderBlockedError();
     if (target.status !== 'PENDIENTE' && target.status !== 'EN_CURSO') {
       throw new OrderNotFoundError();
     }

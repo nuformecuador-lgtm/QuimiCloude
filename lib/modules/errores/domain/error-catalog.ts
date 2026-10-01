@@ -65,6 +65,8 @@ export const ERROR_MESSAGE_KEY = {
   order_packing_taken: 'errors.order_packing_taken',
   order_not_packable: 'errors.order_not_packable',
   order_produced_frozen: 'errors.order_produced_frozen',
+  order_would_block: 'errors.order_would_block',
+  order_blocked: 'errors.order_blocked',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -161,4 +163,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
   'errors.order_produced_frozen':
     'Un pedido ya producido conserva sus responsables tal como estaban.',
+  'errors.order_would_block':
+    'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
+  'errors.order_blocked': 'Falta material: el pedido esta bloqueado y no se puede iniciar.',
 } as const satisfies Record<ErrorMessageKey, string>;

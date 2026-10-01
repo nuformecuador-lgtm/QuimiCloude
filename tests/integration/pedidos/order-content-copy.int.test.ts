@@ -31,6 +31,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
+  findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma'
@@ -75,6 +76,7 @@ function normalizeForTest(name: string): string {
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
+  findBlockedIds: findBlockedOrderIds,
 }
 
 const unitOfWork: OrderUnitOfWork = {

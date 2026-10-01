@@ -159,3 +159,17 @@ describe('R31 - page.tsx (Server Component) no invoca funciones de un modulo `\'
     expect(ownerModule.trimStart().startsWith("'use client'")).toBe(false);
   });
 });
+
+describe('R34 - el filtro de estado de «Todos» admite BLOQUEADO', () => {
+  it('BLOQUEADO en la URL se conserva como filtro, solo o combinado', () => {
+    expect(parseStatusFilter({ [STATUS_PARAM]: 'BLOQUEADO' })).toEqual(['BLOQUEADO']);
+    expect(parseStatusFilter({ [STATUS_PARAM]: 'PENDIENTE,BLOQUEADO' })).toEqual([
+      'PENDIENTE',
+      'BLOQUEADO',
+    ]);
+  });
+
+  it('BLOQUEADO solo no activa la columna de terminados', () => {
+    expect(isExactlyDelivered(parseStatusFilter({ [STATUS_PARAM]: 'BLOQUEADO' }))).toBe(false);
+  });
+});

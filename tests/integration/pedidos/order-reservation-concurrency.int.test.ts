@@ -30,6 +30,7 @@ import {
   findAliveOrderById,
   listAliveOrders,
   createOrderWriteRepository,
+  findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
@@ -76,7 +77,7 @@ function normalizeForTest(name: string): string {
 // El cableado REAL: los mismos adaptadores que `lib/composition`.
 // ---------------------------------------------------------------------------
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
