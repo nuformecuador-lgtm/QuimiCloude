@@ -586,4 +586,26 @@ describe('createConfirmFormulaImport', () => {
       expect(deps.createRawMaterial).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('R37 — el choque solo cuenta originales vivas', () => {
+    // El catalogo solo devuelve originales; que una version con ese nombre no vuelva lo prueba
+    // tests/integration/documentos/formula-import-versions.int.test.ts contra Postgres.
+    it('R37: un nombre que solo coincide con una version no choca y confirmar crea una receta original nueva', async () => {
+      const bitacora: Bitacora = [];
+      const recipes = dobleDeRecetas(bitacora, null);
+      const deps = crearDeps(bitacora, { recipes: recipes as unknown as FormulaImportDeps['recipes'] });
+      const confirm = createConfirmFormulaImport(deps);
+
+      const resumen = await confirm(actorConPermiso(), entradaBase({ name: 'Sin perfume' }));
+
+      expect(recipes.findAliveByNormalizedName).toHaveBeenCalledWith('Sin perfume', EMPRESA);
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+      expect(deps.createRecipe).toHaveBeenCalledTimes(1);
+      const entrada = (deps.createRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(entrada.name).toBe('Sin perfume');
+      // El alta de receta no tiene forma de colgarla de otra: nace original.
+      expect('parentRecipeId' in entrada).toBe(false);
+      expect(resumen.outcome).toBe('created');
+    });
+  });
 });

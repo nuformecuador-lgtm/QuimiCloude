@@ -71,6 +71,11 @@
       "desde": "2026-09-23"
     },
     {
+      "archivo": "documentos/formula-import-versions.int.test.ts",
+      "motivo": "QC-172 T10 (R37): ejercita `createPreviewFormulaImport` y `createConfirmFormulaImport` con los adaptadores de Prisma reales de `documentos`, `recetas` e `inventario` cableados a mano, como `formula-import.int.test.ts`. `findAliveRecipeByNormalizedName` lee con el cliente Prisma GLOBAL y `createRecipe` abre SU PROPIA `prisma.$transaction`, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol y tipo de documento incluidos) y la limpia en el `afterAll`, en el orden que exigen las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> archivos y tandas de documento -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-01"
+    },
+    {
       "archivo": "documentos/formula-import.int.test.ts",
       "motivo": "T6 (QC-159): ejercita `createConfirmFormulaImport` con los adaptadores de Prisma reales de `documentos`, `recetas`, `inventario` y `pedidos` cableados a mano -el mismo cableado que hara `lib/composition`, sin pasar por el-. `replaceAliveRecipe` y `createOrder` abren SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, y R18 necesita ver la receta EXACTAMENTE como quedo tras un fallo REAL del CHECK `recipe_lines_percentage_check` -envolver la corrida en una transaccion de test con ROLLBACK ocultaria justo eso, igual que ya razona `catalog-import-isolation.int.test.ts`-. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento y unidad incluidos) y la limpia en el `afterAll`, en el orden que exigen las FK: reservas -> pedidos -> recetas (sus lineas caen con ON DELETE CASCADE) -> archivos y tandas de documento -> asientos de inventario -> lotes -> productos -> presentaciones -> unidad propia -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"

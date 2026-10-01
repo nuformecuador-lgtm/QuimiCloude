@@ -283,4 +283,22 @@ describe('createPreviewFormulaImport', () => {
       expect(resultado.nameClash).toBeNull();
     });
   });
+
+  describe('R37 — el choque solo cuenta originales vivas', () => {
+    // El catalogo solo devuelve originales; que una version con ese nombre no vuelva lo prueba
+    // tests/integration/documentos/formula-import-versions.int.test.ts contra Postgres.
+    it('R37: un nombre que solo coincide con una version no vuelve del catalogo y no marca choque', async () => {
+      const bitacora: Bitacora = [];
+      const recipes = dobleDeRecetas(bitacora, null);
+      const deps = crearDeps(bitacora, { recipes: recipes as unknown as FormulaImportDeps['recipes'] });
+      const preview = createPreviewFormulaImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO, name: 'Sin perfume' });
+
+      expect(recipes.findAliveByNormalizedName).toHaveBeenCalledWith('Sin perfume', EMPRESA);
+      expect(recipes.findRefsIncludingDeleted).not.toHaveBeenCalled();
+      expect(recipes.findIdsMatchingName).not.toHaveBeenCalled();
+      expect(resultado.nameClash).toBeNull();
+    });
+  });
 });
