@@ -67,7 +67,7 @@ Tras T0. **Toca:** `lib/modules/recetas/domain/recipe-version.ts` (nuevo), `lib/
 sin líneas → `true`, 99,99 y 100,01 → `true`, 100,00 → `false`; `recipeDisplayName` con y sin
 original (R11, R15, R20, R21).
 
-### T4 [ ] — Repositorio y adaptador
+### T4 [x] — Repositorio y adaptador
 Tras T1, T3. **Toca:** `lib/modules/recetas/ports/recipe-repository.ts`,
 `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`, `lib/composition/index.ts`
 (cableado de `recipeRepository`), `tests/guards/guard-ambito-empresa-recetas.test.ts`,

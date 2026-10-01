@@ -357,3 +357,73 @@ Commit `a09d92d3`.
   | 30 skipped (7482)`. Los 6 rojos son de UI (`configuracion-ui/{unidades,usuarios}-viewport`,
   `inventario/product-page`, `recetas-ui/recipe-page`) y **fallan igual en `14aae6d4` (T1)**: 4
   archivos, 6 tests rojos, sin los cambios de T2/T3. Preexistentes, no de esta tanda.
+
+## T4 — repositorio y adaptador de versiones
+
+Commit `c06dc08e`. Grafo no usado (este worktree no tiene indice); todo con Grep/Read.
+
+### Archivos
+Produccion:
+- `lib/modules/recetas/ports/recipe-repository.ts`: `RecipeRow.original` (`RecipeOriginalRow | null`),
+  tipos `NewRecipeVersion`, `PropagatedVersion`, `ReplaceWithPropagationResult`; metodos
+  `createVersion`, `listAliveVersions`, `replaceAliveWithPropagation` (todos con `scope` al final).
+- `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`: `RECIPE_INCLUDE` con
+  `parent { id, name, description, imagePath, steps }` y `toRecipeRow` rellena `original`;
+  `buildRecipeWhere` + `parentRecipeId: null`; `softDeleteAliveRecipe` en `$transaction` con baja en
+  cascada (misma fecha y autor); nuevas `createRecipeVersion` (`SELECT … FOR SHARE` crudo con
+  `companyScopeColumns(scope)`), `listAliveRecipeVersions` (`name asc, id asc`) y
+  `replaceAliveRecipeWithPropagation` (design §4 paso 5; centinela `VersionNotFound` →
+  `'version_not_found'`; llama a `propagateLines`/`isVersionUnderReview` del dominio).
+- `lib/composition/index.ts`: cableado de los tres metodos nuevos en `recipeRepository`.
+
+Dominio: **no hizo falta tocar nada** para que compile (el dominio solo lee `RecipeRow`). Lo que
+rompia typecheck eran dobles de test que construyen `RecipeRow` o implementan `RecipeRepository`;
+el minimo fue anadir `original: null` y los tres metodos nuevos (que lanzan o devuelven vacio):
+`tests/unit/recetas/{authorization,company-isolation-service,list-recipes,recipe-image-lifecycle,recipe-image-url,recipe-lines-catalog,recipe-service}.test.ts`
+y el cableado a mano de `tests/integration/{recetas/recipe-crud,documentos/formula-import}.int.test.ts`.
+Ningun aserto cambia. `getRecipe` de una version sigue devolviendo sus propios pasos (vacios): eso es T5.
+
+Tests:
+- `tests/guards/guard-ambito-empresa-recetas.test.ts`: anti-placebo ve las cuatro funciones; comentario
+  de la exencion corregido (`replaceAliveRecipe` ya no es la unica que toca `recipeLine`; la nueva
+  NO se exime y pasa el barrido por parametro); tres `describe` estructurales nuevos, cada uno con
+  comprobacion sobre el fuente real + mutaciones en memoria que la hacen morir:
+  `replaceAliveRecipeWithPropagation` (quitar `recipeCompanyScope(scope)` del `updateMany` de la
+  version, quitar `parentRecipeId: id`, quitar el `throw`), `createRecipeVersion` (quitar
+  `company_id` del SQL, quitar `FOR SHARE`) y `softDeleteAliveRecipe` (quitar el ambito de la cascada).
+- `tests/integration/recetas/recipe-versions-repository.int.test.ts` (nuevo, 16 casos, modo `commit`
+  registrado en `tests/integration/aislamiento.json`).
+- `tests/unit/recetas/module-contract.test.ts`: lista `VERSIONES_DE_RECETA_QC172` (14 rutas de T3-T7)
+  dentro de `AMPLIACIONES_APROBADAS`; mensaje de la asercion actualizado.
+
+### R → test (`recipe-versions-repository.int.test.ts` salvo indicacion)
+| R | Casos |
+|---|---|
+| R4 | `R4: crear una version desde una version devuelve not_found y no crea ninguna fila` |
+| R5 | `R5: una original dada de baja devuelve not_found y no crea ninguna fila` |
+| R7 | `R7, R40: devuelve not_found si el id es una version, de otra empresa o de baja` |
+| R8 | `R8: findAliveById de una version trae su original con pasos, descripcion e imagen…` |
+| R9 | `R9: ni la pagina ni su total cuentan versiones, sin consulta, con busqueda y con filtro` |
+| R10 | `R10, R40: listAliveVersions devuelve las vivas por nombre…` (lado repositorio; el caso de uso es T5) |
+| R12 | `R12: un nombre ya usado por otra version viva de la misma original devuelve duplicate` |
+| R14, R15, R19 | `R14, R15, R19: guarda la original y propaga a las versiones elegidas lo que no cambiaron` |
+| R17 | `R17: un id que no es version viva de esa original devuelve version_not_found y no deja nada cambiado` (version de otra original, de baja, de otra empresa, una original, la propia original, uuid inexistente) |
+| R18 | `R18: un fallo forzado a mitad de la propagacion no deja nada cambiado` (trigger acotado a la 2.ª version) |
+| R20 | `R20, R19: una version que queda fuera de 100 % no impide guardar y sale como por revisar` |
+| R23 | `R23: dar de baja una original da de baja sus versiones vivas con la misma fecha y autor…` |
+| R24 | `R24: dar de baja una version solo la da de baja a ella` |
+| R40 | los de R7/R10 y `R40: una original de otra empresa…`, `R40: la baja desde otra empresa…`; guardia de ambito |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio (0 errores).
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes).
+- `pnpm exec vitest run tests/guards/guard-ambito-empresa-recetas.test.ts`: `Tests 38 passed (38)`.
+- `pnpm exec vitest run tests/integration/recetas/recipe-versions-repository.int.test.ts` (base efimera
+  del `globalSetup`): `Tests 16 passed (16)`.
+- `pnpm exec vitest run tests/unit/recetas tests/guards/guard-ambito-empresa-recetas.test.ts tests/guards/guard-aislamiento-integracion.test.ts tests/guards/guard-arquitectura-modulos.test.ts tests/integration/recetas tests/integration/documentos/formula-import.int.test.ts`:
+  `Test Files 2 failed | 55 passed (57)`, `Tests 2 failed | 890 passed (892)`. Los dos rojos NO son de T4:
+  - `tests/unit/recetas-ui/recipe-page.test.tsx` R21: preexistente (ya listado en T2/T3).
+  - `tests/unit/recetas/scope.test.ts:433` «el conjunto de columnas, indices y restricciones de recipes…
+    es exactamente el esperado»: censo cerrado de `model Recipe` que no conoce `parentRecipeId`,
+    `parent` y `versions`. Lo pone rojo el `db/schema.prisma` de **T1** (T4 no toca el esquema); T1 no
+    lo corrio. Arreglo: anadir esas tres entradas al censo. Pendiente de asignar.
