@@ -81,8 +81,8 @@ export type SessionClaims = {
  * Interpreta el contenido firmado ya decodificado (el JSON, no el valor completo de la cookie).
  * Devuelve `null` ante cualquier entrada invalida: JSON mal formado, campos ausentes, `sub` sin
  * forma de UUID, `iat`/`exp` que no sean enteros positivos, un `role` ausente, vacio o que no
- * es texto (QC-9 R28), o un `cid` ausente, vacio, que no es texto ni `null`, o sin forma de UUID,
- * o un `sid` ausente, vacio, que no es texto o sin forma de UUID (QC-23 R6). No lanza en
+ * es texto, o un `cid` ausente, vacio, que no es texto ni `null`, o sin forma de UUID,
+ * o un `sid` ausente, vacio, que no es texto o sin forma de UUID. No lanza en
  * ningun caso: un
  * payload que no es JSON es entrada invalida, no un fallo, y el `try` que lo cubre esta acotado
  * exactamente a la linea de `JSON.parse` (R6).
