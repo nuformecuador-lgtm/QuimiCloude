@@ -739,39 +739,56 @@ decisión humana, no como olvido. Lo pagan QC-162/QC-166 (nota de `requirements.
 
 ### 10.3 Trazabilidad `R<n>` → test
 
+> Consolidado tras la implementación (2026-10-01) desde `progress/impl_QC-161-rol-maestro.md`, con el
+> nombre del caso entre «». Abreviaturas: `U/` = `tests/unit/identity/`, `I/` = `tests/integration/identity/`,
+> «estático» = `U/schema/maestro-migration.test.ts`.
+
 | R | Test |
 |---|---|
-| R1 | `user-crud.int.test.ts` |
-| R2, R3, R4 | `maestro-rol.test.ts`; R4 también `identity-seed.int.test.ts` |
-| R5, R6, R7, R8, R9 | `permissions.test.ts`; R9 también `seed-initial-access.test.ts` e `identity-seed.int.test.ts` (§2.4) |
-| R10 | `seed-initial-access.test.ts`, `identity-seed.int.test.ts` |
-| R11, R13, R15 | `seed-initial-access.test.ts`; R15 también `identity-seed.int.test.ts` |
-| R12 | `seed-initial-access.test.ts`, `initial-access-credentials-env.test.ts` |
-| R14 | `deploy-hook.test.ts` |
-| R16 | `guard-autorizacion-por-permiso.test.ts` |
-| R17 | `maestro-rol.test.ts` |
-| R18 | `identity-seed.int.test.ts` |
-| R19 | revisión: `git diff --stat -- e2e/` vacío |
-| R20 | `guard-dependencias-aprobadas` + `maestro-migration.test.ts` |
-| R21, R22 | `maestro-migration.test.ts`, `maestro-migration.int.test.ts` |
-| R23 | `role-catalog.int.test.ts` |
-| R24, R25 | `user-crud.int.test.ts` |
-| R26 | `maestro-migration.int.test.ts`, `identity-constraints.int.test.ts:1194-1211` |
-| R27, R28 | `maestro-migration.int.test.ts` (y el estático) |
-| R29 | `maestro-sin-empresa-actions.test.ts` |
-| R30 | `verify-credentials.test.ts`, `login.int.test.ts` |
-| R31 | `resolve-session.test.ts`, `route-guard-middleware.test.ts`, `session-user.int.test.ts` |
-| R32 | `session-claims.test.ts`, `resolve-session.test.ts` |
-| R33 | `login-action.test.ts` |
-| R34 | `require-page-permission.test.ts` |
-| R35 | `end-session.test.ts` |
-| R36 | `maestro-migration.int.test.ts`, `identity-constraints.int.test.ts:1433-…` (reescrito), `user-crud.int.test.ts:509-542` (reescritos) |
-| R37 | `maestro-migration.int.test.ts`, `identity-constraints.int.test.ts:1380-1431, 1483-1534` (sin cambios), `user-crud.int.test.ts:509-542` (reescritos) |
-| R38, R39 | `maestro-migration.test.ts`, `maestro-migration.int.test.ts` |
-| R40 | `user-crud.int.test.ts`, `user-service.test.ts`/`user-actions.test.ts` |
-| R41 | test del catálogo de errores (`tests/unit/errores/`) |
-| R42, R43 | `seed-initial-access.test.ts`, `identity-seed.int.test.ts` |
-| R44 | `login.int.test.ts` |
+| R1 | `I/user-crud.int.test.ts` «R1 — la lista de una empresa no lo incluye…», «R1 — editarlo, darlo de baja y cambiarle el estado responden `not_found`…» |
+| R2 | `U/roles/maestro-rol.test.ts` «R2: SEED_ROLES tiene una fila Maestro…», «R2: Administrador, Operador y Empacador conservan su nombre y su descripcion exactos»; `U/roles/empacador-rol.test.ts` (filas exactas, Maestro al final) |
+| R3 | `U/roles/maestro-rol.test.ts` «R3: solo aparece en lib/modules/identity/domain/roles.ts» + anti-cegado y simétrico |
+| R4 | `U/roles/maestro-rol.test.ts` «R4: …no declara ninguna columna de empresa», «R4: SEED_ROLES declara una sola fila Maestro»; `I/identity-seed.int.test.ts` «QC-161 R10, R18, R4: dos corridas…» |
+| R5 | `U/permissions.test.ts` «R5: el catalogo contiene empresas.consultar y empresas.modificar y ningun otro empresas.*», «R5: todo codigo que el catalogo tenia antes sigue en el…»; `tests/unit/navegacion/qc75-convenciones.test.ts`; `tests/unit/asignaciones/schema/order-assignments-migration.test.ts` |
+| R6 | `U/permissions.test.ts` «R6: los dos codigos tienen modulo empresas…», «R6: la descripcion de empresas.modificar nombra el alta, la edicion y la baja» |
+| R7 | `U/permissions.test.ts` «R7: el JSDoc del catalogo tiene el parrafo de la enmienda de empresas, con ordinal y sin citas» + simétrico |
+| R8 | `U/permissions.test.ts` «R8: el Maestro recibe exactamente empresas.consultar y empresas.modificar…»; `U/seed/seed-initial-access.test.ts` «QC-161 R8, R9: sobre una base vacia…» |
+| R9 | `U/permissions.test.ts` «R9: el Administrador no tiene ningun empresas.* y sigue siendo el catalogo menos los excluidos»; `U/seed/seed-initial-access.test.ts` «QC-161 R8, R9…»; `I/identity-seed.int.test.ts` «QC-161 R9 — …ningun empresas.* en `role_permissions`» |
+| R10 | `U/seed/seed-initial-access.test.ts` «QC-161 R10: sin Maestro vivo crea exactamente uno…»; `I/identity-seed.int.test.ts` «QC-161 R10, R18, R4…» |
+| R11 | `U/seed/seed-initial-access.test.ts` «QC-161 R11: con un Maestro vivo el proveedor del Maestro no se invoca…»; `I/identity-seed.int.test.ts` «QC-161 R11: …el seed termina sin crear nada» |
+| R12 | `U/seed/seed-initial-access.test.ts` «QC-161 R12…»; `U/seed/initial-access-credentials-env.test.ts` «QC-161 R12…» (x3); `I/identity-seed.int.test.ts` «QC-161 R12: sin Maestro y sin las SEED_MAESTRO_*…» |
+| R13 | `U/seed/seed-initial-access.test.ts` «QC-161 R13: si la contrasena del Maestro no cumple la politica…» |
+| R14 | `U/seed/deploy-hook.test.ts` «QC-161 R14: las tres claves del Maestro estan declaradas una sola vez y sin valor» |
+| R15 | `U/seed/seed-initial-access.test.ts` «QC-161 R15…» (x2); `I/identity-seed.int.test.ts` «QC-161 R15: …solo se crea el Maestro» |
+| R16 | `tests/guards/guard-autorizacion-por-permiso.test.ts` «QC-161 R16: los patrones se derivan de los roles reales…», «QC-161 R16: dispara con un actor.ts sintetico…» |
+| R17 | `U/roles/maestro-rol.test.ts` «R17: empresas.consultar y empresas.modificar solo aparecen en el catalogo de permisos» + anti-cegado y simétrico |
+| R18 | `I/identity-seed.int.test.ts` «QC-161 R10, R18, R4: dos corridas sobre base vacia…», «R25 — cada rol de semilla tiene en `role_permissions` exactamente…» |
+| R19 | revisión: `git diff --stat $(git merge-base HEAD origin/dev) HEAD -- e2e/` vacío |
+| R20 | estático «R20: es la unica carpeta de la migracion del Maestro y no crea ninguna tabla»; `package.json` sin cambios |
+| R21 | estático «R21…» (orden del UP, rol, permisos, asignaciones); `I/maestro-migration.int.test.ts` «R21: el UP sobre una base sembrada…», «R21: …donde el seed ya creo esas filas no falla», «R21: dos ciclos DOWN -> UP…» |
+| R22 | estático «R22…»; `I/maestro-migration.int.test.ts` «R22: el DOWN sin ningun Maestro deja la base como antes…», «R22: el DOWN con un Maestro vivo / dado de baja falla…» |
+| R23 | `I/role-catalog.int.test.ts` «QC-161 R23 — el rol Maestro existe en la base y NO se ofrece en el selector», «QC-161 R23 — no omite ninguna fila salvo…» |
+| R24 | `I/user-crud.int.test.ts` «R24 — el alta con el rol Maestro se rechaza como accion no permitida…», «R24 — el adaptador responde `action_not_allowed` antes de escribir…» |
+| R25 | `I/user-crud.int.test.ts` «R25 — la edicion hacia el rol Maestro se rechaza como accion no permitida y la fila no cambia…» |
+| R26 | `I/maestro-migration.int.test.ts` «R26: un usuario sin empresa con un rol de empresa se rechaza con 23502…»; `I/identity-constraints.int.test.ts:1194-1211`; `U/schema/identity-schema.test.ts` «QC-161 R26, R27…»; estático |
+| R27 | `I/maestro-migration.int.test.ts` «R27: un Maestro con empresa se rechaza con 23514…»; `U/schema/identity-schema.test.ts` «QC-161 R26, R27…» |
+| R28 | `I/maestro-migration.int.test.ts` «R28: dos Maestros vivos con el mismo correo… o el mismo documento se rechazan…», «R28: un Maestro dado de baja no ocupa…»; estático «R28: dos indices parciales sin empresa…» |
+| R29 | `U/maestro-sin-empresa-actions.test.ts` «QC-161 R29: inventario / pedidos / unidades / identity…» (x4) + simétrico |
+| R30 | `U/verify-credentials.test.ts` «QC-161 R30…»; `I/login.int.test.ts` «QC-161 R30: el LEFT JOIN encuentra al Maestro…», «QC-161 R30: el Maestro entra con su sesion sin empresa…» |
+| R31 | `U/resolve-session.test.ts` «QC-161 R31…»; `U/route-guard-middleware.test.ts`; `I/session-user.int.test.ts` «QC-161 R31: resuelve la ficha del Maestro sin empresa…» |
+| R32 | `U/session-claims.test.ts` «QC-161 R32: un cid null explicito…», «QC-161 R32: un cid ausente, vacio…»; `U/resolve-session.test.ts` |
+| R33 | `U/login-action.test.ts` «QC-161 R33: con solo empresas.* y sin destino de vuelta aterriza en el respaldo…» |
+| R34 | `U/require-page-permission.test.ts` «QC-161 R34: una pagina de inventario.consultar responde el mismo 404…» |
+| R35 | `U/end-session.test.ts` «QC-161 R35: con companyId null registra el cierre…» |
+| R36 | `I/maestro-migration.int.test.ts` «R36: el mismo nombre de usuario se rechaza entre dos empresas…», «R36: un usuario dado de baja no ocupa…»; `I/identity-constraints.int.test.ts` (reescrito); `I/user-crud.int.test.ts` «QC-161 R36 — …OTRA empresa devuelve `username`…»; estático «R36: users_username_unique del UP…» |
+| R37 | `I/maestro-migration.int.test.ts` «R37: el mismo correo y el mismo documento entre un usuario de empresa y un Maestro se aceptan»; `I/identity-constraints.int.test.ts:1380`, `:1483`, `:1884`; `I/user-crud.int.test.ts` «QC-161 R37 — …SI se crean…» |
+| R38 | `I/maestro-migration.int.test.ts` «R38: el UP sobre una base sin nombres de usuario repetidos no cambia ninguna fila…»; estático «R38, R39: el UP no escribe filas de users…» |
+| R39 | `I/maestro-migration.int.test.ts` «R39: con dos usuarios vivos de empresas distintas con el mismo nombre…» + simétrico; estático «R39: la guardia es la PRIMERA sentencia…», «R39: el mensaje lista cada nombre…» |
+| R40 | `I/user-crud.int.test.ts` «R40 — el alta con el nombre de un usuario de OTRA empresa o del Maestro…», «R40 — la edicion…», «R40 — por el caso de uso llega como `DuplicateUsernameError`…»; `U/usuarios/user-service.test.ts` |
+| R41 | `tests/unit/errores/catalogo.test.ts` «R41 — duplicate_username dice el choque sin nombrar la empresa», «R41 — duplicate_email y duplicate_document siguen diciendo…» |
+| R42 | `U/seed/seed-initial-access.test.ts` «QC-161 R42…» (x2); `I/identity-seed.int.test.ts` «QC-161 R42: un usuario vivo de otra empresa…», «QC-161 R42: si ese usuario esta dado de baja…» |
+| R43 | `U/seed/seed-initial-access.test.ts` «QC-161 R43…» (x2); `I/identity-seed.int.test.ts` «QC-161 R43: si el correo del Maestro es el de un usuario de una empresa, el seed lo crea» |
+| R44 | `I/login.int.test.ts` «QC-161 R44: un usuario de la empresa B y el Maestro entran con su nombre en otras mayusculas…» |
 
 ---
 

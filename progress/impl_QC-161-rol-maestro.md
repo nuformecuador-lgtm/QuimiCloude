@@ -773,11 +773,22 @@ Guardias aparte (el gate no llega a ellas con rojos relacionados): `vitest run g
 - Rojos ajenos en `--rapido`: `unidades-viewport`, `usuarios-viewport` (baseline);
   `inventario/product-page.test.tsx` y `recetas-ui/recipe-page.test.tsx` (deuda de dev **fuera** del
   baseline: fallan igual en `40d0dea2`, antes de T1, y la rama no toca `app/` ni esos modulos).
-- Puntos para el reviewer o el leader:
-  1. T11: el Maestro del fixture no se crea «en la transaccion del test» porque `login.int` y
-     `session-user.int` van como `commit` en el censo y los adaptadores leen con el cliente global.
-     Se crea en cada caso y se borra en su `finally`; nunca se usa el del seed.
-  2. T7: la segunda corrida de `db:seed` imprime «db:seed: nada que crear», no «ya existia» (es lo que
-     hace `scripts/seed.ts` cuando no crea nada). El Maestro nace con `mustChangeCredential: true`,
-     igual que el Administrador; el spec no lo fija.
-  3. La desviacion aprobada (`ADMIN_EXCLUDED_PERMISSIONS` con `empresas.*`) esta en `design.md > 2`.
+  **Actualizado (preparacion de T14):** el leader confirmo que fallan igual en `origin/dev`
+  (`a543c84d`, #131, y `3018853a`) y ya estan en `tests/baseline-rojos.json` con salida en QC-177.
+- Mapa R1..R44 -> test consolidado en `specs/QC-161-rol-maestro/design.md > 10.3`.
+- La desviacion aprobada (`ADMIN_EXCLUDED_PERMISSIONS` con `empresas.*`) esta en `design.md > 2`.
+
+## Pendientes del reviewer
+
+Tres puntos menores en los que la implementacion no sigue el spec al pie de la letra. No se han
+arreglado: decide el reviewer.
+
+1. **T11, fixture del Maestro.** El spec pide crearlo «en la transaccion del test», pero `login.int` y
+   `session-user.int` van como `commit` en el censo y los adaptadores leen con el cliente Prisma
+   global, que no ve filas sin confirmar. Se crea en cada caso y se borra en su `finally`; nunca se
+   usa el del seed.
+2. **T7, texto del seed.** El «Hecho» de T7 pide que la segunda corrida de `db:seed` diga «ya existia».
+   Imprime «db:seed: nada que crear», que es lo que `scripts/seed.ts` ya hacia cuando no crea nada.
+   No se ha tocado esa rama del script.
+3. **T7, `mustChangeCredential`.** El Maestro nace con `mustChangeCredential: true`, igual que el
+   Administrador inicial. El spec no fija ese campo.
