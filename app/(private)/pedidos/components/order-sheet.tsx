@@ -16,7 +16,7 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
-import { OrderDistributionDialog } from './order-distribution-dialog';
+import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
 import { OrderForm, type OrderSheetSection } from './order-form';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
@@ -211,6 +211,13 @@ export function OrderRowSheetActions({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [distributionOpen, setDistributionOpen] = useState(false);
+  // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
+  const [savedDistribution, setSavedDistribution] = useState<{
+    readonly order: OrderSummary;
+    readonly draft: OrderDistributionDraft;
+  } | null>(null);
+  const pendingDistribution =
+    savedDistribution?.order === order ? savedDistribution.draft : undefined;
   /**
    * QC-102 R23 — EN QUE SECCION abre el UNICO panel de esta fila. No hay un segundo `OrderSheet`
    * para responsables: editar y responsables abren **el mismo**, y esto es lo que los distingue.
@@ -256,6 +263,8 @@ export function OrderRowSheetActions({
           units={units}
           open
           onOpenChange={setDistributionOpen}
+          saved={pendingDistribution}
+          onSaved={(draft) => setSavedDistribution({ order, draft })}
         />
       ) : null}
     </>

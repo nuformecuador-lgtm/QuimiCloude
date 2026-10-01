@@ -279,3 +279,72 @@ describe('dialogo «Reparto y unidad»', () => {
     expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeDisabled();
   });
 });
+
+describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
+  function accionesDeFila(order: OrderSummary) {
+    return (
+      <OrderRowSheetActions
+        order={order}
+        recipes={{ items: [], totalPages: 1 }}
+        units={UNIDADES}
+        canEditDistribution
+      />
+    );
+  }
+
+  async function guardarEnvases(user: ReturnType<typeof setupUser>, envases: string) {
+    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    const campo = await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
+    await user.clear(campo);
+    await user.type(campo, envases);
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+    await waitFor(() => expect(routerMock.refresh).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.queryByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeNull(),
+    );
+  }
+
+  it('R11: con el mismo pedido aun en props, reabre con lo guardado y no con lo anterior', async () => {
+    const user = setupUser();
+    render(accionesDeFila(pedido()));
+
+    await guardarEnvases(user, '5');
+    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+
+    expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(5);
+  });
+
+  it('R11: guardar tras reabrir antes del refresco no reenvia los valores anteriores', async () => {
+    const user = setupUser();
+    render(accionesDeFila(pedido()));
+
+    await guardarEnvases(user, '5');
+    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await user.click(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(2));
+    expect(updateDistributionMock.mock.calls[1]?.[1]).toEqual({
+      unitId: UNIDAD_ID,
+      presentationLines: [{ presentationId: PRESENTACION_ID, packages: '5' }],
+    });
+  });
+
+  it('R11: cuando llega el refresco, reabre con el pedido nuevo y descarta lo guardado en local', async () => {
+    const user = setupUser();
+    const { rerender } = render(accionesDeFila(pedido()));
+
+    await guardarEnvases(user, '5');
+    rerender(
+      accionesDeFila(
+        pedido('POR_EMPACAR', {
+          presentationLines: [
+            { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 7 },
+          ],
+        }),
+      ),
+    );
+    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+
+    expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(7);
+  });
+});

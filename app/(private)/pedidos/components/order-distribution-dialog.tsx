@@ -52,11 +52,22 @@ const LABELS = {
   success: 'Reparto actualizado.',
 } as const;
 
+export type OrderDistributionDraft = {
+  readonly unitId: string;
+  readonly lines: readonly OrderDistributionLine[];
+};
+
 export type OrderDistributionDialogProps = {
   readonly order: OrderSummary;
   readonly units: readonly UnitView[];
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  /**
+   * Lo ultimo guardado desde este dialogo mientras `order` aun no lo refleja: `router.refresh()`
+   * no se espera, y reabrir con los valores viejos y guardar desharia el cambio.
+   */
+  readonly saved?: OrderDistributionDraft;
+  readonly onSaved?: (saved: OrderDistributionDraft) => void;
 };
 
 function unexpectedFromRejection(): ErrorState {
@@ -87,11 +98,13 @@ export function OrderDistributionDialog({
   units,
   open,
   onOpenChange,
+  saved,
+  onSaved,
 }: OrderDistributionDialogProps) {
   const router = useRouter();
-  const [unitId, setUnitId] = useState(order.unitId ?? '');
-  const [lines, setLines] = useState<readonly OrderDistributionLine[]>(() =>
-    fromOrderPresentationLines(order.presentationLines),
+  const [unitId, setUnitId] = useState(saved?.unitId ?? order.unitId ?? '');
+  const [lines, setLines] = useState<readonly OrderDistributionLine[]>(
+    () => saved?.lines ?? fromOrderPresentationLines(order.presentationLines),
   );
   const [error, setError] = useState<ErrorState | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -106,6 +119,7 @@ export function OrderDistributionDialog({
   function save() {
     if (!canSave) return;
     const input = { unitId, presentationLines: toPresentationLinesInput(lines) };
+    const draft: OrderDistributionDraft = { unitId, lines };
     startTransition(async () => {
       let result: OrderMutationFormState;
       try {
@@ -119,6 +133,7 @@ export function OrderDistributionDialog({
         return;
       }
       setError(null);
+      onSaved?.(draft);
       onOpenChange(false);
       toast.success(LABELS.success);
       router.refresh();

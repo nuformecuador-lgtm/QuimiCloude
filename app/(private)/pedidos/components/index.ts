@@ -100,6 +100,7 @@ export {
   ORDER_DISTRIBUTION_DIALOG_TESTID,
   OrderDistributionDialog,
   type OrderDistributionDialogProps,
+  type OrderDistributionDraft,
 } from './order-distribution-dialog';
 export {
   ORDER_DISTRIBUTION_DEBOUNCE_MS,
