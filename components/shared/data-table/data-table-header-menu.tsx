@@ -23,6 +23,7 @@ import { TableHead } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
 import type { DataTableColumn, DataTableSort, DataTableTexts } from './data-table-types';
+import { toColumnTextClass } from './data-table-column-style';
 
 /**
  * Menu por columna y celda de cabecera (`design.md > 2, 5, 8`, T7). Dos piezas de un mismo
@@ -204,9 +205,13 @@ export function DataTableHeaderCell<TRow>({
       data-testid={`data-table-head-${column.id}`}
       data-pinned={pinned === false ? undefined : pinned}
       style={style}
-      className={cn(column.align === 'end' && 'text-right', pinned !== false && 'bg-background')}
+      className={cn(
+        column.align === 'end' && 'text-right',
+        pinned !== false && 'bg-background',
+        toColumnTextClass(column),
+      )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         {isSortable ? (
           <button
             type="button"

@@ -87,12 +87,14 @@ describe('listResponsibleCandidates', () => {
     expect(Object.keys(candidato as object).sort()).toEqual(['displayName', 'id']);
   });
 
-  it('pide a `identity` la empresa del actor, el reloj inyectado y el tope de 25', async () => {
+  it('pide a `identity` la empresa del actor, el reloj inyectado, el tope de 25 y solo cuentas `active`', async () => {
     const m = montar([]);
 
     await m.listar(actorCon('asignaciones.modificar'), {});
 
-    expect(m.listAliveInCompany).toHaveBeenCalledWith(EMPRESA, AHORA, MAX_CANDIDATES);
+    expect(m.listAliveInCompany).toHaveBeenCalledWith(EMPRESA, AHORA, MAX_CANDIDATES, {
+      accountStatus: ['active'],
+    });
     expect(MAX_CANDIDATES).toBe(25);
   });
 });
