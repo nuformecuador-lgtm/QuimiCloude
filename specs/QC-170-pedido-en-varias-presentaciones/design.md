@@ -500,6 +500,34 @@ del reparto se serializan: el que llega segundo ve el estado que dejó el primer
    `receiveFromOrder` (§5) con `unitCost` fijo del paso 4, no recalculado por línea.
 6. `setReservedAt(id, null)`.
 
+> **Nota de enmienda (2026-10-01) — decisión humana 2026-10-01** (R18 enmendado, hallazgo B3 de
+> `progress/review_QC-170-pedido-en-varias-presentaciones.md`). Sustituye el paso 4 anterior; el
+> resto de la secuencia queda igual.
+>
+> - **La cantidad total se suma en la unidad del pedido.** Antes del paso 4, Terminar lee
+>   `orders.unit_id` de la fila ya bloqueada y la `UnitConversion` de esa unidad y de cada unidad de
+>   presentación distinta del reparto (`UnitCatalog`, igual que §3; `PresentationRef.unitId`, T4).
+>   La cantidad de cada línea (`packages × content`, en la unidad de su presentación) se convierte
+>   con `convertQuantity(cantidad, unidadPresentación, unidadPedido)` —la misma conversión que R6 y
+>   `validateDistribution` (T20), sin conversión si las dos unidades coinciden— y el total es la suma
+>   de esas cantidades convertidas. `unitCost = deriveUnitCost(lotCost, totalEnUnidadDelPedido)`,
+>   una sola vez: es coste **por unidad del pedido**.
+> - **Inconvertible (R7).** Un `IncompatibleUnitsError` de esa conversión se traduce a
+>   `incompatible_units` (código ya en el catálogo, QC-76) y se lanza dentro de la misma transacción,
+>   como el `presentation_without_content` del paso 5: deshace el `UPDATE` del paso 1 y ningún lote
+>   nace. No hay código nuevo. Es defensa en profundidad: R7 (al guardar), R38 (al editar cantidad o
+>   unidad) y R13/R14 (reparto fijado) impiden llegar a Terminar con un reparto inconvertible. Un
+>   pedido con líneas siempre tiene unidad (R41-R43, R45), así que `unit_id` nulo con líneas tampoco
+>   es alcanzable sin escribir en la base; si aparece, se rechaza con `order_without_unit` (código
+>   ya existente, R42), también deshaciendo todo. Pendiente de confirmar por el humano: no lo cubre
+>   la decisión del 2026-10-01.
+> - **Alternativa descartada: sumar sin convertir (la versión anterior).** Con un reparto en L y ml
+>   la suma mezclaba magnitudes (p. ej. 2 L + 500 ml = 502) y cada lote salía con un coste por
+>   unidad incorrecto, contra D6.
+> - **Alternativa descartada: convertir a la unidad base de QC-76 en vez de a la del pedido.** Daría
+>   un coste coherente entre lotes, pero en una unidad que no es la del pedido ni la de R6; la
+>   decisión humana fija la unidad del pedido.
+
 `OrderCatalog.finishPackingAliveById` devuelve, en el éxito, `finishedGoods: readonly
 FinishedGoodsReceipt[]` (uno por línea) en vez de un único objeto.
 

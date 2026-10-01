@@ -98,11 +98,20 @@
 - **R17**: CUANDO el Empacador termina el empaque (`EN_EMPAQUE → ENTREGADO`), el sistema DEBE dar de
   alta, por cada línea del reparto, un lote de producto terminado de la combinación receta +
   presentación de esa línea, con cantidad `envases × contenido de la línea`. [D5]
-- **R18**: El sistema DEBE calcular un único coste de los ingredientes del pedido (el guardado, o
-  recalculado si no hay ninguno, con el mismo criterio de QC-150 D21) y DEBE derivar de él un único
-  coste unitario, dividiendo entre la cantidad total producida (la suma de `envases × contenido` de
-  todas las líneas): todos los lotes que nacen de un mismo pedido llevan el mismo coste por unidad.
-  [D6]
+- **R18**: CUANDO el Empacador termina el empaque, el sistema DEBE calcular un único coste de los
+  ingredientes del pedido (el guardado, o recalculado si no hay ninguno, con el mismo criterio de
+  QC-150 D21) y DEBE derivar de él un único coste por unidad del pedido, dividiéndolo entre la
+  cantidad total producida expresada en la unidad del pedido (`orders.unit_id`, R40): la suma, por
+  cada línea, de `envases × contenido` convertido desde la unidad de su presentación a la unidad del
+  pedido con la misma conversión de R6 (QC-76), sin convertir la línea cuya presentación ya está en
+  esa unidad. Todos los lotes que nacen de un mismo pedido DEBEN llevar ese mismo coste por unidad
+  del pedido. SI alguna línea no puede convertirse a la unidad del pedido, ENTONCES rige R7: el
+  servidor rechaza con `incompatible_units` y, como con R19, Terminar se rechaza entero y ningún
+  lote nace (con R7 al guardar, R38 al editar y R13/R14 fijando el reparto, el caso solo es
+  alcanzable con una fila escrita directamente en la base: defensa en profundidad). [D6]
+  > **Enmienda 2026-10-01 — decisión humana.** Motivo: la suma sin convertir mezclaba unidades (L y
+  > ml) en un reparto mixto y daba un coste por unidad incorrecto, contra D6 y R6 (hallazgo B3 de
+  > `progress/review_QC-170-pedido-en-varias-presentaciones.md`).
 - **R19**: SI alguna línea del reparto no tiene contenido copiado ni la presentación tiene hoy un
   contenido vigente, ENTONCES el sistema DEBE rechazar Terminar el empaque entero (ningún lote nace)
   con un error que identifique la línea. [D5] [Q2] (Con R34 ninguna línea nueva nace sin

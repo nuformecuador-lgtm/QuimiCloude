@@ -358,6 +358,24 @@ R13, R35, R36, R41, R42); el esquema rechaza cualquier campo que no sea `unitId`
 `EN_EMPAQUE`/`ENTREGADO`/`CANCELADO` (R11, R13); el formulario muestra el disponible y el aviso de
 R39; `guard-pantallas-exigen-permiso` en verde.
 
+### [ ] T26 — `finishPackingAliveById`: coste por unidad sobre la cantidad convertida a la unidad del pedido (R18 enmendado 2026-10-01)
+
+> Nueva el 2026-10-01 por la enmienda humana de R18 (hallazgo B3 de
+> `progress/review_QC-170-pedido-en-varias-presentaciones.md`). Ver `design.md > 4.5`, nota de
+> enmienda del 2026-10-01.
+
+**Archivos**: `lib/modules/pedidos/domain/order-packing.ts` (hoy `:114-132`: `totalQuantity` suma
+`packages × content` sin convertir), lo que haga falta en sus `deps` para leer `orders.unit_id` y las
+`UnitConversion` (`UnitCatalog`, `PresentationRef.unitId` de T4), `tests/unit/pedidos/order-packing.test.ts`.
+Depende de: T4, T14, T20 (reutiliza la misma conversión que `validateDistribution`).
+**Hecho cuando**: el total que entra en `deriveUnitCost` es la suma de `packages × content` de cada
+línea convertida con `convertQuantity` a la unidad del pedido (sin convertir si coinciden), una sola
+vez (R18); un test con un pedido en L y un reparto con una línea en L y otra en ml comprueba que
+todos los lotes del pedido salen con el MISMO `unit_cost`, igual a `lotCost / total convertido a L`
+(cifra exacta en `Decimal`, no la de la suma sin convertir); otro test con una línea cuya unidad no
+comparte base con la del pedido comprueba `incompatible_units`, que ningún lote nace y que el pedido
+sigue `EN_EMPAQUE` (R7, R18); los tests ya existentes de T14 (R17, R19, R21) siguen en verde.
+
 ## Guardias que se ponen rojas y quién las arregla
 
 `guard-catalogo-de-errores` (T17: cuatro altas, 60 → 64; sin cambio en F1.4 bis: R44 retirado no
@@ -388,6 +406,7 @@ T0,T1 → T13
 T8,T9,T13,T20 → T21
 T1,T7 → T23
 T6,T10,T12,T13 → T14
+T4,T14,T20 → T26
 T10 → T16 (desbloqueada, [Q1]) → T15 (solo lectura) ; T16,T11 → T22 → T25 (depende tambien de T9)
 T0 → T17 [P]
 cualquier momento → T18 [P], T24 [P]
