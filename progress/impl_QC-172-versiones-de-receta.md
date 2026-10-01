@@ -495,3 +495,95 @@ Fixtures ajustados (solo campos nuevos obligatorios; ningun aserto cambia):
   `recetas-ui/recipe-page.test.tsx` R21, preexistente (T2/T3/T4). `scope.test.ts` ya en verde.
 - `pnpm exec vitest run tests/guards`: `Test Files 44 passed (44)`, `Tests 593 passed | 5 skipped (598)`.
 - No corridos (por indicacion): suite completa, `./init.sh`, `vitest related`.
+
+## T6 — catalogo publico con versiones
+
+Commit `9111b03e`. Grafo no usado; todo con Grep/Read.
+
+### Archivos
+Produccion:
+- `lib/modules/recetas/domain/recipe-catalog.ts`: `RecipeRef` gana `ownName`, `isUnderReview` y
+  `original`; `name` pasa a ser el mostrado. Doc de `findExecutionContentById`,
+  `findIdsMatchingName` y `findAliveByNormalizedName` al dia. Se limpiaron las citas de fichas del
+  comentario de `RecipeRef` (lineas tocadas).
+- `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`:
+  - `toRecipeRef` compone el nombre con `recipeDisplayName` y calcula `isUnderReview` con
+    `isVersionUnderReview` (lineas a `toFixed(2)`).
+  - `findRecipeRefsIncludingDeleted`: el `select` gana `parent { id, name }` y
+    `lines { percentage }`; sigue siendo un solo `findMany`.
+  - `toRecipeExecutionContent`/`findExecutionContentByIdOn`: `parent { name, steps }` sin filtro de
+    vida; nombre compuesto y pasos de la original si es version; lineas propias.
+  - `findRecipeIdsMatchingName`: `AND: [scope, { OR: [{ nameNormalized }, { parent: { nameNormalized } }] }]`.
+  - `findAliveRecipeByNormalizedName`: `parentRecipeId: null`.
+
+Tests:
+- `tests/unit/recetas/recipe-catalog.test.ts`: filas de los casos previos con `parent: null`,
+  `lines: []` y `RecipeRef` con los tres campos nuevos (ningun aserto cambia de sentido); el `select`
+  y el `where` de busqueda/choque se fijan con su forma nueva. Casos nuevos (abajo).
+- `tests/integration/recetas/company-scope-queries.int.test.ts`: `toEqual` de `:473` con los campos
+  nuevos; `describe` nuevo de versiones con siembra propia (un producto por empresa, para no tocar
+  el recuento de lineas del producto sembrado que fija el caso de `recipe_lines`) y su `afterAll`
+  (versiones -> originales -> productos). El `afterAll` global borra antes las versiones (FK RESTRICT).
+- Dobles de `RecipeRef` (solo campos nuevos; `ownName` = `name`, `isUnderReview: false`,
+  `original: null`):
+  - `pedidos/{create-order,update-order,list-orders,order-service,company-isolation-service,company-scope,quote-order-cost,transition-order}.test.ts`;
+  - `asignaciones/{list-assigned-orders,list-company-orders,list-finished-orders,get-packing-order,list-packing-orders}.test.ts`
+    (los cinco de la enmienda);
+  - `documentos/confirm-formula-import.test.ts` (el doble anade los campos al devolver).
+- No hizo falta tocar `OrderView`/`toOrderView` para compilar: `pedidos` solo lee `ref.name`, que
+  ahora es el mostrado. Nada de T9 adelantado.
+
+### R -> test
+| R | Casos |
+|---|---|
+| R8 | `recipe-catalog` › `R8, R11: una version se ejecuta con el nombre compuesto, los pasos de su original…`, `R8: los pasos propios de una version no se usan…`, `R8, R25: pide los pasos de la original sin filtro de vida…`; int › `R8, R25: …version dada de baja trae los pasos de su original, tambien de baja`, `R8, R11: …version viva…` |
+| R11 | `recipe-catalog` › `toRecipeRef de una version` › `R11: el nombre mostrado es «Original · Version»…`, `R11: una version dada de baja conserva su nombre compuesto`; int › `R11, R21: la referencia de una version publica la original…` |
+| R21 | `recipe-catalog` › `R21: …no suman 100…`, `R21: una version sin lineas…`, `R21: una original sin lineas NO esta por revisar…` |
+| R25 | int › `R8, R25`; `recipe-catalog` › `R8, R25` |
+| R37 | `recipe-catalog` › `R37: findAliveRecipeByNormalizedName solo mira originales`; int › `R37: findAliveByNormalizedName ignora una version viva…` |
+| R40, R41 | `recipe-catalog` › `R41, R40: el OR … va DENTRO del AND con el ambito`; int › `R41, R40: una version se encuentra por su nombre y por el de su original, y nunca la de otra empresa` |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio (0 errores).
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes).
+- `pnpm exec vitest run tests/unit/recetas tests/unit/pedidos tests/unit/asignaciones tests/unit/documentos`:
+  `Test Files 1 failed | 251 passed (252)`, `Tests 1 failed | 3393 passed | 33 skipped (3427)`. El rojo
+  es `recetas-ui/recipe-page.test.tsx` R21, preexistente.
+- `pnpm exec vitest run tests/integration/recetas/company-scope-queries.int.test.ts` (base efimera):
+  `Tests 32 passed (32)`.
+- `pnpm exec vitest run tests/guards`: `Test Files 44 passed (44)`, `Tests 593 passed | 5 skipped (598)`.
+
+## T7 — server actions de versiones
+
+Commit `e9298bb0`.
+
+### Archivos
+- `lib/modules/recetas/adapters/driving/recipe-actions.ts`: `createRecipeVersionAction(originalId, input)`,
+  `updateRecipeVersionAction(versionId, input)` (validan con `createRecipeVersionSchema` /
+  `updateRecipeVersionSchema` antes de leer sesion o llamar al caso de uso) y
+  `listRecipeVersionsAction(originalId)`; mismo `currentActor` + `toErrorState`. Tipos de estado
+  `CreateRecipeVersionFormState`, `UpdateRecipeVersionFormState`, `RecipeVersionListResult`.
+  `listRecipeVersionsAction` no valida el id en el borde, igual que `getRecipeAction`/`deleteRecipeAction`.
+- `tests/unit/recetas/recipe-actions.test.ts`: tres `describe` nuevos y las tres acciones en el censo
+  de `QC-50 R13` (el caso «las cinco actions» pasa a «todas las actions»).
+- `tests/unit/identity/session-once-per-request-actions.test.ts`: tres filas en `ACCIONES` (opcional
+  segun T0.6; encaja con el formato), con entradas validas para que lleguen a `currentActor`.
+
+### R -> test
+| R | Casos |
+|---|---|
+| R38 | `recipe-actions` › `createRecipeVersionAction` › `R38: rechaza la entrada invalida ({sin nombre, lineas que no suman 100, lineas vacias, no objeto}) sin llamar al caso de uso`, `R38: sin permiso → …`; `updateRecipeVersionAction` › `R38: rechaza … ({sin lineas, no suman 100, sin nombre})`; `listRecipeVersionsAction` › `R38: sin permiso → …`; `session-once-per-request-actions` › filas de las tres |
+| R2 | `recipe-actions` › `R2: sin lineas es valida y llega al caso de uso…` |
+| R4, R5, R12 | `recipe-actions` › `createRecipeVersionAction` › `R4/R5/R12 … → estado de error traducido` |
+| R7 | `recipe-actions` › `R7: editar una original por esta via devuelve accion no permitida traducida` |
+| R10 | `recipe-actions` › `R10: original inexistente, de baja o version → estado de error traducido` |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes).
+- `pnpm exec vitest run tests/unit/recetas/recipe-actions.test.ts tests/unit/identity/session-once-per-request-actions.test.ts`:
+  `Test Files 2 passed (2)`, `Tests 84 passed (84)`.
+- `pnpm exec vitest run tests/guards tests/unit/recetas tests/unit/identity/session-once-per-request-actions.test.ts`:
+  `Test Files 1 failed | 92 passed (93)`, `Tests 1 failed | 1375 passed | 5 skipped (1381)`. El rojo
+  es `recetas-ui/recipe-page.test.tsx` R21, preexistente.
+- No corridos (por indicacion): suite completa, `./init.sh`, `vitest related`.

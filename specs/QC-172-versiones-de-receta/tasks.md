@@ -99,7 +99,7 @@ por revisar (R22); `updateRecipe` sin ids llama a `replaceAlive` y no a la propa
 devuelve `propagated` (R14, R19); `getRecipe` de una versión devuelve pasos, descripción e imagen de la
 original (R8, ⚑ P3); `listRecipeVersions` ordenado, con `isUnderReview`, y rechazo de versión/baja (R10).
 
-### T6 [ ] — Catálogo público y sus consumidores
+### T6 [x] — Catálogo público y sus consumidores
 Tras T3, T1. **Toca:** `lib/modules/recetas/domain/recipe-catalog.ts`,
 `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`,
 `tests/unit/recetas/recipe-catalog.test.ts`, `tests/integration/recetas/company-scope-queries.int.test.ts`,
@@ -111,7 +111,7 @@ y los dobles de `RecipeRef` que T0.2 liste en `tests/unit/{pedidos,asignaciones,
 (R8, R25); `findAliveByNormalizedName` ignora versiones (R37); `findIdsMatchingName` encuentra una
 versión por su nombre y por el de su original, y no la de otra empresa (R41, R40). Typecheck en verde.
 
-### T7 [ ] — Server Actions de versiones
+### T7 [x] — Server Actions de versiones
 Tras T5. **Toca:** `lib/modules/recetas/adapters/driving/recipe-actions.ts`,
 `tests/unit/recetas/recipe-actions.test.ts`, `tests/unit/identity/session-once-per-request-actions.test.ts`.
 **Hacer:** §5, último párrafo.
