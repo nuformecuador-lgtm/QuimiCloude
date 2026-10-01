@@ -1,4 +1,4 @@
--- Nace `order_presentation_lines` (el reparto del pedido, QC-170 R1-R5) y `orders.unit_id`
+-- Nace `order_presentation_lines` (el reparto del pedido en presentaciones) y `orders.unit_id`
 -- (la unidad en la que se expresa `quantity`). Las dos son DDL puro sobre una base con datos:
 -- ninguna toca una fila existente.
 --
@@ -27,7 +27,7 @@ ALTER TABLE "order_presentation_lines" ADD CONSTRAINT "order_presentation_lines_
 ALTER TABLE "order_presentation_lines" ADD CONSTRAINT "order_presentation_lines_content_positive"
   CHECK ("presentation_content" IS NULL OR "presentation_content" > 0);
 
--- Una presentacion, una linea por pedido (R2): repetirla suma envases sobre la misma fila.
+-- Una presentacion, una linea por pedido: repetirla suma envases sobre la misma fila.
 CREATE UNIQUE INDEX "order_presentation_lines_order_id_presentation_id_key"
   ON "order_presentation_lines"("order_id", "presentation_id");
 
@@ -54,8 +54,8 @@ ALTER TABLE "order_presentation_lines" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "order_presentation_lines" FORCE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------------------
--- 2. `orders.unit_id`: la unidad en que se expresa `quantity` (R40-R41). Anulable en la base
--- (R43 deja pedidos antiguos sin ella); la aplicacion la exige en el alta y en la edicion.
+-- 2. `orders.unit_id`: la unidad en que se expresa `quantity`. Anulable en la base
+-- (los pedidos previos no la tienen); la aplicacion la exige en el alta y en la edicion.
 -- ---------------------------------------------------------------------------------------
 ALTER TABLE "orders" ADD COLUMN "unit_id" UUID;
 

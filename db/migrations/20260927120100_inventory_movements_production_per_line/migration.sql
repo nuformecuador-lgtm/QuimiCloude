@@ -1,4 +1,4 @@
--- El reparto de QC-170 puede dar de alta varios asientos `production` por pedido -uno por
+-- El reparto en presentaciones puede dar de alta varios asientos `production` por pedido -uno por
 -- linea-, asi que la unicidad de un solo asiento `production` por pedido
 -- (`inventory_movements_one_production_per_order`, `20260924190100_*`) queda falsa. Depende de
 -- la migracion anterior: la FK nueva apunta a `order_presentation_lines`, que nace ahi.
