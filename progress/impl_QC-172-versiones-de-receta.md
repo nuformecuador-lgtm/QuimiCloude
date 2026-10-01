@@ -427,3 +427,71 @@ Tests:
     es exactamente el esperado»: censo cerrado de `model Recipe` que no conoce `parentRecipeId`,
     `parent` y `versions`. Lo pone rojo el `db/schema.prisma` de **T1** (T4 no toca el esquema); T1 no
     lo corrio. Arreglo: anadir esas tres entradas al censo. Pendiente de asignar.
+
+## T5 — casos de uso de versiones
+
+Commit `18fb888e`. Grafo no usado (este worktree no tiene indice); todo con Grep/Read.
+
+### Archivos
+Produccion:
+- `lib/modules/recetas/domain/create-recipe-version.ts` (nuevo): permiso → zod → `findAliveById`
+  (null → no encontrada; version → accion no permitida) → `lines ?? copia de la original` por
+  `recipeLinesSchema` → productos (existen, no terminados) → `createVersion`.
+- `lib/modules/recetas/domain/update-recipe-version.ts` (nuevo): permiso → zod → `findAliveById`
+  (original → accion no permitida) → solo valida productos nuevos → `replaceAlive` con `steps: []`,
+  `description`/`imagePath` `null`.
+- `lib/modules/recetas/domain/list-recipe-versions.ts` (nuevo): `recetas.consultar`; original
+  inexistente o que es version → no encontrada; `RecipeVersionSummary[]` en el orden del repositorio.
+- `update-recipe.ts`: version → `ActionNotAllowedError` antes de validar productos o subir imagen;
+  sin ids → `replaceAlive` (camino de hoy); con ids → `replaceAliveWithPropagation`
+  (`version_not_found` → `ValidationError`); `UpdateRecipeResult.propagated` (vacio sin propagar).
+- `get-recipe.ts`: `original`, `isUnderReview`, `displayName`; pasos, `stepCount`, descripcion e
+  imagen de la original si es version.
+- `recipe-input.ts`: `propagateToVersionIds` (uuid, sin repetidos, `default([])`) en
+  `updateRecipeSchema`; `createRecipeVersionSchema` (`lines` opcional) y `updateRecipeVersionSchema`;
+  `recipeLinesSchema` pasa a exportarse (sin barrel) para validar las lineas copiadas.
+- `recipe-view.ts`: `RecipeDetail` + `original`/`isUnderReview`/`displayName`; `RecipeVersionSummary`.
+- `index.ts`: los tres factories, sus `Deps`, los dos esquemas, sus tipos y `RecipeVersionSummary`.
+- `lib/composition/index.ts`: `recetas.createRecipeVersion`, `updateRecipeVersion`, `listRecipeVersions`.
+
+Tests nuevos: `tests/unit/recetas/{create-recipe-version,update-recipe-version,list-recipe-versions,update-recipe,get-recipe}.test.ts`.
+
+Fixtures ajustados (solo campos nuevos obligatorios; ningun aserto cambia):
+- `tests/unit/recetas-ui/recipe-form.test.tsx` (enmienda 2).
+- `tests/unit/recetas/scope.test.ts`: censo de `model Recipe` + `parentRecipeId`, `parent`, `versions`.
+- **Fuera de la lista de T5, por typecheck rojo**: `tests/unit/pedidos-ui/{order-form,order-form-quote,order-sheet,pedidos-viewport}.test.tsx`
+  (construyen `RecipeDetail`; T0 solo contaba los dos primeros) y
+  `tests/unit/documentos/{confirm-formula-import,formula-import-authorization}.test.ts` (doble de
+  `updateRecipe` sin `propagated`). Y `tests/unit/recetas/company-scope.test.ts` (fila con
+  `as unknown as` sin `original`: rojo en ejecucion, no en typecheck).
+
+### R → test
+| R | Casos |
+|---|---|
+| R1 | `create-recipe-version` › `R1, R40: crea la version con sus lineas, vinculada a la original…` |
+| R2 | `create-recipe-version` › `R2: sin lineas, la version nace con una copia…`; `R2, R3: …original que no suma 100…` |
+| R3 | `create-recipe-version` › `R3: con lineas {que no suman 100, que suman mas de 100, vacias, con un producto repetido, con tres decimales}`, `R3: …producto terminado…`, `R3: …producto que no existe…`; `update-recipe-version` › `R3: …` (3 + terminado) |
+| R4 | `create-recipe-version` › `R4: crear desde una version → accion no permitida…` |
+| R5 | `create-recipe-version` › `R5, R40: original inexistente…`; `R5: …not_found entre la lectura y el alta` |
+| R6 | `update-recipe-version` › `R6, R8, R40: reemplaza nombre y lineas…`; `R6: solo valida contra el catalogo el producto nuevo` |
+| R7 | `update-recipe` › `R7: editar una version con la operacion de recetas originales…`; `update-recipe-version` › `R7: editar una original con la operacion de versiones…` |
+| R8 | `get-recipe` › `R8, R11: el detalle de una version trae los pasos, la descripcion y la imagen de su original…` |
+| R10 | `list-recipe-versions` › `R10, R11, R21, R40: …`, `R10, R40: …no encontrada`, `R10: pedir las versiones de una version…` |
+| R11 | `get-recipe` › `R8, R11`, `R11, R21: una original se muestra con su nombre…`; `list-recipe-versions` |
+| R12 | `create-recipe-version` y `update-recipe-version` › `R12: …nombre duplicado` |
+| R14, R19, R20 | `update-recipe` › `R14, R19, R20: con versiones indicadas guarda y propaga…`; `R14: la propagacion que responde {not_found, duplicate}…` |
+| R16 | `update-recipe` › `R16: sin versiones indicadas…`, `R16: una lista vacia…` |
+| R17 | `update-recipe` › `R17: si alguna version indicada no es una version viva…`, `R17: con versiones {repetidas, que no son uuid}…` |
+| R21 | `get-recipe` › `R21: una version {que no suma 100, sin lineas} sale por revisar`; `R11, R21` |
+| R22 | `update-recipe-version` › `R22: editar una version por revisar con lineas validas la deja de considerar por revisar` (repositorio con estado + `getRecipe`) |
+| R38 | los cinco archivos › `R38: … rechaza antes de llamar a ningun doble` |
+| R40 | `create-recipe-version`, `update-recipe-version`, `list-recipe-versions`, `get-recipe` (scope = empresa del actor; otra empresa = no encontrada) |
+
+### Verificacion (salida real)
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `0 errors, 8 warnings` (las 8 preexistentes).
+- `pnpm exec vitest run tests/unit/recetas tests/unit/recetas-ui/recipe-form.test.tsx tests/unit/documentos/confirm-formula-import.test.ts tests/unit/documentos/formula-import-authorization.test.ts tests/unit/pedidos-ui/{order-form,order-form-quote,order-sheet,pedidos-viewport}.test.tsx tests/guards/guard-arquitectura-modulos.test.ts tests/guards/guard-ambito-empresa-recetas.test.ts`:
+  `Test Files 1 failed | 55 passed (56)`, `Tests 1 failed | 918 passed (919)`. El rojo es
+  `recetas-ui/recipe-page.test.tsx` R21, preexistente (T2/T3/T4). `scope.test.ts` ya en verde.
+- `pnpm exec vitest run tests/guards`: `Test Files 44 passed (44)`, `Tests 593 passed | 5 skipped (598)`.
+- No corridos (por indicacion): suite completa, `./init.sh`, `vitest related`.

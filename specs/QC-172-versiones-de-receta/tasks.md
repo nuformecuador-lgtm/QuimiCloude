@@ -83,7 +83,7 @@ no es versión de esa original no deja nada cambiado (R17) y un fallo forzado a 
 su `describe` estructural cubre también `replaceAliveWithPropagation`, con un caso que muere si se le
 quita el `recipeCompanyScope(scope)` al `updateMany` de la versión.
 
-### T5 [ ] — Casos de uso de `recetas`
+### T5 [x] — Casos de uso de `recetas`
 Tras T2, T4. **Toca:** `lib/modules/recetas/domain/{create-recipe-version.ts,update-recipe-version.ts,list-recipe-versions.ts}`
 (nuevos), `update-recipe.ts`, `get-recipe.ts`, `recipe-input.ts`, `recipe-view.ts`, `index.ts`,
 `lib/composition/index.ts` (exporta los tres casos de uso),
