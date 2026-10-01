@@ -792,3 +792,36 @@ arreglado: decide el reviewer.
    No se ha tocado esa rama del script.
 3. **T7, `mustChangeCredential`.** El Maestro nace con `mustChangeCredential: true`, igual que el
    Administrador inicial. El spec no fija ese campo.
+
+## Vuelta 2
+
+Tras el rechazo de `progress/review_QC-161-rol-maestro.md` (B1, m1, m3). Solo comentarios; ningun
+cambio de codigo ni de nombres de casos.
+
+- **B1** (`03b6bf5b`): `lib/modules/identity/domain/session-claims.ts`, JSDoc de
+  `parseSessionClaims`, sin `(QC-9 R28)` ni `(QC-23 R6)` en las dos lineas que toca la rama.
+  `tests/unit/identity/session-claims.test.ts`: 20/20.
+- **m1** (`fd67991c`): 42 lineas de comentario anadidas por la rama en 14 archivos de `tests/` sin
+  citas de fichas, requisitos ni tasks (`QC-<n>`, `R<n>`, `T10`). Intactos: los nombres de
+  `it`/`describe` y los strings que compara un test (`permissions.test.ts:635,731-733`, el regex y
+  sus entradas; `maestro-rol.test.ts:207`, mensaje de fallo de un `expect`). Unit tocados: 9
+  archivos, 240/240. Integracion tocados (contra copia de `QuimiCloude_QC161`): 5 archivos, 159/159.
+- **m3** (`52dd90b3`): `db/schema.prisma`, comentario de cabecera de `User` reajustado (la linea
+  larga era la 90 del archivo; 165 es su posicion en el diff). `prisma validate` ok,
+  `prisma format --check` ok, `prisma migrate diff` del esquema anterior al nuevo: «No difference
+  detected.», `prisma generate` y `typecheck` ok.
+
+`./init.sh --rapido` (una corrida): prisma, fichas, cupo, base `QuimiCloude_QC161` al dia (57
+migraciones), typecheck y lint (0 errores, 8 warnings ajenos) verdes. `test:rapido`:
+
+```
+ Test Files  4 failed | 540 passed (544)
+      Tests  6 failed | 7890 passed | 44 skipped (7940)
+```
+
+Los 4 rojos estan en `tests/baseline-rojos.json`: `unidades-viewport`, `usuarios-viewport`,
+`product-page` (R18) y `recipe-page` (R21). Como el gate se corta ahi, las guardias se corrieron
+aparte: `pnpm exec vitest run guard` → 51 archivos, 654 passed, 11 skipped. Sin bases
+`qct_qc161_*` huerfanas.
+
+Veredicto: B1, m1 y m3 resueltos; ningun rojo fuera de la linea base.
