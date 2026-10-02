@@ -26,7 +26,7 @@ export const cropCatalogMemory: CropCatalog = {
     return Promise.resolve(rutas);
   },
 
-  createSignedReadUrl(path: string): Promise<string> {
-    return Promise.resolve(`${E2E_STORAGE_ORIGIN}/crops/${path}`);
+  publicUrl(path: string): string {
+    return `${E2E_STORAGE_ORIGIN}/crops/${path}`;
   },
 };

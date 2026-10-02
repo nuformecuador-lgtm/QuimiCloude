@@ -23,15 +23,13 @@ const SESSION_CLAIMS_SCHEMA = z.object({
   // sin consultar la base y sin suponer ningun rol por defecto. Un rol por defecto seria un rol
   // inventado, y este contenido lo escribe quien firma, no quien lee.
   role: z.string().min(1),
-  // QC-48 R6: el UUID de la empresa de la persona, y NADA MAS de ella —ni su nombre, ni su
-  // nombre normalizado, ni sus marcas de tiempo, ni su estado de baja—. Se llama `cid` y no
-  // `companyId` por la misma razon por la que existen `sub`, `iat` y `exp`: este valor viaja en
-  // cada peticion y el UUID ya cuesta 36 caracteres. `.uuid()` y no `.min(1)` a proposito, mismo
-  // criterio que `sub`: el valor acaba comparandose contra una columna `@db.Uuid`, asi que un
-  // texto sin forma de UUID tiene que morir en el borde y no en Prisma. Ausente, vacio, de un
-  // tipo que no es texto o mal formado -> `null`, sin consultar la base y sin suponer ninguna
-  // empresa por defecto (R9): una empresa por defecto seria una empresa inventada.
-  cid: z.string().uuid(),
+  // El UUID de la empresa de la persona, y nada mas de ella. Se llama `cid` y no `companyId`
+  // porque viaja en cada peticion. `.uuid()` y no `.min(1)`, mismo criterio que `sub`: acaba
+  // comparandose contra una columna `@db.Uuid`. `null` explicito es «sin empresa» (el Maestro);
+  // ausente, vacio, de un tipo que no es texto o mal formado invalida la sesion: una empresa por
+  // defecto seria una empresa inventada. Admitir `null` no exige subir la version de la cookie:
+  // toda cookie emitida antes lleva un UUID.
+  cid: z.string().uuid().nullable(),
   // QC-23 R1, R6: el IDENTIFICADOR de esta sesion. `.uuid()` y no `.min(1)` a proposito, mismo
   // criterio que `sub` y `cid`: el valor acaba comparandose contra una columna `@db.Uuid`
   // (`revoked_sessions.session_id`), asi que un texto sin forma de UUID tiene que morir en el
@@ -63,8 +61,10 @@ export type SessionClaims = {
    * para que fuera del codec nadie vea la abreviatura. **No autoriza nada por si sola** (QC-48
    * R22): quien filtra datos de negocio usa la empresa LEIDA DE LA BASE, y este valor solo sirve
    * como material de comparacion contra la ficha del usuario (QC-48 R13, R20).
+   *
+   * `null` solo si se firmo explicitamente sin empresa.
    */
-  readonly companyId: string;
+  readonly companyId: string | null;
   /**
    * El identificador de ESTA sesion (QC-23 R1). Se traduce aqui de `sid` a `sessionId` —en el
    * mismo sitio donde `role` pasa a `roleName` y `cid` a `companyId`— para que fuera del codec
@@ -81,8 +81,8 @@ export type SessionClaims = {
  * Interpreta el contenido firmado ya decodificado (el JSON, no el valor completo de la cookie).
  * Devuelve `null` ante cualquier entrada invalida: JSON mal formado, campos ausentes, `sub` sin
  * forma de UUID, `iat`/`exp` que no sean enteros positivos, un `role` ausente, vacio o que no
- * es texto (QC-9 R28), o un `cid` ausente, vacio, que no es texto o sin forma de UUID (QC-48
- * R9), o un `sid` ausente, vacio, que no es texto o sin forma de UUID (QC-23 R6). No lanza en
+ * es texto, o un `cid` ausente, vacio, que no es texto ni `null`, o sin forma de UUID,
+ * o un `sid` ausente, vacio, que no es texto o sin forma de UUID. No lanza en
  * ningun caso: un
  * payload que no es JSON es entrada invalida, no un fallo, y el `try` que lo cubre esta acotado
  * exactamente a la linea de `JSON.parse` (R6).

@@ -7,6 +7,6 @@
 export interface CropCatalog {
   /** Las rutas completas de los recortes que ya existen para ese archivo de esa empresa. */
   list(companyId: string, documentFileId: string): Promise<readonly string[]>;
-  /** Una URL de lectura firmada para esa ruta, valida durante `expiresInSeconds`. */
-  createSignedReadUrl(path: string, expiresInSeconds: number): Promise<string>;
+  /** URL publica de lectura de esa ruta. Sincrona: no toca la red. */
+  publicUrl(path: string): string;
 }

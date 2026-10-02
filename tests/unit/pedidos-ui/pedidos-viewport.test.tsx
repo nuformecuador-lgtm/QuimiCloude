@@ -30,23 +30,27 @@
 // columnas angostas (correlativo, estado, prioridad) y dos anchas (receta, motivo), y `tasks.md >
 // T14` obliga a **comprobarlo y anotar el resultado**, parando si resultara inservible.
 //
-// **Resultado: NO bloquea.** Los cuatro hechos que lo sostienen se afirman en el ultimo `describe`
+// **Resultado: CERRADA por decision humana.** La pantalla declara ancho fijo donde lo necesita
+// y contenido en el resto, y los hechos que lo sostienen se afirman en el ultimo `describe`
 // de este archivo, en los dos viewports:
 //
-//   1. Ninguna de las diez columnas declara ancho: `buildOrderColumns` no emite `size`, `width`,
-//      `minSize` ni `maxSize`. No hay nada que la libreria pueda imponer al DOM por esa via.
-//   2. Ninguna celda ni cabecera recibe un estilo de ancho en linea. `data-table.tsx` solo escribe
-//      estilo en linea para el fijado (`position`, `left`/`right`, `zIndex`), nunca `width`.
-//   3. La tabla usa **layout automatico**: `components/ui/table.tsx` no declara `table-fixed`, asi
-//      que el navegador dimensiona cada columna **por su contenido**, y las celdas llevan
-//      `whitespace-nowrap`, asi que el contenido no se parte en columnas angostas.
-//   4. Los 150 px por defecto de la libreria solo alimentan los **offsets sticky**
-//      (`column.getStart()`), y la unica columna fijada es la **primera**, cuyo offset es `0`. Un
-//      offset de 0 no depende del ancho supuesto de nada.
+//   1. Solo `recipeName` declara ancho: `width: 500` del contrato (fijo + minimo en linea, para
+//      que el salto de linea no la encoja) con `hideText: false` (el texto parte dentro de esos
+//      500 px). Es el texto largo de la fila y sin tope empuja al resto fuera de la vista.
+//   2. Ninguna columna declara las claves de dimensionado de la LIBRERIA (`size`, `minSize`,
+//      `maxSize`, ...): por esa via la libreria no impone nada al DOM, y sus 150 px por defecto
+//      solo alimentan los offsets sticky.
+//   3. El resto de celdas y cabeceras no lleva ningun estilo de ancho en linea: `data-table.tsx`
+//      solo escribe `width`/`minWidth` donde la columna lo declara, y `position`/`left`/`right`
+//      para el fijado.
+//   4. La tabla usa **layout automatico**: `components/ui/table.tsx` no declara `table-fixed`, asi
+//      que el navegador dimensiona por contenido lo no declarado, y las celdas sin `hideText`
+//      llevan `whitespace-nowrap`, asi que el contenido no se parte en columnas angostas.
+//   5. La unica columna fijada es la del correlativo (R19), y es la **primera**, cuyo offset
+//      sticky es `0`. Un offset de 0 no depende del ancho supuesto de nada.
 //
-// Es decir: el ancho por defecto de la libreria no llega al DOM en esta pantalla. Por eso **no se
-// propone una tercera prop de ancho en el componente compartido** —seria alcance inventado, y la
-// decision es del humano—, y P2 se **arrastra** tal como esta escrita, sin cambiar de estado.
+// Es decir: el ancho declarado llega al DOM solo donde la pantalla lo pide, y el ancho por
+// defecto de la libreria sigue sin llegar a ninguna parte en esta pantalla.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
@@ -64,6 +68,7 @@ import {
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_SELECT_TESTID,
   QUANTITY_COLUMN_ID,
+  RECIPE_NAME_COLUMN_ID,
   RECIPE_PICKER_TESTID,
   buildOrderColumns,
   type RecipePickerPage,
@@ -594,14 +599,15 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
   // P2 de QC-55 (ancho de columna): comprobacion formal. Ver la cabecera de este archivo.
   // ------------------------------------------------------------------------------------------
 
-  it('P2 — ninguna columna declara ancho y ninguna celda recibe uno en linea', async () => {
-    // Primera mitad: la CONFIGURACION. Si una columna declarase `size`, la libreria si tendria un
-    // ancho que imponer, y los 150 px por defecto dejarian de ser inertes.
+  it('P2 — solo receta declara ancho fijo y el resto no recibe ninguno en linea', async () => {
+    // Primera mitad: la CONFIGURACION. Solo `recipeName` declara el `width` del contrato
+    // (decision humana: es el texto largo de la fila); ninguna declara las claves de
+    // dimensionado de la libreria, asi que por esa via no impone nada.
     const columnas = buildOrderColumns({ recipes: RECETAS, units: [] });
     expect(columnas).toHaveLength(11);
 
     for (const columna of columnas) {
-      for (const clave of ['size', 'width', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {
+      for (const clave of ['size', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {
         expect(
           Object.prototype.hasOwnProperty.call(columna, clave),
           `la columna ${columna.id} declara ${clave}`,
@@ -609,7 +615,18 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
       }
     }
 
-    // Segunda mitad: el DOM. Ni cabeceras ni celdas llevan ancho en linea.
+    const receta = columnas.find((columna) => columna.id === RECIPE_NAME_COLUMN_ID);
+    expect(receta?.width).toBe(500);
+    expect(receta?.hideText).toBe(false);
+    for (const columna of columnas.filter((otra) => otra.id !== RECIPE_NAME_COLUMN_ID)) {
+      expect(
+        Object.prototype.hasOwnProperty.call(columna, 'width'),
+        `la columna ${columna.id} declara width`,
+      ).toBe(false);
+    }
+
+    // Segunda mitad: el DOM. Solo las celdas de receta llevan ancho en linea (fijo + minimo,
+    // para que el salto de linea no la encoja); el resto, ninguno.
     await renderPantalla();
 
     const celdas = [
@@ -619,9 +636,15 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     expect(celdas.length, 'la tabla deberia tener celdas').toBeGreaterThan(0);
 
     for (const celda of celdas) {
-      expect((celda as HTMLElement).style.width, `ancho en linea a ${ancho}px`).toBe('');
-      expect((celda as HTMLElement).style.minWidth, `ancho minimo en linea a ${ancho}px`).toBe('');
-      expect((celda as HTMLElement).style.maxWidth, `ancho maximo en linea a ${ancho}px`).toBe('');
+      const esReceta =
+        celda.getAttribute('data-testid') === `data-table-cell-${RECIPE_NAME_COLUMN_ID}` ||
+        celda.getAttribute('data-testid') === `data-table-head-${RECIPE_NAME_COLUMN_ID}`;
+      const estilo = celda as HTMLElement;
+      expect(estilo.style.width, `ancho en linea a ${ancho}px`).toBe(esReceta ? '500px' : '');
+      expect(estilo.style.minWidth, `ancho minimo en linea a ${ancho}px`).toBe(
+        esReceta ? '500px' : '',
+      );
+      expect(estilo.style.maxWidth, `ancho maximo en linea a ${ancho}px`).toBe('');
       expect(celda.getAttribute('width'), `atributo width a ${ancho}px`).toBeNull();
     }
   });

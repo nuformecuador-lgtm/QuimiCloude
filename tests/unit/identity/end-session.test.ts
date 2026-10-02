@@ -49,7 +49,7 @@ function claimsDe(sessionId: string): SessionClaims {
  * Es la forma minima de la base que hace falta para poder preguntarle a la cadena REAL si una
  * sesion sigue resolviendo.
  */
-function crearMundo() {
+function crearMundo(companyId: string | null = COMPANY_ID) {
   const estado = { sello: SELLO_VIEJO, cerradas: new Map<string, Date>() };
 
   const revokeSession = vi.fn(
@@ -70,7 +70,7 @@ function crearMundo() {
         firstNames: 'Ana Maria',
         lastNames: 'Perez Gomez',
         roleName: 'operador',
-        companyId: COMPANY_ID,
+        companyId,
         companyDeletedAt: null,
         permissions: ['inventario.consultar'],
         accountStatus: 'active',
@@ -244,5 +244,46 @@ describe('endSession — si el registro falla, el cierre NO se bloquea (R23)', (
     expect(mundo.revokeSession).not.toHaveBeenCalled();
     expect(clear).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('endSession — la sesion de quien no tiene empresa (QC-161)', () => {
+  function claimsSinEmpresa(sessionId: string): SessionClaims {
+    return { ...claimsDe(sessionId), roleName: 'Maestro', companyId: null };
+  }
+
+  it('QC-161 R35: con companyId null registra el cierre de ese sid, borra la cookie y la sesion deja de valer', async () => {
+    const mundo = crearMundo(null);
+    const claims = claimsSinEmpresa(SID_MOVIL);
+    const { session, cookie, clear, checkLog, log } = crearDobles(claims);
+
+    // Antes de cerrar, la sesion sin empresa resuelve: es una sesion de verdad.
+    const resolveMovil = createResolveSession({
+      session: { readClaims: async () => claims },
+      users: mundo.users,
+      log: { log: vi.fn() },
+    });
+    expect(await resolveMovil(AHORA)).not.toBeNull();
+
+    await createEndSession({
+      session,
+      revocations: mundo.revocations,
+      cookie,
+      log: checkLog,
+      now: () => AHORA,
+    })();
+
+    expect(mundo.revokeSession).toHaveBeenCalledTimes(1);
+    expect(mundo.revokeSession).toHaveBeenCalledWith({
+      sessionId: SID_MOVIL,
+      userId: SUB,
+      expiresAt: claims.expiresAt,
+      now: AHORA,
+    });
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(log).not.toHaveBeenCalled();
+    expect(mundo.stampAll).not.toHaveBeenCalled();
+    // La sesion cerrada no vuelve a valer.
+    expect(await resolveMovil(AHORA)).toBeNull();
   });
 });

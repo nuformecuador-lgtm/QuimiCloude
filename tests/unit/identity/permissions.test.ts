@@ -12,6 +12,7 @@ import {
   ROLE_ADMINISTRADOR,
   ROLE_OPERADOR,
   ROLE_EMPACADOR,
+  ROLE_MAESTRO,
   SEED_ROLE_PERMISSIONS,
   ADMIN_EXCLUDED_PERMISSIONS,
 } from '@/lib/modules/identity'
@@ -40,7 +41,14 @@ const CODIGOS_DEL_REQUISITO = [
   'documentos.consultar',
   'documentos.modificar',
   'empaque.modificar',
+  'empresas.consultar',
+  'empresas.modificar',
 ] as const
+
+/** Los dos codigos de la plataforma: solo los recibe el Maestro. */
+const CODIGOS_DE_EMPRESAS = ['empresas.consultar', 'empresas.modificar'] as const
+
+const esDeEmpresas = (codigo: string): boolean => codigo.startsWith('empresas.')
 
 /** Lo que en verdad recibe el Administrador: el catalogo del requisito menos los codigos
  *  excluidos (R36), nunca un total escrito a mano. */
@@ -162,9 +170,9 @@ const PERMISOS_PREVIOS = [
   },
 ] as const
 
-/** Los nombres de modulo del repositorio, mas `usuarios` y `terminados`: no son carpetas reales de
- *  `lib/modules/` -viven dentro de `identity`- pero valen igual como `<modulo>` porque el codigo
- *  lo lee una persona. */
+/** Los nombres de modulo del repositorio, mas `usuarios`, `terminados` y `empresas`: no son
+ *  carpetas reales de `lib/modules/` -viven dentro de `identity`- pero valen igual como `<modulo>`
+ *  porque el codigo lo lee una persona. */
 const MODULOS = [
   'inventario',
   'recetas',
@@ -178,6 +186,7 @@ const MODULOS = [
   'clientes',
   'documentos',
   'empaque',
+  'empresas',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
@@ -191,6 +200,7 @@ const MODULOS_CON_ESCRITURA = [
   'asignaciones',
   'clientes',
   'documentos',
+  'empresas',
 ]
 const MODULOS_SIN_ESCRITURA = ['dashboard', 'terminados']
 /** Modulos que solo escriben, sin consulta propia (R34): quien tiene el permiso ya ve el pedido
@@ -239,7 +249,8 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
       (codigo) =>
         codigo !== 'documentos.consultar' &&
         codigo !== 'documentos.modificar' &&
-        codigo !== 'empaque.modificar',
+        codigo !== 'empaque.modificar' &&
+        !esDeEmpresas(codigo),
     )
 
     expect(codigos).toEqual([
@@ -247,6 +258,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
       'documentos.consultar',
       'documentos.modificar',
       'empaque.modificar',
+      ...CODIGOS_DE_EMPRESAS,
     ])
     expect(codigos.filter((codigo) => codigo.startsWith('documentos.'))).toEqual([
       'documentos.consultar',
@@ -328,7 +340,8 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
         codigo !== 'clientes.modificar' &&
         codigo !== 'documentos.consultar' &&
         codigo !== 'documentos.modificar' &&
-        codigo !== 'empaque.modificar',
+        codigo !== 'empaque.modificar' &&
+        !esDeEmpresas(codigo),
     )
 
     expect(codigos).toEqual([
@@ -338,6 +351,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
       'documentos.consultar',
       'documentos.modificar',
       'empaque.modificar',
+      ...CODIGOS_DE_EMPRESAS,
     ])
   })
 
@@ -358,10 +372,12 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     })
   })
 
-  it('R35: el catalogo es el previo mas empaque.modificar, en su posicion final, ningun otro codigo cambia', () => {
-    const catalogoPrevio = CODIGOS_DEL_REQUISITO.filter((codigo) => codigo !== 'empaque.modificar')
+  it('R35: el catalogo es el previo mas empaque.modificar en su posicion, con solo los empresas.* detras, ningun otro codigo cambia', () => {
+    const catalogoPrevio = CODIGOS_DEL_REQUISITO.filter(
+      (codigo) => codigo !== 'empaque.modificar' && !esDeEmpresas(codigo),
+    )
 
-    expect(codigos).toEqual([...catalogoPrevio, 'empaque.modificar'])
+    expect(codigos).toEqual([...catalogoPrevio, 'empaque.modificar', ...CODIGOS_DE_EMPRESAS])
   })
 
   it('R6: la enmienda de terminados.consultar en el fuente no cita ficha ni requisito', () => {
@@ -605,12 +621,146 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
 
   it('R6: el seed asigna permisos SOLO a roles, sin ninguna clave de empresa', () => {
     expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
-      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO].sort(),
     )
     for (const asignados of Object.values(SEED_ROLE_PERMISSIONS)) {
       for (const codigo of asignados) {
         expect(typeof codigo).toBe('string')
       }
+    }
+  })
+})
+
+describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
+  const citaFichaORequisito = /QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i
+  const ORDINALES = [
+    'primera',
+    'segunda',
+    'tercera',
+    'cuarta',
+    'quinta',
+    'sexta',
+    'septima',
+    'octava',
+    'novena',
+    'decima',
+  ]
+
+  /** El parrafo del JSDoc de `PERMISSIONS` que cumple lo que se pide a la enmienda de empresas. */
+  function esLaEnmiendaDeEmpresas(parrafo: string): boolean {
+    const ordinal = parrafo.match(/\*\*(\S+) enmienda al catalogo cerrado\*\*/i)?.[1]?.toLowerCase()
+    return (
+      parrafo.split('\n').length <= 5 &&
+      ordinal !== undefined &&
+      ORDINALES.includes(ordinal) &&
+      CODIGOS_DE_EMPRESAS.every((codigo) => parrafo.includes(codigo)) &&
+      parrafo.includes('lib/modules/') &&
+      !citaFichaORequisito.test(parrafo)
+    )
+  }
+
+  function parrafosDelCatalogo(): string[] {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .filter(Boolean)
+  }
+
+  it('R5: el catalogo contiene empresas.consultar y empresas.modificar y ningun otro empresas.*', () => {
+    for (const codigo of CODIGOS_DE_EMPRESAS) {
+      expect(codigos).toContain(codigo)
+    }
+    expect(codigos.filter(esDeEmpresas)).toEqual([...CODIGOS_DE_EMPRESAS])
+  })
+
+  it('R5: todo codigo que el catalogo tenia antes sigue en el, en el mismo orden', () => {
+    const previos = CODIGOS_DEL_REQUISITO.filter((codigo) => !esDeEmpresas(codigo))
+
+    expect(codigos.filter((codigo) => !esDeEmpresas(codigo))).toEqual(previos)
+    for (const previo of PERMISOS_PREVIOS) {
+      expect(PERMISSIONS.find((permiso) => permiso.code === previo.code)).toEqual(previo)
+    }
+  })
+
+  it('R6: los dos codigos tienen modulo empresas, su accion y descripcion no vacia', () => {
+    const consultar = PERMISSIONS.find((permiso) => permiso.code === 'empresas.consultar')
+    const modificar = PERMISSIONS.find((permiso) => permiso.code === 'empresas.modificar')
+
+    expect(consultar?.module).toBe('empresas')
+    expect(consultar?.action).toBe('consultar')
+    expect(consultar?.description.trim().length).toBeGreaterThan(0)
+    expect(modificar?.module).toBe('empresas')
+    expect(modificar?.action).toBe('modificar')
+    expect(modificar?.description.trim().length).toBeGreaterThan(0)
+  })
+
+  it('R6: la descripcion de empresas.modificar nombra el alta, la edicion y la baja', () => {
+    const descripcion =
+      PERMISSIONS.find((permiso) => permiso.code === 'empresas.modificar')?.description ?? ''
+
+    expect(descripcion).toMatch(/\balta\b/i)
+    expect(descripcion).toMatch(/\bedit/i)
+    expect(descripcion).toMatch(/\bbaja\b/i)
+  })
+
+  it('R7: el JSDoc del catalogo tiene el parrafo de la enmienda de empresas, con ordinal y sin citas', () => {
+    const parrafos = parrafosDelCatalogo()
+    const enmienda = parrafos.find((parrafo) => parrafo.includes('empresas.consultar'))
+
+    expect(enmienda).toBeDefined()
+    expect(esLaEnmiendaDeEmpresas(enmienda!)).toBe(true)
+    expect(enmienda).toMatch(/enmienda/i)
+    expect(enmienda).toContain('lib/modules/')
+    expect(enmienda).not.toMatch(citaFichaORequisito)
+    const primeraFrase = (parrafos[0] ?? '').split('.')[0] ?? ''
+    expect(primeraFrase).not.toMatch(citaFichaORequisito)
+  })
+
+  it('R7: el caso simetrico: el detector rechaza parrafos sinteticos que citan, no tienen ordinal o pasan de cinco lineas', () => {
+    const bueno =
+      '* **Novena enmienda al catalogo cerrado**: suma `empresas.consultar` y `empresas.modificar`;\n' +
+      '* su modulo no es una carpeta de `lib/modules/`.'
+    expect(esLaEnmiendaDeEmpresas(bueno)).toBe(true)
+
+    expect(esLaEnmiendaDeEmpresas(`${bueno} Ver QC-161.`)).toBe(false)
+    expect(esLaEnmiendaDeEmpresas(`${bueno} Lo pide R7.`)).toBe(false)
+    expect(esLaEnmiendaDeEmpresas(`${bueno} Ver design.md.`)).toBe(false)
+    expect(esLaEnmiendaDeEmpresas(bueno.replace('**Novena enmienda', '**Otra enmienda'))).toBe(false)
+    expect(esLaEnmiendaDeEmpresas(bueno.replace('`lib/modules/`', 'una carpeta'))).toBe(false)
+    expect(esLaEnmiendaDeEmpresas(bueno.replace('`empresas.modificar`', 'otro'))).toBe(false)
+    expect(esLaEnmiendaDeEmpresas(`${bueno}\n* a\n* b\n* c\n* d`)).toBe(false)
+  })
+
+  it('R8: el Maestro recibe exactamente empresas.consultar y empresas.modificar, escritos uno a uno', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
+  })
+
+  it('R9: el Administrador no tiene ningun empresas.* y sigue siendo el catalogo menos los excluidos', () => {
+    expect((SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(esDeEmpresas)).toEqual([])
+    expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual(expect.arrayContaining([...CODIGOS_DE_EMPRESAS]))
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
+      CODIGOS_DEL_REQUISITO.filter((codigo) => !esDeEmpresas(codigo) && codigo !== 'empaque.modificar'),
+    )
+  })
+
+  it('R9: Operador y Empacador conservan exactamente sus permisos y ninguno tiene empresas.*', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+      'empaque.modificar',
+    ])
+    for (const rol of [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR]) {
+      expect((SEED_ROLE_PERMISSIONS[rol] ?? []).filter(esDeEmpresas), rol).toEqual([])
     }
   })
 })

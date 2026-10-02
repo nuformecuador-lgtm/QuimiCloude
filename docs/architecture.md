@@ -17,11 +17,14 @@ consecuencias de arquitectura que no son opinables:
    NO se parte**: roles y tipos de documento son del sistema y se comparten —
    «Administrador» significa lo mismo en todas. Lo que une las dos mitades es que **cada
    usuario pertenece a UNA empresa y tiene UN rol**: la empresa es una columna de su ficha
-   (`users.company_id`, obligatoria), no una tabla de pertenencias. Un usuario no puede
-   estar en dos empresas a la vez, y eso es deliberado (QC-47, decisiones 4 y 5). Lo que
-   SI se parte por empresa dentro de la identidad es la **unicidad**: el correo, el nombre
-   de usuario y el documento se miden dentro de la empresa, asi que dos empresas pueden
-   tener cada una su `admin`.
+   (`users.company_id`, obligatoria **salvo para el Maestro**), no una tabla de
+   pertenencias. Un usuario no puede estar en dos empresas a la vez, y eso es deliberado
+   (QC-47, decisiones 4 y 5). El Maestro, dueno de la plataforma, no pertenece a ninguna
+   (QC-161): la columna admite `NULL` y el disparador `users_check_company_by_role` es la
+   garantia —sin empresa solo el Maestro, y el Maestro nunca con empresa—. Lo que SI se
+   parte por empresa dentro de la identidad es la **unicidad** del correo y del documento:
+   se miden dentro de la empresa (y aparte entre los usuarios sin empresa). El **nombre de
+   usuario es unico en todo el sistema**, empresas y Maestro incluidos (QC-161).
    - **La frontera se valida en el service.** `## Acceso a datos y autorizacion` sigue
      mandando entero: la RLS no filtra ninguna query de esta aplicacion, asi que un
      aislamiento implementado solo como policy **no cuenta como implementado**, igual que

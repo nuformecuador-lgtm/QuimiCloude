@@ -63,7 +63,7 @@ export type DataTableFilterSpec =
 export type DataTableColumn<TRow> = {
   readonly id: string;
   readonly label: string;
-  readonly align: 'start' | 'end';
+  readonly align: 'start' | 'end' | 'center';
   /** Como se obtiene el contenido de la celda. Devuelve `ReactNode`, no `string` (pregunta abierta 4). */
   readonly cell: (row: TRow) => ReactNode;
   /** Ausente = no ordenable (R14). */
@@ -72,6 +72,28 @@ export type DataTableColumn<TRow> = {
   readonly filter?: DataTableFilterSpec;
   /** Ausente = el usuario puede fijarla (R23); `false` la excluye del fijado. */
   readonly pinnable?: boolean;
+  /**
+   * Borde al que nace fijada cuando el usuario **no** tiene todavia ninguna preferencia
+   * guardada para ese `tableId` (QC-35 `design.md > 6.3`). Ausente = nace sin fijar.
+   *
+   * Es un valor **por defecto**, no una imposicion: en cuanto hay algo persistido gana lo
+   * persistido, incluida la decision de soltarla (R25, R26). Declarar `defaultPinned`
+   * implica fijable: la columna ofrece soltarla en su menu aunque `pinnable` sea `false`.
+   */
+  readonly defaultPinned?: 'left' | 'right';
+  /**
+   * Ancho fijo de la columna (`th` + `td`), como estilo `width` en linea. Numero = px,
+   * cadena = cualquier valor CSS (`'12rem'`, `'200px'`). Ausente = sin ancho declarado, el
+   * layout automatico reparte por contenido como siempre.
+   */
+  readonly width?: number | string;
+  /**
+   * Como se comporta el texto cuando supera el ancho disponible. `true` o ausente = truncado
+   * (`overflow-hidden` + `text-ellipsis`, manteniendo el `whitespace-nowrap` de la tabla: el
+   * comportamiento de siempre). `false` = el texto salta de linea dentro del ancho permitido
+   * (`whitespace-normal` + `break-words`), util junto a `width`.
+   */
+  readonly hideText?: boolean;
 };
 
 /**
@@ -123,6 +145,17 @@ export type DataTableTexts = {
   readonly lastMonth: string;
   /** Atajo de rango de fechas: ultimo año (R18). */
   readonly lastYear: string;
+  /**
+   * `aria-label` de la flecha que desplaza la tabla a la izquierda cuando desborda
+   * horizontalmente. Opcional con valor interno por defecto: asi los nueve consumidores
+   * existentes no cambian; quien quiera localizar la etiqueta la provee por tabla.
+   */
+  readonly scrollLeft?: string;
+  /**
+   * `aria-label` de la flecha que desplaza la tabla a la derecha cuando desborda
+   * horizontalmente. Opcional con valor interno por defecto (ver `scrollLeft`).
+   */
+  readonly scrollRight?: string;
 };
 
 /**
@@ -158,14 +191,4 @@ export type DataTableProps<TRow> = {
    * una cadena.
    */
   readonly searchable?: boolean;
-  /**
-   * Ids de columna que nacen fijadas al borde izquierdo cuando el usuario **no** tiene todavia
-   * ninguna preferencia guardada para este `tableId` (QC-35 `design.md > 6.3`). Ausente = nada
-   * fijado por defecto, el comportamiento de siempre.
-   *
-   * Es un valor **por defecto**, no una imposicion: en cuanto hay algo persistido para ese
-   * `tableId` gana lo persistido, asi que el usuario puede soltar la columna y su decision se
-   * recuerda (R25, R26).
-   */
-  readonly defaultPinnedColumns?: readonly string[];
 };

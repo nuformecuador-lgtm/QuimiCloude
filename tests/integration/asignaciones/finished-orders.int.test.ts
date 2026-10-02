@@ -128,6 +128,8 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     finishAssignedOrder: createFinishAssignedOrder({
       assignments,
       orders,
+      people: assignmentDirectoryPrisma,
+      groups: assignmentDirectoryPrisma,
       now: () => NOW,
     }),
     // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.

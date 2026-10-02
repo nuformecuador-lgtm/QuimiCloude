@@ -8,11 +8,11 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
-import type { CatalogLineView } from '@/lib/modules/proveedores';
+import type { CatalogLineListItem } from '@/lib/modules/proveedores';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { CatalogLineSheet } from './catalog-line-sheet';
-import { CATALOG_DEFAULT_PINNED_COLUMNS, buildCatalogColumns } from './catalog-columns';
+import { buildCatalogColumns } from './catalog-columns';
 import type { CatalogDirectories } from './catalog-directories';
 import { catalogListHref } from './catalog-list-params';
 import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
@@ -90,7 +90,7 @@ export const CATALOG_TABLE_TEXTS: DataTableTexts = {
 };
 
 export type CatalogTableProps = {
-  readonly lines: readonly CatalogLineView[];
+  readonly lines: readonly CatalogLineListItem[];
   readonly directories: CatalogDirectories;
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;
@@ -183,7 +183,6 @@ export function CatalogTable({
         onParamsChange={(next) => navigate(catalogListHref(supplierId, next))}
         status="idle"
         texts={CATALOG_TABLE_TEXTS}
-        defaultPinnedColumns={CATALOG_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

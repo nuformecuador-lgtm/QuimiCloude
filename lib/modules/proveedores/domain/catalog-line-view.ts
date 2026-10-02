@@ -60,3 +60,10 @@ export type CatalogLineView = CatalogLineFields & {
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
 };
+
+/**
+ * Salida del listado del catalogo: la vista de siempre mas la URL publica del recorte.
+ * `imagePath` se conserva -el formulario de edicion la reenvia en su campo oculto-, y
+ * `imageUrl` es `null` cuando la linea no tiene imagen.
+ */
+export type CatalogLineListItem = CatalogLineView & { readonly imageUrl: string | null };

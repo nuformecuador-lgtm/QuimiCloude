@@ -51,6 +51,7 @@ import type {
 import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
 import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 import type { NewSupplier, SupplierView } from '@/lib/modules/proveedores/domain/supplier-view';
+import type { CatalogImageUrl } from '@/lib/modules/proveedores/ports/catalog-image-url';
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 import type { UnitCatalog } from '@/lib/modules/unidades';
@@ -305,6 +306,7 @@ function catalogoDeUnidades() {
 /** Los nueve casos de uso cableados contra un almacen y un catalogo de unidades concretos. */
 function casosDeUso(suppliers: SupplierRepository, catalog: SupplierCatalogRepository, units: UnitCatalog) {
   const log = { ignoredFields: vi.fn() };
+  const images: CatalogImageUrl = { publicUrl: vi.fn((path: string) => `https://cdn.test/${path}`) };
   return {
     createSupplier: createCreateSupplier({ suppliers, now }),
     updateSupplier: createUpdateSupplier({ suppliers, now }),
@@ -314,7 +316,7 @@ function casosDeUso(suppliers: SupplierRepository, catalog: SupplierCatalogRepos
     createCatalogLine: createCreateCatalogLine({ catalog, units, now }),
     updateCatalogLine: createUpdateCatalogLine({ catalog, units, now }),
     deleteCatalogLine: createDeleteCatalogLine({ catalog, now }),
-    listCatalogLines: createListCatalogLines({ catalog, log }),
+    listCatalogLines: createListCatalogLines({ catalog, log, images }),
   };
 }
 

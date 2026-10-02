@@ -10,7 +10,10 @@ import {
   createVerifyCredentials,
   seedInitialAccess,
 } from '@/lib/modules/identity';
-import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
+import {
+  readInitialAdminCredentialsFromEnv,
+  readInitialMaestroCredentialsFromEnv,
+} from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
 import { withInitialAccessTransaction } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import {
@@ -116,6 +119,7 @@ import type {
   ReservationQueries,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
+import { forModule } from '@/lib/shared/observability/logger';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findUnitRefsSharingBaseInCompany,
@@ -175,6 +179,7 @@ import {
   createListSupplierShowcase,
   createUpdateCatalogLine,
   createUpdateSupplier,
+  type CatalogImageUrl,
 } from '@/lib/modules/proveedores';
 // La importacion por identidad de un catalogo. El adaptador y el puerto son
 // de uso EXCLUSIVO de esta operacion -por eso no se cablean junto al resto de `proveedores`, mas
@@ -396,7 +401,7 @@ import {
 import { uploadCrop } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
 import { cropStorageMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-memory';
 import {
-  createCropSignedReadUrl,
+  cropPublicUrl,
   listCrops,
 } from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase';
 import { cropCatalogMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-memory';
@@ -413,6 +418,7 @@ import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signat
 import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
+import type { DocumentJobLog } from '@/lib/modules/documentos/ports/document-job-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 // `clientes`. Imports al final del bloque, bloque de cableado al final del archivo: no
 // reordena ni reformatea nada de lo que hay arriba.
@@ -652,6 +658,7 @@ export const identity = {
         repository,
         passwordHasher,
         credentials: readInitialAdminCredentialsFromEnv,
+        maestroCredentials: readInitialMaestroCredentialsFromEnv,
         // R18: el seed evalua la politica antes de hashear; aqui se le entrega la misma
         // funcion que expone la fachada.
         checkCredentialPolicy,
@@ -950,6 +957,17 @@ const supplierCatalogRepository: SupplierCatalogRepository = {
 };
 
 /**
+ * La URL publica de un recorte sale del MISMO bucket que ya lee
+ * `cropCatalog`, mas abajo -mismo criterio de bifurcacion por `documentsE2EDoublesEnabled()`-.
+ * Declarada AQUI, antes de la fachada de `proveedores`, porque sus tres casos de uso capturan
+ * esta dependencia al construirse.
+ */
+const catalogImageUrl: CatalogImageUrl = {
+  publicUrl: (path) =>
+    documentsE2EDoublesEnabled() ? cropCatalogMemory.publicUrl(path) : cropPublicUrl(path),
+};
+
+/**
  * Fachada del modulo `proveedores` ya cableada (T13, `design.md > 10`). Es lo que consumen
  * las dos Server Actions de T14.
  *
@@ -983,10 +1001,17 @@ export const proveedores = {
   listCatalogLines: createListCatalogLines({
     catalog: supplierCatalogRepository,
     log: proveedoresListQueryLog,
+    images: catalogImageUrl,
   }),
   // La vista de catalogo visual. Claves nuevas al final: ninguna de las de arriba se toca.
-  listSupplierShowcase: createListSupplierShowcase({ suppliers: supplierRepository }),
-  listShowcaseLines: createListShowcaseLines({ catalog: supplierCatalogRepository }),
+  listSupplierShowcase: createListSupplierShowcase({
+    suppliers: supplierRepository,
+    images: catalogImageUrl,
+  }),
+  listShowcaseLines: createListShowcaseLines({
+    catalog: supplierCatalogRepository,
+    images: catalogImageUrl,
+  }),
 };
 
 // ---------------------------------------------------------------------------------------
@@ -1371,6 +1396,8 @@ export const asignaciones = {
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
+    people: peopleDirectory,
+    groups: workGroupDirectory,
     now: () => new Date(),
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
@@ -1564,10 +1591,8 @@ const cropCatalog: CropCatalog = {
     documentsE2EDoublesEnabled()
       ? cropCatalogMemory.list(companyId, documentFileId)
       : listCrops(companyId, documentFileId),
-  createSignedReadUrl: (path, expiresInSeconds) =>
-    documentsE2EDoublesEnabled()
-      ? cropCatalogMemory.createSignedReadUrl(path, expiresInSeconds)
-      : createCropSignedReadUrl(path, expiresInSeconds),
+  publicUrl: (path) =>
+    documentsE2EDoublesEnabled() ? cropCatalogMemory.publicUrl(path) : cropPublicUrl(path),
 };
 
 /** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
@@ -1587,11 +1612,14 @@ const cropCatalogImages = createCropCatalogImages({
  * que lo ejecuta en este mismo proceso en vez de publicar nada. Dos construcciones serian dos
  * cableados que pueden divergir.
  */
+const documentJobLog: DocumentJobLog = forModule('documentos');
+
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
   processPdfByStrategy,
   cropCatalogImages,
+  log: documentJobLog,
 });
 
 const processingQueue: ProcessingQueue = {

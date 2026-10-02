@@ -317,11 +317,12 @@ test.describe('catalogo-desde-pdf', () => {
 
     await loginAndLand(page, adminUser);
 
-    // --- 1. La pantalla de detalle del proveedor, por su constante de ruta.
+    // --- 1. La pantalla de detalle del proveedor; la subida vive en una ventana que se abre con su botón.
     await page.goto(supplierDetailRoute(supplier));
     await expect(page.getByTestId('supplier-detail-name')).toHaveText(supplierName, {
       timeout: 60_000,
     });
+    await page.getByTestId('document-upload-open').click();
     await expect(page.getByTestId('document-upload')).toBeVisible({ timeout: 60_000 });
 
     // --- 2. Elegir el PDF y subirlo: enlace firmado, encolado y Server Actions reales.

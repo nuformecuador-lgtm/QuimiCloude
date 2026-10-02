@@ -18,7 +18,7 @@ type FilaCredenciales = {
   lock_level: number;
   locked_until: Date | null;
   role_name: string;
-  company_id: string;
+  company_id: string | null;
   company_deleted_at: Date | null;
   account_status: UserAccountStatus;
 };
@@ -29,8 +29,10 @@ type FilaCredenciales = {
  * Va con `$queryRaw` parametrizado (template tag, jamas interpolacion de cadenas) y no con la
  * API tipada y `mode: 'insensitive'` por una razon concreta: la unicidad del nombre de usuario
  * vive como indice funcional parcial `users_username_unique` sobre
- * `lower(username) WHERE deleted_at IS NULL`. `mode: 'insensitive'` genera `ILIKE`, que **no**
- * usa ese indice: el login haria un seq scan sobre `users` en la ruta mas caliente de la app.
+ * `lower(username) WHERE deleted_at IS NULL`, unico en todo el sistema: la condicion de busqueda
+ * es exactamente la del indice y devuelve a lo sumo una fila, sea de una empresa o del Maestro; el
+ * `LIMIT 1` queda como defensa. `mode: 'insensitive'` genera `ILIKE`, que **no** usa ese indice:
+ * el login haria un seq scan sobre `users` en la ruta mas caliente de la app.
  *
  * Devuelve el id, el hash, el estado de bloqueo y el NOMBRE DEL ROL. Ni correo, ni documento, ni
  * nombre, ni telefono: lo que no sale de la base no se puede filtrar por error en un log (R15).
@@ -46,8 +48,8 @@ type FilaCredenciales = {
  * QC-48 (R2) — el identificador de la empresa entra como una COLUMNA MAS de `users`
  * (`u.company_id`), que es un campo de la fila que esta consulta ya lee: traerlo no cuesta ni
  * una lectura mas. Su marca de baja no esta en esa fila —vive en `companies`— y entra por un
- * `JOIN companies c ON c.id = u.company_id` en ESTA misma consulta, exactamente igual que QC-9
- * hizo con el rol: el `JOIN` resuelve por la clave primaria de `companies`, asi que el plan gana
+ * `LEFT JOIN companies c ON c.id = u.company_id` en ESTA misma consulta, igual que el rol:
+ * el `JOIN` resuelve por la clave primaria de `companies`, asi que el plan gana
  * una busqueda de indice y **no** gana un viaje a la base. El login sigue costando una lectura.
  * De la empresa salen esas dos columnas y nada mas: ni su nombre, ni su normalizado, ni sus
  * marcas de creacion (R6).
@@ -58,11 +60,11 @@ type FilaCredenciales = {
  * su verificacion de hash y porque una regla de acceso escondida en un `WHERE` solo se puede
  * afirmar contra Postgres, no con objetos planos.
  *
- * `INNER JOIN` y no `LEFT`, en los dos: `users.role_id` es NOT NULL con clave foranea
- * `onDelete: Restrict`, asi que todo usuario vivo tiene rol; y `users.company_id` lo mismo desde
- * QC-47 (R9, R10, R11), asi que todo usuario vivo tiene empresa. Si un dia no la tuviera, la
- * persona no se encontraria —y no entraria— en vez de emitirse una sesion con un rol o una
- * empresa inventados (QC-48 R5).
+ * `INNER JOIN` con `roles`: `users.role_id` es NOT NULL con clave foranea `onDelete: Restrict`,
+ * asi que todo usuario vivo tiene rol, y sin el la persona no entraria. `LEFT JOIN` con
+ * `companies`: el Maestro no tiene empresa y tiene que encontrarse igual, con `company_id` y
+ * `company_deleted_at` en `null`. No abre ninguna puerta: el disparador
+ * `users_check_company_by_role` impide que un usuario de cualquier otro rol quede sin empresa.
  *
  * QC-78 (R1) — el `SELECT` gana `u.account_status`, otra COLUMNA MAS de la fila de `users` que
  * esta consulta ya lee: no cuesta ni un `JOIN` ni una lectura mas. Y el `WHERE` NO se toca: aqui
@@ -81,7 +83,7 @@ export async function findActiveByUsername(username: string): Promise<Authentica
            u.account_status
     FROM users u
     JOIN roles r ON r.id = u.role_id
-    JOIN companies c ON c.id = u.company_id
+    LEFT JOIN companies c ON c.id = u.company_id
     WHERE lower(u.username) = lower(${username}) AND u.deleted_at IS NULL
     LIMIT 1
   `;

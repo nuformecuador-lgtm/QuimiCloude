@@ -39,6 +39,7 @@ async function main(): Promise<void> {
     const creoAlgo =
       outcome.createdRoles.length > 0 ||
       outcome.createdAdmin ||
+      outcome.createdMaestro ||
       outcome.createdCompany !== null ||
       outcome.createdPermissions.length > 0 ||
       outcome.createdRolePermissions > 0
@@ -63,7 +64,8 @@ async function main(): Promise<void> {
           ? `permisos creados: ${outcome.createdPermissions.length} (${outcome.createdPermissions.join(', ')})`
           : 'permisos creados: 0'
       const asignaciones = `asignaciones permiso-rol creadas: ${outcome.createdRolePermissions}`
-      console.log(`db:seed: ${roles} - ${permisos} - ${asignaciones} - ${empresa} - ${admin}`)
+      const maestro = outcome.createdMaestro ? 'usuario maestro: creado' : 'usuario maestro: ya existia'
+      console.log(`db:seed: ${roles} - ${permisos} - ${asignaciones} - ${empresa} - ${admin} - ${maestro}`)
     } else {
       console.log('db:seed: nada que crear')
     }

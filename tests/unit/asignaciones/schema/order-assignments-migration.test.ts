@@ -873,6 +873,8 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
       'documentos.consultar',
       'documentos.modificar',
       'empaque.modificar',
+      'empresas.consultar',
+      'empresas.modificar',
     ]
     const CODIGOS_QC66 = [
       'dashboard.consultar',

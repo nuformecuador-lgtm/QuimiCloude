@@ -144,4 +144,29 @@ describe('usePinnedColumns', () => {
 
     expect(result.current.pinning).toEqual({ left: [], right: ['stock'] });
   });
+
+  it('el defecto por columna nace fijado en el borde que pide cuando no hay nada persistido', async () => {
+    const { result } = renderHook(() =>
+      usePinnedColumns('inventario', COLUMN_IDS, { left: ['nombre'], right: ['precio'] }),
+    );
+
+    await vi.waitFor(() => {
+      expect(result.current.pinning).toEqual({ left: ['nombre'], right: ['precio'] });
+    });
+  });
+
+  it('con algo persistido gana lo persistido, no el defecto por columna', async () => {
+    window.localStorage.setItem(
+      buildPinningStorageKey('inventario'),
+      JSON.stringify({ left: [], right: [] }),
+    );
+
+    const { result } = renderHook(() =>
+      usePinnedColumns('inventario', COLUMN_IDS, { left: ['nombre'], right: ['precio'] }),
+    );
+
+    await vi.waitFor(() => {
+      expect(result.current.pinning).toEqual({ left: [], right: [] });
+    });
+  });
 });

@@ -26,6 +26,7 @@ import type { Prisma } from '@prisma/client';
 import {
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
+  normalizeWorkGroupName,
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_OPERADOR,
@@ -61,6 +62,10 @@ const SHARED_TOKEN = `${FIXTURE_PREFIX}${RUN_ID}`;
 const COMPANY_NAME = `${SHARED_TOKEN}_empresa`;
 
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
+
+/** El equipo vinculado al pedido: trae al Operario y al Empacador, pero al asignar solo se
+ *  escribe la fila del Operario —el Empacador «se une despues» y su fila la crea el Finalizar. */
+const WORK_GROUP_NAME = `${SHARED_TOKEN}_turno`;
 
 /** El único ingrediente de la receta del fixture: Finalizar lo consume al dejar el pedido por
  *  empacar. */
@@ -167,6 +172,7 @@ let productId: string | null = null;
 let presentationId: string | null = null;
 let operatorUserId: string | null = null;
 let empacadorUserId: string | null = null;
+let workGroupId: string | null = null;
 let orderId: string | null = null;
 let orderNumber: string | null = null;
 
@@ -320,8 +326,10 @@ test.beforeAll(async () => {
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
   if (orphanCompanyIds.length > 0) {
-    await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.workGroupMember.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.workGroup.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   await prisma.user.deleteMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -431,8 +439,28 @@ test.beforeAll(async () => {
   orderId = order.id;
   orderNumber = formatOrderNumber({ year, sequence: BASE_SEQUENCE });
 
+  // El equipo vinculado, con el Operario y el Empacador dentro. Al pedido solo se le escribe la
+  // fila del Operario con el origen del grupo: el grupo queda vinculado y el Empacador sin fila,
+  // que es la precondicion del auto-asignado del Finalizar.
+  workGroupId = (
+    await prisma.workGroup.create({
+      data: {
+        name: WORK_GROUP_NAME,
+        nameNormalized: normalizeWorkGroupName(WORK_GROUP_NAME),
+        companyId,
+      },
+      select: { id: true },
+    })
+  ).id;
+  await prisma.workGroupMember.createMany({
+    data: [
+      { workGroupId, userId: operatorUserId, companyId },
+      { workGroupId, userId: empacadorUserId, companyId },
+    ],
+  });
+
   await prisma.orderAssignment.create({
-    data: { orderId, userId: operatorUserId, companyId },
+    data: { orderId, userId: operatorUserId, companyId, workGroupId, workGroupName: WORK_GROUP_NAME },
   });
 });
 
@@ -478,6 +506,14 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.presentation.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.workGroupMember.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.workGroup.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       prisma.user.deleteMany({
@@ -536,6 +572,13 @@ test.describe('el recorrido de empaque (R48)', () => {
     );
 
     expect(await orderStatus(orderId)).toBe('POR_EMPACAR');
+
+    // El Finalizar asigno al Empacador del equipo vinculado, con el origen del grupo.
+    const empacadorAssignment = await prisma.orderAssignment.findUniqueOrThrow({
+      where: { orderId_userId: { orderId, userId: empacadorUserId } },
+    });
+    expect(empacadorAssignment.workGroupId).toBe(workGroupId);
+    expect(empacadorAssignment.workGroupName).toBe(WORK_GROUP_NAME);
 
     const deliveredNotice = page.getByTestId(DELIVERED_NOTICE_TESTID);
     await expect(deliveredNotice).toBeVisible({ timeout: 60_000 });

@@ -45,6 +45,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { createCreateOrder, createFinishPacking, createStartPacking, createTransitionOrder, createUpdateOrder } from '@/lib/modules/pedidos';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
+import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
@@ -131,8 +132,12 @@ function finishAssignedOrderPara(orderId: string) {
   return createFinishAssignedOrder({
     assignments: {
       listOrderIdsByUserInCompany: async () => [orderId],
+      // Sin filas: el auto-asignado del empacador no tiene candidatos y no escribe.
+      listByOrderInCompany: async () => [],
     } as unknown as OrderAssignmentRepository,
     orders: orderCatalog,
+    people: assignmentDirectoryPrisma,
+    groups: assignmentDirectoryPrisma,
     now: () => new Date(),
   });
 }

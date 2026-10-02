@@ -274,12 +274,16 @@ createListResponsibleCandidates(deps: { people: PeopleDirectory; now? })
 1. `requirePermission(actor, 'asignaciones.modificar')`: es para escribir, y es la misma condición
    con la que hoy se monta el panel.
 2. `z.strictObject({})`.
-3. `people.listAliveInCompany(actor.companyId, now, MAX_CANDIDATES)`. Es un **método nuevo** de
-   `PeopleDirectory` que devuelve `PersonRef` (con permisos) de las personas vivas de la empresa,
-   ordenadas por `last_names, first_names, id` y con el tope de 25 que hoy tiene el selector.
-4. Se queda con las que cumplen `canBeResponsible` y devuelve `{ id, displayName }`. No se filtra
-   por cuenta activa: hoy el selector tampoco lo hace, y el service ya rechaza a las inactivas
-   (`user_not_assignable`).
+3. `people.listAliveInCompany(actor.companyId, now, MAX_CANDIDATES, { accountStatus: ['active'] })`.
+   Es un **método nuevo** de `PeopleDirectory` que devuelve `PersonRef` (con permisos) de las
+   personas vivas de la empresa, ordenadas por `last_names, first_names, id` y con el tope de
+   25 que hoy tiene el selector. El 4º parámetro son los filtros ABIERTOS del directorio
+   (`PeopleRefFilters`): un solo llamado, sin un método por combinación.
+4. Se queda con las que cumplen `canBeResponsible` y devuelve `{ id, displayName }`. El filtro
+   `['active']` es de estados de cuenta EFECTIVOS (`effectiveAccountStatus` en el adaptador,
+   R21), no de la columna: una `blocked` con plazo vencido sí entra y una `active` con
+   bloqueo vigente no. El service sigue rechazando a las inactivas al asignar
+   (`user_not_assignable`) como segunda barrera.
 
 **Cambio de comportamiento que se declara.** Hoy la lista de personas sale de `listUsersAction`,
 que exige `usuarios.consultar`, y sin ese permiso se degrada a vacía (QC-102). Con este caso de uso

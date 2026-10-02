@@ -148,11 +148,12 @@ const ANCLAS_DE_LA_PANTALLA: Readonly<Record<string, readonly string[]>> = {
     'DeleteOrderDialogProps',
   ],
   // QC-35: la declaracion de columnas. QC-102 le añade una; las siete de antes siguen.
+  // `ORDER_DEFAULT_PINNED_COLUMNS` salio a proposito: el defecto vive en la columna
+  // (`defaultPinned: 'left'`) y la prop de tabla `defaultPinnedColumns` ya no existe.
   'order-columns.tsx': [
     'ACTIONS_COLUMN_ID',
     'CANCELLATION_REASON_COLUMN_ID',
     'MISSING_VALUE_MARK',
-    'ORDER_DEFAULT_PINNED_COLUMNS',
     'ORDER_NUMBER_COLUMN_ID',
     'QUANTITY_COLUMN_ID',
     'RECIPE_NAME_COLUMN_ID',

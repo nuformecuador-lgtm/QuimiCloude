@@ -7,7 +7,6 @@ import { DataTable, type DataTableParams, type DataTableTexts } from '@/componen
 import type { AssignedOrderView, AssignmentViewKind } from '@/lib/modules/asignaciones';
 
 import {
-  ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS,
   buildAssignedOrdersColumns,
 } from './assigned-orders-columns';
 import { assignedOrdersListHref } from './assigned-orders-list-params';
@@ -78,7 +77,6 @@ export function AssignedOrdersTable({ rows, params, totalPages, vista }: Assigne
         status="idle"
         texts={ASSIGNED_ORDERS_TABLE_TEXTS}
         searchable={false}
-        defaultPinnedColumns={ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );
