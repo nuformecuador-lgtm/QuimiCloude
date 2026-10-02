@@ -20,6 +20,8 @@
 | QC-170 | pedido-en-varias-presentaciones | Pedidos | fullstack | done | feature/QC-170-pedido-en-varias-presentaciones | **CERRADA el 2026-10-02** (PR #137, merge `c8649e9d`): resumen en `progress/history.md`. Tarjeta en *Finalizado* y comentada. Deuda: QC-178 (precision de `unit_cost`). Regla de la vuelta 2+ acotada: escrita en `AGENTS.md > F2.2` (PR #140, merge `9e49f743`). |
 
 ## Evaluaciones
+**2026-10-02: QC-174** `crear-versiones-en-la-receta`: F1.0 (worktree desde origin/dev `d3535685`, indexado en el grafo) y F1.1 (`complexity:medium` en Jira: solo frontend, dos paginas nuevas, aviso de propagacion y un E2E; sin integraciones). Cupo `frontend` 0 de 2. F1.2: `spec_author` lanzado sobre la semilla acotada. F1.2/F1.3: R1-R39, T0-T12, semilla intacta (diff) y D1-D9 citadas; tarjeta a En revision. **Parada en F1.4** con P1 (propagated en updateRecipeAction) y tres comportamientos anadidos por spec_author (R7, R29, R33/R34). **F1.4 APROBADO el 2026-10-02** con P1 (a) y R7/R29/R33-R34 tal cual. **F2.0**: in_progress, En curso; cupo frontend 1 de 2; sin cruce (ninguna otra frontend en curso; QC-173 pending). F2.1: implementer lanzado. **2026-10-02**: T0-T12 hechos; E2E 2 passed (tambien tras el sync); reviewer OK (0 bloqueantes, m1 corregido). Sync con origin/dev (`dffd2490`): 897a4f91 rompe 3 tests de dev (pantallas-exigen-permiso, recetas/module-contract, recetas/scope); **el humano eligio dejarlos en el baseline** (`ff4cd933`) y arreglarlos aparte. `./init.sh` completo OK. **PR abierto**; esperando merge.
+
 
 ### QC-138 - F2.0 (2026-09-26)
 

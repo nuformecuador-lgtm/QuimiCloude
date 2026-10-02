@@ -57,6 +57,7 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
   deleteRecipeAction: deleteRecipeActionMock,
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
 }));
 
 vi.mock('@/lib/modules/documentos/adapters/driving/document-upload-actions', () => ({

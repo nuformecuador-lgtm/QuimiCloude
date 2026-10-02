@@ -42,11 +42,13 @@ export { RecipeTableSkeleton } from './recipe-table-skeleton';
 
 export {
   buildRecipePayload,
+  buildRecipeVersionPayload,
   createLocalKey,
   extractFieldError,
   extractGeneralLinesError,
   extractLineErrors,
   extractStepErrors,
+  toLineFormValues,
   type ImageFieldState,
   type RecipeFormMode,
   type RecipeFormState,
@@ -57,6 +59,8 @@ export {
   type RecipePayload,
   type RecipeStepErrors,
   type RecipeStepFormValue,
+  type RecipeVersionFormState,
+  type RecipeVersionPayload,
 } from './recipe-form-state';
 export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
 export {
@@ -70,6 +74,21 @@ export {
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
+export {
+  PropagateVersionsDialog,
+  type PropagateVersionsDialogProps,
+} from './propagate-versions-dialog';
+export {
+  RecipeVersionForm,
+  type RecipeVersionFormOriginal,
+  type RecipeVersionFormProps,
+} from './recipe-version-form';
+export { RecipeVersionList, type RecipeVersionListProps } from './recipe-version-list';
+export {
+  compareWithOriginal,
+  type RemovedLine,
+  type VersionLineMark,
+} from './recipe-version-diff';
 
 // `recipe-step-schema.ts` no sale por aquí: su export tiene un tipo de la librería del editor, y el
 // barrel dejaría usarlo desde cualquier archivo sin importar la librería, que debe quedar aislada.

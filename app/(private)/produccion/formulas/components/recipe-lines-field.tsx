@@ -3,6 +3,7 @@
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ import {
   formatPercentage,
   percentageToHundredths,
   sumPercentages,
+  type RecipeLineView,
 } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 
@@ -22,6 +24,7 @@ import {
   type RecipeLineErrors,
   type RecipeLineFormValue,
 } from './recipe-form-state';
+import { compareWithOriginal, type VersionLineMark } from './recipe-version-diff';
 
 /**
  * Campo de líneas de producto en porcentaje, sin selector de unidad -el insumo ya trae la suya-.
@@ -159,6 +162,20 @@ export type RecipeLinesFieldProps = {
   };
   readonly errors?: RecipeLineErrors;
   readonly generalError?: string;
+  /** Líneas de la original: con ellas el campo marca cada línea y lista lo quitado. */
+  readonly baseline?: readonly RecipeLineView[];
+};
+
+const MARK_LABEL: Record<VersionLineMark['kind'], string> = {
+  same: 'Igual',
+  changed: 'Cambiado',
+  added: 'Añadido',
+};
+
+const MARK_VARIANT: Record<VersionLineMark['kind'], 'secondary' | 'outline' | 'default'> = {
+  same: 'secondary',
+  changed: 'outline',
+  added: 'default',
 };
 
 /** Fantasma del tab de máquinas: misma idea que `GHOST_LINE`, sin porcentaje. */
@@ -176,9 +193,12 @@ export function RecipeLinesField({
   initialMachinePage,
   errors,
   generalError,
+  baseline,
 }: RecipeLinesFieldProps) {
   const headingId = useId();
   const sumId = useId();
+  const removedHeadingId = useId();
+  const diff = baseline === undefined ? null : compareWithOriginal(baseline, lines);
   const [activeTab, setActiveTab] = useState<LinesTab>('ingredients');
   const [machines, setMachines] = useState<readonly RecipeMachineFormValue[]>([]);
 
@@ -327,6 +347,7 @@ export function RecipeLinesField({
           const isUnavailable = line.productName === null;
           const lineErrors = errors?.[index];
           const percentageErrorId = `recipe-line-percentage-error-${index}`;
+          const mark = diff?.marks[index] ?? null;
 
           return (
             <div
@@ -357,6 +378,25 @@ export function RecipeLinesField({
                   units={units}
                   productType={PRODUCT_TYPES.PRODUCT}
                 />
+                {mark === null ? null : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant={MARK_VARIANT[mark.kind]}
+                      data-testid={`recipe-line-mark-${index}`}
+                      data-mark={mark.kind}
+                    >
+                      {MARK_LABEL[mark.kind]}
+                    </Badge>
+                    {mark.kind === 'changed' ? (
+                      <span
+                        className="text-sm text-muted-foreground"
+                        data-testid={`recipe-line-original-${index}`}
+                      >
+                        {`Original: ${formatPercentage(mark.originalPercentage)} %`}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-1">
@@ -450,6 +490,31 @@ export function RecipeLinesField({
           );
         })}
       </div>
+
+      {diff === null || diff.removed.length === 0 ? null : (
+        <section
+          aria-labelledby={removedHeadingId}
+          data-testid="recipe-lines-removed"
+          className="flex flex-col gap-2 rounded-lg border border-dashed p-3"
+        >
+          <h3 id={removedHeadingId} className="text-sm font-medium">
+            Quitados de la original
+          </h3>
+          <ul className="flex flex-col gap-1">
+            {diff.removed.map((line, index) => (
+              <li
+                key={line.productId}
+                data-testid={`recipe-line-removed-${index}`}
+                className="flex flex-wrap items-center gap-2 text-sm"
+              >
+                <Badge variant="destructive">Quitado</Badge>
+                <span>{productPickerLabel(line.productName)}</span>
+                <span className="text-muted-foreground">{`${formatPercentage(line.percentage)} %`}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/*
         Indicador de suma: SIEMPRE montado, incluso sin ninguna línea -"Suma: 0,00 % —
