@@ -221,7 +221,7 @@ existen.
 
 ## 4. Matriz de transiciones (`order-transitions.ts`)
 
-Pasa de 4×4 = 16 pares a 5×5 = 25 pares:
+Pasa de 4×4 = 16 pares a 5×5 = 25 pares en la versión aprobada. **Tras el rebase sobre QC-168 (§10, punto 4) la matriz real es 7×7 = 49 pares**: entran `POR_EMPACAR` y `EN_EMPAQUE`, que no conectan con `BLOQUEADO` en ninguna dirección. La tabla muestra solo los pares que toca esta ficha; la fuente completa es `order-transitions.ts`.
 
 | desde \ a | PENDIENTE | EN_CURSO | ENTREGADO | CANCELADO | BLOQUEADO |
 |---|---|---|---|---|---|

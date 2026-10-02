@@ -5,7 +5,7 @@
 > nivel una vez cumplidas sus dependencias. «Hecho» incluye siempre que pase `./init.sh --rapido`.
 > Los tests nombran el `R<n>` en el título del caso.
 
-## T0. Confirmar las respuestas de F1.4 y el estado de QC-168
+## T0. [x] Confirmar las respuestas de F1.4 y el estado de QC-168
 
 - **Depende de:** aprobación del spec.
 - **Archivos:** ninguno de producción. Solo `progress/impl_QC-138-...md`, donde se anota si
@@ -15,7 +15,7 @@
 - **Hecho:** R4, R12, R16, R20, R23, R27 y R31 son firmes, con la propuesta aprobada. El orden del
   enum está decidido según `design.md > 10`.
 
-## T1. Enum `BLOQUEADO` y mapas exhaustivos que no compilan sin él
+## T1. [x] Enum `BLOQUEADO` y mapas exhaustivos que no compilan sin él
 
 - **Depende de:** T0.
 - **Archivos:**
@@ -35,7 +35,7 @@
     `tests/integration/pedidos/pedidos-constraints.int.test.ts`.
 - **Hecho:**
   - `module-contract` en verde, con el valor al final.
-  - La matriz 5×5 probada par a par: 25 casos.
+  - La matriz probada par a par: 7×7 = 49 casos tras el rebase sobre QC-168 (5×5 = 25 en la versión aprobada).
   - Se cancela un `BLOQUEADO`.
   - Se borra lógicamente un `BLOQUEADO`.
   - La asignación admite un `BLOQUEADO`.
@@ -43,7 +43,7 @@
     de rollback).
 - **Cubre:** R25, R27, R28, R33, R35, R36.
 
-## T2. [P] Índice parcial de bloqueados
+## T2. [x] [P] Índice parcial de bloqueados
 
 - **Depende de:** T1.
 - **Archivos:** `db/migrations/<ts+1>_orders_blocked_index/migration.sql` y `down.sql`;
@@ -52,7 +52,7 @@
   predicado.
 - **Cubre:** apoyo de R16 y R18.
 
-## T3. [P] `ReservationOutcome` distingue `insufficient`
+## T3. [x] [P] `ReservationOutcome` distingue `insufficient`
 
 - **Depende de:** T0.
 - **Archivos:**
@@ -68,7 +68,7 @@
   - Los tests existentes de QC-141 siguen en verde.
 - **Cubre:** R1, R2, R4, R5 (parte de inventario).
 
-## T4. Errores nuevos del catálogo
+## T4. [x] Errores nuevos del catálogo
 
 - **Depende de:** T0.
 - **Archivos:**
@@ -80,7 +80,7 @@
   en verde.
 - **Cubre:** apoyo de R6 y R32.
 
-## T5. Puertos de escritura y lectura de `pedidos`
+## T5. [x] Puertos de escritura y lectura de `pedidos`
 
 - **Depende de:** T1, T2.
 - **Archivos:**
@@ -97,7 +97,7 @@
   - La guardia de QC-145 sigue en verde: ningún bloque `data:` nuevo con `status:`.
 - **Cubre:** R16, R18, R38 (lectura).
 
-## T6. Alta y edición bloquean con confirmación
+## T6. [x] Alta y edición bloquean con confirmación
 
 - **Depende de:** T3, T4, T5.
 - **Archivos:**
@@ -122,7 +122,7 @@
 - **Cubre:** R1, R2, R3, R5, R6, R8 (servidor), R10, R11, R12, R26, R37 (parte de pedidos),
   R38 (escritura).
 
-## T7. Caso de uso `reviewBlockedOrders`
+## T7. [x] Caso de uso `reviewBlockedOrders`
 
 - **Depende de:** T5, T3.
 - **Archivos:**
@@ -143,7 +143,7 @@
   - Una cancelación que llega antes impide el desbloqueo.
 - **Cubre:** R14, R15, R16, R17, R18, R22, R23 (parte de pedidos), R24.
 
-## T8. Disparo desde inventario y cableado
+## T8. [x] Disparo desde inventario y cableado
 
 - **Depende de:** T7.
 - **Archivos:**
@@ -166,7 +166,7 @@
   - La guardia de arquitectura está en verde.
 - **Cubre:** R13, R19, R20, R23, R37 (parte de inventario), R38.
 
-## T9. [P] Asignaciones: el Operador ve el bloqueado y no lo arranca
+## T9. [x] [P] Asignaciones: el Operador ve el bloqueado y no lo arranca
 
 - **Depende de:** T1, T4.
 - **Archivos:**
@@ -181,7 +181,7 @@
   - Un pedido bloqueado por una edición entre la lectura y la transición → `order_blocked`.
 - **Cubre:** R28 (planta), R30, R32.
 
-## T10. [P] Proceso diario ignora los bloqueados
+## T10. [x] [P] Proceso diario ignora los bloqueados
 
 - **Depende de:** T6.
 - **Archivos:** `tests/integration/pedidos/order-expiry.int.test.ts`. No se espera cambio de
@@ -189,7 +189,7 @@
 - **Hecho:** un `BLOQUEADO` creado hace más de 15 días sigue `BLOQUEADO` después de la ejecución.
 - **Cubre:** R29.
 
-## T11. UI de Pedidos: modal y estado
+## T11. [x] UI de Pedidos: modal y estado
 
 - **Depende de:** T6.
 - **Archivos:**
@@ -208,7 +208,7 @@
   - Objetivos táctiles de al menos 44 px.
 - **Cubre:** R7, R8 (cliente), R9, R34 (Pedidos).
 
-## T12. [P] UI de Asignación
+## T12. [x] [P] UI de Asignación
 
 - **Depende de:** T9.
 - **Archivos:**
@@ -224,7 +224,7 @@
   - El test táctil está en verde.
 - **Cubre:** R31, R34 (Asignación).
 
-## T13. Transversales
+## T13. [x] Transversales
 
 - **Depende de:** T6, T8.
 - **Archivos:** `tests/unit/pedidos/qc138-transversales.test.ts` (nuevo).
@@ -237,7 +237,7 @@
 - **Hecho:** los cuatro casos están en verde.
 - **Cubre:** R37, R39.
 
-## T14. E2E
+## T14. [x] E2E
 
 - **Depende de:** T8, T11, T12.
 - **Archivos:** `e2e/pedido-bloqueado.spec.ts` (nuevo).
@@ -245,7 +245,7 @@
   `./init.sh` completo.
 - **Cubre:** R40, y además R7, R13, R14 y R31 de punta a punta.
 
-## T15. Cierre
+## T15. [x] Cierre
 
 - **Depende de:** todas.
 - **Archivos:** `progress/impl_QC-138-...md`.

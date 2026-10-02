@@ -111,9 +111,9 @@ esta feature se **renumeraron** para ir detrás (ver «Merge de `dev` del 2026-1
 | T14 E2E | [x] | tanda C; verde en Chromium y WebKit en T15 |
 | T15 cierre | [x] | T15: `./init.sh` completo en verde |
 
-`tasks.md` de esta feature no usa casillas de verificación: sus tareas son listas de
-`**Depende de**`, `**Archivos**` y `**Hecho**`, igual que el de QC-168. El estado por tarea se
-anota en esta tabla, que es donde se lleva el estado en el resto del repo.
+`tasks.md` marca cada tarea cerrada con `[x]` en su título (añadido por el leader tras el
+review, menor 1; la afirmación anterior de que QC-168 no usaba casillas era falsa). El detalle
+por tarea se anota en esta tabla.
 
 ## Desviaciones respecto de `tasks.md`, y por qué
 
