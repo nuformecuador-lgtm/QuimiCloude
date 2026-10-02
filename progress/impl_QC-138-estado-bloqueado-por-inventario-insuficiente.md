@@ -561,3 +561,60 @@ Ni `logger.ts` ni `LogFields` cambian.
 - No se corrió la suite E2E entera: las otras 25 specs no tocan pedidos ni asignación.
 
 **Pendiente:** borrar `QuimiCloude_QC138` al cerrar la feature.
+
+## F2.3 — Merge de `origin/dev` antes del PR (2026-10-02)
+
+Merge (no rebase) de `origin/dev` sobre `0295adbf`: trae QC-172 (versiones de receta, PR #136,
+migracion `20261001120000_recipe_versions`), la columna de miembros en grupos y bookkeeping.
+Commit del merge `62351a3a`; ajustes de tests `09b3b09b`.
+
+**Conflictos y resolucion** (todos aditivos, sin nombres repetidos):
+- `app/(private)/pedidos/components/index.ts`: version de `dev` (`RecipeVersionSelect`) + las
+  exportaciones de QC-138 (`BlockedOrderDialog`, `ORDER_CONFIRM_BLOCKED_FIELD`).
+- `errores/domain/error-codes.ts` y `error-catalog.ts`: `order_would_block`, `order_blocked` y
+  `recipe_version_under_review`. `tests/unit/errores/catalogo.test.ts`: 61 (dev) / 62 (QC-138) → **63**.
+- `pedidos/domain/errors.ts`: `OrderWouldBlockError` y `RecipeVersionUnderReviewError`.
+- `order-input.ts` y `order-actions.ts`: `confirmBlocked` y `recipeVersionId` conviven.
+- `create-order.ts` y `update-order.ts`: solo chocaban los imports. Queda la resolucion de la
+  version efectiva de QC-172 (`requireOrderRecipe`, sustituye a `RecipeNotFoundError` local) y el
+  bloqueo/desbloqueo de QC-138 dentro de la transaccion.
+- Tests unitarios (`create-order`, `update-order`, `order-input`, `order-form`, `order-columns`):
+  version de `dev` + los bloques `describe` de QC-138 al final; `recipeVersion: null` en el fixture.
+- `feature_list.json`: version de `dev` (lo unico propio, `in_progress`, ya estaba alli).
+- `progress/current.md`: auto-merge; se quito un encabezado `## Evaluaciones` duplicado.
+- Sin conflicto: `db/schema.prisma`, `lib/composition/index.ts`, `aislamiento.json`, la guardia de
+  identificador de request (la lista de migraciones ya quedaba en orden).
+
+**Migraciones: no hizo falta renumerar.** Las de QC-138 son `20261001170000_order_status_blocked` y
+`20261001170100_orders_blocked_index`, ya POSTERIORES a `20261001120000_recipe_versions` desde la
+renumeracion de `a639b481`. QC-172 solo toca `recipes` (`parent_recipe_id`, CHECK e indices
+unicos), nada de `orders`/`status`: los dos `down.sql` siguen correctos sin cambios.
+En `QuimiCloude_QC138` (`.env` = 2 lineas con la base propia): `db:migrate` aplico
+`20261001120000_recipe_versions`; despues `db:rollback` de `orders_blocked_index` y de
+`order_status_blocked` (la segunda apartando temporalmente la carpeta del indice, porque el script
+siempre revierte la ultima carpeta del disco) y `db:migrate` las reaplico las dos. Verde.
+
+**Version de la receta en el bloqueo.** Con QC-172 el pedido guarda en `orders.recipe_id` la receta
+EFECTIVA (la version si se eligio una). El alta y la edicion calculan coste, necesidad y reserva con
+`effectiveId`; `reviewBlockedOrders` y `transition-order` leen `locked.recipeId`, que ya es esa
+misma version, via `findExecutionContentById` (lineas propias de la version). No hace falta
+ninguna decision nueva fuera del spec.
+
+**Ajustes tras el merge** (`09b3b09b`, solo tests, rojos que destapo el gate):
+- `tests/integration/pedidos/order-crud.int.test.ts`: el catalogo de recetas montado a mano en el
+  bloque de QC-138 devolvia `RecipeRef` sin `original`, y `requireOrderRecipe` lo trataba como
+  `recipe_not_found` (8 casos). Ahora devuelve `original`, `isUnderReview` y `ownName`.
+- `tests/unit/pedidos/qc138-transversales.test.ts`: la lista cerrada de claves del esquema de alta
+  gana `recipeVersionId`.
+
+**Gate `./init.sh` completo.**
+- Corrida 1 (sobre `62351a3a`): `EXIT=1`, `7 failed | 817 passed (824)` archivos; dos rojos fuera
+  del baseline, los dos de arriba.
+- Corrida 2 (sobre `09b3b09b`): `== init OK ==`, `EXIT=0`. `5 failed | 819 passed (824)` archivos,
+  `7 failed | 11409 passed | 128 skipped (11544)` tests; «sin rojos nuevos (5 rojos, todos en el
+  baseline de 5)»: `account-status-scope`, `unidades-viewport`, `usuarios-viewport`,
+  `recipe-page`, `product-page`.
+
+**E2E** (puerto 3117, `QuimiCloude_QC138`): `e2e/pedido-bloqueado.spec.ts` y
+`e2e/reserva-de-material.spec.ts` con `--project=chromium --project=webkit`: `4 passed (2.2m)`,
+`EXIT=0` (Chromium 2/2, WebKit 2/2).
