@@ -262,3 +262,35 @@ Dominio, puertos y barrel sin tocar.
 4. R21: `inert` no bloquea en jsdom; el unitario afirma el atributo y `aria-checked="false"`; `inert`/`aria-readonly` van en un `div` envolvente (jsx-a11y).
 5. Textos no fijados por el spec: toast al borrar version sigue «Receta borrada.»; descripcion del aviso de propagacion y texto del aviso persistente (ver T10).
 6. E2E: esperas añadidas por recorte al restante y por hidratacion tardia de WebKit (patron existente del repo).
+
+## m1 y sync con dev antes del PR
+
+### m1 — toast al borrar una version (aprobado por el humano)
+- `app/(private)/produccion/formulas/components/delete-recipe-dialog.tsx`: `DELETE_VERSION_SUCCESS = 'Versión borrada.'`; el toast usa `isVersion` (prop `kind` ya existente: `recipe-version-list.tsx` pasa `kind="version"`, `recipe-table.tsx` usa el default `'recipe'`). Sin cambios de backend ni props.
+- `tests/unit/recetas-ui/delete-recipe-dialog.test.tsx`: fija «Versión borrada.» en `R32: confirmar borra esa versión una sola vez, cierra, avisa y refresca` y «Receta borrada.» en `R32: sin confirmar no se invoca el borrado; al confirmar se invoca una vez con la original`. 14 passed / 0 failed.
+- Sustituye la nota 5 de arriba en lo que toca al toast. Commit `9341035a`.
+
+### Merge de origin/dev
+- `git merge origin/dev` (897a4f91, grupos/usuarios), sin conflictos. Commit `dffd2490`.
+
+### Gate completo (`./init.sh`)
+Primera corrida (sobre `dffd2490`): `Test Files 9 failed | 816 passed (825)`, `Tests 10 failed | 11342 passed | 130 skipped (11482)`, `✗ hay rojos NUEVOS respecto del baseline`, 4 archivos fuera del baseline:
+- `tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts` — `Hook timed out in 60000ms` (beforeAll R9). Timeout bajo carga: corrido aparte, `Tests 5 passed (5)`. No se toca.
+- `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` (`'/pedidos' se sirve con el permiso`), `tests/unit/recetas/module-contract.test.ts` y `tests/unit/recetas/scope.test.ts` («segunda pantalla de recetas fuera de su carpeta: app/(private)/pedidos/page.tsx»). Causa: 897a4f91 hace que `pedidos/page.tsx` llame a `listRecipesAction`. Corridos en un worktree temporal de `origin/dev` puro (897a4f91): `Test Files 3 failed (3)`, `Tests 3 failed | 41 passed (44)`. Deuda ajena de dev → añadidos a `tests/baseline-rojos.json` con motivo y fecha (commit `ff4cd933`). Dilo en el PR.
+
+Segunda corrida (sobre `ff4cd933`), salida real:
+```
+✓ typecheck paso
+✓ lint paso
+ Test Files  8 failed | 817 passed (825)
+      Tests  10 failed | 11344 passed | 128 skipped (11482)
+     Errors  1 error
+   Duration  667.52s
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (8 rojos, todos en el baseline de 8)
+✓ todas las migraciones tienen down.sql
+== init OK ==
+```
+Los 8 rojos, todos en baseline: account-status-scope, recetas/module-contract, recetas/scope, unidades-viewport, usuarios-viewport, inventario/product-page, navegacion/pantallas-exigen-permiso, recetas-ui/recipe-page.
+`Errors 1 error`: rechazo no manejado (`cookies` fuera de request scope, E251) originado en `tests/unit/configuracion-ui/grupos/work-group-create-action.test.tsx`, archivo que llega de dev; QC-174 no lo toca y el gate no lo cuenta como rojo.
+Logs del gate fuera del repo (scratchpad), sin versionar.
