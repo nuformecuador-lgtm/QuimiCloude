@@ -4,13 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
 import type { WorkGroupRow } from '@/lib/modules/identity';
 
 import { WorkGroupForm } from './work-group-form';
@@ -25,6 +19,12 @@ import { WorkGroupMembers } from './work-group-members';
  * pestana** al cerrarse —la segunda mitad de R20— sin que haya que guardarlos en ningun sitio: los
  * parametros de lista viven en la cadena de consulta y el `tab` viaja con ellos.
  *
+ * **Quien posee el `SheetContent` entero —cabecera, cuerpo con scroll y pie fijo— es
+ * `WorkGroupForm`** (igual que `UserForm` para `user-sheet.tsx`): asi Guardar/Cancelar quedan
+ * FIJOS fuera del area que hace scroll, en vez de enterrados al fondo de la lista de miembros.
+ * `WORK_GROUP_SHEET_TESTID` se declara alla —es quien pinta ese `SheetContent`—; este archivo ya
+ * no lo necesita, porque no monta ningun `SheetContent` propio.
+ *
  * **UN SOLO panel para los dos modos.** Quien decide cual esta abierto y sobre quien es
  * `work-group-table.tsx`, que monta **una** instancia para toda la pagina:
  *
@@ -34,7 +34,10 @@ import { WorkGroupMembers } from './work-group-members';
  *     entonces se anade a cada persona elegida, de a una, sobre el grupo recien creado.
  *   - **Edicion** (`group !== null`): el formulario **precargado con `group.name`** y, debajo, el
  *     bloque de miembros reales (`WorkGroupMembers`), que ya gestiona sus propias llamadas al
- *     servidor para meter y sacar gente del grupo que SI existe.
+ *     servidor para meter y sacar gente del grupo que SI existe. Llega como **`children`** de
+ *     `WorkGroupForm`: este archivo lo monta, pero quien lo pinta —al final del cuerpo con
+ *     scroll— es `work-group-form.tsx`, SIN que ese archivo importe nada de aqui ni de
+ *     `work-group-members.tsx` (evita el ciclo que su propia cabecera documenta).
  *
  * **Aqui NO hay una segunda lectura de ficha**, a diferencia de `user-sheet.tsx`: la fila trae
  * `{ id, name }` y el formulario necesita `name`. **QC-84 no publica ninguna consulta de grupo
@@ -50,12 +53,6 @@ import { WorkGroupMembers } from './work-group-members';
  * el resultado de esas dos operaciones y quien vuelve a pedir su lista (R30).
  */
 
-export const WORK_GROUP_SHEET_TESTID = 'work-group-sheet';
-
-const CREATE_TITLE = 'Nuevo grupo';
-const EDIT_TITLE = 'Editar grupo';
-const CREATE_DESCRIPTION = 'Ponle nombre al grupo de trabajo.';
-const EDIT_DESCRIPTION = 'Cambia el nombre del grupo y gestiona sus miembros.';
 const CREATE_SUCCESS = 'Grupo creado.';
 const UPDATE_SUCCESS = 'Grupo actualizado.';
 
@@ -81,26 +78,11 @@ export function WorkGroupSheet({ group, open, onOpenChange }: WorkGroupSheetProp
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        minScreenWidth={70}
-        className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-        data-testid={WORK_GROUP_SHEET_TESTID}
-        data-mode={isEdit ? 'edit' : 'create'}
-        data-work-group-id={group?.id ?? ''}
-      >
-        <SheetHeader>
-          <SheetTitle>{isEdit ? EDIT_TITLE : CREATE_TITLE}</SheetTitle>
-          <SheetDescription>{isEdit ? EDIT_DESCRIPTION : CREATE_DESCRIPTION}</SheetDescription>
-        </SheetHeader>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
-          <WorkGroupForm group={group} onSaved={handleSaved} />
-          {/* El alta elige miembros DENTRO del propio formulario (estado local, sin servidor): no
-              hay todavia un `workGroupId` real al que anadir a nadie por Server Action. */}
-          {group === null ? null : <WorkGroupMembers workGroupId={group.id} />}
-        </div>
-      </SheetContent>
+      <WorkGroupForm group={group} onSaved={handleSaved}>
+        {/* El alta elige miembros DENTRO del propio formulario (estado local, sin servidor): no
+            hay todavia un `workGroupId` real al que anadir a nadie por Server Action. */}
+        {group === null ? null : <WorkGroupMembers workGroupId={group.id} />}
+      </WorkGroupForm>
     </Sheet>
   );
 }

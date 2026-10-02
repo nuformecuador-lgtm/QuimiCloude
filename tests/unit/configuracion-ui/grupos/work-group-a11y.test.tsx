@@ -110,7 +110,13 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse desde la pestana de grupos`);
   };
   return {
-    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
+    // El picker de miembros que el panel de edicion monta SI la pide, siempre, al abrirse (R28):
+    // responde una pagina vacia. Lo que ese picker pinta se prueba en `work-group-form.test.tsx`
+    // y en `work-group-members.test.tsx`; aqui solo interesa el desbordamiento del viewport.
+    listUsersAction: vi.fn(async () => ({
+      status: 'success',
+      data: { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
+    })),
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),

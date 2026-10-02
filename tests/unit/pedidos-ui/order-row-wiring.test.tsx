@@ -9,7 +9,7 @@
 // **Las seis actions son dobles que FALLAN si se les llama**: abrir un panel o un dialogo no
 // invoca ninguna operacion.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -146,6 +146,14 @@ function montarLista(status: OrderStatus = 'PENDIENTE') {
   );
 }
 
+/**
+ * Las cuatro acciones viven detras del menu "de los 3 puntos" (ver el comentario de cabecera de
+ * `order-row-actions.tsx`): se abre el disparador antes de buscar cualquier accion por testid.
+ */
+function abrirMenu(): void {
+  fireEvent.click(screen.getByTestId('order-row-actions'));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
@@ -158,10 +166,11 @@ afterEach(() => {
 });
 
 describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', () => {
-  it('la fila trae los tres controles y, cerrada, no monta ningun panel ni dialogo', () => {
+  it('la fila trae el disparador y, cerrada, no monta ningun panel ni dialogo', () => {
     montarLista();
 
     expect(screen.getByTestId('order-row-actions')).toBeInTheDocument();
+    abrirMenu();
     expect(screen.getByTestId('order-action-edit')).toBeEnabled();
     expect(screen.getByTestId('order-action-cancel')).toBeEnabled();
     expect(screen.getByTestId('order-action-delete')).toBeEnabled();
@@ -175,7 +184,8 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    abrirMenu();
+    await user.click(await screen.findByTestId('order-action-edit'));
 
     expect(await screen.findByTestId(ORDER_FORM_TESTID)).toBeInTheDocument();
     expect(screen.queryByTestId(CANCEL_ORDER_DIALOG_TESTID)).toBeNull();
@@ -186,7 +196,8 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-action-cancel'));
+    abrirMenu();
+    await user.click(await screen.findByTestId('order-action-cancel'));
 
     expect(await screen.findByTestId(CANCEL_ORDER_DIALOG_TESTID)).toBeInTheDocument();
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
@@ -197,7 +208,8 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-action-delete'));
+    abrirMenu();
+    await user.click(await screen.findByTestId('order-action-delete'));
 
     expect(await screen.findByTestId(DELETE_ORDER_DIALOG_TESTID)).toBeInTheDocument();
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
@@ -207,17 +219,18 @@ describe('desde una fila viva, cada accion abre lo suyo (R23, R25, R37, R38)', (
 
 describe('con el pedido en estado final ninguna de las tres abre nada (R24)', () => {
   for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
-    it(`estado ${status}: los tres controles deshabilitados y ningun panel ni dialogo montado`, async () => {
-      const user = setupUser();
+    it(`estado ${status}: los tres items deshabilitados y ningun panel ni dialogo montado`, () => {
       montarLista(status);
 
+      abrirMenu();
       for (const testId of ['order-action-edit', 'order-action-cancel', 'order-action-delete']) {
-        const control = screen.getByTestId(testId);
-        expect(control).toBeDisabled();
-        await user.click(control);
+        const item = screen.getByTestId(testId);
+        expect(item).toHaveAttribute('aria-disabled', 'true');
+        // El primitivo deja el item en el arbol pero bloquea su `onSelect`: el evento nativo se
+        // dispara a mano, sin pasar por la comprobacion de `pointer-events` de `user-event`.
+        fireEvent.click(item);
       }
 
-      expect(screen.getByTestId('order-row-actions-reason')).toBeInTheDocument();
       expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
       expect(screen.queryByTestId(CANCEL_ORDER_DIALOG_TESTID)).toBeNull();
       expect(screen.queryByTestId(DELETE_ORDER_DIALOG_TESTID)).toBeNull();

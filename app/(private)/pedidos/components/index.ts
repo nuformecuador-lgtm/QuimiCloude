@@ -161,7 +161,6 @@ export {
 export { OrderListSection } from './order-list-section';
 export { ORDER_SKELETON_COLUMN_COUNT, OrderListSkeleton } from './order-list-skeleton';
 export {
-  FINAL_ORDER_REASON,
   ORDER_ACTION_DISTRIBUTION_TESTID,
   OrderRowActions,
   acceptsDistributionEdit,

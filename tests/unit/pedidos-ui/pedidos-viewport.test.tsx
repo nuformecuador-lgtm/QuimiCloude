@@ -473,33 +473,34 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     expect(document.body.style.overflowX).toBe('');
   });
 
-  it('las acciones de fila siguen siendo alcanzables dentro de la tabla (R22)', async () => {
+  it('el disparador de las acciones de fila sigue siendo alcanzable dentro de la tabla (R22)', async () => {
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
     const celda = within(fila).getByTestId(`data-table-cell-${ACTIONS_COLUMN_ID}`);
 
-    // Las tres, en el DOM y visibles, sin ninguna interaccion previa.
-    for (const accion of ['order-action-edit', 'order-action-cancel', 'order-action-delete']) {
-      const control = within(celda).getByTestId(accion);
-      expect(control, `${accion} a ${ancho}px`).toBeVisible();
-      expect(control, `${accion} a ${ancho}px`).toBeEnabled();
-    }
+    // El disparador, en el DOM y visible, sin ninguna interaccion previa. Las cuatro acciones
+    // viven detras de el (decision humana puntual, ver el comentario de cabecera de
+    // `order-row-actions.tsx`) y se alcanzan abriendolo con un clic (siguiente caso).
+    const disparador = within(celda).getByTestId('order-row-actions');
+    expect(disparador, `disparador a ${ancho}px`).toBeVisible();
+    expect(disparador, `disparador a ${ancho}px`).toBeEnabled();
 
-    // Y viajan DENTRO del contenedor que se desplaza: el scroll de la tabla las alcanza sin que
+    // Y viaja DENTRO del contenedor que se desplaza: el scroll de la tabla lo alcanza sin que
     // el documento se mueva.
     expect(screen.getByRole('table').parentElement?.contains(celda)).toBe(true);
   });
 
-  it('ningun control se descubre ni se activa solo con :hover (R45)', async () => {
+  it('el disparador esta en el DOM y visible desde el primer render, sin :hover (R45)', async () => {
     await renderPantalla();
 
-    // 1) En el DOM: los tres controles de fila y el disparador del alta estan visibles ya, sin
-    //    pasar el puntero por encima. En tactil no hay puntero que pasar.
+    // 1) En el DOM: el disparador de la fila y el del alta estan visibles ya, sin pasar el
+    //    puntero por encima. En tactil no hay puntero que pasar. Las cuatro acciones viven detras
+    //    de este disparador y se comprueban en el caso siguiente, que lo abre con un clic.
     const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
-    for (const accion of ['order-action-edit', 'order-action-cancel', 'order-action-delete']) {
-      expect(within(fila).getByTestId(accion)).toBeVisible();
-    }
+    const disparador = within(fila).getByTestId('order-row-actions');
+    expect(disparador, `disparador a ${ancho}px`).toBeVisible();
+    expect(disparador, `disparador a ${ancho}px`).toBeEnabled();
     expect(screen.getByTestId(ORDER_CREATE_OPEN_TESTID)).toBeVisible();
 
     // 2) En las clases: ningun elemento de la pantalla usa el puntero para REVELAR nada. Un
@@ -521,14 +522,41 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     }
   });
 
-  it('los controles tactiles de la lista miden al menos 44x44 px (R45)', async () => {
+  it('abrir el disparador con un CLIC (nunca hover) revela las cuatro acciones (R45)', async () => {
+    const user = setupUser();
+    await renderPantalla();
+
+    const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
+    const disparador = within(fila).getByTestId('order-row-actions');
+
+    // Antes del clic, ninguna accion esta en el DOM: no hay nada que un `:hover` pudiera revelar.
+    for (const accion of [
+      'order-action-edit',
+      'order-action-cancel',
+      'order-action-delete',
+      'order-action-responsibles',
+    ]) {
+      expect(screen.queryByTestId(accion), `${accion} antes de abrir a ${ancho}px`).toBeNull();
+    }
+
+    await user.click(disparador);
+
+    for (const accion of [
+      'order-action-edit',
+      'order-action-cancel',
+      'order-action-delete',
+      'order-action-responsibles',
+    ]) {
+      expect(await screen.findByTestId(accion), `${accion} a ${ancho}px`).toBeVisible();
+    }
+  });
+
+  it('el disparador de acciones y el del alta miden al menos 44x44 px (R45)', async () => {
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
     const controles = [
-      ...['order-action-edit', 'order-action-cancel', 'order-action-delete'].map((accion) =>
-        within(fila).getByTestId(accion),
-      ),
+      within(fila).getByTestId('order-row-actions'),
       screen.getByTestId(ORDER_CREATE_OPEN_TESTID),
     ];
 

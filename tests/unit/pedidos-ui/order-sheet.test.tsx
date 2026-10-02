@@ -10,7 +10,7 @@
 //
 // **Ningun assert sobre copy** (R44).
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -523,7 +523,8 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId('order-action-edit'));
 
     await screen.findByTestId(ORDER_FORM_TESTID);
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
@@ -545,7 +546,12 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
       <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} />,
     );
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    const item = await screen.findByTestId('order-action-edit');
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    // El item deshabilitado sigue en el arbol: el evento nativo se dispara a mano, sin pasar por
+    // la comprobacion de `pointer-events` de `user-event`.
+    fireEvent.click(item);
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
     expect(updateOrderActionMock).not.toHaveBeenCalled();
@@ -594,7 +600,8 @@ describe('el termino de busqueda sobrevive al panel lateral (R4, R9)', () => {
 
     expect(screen.getByTestId('data-table-search')).toHaveValue(termino);
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId('order-action-edit'));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
     expect(routerMock.push).not.toHaveBeenCalled();

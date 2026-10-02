@@ -17,13 +17,10 @@ import {
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import {
-  WORK_GROUP_CANDIDATE_TESTID,
-  WORK_GROUP_CANDIDATES_EMPTY_TESTID,
   WORK_GROUP_CANDIDATES_ERROR_TESTID,
   WORK_GROUP_CANDIDATES_LOADING_TESTID,
   WORK_GROUP_ID_FIELD,
   WORK_GROUP_MEMBER_ID_FIELD,
-  WORK_GROUP_MEMBER_SEARCH_TESTID,
   WorkGroupMemberPicker,
 } from './work-group-form';
 
@@ -94,12 +91,9 @@ export const WORK_GROUP_REMOVE_ERROR_TESTID = 'work-group-remove-error';
 // `work-group-form.tsx` (evita un ciclo de imports entre los dos archivos), pero el barrel de la
 // ruta sigue republicandolos `from './work-group-members'` sin que haya que tocarlo.
 export {
-  WORK_GROUP_CANDIDATE_TESTID,
-  WORK_GROUP_CANDIDATES_EMPTY_TESTID,
   WORK_GROUP_CANDIDATES_ERROR_TESTID,
   WORK_GROUP_CANDIDATES_LOADING_TESTID,
   WORK_GROUP_MEMBER_ID_FIELD,
-  WORK_GROUP_MEMBER_SEARCH_TESTID,
 };
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';

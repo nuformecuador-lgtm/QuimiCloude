@@ -36,7 +36,7 @@ import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { routerMock, listaDeResponsables, listaEnLote } = vi.hoisted(() => ({
@@ -215,7 +215,10 @@ describe('la seccion vive DENTRO del panel que ya existe (R23)', () => {
     // Cerrada la fila, no hay ningun panel montado.
     expect(screen.queryByTestId(ORDER_SHEET_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-action-responsibles'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+    );
 
     // UNA sola instancia de panel, y es el `order-sheet` de QC-35: no hay panel nuevo.
     const paneles = await screen.findAllByTestId(ORDER_SHEET_TESTID);
@@ -249,7 +252,8 @@ describe('la seccion vive DENTRO del panel que ya existe (R23)', () => {
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
 
     const paneles = await screen.findAllByTestId(ORDER_SHEET_TESTID);
     expect(paneles).toHaveLength(1);
@@ -264,7 +268,10 @@ describe('la seccion vive DENTRO del panel que ya existe (R23)', () => {
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-action-responsibles'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+    );
 
     expect(await screen.findByTestId(ORDER_FORM_TESTID)).toBeInTheDocument();
     // Una sola seccion de responsables en todo el documento, no una por cada via de apertura.
@@ -277,7 +284,10 @@ describe('abrir el panel NO emite ninguna consulta de responsables (R26)', () =>
     const user = setupUser();
     montarLista();
 
-    await user.click(screen.getByTestId('order-action-responsibles'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+    );
     await screen.findByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
 
     expect(listaDeResponsables).toHaveBeenCalledTimes(0);
@@ -322,7 +332,10 @@ describe('con el pedido ENTREGADO o CANCELADO la seccion CALLA (R29)', () => {
       // permiso. Si se cayera el corte por estado, este caso lo dice.
       montarLista(status);
 
-      await user.click(screen.getByTestId('order-action-responsibles'));
+      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(
+        await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+      );
       const seccion = await screen.findByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
 
       for (const testId of CONTROLES_DE_ESCRITURA) {
@@ -353,7 +366,10 @@ describe('con el pedido ENTREGADO o CANCELADO la seccion CALLA (R29)', () => {
       const user = setupUser();
       montarLista(status);
 
-      await user.click(screen.getByTestId('order-action-responsibles'));
+      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(
+        await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+      );
       const seccion = await screen.findByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
 
       expect(within(seccion).getByTestId(RESPONSIBLE_SEARCH_TESTID)).toBeInTheDocument();

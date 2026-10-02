@@ -9,9 +9,15 @@
 // `WORK_GROUP_NAME_ISSUE_MESSAGES` o contra el mensaje del catalogo de errores, nunca contra una
 // frase escrita aqui.
 //
-// **El panel se monta de verdad**: el formulario vive dentro de un `Sheet` porque su boton de
-// cancelar es un `SheetClose`. Lo que el panel decide —titulo, miembros, cierre— se prueba en
-// `work-group-sheet.test.tsx`.
+// **El panel se monta de verdad**: `WorkGroupForm` pinta su PROPIO `SheetContent` (cabecera, cuerpo
+// con scroll y pie fijo), asi que el unico envoltorio que este archivo necesita es el `<Sheet>` —el
+// primitivo que declara el contexto del panel—, sin un segundo `SheetContent` alrededor. Lo que el
+// panel decide ADEMAS —miembros de la edicion, cierre, aviso— se prueba en `work-group-sheet.test.tsx`.
+//
+// **Las filas del picker de candidatos se localizan por el `data-testid` REAL de la tabla
+// compartida** (`data-table-row-<id>`, de `components/shared/data-table`), no por un `data-testid`
+// propio de este dominio: desde que `WorkGroupMemberPicker` monta `<DataTable>`, esa es la unica
+// forma estable de llegar a una fila concreta.
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
@@ -19,7 +25,6 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  WORK_GROUP_CANDIDATE_TESTID,
   WORK_GROUP_FORM_ERROR_CODE_TESTID,
   WORK_GROUP_FORM_ERROR_TESTID,
   WORK_GROUP_FORM_ID_TESTID,
@@ -36,7 +41,7 @@ import {
   WorkGroupForm,
   workGroupNameIssue,
 } from '@/app/(private)/configuracion/usuarios/components';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
 import { errorMessage } from '@/lib/modules/errores';
 import { WORK_GROUP_NAME_MAX_LENGTH, normalizeWorkGroupName } from '@/lib/modules/identity';
 import type { UserRow } from '@/lib/modules/identity';
@@ -123,9 +128,7 @@ const CANDIDATO: UserRow = {
 function montar(group: typeof GRUPO | null, onSaved = vi.fn<() => void>()) {
   render(
     <Sheet open onOpenChange={() => {}}>
-      <SheetContent>
-        <WorkGroupForm group={group} onSaved={onSaved} />
-      </SheetContent>
+      <WorkGroupForm group={group} onSaved={onSaved} />
     </Sheet>,
   );
   return onSaved;
@@ -163,9 +166,13 @@ function fuenteDelFormulario(): string {
     .replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
-/** Espera a que el picker de miembros, que el alta monta siempre, pinte su primera fila. */
+/**
+ * Espera a que el picker de miembros, que el alta monta siempre, pinte su primera fila. La
+ * localiza por el `data-testid` REAL de `<DataTable>` (`data-table-row-<id>`): `getRowId` del
+ * picker es `candidate.id`, asi que es la MISMA fila para cualquier candidato de la pagina.
+ */
 async function esperarCandidato(): Promise<HTMLElement> {
-  return screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+  return screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
 }
 
 beforeEach(() => {
@@ -449,7 +456,8 @@ describe('el alta puede elegir miembros iniciales, en estado local hasta crear e
     montar(GRUPO);
 
     expect(screen.queryByTestId(WORK_GROUP_PENDING_MEMBER_TESTID)).toBeNull();
-    expect(screen.queryByTestId(WORK_GROUP_CANDIDATE_TESTID)).toBeNull();
+    // `data-table` es el envoltorio que pinta `<DataTable>`: ausente, el picker no se monto.
+    expect(screen.queryByTestId('data-table')).toBeNull();
     // Y por tanto no consulto la lista de personas: ese bloque, en la edicion, no existe.
     expect(listUsersActionMock).not.toHaveBeenCalled();
   });

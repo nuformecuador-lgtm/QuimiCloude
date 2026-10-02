@@ -34,7 +34,7 @@
 // **Ningun assert sobre copy** (R41): todo se localiza por rol accesible, por `data-testid` publico
 // de la tabla compartida o por constantes exportadas del barrel de la ruta.
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -73,7 +73,7 @@ import UsuariosPage from '@/app/(private)/configuracion/usuarios/page';
 import type { RoleOption, UserRow } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import {
   NARROW_VIEWPORT,
   WIDE_VIEWPORT,
@@ -221,13 +221,6 @@ const COLUMNAS = [
   ROLE_NAME_COLUMN_ID,
   ACCOUNT_STATUS_COLUMN_ID,
   ACTIONS_COLUMN_ID,
-] as const;
-
-/** Las tres acciones de fila, siempre en el DOM (R40). */
-const ACCIONES_DE_FILA = [
-  USER_ACTION_EDIT_TESTID,
-  USER_ACTION_STATUS_TESTID,
-  USER_ACTION_DELETE_TESTID,
 ] as const;
 
 function pagina(items: readonly UserRow[]) {
@@ -500,28 +493,20 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
   // R40 — Nada detras del puntero
   // ------------------------------------------------------------------------------------------
 
-  it('las TRES acciones estan en el DOM y visibles desde el primer render, sin :hover (R40)', async () => {
+  it('el disparador de acciones esta en el DOM y visible desde el primer render, sin :hover (R40)', async () => {
     await renderPantalla();
 
-    // 1) En el DOM: los tres controles de CADA fila estan visibles ya, sin pasar el puntero por
-    //    encima. En tactil no hay puntero que pasar. Se localizan ademas por su rol y su nombre
-    //    accesible, que es el contrato que R41 exige y que compone el propio componente.
+    // 1) En el DOM: el disparador de CADA fila esta visible ya, sin pasar el puntero por encima.
+    //    En tactil no hay puntero que pasar. Se nombra con el usuario de su fila (R41). Las TRES
+    //    acciones viven detras de este disparador -decision humana puntual de esta pantalla, ver
+    //    `user-row-actions.tsx`- y se prueban en el caso siguiente, que lo abre con un clic.
     for (const usuario of FILAS) {
       const fila = screen.getByTestId(`data-table-row-${usuario.id}`);
+      const disparador = within(fila).getByTestId(USER_ROW_ACTIONS_TESTID);
 
-      for (const accion of ACCIONES_DE_FILA) {
-        const control = within(fila).getByTestId(accion);
-        expect(control, `${accion} a ${ancho}px`).toBeVisible();
-        expect(control, `${accion} a ${ancho}px`).toBeEnabled();
-      }
-
-      for (const nombre of [
-        editUserLabel(usuario.displayName),
-        changeUserStatusLabel(usuario.displayName),
-        deleteUserLabel(usuario.displayName),
-      ]) {
-        expect(within(fila).getByRole('button', { name: nombre })).toBeVisible();
-      }
+      expect(disparador, `disparador de ${usuario.id} a ${ancho}px`).toBeVisible();
+      expect(disparador, `disparador de ${usuario.id} a ${ancho}px`).toBeEnabled();
+      expect(disparador).toHaveAccessibleName(expect.stringContaining(usuario.displayName));
     }
 
     expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeVisible();
@@ -546,6 +531,39 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
     }
   });
 
+  it('abrir el disparador con un CLIC (nunca hover) revela las tres acciones, cada una con su nombre (R40)', async () => {
+    const user = setupUser();
+    await renderPantalla();
+
+    for (const usuario of FILAS) {
+      const fila = screen.getByTestId(`data-table-row-${usuario.id}`);
+      const disparador = within(fila).getByTestId(USER_ROW_ACTIONS_TESTID);
+
+      // Antes del clic, ninguna accion esta en el DOM: no hay nada que un `:hover` pudiera revelar.
+      expect(
+        screen.queryByTestId(USER_ACTION_EDIT_TESTID),
+        `editar de ${usuario.id} antes de abrir a ${ancho}px`,
+      ).toBeNull();
+
+      await user.click(disparador);
+
+      for (const [testid, nombre] of [
+        [USER_ACTION_EDIT_TESTID, editUserLabel(usuario.displayName)],
+        [USER_ACTION_STATUS_TESTID, changeUserStatusLabel(usuario.displayName)],
+        [USER_ACTION_DELETE_TESTID, deleteUserLabel(usuario.displayName)],
+      ] as const) {
+        const item = await screen.findByTestId(testid);
+        expect(item, `${testid} de ${usuario.id} a ${ancho}px`).toBeVisible();
+        expect(item).toHaveAccessibleName(nombre);
+      }
+
+      await user.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByTestId(USER_ACTION_EDIT_TESTID)).toBeNull(),
+      );
+    }
+  });
+
   // ------------------------------------------------------------------------------------------
   // R40 — 44x44 px y 16 px
   // ------------------------------------------------------------------------------------------
@@ -555,7 +573,7 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
 
     const fila = screen.getByTestId(`data-table-row-${ANA.id}`);
     const controles = [
-      ...ACCIONES_DE_FILA.map((accion) => within(fila).getByTestId(accion)),
+      within(fila).getByTestId(USER_ROW_ACTIONS_TESTID),
       screen.getByTestId(USER_CREATE_OPEN_TESTID),
     ];
 
@@ -612,7 +630,10 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${ANA.id}`);
-    await user.click(within(fila).getByTestId(USER_ACTION_DELETE_TESTID));
+    await user.click(within(fila).getByTestId(USER_ROW_ACTIONS_TESTID));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId(USER_ACTION_DELETE_TESTID)),
+    );
 
     const dialogo = await screen.findByTestId(DELETE_USER_DIALOG_TESTID);
     expect(dialogo, `el dialogo a ${ancho}px`).toBeVisible();
@@ -634,7 +655,10 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${ANA.id}`);
-    await user.click(within(fila).getByTestId(USER_ACTION_STATUS_TESTID));
+    await user.click(within(fila).getByTestId(USER_ROW_ACTIONS_TESTID));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId(USER_ACTION_STATUS_TESTID)),
+    );
 
     const dialogo = await screen.findByTestId(USER_STATUS_DIALOG_TESTID);
     expect(dialogo, `el dialogo a ${ancho}px`).toBeVisible();

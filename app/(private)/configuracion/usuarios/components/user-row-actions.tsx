@@ -2,7 +2,7 @@
 
 import { PencilIcon, TrashIcon, UserCogIcon } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
 import type { UserRow } from '@/lib/modules/identity';
 
 import { changeUserStatusLabel, deleteUserLabel, editUserLabel } from './user-labels';
@@ -11,10 +11,10 @@ import { changeUserStatusLabel, deleteUserLabel, editUserLabel } from './user-la
  * Las TRES acciones de fila de un usuario: editar, borrar y cambiar el estado de cuenta (R6
  * —mitad cliente—, R32, R40; `design.md > 9`).
  *
- * **Con `canModify === false` devuelve `null`, o sea la celda queda VACIA** (R6): sin botones,
- * sin botones deshabilitados, sin explicacion y sin nada en el DOM. Un boton deshabilitado
- * anuncia una capacidad que la sesion no tiene y solo sirve para que alguien intente averiguar
- * por que; la ausencia de acciones es la unica senal.
+ * **Con `canModify === false` devuelve `null`, o sea la celda queda VACIA** (R6): sin disparador,
+ * sin nada deshabilitado, sin explicacion y sin nada en el DOM. Un control deshabilitado anuncia
+ * una capacidad que la sesion no tiene y solo sirve para que alguien intente averiguar por que; la
+ * ausencia de acciones es la unica senal.
  *
  * **Ocultarlas es comodidad de la interfaz, NO el control** (R6). Quien autoriza es el caso de uso
  * del modulo, cuya primera linea es `requirePermission` en las seis operaciones. Esta pantalla no
@@ -23,9 +23,14 @@ import { changeUserStatusLabel, deleteUserLabel, editUserLabel } from './user-la
  * (`docs/architecture.md > Permisos`), asi que una pantalla puede ofrecer un boton que el service
  * ya deniega; ese rechazo se pinta como cualquier otro error, por su `code` (R7).
  *
- * **Siempre visibles y siempre en el DOM** (R40): nada se descubre con `:hover` —que en tactil no
- * existe— ni vive dentro de un desplegable que las esconda del arbol, y cada control mide al menos
- * 44x44 px.
+ * **Decision humana puntual sobre R40 (pedida por chat, solo para esta pantalla):** las tres
+ * acciones ya NO son tres botones en linea, sino items de un menu "de los 3 puntos"
+ * (`RowActionsMenu`, `components/shared/row-actions-menu.tsx`). R40 sigue exigiendo que nada se
+ * descubra con `:hover` y que cada control mida 44x44 px, y eso se sigue cumpliendo: el
+ * DISPARADOR del menu esta siempre visible y siempre en el DOM, con su propio objetivo tactil. Lo
+ * que cambia es que las tres acciones individuales viven dentro del menu que ese disparador abre
+ * con un clic, no como tres controles sueltos. No es una derogacion general de R40 para el resto
+ * del repo: las demas pantallas con botones en linea siguen con ellos.
  *
  * **UNA sola accion para el estado de cuenta** (R32), no un verbo por transicion: quien elige
  * entre los cuatro valores es el dialogo de T11, y la pantalla no decide que transiciones son
@@ -41,9 +46,6 @@ import { changeUserStatusLabel, deleteUserLabel, editUserLabel } from './user-la
  * cada panel para toda la pagina en vez de una por fila— sin reescribir ni una linea de este
  * componente.
  */
-
-/** Objetivo tactil minimo (44x44 px) de R40. Los primitivos miden 32 px de alto por defecto. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 export const USER_ROW_ACTIONS_TESTID = 'user-row-actions';
 export const USER_ACTION_EDIT_TESTID = 'user-action-edit';
@@ -73,6 +75,11 @@ export type UserRowActionsProps = {
   readonly onStatusChange?: UserRowActionHandler;
 };
 
+/** Nombre accesible del disparador: el verbo mas el nombre del usuario, igual criterio que R41. */
+function userRowActionsTriggerLabel(displayName: string): string {
+  return `Acciones de ${displayName}`;
+}
+
 export function UserRowActions({
   user,
   canModify,
@@ -80,51 +87,41 @@ export function UserRowActions({
   onDelete,
   onStatusChange,
 }: UserRowActionsProps) {
-  // R6: sin `usuarios.modificar` la celda no emite NADA. Ni un contenedor vacio, que ya seria una
+  // R6: sin `usuarios.modificar` la celda no emite NADA. Ni un disparador vacio, que ya seria una
   // pista de que ahi hay acciones para otros.
   if (!canModify) return null;
 
+  const items: RowActionMenuItem[] = [
+    {
+      key: 'edit',
+      label: editUserLabel(user.displayName),
+      icon: PencilIcon,
+      onSelect: () => onEdit?.(user),
+      testId: USER_ACTION_EDIT_TESTID,
+    },
+    {
+      key: 'status',
+      label: changeUserStatusLabel(user.displayName),
+      icon: UserCogIcon,
+      onSelect: () => onStatusChange?.(user),
+      testId: USER_ACTION_STATUS_TESTID,
+    },
+    {
+      key: 'delete',
+      label: deleteUserLabel(user.displayName),
+      icon: TrashIcon,
+      onSelect: () => onDelete?.(user),
+      destructive: true,
+      testId: USER_ACTION_DELETE_TESTID,
+    },
+  ];
+
   return (
-    <div
-      className="flex items-center justify-end gap-1"
-      data-testid={USER_ROW_ACTIONS_TESTID}
-      data-user-id={user.id}
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={TOUCH_TARGET}
-        aria-label={editUserLabel(user.displayName)}
-        data-testid={USER_ACTION_EDIT_TESTID}
-        onClick={() => onEdit?.(user)}
-      >
-        <PencilIcon aria-hidden="true" />
-      </Button>
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={TOUCH_TARGET}
-        aria-label={changeUserStatusLabel(user.displayName)}
-        data-testid={USER_ACTION_STATUS_TESTID}
-        onClick={() => onStatusChange?.(user)}
-      >
-        <UserCogIcon aria-hidden="true" />
-      </Button>
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={TOUCH_TARGET}
-        aria-label={deleteUserLabel(user.displayName)}
-        data-testid={USER_ACTION_DELETE_TESTID}
-        onClick={() => onDelete?.(user)}
-      >
-        <TrashIcon aria-hidden="true" />
-      </Button>
-    </div>
+    <RowActionsMenu
+      items={items}
+      triggerLabel={userRowActionsTriggerLabel(user.displayName)}
+      triggerTestId={USER_ROW_ACTIONS_TESTID}
+      triggerDataAttributes={{ 'data-user-id': user.id }}
+    />
   );
 }

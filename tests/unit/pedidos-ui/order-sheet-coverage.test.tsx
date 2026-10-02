@@ -17,7 +17,7 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { routerMock } = vi.hoisted(() => ({
@@ -167,7 +167,8 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
       const user = setupUser();
       montarLista({ [PEDIDO_ID]: coverage });
 
-      await user.click(screen.getByTestId('order-action-edit'));
+      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
 
       const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
       const etiqueta = within(panel).getByTestId(ORDER_SHEET_COVERAGE_TESTID);
@@ -182,7 +183,8 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
     const user = setupUser();
     montarLista({});
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
 
     const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
     expect(within(panel).queryByTestId(ORDER_SHEET_COVERAGE_TESTID)).toBeNull();
@@ -192,7 +194,10 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
     const user = setupUser();
     montarLista({ [PEDIDO_ID]: 'full' });
 
-    await user.click(screen.getByTestId('order-action-responsibles'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+    );
 
     const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
     expect(within(panel).getByTestId('order-coverage')).toHaveAttribute('data-coverage', 'full');

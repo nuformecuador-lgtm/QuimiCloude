@@ -18,10 +18,11 @@ import {
   WORK_GROUP_SHEET_TESTID,
   WorkGroupCreateAction,
 } from '@/app/(private)/configuracion/usuarios/components';
+import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
 import { setupUser } from '../../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../../helpers/viewport';
 
-const { routerMock } = vi.hoisted(() => ({
+const { routerMock, listUsersActionMock } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -30,6 +31,7 @@ const { routerMock } = vi.hoisted(() => ({
     forward: vi.fn<() => void>(),
     prefetch: vi.fn<(href: string) => void>(),
   },
+  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -56,9 +58,29 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
   };
 });
 
+vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
+  const noDebeInvocarse = (nombre: string) => () => {
+    throw new Error(`${nombre} no debe invocarse desde el disparador del alta`);
+  };
+  return {
+    // El picker de miembros iniciales, que el panel de alta monta siempre, consulta esta action
+    // al montarse; las otras cinco siguen sin tener nada que hacer aqui.
+    listUsersAction: listUsersActionMock,
+    getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
+    createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
+    updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
+    deleteUserAction: vi.fn(noDebeInvocarse('deleteUserAction')),
+    setUserAccountStatusAction: vi.fn(noDebeInvocarse('setUserAccountStatusAction')),
+  };
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   setViewportWidth(WIDE_VIEWPORT);
+  listUsersActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
+  });
 });
 
 afterEach(() => {

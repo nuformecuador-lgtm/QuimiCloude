@@ -41,7 +41,7 @@ import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 // LA SEGUNDA MITAD DE R28, invocada y no reescrita: los casos de QC-87 corren tal cual estan en
@@ -275,7 +275,10 @@ describe('QC-102 — sin `asignaciones.modificar` el panel es de SOLO LECTURA (R
       />,
     );
 
-    await user.click(screen.getByTestId('order-action-responsibles'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+    );
     const seccion = await screen.findByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
 
     for (const testId of CONTROLES_DE_ESCRITURA) {

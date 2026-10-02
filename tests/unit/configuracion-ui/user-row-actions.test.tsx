@@ -5,11 +5,17 @@
 // tests del modulo: ocultar es comodidad, no autorizacion, y R6 lo dice con esas palabras para que
 // las dos mitades sean exigibles por separado.
 //
-// **Los botones se localizan por ROL ARIA y por su nombre accesible compuesto** (R41), con las
+// **Migrado al menu "de los 3 puntos" por decision humana puntual de esta pantalla** (ver el
+// comentario de cabecera de `user-row-actions.tsx`): las tres acciones ya no son tres botones en
+// linea, sino items de `RowActionsMenu` que aparecen al abrir su disparador. R40 se prueba ahora
+// en DOS mitades: el disparador esta siempre presente y mide 44x44 px sin ninguna interaccion
+// previa (eso no cambio), y las tres acciones solo llegan al arbol tras abrirlo con un clic.
+//
+// **Los items se localizan por ROL ARIA y por su nombre accesible compuesto** (R41), con las
 // mismas funciones que los componen (`editUserLabel`, `deleteUserLabel`, `changeUserStatusLabel`):
 // unica fuente de ese texto, y por tanto ningun literal de copy en este archivo.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -25,8 +31,6 @@ import {
 } from '@/app/(private)/configuracion/usuarios/components';
 import { USER_ACCOUNT_STATUSES, type UserRow } from '@/lib/modules/identity';
 
-import { setupUser } from '../../helpers/user-event';
-
 const USUARIO: UserRow = {
   id: '33333333-3333-4333-8333-333333333333',
   displayName: 'Lopez Rivera Ana Maria',
@@ -39,12 +43,17 @@ const USUARIO: UserRow = {
 /** Objetivo tactil minimo que exige R40: 44x44 px, que en Tailwind es `min-h-11 min-w-11`. */
 const CLASES_TACTILES = ['min-h-11', 'min-w-11'] as const;
 
+/** Abre el menu pulsando su disparador. Mismo patron que `data-table.test.tsx` para este primitivo. */
+function abrirMenu(): void {
+  fireEvent.click(screen.getByTestId(USER_ROW_ACTIONS_TESTID));
+}
+
 afterEach(() => {
   cleanup();
 });
 
 describe('sin `usuarios.modificar` la celda no emite NADA (R6)', () => {
-  it('ni contenedor, ni botones, ni texto: el DOM queda vacio', () => {
+  it('ni disparador, ni menu, ni texto: el DOM queda vacio', () => {
     const { container } = render(<UserRowActions user={USUARIO} canModify={false} />);
 
     expect(container.innerHTML).toBe('');
@@ -52,7 +61,7 @@ describe('sin `usuarios.modificar` la celda no emite NADA (R6)', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('tampoco hay botones DESHABILITADOS ni explicacion de por que no hay acciones', () => {
+  it('tampoco hay nada deshabilitado ni explicacion de por que no hay acciones', () => {
     const { container } = render(<UserRowActions user={USUARIO} canModify={false} />);
 
     expect(document.querySelectorAll('[disabled]')).toHaveLength(0);
@@ -63,64 +72,101 @@ describe('sin `usuarios.modificar` la celda no emite NADA (R6)', () => {
   });
 });
 
-describe('con `usuarios.modificar` hay TRES acciones, siempre en el DOM (R6, R32, R40)', () => {
-  it('editar, cambiar estado y borrar, las tres presentes sin interaccion previa', () => {
+describe('con `usuarios.modificar` el disparador esta SIEMPRE en el DOM (R6, R40)', () => {
+  it('el disparador existe sin interaccion previa y nombra al usuario sobre el que actua', () => {
     render(<UserRowActions user={USUARIO} canModify />);
 
-    expect(screen.getByTestId(USER_ACTION_EDIT_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(USER_ACTION_STATUS_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(USER_ACTION_DELETE_TESTID)).toBeInTheDocument();
-    expect(screen.getAllByRole('button')).toHaveLength(3);
+    const disparador = screen.getByTestId(USER_ROW_ACTIONS_TESTID);
+    expect(disparador).toBeInTheDocument();
+    expect(disparador).toHaveAccessibleName(expect.stringContaining(USUARIO.displayName));
   });
 
-  it('UNA sola accion para el estado de cuenta: no hay un boton por verbo (R32)', () => {
+  it('el disparador mide al menos 44x44 px', () => {
     render(<UserRowActions user={USUARIO} canModify />);
 
-    // Si alguien tradujera estados a verbos («Activar», «Bloquear»…) habria mas de tres botones y
-    // la pantalla estaria decidiendo que transiciones son legales, que es regla de negocio.
-    expect(screen.getAllByRole('button')).toHaveLength(3);
-    expect(screen.getAllByTestId(USER_ACTION_STATUS_TESTID)).toHaveLength(1);
-  });
-
-  it('cada accion NOMBRA al usuario sobre el que actua (R41)', () => {
-    render(<UserRowActions user={USUARIO} canModify />);
-
-    expect(
-      screen.getByRole('button', { name: editUserLabel(USUARIO.displayName) }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: deleteUserLabel(USUARIO.displayName) }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: changeUserStatusLabel(USUARIO.displayName) }),
-    ).toBeInTheDocument();
-  });
-
-  it('cada control mide al menos 44x44 px (R40)', () => {
-    render(<UserRowActions user={USUARIO} canModify />);
-
-    for (const boton of screen.getAllByRole('button')) {
-      for (const clase of CLASES_TACTILES) {
-        expect(boton.className, `${boton.getAttribute('data-testid')} sin ${clase}`).toContain(
-          clase,
-        );
-      }
+    const disparador = screen.getByTestId(USER_ROW_ACTIONS_TESTID);
+    for (const clase of CLASES_TACTILES) {
+      expect(disparador.className, `disparador sin ${clase}`).toContain(clase);
     }
   });
 
-  it('nada se descubre con `:hover` ni vive en un desplegable fuera del DOM (R40)', () => {
-    const { container } = render(<UserRowActions user={USUARIO} canModify />);
+  it('antes de abrirlo, ninguna de las tres acciones esta en el DOM', () => {
+    render(<UserRowActions user={USUARIO} canModify />);
 
-    // Las tres acciones estan en el arbol desde el primer render: no hay disparador de menu que
-    // las esconda, ni clase de visibilidad condicionada al puntero.
-    expect(container.querySelectorAll('button')).toHaveLength(3);
-    expect(container.innerHTML).not.toContain('group-hover');
-    expect(container.innerHTML).not.toContain('hover:opacity');
+    expect(screen.queryByTestId(USER_ACTION_EDIT_TESTID)).toBeNull();
+    expect(screen.queryByTestId(USER_ACTION_STATUS_TESTID)).toBeNull();
+    expect(screen.queryByTestId(USER_ACTION_DELETE_TESTID)).toBeNull();
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('no depende de `:hover`: nada en su clase condiciona la visibilidad al puntero', () => {
+    render(<UserRowActions user={USUARIO} canModify />);
+
+    const disparador = screen.getByTestId(USER_ROW_ACTIONS_TESTID);
+    expect(disparador.className).not.toContain('group-hover');
+    expect(disparador.className).not.toContain('hover:opacity');
   });
 });
 
-describe('los disparadores avisan con la fila, y no hacen nada mas (R36)', () => {
-  it('cada boton invoca SU manejador con el usuario de la fila', async () => {
+describe('al abrir el disparador, el menu trae las TRES acciones y ninguna mas (R6, R32, R41)', () => {
+  it('editar, cambiar estado y borrar, las tres presentes y ninguna otra', async () => {
+    render(<UserRowActions user={USUARIO} canModify />);
+
+    abrirMenu();
+
+    expect(await screen.findByTestId(USER_ACTION_EDIT_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_ACTION_STATUS_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_ACTION_DELETE_TESTID)).toBeInTheDocument();
+    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+  });
+
+  it('UNA sola accion para el estado de cuenta: no hay un item por verbo (R32)', async () => {
+    render(<UserRowActions user={USUARIO} canModify />);
+
+    abrirMenu();
+
+    // Si alguien tradujera estados a verbos («Activar», «Bloquear»…) habria mas de tres items y
+    // el menu estaria decidiendo que transiciones son legales, que es regla de negocio.
+    await screen.findByTestId(USER_ACTION_STATUS_TESTID);
+    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+    expect(screen.getAllByTestId(USER_ACTION_STATUS_TESTID)).toHaveLength(1);
+  });
+
+  it('cada accion NOMBRA al usuario sobre el que actua (R41)', async () => {
+    render(<UserRowActions user={USUARIO} canModify />);
+
+    abrirMenu();
+    await screen.findByTestId(USER_ACTION_EDIT_TESTID);
+
+    expect(
+      screen.getByRole('menuitem', { name: editUserLabel(USUARIO.displayName) }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: deleteUserLabel(USUARIO.displayName) }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: changeUserStatusLabel(USUARIO.displayName) }),
+    ).toBeInTheDocument();
+  });
+
+  it('QC-101 no anade nada al menu: exactamente las tres acciones de siempre, ninguna de sesiones', async () => {
+    render(<UserRowActions user={USUARIO} canModify />);
+
+    abrirMenu();
+    await screen.findByTestId(USER_ACTION_EDIT_TESTID);
+
+    expect(
+      screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid')).sort(),
+    ).toEqual([USER_ACTION_DELETE_TESTID, USER_ACTION_EDIT_TESTID, USER_ACTION_STATUS_TESTID].sort());
+    // El cierre de sesiones vive en el panel de detalle, nunca en este menu.
+    expect(
+      screen.queryByRole('menuitem', { name: endUserSessionsLabel(USUARIO.displayName) }),
+    ).toBeNull();
+  });
+});
+
+describe('los items del menu avisan con la fila, y no hacen nada mas (R36)', () => {
+  it('cada item invoca SU manejador con el usuario de la fila', async () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();
     const onStatusChange = vi.fn();
@@ -135,55 +181,42 @@ describe('los disparadores avisan con la fila, y no hacen nada mas (R36)', () =>
       />,
     );
 
-    const usuario = setupUser();
-
-    await usuario.click(screen.getByTestId(USER_ACTION_EDIT_TESTID));
-    await usuario.click(screen.getByTestId(USER_ACTION_STATUS_TESTID));
-    await usuario.click(screen.getByTestId(USER_ACTION_DELETE_TESTID));
-
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId(USER_ACTION_EDIT_TESTID));
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(USUARIO);
+
+    // El menu se cierra tras cada seleccion (comportamiento por defecto del primitivo): se
+    // reabre para alcanzar el siguiente item.
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId(USER_ACTION_STATUS_TESTID));
     expect(onStatusChange).toHaveBeenCalledExactlyOnceWith(USUARIO);
+
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId(USER_ACTION_DELETE_TESTID));
     expect(onDelete).toHaveBeenCalledExactlyOnceWith(USUARIO);
   });
 
   it('sin manejadores —el panel y los dialogos aun no existen— pulsar no rompe nada', async () => {
     render(<UserRowActions user={USUARIO} canModify />);
 
-    // T9, T10 y T11 enchufaran los tres manejadores sin reescribir este componente; hasta
-    // entonces, los disparadores existen y no revientan.
-    const usuario = setupUser();
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId(USER_ACTION_EDIT_TESTID));
 
-    for (const boton of screen.getAllByRole('button')) {
-      await usuario.click(boton);
-    }
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId(USER_ACTION_STATUS_TESTID));
 
-    expect(screen.getAllByRole('button')).toHaveLength(3);
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId(USER_ACTION_DELETE_TESTID));
+
+    expect(screen.getByTestId(USER_ROW_ACTIONS_TESTID)).toBeInTheDocument();
   });
 
-  it('R8 — QC-101 no anade nada a la fila: exactamente tres controles, ninguno de sesiones y sin menu', () => {
+  it('el disparador lleva el identificador de la fila como DATO, no como texto visible', () => {
     render(<UserRowActions user={USUARIO} canModify />);
 
-    const celda = screen.getByTestId(USER_ROW_ACTIONS_TESTID);
-    // Exactamente los tres de hoy, identificados uno a uno, y ni uno mas de ningun tipo.
-    expect(celda.querySelectorAll('button, a, [role="button"], [role="menuitem"]')).toHaveLength(3);
-    expect(
-      [...celda.querySelectorAll('button')].map((boton) => boton.getAttribute('data-testid')).sort(),
-    ).toEqual([USER_ACTION_DELETE_TESTID, USER_ACTION_EDIT_TESTID, USER_ACTION_STATUS_TESTID].sort());
-    // El cierre de sesiones vive en el panel de detalle, nunca en la fila.
-    expect(
-      screen.queryByRole('button', { name: endUserSessionsLabel(USUARIO.displayName) }),
-    ).toBeNull();
-    // Y no se introduce ningun menu desplegable de fila.
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(celda.querySelectorAll('[aria-haspopup]')).toHaveLength(0);
-  });
+    const disparador = screen.getByTestId(USER_ROW_ACTIONS_TESTID);
 
-  it('la celda lleva el identificador de la fila como DATO, no como texto visible', () => {
-    render(<UserRowActions user={USUARIO} canModify />);
-
-    const celda = screen.getByTestId(USER_ROW_ACTIONS_TESTID);
-
-    expect(celda).toHaveAttribute('data-user-id', USUARIO.id);
-    expect(celda.textContent).not.toContain(USUARIO.id);
+    expect(disparador).toHaveAttribute('data-user-id', USUARIO.id);
+    expect(disparador.textContent).not.toContain(USUARIO.id);
   });
 });

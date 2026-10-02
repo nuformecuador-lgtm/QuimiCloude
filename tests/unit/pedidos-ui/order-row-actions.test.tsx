@@ -1,22 +1,32 @@
 // QC-35 T8 — Las acciones de fila y los estados finales: R23, R24, R43, R45.
 //
+// **Migrado al menu "de los 3 puntos" por la misma decision humana puntual que ya migro
+// `user-row-actions.tsx`** (ver el comentario de cabecera de `order-row-actions.tsx`): las
+// cuatro acciones ya no son botones en linea, sino items de `RowActionsMenu` que aparecen al
+// abrir su disparador. R45 se prueba ahora en DOS mitades: el disparador esta siempre presente y
+// mide 44x44 px sin ninguna interaccion previa, y las cuatro acciones solo llegan al arbol tras
+// abrirlo con un clic.
+//
 // **Los dobles FALLAN si se les llama.** Las seis Server Actions de `pedidos` y los tres
 // callbacks de enganche estan sustituidos por funciones que lanzan: asi «no se invoca ninguna
 // operacion» se comprueba de verdad, en vez de mirar un contador que un fallo silencioso podria
 // dejar a cero por otra razon.
 //
+// **Items deshabilitados: `fireEvent.click` y no `user.click`.** `user-event` se niega a pinchar
+// un elemento con `pointer-events: none` (la clase que trae `data-disabled`), que es justo la
+// comprobacion visual que ya cubre `pedidos-viewport.test.tsx`. Aqui lo que se demuestra es la
+// otra mitad: que aunque alguien dispare el evento nativo, el primitivo del menu no llega a
+// invocar `onSelect`.
+//
 // **Ningun assert sobre copy** (R44): los controles se localizan por `data-testid` y por su rol
-// accesible, y el motivo visible se afirma por identificador, no por su texto.
+// accesible. Con el pedido en estado final no hay ningun texto de motivo que afirmar: las tres
+// acciones simplemente quedan `aria-disabled` dentro del menu.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  FINAL_ORDER_REASON,
-  OrderRowActions,
-  isFinalOrderStatus,
-} from '@/app/(private)/pedidos/components';
+import { OrderRowActions, isFinalOrderStatus } from '@/app/(private)/pedidos/components';
 import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
@@ -73,6 +83,14 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
   };
 }
 
+/** Objetivo tactil minimo que exige R45: 44x44 px, que en Tailwind es `min-h-11 min-w-11`. */
+const CLASES_TACTILES = ['min-h-11', 'min-w-11'] as const;
+
+/** Abre el menu pulsando su disparador. Mismo patron que `user-row-actions.test.tsx`. */
+function abrirMenu(): void {
+  fireEvent.click(screen.getByTestId('order-row-actions'));
+}
+
 /** Los tres callbacks de enganche, como dobles que FALLAN si alguien los llama. */
 function enganchesQueFallan() {
   return {
@@ -89,6 +107,7 @@ function enganchesQueFallan() {
 }
 
 const CONTROLES = ['order-action-edit', 'order-action-cancel', 'order-action-delete'] as const;
+const RESPONSABLES_TESTID = 'order-action-responsibles';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -98,61 +117,112 @@ afterEach(() => {
   cleanup();
 });
 
-describe('las tres acciones estan SIEMPRE visibles (R23, R45)', () => {
-  it('editar, cancelar y borrar existen en el DOM sin ninguna interaccion previa', () => {
+describe('el disparador esta SIEMPRE en el DOM, sin ninguna accion detras hasta abrirlo (R23, R45)', () => {
+  it('existe sin interaccion previa, mide al menos 44x44 px y ninguna accion esta aun en el arbol', () => {
     render(<OrderRowActions order={pedido('PENDIENTE')} />);
 
-    for (const testId of CONTROLES) {
-      const control = screen.getByTestId(testId);
-      expect(control).toBeVisible();
-      // Identificable por su rol accesible, no por el texto de un icono (R44).
-      expect(control).toHaveAccessibleName();
-      // Area tactil de al menos 44x44 px: nada que dependa del puntero fino.
-      expect(control.className).toContain('min-h-11');
-      expect(control.className).toContain('min-w-11');
+    const disparador = screen.getByTestId('order-row-actions');
+    expect(disparador).toBeInTheDocument();
+    for (const clase of CLASES_TACTILES) {
+      expect(disparador.className, `disparador sin ${clase}`).toContain(clase);
     }
+
+    for (const testId of [...CONTROLES, RESPONSABLES_TESTID]) {
+      expect(screen.queryByTestId(testId)).toBeNull();
+    }
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('ninguna accion se descubre con `:hover`: no hay clase de visibilidad condicionada al puntero', () => {
-    const { container } = render(<OrderRowActions order={pedido('PENDIENTE')} />);
+  it('no depende de `:hover`: nada en su clase condiciona la visibilidad al puntero', () => {
+    render(<OrderRowActions order={pedido('PENDIENTE')} />);
 
-    expect(container.innerHTML).not.toContain('group-hover');
-    expect(container.innerHTML).not.toContain('hover:opacity');
-    expect(container.innerHTML).not.toContain('invisible');
+    const disparador = screen.getByTestId('order-row-actions');
+    expect(disparador.className).not.toContain('group-hover');
+    expect(disparador.className).not.toContain('hover:opacity');
   });
 
-  it('con el pedido abierto, pulsar una accion emite su enganche con la fila recibida por props (R43)', async () => {
-    const user = setupUser();
+  it('lleva el identificador de la fila como DATO, no como texto visible', () => {
+    const elPedido = pedido('PENDIENTE');
+    render(<OrderRowActions order={elPedido} />);
+
+    const disparador = screen.getByTestId('order-row-actions');
+    expect(disparador).toHaveAttribute('data-order-id', elPedido.id);
+    expect(disparador.textContent).not.toContain(elPedido.id);
+  });
+});
+
+describe('al abrir el disparador, el menu trae las CUATRO acciones y ninguna mas (R23, R41)', () => {
+  it('editar, cancelar, borrar y responsables, las cuatro presentes y ninguna otra', async () => {
+    render(<OrderRowActions order={pedido('PENDIENTE')} />);
+
+    abrirMenu();
+
+    expect(await screen.findByTestId('order-action-edit')).toBeInTheDocument();
+    expect(screen.getByTestId('order-action-cancel')).toBeInTheDocument();
+    expect(screen.getByTestId('order-action-delete')).toBeInTheDocument();
+    expect(screen.getByTestId(RESPONSABLES_TESTID)).toBeInTheDocument();
+    expect(screen.getAllByRole('menuitem')).toHaveLength(4);
+  });
+});
+
+describe('con el pedido abierto, pulsar una accion emite su enganche con la fila recibida por props (R43)', () => {
+  it('editar', async () => {
     const onEdit = vi.fn();
     render(<OrderRowActions order={pedido('EN_CURSO')} onEdit={onEdit} />);
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId('order-action-edit'));
 
-    expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onEdit).toHaveBeenCalledWith(pedido('EN_CURSO'));
+    expect(onEdit).toHaveBeenCalledExactlyOnceWith(pedido('EN_CURSO'));
+  });
+
+  it('cancelar', async () => {
+    const onCancel = vi.fn();
+    render(<OrderRowActions order={pedido('EN_CURSO')} onCancel={onCancel} />);
+
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId('order-action-cancel'));
+
+    expect(onCancel).toHaveBeenCalledExactlyOnceWith(pedido('EN_CURSO'));
+  });
+
+  it('borrar', async () => {
+    const onDelete = vi.fn();
+    render(<OrderRowActions order={pedido('EN_CURSO')} onDelete={onDelete} />);
+
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId('order-action-delete'));
+
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(pedido('EN_CURSO'));
+  });
+
+  it('sin manejadores —el panel y los dialogos aun no existen— pulsar no rompe nada', async () => {
+    render(<OrderRowActions order={pedido('EN_CURSO')} />);
+
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId('order-action-edit'));
+
+    expect(screen.getByTestId('order-row-actions')).toBeInTheDocument();
   });
 });
 
 describe('con el pedido en estado final las tres acciones estan deshabilitadas (R24, R42)', () => {
   it.each(['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const)(
-    'con un pedido %s: los tres controles `disabled`, el motivo visible y ninguna operacion invocada',
+    'con un pedido %s: las tres marcadas `aria-disabled` y ninguna operacion invocada',
     async (status) => {
-      const user = setupUser();
       const enganches = enganchesQueFallan();
       render(<OrderRowActions order={pedido(status)} {...enganches} />);
 
+      abrirMenu();
       for (const testId of CONTROLES) {
-        expect(screen.getByTestId(testId)).toBeDisabled();
+        expect(await screen.findByTestId(testId)).toHaveAttribute('aria-disabled', 'true');
       }
 
-      // El motivo se PINTA y se localiza por `data-testid`: `title` no existe en tactil.
-      const motivo = screen.getByTestId('order-row-actions-reason');
-      expect(motivo).toBeVisible();
-      expect(motivo).toHaveTextContent(FINAL_ORDER_REASON);
-
-      // Pulsar no abre nada: los dobles lanzarian si se les llamara.
+      // El primitivo deja el item en el arbol pero bloquea su `onSelect`: se dispara el evento
+      // nativo a mano (sin pasar por la comprobacion de `pointer-events` de `user-event`, que ya
+      // cubre `pedidos-viewport.test.tsx`) y se confirma que ningun enganche llega a invocarse.
       for (const testId of CONTROLES) {
-        await user.click(screen.getByTestId(testId));
+        fireEvent.click(screen.getByTestId(testId));
       }
       expect(enganches.onEdit).not.toHaveBeenCalled();
       expect(enganches.onCancel).not.toHaveBeenCalled();
@@ -161,14 +231,14 @@ describe('con el pedido en estado final las tres acciones estan deshabilitadas (
   );
 
   it.each(['PENDIENTE', 'EN_CURSO'] as const)(
-    'con un pedido %s no hay motivo de bloqueo y los tres controles estan habilitados',
-    (status) => {
+    'con un pedido %s las tres acciones no llevan `aria-disabled`',
+    async (status) => {
       render(<OrderRowActions order={pedido(status)} />);
 
+      abrirMenu();
       for (const testId of CONTROLES) {
-        expect(screen.getByTestId(testId)).toBeEnabled();
+        expect(await screen.findByTestId(testId)).not.toHaveAttribute('aria-disabled');
       }
-      expect(screen.queryByTestId('order-row-actions-reason')).toBeNull();
     },
   );
 });
@@ -182,25 +252,24 @@ describe('el predicado de estado final es UNO solo y sale del contrato (R24, R42
 });
 
 // ---------------------------------------------------------------------------------------------
-// QC-102 T13 — La CUARTA accion de la fila, «Responsables»: R24.
+// QC-102 T13 — La CUARTA accion del menu, «Responsables»: R24.
 //
 // Lo que este bloque protege es la asimetria deliberada de `design.md > 3.2`: las tres acciones
 // de QC-35 mueren con el pedido cerrado porque lo MODIFICAN; esta solo abre el panel para VER, y
-// QC-87 R13 permite consultar responsables en los cuatro estados. Si alguien "uniformara" la fila
-// deshabilitando las cuatro, aqui se pone rojo.
+// QC-87 R13 permite consultar responsables en los cuatro estados. Si alguien "uniformara" el
+// menu deshabilitando las cuatro, aqui se pone rojo.
 // ---------------------------------------------------------------------------------------------
 
-const RESPONSABLES_TESTID = 'order-action-responsibles';
-
 describe('QC-102 — la entrada propia «Responsables» (R24)', () => {
-  it('existe en la fila, visible, con nombre accesible y objetivo tactil de 44x44', () => {
+  it('existe en el menu, visible, con nombre accesible y sin `aria-disabled`', async () => {
     render(<OrderRowActions order={pedido('PENDIENTE')} />);
 
-    const control = screen.getByTestId(RESPONSABLES_TESTID);
-    expect(control).toBeVisible();
-    expect(control).toHaveAccessibleName();
-    expect(control.className).toContain('min-h-11');
-    expect(control.className).toContain('min-w-11');
+    abrirMenu();
+
+    const item = await screen.findByTestId(RESPONSABLES_TESTID);
+    expect(item).toBeVisible();
+    expect(item).toHaveAccessibleName();
+    expect(item).not.toHaveAttribute('aria-disabled');
   });
 
   it('pulsarla emite su enganche con la fila: ver responsables NO exige abrir la edicion', async () => {
@@ -210,45 +279,37 @@ describe('QC-102 — la entrada propia «Responsables» (R24)', () => {
       throw new Error('ver responsables no debe abrir el formulario de edicion');
     });
     render(
-      <OrderRowActions
-        order={pedido('EN_CURSO')}
-        onEdit={onEdit}
-        onResponsibles={onResponsibles}
-      />,
+      <OrderRowActions order={pedido('EN_CURSO')} onEdit={onEdit} onResponsibles={onResponsibles} />,
     );
 
-    await user.click(screen.getByTestId(RESPONSABLES_TESTID));
+    abrirMenu();
+    await user.click(await screen.findByTestId(RESPONSABLES_TESTID));
 
-    expect(onResponsibles).toHaveBeenCalledTimes(1);
-    expect(onResponsibles).toHaveBeenCalledWith(pedido('EN_CURSO'));
+    expect(onResponsibles).toHaveBeenCalledExactlyOnceWith(pedido('EN_CURSO'));
     expect(onEdit).not.toHaveBeenCalled();
   });
 
   it.each(['ENTREGADO', 'CANCELADO'] as const)(
-    'con un pedido %s sigue ACTIVA, mientras las otras tres siguen deshabilitadas y el motivo visible',
+    'con un pedido %s sigue ACTIVA, mientras las otras tres siguen deshabilitadas',
     async (status) => {
-      const user = setupUser();
       const enganches = enganchesQueFallan();
       const onResponsibles = vi.fn();
       render(
-        <OrderRowActions
-          order={pedido(status)}
-          {...enganches}
-          onResponsibles={onResponsibles}
-        />,
+        <OrderRowActions order={pedido(status)} {...enganches} onResponsibles={onResponsibles} />,
       );
 
-      // Las tres de QC-35, intactas: `disabled` y con su motivo a la vista.
+      abrirMenu();
+
+      // Las tres de QC-35, intactas: `aria-disabled`.
       for (const testId of CONTROLES) {
-        expect(screen.getByTestId(testId)).toBeDisabled();
+        expect(await screen.findByTestId(testId)).toHaveAttribute('aria-disabled', 'true');
       }
-      expect(screen.getByTestId('order-row-actions-reason')).toHaveTextContent(FINAL_ORDER_REASON);
 
       // Y la cuarta, viva: se puede pulsar y emite.
-      const control = screen.getByTestId(RESPONSABLES_TESTID);
-      expect(control).toBeEnabled();
-      await user.click(control);
-      expect(onResponsibles).toHaveBeenCalledTimes(1);
+      const item = screen.getByTestId(RESPONSABLES_TESTID);
+      expect(item).not.toHaveAttribute('aria-disabled');
+      fireEvent.click(item);
+      expect(onResponsibles).toHaveBeenCalledExactlyOnceWith(pedido(status));
 
       // Sin haber abierto nada de lo que el pedido cerrado prohibe.
       expect(enganches.onEdit).not.toHaveBeenCalled();
