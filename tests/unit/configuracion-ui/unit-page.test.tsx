@@ -349,14 +349,16 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByTestId(UNIT_LIST_ERROR_TESTID)).toBeNull();
   });
 
-  it('vacio: es el de «la busqueda no encontro nada» y NO ofrece crear la primera (R24)', async () => {
+  it('vacio: es el de «la busqueda no encontro nada» y el estado vacio en si NO ofrece crear la primera (R24)', async () => {
     conLecturas(pagina([]), CATALOGO_VACIO);
 
     await renderPantalla();
 
     expect(screen.getByTestId(UNIT_LIST_EMPTY_TESTID)).toBeInTheDocument();
-    // Lo que esta pantalla se aparta de su hermana: aqui NO se ofrece «crea la primera».
-    expect(screen.queryByTestId(UNIT_CREATE_OPEN_TESTID)).toBeNull();
+    // El alta vive en la cabecera de la pagina (decision humana 2026-10-02), no en el estado
+    // vacio de la lista: por eso sigue en el DOM aqui. Lo que aparta a esta pantalla de su
+    // hermana es que `UnitListEmpty` en si no lleva ningun slot de «crear la primera».
+    expect(screen.getByTestId(UNIT_CREATE_OPEN_TESTID)).toBeInTheDocument();
     // Sin termino y en la primera pagina, tampoco se ofrece limpiar ni volver: no aplican.
     expect(screen.queryByTestId(UNIT_LIST_CLEAR_SEARCH_TESTID)).toBeNull();
     expect(screen.queryByTestId(UNIT_LIST_FIRST_PAGE_TESTID)).toBeNull();

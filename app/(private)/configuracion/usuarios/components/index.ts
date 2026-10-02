@@ -281,9 +281,16 @@ export {
   WORK_GROUP_NAME_FIELD,
   WORK_GROUP_NAME_FIELD_TESTID,
   WORK_GROUP_NAME_ISSUE_MESSAGES,
+  WORK_GROUP_PENDING_MEMBER_REMOVE_TESTID,
+  WORK_GROUP_PENDING_MEMBER_TESTID,
+  WORK_GROUP_PICKER_NEXT_TESTID,
+  WORK_GROUP_PICKER_POSITION_TESTID,
+  WORK_GROUP_PICKER_PREVIOUS_TESTID,
   WorkGroupForm,
+  WorkGroupMemberPicker,
   workGroupNameIssue,
   type WorkGroupFormProps,
+  type WorkGroupMemberPickerProps,
   type WorkGroupNameIssue,
 } from './work-group-form';
 export {

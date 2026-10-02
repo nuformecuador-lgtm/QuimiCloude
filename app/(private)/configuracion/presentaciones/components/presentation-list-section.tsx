@@ -1,6 +1,6 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listPresentationsAction } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
-import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import { PresentationListEmpty } from './presentation-list-empty';
 import { PresentationListError } from './presentation-list-error';
@@ -9,7 +9,7 @@ import { PresentationSheet } from './presentation-sheet';
 import { PresentationTable } from './presentation-table';
 
 /**
- * Seccion de lista: pide los datos y despacha a uno de los tres estados (R7, R15, R16, R17,
+ * Seccion de lista: pide la pagina y despacha a uno de los tres estados (R7, R15, R16, R17,
  * `design.md > 5.3`).
  *
  * **Server Component `async`**: los datos se piden en el servidor y bajan al cliente ya
@@ -17,18 +17,13 @@ import { PresentationTable } from './presentation-table';
  * R16 aparece solo mientras esta consulta esta en vuelo —sin un estado de carga escrito a mano y
  * sin carreras entre peticiones—.
  *
- * **DOS lecturas, en `Promise.all` porque son independientes** (QC-80 R16, `design.md > 5`):
- * `listPresentationsAction(params)` trae la pagina que se pinta y `listUnitsAction()` trae el
- * catalogo ENTERO de unidades, **una sola vez por pantalla**, que baja por props hasta el
- * formulario -que no consulta nada-. Es el patron de la pantalla de detalle de proveedor
- * (QC-44 R46) y el de `unit-list-section.tsx`.
+ * **UNA sola lectura propia, `listPresentationsAction(params)`** (QC-80 R16, `design.md > 5`): el
+ * catalogo ENTERO de unidades ya NO lo pide esta seccion —lo pide `page.tsx`, una sola vez por
+ * pantalla— y llega aqui por props, listo para bajar al formulario sin que este consulte nada.
  *
- * **QC-80 R19 — si el catalogo de unidades falla, NO se monta NINGUN `PresentationSheet`**: ni el
- * de la cabecera, ni el de «crear la primera», ni el de la fila. Se pinta `PresentationListError`
- * y punto. Un formulario con el selector vacio seria PEOR que el error: dejaria al usuario delante
- * de un campo obligatorio imposible de rellenar. Es al reves que en `unit-list-section.tsx`, donde
- * el catalogo secundario solo alimenta una columna informativa y su fallo se degrada; aqui
- * alimenta un campo `NOT NULL` del que depende poder guardar.
+ * **QC-80 R19 — si el catalogo de unidades falla, `page.tsx` no monta esta seccion**: decide eso
+ * ANTES, con `PresentationListError` y sin pintar ni `<h1>` ni el disparador de la cabecera. Esta
+ * seccion asume que si se esta ejecutando, el catalogo ya llego bien.
  *
  * **Una sola llamada a `listPresentationsAction`**, con los parametros **enteros y sin traducir**:
  * `DataTableParams` es campo a campo la misma forma que `ListQuery` (`design.md > 5.2`), y
@@ -52,25 +47,16 @@ export const PRESENTATION_LIST_TESTID = 'presentation-list';
 export type PresentationListSectionProps = {
   /** Los parametros ya acotados por `parsePresentationListParams` (R14). */
   readonly params: DataTableParams;
+  /** Catalogo entero de unidades, pedido UNA sola vez por `page.tsx` (QC-80 R16, R19). */
+  readonly units: readonly UnitRef[];
 };
 
-export async function PresentationListSection({ params }: PresentationListSectionProps) {
-  const [result, unitsResult] = await Promise.all([
-    listPresentationsAction(params),
-    listUnitsAction(),
-  ]);
+export async function PresentationListSection({ params, units }: PresentationListSectionProps) {
+  const result = await listPresentationsAction(params);
 
   if (result.status === 'error') {
     return <PresentationListError error={result} />;
   }
-
-  // R19: el catalogo de unidades no es un adorno de esta pantalla —es el campo obligatorio del
-  // formulario—, asi que su fallo tumba la pantalla entera en vez de abrir un panel inservible.
-  if (unitsResult.status === 'error') {
-    return <PresentationListError error={unitsResult} />;
-  }
-
-  const units = unitsResult.data;
 
   const { items, page: currentPage, totalPages } = result.data;
 
@@ -93,10 +79,6 @@ export async function PresentationListSection({ params }: PresentationListSectio
 
   return (
     <div className="flex flex-col gap-4" data-testid={PRESENTATION_LIST_TESTID}>
-      {/* El disparador del alta (R21). Vive junto a la lista, no en la pagina. */}
-      <div className="flex justify-end">
-        <PresentationSheet units={units} />
-      </div>
       {/*
         `presentation-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda
         que devuelve elementos (`design.md > 6`)—, asi que desde aqui solo bajan datos

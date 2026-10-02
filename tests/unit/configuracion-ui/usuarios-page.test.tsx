@@ -22,6 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   USERS_TITLE_TESTID,
+  USER_CREATE_OPEN_TESTID,
   USER_ROW_ACTIONS_TESTID,
 } from '@/app/(private)/configuracion/usuarios/components';
 import UsuariosPage from '@/app/(private)/configuracion/usuarios/page';
@@ -400,5 +401,60 @@ describe('`canModify` sale de assertPermission y de nada mas (R6, R8)', () => {
     for (const prohibido of ['prisma', '@/db', "fetch('/api", 'next/headers']) {
       expect(fuente, `page.tsx no debe usar ${prohibido}`).not.toContain(prohibido);
     }
+  });
+});
+
+// El disparador del alta de usuario se movio de `user-list-section.tsx` a esta pagina, junto al
+// `<h1>` (decision humana del 2026-09-17, extendida al mover el boton a la cabecera, igual que
+// `inventario` y `proveedores`): esta cobertura reemplaza la que antes vivia en
+// `user-list-section.test.tsx`.
+describe('el disparador del alta vive en la cabecera, junto al `<h1>` (2026-09-17)', () => {
+  it('con filas, el disparador esta junto al titulo', async () => {
+    await renderPantalla();
+
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('EL ALTA SOBREVIVE AL VACIO: con cero filas el disparador sigue ahi', async () => {
+    // La regresion que este caso existe para cerrar. El listado EXCLUYE al actor (R11), asi que
+    // una instalacion recien sembrada —un unico usuario, el que esta mirando la pantalla— ve la
+    // lista vacia. Como el disparador vive en la cabecera y no en la seccion de lista, ese vacio
+    // no le quita la unica salida para crear al segundo usuario.
+    listUsersActionMock.mockResolvedValue(paginaCon([]));
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('Y EN ERROR TAMBIEN: la lista falla, pero el alta sigue ofreciendose', async () => {
+    listUsersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('sin `usuarios.modificar` no hay disparador, ni con filas ni sin ellas (R6)', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_CONSULTA]));
+
+    await renderPantalla();
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+
+    cleanup();
+    listUsersActionMock.mockResolvedValue(paginaCon([]));
+    await renderPantalla();
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
+  it('el catalogo de roles se pide UNA sola vez, sin argumentos: es cerrado y entero (R24)', async () => {
+    await renderPantalla();
+
+    expect(listRolesActionMock).toHaveBeenCalledTimes(1);
+    expect(listRolesActionMock.mock.calls[0]).toEqual([]);
   });
 });

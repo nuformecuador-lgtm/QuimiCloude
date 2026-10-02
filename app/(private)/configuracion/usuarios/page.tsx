@@ -4,15 +4,18 @@ import { Suspense } from 'react';
 import { identity } from '@/lib/composition';
 import { assertPermission } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { listRolesAction } from '@/lib/modules/identity/adapters/driving/role-actions';
 import { BRAND_LABEL, USERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
   GROUPS_TAB,
   USERS_TITLE_TESTID,
+  UserCreateAction,
   UserListSection,
   UserListSkeleton,
   UsuariosTabsSwitch,
   WORK_GROUP_SECTION_TESTID,
+  WorkGroupCreateAction,
   WorkGroupListSection,
   WorkGroupListSkeleton,
   buildUserListQuery,
@@ -122,6 +125,14 @@ async function canModifyUsers(): Promise<UserScreenSession> {
  * parametros de lista de las dos pestanas son independientes** (R7): cada parser lee los suyos de
  * la misma URL y el conmutador emite un `href` que lleva **solo** `tab`.
  *
+ * **El disparador del alta vive AQUI, junto al `<h1>`**, no dentro de la seccion de lista: se pinta
+ * SIEMPRE, con filas o sin ellas y antes de saber si la consulta de la pestana vigente va a fallar
+ * (decision humana del 2026-09-17, extendida al mover el boton a la cabecera). Cual de los dos se
+ * monta depende de la MISMA `tab` que decide la seccion: `WorkGroupCreateAction` en grupos,
+ * `UserCreateAction` en personas. El catalogo de roles que pide el segundo se trae tambien AQUI,
+ * UNA SOLA VEZ (R24) y solo cuando la pestana lo necesita, y baja por props tanto al boton de la
+ * cabecera como a `UserListSection`, que ya no lo consulta por su cuenta.
+ *
  * **La marca y la etiqueta llegan IMPORTADAS**, nunca escritas a mano: el nombre de la pantalla es
  * el mismo dato que pinta su item del menu.
  */
@@ -134,9 +145,24 @@ export default async function UsuariosPage({
 
   const resolved = await searchParams;
   const tab = parseUsuariosTab(resolved);
-  const { canModify, currentUserId } = await canModifyUsers();
   const params = parseUserListParams(resolved);
   const workGroupParams = parseWorkGroupListParams(resolved);
+
+  /*
+    El catalogo de roles solo lo necesita el alta de PERSONAS (el selector del panel, R24): en la
+    pestana de grupos no hay `<select>` de rol que rellenar, asi que pedirlo ahi seria una consulta
+    inventada, igual que `WorkGroupListSection` ya evita pedir un catalogo que no usa. Se trae en el
+    mismo `Promise.all` que `canModifyUsers()` para no encadenar dos vueltas al servidor.
+  */
+  const [{ canModify, currentUserId }, rolesResult] = await Promise.all([
+    canModifyUsers(),
+    tab === GROUPS_TAB ? Promise.resolve(null) : listRolesAction(),
+  ]);
+
+  // Degradado declarado (R24), igual que antes vivia dentro de `UserListSection`: sin catalogo, el
+  // panel de alta y el de cada fila reciben el error y ninguna opcion, pero la lista se pinta igual.
+  const roles = rolesResult !== null && rolesResult.status === 'success' ? rolesResult.data : [];
+  const rolesError = rolesResult !== null && rolesResult.status !== 'success' ? rolesResult : null;
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -144,6 +170,16 @@ export default async function UsuariosPage({
         <h1 data-testid={USERS_TITLE_TESTID} className="text-2xl font-semibold">
           {USERS_LABEL}
         </h1>
+        {tab === GROUPS_TAB ? (
+          <WorkGroupCreateAction canModify={canModify} />
+        ) : (
+          <UserCreateAction
+            canModify={canModify}
+            currentUserId={currentUserId}
+            roles={roles}
+            rolesError={rolesError}
+          />
+        )}
       </div>
       <UsuariosTabsSwitch tab={tab} />
       {tab === GROUPS_TAB ? (
@@ -160,7 +196,13 @@ export default async function UsuariosPage({
           key={buildUserListQuery(params)}
           fallback={<UserListSkeleton rows={params.pageSize} />}
         >
-          <UserListSection params={params} canModify={canModify} currentUserId={currentUserId} />
+          <UserListSection
+            params={params}
+            canModify={canModify}
+            currentUserId={currentUserId}
+            roles={roles}
+            rolesError={rolesError}
+          />
         </Suspense>
       )}
     </div>

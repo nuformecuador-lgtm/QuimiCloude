@@ -28,10 +28,12 @@ import {
   TAB_PARAM,
   USERS_TAB,
   USERS_TITLE_TESTID,
+  USER_CREATE_OPEN_TESTID,
   USER_TABLE_TESTID,
   USUARIOS_TABS_TESTID,
   WORK_GROUP_TABLE_TESTID,
   USUARIOS_TAB_TESTIDS,
+  WORK_GROUP_CREATE_OPEN_TESTID,
   WORK_GROUP_SECTION_TESTID,
   parseUserListParams,
 } from '@/app/(private)/configuracion/usuarios/components';
@@ -390,5 +392,41 @@ describe('el corte por permiso sigue siendo UNO SOLO y el de siempre (R8)', () =
     expect(notFoundMock).toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();
     expect(listUsersActionMock).not.toHaveBeenCalled();
+  });
+});
+
+// El disparador del alta se movio a la cabecera (decision humana del 2026-09-17, extendida al
+// mover el boton junto al `<h1>`): CUAL de los dos se monta depende de la MISMA `tab` que decide
+// la seccion.
+describe('la cabecera monta el disparador que corresponde a la pestana vigente', () => {
+  it('en personas (sin `tab`) el disparador es el de usuarios, no el de grupos', async () => {
+    await renderPantalla();
+
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+    expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
+  it('con `tab=grupos` el disparador es el de grupos, no el de usuarios', async () => {
+    await renderPantalla({ [TAB_PARAM]: GROUPS_TAB });
+
+    expect(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeEnabled();
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
+  it('EL ALTA DE GRUPOS SOBREVIVE AL VACIO: con cero grupos el disparador sigue ahi', async () => {
+    // Los grupos nacen en cero: NADIE los siembra, asi que toda instalacion arranca con la lista
+    // vacia. Como el disparador vive en la cabecera, ese vacio no le quita la unica via para crear
+    // el primer grupo.
+    listWorkGroupsActionMock.mockResolvedValue(paginaDeGruposCon([]));
+
+    await renderPantalla({ [TAB_PARAM]: GROUPS_TAB });
+
+    expect(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('sin `tab=grupos` el catalogo de roles de PERSONAS no se pide: no hay selector que llenar', async () => {
+    await renderPantalla({ [TAB_PARAM]: GROUPS_TAB });
+
+    expect(listRolesActionMock).not.toHaveBeenCalled();
   });
 });

@@ -31,6 +31,9 @@ import {
   WORK_GROUP_MEMBER_REMOVE_TESTID,
   WORK_GROUP_MEMBER_ROW_TESTID,
   WORK_GROUP_MEMBER_SEARCH_TESTID,
+  WORK_GROUP_PICKER_NEXT_TESTID,
+  WORK_GROUP_PICKER_POSITION_TESTID,
+  WORK_GROUP_PICKER_PREVIOUS_TESTID,
   WORK_GROUP_REMOVE_ERROR_TESTID,
   WorkGroupMembers,
 } from '@/app/(private)/configuracion/usuarios/components';
@@ -145,16 +148,21 @@ function nombresPintados(): string[] {
 }
 
 /**
- * Escribe en el buscador y espera al candidato. **Con temporizadores reales**: el rebote es de
- * `SEARCH_DEBOUNCE_MS` y `findBy*` espera hasta un segundo, asi que la espera es la de verdad. Los
- * casos que solo miran la LLAMADA —y no el DOM— si falsean el reloj, para demostrar que antes del
- * rebote no se consulta.
+ * Escribe en el buscador y espera a la FILA del candidato (una `<tr>` de la tabla). **Con
+ * temporizadores reales**: el rebote es de `SEARCH_DEBOUNCE_MS` y `findBy*` espera hasta un
+ * segundo, asi que la espera es la de verdad. Los casos que solo miran la LLAMADA —y no el DOM—
+ * si falsean el reloj, para demostrar que antes del rebote no se consulta.
  */
 async function buscarCandidato(): Promise<HTMLElement> {
   fireEvent.change(screen.getByTestId(WORK_GROUP_MEMBER_SEARCH_TESTID), {
     target: { value: 'nieto' },
   });
   return screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+}
+
+/** El boton «Agregar» DENTRO de la fila del candidato: es lo unico que dispara el alta (R28). */
+function botonAgregar(fila: HTMLElement): HTMLElement {
+  return within(fila).getByRole('button');
 }
 
 /** Fuente de la lista de miembros sin comentarios. */
@@ -241,6 +249,9 @@ describe('se pinta lo que la operacion devuelve, y nada mas (R25, R31)', () => {
   it('y su fuente no nombra ningun dato de credencial ni de estado de cuenta (R31)', () => {
     const fuente = fuenteDeLosMiembros();
 
+    // La tabla de candidatos (con `username` y `roleName`) vive en `work-group-form.tsx`
+    // (`WorkGroupMemberPicker`), no aqui: este archivo solo la MONTA, asi que su propia fuente no
+    // deberia nombrar ningun dato de persona mas alla de `displayName` y el identificador.
     for (const prohibido of [
       'accountStatus',
       'email',
@@ -376,19 +387,88 @@ describe('el buscador saca sus candidatos de la consulta de personas (R28)', () 
     montar();
     await esperarLista();
 
-    const candidato = await buscarCandidato();
-    // Del candidato tampoco se pinta el estado de cuenta (pregunta abierta 2).
-    expect(candidato).toHaveTextContent(CANDIDATO.displayName);
-    expect(candidato.textContent ?? '').not.toContain(CANDIDATO.email);
-    expect(candidato.textContent ?? '').not.toContain(CANDIDATO.accountStatus);
+    const fila = await buscarCandidato();
+    // De cada candidato se pinta nombre y rol; NI usuario, ni correo, ni estado de cuenta.
+    expect(fila).toHaveTextContent(CANDIDATO.displayName);
+    expect(fila).toHaveTextContent(CANDIDATO.roleName);
+    expect(fila.textContent ?? '').not.toContain(CANDIDATO.username);
+    expect(fila.textContent ?? '').not.toContain(CANDIDATO.email);
+    expect(fila.textContent ?? '').not.toContain(CANDIDATO.accountStatus);
 
-    fireEvent.click(candidato);
+    fireEvent.click(botonAgregar(fila));
 
     await waitFor(() => expect(addWorkGroupMemberActionMock).toHaveBeenCalledTimes(1));
     const datos = addWorkGroupMemberActionMock.mock.calls[0]![1];
     expect([...datos.keys()].sort()).toEqual([WORK_GROUP_MEMBER_ID_FIELD, WORK_GROUP_ID_FIELD].sort());
     expect(datos.get(WORK_GROUP_ID_FIELD)).toBe(GRUPO_ID);
     expect(datos.get(WORK_GROUP_MEMBER_ID_FIELD)).toBe(CANDIDATO.id);
+  });
+
+  it('la tabla de candidatos ya NO tiene columna «Usuario»: solo nombre, rol y acciones', async () => {
+    montar();
+    await esperarLista();
+
+    const fila = await screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+    // Nombre, rol y la celda de acciones: tres celdas, ni una mas.
+    expect(within(fila).getAllByRole('cell')).toHaveLength(3);
+  });
+
+  it('aparece aunque no se escriba nada en el buscador: trae la primera pagina de TODAS', async () => {
+    montar();
+    await esperarLista();
+
+    // Sin ningun `fireEvent.change`: la tabla se pinta igual, con tiempo real de por medio.
+    const fila = await screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+    expect(fila).toHaveTextContent(CANDIDATO.displayName);
+    expect(listUsersActionMock.mock.calls[0]![0]).toMatchObject({ search: '' });
+  });
+});
+
+describe('el buscador de candidatos esta paginado (QC-85 ampliacion)', () => {
+  it('muestra la posicion dentro del total y los dos controles', async () => {
+    listUsersActionMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [CANDIDATO], total: 23, page: 2, pageSize: 10, totalPages: 3 },
+    });
+    montar();
+    await esperarLista();
+    await screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+
+    const indicador = screen.getByTestId(WORK_GROUP_PICKER_POSITION_TESTID);
+    expect(indicador).toHaveAttribute('role', 'status');
+    expect(indicador).toHaveAttribute('data-page', '2');
+    expect(indicador).toHaveAttribute('data-total-pages', '3');
+    expect(indicador).toHaveAttribute('data-total', '23');
+    expect(screen.getByTestId(WORK_GROUP_PICKER_PREVIOUS_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(WORK_GROUP_PICKER_NEXT_TESTID)).toBeInTheDocument();
+  });
+
+  it('avanzar pide la pagina siguiente al servidor', async () => {
+    const user = setupUser();
+    listUsersActionMock.mockImplementation(async (consulta) => ({
+      status: 'success',
+      data: {
+        items: [CANDIDATO],
+        total: 23,
+        page: (consulta as { page: number }).page,
+        pageSize: 10,
+        totalPages: 3,
+      },
+    }));
+    montar();
+    await esperarLista();
+    await screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+
+    await user.click(screen.getByTestId(WORK_GROUP_PICKER_NEXT_TESTID));
+
+    await waitFor(() =>
+      expect(screen.getByTestId(WORK_GROUP_PICKER_POSITION_TESTID)).toHaveAttribute(
+        'data-page',
+        '2',
+      ),
+    );
+    const ultimaLlamada = listUsersActionMock.mock.calls.at(-1)![0];
+    expect(ultimaLlamada).toMatchObject({ page: 2 });
   });
 });
 
@@ -414,7 +494,7 @@ describe('los cuatro «ya pertenece» son CUATRO casos, por su codigo (R29)', ()
 
       montar();
       await esperarLista();
-      fireEvent.click(await buscarCandidato());
+      fireEvent.click(botonAgregar(await buscarCandidato()));
 
       const region = await screen.findByTestId(WORK_GROUP_ADD_ERROR_TESTID);
       expect(region).toHaveAttribute('data-code', code);
@@ -434,7 +514,7 @@ describe('los cuatro «ya pertenece» son CUATRO casos, por su codigo (R29)', ()
     });
     montar();
     await esperarLista();
-    fireEvent.click(await buscarCandidato());
+    fireEvent.click(botonAgregar(await buscarCandidato()));
 
     expect(await screen.findByTestId(WORK_GROUP_ADD_ERROR_TESTID)).toBeInTheDocument();
     // Ni se volvio a consultar, ni se inserto ninguna fila.
@@ -449,7 +529,7 @@ describe('tras un exito se vuelve a consultar, y nada es optimista (R30)', () =>
     // entra en el grupo pero no se ve (`design.md > 10.2`). R30 prohibe compensarlo.
     montar();
     await esperarLista();
-    fireEvent.click(await buscarCandidato());
+    fireEvent.click(botonAgregar(await buscarCandidato()));
 
     await waitFor(() => expect(listWorkGroupMembersActionMock).toHaveBeenCalledTimes(2));
     await esperarLista();
