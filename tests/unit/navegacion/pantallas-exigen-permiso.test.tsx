@@ -93,6 +93,9 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   createRecipeAction: vi.fn(),
   updateRecipeAction: vi.fn(),
   deleteRecipeAction: vi.fn(),
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success', data: [] })),
+  createRecipeVersionAction: vi.fn(),
+  updateRecipeVersionAction: vi.fn(),
 }));
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({

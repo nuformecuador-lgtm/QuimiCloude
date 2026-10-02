@@ -185,3 +185,8 @@ Dominio, puertos y barrel sin tocar.
 - Desvio de ubicacion: los casos van en `recipe-form.test.tsx` (unico que monta `EditarRecetaPage`), no en `recipe-page.test.tsx` (que prueba la lista). Si el id es de version, la lectura de versiones se descarta (una consulta de mas).
 - R7: «R7: el id de una version redirige a su pagina bajo la original sin pintar el formulario»; R1/R5: «R1, R5: la original pide sus versiones, el formulario las recibe y debajo sale la lista de versiones»; R5: «R5: si falla la lista de versiones presenta el error propio y ningun formulario».
 - vitest recipe-page + recipe-form + formulas-upload: `Test Files 1 failed | 2 passed (3)` / `Tests 1 failed | 86 passed (87)` — el rojo es recipe-page R21, de baseline.
+
+## Cierre tanda 3 (commit 7846ebe5) — `./init.sh --rapido`
+- Primera corrida: `Test Files 5 failed | 269 passed (274)` / `Tests 7 failed | 3939 passed | 44 skipped (3990)`. 6 rojos de baseline + 1 propio: `pantallas-exigen-permiso.test.tsx` «'/produccion/formulas/[id]' se sirve con el permiso…» — el mock de `recipe-actions` no exportaba `listRecipeVersionsAction`, que la ficha llama desde T9 (previsto en T0).
+- Arreglo: el mock exporta `listRecipeVersionsAction` (`{status:'success', data: []}`), `createRecipeVersionAction` y `updateRecipeVersionAction`. `vitest run` del archivo: `Test Files 1 passed (1)` / `Tests 42 passed (42)`.
+- Base de desarrollo (la que usa el E2E): `prisma migrate deploy` aplico `20261001120000_recipe_versions` y `20261001160815_platform_maestro_role` (ya mergeadas en dev).
