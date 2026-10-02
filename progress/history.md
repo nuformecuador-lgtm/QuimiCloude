@@ -4955,3 +4955,23 @@ podar.
 - **Arrastre:** el seed de la base de pruebas pedía las `SEED_MAESTRO_*` de QC-161; añadidas al `.env` local con
   valores provisionales que el humano cambiará.
 - **Desbloquea:** QC-174.
+
+## 2026-10-02 — QC-170-pedido-en-varias-presentaciones
+
+- **PR #137**, merge `c8649e9d`. Spec R1–R49 (R44 retirado), T0–T26. Un pedido se **reparte en lineas** de N envases x
+  presentacion y muestra lo que queda disponible; vuelve `orders.unit_id`. El producto terminado entra **al terminar el
+  empaque**, un lote por linea, con el coste por unidad expresado en la unidad de la presentacion de cada lote. La
+  presentacion unica de QC-146 desaparece y los pedidos vivos se convierten en su reparto. Enmienda QC-168, QC-150 y,
+  tras el merge de QC-172, el **R36 de QC-172** (el producto terminado de la version entra al terminar el empaque).
+- **Review:** vuelta 1 RECHAZADA (B1 citas en comentarios, B2 cuatro E2E rotos, B3 coste con unidades mezcladas, B4
+  aislamiento sin test); vuelta 2 **acotada a los arreglos** por orden del humano: OK.
+- **Dos sincronizaciones con dev antes del merge:** la primera (88 commits) destapo un doble de test de #130 con el
+  contrato viejo de `transitionAliveById` que colgaba el gate en un bucle sin fin; la segunda (36 commits, QC-172) dejo
+  16 conflictos resueltos como suma y un E2E de QC-172 adaptado al reparto. Sin renumerar migraciones.
+- **Gate:** sin rojos nuevos (8, todos en el baseline). E2E de 11 specs en Chromium y WebKit, verdes.
+- **Baseline:** tres rojos nuevos de dev, todos desde `897a4f91` (commit ad hoc que subio recetas y unidades a
+  `pedidos/page.tsx`): `recetas/scope`, `recetas/module-contract`, `navegacion/pantallas-exigen-permiso`. Necesitan ficha.
+- **Deuda:** precision de `unit_cost` (`decimal(14,4)`) aceptada por el humano, arreglo en **QC-178**.
+  `finish-assigned-order` reintenta con un `for (;;)` sin tope si el puerto responde `stale`; no se toco.
+- **Arrastre del arnes:** dias perdidos por modelos (cuota de OpenRouter, Ollama 3B, glm-5.3 que toco el spec aprobado);
+  ver `progress/current.md > Modelos`.
