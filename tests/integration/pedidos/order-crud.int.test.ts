@@ -984,9 +984,17 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
       (
         await tx.recipe.findMany({
           where: { id: { in: [...ids] }, companyId },
-          select: { id: true, name: true, deletedAt: true },
+          select: { id: true, name: true, deletedAt: true, parent: { select: { id: true, name: true } } },
         })
-      ).map((r) => ({ id: r.id, name: r.name, isDeleted: r.deletedAt !== null })),
+      ).map((r) => ({
+        id: r.id,
+        name: r.name,
+        ownName: r.name,
+        isDeleted: r.deletedAt !== null,
+        // Desde QC-172 el alta distingue original de version: estas recetas son originales.
+        isUnderReview: false,
+        original: r.parent,
+      })),
     findExecutionContentById: createRecipeExecutionReader(tx).findExecutionContentById,
   } as unknown as RecipeCatalog
   const presentations = {

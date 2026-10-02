@@ -343,6 +343,7 @@ describe('R21 — no hay accion manual de desbloqueo', () => {
       'priority',
       'quantity',
       'recipeId',
+      'recipeVersionId',
     ]);
 
     const conEstado = {
