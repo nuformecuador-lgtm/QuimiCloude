@@ -792,19 +792,25 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  * El aviso de existencia que sube, atado a la revision de los pedidos bloqueados de `pedidos`.
  * Va antes de la fachada de `inventario`, que lo necesita; `reviewBlockedOrders` se declara mas
  * abajo y solo se lee cuando llega un aviso, con el modulo ya cargado. Nunca lanza: el lote o el
- * ajuste ya estan escritos y un fallo aqui no puede devolverlos como error. Los fallos van al
- * mismo registro del servidor que la caducidad.
+ * ajuste ya estan escritos y un fallo aqui no puede devolverlos como error.
  */
+const blockedOrdersLog = forModule('pedidos');
+
 const stockIncreaseListener: StockIncreaseListener = {
   async onStockIncreased({ companyId, now }) {
     try {
       const result = await reviewBlockedOrders({ companyId, now });
       if (result.failed.length > 0) {
-        console.error('blocked_orders_review_failed', { companyId, failed: result.failed });
+        // El logger solo admite primitivas; `failed` lleva unicamente ids y codigos.
+        blockedOrdersLog.error('blocked_orders_review_failed', {
+          companyId,
+          failedCount: result.failed.length,
+          failed: JSON.stringify(result.failed),
+        });
       }
     } catch {
       // Sin el error: su mensaje puede traer datos de la consulta.
-      console.error('blocked_orders_review_failed', { companyId, stage: 'blocked_ids' });
+      blockedOrdersLog.error('blocked_orders_review_failed', { companyId, stage: 'blocked_ids' });
     }
   },
 };

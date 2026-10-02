@@ -189,8 +189,8 @@ async function findOrderRow(page: Page, numberText: string): Promise<Locator> {
   }
 }
 
-/** Crea un pedido de `quantity` para la receta y la presentacion del fixture, por la pantalla. */
-async function createOrder(page: Page, quantity: string): Promise<void> {
+/** Rellena y envia el alta de un pedido de `quantity` para la receta y la presentacion del fixture. */
+async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await page.goto(ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
@@ -218,6 +218,21 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
   await page.getByTestId('order-field-quantity').fill(quantity);
 
   await page.getByTestId('order-form-submit').click();
+}
+
+/** Crea un pedido que alcanza: se guarda sin aviso y el formulario se cierra. */
+async function createOrder(page: Page, quantity: string): Promise<void> {
+  await submitNewOrder(page, quantity);
+  await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+}
+
+/** Crea un pedido que no alcanza: el alta pide confirmacion y se guarda bloqueado. */
+async function createBlockedOrder(page: Page, quantity: string): Promise<void> {
+  await submitNewOrder(page, quantity);
+  const dialog = page.getByTestId('blocked-order-dialog');
+  await expect(dialog).toBeVisible({ timeout: 60_000 });
+  await dialog.getByTestId('blocked-order-confirm').click();
+  await expect(dialog).toHaveCount(0, { timeout: 60_000 });
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }
 
@@ -225,8 +240,12 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
 async function openEdit(page: Page, numberText: string): Promise<void> {
   await page.goto(ordersUrl());
   const row = await findOrderRow(page, numberText);
-  await row.getByTestId('order-action-edit').click();
-  await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+  // La fila llega pintada por el servidor: en WebKit un clic antes de hidratar se pierde sin
+  // abrir el formulario, asi que se reintenta hasta que aparece.
+  await expect(async () => {
+    await row.getByTestId('order-action-edit').click();
+    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 60_000 });
 }
 
 /** La cobertura de un pedido, leida de su fila («Apartado», «Sin apartar»). */
@@ -548,12 +567,15 @@ test.describe('reserva de material del pedido', () => {
     expect(await coverageOf(page, orderANumber)).toBe('full');
 
     // --- 3. Pedido B, de 1.500 tambien: solo quedan 500 disponibles, asi que no alcanza y no
-    // aparta nada -ni siquiera parcialmente-, y lo de A sigue intacto.
-    await createOrder(page, ORDER_QUANTITY);
+    // aparta nada -ni siquiera parcialmente-, y lo de A sigue intacto. Un alta que no alcanza ya
+    // no se guarda sin mas: pide confirmacion y queda BLOQUEADO.
+    await createBlockedOrder(page, ORDER_QUANTITY);
     const orderB = await prisma.order.findFirstOrThrow({
       where: { recipeId, deletedAt: null, id: { not: orderA.id } },
-      select: { id: true, orderYear: true, orderSequence: true },
+      select: { id: true, orderYear: true, orderSequence: true, status: true },
     });
+    expect(orderB.status).toBe('BLOQUEADO');
+    expect(await prisma.reservationMovement.count({ where: { orderId: orderB.id } })).toBe(0);
     const orderBNumber = formatOrderNumber({
       year: orderB.orderYear,
       sequence: orderB.orderSequence,
@@ -589,10 +611,16 @@ test.describe('reserva de material del pedido', () => {
     await expect(productRow.getByTestId('product-available')).toContainText('2000');
 
     // --- 5. Reeditar B, sin tocar ningun campo, recalcula lo apartado desde cero: con el lote
-    // libre entero, ahora si alcanza.
+    // libre entero, ahora si alcanza, asi que se guarda sin aviso y sale de BLOQUEADO.
     await openEdit(page, orderBNumber);
     await page.getByTestId('order-form-submit').click();
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+
+    const reeditedOrderB = await prisma.order.findUniqueOrThrow({
+      where: { id: orderB.id },
+      select: { status: true },
+    });
+    expect(reeditedOrderB.status).toBe('PENDIENTE');
 
     // Reeditar tambien cierra el formulario y despues llama a `router.refresh()`
     // (`OrderSheet.handleSaved`): la cobertura nueva en la fila de B -sin navegar, `openEdit` ya

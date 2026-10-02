@@ -1,4 +1,4 @@
-// QC-138 T13 — lo que la ficha NO debe cambiar (R37, R39).
+// QC-138 T13 — lo que la ficha NO debe cambiar (R37, R39) ni ofrecer (R21).
 //
 // Permisos y dependencias se comparan con el padre de la rama -el `merge-base` con `origin/dev`-,
 // no con una cifra: otra ficha puede sumar un permiso o una dependencia aprobada en paralelo y eso
@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
+import { createOrderSchema, updateOrderSchema } from '@/lib/modules/pedidos';
 
 function findRepoRoot(startDir: string): string {
   let dir = startDir;
@@ -262,5 +263,141 @@ describe('R39 — los identificadores nuevos de base van en ingles', () => {
     const ids = identificadoresCreados(sintetico);
     expect(ids).toEqual(['pedidos_bloqueados_idx']);
     expect(palabrasDe(ids[0] as string).some((palabra) => !PALABRAS_EN_INGLES.has(palabra))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// R21 — no hay accion manual de desbloqueo
+// ---------------------------------------------------------------------------------------------
+
+/** Lo que un export tendria que llamarse para ser una accion manual de desbloqueo o de estado. */
+const NOMBRE_DE_DESBLOQUEO = /unblock|desbloque|setStatus|changeStatus|updateStatus|forceStatus|overrideStatus/i;
+
+/** Los nombres que un fuente TypeScript exporta: declaraciones y listas `export { ... }`. */
+export function nombresExportados(fuente: string): string[] {
+  const codigo = stripComments(fuente);
+  const declarados = [
+    ...codigo.matchAll(/\bexport\s+(?:declare\s+)?(?:async\s+)?(?:function\*?|const|let|var|class|type|interface|enum)\s+(\w+)/g),
+  ].map((match) => match[1] as string);
+  const listados = [...codigo.matchAll(/\bexport\s+(?:type\s+)?\{([^}]*)\}/g)].flatMap((match) =>
+    (match[1] as string)
+      .split(',')
+      .map((parte) => parte.trim().replace(/^type\s+/, ''))
+      .filter((parte) => parte.length > 0)
+      .map((parte) => (parte.split(/\s+as\s+/).pop() as string).trim()),
+  );
+  return [...new Set([...declarados, ...listados])].sort();
+}
+
+function leer(ruta: string): string {
+  return readFileSync(join(repoRoot, ...ruta.split('/')), 'utf8');
+}
+
+/** El bloque de texto que empieza en `inicio` y acaba en el primer `cierre` posterior. */
+function bloqueEntre(fuente: string, inicio: string, cierre: string): string {
+  const desde = fuente.indexOf(inicio);
+  if (desde < 0) throw new Error(`no se encontro «${inicio}»`);
+  const hasta = fuente.indexOf(cierre, desde + inicio.length);
+  if (hasta < 0) throw new Error(`no se encontro el cierre de «${inicio}»`);
+  return fuente.slice(desde, hasta + cierre.length);
+}
+
+describe('R21 — no hay accion manual de desbloqueo', () => {
+  it('R21: el contrato de pedidos no exporta nada que desbloquee o fije el estado a mano', async () => {
+    const nombres = nombresExportados(leer('lib/modules/pedidos/index.ts'));
+    const enEjecucion = Object.keys(await import('@/lib/modules/pedidos'));
+
+    // El lector de exports ve todo lo que el barrel publica de verdad: si no, el filtro no prueba nada.
+    expect(enEjecucion.filter((nombre) => !nombres.includes(nombre))).toEqual([]);
+    expect(nombres).toContain('createReviewBlockedOrders');
+
+    expect(nombres.filter((nombre) => NOMBRE_DE_DESBLOQUEO.test(nombre))).toEqual([]);
+  });
+
+  it('R21: las Server Actions de pedidos son solo alta, edicion, cancelacion, borrado, consultas y cotizacion', () => {
+    const fuente = leer('lib/modules/pedidos/adapters/driving/order-actions.ts');
+    const acciones = [...stripComments(fuente).matchAll(/\bexport\s+async\s+function\s+(\w+)/g)].map(
+      (match) => match[1] as string,
+    );
+
+    expect(acciones).toEqual(
+      expect.arrayContaining([
+        'createOrderAction',
+        'updateOrderAction',
+        'cancelOrderAction',
+        'deleteOrderAction',
+        'getOrderAction',
+        'listOrdersAction',
+        'listOrderCoverageAction',
+        'quoteOrderCostAction',
+      ]),
+    );
+    expect(nombresExportados(fuente).filter((nombre) => NOMBRE_DE_DESBLOQUEO.test(nombre))).toEqual([]);
+    expect(stripComments(fuente)).not.toMatch(/\breviewBlockedOrders\b|\bcreateReviewBlockedOrders\b/);
+  });
+
+  it('R21: el esquema del formulario de pedido no declara estado y descarta uno que llegue', () => {
+    expect(Object.keys(createOrderSchema.shape).sort()).toEqual([
+      'confirmBlocked',
+      'presentationId',
+      'priority',
+      'quantity',
+      'recipeId',
+    ]);
+
+    const conEstado = {
+      recipeId: '00000000-0000-4000-8000-000000000001',
+      presentationId: '00000000-0000-4000-8000-000000000002',
+      quantity: '10',
+      status: 'PENDIENTE',
+    };
+    for (const esquema of [createOrderSchema, updateOrderSchema]) {
+      const resultado = esquema.parse(conEstado);
+      expect(resultado).not.toHaveProperty('status');
+    }
+  });
+
+  it('R21: la revision de bloqueados solo la dispara el aviso de inventario, no la fachada ni una action', () => {
+    const composicion = stripComments(leer('lib/composition/index.ts'));
+
+    expect(composicion).not.toMatch(/\bexport\s+(?:const|function|async\s+function)\s+reviewBlockedOrders\b/);
+    expect(composicion).not.toMatch(/\bexport\s*\{[^}]*\breviewBlockedOrders\b[^}]*\}/);
+
+    const fachada = bloqueEntre(composicion, 'export const pedidos = {', '} as const;');
+    expect(fachada).not.toMatch(/\breviewBlockedOrders\b/);
+    const clavesDeLaFachada = [...fachada.matchAll(/^ {2}(\w+)\s*[:,]/gm)].map((match) => match[1] as string);
+    expect(clavesDeLaFachada).toContain('createOrder');
+    expect(clavesDeLaFachada.filter((clave) => NOMBRE_DE_DESBLOQUEO.test(clave))).toEqual([]);
+
+    // Fuera de su declaracion, el unico que la llama es el aviso de existencia que sube.
+    const aviso = bloqueEntre(composicion, 'const stockIncreaseListener', '\n};');
+    const sinDeclaracion = composicion.replace(/const\s+reviewBlockedOrders\s*=/, '').replace(aviso, '');
+    expect(aviso).toMatch(/\breviewBlockedOrders\s*\(/);
+    expect(sinDeclaracion).not.toMatch(/\breviewBlockedOrders\b/);
+
+    const driving = listarFuentes(join(repoRoot, 'lib'))
+      .filter((ruta) => ruta.split(sep).join('/').includes('/adapters/driving/'))
+      .concat(listarFuentes(join(repoRoot, 'app')))
+      .filter((ruta) => /\b(?:create)?[Rr]eviewBlockedOrders\b/.test(stripComments(readFileSync(ruta, 'utf8'))))
+      .map((ruta) => ruta.slice(repoRoot.length + 1).split(sep).join('/'));
+    expect(driving).toEqual([]);
+  });
+
+  it('el criterio detecta una action sintetica de desbloqueo y no una legitima', () => {
+    const sintetico = [
+      "'use server';",
+      'export async function unblockOrderAction(id: string) {}',
+      'export async function createOrderAction() {}',
+      'export { desbloquearPedido, cancelOrder as cancelar };',
+      '// export async function setStatusAction() {}',
+    ].join('\n');
+
+    expect(nombresExportados(sintetico)).toEqual(['cancelar', 'createOrderAction', 'desbloquearPedido', 'unblockOrderAction']);
+    expect(nombresExportados(sintetico).filter((nombre) => NOMBRE_DE_DESBLOQUEO.test(nombre))).toEqual([
+      'desbloquearPedido',
+      'unblockOrderAction',
+    ]);
+    expect(NOMBRE_DE_DESBLOQUEO.test('unblockOrder')).toBe(true);
+    expect(NOMBRE_DE_DESBLOQUEO.test('createReviewBlockedOrders')).toBe(false);
   });
 });

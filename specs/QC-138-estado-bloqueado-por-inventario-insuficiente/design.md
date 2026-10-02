@@ -331,13 +331,16 @@ createOrder(input, actor):
 const stockIncreaseListener: StockIncreaseListener = {
   async onStockIncreased({ companyId, now }) {
     const result = await reviewBlockedOrders({ companyId, now });
-    if (result.failed.length > 0) console.error('blocked_orders_review_failed', { companyId, failed: result.failed });
+    if (result.failed.length > 0) blockedOrdersLog.error({ companyId, failed: result.failed }, 'blocked_orders_review_failed');
   },
 };
 ```
 
-- El canal es el mismo registro del servidor que usa la caducidad (`order-expiry-cron-route.ts`).
-  El canal definitivo sigue siendo la pregunta 3 abierta de QC-141.
+- **Enmienda del 2026-10-02 (decisión del humano en F2.1):** el fallo va al logger `pino` del
+  repo (`forModule('pedidos')` de `lib/shared/observability/logger.ts`, como `documentJobLog` en
+  `lib/composition/index.ts`), no a `console.error`. El evento `blocked_orders_review_failed` y su
+  contenido (`companyId`, `failed`) no cambian. Sustituye a la frase anterior, que mandaba el fallo
+  al mismo registro que la caducidad (`order-expiry-cron-route.ts`).
 - **Orden de declaración:** el `const inventario = {...}` está antes que el bloque de `pedidos`, y
   un `const` no existe antes de su línea. El listener se declara antes de la fachada de
   `inventario`, junto a `orderNumberDirectory`, y referencia funciones de módulo que ya están

@@ -108,8 +108,8 @@ esta feature se **renumeraron** para ir detrás (ver «Merge de `dev` del 2026-1
 | T11 UI de Pedidos | [x] | tanda C |
 | T12 UI de Asignación | [x] | tanda A |
 | T13 transversales | [x] | tanda B |
-| T14 E2E | escrito, verde en Chromium | tanda C; el `./init.sh` completo lo corre el leader |
-| T15 cierre | [ ] | `./init.sh` completo lo corre el leader |
+| T14 E2E | [x] | tanda C; verde en Chromium y WebKit en T15 |
+| T15 cierre | [x] | T15: `./init.sh` completo en verde |
 
 `tasks.md` de esta feature no usa casillas de verificación: sus tareas son listas de
 `**Depende de**`, `**Archivos**` y `**Hecho**`, igual que el de QC-168. El estado por tarea se
@@ -437,3 +437,127 @@ contra `QuimiCloude_QC138`, en el puerto propio 3117 con `reuseExistingServer: f
 
 **Pendiente:** T15 (`./init.sh` completo, que corre el leader). Hay que borrar `QuimiCloude_QC138` al
 cerrar la feature.
+
+## T15 — Cierre (2026-10-02)
+
+### Cobertura R1..R40
+
+Se cruzaron las 40 R de `requirements.md` contra los mapas de las tandas A, B y C. Faltaban seis.
+Cinco ya tenían test con su R en el nombre, pero no estaban en el mapa. R21 no tenía ningún test.
+
+**Mapa R → test (las que faltaban)**
+- R21: `qc138-transversales.test.ts`, bloque «R21 — no hay accion manual de desbloqueo» (test
+  nuevo de T15):
+  - «R21: el contrato de pedidos no exporta nada que desbloquee o fije el estado a mano».
+  - «R21: las Server Actions de pedidos son solo alta, edicion, cancelacion, borrado, consultas y
+    cotizacion».
+  - «R21: el esquema del formulario de pedido no declara estado y descarta uno que llegue».
+  - «R21: la revision de bloqueados solo la dispara el aviso de inventario, no la fachada ni una
+    action».
+  - «el criterio detecta una action sintetica de desbloqueo y no una legitima», que es su ancla.
+  - La transición `BLOQUEADO → PENDIENTE` sigue en la tabla de transiciones, porque la usan R10 y
+    R14. No la ofrece ninguna action ni ninguna clave de la fachada.
+- R25: `cancel-order.test.ts`:
+  - «R25: cancela un pedido BLOQUEADO con su motivo, igual que un PENDIENTE».
+  - «R25: cancelar un BLOQUEADO pide motivo y lo recorta igual que en los otros dos estados».
+  - «R5, R25: cancelar un BLOQUEADO no encuentra material que liberar, y eso no lo rompe».
+- R27: `delete-order.test.ts`:
+  - «R27: borra logicamente un BLOQUEADO, igual que un PENDIENTE».
+  - «R27, R5: borrar un BLOQUEADO libera sin encontrar nada y tampoco lo rompe».
+  - «R27: BLOQUEADO no engaña a la lista de no borrables, que son los cuatro estados de antes».
+- R33: `order-state.test.ts`:
+  - «R33: un BLOQUEADO admite la escritura de responsables, sin que eso lo vuelva arrancable».
+  - «los TRES estados que admiten escritura SI llegan al puerto de escritura (R9, R33)».
+- R35, en `order-status-blocked-migration.test.ts`:
+  - «R35: anade BLOQUEADO, y es la UNICA sentencia de la migracion».
+  - «R35: BLOQUEADO es el ULTIMO valor del esquema, y el unico que sigue al de empaque».
+  - «R35: el ADD VALUE no repite valor ni reordena los que ya estaban».
+- R35, en el resto:
+  - `module-contract.test.ts`: «los valores del dominio coinciden, en orden, con los enum del
+    esquema, y los dos defectos con los @default».
+  - `order-transitions.test.ts`: «R35: la matriz es de 7x7 y hay exactamente 9 pares permitidos».
+  - `pedidos-constraints.int.test.ts`: «R35: un pedido BLOQUEADO vivo se inserta sin motivo de
+    cancelacion, sin packed_by ni finished_at, y se borra logicamente».
+- R36: `order-status-blocked-rollback.int.test.ts`:
+  - «R36: un pedido en BLOQUEADO aborta el DOWN entero y deja el esquema intacto».
+  - «R36: sin ningun pedido BLOQUEADO el DOWN revierte entero y el enum queda con los seis
+    valores».
+  - Además, los ocho «R36: …» de `order-status-blocked-migration.test.ts`.
+
+Con esto, R1..R40 tienen todas al menos un test.
+
+### Comentarios de producción
+
+`git diff origin/dev...HEAD -- lib app components db` no añade ninguna cita a fichas. La única
+coincidencia, «(R40,» en `app/(private)/pedidos/components/index.ts`, ya estaba en `dev`: el diff
+solo la cambia de sitio.
+
+### Arreglos de T15 (solo tests)
+
+- `tests/unit/shared/data-table-alcance.test.ts`: alta de `e2e/pedido-bloqueado.spec.ts` en la
+  lista cerrada de E2E que usan la tabla compartida. La lista pasa de veinticuatro a veinticinco.
+  El `./init.sh` completo lo había dado en rojo.
+- `e2e/pedido-bloqueado.spec.ts`: en WebKit fallaba con «page.goto … is interrupted by another
+  navigation to /inventario». El `router.refresh()` del panel de inventario seguía en vuelo. Ahora
+  el helper `addBatchThroughInventory` filtra Inventario por el producto y, tras guardar, espera a
+  que la fila muestre el stock nuevo (2000).
+- `e2e/reserva-de-material.spec.ts`, «R48 - dos pedidos compiten por el mismo lote…»: el recorrido
+  es de QC-141 y caía en los dos navegadores por R6, siempre en el mismo punto. El pedido B, que no
+  alcanza, ya no se guarda `PENDIENTE` sin apartar: abre el aviso. Cambios:
+  - `createOrder` se parte en `submitNewOrder` y `createOrder`. Hay un helper nuevo,
+    `createBlockedOrder`, que pulsa «Guardar bloqueado» (R8). Por Prisma se afirma que B queda
+    `BLOQUEADO` y sin movimientos de reserva.
+  - Las aserciones de inventario y la cobertura `none` de B no cambian, y siguen en verde.
+  - Al reeditar B tras cancelar A, se afirma que pasa a `PENDIENTE` (R10).
+  - `openEdit` reintenta el clic de editar con `toPass` hasta que aparece el formulario. En WebKit,
+    un clic no lo abrió una vez. La causa probable es una fila aún sin hidratar, pero no está
+    confirmada.
+
+### Registro del fallo de la revisión: de `console.error` al logger del repo
+
+Con `console.error` en `lib/composition/index.ts`, el `./init.sh` completo salía en rojo en
+`tests/unit/identity/credencial/scope.test.ts`, que no admite ninguna llamada a consola en el
+cableado. El humano aprobó pasar al logger `pino` del repo: `forModule('pedidos')`. El leader
+enmendó `design.md > 7`.
+
+Desviación del snippet de la enmienda: `SharedLogger.error` recibe `(mensaje, campos)` y `LogFields`
+solo admite primitivas, así que el array `failed` no entra tal cual. Se registra
+`blocked_orders_review_failed` con `{ companyId, failedCount, failed: JSON.stringify(result.failed) }`.
+`failed` solo lleva `{ orderId, code }`. La rama `catch` sigue con `{ companyId, stage: 'blocked_ids' }`.
+Ni `logger.ts` ni `LogFields` cambian.
+
+### Gate `./init.sh` completo (salida real)
+
+- **Corrida 1**, sobre `3e486c69`: `EXIT=1`. Typecheck y lint pasan. `7 failed | 803 passed (810)`
+  archivos y `9 failed | 11169 passed | 128 skipped (11306)` tests. Dos rojos son nuevos y los dos
+  son de la feature:
+  - `tests/unit/shared/data-table-alcance.test.ts`: falta dar de alta el E2E nuevo en la lista.
+  - `tests/unit/identity/credencial/scope.test.ts`: `console.error` en el cableado.
+  Los dos se corrigieron arriba.
+- **Corrida 2**, con los arreglos: `EXIT=1`. `6 failed | 804 passed (810)` archivos y
+  `8 failed | 11175 passed | 128 skipped (11311)` tests. El único rojo fuera del baseline es
+  `tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts`, «`dropRunDatabase` borra la base
+  de verdad…», con `Test timed out in 20000ms`. La feature no toca ese archivo ni la
+  infraestructura de la base de test. Aislado pasa 5/5, y en la corrida 1 había salido verde. Es
+  intermitente bajo carga, así que no va al baseline. Se repitió el gate una vez.
+- **Corrida 3**, mismo árbol: `== init OK ==`, `EXIT=0`. Lint da `0 errors` y solo warnings ajenos.
+  `5 failed | 805 passed (810)` archivos y `7 failed | 11176 passed | 128 skipped (11311)` tests.
+  Salida del gate: «tests: sin rojos nuevos (5 rojos, todos en el baseline de 5)». Los cinco son
+  `account-status-scope`, `unidades-viewport`, `usuarios-viewport`, `product-page` y `recipe-page`.
+  `user-table.test.tsx` no salió rojo en ninguna de las tres corridas.
+
+### E2E (salida real, puerto 3117, base `QuimiCloude_QC138`)
+
+- `e2e/pedido-bloqueado.spec.ts` con `--project=chromium --project=webkit`:
+  - Antes del arreglo: Chromium pasa y WebKit falla, por la carrera de navegación.
+  - Después: `2 passed`, dos corridas seguidas.
+- Subconjunto de pedidos y asignación en los dos navegadores (`--workers=2`): `pedido-bloqueado`,
+  `pedidos`, `pedidos-asignados`, `pedidos-responsables`, `reserva-de-material`,
+  `ajuste-de-inventario`, `aislamiento-pedidos`, `empaque`, `ejecucion-receta`,
+  `pedidos-terminados`, `pedidos-busqueda` y `pedidos-cotizacion`.
+  - Primera corrida: `2 failed | 48 passed`. Fallaba R48 de `reserva-de-material` en los dos
+    navegadores, por R6.
+  - Sobre el árbol final: `50 passed (10.1m)`, `EXIT=0`.
+- No se corrió la suite E2E entera: las otras 25 specs no tocan pedidos ni asignación.
+
+**Pendiente:** borrar `QuimiCloude_QC138` al cerrar la feature.

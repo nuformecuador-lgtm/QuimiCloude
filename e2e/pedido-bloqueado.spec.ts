@@ -38,6 +38,7 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 const LIST_PAGE_SIZE = '25';
 const ORDERS_SORT = 'createdAt:desc';
+const INVENTORY_SEARCH_PARAM = 'q';
 
 const SHARED_TOKEN = `${FIXTURE_PREFIX}${RUN_ID}`;
 
@@ -52,6 +53,8 @@ const FIRST_BATCH_LOT = `${SHARED_TOKEN}_lote`;
 const FIRST_BATCH_STOCK = '500.0000';
 const ORDER_QUANTITY = '1500';
 const NEW_BATCH_STOCK = '1500';
+// Lo que muestra la fila del producto tras el alta: el primer lote mas el nuevo.
+const STOCK_AFTER_NEW_BATCH = '2000';
 const UNIT_COST = '10.0000';
 const NEW_BATCH_UNIT_COST = '10';
 const QTY_ALERT = '1';
@@ -149,8 +152,16 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
 
 /** Da de alta por Inventario un lote nuevo del producto y la presentacion del fixture. */
 async function addBatchThroughInventory(page: Page): Promise<void> {
-  await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+  const query = new URLSearchParams({
+    pageSize: LIST_PAGE_SIZE,
+    [INVENTORY_SEARCH_PARAM]: PRODUCT_NAME,
+  });
+  await page.goto(`${INVENTORY_ROUTE}?${query.toString()}`);
   await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+  const productRow = page.locator('[data-testid^="data-table-row-"]').filter({
+    has: page.getByTestId('product-stock'),
+  });
+  await expect(productRow).toHaveCount(1, { timeout: 60_000 });
 
   await page.getByTestId('product-create-open').first().click();
   await expect(page.getByTestId('product-sheet')).toBeVisible({ timeout: 60_000 });
@@ -181,6 +192,12 @@ async function addBatchThroughInventory(page: Page): Promise<void> {
 
   await page.getByTestId('product-form-submit').click();
   await expect(page.getByTestId('product-sheet')).toHaveCount(0, { timeout: 60_000 });
+  // El panel se cierra ANTES de `router.refresh()`: si el siguiente `goto` sale con ese refresco
+  // en vuelo, WebKit lo interrumpe. El total nuevo en la fila, sin navegar, es la senal de que
+  // el refresco ya se aplico.
+  await expect(productRow.getByTestId('product-stock')).toContainText(STOCK_AFTER_NEW_BATCH, {
+    timeout: 60_000,
+  });
 }
 
 async function createUser(user: Credentials, roleId: string): Promise<string> {

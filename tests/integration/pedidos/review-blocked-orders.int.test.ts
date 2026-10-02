@@ -53,6 +53,18 @@ import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedid
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
+// `lib/composition` pide su logger al cargarse: el espia tiene que existir antes del import.
+const { registroPedidos } = vi.hoisted(() => ({ registroPedidos: vi.fn() }));
+
+vi.mock('@/lib/shared/observability/logger', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/shared/observability/logger')>();
+  return {
+    ...real,
+    forModule: (modulo: string) =>
+      modulo === 'pedidos' ? { info: () => undefined, warn: () => undefined, error: registroPedidos } : real.forModule(modulo),
+  };
+});
+
 function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
@@ -684,7 +696,7 @@ describe('la fachada de inventario dispara la revision', () => {
       await prisma.$executeRawUnsafe(
         `CREATE TRIGGER "${disparador}" BEFORE UPDATE ON "orders" FOR EACH ROW WHEN (OLD."id" = '${orderId}'::uuid) EXECUTE FUNCTION "${funcion}"()`,
       );
-      const registro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      registroPedidos.mockClear();
       const lotesAntes = await prisma.productBatch.count({ where: { productId } });
 
       const alta = await inventario.createProduct(
@@ -696,10 +708,11 @@ describe('la fachada de inventario dispara la revision', () => {
       expect(await prisma.productBatch.count({ where: { productId } })).toBe(lotesAntes + 1);
       expect((await filaDe(orderId)).status).toBe('BLOQUEADO');
       expect(await movimientosDe(orderId)).toEqual([]);
-      expect(registro).toHaveBeenCalledWith('blocked_orders_review_failed', {
-        companyId: fixture.companyId,
-        failed: [{ orderId, code: expect.any(String) }],
-      });
+      const avisos = registroPedidos.mock.calls.filter(([evento]) => evento === 'blocked_orders_review_failed');
+      expect(avisos).toHaveLength(1);
+      const campos = avisos[0]?.[1];
+      expect(campos).toMatchObject({ companyId: fixture.companyId, failedCount: 1 });
+      expect(JSON.parse(String(campos?.failed))).toEqual([{ orderId, code: expect.any(String) }]);
     } finally {
       await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${disparador}" ON "orders"`);
       await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${funcion}"()`);
