@@ -19,7 +19,7 @@
 | QC-138 | estado-bloqueado-por-inventario-insuficiente | Pedidos | fullstack | spec_ready | feature/QC-138-estado-bloqueado-por-inventario-insuficiente | leader. **Spec APROBADO; QC-168 mergeada el 2026-09-26 (#129): lista para F2.0** (rebasar migracion y orden del enum). Ver Evaluaciones. |
 
 ## Evaluaciones
-**2026-10-02: QC-174** `crear-versiones-en-la-receta`: F1.0 (worktree desde origin/dev `d3535685`, indexado en el grafo) y F1.1 (`complexity:medium` en Jira: solo frontend, dos paginas nuevas, aviso de propagacion y un E2E; sin integraciones). Cupo `frontend` 0 de 2. F1.2: `spec_author` lanzado sobre la semilla acotada.
+**2026-10-02: QC-174** `crear-versiones-en-la-receta`: F1.0 (worktree desde origin/dev `d3535685`, indexado en el grafo) y F1.1 (`complexity:medium` en Jira: solo frontend, dos paginas nuevas, aviso de propagacion y un E2E; sin integraciones). Cupo `frontend` 0 de 2. F1.2: `spec_author` lanzado sobre la semilla acotada. F1.2/F1.3: R1-R39, T0-T12, semilla intacta (diff) y D1-D9 citadas; tarjeta a En revision. **Parada en F1.4** con P1 (propagated en updateRecipeAction) y tres comportamientos anadidos por spec_author (R7, R29, R33/R34).
 
 **2026-10-02:** QC-174 `crear-versiones-en-la-receta` **ACOTADA** con `/afinar-feature`: 9 decisiones (4 del humano, 5 heredadas de QC-172), ninguna abierta, en `specs/QC-174-crear-versiones-en-la-receta/requirements.md`; board actualizado (description). Sigue `pending`.
 
