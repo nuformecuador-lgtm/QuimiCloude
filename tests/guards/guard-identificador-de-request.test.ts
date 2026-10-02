@@ -211,6 +211,15 @@ export const E2E_ESPERADOS = [
   'unidades.spec.ts',
   'establecer-contrasena.spec.ts',
   'usuarios.spec.ts',
+  // Alta el 2026-10-02 (QC-172 R44) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: en el formulario de Pedidos se
+  // elige una receta original y una de sus versiones, se guarda el pedido, y en la base lo
+  // apartado sale de las lineas de la version (A y C) y no de las de la original (A y B). NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'versiones-de-receta.spec.ts',
   // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
   // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
   // se nombra, uno a uno-. Lo que ejercita: el recorrido de las vistas de /asignacion por
