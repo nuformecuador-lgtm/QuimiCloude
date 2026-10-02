@@ -27,6 +27,7 @@ import {
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const DELETE_SUCCESS = 'Receta borrada.';
+const DELETE_VERSION_SUCCESS = 'Versión borrada.';
 
 type DeleteKind = 'recipe' | 'version';
 
@@ -86,7 +87,7 @@ export function DeleteRecipeDialog({
       }
       setError(null);
       setOpen(false);
-      toast.success(DELETE_SUCCESS);
+      toast.success(isVersion ? DELETE_VERSION_SUCCESS : DELETE_SUCCESS);
       router.refresh();
     });
   };

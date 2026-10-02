@@ -123,6 +123,7 @@ describe('DeleteRecipeDialog — borrar una versión', () => {
     expect(deleteRecipeActionMock).toHaveBeenCalledTimes(1);
     expect(deleteRecipeActionMock).toHaveBeenCalledWith(VERSION.id);
     expect(toastExito).toHaveBeenCalledTimes(1);
+    expect(toastExito).toHaveBeenCalledWith('Versión borrada.');
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
     expect(listRecipeVersionsActionMock).not.toHaveBeenCalled();
   });
@@ -267,6 +268,8 @@ describe('DeleteRecipeDialog — borrar una original', () => {
     await waitFor(() => expect(screen.queryByTestId(id.dialogo)).toBeNull());
     expect(deleteRecipeActionMock).toHaveBeenCalledTimes(1);
     expect(deleteRecipeActionMock).toHaveBeenCalledWith(ORIGINAL.id);
+    expect(toastExito).toHaveBeenCalledTimes(1);
+    expect(toastExito).toHaveBeenCalledWith('Receta borrada.');
   });
 
   it('R35: si falla el borrado de la original el diálogo sigue abierto con el error a la vista', async () => {
