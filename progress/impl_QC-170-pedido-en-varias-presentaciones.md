@@ -980,3 +980,44 @@ El mapa entero, archivo a archivo, es el de `progress/review_QC-170-pedido-en-va
   `Test Files 51 passed (51)`, `Tests 652 passed | 11 skipped (663)`; `init OK`. Ningún rojo (el de
   `pedidos-convenciones › no cambia package.json` no entró en la selección de related).
 - Pendiente: sincronizar con `dev`, `./init.sh` completo y E2E en WebKit antes del PR.
+
+## F2.3 — cuelgue tras el merge (2026-10-02)
+
+**Causa.** `tests/integration/asignaciones/finish-auto-assign-packers.int.test.ts` (llega de dev con
+el PR #130) dobla `OrderCatalog.transitionAliveById` con el contrato de dev:
+`{ kind: 'ok', finishedGoods: {...} }`. En QC-170 el `'ok'` de ese puerto es el literal (el
+Finalizar ya no da de alta producto terminado; pasa a Terminar el empaque), y
+`finish-assigned-order.ts` solo sale del `for (;;)` con `result === 'ok'`. El objeto no casa con
+ningun resultado, cae en la rama `'stale'`, relee (`findAliveById` doblado devuelve `EN_CURSO`) y
+reintenta sin fin: bucle de microtareas sin E/S a Postgres, por eso CPU girando y
+`pg_stat_activity` vacio. El doble va con `as unknown as OrderCatalog`, asi que el typecheck no lo
+vio. No es de dev: en `origin/dev` el caso de uso sale con `typeof result === 'object'`
+(`git show origin/dev:lib/modules/asignaciones/domain/finish-assigned-order.ts`, l.218), asi que
+alli el doble es correcto; es de la combinacion. No hizo falta worktree temporal: el contrato de
+dev se lee con `git show`.
+
+**Arreglo** (capa mas estrecha, solo el test): el doble devuelve `'ok' as const`, como declara el
+puerto en `lib/modules/pedidos/domain/order-catalog.ts`. Sin cambio de produccion ni de semantica.
+
+**Salida real.**
+
+```
+pnpm exec vitest run tests/integration/asignaciones/finish-auto-assign-packers.int.test.ts
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Duration  3.12s
+
+pnpm exec vitest run tests/integration/asignaciones tests/integration/pedidos   (EXIT=0)
+ Test Files  42 passed (42)
+      Tests  355 passed (355)
+   Duration  47.95s
+```
+
+**Diagnostico, sin tocar: `tests/integration/unidades/unidades-constraints.int.test.ts`.** Rojo
+aislado (1 fallo / 29 verdes) y NO es el `23001` vs `23503` de Postgres 18.6: el caso «la base
+rechaza un unit_id inexistente aunque Prisma no declare la relacion» compara con `toEqual` la
+lista EXACTA de FKs hacia `units` y aparece una de mas, `orders_unit_id_fkey`
+(`confdeltype r`, `confupdtype c`), que crea la migracion propia de QC-170
+`20260927120000_order_presentation_lines`. El test no cambia desde QC-147 (ya en la rama antes
+del merge), asi que es un rojo de QC-170, no del merge ni de dev: falta añadir esa FK a la lista
+esperada (o decidir otra cosa sobre ella). Pendiente de decision del leader.
