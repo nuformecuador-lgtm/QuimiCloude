@@ -15,8 +15,10 @@ Verifica:
    lo verifica (no un test vacío). Si falta uno, es bloqueante.
 2. **Tasks:** todas en `tasks.md` marcadas `[x]`.
 3. **Checkpoints:** recorre `CHECKPOINTS.md` punto por punto.
-4. **Verificación ejecutable:** corre `./init.sh` y confirma verde. Corre los tests
-   tú mismo; no confíes solo en la bitácora del implementer.
+4. **Verificacion ejecutable:** corre lo que necesites para verificar tus hallazgos
+   (typecheck, lint, `vitest related`, guardias, los `.int` afectados). No corras `./init.sh`
+   completo ni el E2E: los corre el leader (`AGENTS.md > Regla del gate: quien corre que`).
+   No confies solo en la bitacora del implementer.
 5. **Calidad y seguridad:** RLS en tablas nuevas, idempotencia/firma en webhooks,
    sin hardcode de contexto, sin secretos, capas separadas.
 6. **Multiplataforma:** si la feature toca UI, revisa el diff contra
@@ -61,3 +63,8 @@ cumplirlo. No arregles el código tú; eso vuelve al implementer.
 `tests/baseline-rojos.json` —solo lo hace el modo completo—, asi que un archivo con deuda ajena
 ya listada sale rojo ahi igual. Antes de tratarlo como bloqueante, mira si el archivo esta en esa
 lista. El 2026-09-18 costo una vuelta entera y una decision que no existia.
+
+**Vuelta 2 y siguientes:** si el leader te da un rango `A..B`, revisa solo ese diff contra
+los hallazgos de la vuelta anterior y sus regresiones. No amplies por tu cuenta: si ves un
+motivo, anotalo como hallazgo. Escribe la vuelta como seccion nueva al final de
+`progress/review_<feature>.md`: `## Vuelta N (acotada a A..B)`.

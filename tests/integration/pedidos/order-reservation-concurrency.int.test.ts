@@ -30,6 +30,7 @@ import {
   findAliveOrderById,
   listAliveOrders,
   createOrderWriteRepository,
+  findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
@@ -76,7 +77,7 @@ function normalizeForTest(name: string): string {
 // El cableado REAL: los mismos adaptadores que `lib/composition`.
 // ---------------------------------------------------------------------------
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -112,12 +113,9 @@ const createOrder = createCreateOrder({ recipes, products, units, presentations,
 const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
-const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({
-  unitOfWork,
-  recipes,
-  products,
-  units,
-});
+// R15, R16: `createTransitionOrder` ya no necesita `recipes`/`products`/`units` -el
+// alta de producto terminado se traslada a Terminar (T14)-.
+const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
 // ---------------------------------------------------------------------------
 // Empresa efimera
@@ -237,8 +235,8 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, presentationId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status, presentationId, presentationContent: null };
+function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
+  return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
 }
 
 type ReservaResumen = { readonly kind: string; readonly quantity: string; readonly createdBy: string | null };
@@ -267,7 +265,7 @@ afterAll(async () => {
 });
 
 describe('R16 — dos altas simultaneas de 1.500 sobre 2.000 disponibles dejan exactamente una apartada', () => {
-  it('con cinco lotes independientes de 2.000, cada carrera deja una reserva de 1.500 y la otra sin apartar', async () => {
+  it('con cinco lotes independientes de 2.000, cada carrera deja una reserva de 1.500 y la otra rechazada con order_would_block sin escribir nada (QC-138 R6)', async () => {
     for (let vuelta = 0; vuelta < 5; vuelta += 1) {
       const fixture = await crearFixture();
       const { productId, batchId } = await crearProductoConLote(fixture, '2000');
@@ -276,29 +274,37 @@ describe('R16 — dos altas simultaneas de 1.500 sobre 2.000 disponibles dejan e
 
       try {
         // Sin `await` entre las dos llamadas: compiten de verdad por el bloqueo del producto.
-        const [primero, segundo] = await Promise.all([
-          createOrder(nuevoPedido(recipeId, fixture.presentationId, '1500.0000'), actorDe(fixture)),
-          createOrder(nuevoPedido(recipeId, fixture.presentationId, '1500.0000'), actorDe(fixture)),
+        const resultados = await Promise.allSettled([
+          createOrder(nuevoPedido(recipeId, fixture.unitId, '1500.0000'), actorDe(fixture)),
+          createOrder(nuevoPedido(recipeId, fixture.unitId, '1500.0000'), actorDe(fixture)),
         ]);
 
-        const [reservedAtPrimero, reservedAtSegundo, movimientosPrimero, movimientosSegundo] = await Promise.all([
-          reservedAtDe(primero.id),
-          reservedAtDe(segundo.id),
-          movimientosDe(primero.id),
-          movimientosDe(segundo.id),
-        ]);
+        const ganadores = resultados.filter((r) => r.status === 'fulfilled');
+        const perdedores = resultados.filter((r) => r.status === 'rejected');
+        expect(ganadores).toHaveLength(1);
+        expect(perdedores).toHaveLength(1);
+        expect(perdedores[0]?.reason).toMatchObject({ code: 'order_would_block' });
 
-        const apartados = [reservedAtPrimero, reservedAtSegundo].filter((valor) => valor !== null);
-        expect(apartados).toHaveLength(1);
+        const ganador = ganadores[0]?.value;
+        if (ganador === undefined) throw new Error('falta el alta ganadora');
+        expect(await reservedAtDe(ganador.id)).not.toBeNull();
 
-        const sumaApartada = [...movimientosPrimero, ...movimientosSegundo]
-          .filter((movimiento) => movimiento.kind === 'reserve')
-          .reduce((acumulado, movimiento) => acumulado + Number(movimiento.quantity), 0);
+        const pedidosDeLaEmpresa = await prisma.order.findMany({
+          where: { companyId: fixture.companyId },
+          select: { id: true },
+        });
+        expect(pedidosDeLaEmpresa.map((row) => row.id)).toEqual([ganador.id]);
+
+        const reservas = await prisma.reservationMovement.findMany({
+          where: { companyId: fixture.companyId },
+          select: { orderId: true, kind: true, quantity: true },
+        });
+        expect(reservas.every((row) => row.orderId === ganador.id)).toBe(true);
+        const sumaApartada = reservas
+          .filter((row) => row.kind === 'reserve')
+          .reduce((acumulado, row) => acumulado + Number(row.quantity), 0);
         expect(sumaApartada).toBe(1500);
         expect(sumaApartada).toBeLessThanOrEqual(2000);
-
-        const movimientosDelQueNoAparto = reservedAtPrimero === null ? movimientosPrimero : movimientosSegundo;
-        expect(movimientosDelQueNoAparto).toEqual([]);
         expect(await stockDe(batchId)).toBe('2000.0000');
       } finally {
         await borrarFixture(fixture, [productId]);
@@ -318,22 +324,26 @@ describe('una merma simultanea a un apartado sobre el mismo producto no deja el 
       // La reserva no toca `stock` -solo asienta en `reservation_movements`-, asi que el unico
       // camino hacia negativo es la propia merma; lo que aqui se comprueba es que el bloqueo del
       // producto deja a la merma leer el `stock` comprometido, gane quien gane la carrera.
-      const [creado] = await Promise.all([
-        createOrder(nuevoPedido(recipeId, fixture.presentationId, '50.0000'), actorDe(fixture)),
+      const [alta, merma] = await Promise.allSettled([
+        createOrder(nuevoPedido(recipeId, fixture.unitId, '50.0000'), actorDe(fixture)),
         adjustBatchStock(batchId, '-50', 'merma', fixture.actorId, new Date(), ambitoDe(fixture)),
       ]);
 
+      expect(merma.status).toBe('fulfilled');
       expect(await stockDe(batchId)).toBe('0.0000');
 
-      const reservedAtFinal = await reservedAtDe(creado.id);
-      const movimientos = await movimientosDe(creado.id);
-      if (reservedAtFinal !== null) {
+      if (alta.status === 'fulfilled') {
         // El apartado gano la carrera: aparto 50 sobre el stock aun sin mermar.
-        expect(movimientos).toEqual([{ kind: 'reserve', quantity: '50.0000', createdBy: fixture.actorId }]);
+        expect(await reservedAtDe(alta.value.id)).not.toBeNull();
+        expect(await movimientosDe(alta.value.id)).toEqual([
+          { kind: 'reserve', quantity: '50.0000', createdBy: fixture.actorId },
+        ]);
       } else {
-        // La merma gano la carrera: dejo el stock en cero antes de que el apartado calculara
-        // disponible, y el pedido queda sin apartar (E1/insuficiente), sin ningun asiento.
-        expect(movimientos).toEqual([]);
+        // QC-138 R6: la merma gano la carrera y el alta sin confirmar ya no alcanza, asi que
+        // se rechaza sin dejar ni pedido ni asiento.
+        expect(alta.reason).toMatchObject({ code: 'order_would_block' });
+        expect(await prisma.order.count({ where: { companyId: fixture.companyId } })).toBe(0);
+        expect(await prisma.reservationMovement.count({ where: { companyId: fixture.companyId } })).toBe(0);
       }
     } finally {
       await borrarFixture(fixture, [productId]);
@@ -350,7 +360,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
 
     try {
       async function nuevaOrden(): Promise<string> {
-        const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '1.0000'), actorDe(fixture));
+        const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '1.0000'), actorDe(fixture));
         return creado.id;
       }
 
@@ -363,8 +373,8 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
         return id;
       }
 
-      const crear = () => createOrder(nuevoPedido(recipeId, fixture.presentationId, '1.0000'), actorDe(fixture));
-      const editar = (orderId: string) => updateOrder(orderId, nuevoPedido(recipeId, fixture.presentationId, '2.0000'), actorDe(fixture));
+      const crear = () => createOrder(nuevoPedido(recipeId, fixture.unitId, '1.0000'), actorDe(fixture));
+      const editar = (orderId: string) => updateOrder(orderId, nuevoPedido(recipeId, fixture.unitId, '2.0000'), actorDe(fixture));
       const cancelar = (orderId: string) => cancelOrder(orderId, { reason: 'vuelta de concurrencia' }, actorDe(fixture));
       const borrar = (orderId: string) => deleteOrder(orderId, actorDe(fixture));
       const finalizar = (orderId: string) =>

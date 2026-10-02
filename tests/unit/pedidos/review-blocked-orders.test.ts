@@ -1,0 +1,335 @@
+// La revision de pedidos bloqueados con dobles: que desbloquea, en que orden, con que autor y
+// que hace cuando un pedido falla. Los efectos sobre la base los prueba
+// `tests/integration/pedidos/review-blocked-orders.int.test.ts`.
+
+import { describe, expect, it, vi } from 'vitest';
+
+import { createReviewBlockedOrders } from '@/lib/modules/pedidos/domain/review-blocked-orders';
+import { fakeOrderRow, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+
+import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
+import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
+import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { CostingBatch, ProductCatalog, ReservationOutcome } from '@/lib/modules/inventario';
+import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
+import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+
+const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
+const AHORA = new Date('2026-09-26T10:00:00.000Z');
+const SCOPE: OrderScope = { companyId: EMPRESA_A };
+
+const PEDIDO_1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+const PEDIDO_2 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+const PEDIDO_3 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+const PRODUCTO_X = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const LITRO: UnitConversion = { id: 'l', baseUnitId: null, factor: null };
+
+function linea(): RecipeExecutionLine {
+  return { productId: PRODUCTO_X, productName: null, percentage: '100.00' };
+}
+
+function lote(overrides: Partial<CostingBatch> = {}): CostingBatch {
+  return {
+    productId: PRODUCTO_X,
+    lot: '1',
+    stock: '100',
+    unitCost: '2.0000',
+    unitId: LITRO.id,
+    purchaseDate: '2026-01-01',
+    available: '100',
+    ...overrides,
+  };
+}
+
+function bloqueado(id: string, overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
+  return fakeOrderRow({ id, status: 'BLOQUEADO', reservedAt: null, quantity: '10.0000', ...overrides });
+}
+
+type Escenario = {
+  readonly ids?: readonly string[];
+  readonly filas?: ReadonlyMap<string, LockedOrderRow>;
+  /** Lo que devuelve `lockAliveById` si no es la misma fila que la lectura previa. */
+  readonly bloqueadas?: ReadonlyMap<string, LockedOrderRow | null>;
+  readonly resultado?: (orderId: string) => ReservationOutcome;
+  readonly lineas?: readonly RecipeExecutionLine[];
+  readonly lotes?: readonly CostingBatch[];
+};
+
+function montar(escenario: Escenario = {}) {
+  const ids = escenario.ids ?? [PEDIDO_1];
+  const filas = escenario.filas ?? new Map(ids.map((id) => [id, bloqueado(id)]));
+  const lineas = escenario.lineas ?? [linea()];
+  const orden: string[] = [];
+
+  const findBlockedIds = vi.fn(async () => ids);
+  const findAliveById = vi.fn(async (id: string) => filas.get(id) ?? null);
+  const orders = { findBlockedIds, findAliveById } as unknown as Pick<
+    OrderRepository,
+    'findBlockedIds' | 'findAliveById'
+  >;
+
+  const lockAliveById = vi.fn(async (id: string) => {
+    orden.push(`lock:${id}`);
+    if (escenario.bloqueadas?.has(id) === true) return escenario.bloqueadas.get(id) ?? null;
+    return filas.get(id) ?? null;
+  });
+  const syncForOrder = vi.fn(async (input: { orderId: string }) =>
+    escenario.resultado === undefined ? ({ kind: 'reserved' } as const) : escenario.resultado(input.orderId),
+  );
+  const setStatus = vi.fn(
+    async (id: string, from: OrderStatus, to: OrderStatus, actorId: string | null, now: Date, scope: OrderScope) => {
+      void [from, to, actorId, now, scope];
+      orden.push(`setStatus:${id}`);
+      return 'ok' as const;
+    },
+  );
+  const setIngredientsCost = vi.fn(
+    async (id: string, cost: string | null, actorId: string | null, now: Date, scope: OrderScope) => {
+      void [id, cost, actorId, now, scope];
+      return 'ok' as const;
+    },
+  );
+  const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null, scope: OrderScope) => {
+    void [id, reservedAt, scope];
+  });
+  const findExecutionContentById = vi.fn(async (id: string) => ({
+    id,
+    name: 'Receta',
+    isDeleted: false,
+    steps: [],
+    lines: lineas,
+  }));
+
+  const uow = fakeUnitOfWork({
+    orders: { lockAliveById, setStatus, setIngredientsCost, setReservedAt },
+    reservations: { syncForOrder },
+    recipes: { findExecutionContentById },
+  });
+
+  const recipes = {
+    findRefsIncludingDeleted: vi.fn(),
+    findExecutionContentById,
+  } as unknown as RecipeCatalog;
+  const products = {
+    findRefs: vi.fn(async () => [{ id: PRODUCTO_X, name: 'x', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }]),
+    findCostingBatches: vi.fn(async () => escenario.lotes ?? [lote()]),
+  } as unknown as ProductCatalog;
+  const units = {
+    findRefs: vi.fn(async () => [LITRO]),
+    findRefsSharingBaseInCompany: vi.fn(async () => []),
+  } as unknown as UnitCatalog;
+
+  const review = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork: uow.unitOfWork });
+  return {
+    review,
+    orden,
+    findBlockedIds,
+    findAliveById,
+    lockAliveById,
+    syncForOrder,
+    setStatus,
+    setIngredientsCost,
+    setReservedAt,
+    products,
+  };
+}
+
+describe('reviewBlockedOrders — desbloqueo', () => {
+  it('R14, R15: el que alcanza se aparta, pasa a PENDIENTE, fija reserved_at al instante y recalcula el importe', async () => {
+    const m = montar();
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({ unblocked: 1, failed: [] });
+    expect(m.setStatus).toHaveBeenCalledWith(PEDIDO_1, 'BLOQUEADO', 'PENDIENTE', null, AHORA, SCOPE);
+    // 10 * 100 % = 10 unidades a 2.0000.
+    expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, '20.0000', null, AHORA, SCOPE);
+    expect(m.setReservedAt).toHaveBeenCalledWith(PEDIDO_1, AHORA, SCOPE);
+  });
+
+  it('R15: si el importe no se puede calcular, lo sustituye por null', async () => {
+    const m = montar({ lotes: [lote({ unitId: 'bidon' })] });
+
+    await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(m.setStatus).toHaveBeenCalledTimes(1);
+    expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, null, null, AHORA, SCOPE);
+  });
+
+  it('R15: el importe se calcula contando como disponible lo apartado por el propio pedido', async () => {
+    const m = montar();
+
+    await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(m.products.findCostingBatches).toHaveBeenCalledWith([PRODUCTO_X], EMPRESA_A, {
+      excludeOrderId: PEDIDO_1,
+    });
+  });
+
+  it('R2: receta sin lineas -> not_reserved desbloquea sin apartar y deja reserved_at nulo', async () => {
+    const m = montar({ lineas: [], resultado: () => ({ kind: 'not_reserved' }) });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado.unblocked).toBe(1);
+    expect(m.setStatus).toHaveBeenCalledWith(PEDIDO_1, 'BLOQUEADO', 'PENDIENTE', null, AHORA, SCOPE);
+    expect(m.setReservedAt).toHaveBeenCalledWith(PEDIDO_1, null, SCOPE);
+  });
+
+  it('R17: el que sigue sin alcanzar queda intacto: ni estado, ni importe, ni reserved_at', async () => {
+    const m = montar({ resultado: () => ({ kind: 'insufficient', productIds: [PRODUCTO_X] }) });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({ unblocked: 0, failed: [] });
+    expect(m.setStatus).not.toHaveBeenCalled();
+    expect(m.setIngredientsCost).not.toHaveBeenCalled();
+    expect(m.setReservedAt).not.toHaveBeenCalled();
+  });
+
+  it('R22: el pedido y los apartados quedan sin autor', async () => {
+    const m = montar();
+
+    await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(m.syncForOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: PEDIDO_1, companyId: EMPRESA_A, actorId: null, now: AHORA }),
+    );
+    expect(m.setStatus.mock.calls[0]?.[3]).toBeNull();
+    expect(m.setIngredientsCost.mock.calls[0]?.[2]).toBeNull();
+  });
+});
+
+describe('reviewBlockedOrders — orden y alcance', () => {
+  it('R16: recorre en el orden que devuelve findBlockedIds, del mas antiguo al mas nuevo', async () => {
+    const m = montar({ ids: [PEDIDO_2, PEDIDO_1, PEDIDO_3] });
+
+    await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(m.orden.filter((paso) => paso.startsWith('lock:'))).toEqual([
+      `lock:${PEDIDO_2}`,
+      `lock:${PEDIDO_1}`,
+      `lock:${PEDIDO_3}`,
+    ]);
+  });
+
+  it('R16: con material para uno solo, se desbloquea el primero de la lista', async () => {
+    let disponible = true;
+    const m = montar({
+      ids: [PEDIDO_1, PEDIDO_2],
+      resultado: () => {
+        if (!disponible) return { kind: 'insufficient', productIds: [PRODUCTO_X] };
+        disponible = false;
+        return { kind: 'reserved' };
+      },
+    });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado.unblocked).toBe(1);
+    expect(m.setStatus).toHaveBeenCalledTimes(1);
+    expect(m.setStatus.mock.calls[0]?.[0]).toBe(PEDIDO_1);
+  });
+
+  it('R18, R38: solo pide los bloqueados de la empresa del movimiento', async () => {
+    const m = montar();
+
+    await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(m.findBlockedIds).toHaveBeenCalledWith(SCOPE);
+    for (const llamada of m.lockAliveById.mock.calls) {
+      expect(llamada[llamada.length - 1]).toStrictEqual(SCOPE);
+    }
+  });
+
+  it('R18: un pedido que ya no esta BLOQUEADO al leerlo no se bloquea ni se escribe', async () => {
+    const m = montar({
+      filas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { status: 'PENDIENTE' })]]),
+    });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({ unblocked: 0, failed: [] });
+    expect(m.lockAliveById).not.toHaveBeenCalled();
+    expect(m.syncForOrder).not.toHaveBeenCalled();
+  });
+
+  it('sin bloqueados no abre ninguna transaccion', async () => {
+    const m = montar({ ids: [] });
+
+    expect(await m.review({ companyId: EMPRESA_A, now: AHORA })).toEqual({ unblocked: 0, failed: [] });
+    expect(m.lockAliveById).not.toHaveBeenCalled();
+  });
+});
+
+describe('reviewBlockedOrders — concurrencia y fallos', () => {
+  it('R24: si al bloquear la fila ya no esta BLOQUEADO (cancelado, desbloqueado), no se toca', async () => {
+    for (const status of ['CANCELADO', 'PENDIENTE'] as const) {
+      const m = montar({ bloqueadas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { status })]]) });
+
+      const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+      expect(resultado, status).toEqual({ unblocked: 0, failed: [] });
+      expect(m.syncForOrder, status).not.toHaveBeenCalled();
+      expect(m.setStatus, status).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R24: si al bloquear la fila ya no existe (borrada), no se toca', async () => {
+    const m = montar({ bloqueadas: new Map([[PEDIDO_1, null]]) });
+
+    expect(await m.review({ companyId: EMPRESA_A, now: AHORA })).toEqual({ unblocked: 0, failed: [] });
+    expect(m.syncForOrder).not.toHaveBeenCalled();
+  });
+
+  it('R15, R24: si una edicion cambio la cantidad entre la lectura y el candado, se deja para la siguiente revision', async () => {
+    const m = montar({ bloqueadas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { quantity: '4.0000' })]]) });
+
+    expect(await m.review({ companyId: EMPRESA_A, now: AHORA })).toEqual({ unblocked: 0, failed: [] });
+    expect(m.syncForOrder).not.toHaveBeenCalled();
+  });
+
+  it('R23: un fallo en un pedido no impide los demas y aparece en failed con su codigo', async () => {
+    const m = montar({
+      ids: [PEDIDO_1, PEDIDO_2, PEDIDO_3],
+      resultado: (orderId) => {
+        if (orderId === PEDIDO_2) throw Object.assign(new Error('boom'), { code: 'insufficient_material' });
+        return { kind: 'reserved' };
+      },
+    });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({
+      unblocked: 2,
+      failed: [{ orderId: PEDIDO_2, code: 'insufficient_material' }],
+    });
+    expect(m.setStatus.mock.calls.map((c) => c[0])).toEqual([PEDIDO_1, PEDIDO_3]);
+  });
+
+  it('R23: un error sin codigo se anota como unexpected, sin el mensaje', async () => {
+    const m = montar({
+      resultado: () => {
+        throw new Error('detalle interno con datos');
+      },
+    });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado.failed).toEqual([{ orderId: PEDIDO_1, code: 'unexpected' }]);
+    expect(JSON.stringify(resultado)).not.toContain('detalle interno');
+  });
+
+  it('R23: un fallo al leer o costear un pedido tambien queda en failed', async () => {
+    const m = montar({ ids: [PEDIDO_1, PEDIDO_2] });
+    m.findAliveById.mockImplementationOnce(async () => {
+      throw new Error('lectura caida');
+    });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado.failed).toEqual([{ orderId: PEDIDO_1, code: 'unexpected' }]);
+    expect(resultado.unblocked).toBe(1);
+  });
+});

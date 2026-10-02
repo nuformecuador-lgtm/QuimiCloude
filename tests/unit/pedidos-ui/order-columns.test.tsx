@@ -85,8 +85,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: null,
-    presentationName: null,
+    presentationLines: [],
+    unitId: null,
+    unitLabel: null,
     ...overrides,
   };
 }
@@ -317,20 +318,53 @@ describe('la cantidad se pinta REDONDEADA A DOS DECIMALES (enmienda del 2026-09-
   });
 });
 
-describe('R20: la columna Presentación pinta el nombre o Sin presentación', () => {
-  it('con presentación informada se pinta su nombre', () => {
+describe('QC-170 R42: la cantidad lleva la unidad del pedido, o va sola si no la tiene', () => {
+  it('con unidad pinta la cifra y su etiqueta', () => {
     const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({ presentationId: 'p-1', presentationName: 'Bidón 20L' }),
+      QUANTITY_COLUMN_ID,
+      pedido({ quantity: '12.5000', unitId: 'unit-l', unitLabel: 'L' }),
     );
 
-    expect(container.textContent).toBe('Bidón 20L');
+    expect(container.textContent).toBe('12.5 L');
   });
 
-  it('sin presentación se pinta «Sin presentación»', () => {
+  it('sin unidad pinta la cifra sola', () => {
+    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '12.5000' }));
+
+    expect(container.textContent).toBe('12.5');
+  });
+});
+
+describe('R20: la columna Presentación pinta el reparto o Sin presentación', () => {
+  it('QC-170 R26: con una linea pinta «envases × nombre» sin «+0»', () => {
     const { container } = pintarCelda(
       PRESENTATION_NAME_COLUMN_ID,
-      pedido({ presentationId: null, presentationName: null }),
+      pedido({
+        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2 }],
+      }),
+    );
+
+    expect(container.textContent).toBe('2 × Bidón 20L');
+  });
+
+  it('QC-170 R26: con varias lineas pinta la primera y «+N»', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({
+        presentationLines: [
+          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5 },
+          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1 },
+        ],
+      }),
+    );
+
+    expect(container.textContent).toBe('5 × Botella 200 ml +1');
+  });
+
+  it('QC-170 R27: sin reparto se pinta «Sin presentación»', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({ presentationLines: [] }),
     );
 
     expect(container.textContent).toBe('Sin presentación');
@@ -353,6 +387,19 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
     const badge = screen.getByTestId('order-status');
     expect(badge).toHaveAttribute('data-status', 'EN_CURSO');
     expect(badge).toHaveTextContent(ORDER_STATUS_LABELS.EN_CURSO);
+  });
+
+  it('R34: el filtro de estado ofrece «Bloqueado» y la celda pinta su etiqueta', () => {
+    const estado = ORDER_COLUMNS.find((column) => column.id === STATUS_COLUMN_ID)?.filter;
+    const opciones = estado?.kind === 'select' ? estado.options : [];
+    expect(opciones).toContainEqual({ value: 'BLOQUEADO', label: ORDER_STATUS_LABELS.BLOQUEADO });
+
+    pintarCelda(STATUS_COLUMN_ID, pedido({ status: 'BLOQUEADO' }));
+
+    const badge = screen.getByTestId('order-status');
+    expect(badge).toHaveAttribute('data-status', 'BLOQUEADO');
+    expect(badge).toHaveTextContent(ORDER_STATUS_LABELS.BLOQUEADO);
+    expect(badge.textContent).not.toBe('BLOQUEADO');
   });
 
   it('cada prioridad del contrato tiene su etiqueta legible', () => {

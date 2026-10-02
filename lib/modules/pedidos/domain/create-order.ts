@@ -1,10 +1,11 @@
 import { requirePermission, type Actor } from './actor';
-import { PresentationNotFoundError, ValidationError } from './errors';
+import { OrderWouldBlockError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildRequirement } from './order-requirement';
+import { resolveDistribution } from './resolve-distribution';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
@@ -37,11 +38,12 @@ export type CreateOrderDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: los lotes con existencia con los que se costea. */
   readonly products: ProductCatalog;
-  /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
+  /** Contrato PUBLICO de `unidades`: la unidad del pedido y las de cada presentacion del
+   *  reparto, para convertir y para el coste. */
   readonly units: UnitCatalog;
-  /** Contrato PUBLICO de `inventario`: la presentacion que se elige, solo para comprobar que
-   *  existe en la empresa de quien escribe. No se le pasa al coste: la presentacion no cambia
-   *  nada de lo que se calcula. */
+  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto, para comprobar que
+   *  existen en la empresa de quien escribe y copiar su contenido. No se le pasan al
+   *  coste: el reparto no cambia nada de lo que ese calculo hace. */
   readonly presentations: PresentationCatalog;
   /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
    *  `reserved_at`, las tres o ninguna. */
@@ -99,7 +101,7 @@ export function createCreateOrder(
 
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const data = parsed.data;
+    const { confirmBlocked, ...data } = parsed.data;
 
     // Se comprueba antes de abrir la transaccion: un alta rechazada no crea ninguna fila. La
     // edicion es mas permisiva con una receta que no cambia (`update-order.ts`).
@@ -109,12 +111,6 @@ export function createCreateOrder(
     );
     const effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
 
-    // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
-    // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
-    // `presentation.content` es lo que se copia en el pedido: `null` si aun no lo tiene.
-    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
-    if (presentation === undefined) throw new PresentationNotFoundError();
-
     const ingredientsCost = await resolveIngredientsCost(
       deps.recipes,
       deps.products,
@@ -122,6 +118,17 @@ export function createCreateOrder(
       effectiveId,
       data.quantity,
       actor.companyId,
+    );
+
+    // La unidad y el reparto se resuelven y se validan contra el
+    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido.
+    const presentationLines = await resolveDistribution(
+      deps.presentations,
+      deps.units,
+      actor.companyId,
+      data.quantity,
+      data.unitId,
+      data.presentationLines,
     );
 
     const instant = now();
@@ -134,9 +141,9 @@ export function createCreateOrder(
           recipeId: effectiveId,
           quantity: data.quantity,
           priority: data.priority,
-          presentationId: data.presentationId,
+          unitId: data.unitId,
           status: STATUS_DE_ALTA,
-          presentationContent: presentation.content,
+          presentationLines,
         },
         instant.getUTCFullYear(),
         actor.id,
@@ -159,6 +166,16 @@ export function createCreateOrder(
         actorId: actor.id,
         now: instant,
       });
+
+      if (outcome.kind === 'insufficient') {
+        // Lanzar deshace el INSERT y lo apartado: sin confirmacion no queda nada escrito.
+        if (!confirmBlocked) throw new OrderWouldBlockError();
+        await transaction.orders.setStatus(order.id, STATUS_DE_ALTA, 'BLOQUEADO', actor.id, instant, scope);
+        // El importe se calculo fuera de la transaccion: otra alta pudo apartar entre medias.
+        if (ingredientsCost !== null) {
+          await transaction.orders.setIngredientsCost(order.id, null, actor.id, instant, scope);
+        }
+      }
 
       await transaction.orders.setReservedAt(
         order.id,

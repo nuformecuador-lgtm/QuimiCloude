@@ -1,6 +1,6 @@
 'use client';
 
-import { PencilIcon, TrashIcon, UsersIcon, XCircleIcon } from 'lucide-react';
+import { PackageIcon, PencilIcon, TrashIcon, UsersIcon, XCircleIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
@@ -46,6 +46,10 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
  * —no una comparacion suelta contra los literales— para que un estado nuevo rompa el
  * `typecheck` en vez de colarse como «editable» por defecto. `POR_EMPACAR` y `EN_EMPAQUE` ya
  * consumieron material y dieron de alta un lote: se cierran igual que `ENTREGADO`.
+ *
+ * `BLOQUEADO` NO es final: un pedido sin material se edita y se cancela como uno `PENDIENTE`, y
+ * bajar su cantidad puede bastar para desbloquearlo. Lo que no admite es el trabajo, y eso lo
+ * rechazan el backend y la lista del Operador, no estos tres controles.
  */
 const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   PENDIENTE: false,
@@ -54,6 +58,7 @@ const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   EN_EMPAQUE: true,
   ENTREGADO: true,
   CANCELADO: true,
+  BLOQUEADO: false,
 };
 
 /**
@@ -69,6 +74,27 @@ export function isFinalOrderStatus(status: OrderStatus): boolean {
 export const FINAL_ORDER_REASON =
   'Este pedido ya está cerrado: no se puede editar, cancelar ni eliminar.';
 
+/**
+ * Estados en que solo cabe la edicion acotada de reparto y unidad. Antes de `POR_EMPACAR` la
+ * edicion general ya cubre los dos campos; desde `EN_EMPAQUE` el reparto queda fijado.
+ */
+const ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: false,
+  EN_CURSO: false,
+  POR_EMPACAR: true,
+  EN_EMPAQUE: false,
+  ENTREGADO: false,
+  CANCELADO: false,
+  // La edicion general sigue abierta en BLOQUEADO y ya cubre reparto y unidad.
+  BLOQUEADO: false,
+};
+
+export function acceptsDistributionEdit(status: OrderStatus): boolean {
+  return ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT[status];
+}
+
+export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
+
 export type OrderRowActionsProps = {
   readonly order: OrderSummary;
   /** Punto de enganche de T10 (panel lateral de edicion). */
@@ -82,6 +108,9 @@ export type OrderRowActionsProps = {
    * cuatro que sigue viva con el pedido cerrado.
    */
   readonly onResponsibles?: (order: OrderSummary) => void;
+  /** Lo decide el servidor con el permiso de modificar pedidos; sin el, la accion no se pinta. */
+  readonly canEditDistribution?: boolean;
+  readonly onDistribution?: (order: OrderSummary) => void;
 };
 
 export function OrderRowActions({
@@ -90,8 +119,11 @@ export function OrderRowActions({
   onCancel,
   onDelete,
   onResponsibles,
+  canEditDistribution = false,
+  onDistribution,
 }: OrderRowActionsProps) {
   const isFinal = isFinalOrderStatus(order.status);
+  const showDistribution = canEditDistribution && acceptsDistributionEdit(order.status);
 
   return (
     <div
@@ -156,6 +188,20 @@ export function OrderRowActions({
         >
           <UsersIcon aria-hidden="true" />
         </Button>
+
+        {showDistribution ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={TOUCH_TARGET}
+            aria-label={`Reparto y unidad del pedido ${order.numberText}`}
+            data-testid={ORDER_ACTION_DISTRIBUTION_TESTID}
+            onClick={() => onDistribution?.(order)}
+          >
+            <PackageIcon aria-hidden="true" />
+          </Button>
+        ) : null}
       </div>
 
       {/*

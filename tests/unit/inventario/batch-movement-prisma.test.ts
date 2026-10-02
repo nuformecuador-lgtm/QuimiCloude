@@ -44,7 +44,15 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
 
     await writeMovement(
       tx,
-      { batchId: LOTE_ID, kind: 'opening', quantity: '10', reason: null, orderId: null, createdBy: ACTOR_ID },
+      {
+        batchId: LOTE_ID,
+        kind: 'opening',
+        quantity: '10',
+        reason: null,
+        orderId: null,
+        orderPresentationLineId: null,
+        createdBy: ACTOR_ID,
+      },
       AHORA,
       AMBITO,
     );
@@ -57,6 +65,7 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
         quantity: '10',
         reason: null,
         orderId: null,
+        orderPresentationLineId: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,
         createdAt: AHORA,
@@ -70,13 +79,47 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
 
     await writeMovement(
       tx,
-      { batchId: LOTE_ID, kind: 'adjustment', quantity: '-3', reason: 'merma', orderId: null, createdBy: ACTOR_ID },
+      {
+        batchId: LOTE_ID,
+        kind: 'adjustment',
+        quantity: '-3',
+        reason: 'merma',
+        orderId: null,
+        orderPresentationLineId: null,
+        createdBy: ACTOR_ID,
+      },
       AHORA,
       AMBITO,
     );
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ kind: 'adjustment', quantity: '-3', reason: 'merma' }) }),
+    );
+  });
+
+  // `orderPresentationLineId` solo lo lleva `production` -uno por linea del reparto-,
+  // pero el punto unico de escritura del asiento lo pasa tal cual para cualquier `kind`.
+  it('escribe `orderPresentationLineId` cuando el asiento lo trae', async () => {
+    const create = vi.fn().mockResolvedValue({ id: 'movimiento-3' });
+    const tx = { inventoryMovement: { create } } as unknown as Parameters<typeof writeMovement>[0];
+
+    await writeMovement(
+      tx,
+      {
+        batchId: LOTE_ID,
+        kind: 'production',
+        quantity: '10',
+        reason: null,
+        orderId: 'pedido-1',
+        orderPresentationLineId: 'linea-1',
+        createdBy: ACTOR_ID,
+      },
+      AHORA,
+      AMBITO,
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ orderPresentationLineId: 'linea-1' }) }),
     );
   });
 });

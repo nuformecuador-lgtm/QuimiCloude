@@ -66,28 +66,20 @@ beforeEach(() => {
 });
 
 describe('finishAssignedOrderAction — la confirmacion viaja en la URL de vuelta, no en el return', () => {
-  it('redirige a `/asignacion?entregado=<numero>` con el numero, los envases y el producto que devuelve el caso de uso (R24)', async () => {
-    finishAssignedOrderMock.mockResolvedValue({
-      numberText: '2026-0000007',
-      packages: '50',
-      productName: 'Desengrasante industrial · Botella 1L',
-    });
+  // R15, R16: Finalizar ya no da de alta ningun lote, asi que la confirmacion ya no
+  // lleva envases ni producto -esa notificacion pasa a Terminar el empaque (T14)-.
+  it('redirige a `/asignacion?entregado=<numero>` con el numero que devuelve el caso de uso', async () => {
+    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007' });
 
     await expect(
       finishAssignedOrderAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
     ).rejects.toThrow('NEXT_REDIRECT');
 
-    expect(redirectMock).toHaveBeenCalledWith(
-      '/asignacion?entregado=2026-0000007&entregado_envases=50&entregado_producto=Desengrasante+industrial+%C2%B7+Botella+1L',
-    );
+    expect(redirectMock).toHaveBeenCalledWith('/asignacion?entregado=2026-0000007');
   });
 
   it('un numero con caracteres especiales viaja escapado en la cadena de consulta', async () => {
-    finishAssignedOrderMock.mockResolvedValue({
-      numberText: '2026/0000007',
-      packages: '5',
-      productName: 'Acido citrico 50% · Bidon 20L',
-    });
+    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026/0000007' });
 
     await expect(
       finishAssignedOrderAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
@@ -96,8 +88,6 @@ describe('finishAssignedOrderAction — la confirmacion viaja en la URL de vuelt
     const [ruta] = redirectMock.mock.calls[0] as [string];
     const params = new URL(ruta, 'http://localhost').searchParams;
     expect(params.get('entregado')).toBe('2026/0000007');
-    expect(params.get('entregado_envases')).toBe('5');
-    expect(params.get('entregado_producto')).toBe('Acido citrico 50% · Bidon 20L');
   });
 
   it('un error del caso de uso se traduce por su `code` y NO redirige', async () => {

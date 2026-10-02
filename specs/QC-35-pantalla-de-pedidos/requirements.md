@@ -235,6 +235,12 @@ del navegador.
 > pantalla. Un pedido es hoy **receta + cantidad + prioridad + estado**, más su correlativo, sus
 > autores y su borrado lógico.
 >
+> **DEROGACIÓN PARCIAL DEL 2026-09-26 (QC-170, decisión humana [Q4]).** La **unidad** vuelve al
+> pedido: QC-170 recrea `orders.unit_id` (obligatoria en el alta, editable, `NULL` en los pedidos
+> heredados sin presentación). El **precio unitario sigue fuera**: esta enmienda del 2026-09-07
+> sigue vigente para `unit_price`. Detalle y pruebas que se invierten en
+> `specs/QC-170-pedido-en-varias-presentaciones/design.md > 0.6`.
+>
 > **ENMIENDA DEL 2026-09-08 (decisión humana).** La cantidad **sí se captura con el control
 > numérico del navegador**: el veto de R39 a ese control queda levantado, y con él la regla
 > correspondiente de la guardia `tests/unit/pedidos-ui/pedidos-convenciones.test.ts`. El resto de

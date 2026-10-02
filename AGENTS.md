@@ -279,6 +279,17 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
    motivo en `progress/current.md` (`## Modelos`). Verifica contra `docs/`,
    `specs/<feature>/` y `CHECKPOINTS.md`. Escribe `progress/review_<feature>.md`.
    Si hay hallazgos mayores, son bloqueantes: vuelve al implementer.
+   - **La vuelta 2 y siguientes se acotan a los arreglos** (2026-10-02). El leader lanza el
+     `reviewer` con el rango `<HEAD de la review anterior>..HEAD` y la lista de hallazgos de
+     esa review: comprueba cada `B<n>`/`m<n>` (cerrado o no) y las regresiones dentro de ese
+     diff. No rehace la trazabilidad completa: el mapa `R<n> -> test` de la vuelta anterior
+     sigue valido salvo en lo que el arreglo toque. Tests: typecheck, lint, `vitest related`
+     del diff, guardias y solo los `.int` que toque el arreglo. El `./init.sh` completo y el
+     E2E corren **una vez**, en F2.4.
+   - **Se amplia solo si** el arreglo enmienda el spec (`R<n>` nuevo o cambiado), toca piezas
+     compartidas (esquema, migraciones, componentes compartidos) o es un cambio masivo en
+     muchos archivos, o si el humano lo pide. Lo decide el leader en el prompt y dice cual
+     aplica. El porque y el incidente: `docs/verification.md > La vuelta 2 del reviewer`.
 9. (F2.3) **Sincronizacion con `dev`.** El implementer:
    - `git fetch origin dev`
    - `git merge origin/dev` en la feature branch.

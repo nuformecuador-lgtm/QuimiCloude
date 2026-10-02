@@ -60,6 +60,10 @@ const ADMIN_PASSWORD = `Qc60-Admin-${RUN_ID.slice(0, 12)}`;
 
 const ORDER_QUANTITY = '7.25';
 
+/** Una linea de reparto que cabe en `ORDER_QUANTITY`: 1 envase de 1. */
+const PRESENTATION_CONTENT = '1';
+const ORDER_PACKAGES = '1';
+
 /** Posicion del pedido propio de A y del gemelo de B: la misma, a proposito (R11). */
 const SHARED_SEQUENCE = 1;
 /** La serie alta de B. Si la numeracion fuera global, el alta de A saldria detras de esta. */
@@ -83,7 +87,13 @@ const RECIPE_PICKER_OPTION = 'recipe-picker-option';
 const RECIPE_PICKER_VALUE = 'recipe-picker-value';
 const PRESENTATION_SELECT = 'presentation-select';
 const PRESENTATION_OPTION = 'presentation-option';
-const PRESENTATION_VALUE = 'presentation-value';
+const UNIT_SELECT = 'presentation-unit-select';
+const UNIT_OPTION = 'presentation-unit-option';
+const DISTRIBUTION_FIELD = 'order-distribution-field';
+const DISTRIBUTION_LINE = 'order-distribution-line';
+const DISTRIBUTION_ADD_PACKAGES = 'order-distribution-add-packages';
+const DISTRIBUTION_ADD = 'order-distribution-add';
+const DISTRIBUTION_AVAILABLE = 'order-distribution-available';
 const QUANTITY_FIELD = 'order-field-quantity';
 const FORM_SUBMIT = 'order-form-submit';
 
@@ -94,6 +104,7 @@ let companyAId: string | null = null;
 let companyBId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
+let unitId: string | null = null;
 let orderAId: string | null = null;
 let orderBId: string | null = null;
 let orderBHighId: string | null = null;
@@ -215,12 +226,18 @@ test.beforeAll(async () => {
   ).map((recipe) => recipe.id);
   if (orphanCompanyIds.length > 0) {
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({
+      where: { companyId: { in: orphanCompanyIds } },
+    });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
     await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.unit.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
+    await prisma.orderPresentationLine.deleteMany({
+      where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
@@ -274,12 +291,15 @@ test.beforeAll(async () => {
     data: { name: UNIT_NAME, nameNormalized: normalizeUnitName(UNIT_NAME), companyId: companyAId },
     select: { id: true },
   });
+  unitId = unit.id;
   presentationId = (
     await prisma.presentation.create({
       data: {
         name: PRESENTATION_NAME,
         nameNormalized: normalizePresentationName(PRESENTATION_NAME),
         unitId: unit.id,
+        // Sin contenido el selector del reparto no deja anadirla.
+        content: PRESENTATION_CONTENT,
         companyId: companyAId,
       },
       select: { id: true },
@@ -298,6 +318,7 @@ test.afterAll(async () => {
   const companyIds = [companyAId, companyBId].filter((id): id is string => id !== null);
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
     () => prisma.orderAssignment.deleteMany({ where: { companyId: { in: companyIds } } }),
+    () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
@@ -455,7 +476,12 @@ test.describe('aislamiento por empresa de pedidos', () => {
     await recipeOption.click();
     await expect(page.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(recipeId);
 
-    const presentationPicker = page.getByTestId(PRESENTATION_SELECT);
+    await page.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
+    await page.getByTestId(ORDER_FORM).getByTestId(UNIT_SELECT).click();
+    await page.locator(`[data-testid="${UNIT_OPTION}"][data-value="${unitId}"]`).click();
+
+    const distribution = page.getByTestId(DISTRIBUTION_FIELD);
+    const presentationPicker = distribution.getByTestId(PRESENTATION_SELECT);
     await presentationPicker.click();
     await presentationPicker.fill(PRESENTATION_NAME);
     const presentationOption = page
@@ -463,9 +489,17 @@ test.describe('aislamiento por empresa de pedidos', () => {
       .filter({ hasText: PRESENTATION_NAME });
     await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
     await presentationOption.click();
-    await expect(page.getByTestId(PRESENTATION_VALUE)).toHaveValue(presentationId ?? '');
+    await distribution.getByTestId(DISTRIBUTION_ADD_PACKAGES).fill(ORDER_PACKAGES);
+    await distribution.getByTestId(DISTRIBUTION_ADD).click();
+    await expect(
+      distribution.locator(`[data-testid="${DISTRIBUTION_LINE}"][data-presentation-id="${presentationId}"]`),
+    ).toHaveCount(1);
+    await expect(distribution.getByTestId(DISTRIBUTION_AVAILABLE)).toHaveAttribute(
+      'data-state',
+      'ready',
+      { timeout: 60_000 },
+    );
 
-    await page.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
     await page.getByTestId(FORM_SUBMIT).click();
     await expect(page.getByTestId(ORDER_FORM)).toHaveCount(0, { timeout: 60_000 });
 

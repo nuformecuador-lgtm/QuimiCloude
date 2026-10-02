@@ -9,10 +9,13 @@ import { deriveUnitCost } from './unit-cost';
 
 import type { NewProductBatch } from './product-batch';
 import type { NewProduct } from './product-view';
+import type { StockIncreaseListener } from './stock-increase-listener';
 import type { ProductRepository } from '../ports/product-repository';
 
 export type CreateProductDeps = {
   readonly products: ProductRepository;
+  /** Recibe el aviso despues de escribir el lote. Sin el, el alta no avisa a nadie. */
+  readonly stockIncreases?: StockIncreaseListener;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };
@@ -131,6 +134,7 @@ export function createCreateProduct(
       if (agregado === 'finished_product') throw new ActionNotAllowedError();
       if (agregado === null) throw new ProductNotFoundError(existente.id);
 
+      await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
       return { id: existente.id, lot: agregado.lot };
     }
 
@@ -143,6 +147,7 @@ export function createCreateProduct(
         : { name: entrada.name, qtyAlert: entrada.qtyAlert, type: entrada.type };
 
     const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);
+    await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
     return { id: creado.id, lot: creado.lot };
   };
 }

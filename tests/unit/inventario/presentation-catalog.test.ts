@@ -19,9 +19,9 @@ const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { presentation: { findMany } } }));
 
 describe('toPresentationRef', () => {
-  it('mapea id y name tal cual, y el contenido nulo como null', () => {
-    const ref = toPresentationRef({ id: 'pr-1', name: 'Bidon 20L', content: null });
-    expect(ref).toEqual({ id: 'pr-1', name: 'Bidon 20L', content: null });
+  it('mapea id, name y unitId tal cual, y el contenido nulo como null', () => {
+    const ref = toPresentationRef({ id: 'pr-1', name: 'Bidon 20L', content: null, unitId: 'u-1' });
+    expect(ref).toEqual({ id: 'pr-1', name: 'Bidon 20L', content: null, unitId: 'u-1' });
   });
 
   // Ampliacion nombrada del contrato -`PresentationRef` gana `content`-,
@@ -31,13 +31,21 @@ describe('toPresentationRef', () => {
       id: 'pr-1',
       name: 'Bidon 20L',
       content: new Prisma.Decimal('1'),
+      unitId: 'u-1',
     });
     expect(ref.content).toBe('1.0000');
   });
 
+  // `PresentationRef` gana `unitId`, la unidad en la que se declara el contenido -
+  // `pedidos` la necesita para convertir el reparto a la unidad del pedido.
+  it('R6: mapea `unitId` tal cual, sin resolver la unidad', () => {
+    const ref = toPresentationRef({ id: 'pr-1', name: 'Bidon 20L', content: null, unitId: 'unidad-1' });
+    expect(ref.unitId).toBe('unidad-1');
+  });
+
   it('la referencia publica no lleva ningun otro campo', () => {
-    const ref = toPresentationRef({ id: 'pr-1', name: 'Bidon 20L', content: null });
-    expect(Object.keys(ref).sort()).toEqual(['content', 'id', 'name']);
+    const ref = toPresentationRef({ id: 'pr-1', name: 'Bidon 20L', content: null, unitId: 'u-1' });
+    expect(Object.keys(ref).sort()).toEqual(['content', 'id', 'name', 'unitId']);
   });
 });
 
@@ -62,11 +70,11 @@ describe('R28 — findRefs compone el ambito con presentationCompanyScope y con 
     expect(args.where).toEqual({
       AND: [presentationCompanyScope({ companyId: 'empresa-1' }), { id: { in: ['pr-1', 'pr-2'] } }],
     })
-    expect(args.select).toEqual({ id: true, name: true, content: true })
+    expect(args.select).toEqual({ id: true, name: true, content: true, unitId: true })
   })
 
   it('una presentacion de OTRA empresa se resuelve igual que una inexistente: no vuelve', async () => {
-    findMany.mockResolvedValue([{ id: 'pr-propia', name: 'Bidon 20L', content: null }])
+    findMany.mockResolvedValue([{ id: 'pr-propia', name: 'Bidon 20L', content: null, unitId: 'u-1' }])
 
     const refs = await findPresentationRefs(['pr-propia', 'pr-de-otra-empresa'], 'empresa-1')
 

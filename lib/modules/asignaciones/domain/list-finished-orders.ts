@@ -54,7 +54,9 @@ export function createListFinishedOrders(
         numberText: formatOrderNumber(row.number),
         recipeName: rowComposed?.recipeName ?? null,
         quantity: row.quantity,
-        presentationName: rowComposed?.presentationName ?? null,
+        presentationLines: rowComposed?.presentationLines ?? [],
+        unitId: row.unitId,
+        unitLabel: rowComposed?.unitLabel ?? null,
         finishedAt: row.finishedAt,
         responsibles: rowComposed?.responsibles ?? [],
       };

@@ -169,8 +169,8 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         });
       }
 
-      const reserved = plan.kind === 'reserved' && plan.allocations.length > 0;
-      return { kind: reserved ? 'reserved' : 'not_reserved' };
+      if (plan.kind === 'insufficient') return { kind: 'insufficient', productIds: plan.productIds };
+      return { kind: plan.allocations.length > 0 ? 'reserved' : 'not_reserved' };
     },
 
     async releaseForOrder(input): Promise<void> {

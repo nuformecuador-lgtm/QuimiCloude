@@ -4,7 +4,7 @@
 // explicitamente: la base sigue aceptando cualquier estado en lugar de cualquier otro. Este
 // archivo es el test que R23 exige a cambio.
 //
-// Se cubre la matriz COMPLETA 4x4 -los 16 pares-, no solo los permitidos: un test que solo
+// Se cubre la matriz COMPLETA 7x7 -los 49 pares-, no solo los permitidos: un test que solo
 // afirma lo que pasa deja pasar una tabla demasiado permisiva. La matriz esperada se escribe
 // aqui a mano, EN OTRO FORMATO que el de `ALLOWED` (una lista de pares, no un mapa de listas),
 // para que no sea la misma estructura copiada: si alguien edita `ALLOWED`, tiene que editar
@@ -20,18 +20,22 @@ import {
   isAllowedTransition,
 } from '@/lib/modules/pedidos/domain/order-transitions'
 
-/** Los UNICOS pares permitidos (`design.md > 2`): las cuatro transiciones hacia delante y el
- *  «quedarse igual» de los dos estados editables desde Pedidos. Nada mas. */
+/** Los UNICOS pares permitidos (`design.md > 4` y `> 10`): las cuatro transiciones hacia delante,
+ *  el «quedarse igual» de los tres estados editables desde Pedidos y el vaiven
+ *  `PENDIENTE <-> BLOQUEADO`. Nada mas. */
 const PERMITIDOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = [
   ['PENDIENTE', 'PENDIENTE'],
   ['PENDIENTE', 'EN_CURSO'],
+  ['PENDIENTE', 'BLOQUEADO'],
   ['EN_CURSO', 'EN_CURSO'],
   ['EN_CURSO', 'POR_EMPACAR'],
   ['POR_EMPACAR', 'EN_EMPAQUE'],
   ['EN_EMPAQUE', 'ENTREGADO'],
+  ['BLOQUEADO', 'BLOQUEADO'],
+  ['BLOQUEADO', 'PENDIENTE'],
 ]
 
-/** Los 36 pares de la matriz, en el orden de declaracion del conjunto cerrado. */
+/** Los 49 pares de la matriz, en el orden de declaracion del conjunto cerrado. */
 const TODOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = ORDER_STATUS_VALUES.flatMap(
   (from) => ORDER_STATUS_VALUES.map((to) => [from, to] as const),
 )
@@ -41,17 +45,18 @@ function esperado(from: OrderStatus, to: OrderStatus): boolean {
 }
 
 describe('pedidos — transiciones de estado', () => {
-  it('la matriz es de 6x6 y hay exactamente 6 pares permitidos', () => {
-    // Si alguien anadiera un septimo estado sin revisar esta tabla, el 36 dejaria de cuadrar.
-    expect(ORDER_STATUS_VALUES).toHaveLength(6)
-    expect(TODOS).toHaveLength(36)
+  it('R35: la matriz es de 7x7 y hay exactamente 9 pares permitidos', () => {
+    // Si alguien anadiera un octavo estado sin revisar esta tabla, el 49 dejaria de cuadrar.
+    expect(ORDER_STATUS_VALUES).toHaveLength(7)
+    expect(TODOS).toHaveLength(49)
     expect(TODOS.filter(([from, to]) => esperado(from, to))).toHaveLength(PERMITIDOS.length)
-    expect(PERMITIDOS).toHaveLength(6)
+    expect(PERMITIDOS).toHaveLength(9)
   })
 
-  it.each(TODOS)('%s -> %s se decide como manda la matriz de design.md > 2', (from, to) => {
-    // R1, R2: las cuatro permitidas, el «quedarse igual» de PENDIENTE y EN_CURSO, y TODO lo
-    // demas rechazado -incluido cualquier retroceso-.
+  it.each(TODOS)('%s -> %s se decide como manda la matriz de design.md > 4 y > 10', (from, to) => {
+    // R1, R2, R28: las cuatro permitidas, el «quedarse igual» de PENDIENTE, EN_CURSO y
+    // BLOQUEADO, el vaiven con BLOQUEADO, y TODO lo demas rechazado -incluido cualquier
+    // retroceso y cualquier salto hacia los estados de empaque-.
     expect(isAllowedTransition(from, to)).toBe(esperado(from, to))
 
     if (esperado(from, to)) {
@@ -75,6 +80,56 @@ describe('pedidos — transiciones de estado', () => {
     expect(isAllowedTransition('CANCELADO', 'PENDIENTE')).toBe(false)
     expect(isAllowedTransition('CANCELADO', 'EN_CURSO')).toBe(false)
     expect(isAllowedTransition('CANCELADO', 'ENTREGADO')).toBe(false)
+  })
+
+  it('R28: BLOQUEADO no conecta con EN_CURSO, ENTREGADO ni los estados de empaque, por ninguna via', () => {
+    // Un pedido sin material no se arranca ni se entrega, y un `EN_CURSO` no puede quedarse sin
+    // material: arrancar implicaba que habia con que producirlo. Un bloqueado tampoco puede
+    // empacar -no aparta nada- ni puede alcanzarse desde uno que ya empezo. Los pares van
+    // escritos uno a uno y no como un producto cartesiano: entre `EN_CURSO`, `POR_EMPACAR` y
+    // `EN_EMPAQUE` SI hay transiciones legales, y un `for` las declararia prohibidas.
+    const prohibidos: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = [
+      ['BLOQUEADO', 'EN_CURSO'],
+      ['BLOQUEADO', 'ENTREGADO'],
+      ['BLOQUEADO', 'POR_EMPACAR'],
+      ['BLOQUEADO', 'EN_EMPAQUE'],
+      ['EN_CURSO', 'BLOQUEADO'],
+      ['POR_EMPACAR', 'BLOQUEADO'],
+      ['EN_EMPAQUE', 'BLOQUEADO'],
+    ]
+
+    for (const [origen, destino] of prohibidos) {
+      expect(esperado(origen, destino), `la tabla de arriba declara ${origen} -> ${destino}`).toBe(
+        false,
+      )
+      expect(isAllowedTransition(origen, destino), `${origen} -> ${destino}`).toBe(false)
+      expect(() => assertTransition(origen, destino)).toThrow(InvalidTransitionError)
+    }
+  })
+
+  it('R28: de un pedido en empaque no se vuelve a BLOQUEADO, ni aunque baje el inventario', () => {
+    for (const estado of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      expect(isAllowedTransition(estado, 'BLOQUEADO'), `${estado} -> BLOQUEADO`).toBe(false)
+    }
+    for (const final of ['ENTREGADO', 'CANCELADO'] as const) {
+      expect(isAllowedTransition(final, 'BLOQUEADO'), `${final} -> BLOQUEADO`).toBe(false)
+    }
+  })
+
+  it('R10: BLOQUEADO vuelve a PENDIENTE y se queda bloqueado si sigue sin alcanzar', () => {
+    // El ciclo es de ida y vuelta y por eso admite «quedarse igual»: se bloquea al crearlo o al
+    // editarlo, y se desbloquea al editarlo con material o al entrar lotes, sin que eso sea un
+    // paso del flujo de trabajo.
+    expect(isAllowedTransition('BLOQUEADO', 'PENDIENTE')).toBe(true)
+    expect(isAllowedTransition('BLOQUEADO', 'BLOQUEADO')).toBe(true)
+    expect(isAllowedTransition('PENDIENTE', 'BLOQUEADO')).toBe(true)
+    for (const par of [
+      ['BLOQUEADO', 'PENDIENTE'],
+      ['BLOQUEADO', 'BLOQUEADO'],
+      ['PENDIENTE', 'BLOQUEADO'],
+    ] as const) {
+      expect(() => assertTransition(par[0], par[1])).not.toThrow()
+    }
   })
 
   it('POR_EMPACAR y EN_EMPAQUE no admiten «quedarse igual»: no son editables desde Pedidos (R32)', () => {

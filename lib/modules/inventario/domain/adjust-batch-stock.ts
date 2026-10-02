@@ -5,10 +5,13 @@ import { compareQuantities } from './decimal-quantity';
 import { ActionNotAllowedError, BatchNotFoundError, ValidationError } from './errors';
 import { MOVEMENT_REASONS } from './movement-reason';
 
+import type { StockIncreaseListener } from './stock-increase-listener';
 import type { ProductRepository } from '../ports/product-repository';
 
 export type AdjustBatchStockDeps = {
   readonly products: ProductRepository;
+  /** Recibe el aviso despues de un ajuste positivo; el negativo no avisa. */
+  readonly stockIncreases?: StockIncreaseListener;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };
@@ -64,13 +67,15 @@ export function createAdjustBatchStock(
     if (!parsed.success) throw new ValidationError();
     const entrada = parsed.data;
 
+    const instante = now();
+
     // La empresa sale del actor y nunca de la entrada, para que nadie pueda ajustar en otra.
     const resultado = await deps.products.adjustBatchStock(
       entrada.batchId,
       entrada.delta,
       entrada.reason,
       actor.id,
-      now(),
+      instante,
       { companyId: actor.companyId },
     );
 
@@ -78,6 +83,10 @@ export function createAdjustBatchStock(
     // un oraculo de existencia sobre los lotes de las demas empresas.
     if (resultado === null) throw new BatchNotFoundError();
     if (resultado === 'increase_not_allowed') throw new ActionNotAllowedError();
+
+    if (compareQuantities(entrada.delta, '0') > 0) {
+      await deps.stockIncreases?.onStockIncreased({ companyId: actor.companyId, now: instante });
+    }
 
     return resultado;
   };

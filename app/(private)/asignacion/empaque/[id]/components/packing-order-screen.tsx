@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
-import type { PackingOrderRow } from '@/lib/modules/asignaciones';
+import type { OrderDistributionLineView, PackingOrderRow } from '@/lib/modules/asignaciones';
 import {
   finishPackingAction,
   startPackingAction,
@@ -16,6 +15,7 @@ import {
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
+import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 /**
  * La pantalla de un pedido de empaque. Sin control de edicion: los datos del pedido se leen tal
@@ -34,7 +34,10 @@ import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 export const PACKING_ORDER_SCREEN_TESTID = 'packing-order-screen';
 export const PACKING_ORDER_NUMBER_TESTID = 'packing-order-number';
 export const PACKING_ORDER_RECIPE_TESTID = 'packing-order-recipe';
+export const PACKING_ORDER_QUANTITY_TESTID = 'packing-order-quantity';
 export const PACKING_ORDER_PRESENTATION_TESTID = 'packing-order-presentation';
+export const PACKING_ORDER_PRESENTATION_LINE_TESTID = 'packing-order-presentation-line';
+export const PACKING_ORDER_MISSING_DISTRIBUTION_TESTID = 'packing-order-missing-distribution';
 export const PACKING_ORDER_PACKAGES_TESTID = 'packing-order-packages';
 export const PACKING_ORDER_STATUS_TESTID = 'packing-order-status';
 export const PACKING_ORDER_PACKER_TESTID = 'packing-order-packer';
@@ -50,6 +53,10 @@ export const PACKING_ORDER_ID_FIELD = 'orderId';
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
 const MISSING_VALUE_MARK = '—';
+const QUANTITY_LABEL = 'Cantidad:';
+const DISTRIBUTION_LABEL = 'Reparto';
+const EMPTY_DISTRIBUTION_TEXT = 'Sin presentación';
+const MISSING_DISTRIBUTION_TEXT = 'Falta el reparto: lo define quien edita pedidos';
 const START_LABEL = 'Comenzar';
 const START_PENDING_LABEL = 'Comenzando…';
 const FINISH_LABEL = 'Terminar';
@@ -58,6 +65,10 @@ const BACK_LABEL = 'Volver a «Por empacar»';
 /** `?vista=por_empacar` es el mismo nombre de parametro que `assignment-view-params.ts`. */
 const BACK_HREF = `${ASSIGNED_ORDERS_ROUTE}?vista=por_empacar`;
 const PACKER_UNKNOWN_TEXT = 'Lo esta empacando otra persona.';
+
+function distributionLineText(line: OrderDistributionLineView): string {
+  return `${line.packages} × ${line.presentationName ?? MISSING_VALUE_MARK}`;
+}
 
 function packerLabel(order: PackingOrderRow): string {
   return order.packedByName === null ? PACKER_UNKNOWN_TEXT : `Lo esta empacando ${order.packedByName}.`;
@@ -97,6 +108,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
   const canStart = order.status === 'POR_EMPACAR';
   const canFinish = order.status === 'EN_EMPAQUE' && order.packedById === actorId;
   const showsOtherPacker = order.status === 'EN_EMPAQUE' && order.packedById !== actorId;
+  const lacksDistribution = order.status === 'POR_EMPACAR' && order.presentationLines.length === 0;
 
   return (
     <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6" data-testid={PACKING_ORDER_SCREEN_TESTID}>
@@ -108,9 +120,48 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
         {order.recipeName ?? RECIPE_MISSING_TEXT}
       </p>
 
-      <p className="text-base text-muted-foreground" data-testid={PACKING_ORDER_PRESENTATION_TESTID}>
-        Presentación: <OrderPresentationLabel name={order.presentationName} />
+      <p
+        className="text-base font-medium"
+        data-testid={PACKING_ORDER_QUANTITY_TESTID}
+        title={exactDecimalTitle(order.quantity)}
+      >
+        {QUANTITY_LABEL} {formatDecimalDisplay(order.quantity)}
+        {order.unitLabel === null ? null : ` ${order.unitLabel}`}
       </p>
+
+      <section
+        aria-labelledby="packing-order-distribution-heading"
+        className="flex flex-col gap-2"
+        data-testid={PACKING_ORDER_PRESENTATION_TESTID}
+      >
+        <h2 id="packing-order-distribution-heading" className="text-base font-medium">
+          {DISTRIBUTION_LABEL}
+        </h2>
+        {order.presentationLines.length === 0 ? (
+          <p className="text-base text-muted-foreground">{EMPTY_DISTRIBUTION_TEXT}</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {order.presentationLines.map((line) => (
+              <li
+                key={line.presentationId}
+                className="text-base"
+                data-testid={PACKING_ORDER_PRESENTATION_LINE_TESTID}
+              >
+                {distributionLineText(line)}
+              </li>
+            ))}
+          </ul>
+        )}
+        {lacksDistribution ? (
+          <p
+            role="status"
+            className="rounded-lg border bg-muted p-3 text-base"
+            data-testid={PACKING_ORDER_MISSING_DISTRIBUTION_TESTID}
+          >
+            {MISSING_DISTRIBUTION_TEXT}
+          </p>
+        ) : null}
+      </section>
 
       <p className="text-base" data-testid={PACKING_ORDER_PACKAGES_TESTID}>
         Envases: {order.packages ?? MISSING_VALUE_MARK}

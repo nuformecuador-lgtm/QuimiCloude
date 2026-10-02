@@ -62,7 +62,9 @@ El porque completo y el incidente: `AGENTS.md > Modelos`. La guardia que lo hace
    apuntando a `specs/<feature>/`, y pide aprobacion humana. DETENTE.
 5. Con "aprobado" (o con la tarjeta movida a *En curso*, que es la forma canonica):
    cambia a `in_progress`, delega en `implementer`, luego en `reviewer`.
-6. Si el reviewer marca hallazgos bloqueantes, vuelve a delegar en el implementer.
+6. Si el reviewer marca hallazgos bloqueantes, vuelve a delegar en el implementer. La vuelta
+   siguiente del reviewer va acotada: pasale el rango `<HEAD de su review>..HEAD` y la lista
+   de hallazgos; amplia solo por una excepcion de `AGENTS.md > F2.2`, y di cual.
 7. Sincroniza con `dev` (`git fetch; git merge origin/dev`), resuelve conflictos
    triviales, pregunta al humano si no sabe que version conservar.
 8. Crea PR hacia `dev` con `gh pr create --base dev`. Reporta la URL al humano.

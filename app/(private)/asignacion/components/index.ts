@@ -10,6 +10,7 @@ export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
+  assignedOrderBlockedNoticeText,
   assignedOrderEnterNoticeText,
 } from './assigned-order-enter-trigger';
 export {

@@ -11,6 +11,7 @@ import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { PresentationCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const COMPANY = '33333333-3333-4333-8333-333333333333'
 const ADMIN: Actor = { id: 'admin-1', companyId: COMPANY, permissions: ['pedidos.consultar'] }
@@ -50,8 +51,8 @@ function fila(recipeId: string): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
+    unitId: null,
   }
 }
 
@@ -65,6 +66,7 @@ function dobles(row: OrderRow | null, refs: readonly RecipeRef[] = [REF_ORIGINAL
     orders: { findAliveById: vi.fn(async () => row) } as unknown as OrderRepository,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     presentations: { findRefs } as unknown as PresentationCatalog,
+    units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
     findRefsIncludingDeleted,
   }
 }

@@ -5,7 +5,12 @@ import {
   createGetAssignedOrderExecution,
   type GetAssignedOrderExecutionDeps,
 } from '@/lib/modules/asignaciones/domain/get-assigned-order-execution';
-import { AsignacionesError, OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
+import {
+  AsignacionesError,
+  OrderBlockedError,
+  OrderNotFoundError,
+  UnauthorizedError,
+} from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/domain/assigned-order-execution-view';
@@ -38,7 +43,8 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '200',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: null,
     packedBy: null,
     ...overrides,
@@ -67,7 +73,7 @@ function unidad(overrides?: Partial<UnitRef>): UnitRef {
 const PRESENTACION = uuid('b');
 
 function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
-  return { id: PRESENTACION, name: 'Bidon 20L', content: null, ...overrides };
+  return { id: PRESENTACION, name: 'Bidon 20L', content: null, unitId: LITRO, ...overrides };
 }
 
 type Dobles = {
@@ -85,7 +91,7 @@ type Dobles = {
 
 function montar(options?: {
   readonly ids?: readonly string[];
-  readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' } | null;
+  readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' } | null;
   readonly summary?: AssignedOrderSummary;
   readonly content?: RecipeExecutionContent | null;
   readonly products?: readonly ProductRef[];
@@ -239,6 +245,22 @@ describe('getAssignedOrderExecution — R7: la empresa', () => {
   });
 });
 
+describe('QC-138 — getAssignedOrderExecution: un BLOQUEADO no se abre', () => {
+  it('R32 — abrir la ejecucion de un BLOQUEADO, tambien por la URL directa, rechaza con `order_blocked`', async () => {
+    const { deps, listAliveSummariesByIds, findExecutionContentById } = montar({
+      order: { id: PEDIDO, status: 'BLOQUEADO' },
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const error = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(OrderBlockedError);
+    expect((error as OrderBlockedError).code).toBe('order_blocked');
+    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(findExecutionContentById).not.toHaveBeenCalled();
+  });
+});
+
 describe('getAssignedOrderExecution — la vista', () => {
   it('compone `recipeName`, `orderQuantity` y `numberText` desde el resumen y el contenido', async () => {
     const { deps } = montar();
@@ -308,7 +330,9 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
         'orderQuantity',
         'steps',
         'lines',
-        'presentationName',
+        'presentationLines',
+        'unitId',
+        'unitLabel',
       ].sort(),
     );
     for (const line of view.lines) {
@@ -322,7 +346,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
 describe('getAssignedOrderExecution — la presentacion del pedido asignado', () => {
   it('R25: la vista lleva el nombre de la presentacion cuando el pedido tiene una', async () => {
     const { deps, findRefsPresentations } = montar({
-      summary: resumen({ presentationId: PRESENTACION }),
+      summary: resumen({ presentationLines: [{ presentationId: PRESENTACION, packages: 1 }] }),
       presentations: [presentacion()],
     });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
@@ -330,17 +354,81 @@ describe('getAssignedOrderExecution — la presentacion del pedido asignado', ()
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(findRefsPresentations).toHaveBeenCalledWith([PRESENTACION], EMPRESA);
-    expect(view.presentationName).toBe('Bidon 20L');
+    expect(view.presentationLines[0]?.presentationName).toBe('Bidon 20L');
   });
 
   it('R25: un pedido sin presentacion devuelve `presentationName: null`, sin consultar el catalogo', async () => {
-    const { deps, findRefsPresentations } = montar({ summary: resumen({ presentationId: null }) });
+    const { deps, findRefsPresentations } = montar({ summary: resumen({ presentationLines: [] }) });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
 
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(findRefsPresentations).not.toHaveBeenCalled();
-    expect(view.presentationName).toBeNull();
+    expect(view.presentationLines).toEqual([]);
+  });
+});
+
+describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad del pedido', () => {
+  const SEGUNDA_PRESENTACION = uuid('9');
+
+  it('R26: la vista lleva TODAS las lineas del reparto en orden de alta, con nombre y envases, en una sola llamada', async () => {
+    const { deps, findRefsPresentations } = montar({
+      summary: resumen({
+        presentationLines: [
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5 },
+          { presentationId: PRESENTACION, packages: 1 },
+        ],
+      }),
+      presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefsPresentations).toHaveBeenCalledTimes(1);
+    expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
+    expect(view.presentationLines).toEqual([
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5 },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1 },
+    ]);
+  });
+
+  it('R27: sin reparto, `presentationLines` es `[]` y la vista sale igual, sin error', async () => {
+    const { deps } = montar({ summary: resumen({ presentationLines: [] }) });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view.presentationLines).toEqual([]);
+    expect(view.orderId).toBe(PEDIDO);
+  });
+
+  it('R26: la cantidad del pedido viaja con la etiqueta de su unidad (simbolo, o nombre si no lo tiene)', async () => {
+    const GARRAFA = uuid('8');
+    const conSimbolo = montar({ summary: resumen({ unitId: LITRO }), ownUnits: [unidad()] });
+    const vistaConSimbolo = await createGetAssignedOrderExecution(conSimbolo.deps)(ACTOR, { orderId: PEDIDO });
+    expect(conSimbolo.findRefs).toHaveBeenCalledWith([LITRO], EMPRESA);
+    expect(vistaConSimbolo.unitId).toBe(LITRO);
+    expect(vistaConSimbolo.unitLabel).toBe('L');
+
+    const sinSimbolo = montar({
+      summary: resumen({ unitId: GARRAFA }),
+      ownUnits: [unidad(), unidad({ id: GARRAFA, name: 'Garrafa', symbol: null })],
+    });
+    const vistaSinSimbolo = await createGetAssignedOrderExecution(sinSimbolo.deps)(ACTOR, { orderId: PEDIDO });
+    expect(vistaSinSimbolo.unitId).toBe(GARRAFA);
+    expect(vistaSinSimbolo.unitLabel).toBe('Garrafa');
+  });
+
+  it('R42: un pedido sin unidad sale con `unitId` y `unitLabel` a null', async () => {
+    const { deps, findRefs } = montar({ summary: resumen({ unitId: null }), products: [] });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefs).not.toHaveBeenCalled();
+    expect(view.unitId).toBeNull();
+    expect(view.unitLabel).toBeNull();
   });
 });
 

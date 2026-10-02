@@ -2,7 +2,8 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, ValidationError } from './errors';
+import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
+import { toDistributionLines, unitLabelOf } from './order-distribution-view';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -50,6 +51,7 @@ export function createGetAssignedOrderExecution(
 
     const target = await deps.orders.findAliveById(orderId, actor.companyId);
     if (target === null) throw new OrderNotFoundError();
+    if (target.status === 'BLOQUEADO') throw new OrderBlockedError();
     if (target.status !== 'PENDIENTE' && target.status !== 'EN_CURSO') {
       throw new OrderNotFoundError();
     }
@@ -116,11 +118,18 @@ export function createGetAssignedOrderExecution(
       };
     });
 
+    const presentationIds = [...new Set(summary.presentationLines.map((line) => line.presentationId))];
     const presentations =
-      summary.presentationId === null
+      presentationIds.length === 0
         ? []
-        : await deps.presentations.findRefs([summary.presentationId], actor.companyId);
-    const presentationName = presentations[0]?.name ?? null;
+        : await deps.presentations.findRefs(presentationIds, actor.companyId);
+    const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
+
+    const orderUnitId = summary.unitId;
+    const orderUnit =
+      orderUnitId === null
+        ? undefined
+        : (await deps.units.findRefs([orderUnitId], actor.companyId)).find((unit) => unit.id === orderUnitId);
 
     return {
       orderId: summary.id,
@@ -130,7 +139,9 @@ export function createGetAssignedOrderExecution(
       orderQuantity: summary.quantity,
       steps,
       lines: executionLines,
-      presentationName,
+      presentationLines: toDistributionLines(summary.presentationLines, presentationNames),
+      unitId: summary.unitId,
+      unitLabel: orderUnit === undefined ? null : unitLabelOf(orderUnit),
     };
   };
 }

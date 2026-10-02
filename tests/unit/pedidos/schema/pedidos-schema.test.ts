@@ -13,10 +13,12 @@
 // (decision cerrada 5, R10), SIN impuestos ni descuentos (decision cerrada 23, R11), SIN cliente
 // ni destinatario (decision cerrada 8, R3), SIN fecha de solicitud aparte de `createdAt`
 // (decision cerrada 10, R4), SIN el numero visible ya formateado (R24), SIN ninguna entidad de
-// linea o item (decision cerrada 1, R2), las cuatro referencias SIN `@relation` (decision cerrada
-// 17, R33) y SIN campos de vuelta `orders Order[]` en `Recipe`, `Unit` ni `User` (R5, R33). Una
-// columna que NO esta no salta a la vista: el test existe para que nadie las «arregle» sin darse
-// cuenta.
+// linea o item GENERICO de receta (decision cerrada 1, R2 -la decision [Q4] de
+// `specs/QC-170-pedido-en-varias-presentaciones/design.md` deroga esa ausencia solo para el
+// reparto por presentacion: `OrderPresentationLine` existe y es la unica coleccion de `Order`-),
+// las cuatro referencias SIN `@relation` (decision cerrada 17, R33) y SIN campos de vuelta
+// `orders Order[]` en `Recipe`, `Unit` ni `User` (R5, R33). Una columna que NO esta no salta a la
+// vista: el test existe para que nadie las «arregle» sin darse cuenta.
 //
 // Cubre R1, R2, R3, R4, R5, R6, R8, R10, R11, R12, R14, R16, R17, R18, R20, R24, R25, R26, R27,
 // R28, R31, R33 y R36.
@@ -127,14 +129,17 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los VEINTE campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
- *  quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id` y
- *  `unit_price` de la tabla
+/** Los DIECINUEVE campos escalares de `Order`, con la columna en ingles que le toca. Fueron
+ *  catorce y quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id`
+ *  y `unit_price` de la tabla
  *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
  *  se anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las
  *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete, `finishedAt` a
- *  dieciocho, `presentationContent` a diecinueve y `packedBy` a veinte. La lista sigue siendo
- *  cerrada: anadir o quitar cualquier otra columna pone este test rojo. */
+ *  dieciocho, `presentationContent` a diecinueve y `packedBy` a veinte. `unitId` vuelve a la
+ *  tabla y las lleva a veintiuno: la decision [Q4] deroga la salida del 2026-09-07 (`design.md`
+ *  seccion 0.6). El reparto por presentacion retira `presentationId` y `presentationContent`
+ *  (pasan a `OrderPresentationLine`) y quedan diecinueve. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
+ *  test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -152,10 +157,9 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
   ['ingredientsCost', 'ingredients_cost'],
   ['reservedAt', 'reserved_at'],
-  ['presentationId', 'presentation_id'], // el envase en que se entrega, opcional
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
-  ['presentationContent', 'presentation_content'], // copia del contenido de la presentacion, opcional
   ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
+  ['unitId', 'unit_id'], // la unidad en que se expresa quantity, opcional [Q4]
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -194,9 +198,12 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toContain('@@map("orders")')
   })
 
-  it('no existe ningun modelo de linea o item de pedido, y Order no tiene coleccion de lineas', () => {
-    // R2 y decision cerrada 1: el pedido es UNA sola fila. Sin cabecera, sin items, y sin poder
-    // apuntar a mas de una receta.
+  it('no existe ningun modelo de linea o item GENERICO de pedido; Order solo tiene la coleccion del reparto por presentacion', () => {
+    // R2 y decision cerrada 1 siguen vigentes para la receta: el pedido apunta a UNA sola receta,
+    // sin cabecera ni items de receta. La decision [Q4] (`design.md` seccion 0.6) deroga la
+    // prohibicion de coleccion para el REPARTO: `OrderPresentationLine` es la unica lista que
+    // `Order` puede tener, y es de `pedidos` (una linea por presentacion elegida, no un item de
+    // receta).
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -205,9 +212,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
     expect(schema).not.toMatch(/@@map\("(order_lines|order_items|order_details|orders_lines)"\)/)
 
-    // Ninguna lista en `Order`: ni de lineas, ni de recetas, ni de nada.
-    expect(order.fields.filter((candidate) => candidate.isList)).toEqual([])
-    // Y la receta es UNA: un escalar, no una coleccion.
+    // La UNICA lista de `Order` es el reparto por presentacion, y apunta a `OrderPresentationLine`.
+    const listas = order.fields.filter((candidate) => candidate.isList)
+    expect(listas.map((candidate) => candidate.name)).toEqual(['presentationLines'])
+    expect(listas[0]?.type).toBe('OrderPresentationLine')
+    // Y la receta sigue siendo UNA: un escalar, no una coleccion.
     expect(field(order, 'recipeId').isList).toBe(false)
     expect(field(order, 'recipeId').type).toBe('String')
     for (const forbidden of ['recipeIds', 'recipes', 'lines', 'items']) {
@@ -301,11 +310,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Los TRES unicos decimales del modelo: la cantidad, el importe de ingredientes y la copia
-    // del contenido de la presentacion.
+    // Los DOS unicos decimales del modelo: la cantidad y el importe de ingredientes. La copia del
+    // contenido de la presentacion vive en la linea de reparto.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['ingredientsCost', 'presentationContent', 'quantity'])
+    ).toEqual(['ingredientsCost', 'quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -337,14 +346,21 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
   })
 
-  it('la unidad YA NO EXISTE en el modelo, ni como referencia ni como texto (2026-09-07)', () => {
-    // Decision humana: `unit_id` salio de `orders`, y con ella la FK `orders_unit_id_fkey`, su
-    // indice y la frontera de este modulo con `unidades`. En NEGATIVO a proposito: si alguien
-    // devuelve la columna -o la cuela como texto libre-, este caso lo dice.
-    expect(has(order, 'unitId')).toBe(false)
+  it('la unidad VUELVE al modelo como uuid anulable, sin @relation y con su indice [Q4]', () => {
+    // La decision humana del 2026-09-07 sacaba `unit_id` de `orders` (y con ella la FK
+    // `orders_unit_id_fkey`, su indice y la frontera con `unidades`); la decision [Q4]
+    // (`design.md` seccion 0.6) la deroga: `quantity` necesita su unidad para que la ejecucion y
+    // el reparto sepan en que se expresa. Vuelve como escalar drift -sin `@relation`, `Unit` sigue
+    // siendo de `unidades`- y opcional: NULL en los pedidos anteriores a la columna.
+    const unitId = field(order, 'unitId')
+    expect(unitId.type).toBe('String')
+    expect(unitId.isOptional).toBe(true)
+    expect(unitId.attributes).toContain('@db.Uuid')
+    expect(unitId.attributes).toContain('@map("unit_id")')
+    expect(unitId.attributes).not.toMatch(/@default\(/)
+    expect(unitId.attributes).not.toMatch(/@relation/)
     expect(has(order, 'unit')).toBe(false)
-    expect(order.body).not.toContain('unit_id')
-    expect(order.body).not.toMatch(/@@index\(\[unitId\]/)
+    expect(order.body).toMatch(/@@index\(\[unitId\],\s*map:\s*"orders_unit_id_idx"\)/)
   })
 
   it('recipeId es uuid OBLIGATORIO y sin @relation', () => {
@@ -361,7 +377,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toMatch(/@@index\(\[recipeId\],\s*map:\s*"orders_recipe_id_idx"\)/)
   })
 
-  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
+  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
     // R16 y decision cerrada 4: dos conjuntos CERRADOS del propio esquema, con esos valores
     // exactos. EL ORDEN DE DECLARACION DE LA PRIORIDAD ES SU ORDEN, de menor a mayor: Postgres
     // ordena un enum por declaracion, no alfabeticamente, asi que reordenar cambia el dato.
@@ -376,6 +392,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'CANCELADO',
       'POR_EMPACAR',
       'EN_EMPAQUE',
+      'BLOQUEADO',
     ])
     expect(parseEnum('OrderPriority')).toEqual(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'])
 
@@ -580,12 +597,13 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
     expect(owners.get('Order')).toBe('pedidos')
 
-    // `pedidos` es dueno de UN solo modelo: esta feature no adopta ninguno ajeno.
+    // `pedidos` gana un segundo modelo con [Q4]: `OrderPresentationLine`, el reparto por
+    // presentacion. Ninguno de los dos es ajeno; ambos declaran su `/// @module pedidos`.
     const pedidosModels = [...owners.entries()]
       .filter(([, moduleName]) => moduleName === 'pedidos')
       .map(([modelName]) => modelName)
       .sort()
-    expect(pedidosModels).toEqual(['Order'])
+    expect(pedidosModels).toEqual(['Order', 'OrderPresentationLine'])
     expect(owners.get('Recipe')).toBe('recetas')
     expect(owners.get('Unit')).toBe('unidades')
     expect(owners.get('User')).toBe('identity')
@@ -641,9 +659,12 @@ describe('db/schema.prisma — modelo de pedido', () => {
       expect(mapped?.[1] ?? nombre, `Order.${nombre} debe mapear a ${columna}`).toBe(columna)
       expect(columna, `Order.${nombre} -> ${columna}`).toMatch(SNAKE_CASE)
     }
-    // Todo campo en `camelCase` con mayuscula dentro tiene que declarar su `@map`, o la columna
-    // real saldria en `camelCase` y R36 se incumpliria sin aviso.
+    // Todo campo ESCALAR en `camelCase` con mayuscula dentro tiene que declarar su `@map`, o la
+    // columna real saldria en `camelCase` y R36 se incumpliria sin aviso. `presentationLines` no
+    // es columna: es la coleccion hacia `OrderPresentationLine`, sin `@map` porque no existe en
+    // `orders`.
     for (const candidate of order.fields) {
+      if (candidate.isList) continue
       if (!/[A-Z]/.test(candidate.name)) continue
       expect(candidate.attributes, `falta @map en Order.${candidate.name}`).toMatch(/@map\("/)
     }
@@ -657,8 +678,8 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_recipe_id_idx',
       'orders_created_by_idx',
       'orders_updated_by_idx',
-      'orders_presentation_id_idx',
       'orders_packed_by_idx',
+      'orders_unit_id_idx',
     ])
     // `finished_at` no gana `@@index` en el esquema: su indice parcial vive solo en la
     // migracion, como los de `list_query_indexes`.
@@ -670,7 +691,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
     for (const nombre of uniqueMaps) expect(nombre).toMatch(SNAKE_CASE)
   })
 
-  it('orders gana una columna decimal(14,4) opcional en snake_case y ninguna tabla nueva (R20)', () => {
+  it('orders gana una columna decimal(14,4) opcional en snake_case (R20)', () => {
     const ingredientsCost = field(order, 'ingredientsCost')
     expect(ingredientsCost.type).toBe('Decimal')
     expect(ingredientsCost.isOptional).toBe(true)
@@ -678,7 +699,8 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(ingredientsCost.attributes).toMatch(/@db\.Decimal\(\s*14\s*,\s*4\s*\)/)
     expect(ingredientsCost.attributes).not.toMatch(/@default\(/)
 
-    // Sigue siendo un solo modelo, dueno de `pedidos`: ninguna tabla nueva nace con la feature.
+    // `pedidos` es dueno de `Order` y, desde [Q4], de `OrderPresentationLine`; ninguna tabla de
+    // costo/precio nace con R20.
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -686,21 +708,17 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((match) => match[1] === 'pedidos')
       .map((match) => match[2])
       .filter((modelName): modelName is string => modelName !== undefined)
-    expect(pedidosModels).toEqual(['Order'])
+      .sort()
+    expect(pedidosModels).toEqual(['Order', 'OrderPresentationLine'])
     expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
   })
 
-  it('presentationId es uuid anulable, sin @relation y con su indice (R1, R2, R5)', () => {
-    const presentationId = field(order, 'presentationId')
-    expect(presentationId.type).toBe('String')
-    expect(presentationId.isOptional).toBe(true)
-    expect(presentationId.attributes).toContain('@db.Uuid')
-    expect(presentationId.attributes).toContain('@map("presentation_id")')
-    expect(presentationId.attributes).not.toMatch(/@default\(/)
-    expect(presentationId.attributes).not.toMatch(/@relation/)
-    expect(order.body).toMatch(
-      /@@index\(\[presentationId\],\s*map:\s*"orders_presentation_id_idx"\)/,
-    )
+  it('la presentacion unica ya no existe en el pedido: ni presentationId, ni presentationContent, ni su indice', () => {
+    expect(has(order, 'presentationId')).toBe(false)
+    expect(has(order, 'presentationContent')).toBe(false)
+    expect(order.body).not.toContain('presentation_id')
+    expect(order.body).not.toContain('presentation_content')
+    expect(order.body).not.toContain('orders_presentation_id_idx')
   })
 
   it('finishedAt es timestamptz anulable, sin default y sin indice en el esquema (R1)', () => {

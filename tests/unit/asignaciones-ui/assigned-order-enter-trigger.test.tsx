@@ -5,6 +5,7 @@ import {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
+  assignedOrderBlockedNoticeText,
   assignedOrderEnterNoticeText,
 } from '@/app/(private)/asignacion/components';
 import { assignedOrderRoute } from '@/lib/shared/routes';
@@ -70,5 +71,34 @@ describe('R27 (QC-63, 2026-09-17; enmienda QC-88 R21) - EN_CURSO: el disparador 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     expect(trigger).toBeInTheDocument();
     expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-3'));
+  });
+});
+
+describe('R31 - BLOQUEADO: el disparador esta deshabilitado y explica por que', () => {
+  it('es un boton deshabilitado y no un enlace: no hay href hacia la ejecucion', () => {
+    const { container } = render(
+      <AssignedOrderEnterTrigger order={{ id: 'order-4', status: 'BLOQUEADO' }} />,
+    );
+
+    const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    expect(trigger.tagName).toBe('BUTTON');
+    expect(trigger).toBeDisabled();
+    expect(trigger).not.toHaveAttribute('href');
+    expect(container.querySelector('a')).toBeNull();
+  });
+
+  it('el motivo es texto VISIBLE, no un `title`, y se enlaza con aria-describedby', () => {
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-4', status: 'BLOQUEADO' }} />);
+
+    const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
+    expect(reason).toBeVisible();
+    expect(reason).toHaveTextContent(assignedOrderBlockedNoticeText());
+    expect(trigger).not.toHaveAttribute('title');
+    expect(trigger.getAttribute('aria-describedby')).toBe(reason.id);
+  });
+
+  it('el motivo del bloqueado no es el aviso de EN_CURSO', () => {
+    expect(assignedOrderBlockedNoticeText()).not.toBe(assignedOrderEnterNoticeText());
   });
 });

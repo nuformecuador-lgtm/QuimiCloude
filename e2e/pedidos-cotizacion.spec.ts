@@ -126,6 +126,10 @@ const COST_BATCH_C = { stock: '50', unitCost: '15.0000', lotSuffix: 'C' } as con
 const COST_QUANTITY = '30';
 const COST_AMOUNT = '$ 370.00';
 
+/** Una linea de reparto que cabe en la cantidad del pedido: 1 envase de 1 L. */
+const PRESENTATION_CONTENT = '1';
+const ORDER_PACKAGES = '1';
+
 let companyId: string;
 let adminUserId: string;
 let unitId: string;
@@ -199,8 +203,9 @@ function rowByNumber(page: Page, numberText: string): Locator {
 test.beforeAll(async () => {
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
 
-  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: apartados -> pedidos ->
-  // recetas (sus lineas van en cascada) -> lotes -> productos -> presentaciones -> usuarios -> empresas.
+  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: apartados -> reparto ->
+  // pedidos -> recetas (sus lineas van en cascada) -> lotes -> productos -> presentaciones ->
+  // usuarios -> empresas.
   const orphanCompanies = await prisma.company.findMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
     select: { id: true },
@@ -209,6 +214,9 @@ test.beforeAll(async () => {
   if (orphanCompanyIds.length > 0) {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({
+      where: { companyId: { in: orphanCompanyIds } },
+    });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -239,6 +247,8 @@ test.beforeAll(async () => {
       name: presentationName,
       nameNormalized: normalizePresentationName(presentationName),
       unitId,
+      // Sin contenido el selector del reparto no deja anadirla.
+      content: PRESENTATION_CONTENT,
       companyId,
     },
     select: { id: true },
@@ -348,6 +358,7 @@ test.afterAll(async () => {
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
     () => prisma.reservationMovement.deleteMany({ where: { companyId } }),
     () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
+    () => prisma.orderPresentationLine.deleteMany({ where: { companyId } }),
     () => prisma.order.deleteMany({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
@@ -410,12 +421,16 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await quantity.fill(QUANTITY_C);
     await expect(quoteValue).toHaveText(MISSING_VALUE_MARK, { timeout: 60_000 });
 
-    // (d) vuelta a 5001, se elige la presentacion y se guarda: la Server Action REAL de `pedidos`
-    // contra Postgres.
+    // (d) vuelta a 5001, se elige la unidad, una linea de reparto con la presentacion y se guarda:
+    // la Server Action REAL de `pedidos` contra Postgres.
     await quantity.fill(QUANTITY_B);
     await expect(quoteValue).toHaveText(AMOUNT_B, { timeout: 60_000 });
 
-    const presentationPicker = page.getByTestId('presentation-select');
+    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+    await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+
+    const distribution = page.getByTestId('order-distribution-field');
+    const presentationPicker = distribution.getByTestId('presentation-select');
     await presentationPicker.click();
     await presentationPicker.fill(presentationName);
     const presentationOption = page
@@ -423,7 +438,18 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
       .filter({ hasText: presentationName });
     await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
     await presentationOption.click();
-    await expect(page.getByTestId('presentation-value')).toHaveValue(presentationId);
+    await distribution.getByTestId('order-distribution-add-packages').fill(ORDER_PACKAGES);
+    await distribution.getByTestId('order-distribution-add').click();
+    await expect(
+      distribution.locator(
+        `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
+      ),
+    ).toHaveCount(1);
+    await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
+      'data-state',
+      'ready',
+      { timeout: 60_000 },
+    );
 
     await page.getByTestId('order-form-submit').click();
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });

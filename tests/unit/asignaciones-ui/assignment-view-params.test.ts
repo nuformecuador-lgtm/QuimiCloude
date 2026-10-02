@@ -104,7 +104,7 @@ describe('parseStatusFilter descarta lo que no es un estado conocido (R24)', () 
     expect(parseStatusFilter({ [STATUS_PARAM]: 'ENTREGADO,PENDIENTE' })).not.toEqual(['ENTREGADO']);
   });
 
-  it('R41 - las seis palabras validas son exactamente las de `/pedidos`, en orden de flujo', () => {
+  it('R41 - las siete palabras validas son exactamente las de `/pedidos`, en orden de flujo', () => {
     expect([...ROUTE_ORDER_STATUS_VALUES]).toEqual([
       'PENDIENTE',
       'EN_CURSO',
@@ -112,6 +112,7 @@ describe('parseStatusFilter descarta lo que no es un estado conocido (R24)', () 
       'EN_EMPAQUE',
       'ENTREGADO',
       'CANCELADO',
+      'BLOQUEADO',
     ]);
   });
 });
@@ -156,5 +157,19 @@ describe('R31 - page.tsx (Server Component) no invoca funciones de un modulo `\'
     const ownerModule = readFileSync(join(componentsDir, 'assignment-view-params.ts'), 'utf8');
     expect(ownerModule).toContain('export function isExactlyDelivered');
     expect(ownerModule.trimStart().startsWith("'use client'")).toBe(false);
+  });
+});
+
+describe('R34 - el filtro de estado de «Todos» admite BLOQUEADO', () => {
+  it('BLOQUEADO en la URL se conserva como filtro, solo o combinado', () => {
+    expect(parseStatusFilter({ [STATUS_PARAM]: 'BLOQUEADO' })).toEqual(['BLOQUEADO']);
+    expect(parseStatusFilter({ [STATUS_PARAM]: 'PENDIENTE,BLOQUEADO' })).toEqual([
+      'PENDIENTE',
+      'BLOQUEADO',
+    ]);
+  });
+
+  it('BLOQUEADO solo no activa la columna de terminados', () => {
+    expect(isExactlyDelivered(parseStatusFilter({ [STATUS_PARAM]: 'BLOQUEADO' }))).toBe(false);
   });
 });

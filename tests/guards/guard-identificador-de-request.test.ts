@@ -167,6 +167,15 @@ export const E2E_ESPERADOS = [
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',
+  // Alta el 2026-10-02 (QC-138) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. Lo que ejercita: un alta de pedido sin material suficiente
+  // abre el modal, «Guardar bloqueado» lo deja Bloqueado en la lista; el Operador asignado lo ve
+  // sin poder entrar; y un alta de lote en Inventario lo deja PENDIENTE con su material apartado.
+  // NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'pedido-bloqueado.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja
@@ -241,6 +250,9 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que el diferimiento sigue INTACTO.
   'producto-terminado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el pedido repartido en varias presentaciones
+  // de punta a punta; no lee ni afirma nada sobre el identificador de peticion.
+  'pedido-en-varias-presentaciones.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -386,11 +398,21 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
+  // Tampoco estas dos: una crea la tabla del reparto por presentacion y la columna de unidad del
+  // pedido, la otra enlaza los movimientos de produccion con esa linea de reparto.
+  '20260927120000_order_presentation_lines',
+  '20260927120100_inventory_movements_production_per_line',
+  // Ni esta: pasa la presentacion unica de cada pedido a su reparto y retira esas columnas.
+  '20260927120200_order_presentation_lines_backfill_and_drop',
   // Anade `parent_recipe_id` a `recipes`; no toca el identificador de peticion.
   '20261001120000_recipe_versions',
   // El rol Maestro: empresa opcional segun rol y nombre de usuario unico en todo el sistema; no
   // toca el identificador de peticion.
   '20261001160815_platform_maestro_role',
+  // El estado BLOQUEADO: una lo anade al enum, la otra crea el indice parcial de
+  // pedidos bloqueados. Ninguna toca el identificador de peticion.
+  '20261001170000_order_status_blocked',
+  '20261001170100_orders_blocked_index',
 ] as const
 
 export function hallazgosDeMigraciones(

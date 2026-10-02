@@ -5,7 +5,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { compareQuantities } from '../../../domain/decimal-quantity';
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
-import { planFinishedGoods } from '../../../domain/finished-goods';
+import { planFinishedGoodsLine } from '../../../domain/finished-goods';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
 
@@ -687,6 +687,7 @@ export async function createWithFirstBatch(
         quantity: batch.stock,
         reason: null,
         orderId: null,
+        orderPresentationLineId: null,
         createdBy: batch.createdBy,
       },
       now,
@@ -746,6 +747,7 @@ export async function addBatchToAlive(
         quantity: batch.stock,
         reason: null,
         orderId: null,
+        orderPresentationLineId: null,
         createdBy: batch.createdBy,
       },
       now,
@@ -875,7 +877,15 @@ export async function adjustBatchStock(
 
       await writeMovement(
         tx,
-        { batchId, kind: 'adjustment', quantity: delta, reason, orderId: null, createdBy: actorId },
+        {
+          batchId,
+          kind: 'adjustment',
+          quantity: delta,
+          reason,
+          orderId: null,
+          orderPresentationLineId: null,
+          createdBy: actorId,
+        },
         now,
         scope,
       );
@@ -945,6 +955,7 @@ export async function consumeBatchStock(
       quantity: negateQuantity(input.quantity),
       reason: null,
       orderId: input.orderId,
+      orderPresentationLineId: null,
       createdBy: input.actorId,
     },
     now,
@@ -961,10 +972,12 @@ export async function consumeBatchStock(
 type PresentationForShareRow = { readonly name: string; readonly unitId: string; readonly content: string | null };
 
 /**
- * La entrada de un lote de produccion al Finalizar un pedido: presentacion `FOR SHARE`,
- * producto terminado (nace si falta, `ON CONFLICT ... DO NOTHING` sobre el indice parcial de
- * la combinacion), lote, asiento `production` y recalculo, todo sobre la MISMA transaccion que
- * el resto del Finalizar -no abre la suya, a diferencia de `createWithFirstBatch`-.
+ * La entrada de un lote de produccion al Terminar el empaque, por UNA linea del reparto:
+ * presentacion `FOR SHARE`, producto terminado (nace si falta, `ON CONFLICT ...
+ * DO NOTHING` sobre el indice parcial de la combinacion), lote, asiento `production` -con
+ * `order_id` Y `order_presentation_line_id`- y recalculo, todo sobre la MISMA transaccion que
+ * el resto de Terminar -no abre la suya, a diferencia de `createWithFirstBatch`-. `unitCost` ya
+ * llega resuelto: el mismo para todas las lineas de un pedido, no se recalcula aqui.
  */
 export async function receiveFinishedGoods(
   tx: Prisma.TransactionClient,
@@ -973,9 +986,10 @@ export async function receiveFinishedGoods(
     readonly recipeId: string;
     readonly recipeName: string;
     readonly presentationId: string;
-    readonly orderQuantity: string;
+    readonly orderPresentationLineId: string;
+    readonly packages: number;
     readonly orderContent: string | null;
-    readonly lotCost: string;
+    readonly unitCost: string;
     readonly actorId: string;
     readonly now: Date;
   },
@@ -996,9 +1010,8 @@ export async function receiveFinishedGoods(
   const content = input.orderContent ?? presentation.content;
   if (content === null) return { kind: 'presentation_without_content' };
 
-  const plan = planFinishedGoods({ orderQuantity: input.orderQuantity, content, lotCost: input.lotCost });
+  const plan = planFinishedGoodsLine({ packages: input.packages, content, unitCost: input.unitCost });
   if (plan.kind === 'no_content') return { kind: 'presentation_without_content' };
-  if (plan.kind === 'no_whole_package') return { kind: 'no_whole_package' };
 
   const name = `${input.recipeName} · ${presentation.name}`;
   // El arbitro de `ON CONFLICT ... WHERE` lo resuelve Postgres en el analisis de la sentencia,
@@ -1032,7 +1045,7 @@ export async function receiveFinishedGoods(
   const batch: NewProductBatch = {
     presentationId: input.presentationId,
     stock: plan.quantity,
-    unitCost: plan.unitCost,
+    unitCost: input.unitCost,
     lot: null,
     purchaseDate: toCivilDate(input.now),
     expiryDate: null,
@@ -1043,7 +1056,7 @@ export async function receiveFinishedGoods(
   const createdBatch = await tx.productBatch.create({
     data: {
       ...toBatchCreateData(product.id, batch, lot, input.now, scope),
-      packageContent: new Prisma.Decimal(plan.content),
+      packageContent: new Prisma.Decimal(content),
     },
     select: { id: true },
   });
@@ -1056,6 +1069,7 @@ export async function receiveFinishedGoods(
       quantity: plan.quantity,
       reason: null,
       orderId: input.orderId,
+      orderPresentationLineId: input.orderPresentationLineId,
       createdBy: input.actorId,
     },
     input.now,
@@ -1064,11 +1078,11 @@ export async function receiveFinishedGoods(
 
   await recalculateProductStock(tx, product.id, scope);
 
-  return { kind: 'received', productId: product.id, productName: product.name, packages: plan.packages };
+  return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
 }
 
 /** `quantity / packageContent`, como entero: `receiveFinishedGoods` siempre escribe la cantidad
- *  del asiento `production` como un multiplo exacto del contenido del lote (`planFinishedGoods`),
+ *  del asiento `production` como un multiplo exacto del contenido del lote (`planFinishedGoodsLine`),
  *  asi que la division nunca deja resto. */
 function packagesFromReceipt(quantity: Prisma.Decimal, packageContent: Prisma.Decimal): string {
   const scaledQuantity = BigInt(quantity.toFixed(4).replace('.', ''));

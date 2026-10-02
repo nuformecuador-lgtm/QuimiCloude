@@ -58,4 +58,8 @@ export interface OrderRepository {
     recipeIds: readonly string[] | null,
     scope: OrderScope,
   ): Promise<Page<OrderRow>>;
+
+  /** Identificadores de los pedidos vivos en `BLOQUEADO` de la empresa, del mas antiguo al mas
+   *  nuevo por `(created_at, id)`: en ese orden se les ofrece el material que entra. */
+  findBlockedIds(scope: OrderScope): Promise<readonly string[]>;
 }

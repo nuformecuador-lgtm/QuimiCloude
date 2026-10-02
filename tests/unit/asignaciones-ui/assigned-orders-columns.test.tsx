@@ -10,6 +10,7 @@ import {
   ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID,
   ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_COLUMN_ID,
+  ASSIGNED_ORDER_STATUS_LABELS,
   MISSING_VALUE_MARK,
   buildAssignedOrdersColumns,
 } from '@/app/(private)/asignacion/components';
@@ -30,7 +31,9 @@ const BASE_ORDER: AssignedOrderView = {
   otherResponsibles: [
     { userId: 'user-2', displayName: 'Ana López García', origin: { kind: 'direct' } },
   ],
-  presentationName: 'Caja x 12',
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  unitId: null,
+  unitLabel: null,
 };
 
 function renderCell(columnId: string, order: AssignedOrderView) {
@@ -97,20 +100,36 @@ describe('la cantidad se pinta TAL CUAL (cadena, no formateada)', () => {
 
     expect(screen.getByText('12.500')).toBeInTheDocument();
   });
+
+  it('QC-170 R42: con unidad la pinta al lado de la cifra', () => {
+    renderCell(ASSIGNED_ORDER_QUANTITY_COLUMN_ID, {
+      ...BASE_ORDER,
+      quantity: '12.500',
+      unitId: 'unit-l',
+      unitLabel: 'L',
+    });
+
+    expect(screen.getByText('12.500 L')).toBeInTheDocument();
+  });
 });
 
 describe('R24: columna Presentación', () => {
-  it('con presentationName pinta el nombre', () => {
-    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, BASE_ORDER);
+  it('QC-170 R26: pinta la primera linea del reparto y «+N» con el resto', () => {
+    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, {
+      ...BASE_ORDER,
+      presentationLines: [
+        { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packages: 5 },
+        { presentationId: 'pres-2', presentationName: 'Caja x 12', packages: 1 },
+      ],
+    });
 
-    const label = screen.getByTestId('order-presentation');
-    expect(label).toHaveTextContent('Caja x 12');
+    expect(screen.getByTestId('order-distribution').textContent).toBe('5 × Botella 200 ml +1');
   });
 
-  it('con presentationName null pinta «Sin presentación»', () => {
-    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, { ...BASE_ORDER, presentationName: null });
+  it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {
+    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, { ...BASE_ORDER, presentationLines: [] });
 
-    const label = screen.getByTestId('order-presentation');
+    const label = screen.getByTestId('order-distribution');
     expect(label).toHaveTextContent('Sin presentación');
   });
 });
@@ -134,5 +153,26 @@ describe('R20 - el propio actor no aparece (el dominio ya lo excluye de otherRes
 
     expect(screen.getByRole('img', { name: 'Beto Ruiz' })).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Ana López García' })).not.toBeInTheDocument();
+  });
+});
+
+describe('R31, R34 - un pedido BLOQUEADO se marca en la lista del Operador', () => {
+  it('la columna Estado pinta «Bloqueado» con `data-status`, no el literal del enum', () => {
+    renderCell(ASSIGNED_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status: 'BLOQUEADO' });
+
+    const cell = screen.getByTestId('assigned-order-status');
+    expect(cell).toHaveAttribute('data-status', 'BLOQUEADO');
+    expect(cell).toHaveTextContent(ASSIGNED_ORDER_STATUS_LABELS.BLOQUEADO);
+    expect(cell).not.toHaveTextContent('BLOQUEADO');
+  });
+
+  it('la columna Entrar no ofrece enlace a la ejecucion', () => {
+    const { container } = renderCell(ASSIGNED_ORDER_ENTER_COLUMN_ID, {
+      ...BASE_ORDER,
+      status: 'BLOQUEADO',
+    });
+
+    expect(container.querySelector('a')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeDisabled();
   });
 });

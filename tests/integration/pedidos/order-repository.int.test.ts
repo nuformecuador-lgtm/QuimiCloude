@@ -61,6 +61,7 @@ import {
   cancelAliveOrder,
   createOrderWriteRepository,
   findAliveOrderById,
+  findBlockedOrderIds,
   listAliveOrders,
   softDeleteAliveOrder,
   updateAliveOrder,
@@ -94,6 +95,7 @@ const YEAR_BORRADO = 2884
 const YEAR_FILTROS = 2885
 const YEAR_DISCRIMINANTES = 2886
 const YEAR_CATALOGO = 2887
+const YEAR_BLOQUEADOS = 2888
 
 const TEST_YEARS = [
   YEAR_ALTA,
@@ -103,6 +105,7 @@ const TEST_YEARS = [
   YEAR_FILTROS,
   YEAR_DISCRIMINANTES,
   YEAR_CATALOGO,
+  YEAR_BLOQUEADOS,
 ] as const
 
 async function dropTestSequences(): Promise<void> {
@@ -216,7 +219,7 @@ async function dropFixtures(): Promise<void> {
   // La receta TAMBIEN antes que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
   await prisma.recipe.delete({ where: { id: recipeId } })
   // La presentacion TAMBIEN antes que la empresa, y despues de todo pedido que la use -cada
-  // caso ya borro los suyos en su `finally` (`limpiar`)-: `orders_company_id_presentation_id_fkey`
+  // caso ya borro los suyos en su `finally` (`limpiar`)-: `order_presentation_lines_company_id_presentation_id_fkey`
   // es `ON DELETE RESTRICT` (QC-146).
   await prisma.presentation.delete({ where: { id: presentationId } })
   // La empresa DESPUES del usuario y de la receta: `users_company_id_fkey` y
@@ -250,8 +253,8 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId,
-    presentationContent: null,
+    unitId,
+    presentationLines: [],
     ...overrides,
   }
 }
@@ -274,9 +277,13 @@ async function altaReal(
 }
 
 /** Borra por `id` EXACTO los pedidos que sembro un caso. Nunca un `deleteMany` con filtro
- *  amplio: este archivo no puede llevarse por delante una fila que no creo el. */
+ *  amplio: este archivo no puede llevarse por delante una fila que no creo el.
+ *
+ * `order_presentation_lines` va PRIMERO: su FK hacia `orders` es `ON DELETE RESTRICT`
+ * (`design.md > 2.1`), asi que un pedido con reparto no se borra hasta vaciarlo. */
 async function limpiar(creados: readonly string[]): Promise<void> {
   if (creados.length === 0) return
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [...creados] } } })
   await prisma.order.deleteMany({ where: { id: { in: [...creados] } } })
 }
 
@@ -687,15 +694,18 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
   })
 })
 
-describe('R27 — listAliveOrderSummariesByIds devuelve la presentacion', () => {
-  it('el resumen que pedidos publica a asignaciones lleva presentationId, con y sin presentacion', async () => {
+describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad', () => {
+  it('el resumen que pedidos publica a asignaciones lleva presentationLines y unitId, con y sin reparto', async () => {
     const creados: string[] = []
     try {
       const now = instantIn(YEAR_CATALOGO, 1, 10)
-      const conPresentacion = await altaReal(creados, YEAR_CATALOGO, now)
-      // Un pedido «viejo» sin presentacion: se inserta con Prisma directo, sin pasar por el
-      // adaptador -que ya la exige siempre- para simular una fila anterior a esta ficha (R2).
-      const filaSinPresentacion = await prisma.order.create({
+      const conReparto = await altaReal(creados, YEAR_CATALOGO, now, {
+        presentationLines: [{ presentationId, packages: 3, content: null }],
+      })
+      // Un pedido «viejo» sin reparto ni unidad: se inserta con Prisma directo, sin pasar por
+      // el adaptador -que ya los exige siempre-, para simular una fila anterior a esta ficha
+      // (R2, R43).
+      const filaSinReparto = await prisma.order.create({
         data: {
           companyId,
           orderYear: YEAR_CATALOGO,
@@ -706,19 +716,184 @@ describe('R27 — listAliveOrderSummariesByIds devuelve la presentacion', () => 
         },
         select: { id: true },
       })
-      creados.push(filaSinPresentacion.id)
+      creados.push(filaSinReparto.id)
 
       const pagina = await listAliveOrderSummariesByIds(
         companyId,
-        [conPresentacion.id, filaSinPresentacion.id],
+        [conReparto.id, filaSinReparto.id],
         ['PENDIENTE'],
         1,
       )
 
-      const resumenConPresentacion = pagina.items.find((item) => item.id === conPresentacion.id)
-      const resumenSinPresentacion = pagina.items.find((item) => item.id === filaSinPresentacion.id)
-      expect(resumenConPresentacion?.presentationId).toBe(presentationId)
-      expect(resumenSinPresentacion?.presentationId).toBeNull()
+      const resumenConReparto = pagina.items.find((item) => item.id === conReparto.id)
+      const resumenSinReparto = pagina.items.find((item) => item.id === filaSinReparto.id)
+      expect(resumenConReparto?.presentationLines).toEqual([{ presentationId, packages: 3 }])
+      expect(resumenConReparto?.unitId).toBe(unitId)
+      expect(resumenSinReparto?.presentationLines).toEqual([])
+      expect(resumenSinReparto?.unitId).toBeNull()
+    } finally {
+      await limpiar(creados)
+    }
+  })
+})
+
+describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentation_lines`', () => {
+  it('`findAliveOrderById` y `listAliveOrders` devuelven las lineas, y `[]` sin reparto', async () => {
+    const creados: string[] = []
+    try {
+      const conReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 10), {
+        presentationLines: [{ presentationId, packages: 4, content: null }],
+      })
+      const sinReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11))
+
+      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4 }])
+
+      const ficha = await findAliveOrderById(conReparto.id, scope())
+      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4 }])
+      // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
+      expect(ficha).toEqual(conReparto)
+
+      const fichaSin = await findAliveOrderById(sinReparto.id, scope())
+      expect(fichaSin?.presentationLines).toEqual([])
+
+      const todos = await recorrerTodo()
+      expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
+        { presentationId, packages: 4 },
+      ])
+      expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
+    } finally {
+      await limpiar(creados)
+    }
+  })
+})
+
+/** Pasa un pedido recien creado de `PENDIENTE` a `BLOQUEADO` por `setStatus`, sin autor. */
+async function bloquear(id: string, now: Date): Promise<void> {
+  const resultado = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).setStatus(id, 'PENDIENTE', 'BLOQUEADO', null, now, scope()),
+  )
+  expect(resultado).toBe('ok')
+}
+
+describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', () => {
+  it('R16, R18 — solo BLOQUEADO vivos de la empresa, en orden (created_at, id)', async () => {
+    const creados: string[] = []
+    const ajenos: string[] = []
+    const marca = token()
+    let otraEmpresa: string | null = null
+    let otraReceta: string | null = null
+    try {
+      const temprano = instantIn(YEAR_BLOQUEADOS, 1, 5)
+      const empate = instantIn(YEAR_BLOQUEADOS, 1, 6)
+      const tarde = instantIn(YEAR_BLOQUEADOS, 1, 7)
+
+      // Se dan de alta en desorden para que el orden lo ponga la consulta, no la insercion.
+      const ultimo = await altaReal(creados, YEAR_BLOQUEADOS, tarde)
+      const empatadoA = await altaReal(creados, YEAR_BLOQUEADOS, empate)
+      const primero = await altaReal(creados, YEAR_BLOQUEADOS, temprano)
+      const empatadoB = await altaReal(creados, YEAR_BLOQUEADOS, empate)
+      const pendiente = await altaReal(creados, YEAR_BLOQUEADOS, temprano)
+      const borrado = await altaReal(creados, YEAR_BLOQUEADOS, temprano)
+      for (const pedido of [ultimo, empatadoA, primero, empatadoB, borrado]) {
+        await bloquear(pedido.id, tarde)
+      }
+      expect(await softDeleteAliveOrder(borrado.id, actorId, tarde, scope())).toBe('ok')
+
+      // Un bloqueado de OTRA empresa, mas antiguo que todos: no puede aparecer.
+      otraEmpresa = (
+        await prisma.company.create({
+          data: { name: `Otra ${marca}`, nameNormalized: normalizeCompanyName(`Otra ${marca}`) },
+          select: { id: true },
+        })
+      ).id
+      otraReceta = (
+        await prisma.recipe.create({
+          data: { name: `Receta ajena ${marca}`, nameNormalized: `recetaajena${marca}`, companyId: otraEmpresa },
+          select: { id: true },
+        })
+      ).id
+      const ajeno = await prisma.order.create({
+        data: {
+          companyId: otraEmpresa,
+          orderYear: YEAR_BLOQUEADOS,
+          orderSequence: 1,
+          recipeId: otraReceta,
+          quantity: new Prisma.Decimal('1'),
+          status: 'BLOQUEADO',
+          createdAt: instantIn(YEAR_BLOQUEADOS, 0, 1),
+        },
+        select: { id: true },
+      })
+      ajenos.push(ajeno.id)
+
+      const empatados = [empatadoA.id, empatadoB.id].sort()
+      expect(await findBlockedOrderIds(scope())).toEqual([primero.id, ...empatados, ultimo.id])
+      expect(await findBlockedOrderIds(scope())).not.toContain(pendiente.id)
+      expect(await findBlockedOrderIds({ companyId: otraEmpresa })).toEqual([ajeno.id])
+    } finally {
+      await limpiar(creados)
+      if (ajenos.length > 0) await prisma.order.deleteMany({ where: { id: { in: ajenos } } })
+      if (otraReceta !== null) await prisma.recipe.delete({ where: { id: otraReceta } })
+      if (otraEmpresa !== null) await prisma.company.delete({ where: { id: otraEmpresa } })
+    }
+  })
+})
+
+describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
+  it('R22 — setStatus admite actorId null y deja updated_by vacio', async () => {
+    const creados: string[] = []
+    try {
+      const now = instantIn(YEAR_BLOQUEADOS, 2, 1)
+      const despues = instantIn(YEAR_BLOQUEADOS, 2, 2)
+      const pedido = await altaReal(creados, YEAR_BLOQUEADOS, now)
+
+      await bloquear(pedido.id, now)
+      const desbloqueo = await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).setStatus(pedido.id, 'BLOQUEADO', 'PENDIENTE', null, despues, scope()),
+      )
+
+      expect(desbloqueo).toBe('ok')
+      const cruda = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(cruda.status).toBe('PENDIENTE')
+      expect(cruda.updatedBy).toBeNull()
+      expect(cruda.updatedAt.toISOString()).toBe(despues.toISOString())
+    } finally {
+      await limpiar(creados)
+    }
+  })
+
+  it('R15 — setIngredientsCost sustituye el importe, tambien por null, sin tocar estado ni datos', async () => {
+    const creados: string[] = []
+    try {
+      const now = instantIn(YEAR_BLOQUEADOS, 3, 1)
+      const despues = instantIn(YEAR_BLOQUEADOS, 3, 2)
+      const pedido = await altaReal(creados, YEAR_BLOQUEADOS, now)
+      await bloquear(pedido.id, now)
+
+      const conImporte = await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, '123.4500', null, despues, scope()),
+      )
+      expect(conImporte).toBe('ok')
+      const tras = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(tras.ingredientsCost?.toFixed(4)).toBe('123.4500')
+      expect(tras.status).toBe('BLOQUEADO')
+      expect(tras.quantity.toFixed(4)).toBe('10.0000')
+      expect(tras.updatedBy).toBeNull()
+      expect(tras.updatedAt.toISOString()).toBe(despues.toISOString())
+
+      const sinImporte = await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, null, actorId, despues, scope()),
+      )
+      expect(sinImporte).toBe('ok')
+      const final = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(final.ingredientsCost).toBeNull()
+      expect(final.updatedBy).toBe(actorId)
+
+      expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
+      const borrado = await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, '1', null, despues, scope()),
+      )
+      expect(borrado).toBe('not_found')
     } finally {
       await limpiar(creados)
     }

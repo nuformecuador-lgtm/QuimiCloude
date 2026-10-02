@@ -41,7 +41,9 @@
     "pedidos/order-crud.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
+    "pedidos/order-status-blocked-rollback.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
+    "pedidos/qc170-backfill.int.test.ts",
     "proveedores/catalog-line.int.test.ts",
     "proveedores/company-scope.int.test.ts",
     "proveedores/material-measurements-migration.int.test.ts",
@@ -267,6 +269,11 @@
       "desde": "2026-09-23"
     },
     {
+      "archivo": "pedidos/review-blocked-orders.int.test.ts",
+      "motivo": "QC-138 T7/T8: la revision de pedidos bloqueados cableada a mano con los adaptadores driven REALES (como 'order-expiry.int.test.ts') y, para el disparo, la fachada 'inventario' de 'lib/composition'. 'withOrderTransaction' y las altas y ajustes de inventario abren SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no las envolveria; los casos de concurrencia (dos revisiones a la vez, y una cancelacion que retiene la fila) necesitan ademas que cada rama confirme para que la otra la vea bajo el candado. Cada caso fabrica sus empresas efimeras con randomUUID y las limpia en un 'finally' por 'company_id'. El caso del fallo crea una funcion y un trigger con nombre unico, acotado por WHEN al pedido del caso, y los borra en el 'finally'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-01"
+    },
+    {
       "archivo": "pedidos/order-content-copy.int.test.ts",
       "motivo": "QC-150 T14: ejercita el flujo REAL de alta y edicion ('createCreateOrder'/'createUpdateOrder') cableado a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades' -el mismo conjunto que 'lib/composition' ata-, y 'withOrderTransaction' abre ademas SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no lo envolveria. Una empresa efimera (randomUUID) nace en 'beforeAll' y muere en 'afterAll'; cada caso siembra su propia receta y presentacion (sin producto ni lote: ningun caso ejercita el coste) y las borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-24"
@@ -330,6 +337,16 @@
       "archivo": "pedidos/order-sequence.int.test.ts",
       "motivo": "Paso de 'transaccion' a 'commit' con QC-60 (2026-09-16). Hasta entonces probaba 'next_order_sequence(integer)' con su propia copia del INSERT dentro de una transaccion con ROLLBACK; QC-60 T3 dejo caer esa funcion y el correlativo lo calcula ahora 'createOrder' (lock de aviso por empresa y ano + max()+1). El archivo se reescribio para llamar al adaptador REAL en vez de a otra copia de su SQL, y ese adaptador usa el cliente Prisma GLOBAL y abre SU PROPIA transaccion, asi que una transaccion del test no lo envolveria. Cada caso fabrica su empresa efimera, da de alta en anos 287x y la borra en un 'finally' (pedidos -> usuario -> rol y tipo de documento -> empresa); la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-16"
+    },
+    {
+      "archivo": "pedidos/qc170-distribution-company-scope.int.test.ts",
+      "motivo": "QC-170 (R29, hallazgo B4 del review): 'updateOrder' y 'updateOrderPresentationLines' ('OrderDistributionTransaction') abren cada uno SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, y los casos que llaman al adaptador ('updateAlive'/'updatePresentationLinesAlive') lo hacen con el cliente global para que el ambito de la otra empresa se compruebe en el 'where' de la sentencia real; una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica DOS empresas efimeras con randomUUID (usuario, dos unidades, presentacion y receta) y las limpia en un 'finally', en el orden que exigen las FK (reservas -> asientos -> lineas de reparto -> pedidos -> receta -> presentacion -> unidades -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-01"
+    },
+    {
+      "archivo": "pedidos/qc170-distribution-concurrency.int.test.ts",
+      "motivo": "QC-170 T21 (R37, R38, R42, R46, R48): 'updateOrder', 'updateOrderPresentationLines' ('OrderDistributionTransaction') y 'startPackingAliveOrder' abren cada uno SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria; R37 necesita ademas DOS llamadas reales sin 'await' entre ellas compitiendo por el 'FOR UPDATE' de la misma fila, y R48 necesita forzar los dos ordenes con un 'pg.Client' que retiene ese mismo 'FOR UPDATE' con SQL crudo mientras la operacion REAL contraria espera, y solo entonces escribe y confirma -mismo mecanismo medido en 'inventario/presentation-unit-race.int.test.ts'-. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, dos o tres unidades, presentacion y receta, y a veces producto y lote) y la limpia en un 'finally', en el orden que exigen las FK (reservas -> asientos -> lineas de reparto -> pedidos -> receta -> producto y lote -> presentacion -> unidades -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-27"
     },
     {
       "archivo": "proveedores/company-scope-queries.int.test.ts",

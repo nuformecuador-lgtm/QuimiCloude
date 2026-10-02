@@ -25,7 +25,28 @@ vi.mock('@/lib/shared/db/prisma', async () => {
   return { prisma: txAwareProxy(actual.prisma) };
 });
 
-import { NOW, actorOf, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
+import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
+import { OrderBlockedError } from '@/lib/modules/asignaciones/domain/errors';
+import { createListAssignedOrders } from '@/lib/modules/asignaciones/domain/list-assigned-orders';
+import { createStartAssignedOrder } from '@/lib/modules/asignaciones/domain/start-assigned-order';
+import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+
+import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
+
+import { NOW, actorOf, codeOf, createOrder, createPerson, inRolledBackTransaction, type Fixture } from './use-case-fixture';
 
 const ESTADOS = ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO'] as const;
 
@@ -93,6 +114,104 @@ describe('asignaciones · la consulta EN LOTE y los cuatro estados (integracion)
       for (const entrada of salida) {
         expect(entrada.responsibles.map((r) => r.userId)).toEqual([persona]);
       }
+    });
+  });
+});
+
+function noUsado(nombre: string): () => Promise<never> {
+  return async () => {
+    throw new Error(`${nombre} no deberia llamarse en este caso`);
+  };
+}
+
+/** La lista del Operador y el arranque, cableados con los adaptadores reales de lectura. La
+ *  transicion explota: un BLOQUEADO no debe llegar a pedirla. */
+function casosDelOperador(fixture: Fixture) {
+  const orders: OrderCatalog = {
+    findAliveById: findAliveOrderTargetById,
+    listAliveSummariesByIds: listAliveOrderSummariesByIds,
+    listAliveSummariesInCompany: noUsado('listAliveSummariesInCompany'),
+    transitionAliveById: noUsado('transitionAliveById'),
+    startPackingAliveById: noUsado('startPackingAliveById'),
+    finishPackingAliveById: noUsado('finishPackingAliveById'),
+  };
+  const recipes = {
+    findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
+    findExecutionContentById: noUsado('findExecutionContentById'),
+    findIdsMatchingName: noUsado('findIdsMatchingName'),
+    findAliveByNormalizedName: noUsado('findAliveByNormalizedName'),
+  } as unknown as RecipeCatalog;
+  const presentations = {
+    findRefs: findPresentationRefs,
+    findByNormalizedNames: findPresentationsByNormalizedNames,
+  } as unknown as PresentationCatalog;
+  const assignments = createOrderAssignmentRepository(fixture.tx);
+
+  return {
+    list: createListAssignedOrders({
+      assignments,
+      orders,
+      recipes,
+      presentations,
+      units: { findRefs: noUsado('units.findRefs') } as unknown as UnitCatalog,
+      people: assignmentDirectoryPrisma,
+      now: () => NOW,
+    }),
+    start: createStartAssignedOrder({
+      assignments,
+      orders,
+      recipes,
+      presentations,
+      units: { findRefs: noUsado('units.findRefs'), findRefsSharingBaseInCompany: noUsado('units.sisters') } as unknown as UnitCatalog,
+      products: { findRefs: noUsado('products.findRefs') } as unknown as ProductCatalog,
+      now: () => NOW,
+    }),
+  };
+}
+
+describe('QC-138 — el Operador ve el pedido BLOQUEADO y no lo arranca (integracion)', () => {
+  it('R30 — la lista incluye el BLOQUEADO asignado junto a PENDIENTE y EN_CURSO, y deja fuera los finales', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const operador = await createPerson(fixture, fixture.companyA);
+      const asignar = async (estado: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' | 'ENTREGADO'): Promise<string> => {
+        const pedido = await createOrder(fixture);
+        await fixture.useCases.assign(actorOf(fixture.companyA), { orderId: pedido, userIds: [operador], workGroupIds: [] }, NOW);
+        await fixture.tx.order.update({ where: { id: pedido }, data: { status: estado } });
+        return pedido;
+      };
+      const pendiente = await asignar('PENDIENTE');
+      const enCurso = await asignar('EN_CURSO');
+      const bloqueado = await asignar('BLOQUEADO');
+      const entregado = await asignar('ENTREGADO');
+
+      const actor: Actor = { id: operador, companyId: fixture.companyA, permissions: ['asignaciones.consultar'] };
+      const pagina = await casosDelOperador(fixture).list(actor, { page: 1 });
+
+      const estados = new Map(pagina.items.map((item) => [item.id, item.status]));
+      expect(estados.get(pendiente)).toBe('PENDIENTE');
+      expect(estados.get(enCurso)).toBe('EN_CURSO');
+      expect(estados.get(bloqueado)).toBe('BLOQUEADO');
+      expect(estados.has(entregado)).toBe(false);
+      expect(pagina.total).toBe(3);
+    });
+  });
+
+  it('R28, R32 — arrancar un BLOQUEADO rechaza con order_blocked y el estado no cambia', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const operador = await createPerson(fixture, fixture.companyA);
+      const pedido = await createOrder(fixture);
+      await fixture.useCases.assign(actorOf(fixture.companyA), { orderId: pedido, userIds: [operador], workGroupIds: [] }, NOW);
+      await fixture.tx.order.update({ where: { id: pedido }, data: { status: 'BLOQUEADO' } });
+
+      const actor: Actor = { id: operador, companyId: fixture.companyA, permissions: ['asignaciones.consultar'] };
+      const error = await casosDelOperador(fixture)
+        .start(actor, { orderId: pedido })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(OrderBlockedError);
+      expect(codeOf(error)).toBe('order_blocked');
+      const fila = await fixture.tx.order.findUniqueOrThrow({ where: { id: pedido }, select: { status: true } });
+      expect(fila.status).toBe('BLOQUEADO');
     });
   });
 });

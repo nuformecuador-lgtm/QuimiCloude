@@ -1,7 +1,7 @@
 /**
  * El contenido de la presentacion. Adaptador Prisma real: solo la base demuestra que el
  * `CHECK presentations_content_positive` acepta un contenido valido y que cambiarlo no toca
- * ni la copia de un pedido ni el contenido guardado de un lote.
+ * ni la copia de una linea de reparto ni el contenido guardado de un lote.
  * Sin transaccion con ROLLBACK, mismo motivo que `presentation-unit.int.test.ts`: cada fila se
  * borra en el `afterAll` por su `id`.
  */
@@ -127,8 +127,9 @@ async function sembrarPedido(presentationId: string, presentationContent: string
       recipeId,
       quantity: '10.0000',
       companyId: empresaDelArchivo,
-      presentationId,
-      presentationContent,
+      presentationLines: {
+        create: [{ companyId: empresaDelArchivo, presentationId, packages: 10, presentationContent }],
+      },
     },
     select: { id: true },
   });
@@ -142,6 +143,7 @@ function anotarParaBorrar(id: string): string {
 }
 
 afterAll(async () => {
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: pedidosSembrados } } });
   await prisma.order.deleteMany({ where: { id: { in: pedidosSembrados } } });
   await prisma.recipe.deleteMany({ where: { id: { in: recetasSembradas } } });
   await prisma.inventoryMovement.deleteMany({ where: { batchId: { in: lotesSembrados } } });
@@ -191,7 +193,7 @@ describe('R6 — el contenido se guarda y se vacia', () => {
 });
 
 describe('R40 — cambiar el contenido se acepta con pedidos o lotes, y no los modifica', () => {
-  it('la edicion del contenido no toca la copia del pedido ni el contenido guardado del lote', async () => {
+  it('la edicion del contenido no toca la copia de la linea de reparto ni el contenido guardado del lote', async () => {
     const unitId = await sembrarUnidad();
     const presentationId = await sembrarPresentacion(unitId, '1.0000');
     const productId = await sembrarProducto(unitId);
@@ -214,7 +216,7 @@ describe('R40 — cambiar el contenido se acepta con pedidos o lotes, y no los m
     const loteDespues = await prisma.productBatch.findUniqueOrThrow({ where: { id: loteId } });
     expect(loteDespues.packageContent?.toFixed(4)).toBe('1.0000');
 
-    const pedidoDespues = await prisma.order.findUniqueOrThrow({ where: { id: pedidoId } });
-    expect(pedidoDespues.presentationContent?.toFixed(4)).toBe('1.0000');
+    const lineaDespues = await prisma.orderPresentationLine.findFirstOrThrow({ where: { orderId: pedidoId } });
+    expect(lineaDespues.presentationContent?.toFixed(4)).toBe('1.0000');
   });
 });

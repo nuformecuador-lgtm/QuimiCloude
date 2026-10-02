@@ -1,7 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority } from '@/lib/modules/pedidos';
@@ -22,10 +22,12 @@ function MissingValue({ field }: { readonly field: string }) {
   );
 }
 
-export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<'PENDIENTE' | 'EN_CURSO', string>> = {
-  PENDIENTE: 'Pendiente',
-  EN_CURSO: 'En curso',
-};
+export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<AssignedOrderView['status'], string>> =
+  {
+    PENDIENTE: 'Pendiente',
+    EN_CURSO: 'En curso',
+    BLOQUEADO: 'Bloqueado',
+  };
 
 export const ASSIGNED_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
   BAJA: 'Baja',
@@ -64,13 +66,14 @@ export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedO
       id: ASSIGNED_ORDER_QUANTITY_COLUMN_ID,
       label: 'Cantidad',
       align: 'end',
-      cell: (order) => order.quantity,
+      cell: (order) =>
+        order.unitLabel === null ? order.quantity : `${order.quantity} ${order.unitLabel}`,
     },
     {
       id: ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
       label: 'Presentación',
       align: 'start',
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: ASSIGNED_ORDER_PRIORITY_COLUMN_ID,

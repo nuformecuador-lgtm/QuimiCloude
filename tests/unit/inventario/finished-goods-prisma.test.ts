@@ -57,9 +57,9 @@ function makeTx(overrides: {
       }),
     },
     inventoryMovement: {
-      create: vi.fn(async () => {
+      create: vi.fn(async (args: { data: { orderId?: string; orderPresentationLineId?: string } }) => {
         order.push('movement-create');
-        return {};
+        return { id: 'movement-1', ...args.data };
       }),
     },
   };
@@ -75,9 +75,10 @@ function baseInput(overrides: Partial<Parameters<typeof receiveFinishedGoods>[1]
     recipeId: 'recipe-1',
     recipeName: 'Desengrasante industrial',
     presentationId: 'presentation-1',
-    orderQuantity: '50.5',
+    orderPresentationLineId: 'line-1',
+    packages: 50,
     orderContent: null,
-    lotCost: '100',
+    unitCost: '2.0000',
     actorId: 'actor-1',
     now: new Date('2026-09-24T12:00:00Z'),
     ...overrides,
@@ -144,7 +145,7 @@ describe('receiveFinishedGoods — orden de pasos con un tx doblado', () => {
       maxLotRows: [{ top: null }],
     });
 
-    const outcome = await receiveFinishedGoods(tx, baseInput({ orderQuantity: '10', orderContent: '3' }), SCOPE);
+    const outcome = await receiveFinishedGoods(tx, baseInput({ packages: 3, orderContent: '3' }), SCOPE);
 
     expect(outcome).toEqual({
       kind: 'received',
@@ -154,32 +155,35 @@ describe('receiveFinishedGoods — orden de pasos con un tx doblado', () => {
     });
   });
 
-  it('menos de un envase entero: rechaza sin escribir nada', async () => {
-    const { tx, txDouble } = makeTx({
-      presentationRows: [{ name: 'Botella 1L', unitId: 'unit-1', content: '1.0000' }],
-      productRows: [],
-      maxLotRows: [],
-    });
-
-    const outcome = await receiveFinishedGoods(tx, baseInput({ orderQuantity: '0.5' }), SCOPE);
-
-    expect(outcome).toEqual({ kind: 'no_whole_package' });
-    expect(txDouble.$executeRaw).not.toHaveBeenCalled();
-    expect(txDouble.productBatch.create).not.toHaveBeenCalled();
-    expect(txDouble.inventoryMovement.create).not.toHaveBeenCalled();
-  });
-
-  it('sin coste de ingredientes: el lote entra a costo cero, nunca sin unit_cost', async () => {
+  // Los envases ya no se calculan aqui -los da la linea del reparto, validada
+  // entero y positivo rio arriba (R1)-, asi que no hay division que pueda dejar
+  // `no_whole_package`: ese caso desaparecio del contrato. Lo que queda de ese caso es este:
+  // el `unitCost` ya llega resuelto y esta funcion lo escribe tal cual, sin recalcularlo.
+  it('el unitCost llega resuelto y se escribe tal cual, sin recalcularlo', async () => {
     const { tx, txDouble } = makeTx({
       presentationRows: [{ name: 'Botella 1L', unitId: 'unit-1', content: '1.0000' }],
       productRows: [{ id: 'product-1', name: 'Desengrasante industrial · Botella 1L' }],
       maxLotRows: [{ top: null }],
     });
 
-    const outcome = await receiveFinishedGoods(tx, baseInput({ lotCost: '0.0000' }), SCOPE);
+    const outcome = await receiveFinishedGoods(tx, baseInput({ unitCost: '0.0000' }), SCOPE);
 
     expect(outcome.kind).toBe('received');
     const createCall = txDouble.productBatch.create.mock.calls[0]?.[0] as { data: { unitCost: unknown } };
     expect(createCall.data.unitCost?.toString()).toBe('0');
+  });
+
+  it('el asiento `production` lleva `order_id` Y `order_presentation_line_id`', async () => {
+    const { tx, txDouble } = makeTx({
+      presentationRows: [{ name: 'Botella 1L', unitId: 'unit-1', content: '1.0000' }],
+      productRows: [{ id: 'product-1', name: 'Desengrasante industrial · Botella 1L' }],
+      maxLotRows: [{ top: null }],
+    });
+
+    await receiveFinishedGoods(tx, baseInput({ orderId: 'order-9', orderPresentationLineId: 'line-9' }), SCOPE);
+
+    const createCall = txDouble.inventoryMovement.create.mock.calls[0]?.[0];
+    expect(createCall?.data.orderId).toBe('order-9');
+    expect(createCall?.data.orderPresentationLineId).toBe('line-9');
   });
 });

@@ -117,6 +117,7 @@ import type {
   ProductCatalog,
   ProductNameLookup,
   ReservationQueries,
+  StockIncreaseListener,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { forModule } from '@/lib/shared/observability/logger';
@@ -223,20 +224,26 @@ import {
   createGetOrder,
   createListOrders,
   createQuoteOrderCost,
+  createQuoteOrderPresentationAvailability,
+  createReviewBlockedOrders,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
+  createUpdateOrderPresentationLines,
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
-  finishPackingAliveOrder,
   findAliveOrderById,
+  findBlockedOrderIds,
   findExpirableOrders,
   listAliveOrders,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
-import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import {
+  createOrderDistributionTransaction,
+  withOrderTransaction,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
@@ -792,6 +799,33 @@ const presentationRepository: PresentationRepository = {
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 /**
+ * El aviso de existencia que sube, atado a la revision de los pedidos bloqueados de `pedidos`.
+ * Va antes de la fachada de `inventario`, que lo necesita; `reviewBlockedOrders` se declara mas
+ * abajo y solo se lee cuando llega un aviso, con el modulo ya cargado. Nunca lanza: el lote o el
+ * ajuste ya estan escritos y un fallo aqui no puede devolverlos como error.
+ */
+const blockedOrdersLog = forModule('pedidos');
+
+const stockIncreaseListener: StockIncreaseListener = {
+  async onStockIncreased({ companyId, now }) {
+    try {
+      const result = await reviewBlockedOrders({ companyId, now });
+      if (result.failed.length > 0) {
+        // El logger solo admite primitivas; `failed` lleva unicamente ids y codigos.
+        blockedOrdersLog.error('blocked_orders_review_failed', {
+          companyId,
+          failedCount: result.failed.length,
+          failed: JSON.stringify(result.failed),
+        });
+      }
+    } catch {
+      // Sin el error: su mensaje puede traer datos de la consulta.
+      blockedOrdersLog.error('blocked_orders_review_failed', { companyId, stage: 'blocked_ids' });
+    }
+  },
+};
+
+/**
  * Fachada del modulo `inventario` ya cableada (T11, `design.md > 3`, `> 7`). Es lo que
  * consumen las Server Actions de T12.
  *
@@ -802,7 +836,7 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
 export const inventario = {
-  createProduct: createCreateProduct({ products: productRepository }),
+  createProduct: createCreateProduct({ products: productRepository, stockIncreases: stockIncreaseListener }),
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
@@ -816,7 +850,10 @@ export const inventario = {
     log: inventarioListQueryLog,
   }),
   // Claves nuevas al final: ninguna de las de arriba se toca.
-  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  adjustBatchStock: createAdjustBatchStock({
+    products: productRepository,
+    stockIncreases: stockIncreaseListener,
+  }),
   listProductBatches: createListProductBatches({ products: productRepository }),
   // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
   // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
@@ -1094,6 +1131,7 @@ const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredList
 const orderRepository: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
+  findBlockedIds: findBlockedOrderIds,
 };
 
 /**
@@ -1117,6 +1155,14 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 
+/**
+ * `OrderDistributionTransaction`: la transaccion CORTA propia de
+ * `updateOrderPresentationLines`, sin `inventario` en su ambito -este caso de uso no toca
+ * material ni reserva-. NO reutiliza `orderUnitOfWork`: son dos transacciones con un alcance
+ * distinto a proposito.
+ */
+const orderDistributionTransaction = createOrderDistributionTransaction();
+
 /** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
  *  `findCoverage` la usa una vez por pagina. */
 const reservationQueries: ReservationQueries = createReservationQueries();
@@ -1131,6 +1177,16 @@ const expireStaleOrders = createExpireStaleOrders({
   findExpirable: findExpirableOrders,
   unitOfWork: orderUnitOfWork,
   now: () => new Date(),
+});
+
+/** La revision de bloqueados que dispara `stockIncreaseListener`. No va en la fachada `pedidos`:
+ *  no lleva actor y ninguna Server Action la llama. */
+const reviewBlockedOrders = createReviewBlockedOrders({
+  orders: orderRepository,
+  recipes: recipeCatalog,
+  products: productCatalog,
+  units: unitCatalog,
+  unitOfWork: orderUnitOfWork,
 });
 
 /**
@@ -1148,10 +1204,11 @@ const expireStaleOrders = createExpireStaleOrders({
  *
  * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
  * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
- * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben SOLO el
- * catalogo de recetas, por el mismo motivo: no calculan ningun importe ni apartan nada.
- * `createOrder` y `updateOrder` son los dos que si costean y aparta, asi que son los dos que
- * reciben tambien `products`, `units` y `unitOfWork`.
+ * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben `recipes`,
+ * `presentations` y `units` -para la etiqueta de `unitId`-, pero no
+ * `products` ni `unitOfWork`: no calculan ningun importe ni apartan nada. `createOrder` y
+ * `updateOrder` son los dos que si costean y aparta, asi que son los dos que reciben tambien
+ * `products` y `unitOfWork`.
  */
 export const pedidos = {
   createOrder: createCreateOrder({
@@ -1165,11 +1222,15 @@ export const pedidos = {
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    // La unidad vuelve al pedido: `getOrder` vuelve a necesitar `units`.
+    units: unitCatalog,
   }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    // Mismo motivo que `getOrder`, una llamada por pagina.
+    units: unitCatalog,
     log: pedidosListQueryLog,
   }),
   updateOrder: createUpdateOrder({
@@ -1193,6 +1254,20 @@ export const pedidos = {
   // orden por su cuenta.
   verifyCronSecret,
   expireStaleOrders,
+  // La edicion ACOTADA del reparto y la unidad. Recibe `presentations`/`units` -mismos catalogos
+  // que `createOrder`/`updateOrder`- y su PROPIA transaccion, mas corta: no la unidad de trabajo
+  // compartida con `inventario`, porque este caso de uso no toca material ni reserva.
+  updateOrderPresentationLines: createUpdateOrderPresentationLines({
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    transaction: orderDistributionTransaction,
+  }),
+  // «Cuanto queda disponible», de solo lectura. Mismos DOS
+  // catalogos que `updateOrderPresentationLines`, sin transaccion: no escribe nada.
+  quoteOrderPresentationAvailability: createQuoteOrderPresentationAvailability({
+    presentations: presentationCatalog,
+    units: unitCatalog,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1237,26 +1312,33 @@ export const observabilidad = {
  *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
  *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
  *  consume el material en la misma transaccion. */
-/** `OrderPackingRepository` cableado con las dos escrituras crudas de `order-prisma.ts`: cada
- *  una un `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida
- *  con `inventario`. */
+/** `OrderPackingRepository` cableado con la escritura cruda de Comenzar (`order-prisma.ts`): un
+ *  `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida con
+ *  `inventario`. Terminar no vive aqui: abre `orderUnitOfWork` directamente. */
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
-  finishPackingAlive: finishPackingAliveOrder,
 };
 
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveById: createTransitionOrder({
+  // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
+  // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
+  // cableados mas abajo para quien todavia los usa-.
+  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
+  startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
+  // Terminar SI necesita los tres catalogos globales -receta y coste del lote, mismo criterio
+  // que Finalizar usaba antes de dejar de dar de alta el lote- y `presentationCatalog`, para
+  // rechazar en profundidad una linea sin contenido copiado ni vigente.
+  finishPackingAliveById: createFinishPacking({
+    packing: orderPackingRepository,
     unitOfWork: orderUnitOfWork,
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
+    presentations: presentationCatalog,
   }),
-  startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository }),
 };
 
 /**
@@ -1344,6 +1426,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
@@ -1382,6 +1465,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   listCompanyOrders: createListCompanyOrders({
@@ -1390,6 +1474,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   listResponsibleCandidates: createListResponsibleCandidates({
@@ -1407,6 +1492,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     products: productCatalog,
     now: () => new Date(),
   }),
@@ -1416,6 +1502,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     products: productCatalog,
     now: () => new Date(),
   }),
