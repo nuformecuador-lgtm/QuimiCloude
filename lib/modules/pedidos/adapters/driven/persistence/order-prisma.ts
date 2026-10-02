@@ -40,7 +40,7 @@ type PrismaLike = PrismaClient | Prisma.TransactionClient;
  *
  * `unit_price` sigue fuera de `orders` desde 2026-09-07: este adaptador no lo
  * selecciona, no lo inserta, no lo actualiza, no lo ordena y no lo filtra. `unit_id` SI volvio
- * ([Q4]): la cantidad se interpreta siempre en esa unidad, con o sin reparto.
+ * y la cantidad se interpreta siempre en esa unidad, con o sin reparto.
  *
  * `deleted_at IS NULL` va en el `where` de TODA lectura y de TODA escritura `…Alive`, nunca
  * en un `if` posterior (R40): el filtro es del puerto, y por eso ningun caso de uso puede

@@ -1141,14 +1141,14 @@ export const pedidos = {
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
-    // [Q4] devuelve la unidad al pedido: `getOrder` vuelve a necesitar `units`.
+    // La unidad vuelve al pedido: `getOrder` vuelve a necesitar `units`.
     units: unitCatalog,
   }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
-    // [Q4]: mismo motivo que `getOrder`, una llamada por pagina.
+    // Mismo motivo que `getOrder`, una llamada por pagina.
     units: unitCatalog,
     log: pedidosListQueryLog,
   }),

@@ -19,7 +19,7 @@ import { orderPresentationIds, unitLabelOf } from './get-order';
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { OrderRepository } from '../ports/order-repository';
 
-/** [Q4] devuelve la unidad al pedido: `units` VUELVE a ser dependencia del listado, UNA sola
+/** La unidad vuelve al pedido: `units` VUELVE a ser dependencia del listado, UNA sola
  *  llamada por pagina con los ids UNICOS. */
 export type ListOrdersDeps = {
   readonly orders: OrderRepository;

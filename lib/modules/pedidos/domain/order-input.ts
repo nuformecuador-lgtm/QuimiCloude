@@ -56,7 +56,7 @@ const recipeIdSchema = z.string().uuid();
 const prioritySchema = z.enum(ORDER_PRIORITY_VALUES);
 
 /**
- * La unidad en que se expresa `quantity` ([Q4]): aqui solo se valida la FORMA -un UUID-.
+ * La unidad en que se expresa `quantity`: aqui solo se valida la FORMA -un UUID-.
  * La EXISTENCIA y que sea visible para la empresa de quien escribe las comprueba el caso de uso
  * contra el contrato publico `@/lib/modules/unidades`. Obligatoria en el alta y en la edicion.
  */

@@ -167,7 +167,7 @@ export interface OrderCatalog {
 /**
  * Una linea del reparto tal como `pedidos` la publica: la presentacion elegida y sus envases,
  * en el orden de alta (`created_at`, desempate `id`). Solo LECTURA: `OrderCatalog` no gana
- * ningun metodo que escriba el reparto (`[D2']`), asi que este tipo no lleva el contenido
+ * ningun metodo que escriba el reparto, asi que este tipo no lleva el contenido
  * copiado ni nada mas que quien reparte no necesite para pintarlo.
  */
 export type AssignedOrderPresentationLine = {

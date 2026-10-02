@@ -18,7 +18,7 @@
  * **Decimotercera enmienda, 2026-09-24**: `customer_not_found`.
  * **Decimocuarta enmienda, 2026-09-25**: `order_packing_taken`, `order_not_packable`,
  * `order_produced_frozen`.
- * **Decimoquinta enmienda, 2026-09-27**: `order_without_distribution`,
+ * **2026-09-27**: `order_without_distribution`,
  * `order_presentation_line_not_editable`, `order_distribution_exceeds_quantity`,
  * `order_without_unit`.
  */

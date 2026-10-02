@@ -11,7 +11,7 @@ import type { OrderNumber } from './order-number';
  * (`docs/architecture.md > Anti-patrones`): el adaptador driven la devuelve con `.toFixed(4)`.
  *
  * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio sigue fuera.
- * [Q4] devuelve la UNIDAD (`unitId`), porque la cantidad se interpreta siempre en ella,
+ * Devuelve la UNIDAD (`unitId`), porque la cantidad se interpreta siempre en ella,
  * con o sin reparto, y el reparto en si mismo -`presentationLines`- sustituye a la presentacion
  * unica.
  *
@@ -103,7 +103,7 @@ export type OrderRow = {
   readonly updatedBy: string | null;
   /** El reparto en orden de alta (`created_at`, desempate `id`); `[]` = sin reparto. */
   readonly presentationLines: readonly OrderPresentationLineRow[];
-  /** La unidad en que se expresa `quantity` ([Q4], devuelve la unidad al pedido).
+  /** La unidad en que se expresa `quantity`.
    *  `null` solo en los pedidos anteriores sin presentacion. */
   readonly unitId: string | null;
 };
@@ -144,7 +144,7 @@ export type OrderView = {
   /** El reparto en orden de alta; `[]` = sin reparto. Cada linea lleva lo que
    *  `presentationLinesSchema` acepta, asi que la edicion lo precarga tal cual. */
   readonly presentationLines: readonly OrderPresentationLineView[];
-  /** La unidad en que se expresa `quantity` ([Q4]); `null` en los pedidos que no la
+  /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la
    *  tienen todavia. */
   readonly unitId: string | null;
   /** El simbolo de la unidad, o su nombre si no tiene simbolo; `null` cuando `unitId`

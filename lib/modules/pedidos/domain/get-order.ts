@@ -11,7 +11,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 import type { OrderRepository } from '../ports/order-repository';
 
 /**
- * [Q4] devuelve la unidad al pedido: `units` VUELVE a ser una dependencia de este caso de uso,
+ * La unidad vuelve al pedido: `units` VUELVE a ser una dependencia de este caso de uso,
  * porque `quantity` se interpreta siempre en `unitId` y la ficha muestra su etiqueta. Sigue sin
  * haber ningun `unitPrice` que costear aqui.
  */
