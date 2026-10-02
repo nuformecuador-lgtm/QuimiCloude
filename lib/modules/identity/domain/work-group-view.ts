@@ -33,12 +33,20 @@
  */
 
 /**
- * Una FILA del listado de grupos (R26): identificador y nombre. **Dos claves, estas y ninguna
- * mas** —un test afirma las claves EXACTAS, no solo que falten algunas—.
+ * Una FILA del listado de grupos (R26): identificador, nombre y sus MIEMBROS —`WorkGroupMemberRow`
+ * reutilizado tal cual, sin una tercera forma de nombrar a una persona—. **Estas tres claves y
+ * ninguna mas** —un test afirma las claves EXACTAS, no solo que falten algunas—.
+ *
+ * `members` existe para pintar los nombres en la columna del listado; no trae ningun conteo
+ * aparte porque `members.length` ya lo es. No esta paginado ni filtrado por estado efectivo de
+ * cuenta: es la misma pertenencia cruda que ve `listMembersAliveInCompany`, solo que aqui entra
+ * SIN pasar por el caso de uso de miembros —es detalle del adaptador, no un segundo camino de
+ * autorizacion—.
  */
 export type WorkGroupRow = {
   readonly id: string;
   readonly name: string;
+  readonly members: readonly WorkGroupMemberRow[];
 };
 
 /**

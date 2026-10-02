@@ -34,14 +34,20 @@ export const USUARIOS_TABS_LABEL = 'Secciones de la pantalla de usuarios';
 export const WORK_GROUP_SECTION_TESTID = 'work-group-section';
 
 /**
- * Como se lee la UNICA columna de datos de la lista de grupos, mas la de acciones (R12).
+ * Como se lee cada columna de datos de la lista de grupos, mas la de acciones (R12).
  *
- * **Una sola columna de datos, y no es un recorte**: `WorkGroupRow` tiene exactamente `id` y
- * `name`, asi que el nombre es literalmente todo lo que la fila trae. **Aqui no hay etiqueta de
- * «miembros»** —ni visibles ni total— porque ese dato no es alcanzable desde el frontend y es de
- * **QC-100** (decision cerrada 5).
+ * **Dos columnas de datos, no una.** `WorkGroupRow` traia solo `id` y `name` porque esa era la
+ * unica forma en la que QC-84/QC-85 dejaban el contrato: ese recorte era deliberado, no un olvido.
+ * El humano lo levanto explicitamente, por fuera del proceso SDD completo, para que esta pantalla
+ * muestre tambien QUE USUARIOS pertenecen a cada grupo —igual que «Responsables» en `/asignacion`—,
+ * asi que `WorkGroupRow` ahora trae tambien `members`, resuelto y sin paginar.
+ *
+ * **Esto NO es QC-100**: QC-100 sigue siendo, el dia que se pida, el CONTEO («3 de 5» miembros
+ * visibles sobre el total). Esta columna es otra cosa: la LISTA de nombres completa, sin numero
+ * alguno al lado.
  */
 export const WORK_GROUP_NAME_COLUMN_LABEL = 'Nombre';
+export const WORK_GROUP_MEMBERS_COLUMN_LABEL = 'Miembros';
 export const WORK_GROUP_ACTIONS_COLUMN_LABEL = 'Acciones';
 
 /**

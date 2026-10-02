@@ -2,18 +2,19 @@
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { getInitials } from '@/lib/shared/ui/initials';
 
 /**
- * QC-102 T7 — Los responsables de UNA fila del listado (R17, R18, R19, R21, R35;
- * `design.md > 3.3`).
+ * Componente de UI generico — circulo con iniciales, tooltip y overflow "+N" — sin atarse a
+ * ningun modulo de dominio (R17, R18, R19, R21, R35; `design.md > 3.3`). Lo usan DOS pantallas:
+ * `/asignacion` para los responsables de un pedido y `/configuracion/usuarios` para los miembros
+ * de un grupo de trabajo.
  *
  * **Un avatar aqui es un circulo con iniciales y NINGUNA imagen** (R21, decision cerrada 10). No
- * es una preferencia estetica: `OrderResponsible` tiene **tres claves** —`userId`, `displayName`,
- * `origin`— y ninguna de ellas es una foto, asi que pedir una seria pedir un dato que el contrato
- * no da. Las iniciales salen de `getInitials` (`lib/shared/ui/initials.ts`), la utilidad que ya
- * existe y ya tiene test propio: **no se vuelve a derivar aqui**.
+ * es una preferencia estetica: `AvatarGroupPerson` solo trae `userId` y `displayName`, y ninguno
+ * de los dos es una foto, asi que pedir una seria pedir un dato que el contrato no da. Las
+ * iniciales salen de `getInitials` (`lib/shared/ui/initials.ts`), la utilidad que ya existe y ya
+ * tiene test propio: **no se vuelve a derivar aqui**.
  *
  * **El nombre completo viaja en el nombre ACCESIBLE, no solo en el tooltip** (R21, R35). Cada
  * circulo es un `role="img"` con `aria-label` igual al `displayName`: quien usa lector de pantalla
@@ -73,14 +74,25 @@ export function responsiblesOverflowLabel(remaining: number): string {
   return `Ver los ${remaining} responsables restantes`;
 }
 
-export type ResponsibleAvatarsProps = {
-  /** Los responsables que la fila del listado YA trajo. Aqui no se pide nada (decision 7). */
-  readonly responsibles: readonly OrderResponsible[];
-  /** Abre el panel en la seccion de responsables. Es la segunda puerta al dato (R35, H5). */
-  readonly onShowAll?: () => void;
+/** La forma minima que este componente necesita de cada persona: nada de dominio, solo UI. */
+export type AvatarGroupPerson = {
+  readonly userId: string;
+  readonly displayName: string;
 };
 
-function ResponsibleAvatar({ responsible }: { readonly responsible: OrderResponsible }) {
+export type ResponsibleAvatarsProps = {
+  /** Las personas que la fila del listado YA trajo. Aqui no se pide nada (decision 7). */
+  readonly responsibles: readonly AvatarGroupPerson[];
+  /** Abre el panel en la seccion de responsables. Es la segunda puerta al dato (R35, H5). */
+  readonly onShowAll?: () => void;
+  /**
+   * Como se lee el disparador del `+N` en ESTA pantalla. Por defecto, `responsiblesOverflowLabel`
+   * (el texto original, para no romper el `aria-label` que ya prueba `/asignacion`).
+   */
+  readonly overflowLabel?: (remaining: number) => string;
+};
+
+function ResponsibleAvatar({ responsible }: { readonly responsible: AvatarGroupPerson }) {
   return (
     <Tooltip>
       <TooltipTrigger
@@ -102,7 +114,11 @@ function ResponsibleAvatar({ responsible }: { readonly responsible: OrderRespons
   );
 }
 
-export function ResponsibleAvatars({ responsibles, onShowAll }: ResponsibleAvatarsProps) {
+export function ResponsibleAvatars({
+  responsibles,
+  onShowAll,
+  overflowLabel = responsiblesOverflowLabel,
+}: ResponsibleAvatarsProps) {
   if (responsibles.length === 0) {
     // R19: el marcador de ausencia de esta pantalla, nunca una celda vacia ni un identificador.
     return (
@@ -136,7 +152,7 @@ export function ResponsibleAvatars({ responsibles, onShowAll }: ResponsibleAvata
               render={
                 <button
                   type="button"
-                  aria-label={responsiblesOverflowLabel(rest.length)}
+                  aria-label={overflowLabel(rest.length)}
                   aria-describedby={namesId}
                   onClick={onShowAll}
                   className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-full text-sm text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}

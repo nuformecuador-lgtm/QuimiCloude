@@ -111,6 +111,7 @@ function fila(overrides: Partial<WorkGroupRow> = {}): WorkGroupRow {
   return {
     id: '22222222-2222-4222-8222-222222222222',
     name: DATO_QUE_NO_DEBE_VERSE,
+    members: [],
     ...overrides,
   };
 }
