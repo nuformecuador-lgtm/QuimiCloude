@@ -1021,3 +1021,5 @@ lista EXACTA de FKs hacia `units` y aparece una de mas, `orders_unit_id_fkey`
 `20260927120000_order_presentation_lines`. El test no cambia desde QC-147 (ya en la rama antes
 del merge), asi que es un rojo de QC-170, no del merge ni de dev: falta añadir esa FK a la lista
 esperada (o decidir otra cosa sobre ella). Pendiente de decision del leader.
+
+**Arreglo de unidades-constraints (decision del leader: `orders.unit_id` vuelve, aprobado en F1.4).** `orders_unit_id_fkey` entra en la lista exacta esperada (`r`/`c`); aislado: `Test Files 1 passed (1)`, `Tests 30 passed (30)`, 1.48s.
