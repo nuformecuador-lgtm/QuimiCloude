@@ -569,6 +569,15 @@ simplifica nada sobre un bucle simple en `pedidos`, y separar «una línea, un l
 llamada es lo que ya prueba `finished-goods.test.ts` de QC-150 hoy — cambiar la forma del contrato
 rompe menos si se mantiene esa granularidad.
 
+### 5.4 Precisión del coste unitario: deuda aceptada (decisión humana 2026-10-02)
+
+`unit_cost` es `decimal(14,4)`. Al expresar el coste en la unidad del lote de cada presentación
+(enmienda de T26), un coste por unidad pequeño (por ejemplo, en ml) redondea a `0.0000` con más
+facilidad, y el error de redondeo se multiplica por la existencia del lote (en el test, el lote en ml
+vale 16,40 en vez de 16,39). El caso del cero ya existía antes de esta ficha; aquí se vuelve más
+frecuente. Decisión: QC-170 lo **acepta como deuda conocida** y no cambia el código; el arreglo
+(subir la escala o guardar el coste en una unidad de referencia) va en **QC-178**.
+
 ## 6. Lo que consume el resultado (asignaciones, listados)
 
 - `AssignedOrderSummary.presentationId` → `presentationLines: readonly { presentationId: string;
