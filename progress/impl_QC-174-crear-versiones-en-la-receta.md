@@ -197,3 +197,68 @@ Dominio, puertos y barrel sin tocar.
 - Lineas localizadas por nombre de producto (la lectura no ordena).
 - Primera corrida: chromium verde; webkit rojo en el paso 4 (A quedaba en 60). Dos causas del test, no del producto: (1) carrera del recorte al restante al teclear B y A seguidas → se espera a que la suma refleje 90,00 % antes de teclear A (y lo mismo en «Cambiada» antes de añadir C); (2) en la ficha recien cargada por `page.goto` WebKit hidrata tarde y el `fill` previo a la hidratacion no llega al estado → reintento `fill('')+fill('30')` dentro de `expect(...).toPass({timeout:120_000})` con la suma como señal, patron ya usado en `e2e/recetas.spec.ts:407-415` y `e2e/clientes.spec.ts:221-235`.
 - Corrida final (logs en `progress/e2e_QC-174_chromium.log`, `progress/e2e_QC-174_webkit.log`): chromium `1 passed (22.6s)`; webkit `1 passed (31.6s)`.
+
+## T12 — Mapa R1…R39 → test
+| R | Test (nombre del caso en el archivo) |
+|---|---|
+| R1 | `tests/unit/recetas-ui/recipe-version-list.test.tsx` «R1: pinta una fila por versión en el orden recibido…»; `tests/unit/recetas-ui/recipe-form.test.tsx` «R1, R5: la original pide sus versiones…» |
+| R2 | `recipe-version-list.test.tsx` «R2: «Por revisar» aparece solo en las versiones que lo están»; E2E paso 6 |
+| R3 | `recipe-version-list.test.tsx` «R3: sin versiones muestra el texto de vacío y ninguna lista» |
+| R4 | `recipe-version-list.test.tsx` «R4: «Nueva versión» enlaza a la página de alta» (con y sin versiones) |
+| R5 | `recipe-form.test.tsx` «R1, R5: …», «R5: si falla la lista de versiones presenta el error propio y ningun formulario» (desvio: no en `recipe-page.test.tsx`, que prueba la lista) |
+| R6 | `e2e/versiones-en-la-receta.spec.ts` paso 3 (la lista de formulas no muestra «Copia» ni «Cambiada») |
+| R7 | `recipe-form.test.tsx` «R7: el id de una version redirige a su pagina bajo la original sin pintar el formulario» |
+| R8 | `tests/unit/recetas-ui/recipe-version-pages.test.tsx` «R8: con una original viva pinta el formulario de alta…»; `recipe-version-form.test.tsx` «R8 — el alta abre con el nombre vacío…»; `recipe-form-payload.test.ts` «R8, R9 — …» |
+| R9 | `recipe-version-pages.test.tsx` «R9: titulo con displayName…»; `recipe-version-form.test.tsx` «R9 — la edición abre con el nombre propio…»; `recipe-form-payload.test.ts` «R9 — conserva la línea de un producto dado de baja…» |
+| R10 | `recipe-version-pages.test.tsx` 8 casos «R10: …» |
+| R11 | `recipe-version-form.test.tsx` «R11 — fuera de 100,00 % …», «R11 — una línea sin producto…»; `recipe-lines-baseline.test.tsx` «R18, R11 — …» |
+| R12 | `recipe-version-form.test.tsx` «R12, R22 — el alta envía exactamente { name, lines }…» |
+| R13 | `recipe-version-form.test.tsx` «R13, R22 — la edición envía exactamente { name, lines }…» |
+| R14 | `recipe-version-form.test.tsx` «R14 — «Cancelar» es un enlace a la ficha…» |
+| R15 | `recipe-version-form.test.tsx` «R15 — nombre duplicado…», «R15 — %s va a la región de error…», «R15 — el error inesperado…» |
+| R16 | `recipe-version-form.test.tsx` «R16 — mientras se guarda… «Guardando…»» |
+| R17 | `tests/unit/recetas-ui/recipe-version-diff.test.ts` «R17: …» (5 casos); `recipe-lines-baseline.test.tsx` «R17 — …» (3 casos) |
+| R18 | `recipe-version-diff.test.ts` «R18: …» (4 casos); `recipe-lines-baseline.test.tsx` «R18, R11 — …», «R19, R18 — …» |
+| R19 | `recipe-version-diff.test.ts` «R19: …» (3 casos); `recipe-lines-baseline.test.tsx` «R19 — teclear un % cambia la marca…», «R19, R18 — quitar una línea…» |
+| R20 | `recipe-version-form.test.tsx` «R20 — en edición, imagen y descripción…», «R20 — en edición sin imagen…», «R20, R21 — el alta no ofrece…» |
+| R21 | `recipe-version-form.test.tsx` «R21 — los pasos de la original se leen dentro de un contenedor inert…» (en jsdom se afirma `inert` + `aria-checked="false"`; `inert` no bloquea en jsdom, medido en T0), «R21 — sin pasos…» |
+| R22 | `recipe-version-form.test.tsx` «R12, R22», «R13, R22»; `recipe-form-payload.test.ts` «R22 — …» (3 casos) |
+| R23 | `recipe-version-form.test.tsx` «R23 — la versión por revisar lleva la marca…», «R23 — sin revisión pendiente…» |
+| R24 | `tests/unit/recetas-ui/recipe-form-propagation.test.tsx` «R24: …» (3 casos) |
+| R25 | `recipe-form-propagation.test.tsx` «R25: …» (3 casos) |
+| R26 | `recipe-form-propagation.test.tsx` «R26: «Guardar sin propagar» guarda con la lista de versiones vacía» |
+| R27 | `recipe-form-propagation.test.tsx` «R27: …» (3 casos) |
+| R28 | `recipe-form-propagation.test.tsx` «R28: guarda sin abrir el aviso y vuelve a la lista» |
+| R29 | `recipe-form-propagation.test.tsx` «R29: no navega, refresca y nombra solo la versión por revisar…»; servidor `tests/unit/recetas/recipe-actions.test.ts` casos R29 (T1); E2E paso 6 |
+| R30 | `recipe-form-propagation.test.tsx` «R30: …» (2 casos) |
+| R31 | `recipe-form-propagation.test.tsx` «R31: muestra el error en la región del formulario…» |
+| R32 | `tests/unit/recetas-ui/delete-recipe-dialog.test.tsx` «R32 …» (3 casos); `recipe-version-list.test.tsx` «R32: borrar una versión pasa por el diálogo en modo versión…» |
+| R33 | `delete-recipe-dialog.test.tsx` «R33 …» (4 casos) |
+| R34 | `delete-recipe-dialog.test.tsx` «R34 …» (3 casos) |
+| R35 | `delete-recipe-dialog.test.tsx` «R35 …» (2 casos) |
+| R36 | `recipe-version-pages.test.tsx` «R36: …» (2 casos); `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` (2 filas nuevas); `tests/guards/guard-pantallas-exigen-permiso.test.ts` «…las diecinueve pantallas privadas de hoy» |
+| R37 | `recipe-version-form.test.tsx` «R37 — …»; `recipe-version-list.test.tsx` «R37: …»; `recipe-form-propagation.test.tsx` «R37: …» (2); `delete-recipe-dialog.test.tsx` «R37 …» |
+| R38 | `e2e/versiones-en-la-receta.spec.ts` (chromium y webkit verdes) |
+| R39 | `tests/guards/guard-dependencias-aprobadas.test.ts`; `git diff origin/dev -- package.json pnpm-lock.yaml` vacio |
+
+## T12 — Gate completo `./init.sh` (tras commit e60796d0)
+```
+ Test Files  5 failed | 820 passed (825)
+      Tests  7 failed | 11335 passed | 128 skipped (11470)
+   Duration  784.80s
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (5 rojos, todos en el baseline de 5)
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
+- Los 5 archivos rojos (unidades-viewport, usuarios-viewport, product-page, recipe-page R21, identity/account-status-scope R19) estan en `tests/baseline-rojos.json`; ninguno es de esta ficha.
+- R39: `git diff origin/dev -- package.json pnpm-lock.yaml` vacio; `guard-dependencias-aprobadas` verde.
+
+## Desvios respecto al spec (resumen)
+1. `recipe-route-contract.test.ts`: dos listas cerradas ampliadas que §5 no preveia (operaciones permitidas +3 acciones de versiones; excepcion exacta para importar `step-document-view` desde `recipe-version-form.tsx`), y el contrato de `[id]` sin subcarpetas pasa a lista cerrada `versiones/{nueva,[versionId]}`.
+2. Listas cerradas de E2E (`guard-identificador-de-request.test.ts`, `recetas/scope.test.ts`) y mocks de `recipe-actions` en `formulas-upload.test.tsx`, `recipe-page.test.tsx`, `pantallas-exigen-permiso.test.tsx`: tocados por arrastre (señalados en T0).
+3. R5/R7 se prueban en `recipe-form.test.tsx` (unico que monta `EditarRecetaPage`), no en `recipe-page.test.tsx`.
+4. R21: `inert` no bloquea en jsdom; el unitario afirma el atributo y `aria-checked="false"`; `inert`/`aria-readonly` van en un `div` envolvente (jsx-a11y).
+5. Textos no fijados por el spec: toast al borrar version sigue «Receta borrada.»; descripcion del aviso de propagacion y texto del aviso persistente (ver T10).
+6. E2E: esperas añadidas por recorte al restante y por hidratacion tardia de WebKit (patron existente del repo).

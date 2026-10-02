@@ -152,7 +152,7 @@ versiones tras propagar (suma 100 en «Copia», 110 en «Cambiada 2»), que la l
 ninguna versión, y en pantalla el aviso persistente y la marca «Por revisar» solo en «Cambiada 2» (R6,
 R38).
 
-### T12 [ ] — Gate y trazabilidad
+### T12 [x] — Gate y trazabilidad
 Tras T11. **Quién:** implementer. **Toca:** `progress/impl_QC-174-crear-versiones-en-la-receta.md`.
 **Hecho cuando:** `./init.sh` completo verde (sin archivos rojos fuera de `tests/baseline-rojos.json`),
 salida pegada, mapa `R1…R39 → test` completo según `design.md > 6` con cualquier desvío explicado, y
