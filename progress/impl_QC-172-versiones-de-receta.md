@@ -756,3 +756,109 @@ Tests:
 - `pnpm exec vitest run tests/unit/pedidos-ui tests/guards/guard-pantalla-pedidos-se-amplia.test.ts tests/guards/guard-identificador-de-request.test.ts tests/guards/guard-catalogo-de-errores.test.ts`:
   `Test Files 34 passed (34)`, `Tests 512 passed | 5 skipped (517)`.
 - No corridos (por indicacion): suite completa, `./init.sh`, `vitest related`, `next dev`.
+
+## T12 — E2E en el pedido
+
+### Archivos
+- `e2e/versiones-de-receta.spec.ts` (nuevo; venia de una sesion interrumpida sin commitear). Revisado
+  contra T12: fixture por Prisma (empresa propia con prefijo `qc172_e2e_` + `RUN_ID`, Administrador
+  del seed, productos A/B/C con lote, original «A 70 / B 30», version «A 50 / C 50», receta sin
+  versiones), limpieza de huerfanos por prefijo y edad y `afterAll` en orden de FK (versiones antes
+  que originales), mismo patron que `e2e/reserva-de-material.spec.ts`. No hizo falta corregirlo.
+- `tests/guards/guard-identificador-de-request.test.ts` y `tests/unit/recetas/scope.test.ts`
+  (backend_dev): alta del spec nuevo en las dos listas CERRADAS de E2E, con comentario fechado
+  2026-10-02. Las puso en rojo el primer gate completo; no estaban en el mapa de archivos de T12
+  (desviacion menor, ver T14).
+
+### R -> test
+| R | Test |
+|---|---|
+| R44, R30 | `e2e/versiones-de-receta.spec.ts` › `R44, R30 - el pedido con una version guarda la version y reserva sus lineas, no las de la original` |
+
+El caso comprueba en la UI que con la receta sin versiones el selector esta deshabilitado y vacio, y
+en Postgres que `orders.recipeId` es la version y que lo reservado es 500 de A y 500 de C, sin
+ningun asiento sobre B.
+
+### Verificacion (salida real)
+`pnpm exec playwright test e2e/versiones-de-receta.spec.ts` (log: `progress/e2e_QC-172_versiones-de-receta.log`):
+```
+Running 2 tests using 2 workers
+  ✓  1 [chromium] › e2e\versiones-de-receta.spec.ts:295:7 › version de receta en el pedido › R44, R30 - el pedido con una version guarda la version y reserva sus lineas, no las de la original (13.8s)
+  ✓  2 [webkit] › e2e\versiones-de-receta.spec.ts:295:7 › version de receta en el pedido › R44, R30 - el pedido con una version guarda la version y reserva sus lineas, no las de la original (21.9s)
+  2 passed (1.1m)
+```
+`pnpm exec vitest run tests/guards/guard-identificador-de-request.test.ts tests/unit/recetas/scope.test.ts`:
+`Test Files 2 passed (2)`, `Tests 28 passed (28)`.
+
+## T14 — Gate completo y trazabilidad
+
+### R45: `package.json`
+- `git diff origin/dev...HEAD -- package.json pnpm-lock.yaml`: vacio. `git log origin/dev..HEAD -- package.json pnpm-lock.yaml`: ningun commit.
+- Ojo: contra la ref LOCAL `dev` (`545de692`, atrasada) sale `+ "pino"`; viene de `origin/dev`
+  (`7211ebdf fix(logger): instala pino…`) por la sincronizacion, no de esta ficha.
+- `guard-dependencias-aprobadas` en verde dentro del gate.
+
+### Mapa R -> test
+Verificado contra los nombres reales de los casos (`it`/`test`/`describe` con `R<n>` en el titulo)
+en los archivos que cita `tasks.md > T14`. Numero = casos que nombran ese R en ese archivo.
+
+| R | Test |
+|---|---|
+| R1, R2, R3 | `tests/unit/recetas/create-recipe-version.test.ts` (1, 2, 3) |
+| R4, R5 | `create-recipe-version.test.ts` (1, 2); `tests/integration/recetas/recipe-versions-repository.int.test.ts` (1, 1) |
+| R6, R22 | `tests/unit/recetas/update-recipe-version.test.ts` (2, 1) |
+| R7 | `update-recipe-version.test.ts` (1); `tests/unit/recetas/update-recipe.test.ts` (1) |
+| R8 | `tests/unit/recetas/get-recipe.test.ts` (1); `tests/unit/recetas/recipe-catalog.test.ts` (3); `recipe-versions-repository.int.test.ts` (1) |
+| R9 | `recipe-versions-repository.int.test.ts` (1) |
+| R10 | `tests/unit/recetas/list-recipe-versions.test.ts` (3) |
+| R11 | `tests/unit/recetas/recipe-version.test.ts` (2); `recipe-catalog.test.ts` (3); `tests/unit/pedidos/get-order.test.ts` (3); `tests/unit/pedidos/list-orders.test.ts` (2) |
+| R12 | `create-recipe-version.test.ts` (1); `tests/integration/recetas/recipe-versions-constraints.int.test.ts` (2) |
+| R13 | `recipe-versions-constraints.int.test.ts` (3) |
+| R14, R16, R19 | `update-recipe.test.ts` (1, 2, 1) |
+| R15, R20, R21 | `recipe-version.test.ts` (16, 3, 6) |
+| R17, R18, R23, R24 | `recipe-versions-repository.int.test.ts` (1 cada uno) |
+| R25 | `tests/unit/pedidos/update-order.test.ts` (1, `it.each` «R35, R25: conservar una version %s…»); `tests/integration/recetas/company-scope-queries.int.test.ts` (12) |
+| R26 | `tests/unit/pedidos-ui/recipe-version-select.test.tsx` (1); `tests/unit/pedidos-ui/order-form.test.tsx` (2) |
+| R27, R28 | `recipe-version-select.test.tsx` (3, 3); `order-form.test.tsx` (3, 3) |
+| R29 | `recipe-version-select.test.tsx` (3); `order-form.test.tsx` (1, `it.each` en linea 1028) |
+| R30, R31, R33 | `tests/unit/pedidos/order-recipe.test.ts` (2, 2, 2); `tests/unit/pedidos/create-order.test.ts` (1, 1, 1) |
+| R32 | `order-recipe.test.ts` (9); `create-order.test.ts` (1, `it.each` en linea 832) |
+| R34 | `update-order.test.ts` (4) |
+| R35 | `update-order.test.ts` (1, `it.each` «R35, R25: conservar una version %s se acepta sin preguntar al catalogo y recalcula con sus lineas») |
+| R36 | `tests/unit/pedidos/transition-order.test.ts` (1); `tests/integration/inventario/finished-goods-version.int.test.ts` (1) |
+| R37 | `tests/integration/documentos/formula-import-versions.int.test.ts` (2); `tests/unit/documentos/confirm-formula-import.test.ts` (2) |
+| R38 | `tests/unit/recetas/recipe-actions.test.ts` (5) + los casos de uso nuevos de arriba |
+| R39 | `create-order.test.ts` (1); `update-order.test.ts` (4); `guard-permisos-sembrados` en verde |
+| R40 | `recipe-versions-repository.int.test.ts` (4); `company-scope-queries.int.test.ts` (2) |
+| R41 | `company-scope-queries.int.test.ts` (2) |
+| R42, R43 | `tests/unit/recetas/schema/recipe-versions-migration.test.ts` (1, 4); `recipe-versions-constraints.int.test.ts` (1, 2) |
+| R44 (y R30 extremo a extremo) | `e2e/versiones-de-receta.spec.ts` (1) |
+| R45 | `tests/guards/guard-dependencias-aprobadas.test.ts` + diff de `package.json` vacio contra `origin/dev` |
+
+Diferencias con la tabla de `tasks.md > T14`, todas por nombre real del caso:
+- R6 y R22 no tienen caso con su numero en `update-recipe.test.ts`; los cubre `update-recipe-version.test.ts`.
+- R45 no tiene caso con `R45` en el titulo: lo cubren la guardia de dependencias y el diff vacio, como ya decia la tabla. Es el unico R sin `R<n>` en un nombre de caso.
+
+### Gate completo (salida real)
+`./init.sh` (modo completo), HEAD `8c33974e`, log en `progress/gate_QC-172_completo.log`:
+```
+✓ typecheck paso
+✖ 8 problems (0 errors, 8 warnings)
+✓ lint paso
+ Test Files  5 failed | 809 passed (814)
+      Tests  7 failed | 11092 passed | 128 skipped (11227)
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (5 rojos, todos en el baseline de 5)
+✓ todas las migraciones tienen down.sql
+== init OK ==
+```
+Los 5 rojos, todos en `tests/baseline-rojos.json`: `configuracion-ui/unidades-viewport.test.tsx`,
+`configuracion-ui/usuarios-viewport.test.tsx`, `inventario/product-page.test.tsx`,
+`recetas-ui/recipe-page.test.tsx`, `identity/account-status-scope.test.ts`.
+
+Primer intento (HEAD `fc6e138c`, log `progress/gate_QC-172_completo_intento1.log`): `exit=1` con dos
+rojos nuevos, ambos por el spec E2E nuevo sin dar de alta en listas cerradas
+(`guard-identificador-de-request.test.ts`, `recetas/scope.test.ts`); arreglado en `8c33974e`. Ese
+intento tambien tuvo 4 `Timeout starting forks runner` (4 archivos sin correr); se corrieron aparte
+en verde (`Test Files 4 passed (4)`, `Tests 63 passed (63)`, `progress/gate_QC-172_rezagados.log`) y
+en el segundo intento corrieron los 814.

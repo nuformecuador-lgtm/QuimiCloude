@@ -167,7 +167,7 @@ edición con versión por revisar o de baja la muestra elegida y el `FormData` l
 
 ## Tanda 5 — cierre
 
-### T12 [ ] — E2E en el pedido
+### T12 [x] — E2E en el pedido
 Tras T11. **Toca:** `e2e/versiones-de-receta.spec.ts` (nuevo), y `e2e/helpers/` solo si hace falta un
 ayudante nuevo.
 **Hacer:** fixture con Prisma —empresa, Administrador del seed, tres productos con lote (A, B, C),
@@ -183,7 +183,7 @@ Tras T1. **Toca:** `specs/QC-24*/requirements.md` o el spec donde viva la unicid
 Solo una nota fechada al final de cada uno; T0 confirma rutas.
 **Hecho cuando:** cada spec citado dice, con fecha y enlace a esta ficha, qué cambió.
 
-### T14 [ ] — Gate completo y trazabilidad
+### T14 [x] — Gate completo y trazabilidad
 Tras todas. **Toca:** `progress/impl_QC-172-versiones-de-receta.md`.
 **Hacer:** `./init.sh` completo en verde; comprobar que `package.json` no cambió (R45); escribir el
 mapa R → test:
