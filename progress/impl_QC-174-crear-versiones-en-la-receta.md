@@ -163,3 +163,7 @@ Dominio, puertos y barrel sin tocar.
 - Nuevos: `formulas/components/recipe-version-list.tsx`, `tests/unit/recetas-ui/recipe-version-list.test.tsx`; `index.ts` exporta `RecipeVersionList`.
 - R1: «R1: pinta una fila por versión en el orden recibido con enlace a su página»; R2: «R2: «Por revisar» aparece solo en las versiones que lo están»; R3: «R3: sin versiones muestra el texto de vacío y ninguna lista»; R4: «R4: «Nueva versión» enlaza a la página de alta» (con y sin versiones); R32: «R32: borrar una versión pasa por el diálogo en modo versión y confirma con su id»; R37: «R37: enlaces y botones nuevos tienen objetivo táctil de al menos 44x44».
 - vitest: `Test Files 1 passed (1)` / `Tests 7 passed (7)`.
+
+## Cierre tanda 2 (commit a9fb339d) — `./init.sh --rapido`
+- `vitest related` sobre 21 archivos del diff: `Test Files 4 failed | 267 passed (271)` / `Tests 6 failed | 3888 passed | 44 skipped (3938)`.
+- Los 6 rojos son exactamente los de `tests/baseline-rojos.json` (unidades-viewport x2, usuarios-viewport x2, product-page R18, recipe-page R21). Ninguno propio. typecheck, lint y guardias verdes.
