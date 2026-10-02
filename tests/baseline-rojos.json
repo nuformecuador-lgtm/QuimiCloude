@@ -28,6 +28,18 @@
     "tests/unit/recetas-ui/recipe-page.test.tsx": {
       "motivo": "Deuda ajena de dev, roja desde a543c84d (data-table: flechas de scroll, width/hideText y defaultPinned por columna, PR #131): el caso de la columna de acciones que no se puede fijar falla igual en origin/dev puro. Salida limpia: QC-177 borra esta entrada. Ajeno a QC-171, que no toca recetas.",
       "desde": "2026-10-01"
+    },
+    "tests/unit/navegacion/pantallas-exigen-permiso.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (alta de grupo con miembros): el caso de /pedidos rechaza con TypeError al leer 'status' en loadFormCatalogs de app/(private)/pedidos/page.tsx, porque el mock de la accion de recetas no cubre la carga nueva de catalogos de la pagina. Ajeno a QC-138, que no toca app/(private)/pedidos/page.tsx.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/recetas/module-contract.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (alta de grupo con miembros): app/(private)/pedidos/page.tsx ahora consume listRecipesAction y la guardia la cuenta como segunda pantalla de recetas fuera de app/(private)/produccion/formulas. Ajeno a QC-138, que no toca app/(private)/pedidos/page.tsx.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/recetas/scope.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (alta de grupo con miembros): app/(private)/pedidos/page.tsx ahora consume listRecipesAction y el test la cuenta como segunda pantalla de recetas fuera de app/(private)/produccion/formulas. Ajeno a QC-138, que no toca app/(private)/pedidos/page.tsx.",
+      "desde": "2026-10-02"
     }
   }
 }
