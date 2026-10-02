@@ -32,6 +32,7 @@ import {
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
@@ -39,7 +40,6 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   createOrderWriteRepository,
-  finishPackingAliveOrder,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
@@ -48,7 +48,7 @@ import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 
-import { NOW, actorOf, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
+import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransaction } from './use-case-fixture';
 
 const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
 if (PERMISOS_DEL_EMPACADOR === undefined) {
@@ -70,14 +70,9 @@ async function transitionAliveByIdReal(
   now: Date,
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
-  const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
-  // Yendo a `POR_EMPACAR`, el exito real lleva `finishedGoods` -aqui no hay producto
-  // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
-  // reconoce el exito por esta forma, no por el literal `'ok'`.
-  if (resultado === 'ok' && to === 'POR_EMPACAR') {
-    return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
-  }
-  return resultado;
+  // R15, R16: yendo a `POR_EMPACAR` el exito real vuelve a ser el literal `'ok'` -ya
+  // no da de alta ningun lote-, asi que este doble no necesita distinguir el destino.
+  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
 }
 
 /** Cablea el caso de uso REAL sobre la `tx` del fixture, con los mismos adaptadores que
@@ -92,8 +87,13 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.
     startPackingAliveById: (id, companyId, packerId, now) =>
       startPackingAliveOrder(id, packerId, now, { companyId }),
-    finishPackingAliveById: (id, companyId, packerId, now) =>
-      finishPackingAliveOrder(id, packerId, now, { companyId }),
+    // T14: `finishPackingAlive` ya vive en `OrderWriteRepository`, dentro de la unidad de
+    // trabajo. Este archivo no ejercita el alta de producto terminado (T14 la prueba entera en
+    // `finish-with-finished-goods.int.test.ts`), asi que el `'ok'` vuelve sin lineas.
+    finishPackingAliveById: async (id, companyId, packerId, now) => {
+      const outcome = await createOrderWriteRepository().finishPackingAlive(id, packerId, now, { companyId });
+      return outcome.kind === 'ok' ? { kind: 'ok', finishedGoods: [] } : outcome.kind;
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 
@@ -117,6 +117,12 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       },
       people: assignmentDirectoryPrisma,
       presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+      units: {
+        findRefs: findUnitRefs,
+        findRefsSharingBaseInCompany: async () => {
+          throw new Error('el listado solo resuelve la etiqueta de la unidad del pedido');
+        },
+      },
       now: () => NOW,
     }),
     finishAssignedOrder: createFinishAssignedOrder({
@@ -275,6 +281,10 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       // Finalizar: EN_CURSO -> POR_EMPACAR. Todavia no aparece en «Terminados».
       await finishAssignedOrder(actorOperario, { orderId: pedido });
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+
+      // R10: Comenzar exige al menos una linea de reparto real, o el pedido queda
+      // `'without_distribution'` y no puede avanzar.
+      await crearLinea(fixture.tx, fixture.companyA, pedido);
 
       // Comenzar: POR_EMPACAR -> EN_EMPAQUE, a nombre del Empacador. Sigue sin aparecer.
       await startPacking(actorEmpacador, { orderId: pedido });

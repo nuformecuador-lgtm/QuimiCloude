@@ -102,6 +102,7 @@ beforeEach(() => {
     orders: trampa('orders', llamadas),
     recipes: trampa('recipes', llamadas),
     presentations: trampa('presentations', llamadas),
+    units: trampa('units', llamadas),
     log: LOG_MUDO,
   }) as (input: unknown, actor: unknown) => Promise<unknown>;
   cableado.listUnits = createListUnits({

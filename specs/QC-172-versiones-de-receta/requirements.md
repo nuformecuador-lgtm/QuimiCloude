@@ -189,6 +189,13 @@ producción al producto terminado de esa versión y esa presentación —distint
 de otras versiones, con su propio stock—, creándolo la primera vez con el nombre «‹original› ·
 ‹versión› · ‹presentación›». [D9] [D6]
 
+> **Enmienda 2026-10-02 (QC-170, decisión humana).** El disparador de R36 pasa de «se finaliza un
+> pedido» a **«se termina el empaque»**: desde QC-170 el producto terminado entra al terminar el
+> empaque, con un lote por línea del reparto, y cada línea lo da de alta en el producto terminado de la
+> versión y de la presentación de esa línea. El resto de R36 (producto distinto por versión y
+> presentación, nombre «‹original› · ‹versión› · ‹presentación›») no cambia. El test pasa de
+> `transition-order.test.ts` a `order-packing.test.ts`.
+
 ### I. Importación de fórmula
 
 **R37.** CUANDO la importación de fórmula compara el nombre de la receta —en la vista previa y al

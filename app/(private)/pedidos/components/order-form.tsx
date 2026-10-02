@@ -3,7 +3,10 @@
 import { useActionState, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
+import {
+  PRESENTATION_UNIT_FIELD,
+  PresentationUnitSelect,
+} from '@/components/shared/presentation-unit-select';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +44,11 @@ import type { UnitView } from '@/lib/modules/unidades';
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { OrderCostQuote } from './order-cost-quote';
+import {
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  OrderDistributionField,
+} from './order-distribution-field';
 import { OrderField } from './order-field';
 import { OrderIngredientsTable } from './order-ingredients-table';
 import { OrderRecipeImage } from './order-recipe-image';
@@ -59,6 +67,12 @@ import {
 import { isFinalOrderStatus } from './order-row-actions';
 import { ORDER_PRIORITY_LABELS, OrderCoverageBadge } from './order-status-badge';
 import { useOrderCostQuote } from './use-order-cost-quote';
+import {
+  availabilityBlocksSave,
+  fromOrderPresentationLines,
+  useOrderDistributionAvailability,
+  type OrderDistributionLine,
+} from './use-order-distribution-availability';
 
 /**
  * QC-102 T14 — EN QUE SECCION abre el panel (R23, R24).
@@ -129,17 +143,20 @@ export const ORDER_SHEET_COVERAGE_TESTID = 'order-sheet-coverage';
  */
 
 /**
- * Los campos de negocio, con el mismo nombre que el adaptador driving lee del `FormData`. Es la
- * unica fuente: `readValues` la recorre, asi que un campo aqui y no en el formulario -o al reves-
- * se nota.
+ * Los campos de negocio de un solo valor, con el mismo nombre que el adaptador driving lee del
+ * `FormData`. Es la unica fuente: `readValues` la recorre, asi que un campo aqui y no en el
+ * formulario -o al reves- se nota. El reparto viaja aparte, como pares repetidos de presentacion
+ * y envases.
  */
 export const ORDER_BUSINESS_FIELDS = [
   RECIPE_FIELD,
   'quantity',
-  PRESENTATION_FIELD,
+  PRESENTATION_UNIT_FIELD,
   'priority',
   RECIPE_VERSION_FIELD,
 ] as const;
+
+const PRESENTATION_LINES_FIELD = 'presentationLines';
 
 /**
  * El estado ya no tiene control propio en este formulario: ninguna de las tres constantes de
@@ -158,7 +175,7 @@ export const ORDER_FORM_ERROR_TESTID = 'order-form-error';
 export const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
 export const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
 
-type OrderFieldName = (typeof ORDER_BUSINESS_FIELDS)[number];
+type OrderFieldName = (typeof ORDER_BUSINESS_FIELDS)[number] | typeof PRESENTATION_LINES_FIELD;
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
@@ -192,7 +209,9 @@ function describeOrder(recipeName: string, quantity: string): string | null {
 const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
   recipeId: 'Elige una receta de la lista.',
   quantity: 'Escribe una cantidad decimal mayor que cero.',
-  presentationId: 'Elige una presentación de la lista.',
+  unitId: 'Elige la unidad del pedido.',
+  presentationLines:
+    'Revisa el reparto: envases enteros mayores que cero, una línea por presentación.',
   priority: 'Elige una de las prioridades disponibles.',
   recipeVersionId: 'Elige una versión de la lista.',
 };
@@ -215,9 +234,12 @@ const FIELD_LABELS = {
  */
 const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
   recipe_not_found: RECIPE_FIELD,
-  // `unit_not_found` ya no existe como codigo del modulo (2026-09-07): sin unidad en el pedido,
-  // no hay nada que pueda emitirlo, y mantener la entrada seria mapear un error imposible.
-  presentation_not_found: PRESENTATION_FIELD,
+  unit_not_found: PRESENTATION_UNIT_FIELD,
+  order_without_unit: PRESENTATION_UNIT_FIELD,
+  presentation_not_found: PRESENTATION_LINES_FIELD,
+  presentation_without_content: PRESENTATION_LINES_FIELD,
+  incompatible_units: PRESENTATION_LINES_FIELD,
+  order_distribution_exceeds_quantity: PRESENTATION_LINES_FIELD,
 };
 
 /**
@@ -275,6 +297,19 @@ function readValues(formData: FormData): FieldValues {
     values[field] = readString(formData, field);
   }
   return values;
+}
+
+function readPresentationLines(
+  formData: FormData,
+): { presentationId: string; packages: string }[] {
+  const packages = formData.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD);
+  return formData.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD).map((id, index) => {
+    const count = packages[index];
+    return {
+      presentationId: typeof id === 'string' ? id : '',
+      packages: typeof count === 'string' ? count : '',
+    };
+  });
 }
 
 /**
@@ -393,6 +428,13 @@ export function OrderForm({
    *  edicion, para que la cotizacion cuente como disponible lo que el propio pedido tiene apartado. */
   const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id);
 
+  const [unitId, setUnitId] = useState(order?.unitId ?? '');
+  const [lines, setLines] = useState<readonly OrderDistributionLine[]>(() =>
+    fromOrderPresentationLines(order?.presentationLines ?? []),
+  );
+  const availability = useOrderDistributionAvailability({ quantity, unitId, lines });
+  const unitLabel = orderUnitLabel(units, unitId, order);
+
   const recipeName = recipe?.name ?? '';
   const recipeImageUrl = recipe?.imageUrl ?? null;
   /** Id de la receta elegida: decide si la tabla de ingredientes se monta. */
@@ -400,7 +442,7 @@ export function OrderForm({
   /** La receta cuyas lineas valen: la version elegida o, sin ella, la original. */
   const effectiveRecipeId = recipe === null ? null : (versionId ?? recipe.id);
   /** Guardar solo se habilita con una receta elegida: sin receta no hay pedido (decision 2026-09-09). */
-  const canSave = recipe !== null;
+  const canSave = recipe !== null && !availabilityBlocksSave(availability);
 
   /*
     Los ingredientes de la receta elegida. Se piden al SERVIDOR al elegir receta -en el alta- o al
@@ -486,12 +528,13 @@ export function OrderForm({
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
     const values = readValues(formData);
+    const candidate = { ...values, presentationLines: readPresentationLines(formData) };
 
     // El esquema del alta y el de la edicion son el mismo objeto (reemplazo completo); se
     // nombran los dos para que quede escrito de donde sale cada regla.
     const parsed = isEdit
-      ? updateOrderSchema.safeParse(values)
-      : createOrderSchema.safeParse(values);
+      ? updateOrderSchema.safeParse(candidate)
+      : createOrderSchema.safeParse(candidate);
 
     if (!parsed.success) {
       const fieldErrors: FieldErrors = {};
@@ -656,23 +699,7 @@ export function OrderForm({
               error={fieldErrors.recipeVersionId}
             />
 
-            {/*
-              Presentacion, cantidad y prioridad EN UNA FILA (decision humana): rejilla de 12
-              columnas que en angosto se apila -movil primero (R45)- y en `sm` o mas ancho reparte
-              presentacion (6), cantidad (3) y prioridad (3), en ese orden.
-            */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-              {/*
-                Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo
-                elegir una existente del catalogo.
-              */}
-              <div className="sm:col-span-6">
-                <PresentationSelect
-                  defaultValue={initialValue(PRESENTATION_FIELD, order?.presentationId ?? '')}
-                  defaultLabel={order?.presentationName ?? ''}
-                  error={fieldErrors.presentationId}
-                />
-              </div>
 
               {/*
                 Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
@@ -685,7 +712,7 @@ export function OrderForm({
                 humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
                 sus decimales. El `FormData` viaja con el valor ya colocado.
               */}
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-4">
                 <OrderField
                   name="quantity"
                   label={FIELD_LABELS.quantity}
@@ -704,8 +731,17 @@ export function OrderForm({
                 />
               </div>
 
+              <div className="sm:col-span-4">
+                <PresentationUnitSelect
+                  units={units}
+                  value={unitId}
+                  onValueChange={setUnitId}
+                  error={fieldErrors.unitId}
+                />
+              </div>
+
               {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-4">
                 <SelectField
                   name="priority"
                   label={FIELD_LABELS.priority}
@@ -720,6 +756,16 @@ export function OrderForm({
                 />
               </div>
             </div>
+
+            <OrderDistributionField
+              lines={lines}
+              onLinesChange={setLines}
+              unitId={unitId}
+              unitLabel={unitLabel}
+              availability={availability}
+              error={fieldErrors.presentationLines}
+              submitLines
+            />
 
             {/* El bloque de coste: DEBAJO de la fila, no entre los campos. Fuera de la condicion
                 de receta elegida, para verse con guion sin receta. */}
@@ -773,6 +819,17 @@ export function OrderForm({
       </div>
     </SheetContent>
   );
+}
+
+/** El catalogo puede no traer la unidad guardada; entonces vale la etiqueta que trajo el pedido. */
+function orderUnitLabel(
+  units: readonly UnitView[],
+  unitId: string,
+  order: OrderSummary | undefined,
+): string | null {
+  const unit = units.find((candidate) => candidate.id === unitId);
+  if (unit !== undefined) return unit.symbol ?? unit.name;
+  return order !== undefined && order.unitId === unitId ? order.unitLabel : null;
 }
 
 type SelectFieldProps = {

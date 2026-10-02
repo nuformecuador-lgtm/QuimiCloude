@@ -6,6 +6,7 @@ import {
   listResponsibleCandidatesAction,
   listResponsiblesForOrdersAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
+import { assertPermission } from '@/lib/modules/identity';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import {
   listOrderCoverageAction,
@@ -95,6 +96,23 @@ type OrderListSectionProps = {
  */
 async function canModifyResponsibles(): Promise<boolean> {
   return canModifyAssignments(await identity.getSessionUser());
+}
+
+const PERMISSION_DENIED = new Error('permiso denegado');
+
+/**
+ * Presentacion, no autorizacion: decide si se pinta la edicion acotada de reparto y unidad. La
+ * Server Action vuelve a exigir el permiso.
+ */
+async function canEditOrderDistribution(): Promise<boolean> {
+  const user = await identity.getSessionUser();
+  try {
+    assertPermission(user, 'pedidos.modificar', () => PERMISSION_DENIED);
+    return true;
+  } catch (error) {
+    if (error !== PERMISSION_DENIED) throw error;
+    return false;
+  }
 }
 
 /**
@@ -245,11 +263,13 @@ export async function OrderListSection({ params, recipes, units }: OrderListSect
     Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
     en fila solo sumaria latencia.
   */
-  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder] = await Promise.all([
-    loadResponsibles(items.map((order) => order.id)),
-    loadResponsiblesCatalog(),
-    loadCoverage(items.map((order) => order.id)),
-  ]);
+  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, canEditDistribution] =
+    await Promise.all([
+      loadResponsibles(items.map((order) => order.id)),
+      loadResponsiblesCatalog(),
+      loadCoverage(items.map((order) => order.id)),
+      canEditOrderDistribution(),
+    ]);
 
   return (
     <div className="flex flex-col gap-4" data-testid="order-list">
@@ -269,6 +289,7 @@ export async function OrderListSection({ params, recipes, units }: OrderListSect
         responsiblesByOrder={responsiblesByOrder}
         responsiblesCatalog={responsiblesCatalog}
         coverageByOrder={coverageByOrder}
+        canEditDistribution={canEditDistribution}
       />
     </div>
   );

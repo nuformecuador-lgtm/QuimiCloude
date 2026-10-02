@@ -28,6 +28,18 @@
     "tests/unit/recetas-ui/recipe-page.test.tsx": {
       "motivo": "Deuda ajena de dev, roja desde a543c84d (data-table: flechas de scroll, width/hideText y defaultPinned por columna, PR #131): el caso de la columna de acciones que no se puede fijar falla igual en origin/dev puro. Salida limpia: QC-177 borra esta entrada. Ajeno a QC-171, que no toca recetas.",
       "desde": "2026-10-01"
+    },
+    "tests/unit/recetas/scope.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios): alta de grupo con miembros, 2026-10-02): hizo que app/(private)/pedidos/page.tsx importe listRecipesAction (loadFormCatalogs) y las guardias de alcance de recetas lo marcan como segunda pantalla de recetas. page.tsx, scope.test.ts y module-contract.test.ts son identicos a origin/dev. Ajeno a QC-170. Salida limpia: la ficha que arregle 897a4f91 borra esta entrada.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/recetas/module-contract.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios): alta de grupo con miembros, 2026-10-02): hizo que app/(private)/pedidos/page.tsx importe listRecipesAction (loadFormCatalogs) y las guardias de alcance de recetas lo marcan como segunda pantalla de recetas. page.tsx, scope.test.ts y module-contract.test.ts son identicos a origin/dev. Ajeno a QC-170. Salida limpia: la ficha que arregle 897a4f91 borra esta entrada.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/navegacion/pantallas-exigen-permiso.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios): alta de grupo con miembros, 2026-10-02): el caso «'/pedidos' se sirve con el permiso» rechaza con TypeError: Cannot read properties of undefined (reading 'status') en loadFormCatalogs (app/(private)/pedidos/page.tsx:91) porque el test no mockea listRecipesAction. page.tsx y el test son identicos a origin/dev. Ajeno a QC-170. Salida limpia: la ficha que arregle 897a4f91 borra esta entrada.",
+      "desde": "2026-10-02"
     }
   }
 }

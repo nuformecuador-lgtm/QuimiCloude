@@ -4,9 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { createFinishPacking, type FinishPackingDeps } from '@/lib/modules/asignaciones/domain/finish-packing';
 import {
   AsignacionesError,
+  IncompatibleUnitsError,
   OrderNotFoundError,
   OrderNotPackableError,
   OrderPackingTakenError,
+  OrderWithoutUnitError,
+  PresentationWithoutContentError,
+  RecipeNotFoundError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/asignaciones/domain/errors';
@@ -23,7 +27,15 @@ const PEDIDO = uuid('7');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
 
-type Resultado = 'ok' | 'not_packer' | 'not_packable' | 'not_found';
+type Resultado =
+  | { readonly kind: 'ok'; readonly finishedGoods: readonly unknown[] }
+  | 'not_packer'
+  | 'not_packable'
+  | 'not_found'
+  | 'recipe_not_found'
+  | 'presentation_without_content'
+  | 'incompatible_units'
+  | 'order_without_unit';
 
 function montar(options?: {
   readonly target?: { readonly id: string; readonly status: string } | null;
@@ -43,7 +55,7 @@ function montar(options?: {
     pageSize: 1,
     totalPages: 1,
   }));
-  const finishPackingAliveById = vi.fn(async () => options?.resultado ?? 'ok');
+  const finishPackingAliveById = vi.fn(async () => options?.resultado ?? { kind: 'ok' as const, finishedGoods: [] });
 
   const deps = {
     orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById },
@@ -115,6 +127,36 @@ describe('finishPacking — R23: estado que no admite Terminar', () => {
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotPackableError);
+  });
+});
+
+describe('finishPacking — R17-R21: da de alta el lote por linea del reparto', () => {
+  it('`recipe_not_found` rechaza con `RecipeNotFoundError`', async () => {
+    const { deps } = montar({ resultado: 'recipe_not_found' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(RecipeNotFoundError);
+  });
+
+  it('`presentation_without_content` rechaza con `PresentationWithoutContentError`', async () => {
+    const { deps } = montar({ resultado: 'presentation_without_content' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(PresentationWithoutContentError);
+  });
+
+  it('R7, R18: `incompatible_units` rechaza con `IncompatibleUnitsError`', async () => {
+    const { deps } = montar({ resultado: 'incompatible_units' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(IncompatibleUnitsError);
+  });
+
+  it('R18: `order_without_unit` rechaza con `OrderWithoutUnitError`', async () => {
+    const { deps } = montar({ resultado: 'order_without_unit' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderWithoutUnitError);
   });
 });
 

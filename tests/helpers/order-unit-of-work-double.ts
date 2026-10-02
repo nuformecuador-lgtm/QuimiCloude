@@ -38,6 +38,8 @@ export function fakeOrderWriteRepository(
     softDeleteAlive: vi.fn(explota('softDeleteAlive')),
     setStatus: vi.fn(explota('setStatus')),
     setReservedAt: vi.fn(explota('setReservedAt')),
+    finishPackingAlive: vi.fn(explota('finishPackingAlive')),
+    findPresentationLinesForFinish: vi.fn(explota('findPresentationLinesForFinish')),
     ...overrides,
   } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
 }
@@ -151,8 +153,8 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: '66666666-6666-4666-8666-666666666666',
-    presentationContent: '1.0000',
+    presentationLines: [],
+    unitId: null,
     reservedAt: new Date('2026-01-02T03:04:05.000Z'),
     ...overrides,
   };

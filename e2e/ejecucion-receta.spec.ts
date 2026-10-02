@@ -200,6 +200,10 @@ async function seedOrder(params: {
   if (!recipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
   if (!presentationId) throw new Error('la presentacion del fixture no existe: fallo el beforeAll');
 
+  const { unitId } = await prisma.presentation.findUniqueOrThrow({
+    where: { id: presentationId },
+    select: { unitId: true },
+  });
   const year = new Date().getUTCFullYear();
   const order = await prisma.order.create({
     data: {
@@ -208,8 +212,17 @@ async function seedOrder(params: {
       orderSequence: params.sequence,
       recipeId,
       quantity: ORDER_QUANTITY,
-      presentationId,
-      presentationContent: PRESENTATION_CONTENT,
+      unitId,
+      presentationLines: {
+        create: [
+          {
+            companyId,
+            presentationId,
+            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+            presentationContent: PRESENTATION_CONTENT,
+          },
+        ],
+      },
       status: params.status,
     },
     select: { id: true },
@@ -262,12 +275,16 @@ test.beforeAll(async () => {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
+    await prisma.orderPresentationLine.deleteMany({
+      where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
@@ -428,6 +445,10 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       scopedCompanyId

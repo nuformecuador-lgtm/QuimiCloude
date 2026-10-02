@@ -2,7 +2,7 @@
 
 import { useActionState, useRef } from 'react';
 
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
@@ -70,6 +70,7 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         title={exactDecimalTitle(execution.orderQuantity)}
       >
         {ORDER_QUANTITY_LABEL} {formatDecimalDisplay(execution.orderQuantity)}
+        {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
       </p>
 
       <p
@@ -80,7 +81,7 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
       </p>
 
       <p className="text-base text-muted-foreground" data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
-        Presentación: <OrderPresentationLabel name={execution.presentationName} />
+        Presentación: <OrderDistributionLabel lines={execution.presentationLines} />
       </p>
 
       <OrderExecutionLines lines={execution.lines} />

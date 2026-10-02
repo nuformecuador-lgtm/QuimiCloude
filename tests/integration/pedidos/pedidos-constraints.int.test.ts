@@ -331,6 +331,7 @@ interface OrderSeed {
   readonly createdBy?: string | null
   readonly updatedBy?: string | null
   readonly presentationId?: string | null
+  readonly unitId?: string | null
 }
 
 /**
@@ -351,7 +352,11 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
       priority: seed.priority,
       createdBy: seed.createdBy ?? null,
       updatedBy: seed.updatedBy ?? null,
-      presentationId: seed.presentationId ?? null,
+      unitId: seed.unitId ?? null,
+      presentationLines:
+        seed.presentationId === undefined || seed.presentationId === null
+          ? undefined
+          : { create: [{ companyId: seed.companyId, presentationId: seed.presentationId, packages: 1 }] },
     },
     select: { id: true },
   })
@@ -372,7 +377,7 @@ type WritableColumn =
   | 'updated_by'
   | 'created_at'
   | 'deleted_at'
-  | 'presentation_id'
+  | 'unit_id'
 
 /**
  * `INSERT` crudo en `orders`. `columns` decide que se escribe: omitir una entrada es
@@ -508,17 +513,8 @@ describe('el pedido como fila completa', () => {
       'order_sequence',
       'order_year',
       // `packed_by` es quien tiene el pedido en empaque: no es un total, un impuesto ni un
-      // cliente. Entre `order_year` y `presentation_content` por el mismo `sort()`
-      // lexicografico ('order_year' < 'packed_by' < 'presentation_c').
+      // cliente. Entre `order_year` y `priority` por el mismo `sort()` lexicografico.
       'packed_by',
-      // `presentation_content` es la copia del contenido de la presentacion:
-      // no es un total, un impuesto ni un cliente. Antes de `presentation_id` por el mismo
-      // `sort()` lexicografico ('presentation_c' < 'presentation_i').
-      'presentation_content',
-      // `presentation_id` es el envase en que se entrega lo fabricado, opcional: no es un
-      // total, un impuesto ni un cliente. Entre `order_year` y `priority` por el mismo
-      // `sort()` lexicografico ('presentation' < 'priority').
-      'presentation_id',
       'priority',
       'quantity',
       'recipe_id',
@@ -526,6 +522,10 @@ describe('el pedido como fila completa', () => {
       // el pedido no tiene material apartado.
       'reserved_at',
       'status',
+      // `unit_id` es la unidad en que se expresa `quantity`: no es un total, un impuesto ni un
+      // cliente. Entre `status` y `updated_at` por el mismo `sort()` lexicografico ('status' <
+      // 'unit_id' < 'updated_at').
+      'unit_id',
       'updated_at',
       'updated_by',
     ])
@@ -596,13 +596,50 @@ describe('la cantidad', () => {
 })
 
 describe('la unidad y la receta', () => {
-  // QC-35bis (2026-09-07): aqui vivian los dos casos de la UNIDAD -«rechaza un pedido sin
-  // unidad (23502) y con unit_id inexistente (23503)» y «rechaza el borrado de una unidad usada
-  // por un pedido con 23503»-. La columna `unit_id` y su FK `orders_unit_id_fkey` se fueron con
-  // la decision humana, y con ellas la unica frontera de `orders` hacia `units`. Los dos casos
-  // equivalentes de la RECETA -NOT NULL, FK y ON DELETE RESTRICT- siguen debajo y son los que
-  // sostienen ahora esa clase de garantia.
+  // `unit_id` volvio con [Q4]: `orders.unit_id` es anulable EN LA BASE -la aplicacion la
+  // exige, R41-, asi que aqui no hay caso de «unidad ausente» -eso es NULL y la base lo acepta-,
+  // solo el de la referencia inexistente y el del borrado con RESTRICT.
 
+  it('rechaza un pedido con unit_id inexistente (23503); NULL sigue aceptado', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+
+      const inexistente = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertOrder(tx, { ...baseColumns(f, freshSequence()), unit_id: asUuid(randomUUID()) }),
+        'pedido con unit_id inexistente',
+      )
+      expect(inexistente).toBe(FOREIGN_KEY_VIOLATION)
+
+      // Sin `unit_id` en absoluto -como cualquier pedido de antes de esta ficha, R43- la base
+      // lo acepta: la columna nace en NULL y no hay ningun CHECK que lo impida.
+      const conteo = await rawInsertOrder(tx, baseColumns(f, freshSequence()))
+      expect(conteo).toBe(1)
+    })
+  })
+
+  it('rechaza el borrado de una unidad usada por un pedido con 23503', async () => {
+    // El RESTRICT existe para que un DELETE por consola no deje un pedido apuntando al vacio.
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const orderId = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        unitId: f.unitId,
+      })
+
+      const fisico = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRaw`DELETE FROM "units" WHERE "id" = CAST(${f.unitId} AS uuid)`,
+        'borrado fisico de una unidad usada por un pedido',
+      )
+      expect(fisico).toBe(FOREIGN_KEY_VIOLATION)
+
+      const stored = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      expect(stored.unitId).toBe(f.unitId)
+    })
+  })
 
   it('rechaza un pedido sin receta (23502) y con recipe_id inexistente (23503)', async () => {
     // R14: la receta es obligatoria y tiene que existir.
@@ -1194,8 +1231,8 @@ describe('las cuatro fronteras que Prisma no declara', () => {
     // aqui de una vez: si una migracion futura borrara alguna por drift, este caso la caza.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      // `unit_id` estaba en esta lista hasta el 2026-09-07: se fue con la columna.
-      const columnas: WritableColumn[] = ['recipe_id', 'created_by', 'updated_by']
+      // `unit_id` volvio a esta lista: [Q4] deroga QC-35bis en la unidad.
+      const columnas: WritableColumn[] = ['recipe_id', 'unit_id', 'created_by', 'updated_by']
 
       for (const columna of columnas) {
         const estado = await expectRejectedByDatabase(
@@ -1215,7 +1252,7 @@ describe('las cuatro fronteras que Prisma no declara', () => {
   })
 })
 
-describe('la presentacion del pedido', () => {
+describe('la presentacion del pedido (hoy, su linea de reparto)', () => {
   it('R1: guarda y relee un pedido con una presentacion de su empresa', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
@@ -1227,9 +1264,9 @@ describe('la presentacion del pedido', () => {
 
       const stored = await tx.order.findUniqueOrThrow({
         where: { id },
-        select: { presentationId: true },
+        select: { presentationLines: { select: { presentationId: true } } },
       })
-      expect(stored.presentationId).toBe(f.presentationId)
+      expect(stored.presentationLines).toEqual([{ presentationId: f.presentationId }])
     })
   })
 
@@ -1240,9 +1277,9 @@ describe('la presentacion del pedido', () => {
 
       const stored = await tx.order.findUniqueOrThrow({
         where: { id },
-        select: { presentationId: true },
+        select: { presentationLines: { select: { presentationId: true } } },
       })
-      expect(stored.presentationId).toBeNull()
+      expect(stored.presentationLines).toEqual([])
     })
   })
 
@@ -1251,25 +1288,24 @@ describe('la presentacion del pedido', () => {
       const f = await seedFixtures(tx)
       const otra = await seedFixtures(tx)
 
+      const orderId = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
+      const rawInsertLine = (presentationId: string): Promise<number> =>
+        tx.$executeRaw`
+          INSERT INTO "order_presentation_lines"
+            ("order_id", "company_id", "presentation_id", "packages", "updated_at")
+          VALUES (${asUuid(orderId)}, ${asUuid(f.companyId)}, ${asUuid(presentationId)}, 1, CURRENT_TIMESTAMP)`
+
       const deOtraEmpresa = await expectRejectedByDatabase(
         tx,
-        () =>
-          rawInsertOrder(tx, {
-            ...baseColumns(f, freshSequence()),
-            presentation_id: asUuid(otra.presentationId),
-          }),
-        'pedido con presentacion de otra empresa',
+        () => rawInsertLine(otra.presentationId),
+        'linea de reparto con presentacion de otra empresa',
       )
       expect(deOtraEmpresa).toBe(FOREIGN_KEY_VIOLATION)
 
       const inexistente = await expectRejectedByDatabase(
         tx,
-        () =>
-          rawInsertOrder(tx, {
-            ...baseColumns(f, freshSequence()),
-            presentation_id: asUuid(randomUUID()),
-          }),
-        'pedido con presentacion inexistente',
+        () => rawInsertLine(randomUUID()),
+        'linea de reparto con presentacion inexistente',
       )
       expect(inexistente).toBe(FOREIGN_KEY_VIOLATION)
     })
@@ -1295,9 +1331,9 @@ describe('la presentacion del pedido', () => {
     expect(await tx.presentation.count({ where: { id: f.presentationId } })).toBe(1)
     const stored = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
-      select: { presentationId: true },
+      select: { presentationLines: { select: { presentationId: true } } },
     })
-    expect(stored.presentationId).toBe(f.presentationId)
+    expect(stored.presentationLines).toEqual([{ presentationId: f.presentationId }])
   }
 
   it('R4: borrar una presentacion usada por un pedido vivo se rechaza con 23503 y deja las dos filas', async () => {

@@ -60,10 +60,16 @@ const EMPTY_LABEL = 'Ninguna presentación coincide con la búsqueda.';
 const LOADING_LABEL = 'Cargando presentaciones...';
 
 /** Solo lo que el selector necesita de una presentacion. R25: aqui no se lista, ni se edita, ni se borra. */
-type PresentationOption = {
+export type PresentationOption = {
   readonly id: string;
   readonly name: string;
+  /** `null` = sin contenido declarado. */
+  readonly content: string | null;
 };
+
+export const PRESENTATION_OPTION_WITHOUT_CONTENT_TESTID = 'presentation-option-without-content';
+
+const WITHOUT_CONTENT_LABEL = 'Sin contenido: complétalo en Presentaciones';
 
 type PresentationSelectProps = {
   /** Presentacion ya asignada al producto que se edita (R19). Ausente en el alta. */
@@ -97,6 +103,11 @@ type PresentationSelectProps = {
    * ofrecerlo. Elegir una presentacion YA EXISTENTE sigue funcionando igual.
    */
   readonly units?: readonly UnitRef[];
+  /** Nombre del campo espejo en el `FormData`. `null` = no aporta campo; el llamante usa `onSelect`. */
+  readonly name?: string | null;
+  readonly onSelect?: (option: PresentationOption) => void;
+  /** Marca las presentaciones sin contenido y no deja elegirlas. */
+  readonly requireContent?: boolean;
 };
 
 /**
@@ -176,6 +187,9 @@ export function PresentationSelect({
   error,
   helper,
   units,
+  name = PRESENTATION_FIELD,
+  onSelect,
+  requireContent = false,
 }: PresentationSelectProps) {
   const labelId = useId();
   const inputId = useId();
@@ -256,7 +270,11 @@ export function PresentationSelect({
     }
 
     return {
-      items: result.data.items.map((item) => ({ id: item.id, name: item.name })),
+      items: result.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        content: item.content,
+      })),
       page: result.data.page,
       totalPages: result.data.totalPages,
     };
@@ -288,6 +306,8 @@ export function PresentationSelect({
   );
 
   function choose(option: PresentationOption) {
+    if (requireContent && option.content === null) return;
+    onSelect?.(option);
     setSelectedId(option.id);
     setSelectedName(option.name);
     setDraft(null);
@@ -352,7 +372,7 @@ export function PresentationSelect({
     // Exito: la presentacion nueva queda SELECCIONADA y el sub-formulario se cierra. No se toca
     // ningun otro campo del producto: lo escrito sigue donde estaba (R24). Se guarda ademas en
     // `created` para que siga ofreciendose aunque la consulta vigente no la traiga todavia.
-    const nueva = { id: result.id, name: parsed.data.name };
+    const nueva = { id: result.id, name: parsed.data.name, content: parsed.data.content ?? null };
     setCreated((previous) => [...previous, nueva]);
     setSelectedId(nueva.id);
     setSelectedName(nueva.name);
@@ -425,18 +445,20 @@ export function PresentationSelect({
         aviso del navegador. Es el mismo patron que usa el propio primitivo de Base UI para su
         input de validacion, `aria-hidden` incluido: el nombre accesible lo lleva el combobox.
       */}
-      <input
-        type="text"
-        name={PRESENTATION_FIELD}
-        required
-        value={selectedId}
-        onChange={() => undefined}
-        onFocus={() => document.getElementById(inputId)?.focus()}
-        aria-hidden="true"
-        tabIndex={-1}
-        className="sr-only"
-        data-testid="presentation-value"
-      />
+      {name === null ? null : (
+        <input
+          type="text"
+          name={name}
+          required
+          value={selectedId}
+          onChange={() => undefined}
+          onFocus={() => document.getElementById(inputId)?.focus()}
+          aria-hidden="true"
+          tabIndex={-1}
+          className="sr-only"
+          data-testid="presentation-value"
+        />
+      )}
 
       <Autocomplete
         items={seleccionables}
@@ -474,19 +496,33 @@ export function PresentationSelect({
             {mensajeDeFallo === null ? (
               <>
                 <AutocompleteList>
-                  {(option: PresentationOption, index: number) => (
-                    <AutocompleteItem
-                      key={option.id}
-                      index={index}
-                      value={option}
-                      className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
-                      data-testid="presentation-option"
-                      data-presentation-id={option.id}
-                      onClick={() => choose(option)}
-                    >
-                      <span className="truncate">{option.name}</span>
-                    </AutocompleteItem>
-                  )}
+                  {(option: PresentationOption, index: number) => {
+                    const withoutContent = requireContent && option.content === null;
+                    return (
+                      <AutocompleteItem
+                        key={option.id}
+                        index={index}
+                        value={option}
+                        disabled={withoutContent}
+                        className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
+                        data-testid="presentation-option"
+                        data-presentation-id={option.id}
+                        data-without-content={withoutContent ? 'true' : undefined}
+                        onClick={() => choose(option)}
+                      >
+                        <span className="truncate">{option.name}</span>
+                        {withoutContent ? (
+                          <span
+                            className="ml-auto flex items-center gap-1 text-sm text-destructive"
+                            data-testid={PRESENTATION_OPTION_WITHOUT_CONTENT_TESTID}
+                          >
+                            <CircleAlertIcon className="size-4" aria-hidden />
+                            {WITHOUT_CONTENT_LABEL}
+                          </span>
+                        ) : null}
+                      </AutocompleteItem>
+                    );
+                  }}
                 </AutocompleteList>
 
                 {seleccionables.length === 0 && !cargando ? (

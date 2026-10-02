@@ -10,7 +10,13 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, OrderNotPackableError, OrderPackingTakenError, ValidationError } from './errors';
+import {
+  OrderNotFoundError,
+  OrderNotPackableError,
+  OrderPackingTakenError,
+  OrderWithoutDistributionError,
+  ValidationError,
+} from './errors';
 
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 
@@ -40,6 +46,9 @@ export function createStartPacking(
     // Repetir Comenzar sobre el propio `EN_EMPAQUE` es exito, sin escribir nada.
     if (result === 'ok' || result === 'already_mine') return;
     if (result === 'taken') throw new OrderPackingTakenError();
+    // `POR_EMPACAR` sin ninguna linea de reparto. `pedidos` ya distingue este caso
+    // de `'not_packable'` -es un estado CORRECTO, solo que sin nada que empacar todavia-.
+    if (result === 'without_distribution') throw new OrderWithoutDistributionError();
     if (result === 'not_packable') throw new OrderNotPackableError();
     throw new OrderNotFoundError(); // 'not_found'
   };

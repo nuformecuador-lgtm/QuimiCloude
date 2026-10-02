@@ -21,7 +21,9 @@ const BASE_ORDER: FinishedOrderView = {
   numberText: '2026-000123',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
-  presentationName: 'Caja x 12',
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  unitId: null,
+  unitLabel: null,
   finishedAt: new Date('2026-09-20T15:30:00.000Z'),
   responsibles: [
     { userId: 'user-1', displayName: 'Ana López García', origin: { kind: 'direct' } },
@@ -68,17 +70,23 @@ describe('R21 - la cantidad se pinta redondeada a dos decimales con formatDecima
   });
 });
 
-describe('R21 - la presentación reutiliza OrderPresentationLabel', () => {
-  it('con presentationName pinta el nombre', () => {
+describe('R21 - la presentación reutiliza OrderDistributionLabel', () => {
+  it('QC-170 R26: pinta la primera linea del reparto', () => {
     renderCell(FINISHED_ORDER_PRESENTATION_COLUMN_ID, BASE_ORDER);
 
-    expect(screen.getByTestId('order-presentation')).toHaveTextContent('Caja x 12');
+    expect(screen.getByTestId('order-distribution').textContent).toBe('5 × Caja x 12');
   });
 
-  it('con presentationName null pinta «Sin presentación»', () => {
-    renderCell(FINISHED_ORDER_PRESENTATION_COLUMN_ID, { ...BASE_ORDER, presentationName: null });
+  it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {
+    renderCell(FINISHED_ORDER_PRESENTATION_COLUMN_ID, { ...BASE_ORDER, presentationLines: [] });
 
-    expect(screen.getByTestId('order-presentation')).toHaveTextContent('Sin presentación');
+    expect(screen.getByTestId('order-distribution')).toHaveTextContent('Sin presentación');
+  });
+
+  it('QC-170 R42: la cantidad lleva la unidad del pedido', () => {
+    renderCell(FINISHED_ORDER_QUANTITY_COLUMN_ID, { ...BASE_ORDER, unitId: 'unit-l', unitLabel: 'L' });
+
+    expect(screen.getByText('12.5 L')).toBeInTheDocument();
   });
 });
 

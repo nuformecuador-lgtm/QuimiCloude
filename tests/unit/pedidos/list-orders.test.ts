@@ -38,6 +38,7 @@ import type { ListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
+import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -76,8 +77,8 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
+    unitId: null,
     ...overrides,
   }
 }
@@ -93,6 +94,7 @@ function dobles(opciones: {
   // este doble cuando el caso no necesita otra cosa.
   idsQueCasan?: readonly string[] | null
   presentaciones?: readonly PresentationRef[]
+  unidades?: readonly UnitRef[]
 }) {
   // Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- porque lo que este archivo
   // afirma es lo que se LE PASO a cada doble: sin ellos, TypeScript infiere una tupla vacia y
@@ -136,17 +138,24 @@ function dobles(opciones: {
     (opciones.presentaciones ?? []).filter((ref) => ids.includes(ref.id)),
   )
 
+  // R42: una sola llamada al catalogo de unidades por pagina, con los ids DEDUPLICADOS.
+  const findUnitRefs = vi.fn(async (ids: readonly string[]) =>
+    (opciones.unidades ?? []).filter((ref) => ids.includes(ref.id)),
+  )
+
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
 
   return {
     orders,
     recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
     presentations: { findRefs } as unknown as PresentationCatalog,
+    units: { findRefs: findUnitRefs } as unknown as UnitCatalog,
     log,
     listAlive,
     findRefsIncludingDeleted,
     findIdsMatchingName,
     findRefs,
+    findUnitRefs,
   }
 }
 
@@ -180,9 +189,9 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
   return (error as PedidosError).code
 }
 
-// QC-35bis (2026-09-07): eran TRES consultas -lista, recetas y unidades-. Al salir la unidad del
-// pedido, la del catalogo de unidades desaparecio. Lo que R45 exige sigue afirmandose igual de
-// fuerte: el numero de consultas NO depende del numero de filas.
+// [Q4] deroga QC-35bis en la unidad: la consulta al catalogo de unidades vuelve (ver «la
+// unidad del pedido» mas abajo). Lo que R45 exige sigue afirmandose igual de fuerte: el numero
+// de consultas NO depende del numero de filas.
 describe('listOrders — dos consultas por pagina, tenga 1 fila o 25 (R45)', () => {
   it('una sola llamada al catalogo de recetas, con los ids DEDUPLICADOS (R45)', async () => {
     // Seis pedidos y dos recetas: si el caso de uso preguntara por fila, habria seis llamadas al
@@ -654,33 +663,25 @@ describe('listOrders — invocaciones de puerto por pagina, con y sin busqueda (
   })
 })
 
-// QC-123 T7 — las LECTURAS no recalculan (R12). No es solo comportamiento: es que el TIPO de
-// las dependencias no deja ni pedir `products` ni `units`. Las dos comprobaciones de abajo se
-// verifican por caminos distintos y ninguna sustituye a la otra:
-//  (a) TIPO — si `ListOrdersDeps` o `GetOrderDeps` alguna vez ganaran `products` o `units`, las
-//      cuatro constantes de mas abajo dejarian de aceptar `true` y `pnpm run typecheck` se
-//      pondria rojo EN ESTA LINEA, sin tocar el resto del archivo.
-//  (b) COMPORTAMIENTO — un doble que EXPLOTA si algo intenta LEER `products` o `units` de las
-//      deps demuestra que, ademas de no declararlos, el caso de uso nunca los toca en tiempo de
-//      ejecucion.
-describe('listOrders (y getOrder) — las lecturas no recalculan (R12)', () => {
-  it('el listado no recibe catalogo de productos ni de unidades (R12)', async () => {
+// QC-123 T7 — las LECTURAS no recalculan el coste (R12): el TIPO de las dependencias no deja
+// pedir `products`. [Q4] deroga esa misma nota para `units`: `ListOrdersDeps`/`GetOrderDeps`
+// SI ganan `units` -no para costear, solo para la etiqueta de `unitId` (R42)-, asi que la
+// afirmacion de TIPO se queda solo con `products` y la de COMPORTAMIENTO se divide en dos: el
+// listado no lee `products` en ningun caso, y SI lee `units` una vez por pagina.
+describe('listOrders (y getOrder) — las lecturas no recalculan el coste (R12)', () => {
+  it('el listado no recibe catalogo de productos (R12)', async () => {
     const listadoSinProductos: 'products' extends keyof ListOrdersDeps ? false : true = true
-    const listadoSinUnidades: 'units' extends keyof ListOrdersDeps ? false : true = true
     const fichaSinProductos: 'products' extends keyof GetOrderDeps ? false : true = true
-    const fichaSinUnidades: 'units' extends keyof GetOrderDeps ? false : true = true
-    expect([listadoSinProductos, listadoSinUnidades, fichaSinProductos, fichaSinUnidades]).toEqual(
-      [true, true, true, true],
-    )
+    expect([listadoSinProductos, fichaSinProductos]).toEqual([true, true])
 
     const d = dobles({
       pagina: pagina([fila({ id: 'o-1', ingredientsCost: '150.0000' })]),
     })
-    // El doble real no tiene ni `products` ni `units`; el Proxy ademas hace explicito que
-    // LEERLOS -aunque alguien los colara con un cast- tira el caso de uso abajo.
+    // El doble real no tiene `products`; el Proxy ademas hace explicito que LEERLO -aunque
+    // alguien lo colara con un cast- tira el caso de uso abajo.
     const vigilado = new Proxy(d, {
       get(target, prop, receiver) {
-        if (prop === 'products' || prop === 'units') {
+        if (prop === 'products') {
           throw new Error(`listOrders no deberia leer '${String(prop)}': las lecturas no recalculan (R12)`)
         }
         return Reflect.get(target, prop, receiver)
@@ -725,36 +726,52 @@ describe('listOrders — el importe no es consultable (R17)', () => {
   })
 })
 
-describe('listOrders — la presentacion del pedido (R21, R22)', () => {
+describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
   const PRESENTACION_A = '77777777-7777-4777-8777-777777777777'
+  const PRESENTACION_B = '99999999-9999-4999-8999-999999999999'
 
-  it('R22: una sola llamada al catalogo de presentaciones por pagina, con alguna presentacion en la pagina', async () => {
+  it('R26: una sola llamada al catalogo de presentaciones por pagina, con los ids unicos de TODAS las lineas', async () => {
     const filas = [
-      fila({ id: 'o-1', presentationId: PRESENTACION_A }),
-      fila({ id: 'o-2', presentationId: PRESENTACION_A }),
-      fila({ id: 'o-3', presentationId: null }),
+      fila({
+        id: 'o-1',
+        presentationLines: [
+          { presentationId: PRESENTACION_A, packages: 5 },
+          { presentationId: PRESENTACION_B, packages: 1 },
+        ],
+      }),
+      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3 }] }),
+      fila({ id: 'o-3', presentationLines: [] }),
     ]
     const d = dobles({
       pagina: pagina(filas, { total: 3 }),
-      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L', content: null }],
+      presentaciones: [
+        { id: PRESENTACION_A, name: 'Bidon 20L', content: null, unitId: 'unidad-1' },
+        { id: PRESENTACION_B, name: 'Botella 1L', content: null, unitId: 'unidad-1' },
+      ],
     })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(d.findRefs).toHaveBeenCalledTimes(1)
-    expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A])
-    expect(salida.items[0]?.presentationName).toBe('Bidon 20L')
-    expect(salida.items[1]?.presentationName).toBe('Bidon 20L')
-    expect(salida.items[2]?.presentationName).toBeNull()
+    expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A, PRESENTACION_B])
+    expect(salida.items[0]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5 },
+      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1 },
+    ])
+    expect(salida.items[1]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3 },
+    ])
+    // R27: sin reparto, lista vacia; no es un error de carga.
+    expect(salida.items[2]?.presentationLines).toEqual([])
   })
 
-  it('R22: ninguna llamada al catalogo de presentaciones si ningun pedido de la pagina tiene presentacion', async () => {
+  it('R27: ninguna llamada al catalogo de presentaciones si ningun pedido de la pagina tiene reparto', async () => {
     const d = dobles({ pagina: pagina([fila({ id: 'o-1' }), fila({ id: 'o-2' })], { total: 2 }) })
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(d.findRefs).not.toHaveBeenCalled()
-    expect(salida.items.every((item) => item.presentationName === null)).toBe(true)
+    expect(salida.items.every((item) => item.presentationLines.length === 0)).toBe(true)
   })
 
   it('R21: ordenar o filtrar por presentacion se OMITE y se anota, como cualquier campo no declarado', async () => {
@@ -777,5 +794,49 @@ describe('listOrders — la presentacion del pedido (R21, R22)', () => {
     )
     expect(consultaRecibida(porFiltro.listAlive.mock.calls).filters).toEqual({})
     expect(porFiltro.log.ignoredFields).toHaveBeenCalledWith('orders', ['presentationId'])
+  })
+})
+
+describe("listOrders — la unidad del pedido (R42, [Q4] deroga QC-35bis)", () => {
+  const UNIDAD_A = '88888888-8888-4888-8888-888888888888'
+
+  it('R42: una sola llamada al catalogo de unidades por pagina, con los ids DEDUPLICADOS', async () => {
+    const filas = [
+      fila({ id: 'o-1', unitId: UNIDAD_A }),
+      fila({ id: 'o-2', unitId: UNIDAD_A }),
+      fila({ id: 'o-3', unitId: null }),
+    ]
+    const d = dobles({
+      pagina: pagina(filas, { total: 3 }),
+      unidades: [{ id: UNIDAD_A, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.findUnitRefs).toHaveBeenCalledTimes(1)
+    expect(d.findUnitRefs.mock.calls[0]?.[0]).toEqual([UNIDAD_A])
+    expect(salida.items[0]?.unitLabel).toBe('L')
+    expect(salida.items[1]?.unitLabel).toBe('L')
+    expect(salida.items[2]?.unitLabel).toBeNull()
+  })
+
+  it('R42: ninguna llamada al catalogo de unidades si ningun pedido de la pagina tiene unidad', async () => {
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' }), fila({ id: 'o-2' })], { total: 2 }) })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.findUnitRefs).not.toHaveBeenCalled()
+    expect(salida.items.every((item) => item.unitLabel === null)).toBe(true)
+  })
+
+  it('sin simbolo, la etiqueta cae al nombre de la unidad', async () => {
+    const d = dobles({
+      pagina: pagina([fila({ id: 'o-1', unitId: UNIDAD_A })], { total: 1 }),
+      unidades: [{ id: UNIDAD_A, name: 'Litro', symbol: null, baseUnitId: null, factor: null }],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(salida.items[0]?.unitLabel).toBe('Litro')
   })
 })

@@ -21,7 +21,10 @@ const POR_EMPACAR_ORDER: PackingOrderRow = {
   id: 'order-1',
   numberText: '2026-0000021',
   recipeName: 'Jarabe simple',
-  presentationName: 'Caja x 12',
+  quantity: '40',
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  unitId: null,
+  unitLabel: null,
   packages: '8',
   status: 'POR_EMPACAR',
   packedByName: null,
@@ -117,6 +120,6 @@ describe('R14 - receta, presentacion y envases', () => {
     cleanup();
 
     renderCell(PACKING_ORDER_PRESENTATION_COLUMN_ID, POR_EMPACAR_ORDER);
-    expect(screen.getByTestId('order-presentation')).toHaveTextContent('Caja x 12');
+    expect(screen.getByTestId('order-distribution')).toHaveTextContent('5 × Caja x 12');
   });
 });

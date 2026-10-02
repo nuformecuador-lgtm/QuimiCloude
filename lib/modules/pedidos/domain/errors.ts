@@ -81,12 +81,15 @@ export class RecipeNotFoundError extends PedidosError {
   }
 }
 
-/*
- * QC-35bis (2026-09-07): `UnitNotFoundError` (code `unit_not_found`) DESAPARECIO junto con la
- * unidad del pedido. No queda ningun caso de uso que pueda emitirlo, asi que dejar la clase
- * publicada seria ofrecer un codigo de error que nada produce -y que el traductor de la pantalla
- * tendria que seguir mapeando por si acaso-.
- */
+/** La unidad del pedido no existe en el catalogo de la empresa de quien escribe, o es de otra
+ *  empresa. Reusa el codigo compartido con `unidades`. */
+export class UnitNotFoundError extends PedidosError {
+  readonly code = 'unit_not_found';
+
+  constructor(diagnostic?: string) {
+    super('unit_not_found', diagnostic);
+  }
+}
 
 /**
  * La presentacion indicada no existe en el catalogo de la empresa de quien escribe -incluida
@@ -190,6 +193,54 @@ export class NoWholePackageError extends PedidosError {
 
   constructor(diagnostic?: string) {
     super('no_whole_package', diagnostic);
+  }
+}
+
+/** El pedido no tiene ninguna linea de reparto: no se puede empezar el empaque sin saber en que
+ *  presentaciones se entrega. */
+export class OrderWithoutDistributionError extends PedidosError {
+  readonly code = 'order_without_distribution';
+
+  constructor(diagnostic?: string) {
+    super('order_without_distribution', diagnostic);
+  }
+}
+
+/** El reparto de un pedido intenta cambiarse cuando el empaque ya comenzo o el pedido esta
+ *  cerrado. */
+export class OrderPresentationLineNotEditableError extends PedidosError {
+  readonly code = 'order_presentation_line_not_editable';
+
+  constructor(diagnostic?: string) {
+    super('order_presentation_line_not_editable', diagnostic);
+  }
+}
+
+/** La suma de envases (en la unidad del pedido) del reparto pasa de la cantidad del pedido. */
+export class OrderDistributionExceedsQuantityError extends PedidosError {
+  readonly code = 'order_distribution_exceeds_quantity';
+
+  constructor(diagnostic?: string) {
+    super('order_distribution_exceeds_quantity', diagnostic);
+  }
+}
+
+/** El pedido no tiene unidad asignada: no se puede repartir en presentaciones sin ella. */
+export class OrderWithoutUnitError extends PedidosError {
+  readonly code = 'order_without_unit';
+
+  constructor(diagnostic?: string) {
+    super('order_without_unit', diagnostic);
+  }
+}
+
+/** Una linea del reparto pide convertir su presentacion a la unidad del pedido y las dos
+ *  unidades no comparten unidad base. Reusa el codigo compartido con `unidades`. */
+export class IncompatibleUnitsError extends PedidosError {
+  readonly code = 'incompatible_units';
+
+  constructor(diagnostic?: string) {
+    super('incompatible_units', diagnostic);
   }
 }
 

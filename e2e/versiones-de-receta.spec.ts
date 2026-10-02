@@ -64,6 +64,7 @@ const adminUser = {
 
 let companyId: string | null = null;
 let presentationId: string | null = null;
+let unitId: string | null = null;
 let originalId: string | null = null;
 let versionId: string | null = null;
 let plainRecipeId: string | null = null;
@@ -88,6 +89,7 @@ test.beforeAll(async () => {
     await prisma.reservationMovement.deleteMany({ where: scope });
     await prisma.inventoryMovement.deleteMany({ where: scope });
     await prisma.orderAssignment.deleteMany({ where: scope });
+    await prisma.orderPresentationLine.deleteMany({ where: scope });
     await prisma.order.deleteMany({ where: scope });
     await prisma.productBatch.deleteMany({ where: scope });
     await prisma.product.deleteMany({ where: { ...scope, recipeId: { not: null } } });
@@ -138,6 +140,7 @@ test.beforeAll(async () => {
     where: { nameNormalized: 'litro', companyId: null },
     select: { id: true },
   });
+  unitId = unit.id;
 
   const presentation = await prisma.presentation.create({
     data: {
@@ -259,6 +262,7 @@ test.afterAll(async () => {
     byCompany((id) => prisma.reservationMovement.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.inventoryMovement.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderAssignment.deleteMany({ where: { companyId: id } })),
+    byCompany((id) => prisma.orderPresentationLine.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.order.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.productBatch.deleteMany({ where: { companyId: id } })),
     byCompany((id) =>
@@ -338,7 +342,14 @@ test.describe('version de receta en el pedido', () => {
     await page.locator(`[data-testid="recipe-version-select-option"][data-value="${versionId}"]`).click();
     await expect(versionValue).toHaveValue(versionId);
 
-    const presentationPicker = page.getByTestId('presentation-select');
+    // QC-170: unidad del pedido y reparto en lugar de la presentacion unica. Toda la cantidad en
+    // una sola linea: con contenido 1, un envase por unidad del pedido.
+    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
+    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+    await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+
+    const distribution = page.getByTestId('order-distribution-field');
+    const presentationPicker = distribution.getByTestId('presentation-select');
     await presentationPicker.click();
     await presentationPicker.fill(PRESENTATION_NAME);
     const presentationOption = page
@@ -346,9 +357,18 @@ test.describe('version de receta en el pedido', () => {
       .filter({ hasText: PRESENTATION_NAME });
     await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
     await presentationOption.click();
-    await expect(page.getByTestId('presentation-value')).toHaveValue(presentationId ?? '');
-
-    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
+    await distribution.getByTestId('order-distribution-add-packages').fill(ORDER_QUANTITY);
+    await distribution.getByTestId('order-distribution-add').click();
+    await expect(
+      distribution.locator(
+        `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
+      ),
+    ).toHaveCount(1);
+    await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
+      'data-state',
+      'ready',
+      { timeout: 60_000 },
+    );
 
     await page.getByTestId('order-form-submit').click();
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });

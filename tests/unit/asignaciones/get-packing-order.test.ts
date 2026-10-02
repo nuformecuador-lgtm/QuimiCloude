@@ -24,7 +24,8 @@ const RESUMEN = {
   quantity: '10.0000',
   priority: 'ALTA',
   status: 'POR_EMPACAR',
-  presentationId: 'presentacion-1',
+  presentationLines: [{ presentationId: 'presentacion-1', packages: 1 }],
+  unitId: 'unidad-1',
   finishedAt: null,
   packedBy: null,
 };
@@ -52,7 +53,15 @@ function montar(options?: { readonly items?: readonly unknown[] }): Dobles {
     assignments: { listByOrdersInCompany: vi.fn(async () => []) },
     recipes: { findRefsIncludingDeleted: vi.fn(async () => [{ id: 'receta-1', name: 'Desengrasante', ownName: 'Desengrasante', isUnderReview: false, original: null, isDeleted: false }]) },
     people: { findRefsIncludingDeletedInCompany: vi.fn(async () => []) },
-    presentations: { findRefs: vi.fn(async () => [{ id: 'presentacion-1', name: 'Botella 1L' }]) },
+    presentations: {
+      findRefs: vi.fn(async () => [
+        { id: 'presentacion-1', name: 'Botella 1L' },
+        { id: 'presentacion-2', name: 'Botella 200 ml' },
+      ]),
+    },
+    units: {
+      findRefs: vi.fn(async () => [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]),
+    },
     products: { findFinishedGoodsReceipts },
     now: () => new Date('2026-09-25T12:00:00.000Z'),
   } as unknown as GetPackingOrderDeps;
@@ -91,7 +100,10 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       id: PEDIDO,
       numberText: expect.any(String),
       recipeName: 'Desengrasante',
-      presentationName: 'Botella 1L',
+      quantity: '10.0000',
+      presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1 }],
+      unitId: 'unidad-1',
+      unitLabel: 'L',
       packages: '5',
       status: 'POR_EMPACAR',
       packedByName: null,
@@ -115,5 +127,48 @@ describe('getPackingOrder — R24: no existe, esta de baja, es de otra empresa o
     const getPackingOrder = createGetPackingOrder(deps);
 
     await expect(getPackingOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotFoundError);
+  });
+});
+
+describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla del Empacador', () => {
+  it('R47: trae TODAS las lineas del reparto en orden de alta y la cantidad con la etiqueta de su unidad', async () => {
+    const conDosLineas = {
+      ...RESUMEN,
+      presentationLines: [
+        { presentationId: 'presentacion-2', packages: 5 },
+        { presentationId: 'presentacion-1', packages: 1 },
+      ],
+    };
+    const { deps } = montar({ items: [conDosLineas] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.presentationLines).toEqual([
+      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 5 },
+      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1 },
+    ]);
+    expect(row.quantity).toBe('10.0000');
+    expect(row.unitLabel).toBe('L');
+  });
+
+  it('R47: un `POR_EMPACAR` sin lineas sale con `presentationLines: []` y su estado, para que la pantalla avise que falta el reparto', async () => {
+    const { deps } = montar({ items: [{ ...RESUMEN, presentationLines: [] }] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.status).toBe('POR_EMPACAR');
+    expect(row.presentationLines).toEqual([]);
+  });
+
+  it('R42: un pedido sin unidad sale con `unitId` y `unitLabel` a null', async () => {
+    const { deps } = montar({ items: [{ ...RESUMEN, unitId: null }] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.unitId).toBeNull();
+    expect(row.unitLabel).toBeNull();
   });
 });

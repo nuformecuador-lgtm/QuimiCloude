@@ -45,12 +45,12 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 61 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 65 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 61 y no 56: entran `customer_not_found` (QC-154), `order_packing_taken`,
-      // `order_not_packable` y `order_produced_frozen` (QC-168) y `recipe_version_under_review`
-      // (QC-172).
-      expect(ERROR_CODES).toHaveLength(61)
+      // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
+      // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
+      // `recipe_version_under_review` (QC-172).
+      expect(ERROR_CODES).toHaveLength(65)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

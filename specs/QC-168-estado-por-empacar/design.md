@@ -1,5 +1,11 @@
 # QC-168 — estado-por-empacar · design.md
 
+> **Enmienda del 2026-09-26 (QC-170).** §2 queda derogado en la mitad del lote (el Finalizar sigue
+> consumiendo material pero ya no da de alta el lote, que pasa a Terminar); §3 queda derogado solo
+> para `finishPackingAliveById`, que sí abre la unidad de trabajo de inventario; §4 se ajusta a la
+> agregación por líneas de reparto. Detalle en
+> `specs/QC-170-pedido-en-varias-presentaciones/design.md > 8`.
+
 > Medido sobre `origin/dev` 7e1087af (incluye QC-150 y QC-141). Todo lo que aquí se cita del código
 > existe en ese commit; lo que no se pudo medir está marcado como tal.
 

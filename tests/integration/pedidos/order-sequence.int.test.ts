@@ -137,14 +137,14 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
-function pedido(presentationId: string, overrides: Partial<NewOrder> = {}): NewOrder {
+function pedido(unitId: string, overrides: Partial<NewOrder> = {}): NewOrder {
   return {
     recipeId: recetaId,
     quantity: '10.0000',
     priority: 'BAJA',
     status: 'PENDIENTE',
-    presentationId,
-    presentationContent: null,
+    unitId,
+    presentationLines: [],
     ...overrides,
   };
 }
@@ -152,7 +152,7 @@ function pedido(presentationId: string, overrides: Partial<NewOrder> = {}): NewO
 async function alta(fixture: Fixture, year: number, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
   return withOrderTransaction((tx) =>
     createOrderWriteRepository(tx).create(
-      pedido(fixture.presentationId, overrides),
+      pedido(unitId, overrides),
       year,
       fixture.actorId,
       instantIn(year),

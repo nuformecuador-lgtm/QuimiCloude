@@ -75,6 +75,42 @@ export {
   type OrderFormProps,
   type OrderSheetSection,
 } from './order-form';
+export {
+  ORDER_DISTRIBUTION_ADD_PACKAGES_TESTID,
+  ORDER_DISTRIBUTION_ADD_TESTID,
+  ORDER_DISTRIBUTION_AVAILABLE_TESTID,
+  ORDER_DISTRIBUTION_ERROR_TESTID,
+  ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
+  ORDER_DISTRIBUTION_LINE_PROBLEM_TESTID,
+  ORDER_DISTRIBUTION_LINE_REMOVE_TESTID,
+  ORDER_DISTRIBUTION_LINE_TESTID,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  ORDER_DISTRIBUTION_TESTID,
+  ORDER_DISTRIBUTION_WARNING_TESTID,
+  ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID,
+  OrderDistributionField,
+  type OrderDistributionFieldProps,
+} from './order-distribution-field';
+export {
+  ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_TESTID,
+  OrderDistributionDialog,
+  type OrderDistributionDialogProps,
+  type OrderDistributionDraft,
+} from './order-distribution-dialog';
+export {
+  ORDER_DISTRIBUTION_DEBOUNCE_MS,
+  availabilityBlocksSave,
+  fromOrderPresentationLines,
+  toPresentationLinesInput,
+  useOrderDistributionAvailability,
+  type OrderDistributionAvailability,
+  type OrderDistributionAvailabilityInput,
+  type OrderDistributionLine,
+} from './use-order-distribution-availability';
 export { OrderListEmpty } from './order-list-empty';
 export {
   ORDER_INGREDIENTS_EMPTY_TESTID,
@@ -117,7 +153,9 @@ export { OrderListSection } from './order-list-section';
 export { ORDER_SKELETON_COLUMN_COUNT, OrderListSkeleton } from './order-list-skeleton';
 export {
   FINAL_ORDER_REASON,
+  ORDER_ACTION_DISTRIBUTION_TESTID,
   OrderRowActions,
+  acceptsDistributionEdit,
   isFinalOrderStatus,
   type OrderRowActionsProps,
 } from './order-row-actions';

@@ -6,6 +6,7 @@ import { orderCompanyScope } from './company-scope';
 
 import type { OrderStatus } from '../../../domain/order-classification';
 import type {
+  AssignedOrderPresentationLine,
   AssignedOrderSummary,
   OrderAssignmentTarget,
   OrderSummaryOrdering,
@@ -58,6 +59,13 @@ export async function findAliveOrderTargetById(
   return row === null ? null : toOrderAssignmentTarget(row);
 }
 
+/** Una fila de `order_presentation_lines`, ya en el orden de alta: la
+ *  consulta pide `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
+type AssignedOrderPresentationLineRow = {
+  readonly presentationId: string;
+  readonly packages: number;
+};
+
 type AssignedOrderSummaryRow = {
   readonly id: string;
   readonly orderYear: number;
@@ -66,13 +74,19 @@ type AssignedOrderSummaryRow = {
   readonly quantity: { toFixed(digits: number): string };
   readonly priority: string;
   readonly status: string;
-  readonly presentationId: string | null;
+  readonly unitId: string | null;
+  readonly presentationLines: readonly AssignedOrderPresentationLineRow[];
   readonly finishedAt: Date | null;
   readonly packedBy: string | null;
 };
 
 /** `select` unico de los dos listados de resumen: si uno gana una columna y el otro no, el
- *  tipo `AssignedOrderSummaryRow` lo dice enseguida. */
+ *  tipo `AssignedOrderSummaryRow` lo dice enseguida.
+ *
+ * El `orderBy` de `presentationLines` lleva sus literales fijados uno a uno -y no con un
+ * `as const` de todo el objeto-, porque este archivo no importa `@prisma/client`
+ * (`tests/unit/pedidos/module-contract.test.ts`) y Prisma exige un ARRAY MUTABLE de
+ * `SortOrder`, no una tupla de solo lectura. */
 const SUMMARY_SELECT = {
   id: true,
   orderYear: true,
@@ -81,10 +95,14 @@ const SUMMARY_SELECT = {
   quantity: true,
   priority: true,
   status: true,
-  presentationId: true,
+  unitId: true,
+  presentationLines: {
+    select: { presentationId: true, packages: true },
+    orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+  },
   finishedAt: true,
   packedBy: true,
-} as const;
+};
 
 /** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
  *  desempate para que sea total. Compartido por los dos listados de resumen para que no
@@ -116,7 +134,13 @@ export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOr
     quantity: row.quantity.toFixed(4),
     priority: row.priority as AssignedOrderSummary['priority'],
     status: row.status as OrderStatus,
-    presentationId: row.presentationId,
+    unitId: row.unitId,
+    presentationLines: row.presentationLines.map(
+      (line): AssignedOrderPresentationLine => ({
+        presentationId: line.presentationId,
+        packages: line.packages,
+      }),
+    ),
     finishedAt: row.finishedAt,
     packedBy: row.packedBy,
   };

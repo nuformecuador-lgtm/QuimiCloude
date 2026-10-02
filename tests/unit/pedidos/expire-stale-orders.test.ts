@@ -211,7 +211,7 @@ describe('createExpireStaleOrders — R26: un fallo no arrastra a los demas y qu
     })
     d.orders.lockAliveById.mockImplementation(async (id: string) => {
       if (id === PEDIDO_A_ID) throw new PedidoDeEjemploError()
-      return fakeOrderRow({ id, presentationId: null })
+      return fakeOrderRow({ id })
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])
     const findExpirable = vi.fn(async () => [candidato(PEDIDO_A_ID), candidato(PEDIDO_B_ID)])
@@ -279,7 +279,7 @@ describe('createExpireStaleOrders — R54: un fallo al listar empresas o candida
   it('una empresa que falla AL BUSCAR sus candidatos se anota y la siguiente se procesa igual', async () => {
     const d = fakeUnitOfWork({
       orders: {
-        lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id, presentationId: null })),
+        lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id })),
         cancelAlive: vi.fn(async () => 'ok' as const),
         setReservedAt: vi.fn(async () => undefined),
       },
@@ -323,7 +323,7 @@ describe('createExpireStaleOrders — R55: un pedido que falla siempre no se rei
       orders: {
         lockAliveById: vi.fn(async (id: string) => {
           if (idsQueFallan.has(id)) throw new PedidoDeEjemploError()
-          return fakeOrderRow({ id, presentationId: null })
+          return fakeOrderRow({ id })
         }),
         cancelAlive: vi.fn(async () => 'ok' as const),
         setReservedAt: vi.fn(async () => undefined),
@@ -362,7 +362,7 @@ describe('createExpireStaleOrders — empresa por empresa, sin que una lea los p
   it('el candidato de la empresa B nunca se busca con el umbral de la empresa A', async () => {
     const d = fakeUnitOfWork({
       orders: {
-        lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id, presentationId: null })),
+        lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id })),
         cancelAlive: vi.fn(async () => 'ok' as const),
         setReservedAt: vi.fn(async () => undefined),
       },
@@ -392,7 +392,7 @@ describe('createExpireStaleOrders — recorre lotes hasta vaciarlos, POR EMPRESA
   it('pide un segundo lote de la MISMA empresa cuando el primero viene LLENO, con el cursor del ultimo candidato, y pasa a la siguiente cuando llega vacio', async () => {
     const d = fakeUnitOfWork({
       orders: {
-        lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id, presentationId: null })),
+        lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id })),
         cancelAlive: vi.fn(async () => 'ok' as const),
         setReservedAt: vi.fn(async () => undefined),
       },

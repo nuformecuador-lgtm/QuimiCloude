@@ -871,7 +871,7 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([
       ['products_company_id_fkey', 'companies'],
       // La identidad del producto terminado suma estas dos: la presentacion (compuesta con
-      // company_id, mismo patron que orders_company_id_presentation_id_fkey) y la receta.
+      // company_id, mismo patron que order_presentation_lines_company_id_presentation_id_fkey) y la receta.
       ['products_company_id_presentation_id_fkey', 'presentations'],
       ['products_recipe_id_fkey', 'recipes'],
       ['products_unit_id_fkey', 'units'],

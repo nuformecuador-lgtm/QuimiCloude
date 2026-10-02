@@ -16,12 +16,7 @@ import { redirect } from 'next/navigation';
 import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { AsignacionesError, type Actor, type AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
-import {
-  ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PACKAGES_PARAM,
-  DELIVERED_ORDER_PARAM,
-  DELIVERED_ORDER_PRODUCT_PARAM,
-} from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, DELIVERED_ORDER_PARAM } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 const toErrorState = createErrorStateTranslator(
@@ -64,7 +59,12 @@ function finishFromFormData(formData: FormData): unknown {
   return { orderId: formData.get('orderId') };
 }
 
-/** Deja el pedido `POR_EMPACAR` y vuelve a la lista de pedidos asignados. */
+/**
+ * Deja el pedido `POR_EMPACAR` y vuelve a la lista de pedidos asignados.
+ *
+ * Finalizar ya no da de alta ningun lote, asi que la confirmacion ya no
+ * lleva envases ni producto -esa notificacion pasa a Terminar el empaque-.
+ */
 export async function finishAssignedOrderAction(
   _prevState: FinishAssignedOrderResult,
   formData: FormData,
@@ -72,22 +72,13 @@ export async function finishAssignedOrderAction(
   const actor = await currentActor();
 
   let numberText: string;
-  let packages: string;
-  let productName: string;
   try {
-    ({ numberText, packages, productName } = await asignaciones.finishAssignedOrder(
-      actor,
-      finishFromFormData(formData),
-    ));
+    ({ numberText } = await asignaciones.finishAssignedOrder(actor, finishFromFormData(formData)));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({
-    [DELIVERED_ORDER_PARAM]: numberText,
-    [DELIVERED_ORDER_PACKAGES_PARAM]: packages,
-    [DELIVERED_ORDER_PRODUCT_PARAM]: productName,
-  });
+  const query = new URLSearchParams({ [DELIVERED_ORDER_PARAM]: numberText });
   redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
 }

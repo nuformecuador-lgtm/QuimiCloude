@@ -175,8 +175,8 @@ function newOrder(fixture: Fixture, quantity = '1.0000'): NewOrder {
     quantity,
     priority: 'BAJA',
     status: 'PENDIENTE',
-    presentationId: fixture.presentationId,
-    presentationContent: null,
+    unitId: fixture.unitId,
+    presentationLines: [],
   };
 }
 

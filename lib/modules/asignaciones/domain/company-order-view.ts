@@ -2,6 +2,7 @@
 import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
 
 import type { OrderResponsible } from './assignment-view';
+import type { OrderDistributionLineView } from './order-distribution-view';
 
 export type CompanyOrderView = {
   readonly id: string;
@@ -10,8 +11,11 @@ export type CompanyOrderView = {
   readonly recipeName: string | null;
   /** Cadena decimal, nunca `number` (`docs/architecture.md > Anti-patrones`). */
   readonly quantity: string;
-  /** `null` = sin presentacion. */
-  readonly presentationName: string | null;
+  /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */
+  readonly presentationLines: readonly OrderDistributionLineView[];
+  /** La unidad de `quantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
+  readonly unitId: string | null;
+  readonly unitLabel: string | null;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   /** Todos los responsables del pedido, incluido el propio actor si lo es. */

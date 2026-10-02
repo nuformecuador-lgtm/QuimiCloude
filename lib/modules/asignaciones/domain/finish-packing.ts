@@ -12,7 +12,16 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, OrderNotPackableError, OrderPackingTakenError, ValidationError } from './errors';
+import {
+  IncompatibleUnitsError,
+  OrderNotFoundError,
+  OrderNotPackableError,
+  OrderPackingTakenError,
+  OrderWithoutUnitError,
+  PresentationWithoutContentError,
+  RecipeNotFoundError,
+  ValidationError,
+} from './errors';
 
 import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
 
@@ -60,9 +69,15 @@ export function createFinishPacking(
     const now = deps.now?.() ?? new Date();
     const result = await deps.orders.finishPackingAliveById(orderId, actor.companyId, actor.id, now);
 
-    if (result === 'ok') return { numberText };
+    // El `'ok'` de Terminar trae el lote por linea del reparto; esta pantalla solo
+    // confirma el numero del pedido, asi que no hace falta devolverlo mas alla de este metodo.
+    if (typeof result === 'object') return { numberText };
     if (result === 'not_packer') throw new OrderPackingTakenError();
     if (result === 'not_packable') throw new OrderNotPackableError();
+    if (result === 'recipe_not_found') throw new RecipeNotFoundError();
+    if (result === 'presentation_without_content') throw new PresentationWithoutContentError();
+    if (result === 'incompatible_units') throw new IncompatibleUnitsError();
+    if (result === 'order_without_unit') throw new OrderWithoutUnitError();
     throw new OrderNotFoundError(); // 'not_found'
   };
 }

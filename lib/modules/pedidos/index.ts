@@ -26,6 +26,7 @@ export type {
   OrderAssignmentTarget,
   OrderCatalog,
   AssignedOrderSummary,
+  AssignedOrderPresentationLine,
   OrderSummaryOrdering,
   FinishedGoodsReceipt,
 } from './domain/order-catalog';
@@ -71,6 +72,13 @@ export {
   ValidationError,
   InsufficientMaterialError,
   RecipeWithoutLinesError,
+  PresentationWithoutContentError,
+  UnitNotFoundError,
+  IncompatibleUnitsError,
+  OrderWithoutUnitError,
+  OrderDistributionExceedsQuantityError,
+  OrderWithoutDistributionError,
+  OrderPresentationLineNotEditableError,
 } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los
@@ -85,6 +93,11 @@ export {
   updateOrderSchema,
   cancelOrderSchema,
   quoteOrderCostSchema,
+  presentationLinesSchema,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  orderPresentationAvailabilitySchema,
+  updateOrderDistributionSchema,
   EDITABLE_STATUS_VALUES,
 } from './domain/order-input';
 export type {
@@ -92,6 +105,8 @@ export type {
   UpdateOrderInput,
   CancelOrderInput,
   QuoteOrderCostInput,
+  OrderPresentationAvailabilityInput,
+  UpdateOrderDistributionInput,
   EditableOrderStatus,
 } from './domain/order-input';
 
@@ -102,7 +117,16 @@ export { assertTransition, isAllowedTransition } from './domain/order-transition
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
  *  `OrderEdit` es lo que acepta `updateAlive`, sin `status`. */
-export type { NewOrder, OrderEdit, OrderRow, OrderView, OrderSummary } from './domain/order-view';
+export type {
+  NewOrder,
+  OrderEdit,
+  OrderPresentationLineRow,
+  OrderPresentationLineView,
+  OrderPresentationLineWrite,
+  OrderRow,
+  OrderView,
+  OrderSummary,
+} from './domain/order-view';
 
 /** QC-57 (R25, R31): el contrato generico de consulta de lista y la lista blanca de pedidos.
  *  `listOrdersSchema`, `ListOrdersInput` y `OrderFilters` se fueron con el: el listado de
@@ -145,7 +169,7 @@ export type { TransitionOrderDeps } from './domain/transition-order';
  *  y Terminar el empaque, cada uno un `UPDATE` condicional sin abrir la unidad de trabajo de
  *  `inventario`. `lib/composition` las cablea sobre el adaptador driven de `pedidos`. */
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
-export type { OrderPackingDeps } from './domain/order-packing';
+export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
@@ -163,3 +187,22 @@ export { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './domain/order
 
 export { createQuoteOrderCost } from './domain/quote-order-cost';
 export type { QuoteOrderCostDeps, OrderCostQuote } from './domain/quote-order-cost';
+
+/** La edicion ACOTADA del reparto y la unidad, aparte de `updateOrder`. */
+export {
+  createUpdateOrderPresentationLines,
+  REPARTO_EDITABLE_STATUSES,
+} from './domain/update-order-presentation-lines';
+export type {
+  UpdateOrderPresentationLinesDeps,
+  UpdateOrderPresentationLinesInput,
+  UpdateOrderPresentationLinesResult,
+} from './domain/update-order-presentation-lines';
+
+/** «Cuanto queda disponible», de solo lectura -no persiste, no rechaza-.
+ *  `quoteOrderPresentationAvailabilityAction` la llama en cada cambio de cantidad, unidad o reparto. */
+export { createQuoteOrderPresentationAvailability } from './domain/order-presentation-availability';
+export type {
+  OrderPresentationAvailability,
+  OrderPresentationAvailabilityDeps,
+} from './domain/order-presentation-availability';
