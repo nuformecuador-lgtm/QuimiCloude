@@ -192,7 +192,8 @@ mapa R → test:
 |---|---|
 | R1, R2, R3, R12 | `tests/unit/recetas/create-recipe-version.test.ts` |
 | R4, R5 | `create-recipe-version.test.ts`; `recipe-versions-repository.int.test.ts` |
-| R6, R7, R22 | `update-recipe-version.test.ts`; `update-recipe.test.ts` |
+| R6, R22 | `update-recipe-version.test.ts` (corregido el 2026-10-02 tras la revisión: `update-recipe.test.ts` no los cubre) |
+| R7 | `update-recipe-version.test.ts`; `update-recipe.test.ts` |
 | R8 | `get-recipe.test.ts`; `recipe-catalog.test.ts`; `recipe-versions-repository.int.test.ts` |
 | R9 | `recipe-versions-repository.int.test.ts` |
 | R10 | `list-recipe-versions.test.ts` |

@@ -332,6 +332,9 @@ Componente nuevo `app/(private)/pedidos/components/recipe-version-select.tsx` (e
 
 `order-form.tsx`:
 - Estado `version: { id; name } | null`; `chooseRecipe` lo pone a `null` (R28).
+  > **Enmienda fechada — 2026-10-02.** En T11 el estado guarda solo `versionId: string | null`: el
+  > nombre no lo usa nada del formulario. Las props del selector siguen siendo las de este apartado.
+  > Detalle en `progress/impl_QC-172-versiones-de-receta.md > T11`.
 - `effectiveRecipeId = version?.id ?? recipe?.id`; `loadIngredients`, `quote.onRecipeChange` y
   `quote.onQuantityChange` usan ese id (R28). `getRecipeAction(versionId)` ya funciona: una versión
   viva es una receta viva para `findAliveById`.
