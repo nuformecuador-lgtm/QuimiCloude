@@ -280,8 +280,10 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     await renderPantalla();
 
     expect(screen.getByTestId(PRESENTATION_LIST_EMPTY_TESTID)).toBeInTheDocument();
-    // La accion util cuando no hay nada: crear la primera.
-    expect(screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID)).toBeInTheDocument();
+    // DOS disparadores con el mismo testid cuando la lista esta vacia (decision humana
+    // 2026-10-02): el de la cabecera, que vive en `page.tsx` y es siempre visible, y el de
+    // «crear la primera» del propio estado vacio, que sigue siendo un segundo punto de entrada.
+    expect(screen.getAllByTestId(PRESENTATION_CREATE_OPEN_TESTID)).toHaveLength(2);
     // Vacio de verdad: no se ofrece «volver a la primera pagina», que es otro caso distinto.
     expect(screen.queryByTestId(PRESENTATION_LIST_FIRST_PAGE_TESTID)).toBeNull();
 

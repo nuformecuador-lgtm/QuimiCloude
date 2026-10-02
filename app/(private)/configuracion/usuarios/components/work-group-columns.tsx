@@ -3,11 +3,13 @@
 import { PencilIcon, TrashIcon } from 'lucide-react';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
+import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { Button } from '@/components/ui/button';
 import { WORK_GROUP_QUERYABLE, type WorkGroupRow } from '@/lib/modules/identity';
 
 import {
   WORK_GROUP_ACTIONS_COLUMN_LABEL,
+  WORK_GROUP_MEMBERS_COLUMN_LABEL,
   WORK_GROUP_NAME_COLUMN_LABEL,
   deleteWorkGroupLabel,
   editWorkGroupLabel,
@@ -16,14 +18,18 @@ import {
 /**
  * Las columnas de la lista de grupos, declaradas **como datos** (R12, R15, R40; `design.md > 4`).
  *
- * **UNA columna de datos —el nombre— y una de acciones. Ninguna mas, y eso ES el requisito**
- * (R12, decision cerrada 5):
+ * **DOS columnas de datos —el nombre y los miembros— y una de acciones.** `WorkGroupRow` traia
+ * antes exactamente `id` y `name`: ese recorte fue deliberado mientras el contrato no tenia otra
+ * forma de resolver la pertenencia. El humano lo levanto hoy, por fuera del proceso SDD completo,
+ * para que esta tabla muestre tambien QUE USUARIOS pertenecen a cada grupo —el mismo espiritu que
+ * «Responsables» en `/asignacion`—, asi que `WorkGroupRow` ahora trae ademas `members`.
  *
- *   - **Ningun conteo de miembros**, ni el de visibles ni el total. No es un olvido ni un recorte
- *     de alcance: `WorkGroupRow` tiene **exactamente `id` y `name`** —con un test que congela esas
- *     dos claves—, asi que ningun numero es alcanzable desde aqui. Calcularlo en el cliente seria
- *     inventar un dato que el contrato no devuelve. Los dos numeros y su presentacion («3 de 5»)
- *     son **QC-100**.
+ *   - **La columna de miembros pinta avatares, no un conteo.** Ningun numero al lado de la lista:
+ *     el conteo («3 de 5» visibles/total) sigue siendo **QC-100**, que es un requisito DISTINTO y
+ *     sigue sin estar hecho. Por decision del humano, esta columna reutiliza el MISMO componente
+ *     de avatares que `/asignacion` usa para «Responsables» —`ResponsibleAvatars`, en
+ *     `components/shared/responsible-avatars.tsx`—, ya generalizado para no depender del tipo
+ *     `OrderResponsible` de otro modulo: ahora acepta cualquier `{ userId, displayName }`.
  *   - **Ningun identificador tecnico, ningun nombre normalizado, ninguna empresa y ninguna marca
  *     de baja**: la fila no los trae, y eso lo impide el TIPO, no una promesa.
  *
@@ -49,14 +55,16 @@ import {
 
 /** Ids de las columnas. Constantes porque los comparten la tabla y los tests (R41). */
 export const WORK_GROUP_NAME_COLUMN_ID = 'name';
+export const WORK_GROUP_MEMBERS_COLUMN_ID = 'members';
 export const WORK_GROUP_ACTIONS_COLUMN_ID = 'actions';
 
 /**
- * Cuantas columnas hay. Existe para que el esqueleto de carga —que lo pinta un Server Component y
- * por tanto **no puede importar este modulo de cliente**— pinte tantas celdas como columnas, y
- * para que el test lo ate a la longitud real en vez de dejarlo desincronizarse en silencio.
+ * Cuantas columnas hay: el nombre, los miembros y las acciones. Existe para que el esqueleto de
+ * carga —que lo pinta un Server Component y por tanto **no puede importar este modulo de
+ * cliente**— pinte tantas celdas como columnas, y para que el test lo ate a la longitud real en
+ * vez de dejarlo desincronizarse en silencio.
  */
-export const WORK_GROUP_COLUMN_COUNT = 2;
+export const WORK_GROUP_COLUMN_COUNT = 3;
 
 export const WORK_GROUP_ROW_ACTIONS_TESTID = 'work-group-row-actions';
 export const WORK_GROUP_ACTION_EDIT_TESTID = 'work-group-action-edit';
@@ -73,7 +81,7 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
 export type WorkGroupRowActionHandler = (group: WorkGroupRow) => void;
 
 export type WorkGroupRowActionsProps = {
-  /** La fila del listado. **Dos claves**, `id` y `name`, y ninguna mas: lo impide el tipo (R12). */
+  /** La fila del listado: `id`, `name` y `members`, y ninguna mas: lo impide el tipo (R12). */
   readonly group: WorkGroupRow;
   /**
    * Si la sesion trae `usuarios.modificar` (R9). **Decision de PRESENTACION**, resuelta en el
@@ -184,12 +192,29 @@ export function createWorkGroupColumns({
       cell: (group) => group.name,
     },
     {
+      id: WORK_GROUP_MEMBERS_COLUMN_ID,
+      label: WORK_GROUP_MEMBERS_COLUMN_LABEL,
+      align: 'start',
+      // Sin `sortable` ni `filter`: la lista blanca (`WORK_GROUP_QUERYABLE`) no declara esta
+      // columna como ordenable ni filtrable, y no se inventa una capacidad que el contrato no
+      // soporta.
+      cell: (group) => (
+        <ResponsibleAvatars
+          responsibles={group.members.map((member) => ({
+            userId: member.id,
+            displayName: member.displayName,
+          }))}
+          overflowLabel={(remaining) => `Ver los ${remaining} miembros restantes`}
+        />
+      ),
+    },
+    {
       id: WORK_GROUP_ACTIONS_COLUMN_ID,
       label: WORK_GROUP_ACTIONS_COLUMN_LABEL,
       align: 'end',
       // Sin `sortable` (ordenar por unos botones no significa nada) y sin `filter` (la lista
       // blanca no declara ninguno). `pinnable: false` para que el usuario no pueda fijarla y tapar
-      // la unica columna de datos.
+      // las columnas de datos.
       pinnable: false,
       cell: (group) => (
         <WorkGroupRowActions

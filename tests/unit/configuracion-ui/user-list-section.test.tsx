@@ -1,9 +1,16 @@
-// QC-67 T7 — La seccion de la lista de usuarios y sus tres estados: R7, R11, R18, R19, R24.
+// QC-67 T7 — La seccion de la lista de usuarios y sus tres estados: R7, R11, R18, R19.
 //
-// **Las DOS lecturas estan mockeadas** por su RUTA EXACTA —`user-actions` y `role-actions`—, que
-// es el borde del modulo `identity` y lo unico que permite ejercitar lista, vacio, error y
-// degradado sin base de datos. El resto del arbol es el real: la seccion, la tabla compartida y
-// las columnas.
+// **`listUsersAction` esta mockeada** por su RUTA EXACTA, el borde del modulo `identity` que
+// permite ejercitar lista, vacio y error sin base de datos. El resto del arbol es el real: la
+// seccion, la tabla compartida y las columnas. `role-actions` sigue doblada en este archivo
+// porque dos casos montan la PAGINA completa (`UsuariosPage`), que si pide el catalogo de roles;
+// la seccion misma ya NO lo pide -lo trae `page.tsx` una sola vez y lo baja por props (R43)-, asi
+// que `roles`/`rolesError` llegan a `renderSeccion` como argumentos, no como un mock de accion.
+//
+// **El disparador del alta (`UserCreateAction`) YA NO vive aqui.** Vive en `page.tsx`, junto al
+// `<h1>` (decision humana del 2026-09-17, extendida al mover el boton a la cabecera): este
+// archivo no lo monta y por tanto no afirma nada sobre el. Su cobertura -que sobrevive al vacio,
+// al error y a la falta de `usuarios.modificar`- vive en `usuarios-page.test.tsx`.
 //
 // **La seccion se invoca como funcion `async`** (`await UserListSection({...})`) porque eso es lo
 // que es: un Server Component. `react-dom` en jsdom no sabe ejecutar uno, asi que se resuelve
@@ -21,7 +28,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   USER_COLUMN_COUNT,
-  USER_CREATE_OPEN_TESTID,
   USER_LIST_EMPTY_TESTID,
   USER_LIST_ERROR_CODE_TESTID,
   USER_LIST_ERROR_MESSAGE_TESTID,
@@ -37,6 +43,7 @@ import {
 } from '@/app/(private)/configuracion/usuarios/components';
 import UsuariosPage from '@/app/(private)/configuracion/usuarios/page';
 import type { DataTableParams } from '@/components/shared/data-table';
+import type { ErrorState } from '@/lib/modules/errores';
 import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
@@ -163,7 +170,9 @@ function paginaCon(items: readonly UserRow[], extra: { page?: number; totalPages
   };
 }
 
-const ROLES_OK = { status: 'success', data: [{ id: 'r1', name: 'Operador' }] };
+const ROLES_OK: readonly { id: string; name: string }[] = [{ id: 'r1', name: 'Operador' }];
+/** El mismo catalogo, envuelto como lo devuelve `listRolesAction` -solo lo usa `UsuariosPage`-. */
+const ROLES_OK_RESULT = { status: 'success', data: ROLES_OK };
 
 function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
   return {
@@ -176,9 +185,20 @@ function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
   };
 }
 
-/** Monta la seccion REAL, resolviendo antes el Server Component `async`. */
-async function renderSeccion(params: DataTableParams = parametros(), canModify = true) {
-  return render(await UserListSection({ params, canModify, currentUserId: null }));
+/**
+ * Monta la seccion REAL, resolviendo antes el Server Component `async`. `roles`/`rolesError`
+ * llegan como ARGUMENTOS, no de un mock de accion: desde que `page.tsx` los pide UNA VEZ y los
+ * baja por props (R43), esta seccion se limita a reenviarlos a `UserTable`.
+ */
+async function renderSeccion(
+  params: DataTableParams = parametros(),
+  canModify = true,
+  roles: readonly { id: string; name: string }[] = ROLES_OK,
+  rolesError: ErrorState | null = null,
+) {
+  return render(
+    await UserListSection({ params, canModify, currentUserId: null, roles, rolesError }),
+  );
 }
 
 /** Fuente de la seccion sin comentarios: el JSDoc NOMBRA lo que el codigo no debe hacer. */
@@ -217,7 +237,7 @@ beforeEach(() => {
   setViewportWidth(WIDE_VIEWPORT);
   getSessionUserMock.mockResolvedValue(sesionCon(['usuarios.consultar', 'usuarios.modificar']));
   listUsersActionMock.mockResolvedValue(paginaCon([fila()]));
-  listRolesActionMock.mockResolvedValue(ROLES_OK);
+  listRolesActionMock.mockResolvedValue(ROLES_OK_RESULT);
 });
 
 afterEach(() => {
@@ -247,36 +267,6 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByTestId(USER_LIST_ERROR_TESTID)).toBeNull();
   });
 
-  it('EL ALTA SOBREVIVE AL VACIO: con cero filas el disparador sigue ahi (2026-09-17)', async () => {
-    // La regresion que este caso existe para cerrar. El listado EXCLUYE al actor (R11), asi que una
-    // instalacion recien sembrada —un unico usuario, el que esta mirando la pantalla— ve la lista
-    // vacia con el catalogo lleno. Con el boton dentro de la tabla, ese vacio no tenia ninguna
-    // salida: no habia forma de crear al segundo usuario desde la interfaz.
-    listUsersActionMock.mockResolvedValue(paginaCon([]));
-
-    await renderSeccion();
-
-    expect(screen.getByTestId(USER_LIST_EMPTY_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
-  });
-
-  it('y con filas tambien: el alta no depende del estado de la lista', async () => {
-    await renderSeccion();
-
-    expect(screen.getByTestId(USER_LIST_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
-  });
-
-  it('sin `usuarios.modificar` no hay alta, ni con filas ni sin ellas (R6)', async () => {
-    await renderSeccion(parametros(), false);
-    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
-
-    cleanup();
-    listUsersActionMock.mockResolvedValue(paginaCon([]));
-    await renderSeccion(parametros(), false);
-    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
-  });
-
   it('error: mensaje DEVUELTO, codigo estable y accion de reintentar (R19)', async () => {
     listUsersActionMock.mockResolvedValue({
       status: 'error',
@@ -299,35 +289,6 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByTestId(USER_LIST_TESTID)).toBeNull();
     expect(screen.queryByTestId(USER_LIST_EMPTY_TESTID)).toBeNull();
-  });
-
-  it('Y EN ERROR TAMBIEN: la lista fallo, pero el alta sigue ofreciendose', async () => {
-    // El alta no depende de la lista: tiene su propia autorizacion en el caso de uso. Dejarla
-    // fuera de este estado reabriria el mismo callejon por otra puerta —un parpadeo de la base en
-    // una instalacion recien sembrada y no hay forma de crear a nadie—.
-    listUsersActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'unexpected',
-      message: 'Ocurrio un error inesperado.',
-    });
-
-    await renderSeccion();
-
-    expect(screen.getByTestId(USER_LIST_ERROR_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
-  });
-
-  it('pero sin `usuarios.modificar` el error tampoco trae alta (R6)', async () => {
-    listUsersActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'unexpected',
-      message: 'Ocurrio un error inesperado.',
-    });
-
-    await renderSeccion(parametros(), false);
-
-    expect(screen.getByTestId(USER_LIST_ERROR_TESTID)).toBeInTheDocument();
-    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
   });
 
   it('cargando: mientras la lista esta en vuelo, la pagina pinta el esqueleto (R19)', async () => {
@@ -385,13 +346,6 @@ describe('los parametros llegan ENTEROS y sin traducir a la consulta (R17, R36)'
     ]);
     expect(consulta).toBe(params);
   });
-
-  it('la consulta de roles se pide SIN argumentos: el catalogo es cerrado y entero', async () => {
-    await renderSeccion();
-
-    expect(listRolesActionMock).toHaveBeenCalledTimes(1);
-    expect(listRolesActionMock.mock.calls[0]).toEqual([]);
-  });
 });
 
 describe('la pantalla no autoriza nada por su cuenta (R7)', () => {
@@ -422,9 +376,10 @@ describe('la pantalla no autoriza nada por su cuenta (R7)', () => {
     for (const prohibido of ['next/headers', 'cookies(', 'lib/composition', 'requirePermission']) {
       expect(fuente, `la seccion no debe usar ${prohibido}`).not.toContain(prohibido);
     }
-    // Y las actions entran por su RUTA EXACTA, nunca por el barrel del modulo (R36).
+    // Y la action entra por su RUTA EXACTA, nunca por el barrel del modulo (R36).
     expect(fuente).toContain('@/lib/modules/identity/adapters/driving/user-actions');
-    expect(fuente).toContain('@/lib/modules/identity/adapters/driving/role-actions');
+    // `role-actions` YA NO la importa esta seccion: el catalogo llega por props desde `page.tsx`.
+    expect(fuente).not.toContain('@/lib/modules/identity/adapters/driving/role-actions');
     // Del barrel del modulo solo puede entrar un `import type`, que TypeScript borra: un import de
     // VALOR arrastraria el `'use server'` del cierre transitivo y romperia a los componentes de
     // cliente que importen el contrato (R36, alternativa E del diseno).
@@ -466,22 +421,23 @@ describe('el actor no se ve, y su ausencia NO se compensa (R11)', () => {
   });
 });
 
-describe('si la consulta de ROLES falla, la lista se pinta igual (R24, degradado)', () => {
-  it('la lista NO cae al estado de error por no poder rellenar el selector', async () => {
-    listRolesActionMock.mockResolvedValue({
+describe('un `rolesError` por props no tumba la lista (R24, degradado)', () => {
+  // `page.tsx` es quien decide ahora el degradado del catalogo de roles (R24): esta seccion solo
+  // REENVIA lo que recibe, asi que lo unico que le corresponde probar es que un `rolesError` no
+  // vacio no cambia el estado de la lista.
+  it('con `rolesError` no nulo la lista se pinta igual: ni tabla sin filas ni error', async () => {
+    await renderSeccion(parametros(), true, [], {
       status: 'error',
       code: 'unauthorized',
       message: 'No tienes permiso para consultar roles.',
     });
-
-    await renderSeccion();
 
     expect(screen.getByTestId(USER_LIST_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId('data-table')).toBeInTheDocument();
     expect(screen.queryByTestId(USER_LIST_ERROR_TESTID)).toBeNull();
   });
 
-  it('y al reves, un fallo del LISTADO si decide el estado aunque los roles esten bien', async () => {
+  it('un fallo del LISTADO si decide el estado, sin relacion con los roles', async () => {
     listUsersActionMock.mockResolvedValue({
       status: 'error',
       code: 'unexpected',

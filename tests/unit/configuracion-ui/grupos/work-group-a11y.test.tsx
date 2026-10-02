@@ -125,10 +125,14 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
   }),
 }));
 
-/** Un nombre LARGO de verdad: con una sola columna de datos, es lo unico que puede desbordar. */
+/** Un nombre LARGO de verdad: es lo que mas facilmente puede desbordar la columna de datos. */
 const GRUPOS: readonly WorkGroupRow[] = [
-  { id: 'g1', name: 'Laboratorio de control de calidad de materias primas y producto terminado' },
-  { id: 'g2', name: 'Produccion' },
+  {
+    id: 'g1',
+    name: 'Laboratorio de control de calidad de materias primas y producto terminado',
+    members: [],
+  },
+  { id: 'g2', name: 'Produccion', members: [] },
 ];
 
 function sesionCon(permissions: readonly string[]) {

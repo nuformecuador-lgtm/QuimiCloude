@@ -13,41 +13,57 @@
 // cancelar es un `SheetClose`. Lo que el panel decide —titulo, miembros, cierre— se prueba en
 // `work-group-sheet.test.tsx`.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  WORK_GROUP_CANDIDATE_TESTID,
   WORK_GROUP_FORM_ERROR_CODE_TESTID,
   WORK_GROUP_FORM_ERROR_TESTID,
   WORK_GROUP_FORM_ID_TESTID,
   WORK_GROUP_FORM_SUBMIT_TESTID,
   WORK_GROUP_FORM_TESTID,
   WORK_GROUP_ID_FIELD,
+  WORK_GROUP_MEMBER_ID_FIELD,
   WORK_GROUP_NAME_ERROR_TESTID,
   WORK_GROUP_NAME_FIELD,
   WORK_GROUP_NAME_FIELD_TESTID,
   WORK_GROUP_NAME_ISSUE_MESSAGES,
+  WORK_GROUP_PENDING_MEMBER_REMOVE_TESTID,
+  WORK_GROUP_PENDING_MEMBER_TESTID,
   WorkGroupForm,
   workGroupNameIssue,
 } from '@/app/(private)/configuracion/usuarios/components';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { errorMessage } from '@/lib/modules/errores';
 import { WORK_GROUP_NAME_MAX_LENGTH, normalizeWorkGroupName } from '@/lib/modules/identity';
+import type { UserRow } from '@/lib/modules/identity';
+import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
 import type {
   CreateWorkGroupFormState,
   WorkGroupMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { setupUser } from '../../../helpers/user-event';
 
-const { createWorkGroupActionMock, renameWorkGroupActionMock } = vi.hoisted(() => ({
+const {
+  createWorkGroupActionMock,
+  renameWorkGroupActionMock,
+  addWorkGroupMemberActionMock,
+  listUsersActionMock,
+} = vi.hoisted(() => ({
   createWorkGroupActionMock:
     vi.fn<(prev: CreateWorkGroupFormState, data: FormData) => Promise<CreateWorkGroupFormState>>(),
   renameWorkGroupActionMock:
     vi.fn<
       (prev: WorkGroupMutationFormState, data: FormData) => Promise<WorkGroupMutationFormState>
     >(),
+  addWorkGroupMemberActionMock:
+    vi.fn<
+      (prev: WorkGroupMutationFormState, data: FormData) => Promise<WorkGroupMutationFormState>
+    >(),
+  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -70,7 +86,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     createWorkGroupAction: createWorkGroupActionMock,
     renameWorkGroupAction: renameWorkGroupActionMock,
     deleteWorkGroupAction: vi.fn(noDebeInvocarse('deleteWorkGroupAction')),
-    addWorkGroupMemberAction: vi.fn(noDebeInvocarse('addWorkGroupMemberAction')),
+    addWorkGroupMemberAction: addWorkGroupMemberActionMock,
     removeWorkGroupMemberAction: vi.fn(noDebeInvocarse('removeWorkGroupMemberAction')),
     listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
     listWorkGroupMembersAction: vi.fn(noDebeInvocarse('listWorkGroupMembersAction')),
@@ -82,7 +98,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse desde el formulario del nombre`);
   };
   return {
-    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
+    listUsersAction: listUsersActionMock,
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
@@ -93,6 +109,16 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
 
 /** Un grupo existente. El identificador es un UUID porque es lo que el esquema del borde espera. */
 const GRUPO = { id: '11111111-1111-4111-8111-111111111111', name: 'Laboratorio' };
+
+/** Un candidato del picker de miembros, que el alta monta siempre (R22, ampliacion de alta). */
+const CANDIDATO: UserRow = {
+  id: 'u9',
+  displayName: 'Nieto Salas, Dario',
+  username: 'dario.nieto',
+  email: 'dario.nieto@example.com',
+  roleName: 'Operario',
+  accountStatus: 'pending',
+};
 
 function montar(group: typeof GRUPO | null, onSaved = vi.fn<() => void>()) {
   render(
@@ -137,10 +163,20 @@ function fuenteDelFormulario(): string {
     .replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
+/** Espera a que el picker de miembros, que el alta monta siempre, pinte su primera fila. */
+async function esperarCandidato(): Promise<HTMLElement> {
+  return screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   createWorkGroupActionMock.mockResolvedValue({ status: 'success', id: 'nuevo' });
   renameWorkGroupActionMock.mockResolvedValue({ status: 'success' });
+  addWorkGroupMemberActionMock.mockResolvedValue({ status: 'success' });
+  listUsersActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [CANDIDATO], total: 1, page: 1, pageSize: 10, totalPages: 1 },
+  });
 });
 
 afterEach(() => {
@@ -345,5 +381,76 @@ describe('un rechazo se pinta por su CODIGO y no pierde lo escrito (R24)', () =>
     expect(region).toHaveAttribute('data-code', 'work_group_not_found');
     expect(campo()).toHaveValue(`${GRUPO.name} central`);
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe('el alta puede elegir miembros iniciales, en estado local hasta crear el grupo', () => {
+  it('elegir un candidato lo mete en «pendientes» SIN llamar a ninguna Server Action de miembro', async () => {
+    montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+
+    expect(await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID)).toHaveTextContent(
+      CANDIDATO.displayName,
+    );
+    expect(addWorkGroupMemberActionMock).not.toHaveBeenCalled();
+    // Y el candidato ya elegido se ve como «Agregado» en la propia tabla del picker.
+    expect(within(fila).getByRole('button')).toBeDisabled();
+  });
+
+  it('«Quitar» saca al candidato de pendientes', async () => {
+    montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+    await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID);
+
+    fireEvent.click(screen.getByTestId(WORK_GROUP_PENDING_MEMBER_REMOVE_TESTID));
+
+    expect(screen.queryByTestId(WORK_GROUP_PENDING_MEMBER_TESTID)).toBeNull();
+    // Y vuelve a poder elegirse: el boton vuelve a decir «Agregar».
+    expect(within(fila).getByRole('button')).not.toBeDisabled();
+  });
+
+  it('al enviar con pendientes: primero se crea el grupo y LUEGO se anade a cada uno, de a una', async () => {
+    const user = setupUser();
+    montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+    await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID);
+
+    await user.type(campo(), 'Turno Noche');
+    await user.click(screen.getByTestId(WORK_GROUP_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createWorkGroupActionMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(addWorkGroupMemberActionMock).toHaveBeenCalledTimes(1));
+
+    const datos = addWorkGroupMemberActionMock.mock.calls[0]![1];
+    expect([...datos.keys()].sort()).toEqual([WORK_GROUP_MEMBER_ID_FIELD, WORK_GROUP_ID_FIELD].sort());
+    expect(datos.get(WORK_GROUP_ID_FIELD)).toBe('nuevo');
+    expect(datos.get(WORK_GROUP_MEMBER_ID_FIELD)).toBe(CANDIDATO.id);
+  });
+
+  it('sin pendientes, crear el grupo no llama a ninguna operacion de miembro (R23)', async () => {
+    const user = setupUser();
+    montar(null);
+    await esperarCandidato();
+
+    await user.type(campo(), 'Turno Noche');
+    await user.click(screen.getByTestId(WORK_GROUP_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createWorkGroupActionMock).toHaveBeenCalledTimes(1));
+    expect(addWorkGroupMemberActionMock).not.toHaveBeenCalled();
+  });
+
+  it('la edicion NO monta el picker de miembros iniciales: ese bloque es solo del alta', () => {
+    montar(GRUPO);
+
+    expect(screen.queryByTestId(WORK_GROUP_PENDING_MEMBER_TESTID)).toBeNull();
+    expect(screen.queryByTestId(WORK_GROUP_CANDIDATE_TESTID)).toBeNull();
+    // Y por tanto no consulto la lista de personas: ese bloque, en la edicion, no existe.
+    expect(listUsersActionMock).not.toHaveBeenCalled();
   });
 });

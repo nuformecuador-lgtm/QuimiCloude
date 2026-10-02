@@ -2,13 +2,20 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import type { UnitView } from '@/lib/modules/unidades';
 import { BRAND_LABEL, ORDERS_LABEL } from '@/lib/shared/navigation/private-nav';
+import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import {
+  FIRST_PAGE,
   OrderListSection,
   OrderListSkeleton,
+  OrderSheet,
   parseOrderListParams,
   type OrderListSearchParams,
+  type RecipePickerPage,
 } from './components';
 
 export const metadata: Metadata = {
@@ -48,10 +55,54 @@ export const metadata: Metadata = {
  * middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan firma, caducidad y empresa.
  * La autorizacion sobre los DATOS la siguen aportando los casos de uso de `pedidos`.
  *
- * El disparador del alta (`<OrderSheet />`) ira junto al titulo cuando T10 lo monte: es un
- * componente de cliente con su propio estado de apertura, asi que esta pagina seguira siendo un
- * Server Component.
+ * **El disparador del alta (`<OrderSheet />`) vive AQUI, junto al titulo**, igual que en
+ * inventario y proveedores: es un componente de cliente con su propio estado de apertura, asi que
+ * esta pagina sigue siendo un Server Component aunque lo monte. Los DOS catalogos que su panel
+ * necesita -la primera pagina de recetas y las unidades- se piden tambien AQUI, UNA SOLA VEZ
+ * (`loadFormCatalogs`), y bajan por props tanto al disparador de la cabecera como a
+ * `OrderListSection`, que ya no los pide por su cuenta. El resto de lecturas de la seccion
+ * -cobertura, responsables, grupos de trabajo- sigue siendo enteramente suya: el disparador de la
+ * cabecera no las necesita.
  */
+
+/**
+ * El catalogo que alimenta el panel lateral de alta (`design.md > 9`): la primera pagina de
+ * recetas -el selector busca las demas en el servidor (R31)- y las unidades -que resuelven la
+ * unidad de los ingredientes que muestra el panel-. **Mismos argumentos** con los que
+ * `OrderListSection` pedia estos dos catalogos antes de subir el disparador a la cabecera: la
+ * primera pagina de recetas con `MAX_PAGE_SIZE` y el catalogo entero de unidades.
+ *
+ * Si algun catalogo falla, el panel se abre con el selector vacio -o la unidad de los ingredientes
+ * sin resolver- en vez de tumbar la pantalla: la lista es lo que la pantalla existe para mostrar,
+ * y el alta ya rechaza en el servidor un id que no exista (`recipe_not_found`). Mismo degradado
+ * que el resto de lecturas de esta pantalla.
+ */
+async function loadFormCatalogs(): Promise<{
+  readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitView[];
+}> {
+  const [recipes, units] = await Promise.all([
+    listRecipesAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+    listUnitsAction(),
+  ]);
+
+  return {
+    recipes:
+      recipes.status === 'success'
+        ? {
+            items: recipes.data.items.map((recipe) => ({
+              id: recipe.id,
+              name: recipe.name,
+              // `imageUrl` ya viene compuesta por `recetas`; aqui no se inventa ninguna URL.
+              imageUrl: recipe.imageUrl,
+            })),
+            totalPages: recipes.data.totalPages,
+          }
+        : { items: [], totalPages: FIRST_PAGE },
+    units: units.status === 'success' ? units.data : [],
+  };
+}
+
 export default async function PedidosPage({
   searchParams,
 }: {
@@ -59,7 +110,10 @@ export default async function PedidosPage({
 }) {
   await requirePagePermission('pedidos.consultar');
 
-  const params = parseOrderListParams(await searchParams);
+  const [params, { recipes, units }] = await Promise.all([
+    searchParams.then(parseOrderListParams),
+    loadFormCatalogs(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -67,6 +121,7 @@ export default async function PedidosPage({
         <h1 data-testid="pedidos-title" className="text-2xl font-semibold">
           {ORDERS_LABEL}
         </h1>
+        <OrderSheet recipes={recipes} units={units} />
       </div>
       {/*
         SIN `key`: remontar este limite en cada cambio de consulta destruia la barra de filtros y
@@ -75,7 +130,7 @@ export default async function PedidosPage({
         aqui cubre la primera carga.
       */}
       <Suspense fallback={<OrderListSkeleton rows={params.pageSize} />}>
-        <OrderListSection params={params} />
+        <OrderListSection params={params} recipes={recipes} units={units} />
       </Suspense>
     </div>
   );
