@@ -266,7 +266,7 @@ async function sumarLoteSinAvisar(
 /** Un pedido guardado BLOQUEADO por el alta real, con su receta de una linea al 100 %. */
 async function crearBloqueado(fixture: Fixture, recipeId: string, quantity: string): Promise<string> {
   const creado = await createOrder(
-    { recipeId, quantity, presentationId: fixture.presentationId, confirmBlocked: true },
+    { recipeId, quantity, unitId: fixture.unitId, confirmBlocked: true },
     actorDe(fixture),
   );
   expect((await filaDe(creado.id)).status).toBe('BLOQUEADO');
@@ -455,7 +455,7 @@ describe('reviewBlockedOrders contra la base — orden y alcance', () => {
       const recetaA = await crearReceta(a);
       await crearLineaCompleta(recetaA, prodA.productId);
       const pendiente = await createOrder(
-        { recipeId: recetaA, quantity: '10.0000', presentationId: a.presentationId },
+        { recipeId: recetaA, quantity: '10.0000', unitId: a.unitId },
         actorDe(a),
       );
       const pendienteAntes = await filaDe(pendiente.id);
@@ -667,7 +667,7 @@ describe('la fachada de inventario dispara la revision', () => {
       const recipeId = await crearReceta(fixture);
       await crearLineaCompleta(recipeId, productId);
       const pendiente = await createOrder(
-        { recipeId, quantity: '10.0000', presentationId: fixture.presentationId },
+        { recipeId, quantity: '10.0000', unitId: fixture.unitId },
         actorDe(fixture),
       );
 

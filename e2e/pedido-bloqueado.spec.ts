@@ -78,6 +78,7 @@ let companyId: string | null = null;
 let productId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
+let unitId: string | null = null;
 let adminUserId: string | null = null;
 let operatorUserId: string | null = null;
 
@@ -119,7 +120,7 @@ async function findOrderRow(page: Page, numberText: string): Promise<Locator> {
   }
 }
 
-/** Rellena el alta de un pedido de la receta y presentacion del fixture y lo envia. */
+/** Rellena el alta de un pedido de la receta y la unidad del fixture, sin reparto, y lo envia. */
 async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await page.goto(ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
@@ -135,17 +136,9 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await recipeOption.click();
   await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-  const presentationPicker = page.getByTestId('presentation-select');
-  await presentationPicker.click();
-  await presentationPicker.fill(PRESENTATION_NAME);
-  const presentationOption = page
-    .getByTestId('presentation-option')
-    .filter({ hasText: PRESENTATION_NAME });
-  await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-  await presentationOption.click();
-  await expect(page.getByTestId('presentation-value')).toHaveValue(presentationId ?? '');
-
   await page.getByTestId('order-field-quantity').fill(quantity);
+  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
   await page.getByTestId('order-form-submit').click();
 }
@@ -236,6 +229,9 @@ test.beforeAll(async () => {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({
+      where: { companyId: { in: orphanCompanyIds } },
+    });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // La receta cae antes que el producto: `recipe_lines.product_id` lo restringe.
@@ -279,6 +275,7 @@ test.beforeAll(async () => {
     where: { nameNormalized: 'litro', companyId: null },
     select: { id: true },
   });
+  unitId = unit.id;
 
   // `products.unit_id` se fija a mano: el disparador que valida el lote exige que el producto ya
   // tenga unidad antes de insertarlo.
@@ -363,6 +360,10 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),

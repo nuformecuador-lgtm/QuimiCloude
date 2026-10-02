@@ -1,7 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
@@ -146,6 +146,8 @@ export type OrderColumnsDeps = {
    * —marcador de ausencia, igual que responsables— y la lista se sigue viendo entera.
    */
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
+  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
+  readonly canEditDistribution?: boolean;
 };
 
 /**
@@ -161,6 +163,7 @@ export function buildOrderColumns({
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
+  canEditDistribution = false,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -209,6 +212,7 @@ export function buildOrderColumns({
       cell: (order) => (
         <span title={exactDecimalTitle(order.quantity)}>
           {formatDecimalDisplay(order.quantity)}
+          {order.unitLabel === null ? null : ` ${order.unitLabel}`}
         </span>
       ),
     },
@@ -217,7 +221,7 @@ export function buildOrderColumns({
       label: 'Presentación',
       align: 'center',
       // Solo informa, como el importe: sin `sortable` y sin `filter`.
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: CREATED_AT_COLUMN_ID,
@@ -292,6 +296,7 @@ export function buildOrderColumns({
           responsiblesCatalog={responsiblesCatalog}
           // La hoja pinta la cobertura de ESTA fila, ya traida por el lote.
           coverage={coverageByOrder[order.id]}
+          canEditDistribution={canEditDistribution}
         />
       ),
     },

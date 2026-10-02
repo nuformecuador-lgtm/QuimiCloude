@@ -1,7 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
@@ -74,13 +74,16 @@ export function buildFinishedOrdersColumns(): readonly DataTableColumn<FinishedO
       id: FINISHED_ORDER_QUANTITY_COLUMN_ID,
       label: 'Cantidad',
       align: 'end',
-      cell: (order) => formatDecimalDisplay(order.quantity),
+      cell: (order) =>
+        order.unitLabel === null
+          ? formatDecimalDisplay(order.quantity)
+          : `${formatDecimalDisplay(order.quantity)} ${order.unitLabel}`,
     },
     {
       id: FINISHED_ORDER_PRESENTATION_COLUMN_ID,
       label: 'Presentación',
       align: 'start',
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: FINISHED_ORDER_DATE_COLUMN_ID,

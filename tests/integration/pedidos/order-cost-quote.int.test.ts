@@ -312,7 +312,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
         now: () => new Date('2026-05-01T12:00:00.000Z'),
       })
       const creado = await alta(
-        { recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId },
+        { recipeId, quantity: '6.0000', priority: 'MEDIA', unitId },
         actorDe(A),
       )
       orderId = creado.id
@@ -346,13 +346,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
       // QC-138 R6/R8: sin confirmar, un alta que no alcanza no se guarda; confirmada queda
       // BLOQUEADO y es ahi donde se compara el importe con la cotizacion.
       const creado = await alta(
-        {
-          recipeId,
-          quantity: '200.0000',
-          priority: 'MEDIA',
-          presentationId: A.presentationId,
-          confirmBlocked: true,
-        },
+        { recipeId, quantity: '200.0000', priority: 'MEDIA', unitId, confirmBlocked: true },
         actorDe(A),
       )
       orderId = creado.id
@@ -427,11 +421,11 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       // necesaria = 6 * 100 % = 6: aparta el UNICO lote entero. Sin excluir la reserva propia del
       // pedido, el lote quedaria con disponible cero para el calculo de la propia edicion y el
       // importe se perderia.
-      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
-      const sinCambios: NewOrder = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId, presentationContent: null }
+      const sinCambios: NewOrder = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, sinCambios, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
@@ -467,7 +461,7 @@ describe('aislamiento: `orderId` de OTRA empresa no cambia nada (R65, ambito)', 
       // El unico pedido que existe aparta el material de Q, no el de A: el lote de A sigue
       // entero disponible para la cotizacion de abajo.
       const creadoQ = await alta(
-        { recipeId: recipeIdQ, quantity: '6.0000', priority: 'MEDIA', presentationId: Q.presentationId },
+        { recipeId: recipeIdQ, quantity: '6.0000', priority: 'MEDIA', unitId },
         actorDe(Q),
       )
       orderIdDeQ = creadoQ.id

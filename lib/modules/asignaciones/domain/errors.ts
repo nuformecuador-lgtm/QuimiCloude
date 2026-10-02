@@ -186,6 +186,26 @@ export class PresentationWithoutContentError extends AsignacionesError {
   }
 }
 
+/** Terminar el empaque encontro una linea del reparto que no se puede pasar a la unidad del
+ *  pedido. Mismo `code` que `IncompatibleUnitsError` de `pedidos`. */
+export class IncompatibleUnitsError extends AsignacionesError {
+  readonly code = 'incompatible_units';
+
+  constructor(diagnostic?: string) {
+    super('incompatible_units', diagnostic);
+  }
+}
+
+/** Terminar el empaque encontro un pedido con reparto y sin unidad. Mismo `code` que
+ *  `OrderWithoutUnitError` de `pedidos`. */
+export class OrderWithoutUnitError extends AsignacionesError {
+  readonly code = 'order_without_unit';
+
+  constructor(diagnostic?: string) {
+    super('order_without_unit', diagnostic);
+  }
+}
+
 /** El Finalizar de la planta intento entregar un pedido cuya cantidad no llena ni un envase de
  *  su presentacion. Mismo `code` que `NoWholePackageError` de `pedidos`. */
 export class NoWholePackageError extends AsignacionesError {
@@ -267,5 +287,15 @@ export class OrderBlockedError extends AsignacionesError {
 
   constructor(diagnostic?: string) {
     super('order_blocked', diagnostic);
+  }
+}
+
+/** Comenzar sobre un pedido `POR_EMPACAR` sin ninguna linea de reparto. Mismo `code` que
+ *  `OrderWithoutDistributionError` de `pedidos`. */
+export class OrderWithoutDistributionError extends AsignacionesError {
+  readonly code = 'order_without_distribution';
+
+  constructor(diagnostic?: string) {
+    super('order_without_distribution', diagnostic);
   }
 }

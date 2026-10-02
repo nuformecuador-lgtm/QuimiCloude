@@ -301,8 +301,13 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: PRESENTACION.id,
-    presentationName: PRESENTACION.name,
+    presentationLines: [
+
+      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
+
+    ],
+    unitId: null,
+    unitLabel: null,
     ...overrides,
   };
 }
@@ -547,12 +552,12 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
-    // Eran cinco campos hasta el 2026-09-07: el precio unitario y el selector de unidad salieron
-    // del formulario con la decision humana. Los que quedan se siguen midiendo uno a uno.
+    // El selector de presentacion del reparto solo aparece con unidad elegida; aqui se mide el de
+    // la unidad, que esta siempre.
     const campos = [
       screen.getByTestId(`order-field-${QUANTITY_COLUMN_ID}`),
       screen.getByTestId(RECIPE_PICKER_TESTID),
-      screen.getByTestId('presentation-select'),
+      screen.getByTestId('presentation-unit-select'),
       screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
     ];
 

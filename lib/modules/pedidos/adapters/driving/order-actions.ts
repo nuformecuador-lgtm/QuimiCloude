@@ -7,9 +7,23 @@ import {
   type ErrorState,
 } from '@/lib/modules/errores';
 import {
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  IncompatibleUnitsError,
+  OrderDistributionExceedsQuantityError,
+  OrderNotFoundError,
+  OrderPresentationLineNotEditableError,
+  OrderWithoutUnitError,
   PedidosError,
+  PresentationNotFoundError,
+  PresentationWithoutContentError,
+  UnitNotFoundError,
+  ValidationError,
+  requirePermission,
+  updateOrderDistributionSchema,
   type Actor,
   type OrderCostQuote,
+  type OrderPresentationAvailability,
   type OrderSummary,
   type OrderView,
   type Page,
@@ -156,14 +170,36 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
   return typeof value === 'string' ? value : undefined;
 }
 
-/** El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
- *  correlativo, ni autores: lo que el esquema no declara no puede llegar (R6, R9). */
+function readFormStrings(formData: FormData, name: string): string[] {
+  return formData.getAll(name).map((value) => (typeof value === 'string' ? value : ''));
+}
+
+/**
+ * Las lineas llegan como dos listas de campos repetidos, unidas por posicion. Si las longitudes
+ * difieren, la posicion sin pareja queda `undefined` y la rechaza `presentationLinesSchema`:
+ * el borde no rellena ni descarta.
+ */
+function readPresentationLines(formData: FormData): unknown[] {
+  const presentationIds = readFormStrings(formData, ORDER_DISTRIBUTION_PRESENTATION_FIELD);
+  const packages = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGES_FIELD);
+  const length = Math.max(presentationIds.length, packages.length);
+  return Array.from({ length }, (_, index) => ({
+    presentationId: presentationIds[index],
+    packages: packages[index],
+  }));
+}
+
+/**
+ * El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
+ * correlativo, ni autores: lo que el esquema no declara no puede llegar.
+ */
 function buildCreateCandidate(formData: FormData): unknown {
   return {
     recipeId: readFormString(formData, 'recipeId'),
     quantity: readFormString(formData, 'quantity'),
     priority: readOptionalFormString(formData, 'priority'),
-    presentationId: readFormString(formData, 'presentationId'),
+    unitId: readFormString(formData, 'unitId'),
+    presentationLines: readPresentationLines(formData),
     // Solo la cadena exacta confirma: cualquier otro valor, o la ausencia, es no confirmar.
     confirmBlocked: formData.get('confirmBlocked') === 'true',
     recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
@@ -340,6 +376,86 @@ export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuo
   try {
     const data = await pedidos.quoteOrderCost(input, actor);
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// «Cuanto queda disponible», de solo lectura.
+// ---------------------------------------------------------------------------------------------
+
+export type OrderPresentationAvailabilityResult =
+  | { status: 'success'; data: OrderPresentationAvailability }
+  | ErrorState;
+
+/**
+ * El disponible en vivo del formulario de reparto, en la unidad del pedido -mismo patron que
+ * `quoteOrderCostAction` para el coste-. Argumento tipado, no `FormData`: no hay `<form>` que
+ * enviar, se recalcula con cada tecla. Nunca rechaza por el reparto: `data.kind` puede ser
+ * `'exceeds_quantity'` con `available` negativo (el aviso), y sigue siendo un `'success'`
+ * -el rechazo lo hace el guardado, no esta consulta.
+ */
+export async function quoteOrderPresentationAvailabilityAction(
+  input: unknown,
+): Promise<OrderPresentationAvailabilityResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.quoteOrderPresentationAvailability(input, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// La edicion ACOTADA «Reparto y unidad» en `POR_EMPACAR`.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * `updateOrderPresentationLines` NO comprueba el permiso: su unico llamador es esta
+ * action, y por eso -a diferencia de las diez de arriba, que no repiten `requirePermission`
+ * porque su caso de uso ya es la primera linea que lo hace- esta SI lo llama, aqui, antes de
+ * `zod` y antes de tocar la fachada.
+ */
+export async function updateOrderDistributionAction(
+  id: string,
+  input: unknown,
+): Promise<OrderMutationFormState> {
+  const actor = await currentActor();
+
+  try {
+    requirePermission(actor, 'pedidos.modificar');
+
+    const parsed = updateOrderDistributionSchema.safeParse(input);
+    if (!parsed.success) throw new ValidationError();
+
+    const result = await pedidos.updateOrderPresentationLines(id, actor, {
+      unitId: parsed.data.unitId,
+      lines: parsed.data.presentationLines,
+    });
+
+    switch (result) {
+      case 'ok':
+        return { status: 'success' };
+      case 'not_found':
+        throw new OrderNotFoundError();
+      case 'not_editable':
+        throw new OrderPresentationLineNotEditableError();
+      case 'unit_not_found':
+        throw new UnitNotFoundError();
+      case 'without_unit':
+        throw new OrderWithoutUnitError();
+      case 'presentation_not_found':
+        throw new PresentationNotFoundError();
+      case 'presentation_without_content':
+        throw new PresentationWithoutContentError();
+      case 'incompatible_units':
+        throw new IncompatibleUnitsError();
+      case 'exceeds_quantity':
+        throw new OrderDistributionExceedsQuantityError();
+    }
   } catch (error) {
     return toErrorState(error);
   }

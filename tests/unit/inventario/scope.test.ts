@@ -291,8 +291,10 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // «presentation» en su nombre; no es una pantalla del catalogo, es la marca que pinta el
     // nombre de la presentacion de un pedido (o «Sin presentacion») a partir de lo que le llega
     // por props, sin consultar ninguna operacion del catalogo.
+    // ACTUALIZADO 2026-10-01 (pedido-en-varias-presentaciones): ese tercer archivo se
+    // renombro a `order-distribution-label.tsx`; el nombre nuevo ya no casa con `screenPattern`,
+    // asi que la exclusion sobra y se retira.
     const SELECTORES_PROMOVIDOS = [
-      'shared/order-presentation-label.tsx',
       'shared/presentation-select.tsx',
       'shared/presentation-unit-select.tsx',
     ] as const

@@ -247,6 +247,9 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que el diferimiento sigue INTACTO.
   'producto-terminado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el pedido repartido en varias presentaciones
+  // de punta a punta; no lee ni afirma nada sobre el identificador de peticion.
+  'pedido-en-varias-presentaciones.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -392,6 +395,12 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
+  // Tampoco estas dos: una crea la tabla del reparto por presentacion y la columna de unidad del
+  // pedido, la otra enlaza los movimientos de produccion con esa linea de reparto.
+  '20260927120000_order_presentation_lines',
+  '20260927120100_inventory_movements_production_per_line',
+  // Ni esta: pasa la presentacion unica de cada pedido a su reparto y retira esas columnas.
+  '20260927120200_order_presentation_lines_backfill_and_drop',
   // Anade `parent_recipe_id` a `recipes`; no toca el identificador de peticion.
   '20261001120000_recipe_versions',
   // El rol Maestro: empresa opcional segun rol y nombre de usuario unico en todo el sistema; no

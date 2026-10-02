@@ -1,6 +1,6 @@
 'use client';
 
-import { PencilIcon, TrashIcon, UsersIcon, XCircleIcon } from 'lucide-react';
+import { PackageIcon, PencilIcon, TrashIcon, UsersIcon, XCircleIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
@@ -74,6 +74,27 @@ export function isFinalOrderStatus(status: OrderStatus): boolean {
 export const FINAL_ORDER_REASON =
   'Este pedido ya está cerrado: no se puede editar, cancelar ni eliminar.';
 
+/**
+ * Estados en que solo cabe la edicion acotada de reparto y unidad. Antes de `POR_EMPACAR` la
+ * edicion general ya cubre los dos campos; desde `EN_EMPAQUE` el reparto queda fijado.
+ */
+const ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: false,
+  EN_CURSO: false,
+  POR_EMPACAR: true,
+  EN_EMPAQUE: false,
+  ENTREGADO: false,
+  CANCELADO: false,
+  // La edicion general sigue abierta en BLOQUEADO y ya cubre reparto y unidad.
+  BLOQUEADO: false,
+};
+
+export function acceptsDistributionEdit(status: OrderStatus): boolean {
+  return ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT[status];
+}
+
+export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
+
 export type OrderRowActionsProps = {
   readonly order: OrderSummary;
   /** Punto de enganche de T10 (panel lateral de edicion). */
@@ -87,6 +108,9 @@ export type OrderRowActionsProps = {
    * cuatro que sigue viva con el pedido cerrado.
    */
   readonly onResponsibles?: (order: OrderSummary) => void;
+  /** Lo decide el servidor con el permiso de modificar pedidos; sin el, la accion no se pinta. */
+  readonly canEditDistribution?: boolean;
+  readonly onDistribution?: (order: OrderSummary) => void;
 };
 
 export function OrderRowActions({
@@ -95,8 +119,11 @@ export function OrderRowActions({
   onCancel,
   onDelete,
   onResponsibles,
+  canEditDistribution = false,
+  onDistribution,
 }: OrderRowActionsProps) {
   const isFinal = isFinalOrderStatus(order.status);
+  const showDistribution = canEditDistribution && acceptsDistributionEdit(order.status);
 
   return (
     <div
@@ -161,6 +188,20 @@ export function OrderRowActions({
         >
           <UsersIcon aria-hidden="true" />
         </Button>
+
+        {showDistribution ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={TOUCH_TARGET}
+            aria-label={`Reparto y unidad del pedido ${order.numberText}`}
+            data-testid={ORDER_ACTION_DISTRIBUTION_TESTID}
+            onClick={() => onDistribution?.(order)}
+          >
+            <PackageIcon aria-hidden="true" />
+          </Button>
+        ) : null}
       </div>
 
       {/*

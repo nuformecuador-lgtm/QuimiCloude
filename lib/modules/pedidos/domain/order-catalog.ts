@@ -33,8 +33,8 @@ export type OrderAssignmentTarget = {
  *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
-/** Lo que entro al inventario cuando un Finalizar dio de alta un lote de producto terminado:
- *  el nombre de quien lo recibio y cuantos envases enteros. */
+/** Lo que entro al inventario por UNA linea del reparto cuando Terminar el empaque dio de alta
+ *  su lote: el nombre del producto terminado que lo recibio y cuantos envases enteros. */
 export type FinishedGoodsReceipt = {
   readonly productName: string;
   readonly packages: string;
@@ -96,11 +96,11 @@ export interface OrderCatalog {
    * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
    * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
    *
-   * Yendo a `'POR_EMPACAR'`, la misma llamada da tambien de alta el lote de producto terminado
-   * de la combinacion del pedido: el exito lleva `finishedGoods` con lo que entro;
-   * `'presentation_without_content'`, `'no_whole_package'` y `'recipe_not_found'` deshacen la
-   * operacion entera igual que los dos casos de arriba. El `'ok'` sin `finishedGoods` sigue
-   * siendo el unico resultado posible cuando `to` no es `'POR_EMPACAR'`.
+   * Yendo a `'POR_EMPACAR'` esta llamada YA NO da de alta ningun lote de
+   * producto terminado -eso se traslada a Terminar el empaque, una vez por linea del reparto-,
+   * asi que el `'ok'` es siempre el literal, sin `finishedGoods` ni los resultados que solo
+   * existian para esa alta (`'presentation_without_content'`, `'no_whole_package'`,
+   * `'recipe_not_found'`).
    *
    * `'EN_EMPAQUE'` y `'ENTREGADO'` no son destino valido de este metodo: se rechazan con
    * `InvalidTransitionError`, aunque la matriz de transiciones los admita, porque solo los
@@ -113,46 +113,67 @@ export interface OrderCatalog {
     to: OrderStatus,
     actorId: string,
     now: Date,
-  ): Promise<
-    | 'ok'
-    | { readonly kind: 'ok'; readonly finishedGoods: FinishedGoodsReceipt }
-    | 'not_found'
-    | 'stale'
-    | 'insufficient_material'
-    | 'recipe_without_lines'
-    | 'presentation_without_content'
-    | 'no_whole_package'
-    | 'recipe_not_found'
-  >;
+  ): Promise<'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines'>;
 
   /**
    * Comenzar el empaque: `POR_EMPACAR -> EN_EMPAQUE` con `packerId` como quien empaca, en una
-   * sola escritura con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
+   * transaccion corta con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
    * empacador repitiendo Comenzar sobre su propio `EN_EMPAQUE`, sin escribir nada;
-   * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'not_packable'` es cualquier otro estado;
-   * `'not_found'` es el mismo caso que en `findAliveById` -no existe, esta de baja o es de
-   * otra empresa-.
+   * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'without_distribution'` es un `POR_EMPACAR` sin
+   * ninguna linea de reparto; `'not_packable'` es cualquier otro estado; `'not_found'` es
+   * el mismo caso que en `findAliveById` -no existe, esta de baja o es de otra empresa-.
    */
   startPackingAliveById(
     id: string,
     companyId: string,
     packerId: string,
     now: Date,
-  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'>;
+  ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'>;
 
   /**
    * Terminar el empaque: `EN_EMPAQUE -> ENTREGADO`, con `finishedAt` en la MISMA escritura que
    * el cambio de estado, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
    * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
    * `'not_found'` es el mismo caso que en `findAliveById`.
+   *
+   * Da de alta, por cada linea del reparto, un lote de producto terminado -mismo
+   * coste unitario para todas-, en la MISMA transaccion que el cambio de estado: si
+   * cualquier linea falla, se deshace TODO. `'recipe_not_found'` es la receta del pedido,
+   * ausente o de otra empresa (mismo caso que antes emitia Finalizar); `'presentation_without_content'`
+   * identifica -por `diagnostic`, nunca en el resultado- la primera linea sin contenido ni
+   * copiado ni vigente (defensa en profundidad).
+   *
+   * `'incompatible_units'` y `'order_without_unit'` son defensa en profundidad: el coste se
+   * reparte en la unidad del pedido, y una linea que no se puede pasar a ella -o un pedido sin
+   * unidad- solo llega aqui con una fila escrita fuera de la aplicacion. Tambien deshacen todo.
    */
   finishPackingAliveById(
     id: string,
     companyId: string,
     packerId: string,
     now: Date,
-  ): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'>;
+  ): Promise<
+    | { readonly kind: 'ok'; readonly finishedGoods: readonly FinishedGoodsReceipt[] }
+    | 'not_packer'
+    | 'not_packable'
+    | 'not_found'
+    | 'recipe_not_found'
+    | 'presentation_without_content'
+    | 'incompatible_units'
+    | 'order_without_unit'
+  >;
 }
+
+/**
+ * Una linea del reparto tal como `pedidos` la publica: la presentacion elegida y sus envases,
+ * en el orden de alta (`created_at`, desempate `id`). Solo LECTURA: `OrderCatalog` no gana
+ * ningun metodo que escriba el reparto, asi que este tipo no lleva el contenido
+ * copiado ni nada mas que quien reparte no necesite para pintarlo.
+ */
+export type AssignedOrderPresentationLine = {
+  readonly presentationId: string;
+  readonly packages: number;
+};
 
 /**
  * Sin autoria, sin motivo de cancelacion y sin marcas de tiempo: lo que no esta en el tipo no se
@@ -166,8 +187,11 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
-  /** `null` = sin presentacion: el contrato que `asignaciones` usa para pintarla. */
-  readonly presentationId: string | null;
+  /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo. */
+  readonly presentationLines: readonly AssignedOrderPresentationLine[];
+  /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la tienen
+   *  todavia. */
+  readonly unitId: string | null;
   /** `null` = sin fecha de terminado: un pedido entregado antes de que la columna existiera, o
    *  uno que no esta ENTREGADO. */
   readonly finishedAt: Date | null;

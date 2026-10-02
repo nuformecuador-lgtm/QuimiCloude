@@ -60,6 +60,7 @@ export {
   OrderNotPackableError,
   OrderProducedFrozenError,
   OrderBlockedError,
+  OrderWithoutDistributionError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -129,6 +130,7 @@ export { canModifyAssignments } from './domain/actor';
 // imports volveria este contrato inimportable desde un componente de cliente.
 export { createListAssignedOrders, type ListAssignedOrdersDeps } from './domain/list-assigned-orders';
 export type { AssignedOrderView } from './domain/assigned-order-view';
+export type { OrderDistributionLineView } from './domain/order-distribution-view';
 
 // ---------------------------------------------------------------------------------------
 // La pantalla de ejecucion. Bloque NUEVO al final: no reordena ni reformatea nada

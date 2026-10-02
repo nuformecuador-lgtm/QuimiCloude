@@ -353,7 +353,10 @@ async function createOrder(
       createdAt: seed.createdAt,
       createdBy: f.userId,
       updatedBy: f.userId,
-      presentationId: seed.presentationId,
+      presentationLines:
+        seed.presentationId === undefined || seed.presentationId === null
+          ? undefined
+          : { create: [{ companyId: f.companyId, presentationId: seed.presentationId, packages: 1 }] },
     },
     select: { id: true },
   })
@@ -862,8 +865,8 @@ describe('que devuelven las lecturas (R40)', () => {
   })
 })
 
-describe('QC-146 — la presentacion del pedido, contra la base', () => {
-  it('R5: la baja logica conserva la presentacion', async () => {
+describe('QC-146 — la presentacion del pedido, contra la base (hoy, su linea de reparto)', () => {
+  it('R5: la baja logica conserva el reparto', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const id = await createOrder(tx, f, { presentationId: f.presentationId })
@@ -872,14 +875,14 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
 
       const stored = await tx.order.findUniqueOrThrow({
         where: { id },
-        select: { presentationId: true, deletedAt: true },
+        select: { presentationLines: { select: { presentationId: true } }, deletedAt: true },
       })
       expect(stored.deletedAt).not.toBeNull()
-      expect(stored.presentationId).toBe(f.presentationId)
+      expect(stored.presentationLines).toEqual([{ presentationId: f.presentationId }])
     })
   })
 
-  it('R9: editar sustituye la presentacion por otra de la misma empresa', async () => {
+  it('R9: editar sustituye la presentacion de la linea por otra de la misma empresa', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const otraPresentacion = (
@@ -895,9 +898,15 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
       ).id
       const id = await createOrder(tx, f, { presentationId: f.presentationId })
 
-      await tx.order.update({ where: { id }, data: { presentationId: otraPresentacion } })
+      await tx.orderPresentationLine.updateMany({
+        where: { orderId: id },
+        data: { presentationId: otraPresentacion },
+      })
 
-      const stored = await tx.order.findUniqueOrThrow({ where: { id }, select: { presentationId: true } })
+      const stored = await tx.orderPresentationLine.findFirstOrThrow({
+        where: { orderId: id },
+        select: { presentationId: true },
+      })
       expect(stored.presentationId).toBe(otraPresentacion)
       expect(stored.presentationId).not.toBe(f.presentationId)
     })
@@ -929,7 +938,8 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
       })
 
       const id = await createOrder(tx, f, { presentationId: f.presentationId })
-      await tx.order.update({ where: { id }, data: { presentationId: f.presentationId, priority: 'ALTA' } })
+      await tx.order.update({ where: { id }, data: { priority: 'ALTA' } })
+      await tx.orderPresentationLine.updateMany({ where: { orderId: id }, data: { packages: 2 } })
 
       const stockDespues = await tx.productBatch.findUniqueOrThrow({
         where: { id: batch.id },
@@ -1008,7 +1018,13 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
   } as unknown as PresentationCatalog
   const products = { findRefs: async () => [], findCostingBatches: async () => [] } as unknown as ProductCatalog
   const units = {
-    findRefs: async () => [],
+    findRefs: async (ids: readonly string[], companyId: string) =>
+      (
+        await tx.unit.findMany({
+          where: { id: { in: [...ids] }, OR: [{ companyId }, { companyId: null }] },
+          select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
+        })
+      ).map((u) => ({ ...u, factor: u.factor === null ? null : u.factor.toFixed(4) })),
     findRefsSharingBaseInCompany: async () => [],
   } as unknown as UnitCatalog
   const now = () => new Date()
@@ -1055,7 +1071,7 @@ function entrada(f: Fixtures, quantity: string, confirmBlocked?: boolean) {
   return {
     recipeId: f.recipeId,
     quantity,
-    presentationId: f.presentationId,
+    unitId: f.unitId,
     ...(confirmBlocked === undefined ? {} : { confirmBlocked }),
   }
 }

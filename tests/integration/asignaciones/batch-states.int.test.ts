@@ -153,6 +153,7 @@ function casosDelOperador(fixture: Fixture) {
       orders,
       recipes,
       presentations,
+      units: { findRefs: noUsado('units.findRefs') } as unknown as UnitCatalog,
       people: assignmentDirectoryPrisma,
       now: () => NOW,
     }),

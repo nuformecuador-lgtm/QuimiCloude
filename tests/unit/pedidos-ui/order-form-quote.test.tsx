@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MISSING_VALUE_MARK,
   ORDER_BUSINESS_FIELDS,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   ORDER_COST_QUOTE_ERROR_TESTID,
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
@@ -96,6 +98,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   createOrderAction: createOrderActionMock,
   updateOrderAction: updateOrderActionMock,
   quoteOrderCostAction: quoteOrderCostActionMock,
+  quoteOrderPresentationAvailabilityAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { kind: 'ok', available: '0' } }),
+  ),
   cancelOrderAction: vi.fn(() => {
     throw new Error('cancelOrderAction no debe invocarse desde el formulario');
   }),
@@ -127,20 +132,32 @@ const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null }
 const RECETA2 = { id: crypto.randomUUID(), name: 'Barniz mate', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA, RECETA2], totalPages: 1 };
 
-const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Litro',
+  symbol: 'L',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
+
+const PRESENTACION = {
+  id: crypto.randomUUID(),
+  name: 'Bidón 20L',
+  unitId: UNIDAD.id,
+  content: '20.0000',
+};
 
 const LINEA_INGREDIENTE = {
   id: 'linea-1',
   productId: crypto.randomUUID(),
   productName: 'Sosa cáustica',
   percentage: '10.00',
-  productUnitId: 'u-litro',
+  productUnitId: UNIDAD.id,
   productStock: '40.0000',
 };
 
-const UNIDADES: readonly UnitView[] = [
-  { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
-];
+const UNIDADES: readonly UnitView[] = [UNIDAD];
 
 function recetaResumen(option: RecipePickerOption): RecipeSummary {
   return {
@@ -193,8 +210,11 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: PRESENTACION.id,
-    presentationName: PRESENTACION.name,
+    presentationLines: [
+      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
+    ],
+    unitId: UNIDAD.id,
+    unitLabel: UNIDAD.symbol,
     ...overrides,
   };
 }
@@ -225,14 +245,14 @@ async function elegirReceta(
   await user.click(await esperarInteractiva(opcion));
 }
 
-async function elegirPresentacion(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId('presentation-select'));
-  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
+async function elegirUnidad(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId('presentation-unit-select'));
+  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
 }
 
 async function rellenarAlta(user: ReturnType<typeof setupUser>, cantidadEscrita = '5') {
   await elegirReceta(user);
-  await elegirPresentacion(user);
+  await elegirUnidad(user);
   await user.type(cantidad(), cantidadEscrita);
 }
 
@@ -391,7 +411,7 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
     expect([...enviado.keys()].sort()).toEqual([...ORDER_BUSINESS_FIELDS].sort());
   });
 
-  it('el FormData de la edicion lleva los mismos campos, sin estado ni importe', async () => {
+  it('el FormData de la edicion lleva los mismos campos mas su reparto, sin estado ni importe', async () => {
     const user = setupUser();
     const elPedido = pedido({ ingredientsCost: '40.0000' });
     renderFormulario(elPedido);
@@ -400,7 +420,13 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
 
     await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
     const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    expect([...enviado.keys()].sort()).toEqual([...ORDER_BUSINESS_FIELDS].sort());
+    expect([...enviado.keys()].sort()).toEqual(
+      [
+        ...ORDER_BUSINESS_FIELDS,
+        ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+        ORDER_DISTRIBUTION_PACKAGES_FIELD,
+      ].sort(),
+    );
   });
 
   it('Guardar sigue habilitado con una cotizacion en vuelo y con el guion', async () => {
@@ -503,7 +529,7 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
       MISSING_VALUE_MARK,
     );
 
-    await elegirPresentacion(user);
+    await elegirUnidad(user);
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));

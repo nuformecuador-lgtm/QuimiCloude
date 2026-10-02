@@ -1,5 +1,10 @@
 # QC-150 — producto-terminado · design.md
 
+> **Enmienda del 2026-09-26 (QC-170).** §1 (lote en la rama del Finalizar), §4.1 (`planFinishedGoods`
+> con `floor`) y §4.3 (el Finalizar da de alta el lote) quedan derogados: el Finalizar ya no da de
+> alta nada y Terminar da de alta un lote por línea del reparto. El resto sigue vigente. Detalle en
+> `specs/QC-170-pedido-en-varias-presentaciones/design.md > 8`.
+
 > Escrito por `spec_author` el 2026-09-23 sobre la rama `feature/QC-150-producto-terminado`, que hoy
 > está a la altura de `dev` (`a8986a10`). **Todo lo de QC-141 que se cita aquí está leído en su
 > worktree** (`.worktrees/QC-141-reserva-de-material-del-pedido/`, rama sin mergear, T10 sin cerrar):

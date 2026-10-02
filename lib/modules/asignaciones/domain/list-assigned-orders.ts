@@ -98,7 +98,9 @@ export function createListAssignedOrders(
         otherResponsibles: (rowComposed?.responsibles ?? []).filter(
           (responsible) => responsible.userId !== actor.id,
         ),
-        presentationName: rowComposed?.presentationName ?? null,
+        presentationLines: rowComposed?.presentationLines ?? [],
+        unitId: row.unitId,
+        unitLabel: rowComposed?.unitLabel ?? null,
       };
     });
 

@@ -5,10 +5,7 @@ import { requirePermission, type Actor } from './actor';
 import {
   InvalidTransitionError,
   MaterialShortageError,
-  NoWholePackageError,
   OrderNotFoundError,
-  PresentationWithoutContentError,
-  RecipeNotFoundError,
   RecipeWithoutLinesError,
   ValidationError,
 } from './errors';
@@ -38,10 +35,12 @@ export type FinishAssignedOrderDeps = {
   readonly now?: () => Date;
 };
 
+/**
+ * Finalizar ya no da de alta ningun lote de producto terminado -eso se
+ * traslada a Terminar el empaque-, asi que ya no hay envases ni producto que devolver aqui.
+ */
 export type FinishAssignedOrderResult = {
   readonly numberText: string;
-  readonly packages: string;
-  readonly productName: string;
 };
 
 /**
@@ -157,12 +156,9 @@ async function compensatePackerAssignments(
  * ANTES de transicionar: una vez `POR_EMPACAR`, el pedido ya no aparece entre los estados de
  * trabajo que consulta `listAliveSummariesByIds`.
  *
- * `transitionAliveById` consume el material y da de alta el lote de producto terminado por
- * dentro: `'insufficient_material'` se traduce a `MaterialShortageError`,
- * `'recipe_without_lines'` a `RecipeWithoutLinesError`, `'presentation_without_content'` a
- * `PresentationWithoutContentError`, `'no_whole_package'` a `NoWholePackageError` y
- * `'recipe_not_found'` a `RecipeNotFoundError`, las cinco propias de este modulo para que el
- * adaptador driving las traduzca con su propio `instanceof`.
+ * `transitionAliveById` consume el material por dentro: `'insufficient_material'` se traduce a
+ * `MaterialShortageError` y `'recipe_without_lines'` a `RecipeWithoutLinesError`, las dos
+ * propias de este modulo para que el adaptador driving las traduzca con su propio `instanceof`.
  *
  * Antes de transicionar asegura filas de responsable para los empacadores vinculados al pedido
  * (ver `ensurePackerAssignments`): si la transicion falla despues, compensa lo creado y propaga
@@ -215,22 +211,15 @@ export function createFinishAssignedOrder(
         actor.id,
         now,
       );
-      if (typeof result === 'object') {
-        const { productName, packages } = result.finishedGoods;
-        return { numberText, productName, packages };
-      }
+      if (result === 'ok') return { numberText };
       // La transicion fallo con el pedido aun `EN_CURSO`: se deshace lo creado y se propaga
       // el error original, con el mismo mapeo de siempre.
       await compensatePackerAssignments(deps, actor.companyId, orderId, createdPackerIds);
       if (result === 'not_found') throw new OrderNotFoundError();
       if (result === 'insufficient_material') throw new MaterialShortageError();
       if (result === 'recipe_without_lines') throw new RecipeWithoutLinesError();
-      if (result === 'presentation_without_content') throw new PresentationWithoutContentError();
-      if (result === 'no_whole_package') throw new NoWholePackageError();
-      if (result === 'recipe_not_found') throw new RecipeNotFoundError();
       // 'stale': alguien lo movio entre la lectura y esta llamada. Se relee y se reintenta
-      // contra el estado real. ('ok' en cadena no ocurre aqui: el destino siempre es
-      // `POR_EMPACAR`, que solo devuelve el `'ok'` con `finishedGoods`.)
+      // contra el estado real.
       order = await deps.orders.findAliveById(orderId, actor.companyId);
       if (order === null) throw new OrderNotFoundError();
       assertFinishable(order);

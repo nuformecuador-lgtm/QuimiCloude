@@ -353,6 +353,45 @@ export async function createOrder(
   return order.id;
 }
 
+/**
+ * Una linea de reparto real para que un pedido `POR_EMPACAR` pueda Comenzar de verdad (R10 de
+ * `pedidos`, QC-170): `startPackingAliveOrder` exige al menos una fila en
+ * `order_presentation_lines` o devuelve `'without_distribution'`. Crea su propia unidad y
+ * presentacion efimeras -mismo patron que `createRecipe`- porque este fixture no las trae por
+ * defecto. Sin limpieza manual: la transaccion del `it` termina en `ROLLBACK`.
+ */
+export async function crearLinea(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  orderId: string,
+  packages = 1,
+): Promise<void> {
+  const marca = randomUUID().replaceAll('-', '');
+  const unit = await tx.unit.create({
+    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, companyId },
+    select: { id: true },
+  });
+  const presentation = await tx.presentation.create({
+    data: {
+      name: `Presentacion ${marca}`,
+      nameNormalized: `presentacion${marca}`,
+      unitId: unit.id,
+      companyId,
+      content: new Prisma.Decimal('1'),
+    },
+    select: { id: true },
+  });
+  await tx.orderPresentationLine.create({
+    data: {
+      orderId,
+      companyId,
+      presentationId: presentation.id,
+      packages,
+      presentationContent: new Prisma.Decimal('1'),
+    },
+  });
+}
+
 export type StoredRow = {
   userId: string;
   companyId: string;

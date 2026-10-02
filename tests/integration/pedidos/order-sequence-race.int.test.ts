@@ -125,8 +125,8 @@ function ambito(fixture: Fixture): OrderScope {
   return { companyId: fixture.companyId };
 }
 
-function pedidoNuevo(presentationId: string): NewOrder {
-  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
+function pedidoNuevo(): NewOrder {
+  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', unitId, presentationLines: [] };
 }
 
 /** El ano sale del MISMO `now` que se escribe en `created_at`, como en el caso de uso: lo exige el
@@ -135,7 +135,7 @@ function altaDe(fixture: Fixture): Promise<OrderRow> {
   const now = new Date();
   return withOrderTransaction((tx) =>
     createOrderWriteRepository(tx).create(
-      pedidoNuevo(fixture.presentationId),
+      pedidoNuevo(),
       now.getUTCFullYear(),
       fixture.actorId,
       now,

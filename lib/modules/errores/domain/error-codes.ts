@@ -18,6 +18,9 @@
  * **Decimotercera enmienda, 2026-09-24**: `customer_not_found`.
  * **Decimocuarta enmienda, 2026-09-25**: `order_packing_taken`, `order_not_packable`,
  * `order_produced_frozen`.
+ * **2026-09-27**: `order_without_distribution`,
+ * `order_presentation_line_not_editable`, `order_distribution_exceeds_quantity`,
+ * `order_without_unit`.
  * **Decimoquinta enmienda, 2026-10-01**: `order_would_block`, `order_blocked`.
  */
 export const ERROR_CODES = [
@@ -116,6 +119,18 @@ export const ERROR_CODES = [
   // Distinto de `invalid_transition`: el pedido esta bloqueado por falta de material y no se puede
   // abrir ni iniciar hasta que se desbloquee.
   'order_blocked',
+  // Distinto de `presentation_without_content`: el pedido no tiene ni una linea de reparto, no le
+  // falta el contenido a una que ya existe.
+  'order_without_distribution',
+  // Distinto de `invalid_transition`: no es el ESTADO del pedido el que no admite el cambio, es
+  // que el reparto de ESTE pedido ya no se puede tocar.
+  'order_presentation_line_not_editable',
+  // Distinto de `invalid_input`: la entrada tiene forma valida, lo que falla es que la suma del
+  // reparto pasa de la cantidad del pedido.
+  'order_distribution_exceeds_quantity',
+  // Distinto de `unit_not_found`: la unidad no falta porque no exista, falta porque el pedido
+  // nunca la tuvo asignada.
+  'order_without_unit',
   // Distinto de `recipe_not_found`: la version existe y esta viva, pero sus lineas no suman 100 %.
   'recipe_version_under_review',
 ] as const;

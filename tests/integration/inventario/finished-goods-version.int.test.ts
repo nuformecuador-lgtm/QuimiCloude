@@ -2,10 +2,12 @@
  * Producto terminado de un pedido cuya receta es una version, contra Postgres real.
  *
  * El nombre de la receta sale del catalogo de `recetas` (`findRecipeRefsIncludingDeleted`), el mismo
- * que usa Finalizar, y la entrada la da `receiveFinishedGoods` dentro de una `prisma.$transaction`
+ * que usa Terminar el empaque (QC-170 movio alli la entrada, que antes daba Finalizar), y la entrada
+ * de cada linea del reparto la da `receiveFinishedGoods` dentro de una `prisma.$transaction`
  * que CONFIRMA, como `finished-goods.int.test.ts`: el catalogo lee con el cliente global y no veria
  * filas de una transaccion del test. Cada caso fabrica su empresa con randomUUID y limpia en un
- * `finally` en el orden de las FK: asientos -> lotes -> productos -> pedidos -> version -> original ->
+ * `finally` en el orden de las FK: asientos -> lotes -> productos -> lineas de reparto -> pedidos ->
+ * version -> original ->
  * presentacion -> unidad; la empresa (usuario, rol, tipo de documento) cae en el `afterAll`.
  */
 import { randomUUID } from 'node:crypto';
@@ -105,7 +107,12 @@ async function sembrarReceta(companyId: string, nombre: string, parentRecipeId: 
 
 let sequenceCounter = 1;
 
-async function sembrarPedido(companyId: string, recipeId: string, presentationId: string): Promise<string> {
+async function sembrarPedido(
+  companyId: string,
+  recipeId: string,
+  unitId: string,
+  presentationId: string,
+): Promise<{ readonly id: string; readonly lineId: string }> {
   const now = new Date();
   const { id } = await prisma.order.create({
     data: {
@@ -114,30 +121,42 @@ async function sembrarPedido(companyId: string, recipeId: string, presentationId
       recipeId,
       quantity: '10',
       companyId,
-      presentationId,
-      presentationContent: '1',
+      unitId,
       createdAt: now,
     },
     select: { id: true },
   });
-  return id;
+  // QC-170: el pedido ya no tiene presentacion unica; se reparte en lineas. Una sola linea de
+  // 10 envases de contenido 1 equivale a la presentacion unica de antes.
+  const { id: lineId } = await prisma.orderPresentationLine.create({
+    data: { orderId: id, companyId, presentationId, packages: 10, presentationContent: '1' },
+    select: { id: true },
+  });
+  return { id, lineId };
 }
 
-/** Lo que hace Finalizar: nombre del catalogo de recetas y entrada de producto terminado. */
-async function finalizar(empresa: Company, orderId: string, recipeId: string, presentationId: string) {
+/** Lo que hace Terminar el empaque por cada linea: nombre del catalogo de recetas y entrada de
+ *  producto terminado. */
+async function finalizar(
+  empresa: Company,
+  pedido: { readonly id: string; readonly lineId: string },
+  recipeId: string,
+  presentationId: string,
+) {
   const [ref] = await findRecipeRefsIncludingDeleted([recipeId], empresa.companyId);
   if (ref === undefined) throw new Error('la receta no volvio del catalogo');
   return prisma.$transaction((tx) =>
     receiveFinishedGoods(
       tx,
       {
-        orderId,
+        orderId: pedido.id,
         recipeId,
         recipeName: ref.name,
         presentationId,
-        orderQuantity: '10',
+        orderPresentationLineId: pedido.lineId,
+        packages: 10,
         orderContent: '1',
-        lotCost: '10',
+        unitCost: '1.0000',
         actorId: empresa.userId,
         now: new Date(),
       },
@@ -153,9 +172,9 @@ describe('producto terminado de un pedido con version de receta', () => {
     const presentationId = await sembrarPresentacion(empresa.companyId, unitId, 'Envase 1 L');
     const originalId = await sembrarReceta(empresa.companyId, 'Crema base');
     const versionId = await sembrarReceta(empresa.companyId, 'Sin perfume', originalId);
-    const pedidoOriginal = await sembrarPedido(empresa.companyId, originalId, presentationId);
-    const pedidoVersion = await sembrarPedido(empresa.companyId, versionId, presentationId);
-    const pedidoVersionBis = await sembrarPedido(empresa.companyId, versionId, presentationId);
+    const pedidoOriginal = await sembrarPedido(empresa.companyId, originalId, unitId, presentationId);
+    const pedidoVersion = await sembrarPedido(empresa.companyId, versionId, unitId, presentationId);
+    const pedidoVersionBis = await sembrarPedido(empresa.companyId, versionId, unitId, presentationId);
 
     try {
       const deLaOriginal = await finalizar(empresa, pedidoOriginal, originalId, presentationId);
@@ -196,7 +215,9 @@ describe('producto terminado de un pedido con version de receta', () => {
       await prisma.inventoryMovement.deleteMany({ where: { batch: { productId: { in: productIds } } } });
       await prisma.productBatch.deleteMany({ where: { productId: { in: productIds } } });
       await prisma.product.deleteMany({ where: { id: { in: productIds } } });
-      await prisma.order.deleteMany({ where: { id: { in: [pedidoOriginal, pedidoVersion, pedidoVersionBis] } } });
+      const pedidos = [pedidoOriginal.id, pedidoVersion.id, pedidoVersionBis.id];
+      await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: pedidos } } });
+      await prisma.order.deleteMany({ where: { id: { in: pedidos } } });
       await prisma.recipe.deleteMany({ where: { id: versionId } });
       await prisma.recipe.deleteMany({ where: { id: originalId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });

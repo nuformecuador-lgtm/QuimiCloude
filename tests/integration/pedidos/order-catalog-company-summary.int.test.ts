@@ -123,8 +123,8 @@ function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: e.presentationId,
-    presentationContent: null,
+    unitId: e.unitId,
+    presentationLines: [],
     ...overrides,
   }
 }

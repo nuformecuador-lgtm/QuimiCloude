@@ -142,8 +142,8 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId,
-    presentationContent: null,
+    unitId,
+    presentationLines: [],
     ...overrides,
   }
 }
@@ -290,8 +290,8 @@ describe('R5, R9 — editar y cancelar no tocan finished_at', () => {
         recipeId,
         quantity: '20.0000',
         priority: 'ALTA',
-        presentationId,
-        presentationContent: null,
+        unitId,
+        presentationLines: [],
       }
       const resultado = await updateAliveOrder(id, edit, actorId, instant(20), null, scope())
       expect(resultado).toBe('ok')

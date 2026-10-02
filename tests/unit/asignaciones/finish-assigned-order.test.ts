@@ -9,12 +9,9 @@ import {
   AsignacionesError,
   InvalidTransitionError,
   MaterialShortageError,
-  NoWholePackageError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
   OrderProducedFrozenError,
-  PresentationWithoutContentError,
-  RecipeNotFoundError,
   RecipeWithoutLinesError,
   UnauthorizedError,
 } from '@/lib/modules/asignaciones/domain/errors';
@@ -49,23 +46,9 @@ const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.
 
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
 
-/** El exito por defecto de `transitionAliveById` yendo a `POR_EMPACAR`: un objeto
- *  con el lote de producto terminado que entro, no el literal `'ok'` -ese solo sale de una
- *  transicion que no es `POR_EMPACAR`, y `finishAssignedOrder` siempre pide esa-. */
-const OK_CON_PRODUCCION = {
-  kind: 'ok' as const,
-  finishedGoods: { productName: 'Desengrasante industrial · Botella 1L', packages: '5' },
-};
-
-type TransitionResult =
-  | typeof OK_CON_PRODUCCION
-  | 'not_found'
-  | 'stale'
-  | 'insufficient_material'
-  | 'recipe_without_lines'
-  | 'presentation_without_content'
-  | 'no_whole_package'
-  | 'recipe_not_found';
+// R15, R16: `transitionAliveById` yendo a `POR_EMPACAR` ya no da de alta ningun lote,
+// asi que el exito es el literal `'ok'`, sin `finishedGoods`.
+type TransitionResult = 'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines';
 
 type Dobles = {
   readonly deps: FinishAssignedOrderDeps;
@@ -109,7 +92,7 @@ function montar(options?: {
   readonly personas?: readonly PersonRef[];
 }): Dobles {
   const estados = [...(options?.ordenDeEstados ?? ['EN_CURSO'])];
-  const resultados = [...(options?.transitionResults ?? [OK_CON_PRODUCCION])];
+  const resultados = [...(options?.transitionResults ?? ['ok' as const])];
   const snapshots = [...(options?.snapshots ?? [])];
 
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
@@ -121,7 +104,7 @@ function montar(options?: {
     pageSize: 1,
     totalPages: 1,
   }));
-  const transitionAliveById = vi.fn(async () => resultados.shift() ?? OK_CON_PRODUCCION);
+  const transitionAliveById = vi.fn(async () => resultados.shift() ?? 'ok');
   const listByOrderInCompany = vi.fn(async () => options?.filas ?? []);
   const insertMissing = vi.fn(async () => 1);
   const deleteOne = vi.fn(async () => 'ok' as const);
@@ -226,14 +209,12 @@ describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado re
   it('si `transitionAliveById` devuelve `stale`, relee y reintenta sin lanzar un error visible', async () => {
     const { deps, findAliveById, transitionAliveById } = montar({
       ordenDeEstados: ['EN_CURSO', 'EN_CURSO'],
-      transitionResults: ['stale', OK_CON_PRODUCCION],
+      transitionResults: ['stale', 'ok'],
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
     await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
       numberText: '2026-0000007',
-      productName: OK_CON_PRODUCCION.finishedGoods.productName,
-      packages: OK_CON_PRODUCCION.finishedGoods.packages,
     });
     expect(findAliveById).toHaveBeenCalledTimes(2);
     expect(transitionAliveById).toHaveBeenCalledTimes(2);
@@ -241,28 +222,12 @@ describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado re
 });
 
 describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES de transicionar', () => {
-  it('resuelve con el `numberText` formateado del pedido', async () => {
+  it('resuelve con el `numberText` formateado del pedido, sin envases ni producto (R16)', async () => {
     const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
     await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
       numberText: '2026-0000007',
-      productName: OK_CON_PRODUCCION.finishedGoods.productName,
-      packages: OK_CON_PRODUCCION.finishedGoods.packages,
-    });
-  });
-
-  it('R24: el exito lleva el producto y los envases del lote de producto terminado que entro', async () => {
-    const { deps } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: [{ kind: 'ok', finishedGoods: { productName: 'Acido citrico 50% · Bidon 20L', packages: '3' } }],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
-      numberText: '2026-0000007',
-      productName: 'Acido citrico 50% · Bidon 20L',
-      packages: '3',
     });
   });
 
@@ -359,44 +324,10 @@ describe('finishAssignedOrder — QC-141: el Finalizar traduce lo que devuelve e
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
   });
 
-  it('R18: `presentation_without_content` se traduce a PresentationWithoutContentError, sin reintentar', async () => {
-    const { deps, transitionAliveById } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: ['presentation_without_content'],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
-      PresentationWithoutContentError,
-    );
-    expect(transitionAliveById).toHaveBeenCalledTimes(1);
-  });
-
-  it('R19: `no_whole_package` se traduce a NoWholePackageError, sin reintentar', async () => {
-    const { deps, transitionAliveById } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: ['no_whole_package'],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
-      NoWholePackageError,
-    );
-    expect(transitionAliveById).toHaveBeenCalledTimes(1);
-  });
-
-  it('D24: `recipe_not_found` se traduce a RecipeNotFoundError, sin reintentar', async () => {
-    const { deps, transitionAliveById } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: ['recipe_not_found'],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
-      RecipeNotFoundError,
-    );
-    expect(transitionAliveById).toHaveBeenCalledTimes(1);
-  });
+  // R15, R16: `transitionAliveById` yendo a `POR_EMPACAR` ya no puede devolver
+  // `presentation_without_content`, `no_whole_package` ni `recipe_not_found` -esos tres
+  // resultados solo existian para el alta de producto terminado, que se traslado a Terminar el
+  // empaque-, asi que los tres casos que los traducian se retiran de este archivo.
 });
 
 describe('finishAssignedOrder — R16: no admite ningun dato de marcado', () => {
@@ -615,7 +546,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
   it('R7: el reintento `stale` no repite el auto-asignado', async () => {
     const { deps, listByOrderInCompany, insertMissing, transitionAliveById } = montar({
       ordenDeEstados: ['EN_CURSO', 'EN_CURSO'],
-      transitionResults: ['stale', OK_CON_PRODUCCION],
+      transitionResults: ['stale', 'ok'],
       filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
       snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
       personas: [

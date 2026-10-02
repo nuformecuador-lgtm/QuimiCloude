@@ -7,6 +7,9 @@
 // pedido se acepta aunque este dada de baja, si no cambia-. Lo unico que anade QC-50 es que
 // CAMBIAR la receta a una de otra empresa se rechaza igual que cambiarla a una inexistente o
 // dada de baja: ningun codigo de error nuevo, ninguna firma publica distinta.
+//
+// QC-170: la presentacion UNICA de QC-146 se fue; la edicion ahora exige `unitId` y valida el
+// reparto contra el total con `validateDistribution`, con la fila del pedido YA bloqueada.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -42,6 +45,9 @@ const RECETA_DE_A = '22222222-2222-4222-8222-222222222222';
 const RECETA_DE_B = '55555555-5555-4555-8555-555555555555';
 const RECETA_INEXISTENTE = '99999999-9999-4999-8999-999999999999';
 const PRESENTACION_DE_A = '66666666-6666-4666-8666-666666666666';
+/** La unidad del pedido: `catalogoDeUnidades` la deja SIEMPRE resoluble. */
+const UNIT_ID = '77777777-7777-4777-8777-777777777777';
+const OTRA_UNIDAD_INCOMPATIBLE = '10101010-1010-4101-8101-101010101010';
 
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
@@ -59,8 +65,8 @@ function filaExistente(): OrderRow {
     updatedAt: AHORA,
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: PRESENTACION_DE_A,
-    presentationContent: '1.0000',
+    presentationLines: [],
+    unitId: null,
   };
 }
 
@@ -107,11 +113,14 @@ function catalogoDeProductos(batches: readonly CostingBatch[] = [], refs?: reado
   return { products: { findRefs, findCostingBatches } as unknown as ProductCatalog, findCostingBatches, findRefs };
 }
 
-/** Catalogo de unidades (T5): una sola llamada por alta o edicion. */
+/** Catalogo de unidades: `UNIT_ID` -la del pedido- SIEMPRE resuelve, ademas de las que el test
+ *  anada (las de las presentaciones del reparto, o la del coste de ingredientes). */
 function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new Map()) {
+  const UNIDAD_PEDIDO: UnitConversion = { id: UNIT_ID, baseUnitId: null, factor: null };
+  const combinadas = new Map<string, UnitConversion>([[UNIT_ID, UNIDAD_PEDIDO], ...unidades]);
   const findRefs = vi.fn(async (ids: readonly string[]) =>
     ids.flatMap((id) => {
-      const unidad = unidades.get(id);
+      const unidad = combinadas.get(id);
       return unidad === undefined ? [] : [unidad];
     }),
   );
@@ -120,12 +129,13 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
 }
 
 /** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
- *  contenido que le pase el test -`null` por defecto, para el caso sin copia-. */
+ *  contenido y la unidad que le pase el test -`null`/`UNIT_ID` por defecto. */
 function catalogoDePresentaciones(
   content: string | null = null,
+  unitId: string = UNIT_ID,
 ): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
   const findRefs = vi.fn(async (ids: readonly string[]) =>
-    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L', content }] : [],
+    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L', content, unitId }] : [],
   );
   return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
@@ -168,7 +178,7 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 const EDICION_HACIA_B = {
   recipeId: RECETA_DE_B,
   quantity: '10.0000',
-  presentationId: PRESENTACION_DE_A,
+  unitId: UNIT_ID,
 };
 
 /** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar la edicion sobre
@@ -309,8 +319,8 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
   });
 });
 
-describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', () => {
-  it('R7: editar un pedido sin presentacion exige elegir una', async () => {
+describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R42)', () => {
+  it('R41: editar un pedido sin `unitId` en la entrada lanza invalid_input', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
@@ -325,40 +335,64 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     });
 
     expect(
-      await codigoDelFallo(() => updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationId: undefined }, ACTOR_A)),
+      await codigoDelFallo(() =>
+        updateOrder(ORDER_ID, { recipeId: RECETA_DE_A, quantity: '10.0000' }, ACTOR_A),
+      ),
     ).toBe('invalid_input');
     expect(repo.updateAlive).not.toHaveBeenCalled();
     expect(pres.findRefs).not.toHaveBeenCalled();
   });
 
-  it('R9: un pedido PENDIENTE y uno EN_CURSO cambian de presentacion', async () => {
+  it('R41: cambiar a una unidad ausente del catalogo de la empresa -> unit_not_found, sin escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    const UNIDAD_AJENA = '20202020-2020-4202-8202-202020202020';
+    expect(
+      await codigoDelFallo(() =>
+        updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, unitId: UNIDAD_AJENA }, ACTOR_A),
+      ),
+    ).toBe('unit_not_found');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
+
+  it('R9: un pedido PENDIENTE y uno EN_CURSO aceptan cambiar la unidad', async () => {
     for (const status of ['PENDIENTE', 'EN_CURSO'] as const) {
       const cat = catalogoDeRecetas();
       const repo = repositorioConEstado(status);
-      const pres = catalogoDePresentaciones();
-      const OTRA_PRESENTACION = '99999999-9999-4999-8999-999999999999';
-      pres.findRefs.mockImplementation(async (ids: readonly string[]) =>
-        ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L', content: '2.0000' }] : [],
+      const OTRA_UNIDAD = '30303030-3030-4303-8303-303030303030';
+      const unidades = catalogoDeUnidades(
+        new Map([[OTRA_UNIDAD, { id: OTRA_UNIDAD, baseUnitId: null, factor: null }]]),
       );
       const updateOrder = createUpdateOrder({
         orders: repo.orders,
         unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
-        units: catalogoDeUnidades().units,
-        presentations: pres.presentations,
+        units: unidades.units,
+        presentations: catalogoDePresentaciones().presentations,
         now: () => AHORA,
       });
 
       await updateOrder(
         ORDER_ID,
-        { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationId: OTRA_PRESENTACION },
+        { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, unitId: OTRA_UNIDAD },
         ACTOR_A,
       );
 
       expect(repo.updateAlive, status).toHaveBeenCalledTimes(1);
-      const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationId: string }];
-      expect(dataEscrita.presentationId, status).toBe(OTRA_PRESENTACION);
+      const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { unitId: string }];
+      expect(dataEscrita.unitId, status).toBe(OTRA_UNIDAD);
     }
   });
 
@@ -388,11 +422,11 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     }
   });
 
-  it('receta y presentacion invalidas a la vez -> `recipe_not_found`: la receta se comprueba primero', async () => {
+  it('receta y unidad invalidas a la vez -> `recipe_not_found`: la receta se comprueba primero', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
-    const PRESENTACION_INEXISTENTE = '77777777-7777-4777-8777-777777777777';
+    const UNIDAD_INEXISTENTE = '40404040-4040-4404-8404-404040404040';
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
@@ -406,7 +440,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     const codigo = await codigoDelFallo(() =>
       updateOrder(
         ORDER_ID,
-        { ...EDICION_HACIA_B, presentationId: PRESENTACION_INEXISTENTE },
+        { ...EDICION_HACIA_B, unitId: UNIDAD_INEXISTENTE },
         ACTOR_A,
       ),
     );
@@ -416,38 +450,38 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     expect(repo.updateAlive).not.toHaveBeenCalled();
   });
 
-  it('R39: cambiar de presentacion sustituye la copia por el contenido nuevo', async () => {
+  it('R6, R8: una linea con contenido escribe el reparto con el contenido copiado en este instante', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
-    const OTRA_PRESENTACION = '99999999-9999-4999-8999-999999999999';
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: {
-        findRefs: vi.fn(async (ids: readonly string[]) =>
-          ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L', content: '7.0000' }] : [],
-        ),
-      } as unknown as PresentationCatalog,
+      presentations: catalogoDePresentaciones('7.0000').presentations,
       now: () => AHORA,
     });
 
     await updateOrder(
       ORDER_ID,
-      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationId: OTRA_PRESENTACION },
+      {
+        ...EDICION_HACIA_B,
+        recipeId: RECETA_DE_A,
+        presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+      },
       ACTOR_A,
     );
 
-    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
-    expect(dataEscrita.presentationContent).toBe('7.0000');
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [
+      string,
+      { presentationLines: readonly { presentationId: string; packages: number; content: string | null }[] },
+    ];
+    expect(dataEscrita.presentationLines).toEqual([{ presentationId: PRESENTACION_DE_A, packages: 1, content: '7.0000' }]);
   });
 
-  it('R39: no cambiar de presentacion conserva la copia de la fila leida', async () => {
+  it('R9: sin ningun reparto en la entrada, la edicion escribe el conjunto vacio', async () => {
     const cat = catalogoDeRecetas();
-    // La fila leida trae `presentationContent: '1.0000'` (`filaExistente`); la presentacion
-    // vigente contesta OTRO contenido, y aun asi la copia NO se toca porque el id no cambia.
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
@@ -455,17 +489,17 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('9.0000').presentations,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
     await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
 
-    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
-    expect(dataEscrita.presentationContent).toBe('1.0000');
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationLines: readonly unknown[] }];
+    expect(dataEscrita.presentationLines).toEqual([]);
   });
 
-  it('R39: editar cantidad, prioridad o receta sin cambiar presentacion no toca la copia', async () => {
+  it('R35: una linea sin contenido -> presentation_without_content, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
@@ -474,18 +508,88 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('9.0000').presentations,
+      presentations: catalogoDePresentaciones(null).presentations,
       now: () => AHORA,
     });
 
-    await updateOrder(
-      ORDER_ID,
-      { recipeId: RECETA_DE_A, quantity: '99.0000', priority: 'CRITICA', presentationId: PRESENTACION_DE_A },
-      ACTOR_A,
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(
+        ORDER_ID,
+        {
+          ...EDICION_HACIA_B,
+          recipeId: RECETA_DE_A,
+          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+        },
+        ACTOR_A,
+      ),
     );
 
-    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationContent: string | null }];
-    expect(dataEscrita.presentationContent).toBe('1.0000');
+    expect(codigo).toBe('presentation_without_content');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
+
+  it('R7, R38: la unidad nueva deja el reparto vigente inconvertible -> incompatible_units, sin escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const unidades = catalogoDeUnidades(
+      new Map([[OTRA_UNIDAD_INCOMPATIBLE, { id: OTRA_UNIDAD_INCOMPATIBLE, baseUnitId: null, factor: null }]]),
+    );
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: unidades.units,
+      presentations: catalogoDePresentaciones('5.0000', UNIT_ID).presentations,
+      now: () => AHORA,
+    });
+
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(
+        ORDER_ID,
+        {
+          ...EDICION_HACIA_B,
+          recipeId: RECETA_DE_A,
+          unitId: OTRA_UNIDAD_INCOMPATIBLE,
+          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+        },
+        ACTOR_A,
+      ),
+    );
+
+    expect(codigo).toBe('incompatible_units');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
+
+  it('R36, R38: bajar la cantidad deja el reparto vigente por encima del total -> order_distribution_exceeds_quantity', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('5.0000').presentations,
+      now: () => AHORA,
+    });
+
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(
+        ORDER_ID,
+        {
+          ...EDICION_HACIA_B,
+          recipeId: RECETA_DE_A,
+          quantity: '4.0000',
+          // 3 envases x 5 = 15, mas que los 4 de la cantidad bajada.
+          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 3 }],
+        },
+        ACTOR_A,
+      ),
+    );
+
+    expect(codigo).toBe('order_distribution_exceeds_quantity');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
   });
 });
 
@@ -746,7 +850,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     expect(cat.findExecutionContentById).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
   });
 
-  it('las lecturas de lotes y de unidades son UNA sola, tenga la receta 1 o 20 lineas', async () => {
+  it('las lecturas de lotes son UNA sola y las de unidades DOS -coste y reparto-, tenga la receta 1 o 20 lineas', async () => {
     for (const cantidad of [1, 20]) {
       const lineas = Array.from({ length: cantidad }, (_, i) =>
         lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}` }),
@@ -771,7 +875,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '1.0000' }, ACTOR_A);
 
       expect(prod.findCostingBatches, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
-      expect(uni.findRefs, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
+      expect(uni.findRefs, `${cantidad} lineas`).toHaveBeenCalledTimes(2);
     }
   });
 
@@ -993,7 +1097,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
 
     await updateOrder(
       ORDER_ID,
-      { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A },
+      { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID },
       ACTOR_A,
     );
 
@@ -1071,7 +1175,7 @@ describe('edicion con version de receta', () => {
   const entrada = (recipeVersionId: string | null, recipeId = RECETA_DE_A) => ({
     recipeId,
     quantity: '10.0000',
-    presentationId: PRESENTACION_DE_A,
+    unitId: UNIT_ID,
     recipeVersionId,
   });
 
@@ -1203,7 +1307,7 @@ describe('edicion con version de receta', () => {
 
     await updateOrder(
       ORDER_ID,
-      { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A },
+      { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID },
       ACTOR_A,
     );
 
@@ -1258,7 +1362,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
     return { updateOrder, updateAlive, syncForOrder, setStatus, setIngredientsCost, setReservedAt };
   }
 
-  const ENTRADA = { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A };
+  const ENTRADA = { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID };
   const SCOPE = { companyId: EMPRESA_A };
 
   it('R6: PENDIENTE que deja de alcanzar sin confirmacion -> order_would_block, sin mover estado ni reserva', async () => {

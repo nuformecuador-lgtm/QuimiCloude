@@ -226,14 +226,14 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, presentationId: string, quantity: string): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
+function nuevoPedido(recipeId: string, unitId: string, quantity: string): NewOrder {
+  return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', unitId, presentationLines: [] };
 }
 
 /** Crea un pedido reservado y lo hace CADUCADO a proposito: `reserved_at` pasa a un instante
  *  anterior al umbral de los 15 dias, con `$executeRaw` para no mover `updated_at`. */
 async function crearPedidoCaducado(fixture: Fixture, recipeId: string): Promise<string> {
-  const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+  const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
   const vencido = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
   await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${vencido}::timestamptz WHERE "id" = ${creado.id}::uuid`;
   return creado.id;
@@ -294,7 +294,7 @@ describe('R22 — el proceso diario NO toca lo que no debe', () => {
     const recipeId = await crearReceta(fixture); // sin lineas: no aparta nada (E2)
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect((await estadoDe(creado.id)).reservedAt).toBeNull();
 
       await expireStaleOrders();
@@ -313,7 +313,7 @@ describe('R22 — el proceso diario NO toca lo que no debe', () => {
     await crearLineaCompleta(recipeId, productId);
 
     try {
-      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
       await expireStaleOrders();
 
@@ -468,7 +468,7 @@ describe('QC-138 R29 — el proceso diario no toca un pedido BLOQUEADO', () => {
 
     try {
       const creado = await createOrder(
-        { ...nuevoPedido(recipeId, fixture.presentationId, '10.0000'), confirmBlocked: true },
+        { ...nuevoPedido(recipeId, fixture.unitId, '10.0000'), confirmBlocked: true },
         actorDe(fixture),
       );
       const antiguo = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
@@ -493,7 +493,7 @@ describe('QC-138 R29 — el proceso diario no toca un pedido BLOQUEADO', () => {
 
     try {
       const creado = await createOrder(
-        { ...nuevoPedido(recipeId, fixture.presentationId, '10.0000'), confirmBlocked: true },
+        { ...nuevoPedido(recipeId, fixture.unitId, '10.0000'), confirmBlocked: true },
         actorDe(fixture),
       );
       const vencido = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);

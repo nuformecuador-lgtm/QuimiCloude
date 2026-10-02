@@ -26,9 +26,15 @@
  * unitarios disfrazados; este devuelve el MISMO `PrismaClient` real (`vi.importActual`) envuelto.
  * Si la transaccion no esta abierta —`setCurrentTx(null)`—, el proxy es transparente.
  *
- * `$transaction` NO se delega y no hace falta excluirlo a mano: el cliente transaccional de Prisma
- * no lo tiene, asi que `undefined` hace caer la busqueda al cliente real. Ese es justamente el
- * metodo con el que el propio test abre su transaccion.
+ * `$transaction` SI se intercepta, pero solo en su forma interactiva (`$transaction(fn)`) y solo
+ * mientras hay una transaccion de test en curso: el propio adaptador de produccion (`Comenzar`,
+ * `order-prisma.ts`) abre su propia `prisma.$transaction` para el `SELECT ... FOR UPDATE` mas el
+ * reconteo, y esa llamada no puede convertirse en un `BEGIN` real anidado -Postgres no lo permite
+ * sobre la misma conexion, y una conexion nueva del pool no veria ninguna fila sin commit del
+ * fixture-. En vez de abrir otra transaccion, se ejecuta el callback directamente sobre la `tx` del
+ * test: el mismo efecto que Prisma le daria dentro de la MISMA transaccion, sin el `BEGIN`
+ * redundante. El `$transaction` con el que el propio test abre SU transaccion no pasa por aqui:
+ * se llama cuando `current` todavia es `null`, antes de que exista nada que interceptar.
  *
  * Este archivo NO termina en `.int.test.ts` a proposito: no es una suite, no lo recoge el
  * `include` de Vitest y no entra en `tests/integration/aislamiento.json` (la guardia filtra por
@@ -51,6 +57,13 @@ export function setCurrentTx(tx: object | null): void {
 export function txAwareProxy<T extends object>(real: T): T {
   return new Proxy(real, {
     get(target, prop, receiver) {
+      if (current !== null && prop === '$transaction') {
+        return (arg: unknown, ...rest: readonly unknown[]) => {
+          if (typeof arg === 'function') return (arg as (tx: object) => unknown)(current as object);
+          const real = Reflect.get(target, prop, receiver) as (...args: unknown[]) => unknown;
+          return real.call(target, arg, ...rest);
+        };
+      }
       if (current !== null && typeof prop === 'string') {
         const fromTx = (current as Record<string, unknown>)[prop];
         if (fromTx !== undefined) return fromTx;

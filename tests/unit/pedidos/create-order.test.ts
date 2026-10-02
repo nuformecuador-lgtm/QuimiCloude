@@ -13,6 +13,11 @@
 // companyId)` simplemente no devuelve la referencia cuando la receta pedida es de otra empresa
 // -tal y como promete `RecipeCatalog` (`lib/modules/recetas/domain/recipe-catalog.ts`)-, y el
 // caso de uso no puede distinguir eso de que el id no exista en absoluto.
+//
+// QC-170: la presentacion UNICA de QC-146 se fue. El alta ahora exige `unitId` y valida el
+// reparto (`presentationLines`) contra el total con `validateDistribution` -las descripciones
+// «QC-146 — la presentacion del pedido en el alta» de esta feccion pasan a ser
+// «QC-170 — el reparto en el alta».
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -45,6 +50,10 @@ const RECETA_DE_A = '22222222-2222-4222-8222-222222222222';
 const RECETA_DE_B = '55555555-5555-4555-8555-555555555555';
 const RECETA_INEXISTENTE = '99999999-9999-4999-8999-999999999999';
 const PRESENTACION_DE_A = '66666666-6666-4666-8666-666666666666';
+/** La unidad del pedido, por defecto: `catalogoDeUnidades` la deja SIEMPRE resoluble, porque
+ *  casi todos los casos de este archivo necesitan un `unitId` valido para llegar al reparto. */
+const UNIT_ID = '77777777-7777-4777-8777-777777777777';
+const OTRA_UNIDAD_INCOMPATIBLE = '88888888-8888-4888-8888-888888888888';
 
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
@@ -62,8 +71,8 @@ function filaCreada(): OrderRow {
     updatedAt: AHORA,
     createdBy: ACTOR_A.id,
     updatedBy: ACTOR_A.id,
-    presentationId: PRESENTACION_DE_A,
-    presentationContent: null,
+    presentationLines: [],
+    unitId: null,
   };
 }
 
@@ -113,11 +122,14 @@ function catalogoDeProductos(batches: readonly CostingBatch[] = [], refs?: reado
   return { products: { findRefs, findCostingBatches } as unknown as ProductCatalog, findCostingBatches, findRefs };
 }
 
-/** Catalogo de unidades (T5): una sola llamada por alta o edicion. */
+/** Catalogo de unidades: `UNIT_ID` -la del pedido- SIEMPRE resuelve, ademas de las que el test
+ *  anada (las de las presentaciones del reparto, o la del coste de ingredientes). */
 function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new Map()) {
+  const UNIDAD_PEDIDO: UnitConversion = { id: UNIT_ID, baseUnitId: null, factor: null };
+  const combinadas = new Map<string, UnitConversion>([[UNIT_ID, UNIDAD_PEDIDO], ...unidades]);
   const findRefs = vi.fn(async (ids: readonly string[]) =>
     ids.flatMap((id) => {
-      const unidad = unidades.get(id);
+      const unidad = combinadas.get(id);
       return unidad === undefined ? [] : [unidad];
     }),
   );
@@ -126,12 +138,14 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
 }
 
 /** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
- *  contenido que le pase el test -`null` por defecto, para el caso sin copia-. */
+ *  contenido y la unidad que le pase el test -`null`/`UNIT_ID` por defecto, para el caso sin
+ *  copia y misma unidad que el pedido, sin conversion. */
 function catalogoDePresentaciones(
   content: string | null = null,
+  unitId: string = UNIT_ID,
 ): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
   const findRefs = vi.fn(async (ids: readonly string[]) =>
-    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L', content }] : [],
+    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L', content, unitId }] : [],
   );
   return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
@@ -170,7 +184,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     });
 
     const codigoAjena = await codigoDelFallo(() =>
-      createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A),
+      createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A),
     );
 
     expect(codigoAjena).toBe('recipe_not_found');
@@ -187,7 +201,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
         units: catalogoDeUnidades().units,
         presentations: catalogoDePresentaciones().presentations,
         now: () => AHORA,
-      })({ recipeId: RECETA_DE_B, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A),
+      })({ recipeId: RECETA_DE_B, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A),
     ).rejects.toBeInstanceOf(RecipeNotFoundError);
 
     // Indistinguible de una receta que no existe en absoluto: mismo `code`, mismo mensaje.
@@ -200,7 +214,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
-    })({ recipeId: RECETA_INEXISTENTE, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A).catch((e: unknown) => e);
+    })({ recipeId: RECETA_INEXISTENTE, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A).catch((e: unknown) => e);
 
     expect((errorInexistente as PedidosError).code).toBe(codigoAjena);
     expect((errorInexistente as Error).constructor.name).toBe(RecipeNotFoundError.name);
@@ -218,7 +232,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       now: () => AHORA,
     });
 
-    await codigoDelFallo(() => createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A));
+    await codigoDelFallo(() => createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A));
 
     expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_B], EMPRESA_A);
   });
@@ -235,15 +249,15 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       now: () => AHORA,
     });
 
-    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
 
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.create).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () => {
-  it('R6: sin presentacion lanza invalid_input y no escribe', async () => {
+describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () => {
+  it('R41: sin `unitId` lanza invalid_input y no escribe', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
@@ -263,7 +277,114 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
     expect(pres.findRefs).not.toHaveBeenCalled();
   });
 
-  it('R8: una presentacion ausente del catalogo de la empresa -> presentation_not_found, sin escribir', async () => {
+  it('R41: una unidad ausente del catalogo de la empresa -> unit_not_found, sin escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    const UNIDAD_AJENA = '99999999-1111-4222-8333-444444444444';
+    expect(
+      await codigoDelFallo(() =>
+        createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIDAD_AJENA }, ACTOR_A),
+      ),
+    ).toBe('unit_not_found');
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(pres.findRefs).not.toHaveBeenCalled();
+  });
+
+  it('R2: una presentacion repetida en el reparto se rechaza en el BORDE, sin llegar a ningun catalogo', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    expect(
+      await codigoDelFallo(() =>
+        createOrder(
+          {
+            recipeId: RECETA_DE_A,
+            quantity: '10.0000',
+            unitId: UNIT_ID,
+            presentationLines: [
+              { presentationId: PRESENTACION_DE_A, packages: 1 },
+              { presentationId: PRESENTACION_DE_A, packages: 2 },
+            ],
+          },
+          ACTOR_A,
+        ),
+      ),
+    ).toBe('invalid_input');
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(pres.findRefs).not.toHaveBeenCalled();
+  });
+
+  it('R9: sin ningun reparto (`[]`), el alta se completa igual y escribe el conjunto vacio', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
+
+    expect(repo.create).toHaveBeenCalledTimes(1);
+    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
+      unitId: string;
+      presentationLines: readonly unknown[];
+    };
+    expect(data.unitId).toBe(UNIT_ID);
+    expect(data.presentationLines).toEqual([]);
+  });
+
+  it('R6, R8: una linea que existe en la empresa del actor escribe el reparto con el contenido copiado', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('5.0000').presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder(
+      {
+        recipeId: RECETA_DE_A,
+        quantity: '10.0000',
+        unitId: UNIT_ID,
+        presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 2 }],
+      },
+      ACTOR_A,
+    );
+
+    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
+      presentationLines: readonly { presentationId: string; packages: number; content: string | null }[];
+    };
+    expect(data.presentationLines).toEqual([{ presentationId: PRESENTACION_DE_A, packages: 2, content: '5.0000' }]);
+  });
+
+  it('una presentacion ausente del catalogo de la empresa -> presentation_not_found, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
@@ -279,71 +400,21 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
     const AJENA = '88888888-8888-4888-8888-888888888888';
     expect(
       await codigoDelFallo(() =>
-        createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: AJENA }, ACTOR_A),
+        createOrder(
+          {
+            recipeId: RECETA_DE_A,
+            quantity: '10.0000',
+            unitId: UNIT_ID,
+            presentationLines: [{ presentationId: AJENA, packages: 1 }],
+          },
+          ACTOR_A,
+        ),
       ),
     ).toBe('presentation_not_found');
     expect(repo.create).not.toHaveBeenCalled();
-    expect(pres.findRefs).toHaveBeenCalledWith([AJENA], EMPRESA_A);
   });
 
-  it('R13: el coste y la cantidad no dependen de la presentacion', async () => {
-    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
-    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
-    const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
-    const repo1 = repositorioDePedidos();
-    const repo2 = repositorioDePedidos();
-
-    const createOrder1 = createCreateOrder({
-      unitOfWork: repo1.unitOfWork,
-      recipes: cat.recipes,
-      products: prod.products,
-      units: uni.units,
-      presentations: catalogoDePresentaciones().presentations,
-      now: () => AHORA,
-    });
-    const createOrder2 = createCreateOrder({
-      unitOfWork: repo2.unitOfWork,
-      recipes: cat.recipes,
-      products: prod.products,
-      units: uni.units,
-      presentations: catalogoDePresentaciones().presentations,
-      now: () => AHORA,
-    });
-
-    await createOrder1({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
-    await createOrder2({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
-
-    const costeUno = (repo1.create.mock.calls[0] as unknown as readonly unknown[])[4];
-    const costeDos = (repo2.create.mock.calls[0] as unknown as readonly unknown[])[4];
-    expect(costeUno).toBe(costeDos);
-    expect(costeUno).toBe('30.0000');
-    // El `NewOrder` que llega al puerto lleva la presentacion, pero nunca se le pasa a
-    // `resolveIngredientsCost`: firma de esa funcion en `resolve-ingredients-cost.ts`.
-    const dataUno = (repo1.create.mock.calls[0] as unknown as readonly unknown[])[0] as { presentationId: string };
-    expect(dataUno.presentationId).toBe(PRESENTACION_DE_A);
-  });
-
-  it('R38: copia el contenido que la presentacion tiene en ese instante', async () => {
-    const cat = catalogoDeRecetas();
-    const repo = repositorioDePedidos();
-    const createOrder = createCreateOrder({
-      unitOfWork: repo.unitOfWork,
-      recipes: cat.recipes,
-      products: catalogoDeProductos().products,
-      units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('5.0000').presentations,
-      now: () => AHORA,
-    });
-
-    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
-
-    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
-      presentationContent: string | null;
-    };
-    expect(data.presentationContent).toBe('5.0000');
-  });
-
-  it('R38: sin contenido en la presentacion, el pedido no lleva copia', async () => {
+  it('R35: una presentacion sin contenido en el reparto -> presentation_without_content, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
@@ -355,12 +426,107 @@ describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () =>
       now: () => AHORA,
     });
 
-    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+    expect(
+      await codigoDelFallo(() =>
+        createOrder(
+          {
+            recipeId: RECETA_DE_A,
+            quantity: '10.0000',
+            unitId: UNIT_ID,
+            presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+          },
+          ACTOR_A,
+        ),
+      ),
+    ).toBe('presentation_without_content');
+    expect(repo.create).not.toHaveBeenCalled();
+  });
 
-    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
-      presentationContent: string | null;
-    };
-    expect(data.presentationContent).toBeNull();
+  it('R7: la unidad de la presentacion no comparte base con la del pedido -> incompatible_units, sin escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const unidades = catalogoDeUnidades(
+      new Map([[OTRA_UNIDAD_INCOMPATIBLE, { id: OTRA_UNIDAD_INCOMPATIBLE, baseUnitId: null, factor: null }]]),
+    );
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: unidades.units,
+      presentations: catalogoDePresentaciones('5.0000', OTRA_UNIDAD_INCOMPATIBLE).presentations,
+      now: () => AHORA,
+    });
+
+    expect(
+      await codigoDelFallo(() =>
+        createOrder(
+          {
+            recipeId: RECETA_DE_A,
+            quantity: '10.0000',
+            unitId: UNIT_ID,
+            presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+          },
+          ACTOR_A,
+        ),
+      ),
+    ).toBe('incompatible_units');
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('R36: el reparto pasa de la cantidad del pedido -> order_distribution_exceeds_quantity, sin escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('5.0000').presentations,
+      now: () => AHORA,
+    });
+
+    expect(
+      await codigoDelFallo(() =>
+        createOrder(
+          {
+            recipeId: RECETA_DE_A,
+            quantity: '10.0000',
+            unitId: UNIT_ID,
+            // 3 envases x 5 = 15, mas que los 10 del pedido.
+            presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 3 }],
+          },
+          ACTOR_A,
+        ),
+      ),
+    ).toBe('order_distribution_exceeds_quantity');
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('R20: ninguna alta -con o sin reparto- llama a scope.finishedGoods.receiveFromOrder', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      // `fakeUnitOfWork` por defecto explota si algo llama a `finishedGoods.receiveFromOrder`:
+      // que el alta termine sin lanzar demuestra que no lo hizo.
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('5.0000').presentations,
+      now: () => AHORA,
+    });
+
+    await expect(
+      createOrder(
+        {
+          recipeId: RECETA_DE_A,
+          quantity: '10.0000',
+          unitId: UNIT_ID,
+          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+        },
+        ACTOR_A,
+      ),
+    ).resolves.toMatchObject({ id: filaCreada().id });
   });
 });
 
@@ -433,7 +599,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     });
 
     await createOrder(
-      { recipeId: RECETA_DE_A, quantity: '20.0000', presentationId: PRESENTACION_DE_A },
+      { recipeId: RECETA_DE_A, quantity: '20.0000', unitId: UNIT_ID },
       ACTOR_A,
     );
 
@@ -442,7 +608,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('60.0000');
   });
 
-  it('las lecturas de lotes y de unidades son UNA sola, tenga la receta 1 o 20 lineas', async () => {
+  it('las lecturas de lotes son UNA sola y las de unidades DOS -coste y reparto-, tenga la receta 1 o 20 lineas', async () => {
     for (const cantidad of [1, 20]) {
       const lineas = Array.from({ length: cantidad }, (_, i) =>
         lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}` }),
@@ -463,10 +629,13 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
         now: () => AHORA,
       });
 
-      await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+      await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000', unitId: UNIT_ID }, ACTOR_A);
 
       expect(prod.findCostingBatches, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
-      expect(uni.findRefs, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
+      // Dos llamadas: `resolveIngredientsCost` (el coste) y `resolveDistribution` (el reparto,
+      // que resuelve `unitId` aunque no traiga ninguna linea) -ninguna crece con el numero de
+      // lineas de la receta.
+      expect(uni.findRefs, `${cantidad} lineas`).toHaveBeenCalledTimes(2);
     }
   });
 
@@ -487,7 +656,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     });
 
     await expect(
-      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_SIN_MODIFICAR),
+      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_SIN_MODIFICAR),
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
@@ -507,7 +676,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       now: () => AHORA,
     });
 
-    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000', unitId: UNIT_ID }, ACTOR_A);
 
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.create).toHaveBeenCalledTimes(1);
@@ -529,7 +698,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     });
 
     await createOrder(
-      { recipeId: RECETA_DE_A, quantity: '20.0000', presentationId: PRESENTACION_DE_A },
+      { recipeId: RECETA_DE_A, quantity: '20.0000', unitId: UNIT_ID },
       ACTOR_A,
     );
 
@@ -574,7 +743,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       now: () => AHORA,
     });
 
-    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
 
     expect(repo.orden).toEqual(['orders.create', 'reservations.syncForOrder', 'orders.setReservedAt']);
     expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
@@ -592,7 +761,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       now: () => AHORA,
     });
 
-    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
 
     expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
   });
@@ -615,7 +784,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
 
     await expect(
-      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, SIN_PERMISO),
+      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, SIN_PERMISO),
     ).rejects.toBeInstanceOf(UnauthorizedError);
     expect(unitOfWork.run).not.toHaveBeenCalled();
   });
@@ -634,7 +803,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     });
 
     const creado = await createOrder(
-      { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A },
+      { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID },
       ACTOR_A,
     );
 
@@ -690,7 +859,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       now: () => AHORA,
     });
 
-    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
 
     expect(findExecutionContentByIdGlobal).toHaveBeenCalledTimes(1);
     expect(findExecutionContentByIdDeLaTransaccion).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
@@ -755,7 +924,7 @@ describe('alta con version de receta', () => {
   const entrada = (recipeVersionId?: string | null) => ({
     recipeId: RECETA_DE_A,
     quantity: '10.0000',
-    presentationId: PRESENTACION_DE_A,
+    unitId: UNIT_ID,
     ...(recipeVersionId === undefined ? {} : { recipeVersionId }),
   });
 
@@ -914,7 +1083,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
     });
   }
 
-  const ENTRADA = { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A };
+  const ENTRADA = { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID };
 
   it('R1, R6: no alcanza y sin confirmacion -> order_would_block, sin fijar estado ni reserva', async () => {
     const repo = repositorioQueBloquea(INSUFICIENTE);

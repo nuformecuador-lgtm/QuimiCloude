@@ -129,7 +129,7 @@ async function sembrarReceta(companyId: string): Promise<string> {
 
 let sequenceCounter = 1;
 
-async function sembrarPedido(companyId: string, recipeId: string, presentationId: string): Promise<string> {
+async function sembrarPedido(companyId: string, recipeId: string): Promise<string> {
   const now = new Date();
   const { id } = await prisma.order.create({
     data: {
@@ -138,10 +138,22 @@ async function sembrarPedido(companyId: string, recipeId: string, presentationId
       recipeId,
       quantity: '10',
       companyId,
-      presentationId,
-      presentationContent: null,
       createdAt: now,
     },
+    select: { id: true },
+  });
+  return id;
+}
+
+/** La linea del reparto que `receiveFinishedGoods` exige por `orderPresentationLineId`. */
+async function sembrarLinea(
+  orderId: string,
+  companyId: string,
+  presentationId: string,
+  packages: number,
+): Promise<string> {
+  const { id } = await prisma.orderPresentationLine.create({
+    data: { orderId, companyId, presentationId, packages, presentationContent: null },
     select: { id: true },
   });
   return id;
@@ -153,19 +165,22 @@ async function limpiarProducto(productId: string): Promise<void> {
   await prisma.product.deleteMany({ where: { id: productId } });
 }
 
-/** Escribe el asiento `production` de verdad, por la MISMA ruta que el Finalizar, envuelta en su
- *  propia transaccion que CONFIRMA -igual que `finished-goods.int.test.ts`-. */
+/** Escribe el asiento `production` de verdad, por la MISMA ruta que Terminar, envuelta en su
+ *  propia transaccion que CONFIRMA -igual que `finished-goods.int.test.ts`-. Siembra su propia
+ *  linea del reparto: `packages` reemplaza a `orderQuantity`/`content`, ya no hay
+ *  division que hacer aqui. */
 async function recibir(
   companyId: string,
   input: {
     readonly orderId: string;
     readonly recipeId: string;
     readonly presentationId: string;
-    readonly orderQuantity: string;
-    readonly lotCost: string;
+    readonly packages: number;
+    readonly unitCost: string;
     readonly actorId: string;
   },
 ): Promise<{ readonly productId: string }> {
+  const lineId = await sembrarLinea(input.orderId, companyId, input.presentationId, input.packages);
   const outcome = await prisma.$transaction((tx) =>
     receiveFinishedGoods(
       tx,
@@ -174,9 +189,10 @@ async function recibir(
         recipeId: input.recipeId,
         recipeName: `Receta ${input.orderId}`,
         presentationId: input.presentationId,
-        orderQuantity: input.orderQuantity,
+        orderPresentationLineId: lineId,
+        packages: input.packages,
         orderContent: null,
-        lotCost: input.lotCost,
+        unitCost: input.unitCost,
         actorId: input.actorId,
         now: new Date(),
       },
@@ -203,6 +219,7 @@ async function sembrarFixture(content = '1'): Promise<Fixture> {
 }
 
 async function limpiarFixture(fixture: Fixture, orderIds: readonly string[]): Promise<void> {
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [...orderIds] } } });
   await prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } });
   await prisma.recipe.deleteMany({ where: { id: fixture.recipeId } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
@@ -212,7 +229,7 @@ async function limpiarFixture(fixture: Fixture, orderIds: readonly string[]): Pr
 describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron por pedido', () => {
   it('un pedido con asiento production devuelve los envases enteros que entraron', async () => {
     const fixture = await sembrarFixture('2');
-    const orderId = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId, fixture.presentationId);
+    const orderId = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId);
     let productId: string | null = null;
 
     try {
@@ -220,8 +237,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
         orderId,
         recipeId: fixture.recipeId,
         presentationId: fixture.presentationId,
-        orderQuantity: '10',
-        lotCost: '20',
+        packages: 5,
+        unitCost: '2.0000',
         actorId: fixture.empresa.userId,
       });
       productId = recibido.productId;
@@ -237,8 +254,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
 
   it('varios pedidos de la misma empresa en una sola llamada, cada uno con su propia fila', async () => {
     const fixture = await sembrarFixture('1');
-    const orderId1 = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId, fixture.presentationId);
-    const orderId2 = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId, fixture.presentationId);
+    const orderId1 = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId);
+    const orderId2 = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId);
     let productId: string | null = null;
 
     try {
@@ -246,8 +263,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
         orderId: orderId1,
         recipeId: fixture.recipeId,
         presentationId: fixture.presentationId,
-        orderQuantity: '3',
-        lotCost: '3',
+        packages: 3,
+        unitCost: '1.0000',
         actorId: fixture.empresa.userId,
       });
       productId = primero.productId;
@@ -255,8 +272,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
         orderId: orderId2,
         recipeId: fixture.recipeId,
         presentationId: fixture.presentationId,
-        orderQuantity: '7',
-        lotCost: '7',
+        packages: 7,
+        unitCost: '1.0000',
         actorId: fixture.empresa.userId,
       });
 
@@ -276,7 +293,7 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
 
   it('un pedido SIN asiento production simplemente no aparece', async () => {
     const fixture = await sembrarFixture('1');
-    const orderId = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId, fixture.presentationId);
+    const orderId = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId);
 
     try {
       const receipts = await findFinishedGoodsReceipts([orderId], fixture.empresa.companyId);
@@ -289,7 +306,7 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
   it('un pedido de OTRA empresa no aparece, aunque tenga asiento production', async () => {
     const fixture = await sembrarFixture('1');
     const otraEmpresa = await nuevaEmpresa();
-    const orderId = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId, fixture.presentationId);
+    const orderId = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId);
     let productId: string | null = null;
 
     try {
@@ -297,8 +314,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
         orderId,
         recipeId: fixture.recipeId,
         presentationId: fixture.presentationId,
-        orderQuantity: '4',
-        lotCost: '4',
+        packages: 4,
+        unitCost: '1.0000',
         actorId: fixture.empresa.userId,
       });
       productId = recibido.productId;
@@ -314,16 +331,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
 
   it('un pedido cuyo lote quedo sin contenido de envase se omite, sin tumbar el resto', async () => {
     const fixture = await sembrarFixture('2');
-    const orderIdSinContenido = await sembrarPedido(
-      fixture.empresa.companyId,
-      fixture.recipeId,
-      fixture.presentationId,
-    );
-    const orderIdConContenido = await sembrarPedido(
-      fixture.empresa.companyId,
-      fixture.recipeId,
-      fixture.presentationId,
-    );
+    const orderIdSinContenido = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId);
+    const orderIdConContenido = await sembrarPedido(fixture.empresa.companyId, fixture.recipeId);
     let productId: string | null = null;
 
     try {
@@ -331,8 +340,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
         orderId: orderIdSinContenido,
         recipeId: fixture.recipeId,
         presentationId: fixture.presentationId,
-        orderQuantity: '4',
-        lotCost: '4',
+        packages: 2,
+        unitCost: '1.0000',
         actorId: fixture.empresa.userId,
       });
       productId = sinContenido.productId;
@@ -347,8 +356,8 @@ describe('R14 — findFinishedGoodsReceipts: los envases que de verdad entraron 
         orderId: orderIdConContenido,
         recipeId: fixture.recipeId,
         presentationId: fixture.presentationId,
-        orderQuantity: '6',
-        lotCost: '6',
+        packages: 3,
+        unitCost: '1.0000',
         actorId: fixture.empresa.userId,
       });
       expect(conContenido.productId).toBe(productId);

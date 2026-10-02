@@ -625,6 +625,13 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       // Lista exacta y no `toContain`: una FK nueva hacia `units` sin RESTRICT, o una perdida
       // por drift de `migrate dev`, tiene que poner rojo este caso.
       expect(foreignKeys).toEqual([
+        // La unidad del pedido: con RESTRICT, una unidad usada por un pedido no se borra.
+        {
+          conname: 'orders_unit_id_fkey',
+          referencia: 'units',
+          confdeltype: 'r',
+          confupdtype: 'c',
+        },
         {
           conname: 'presentations_unit_id_fkey',
           referencia: 'units',

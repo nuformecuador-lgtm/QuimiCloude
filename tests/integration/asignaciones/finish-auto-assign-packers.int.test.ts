@@ -57,7 +57,12 @@ async function createRoleWithPermissions(
   return role.id;
 }
 
-/** Transicion doblada: exito con lote, sin pasar por inventario. */
+/**
+ * Transicion doblada: exito sin pasar por inventario. El `'ok'` del puerto es el literal: el
+ * Finalizar ya no da de alta producto terminado (eso pasa a Terminar el empaque), asi que no
+ * hay `finishedGoods` que devolver. Un objeto aqui no es `'ok'` para el caso de uso y lo
+ * trataria como `'stale'`, reintentando sin fin.
+ */
 function ordersDoblados(orderId: string): OrderCatalog {
   return {
     findAliveById: async () => ({ id: orderId, status: 'EN_CURSO' as const }),
@@ -77,10 +82,7 @@ function ordersDoblados(orderId: string): OrderCatalog {
       pageSize: 1,
       totalPages: 1,
     }),
-    transitionAliveById: async () => ({
-      kind: 'ok' as const,
-      finishedGoods: { productName: 'Producto de prueba', packages: '2' },
-    }),
+    transitionAliveById: async () => 'ok' as const,
   } as unknown as OrderCatalog;
 }
 

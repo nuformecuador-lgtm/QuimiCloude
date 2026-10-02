@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { PackingOrderRow } from '@/lib/modules/asignaciones';
 import { packingOrderRoute } from '@/lib/shared/routes';
 
@@ -61,7 +61,7 @@ export function buildPackingOrdersColumns(): readonly DataTableColumn<PackingOrd
       id: PACKING_ORDER_PRESENTATION_COLUMN_ID,
       label: 'Presentación',
       align: 'start',
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: PACKING_ORDER_PACKAGES_COLUMN_ID,

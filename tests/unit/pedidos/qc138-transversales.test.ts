@@ -339,16 +339,17 @@ describe('R21 — no hay accion manual de desbloqueo', () => {
   it('R21: el esquema del formulario de pedido no declara estado y descarta uno que llegue', () => {
     expect(Object.keys(createOrderSchema.shape).sort()).toEqual([
       'confirmBlocked',
-      'presentationId',
+      'presentationLines',
       'priority',
       'quantity',
       'recipeId',
       'recipeVersionId',
+      'unitId',
     ]);
 
     const conEstado = {
       recipeId: '00000000-0000-4000-8000-000000000001',
-      presentationId: '00000000-0000-4000-8000-000000000002',
+      unitId: '00000000-0000-4000-8000-000000000002',
       quantity: '10',
       status: 'PENDIENTE',
     };

@@ -25,7 +25,9 @@ const BASE_ORDER: CompanyOrderView = {
   numberText: '2026-000123',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
-  presentationName: 'Caja x 12',
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  unitId: null,
+  unitLabel: null,
   priority: 'ALTA',
   status: 'ENTREGADO',
   responsibles: [
@@ -138,11 +140,11 @@ describe('R24, R41 - la columna Estado declara el filtro select de los siete est
 describe('R25 - la presentación, la prioridad, el estado y los responsables', () => {
   it('presentacion: con nombre lo pinta, sin el «Sin presentación»', () => {
     renderCell(COMPANY_ORDER_PRESENTATION_COLUMN_ID, BASE_ORDER);
-    expect(screen.getByTestId('order-presentation')).toHaveTextContent('Caja x 12');
+    expect(screen.getByTestId('order-distribution')).toHaveTextContent('5 × Caja x 12');
     cleanup();
 
-    renderCell(COMPANY_ORDER_PRESENTATION_COLUMN_ID, { ...BASE_ORDER, presentationName: null });
-    expect(screen.getByTestId('order-presentation')).toHaveTextContent('Sin presentación');
+    renderCell(COMPANY_ORDER_PRESENTATION_COLUMN_ID, { ...BASE_ORDER, presentationLines: [] });
+    expect(screen.getByTestId('order-distribution')).toHaveTextContent('Sin presentación');
   });
 
   it('estado: pinta la etiqueta legible con `data-status`', () => {
