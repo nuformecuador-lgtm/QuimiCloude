@@ -28,6 +28,18 @@
     "tests/unit/recetas-ui/recipe-page.test.tsx": {
       "motivo": "Deuda ajena de dev, roja desde a543c84d (data-table: flechas de scroll, width/hideText y defaultPinned por columna, PR #131): el caso de la columna de acciones que no se puede fijar falla igual en origin/dev puro. Salida limpia: QC-177 borra esta entrada. Ajeno a QC-171, que no toca recetas.",
       "desde": "2026-10-01"
+    },
+    "tests/unit/navegacion/pantallas-exigen-permiso.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios)): app/(private)/pedidos/page.tsx empezo a llamar a listRecipesAction en loadFormCatalogs y el mock del test la deja en vi.fn() sin valor, asi que '/pedidos' rompe leyendo .status de undefined. Falla igual en origin/dev puro (897a4f91). Ajeno a QC-174, que no toca pedidos.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/recetas/module-contract.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios)): app/(private)/pedidos/page.tsx importa recipe-actions y la frontera de QC-25/QC-26 lo cuenta como 'segunda pantalla de recetas fuera de su carpeta'. Falla igual en origin/dev puro (897a4f91). Ajeno a QC-174, que no toca pedidos.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/recetas/scope.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios)): misma causa que module-contract — app/(private)/pedidos/page.tsx importa recipe-actions y el alcance de QC-25 lo cuenta como segunda pantalla de recetas. Falla igual en origin/dev puro (897a4f91). Ajeno a QC-174, que no toca pedidos.",
+      "desde": "2026-10-02"
     }
   }
 }
