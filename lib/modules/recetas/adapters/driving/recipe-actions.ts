@@ -18,6 +18,7 @@ import {
   type RecipeDetail,
   type RecipeSummary,
   type RecipeVersionSummary,
+  type UpdateRecipeResult,
 } from '@/lib/modules/recetas';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -62,7 +63,7 @@ export type CreateRecipeFormState =
 
 export type UpdateRecipeFormState =
   | { status: 'idle' }
-  | { status: 'success' }
+  | { status: 'success'; propagated: UpdateRecipeResult['propagated'] }
   | ErrorState;
 
 export type DeleteRecipeFormState =
@@ -166,11 +167,11 @@ export async function updateRecipeAction(id: string, input: unknown): Promise<Up
   const actor = await currentActor();
 
   try {
-    const { warnings } = await recetas.updateRecipe(id, parsed.data, actor);
+    const { warnings, propagated } = await recetas.updateRecipe(id, parsed.data, actor);
     // R49: una advertencia de borrado NUNCA convierte la edicion en error para el
     // llamante -la receta ya quedo persistida y correcta-, pero tampoco se descarta.
     for (const warning of warnings) logStorageWarning(warning);
-    return { status: 'success' };
+    return { status: 'success', propagated };
   } catch (error) {
     return toErrorState(error);
   }

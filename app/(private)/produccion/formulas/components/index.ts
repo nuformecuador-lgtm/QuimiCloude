@@ -70,6 +70,11 @@ export {
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
+export {
+  compareWithOriginal,
+  type RemovedLine,
+  type VersionLineMark,
+} from './recipe-version-diff';
 
 // `recipe-step-schema.ts` no sale por aquí: su export tiene un tipo de la librería del editor, y el
 // barrel dejaría usarlo desde cualquier archivo sin importar la librería, que debe quedar aislada.

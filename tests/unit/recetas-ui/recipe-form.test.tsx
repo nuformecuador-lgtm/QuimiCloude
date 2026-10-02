@@ -513,7 +513,7 @@ beforeEach(() => {
     permissions: PERMISSIONS.map((permiso) => permiso.code),
   });
   createRecipeActionMock.mockResolvedValue({ status: 'success', id: RECIPE_ID });
-  updateRecipeActionMock.mockResolvedValue({ status: 'success' });
+  updateRecipeActionMock.mockResolvedValue({ status: 'success', propagated: [] });
   listProductsActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [productView()], total: 3, page: 2, pageSize: MAX_PAGE_SIZE, totalPages: 2 },

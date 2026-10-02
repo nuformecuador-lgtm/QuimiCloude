@@ -5,7 +5,13 @@ import { join, relative, sep } from 'node:path';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { RECIPE_QUERYABLE } from '@/lib/modules/recetas';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
-import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
+import {
+  FORMULAS_ROUTE,
+  NEW_RECIPE_ROUTE,
+  newRecipeVersionRoute,
+  recipeEditRoute,
+  recipeVersionRoute,
+} from '@/lib/shared/routes';
 
 /**
  * Guardias de codigo, sin DOM: lo que la ruta promete no hacer (incrustar la ruta, repetir la
@@ -508,6 +514,18 @@ describe('contrato de la ruta de recetas', () => {
     );
 
     expect(FUENTES_DE_LA_RUTA.length).toBeGreaterThan(1);
+  });
+
+  it('las rutas de version cuelgan de recipeEditRoute con su forma exacta', () => {
+    expect(newRecipeVersionRoute('sonda-de-prueba')).toBe(
+      '/produccion/formulas/sonda-de-prueba/versiones/nueva',
+    );
+    expect(recipeVersionRoute('sonda-de-prueba', 'sonda-de-version')).toBe(
+      '/produccion/formulas/sonda-de-prueba/versiones/sonda-de-version',
+    );
+    expect(newRecipeVersionRoute('sonda-de-prueba')).toBe(
+      `${recipeEditRoute('sonda-de-prueba')}/versiones/nueva`,
+    );
   });
 
   it('ningun archivo de produccion incrusta el literal de la ruta y private-nav reexporta, no redeclara', () => {
@@ -1202,6 +1220,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue
         // CERRADA.
         'formulaImportRoute',
+        // Alta y edicion de una version de receta, derivadas de `recipeEditRoute`. No son del
+        // asistente de lectura.
+        'newRecipeVersionRoute',
+        'recipeVersionRoute',
       ].sort(),
     );
   });

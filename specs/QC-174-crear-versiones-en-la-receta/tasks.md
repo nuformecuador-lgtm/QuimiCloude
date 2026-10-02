@@ -29,7 +29,7 @@ discrepancia con `design.md` está avisada al leader antes de T1.
 
 ## Tanda 1 — servidor y piezas puras
 
-### T1 [ ] [P] — `updateRecipeAction` devuelve `propagated` (⚑ P1 a)
+### T1 [x] [P] — `updateRecipeAction` devuelve `propagated` (⚑ P1 a)
 Tras T0. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/adapters/driving/recipe-actions.ts`,
 `tests/unit/recetas/recipe-actions.test.ts`.
 **Hacer:** §3, última fila. Sin tocar dominio, puertos ni barrel.
@@ -37,7 +37,7 @@ Tras T0. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/adapters/drivin
 acción responde `{ status: 'success', propagated }` idéntico; sin propagación, `propagated: []`; los
 casos de hoy (entrada inválida no llama al caso de uso, advertencias registradas) siguen verdes (R29).
 
-### T2 [ ] [P] — Rutas de versión
+### T2 [x] [P] — Rutas de versión
 Tras T0. **Quién:** frontend_dev. **Toca:** `lib/shared/routes.ts`,
 `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
 **Hacer:** §1, `newRecipeVersionRoute(id)` y `recipeVersionRoute(id, versionId)` derivadas de
@@ -45,7 +45,7 @@ Tras T0. **Quién:** frontend_dev. **Toca:** `lib/shared/routes.ts`,
 **Hecho cuando:** el test de contrato comprueba las dos formas exactas y que ninguna página nueva
 incrusta el literal `/versiones` (se amplía el caso existente cuando existan las páginas, T8).
 
-### T3 [ ] [P] — `compareWithOriginal`
+### T3 [x] [P] — `compareWithOriginal`
 Tras T0. **Quién:** frontend_dev. **Toca:** `app/(private)/produccion/formulas/components/recipe-version-diff.ts`
 (nuevo), `tests/unit/recetas-ui/recipe-version-diff.test.ts` (nuevo).
 **Hacer:** §2.1.

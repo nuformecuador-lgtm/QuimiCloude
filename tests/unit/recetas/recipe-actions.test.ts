@@ -169,11 +169,12 @@ describe('updateRecipeAction — R38, R47-R49', () => {
     updateRecipeMock.mockResolvedValue({
       id: 'receta-1',
       warnings: [{ operation: 'remove', path: 'recetas/anterior.jpg', message: 'el bucket no respondio' }],
+      propagated: [],
     });
 
     const resultado = await updateRecipeAction('receta-1', VALID_RECIPE_INPUT);
 
-    expect(resultado).toEqual({ status: 'success' });
+    expect(resultado).toEqual({ status: 'success', propagated: [] });
     // La advertencia se REGISTRA, no se descarta en silencio (R49, docs/conventions.md).
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy.mock.calls[0]?.[0]).toContain('recetas/anterior.jpg');
@@ -182,12 +183,32 @@ describe('updateRecipeAction — R38, R47-R49', () => {
 
   it('sin advertencias no registra nada', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    updateRecipeMock.mockResolvedValue({ id: 'receta-1', warnings: [] });
+    updateRecipeMock.mockResolvedValue({ id: 'receta-1', warnings: [], propagated: [] });
 
     await updateRecipeAction('receta-1', VALID_RECIPE_INPUT);
 
     expect(errorSpy).not.toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+
+  it('R29: devuelve tal cual las versiones propagadas que devuelve el caso de uso', async () => {
+    const propagated = [
+      { versionId: 'version-1', isUnderReview: false },
+      { versionId: 'version-2', isUnderReview: true },
+    ];
+    updateRecipeMock.mockResolvedValue({ id: 'receta-1', warnings: [], propagated });
+
+    const resultado = await updateRecipeAction('receta-1', VALID_RECIPE_INPUT);
+
+    expect(resultado).toStrictEqual({ status: 'success', propagated });
+  });
+
+  it('R29: sin propagacion responde propagated vacio', async () => {
+    updateRecipeMock.mockResolvedValue({ id: 'receta-1', warnings: [], propagated: [] });
+
+    const resultado = await updateRecipeAction('receta-1', VALID_RECIPE_INPUT);
+
+    expect(resultado).toStrictEqual({ status: 'success', propagated: [] });
   });
 });
 

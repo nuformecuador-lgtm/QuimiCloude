@@ -54,6 +54,19 @@ export function recipeEditRoute(id: string): string {
 }
 
 /**
+ * Alta de una version de la receta `id`, derivada de `recipeEditRoute`. `nueva` es un segmento
+ * estatico y un id de version es un UUID, asi que no choca con `[versionId]`.
+ */
+export function newRecipeVersionRoute(id: string): string {
+  return `${recipeEditRoute(id)}/versiones/nueva`;
+}
+
+/** Edicion de la version `versionId` de la receta `id`, derivada de `recipeEditRoute`. */
+export function recipeVersionRoute(id: string, versionId: string): string {
+  return `${recipeEditRoute(id)}/versiones/${versionId}`;
+}
+
+/**
  * Ruta de la revision de un archivo de formula importado desde PDF, derivada de `FORMULAS_ROUTE`.
  * Mismo patron que `supplierCatalogImportRoute`: el segmento `importar` cuelga del listado y no
  * hay una segunda constante de prefijo. No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la

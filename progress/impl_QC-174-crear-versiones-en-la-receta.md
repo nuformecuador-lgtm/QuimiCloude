@@ -99,3 +99,26 @@ no hay rama remota de QC-173. Sin conflicto hoy.
 - **Spec nuevo = dos listas CERRADAS de E2E** a las que darlo de alta (lo que le paso a QC-172 en T12):
   `tests/guards/guard-identificador-de-request.test.ts` (~`:222`) y `tests/unit/recetas/scope.test.ts`
   (~`:252`). **No figuran en el mapa de archivos de T11** → discrepancia con tasks.md.
+
+## T1
+
+**Archivos:** `lib/modules/recetas/adapters/driving/recipe-actions.ts` (exito de `UpdateRecipeFormState` =
+`{ status: 'success'; propagated: UpdateRecipeResult['propagated'] }`; la accion devuelve el `propagated`
+del caso de uso), `tests/unit/recetas/recipe-actions.test.ts` (dobles con `propagated`, dos casos nuevos).
+Dominio, puertos y barrel sin tocar.
+
+**R -> test:**
+- R29 (servidor) -> `tests/unit/recetas/recipe-actions.test.ts` > `updateRecipeAction — R38, R47-R49` >
+  `R29: devuelve tal cual las versiones propagadas que devuelve el caso de uso` y
+  `R29: sin propagacion responde propagated vacio`. Casos previos (entrada invalida no llama al caso de
+  uso, advertencias registradas) siguen verdes.
+
+**Verificacion:**
+- `pnpm run typecheck`: ROJO, 1 error fuera del alcance de T1:
+  `tests/unit/recetas-ui/recipe-form.test.tsx(516,44): error TS2345: Argument of type '{ status: "success"; }' is not assignable to parameter of type 'UpdateRecipeFormState'.`
+  El doble `updateRecipeActionMock.mockResolvedValue({ status: 'success' })` necesita `propagated: []`.
+  Archivo de UI (lo toca T10 segun tasks.md); no lo arregla backend_dev. `recipe-form.tsx` compila.
+- `pnpm run lint`: `✖ 8 problems (0 errors, 8 warnings)` (warnings ajenos).
+- `pnpm exec vitest related --run lib/modules/recetas/adapters/driving/recipe-actions.ts tests/unit/recetas/recipe-actions.test.ts`:
+  `Test Files  1 failed | 44 passed (45)` / `Tests  1 failed | 754 passed (755)`. El rojo es
+  `tests/unit/recetas-ui/recipe-page.test.tsx > R21 ...44x44`, listado en `tests/baseline-rojos.json` (deuda de dev).
