@@ -1142,3 +1142,72 @@ describe('QC-78 — el estado de cuenta manda en el login', () => {
     ).toBeLessThan(posicion.corteDeEmpresa);
   });
 });
+
+// ================================================================================================
+// El login de quien no tiene empresa (el Maestro).
+// ================================================================================================
+
+describe('verificacion de credenciales — sin empresa (QC-161)', () => {
+  const MAESTRO: AuthenticatableUser = {
+    ...USUARIO,
+    id: 'maestro-1',
+    roleName: 'Maestro',
+    companyId: null,
+    companyDeletedAt: null,
+  };
+
+  it('QC-161 R30: sin empresa y con credenciales correctas emite un ticket con companyId null', async () => {
+    const { verifyCredentials, session, hasher } = montar([MAESTRO]);
+
+    const resultado = await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+
+    expect(resultado).toEqual({ ok: true });
+    expect(session.startSession).toHaveBeenCalledTimes(1);
+    const ticket = session.startSession.mock.calls[0]?.[0];
+    expect(ticket).toMatchObject({ userId: MAESTRO.id, roleName: 'Maestro' });
+    // `null` explicito, no ausente ni una empresa inventada.
+    expect(ticket).toHaveProperty('companyId', null);
+    expect(hasher.verify).toHaveBeenCalledTimes(1);
+  });
+
+  it('QC-161 R30: sin empresa, una contrasena incorrecta se rechaza con el mismo objeto y cuenta el fallo', async () => {
+    const maestro = montar([MAESTRO]);
+    const normal = montar();
+
+    const r1 = await maestro.verifyCredentials({ username: 'admin', password: 'incorrecta' });
+    const r2 = await normal.verifyCredentials({ username: 'admin', password: 'incorrecta' });
+
+    expect(r1).toBe(r2);
+    expect(maestro.session.startSession).not.toHaveBeenCalled();
+    expect(maestro.attempts.compareAndSet).toHaveBeenCalledTimes(1);
+    expect(maestro.attempts.compareAndSet.mock.calls[0]?.[0]).toBe(MAESTRO.id);
+  });
+
+  it('QC-161 R30: sin empresa, una cuenta bloqueada no entra ni con la contrasena correcta y no escribe', async () => {
+    const bloqueado: AuthenticatableUser = {
+      ...MAESTRO,
+      failedAttempts: 3,
+      lockLevel: 1,
+      lockedUntil: bloqueadaHasta(),
+    };
+    const { verifyCredentials, session, attempts } = montar([bloqueado]);
+
+    await expect(
+      verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA }),
+    ).resolves.toEqual({ ok: false });
+    expect(session.startSession).not.toHaveBeenCalled();
+    expect(attempts.compareAndSet).not.toHaveBeenCalled();
+    expect(attempts.set).not.toHaveBeenCalled();
+  });
+
+  it('QC-161 R30: sin empresa, una cuenta que no esta activa no entra ni con la contrasena correcta', async () => {
+    for (const estado of ['pending', 'inactive'] as const) {
+      const { verifyCredentials, session } = montar([{ ...MAESTRO, accountStatus: estado }]);
+
+      await expect(
+        verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA }),
+      ).resolves.toEqual({ ok: false });
+      expect(session.startSession).not.toHaveBeenCalled();
+    }
+  });
+});

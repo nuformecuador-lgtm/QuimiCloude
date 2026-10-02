@@ -89,8 +89,8 @@ export const EXENTAS: readonly Exenta[] = [
   { tabla: 'permissions', motivo: 'catalogo de permisos, compartido por todas las empresas' },
   { tabla: 'role_permissions', motivo: 'cuelga de dos catalogos compartidos, roles y permisos' },
   { tabla: 'companies', motivo: 'es la propia fila de la empresa, no algo que le pertenezca' },
-  { tabla: 'credential_setup_tokens', motivo: 'cuelga de un usuario que ya tiene su empresa' },
-  { tabla: 'revoked_sessions', motivo: 'cuelga de un usuario que ya tiene su empresa' },
+  { tabla: 'credential_setup_tokens', motivo: 'cuelga de un usuario: la empresa es la de su ficha, o ninguna si es el Maestro' },
+  { tabla: 'revoked_sessions', motivo: 'cuelga de un usuario: la empresa es la de su ficha, o ninguna si es el Maestro' },
   { tabla: 'recipe_lines', motivo: 'hereda la empresa de la receta a la que pertenece' },
 ]
 

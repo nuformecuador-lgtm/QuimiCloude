@@ -40,6 +40,9 @@
  * siguen valiendo tal cual porque todos sus usuarios caen en la MISMA empresa; lo que la
  * ficha añade es la otra mitad, la que solo pasa con la empresa dentro del indice: el mismo
  * correo, el mismo `username` y el mismo documento SI se aceptan en empresas distintas.
+ *
+ * Hoy el nombre de usuario vuelve a ser unico en todo el sistema
+ * (`lower(username) WHERE deleted_at IS NULL`); correo y documento siguen por empresa.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -1369,6 +1372,9 @@ describe('la empresa a la que pertenece el usuario', () => {
 // ---------------------------------------------------------------------------
 // EL CORAZON DE LA FICHA (R16, R17, R18, R19).
 //
+// El nombre de usuario dejo de ser por empresa: su caso ya rechaza tambien en otra
+// empresa. Correo y documento siguen como abajo.
+//
 // Cada uno de los tres va en los DOS sentidos: dentro de la misma empresa la base rechaza
 // con 23505, y en empresas distintas la base ACEPTA. La mitad que rechaza ya pasaba con los
 // indices globales de QC-4; la que acepta es la que solo puede pasar con `company_id` dentro
@@ -1430,29 +1436,32 @@ describe('unicidad DENTRO de la empresa', () => {
     })
   })
 
-  it('rechaza el mismo nombre de usuario en la misma empresa y lo acepta en otra', async () => {
-    // R17 — y es exactamente el caso que el humano cerro: dos empresas pueden tener cada una
-    // su `admin`.
+  it('QC-161 R36: rechaza el mismo nombre de usuario en la misma empresa y en otra, en otras mayusculas', async () => {
+    // Antes el mismo nombre se aceptaba en otra empresa. Ahora el nombre de usuario
+    // es unico en todo el sistema. Nombre propio del caso: `admin` puede ser el del
+    // Administrador de la instalacion y el choque no mediria lo que el caso quiere.
     await inRolledBackTransaction(async (tx) => {
       const roleId = await createRole(tx)
       const empresaA = await createCompany(tx, 'empresa-usuario-a')
       const empresaB = await createCompany(tx, 'empresa-usuario-b')
+      const username = 'ana.global'
 
       const { id: enA } = await createUser(tx, roleId, {
-        email: 'admin@empresa-a.example.com',
-        username: 'admin',
+        email: 'ana@empresa-a.example.com',
+        username,
         documentNumber: '111000111',
         companyId: empresaA,
       })
 
-      const sqlState = await expectRejectedByDatabase(
+      // Correo y documento distintos: el 23505 solo puede venir del nombre de usuario.
+      const mismaEmpresa = await expectRejectedByDatabase(
         tx,
         () =>
           rawInsertUser(
             tx,
             userSqlValues({
               email: 'otro@empresa-a.example.com',
-              username: 'ADMIN',
+              username: 'ANA.GLOBAL',
               documentNumber: '222000222',
             }),
             roleId,
@@ -1460,23 +1469,31 @@ describe('unicidad DENTRO de la empresa', () => {
           ),
         'segundo usuario con el mismo nombre de usuario en la misma empresa',
       )
-      expect(sqlState).toBe(UNIQUE_VIOLATION)
+      expect(mismaEmpresa).toBe(UNIQUE_VIOLATION)
 
-      const { id: enB } = await createUser(tx, roleId, {
-        email: 'admin@empresa-b.example.com',
-        username: 'admin',
-        documentNumber: '333000333',
-        companyId: empresaB,
-      })
+      const otraEmpresa = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({
+              email: 'ana@empresa-b.example.com',
+              username: 'Ana.Global',
+              documentNumber: '333000333',
+            }),
+            roleId,
+            empresaB,
+          ),
+        'usuario de otra empresa con el mismo nombre de usuario',
+      )
+      expect(otraEmpresa).toBe(UNIQUE_VIOLATION)
 
-      // Acotado a las dos empresas del caso: el `admin` de la instalacion tambien esta en
-      // `users`, y ese es justamente el punto — `admin` ya no es una clave global.
       const filas = await tx.user.findMany({
-        where: { username: 'admin', companyId: { in: [empresaA, empresaB] } },
-        select: { id: true, companyId: true },
+        where: { username: { equals: username, mode: 'insensitive' } },
+        select: { id: true },
       })
-      expect(filas.map((fila) => fila.id).sort()).toEqual([enA, enB].sort())
-      expect(new Set(filas.map((fila) => fila.companyId))).toEqual(new Set([empresaA, empresaB]))
+      expect(filas.map((fila) => fila.id)).toEqual([enA])
+      expect(await tx.user.count({ where: { companyId: empresaB } })).toBe(0)
     })
   })
 
@@ -1864,7 +1881,7 @@ describe('el estado de cuenta del usuario', () => {
     })
   })
 
-  it('una cuenta inactive sigue ocupando su correo, su nombre de usuario y su documento en su empresa', async () => {
+  it('una cuenta inactive sigue ocupando su correo, su nombre de usuario y su documento en su empresa (y su nombre de usuario en todas, QC-161 R36, R37)', async () => {
     // R15 — el corazon de la decision cerrada 9. Los tres indices unicos NO cambian: siguen
     // midiendose dentro de la empresa y solo sobre las filas vivas, y el estado de cuenta NO
     // participa en ninguno. Si alguien metiera `account_status` en cualquiera de los tres,
@@ -1946,9 +1963,28 @@ describe('el estado de cuenta del usuario', () => {
       )
       expect(porDocumento).toBe(UNIQUE_VIOLATION)
 
-      // Y en OTRA empresa los tres valores siguen libres: la unicidad es por empresa (QC-47) y
-      // el estado no le anade ni le quita nada.
-      const { id: enB } = await createUser(tx, roleId, { ...seed, companyId: empresaB })
+      // El nombre de usuario de la cuenta apagada tambien esta ocupado en OTRA
+      // empresa (es unico en todo el sistema); el estado no le quita nada.
+      const porUsuarioEnB = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertUser(
+            tx,
+            userSqlValues({ email: 'otra.empresa@example.com', username: seed.username, documentNumber: '960000003' }),
+            roleId,
+            empresaB,
+          ),
+        'nombre de usuario ocupado por una cuenta inactive de otra empresa',
+      )
+      expect(porUsuarioEnB).toBe(UNIQUE_VIOLATION)
+
+      // En OTRA empresa el correo y el documento siguen libres: esos van por empresa
+      // y el estado no les anade ni les quita nada.
+      const { id: enB } = await createUser(tx, roleId, {
+        ...seed,
+        username: 'anaperez.b',
+        companyId: empresaB,
+      })
       expect(enB).not.toBe(apagada)
 
       const filas = await tx.user.findMany({

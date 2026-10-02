@@ -862,3 +862,51 @@ rojos nuevos, ambos por el spec E2E nuevo sin dar de alta en listas cerradas
 intento tambien tuvo 4 `Timeout starting forks runner` (4 archivos sin correr); se corrieron aparte
 en verde (`Test Files 4 passed (4)`, `Tests 63 passed (63)`, `progress/gate_QC-172_rezagados.log`) y
 en el segundo intento corrieron los 814.
+
+## Sync con dev antes del PR (2026-10-02)
+
+`git merge origin/dev` (merge, no rebase) sobre `88df5c5b`: 44 commits de dev, entre ellos QC-161
+rol-maestro (PR #135).
+
+**Conflicto (uno solo):** `tests/guards/guard-identificador-de-request.test.ts`, en la lista cerrada
+de **migraciones** (no en `E2E_ESPERADOS`, que entro sin conflicto y conserva
+`versiones-de-receta.spec.ts`). Esta rama anadio `20261001120000_recipe_versions` y dev anadio
+`20261001160815_platform_maestro_role`. Se resolvio conservando las dos altas con sus comentarios,
+en orden cronologico (la de esta rama primero), que es el mismo orden de `db/migrations/`.
+
+**Auto-merge revisado:** `db/schema.prisma`, `lib/composition/index.ts`, `error-catalog.ts`,
+`feature_list.json`, `progress/current.md`, `aislamiento.json`, `recipe-crud.int.test.ts` y
+`catalogo.test.ts`. Sin marcas de conflicto; `feature_list.json` parsea; sin codigos de error
+duplicados en el catalogo; las migraciones quedan `..._packing_permission` ->
+`20261001120000_recipe_versions` -> `20261001160815_platform_maestro_role`; `current.md` conserva
+las lineas de los dos lados (la de QC-161 cerrada y la de QC-172).
+
+**Gate tras el sync: acotado por decision del humano (2026-10-02).** El humano pidio no correr
+`./init.sh` completo sino typecheck, lint y los tests de los archivos con conflicto o auto-merge.
+Para cuando llego la indicacion, `./init.sh` completo ya habia terminado; su resultado fue:
+
+- typecheck y lint en verde (`✖ 8 problems (0 errors, 8 warnings)`, warnings ya existentes).
+- vitest **no llego a correr**: el global setup de integracion fallo al construir la plantilla de
+  BD, en el sembrado: `db:seed: fallo — faltan las variables de entorno: SEED_MAESTRO_USERNAME,
+  SEED_MAESTRO_PASSWORD, SEED_MAESTRO_EMAIL`. Es la condicion de entorno que trae QC-161 (ver
+  `current.md`): ni el `.env` del worktree ni el del arbol principal las tienen. No se inventaron
+  valores. Mientras falten, **ningun test de integracion corre** (tampoco
+  `recipe-crud.int.test.ts`).
+
+Gate acotado (sin integracion, por lo anterior):
+
+- `pnpm run typecheck` -> exit 0.
+- `pnpm run lint` -> exit 0, `✖ 8 problems (0 errors, 8 warnings)`.
+- `pnpm exec vitest related --run --project node --project ui` sobre
+  `guard-identificador-de-request.test.ts`, `catalogo.test.ts`, `db/schema.prisma`,
+  `lib/composition/index.ts`, `error-catalog.ts` y `aislamiento.json`:
+  `Test Files  4 failed | 426 passed (430)`, `Tests  6 failed | 6500 passed | 30 skipped (6536)`.
+  Los 4 archivos rojos (`unidades-viewport`, `usuarios-viewport`, `inventario/product-page`,
+  `recetas-ui/recipe-page`) estan **todos** en `tests/baseline-rojos.json` como deuda ajena de dev
+  (desde 2026-10-01). Corridos aparte siguen igual (`Test Files 4 failed (4)`,
+  `Tests 6 failed | 161 passed (167)`), con fallos de asercion, no de timeout. Ninguno es nuevo
+  del sync.
+
+**Pendiente antes del PR:** cargar `SEED_MAESTRO_*` en el `.env` (y en Vercel) y correr
+`recipe-crud.int.test.ts` y el resto de la integracion; sin eso la integracion de esta rama no
+esta verificada tras el sync.

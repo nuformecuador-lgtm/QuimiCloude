@@ -4925,3 +4925,18 @@ podar.
   error en las líneas con imagen, en vez de mostrar el marcador.
 - **Pendiente humano (T8):** pasar a público el bucket de recortes en cada entorno ANTES de desplegar.
 - **Desbloquea:** QC-176.
+
+## 2026-10-01 — QC-161-rol-maestro
+
+- **PR #135**, merge `b4afc965`. Spec R1–R44, T0–T14. Nace el rol **Maestro** (sin empresa, solo
+  `empresas.consultar` / `empresas.modificar`, nunca asignable) y su primer usuario por seed (`SEED_MAESTRO_*`).
+  Migración `20261001160815_platform_maestro_role`: `company_id` obligatoria salvo para el Maestro y nombre de
+  usuario único en todo el sistema. Sin dependencias.
+- **Decisiones humanas en F2:** `empresas.*` entra en `ADMIN_EXCLUDED_PERMISSIONS` (desviación del design, que no
+  conocía la lista de QC-168); R39 sin cambios (base de desarrollo, sin repetidos).
+- **Review:** vuelta 1 rechazada (B1: citas de ficha en un JSDoc de producción; 3 menores), vuelta 2 OK. Gate
+  completo verde sobre `b2749955` (5 rojos, todos del baseline de QC-177); `--rapido` tras el merge de dev con un
+  timeout de máquina que aislado pasa 9/9.
+- **Arrastre:** bloqueada a mitad por dev rojo en typecheck (`pino`); arreglado en PR #132/#133.
+- **Condición de despliegue cumplida:** `SEED_MAESTRO_*` en Vercel (producción y preview), confirmado por el humano.
+- **Desbloquea:** QC-162 y QC-165.

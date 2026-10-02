@@ -106,6 +106,20 @@ describe('.env.example — las tres SEED_ADMIN_* sin valor (R6)', () => {
   })
 })
 
+const SEED_MAESTRO_ENV_VAR_NAMES = ['SEED_MAESTRO_USERNAME', 'SEED_MAESTRO_PASSWORD', 'SEED_MAESTRO_EMAIL'] as const
+
+describe('.env.example — las tres SEED_MAESTRO_* sin valor (QC-161)', () => {
+  const envExampleText = readFileSync(join(repoRoot, '.env.example'), 'utf8')
+
+  it('QC-161 R14: las tres claves del Maestro estan declaradas una sola vez y sin valor', () => {
+    for (const name of SEED_MAESTRO_ENV_VAR_NAMES) {
+      const matches = [...envExampleText.matchAll(new RegExp(`^${name}=(.*)$`, 'gm'))]
+      expect(matches, `${name} debe aparecer exactamente una vez en .env.example`).toHaveLength(1)
+      expect((matches[0]?.[1] ?? '').trim(), `${name} no deberia traer un valor en .env.example`).toBe('')
+    }
+  })
+})
+
 // ---------------------------------------------------------------------------------------
 // Bloque 2 — ninguna dependencia nueva (R21)
 // ---------------------------------------------------------------------------------------

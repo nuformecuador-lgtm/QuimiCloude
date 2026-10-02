@@ -15,7 +15,15 @@ import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
 import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
+import {
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  SEED_ROLES,
+} from '@/lib/modules/identity/domain/roles';
+
+const NOMBRES_DE_SEED_ROLES: readonly string[] = SEED_ROLES.map((role) => role.name);
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import type { CredentialRule } from '@/lib/modules/identity/domain/credential-policy';
 import type { InitialAdminCredentials } from '@/lib/modules/identity/ports/initial-access-credentials';
@@ -28,6 +36,15 @@ const CREDENCIALES_POR_DEFECTO: InitialAdminCredentials = {
   username: 'admin.inicial',
   credential: CREDENCIAL_DE_PRUEBA,
   email: 'admin.inicial@example.test',
+};
+
+/** Credencial del Maestro, distinta de la del Administrador para poder rastrearla. */
+const CREDENCIAL_DEL_MAESTRO_DE_PRUEBA = 'credencial-del-maestro-de-prueba-no-real';
+
+const CREDENCIALES_DEL_MAESTRO: InitialAdminCredentials = {
+  username: 'plataforma.inicial',
+  credential: CREDENCIAL_DEL_MAESTRO_DE_PRUEBA,
+  email: 'plataforma.inicial@example.test',
 };
 
 /** Hash de mentira, deterministico y reconocible: nunca coincide con la credencial. */
@@ -51,6 +68,15 @@ function crearRepositorioFalso(options: {
   permisosExistentes?: ReadonlySet<string>;
   /** QC-74 R10: asignaciones ya existentes, codificadas `${roleId}|${permissionCode}`. */
   asignacionesExistentes?: ReadonlySet<string>;
+  /**
+   * Usuarios vivos con rol Maestro. Por defecto, los mismos que con Administrador: los
+   * casos anteriores al Maestro describen una instalacion «completa» o «vacia» entera.
+   */
+  usuariosVivosConMaestro?: number;
+  /** Lo que responde `countLiveUsersWithUsername`. */
+  usuariosVivosConElNombreDelMaestro?: number;
+  /** Lo que responde `countLiveUsersWithoutCompanyWithEmail`. */
+  usuariosSinEmpresaConElCorreoDelMaestro?: number;
 } = {}): InitialAccessRepository & {
   readonly llamadas: LlamadaRegistrada[];
   /** Estado de `companies` tal como lo ve el doble, para poder afirmar QUE id se reutilizo. */
@@ -62,6 +88,7 @@ function crearRepositorioFalso(options: {
   const llamadas: LlamadaRegistrada[] = [];
   const rolesExistentes = new Map(options.rolesExistentes ?? []);
   const usuariosVivosConAdministrador = options.usuariosVivosConAdministrador ?? 0;
+  const usuariosVivosConMaestro = options.usuariosVivosConMaestro ?? usuariosVivosConAdministrador;
   const empresasVivas = new Map(options.empresasVivas ?? []);
   const permisosExistentes = new Set(options.permisosExistentes ?? []);
   const asignacionesExistentes = new Set(options.asignacionesExistentes ?? []);
@@ -84,7 +111,9 @@ function crearRepositorioFalso(options: {
     },
     async countLiveUsersWithRole(roleName) {
       llamadas.push({ metodo: 'countLiveUsersWithRole', args: [roleName] });
-      return roleName === ROLE_ADMINISTRADOR ? usuariosVivosConAdministrador : 0;
+      if (roleName === ROLE_ADMINISTRADOR) return usuariosVivosConAdministrador;
+      if (roleName === ROLE_MAESTRO) return usuariosVivosConMaestro;
+      return 0;
     },
     async createRole(role) {
       llamadas.push({ metodo: 'createRole', args: [role] });
@@ -133,6 +162,18 @@ function crearRepositorioFalso(options: {
       llamadas.push({ metodo: 'createInitialAdmin', args: [input] });
       return { id: 'usuario-inicial-1' };
     },
+    async createInitialMaestro(input) {
+      llamadas.push({ metodo: 'createInitialMaestro', args: [input] });
+      return { id: 'maestro-inicial-1' };
+    },
+    async countLiveUsersWithUsername(username) {
+      llamadas.push({ metodo: 'countLiveUsersWithUsername', args: [username] });
+      return options.usuariosVivosConElNombreDelMaestro ?? 0;
+    },
+    async countLiveUsersWithoutCompanyWithEmail(email) {
+      llamadas.push({ metodo: 'countLiveUsersWithoutCompanyWithEmail', args: [email] });
+      return options.usuariosSinEmpresaConElCorreoDelMaestro ?? 0;
+    },
   };
 }
 
@@ -167,6 +208,7 @@ function llamadasDeEscritura(llamadas: readonly LlamadaRegistrada[]): readonly L
       llamada.metodo === 'createRole' ||
       llamada.metodo === 'createCompany' ||
       llamada.metodo === 'createInitialAdmin' ||
+      llamada.metodo === 'createInitialMaestro' ||
       // QC-74: los dos metodos de escritura nuevos entran aqui a proposito, para que los
       // casos que afirman «no se escribio nada» tambien los cubran.
       llamada.metodo === 'createPermissions' ||
@@ -246,23 +288,23 @@ describe('seedInitialAccess', () => {
     // afirmado caso por caso ademas de en el acumulado del caso 9.
     for (const salida of salidasCapturadas) {
       expect(salida).not.toContain(CREDENCIAL_DE_PRUEBA);
+      expect(salida).not.toContain(CREDENCIAL_DEL_MAESTRO_DE_PRUEBA);
     }
   });
 
   // Caso 1 (R2, R4)
-  it('sobre una base vacia crea los tres roles y el usuario inicial con rol Administrador', async () => {
+  it('sobre una base vacia crea todos los roles de SEED_ROLES y el usuario inicial con rol Administrador', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
-    // El seed asegura los tres roles de `SEED_ROLES`, no solo los dos historicos.
-    expect(outcome.createdRoles.slice().sort()).toEqual(
-      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
-    );
+    // El seed asegura todos los roles de `SEED_ROLES`, no solo los historicos.
+    expect(outcome.createdRoles.slice().sort()).toEqual([...NOMBRES_DE_SEED_ROLES].sort());
     expect(outcome.createdAdmin).toBe(true);
 
     const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
@@ -281,8 +323,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
     expect(creacionDeAdmin).toBeDefined();
@@ -312,10 +355,12 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
-    expect(passwordHasher.hash).toHaveBeenCalledTimes(1);
+    // Una vez por usuario inicial, el Administrador y el Maestro.
+    expect(passwordHasher.hash).toHaveBeenCalledTimes(2);
     expect(passwordHasher.hash).toHaveBeenCalledWith(CREDENCIAL_DE_PRUEBA);
 
     const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
@@ -325,9 +370,8 @@ describe('seedInitialAccess', () => {
     expect(input.passwordHash).not.toBe(CREDENCIAL_DE_PRUEBA);
   });
 
-  // Con tres roles de semilla, faltar el Administrador deja faltando tambien a Operador y
-  // Empacador.
-  it('si el rol Operador falta y el Administrador ya existe, crea Operador y Empacador', async () => {
+  // Si solo existe el Administrador, faltan todos los demas roles de semilla.
+  it('si el rol Operador falta y el Administrador ya existe, crea los demas roles de SEED_ROLES', async () => {
     const repository = crearRepositorioFalso({
       rolesExistentes: new Map([[ROLE_ADMINISTRADOR, 'rol-admin-existente']]),
       usuariosVivosConAdministrador: 1,
@@ -335,15 +379,18 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
     expect(creacionesDeRol.length).toBeGreaterThan(0);
-    expect(outcome.createdRoles.slice().sort()).toEqual([ROLE_OPERADOR, ROLE_EMPACADOR].sort());
-    expect(creacionesDeRol).toHaveLength(2);
+    const faltantes = NOMBRES_DE_SEED_ROLES.filter((nombre) => nombre !== ROLE_ADMINISTRADOR);
+    expect(faltantes).toEqual(expect.arrayContaining([ROLE_OPERADOR, ROLE_EMPACADOR]));
+    expect(outcome.createdRoles.slice().sort()).toEqual([...faltantes].sort());
+    expect(creacionesDeRol).toHaveLength(faltantes.length);
     expect(creacionesDeRol.map((llamada) => (llamada.args[0] as { name: string }).name).sort()).toEqual(
-      [ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
+      [...faltantes].sort(),
     );
   });
 
@@ -361,8 +408,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la lectura si ocurrio, para que un doble mal cableado no pase en verde.
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
@@ -388,8 +436,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
     expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
@@ -416,8 +465,9 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => {
       throw new Error(mensajeDeError);
     });
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await expect(seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy })).rejects.toThrow(
+    await expect(seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy })).rejects.toThrow(
       'falta SEED_ADMIN_PASSWORD',
     );
 
@@ -430,7 +480,7 @@ describe('seedInitialAccess', () => {
     // stack (caso 9 lo vuelve a comprobar sobre la salida acumulada de consola).
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+      await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
@@ -440,7 +490,7 @@ describe('seedInitialAccess', () => {
   });
 
   // Caso 7b (R13) — por que los pasos 4 y 5 tienen que ir en una transaccion.
-  it('si createInitialAdmin lanza DESPUES de crear los roles, los tres roles ya quedaron creados y el error se propaga', async () => {
+  it('si createInitialAdmin lanza DESPUES de crear los roles, todos los roles de SEED_ROLES ya quedaron creados y el error se propaga', async () => {
     const repository = crearRepositorioFalso();
     const mensajeDeError = 'fallo simulado del alta del usuario inicial';
     repository.createInitialAdmin = async () => {
@@ -449,18 +499,21 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+      await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
 
-    // Primero: que los roles SI se crearon (los tres, exactamente). Ocurrio ANTES de
-    // afirmar cualquier otra cosa, siguiendo el orden en que el dominio los crea.
+    // Primero: que los roles SI se crearon (todos los de `SEED_ROLES`, exactamente). Ocurrio
+    // ANTES de afirmar cualquier otra cosa, siguiendo el orden en que el dominio los crea.
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
-    expect(creacionesDeRol).toHaveLength(3);
+    expect(creacionesDeRol.map((llamada) => (llamada.args[0] as { name: string }).name)).toEqual(
+      NOMBRES_DE_SEED_ROLES,
+    );
 
     // Luego: que el error se propaga.
     expect(errorCapturado).not.toBeNull();
@@ -482,8 +535,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
 
@@ -507,10 +561,11 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa({ ok: false, unmet: ['min_length', 'no_symbol'] });
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+      await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
@@ -545,8 +600,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la empresa SI se creo, con el nombre de la constante del dominio y con su
     // normalizado calculado por `normalizeCompanyName` (R3, R21).
@@ -577,7 +633,9 @@ describe('seedInitialAccess', () => {
     );
     expect(rolAdministrador).toBeDefined();
     expect(input.roleId).toBeTruthy();
-    expect(repository.llamadas.at(-1)?.metodo).toBe('createInitialAdmin');
+    // Despues solo puede venir el alta del Maestro, que no toca al Administrador.
+    const llamadasSinElMaestro = repository.llamadas.filter((llamada) => llamada.metodo !== 'createInitialMaestro');
+    expect(llamadasSinElMaestro.at(-1)?.metodo).toBe('createInitialAdmin');
 
     // Y el orden: la empresa se resolvio ANTES de escribir el usuario.
     const indiceCreacionDeEmpresa = repository.llamadas.findIndex((llamada) => llamada.metodo === 'createCompany');
@@ -594,8 +652,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la busqueda SI ocurrio, y por el nombre NORMALIZADO, no por el original.
     const busquedas = repository.llamadas.filter((llamada) => llamada.metodo === 'findCompanyIdByNormalizedName');
@@ -627,8 +686,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: el seed SI corrio y SI leyo el estado.
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
@@ -658,12 +718,16 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la lectura SI ocurrio, exactamente una vez y con el nombre del rol
     // Administrador. Es la unica fuente de `needsAdmin`.
-    const conteos = repository.llamadas.filter((llamada) => llamada.metodo === 'countLiveUsersWithRole');
+    // La otra lectura es la del Maestro, que decide `needsMaestro` y no `needsAdmin`.
+    const conteos = repository.llamadas.filter(
+      (llamada) => llamada.metodo === 'countLiveUsersWithRole' && llamada.args[0] !== ROLE_MAESTRO,
+    );
     expect(conteos).toHaveLength(1);
     expect(conteos[0]?.args[0]).toBe(ROLE_ADMINISTRADOR);
 
@@ -681,6 +745,7 @@ describe('seedInitialAccess', () => {
       repository: repositorioSinAdministrador,
       passwordHasher: crearHasherFalso(),
       credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
       checkCredentialPolicy: crearPoliticaFalsa(),
     });
     expect(otroDesenlace.createdAdmin).toBe(true);
@@ -703,8 +768,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: el catalogo SI se creo, entero y derivado de `PERMISSIONS`.
     const creacionesDePermisos = repository.llamadas.filter((llamada) => llamada.metodo === 'createPermissions');
@@ -785,8 +851,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
       ?.args[0] as readonly { roleId: string; permissionCode: string }[];
@@ -803,6 +870,35 @@ describe('seedInitialAccess', () => {
     expect(codigosDe(ROLE_OPERADOR)).not.toContain('documentos.modificar');
     expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.consultar');
     expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.modificar');
+  });
+
+  it('QC-161 R8, R9: sobre una base vacia el Maestro recibe exactamente empresas.consultar y empresas.modificar; el Administrador, el Operador y el Empacador ningun empresas.*', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
+
+    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+
+    const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
+      ?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    const rolesCreados = new Map(
+      repository.llamadas
+        .filter((llamada) => llamada.metodo === 'createRole')
+        .map((llamada, index) => [(llamada.args[0] as { name: string }).name, `rol-${index + 1}`]),
+    );
+    const codigosDe = (rol: string): string[] =>
+      paresCreados.filter((par) => par.roleId === rolesCreados.get(rol)).map((par) => par.permissionCode);
+    const deEmpresas = (codigos: readonly string[]): string[] =>
+      codigos.filter((codigo) => codigo.startsWith('empresas.'));
+
+    expect(codigosDe(ROLE_MAESTRO)).toEqual(['empresas.consultar', 'empresas.modificar']);
+    expect(codigosDe(ROLE_ADMINISTRADOR)).toEqual([...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])]);
+    expect(codigosDe(ROLE_ADMINISTRADOR).length).toBeGreaterThan(0);
+    expect(deEmpresas(codigosDe(ROLE_ADMINISTRADOR))).toEqual([]);
+    expect(deEmpresas(codigosDe(ROLE_OPERADOR))).toEqual([]);
+    expect(deEmpresas(codigosDe(ROLE_EMPACADOR))).toEqual([]);
   });
 
   it('QC-142 R13: sobre una base sembrada antes de esta feature -todo salvo documentos.*- el seed crea exactamente esos dos permisos y las dos asignaciones del Administrador, y la segunda corrida no cambia nada', async () => {
@@ -834,11 +930,13 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
     const primeraCorrida = await seedInitialAccess({
       repository,
       passwordHasher,
       credentials,
+      maestroCredentials,
       checkCredentialPolicy,
     });
 
@@ -863,6 +961,7 @@ describe('seedInitialAccess', () => {
       repository,
       passwordHasher,
       credentials,
+      maestroCredentials,
       checkCredentialPolicy,
     });
     const llamadasDeLaSegunda = repository.llamadas.slice(llamadasTrasLaPrimera);
@@ -882,8 +981,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: las dos LECTURAS del paso de permisos si ocurrieron, y con el catalogo
     // real y los ids de los dos roles sembrados. Sin esto, un doble mal cableado que
@@ -925,8 +1025,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: SI se crearon las que faltaban — las once del Administrador.
     const creaciones = repository.llamadas.filter((llamada) => llamada.metodo === 'createRolePermissions');
@@ -966,8 +1067,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: se creo lo que faltaba, y solo eso.
     expect(outcome.createdPermissions).toEqual([codigoQueFalta]);
@@ -985,8 +1087,9 @@ describe('seedInitialAccess', () => {
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la escritura SI ocurrio, una sola vez (un doble mal cableado no pasa en verde).
     const creacionesDeAdmin = repository.llamadas.filter((llamada) => llamada.metodo === 'createInitialAdmin');
@@ -1011,6 +1114,306 @@ describe('seedInitialAccess', () => {
     // R10: quien lo cambio NO viaja. El administrador inicial lo crea el sistema, no una
     // persona, y eso se escribe dejando la columna NULL — no pasando un id cualquiera.
     expect(Object.keys(input)).not.toContain('accountStatusChangedBy');
+  });
+
+  // ---------------------------------------------------------------------------------
+// El primer Maestro. Mismo orden: PRIMERO que algo ocurrio, luego lo que no.
+  // ---------------------------------------------------------------------------------
+
+  /** Instalacion completa con Administrador y sin Maestro, salvo lo que el caso cambie. */
+  function repositorioSinMaestro(extra: Parameters<typeof crearRepositorioFalso>[0] = {}) {
+    return crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      usuariosVivosConMaestro: 0,
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
+      ...extra,
+    });
+  }
+
+  function altasDelMaestro(llamadas: readonly LlamadaRegistrada[]) {
+    return llamadas.filter((llamada) => llamada.metodo === 'createInitialMaestro');
+  }
+
+  async function mensajeDelRechazo(promesa: Promise<unknown>): Promise<string> {
+    try {
+      await promesa;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+    throw new Error('se esperaba que el seed lanzara');
+  }
+
+  it('QC-161 R10: sin Maestro vivo crea exactamente uno, sin empresa, activo, con hash y con los marcadores Plataforma/Inicial', async () => {
+    const repository = repositorioSinMaestro();
+    const passwordHasher = crearHasherFalso();
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
+
+    const outcome = await seedInitialAccess({
+      repository,
+      passwordHasher,
+      credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials,
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    });
+
+    const altas = altasDelMaestro(repository.llamadas);
+    expect(altas).toHaveLength(1);
+    expect(outcome.createdMaestro).toBe(true);
+    const input = altas[0]?.args[0] as Record<string, unknown>;
+    expect(input).toEqual({
+      roleId: ROLES_YA_SEMBRADOS.get(ROLE_MAESTRO),
+      accountStatus: 'active',
+      username: CREDENCIALES_DEL_MAESTRO.username,
+      email: CREDENCIALES_DEL_MAESTRO.email,
+      passwordHash: hashDe(CREDENCIAL_DEL_MAESTRO_DE_PRUEBA),
+      firstNames: 'Plataforma',
+      lastNames: 'Inicial',
+      birthDate: new Date('1900-01-01T00:00:00.000Z'),
+      phone: '+00 000 000 0000',
+      documentTypeCode: DOCUMENT_TYPE_CC,
+      documentNumber: '00000000',
+    });
+    expect(Object.keys(input)).not.toContain('companyId');
+    expect(input.passwordHash).not.toBe(CREDENCIAL_DEL_MAESTRO_DE_PRUEBA);
+    expect(passwordHasher.hash).toHaveBeenCalledWith(CREDENCIAL_DEL_MAESTRO_DE_PRUEBA);
+    // Crear al Maestro no lee ni crea ninguna empresa. El conteo de correo sin empresa no
+    // toca `companies`, por eso se excluye del filtro por nombre.
+    expect(
+      llamadasSobreEmpresas(repository.llamadas).filter(
+        (llamada) => llamada.metodo !== 'countLiveUsersWithoutCompanyWithEmail',
+      ),
+    ).toEqual([]);
+  });
+
+  it('QC-161 R10: sobre base vacia los marcadores del Maestro son los del Administrador salvo los nombres', async () => {
+    const repository = crearRepositorioFalso();
+
+    await seedInitialAccess({
+      repository,
+      passwordHasher: crearHasherFalso(),
+      credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    });
+
+    const admin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin')
+      ?.args[0] as Record<string, unknown>;
+    const maestro = altasDelMaestro(repository.llamadas)[0]?.args[0] as Record<string, unknown>;
+    expect(admin).toBeDefined();
+    expect(maestro).toBeDefined();
+    for (const campo of ['birthDate', 'phone', 'documentTypeCode', 'documentNumber', 'lastNames']) {
+      expect(maestro[campo]).toEqual(admin[campo]);
+    }
+    expect(maestro.firstNames).toBe('Plataforma');
+    expect(maestro.roleId).toBeTruthy();
+    expect(maestro.roleId).not.toBe(admin.roleId);
+    expect(Object.keys(maestro)).not.toContain('companyId');
+  });
+
+  it('QC-161 R11: con un Maestro vivo el proveedor del Maestro no se invoca, aunque lanzara', async () => {
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      usuariosVivosConMaestro: 1,
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
+    });
+    const maestroCredentials = vi.fn((): InitialAdminCredentials => {
+      throw new Error('faltan las variables de entorno: SEED_MAESTRO_USERNAME');
+    });
+
+    const outcome = await seedInitialAccess({
+      repository,
+      passwordHasher: crearHasherFalso(),
+      credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials,
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    });
+
+    expect(
+      repository.llamadas.filter(
+        (llamada) => llamada.metodo === 'countLiveUsersWithRole' && llamada.args[0] === ROLE_MAESTRO,
+      ),
+    ).toHaveLength(1);
+    expect(maestroCredentials).not.toHaveBeenCalled();
+    expect(outcome.createdMaestro).toBe(false);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+    expect(repository.llamadas.some((llamada) => llamada.metodo === 'countLiveUsersWithUsername')).toBe(false);
+  });
+
+  it('QC-161 R12: si faltan las variables del Maestro el error se propaga y no se escribe nada, ni roles', async () => {
+    const repository = crearRepositorioFalso();
+    const mensaje = 'faltan las variables de entorno: SEED_MAESTRO_USERNAME, SEED_MAESTRO_EMAIL';
+    const maestroCredentials = vi.fn((): InitialAdminCredentials => {
+      throw new Error(mensaje);
+    });
+
+    await expect(
+      seedInitialAccess({
+        repository,
+        passwordHasher: crearHasherFalso(),
+        credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+        maestroCredentials,
+        checkCredentialPolicy: crearPoliticaFalsa(),
+      }),
+    ).rejects.toThrow(mensaje);
+
+    expect(maestroCredentials).toHaveBeenCalledTimes(1);
+    expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+  });
+
+  it('QC-161 R13: si la contrasena del Maestro no cumple la politica lanza con las reglas, sin la contrasena y sin escribir', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = vi.fn(async (candidata: string) =>
+      candidata === CREDENCIAL_DEL_MAESTRO_DE_PRUEBA
+        ? { ok: false, unmet: ['no_uppercase', 'no_digit'] as CredentialRule[] }
+        : { ok: true, unmet: [] as CredentialRule[] },
+    );
+
+    const mensaje = await mensajeDelRechazo(
+      seedInitialAccess({
+        repository,
+        passwordHasher,
+        credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+        maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
+        checkCredentialPolicy,
+      }),
+    );
+
+    expect(checkCredentialPolicy).toHaveBeenCalledWith(CREDENCIAL_DEL_MAESTRO_DE_PRUEBA);
+    expect(mensaje).toContain('no_uppercase');
+    expect(mensaje).toContain('no_digit');
+    expect(mensaje).not.toContain(CREDENCIAL_DEL_MAESTRO_DE_PRUEBA);
+    expect(passwordHasher.hash).not.toHaveBeenCalledWith(CREDENCIAL_DEL_MAESTRO_DE_PRUEBA);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+  });
+
+  it('QC-161 R15: con el Administrador ya creado y sin Maestro solo se crea el Maestro', async () => {
+    const repository = repositorioSinMaestro();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    const outcome = await seedInitialAccess({
+      repository,
+      passwordHasher: crearHasherFalso(),
+      credentials,
+      maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    });
+
+    expect(altasDelMaestro(repository.llamadas)).toHaveLength(1);
+    expect(llamadasDeEscritura(repository.llamadas).map((llamada) => llamada.metodo)).toEqual([
+      'createInitialMaestro',
+    ]);
+    expect(credentials).not.toHaveBeenCalled();
+    expect(outcome.createdAdmin).toBe(false);
+    expect(outcome.createdCompany).toBeNull();
+  });
+
+  it('QC-161 R15: con el Maestro ya creado y sin Administrador el Administrador y su empresa se crean como siempre', async () => {
+    const repository = crearRepositorioFalso({ usuariosVivosConAdministrador: 0, usuariosVivosConMaestro: 1 });
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
+
+    const outcome = await seedInitialAccess({
+      repository,
+      passwordHasher: crearHasherFalso(),
+      credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials,
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    });
+
+    expect(outcome.createdAdmin).toBe(true);
+    expect(outcome.createdCompany).toBe(INITIAL_COMPANY_NAME);
+    expect(outcome.createdMaestro).toBe(false);
+    expect(maestroCredentials).not.toHaveBeenCalled();
+    expect(altasDelMaestro(repository.llamadas)).toEqual([]);
+  });
+
+  it('QC-161 R42: si el nombre del Maestro ya lo usa un usuario vivo lanza sin el valor y sin escribir nada', async () => {
+    const repository = crearRepositorioFalso({ usuariosVivosConElNombreDelMaestro: 1 });
+
+    const mensaje = await mensajeDelRechazo(
+      seedInitialAccess({
+        repository,
+        passwordHasher: crearHasherFalso(),
+        credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+        maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
+        checkCredentialPolicy: crearPoliticaFalsa(),
+      }),
+    );
+
+    const consultas = repository.llamadas.filter((llamada) => llamada.metodo === 'countLiveUsersWithUsername');
+    expect(consultas).toHaveLength(1);
+    expect(consultas[0]?.args[0]).toBe(CREDENCIALES_DEL_MAESTRO.username);
+    expect(mensaje).toBe('el nombre de usuario del maestro inicial ya esta en uso');
+    expect(mensaje).not.toContain(CREDENCIALES_DEL_MAESTRO.username);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+  });
+
+  it('QC-161 R42: si coincide con el del Administrador de la misma corrida salvo mayusculas lanza igual y no escribe nada', async () => {
+    const repository = crearRepositorioFalso();
+    const maestroConElNombreDelAdmin: InitialAdminCredentials = {
+      ...CREDENCIALES_DEL_MAESTRO,
+      username: CREDENCIALES_POR_DEFECTO.username.toUpperCase(),
+    };
+
+    const mensaje = await mensajeDelRechazo(
+      seedInitialAccess({
+        repository,
+        passwordHasher: crearHasherFalso(),
+        credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+        maestroCredentials: vi.fn(() => maestroConElNombreDelAdmin),
+        checkCredentialPolicy: crearPoliticaFalsa(),
+      }),
+    );
+
+    expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
+    expect(mensaje).toBe('el nombre de usuario del maestro inicial ya esta en uso');
+    expect(mensaje.toLowerCase()).not.toContain(CREDENCIALES_POR_DEFECTO.username);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+  });
+
+  it('QC-161 R43: si el correo del Maestro ya lo usa otro usuario sin empresa lanza sin el valor y sin escribir nada', async () => {
+    const repository = crearRepositorioFalso({ usuariosSinEmpresaConElCorreoDelMaestro: 1 });
+
+    const mensaje = await mensajeDelRechazo(
+      seedInitialAccess({
+        repository,
+        passwordHasher: crearHasherFalso(),
+        credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+        maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
+        checkCredentialPolicy: crearPoliticaFalsa(),
+      }),
+    );
+
+    const consultas = repository.llamadas.filter(
+      (llamada) => llamada.metodo === 'countLiveUsersWithoutCompanyWithEmail',
+    );
+    expect(consultas).toHaveLength(1);
+    expect(consultas[0]?.args[0]).toBe(CREDENCIALES_DEL_MAESTRO.email);
+    expect(mensaje).toBe('el correo del maestro inicial ya esta en uso');
+    expect(mensaje).not.toContain(CREDENCIALES_DEL_MAESTRO.email);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+  });
+
+  it('QC-161 R43: con el mismo correo que el Administrador inicial se crean los dos', async () => {
+    const repository = crearRepositorioFalso();
+
+    const outcome = await seedInitialAccess({
+      repository,
+      passwordHasher: crearHasherFalso(),
+      credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials: vi.fn(() => ({ ...CREDENCIALES_DEL_MAESTRO, email: CREDENCIALES_POR_DEFECTO.email })),
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    });
+
+    expect(outcome.createdAdmin).toBe(true);
+    expect(outcome.createdMaestro).toBe(true);
+    const maestro = altasDelMaestro(repository.llamadas)[0]?.args[0] as { email: string };
+    expect(maestro.email).toBe(CREDENCIALES_POR_DEFECTO.email);
   });
 
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos

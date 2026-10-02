@@ -385,6 +385,9 @@ export const MIGRACIONES_ESPERADAS = [
   '20260925120100_packing_permission',
   // Anade `parent_recipe_id` a `recipes`; no toca el identificador de peticion.
   '20261001120000_recipe_versions',
+  // El rol Maestro: empresa opcional segun rol y nombre de usuario unico en todo el sistema; no
+  // toca el identificador de peticion.
+  '20261001160815_platform_maestro_role',
 ] as const
 
 export function hallazgosDeMigraciones(

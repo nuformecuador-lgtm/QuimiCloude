@@ -549,20 +549,22 @@ describe('db/schema.prisma — la empresa (QC-47)', () => {
 })
 
 describe('db/schema.prisma — la columna de empresa del usuario (QC-47)', () => {
-  it('companyId es obligatorio, uuid y mapea a company_id (R9)', () => {
+  it('QC-161 R26, R27: companyId es opcional solo en la columna, uuid, mapea a company_id y sin @default', () => {
+    // Antes la columna era obligatoria. Ahora admite NULL para el Maestro y la
+    // obligacion para el resto la pone el disparador `users_check_company_by_role`, no Prisma.
     const companyId = field(user, 'companyId')
     expect(companyId.type).toBe('String')
-    expect(companyId.isOptional, 'User.companyId no puede ser opcional (R9)').toBe(false)
+    expect(companyId.isOptional, 'User.companyId tiene que ser opcional: el Maestro no tiene empresa').toBe(true)
     expect(companyId.attributes).toContain('@db.Uuid')
     expect(companyId.attributes).toContain('@map("company_id")')
-    // Obligatorio DE VERDAD: un `@default` lo rellenaria solo y R9 dejaria de significar nada.
+    // Un `@default` rellenaria la empresa sola y el disparador dejaria de ver la fila sin empresa.
     expect(companyId.attributes).not.toMatch(/@default\(/)
   })
 
-  it('la relacion User-Company va con @relation y ON DELETE RESTRICT (R10, R11)', () => {
+  it('la relacion User-Company va con @relation y ON DELETE RESTRICT (R10, R11; opcional desde QC-161)', () => {
     const relation = field(user, 'company')
     expect(relation.type).toBe('Company')
-    expect(relation.isOptional).toBe(false)
+    expect(relation.isOptional).toBe(true)
     expect(relation.attributes).toMatch(/fields:\s*\[companyId\]/)
     expect(relation.attributes).toMatch(/references:\s*\[id\]/)
     // R11: borrar una empresa con usuarios —vivos o de baja— tiene que fallar con 23503.

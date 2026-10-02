@@ -26,3 +26,9 @@ export interface InitialAdminCredentials {
  * antes de haber decidido que hay que crear el usuario inicial (R13).
  */
 export type InitialAdminCredentialsProvider = () => InitialAdminCredentials;
+
+/**
+ * Mismo contrato para el primer Maestro, con sus propias variables de origen. El dominio
+ * solo lo invoca si no hay ningun Maestro vivo.
+ */
+export type InitialMaestroCredentialsProvider = () => InitialAdminCredentials;

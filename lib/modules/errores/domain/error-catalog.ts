@@ -105,7 +105,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.incompatible_units': 'Las dos unidades no comparten unidad base: no son convertibles.',
   'errors.user_not_found': 'El usuario solicitado no existe.',
   'errors.duplicate_email': 'Ya existe un usuario con ese correo en la empresa.',
-  'errors.duplicate_username': 'Ya existe un usuario con ese nombre de usuario en la empresa.',
+  'errors.duplicate_username': 'Ya existe un usuario con ese nombre de usuario.',
   'errors.duplicate_document': 'Ya existe un usuario con ese documento en la empresa.',
   'errors.role_not_found': 'El rol indicado no existe.',
   'errors.self_operation': 'No puedes realizar esta operacion sobre tu propia cuenta.',

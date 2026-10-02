@@ -47,3 +47,6 @@ export const INITIAL_USER_ACCOUNT_STATUS: UserAccountStatus = 'pending'
  * cerraria el sistema sobre si mismo en cuanto QC-78 corte el login por estado.
  */
 export const SEED_ADMIN_ACCOUNT_STATUS: UserAccountStatus = 'active'
+
+/** Estado del primer Maestro que crea el seed. Explicito por el mismo motivo que el anterior. */
+export const SEED_MAESTRO_ACCOUNT_STATUS: UserAccountStatus = 'active'

@@ -2438,7 +2438,7 @@
       "epic_name": "Identidad y acceso",
       "name": "rol-maestro",
       "description": "Nace el rol MAESTRO (dueno de la plataforma, por encima de las empresas) y con el empresas.consultar y empresas.modificar (modificar cubre alta, edicion y baja): una enmienda mas al catalogo cerrado de QC-74. El Maestro recibe SOLO esos dos; Administrador, Operador y Empacador no cambian. EL MAESTRO NO PERTENECE A NINGUNA EMPRESA: users.company_id sigue obligatoria para todos menos para el (enmienda a QC-47). EL PRIMER MAESTRO lo crea el seed, igual que el Administrador inicial: usuario, contrasena y correo desde .env (QC-6). NUNCA aparece en el selector de roles y el servidor rechaza asignarlo. ACOTADA el 2026-09-24 con /afinar-feature. LOGIN: inicia sesion como cualquiera y aterriza en su area (QC-166); las pantallas de empresa le niegan el acceso por permiso (QC-93). NO ENTRA: gestion de empresas (QC-162), administradores por el Maestro (QC-165), pantallas (QC-166). CHOCA en el catalogo de permisos con QC-153 y QC-142: recuento contra dev al implementar.",
-      "status": "spec_ready",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",

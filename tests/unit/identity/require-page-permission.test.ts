@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { PERMISSIONS } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 
@@ -108,5 +109,43 @@ describe('requirePagePermission', () => {
     expect(fuente.trim().length).toBeGreaterThan(0);
     expect(fuente).toContain('assertPermission');
     expect(fuente).not.toContain('.includes(');
+  });
+});
+
+// Quien solo tiene los permisos del Maestro pide pantallas privadas de empresa.
+describe('requirePagePermission con los permisos del Maestro (QC-161)', () => {
+  const PERMISOS_DEL_MAESTRO = ['empresas.consultar', 'empresas.modificar'];
+
+  it('QC-161 R34: una pagina de inventario.consultar responde el mismo 404, sin redirigir', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(PERMISOS_DEL_MAESTRO));
+
+    await expect(requirePagePermission('inventario.consultar')).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('QC-161 R34: cualquier permiso del catalogo que no sea empresas.* responde 404', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(PERMISOS_DEL_MAESTRO));
+    const ajenos = PERMISSIONS.map((p) => p.code).filter((code) => !code.startsWith('empresas.'));
+    expect(ajenos.length).toBeGreaterThan(0);
+
+    for (const code of ajenos) {
+      notFoundMock.mockClear();
+      await expect(requirePagePermission(code)).rejects.toThrow('NEXT_NOT_FOUND');
+      expect(notFoundMock).toHaveBeenCalledTimes(1);
+    }
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  // Simetrico: el corte es por permiso y no por quien es. Con `empresas.consultar` la misma
+  // sesion pasa, que es lo que necesitara la pantalla del Maestro.
+  it('QC-161 R34: con empresas.consultar la pagina que lo exige no corta', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(PERMISOS_DEL_MAESTRO));
+
+    await expect(requirePagePermission('empresas.consultar')).resolves.toBeUndefined();
+
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });

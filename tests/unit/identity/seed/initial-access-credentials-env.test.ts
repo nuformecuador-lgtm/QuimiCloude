@@ -8,7 +8,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
+import {
+  readInitialAdminCredentialsFromEnv,
+  readInitialMaestroCredentialsFromEnv,
+} from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
 
 /** Valores de prueba evidentemente ficticios: nunca se persisten (R8, ajeno a este test). */
 const USERNAME_DE_PRUEBA = 'admin.inicial.prueba';
@@ -84,5 +87,59 @@ describe('adaptador — credenciales del usuario inicial desde el entorno', () =
     expect(mensaje).not.toContain(USERNAME_DE_PRUEBA);
     expect(mensaje).not.toContain(CREDENCIAL_DE_PRUEBA);
     expect(mensaje).not.toContain(EMAIL_DE_PRUEBA);
+  });
+});
+
+describe('adaptador — credenciales del primer Maestro desde el entorno (QC-161)', () => {
+  const NOMBRES = ['SEED_MAESTRO_USERNAME', 'SEED_MAESTRO_PASSWORD', 'SEED_MAESTRO_EMAIL'] as const;
+  const VALORES = ['plataforma.prueba', 'credencial-del-maestro-no-real', 'plataforma.prueba@example.test'] as const;
+
+  function fijarLasDelMaestro(): void {
+    NOMBRES.forEach((nombre, indice) => vi.stubEnv(nombre, VALORES[indice]));
+  }
+
+  it('QC-161 R12: con las tres presentes devuelve los tres valores, sin leer las del Administrador', () => {
+    fijarLasDelMaestro();
+    vi.stubEnv('SEED_ADMIN_USERNAME', undefined);
+    vi.stubEnv('SEED_ADMIN_PASSWORD', undefined);
+    vi.stubEnv('SEED_ADMIN_EMAIL', undefined);
+
+    expect(readInitialMaestroCredentialsFromEnv()).toEqual({
+      username: VALORES[0],
+      credential: VALORES[1],
+      email: VALORES[2],
+    });
+  });
+
+  it('QC-161 R12: sin ninguna, el error las nombra todas y no lleva ningun valor', () => {
+    fijarLasDelMaestro();
+    for (const nombre of NOMBRES) vi.stubEnv(nombre, undefined);
+
+    let mensaje = '';
+    try {
+      readInitialMaestroCredentialsFromEnv();
+    } catch (error) {
+      mensaje = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(mensaje).not.toBe('');
+    for (const nombre of NOMBRES) expect(mensaje).toContain(nombre);
+    for (const valor of VALORES) expect(mensaje).not.toContain(valor);
+  });
+
+  it('QC-161 R12: vacia o solo espacios cuenta como ausente y solo se nombra esa', () => {
+    fijarLasDelMaestro();
+    vi.stubEnv('SEED_MAESTRO_PASSWORD', '   ');
+    vi.stubEnv('SEED_MAESTRO_EMAIL', '');
+
+    let mensaje = '';
+    try {
+      readInitialMaestroCredentialsFromEnv();
+    } catch (error) {
+      mensaje = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(mensaje).toBe('faltan las variables de entorno: SEED_MAESTRO_PASSWORD, SEED_MAESTRO_EMAIL');
+    expect(mensaje).not.toContain(VALORES[0]);
   });
 });

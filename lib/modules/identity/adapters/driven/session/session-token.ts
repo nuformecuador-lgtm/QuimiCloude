@@ -88,7 +88,11 @@ type SessionPayload = {
   readonly iat: number;
   readonly exp: number;
   readonly role: string;
-  readonly cid: string;
+  /**
+   * `null` solo para quien no tiene empresa. La version no sube por esto: toda cookie `v4`
+   * emitida antes lleva un UUID y el esquema nuevo la sigue aceptando.
+   */
+  readonly cid: string | null;
   /**
    * QC-23 (R1) — el UUID de ESTA sesion, y nada mas: no se deriva de `sub` ni de `iat`, porque
    * dos sesiones de la misma persona emitidas en el mismo segundo tienen que distinguirse (R2).
