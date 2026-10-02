@@ -21,7 +21,7 @@
 ## Evaluaciones
 **2026-10-01:** QC-161 cerrada (PR #135, merge `b4afc965`; tarjeta a Finalizado; resumen en history). Desbloquea QC-162 y QC-165.
 
-**2026-10-01: QC-172** `versiones-de-receta`: F1.0 (worktree desde dev `81f1cd8e`) y F1.1 (`complexity:high`, en Jira; cupo `fullstack` 0 de 3). **ACOTADA** con `/afinar-feature`: 14 decisiones, ninguna abierta, en `specs/QC-172-versiones-de-receta/requirements.md`; board actualizado (description). F1.2/F1.3: R1-R45, T0-T14, semilla intacta (diff) y D1-D14 citadas (`1e1c4c1f`); tarjeta a En revision. **F1.4 APROBADO el 2026-10-01** con P1-P3 en la opcion (a). **F2.0**: in_progress, En curso; cupo fullstack 1 de 3; sin cruce real (QC-170, QC-164 y QC-173 siguen pending, QC-131 es backend y no toca recetas ni pedidos). F2.1: implementer lanzado. **2026-10-02**: T0-T14 hechos; E2E 2 passed; `./init.sh` completo OK sobre `8c33974e`; reviewer OK (0 bloqueantes, m2/m4 corregidos). Sync con origin/dev (merge `91b7e9a1`, conflicto en la lista de migraciones del guard): gate acotado por decision del humano + integracion 52/52. `SEED_MAESTRO_*` anadidas a los `.env` (provisionales, el humano las cambia; faltan en Vercel). **PR #136** abierto contra dev; esperando merge.
+**2026-10-02:** QC-172 cerrada (PR #136, merge `8303e0b8`; tarjeta a Finalizado; resumen en history). Desbloquea QC-174.
 
 **2026-10-01:** QC-171 cerrada (PR #134, merge `d17242a9`; tarjeta a Finalizado; resumen en history). Desbloquea QC-176. **T8 pendiente del humano**: bucket de recortes a publico antes de desplegar. Base local `QuimiCloude` migrada al dia (11 migraciones; `20260923150000`/`150100` marcadas `--applied` por ser identicas a las que QC-141 aplico antes de renumerarlas).
 
