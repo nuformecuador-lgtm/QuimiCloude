@@ -1023,3 +1023,81 @@ del merge), asi que es un rojo de QC-170, no del merge ni de dev: falta añadir 
 esperada (o decidir otra cosa sobre ella). Pendiente de decision del leader.
 
 **Arreglo de unidades-constraints (decision del leader: `orders.unit_id` vuelve, aprobado en F1.4).** `orders_unit_id_fkey` entra en la lista exacta esperada (`r`/`c`); aislado: `Test Files 1 passed (1)`, `Tests 30 passed (30)`, 1.48s.
+
+## F2.3 bis — merge con QC-172 (2026-10-02)
+
+`git merge origin/dev` sobre `aa648a88`: 36 commits, sobre todo QC-172 versiones-de-receta (PR #136).
+16 archivos en conflicto, todos resueltos como SUMA; ninguno ambiguo. Commits: `029365a2` (merge) y
+`1e8c9b12` (tests de QC-172 adaptados al reparto). Sin push.
+
+### Conflictos y resolucion
+
+| Archivo | Resolucion |
+|---|---|
+| `lib/modules/errores/domain/error-codes.ts` | union: los 4 codigos de QC-170 + `recipe_version_under_review` (65 en total) |
+| `lib/modules/errores/domain/error-catalog.ts` | union en `ERROR_MESSAGE_KEY` y en los mensajes (2 hunks) |
+| `lib/modules/pedidos/domain/errors.ts` | union: clases de QC-170 + `RecipeVersionUnderReviewError` |
+| `tests/unit/errores/catalogo.test.ts` | cuenta 64 / 61 -> 65, comentario con las dos procedencias |
+| `lib/modules/pedidos/domain/order-input.ts` | `unitId` + `presentationLines` (QC-170) + `recipeVersionId` (QC-172); sin `presentationId` |
+| `lib/modules/pedidos/adapters/driving/order-actions.ts` | lee `unitId`, `presentationLines` y `recipeVersionId` |
+| `lib/modules/pedidos/domain/create-order.ts` | imports sin `RecipeNotFoundError`/`PresentationNotFoundError`; `orders.create` con `recipeId: effectiveId` (QC-172) + `unitId` + `presentationLines` (QC-170) |
+| `lib/modules/pedidos/domain/update-order.ts` | idem en `updateAlive`; el `effectiveId` de QC-172 ya entro sin conflicto y alimenta coste, necesidad y escritura |
+| `lib/modules/pedidos/domain/get-order.ts` | imports `RecipeRef` (QC-172) + `UnitCatalog` (QC-170) |
+| `lib/modules/pedidos/domain/list-orders.ts` | `toOrderView(row, recipesById, presentationNames, unitLabels)` |
+| `app/(private)/pedidos/components/order-form.tsx` | `ORDER_BUSINESS_FIELDS` = receta, cantidad, unidad, prioridad, version (+ `PRESENTATION_LINES_FIELD`); `RecipeVersionSelect` tras el selector de receta; el comentario de la fila presentacion/cantidad/prioridad se va (ya no existe esa fila) |
+| `tests/guards/guard-identificador-de-request.test.ts` | lista cerrada de migraciones: las 3 de QC-170 + `20261001120000_recipe_versions` |
+| `tests/unit/pedidos-ui/order-form-quote.test.tsx` | titulo de QC-170 («mismos campos mas su reparto»); el cuerpo ya usa `ORDER_BUSINESS_FIELDS` |
+| `tests/unit/pedidos/order-input.test.ts` | claves esperadas: `presentationLines, priority, quantity, recipeId, recipeVersionId, unitId` (2 hunks) |
+| `tests/unit/pedidos/transition-order.test.ts` | se queda sin `catalogosGlobales` (QC-170 lo retiro) y sin el caso R36 de QC-172 sobre Finalizar: ver abajo |
+| `feature_list.json` | version de dev (fila de QC-170 solo diferia en el texto de la descripcion, ya reescrito en dev; estado `in_progress` en ambas) |
+
+**R36 de QC-172 (producto terminado por version).** No es un conflicto ambiguo: en QC-170 Finalizar ya
+no da de alta producto terminado (R15/R16, enmienda de QC-150/QC-168), lo hace Terminar el empaque una
+vez por linea (`order-packing.ts`), y esa entrada ya usa `updated.recipeId` (el id de la version, que es
+lo que guarda el pedido) y `recipeRef.name` del catalogo (el nombre compuesto «Original · Version»). R36
+se cumple sin tocar produccion; solo cambia el momento. El test se porta a
+`tests/unit/pedidos/order-packing.test.ts` («QC-172 R36: un pedido con version da de alta cada linea...»)
+y `tests/integration/inventario/finished-goods-version.int.test.ts` pasa a la firma por linea de
+`receiveFinishedGoods` (pedido con `unitId` + una linea de 10 envases). Para el leader: el texto de R36
+dice «CUANDO se finaliza un pedido»; con QC-170 el disparador es Terminar el empaque. Si se quiere,
+nota de enmienda en el spec de QC-172.
+
+### Ajustes de tests fuera de los conflictos (`1e8c9b12`)
+
+- `create-order.test.ts`, `update-order.test.ts` (bloques de version de QC-172): `presentationId` -> `unitId: UNIT_ID` en la entrada.
+- `get-order.test.ts` (nuevo de QC-172): fila con `presentationLines: []`, `unitId: null`; deps con `units`.
+- `order-list-section.test.tsx`: los 2 casos de QC-170 pasan `recipes`/`units` (props nuevas de dev).
+- `order-distribution-dialog.test.tsx`: fixture con `recipeVersion: null`.
+- `order-packing.test.ts`: `RecipeRef` completo en el doble + caso R36 portado.
+
+### Migraciones: NO se renumeran
+
+Las de QC-170 (`20260927120000_order_presentation_lines`, `20260927120100_inventory_movements_production_per_line`,
+`20260927120200_order_presentation_lines_backfill_and_drop`) tocan `orders`, `order_presentation_lines`,
+`inventory_movements` y `presentations`. La de dev `20261001120000_recipe_versions` toca solo `recipes`
+(columna `parent_recipe_id`, FK, CHECK e indices) y `20261001160815_platform_maestro_role` solo
+`users`/`roles`/`permissions`. Tablas disjuntas, sin dependencia de orden, y las de QC-170 ya van antes
+que las de dev en el historial: el orden resultante es el mismo que aplicaria cualquier base nueva.
+`prisma migrate deploy` sobre `QuimiCloude_QC170`: aplicada `20261001120000_recipe_versions`; `migrate
+status` limpio. `prisma generate` regenerado (sin el, el typecheck no veia `parentRecipeId`).
+
+### Salida real
+
+```
+pnpm run typecheck            -> 0 errores
+pnpm run lint                 -> 0 errores, 8 warnings (preexistentes, ninguno en archivos del merge)
+pnpm exec vitest run tests/unit/pedidos tests/unit/pedidos-ui tests/unit/errores tests/unit/recetas \
+  tests/guards tests/integration/pedidos tests/integration/recetas \
+  tests/integration/inventario/finished-goods-version.int.test.ts
+ Test Files  3 failed | 208 passed (211)
+      Tests  3 failed | 3088 passed | 5 skipped (3096)
+   Duration  130.92s
+```
+
+Los 3 rojos, ninguno del merge:
+- `tests/unit/recetas-ui/recipe-page.test.tsx` (R21): en `tests/baseline-rojos.json`.
+- `tests/unit/recetas/scope.test.ts` y `tests/unit/recetas/module-contract.test.ts`: «segunda pantalla de
+  recetas fuera de su carpeta: app/(private)/pedidos/page.tsx». `page.tsx` y los dos tests son
+  byte-identicos a `origin/dev` (`git diff --quiet origin/dev HEAD -- ...`): rojo que trae QC-172 desde
+  dev y NO esta en el baseline. Decision del leader (anadirlo al baseline o abrir la excepcion en la
+  guardia).
