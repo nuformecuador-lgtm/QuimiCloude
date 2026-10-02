@@ -35,10 +35,21 @@ const CARPETA_NUEVA = join(CARPETA_RUTA, NUEVA_SUFIJO);
 const PAGE_NUEVA_PATH = join(CARPETA_NUEVA, 'page.tsx');
 const CARPETA_EDICION = join(CARPETA_RUTA, '[id]');
 const PAGE_EDICION_PATH = join(CARPETA_EDICION, 'page.tsx');
+/** Los segmentos dinamicos se pasan como sondas para que la carpeta salga de `routes.ts`. */
+const SUFIJO_NUEVA_VERSION = newRecipeVersionRoute('[id]').slice(FORMULAS_ROUTE.length + 1);
+const SUFIJO_VERSION = recipeVersionRoute('[id]', '[versionId]').slice(FORMULAS_ROUTE.length + 1);
+const CARPETA_NUEVA_VERSION = join(CARPETA_RUTA, SUFIJO_NUEVA_VERSION);
+const CARPETA_VERSION = join(CARPETA_RUTA, SUFIJO_VERSION);
+const CARPETA_VERSIONES = join(CARPETA_VERSION, '..');
+const PAGE_NUEVA_VERSION_PATH = join(CARPETA_NUEVA_VERSION, 'page.tsx');
+const PAGE_VERSION_PATH = join(CARPETA_VERSION, 'page.tsx');
 
 const LAYOUT_PRIVADO_PATH = join('app', '(private)', 'layout.tsx');
 
 const LITERALES_DE_RUTA = [`'${FORMULAS_ROUTE}'`, `"${FORMULAS_ROUTE}"`, `\`${FORMULAS_ROUTE}`];
+
+/** El segmento de versiones solo lo componen `newRecipeVersionRoute` y `recipeVersionRoute`. */
+const SEGMENTO_DE_VERSIONES = '/versiones';
 
 function leer(rutaRelativa: string): string {
   return readFileSync(join(RAIZ, rutaRelativa), 'utf8');
@@ -526,6 +537,10 @@ describe('contrato de la ruta de recetas', () => {
     expect(newRecipeVersionRoute('sonda-de-prueba')).toBe(
       `${recipeEditRoute('sonda-de-prueba')}/versiones/nueva`,
     );
+
+    for (const pagina of [PAGE_NUEVA_VERSION_PATH, PAGE_VERSION_PATH]) {
+      expect(existsSync(join(RAIZ, pagina)), `deberia existir ${pagina}`).toBe(true);
+    }
   });
 
   it('ningun archivo de produccion incrusta el literal de la ruta y private-nav reexporta, no redeclara', () => {
@@ -537,12 +552,17 @@ describe('contrato de la ruta de recetas', () => {
         if (ruta === 'lib/shared/routes.ts') continue;
         const codigo = fuenteSinComentarios(ruta);
         if (LITERALES_DE_RUTA.some((literal) => codigo.includes(literal))) conElLiteral.push(ruta);
+        else if (codigo.includes(SEGMENTO_DE_VERSIONES)) conElLiteral.push(ruta);
       }
     }
 
     expect(conElLiteral, 'el literal de la ruta solo puede vivir en lib/shared/routes.ts').toEqual(
       [],
     );
+    // Ancla anti-vacuidad: las dos paginas de version entran en el barrido de `app`.
+    for (const pagina of [PAGE_NUEVA_VERSION_PATH, PAGE_VERSION_PATH]) {
+      expect(FUENTES_DE_LA_RUTA).toContain(enRutaDePosix(pagina));
+    }
 
     expect(leer('lib/shared/routes.ts')).toContain('export const FORMULAS_ROUTE');
 
@@ -606,13 +626,19 @@ describe('contrato de la ruta de recetas', () => {
 
   // El permiso que exigen las pantallas y el de su item de menu tienen que ser el mismo codigo: se
   // deriva del catalogo en vez de escribirse a mano.
-  it('las tres pantallas exigen recetas.consultar y el item de menu declara ese mismo permiso (QC-75 R5, R6)', () => {
+  it('las cinco pantallas exigen recetas.consultar y el item de menu declara ese mismo permiso (QC-75 R5, R6)', () => {
     const permiso = PERMISSIONS.find(
       (entrada) => entrada.module === 'recetas' && entrada.action === 'consultar',
     );
     expect(permiso, 'el catalogo de identity deberia tener recetas.consultar').toBeDefined();
 
-    for (const pagina of [PAGE_PATH, PAGE_NUEVA_PATH, PAGE_EDICION_PATH]) {
+    for (const pagina of [
+      PAGE_PATH,
+      PAGE_NUEVA_PATH,
+      PAGE_EDICION_PATH,
+      PAGE_NUEVA_VERSION_PATH,
+      PAGE_VERSION_PATH,
+    ]) {
       expect(fuenteSinComentarios(pagina), `${pagina} deberia exigir su permiso`).toContain(
         `requirePagePermission('${permiso?.code}')`,
       );
@@ -899,7 +925,7 @@ describe('contrato de la ruta de recetas', () => {
     expect(conDndKit).toEqual([join(COMPONENTES_PATH, 'recipe-steps-field.tsx').split('\\').join('/')]);
   });
 
-  it('los componentes de ruta se exponen por el barrel, las tres paginas importan solo del barrel y no queda ningun componente suelto', () => {
+  it('los componentes de ruta se exponen por el barrel, las cinco paginas importan solo del barrel y no queda ningun componente suelto', () => {
     // Regla de `docs/architecture.md > Componentes`.
     const barrel = fuenteSinComentarios(BARREL_PATH.split('\\').join('/'));
 
@@ -937,6 +963,14 @@ describe('contrato de la ruta de recetas', () => {
     expect(paginaEdicion).toContain("from '../components'");
     expect(paginaEdicion).not.toContain("from '../components/");
 
+    for (const pagina of [PAGE_NUEVA_VERSION_PATH, PAGE_VERSION_PATH]) {
+      const fuente = fuenteSinComentarios(enRutaDePosix(pagina));
+      expect(fuente, `${pagina} debe importar del barrel`).toContain("from '../../../components'");
+      expect(fuente, `${pagina} no puede importar por ruta profunda`).not.toContain(
+        "from '../../../components/",
+      );
+    }
+
     // La frontera cliente/servidor se declara en cada componente, no en el barrel.
     expect(barrel).not.toContain('use client');
 
@@ -954,10 +988,23 @@ describe('contrato de la ruta de recetas', () => {
       );
     }
 
-    for (const carpeta of [CARPETA_NUEVA, CARPETA_EDICION]) {
+    // Lista CERRADA de subcarpetas: `[id]` solo cuelga `versiones`, y esta solo el alta y la
+    // pagina de una version.
+    const SUBCARPETAS_LEGITIMAS = new Map<string, readonly string[]>([
+      [CARPETA_NUEVA, []],
+      [CARPETA_EDICION, ['versiones']],
+      [CARPETA_VERSIONES, ['[versionId]', 'nueva']],
+      [CARPETA_NUEVA_VERSION, []],
+      [CARPETA_VERSION, []],
+    ]);
+    for (const [carpeta, subcarpetas] of SUBCARPETAS_LEGITIMAS) {
       const entradas = readdirSync(join(RAIZ, carpeta), { withFileTypes: true });
+      expect(
+        entradas.filter((entrada) => entrada.isDirectory()).map((entrada) => entrada.name).sort(),
+        `${carpeta} tiene subcarpetas fuera de la lista`,
+      ).toEqual([...subcarpetas].sort());
       for (const entrada of entradas) {
-        expect(entrada.isDirectory(), `${carpeta} no deberia tener subcarpetas`).toBe(false);
+        if (entrada.isDirectory()) continue;
         expect(
           archivosDeAppRouter,
           `${carpeta}/${entrada.name} no es un archivo del App Router`,

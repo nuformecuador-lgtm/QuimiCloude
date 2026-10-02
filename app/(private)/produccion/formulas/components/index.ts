@@ -75,6 +75,10 @@ export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-fie
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
 export {
+  PropagateVersionsDialog,
+  type PropagateVersionsDialogProps,
+} from './propagate-versions-dialog';
+export {
   RecipeVersionForm,
   type RecipeVersionFormOriginal,
   type RecipeVersionFormProps,

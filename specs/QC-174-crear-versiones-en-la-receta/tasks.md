@@ -104,7 +104,7 @@ descripción, imagen ni pasos; `text-base` en el nombre (R8, R9, R11–R16, R20�
 
 ## Tanda 3 — páginas y ficha
 
-### T8 [ ] — Páginas de alta y de versión
+### T8 [x] — Páginas de alta y de versión
 Tras T7. **Quién:** frontend_dev. **Toca:** `app/(private)/produccion/formulas/[id]/versiones/nueva/page.tsx`
 (nuevo), `app/(private)/produccion/formulas/[id]/versiones/[versionId]/page.tsx` (nuevo),
 `tests/unit/recetas-ui/recipe-version-pages.test.tsx` (nuevo),
@@ -117,7 +117,7 @@ de alta; `[id]` inexistente, de otra empresa (doble que devuelve `recipe_not_fou
 «no encontrada» sin formulario; versión cuyo `original.id` no es `[id]` → «no encontrada»; título con
 `displayName`; otro error → `RecipeListError` (R8, R9, R10, R36).
 
-### T9 [ ] — Ficha de la original
+### T9 [x] — Ficha de la original
 Tras T6, T10. **Quién:** frontend_dev. **Toca:** `app/(private)/produccion/formulas/[id]/page.tsx`,
 `tests/unit/recetas-ui/recipe-page.test.tsx`.
 **Hacer:** §1, fila 1.
@@ -126,7 +126,7 @@ Tras T6, T10. **Quién:** frontend_dev. **Toca:** `app/(private)/produccion/form
 `versions` y debajo sale `RecipeVersionList`; error al listar → `RecipeListError` sin formulario (R1, R5,
 R7). Los casos de hoy de la página siguen verdes.
 
-### T10 [ ] — Propagación en `RecipeForm`
+### T10 [x] — Propagación en `RecipeForm`
 Tras T1, T7 (comparte `recipe-form.tsx`). **Quién:** frontend_dev. **Toca:**
 `formulas/components/recipe-form.tsx`, `formulas/components/propagate-versions-dialog.tsx` (nuevo),
 `formulas/components/index.ts`, `tests/unit/recetas-ui/recipe-form-propagation.test.tsx` (nuevo),

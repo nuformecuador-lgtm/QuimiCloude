@@ -238,6 +238,12 @@ function describir(infracciones: readonly Infraccion[]): string {
 // pantalla de ejecucion del pedido de empaque. Llama a `requirePagePermission` UNA sola vez
 // -`asignaciones.consultar`-, mismo patron que `/asignacion/[id]`: abrir y terminar el empaque los
 // hace el caso de uso, no un permiso nuevo de pantalla.
+//
+// TENSADA el 2026-10-02 (QC-174): de diecisiete a DIECINUEVE, con
+// `/produccion/formulas/[id]/versiones/nueva` y `/produccion/formulas/[id]/versiones/[versionId]`,
+// el alta y la edicion de una version de receta. Cada una llama a `requirePagePermission` UNA sola
+// vez -`recetas.consultar`-, mismo patron que `/produccion/formulas/[id]`: guardar lo autoriza el
+// caso de uso con `recetas.modificar`.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',
@@ -251,6 +257,8 @@ const RUTAS_ESPERADAS_HOY = [
   '/pedidos',
   '/produccion/formulas',
   '/produccion/formulas/[id]',
+  '/produccion/formulas/[id]/versiones/[versionId]',
+  '/produccion/formulas/[id]/versiones/nueva',
   '/produccion/formulas/importar/[documentoId]',
   '/produccion/formulas/nueva',
   '/proveedores',
@@ -259,7 +267,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las diecisiete pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las diecinueve pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);

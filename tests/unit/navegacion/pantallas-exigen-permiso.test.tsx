@@ -4,6 +4,8 @@ import DashboardPage from '@/app/(private)/dashboard/page';
 import InventarioPage from '@/app/(private)/inventario/page';
 import PedidosPage from '@/app/(private)/pedidos/page';
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
+import EditarVersionPage from '@/app/(private)/produccion/formulas/[id]/versiones/[versionId]/page';
+import NuevaVersionPage from '@/app/(private)/produccion/formulas/[id]/versiones/nueva/page';
 import NuevaRecetaPage from '@/app/(private)/produccion/formulas/nueva/page';
 import FormulasPage from '@/app/(private)/produccion/formulas/page';
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
@@ -208,6 +210,29 @@ const PAGINAS: readonly CasoDePagina[] = [
     invocar: () =>
       EditarRecetaPage({
         params: parametroEspia('/produccion/formulas/[id]', { id: 'ID-DEL-FIXTURE' }),
+      }),
+    leeAlgo: true,
+  },
+  {
+    ruta: '/produccion/formulas/[id]/versiones/nueva',
+    permiso: 'recetas.consultar',
+    invocar: () =>
+      NuevaVersionPage({
+        params: parametroEspia('/produccion/formulas/[id]/versiones/nueva', {
+          id: 'ID-DEL-FIXTURE',
+        }),
+      }),
+    leeAlgo: true,
+  },
+  {
+    ruta: '/produccion/formulas/[id]/versiones/[versionId]',
+    permiso: 'recetas.consultar',
+    invocar: () =>
+      EditarVersionPage({
+        params: parametroEspia('/produccion/formulas/[id]/versiones/[versionId]', {
+          id: 'ID-DEL-FIXTURE',
+          versionId: 'ID-DE-VERSION-DEL-FIXTURE',
+        }),
       }),
     leeAlgo: true,
   },

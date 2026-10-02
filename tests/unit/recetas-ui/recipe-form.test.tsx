@@ -21,6 +21,7 @@ import {
 import type {
   CreateRecipeFormState,
   RecipeQueryResult,
+  RecipeVersionListResult,
   UpdateRecipeFormState,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { ProductListResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -28,7 +29,7 @@ import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/uni
 import type { UnitView } from '@/lib/modules/unidades';
 import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, recipeVersionRoute } from '@/lib/shared/routes';
 import { PERMISSIONS } from '@/lib/modules/identity';
 
 /**
@@ -76,6 +77,8 @@ const {
   createRecipeActionMock,
   updateRecipeActionMock,
   getRecipeActionMock,
+  listRecipeVersionsActionMock,
+  redirectMock,
   listProductsActionMock,
   listUnitsActionMock,
 } = vi.hoisted(() => ({
@@ -91,6 +94,11 @@ const {
   createRecipeActionMock: vi.fn<(input: unknown) => Promise<CreateRecipeFormState>>(),
   updateRecipeActionMock: vi.fn<(id: string, input: unknown) => Promise<UpdateRecipeFormState>>(),
   getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+  listRecipeVersionsActionMock: vi.fn<(originalId: string) => Promise<RecipeVersionListResult>>(),
+  // `redirect` de Next lanza para cortar el render; el doble lanza igual para que la pagina no siga.
+  redirectMock: vi.fn<(ruta: string) => never>((ruta) => {
+    throw new Error(`redirect:${ruta}`);
+  }),
   listProductsActionMock: vi.fn<(query: unknown) => Promise<ProductListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
 }));
@@ -110,12 +118,14 @@ vi.mock('@/lib/composition', () => ({
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => routerMock,
+  redirect: redirectMock,
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   createRecipeAction: createRecipeActionMock,
   updateRecipeAction: updateRecipeActionMock,
   getRecipeAction: getRecipeActionMock,
+  listRecipeVersionsAction: listRecipeVersionsActionMock,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
@@ -263,6 +273,7 @@ function renderEditForm(recipe: RecipeDetail) {
     <RecipeForm
       mode="edit"
       recipe={recipe}
+      versions={[]}
       units={UNITS}
       initialProductPage={PRODUCT_PAGE_1}
       initialMachinePage={MACHINE_PAGE}
@@ -519,6 +530,7 @@ beforeEach(() => {
     data: { items: [productView()], total: 3, page: 2, pageSize: MAX_PAGE_SIZE, totalPages: 2 },
   });
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: UNITS });
+  listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
   toastSuccessSpy = vi.spyOn(toast, 'success');
   // jsdom no implementa `URL.createObjectURL`/`revokeObjectURL` (API de navegador real): se
   // resuelve aquí, explícitamente, en vez de en producción.
@@ -645,6 +657,71 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     );
     expect(screen.queryByTestId('recipe-form')).toBeNull();
     expect(getRecipeActionMock).toHaveBeenCalledWith(RECIPE_ID);
+  });
+});
+
+describe('QC-174 — la ficha de la original y el id de una version', () => {
+  const ORIGINAL_ID = '77777777-7777-4777-8777-777777777777';
+
+  it('R7: el id de una version redirige a su pagina bajo la original sin pintar el formulario', async () => {
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recipeDetail({ original: { id: ORIGINAL_ID, name: 'Original' } }),
+    });
+
+    await expect(
+      EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) }),
+    ).rejects.toThrow(`redirect:${recipeVersionRoute(ORIGINAL_ID, RECIPE_ID)}`);
+
+    expect(redirectMock).toHaveBeenCalledTimes(1);
+    expect(redirectMock).toHaveBeenCalledWith(recipeVersionRoute(ORIGINAL_ID, RECIPE_ID));
+    expect(screen.queryByTestId('recipe-form')).toBeNull();
+  });
+
+  it('R1, R5: la original pide sus versiones, el formulario las recibe y debajo sale la lista de versiones', async () => {
+    getRecipeActionMock.mockResolvedValue({ status: 'success', data: recipeDetail() });
+    listRecipeVersionsActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        {
+          id: 'version-1',
+          name: 'Copia',
+          displayName: 'Detergente industrial - Copia',
+          isUnderReview: false,
+          updatedAt: new Date('2026-01-03T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    const tree = await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) });
+    render(tree);
+
+    expect(listRecipeVersionsActionMock).toHaveBeenCalledWith(RECIPE_ID);
+    expect(redirectMock).not.toHaveBeenCalled();
+    const form = screen.getByTestId('recipe-form');
+    const versions = screen.getByTestId('recipe-versions');
+    expect(form.compareDocumentPosition(versions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(versions).getAllByTestId('recipe-version-row')).toHaveLength(1);
+    expect(within(versions).getByTestId('recipe-version-link')).toHaveAttribute(
+      'href',
+      recipeVersionRoute(RECIPE_ID, 'version-1'),
+    );
+  });
+
+  it('R5: si falla la lista de versiones presenta el error propio y ningun formulario', async () => {
+    getRecipeActionMock.mockResolvedValue({ status: 'success', data: recipeDetail() });
+    listRecipeVersionsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+
+    const tree = await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) });
+    render(tree);
+
+    expect(screen.getByTestId('recipe-list-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('recipe-form')).toBeNull();
+    expect(screen.queryByTestId('recipe-versions')).toBeNull();
   });
 });
 
