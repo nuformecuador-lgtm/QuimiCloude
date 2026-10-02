@@ -910,3 +910,11 @@ Gate acotado (sin integracion, por lo anterior):
 **Pendiente antes del PR:** cargar `SEED_MAESTRO_*` en el `.env` (y en Vercel) y correr
 `recipe-crud.int.test.ts` y el resto de la integracion; sin eso la integracion de esta rama no
 esta verificada tras el sync.
+
+### Integracion tras el sync (2026-10-02, leader)
+El humano anadio las `SEED_MAESTRO_*` al `.env` del worktree y del arbol principal (valores
+provisionales, los cambia el). Corrida acotada a los modulos que toco el merge:
+`pnpm exec vitest run --project integration tests/integration/recetas tests/integration/identity
+tests/integration/pedidos tests/integration/documentos/formula-import-versions.int.test.ts` ->
+`Test Files 52 passed (52)`, `Tests 692 passed (692)`. Log sin versionar:
+`progress/gate_QC-172_sync_integracion.log`. Ojo: las `SEED_MAESTRO_*` tambien hacen falta en Vercel.
