@@ -28,6 +28,14 @@
     "tests/unit/recetas-ui/recipe-page.test.tsx": {
       "motivo": "Deuda ajena de dev, roja desde a543c84d (data-table: flechas de scroll, width/hideText y defaultPinned por columna, PR #131): el caso de la columna de acciones que no se puede fijar falla igual en origin/dev puro. Salida limpia: QC-177 borra esta entrada. Ajeno a QC-171, que no toca recetas.",
       "desde": "2026-10-01"
+    },
+    "tests/unit/recetas/scope.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde el merge de QC-172 (PR #136, 8303e0b8): app/(private)/pedidos/page.tsx consume recetas (selector de version) y las guardias de alcance de recetas lo marcan como segunda pantalla. page.tsx, scope.test.ts y module-contract.test.ts son identicos a origin/dev. Ajeno a QC-170. Salida limpia: la ficha que abra la excepcion en la guardia borra esta entrada.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/recetas/module-contract.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde el merge de QC-172 (PR #136, 8303e0b8): app/(private)/pedidos/page.tsx consume recetas (selector de version) y las guardias de alcance de recetas lo marcan como segunda pantalla. page.tsx, scope.test.ts y module-contract.test.ts son identicos a origin/dev. Ajeno a QC-170. Salida limpia: la ficha que abra la excepcion en la guardia borra esta entrada.",
+      "desde": "2026-10-02"
     }
   }
 }
