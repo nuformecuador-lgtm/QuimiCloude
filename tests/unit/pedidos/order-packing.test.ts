@@ -71,7 +71,7 @@ function catalogosGlobales(overrides: {
   readonly findPresentationRefs: ReturnType<typeof vi.fn>;
 } {
   const findRefsIncludingDeleted = vi.fn(async () =>
-    overrides.recipeFound === false ? [] : [{ id: RECETA, name: overrides.recipeName ?? 'Desengrasante', isDeleted: false }],
+    overrides.recipeFound === false ? [] : [{ id: RECETA, name: overrides.recipeName ?? 'Desengrasante', ownName: overrides.recipeName ?? 'Desengrasante', isUnderReview: false, original: null, isDeleted: false }],
   );
   const findExecutionContentById = vi.fn(async () => ({ id: RECETA, name: 'Desengrasante', isDeleted: false, steps: [], lines: [] }));
   const findPresentationRefs = vi.fn(async (ids: readonly string[]) =>
@@ -399,5 +399,38 @@ describe('createFinishPacking (T14, R17-R21)', () => {
 
     await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('recipe_not_found');
     expect(receiveFromOrder).not.toHaveBeenCalled();
+  });
+
+  // QC-172 R36, llevado aqui en el merge con QC-170: la entrada de producto terminado ya no la da
+  // Finalizar sino Terminar el empaque, una por linea del reparto. El pedido guarda el id de la
+  // version, y cada linea entra al producto de ESA version con el nombre compuesto del catalogo.
+  it('QC-172 R36: un pedido con version da de alta cada linea con el id de la version y el nombre «Original · Version»', async () => {
+    const VERSION = 'r-version';
+    const base = catalogosGlobales();
+    const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) =>
+      ids.map((id) => ({
+        id,
+        name: 'Crema base · Sin perfume',
+        ownName: 'Sin perfume',
+        isUnderReview: false,
+        original: { id: 'r-original', name: 'Crema base' },
+        isDeleted: false,
+      })),
+    );
+    const catalogos = { ...base, recipes: { ...base.recipes, findRefsIncludingDeleted }, findRefsIncludingDeleted };
+    const lineas = [lineaDe({ id: 'linea-1', presentationId: 'p-1', packages: 5 }), lineaDe({ id: 'linea-2', presentationId: 'p-2', packages: 3 })];
+    const { finishPackingAliveById, receiveFromOrder } = montar({
+      lines: lineas,
+      catalogos,
+      finishPackingAlive: { kind: 'ok', recipeId: VERSION, quantity: '10.0000', ingredientsCost: '20.0000', unitId: LITRO },
+    });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toMatchObject({ kind: 'ok' });
+
+    expect(findRefsIncludingDeleted).toHaveBeenCalledWith([VERSION], EMPRESA);
+    expect(receiveFromOrder).toHaveBeenCalledTimes(2);
+    for (const call of receiveFromOrder.mock.calls) {
+      expect(call[0]).toMatchObject({ recipeId: VERSION, recipeName: 'Crema base · Sin perfume' });
+    }
   });
 });

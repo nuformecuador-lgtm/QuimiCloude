@@ -1175,7 +1175,7 @@ describe('edicion con version de receta', () => {
   const entrada = (recipeVersionId: string | null, recipeId = RECETA_DE_A) => ({
     recipeId,
     quantity: '10.0000',
-    presentationId: PRESENTACION_DE_A,
+    unitId: UNIT_ID,
     recipeVersionId,
   });
 
@@ -1307,7 +1307,7 @@ describe('edicion con version de receta', () => {
 
     await updateOrder(
       ORDER_ID,
-      { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A },
+      { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID },
       ACTOR_A,
     );
 

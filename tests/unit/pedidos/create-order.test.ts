@@ -924,7 +924,7 @@ describe('alta con version de receta', () => {
   const entrada = (recipeVersionId?: string | null) => ({
     recipeId: RECETA_DE_A,
     quantity: '10.0000',
-    presentationId: PRESENTACION_DE_A,
+    unitId: UNIT_ID,
     ...(recipeVersionId === undefined ? {} : { recipeVersionId }),
   });
 

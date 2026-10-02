@@ -809,7 +809,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
     });
     listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
 
-    render(await OrderListSection({ params: parametros() }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
 
     expect(screen.getByTestId(ACCION)).toBeInTheDocument();
   });
@@ -821,7 +821,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
     });
     listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
 
-    render(await OrderListSection({ params: parametros() }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
     expect(screen.queryByTestId(ACCION)).toBeNull();

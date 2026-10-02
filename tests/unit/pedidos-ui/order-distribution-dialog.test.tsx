@@ -97,6 +97,7 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: 'Esmalte azul',
+    recipeVersion: null,
     quantity: '100.0000',
     priority: 'MEDIA',
     status,
