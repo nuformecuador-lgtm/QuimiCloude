@@ -207,3 +207,107 @@ parciales, una por tanda. Este informe trae el mapa entero.
    `order-packing.ts` y añadir un caso L/ml en unidad e integración.
 4. B4: añadir un test de integración del rechazo entre empresas en la edición acotada del reparto.
 5. Sincronizar con `dev` (m2) y correr `./init.sh` completo antes del PR.
+
+## Vuelta 2 (acotada a d3e6470d..f6f1b05e)
+
+Fecha: 2026-10-02. Alcance: solo los arreglos del review 1, por orden del humano. HEAD = `f6f1b05e`.
+El mapa R->test de la vuelta 1 se da por válido.
+
+### Veredicto: **OK**
+
+Los cuatro bloqueantes están cerrados y no hay hallazgos nuevos bloqueantes. Quedan pendientes, a
+cargo del leader: sincronizar con `dev`, correr `./init.sh` completo, E2E (WebKit incluido) antes
+del PR, y la pregunta del redondeo para el humano (ver abajo).
+
+### B1-B4 / m1-m6
+
+| # | Estado | Evidencia |
+|---|---|---|
+| B1 | **Cerrado** | `git diff -U0 0736e1ff..HEAD -- lib app components db`, líneas `+` con `QC-<n>`, `R<n>`, `design.md`, `T<n>` o «decisión cerrada»: **0** (en cualquier línea añadida, no solo en comentarios). Incluye las migraciones, que `aad15786` también limpió. |
+| B2 | **Cerrado (por lectura)** | Los cuatro spec cambian: `pedidos-cotizacion` +38, `reserva-de-material` +35, `recetas-porcentaje` +19 y `aislamiento-pedidos` (normalizado a LF). Todos borran `orderPresentationLine` antes de los pedidos (p. ej. `aislamiento-pedidos.spec.ts:229,238,321`, `reserva-de-material.spec.ts:320,329,491`). Playwright no lo he corrido (fuera del alcance de esta vuelta). La bitácora dice 8/8 en Chromium, y WebKit sigue sin correrse. |
+| B3 | **Cerrado conforme a la enmienda** | R18 está enmendado (`requirements.md`) y T26 tiene su «Hecho cuando» enmendado en `aa445889`. El total se suma convertido a `orders.unit_id` con `sumInOrderUnit` (`order-distribution.ts`), la misma función que usa `validateDistribution`. El coste por unidad va expresado en la unidad de cada lote (`unitCostByPresentationUnit`, `order-packing.ts`). `incompatible_units` y `order_without_unit` se lanzan dentro de la transacción. Tests: `order-packing.test.ts:272` (L/ml: 16.3934 y 0.0164), `:306` (misma unidad), `:330` (incompatible, ningún lote), `:347` (sin unidad); `finish-with-finished-goods.int.test.ts:887` (Postgres: stock y `unit_cost` de los dos lotes, suma aprox. 1000) y `:925` (incompatible, pedido `EN_EMPAQUE`, ningún producto). La traducción en `asignaciones` está en `finish-packing.test.ts`. |
+| B4 | **Cerrado** | `tests/integration/pedidos/qc170-distribution-company-scope.int.test.ts`, 8 casos. Cubre el caso de uso y el adaptador (`updatePresentationLinesAlive` y `updateAlive`) con el ámbito de la otra empresa: `not_found` / `OrderNotFoundError`, con foto del pedido y sus líneas igual antes y después (`:292-305`, `:344-359`, `:391-400`, `:420-441`). Hay controles positivos (`:310`, `:364`, `:405`) y un caso de presentación ajena (`:329`). Está dado de alta en `tests/integration/aislamiento.json:323`. |
+| m1 | **Cerrado** | `order-sheet.tsx` guarda `{ order, draft }` y se lo pasa al diálogo mientras `order` sea el mismo objeto. Tests en `order-distribution-dialog.test.tsx` (3 casos «reabrir antes de que llegue el refresco»), en verde. |
+| m2 | Abierto, no es de la rama | Se resuelve al sincronizar con `dev`. |
+| m3 | Abierto, no es de la rama | `user-table` no entró en esta corrida. |
+| m4 | Anotado | En la bitácora. Además, `order_without_unit` tiene ahora un uso defensivo en Terminar con su test (`order-packing.test.ts:347`). |
+| m5 | Anotado | Mapa consolidado de la bitácora, filas R31/R32. |
+| m6 | Cerrado | `impl_*.md` > «Mapa R<n> -> test consolidado», como delta sobre el mapa de este informe. |
+
+### Regresiones dentro del diff
+
+Ninguna bloqueante. Lo que he revisado:
+- `resolveLines` (`order-packing.ts`) ahora llama a `presentations.findRefs` para todas las líneas, no
+  solo para las que no tienen contenido copiado. Si falta una ref, lanza un `Error` genérico. Es
+  aceptable: `presentations` no tiene borrado lógico y la FK impide que falte.
+- `validateDistribution` se refactorizó sobre `sumInOrderUnit`. Con unidades iguales, la línea no
+  se convierte y `withoutTrailingZeros` iguala la escala. Los tests de `order-distribution` y los de
+  guardar siguen verdes en `related`.
+- El código que el diff cambia fuera de comentarios es solo B3, m1 y la traducción de errores
+  (`git diff -w`, filtrando líneas de comentario). Las limpiezas de B1 van en commits propios
+  (`668aeb77`, `aad15786`, `21f7eaaf`).
+
+### Hallazgos nuevos
+
+- **menor n1:** quedan 11 líneas de producción, añadidas por la rama, que citan identificadores del
+  spec que la regla no nombra literalmente: `[Q4]` x9 y `[D2]` prima x1, más «Decimoquinta enmienda» en
+  `lib/modules/errores/domain/error-codes.ts`. Están en `order-view.ts` (3), `composition/index.ts` (2),
+  `order-input.ts`, `order-catalog.ts`, `list-orders.ts`, `get-order.ts` y `order-prisma.ts`. No
+  entran en la lista cerrada de `docs/conventions.md > Comentarios` (QC-, R, design.md, «decisión
+  cerrada»), pero tienen el mismo problema: quien lee el código no tiene el spec delante. Se
+  recomienda quitarlas en un `chore` propio. No es bloqueante.
+
+### Efecto de `aad15786` (comentarios en dos `migration.sql`)
+
+`aad15786` cambia 4 líneas de comentario en `20260927120000_order_presentation_lines` y 1 en
+`20260927120100_inventory_movements_production_per_line`. Prisma guarda en `_prisma_migrations` el
+sha256 del archivo, así que cualquier base que las aplicara antes de ese commit tiene un checksum
+distinto. Con checksum distinto, `migrate deploy` (`build` y `db:migrate`) sigue sin quejarse, pero
+`migrate dev` (`db:migrate:create`) lo detecta como «modified after it was applied» y pide reset.
+
+Comprobado solo con lectura, comparando el sha256 de cada archivo con `_prisma_migrations.checksum`:
+- `QuimiCloude_QC170` (la base del worktree, `.env`): las dos migraciones, **IGUAL**, `finished_at` puesto. No hay drift.
+- `QuimiCloude` (la base local principal): **no aplicadas**. No hay drift.
+- Bases de test `qct_*`: la plantilla se nombra por el hash de las migraciones
+  (`tests/helpers/test-database.ts:176-186,243`), así que el cambio genera una plantilla nueva y no hay drift.
+- `dev`, `master` y Supabase: las dos migraciones solo existen en esta rama (`git log`: `609a7e49`,
+  `aad15786`), así que no pueden estar aplicadas desde `dev`.
+- **Sin verificar:** otras bases locales, como las de otros worktrees que hubieran aplicado esta
+  rama. El escaneo de todas las bases del servidor lo denegó el clasificador de permisos y no lo he
+  repetido. Si alguna tiene la versión anterior, solo afecta a `migrate dev` en esa base.
+
+### Pregunta abierta del implementer: redondeo a `decimal(14,4)`
+
+**Clasificación: pregunta para el humano, no bloqueante.**
+- El caso de 0.0000 no es nuevo. Antes de T26, `deriveUnitCost` ya devolvía `null` cuando el
+  coste redondeaba a cero (`unit-cost.ts:86`), y el código antiguo lo convertía en 0.0000.
+  Ahora `divideCost` devuelve 0.0000 directamente: el comportamiento es el mismo.
+- Lo que cambia es la probabilidad. Al expresar el coste por unidad de la presentación (p. ej. ml),
+  el coste por unidad es 1000 veces menor. Pasa a 0 con más facilidad, y el error de redondeo
+  (hasta 0.00005 por unidad) se multiplica por un stock 1000 veces mayor. En el test:
+  16.40 frente a 16.39.
+- Ni R18 enmendado ni D6 fijan precisión ni tolerancia. Es una decisión de producto: subir la
+  escala de `unit_cost`, guardar el coste en la unidad del pedido, o aceptar el error. Si el humano
+  no la toma, se anota como deuda, y bloquearía solo si fija una tolerancia que hoy se incumple.
+
+### Salida real (esta vuelta)
+
+- `pnpm typecheck` -> exit 0.
+- `pnpm lint` -> exit 0, `7 problems (0 errors, 7 warnings)` (avisos previos).
+- `vitest related --run` sobre los `.ts/.tsx` del diff -> `Test Files 4 failed | 363 passed (367)`,
+  `Tests 4 failed | 5252 passed | 16 skipped (5272)`, `Duration 1495.92s`. Los 4 rojos son
+  timeouts bajo carga, en archivos fuera del diff: `product-page` (2), `recipe-lines-tabs`,
+  `recipe-route-contract` y `session-once-per-request-render`, con tests de 20 a 340 s.
+- Repetidos aislados, junto con los dos de integración pedidos y los unitarios de B3/m1
+  (`qc170-distribution-company-scope.int`, `finish-with-finished-goods.int`, `order-packing`,
+  `order-distribution-dialog`, `asignaciones/finish-packing`) -> `Test Files 9 passed (9)`,
+  `Tests 196 passed (196)`.
+- `vitest run tests/guards` -> `Test Files 44 passed (44)`, `Tests 584 passed | 5 skipped (589)`.
+- No he corrido `./init.sh`, Playwright ni merge con `dev` (por orden).
+
+### Lo que falta (leader)
+
+1. Sincronizar con `dev` (m2), correr `./init.sh` completo y los E2E (Chromium y WebKit) antes del PR.
+2. Llevar al humano la pregunta del redondeo y, opcionalmente, la confirmación de la lectura
+   «coste en la unidad de cada lote», que la enmienda de T26 ya fija.
+3. Opcional: limpiar n1 (`[Q4]`, `[D2]` prima, «enmienda») en un `chore` propio.
