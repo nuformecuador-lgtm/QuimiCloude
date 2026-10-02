@@ -105,10 +105,10 @@ esta feature se **renumeraron** para ir detrás (ver «Merge de `dev` del 2026-1
 | T8 disparo desde inventario y cableado | [x] | tanda B |
 | T9 asignaciones: el Operador ve el bloqueado y no lo arranca | [x] | tanda A |
 | T10 proceso diario ignora los bloqueados | [x] | tanda B |
-| T11 UI de Pedidos | [ ] | |
+| T11 UI de Pedidos | [x] | tanda C |
 | T12 UI de Asignación | [x] | tanda A |
 | T13 transversales | [x] | tanda B |
-| T14 E2E | [ ] | lo corre el leader |
+| T14 E2E | escrito, verde en Chromium | tanda C; el `./init.sh` completo lo corre el leader |
 | T15 cierre | [ ] | `./init.sh` completo lo corre el leader |
 
 `tasks.md` de esta feature no usa casillas de verificación: sus tareas son listas de
@@ -358,4 +358,82 @@ viejo de alta y edición, y un rojo de guardia causado por finales de línea (ve
 por `Hook timed out in 60000ms` al importar `lib/composition` bajo carga; aislado pasa 9/9 y en la
 corrida final no apareció.
 
-**Pendiente:** T11 (UI de Pedidos: modal «Guardar bloqueado»), T14 (E2E, lo corre el leader) y T15.
+**Pendiente tras la tanda B:** T11, T14 y T15 (cerrados o encaminados en la tanda C).
+
+## Tanda C (2026-10-02): T11 y T14
+
+**Archivos**
+- T11: `app/(private)/pedidos/components/blocked-order-dialog.tsx` (nuevo; `AlertDialog` con
+  «Volver» y «Guardar bloqueado», `min-h-11 min-w-11`), `components/index.ts` (exporta el diálogo,
+  sus testids y `ORDER_CONFIRM_BLOCKED_FIELD`), `order-form.tsx` (estado `wouldBlock`: ante
+  `order_would_block` abre el modal en vez de la región de error; «Guardar bloqueado» copia el último
+  `FormData`, añade `confirmBlocked=true` y lo reenvía; «Volver»/Escape cierran sin llamar a la
+  action; el botón Guardar se deshabilita durante el reenvío). `order-status-badge.tsx` no se tocó:
+  ya traía `BLOQUEADO: 'Bloqueado'` (variante `destructive`) y el filtro sale de `ORDER_STATUS_FLOW`.
+  Tests: `tests/unit/pedidos-ui/blocked-order-dialog.test.tsx` (nuevo), `order-form.test.tsx`,
+  `order-columns.test.tsx`.
+- Limpieza de la tanda A: los JSDoc de `company-orders-columns.tsx` y de `isExactlyDelivered` en
+  `assignment-view-params.ts` dicen ahora «todos los estados» en vez de «los cuatro estados». Solo
+  comentarios.
+- T14: `e2e/pedido-bloqueado.spec.ts` (nuevo). Reutiliza `loginAndLand`; los datos de partida van
+  por Prisma con prefijo `qc138_e2e_`. Importa `ORDER_STATUS_LABELS` y
+  `assignedOrderBlockedNoticeText()` de `@/app/...`: es el primer E2E que importa de `app/`
+  (Playwright, `tsc` y `eslint` lo aceptan).
+- Guardia: `tests/guards/guard-identificador-de-request.test.ts` da de alta `pedido-bloqueado.spec.ts`
+  en la lista cerrada `E2E_ESPERADOS`, con su comentario, igual que las altas anteriores. Sin esa alta
+  el gate caza el archivo nuevo de `e2e/`.
+
+**Desviaciones y decisiones**
+1. **Título del modal «Material insuficiente».** El spec fija los dos botones pero no el título. Se
+   puede cambiar con la prop `title`. La descripción es el `message` del catálogo para
+   `errors.order_would_block`. Queda abierto para el reviewer o el leader.
+2. **Finales de línea.** En el índice, `components/index.ts` y `order-columns.test.tsx` estaban en
+   CRLF. El commit los deja en LF, como pide `.gitattributes`, así que `git show --stat` los cuenta
+   como reescritos enteros. Con `--ignore-cr-at-eol` el cambio real es de 9 y 13 líneas.
+3. **Alta en la guardia del identificador de petición.** No está en `tasks.md`, pero la exige
+   cualquier archivo nuevo en `e2e/`. El E2E no menciona el identificador ni `reference`, así que el
+   diferimiento de QC-71 R21 sigue intacto.
+
+**Mapa R → test (tanda C)**
+- R7: `blocked-order-dialog.test.tsx` «R7: ofrece exactamente dos acciones, «Guardar bloqueado» y
+  «Volver»»; `order-form.test.tsx` «R7: en el alta, ante order_would_block aparece el aviso y no la
+  region de error», «R7: en la edicion, ante order_would_block aparece el mismo aviso».
+- R7, R9 (objetivo táctil): `blocked-order-dialog.test.tsx` «R7, R9: las dos acciones tienen objetivo
+  tactil de al menos 44x44»; `order-form.test.tsx` «R7, R9: las acciones del aviso tienen objetivo
+  tactil de al menos 44x44».
+- R8 (cliente): `order-form.test.tsx` «R8: en el alta, «Guardar bloqueado» reenvia el mismo FormData
+  con confirmBlocked=true», «R8: en la edicion, «Guardar bloqueado» reenvia al mismo pedido y,
+  guardado, no vuelve a avisar»; `blocked-order-dialog.test.tsx` «R8: «Guardar bloqueado» avisa a
+  quien lo monta y no cierra por su cuenta».
+- R9: `order-form.test.tsx` «R9: «Volver» cierra el aviso sin llamar a la action y los campos
+  conservan su valor»; `blocked-order-dialog.test.tsx` «R9: «Volver» pide cerrar sin confirmar».
+- R34 (Pedidos): `order-columns.test.tsx` «R34: el filtro de estado ofrece «Bloqueado» y la celda
+  pinta su etiqueta».
+- R40, y R7, R13, R14 y R31 de punta a punta: `e2e/pedido-bloqueado.spec.ts` «R40, R7, R13, R14, R31 -
+  un pedido sin material se guarda bloqueado, el Operador no puede entrar y un alta de lote lo deja
+  pendiente con material apartado».
+
+**E2E (salida real).** `pnpm exec playwright test e2e/pedido-bloqueado.spec.ts --project=chromium`
+contra `QuimiCloude_QC138`, en el puerto propio 3117 con `reuseExistingServer: false`: `1 passed`
+(unos 28 s), dos corridas seguidas en verde. WebKit y la suite E2E entera no se corrieron: son del
+`./init.sh` completo del leader.
+
+**Gate `./init.sh --rapido`** (salida real)
+- Primera corrida, con T11 aún sin commit: typecheck ok, lint ok (`0 errors, 8 warnings`, ajenos),
+  `5 failed | 533 passed (538)` archivos y `7 failed | 7784 passed | 30 skipped (7821)` tests. Hay
+  6 rojos de baseline y 1 propio: la guardia del identificador de petición, por el E2E nuevo. Se
+  corrigió con el alta en la guardia.
+- Segunda corrida, sobre el commit de la tanda C, con T11 dentro de `vitest related`: typecheck ok,
+  lint ok (`0 errors, 8 warnings`), `5 failed | 533 passed (538)` archivos y
+  `7 failed | 7784 passed | 30 skipped (7821)` tests.
+  - Seis rojos son de los 4 archivos de `tests/baseline-rojos.json`: `unidades-viewport` (2),
+    `usuarios-viewport` (2), `product-page` R18 y `recipe-page` R21.
+  - El séptimo es `tests/unit/configuracion-ui/user-table.test.tsx` «la accion de editar de una fila
+    abre el panel SOBRE ESE usuario (R26)», que no está en el baseline. `findByTestId` agotó el
+    tiempo bajo carga. Este archivo no toca nada de la feature, salió verde en la primera corrida y
+    aislado pasa 27/27. Es intermitente, no es un rojo propio; lo decide el leader.
+  - Aislados, los 4 archivos de esta tanda (`order-form`, `blocked-order-dialog`, `order-columns` y
+    la guardia) pasan 107/107.
+
+**Pendiente:** T15 (`./init.sh` completo, que corre el leader). Hay que borrar `QuimiCloude_QC138` al
+cerrar la feature.

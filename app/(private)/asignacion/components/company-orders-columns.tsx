@@ -11,7 +11,7 @@ import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
 
 /**
  * Las columnas de «Todos»: número, receta, cantidad,
- * presentación, prioridad, estado (con filtro `select` de los cuatro estados) y responsables.
+ * presentación, prioridad, estado (con filtro `select` de todos los estados) y responsables.
  * **Sin columna «Entrar» ni acciones**, tampoco para los pedidos asignados al propio actor.
  *
  * La columna de **fecha de terminado** solo aparece cuando el filtro vigente es EXACTAMENTE

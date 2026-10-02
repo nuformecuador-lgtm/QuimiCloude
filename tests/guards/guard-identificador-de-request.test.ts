@@ -167,6 +167,15 @@ export const E2E_ESPERADOS = [
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',
+  // Alta el 2026-10-02 (QC-138) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. Lo que ejercita: un alta de pedido sin material suficiente
+  // abre el modal, «Guardar bloqueado» lo deja Bloqueado en la lista; el Operador asignado lo ve
+  // sin poder entrar; y un alta de lote en Inventario lo deja PENDIENTE con su material apartado.
+  // NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'pedido-bloqueado.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja

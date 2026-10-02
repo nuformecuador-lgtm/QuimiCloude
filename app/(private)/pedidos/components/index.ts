@@ -7,6 +7,14 @@
 //
 // La pagina y los componentes de la ruta importan SIEMPRE desde aqui, nunca por ruta profunda.
 export {
+  BLOCKED_ORDER_CONFIRM_TESTID,
+  BLOCKED_ORDER_DIALOG_TESTID,
+  BLOCKED_ORDER_DISMISS_TESTID,
+  BLOCKED_ORDER_MESSAGE_TESTID,
+  BlockedOrderDialog,
+  type BlockedOrderDialogProps,
+} from './blocked-order-dialog';
+export {
   CANCEL_ORDER_CONFIRM_TESTID,
   CANCEL_ORDER_DIALOG_TESTID,
   CANCEL_ORDER_DISMISS_TESTID,
@@ -59,6 +67,7 @@ export {
 } from './use-order-cost-quote';
 export {
   ORDER_BUSINESS_FIELDS,
+  ORDER_CONFIRM_BLOCKED_FIELD,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_SUBMIT_TESTID,

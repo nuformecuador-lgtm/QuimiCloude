@@ -26,7 +26,12 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  BLOCKED_ORDER_CONFIRM_TESTID,
+  BLOCKED_ORDER_DIALOG_TESTID,
+  BLOCKED_ORDER_DISMISS_TESTID,
+  BLOCKED_ORDER_MESSAGE_TESTID,
   ORDER_BUSINESS_FIELDS,
+  ORDER_CONFIRM_BLOCKED_FIELD,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_TITLE_TESTID,
   ORDER_INGREDIENTS_EMPTY_TESTID,
@@ -930,5 +935,121 @@ describe('formulario de pedido — el identificador del error inesperado (QC-71 
       'duplicate_number',
     );
     esperarSinIdentificador();
+  });
+});
+
+describe('pedido que no alcanza: el aviso de guardarlo bloqueado', () => {
+  const MENSAJE_BLOQUEO = 'No hay material suficiente para este pedido.';
+  const NO_ALCANZA = { status: 'error', code: 'order_would_block', message: MENSAJE_BLOQUEO } as const;
+
+  /** Lo que viajo en cada envio, sin el campo de confirmacion: para comparar los demas campos. */
+  function camposDeNegocio(formData: FormData): Record<string, string> {
+    const campos: Record<string, string> = {};
+    for (const [nombre, valor] of formData) {
+      if (nombre !== ORDER_CONFIRM_BLOCKED_FIELD) campos[nombre] = String(valor);
+    }
+    return campos;
+  }
+
+  it('R7: en el alta, ante order_would_block aparece el aviso y no la region de error', async () => {
+    const user = setupUser();
+    createOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario();
+
+    await rellenarAlta(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    const dialogo = await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID);
+    expect(within(dialogo).getAllByRole('button')).toHaveLength(2);
+    expect(screen.getByTestId(BLOCKED_ORDER_MESSAGE_TESTID)).toHaveTextContent(MENSAJE_BLOQUEO);
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('R7: en la edicion, ante order_would_block aparece el mismo aviso', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    expect(await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+  });
+
+  it('R7, R9: las acciones del aviso tienen objetivo tactil de al menos 44x44', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID);
+
+    for (const testId of [BLOCKED_ORDER_CONFIRM_TESTID, BLOCKED_ORDER_DISMISS_TESTID]) {
+      const boton = screen.getByTestId(testId);
+      expect(boton.className, testId).toContain('min-h-11');
+      expect(boton.className, testId).toContain('min-w-11');
+    }
+  });
+
+  it('R8: en el alta, «Guardar bloqueado» reenvia el mismo FormData con confirmBlocked=true', async () => {
+    const user = setupUser();
+    createOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario();
+
+    await rellenarAlta(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_CONFIRM_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(2));
+    const primero = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    const reenvio = createOrderActionMock.mock.calls[1]?.[1] as FormData;
+    expect(primero.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBeNull();
+    expect(reenvio.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBe('true');
+    expect(camposDeNegocio(reenvio)).toEqual(camposDeNegocio(primero));
+    expect(updateOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R8: en la edicion, «Guardar bloqueado» reenvia al mismo pedido y, guardado, no vuelve a avisar', async () => {
+    // El servidor decide si queda bloqueado o, si entre tanto alcanza, pendiente: el formulario
+    // solo ve el exito y cierra.
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    const elPedido = pedido();
+    renderFormulario(elPedido);
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_CONFIRM_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(2));
+    expect(updateOrderActionMock.mock.calls[1]?.[0]).toBe(elPedido.id);
+    const primero = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    const reenvio = updateOrderActionMock.mock.calls[1]?.[2] as FormData;
+    expect(reenvio.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBe('true');
+    expect(camposDeNegocio(reenvio)).toEqual(camposDeNegocio(primero));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull();
+  });
+
+  it('R9: «Volver» cierra el aviso sin llamar a la action y los campos conservan su valor', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    const elPedido = pedido();
+    renderFormulario(elPedido);
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '7.7777');
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_DISMISS_TESTID));
+
+    await waitFor(() => expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull());
+    expect(updateOrderActionMock).toHaveBeenCalledTimes(1);
+    expect(createOrderActionMock).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    // Al pinchar Guardar el campo perdio el foco antes del envio: lo que conserva es lo colocado.
+    expect(cantidad().value).toBe('7.78');
+    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
   });
 });
