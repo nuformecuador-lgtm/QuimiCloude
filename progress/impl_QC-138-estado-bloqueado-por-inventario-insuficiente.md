@@ -100,14 +100,14 @@ esta feature se **renumeraron** para ir detrás (ver «Merge de `dev` del 2026-1
 | T3 `ReservationOutcome` distingue `insufficient` | [x] | tanda A |
 | T4 errores nuevos del catálogo | [x] | tanda A |
 | T5 puertos de escritura y lectura de `pedidos` | [x] | tanda A |
-| T6 alta y edición bloquean con confirmación | [ ] | |
-| T7 caso de uso `reviewBlockedOrders` | [ ] | |
-| T8 disparo desde inventario y cableado | [ ] | |
+| T6 alta y edición bloquean con confirmación | [x] | tanda B |
+| T7 caso de uso `reviewBlockedOrders` | [x] | tanda B |
+| T8 disparo desde inventario y cableado | [x] | tanda B |
 | T9 asignaciones: el Operador ve el bloqueado y no lo arranca | [x] | tanda A |
-| T10 proceso diario ignora los bloqueados | [ ] | |
+| T10 proceso diario ignora los bloqueados | [x] | tanda B |
 | T11 UI de Pedidos | [ ] | |
 | T12 UI de Asignación | [x] | tanda A |
-| T13 transversales | [ ] | |
+| T13 transversales | [x] | tanda B |
 | T14 E2E | [ ] | lo corre el leader |
 | T15 cierre | [ ] | `./init.sh` completo lo corre el leader |
 
@@ -244,3 +244,118 @@ de los 4 archivos de `tests/baseline-rojos.json`: `unidades-viewport` (2), `usua
 
 **Pendiente de limpieza (no bloquea):** los JSDoc de `company-orders-columns.tsx` y de
 `isExactlyDelivered` en `assignment-view-params.ts` siguen hablando de «los cuatro estados».
+
+## Tanda B (2026-10-02): T6, T7, T8, T10 y T13
+
+Retomada desde el WIP `12a6d911` (resguardado tras cortes 502 de la API). Auditoría contra
+`tasks.md > Hecho`: el código y las baterías de T6, T7, T8, T10 y T13 estaban completos, con
+typecheck en verde y los 11 archivos unitarios (415 tests) y los 3 de integración nuevos (51 tests)
+en verde. Faltaba cerrar 7 casos de integración **anteriores** a la ficha que asumían el contrato
+viejo de alta y edición, y un rojo de guardia causado por finales de línea (ver Desviaciones).
+
+**Archivos**
+- T6: `pedidos/domain/order-input.ts` (`confirmBlocked`), `create-order.ts`, `update-order.ts`,
+  `adapters/driving/order-actions.ts`; tests `create-order`, `update-order`, `order-input`,
+  `order-actions`, `authorization`, `company-isolation-service` (unit) y `order-crud.int.test.ts`.
+- T7: `pedidos/domain/review-blocked-orders.ts` (nuevo), `pedidos/index.ts`;
+  `tests/unit/pedidos/review-blocked-orders.test.ts` y
+  `tests/integration/pedidos/review-blocked-orders.int.test.ts` (nuevos).
+- T8: `inventario/domain/stock-increase-listener.ts` (nuevo), `inventario/index.ts`,
+  `create-product.ts`, `adjust-batch-stock.ts`, `lib/composition/index.ts` (listener que nunca
+  lanza y registra con `console.error('blocked_orders_review_failed', ...)`, como pide
+  `design.md > 7`); tests `create-product`, `adjust-batch-stock` (unit) y el bloque «la fachada de
+  inventario dispara la revision» de `review-blocked-orders.int.test.ts`. La guardia de
+  arquitectura sigue verde sin editarse.
+- T10: `tests/integration/pedidos/order-expiry.int.test.ts`. Sin cambio de código.
+- T13: `tests/unit/pedidos/qc138-transversales.test.ts` (nuevo).
+- Censo: `tests/integration/aislamiento.json` gana `pedidos/review-blocked-orders.int.test.ts`.
+- Adaptación al contrato de T6 (backend_dev): `order-cost-quote.int.test.ts`,
+  `order-ingredients-cost.int.test.ts`, `order-reservation.int.test.ts`,
+  `order-reservation-concurrency.int.test.ts`.
+
+**Desviaciones**
+1. **7 casos de integración previos se adaptan a R6, R8 y R11.** Antes, un alta o edición sin
+   material quedaba `PENDIENTE` sin apartar; ahora rechaza con `order_would_block` salvo
+   confirmación. Cada caso conserva lo que vigilaba:
+   - `order-cost-quote` «sin existencia suficiente, la cotizacion y el alta dan las dos null (R62)»:
+     alta con `confirmBlocked`, importe nulo igual que la cotización, y además `BLOQUEADO`.
+   - `order-ingredients-cost` «la edicion lo reescribe, incluso a nulo (R11)» y «disponible
+     insuficiente aunque la existencia TOTAL alcance... (R61)»: con `confirmBlocked`; importe NULL
+     y además `BLOQUEADO`.
+   - `order-reservation-concurrency` «R16 — dos altas simultaneas...»: `Promise.allSettled`; una
+     apartada y la otra rechazada con `order_would_block` sin escribir nada (QC-138 R6). «una merma
+     simultanea a un apartado...»: si gana la merma, el alta rechaza con `order_would_block` sin
+     filas; el lote queda en cero en ambos órdenes.
+   - `order-reservation` «R13 — editar que ya no cabe...» y «una edicion nunca escribe
+     `consumption`...»: edición con `confirmBlocked`; mismos asientos, estado esperado `BLOQUEADO`
+     (QC-138 R11).
+2. **Finales de línea.** La copia de trabajo del WIP tenía CRLF en los fuentes tocados (los blobs
+   ya eran LF). La guardia de `module-contract.test.ts` despoja comentarios con `//.*$` y, con `\r`,
+   leía como código el comentario de `lib/composition/index.ts` que menciona `prisma.order`. Se
+   normalizó la copia a LF; ningún blob cambia por esto.
+
+**Mapa R → test (tanda B)**
+- R1, R6: `create-order.test.ts` «R1, R6: no alcanza y sin confirmacion -> order_would_block...»;
+  `order-crud.int.test.ts` «R1, R6: alta que no alcanza sin confirmacion -> order_would_block y
+  ninguna fila, ni pedido ni movimiento»; `update-order.test.ts` «R6: PENDIENTE que deja de alcanzar
+  sin confirmacion...»; `order-actions.test.ts` «R6: order_would_block vuelve con su codigo estable...».
+- R2: `create-order.test.ts` «R2: receta sin lineas (not_reserved) -> PENDIENTE...»;
+  `order-crud.int.test.ts` «R2: receta sin lineas -> PENDIENTE sin pedir confirmacion»;
+  `review-blocked-orders.int.test.ts` «R2: un BLOQUEADO cuya receta se quedo sin lineas se
+  desbloquea sin apartar».
+- R3: `create-order.test.ts` «R3: importe nulo por una unidad sin base comun, con la reserva
+  cubierta -> PENDIENTE».
+- R5, R8: `order-crud.int.test.ts` «R5, R8: alta confirmada que no alcanza -> BLOQUEADO, sin
+  apartado, reserved_at nulo y sin importe»; `create-order.test.ts` «R5: con confirmacion, un
+  importe calculado antes de bloquear se borra».
+- R8 (servidor), R10: `order-crud.int.test.ts` «R8, R10: alta confirmada que si alcanza ->
+  PENDIENTE...»; `update-order.test.ts` «R8: con confirmacion pero alcanzando, un PENDIENTE sigue
+  PENDIENTE»; `order-actions.test.ts` «R8: confirmBlocked=true llega al alta y a la edicion...».
+- R10, R26: `order-crud.int.test.ts` «R10, R26: editar un BLOQUEADO hasta que alcanza lo desbloquea
+  y aparta»; `update-order.test.ts` «R26: BLOQUEADO que sigue sin alcanzar con confirmacion se guarda
+  sin mover el estado».
+- R11: `order-crud.int.test.ts` «R11: un PENDIENTE que pasa a BLOQUEADO libera todo lo apartado con
+  quien edita como autor».
+- R12: `order-crud.int.test.ts` «R12: un EN_CURSO que deja de alcanzar -> insufficient_material sin
+  escribir nada».
+- R13: `review-blocked-orders.int.test.ts` «R13, R37, R38: un lote adicional en A, con solo
+  inventario.modificar, desbloquea A y no toca B», «R13: el primer lote de un producto nuevo tambien
+  dispara la revision», «R13: un ajuste positivo desbloquea»; `create-product.test.ts` y
+  `adjust-batch-stock.test.ts` «R13: ... avisa una vez, despues de ...».
+- R14, R15, R22: `review-blocked-orders.int.test.ts` «R14, R15, R22: el que alcanza aparta sin autor,
+  pasa a PENDIENTE, reserved_at al instante de la revision y recalcula el importe»; «R15: el importe
+  se sustituye tambien cuando sale sin calcular».
+- R16: `review-blocked-orders.int.test.ts` «R16: con material para uno solo, se desbloquea el mas
+  antiguo aunque se haya creado despues en la tabla».
+- R17: `review-blocked-orders.int.test.ts` «R17: el que sigue sin alcanzar queda intacto, ni estado
+  ni importe ni updated_at».
+- R18, R38: `review-blocked-orders.int.test.ts` «R18, R38: no toca un PENDIENTE de la empresa ni un
+  BLOQUEADO de otra empresa»; `company-isolation-service.test.ts` «R38: editar con confirmacion un
+  pedido de OTRA empresa -> order_not_found y no se bloquea».
+- R19: `review-blocked-orders.int.test.ts` «R19: un ajuste negativo que deja sin cubrir a un
+  PENDIENTE no lo bloquea».
+- R20: `review-blocked-orders.int.test.ts` «R20: un ajuste negativo no dispara la revision aunque el
+  bloqueado ya alcance»; `adjust-batch-stock.test.ts` «R19, R20: un ajuste negativo no avisa».
+- R23: `review-blocked-orders.int.test.ts` «R23: si la revision falla, el alta del lote no falla, el
+  lote queda escrito y el fallo se registra»; `review-blocked-orders.test.ts` «R23: un fallo en un
+  pedido no impide los demas y aparece en failed con su codigo».
+- R24: `review-blocked-orders.int.test.ts` «R24: dos revisiones concurrentes, cada una en su
+  transaccion, desbloquean una sola vez», «R24: una cancelacion que tiene la fila bloqueada cuando
+  llega la revision gana, y el pedido no se desbloquea».
+- R29: `order-expiry.int.test.ts` «R29: un BLOQUEADO creado hace mas de 15 dias sigue BLOQUEADO, sin
+  motivo ni movimientos».
+- R37: `authorization.test.ts` «R37: ... con confirmBlocked y solo inventario.modificar rechaza sin
+  tocar ningun puerto»; `qc138-transversales.test.ts` «R37: todo codigo del catalogo actual ya estaba
+  en el catalogo del padre de la rama».
+- R39: `qc138-transversales.test.ts` bloques «R39 — package.json no gana dependencias», «R39 — nada
+  borra fisicamente pedidos ni reservas» y «R39 — los identificadores nuevos de base van en ingles».
+
+**Gate `./init.sh --rapido`** (salida real, corrida final limpia): typecheck ok, lint ok
+(`0 errors, 8 warnings`, ajenos), tests `4 failed | 533 passed (537)` archivos,
+`6 failed | 7774 passed | 30 skipped (7810)`. Los 6 rojos son de los 4 archivos de
+`tests/baseline-rojos.json`: `unidades-viewport` (2), `usuarios-viewport` (2), `product-page` y
+`recipe-page`. Ningún rojo propio. En una corrida intermedia `session-once-per-request-render` cayó
+por `Hook timed out in 60000ms` al importar `lib/composition` bajo carga; aislado pasa 9/9 y en la
+corrida final no apareció.
+
+**Pendiente:** T11 (UI de Pedidos: modal «Guardar bloqueado»), T14 (E2E, lo corre el leader) y T15.
