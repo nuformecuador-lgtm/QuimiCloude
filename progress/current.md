@@ -19,6 +19,8 @@
 | QC-138 | estado-bloqueado-por-inventario-insuficiente | Pedidos | fullstack | spec_ready | feature/QC-138-estado-bloqueado-por-inventario-insuficiente | leader. **Spec APROBADO; QC-168 mergeada el 2026-09-26 (#129): lista para F2.0** (rebasar migracion y orden del enum). Ver Evaluaciones. |
 
 ## Evaluaciones
+**2026-10-02:** QC-174 `crear-versiones-en-la-receta` **ACOTADA** con `/afinar-feature`: 9 decisiones (4 del humano, 5 heredadas de QC-172), ninguna abierta, en `specs/QC-174-crear-versiones-en-la-receta/requirements.md`; board actualizado (description). Sigue `pending`.
+
 **2026-10-01:** QC-161 cerrada (PR #135, merge `b4afc965`; tarjeta a Finalizado; resumen en history). Desbloquea QC-162 y QC-165.
 
 **2026-10-02:** QC-172 cerrada (PR #136, merge `8303e0b8`; tarjeta a Finalizado; resumen en history). Desbloquea QC-174.
