@@ -414,7 +414,7 @@ export async function quoteOrderPresentationAvailabilityAction(
 // ---------------------------------------------------------------------------------------------
 
 /**
- * `updateOrderPresentationLines` (T9) NO comprueba el permiso: su unico llamador es esta
+ * `updateOrderPresentationLines` NO comprueba el permiso: su unico llamador es esta
  * action, y por eso -a diferencia de las diez de arriba, que no repiten `requirePermission`
  * porque su caso de uso ya es la primera linea que lo hace- esta SI lo llama, aqui, antes de
  * `zod` y antes de tocar la fachada.

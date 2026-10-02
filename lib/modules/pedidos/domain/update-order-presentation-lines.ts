@@ -6,8 +6,9 @@
 // igual»). Por eso este caso de uso NO pasa por `assertTransition`: `REPARTO_EDITABLE_STATUSES`
 // es su propia ventana de estados, deliberadamente distinta de la matriz de transiciones.
 //
-// La AUTORIZACION (`pedidos.modificar`) la comprueba QUIEN LLAMA (T25), no este caso de uso —
-// mismo criterio que `finishAssignedOrder` con `startAssignedOrder`—: solo hay un llamador.
+// La AUTORIZACION (`pedidos.modificar`) la comprueba QUIEN LLAMA
+// (`updateOrderDistributionAction`), no este caso de uso —mismo criterio que
+// `finishAssignedOrder` con `startAssignedOrder`—: solo hay un llamador.
 //
 // No abre la unidad de trabajo compartida con `inventario`: no toca `quantity`, la
 // receta ni la reserva. La transaccion la abre `OrderDistributionTransaction`, mas corta que

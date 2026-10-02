@@ -1,9 +1,9 @@
 // lib/modules/pedidos/domain/order-presentation-availability.ts
 //
 // «Cuanto queda disponible»: lectura pura para el formulario de `/pedidos` (alta, edicion y la
-// edicion acotada de T25). Resuelve unidad y presentaciones contra los catalogos -mismo patron
-// de dos llamadas de `resolve-distribution.ts`-, y REUTILIZA `validateDistribution` (T20) para
-// el calculo. A diferencia de `resolveDistribution` (que lanza y detiene el guardado), esta
+// edicion acotada «Reparto y unidad»). Resuelve unidad y presentaciones contra los catalogos
+// -mismo patron de dos llamadas de `resolve-distribution.ts`-, y REUTILIZA `validateDistribution`
+// para el calculo. A diferencia de `resolveDistribution` (que lanza y detiene el guardado), esta
 // funcion NUNCA lanza por el reparto: es de solo lectura, el rechazo lo hacen `createOrder`,
 // `updateOrder` y `updateOrderPresentationLines` al guardar.
 

@@ -1233,7 +1233,7 @@ export const observabilidad = {
  *  consume el material en la misma transaccion. */
 /** `OrderPackingRepository` cableado con la escritura cruda de Comenzar (`order-prisma.ts`): un
  *  `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida con
- *  `inventario`. Terminar (T14) YA NO vive aqui: abre `orderUnitOfWork` directamente. */
+ *  `inventario`. Terminar no vive aqui: abre `orderUnitOfWork` directamente. */
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
 };

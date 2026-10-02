@@ -64,7 +64,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
         // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos
         // -`finishedAt` no lo escribe este destino de todos modos, solo Terminar-. Ya
         // no hay presentacion, receta viva ni coste de lote que resolver aqui -eso es
-        // de Terminar (T14)-, solo el consumo de siempre.
+        // de Terminar-, solo el consumo de siempre.
         if (to === 'POR_EMPACAR') {
           // Con el cliente de ESTA transaccion (`scope.recipes`), no con el lector global: pedir
           // una segunda conexion mientras esta retiene la suya es espera o error bajo carga.
