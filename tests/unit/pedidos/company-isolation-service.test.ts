@@ -54,7 +54,7 @@ import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventar
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
-import { fakeFinishedGoodsIntake, fakeOrderUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeFinishedGoodsIntake, fakeOrderUnitOfWork, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
@@ -369,6 +369,65 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
     for (const [metodo, args] of llamadasAlPuerto(a)) {
       expect(args[args.length - 1], metodo).toStrictEqual({ companyId: EMPRESA_A })
     }
+  })
+})
+
+describe('QC-138 R38 — bloquear al crear o editar solo toca la empresa de quien escribe', () => {
+  function conReservaInsuficiente(a: Almacen) {
+    const setStatus = vi.fn(async (...args: unknown[]) => {
+      void args
+      return 'ok' as const
+    })
+    const setIngredientsCost = vi.fn(async (...args: unknown[]) => {
+      void args
+      return 'ok' as const
+    })
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: {
+        lockAliveById: a.espias.lockAliveById,
+        create: a.espias.create,
+        updateAlive: a.espias.updateAlive,
+        setReservedAt: a.espias.setReservedAt,
+        setStatus,
+        setIngredientsCost,
+      } as never,
+      reservations: { syncForOrder: vi.fn(async () => ({ kind: 'insufficient' as const, productIds: ['p'] })) },
+    })
+    const now = () => new Date('2026-09-15T10:00:00.000Z')
+    const deps = {
+      orders: a.orders,
+      recipes: a.recipes,
+      products: a.products,
+      units: a.units,
+      presentations: a.presentations,
+      unitOfWork,
+      now,
+    }
+    return { createOrder: createCreateOrder(deps), updateOrder: createUpdateOrder(deps), setStatus }
+  }
+
+  it('R38: crear y editar bloqueado pasan el ambito del actor a setStatus', async () => {
+    const a = almacen()
+    const c = conReservaInsuficiente(a)
+
+    await c.createOrder({ ...ENTRADA_ALTA, confirmBlocked: true, companyId: EMPRESA_B }, ACTOR_A)
+    await c.updateOrder(PEDIDO_DE_A, { ...ENTRADA_ALTA, confirmBlocked: true, companyId: EMPRESA_B }, ACTOR_A)
+
+    expect(c.setStatus).toHaveBeenCalledTimes(2)
+    for (const args of c.setStatus.mock.calls) {
+      expect(args[args.length - 1]).toStrictEqual({ companyId: EMPRESA_A })
+    }
+  })
+
+  it('R38: editar con confirmacion un pedido de OTRA empresa -> order_not_found y no se bloquea', async () => {
+    const a = almacen()
+    const c = conReservaInsuficiente(a)
+
+    const error = await capturar(c.updateOrder(PEDIDO_DE_B, { ...ENTRADA_ALTA, confirmBlocked: true }, ACTOR_A))
+
+    expect(error).toBeInstanceOf(OrderNotFoundError)
+    expect(c.setStatus).not.toHaveBeenCalled()
+    expect(a.foto().find((f) => f.id === PEDIDO_DE_B)?.status).toBe('PENDIENTE')
   })
 })
 

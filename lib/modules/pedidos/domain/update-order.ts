@@ -1,10 +1,13 @@
 import { requirePermission, type Actor } from './actor';
 import {
+  InsufficientMaterialError,
   OrderNotFoundError,
+  OrderWouldBlockError,
   PresentationNotFoundError,
   RecipeNotFoundError,
   ValidationError,
 } from './errors';
+import type { OrderStatus } from './order-classification';
 import { updateOrderSchema } from './order-input';
 import { buildRequirement } from './order-requirement';
 import type { OrderScope } from './order-scope';
@@ -17,6 +20,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 import type { OrderRepository } from '../ports/order-repository';
+import type { OrderWriteRepository } from '../ports/order-write-repository';
 
 /** Recupera `products` y `units` porque cada escritura recalcula el coste de los ingredientes:
  *  hace falta leer los lotes disponibles y convertir entre la unidad de la receta y la del
@@ -73,7 +77,7 @@ export function createUpdateOrder(
 
     const parsed = updateOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const data = parsed.data;
+    const { confirmBlocked, ...data } = parsed.data;
 
     // R33: no existe y ya esta borrado son el mismo caso. La comprobacion de estado se hace
     // sobre la fila que se acaba de leer y NO en el `where` del `UPDATE` (`design.md > 7.4`):
@@ -159,6 +163,20 @@ export function createUpdateOrder(
         now: instant,
       });
 
+      if (outcome.kind === 'insufficient') {
+        // Un pedido en curso tiene que seguir teniendo con que producirse.
+        if (locked.status === 'EN_CURSO') throw new InsufficientMaterialError();
+        if (!confirmBlocked) throw new OrderWouldBlockError();
+        if (locked.status !== 'BLOQUEADO') {
+          await moveStatus(transaction.orders, id, locked.status, 'BLOQUEADO', actor.id, instant, scope);
+        }
+        if (ingredientsCost !== null) {
+          await transaction.orders.setIngredientsCost(id, null, actor.id, instant, scope);
+        }
+      } else if (locked.status === 'BLOQUEADO') {
+        await moveStatus(transaction.orders, id, 'BLOQUEADO', 'PENDIENTE', actor.id, instant, scope);
+      }
+
       await transaction.orders.setReservedAt(
         id,
         outcome.kind === 'reserved' ? instant : null,
@@ -166,4 +184,19 @@ export function createUpdateOrder(
       );
     });
   };
+}
+
+/** La fila ya esta bloqueada por `lockAliveById`, asi que cualquier resultado distinto de `ok`
+ *  es que el pedido dejo de existir para esta empresa. */
+async function moveStatus(
+  orders: OrderWriteRepository,
+  id: string,
+  from: OrderStatus,
+  to: OrderStatus,
+  actorId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<void> {
+  const result = await orders.setStatus(id, from, to, actorId, now, scope);
+  if (result !== 'ok') throw new OrderNotFoundError();
 }

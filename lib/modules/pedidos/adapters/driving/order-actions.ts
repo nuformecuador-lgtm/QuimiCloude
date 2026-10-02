@@ -167,6 +167,8 @@ function buildCreateCandidate(formData: FormData): unknown {
     quantity: readFormString(formData, 'quantity'),
     priority: readOptionalFormString(formData, 'priority'),
     presentationId: readFormString(formData, 'presentationId'),
+    // Solo la cadena exacta confirma: cualquier otro valor, o la ausencia, es no confirmar.
+    confirmBlocked: formData.get('confirmBlocked') === 'true',
   };
 }
 

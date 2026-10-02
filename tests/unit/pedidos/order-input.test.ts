@@ -123,7 +123,13 @@ describe('pedidos — createOrderSchema (alta)', () => {
       createdBy: '33333333-3333-4333-8333-333333333333',
       updatedBy: '33333333-3333-4333-8333-333333333333',
     })
-    expect(Object.keys(parsed).sort()).toEqual(['presentationId', 'priority', 'quantity', 'recipeId'])
+    expect(Object.keys(parsed).sort()).toEqual([
+      'confirmBlocked',
+      'presentationId',
+      'priority',
+      'quantity',
+      'recipeId',
+    ])
     expect(parsed).not.toHaveProperty('status')
     expect(parsed).not.toHaveProperty('cancellationReason')
     expect(parsed).not.toHaveProperty('orderYear')
@@ -150,6 +156,7 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
   it('R6: `updateOrderSchema` es EXACTAMENTE `createOrderSchema`, sin campo de estado', () => {
     expect(updateOrderSchema).toBe(createOrderSchema)
     expect(Object.keys(updateOrderSchema.parse(edicionValida)).sort()).toEqual([
+      'confirmBlocked',
       'presentationId',
       'priority',
       'quantity',
@@ -197,6 +204,33 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
     expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '0' }).success).toBe(false)
     expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '-1' }).success).toBe(false)
     expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '0.0001' }).success).toBe(true)
+  })
+})
+
+describe('QC-138 — confirmBlocked en el alta y la edicion', () => {
+  it('R6: sin confirmBlocked, la entrada vale y no confirma', () => {
+    expect(createOrderSchema.parse(altaValida()).confirmBlocked).toBe(false)
+    expect(updateOrderSchema.parse(altaValida()).confirmBlocked).toBe(false)
+  })
+
+  it('R8: confirmBlocked=true se conserva; un valor que no es booleano se rechaza', () => {
+    expect(createOrderSchema.parse({ ...altaValida(), confirmBlocked: true }).confirmBlocked).toBe(true)
+    for (const confirmBlocked of ['true', 1, null, 'si']) {
+      expect(
+        createOrderSchema.safeParse({ ...altaValida(), confirmBlocked }).success,
+        `confirmBlocked=${String(confirmBlocked)}`,
+      ).toBe(false)
+    }
+  })
+
+  it('R6: confirmar no permite elegir el estado: un status BLOQUEADO se descarta', () => {
+    const parsed = createOrderSchema.parse({ ...altaValida(), confirmBlocked: true, status: 'BLOQUEADO' })
+    expect(parsed).not.toHaveProperty('status')
+  })
+
+  it('la cotizacion no hereda confirmBlocked', () => {
+    const parsed = quoteOrderCostSchema.parse({ ...altaValida(), confirmBlocked: true })
+    expect(parsed).not.toHaveProperty('confirmBlocked')
   })
 })
 

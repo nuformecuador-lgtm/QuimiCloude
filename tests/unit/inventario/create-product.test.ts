@@ -888,3 +888,64 @@ describe('R4 — ningun importe pasa por coma flotante', () => {
     }
   });
 });
+
+describe('QC-138 — el alta de un lote avisa de la entrada de material (R13, R20, R23)', () => {
+  function oyente() {
+    const orden: string[] = [];
+    const onStockIncreased = vi.fn(async (input: { companyId: string; now: Date }) => {
+      void input;
+      orden.push('onStockIncreased');
+    });
+    return { stockIncreases: { onStockIncreased }, onStockIncreased, orden };
+  }
+
+  it('R13: el primer lote de un producto nuevo avisa una vez, despues de escribirlo', async () => {
+    const o = oyente();
+    const products = montarRepositorio();
+    products.createWithFirstBatch.mockImplementation(async () => {
+      o.orden.push('createWithFirstBatch');
+      return { id: 'producto-nuevo-1', batchId: 'lote-1', lot: '1' };
+    });
+    const createProduct = createCreateProduct({ products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+    await createProduct(ALTA_VALIDA, ADMIN);
+
+    expect(o.orden).toEqual(['createWithFirstBatch', 'onStockIncreased']);
+    expect(o.onStockIncreased).toHaveBeenCalledWith({ companyId: EMPRESA, now: AHORA });
+  });
+
+  it('R13: un lote adicional de un producto que ya existe avisa una vez, despues de escribirlo', async () => {
+    const o = oyente();
+    const products = montarRepositorio({
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(
+        async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT }),
+      ),
+    });
+    products.addBatchToAlive.mockImplementation(async () => {
+      o.orden.push('addBatchToAlive');
+      return { batchId: 'lote-1', lot: '1' };
+    });
+    const createProduct = createCreateProduct({ products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+    await createProduct(ALTA_VALIDA, ADMIN);
+
+    expect(o.orden).toEqual(['addBatchToAlive', 'onStockIncreased']);
+    expect(o.onStockIncreased).toHaveBeenCalledTimes(1);
+  });
+
+  it('R20: un alta rechazada no avisa', async () => {
+    const o = oyente();
+    const products = montarRepositorio({
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(
+        async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT }),
+      ),
+      addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => null),
+    });
+    const createProduct = createCreateProduct({ products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+    await expect(createProduct(ALTA_VALIDA, ADMIN)).rejects.toBeInstanceOf(ProductNotFoundError);
+    await expect(createProduct({ ...ALTA_VALIDA, stock: 'x' }, ADMIN)).rejects.toBeInstanceOf(ValidationError);
+    await expect(createProduct(ALTA_VALIDA, SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(o.onStockIncreased).not.toHaveBeenCalled();
+  });
+});

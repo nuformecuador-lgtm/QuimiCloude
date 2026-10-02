@@ -341,6 +341,21 @@ describe('R12: alta y edicion rechazan sin pedidos.modificar antes del catalogo 
   }
 })
 
+describe('QC-138 R37: confirmar el bloqueo no abre el alta ni la edicion sin pedidos.modificar', () => {
+  const CON_CONFIRMACION = SIETE.filter(([nombre]) => ['createOrder', 'updateOrder'].includes(nombre))
+
+  for (const [nombre, , invocacion] of CON_CONFIRMACION) {
+    it(`R37: ${nombre} con confirmBlocked y solo inventario.modificar rechaza sin tocar ningun puerto`, async () => {
+      const { error, llamadas } = await ejecutar(
+        invocacion,
+        actorCon('inventario.modificar', CONSULTAR),
+        { ...ENTRADA_ALTA, confirmBlocked: true },
+      )
+      esperaRechazo(error, llamadas, nombre)
+    })
+  }
+})
+
 describe('QC-74 — la autorizacion va ANTES de la validacion (R12)', () => {
   // Las operaciones que validan entrada con zod. Con entrada invalida Y sin permiso, el error
   // tiene que ser el de PERMISO: si saliera `ValidationError`, zod habria corrido antes.

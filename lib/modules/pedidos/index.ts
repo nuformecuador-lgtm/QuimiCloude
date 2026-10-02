@@ -164,3 +164,13 @@ export { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './domain/order
 
 export { createQuoteOrderCost } from './domain/quote-order-cost';
 export type { QuoteOrderCostDeps, OrderCostQuote } from './domain/quote-order-cost';
+
+/** La revision de bloqueados que dispara una entrada de material en `inventario`. Sin actor:
+ *  `lib/composition` la ata al aviso de inventario y no la publica a las Server Actions. */
+export { createReviewBlockedOrders } from './domain/review-blocked-orders';
+export type {
+  BlockedOrderReviewFailure,
+  ReviewBlockedOrdersDeps,
+  ReviewBlockedOrdersInput,
+  ReviewBlockedOrdersResult,
+} from './domain/review-blocked-orders';

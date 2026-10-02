@@ -84,6 +84,9 @@ export const createOrderSchema = z.object({
   quantity: quantitySchema,
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
   presentationId: presentationIdSchema,
+  /** Permiso explicito para guardar el pedido bloqueado si el material no alcanza. No elige el
+   *  estado: si al escribir alcanza, el pedido queda pendiente igual. */
+  confirmBlocked: z.boolean().default(false),
 });
 
 /**

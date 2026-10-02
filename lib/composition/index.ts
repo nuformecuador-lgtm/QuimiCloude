@@ -117,6 +117,7 @@ import type {
   ProductCatalog,
   ProductNameLookup,
   ReservationQueries,
+  StockIncreaseListener,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { forModule } from '@/lib/shared/observability/logger';
@@ -217,6 +218,7 @@ import {
   createGetOrder,
   createListOrders,
   createQuoteOrderCost,
+  createReviewBlockedOrders,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
@@ -787,6 +789,27 @@ const presentationRepository: PresentationRepository = {
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 /**
+ * El aviso de existencia que sube, atado a la revision de los pedidos bloqueados de `pedidos`.
+ * Va antes de la fachada de `inventario`, que lo necesita; `reviewBlockedOrders` se declara mas
+ * abajo y solo se lee cuando llega un aviso, con el modulo ya cargado. Nunca lanza: el lote o el
+ * ajuste ya estan escritos y un fallo aqui no puede devolverlos como error. Los fallos van al
+ * mismo registro del servidor que la caducidad.
+ */
+const stockIncreaseListener: StockIncreaseListener = {
+  async onStockIncreased({ companyId, now }) {
+    try {
+      const result = await reviewBlockedOrders({ companyId, now });
+      if (result.failed.length > 0) {
+        console.error('blocked_orders_review_failed', { companyId, failed: result.failed });
+      }
+    } catch {
+      // Sin el error: su mensaje puede traer datos de la consulta.
+      console.error('blocked_orders_review_failed', { companyId, stage: 'blocked_ids' });
+    }
+  },
+};
+
+/**
  * Fachada del modulo `inventario` ya cableada (T11, `design.md > 3`, `> 7`). Es lo que
  * consumen las Server Actions de T12.
  *
@@ -797,7 +820,7 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
 export const inventario = {
-  createProduct: createCreateProduct({ products: productRepository }),
+  createProduct: createCreateProduct({ products: productRepository, stockIncreases: stockIncreaseListener }),
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
@@ -811,7 +834,10 @@ export const inventario = {
     log: inventarioListQueryLog,
   }),
   // Claves nuevas al final: ninguna de las de arriba se toca.
-  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  adjustBatchStock: createAdjustBatchStock({
+    products: productRepository,
+    stockIncreases: stockIncreaseListener,
+  }),
   listProductBatches: createListProductBatches({ products: productRepository }),
   // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
   // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
@@ -1121,6 +1147,16 @@ const expireStaleOrders = createExpireStaleOrders({
   findExpirable: findExpirableOrders,
   unitOfWork: orderUnitOfWork,
   now: () => new Date(),
+});
+
+/** La revision de bloqueados que dispara `stockIncreaseListener`. No va en la fachada `pedidos`:
+ *  no lleva actor y ninguna Server Action la llama. */
+const reviewBlockedOrders = createReviewBlockedOrders({
+  orders: orderRepository,
+  recipes: recipeCatalog,
+  products: productCatalog,
+  units: unitCatalog,
+  unitOfWork: orderUnitOfWork,
 });
 
 /**
