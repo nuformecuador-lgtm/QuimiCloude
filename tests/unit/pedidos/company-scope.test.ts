@@ -164,7 +164,15 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
   })
 
   it('la vista del pedido (`toOrderView`) no la lleva', () => {
-    const vista = toOrderView(filaConEmpresa(), new Map([[RECETA, 'Acido citrico 50%']]))
+    const vista = toOrderView(
+      filaConEmpresa(),
+      new Map([
+        [
+          RECETA,
+          { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
+        ],
+      ]),
+    )
     expect(vista).not.toHaveProperty('companyId')
     expect(exponeEmpresa(vista)).toBe(false)
   })
@@ -185,7 +193,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
     })
     const recipes = {
       findRefsIncludingDeleted: vi.fn(async () => [
-        { id: RECETA, name: 'Acido citrico 50%', isDeleted: false },
+        { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
       ]),
       findExecutionContentById: vi.fn(async () => ({
         id: RECETA,

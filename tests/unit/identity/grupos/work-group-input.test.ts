@@ -190,6 +190,7 @@ describe('tipos de salida de las dos consultas (QC-84 T3)', () => {
   const CLAVES_DE_GRUPO: Record<keyof WorkGroupRow, true> = {
     id: true,
     name: true,
+    members: true,
   };
 
   const CLAVES_DE_MIEMBRO: Record<keyof WorkGroupMemberRow, true> = {
@@ -210,8 +211,8 @@ describe('tipos de salida de las dos consultas (QC-84 T3)', () => {
     'lockedUntil',
   ];
 
-  it('la fila del listado trae el identificador y el nombre, y nada mas (R26)', () => {
-    expect(Object.keys(CLAVES_DE_GRUPO)).toEqual(['id', 'name']);
+  it('la fila del listado trae el identificador, el nombre y sus miembros, y nada mas (R26)', () => {
+    expect(Object.keys(CLAVES_DE_GRUPO)).toEqual(['id', 'name', 'members']);
     for (const campo of NUNCA) {
       expect(Object.keys(CLAVES_DE_GRUPO), `WorkGroupRow no puede traer ${campo}`).not.toContain(
         campo,

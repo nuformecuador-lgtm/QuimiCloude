@@ -108,6 +108,10 @@ export const createOrderSchema = z.object({
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
   unitId: unitIdSchema,
   presentationLines: presentationLinesSchema,
+  // El formulario envia '' cuando se elige «Original».
+  recipeVersionId: z
+    .preprocess((value) => (value === '' ? null : value), z.string().uuid().nullable())
+    .default(null),
 });
 
 /**

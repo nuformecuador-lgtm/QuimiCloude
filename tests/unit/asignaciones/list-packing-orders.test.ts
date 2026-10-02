@@ -63,7 +63,10 @@ function montar(): Dobles {
     pageSize: 10,
     totalPages: 1,
   }));
-  const findRefsIncludingDeleted = vi.fn(async () => [{ id: 'receta-1', name: 'Desengrasante' }, { id: 'receta-2', name: 'Limpiador' }]);
+  const findRefsIncludingDeleted = vi.fn(async () => [
+    { id: 'receta-1', name: 'Desengrasante', ownName: 'Desengrasante', isUnderReview: false, original: null, isDeleted: false },
+    { id: 'receta-2', name: 'Limpiador', ownName: 'Limpiador', isUnderReview: false, original: null, isDeleted: false },
+  ]);
   const findRefsPresentations = vi.fn(async () => [{ id: 'presentacion-1', name: 'Botella 1L' }]);
   const findRefsUnits = vi.fn(async () => [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]);
   const findFinishedGoodsReceipts = vi.fn(async () => [

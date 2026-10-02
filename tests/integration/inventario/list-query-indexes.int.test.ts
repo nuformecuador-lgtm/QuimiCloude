@@ -373,7 +373,8 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(compuesto).toMatch(/\(company_id, name_normalized\)/u)
     // Y ES parcial, con el mismo WHERE que el resto de indices de esta tabla con borrado
     // logico: esta es la asercion que la falsabilidad del caso depende de que exista.
-    expect(compuesto, `${compuesto ?? ''} deberia ser parcial`).toMatch(/WHERE \(deleted_at IS NULL\)/u)
+    // `\(+`: con `AND parent_recipe_id IS NULL` Postgres abre dos parentesis tras el WHERE.
+    expect(compuesto, `${compuesto ?? ''} deberia ser parcial`).toMatch(/WHERE \(+deleted_at IS NULL\)/u)
 
     expect(indexes.has('recipes_name_unique')).toBe(false)
   })

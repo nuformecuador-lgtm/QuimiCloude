@@ -167,7 +167,7 @@ export function createListOrders(
     // pidio. La vigencia se exige al ESCRIBIR (R15, R25), no al leer.
     const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
 
-    const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
+    const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
 
     // Las presentaciones de TODAS las lineas de la pagina, deduplicadas: una sola llamada.
     const presentationIds = orderPresentationIds(page.items);
@@ -183,7 +183,7 @@ export function createListOrders(
     const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
 
     return {
-      items: page.items.map((row) => toOrderView(row, recipeNames, presentationNames, unitLabels)),
+      items: page.items.map((row) => toOrderView(row, recipesById, presentationNames, unitLabels)),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

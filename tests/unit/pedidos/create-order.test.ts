@@ -22,7 +22,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order';
-import { RecipeNotFoundError, UnauthorizedError, type PedidosError } from '@/lib/modules/pedidos/domain/errors';
+import {
+  RecipeNotFoundError,
+  RecipeVersionUnderReviewError,
+  UnauthorizedError,
+  type PedidosError,
+} from '@/lib/modules/pedidos/domain/errors';
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
@@ -78,8 +83,8 @@ function filaCreada(): OrderRow {
  */
 function catalogoDeRecetas(lineasPorReceta: ReadonlyMap<string, readonly RecipeExecutionLine[]> = new Map()) {
   const recetas = new Map<string, { companyId: string; ref: RecipeRef }>([
-    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', isDeleted: false } }],
-    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', isDeleted: false } }],
+    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false } }],
+    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', ownName: 'Formula de B', isUnderReview: false, original: null, isDeleted: false } }],
   ]);
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
     ids.flatMap((id) => {
@@ -822,7 +827,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       lines: lineas,
     }));
     const recipesGlobal = {
-      findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'x', isDeleted: false }))),
+      findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'x', ownName: 'x', isUnderReview: false, original: null, isDeleted: false }))),
       findExecutionContentById: findExecutionContentByIdGlobal,
     } as unknown as RecipeCatalog;
     // El lector de `scope.recipes` -sobre el cliente de LA transaccion- es el UNICO que puede
@@ -858,5 +863,179 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
 
     expect(findExecutionContentByIdGlobal).toHaveBeenCalledTimes(1);
     expect(findExecutionContentByIdDeLaTransaccion).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
+  });
+});
+
+describe('alta con version de receta', () => {
+  const VERSION_DE_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const VERSION_DE_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const ORIGINAL_A = { id: RECETA_DE_A, name: 'Acido citrico 50%' };
+  const PRODUCTO_Y = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  function ref(id: string, overrides: Partial<RecipeRef> = {}): RecipeRef {
+    return { id, name: id, ownName: id, isDeleted: false, isUnderReview: false, original: null, ...overrides };
+  }
+
+  /** Catalogo acotado a la empresa A: lo que no esta en `refs` no vuelve, como una receta de
+   *  otra empresa. Las lineas de cada id las sirven los dos lectores, global y de transaccion. */
+  function catalogoConVersiones(
+    refs: readonly RecipeRef[],
+    lineas: ReadonlyMap<string, readonly RecipeExecutionLine[]> = new Map(),
+  ) {
+    const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
+      companyId === EMPRESA_A ? refs.filter((r) => ids.includes(r.id)) : [],
+    );
+    const contenido = (id: string) => ({ id, name: 'Receta', isDeleted: false, steps: [], lines: lineas.get(id) ?? [] });
+    const findExecutionContentById = vi.fn(async (id: string) => contenido(id));
+    const enTransaccion = vi.fn(async (id: string) => contenido(id));
+    return {
+      recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
+      findRefsIncludingDeleted,
+      findExecutionContentById,
+      enTransaccion,
+    };
+  }
+
+  function alta(
+    recipes: RecipeCatalog,
+    enTransaccion?: RecipeCatalog['findExecutionContentById'],
+    batches: readonly CostingBatch[] = [],
+  ) {
+    const create = vi.fn(async () => filaCreada());
+    const setReservedAt = vi.fn(async () => undefined);
+    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create, setReservedAt },
+      reservations: { syncForOrder },
+      ...(enTransaccion === undefined ? {} : { recipes: { findExecutionContentById: enTransaccion } }),
+    });
+    const run = vi.spyOn(unitOfWork, 'run');
+    const createOrder = createCreateOrder({
+      unitOfWork,
+      recipes,
+      products: catalogoDeProductos(batches).products,
+      units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+    return { createOrder, create, syncForOrder, run };
+  }
+
+  const entrada = (recipeVersionId?: string | null) => ({
+    recipeId: RECETA_DE_A,
+    quantity: '10.0000',
+    presentationId: PRESENTACION_DE_A,
+    ...(recipeVersionId === undefined ? {} : { recipeVersionId }),
+  });
+
+  it('R30: guarda la version como receta y calcula necesidad y coste con SUS lineas, en una sola lectura del catalogo', async () => {
+    const cat = catalogoConVersiones(
+      [ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A })],
+      new Map([
+        [RECETA_DE_A, [lineaDeReceta()]],
+        [VERSION_DE_A, [lineaDeReceta({ productId: PRODUCTO_Y })]],
+      ]),
+    );
+    const lotes = [
+      loteCosteable({ stock: '100', unitCost: '3.0000' }),
+      loteCosteable({ productId: PRODUCTO_Y, stock: '100', unitCost: '5.0000' }),
+    ];
+    const { createOrder, create, syncForOrder } = alta(cat.recipes, cat.enTransaccion, lotes);
+
+    await createOrder(entrada(VERSION_DE_A), ACTOR_A);
+
+    expect(cat.findRefsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_A, VERSION_DE_A], EMPRESA_A);
+    const [nuevo, , , , coste] = create.mock.calls[0] as unknown as readonly [
+      { recipeId: string },
+      unknown,
+      unknown,
+      unknown,
+      string,
+    ];
+    expect(nuevo.recipeId).toBe(VERSION_DE_A);
+    expect(nuevo).not.toHaveProperty('recipeVersionId');
+    expect(coste).toBe('50.0000');
+    expect(cat.findExecutionContentById).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
+    expect(cat.enTransaccion).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
+    const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
+  });
+
+  it('R31: sin version, o con version vacia, pide solo la receta y guarda la original como hoy', async () => {
+    for (const recipeVersionId of [undefined, null, '']) {
+      const cat = catalogoConVersiones([ref(RECETA_DE_A)]);
+      const { createOrder, create } = alta(cat.recipes);
+
+      await createOrder(entrada(recipeVersionId), ACTOR_A);
+
+      expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_A], EMPRESA_A);
+      expect((create.mock.calls[0] as unknown as readonly [{ recipeId: string }])[0].recipeId).toBe(RECETA_DE_A);
+    }
+  });
+
+  const rechazos: readonly (readonly [string, readonly RecipeRef[], string, string])[] = [
+    ['la receta es una version', [ref(VERSION_DE_A, { original: ORIGINAL_A })], VERSION_DE_A, ''],
+    [
+      'la version es de otra receta',
+      [ref(RECETA_DE_A), ref(VERSION_DE_B, { original: { id: RECETA_DE_B, name: 'B' } })],
+      RECETA_DE_A,
+      VERSION_DE_B,
+    ],
+    [
+      'la version esta de baja',
+      [ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A, isDeleted: true })],
+      RECETA_DE_A,
+      VERSION_DE_A,
+    ],
+    ['la version es de otra empresa', [ref(RECETA_DE_A)], RECETA_DE_A, VERSION_DE_A],
+    [
+      'la original esta de baja',
+      [ref(RECETA_DE_A, { isDeleted: true }), ref(VERSION_DE_A, { original: ORIGINAL_A })],
+      RECETA_DE_A,
+      VERSION_DE_A,
+    ],
+  ];
+
+  it.each(rechazos)(
+    'R32: %s -> recipe_not_found sin abrir la unidad de trabajo',
+    async (_caso, refs, recipeId, recipeVersionId) => {
+      const cat = catalogoConVersiones(refs);
+      const { createOrder, create, run } = alta(cat.recipes);
+
+      const error = await createOrder({ ...entrada(recipeVersionId), recipeId }, ACTOR_A).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(RecipeNotFoundError);
+      expect(run).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+      expect(cat.findExecutionContentById).not.toHaveBeenCalled();
+    },
+  );
+
+  it('R33: una version por revisar -> recipe_version_under_review, distinto de not_found, sin abrir la unidad de trabajo', async () => {
+    const cat = catalogoConVersiones([
+      ref(RECETA_DE_A),
+      ref(VERSION_DE_A, { original: ORIGINAL_A, isUnderReview: true }),
+    ]);
+    const { createOrder, create, run } = alta(cat.recipes);
+
+    const error = await createOrder(entrada(VERSION_DE_A), ACTOR_A).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(RecipeVersionUnderReviewError);
+    expect((error as PedidosError).code).toBe('recipe_version_under_review');
+    expect(run).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('R39: con version se exige el mismo permiso de hoy y sin el no se lee nada', async () => {
+    const createOrder = createCreateOrder({ ...catalogosQueExplotan(), now: () => AHORA });
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
+
+    await expect(createOrder(entrada(VERSION_DE_A), SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError);
+
+    const cat = catalogoConVersiones([ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A })]);
+    const { createOrder: conPermiso, create } = alta(cat.recipes);
+    await conPermiso(entrada(VERSION_DE_A), { ...SIN_PERMISO, permissions: ['pedidos.modificar'] });
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });

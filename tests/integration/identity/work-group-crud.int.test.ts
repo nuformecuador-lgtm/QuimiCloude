@@ -534,7 +534,7 @@ describe('R24 + R25 + R26 — el listado pagina 10/25, ordena estable y trae DOS
     });
   });
 
-  it('R26 — cada fila trae EXACTAMENTE `id` y `name`: ni el normalizado, ni la empresa, ni la marca de baja', async () => {
+  it('R26 — cada fila trae EXACTAMENTE `id`, `name` y `members`: ni el normalizado, ni la empresa, ni la marca de baja', async () => {
     await withCompany(async (companyId) => {
       const actor = actorOf(companyId);
       await identity.createWorkGroup(actor, { name: 'Turno noche' });
@@ -543,7 +543,31 @@ describe('R24 + R25 + R26 — el listado pagina 10/25, ordena estable y trae DOS
       const fila = pagina.items[0];
 
       expect(fila).toBeDefined();
-      expect(Object.keys(fila ?? {}).sort()).toEqual(['id', 'name']);
+      expect(Object.keys(fila ?? {}).sort()).toEqual(['id', 'members', 'name']);
+    });
+  });
+
+  it('cada fila trae los NOMBRES de sus miembros (humano, fuera de QC-84): un grupo sin miembros trae `members: []`, y uno con miembros trae su `displayName`', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorOf(companyId);
+      const vacio = await identity.createWorkGroup(actor, { name: 'Turno madrugada' });
+      const conGente = await identity.createWorkGroup(actor, { name: 'Turno tarde' });
+      const unoId = await seedUser(companyId);
+      const dosId = await seedUser(companyId);
+      await identity.addWorkGroupMember(actor, { workGroupId: conGente.id, userId: unoId });
+      await identity.addWorkGroupMember(actor, { workGroupId: conGente.id, userId: dosId });
+
+      const pagina = await identity.listWorkGroups(actor, listInput());
+      const filaVacia = pagina.items.find((row) => row.id === vacio.id);
+      const filaConGente = pagina.items.find((row) => row.id === conGente.id);
+
+      expect(filaVacia?.members).toEqual([]);
+      expect(filaConGente?.members.map((member) => member.id).sort()).toEqual(
+        [unoId, dosId].sort(),
+      );
+      for (const member of filaConGente?.members ?? []) {
+        expect(member.displayName.length).toBeGreaterThan(0);
+      }
     });
   });
 });

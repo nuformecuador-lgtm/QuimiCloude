@@ -59,4 +59,17 @@ export type RecipeStepView = RecipeStepDocument;
 export type RecipeDetail = RecipeSummary & {
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineView[];
+  /** `null` en una original. */
+  readonly original: { readonly id: string; readonly name: string } | null;
+  readonly isUnderReview: boolean;
+  /** «Original · Version» en una version; el nombre tal cual en una original. */
+  readonly displayName: string;
+};
+
+export type RecipeVersionSummary = {
+  readonly id: string;
+  readonly name: string;
+  readonly displayName: string;
+  readonly isUnderReview: boolean;
+  readonly updatedAt: Date;
 };

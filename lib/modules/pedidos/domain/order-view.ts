@@ -131,7 +131,14 @@ export type OrderView = {
   readonly number: OrderNumber;
   readonly numberText: string;
   readonly recipeId: string;
+  /** El nombre mostrado: «Original · Version» si `recipeId` es una version. */
   readonly recipeName: string | null;
+  /** `null` si la receta es una original o no vuelve del catalogo. */
+  readonly recipeVersion: {
+    readonly originalId: string;
+    readonly originalName: string;
+    readonly versionName: string;
+  } | null;
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;

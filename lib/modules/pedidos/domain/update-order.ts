@@ -1,6 +1,7 @@
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
+import { OrderNotFoundError, ValidationError } from './errors';
 import { updateOrderSchema } from './order-input';
+import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildRequirement } from './order-requirement';
 import { resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
@@ -85,13 +86,16 @@ export function createUpdateOrder(
     // modifica ninguna fila.
     assertTransition(row.status, row.status);
 
-    // R25 -la sutileza de esta ficha-. Si la receta NO cambia se acepta aunque este dada de
-    // baja: corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula.
-    // Si CAMBIA, se exige viva igual que en el alta (R15), asi que sigue siendo imposible
-    // PONER una receta inexistente o dada de baja.
-    if (data.recipeId !== row.recipeId) {
-      const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
-      if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
+    // Si la receta del pedido no cambia se acepta aunque este dada de baja o por revisar:
+    // corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula. Si
+    // cambia, se exige lo mismo que en el alta.
+    let effectiveId = data.recipeVersionId ?? data.recipeId;
+    if (effectiveId !== row.recipeId) {
+      const refs = await deps.recipes.findRefsIncludingDeleted(
+        orderRecipeIds(data.recipeId, data.recipeVersionId),
+        actor.companyId,
+      );
+      effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
     }
 
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
@@ -103,7 +107,7 @@ export function createUpdateOrder(
       deps.recipes,
       deps.products,
       deps.units,
-      data.recipeId,
+      effectiveId,
       data.quantity,
       actor.companyId,
       { orderId: id },
@@ -136,12 +140,18 @@ export function createUpdateOrder(
       // lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido-. Se lee con
       // `scope.recipes`, sobre el cliente de ESTA transaccion, para que la lectura vea la
       // misma instantanea que acaba de bloquear `lockAliveById`.
-      const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
+      const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
       const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 
       const result = await transaction.orders.updateAlive(
         id,
-        { ...data, presentationLines },
+        {
+          recipeId: effectiveId,
+          quantity: data.quantity,
+          priority: data.priority,
+          unitId: data.unitId,
+          presentationLines,
+        },
         actor.id,
         instant,
         ingredientsCost,

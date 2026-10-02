@@ -7,9 +7,10 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
+  createErrorStateTranslator,
   ERROR_CODES,
   ERROR_MESSAGE_KEY,
   ERROR_MESSAGES_ES,
@@ -17,6 +18,11 @@ import {
   UNEXPECTED_ERROR_CODE,
   type ErrorCode,
 } from '@/lib/modules/errores'
+import {
+  PedidosError,
+  RecipeNotFoundError,
+  RecipeVersionUnderReviewError,
+} from '@/lib/modules/pedidos/domain/errors'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -39,11 +45,12 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 64 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 65 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 64 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
-      // `order_distribution_exceeds_quantity` y `order_without_unit`.
-      expect(ERROR_CODES).toHaveLength(64)
+      // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
+      // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
+      // `recipe_version_under_review` (QC-172).
+      expect(ERROR_CODES).toHaveLength(65)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -464,6 +471,20 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
       }
       expect(errorMessage('user_not_pending')).not.toBe(enlace)
       expect(errorMessage('user_not_pending')).not.toBe(errorMessage('user_not_found'))
+    })
+
+    it('QC-172 R33: recipe_version_under_review sale por el traductor con su texto, distinto de recipe_not_found', async () => {
+      const toErrorState = createErrorStateTranslator(PedidosError, async () => null, vi.fn())
+
+      expect(await toErrorState(new RecipeVersionUnderReviewError())).toEqual({
+        status: 'error',
+        code: 'recipe_version_under_review',
+        message: 'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
+      })
+      expect(await toErrorState(new RecipeNotFoundError())).not.toMatchObject({
+        code: 'recipe_version_under_review',
+      })
+      expect(errorMessage('recipe_version_under_review')).not.toBe(errorMessage('recipe_not_found'))
     })
 
     it('el modulo errores no importa identity ni lo nombra', () => {

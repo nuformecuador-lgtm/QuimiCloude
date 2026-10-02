@@ -28,11 +28,13 @@ import { WorkGroupMembers } from './work-group-members';
  * **UN SOLO panel para los dos modos.** Quien decide cual esta abierto y sobre quien es
  * `work-group-table.tsx`, que monta **una** instancia para toda la pagina:
  *
- *   - **Alta** (`group === null`): solo el formulario del nombre. **Sin lista de miembros**,
- *     porque el grupo todavia no existe y no hay identificador al que anadir a nadie. Meter gente
- *     es abrir el panel otra vez sobre el grupo ya creado.
+ *   - **Alta** (`group === null`): el formulario del nombre, y debajo un selector para elegir los
+ *     miembros INICIALES. El grupo todavia no existe, asi que esa eleccion vive en estado LOCAL
+ *     de `work-group-form.tsx` —sin ninguna llamada al servidor— hasta que la creacion termina:
+ *     entonces se anade a cada persona elegida, de a una, sobre el grupo recien creado.
  *   - **Edicion** (`group !== null`): el formulario **precargado con `group.name`** y, debajo, el
- *     bloque de miembros.
+ *     bloque de miembros reales (`WorkGroupMembers`), que ya gestiona sus propias llamadas al
+ *     servidor para meter y sacar gente del grupo que SI existe.
  *
  * **Aqui NO hay una segunda lectura de ficha**, a diferencia de `user-sheet.tsx`: la fila trae
  * `{ id, name }` y el formulario necesita `name`. **QC-84 no publica ninguna consulta de grupo
@@ -81,6 +83,7 @@ export function WorkGroupSheet({ group, open, onOpenChange }: WorkGroupSheetProp
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
+        minScreenWidth={70}
         className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
         data-testid={WORK_GROUP_SHEET_TESTID}
         data-mode={isEdit ? 'edit' : 'create'}
@@ -93,7 +96,8 @@ export function WorkGroupSheet({ group, open, onOpenChange }: WorkGroupSheetProp
 
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
           <WorkGroupForm group={group} onSaved={handleSaved} />
-          {/* El alta no monta el bloque de miembros: no hay grupo al que anadir a nadie. */}
+          {/* El alta elige miembros DENTRO del propio formulario (estado local, sin servidor): no
+              hay todavia un `workGroupId` real al que anadir a nadie por Server Action. */}
           {group === null ? null : <WorkGroupMembers workGroupId={group.id} />}
         </div>
       </SheetContent>

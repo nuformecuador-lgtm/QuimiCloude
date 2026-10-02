@@ -187,7 +187,7 @@ function almacen() {
 
   const recipes = {
     findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) =>
-      ids.map((id) => ({ id, name: 'Acido citrico 50%', isDeleted: false })),
+      ids.map((id) => ({ id, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false })),
     ),
     // Receta SIN lineas: este archivo prueba el ambito, no el calculo del importe.
     findExecutionContentById: vi.fn(async (id: string) => ({

@@ -162,11 +162,8 @@ function readFormString(formData: FormData, name: string): string {
 }
 
 /**
- * Un campo AUSENTE del formulario es ausencia (`undefined`), no cadena vacia. Lo usa solo la
- * prioridad, que es el unico campo opcional del alta (R9): si el formulario no la envia, el
- * esquema aplica `BAJA` por defecto. Si la envia vacia, el esquema la rechaza como valor
- * fuera del conjunto cerrado (R19) — y eso es correcto: convertir el blanco en ausencia aqui
- * seria una regla de negocio en el borde, y el borde no decide (R5).
+ * Un campo AUSENTE del formulario es ausencia (`undefined`), no cadena vacia, para que el
+ * esquema aplique su defecto. Que hacer con un blanco lo decide el esquema, no el borde.
  */
 function readOptionalFormString(formData: FormData, name: string): string | undefined {
   const value = formData.get(name);
@@ -203,6 +200,7 @@ function buildCreateCandidate(formData: FormData): unknown {
     priority: readOptionalFormString(formData, 'priority'),
     unitId: readFormString(formData, 'unitId'),
     presentationLines: readPresentationLines(formData),
+    recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
   };
 }
 

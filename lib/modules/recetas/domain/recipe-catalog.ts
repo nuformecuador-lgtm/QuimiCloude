@@ -7,13 +7,18 @@ import type { RecipeStepView } from './recipe-view';
 export type RecipeId = string;
 
 /** Lo que otro modulo puede saber de una receta sin tocar su tabla. `isDeleted` va en el Ref y
- *  no en dos metodos distintos a proposito (QC-34 `design.md > 11.3`): quien lee un pedido
- *  necesita el nombre de una receta dada de baja (QC-34 R44) y quien valida un alta necesita
- *  rechazarla (QC-34 R15), y las dos preguntas se responden con la MISMA lectura. */
+ *  no en dos metodos distintos: quien lee un pedido necesita el nombre de una receta dada de
+ *  baja y quien valida un alta necesita rechazarla, con la MISMA lectura. */
 export type RecipeRef = {
   readonly id: RecipeId;
+  /** El que se muestra: «Original · Version» si es una version. */
   readonly name: string;
+  readonly ownName: string;
   readonly isDeleted: boolean;
+  /** Siempre `false` en una original. */
+  readonly isUnderReview: boolean;
+  /** `null` si la receta es una original. */
+  readonly original: { readonly id: RecipeId; readonly name: string } | null;
 };
 
 /** Servicio que `recetas` ofrece a los demas modulos (`docs/architecture.md > Dominio` n.o 2:
@@ -39,7 +44,8 @@ export interface RecipeCatalog {
 
   /** El contenido con el que se ejecuta una receta, INCLUIDA UNA DADA DE BAJA (viene con
    *  `isDeleted: true`, nunca `null` por eso). `null` es solo «este id no existe» -y una
-   *  receta de OTRA empresa cuenta como si no existiera-. */
+   *  receta de OTRA empresa cuenta como si no existiera-. Una version se ejecuta con sus
+   *  propias lineas y los pasos de su original, aunque cualquiera de las dos este de baja. */
   findExecutionContentById(
     id: RecipeId,
     companyId: string,
@@ -47,12 +53,14 @@ export interface RecipeCatalog {
 
   /** Ids (no `Ref`s: quien busca no necesita nombres ni fechas) de las recetas de esa empresa
    *  cuyo nombre casa con `search`, INCLUIDAS LAS DADAS DE BAJA -una receta de baja tiene que
-   *  seguir siendo encontrable por su nombre-. `null` significa que `search` no es una
+   *  seguir siendo encontrable por su nombre-. Una version casa por el suyo y por el de su
+   *  original. `null` significa que `search` no es una
    *  busqueda -no queda nada al normalizarlo-, y por tanto no filtra nada; `[]` significa que
    *  ninguna receta casa. Los dos casos son distintos y no deben fundirse. */
   findIdsMatchingName(search: string, companyId: string): Promise<readonly RecipeId[] | null>;
 
-  /** La receta VIVA de esa empresa cuyo nombre normalizado es el de `name`, o `null`. Normaliza
+  /** La receta ORIGINAL VIVA de esa empresa cuyo nombre normalizado es el de `name`, o `null`
+   *  (una version no ocupa el nombre de una original). Normaliza
    *  con `normalizeRecipeName` -la misma que escribe la columna `name_normalized`-, y un `name`
    *  que normaliza a `''` devuelve `null` sin consultar la base: no hay nada que buscar. */
   findAliveByNormalizedName(

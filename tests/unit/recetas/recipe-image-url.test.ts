@@ -52,6 +52,9 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
     listAlive: vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 })),
     replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(async () => 'ok'),
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
+    createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
+    listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     ...overrides,
   };
 }
@@ -105,6 +108,7 @@ describe('R24 — se persiste la ruta, no la URL', () => {
       createdAt: AHORA,
       updatedAt: AHORA,
       lines: [],
+      original: null,
     };
     const recipesConDetalle = montarRepositorio({
       findAliveById: vi.fn<RecipeRepository['findAliveById']>(async () => filaConImagen),
@@ -130,6 +134,7 @@ describe('R24 — se persiste la ruta, no la URL', () => {
       createdAt: AHORA,
       updatedAt: AHORA,
       lines: [],
+      original: null,
     };
     const recipes = montarRepositorio({
       findAliveById: vi.fn<RecipeRepository['findAliveById']>(async () => filaSinImagen),
@@ -158,6 +163,7 @@ describe('R25 — la URL compuesta es publica, sin firma ni caducidad', () => {
       createdAt: AHORA,
       updatedAt: AHORA,
       lines: [],
+      original: null,
     };
     const recipes = montarRepositorio({
       findAliveById: vi.fn<RecipeRepository['findAliveById']>(async () => filaConImagen),

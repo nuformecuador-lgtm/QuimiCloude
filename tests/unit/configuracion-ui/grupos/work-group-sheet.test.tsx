@@ -23,13 +23,19 @@ import {
   WorkGroupSheet,
 } from '@/app/(private)/configuracion/usuarios/components';
 import type { WorkGroupRow } from '@/lib/modules/identity';
+import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
 import type {
   CreateWorkGroupFormState,
   WorkGroupMemberListResult,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { setupUser } from '../../../helpers/user-event';
 
-const { routerMock, createWorkGroupActionMock, listWorkGroupMembersActionMock } = vi.hoisted(() => ({
+const {
+  routerMock,
+  createWorkGroupActionMock,
+  listWorkGroupMembersActionMock,
+  listUsersActionMock,
+} = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -42,6 +48,7 @@ const { routerMock, createWorkGroupActionMock, listWorkGroupMembersActionMock } 
     vi.fn<(prev: CreateWorkGroupFormState, data: FormData) => Promise<CreateWorkGroupFormState>>(),
   listWorkGroupMembersActionMock:
     vi.fn<(workGroupId: string, query: unknown) => Promise<WorkGroupMemberListResult>>(),
+  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -69,7 +76,9 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse al abrir el panel`);
   };
   return {
-    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
+    // El ALTA monta el picker de miembros iniciales (`WorkGroupMemberPicker`), que SI consulta
+    // esta action siempre (QC-85 ampliacion); las otras cinco siguen sin tener nada que hacer aqui.
+    listUsersAction: listUsersActionMock,
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
@@ -78,7 +87,11 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
   };
 });
 
-const GRUPO: WorkGroupRow = { id: '11111111-1111-4111-8111-111111111111', name: 'Laboratorio' };
+const GRUPO: WorkGroupRow = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Laboratorio',
+  members: [],
+};
 
 /** Los cuatro archivos de las escrituras: ninguno monta una segunda region de avisos (R35). */
 const ARCHIVOS_DE_LAS_ESCRITURAS = [
@@ -134,6 +147,10 @@ beforeEach(() => {
   toastExito = vi.spyOn(toast, 'success').mockImplementation(() => 'id');
   createWorkGroupActionMock.mockResolvedValue({ status: 'success', id: 'nuevo' });
   listWorkGroupMembersActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
+  });
+  listUsersActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
   });

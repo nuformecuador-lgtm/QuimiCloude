@@ -16,7 +16,9 @@ import {
   ORDER_COST_QUOTE_VALUE_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   OrderForm,
+  ORIGINAL_VERSION_VALUE,
   RECIPE_PICKER_TESTID,
+  RECIPE_VERSION_SELECT_TESTID,
   type RecipePickerOption,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
@@ -30,8 +32,9 @@ import type {
 import type {
   RecipeListResult,
   RecipeQueryResult,
+  RecipeVersionListResult,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { RecipeDetail, RecipeSummary } from '@/lib/modules/recetas';
+import type { RecipeDetail, RecipeSummary, RecipeVersionSummary } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 
 const {
@@ -40,6 +43,7 @@ const {
   quoteOrderCostActionMock,
   listRecipesActionMock,
   getRecipeActionMock,
+  listRecipeVersionsActionMock,
   listPresentationsActionMock,
 } = vi.hoisted(() => {
   const noDebeInvocarse = (nombre: string) => () => {
@@ -60,6 +64,7 @@ const {
     prohibida: noDebeInvocarse,
     listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
     getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+    listRecipeVersionsActionMock: vi.fn<(id: string) => Promise<RecipeVersionListResult>>(),
     listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
   };
 });
@@ -111,6 +116,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: listRecipeVersionsActionMock,
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
 }));
@@ -180,6 +186,9 @@ function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [],
     lines: [LINEA_INGREDIENTE],
+    original: null,
+    isUnderReview: false,
+    displayName: RECETA.name,
     ...overrides,
   };
 }
@@ -191,6 +200,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: '5',
     priority: 'ALTA',
     status: 'EN_CURSO',
@@ -259,6 +269,7 @@ beforeEach(() => {
     data: { ingredientsCost: null },
   });
   getRecipeActionMock.mockResolvedValue({ status: 'success', data: recetaDetalle() });
+  listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
   listPresentationsActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
@@ -590,5 +601,95 @@ describe('R21 — la cotizacion fallida no bloquea el guardado', () => {
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('la cotizacion sigue a la version elegida', () => {
+  const VIVA: RecipeVersionSummary = {
+    id: crypto.randomUUID(),
+    name: 'Sin colorante',
+    displayName: `${RECETA.name} · Sin colorante`,
+    isUnderReview: false,
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  };
+
+  function selectorDeVersion(): HTMLElement {
+    return screen.getByTestId(RECIPE_VERSION_SELECT_TESTID);
+  }
+
+  async function elegirVersion(user: ReturnType<typeof setupUser>, indice: number) {
+    await waitFor(() => expect(selectorDeVersion()).toBeEnabled());
+    await user.click(selectorDeVersion());
+    const opciones = await screen.findAllByTestId(`${RECIPE_VERSION_SELECT_TESTID}-option`);
+    await user.click(await esperarInteractiva(opciones[indice]!));
+  }
+
+  it('R28: elegir una version cotiza con su id, la cantidad tambien, y «Original» vuelve a la original', async () => {
+    const user = setupUser();
+    listRecipeVersionsActionMock.mockImplementation(async (id) => ({
+      status: 'success',
+      data: id === RECETA.id ? [VIVA] : [],
+    }));
+    renderFormulario();
+    await user.type(cantidad(), '5');
+    await elegirReceta(user);
+
+    await elegirVersion(user, 1);
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '5' }),
+    );
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '8');
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '8' }),
+    );
+
+    await elegirVersion(user, 0);
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
+        recipeId: RECETA.id,
+        quantity: '8',
+      }),
+    );
+  });
+
+  it('R28: cambiar de receta devuelve el selector a «Original» y cotiza con la receta nueva', async () => {
+    const user = setupUser();
+    listRecipeVersionsActionMock.mockImplementation(async (id) => ({
+      status: 'success',
+      data: id === RECETA.id ? [VIVA] : [],
+    }));
+    renderFormulario();
+    await user.type(cantidad(), '5');
+    await elegirReceta(user);
+    await elegirVersion(user, 1);
+    await waitFor(() =>
+      expect(screen.getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-value`)).toHaveValue(VIVA.id),
+    );
+
+    listRecipesActionMock.mockResolvedValue({
+      status: 'success',
+      data: {
+        items: [recetaResumen(RECETA), recetaResumen(RECETA2)],
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+      },
+    });
+    await elegirReceta(user, RECETA2);
+
+    expect(screen.getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-value`)).toHaveValue(
+      ORIGINAL_VERSION_VALUE,
+    );
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
+        recipeId: RECETA2.id,
+        quantity: '5',
+      }),
+    );
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA2.id));
+    await waitFor(() => expect(selectorDeVersion()).toBeDisabled());
   });
 });

@@ -69,6 +69,7 @@ export const ERROR_MESSAGE_KEY = {
   order_presentation_line_not_editable: 'errors.order_presentation_line_not_editable',
   order_distribution_exceeds_quantity: 'errors.order_distribution_exceeds_quantity',
   order_without_unit: 'errors.order_without_unit',
+  recipe_version_under_review: 'errors.recipe_version_under_review',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -173,4 +174,6 @@ export const ERROR_MESSAGES_ES = {
     'El reparto pasa de la cantidad del pedido: quita envases o elige presentaciones mas pequenas.',
   'errors.order_without_unit':
     'El pedido no tiene unidad: asignale una desde la edicion del pedido antes de repartirlo.',
+  'errors.recipe_version_under_review':
+    'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
 } as const satisfies Record<ErrorMessageKey, string>;

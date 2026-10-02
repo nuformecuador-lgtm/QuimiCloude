@@ -2,7 +2,6 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 
 import { FIRST_PAGE } from './user-list-params';
-import { WorkGroupCreateAction } from './work-group-create-action';
 import { WorkGroupListEmpty } from './work-group-list-empty';
 import { WorkGroupListError } from './work-group-list-error';
 import { workGroupListHref } from './work-group-list-params';
@@ -32,6 +31,14 @@ import { WorkGroupTable } from './work-group-table';
  * composicion y no se repite ninguna comprobacion. La autorizacion la aportan los casos de uso de
  * `identity`; si la operacion responde `unauthorized` se pinta el estado de error **sin un solo
  * dato de grupos**. `canModify` solo se transporta: lo resolvio la pagina (R9, R10).
+ *
+ * **El disparador del alta YA NO cuelga de aqui: vive en `page.tsx`, junto al `<h1>`** (decision
+ * humana del 2026-09-17, extendida al mover el boton a la cabecera). Antes era hermana de los tres
+ * estados de esta seccion —se pintaba con filas, sin ellas y tambien en el estado de error, porque
+ * los grupos nacen en cero y el primer grupo era imposible de crear si el boton dependia de la
+ * tabla—; esta seccion ya no monta `WorkGroupCreateAction` en ninguno de los dos caminos, y la
+ * pagina logra la misma garantia pintandolo siempre, antes de decidir siquiera que seccion de
+ * pestana montar.
  */
 
 export const WORK_GROUP_LIST_TESTID = 'work-group-list';
@@ -47,29 +54,15 @@ export async function WorkGroupListSection({ params, canModify }: WorkGroupListS
   const pageResult = await listWorkGroupsAction(params);
 
   // R11 y R19: con error NO se pinta tabla, ni fila, ni un dato. Ni siquiera una tabla vacia, que
-  // seria decir «no hay grupos» sin saberlo. Pero el alta SI sigue ahi: no depende de la lista,
-  // tiene su propia autorizacion en el caso de uso, y aqui dejarla fuera seria especialmente caro
-  // —los grupos nacen en cero, asi que un fallo de lectura en una instalacion nueva volveria a
-  // dejar el primer grupo sin ninguna via—. La regla es «el alta esta siempre que `canModify`».
+  // seria decir «no hay grupos» sin saberlo.
   if (pageResult.status === 'error') {
-    return (
-      <>
-        <WorkGroupCreateAction canModify={canModify} />
-        <WorkGroupListError error={pageResult} />
-      </>
-    );
+    return <WorkGroupListError error={pageResult} />;
   }
 
   const { items, page: currentPage, totalPages } = pageResult.data;
 
   return (
     <>
-      {/*
-        El alta, ANTES de elegir estado: se ofrece haya filas o no. Sin esto el primer grupo era
-        imposible de crear, porque los grupos nacen en cero y el boton vivia dentro de la tabla.
-      */}
-      <WorkGroupCreateAction canModify={canModify} />
-
       {items.length === 0 ? (
         // R18 INTACTO: las dos salidas, **cada una bajo su condicion**, y ningun «crea el primero».
         // Quien ofrece el alta es la pantalla, arriba, no este estado.

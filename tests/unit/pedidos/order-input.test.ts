@@ -185,6 +185,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
       'priority',
       'quantity',
       'recipeId',
+      'recipeVersionId',
       'unitId',
     ])
     expect(parsed).not.toHaveProperty('status')
@@ -217,6 +218,7 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
       'priority',
       'quantity',
       'recipeId',
+      'recipeVersionId',
       'unitId',
     ])
   })
@@ -412,5 +414,34 @@ describe('pedidos — la consulta del listado, ya con el contrato generico (QC-5
     })
     expect(porNumero.query.filters).toEqual({})
     expect(porNumero.ignored).toEqual(['orderNumber'])
+  })
+})
+
+describe('pedidos — recipeVersionId en alta y edicion', () => {
+  const VERSION_ID = '33333333-3333-4333-8333-333333333333'
+
+  it('R31: sin el campo, la entrada de hoy sigue valiendo y la version es null', () => {
+    expect(createOrderSchema.parse(altaValida()).recipeVersionId).toBeNull()
+    expect(updateOrderSchema.parse(altaValida()).recipeVersionId).toBeNull()
+  })
+
+  it('R31: la cadena vacia que envia «Original» en el formulario se lee como null', () => {
+    expect(createOrderSchema.parse({ ...altaValida(), recipeVersionId: '' }).recipeVersionId).toBeNull()
+    expect(createOrderSchema.parse({ ...altaValida(), recipeVersionId: null }).recipeVersionId).toBeNull()
+  })
+
+  it('R30: un UUID de version se conserva tal cual', () => {
+    expect(createOrderSchema.parse({ ...altaValida(), recipeVersionId: VERSION_ID }).recipeVersionId).toBe(
+      VERSION_ID,
+    )
+  })
+
+  it('R32: una version que no es UUID se rechaza en el borde', () => {
+    for (const recipeVersionId of ['no-es-uuid', ' ', 42]) {
+      expect(
+        createOrderSchema.safeParse({ ...altaValida(), recipeVersionId }).success,
+        `recipeVersionId=${String(recipeVersionId)}`,
+      ).toBe(false)
+    }
   })
 })

@@ -13,12 +13,20 @@ import { fileURLToPath } from 'node:url';
 
 import {
   createRecipeAction,
+  createRecipeVersionAction,
   deleteRecipeAction,
   getRecipeAction,
   listRecipesAction,
+  listRecipeVersionsAction,
   updateRecipeAction,
+  updateRecipeVersionAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import { RecipeNotFoundError, UnauthorizedError } from '@/lib/modules/recetas';
+import {
+  ActionNotAllowedError,
+  RecipeDuplicateNameError,
+  RecipeNotFoundError,
+  UnauthorizedError,
+} from '@/lib/modules/recetas';
 import { errorMessage } from '@/lib/modules/errores';
 
 const {
@@ -27,6 +35,9 @@ const {
   listRecipesMock,
   updateRecipeMock,
   deleteRecipeMock,
+  createRecipeVersionMock,
+  updateRecipeVersionMock,
+  listRecipeVersionsMock,
   getSessionUserMock,
   getSessionContextMock,
 } = vi.hoisted(() => ({
@@ -35,6 +46,9 @@ const {
   listRecipesMock: vi.fn(),
   updateRecipeMock: vi.fn(),
   deleteRecipeMock: vi.fn(),
+  createRecipeVersionMock: vi.fn(),
+  updateRecipeVersionMock: vi.fn(),
+  listRecipeVersionsMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
 }));
@@ -56,6 +70,9 @@ vi.mock('@/lib/composition', () => ({
     listRecipes: listRecipesMock,
     updateRecipe: updateRecipeMock,
     deleteRecipe: deleteRecipeMock,
+    createRecipeVersion: createRecipeVersionMock,
+    updateRecipeVersion: updateRecipeVersionMock,
+    listRecipeVersions: listRecipeVersionsMock,
   },
 }));
 
@@ -234,6 +251,123 @@ describe('deleteRecipeAction, getRecipeAction, listRecipesAction — traduccion 
   });
 });
 
+const ORIGINAL_ID = '22222222-2222-4222-8222-222222222222';
+const VERSION_ID = '33333333-3333-4333-8333-333333333333';
+const VALID_VERSION_INPUT = {
+  name: 'Sin perfume',
+  lines: [{ productId: '11111111-1111-4111-8111-111111111111', percentage: '100.00' }],
+};
+
+describe('createRecipeVersionAction — R38', () => {
+  it.each([
+    ['sin nombre', { name: '   ' }],
+    ['con lineas que no suman 100', { name: 'Sin perfume', lines: [{ ...VALID_VERSION_INPUT.lines[0], percentage: '90.00' }] }],
+    ['con lineas vacias', { name: 'Sin perfume', lines: [] }],
+    ['que no es un objeto', 'no-es-un-objeto'],
+  ])('R38: rechaza la entrada invalida (%s) sin llamar al caso de uso', async (_caso, entrada) => {
+    const resultado = await createRecipeVersionAction(ORIGINAL_ID, entrada);
+
+    expect(resultado).toEqual({ status: 'error', code: 'invalid_input', message: errorMessage('invalid_input') });
+    expect(createRecipeVersionMock).not.toHaveBeenCalled();
+    expect(getSessionUserMock).not.toHaveBeenCalled();
+  });
+
+  it('R2: sin lineas es valida y llega al caso de uso con la original y el actor de la sesion', async () => {
+    createRecipeVersionMock.mockResolvedValue({ id: VERSION_ID });
+
+    const resultado = await createRecipeVersionAction(ORIGINAL_ID, { name: 'Sin perfume' });
+
+    expect(resultado).toEqual({ status: 'success', id: VERSION_ID });
+    expect(createRecipeVersionMock).toHaveBeenCalledWith(
+      ORIGINAL_ID,
+      expect.objectContaining({ name: 'Sin perfume' }),
+      ADMIN_ACTOR,
+    );
+  });
+
+  it.each([
+    ['R4: desde una version', new ActionNotAllowedError(), 'action_not_allowed'],
+    ['R5: original inexistente', new RecipeNotFoundError(), 'recipe_not_found'],
+    ['R12: nombre duplicado', new RecipeDuplicateNameError(), 'recipe_duplicate_name'],
+    ['R38: sin permiso', new UnauthorizedError(), 'unauthorized'],
+  ] as const)('%s → estado de error traducido', async (_caso, error, codigo) => {
+    createRecipeVersionMock.mockRejectedValue(error);
+
+    const resultado = await createRecipeVersionAction(ORIGINAL_ID, VALID_VERSION_INPUT);
+
+    expect(resultado).toEqual({ status: 'error', code: codigo, message: errorMessage(codigo) });
+  });
+});
+
+describe('updateRecipeVersionAction — R38', () => {
+  it.each([
+    ['sin lineas', { name: 'Sin perfume' }],
+    ['con lineas que no suman 100', { name: 'Sin perfume', lines: [{ ...VALID_VERSION_INPUT.lines[0], percentage: '99.99' }] }],
+    ['sin nombre', { ...VALID_VERSION_INPUT, name: '' }],
+  ])('R38: rechaza la entrada invalida (%s) sin llamar al caso de uso', async (_caso, entrada) => {
+    const resultado = await updateRecipeVersionAction(VERSION_ID, entrada);
+
+    expect(resultado).toEqual({ status: 'error', code: 'invalid_input', message: errorMessage('invalid_input') });
+    expect(updateRecipeVersionMock).not.toHaveBeenCalled();
+  });
+
+  it('con entrada valida llama al caso de uso con la version y el actor de la sesion', async () => {
+    updateRecipeVersionMock.mockResolvedValue({ id: VERSION_ID });
+
+    const resultado = await updateRecipeVersionAction(VERSION_ID, VALID_VERSION_INPUT);
+
+    expect(resultado).toEqual({ status: 'success' });
+    expect(updateRecipeVersionMock).toHaveBeenCalledWith(
+      VERSION_ID,
+      expect.objectContaining({ name: 'Sin perfume' }),
+      ADMIN_ACTOR,
+    );
+  });
+
+  it('R7: editar una original por esta via devuelve accion no permitida traducida', async () => {
+    updateRecipeVersionMock.mockRejectedValue(new ActionNotAllowedError());
+
+    const resultado = await updateRecipeVersionAction(ORIGINAL_ID, VALID_VERSION_INPUT);
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'action_not_allowed',
+      message: errorMessage('action_not_allowed'),
+    });
+  });
+});
+
+describe('listRecipeVersionsAction — R10, R38', () => {
+  it('devuelve las versiones del caso de uso en exito', async () => {
+    const versiones = [
+      {
+        id: VERSION_ID,
+        name: 'Sin perfume',
+        displayName: 'Crema · Sin perfume',
+        isUnderReview: false,
+        updatedAt: new Date('2026-10-01T00:00:00.000Z'),
+      },
+    ];
+    listRecipeVersionsMock.mockResolvedValue(versiones);
+
+    const resultado = await listRecipeVersionsAction(ORIGINAL_ID);
+
+    expect(resultado).toEqual({ status: 'success', data: versiones });
+    expect(listRecipeVersionsMock).toHaveBeenCalledWith(ORIGINAL_ID, ADMIN_ACTOR);
+  });
+
+  it.each([
+    ['R10: original inexistente, de baja o version', new RecipeNotFoundError(), 'recipe_not_found'],
+    ['R38: sin permiso', new UnauthorizedError(), 'unauthorized'],
+  ] as const)('%s → estado de error traducido', async (_caso, error, codigo) => {
+    listRecipeVersionsMock.mockRejectedValue(error);
+
+    const resultado = await listRecipeVersionsAction(ORIGINAL_ID);
+
+    expect(resultado).toEqual({ status: 'error', code: codigo, message: errorMessage(codigo) });
+  });
+});
+
 describe('QC-50 R13 — la empresa sale de getSessionContext y nunca de la entrada', () => {
   const INVOCACIONES: ReadonlyArray<{
     readonly nombre: string;
@@ -265,6 +399,21 @@ describe('QC-50 R13 — la empresa sale de getSessionContext y nunca de la entra
       mock: listRecipesMock,
       invocar: () => listRecipesAction({ page: 1, pageSize: 10 }),
     },
+    {
+      nombre: 'createRecipeVersionAction',
+      mock: createRecipeVersionMock,
+      invocar: () => createRecipeVersionAction(ORIGINAL_ID, { name: 'Sin perfume' }),
+    },
+    {
+      nombre: 'updateRecipeVersionAction',
+      mock: updateRecipeVersionMock,
+      invocar: () => updateRecipeVersionAction(VERSION_ID, VALID_VERSION_INPUT),
+    },
+    {
+      nombre: 'listRecipeVersionsAction',
+      mock: listRecipeVersionsMock,
+      invocar: () => listRecipeVersionsAction(ORIGINAL_ID),
+    },
   ];
 
   function actorRecibido(mock: ReturnType<typeof vi.fn>): unknown {
@@ -273,7 +422,7 @@ describe('QC-50 R13 — la empresa sale de getSessionContext y nunca de la entra
     return llamada.at(-1);
   }
 
-  it('las cinco actions piden LAS DOS caras de la sesion y componen el actor con la empresa', async () => {
+  it('todas las actions piden LAS DOS caras de la sesion y componen el actor con la empresa', async () => {
     for (const { nombre, mock, invocar } of INVOCACIONES) {
       vi.clearAllMocks();
       getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER);

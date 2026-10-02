@@ -124,6 +124,8 @@ export const ERROR_CODES = [
   // Distinto de `unit_not_found`: la unidad no falta porque no exista, falta porque el pedido
   // nunca la tuvo asignada.
   'order_without_unit',
+  // Distinto de `recipe_not_found`: la version existe y esta viva, pero sus lineas no suman 100 %.
+  'recipe_version_under_review',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -98,7 +98,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
     }
     const recipesConVigencia = {
       ...d.recipes,
-      findRefsIncludingDeleted: vi.fn(async () => [{ id: RECIPE_ID, isDeleted: false }]),
+      findRefsIncludingDeleted: vi.fn(async () => [{ id: RECIPE_ID, isDeleted: false, isUnderReview: false, original: null }]),
     } as unknown as RecipeCatalog
 
     const create = vi.fn(async () => filaExistente())
