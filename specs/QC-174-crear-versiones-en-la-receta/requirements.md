@@ -205,7 +205,7 @@ revisar» solo a la primera. [D4]
 Nueva de F1.2; no reabre la tabla de decisiones. Lleva la opción recomendada, que es con la que está
 escrito el requisito marcado ⚑.
 
-**P1. La Server Action de guardar la original no devuelve qué versiones quedaron por revisar (R29).**
+**P1. La Server Action de guardar la original no devuelve qué versiones quedaron por revisar (R29).** **RESUELTA el 2026-10-02 (F1.4): opción (a).**
 Hallazgo medido en el código: el caso de uso `updateRecipe` sí devuelve `propagated: [{ versionId,
 isUnderReview }]` (QC-172 R19, `lib/modules/recetas/domain/update-recipe.ts:24-28,159`), pero
 `updateRecipeAction` lo descarta y responde solo `{ status: 'success' }`
@@ -233,3 +233,6 @@ que esta ficha toca, no puede leerlo.
 | 2026-10-02 | ¿Pasos editables en la versión? | **No. Heredado de QC-172 D4 / R8**: la página de la versión muestra los pasos de la original, sin editor. |
 | 2026-10-02 | ¿Qué pasa al borrar? | **Heredado de QC-172 R23 y R24**: borrar una versión la da de baja solo a ella; borrar la original avisa de que se borran también sus N versiones. |
 | 2026-10-02 | ¿Estados y librerías? | **Heredado de las pantallas de `produccion/formulas`**: vacío, cargando y error como ellas; sin dependencias nuevas. |
+
+> **F1.4 — aprobado por el humano el 2026-10-02**: spec entero, P1 en la opción (a), y R7, R29 y R33/R34
+> (añadidos por `spec_author`) tal como están escritos.
