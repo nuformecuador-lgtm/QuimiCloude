@@ -86,6 +86,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', 
 });
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: vi.fn(() => {
     throw new Error('listRecipesAction no debe invocarse: la primera pagina llega por props');
   }),
@@ -161,6 +162,7 @@ function pedido(status: OrderStatus): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: '12.5000',
     priority: 'MEDIA',
     status,

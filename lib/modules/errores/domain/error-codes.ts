@@ -109,6 +109,8 @@ export const ERROR_CODES = [
   'order_not_packable',
   // Distinto de `order_delivered_frozen`: el pedido esta por empacar o en empaque, no entregado.
   'order_produced_frozen',
+  // Distinto de `recipe_not_found`: la version existe y esta viva, pero sus lineas no suman 100 %.
+  'recipe_version_under_review',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

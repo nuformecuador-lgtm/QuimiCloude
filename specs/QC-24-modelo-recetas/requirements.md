@@ -244,3 +244,11 @@ decisiones cerradas (filas 20, 21 y 22). Aquí ya no quedan.
 | 2026-09-02 | ¿El nombre de una receta borrada queda libre? | **Sí.** El índice único es **parcial**: solo alcanza a las recetas vivas (`WHERE deleted_at IS NULL`). Borrar una receta libera su nombre. Heredado de **QC-4**, que lo resolvió igual para el correo y el documento de `users`; QC-20 D16 no tuvo que responderlo porque `presentations` no tiene borrado lógico. Cierra la pregunta abierta 3 de `spec_author` |
 | 2026-09-02 | ¿La descripción es obligatoria? | **No, es opcional.** Confirma lo que dice la ficha del board. Su largo máximo (500) sigue siendo validación de aplicación en **QC-25**. Cierra la pregunta abierta 4 de `spec_author` |
 | 2026-09-02 | ¿Puede existir una receta sin autor? | **Sí: `created_by` y `updated_by` son anulables.** Algo que no es una persona —una importación masiva, un seed— tiene que poder crear recetas. Un autor vacío significa **«no la creó una persona»**, no «se perdió el dato»; quien lo lea lo muestra así (**QC-25**). Se aparta de la posición por defecto que había tomado `spec_author` (`NOT NULL`). Cierra la pregunta abierta 5 de `spec_author` |
+
+## Enmienda 2026-10-01 — versiones de receta (QC-172)
+
+La unicidad del nombre (R7, R9) se parte en dos ámbitos disjuntos: entre **originales** vivas de la
+misma empresa (`recipes_company_name_unique`, ahora con `parent_recipe_id IS NULL`) y entre
+**versiones** vivas de la misma original (nuevo `recipes_version_name_unique`). Una versión puede
+llamarse como otra receta original. Detalle en
+[`specs/QC-172-versiones-de-receta/`](../QC-172-versiones-de-receta/).

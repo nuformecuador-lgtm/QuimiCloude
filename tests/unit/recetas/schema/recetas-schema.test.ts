@@ -222,6 +222,7 @@ const RECIPE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
+  ['parentRecipeId', 'parent_recipe_id'],
 ]
 
 /** Cada campo escalar de `RecipeLine`, con su columna (R28).
@@ -263,7 +264,7 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     expect(field(recipe, 'imagePath').type).toBe('String')
 
     // La forma completa de la tabla: si alguien anade o quita una columna, este test lo dice.
-    expect(scalarNames(recipe, ['RecipeLine'])).toEqual(RECIPE_COLUMNS.map(([name]) => name).sort())
+    expect(scalarNames(recipe, ['RecipeLine', 'Recipe'])).toEqual(RECIPE_COLUMNS.map(([name]) => name).sort())
     expect(recipe.body).toContain('@@map("recipes")')
   })
 
@@ -474,11 +475,11 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
         expect(candidate.type, `${candidate.name} no puede apuntar a otro modulo`).not.toBe('User')
       }
     }
-    // El unico `@relation` de los dos modelos es el intra-modulo linea -> receta.
+    // Los unicos `@relation` son intra-modulo: version <-> original y linea -> receta.
     const relations = [...recipe.fields, ...recipeLine.fields].filter((candidate) =>
       /@relation/.test(candidate.attributes),
     )
-    expect(relations.map((candidate) => candidate.name)).toEqual(['recipe'])
+    expect(relations.map((candidate) => candidate.name)).toEqual(['parent', 'versions', 'recipe'])
     // Y `User` no gana ninguna coleccion de recetas del otro lado, ni `Product` de lineas.
     const user = parseModel('User')
     expect(user.fields.some((candidate) => candidate.type === 'Recipe')).toBe(false)

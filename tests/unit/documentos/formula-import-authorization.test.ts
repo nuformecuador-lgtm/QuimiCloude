@@ -102,7 +102,7 @@ function dobleDeCreateRecipe(bitacora: Bitacora) {
 function dobleDeUpdateRecipe(bitacora: Bitacora) {
   return vi.fn(async (id: string) => {
     bitacora.push('updateRecipe');
-    return { id, warnings: [] };
+    return { id, warnings: [], propagated: [] };
   });
 }
 

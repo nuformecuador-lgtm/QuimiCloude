@@ -76,7 +76,7 @@ function dobleDeRecetas(
   return {
     findRefsIncludingDeleted: vi.fn(async () => {
       bitacora.push('recipes.findRefsIncludingDeleted');
-      return refsIncludingDeleted;
+      return refsIncludingDeleted.map((ref) => ({ ...ref, ownName: ref.name, isUnderReview: false, original: null }));
     }),
     findExecutionContentById: vi.fn(),
     findIdsMatchingName: vi.fn(),
@@ -126,7 +126,7 @@ function dobleDeCreateRecipe(bitacora: Bitacora) {
 function dobleDeUpdateRecipe(bitacora: Bitacora) {
   return vi.fn(async (id: string) => {
     bitacora.push('updateRecipe');
-    return { id, warnings: [] };
+    return { id, warnings: [], propagated: [] };
   });
 }
 
@@ -584,6 +584,28 @@ describe('createConfirmFormulaImport', () => {
       expect(segunda.rawMaterialsCreated).toBe(0);
       expect(segunda.rawMaterialsReused).toBe(1);
       expect(deps.createRawMaterial).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('R37 — el choque solo cuenta originales vivas', () => {
+    // El catalogo solo devuelve originales; que una version con ese nombre no vuelva lo prueba
+    // tests/integration/documentos/formula-import-versions.int.test.ts contra Postgres.
+    it('R37: un nombre que solo coincide con una version no choca y confirmar crea una receta original nueva', async () => {
+      const bitacora: Bitacora = [];
+      const recipes = dobleDeRecetas(bitacora, null);
+      const deps = crearDeps(bitacora, { recipes: recipes as unknown as FormulaImportDeps['recipes'] });
+      const confirm = createConfirmFormulaImport(deps);
+
+      const resumen = await confirm(actorConPermiso(), entradaBase({ name: 'Sin perfume' }));
+
+      expect(recipes.findAliveByNormalizedName).toHaveBeenCalledWith('Sin perfume', EMPRESA);
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+      expect(deps.createRecipe).toHaveBeenCalledTimes(1);
+      const entrada = (deps.createRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(entrada.name).toBe('Sin perfume');
+      // El alta de receta no tiene forma de colgarla de otra: nace original.
+      expect('parentRecipeId' in entrada).toBe(false);
+      expect(resumen.outcome).toBe('created');
     });
   });
 });

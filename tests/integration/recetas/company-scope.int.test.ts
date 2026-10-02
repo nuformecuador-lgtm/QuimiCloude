@@ -595,7 +595,8 @@ describe('R10 — el nombre normalizado es unico por empresa, sobre recetas VIVA
         SELECT indexdef FROM pg_indexes
          WHERE schemaname = 'public' AND indexname = 'recipes_company_name_unique'`
       expect(definicion).toHaveLength(1)
-      expect(definicion[0]?.indexdef).toMatch(/WHERE \(deleted_at IS NULL\)/i)
+      // `\(+`: con `AND parent_recipe_id IS NULL` Postgres abre dos parentesis tras el WHERE.
+      expect(definicion[0]?.indexdef).toMatch(/WHERE \(+deleted_at IS NULL\)/i)
     })
   })
 })

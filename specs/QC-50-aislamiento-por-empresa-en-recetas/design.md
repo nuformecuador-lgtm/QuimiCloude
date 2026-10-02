@@ -633,3 +633,11 @@ mintiendo (los tres de §6.1 sobre la excepción muerta).
 No hay pantalla nueva ni cambio visual: la pantalla bajo `FORMULAS_ROUTE` ve menos filas, nada más. No
 se toca ningún componente (R32). No aplica la regla multiplataforma más allá de lo que la pantalla ya
 cumple.
+
+## Enmienda 2026-10-01 — versiones de receta (QC-172)
+
+El índice `recipes_company_name_unique (company_id, name_normalized)` pasa a ser parcial con
+`WHERE deleted_at IS NULL AND parent_recipe_id IS NULL`: solo cubre recetas originales. Se añade
+`recipes_version_name_unique (parent_recipe_id, name_normalized)` con
+`WHERE deleted_at IS NULL AND parent_recipe_id IS NOT NULL` para la unicidad entre versiones de la
+misma original. Detalle en [`specs/QC-172-versiones-de-receta/`](../QC-172-versiones-de-receta/).

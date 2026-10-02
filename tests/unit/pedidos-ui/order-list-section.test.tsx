@@ -117,6 +117,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: listRecipesActionMock,
   // El panel de edicion monta `OrderForm` por fila y su efecto pide el detalle de la receta para
   // los ingredientes: sin este doble, la llamada iria a la sesion real (R43).
@@ -211,6 +212,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: CORRELATIVO_QUE_NO_DEBE_VERSE,
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: DATO_QUE_NO_DEBE_VERSE,
+    recipeVersion: null,
     quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',

@@ -9,12 +9,15 @@ import {
 } from '@/lib/modules/errores';
 import {
   createRecipeSchema,
+  createRecipeVersionSchema,
   updateRecipeSchema,
+  updateRecipeVersionSchema,
   RecetasError,
   type Actor,
   type Page,
   type RecipeDetail,
   type RecipeSummary,
+  type RecipeVersionSummary,
 } from '@/lib/modules/recetas';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -73,6 +76,20 @@ export type RecipeQueryResult =
 
 export type RecipeListResult =
   | { status: 'success'; data: Page<RecipeSummary> }
+  | ErrorState;
+
+export type CreateRecipeVersionFormState =
+  | { status: 'idle' }
+  | { status: 'success'; id: string }
+  | ErrorState;
+
+export type UpdateRecipeVersionFormState =
+  | { status: 'idle' }
+  | { status: 'success' }
+  | ErrorState;
+
+export type RecipeVersionListResult =
+  | { status: 'success'; data: readonly RecipeVersionSummary[] }
   | ErrorState;
 
 /**
@@ -195,6 +212,58 @@ export async function listRecipesAction(query: unknown): Promise<RecipeListResul
 
   try {
     const data = await recetas.listRecipes(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Alta de una version de una original. Sin `lines`, nace con una copia de las de la original. */
+export async function createRecipeVersionAction(
+  originalId: string,
+  input: unknown,
+): Promise<CreateRecipeVersionFormState> {
+  const parsed = createRecipeVersionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE };
+  }
+
+  const actor = await currentActor();
+
+  try {
+    const { id } = await recetas.createRecipeVersion(originalId, parsed.data, actor);
+    return { status: 'success', id };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Edicion de una version: nombre y lineas; pasos, descripcion e imagen son los de su original. */
+export async function updateRecipeVersionAction(
+  versionId: string,
+  input: unknown,
+): Promise<UpdateRecipeVersionFormState> {
+  const parsed = updateRecipeVersionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE };
+  }
+
+  const actor = await currentActor();
+
+  try {
+    await recetas.updateRecipeVersion(versionId, parsed.data, actor);
+    return { status: 'success' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Versiones vivas de una original, incluidas las que estan por revisar. */
+export async function listRecipeVersionsAction(originalId: string): Promise<RecipeVersionListResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await recetas.listRecipeVersions(originalId, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

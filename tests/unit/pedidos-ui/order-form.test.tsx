@@ -41,8 +41,11 @@ import {
   ORDER_STATUS_FIELD,
   ORDER_STATUS_SELECT_TESTID,
   OrderForm,
+  ORIGINAL_VERSION_VALUE,
   RECIPE_FIELD,
   RECIPE_PICKER_TESTID,
+  RECIPE_VERSION_FIELD,
+  RECIPE_VERSION_SELECT_TESTID,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
@@ -64,8 +67,9 @@ import type {
 import type {
   RecipeListResult,
   RecipeQueryResult,
+  RecipeVersionListResult,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { RecipeDetail } from '@/lib/modules/recetas';
+import type { RecipeDetail, RecipeVersionSummary } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
@@ -75,6 +79,7 @@ const {
   prohibida,
   listRecipesActionMock,
   getRecipeActionMock,
+  listRecipeVersionsActionMock,
   listPresentationsActionMock,
 } = vi.hoisted(() => {
   const noDebeInvocarse = (nombre: string) => () => {
@@ -94,6 +99,7 @@ const {
     prohibida: noDebeInvocarse,
     listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
     getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+    listRecipeVersionsActionMock: vi.fn<(id: string) => Promise<RecipeVersionListResult>>(),
     listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
   };
 });
@@ -144,6 +150,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: listRecipeVersionsActionMock,
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
 }));
@@ -197,6 +204,9 @@ function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [],
     lines: [LINEA_INGREDIENTE],
+    original: null,
+    isUnderReview: false,
+    displayName: RECETA.name,
     ...overrides,
   };
 }
@@ -208,6 +218,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: CANTIDAD,
     priority: 'ALTA',
     status: 'EN_CURSO',
@@ -265,6 +276,7 @@ beforeEach(() => {
   });
   updateOrderActionMock.mockResolvedValue({ status: 'success' });
   getRecipeActionMock.mockResolvedValue({ status: 'success', data: recetaDetalle() });
+  listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
   listPresentationsActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
@@ -931,4 +943,116 @@ describe('formulario de pedido — el identificador del error inesperado (QC-71 
     );
     esperarSinIdentificador();
   });
+});
+
+describe('el selector de version en el formulario', () => {
+  function versionDeLaReceta(name: string, isUnderReview = false): RecipeVersionSummary {
+    return {
+      id: crypto.randomUUID(),
+      name,
+      displayName: `${RECETA.name} · ${name}`,
+      isUnderReview,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+  }
+
+  function selectorDeVersion(): HTMLElement {
+    return screen.getByTestId(RECIPE_VERSION_SELECT_TESTID);
+  }
+
+  async function elegirVersion(user: ReturnType<typeof setupUser>, indice: number) {
+    await waitFor(() => expect(selectorDeVersion()).toBeEnabled());
+    await user.click(selectorDeVersion());
+    const opciones = await screen.findAllByTestId(`${RECIPE_VERSION_SELECT_TESTID}-option`);
+    await user.click(await esperarInteractiva(opciones[indice]!));
+  }
+
+  it('R27: en el alta sin receta el selector esta deshabilitado y su campo viaja vacio', () => {
+    renderFormulario();
+
+    expect(selectorDeVersion()).toBeDisabled();
+    expect(screen.getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-value`)).toHaveValue(
+      ORIGINAL_VERSION_VALUE,
+    );
+  });
+
+  it('R26, R27: elegir la receta pide sus versiones; sin ninguna ofrecible sigue deshabilitado', async () => {
+    const user = setupUser();
+    listRecipeVersionsActionMock.mockResolvedValue({
+      status: 'success',
+      data: [versionDeLaReceta('A medias', true)],
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    await waitFor(() => expect(listRecipeVersionsActionMock).toHaveBeenCalledWith(RECETA.id));
+    expect(selectorDeVersion()).toBeDisabled();
+  });
+
+  it('R28: elegir una version pide sus ingredientes y volver a «Original» los de la original', async () => {
+    const user = setupUser();
+    const viva = versionDeLaReceta('Sin colorante');
+    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [viva] });
+    renderFormulario();
+    await elegirCatalogos(user);
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA.id));
+
+    await elegirVersion(user, 1);
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(viva.id));
+
+    await elegirVersion(user, 0);
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA.id));
+  });
+
+  it('R28: el alta con version envia la original como receta y la version en su campo', async () => {
+    const user = setupUser();
+    const viva = versionDeLaReceta('Sin colorante');
+    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [viva] });
+    renderFormulario();
+    await rellenarAlta(user);
+    await elegirVersion(user, 1);
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
+    expect(enviado.get(RECIPE_VERSION_FIELD)).toBe(viva.id);
+  });
+
+  it.each([
+    ['por revisar', true],
+    ['dada de baja', false],
+  ] as const)(
+    'R29: la edicion de un pedido con una version %s la muestra elegida y el FormData la conserva',
+    async (nota, sigueListada) => {
+      const user = setupUser();
+      const actual = versionDeLaReceta('A medias', true);
+      listRecipeVersionsActionMock.mockResolvedValue({
+        status: 'success',
+        data: sigueListada ? [actual] : [],
+      });
+      const elPedido = pedido({
+        recipeId: actual.id,
+        recipeName: actual.displayName,
+        recipeVersion: { originalId: RECETA.id, originalName: RECETA.name, versionName: actual.name },
+      });
+      renderFormulario(elPedido);
+
+      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(RECETA.id);
+      expect(screen.getByRole('combobox', { name: 'Receta' })).toHaveValue(RECETA.name);
+      await waitFor(() => expect(selectorDeVersion()).toHaveTextContent(nota));
+      expect(selectorDeVersion()).toHaveTextContent(actual.name);
+      expect(selectorDeVersion()).toBeEnabled();
+      expect(getRecipeActionMock).toHaveBeenCalledWith(actual.id);
+
+      await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+      await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+      const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+      expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
+      expect(enviado.get(RECIPE_VERSION_FIELD)).toBe(actual.id);
+    },
+  );
 });
