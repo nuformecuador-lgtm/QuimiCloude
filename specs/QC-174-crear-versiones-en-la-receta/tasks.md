@@ -13,7 +13,7 @@
 
 ## Tanda 0 — medición
 
-### T0 [ ] — Medir antes de tocar
+### T0 [x] — Medir antes de tocar
 **Quién:** implementer. **Toca:** solo `progress/impl_QC-174-crear-versiones-en-la-receta.md` (nuevo).
 **Hacer:**
 1. Reverificar cada fila de `design.md > 0` con archivo:línea en la rama (puede haber entrado `dev`).
