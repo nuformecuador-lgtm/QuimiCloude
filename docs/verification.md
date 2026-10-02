@@ -399,6 +399,25 @@ Los avisos propios de `scripts/validate-features.mjs` —no ampliar la comprobac
 las fichas `done`, no cambiar el máximo por zona sin mirar `CLAUDE.md` / `AGENTS.md`— viven
 como comentarios en el script, que es donde se leen en el momento de romperlos.
 
+## La vuelta 2 del reviewer se acota a los arreglos (QC-170, 2026-10-02)
+
+Tras un RECHAZADO, lo que cambió es el diff de los arreglos, no la feature. Revisar la
+feature entera otra vez repite un trabajo ya hecho y no añade cobertura: la red contra
+regresiones fuera del diff ya existe, y es el `./init.sh` completo y el E2E de F2.4.
+
+**El incidente.** En QC-170 el leader lanzó la vuelta 2 pidiendo la trazabilidad R1-R49
+completa para unos arreglos localizados (B1-B4, m1-m6). El humano la paró («¿por qué
+tarda tanto un arreglo, no debería ser algo aislado?»). La relanzada, acotada a
+`d3e6470d..f6f1b05e`, dio OK con un menor nuevo.
+
+**Qué se acepta a cambio.** Una regresión fuera del diff de los arreglos no se ve hasta
+el gate completo de F2.4. Por eso ese gate y el E2E siguen siendo obligatorios antes del
+PR, sin excepción.
+
+**Cómo queda escrito.** Cada vuelta va como sección añadida al final de
+`progress/review_<feature>.md`: `## Vuelta N (acotada a <A>..<B>)`. Si el leader amplió,
+el título dice cuál de las excepciones de `AGENTS.md > F2.2` aplicó.
+
 ## Regla del reviewer
 Si un requisito no tiene test, o un test no verifica el requisito que dice cubrir,
 es hallazgo bloqueante. La feature no pasa a `done`.
