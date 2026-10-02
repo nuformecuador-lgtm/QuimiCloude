@@ -1,7 +1,7 @@
 // La edicion acotada «Reparto y unidad»: la accion de fila y su dialogo. Las Server Actions que
 // el dialogo no debe tocar son dobles que fallan si se les llama.
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -138,10 +138,13 @@ afterEach(() => {
 });
 
 describe('accion de fila «Reparto y unidad»', () => {
-  it('R11: con permiso de modificar pedidos y en POR_EMPACAR se pinta', () => {
+  it('R11: con permiso de modificar pedidos y en POR_EMPACAR se pinta', async () => {
     render(<OrderRowActions order={pedido('POR_EMPACAR')} canEditDistribution />);
 
-    expect(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID)).toBeInTheDocument();
+    // La accion vive dentro del menu "de los 3 puntos" (RowActionsMenu): hay que abrir el
+    // disparador antes de que el item exista en el documento (via portal).
+    fireEvent.click(screen.getByTestId('order-row-actions'));
+    expect(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID)).toBeInTheDocument();
   });
 
   it('R12: sin permiso de modificar pedidos no se pinta, tampoco en POR_EMPACAR', () => {
@@ -162,6 +165,9 @@ describe('accion de fila «Reparto y unidad»', () => {
   it('R11: solo POR_EMPACAR de todos los estados del contrato la ofrece', () => {
     const conAccion = ORDER_STATUS_VALUES.filter((status) => {
       const { unmount } = render(<OrderRowActions order={pedido(status)} canEditDistribution />);
+      // Abre el menu antes de mirar: el item solo existe en el documento (via portal) mientras
+      // el disparador esta abierto.
+      fireEvent.click(screen.getByTestId('order-row-actions'));
       const visible = screen.queryByTestId(ORDER_ACTION_DISTRIBUTION_TESTID) !== null;
       unmount();
       return visible;
@@ -181,7 +187,8 @@ describe('accion de fila «Reparto y unidad»', () => {
       />,
     );
 
-    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
   });
@@ -294,7 +301,8 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
   }
 
   async function guardarEnvases(user: ReturnType<typeof setupUser>, envases: string) {
-    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
     const campo = await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
     await user.clear(campo);
     await user.type(campo, envases);
@@ -310,7 +318,8 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     render(accionesDeFila(pedido()));
 
     await guardarEnvases(user, '5');
-    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(5);
   });
@@ -320,7 +329,8 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     render(accionesDeFila(pedido()));
 
     await guardarEnvases(user, '5');
-    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
     await user.click(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
 
     await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(2));
@@ -344,7 +354,8 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
         }),
       ),
     );
-    await user.click(screen.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(7);
   });

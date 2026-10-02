@@ -10,7 +10,7 @@
 // **Los tres estados se distinguen por `data-testid` DISTINTOS** (R44), nunca por copy: el copy
 // cambia sin avisar y un assert sobre el no dice nada sobre la exclusividad de los estados.
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -811,7 +811,10 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
 
     render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
 
-    expect(screen.getByTestId(ACCION)).toBeInTheDocument();
+    // Las acciones de fila viven dentro del menu "de los 3 puntos" (RowActionsMenu): hay que
+    // abrir el disparador antes de que el item exista en el documento (via portal).
+    fireEvent.click(screen.getByTestId('order-row-actions'));
+    expect(await screen.findByTestId(ACCION)).toBeInTheDocument();
   });
 
   it('R12: con solo empaque.modificar, la fila en POR_EMPACAR no la ofrece', async () => {
@@ -824,6 +827,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
     render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('order-row-actions'));
     expect(screen.queryByTestId(ACCION)).toBeNull();
   });
 });
