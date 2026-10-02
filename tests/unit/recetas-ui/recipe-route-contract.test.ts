@@ -747,6 +747,10 @@ describe('contrato de la ruta de recetas', () => {
       'listRecipesAction',
       'listProductsAction',
       'listUnitsAction',
+      // Operaciones de versiones de QC-172 que usa QC-174 (design §3). La lista sigue CERRADA.
+      'listRecipeVersionsAction',
+      'createRecipeVersionAction',
+      'updateRecipeVersionAction',
     ]);
 
     for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
@@ -756,7 +760,7 @@ describe('contrato de la ruta de recetas', () => {
       while ((encaje = patron.exec(codigo)) !== null) {
         expect(
           permitidas.has(encaje[1]),
-          `${ruta}: «${encaje[1]}» no es una de las siete operaciones publicadas`,
+          `${ruta}: «${encaje[1]}» no es una de las diez operaciones publicadas`,
         ).toBe(true);
       }
     }
@@ -1113,6 +1117,13 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'app/(private)/asignacion/[id]/components/order-execution-screen.tsx';
 
   /**
+   * La edicion de una version pinta el documento con la vista sin estado del asistente, no con el
+   * asistente: se acepta solo ese archivo y solo ese import exacto.
+   */
+  const MONTADOR_DE_LA_VISTA = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-version-form.tsx'));
+  const IMPORT_DE_LA_VISTA = "from '@/components/shared/step-reader/step-document-view';";
+
+  /**
    * Por nombre y no por carpeta: un test nuevo que lo montase en otro sitio tiene que salir en la
    * lista. Este mismo archivo esta porque escribe el nombre para poder prohibirlo.
    */
@@ -1228,14 +1239,22 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     );
   });
 
-  it('el asistente solo se importa desde recipe-form.tsx', () => {
+  it('el asistente solo se importa desde sus dos montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
     const importadores: string[] = [];
+
+    const vista = fuenteSinComentarios(MONTADOR_DE_LA_VISTA);
+    expect(vista).toContain(IMPORT_DE_LA_VISTA);
+    expect(vista, 'recipe-version-form.tsx no puede montar el asistente').not.toContain('StepReader');
 
     for (const carpeta of ['app', 'components', 'lib', 'hooks', 'tests', 'e2e']) {
       if (!existsSync(join(RAIZ, carpeta))) continue;
       for (const ruta of fuentesBajo(carpeta)) {
         if ((TESTS_QUE_LO_NOMBRAN as readonly string[]).includes(ruta)) continue;
-        const codigo = fuenteSinComentarios(ruta);
+        const fuente = fuenteSinComentarios(ruta);
+        // Al montador de la vista se le descuenta solo su import exacto; cualquier otro del
+        // step-reader sigue contando.
+        const codigo =
+          ruta === MONTADOR_DE_LA_VISTA ? fuente.replace(IMPORT_DE_LA_VISTA, '') : fuente;
         if (IMPORTS_DEL_ASISTENTE.some((importado) => codigo.includes(importado))) {
           importadores.push(ruta);
         }

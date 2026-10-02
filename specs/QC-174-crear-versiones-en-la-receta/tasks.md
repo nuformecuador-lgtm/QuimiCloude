@@ -56,7 +56,7 @@ quitado; ingrediente de la original con `productName: null` sale en `removed` co
 
 ## Tanda 2 — componentes
 
-### T4 [ ] — `RecipeLinesField` con `baseline`
+### T4 [x] — `RecipeLinesField` con `baseline`
 Tras T3. **Quién:** frontend_dev. **Toca:** `formulas/components/recipe-lines-field.tsx`,
 `tests/unit/recetas-ui/recipe-lines-baseline.test.tsx` (nuevo).
 **Hacer:** §2.2.
@@ -65,7 +65,7 @@ Tras T3. **Quién:** frontend_dev. **Toca:** `formulas/components/recipe-lines-f
 `changed` muestra el % de la original, los quitados se listan fuera de las filas y la suma no los
 cuenta; teclear un % o quitar una línea cambia las marcas en el mismo render (R17, R18, R19, R11).
 
-### T5 [ ] [P] — `DeleteRecipeDialog` con versiones
+### T5 [x] [P] — `DeleteRecipeDialog` con versiones
 Tras T0. **Quién:** frontend_dev. **Toca:** `formulas/components/delete-recipe-dialog.tsx`,
 `tests/unit/recetas-ui/delete-recipe-dialog.test.tsx` (nuevo); **no** toca el barrel.
 **Hecho cuando:** test con dobles de `listRecipeVersionsAction` y `deleteRecipeAction`: `kind: 'version'`
@@ -75,7 +75,7 @@ confirmar deshabilitado; error al borrar → diálogo abierto con el mensaje; si
 `deleteRecipeAction`; botones con `min-h-11 min-w-11` (R32, R33, R34, R35, R37). La tabla de la lista
 sigue llamándolo igual.
 
-### T6 [ ] — `RecipeVersionList`
+### T6 [x] — `RecipeVersionList`
 Tras T2, T5. **Quién:** frontend_dev. **Toca:** `formulas/components/recipe-version-list.tsx` (nuevo),
 `formulas/components/index.ts`, `tests/unit/recetas-ui/recipe-version-list.test.tsx` (nuevo).
 **Hacer:** §2.5.
@@ -84,7 +84,7 @@ revisar» solo en las que lo están; vacío con su texto y sin lista; «Nueva ve
 `newRecipeVersionRoute`; borrar una pasa por el diálogo en modo versión; objetivos táctiles (R1, R2, R3,
 R4, R32, R37).
 
-### T7 [ ] — `RecipeVersionForm` y su payload
+### T7 [x] — `RecipeVersionForm` y su payload
 Tras T2, T4. **Quién:** frontend_dev. **Toca:** `formulas/components/recipe-version-form.tsx` (nuevo),
 `formulas/components/recipe-form-state.ts` (`toLineFormValues`, `buildRecipeVersionPayload`),
 `formulas/components/recipe-form.tsx` (solo para usar `toLineFormValues` en `buildInitialState`),

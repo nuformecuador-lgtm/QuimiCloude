@@ -22,7 +22,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   createRecipeSchema,
-  formatPercentage,
   sumPercentages,
   updateRecipeSchema,
   type RecipeDetail,
@@ -46,9 +45,9 @@ import {
   extractGeneralLinesError,
   extractLineErrors,
   extractStepErrors,
+  toLineFormValues,
   type RecipeFormState,
   type RecipeLineErrors,
-  type RecipeLineFormValue,
   type RecipeStepErrors,
   type RecipeStepFormValue,
 } from './recipe-form-state';
@@ -152,21 +151,7 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
   return {
     name: recipe.name,
     description: recipe.description ?? '',
-    // R21: se conservan TAL CUAL, incluidas las líneas cuyo `productName` es `null` -producto
-    // dado de baja-. `key` es una clave local de React, nunca el `id` de dominio de la línea.
-    lines: recipe.lines.map(
-      (line): RecipeLineFormValue => ({
-        key: createLocalKey('line'),
-        productId: line.productId,
-        productName: line.productName,
-        // El campo se precarga con la MISMA función que formatea en el resto de la
-        // receta -«12.50» -> «12,50»-, nunca con el valor crudo del contrato.
-        percentage: formatPercentage(line.percentage),
-        // La unidad del PRODUCTO, no de la línea -que ya no tiene una-: el detalle de la
-        // receta la trae en `productUnitId` desde `RecipeLineView`.
-        productUnitId: line.productUnitId,
-      }),
-    ),
+    lines: toLineFormValues(recipe.lines),
     // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a
     // texto -el puente de QC-62 R19 se retiro con T4-, asi que reabrir una receta conserva sus
     // marcas y sus listas de verificacion intactas. `key` es una clave local de React.

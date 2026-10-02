@@ -1,6 +1,10 @@
 import type { ZodIssue } from 'zod';
 
-import type { RecipeStepDocument } from '@/lib/modules/recetas';
+import {
+  formatPercentage,
+  type RecipeLineView,
+  type RecipeStepDocument,
+} from '@/lib/modules/recetas';
 
 /**
  * Tipos del estado del formulario de receta y el armado de su payload (T13, R22, R29, R32, R35,
@@ -156,12 +160,7 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
     steps: state.steps.map((step): RecipeStepPayload => step.document),
-    lines: state.lines.map(
-      (line): RecipeLinePayload => ({
-        productId: line.productId,
-        percentage: line.percentage.replace(',', '.'),
-      }),
-    ),
+    lines: toLinePayloads(state.lines),
   };
 
   switch (state.image.kind) {
@@ -173,6 +172,47 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     case 'cleared':
       return { ...base, image: null };
   }
+}
+
+function toLinePayloads(lines: readonly RecipeLineFormValue[]): RecipeLinePayload[] {
+  return lines.map(
+    (line): RecipeLinePayload => ({
+      productId: line.productId,
+      percentage: line.percentage.replace(',', '.'),
+    }),
+  );
+}
+
+/** Estado del formulario de una versión: solo lo que la versión tiene propio. */
+export type RecipeVersionFormState = {
+  readonly name: string;
+  readonly lines: readonly RecipeLineFormValue[];
+};
+
+export type RecipeVersionPayload = {
+  readonly name: string;
+  readonly lines: readonly RecipeLinePayload[];
+};
+
+/** Pasos, descripción e imagen son de la original: la versión nunca los envía. */
+export function buildRecipeVersionPayload(state: RecipeVersionFormState): RecipeVersionPayload {
+  return { name: state.name, lines: toLinePayloads(state.lines) };
+}
+
+/**
+ * Líneas del detalle proyectadas al estado del formulario. Se conservan las de un producto dado
+ * de baja (`productName: null`) y el % se precarga ya formateado («12.50» -> «12,50»).
+ */
+export function toLineFormValues(lines: readonly RecipeLineView[]): RecipeLineFormValue[] {
+  return lines.map(
+    (line): RecipeLineFormValue => ({
+      key: createLocalKey('line'),
+      productId: line.productId,
+      productName: line.productName,
+      percentage: formatPercentage(line.percentage),
+      productUnitId: line.productUnitId,
+    }),
+  );
 }
 
 /** Genera una clave local única para una línea o un paso nuevo. Nunca es el id de dominio. */
