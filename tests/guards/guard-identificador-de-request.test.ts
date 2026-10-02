@@ -220,6 +220,9 @@ export const E2E_ESPERADOS = [
   // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
   // INTACTO.
   'versiones-de-receta.spec.ts',
+  // Alta (QC-174 R38): crea y edita versiones desde la ficha, propaga un cambio de la original y
+  // comprueba lineas en la base y el aviso «por revisar». No toca el identificador de peticion.
+  'versiones-en-la-receta.spec.ts',
   // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
   // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
   // se nombra, uno a uno-. Lo que ejercita: el recorrido de las vistas de /asignacion por

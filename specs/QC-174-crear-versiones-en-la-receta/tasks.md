@@ -143,7 +143,7 @@ validación previa falla, no se abre el aviso.
 
 ## Tanda 4 — E2E y cierre
 
-### T11 [ ] — E2E `versiones-en-la-receta`
+### T11 [x] — E2E `versiones-en-la-receta`
 Tras T8, T9, T10. **Quién:** implementer (frontend_dev escribe, implementer corre). **Toca:**
 `e2e/versiones-en-la-receta.spec.ts` (nuevo).
 **Hacer:** §6.1.

@@ -250,6 +250,7 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'recetas-porcentaje.spec.ts', // QC-147 / R22: E2E del porcentaje en lineas de receta
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
       'versiones-de-receta.spec.ts', // QC-172 / R44, R30: E2E del pedido con version de receta
+      'versiones-en-la-receta.spec.ts', // QC-174 / R38, R6: E2E de versiones en la ficha
     ])
   })
 
