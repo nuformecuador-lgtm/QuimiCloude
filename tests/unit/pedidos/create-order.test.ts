@@ -1039,3 +1039,155 @@ describe('alta con version de receta', () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)', () => {
+  const INSUFICIENTE = { kind: 'insufficient' as const, productIds: [PRODUCTO_X] };
+
+  function repositorioQueBloquea(outcome: { kind: 'reserved' } | { kind: 'not_reserved' } | typeof INSUFICIENTE) {
+    const orden: string[] = [];
+    const create = vi.fn(async () => {
+      orden.push('orders.create');
+      return filaCreada();
+    });
+    const syncForOrder = vi.fn(async () => {
+      orden.push('reservations.syncForOrder');
+      return outcome;
+    });
+    const setStatus = vi.fn(async () => {
+      orden.push('orders.setStatus');
+      return 'ok' as const;
+    });
+    const setIngredientsCost = vi.fn(async () => {
+      orden.push('orders.setIngredientsCost');
+      return 'ok' as const;
+    });
+    const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => {
+      void [id, reservedAt];
+      orden.push('orders.setReservedAt');
+    });
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create, setStatus, setIngredientsCost, setReservedAt },
+      reservations: { syncForOrder },
+    });
+    return { unitOfWork, orden, create, syncForOrder, setStatus, setIngredientsCost, setReservedAt };
+  }
+
+  function altaCon(repo: ReturnType<typeof repositorioQueBloquea>, prod = catalogoDeProductos()) {
+    return createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]])).recipes,
+      products: prod.products,
+      units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+  }
+
+  const ENTRADA = { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID };
+
+  it('R1, R6: no alcanza y sin confirmacion -> order_would_block, sin fijar estado ni reserva', async () => {
+    const repo = repositorioQueBloquea(INSUFICIENTE);
+    const createOrder = altaCon(repo);
+
+    expect(await codigoDelFallo(() => createOrder(ENTRADA, ACTOR_A))).toBe('order_would_block');
+    expect(repo.orden).toEqual(['orders.create', 'reservations.syncForOrder']);
+    expect(repo.setStatus).not.toHaveBeenCalled();
+    expect(repo.setReservedAt).not.toHaveBeenCalled();
+  });
+
+  it('R6: confirmBlocked=false explicito se comporta igual que la ausencia', async () => {
+    const repo = repositorioQueBloquea(INSUFICIENTE);
+    const createOrder = altaCon(repo);
+
+    expect(await codigoDelFallo(() => createOrder({ ...ENTRADA, confirmBlocked: false }, ACTOR_A))).toBe(
+      'order_would_block',
+    );
+  });
+
+  it('R5, R8: no alcanza y con confirmacion -> BLOQUEADO desde PENDIENTE, reserved_at nulo', async () => {
+    const repo = repositorioQueBloquea(INSUFICIENTE);
+    const createOrder = altaCon(repo);
+
+    const creado = await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect(creado.id).toBe(filaCreada().id);
+    expect(repo.setStatus).toHaveBeenCalledWith(
+      filaCreada().id,
+      'PENDIENTE',
+      'BLOQUEADO',
+      ACTOR_A.id,
+      AHORA,
+      { companyId: EMPRESA_A },
+    );
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+    // El alta inserta con el estado por defecto: el bloqueado entra solo por `setStatus`.
+    expect((repo.create.mock.calls[0] as unknown as readonly [{ status: string }])[0].status).toBe('PENDIENTE');
+  });
+
+  it('R5: con confirmacion, un importe calculado antes de bloquear se borra', async () => {
+    const repo = repositorioQueBloquea(INSUFICIENTE);
+    const createOrder = altaCon(repo, catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]));
+
+    await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('30.0000');
+    expect(repo.setIngredientsCost).toHaveBeenCalledWith(filaCreada().id, null, ACTOR_A.id, AHORA, {
+      companyId: EMPRESA_A,
+    });
+  });
+
+  it('R5: sin importe previo no hace falta borrarlo', async () => {
+    const repo = repositorioQueBloquea(INSUFICIENTE);
+    const createOrder = altaCon(repo);
+
+    await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect(repo.setIngredientsCost).not.toHaveBeenCalled();
+  });
+
+  it('R8, R10: con confirmacion pero alcanza -> PENDIENTE con material apartado, sin setStatus', async () => {
+    const repo = repositorioQueBloquea({ kind: 'reserved' });
+    const createOrder = altaCon(repo);
+
+    await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect(repo.setStatus).not.toHaveBeenCalled();
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
+  });
+
+  it('R2: receta sin lineas (not_reserved) -> PENDIENTE sin pedir confirmacion', async () => {
+    const repo = repositorioQueBloquea({ kind: 'not_reserved' });
+    const createOrder = altaCon(repo);
+
+    await createOrder(ENTRADA, ACTOR_A);
+
+    expect(repo.setStatus).not.toHaveBeenCalled();
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+  });
+
+  it('R3: importe nulo por una unidad sin base comun, con la reserva cubierta -> PENDIENTE', async () => {
+    const repo = repositorioQueBloquea({ kind: 'reserved' });
+    // El lote esta en una unidad que no se puede convertir a la del producto: el coste es nulo.
+    const prod = catalogoDeProductos(
+      [loteCosteable({ unitId: 'bidon' })],
+      [{ id: PRODUCTO_X, name: 'producto', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }],
+    );
+    const createOrder = altaCon(repo, prod);
+
+    await createOrder(ENTRADA, ACTOR_A);
+
+    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBeNull();
+    expect(repo.setStatus).not.toHaveBeenCalled();
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
+  });
+
+  it('R37: sin pedidos.modificar -> unauthorized antes de leer nada', async () => {
+    const catalogos = catalogosQueExplotan();
+    const createOrder = createCreateOrder({ ...catalogos, now: () => AHORA });
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['inventario.modificar'] };
+
+    await expect(createOrder({ ...ENTRADA, confirmBlocked: true }, SIN_PERMISO)).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+  });
+});

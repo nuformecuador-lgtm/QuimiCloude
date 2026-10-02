@@ -196,6 +196,16 @@ export class NoWholePackageError extends PedidosError {
   }
 }
 
+/** Al crear o editar, el material disponible no cubre el pedido y no llego la confirmacion de
+ *  guardarlo bloqueado. Se lanza dentro de la transaccion para que no quede nada escrito. */
+export class OrderWouldBlockError extends PedidosError {
+  readonly code = 'order_would_block';
+
+  constructor(diagnostic?: string) {
+    super('order_would_block', diagnostic);
+  }
+}
+
 /** El pedido no tiene ninguna linea de reparto: no se puede empezar el empaque sin saber en que
  *  presentaciones se entrega. */
 export class OrderWithoutDistributionError extends PedidosError {

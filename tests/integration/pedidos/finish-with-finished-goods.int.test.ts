@@ -29,6 +29,7 @@ import {
 import {
   findAliveOrderById,
   createOrderWriteRepository,
+  findBlockedOrderIds,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
@@ -107,7 +108,7 @@ const units: UnitCatalog = {
 const orderPackingRepository: OrderPackingRepository = { startPackingAlive: startPackingAliveOrder };
 
 const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
-const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); } }, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
 
 const orderCatalog: OrderCatalog = {
   findAliveById: async (id, companyId) => {

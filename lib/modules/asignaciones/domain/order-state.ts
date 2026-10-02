@@ -45,10 +45,18 @@ import {
 } from './errors';
 
 /** `null` = ese estado ADMITE las escrituras. Los que no, con su error propio y distinto:
- *  son frases distintas para quien las lee, no un matiz de redaccion. */
+ *  son frases distintas para quien las lee, no un matiz de redaccion.
+ *
+ *  `BLOQUEADO` ADMITE las escrituras -asignar, quitar grupo y desasignar-, y no por
+ *  descuido: se le puede poner responsable a un pedido que todavia no tiene material, y quien
+ *  lo asigne no lo va a poder arrancar hasta que el material entre. Lo que no se admite es
+ *  arrancarlo, y eso lo rechazan `get-assigned-order-execution` y `start-assigned-order`, que
+ *  tienen su propio error para no confundir «no se puede iniciar» con «no se le pueden poner
+ *  responsables». */
 const ERROR_POR_ESTADO = {
   PENDIENTE: null,
   EN_CURSO: null,
+  BLOQUEADO: null,
   POR_EMPACAR: (): AsignacionesError => new OrderProducedFrozenError(),
   EN_EMPAQUE: (): AsignacionesError => new OrderProducedFrozenError(),
   ENTREGADO: (): AsignacionesError => new OrderDeliveredFrozenError(),

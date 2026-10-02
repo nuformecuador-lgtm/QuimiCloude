@@ -10,6 +10,7 @@ import {
   ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID,
   ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_COLUMN_ID,
+  ASSIGNED_ORDER_STATUS_LABELS,
   MISSING_VALUE_MARK,
   buildAssignedOrdersColumns,
 } from '@/app/(private)/asignacion/components';
@@ -152,5 +153,26 @@ describe('R20 - el propio actor no aparece (el dominio ya lo excluye de otherRes
 
     expect(screen.getByRole('img', { name: 'Beto Ruiz' })).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Ana López García' })).not.toBeInTheDocument();
+  });
+});
+
+describe('R31, R34 - un pedido BLOQUEADO se marca en la lista del Operador', () => {
+  it('la columna Estado pinta «Bloqueado» con `data-status`, no el literal del enum', () => {
+    renderCell(ASSIGNED_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status: 'BLOQUEADO' });
+
+    const cell = screen.getByTestId('assigned-order-status');
+    expect(cell).toHaveAttribute('data-status', 'BLOQUEADO');
+    expect(cell).toHaveTextContent(ASSIGNED_ORDER_STATUS_LABELS.BLOQUEADO);
+    expect(cell).not.toHaveTextContent('BLOQUEADO');
+  });
+
+  it('la columna Entrar no ofrece enlace a la ejecucion', () => {
+    const { container } = renderCell(ASSIGNED_ORDER_ENTER_COLUMN_ID, {
+      ...BASE_ORDER,
+      status: 'BLOQUEADO',
+    });
+
+    expect(container.querySelector('a')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeDisabled();
   });
 });

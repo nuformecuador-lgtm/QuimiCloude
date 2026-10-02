@@ -137,11 +137,11 @@ function montar(deps: {
 }
 
 describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados editables", () => {
-  it('REPARTO_EDITABLE_STATUSES es exactamente PENDIENTE, EN_CURSO, POR_EMPACAR', () => {
-    expect(REPARTO_EDITABLE_STATUSES).toEqual(['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR']);
+  it('REPARTO_EDITABLE_STATUSES es exactamente PENDIENTE, EN_CURSO, POR_EMPACAR y BLOQUEADO (QC-138)', () => {
+    expect(REPARTO_EDITABLE_STATUSES).toEqual(['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'BLOQUEADO']);
   });
 
-  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR'])(
+  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'BLOQUEADO'])(
     'acepta %s: ok',
     async (status) => {
       const { orders } = ordersDoble(filaBloqueada({ status }));

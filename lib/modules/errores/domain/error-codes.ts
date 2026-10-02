@@ -21,6 +21,7 @@
  * **2026-09-27**: `order_without_distribution`,
  * `order_presentation_line_not_editable`, `order_distribution_exceeds_quantity`,
  * `order_without_unit`.
+ * **Decimoquinta enmienda, 2026-10-01**: `order_would_block`, `order_blocked`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -112,6 +113,12 @@ export const ERROR_CODES = [
   'order_not_packable',
   // Distinto de `order_delivered_frozen`: el pedido esta por empacar o en empaque, no entregado.
   'order_produced_frozen',
+  // Distinto de `insufficient_material`: no rechaza la operacion, pide confirmar que el pedido se
+  // guarde bloqueado porque el material disponible no lo cubre.
+  'order_would_block',
+  // Distinto de `invalid_transition`: el pedido esta bloqueado por falta de material y no se puede
+  // abrir ni iniciar hasta que se desbloquee.
+  'order_blocked',
   // Distinto de `presentation_without_content`: el pedido no tiene ni una linea de reparto, no le
   // falta el contenido a una que ya existe.
   'order_without_distribution',

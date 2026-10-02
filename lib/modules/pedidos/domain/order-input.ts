@@ -108,6 +108,9 @@ export const createOrderSchema = z.object({
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
   unitId: unitIdSchema,
   presentationLines: presentationLinesSchema,
+  /** Permiso explicito para guardar el pedido bloqueado si el material no alcanza. No elige el
+   *  estado: si al escribir alcanza, el pedido queda pendiente igual. */
+  confirmBlocked: z.boolean().default(false),
   // El formulario envia '' cuando se elige «Original».
   recipeVersionId: z
     .preprocess((value) => (value === '' ? null : value), z.string().uuid().nullable())

@@ -46,6 +46,7 @@ import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/dri
 import { findPresentationRefs, findPresentationsByNormalizedNames } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   findAliveOrderById,
+  findBlockedOrderIds,
   listAliveOrders,
   createOrderWriteRepository,
   startPackingAliveOrder,
@@ -96,7 +97,7 @@ function connectionString(): string {
 // El cableado REAL: los mismos adaptadores que `lib/composition`.
 // ---------------------------------------------------------------------------
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>

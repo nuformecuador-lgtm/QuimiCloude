@@ -1,5 +1,5 @@
 // lib/modules/pedidos/domain/order-classification.ts
-/** Los SEIS estados, EN SU ORDEN DE DECLARACION del esquema. El dominio NO puede importar
+/** Los SIETE estados, EN SU ORDEN DE DECLARACION del esquema. El dominio NO puede importar
  *  `@prisma/client` (`docs/architecture.md > La regla de dependencias`), asi que estos valores
  *  son un DUPLICADO del `enum OrderStatus` de `db/schema.prisma`. Es el punto fragil del
  *  modulo: `module-contract.test.ts` lee el esquema y compara las dos listas, valor a valor y
@@ -16,13 +16,16 @@ export const ORDER_STATUS_VALUES = [
   'CANCELADO',
   'POR_EMPACAR',
   'EN_EMPAQUE',
+  'BLOQUEADO',
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUS_VALUES)[number];
 
 /** El mismo conjunto, en el orden del FLUJO de trabajo: `PENDIENTE -> EN_CURSO -> POR_EMPACAR
  *  -> EN_EMPAQUE -> ENTREGADO`, con `CANCELADO` al final porque no es un paso del flujo sino
- *  una salida lateral. Lo usan las pantallas que pintan filtros o columnas de estado; ninguna
- *  lectura de la base ni ninguna regla de transicion depende de este orden. */
+ *  una salida lateral, y `BLOQUEADO` tambien al final y por el mismo motivo: no es un paso, es
+ *  un estado al que se llega porque el material no alcanza y del que se sale cuando llega. Lo
+ *  usan las pantallas que pintan filtros o columnas de estado; ninguna lectura de la base ni
+ *  ninguna regla de transicion depende de este orden. */
 export const ORDER_STATUS_FLOW: readonly OrderStatus[] = [
   'PENDIENTE',
   'EN_CURSO',
@@ -30,6 +33,7 @@ export const ORDER_STATUS_FLOW: readonly OrderStatus[] = [
   'EN_EMPAQUE',
   'ENTREGADO',
   'CANCELADO',
+  'BLOQUEADO',
 ];
 
 /** Las cuatro prioridades, DE MENOR A MAYOR. El orden es el dato: es lo que fijo la decision

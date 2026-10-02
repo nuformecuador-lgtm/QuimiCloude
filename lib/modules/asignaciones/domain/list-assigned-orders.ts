@@ -35,12 +35,13 @@ export type ListAssignedOrdersDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
 };
 
-const ESTADOS_DE_TRABAJO = ['PENDIENTE', 'EN_CURSO'] as const;
+// `BLOQUEADO` entra para que el Operador vea el pedido aunque todavia no lo pueda iniciar.
+const ESTADOS_DE_TRABAJO = ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const;
 
 /** El estrechamiento es seguro porque la consulta se llama SIEMPRE filtrando por
  *  `ESTADOS_DE_TRABAJO`: ninguna fila puede volver con otro estado. */
-function toWorkingStatus(status: string): 'PENDIENTE' | 'EN_CURSO' {
-  return status as 'PENDIENTE' | 'EN_CURSO';
+function toWorkingStatus(status: string): AssignedOrderView['status'] {
+  return status as AssignedOrderView['status'];
 }
 
 export function createListAssignedOrders(

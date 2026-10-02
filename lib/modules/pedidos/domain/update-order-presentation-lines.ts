@@ -27,13 +27,15 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 import type { OrderDistributionTransaction } from '../ports/order-distribution-transaction';
 
 /**
- * El reparto y la unidad se pueden editar hasta Comenzar empaque. `'BLOQUEADO'` no existe hoy
- * en el enum de `db/schema.prisma`, asi que esta lista no lo contempla.
+ * El reparto y la unidad se pueden editar hasta Comenzar empaque. `'BLOQUEADO'` entra porque
+ * QC-138 lo anadio al enum (R9, R11): el bloqueo es por material y el reparto no participa en la
+ * reserva (R30).
  */
 export const REPARTO_EDITABLE_STATUSES: readonly OrderStatus[] = [
   'PENDIENTE',
   'EN_CURSO',
   'POR_EMPACAR',
+  'BLOQUEADO',
 ];
 
 export type UpdateOrderPresentationLinesInput = {

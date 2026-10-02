@@ -116,6 +116,50 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
   })
 
+  it('R27: borra logicamente un BLOQUEADO, igual que un PENDIENTE', async () => {
+    // Un pedido sin material no dejo consumo ni lote que explicar, asi que borrarlo no pierde
+    // nada: se va por la misma puerta que un PENDIENTE, con su marca de tiempo y su autor.
+    const d = dobles({ fila: fila('BLOQUEADO') })
+
+    await createDeleteOrder(d)(ORDER_ID, ADMIN)
+
+    expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
+    expect(d.softDeleteAlive.mock.calls[0]).toEqual([
+      ORDER_ID,
+      ADMIN.id,
+      AHORA,
+      { companyId: ADMIN.companyId },
+    ])
+  })
+
+  it('R27, R5: borrar un BLOQUEADO libera sin encontrar nada y tampoco lo rompe', async () => {
+    // No aparta material, asi que la liberacion no tiene filas que tocar; se afirma el camino
+    // completo, no una excepcion: la operacion termina y el `reserved_at` queda vacio.
+    const d = dobles({ fila: fila('BLOQUEADO') })
+
+    await createDeleteOrder(d)(ORDER_ID, ADMIN)
+
+    expect(d.releaseForOrder).toHaveBeenCalledTimes(1)
+    expect(d.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, { companyId: ADMIN.companyId })
+    expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
+  })
+
+  it('R27: BLOQUEADO no engaña a la lista de no borrables, que son los cuatro estados de antes', async () => {
+    // La lista es explicita a proposito, asi que el caso anterior no basta: si alguien colara
+    // BLOQUEADO en ella, ese caso caeria, y aqui se afirma el conjunto entero de los siete.
+    for (const status of ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const) {
+      const d = dobles({ fila: fila(status) })
+      await createDeleteOrder(d)(ORDER_ID, ADMIN)
+      expect(d.softDeleteAlive, status).toHaveBeenCalledTimes(1)
+    }
+    for (const status of ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      const d = dobles({ fila: fila(status) })
+      expect(await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN)), status).toBe(
+        'not_deletable',
+      )
+    }
+  })
+
   it('no borra un ENTREGADO, y falla con not_deletable, no con invalid_transition (R32)', async () => {
     const d = dobles({ fila: fila('ENTREGADO') })
 

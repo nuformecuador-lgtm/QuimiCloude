@@ -31,6 +31,7 @@ import {
   findAliveOrderById,
   listAliveOrders,
   createOrderWriteRepository,
+  findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
@@ -76,7 +77,7 @@ function normalizeForTest(name: string): string {
 // El cableado REAL: los mismos adaptadores que `lib/composition`.
 // ---------------------------------------------------------------------------
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -328,7 +329,7 @@ describe('R12 — editar a la baja deja solo la diferencia', () => {
 });
 
 describe('R13 — editar que ya no cabe libera todo', () => {
-  it('subir la cantidad por encima de la existencia libera lo que tenia apartado, sin error', async () => {
+  it('subir la cantidad por encima de la existencia, confirmando, libera lo que tenia apartado y lo deja BLOQUEADO (QC-138 R11)', async () => {
     const fixture = await crearFixture();
     const { productId } = await crearProductoConLote(fixture, '100');
     const recipeId = await crearReceta(fixture);
@@ -337,7 +338,12 @@ describe('R13 — editar que ya no cabe libera todo', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
-      await updateOrder(creado.id, nuevoPedido(recipeId, fixture.unitId, '1000.0000'), actorDe(fixture));
+      // Sin confirmar no se escribiria nada (QC-138 R6): el caso vigila la liberacion.
+      await updateOrder(
+        creado.id,
+        { ...nuevoPedido(recipeId, fixture.unitId, '1000.0000'), confirmBlocked: true },
+        actorDe(fixture),
+      );
 
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos).toEqual([
@@ -345,6 +351,8 @@ describe('R13 — editar que ya no cabe libera todo', () => {
         { kind: 'release', quantity: '10.0000', createdBy: fixture.actorId },
       ]);
       expect(await reservedAtDe(creado.id)).toBeNull();
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
+      expect(row.status).toBe('BLOQUEADO');
     } finally {
       await borrarFixture(fixture, [productId]);
     }
@@ -462,17 +470,18 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '5.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('5.0000');
 
-      // Subir por encima de la existencia no rechaza: la edicion nunca consume, asi que
-      // `insufficient_material` no puede salir de aqui.
+      // Confirmando el bloqueo (QC-138 R8), subir por encima de la existencia no rechaza: la
+      // edicion nunca consume, y el `status` de entrada no mueve el pedido a `ENTREGADO`.
       await updateOrder(
         creado.id,
-        nuevoPedido(recipeId, fixture.unitId, '500.0000', 'ENTREGADO'),
+        { ...nuevoPedido(recipeId, fixture.unitId, '500.0000', 'ENTREGADO'), confirmBlocked: true },
         actorDe(fixture),
       );
 
       expect(await stockDe(batchId)).toBe('5.0000');
       const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
-      expect(row.status).toBe('PENDIENTE');
+      // QC-138 R11: el PENDIENTE que deja de alcanzar queda BLOQUEADO.
+      expect(row.status).toBe('BLOQUEADO');
       expect(row.quantity.toFixed(4)).toBe('500.0000');
       const movimientos = await movimientosDe(creado.id);
       expect(movimientos.every((m) => m.kind !== 'consume')).toBe(true);

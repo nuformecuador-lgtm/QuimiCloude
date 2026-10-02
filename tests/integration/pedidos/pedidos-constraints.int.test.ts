@@ -317,7 +317,7 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   }
 }
 
-type OrderStatusValue = 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO'
+type OrderStatusValue = 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'BLOQUEADO'
 type OrderPriorityValue = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
 
 interface OrderSeed {
@@ -1219,6 +1219,38 @@ describe('el CHECK del pedido entregado', () => {
       })
       expect(entregado.status).toBe('ENTREGADO')
       expect(entregado.deletedAt).toBeNull()
+    })
+  })
+
+  it('R35: un pedido BLOQUEADO vivo se inserta sin motivo de cancelacion, sin packed_by ni finished_at, y se borra logicamente', async () => {
+    // Ninguno de los CHECK existentes nombra BLOQUEADO -solo miran ENTREGADO, CANCELADO o el
+    // conjunto de empaque-, asi que un pedido bloqueado nace con esas tres columnas nulas y
+    // el borrado logico se acepta igual que en PENDIENTE o EN_CURSO.
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+
+      const bloqueado = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        status: 'BLOQUEADO',
+      })
+      const nacido = await tx.order.findUniqueOrThrow({
+        where: { id: bloqueado },
+        select: { status: true, cancellationReason: true, packedBy: true, finishedAt: true, deletedAt: true },
+      })
+      expect(nacido.status).toBe('BLOQUEADO')
+      expect(nacido.cancellationReason).toBeNull()
+      expect(nacido.packedBy).toBeNull()
+      expect(nacido.finishedAt).toBeNull()
+      expect(nacido.deletedAt).toBeNull()
+
+      const borrado = await tx.order.update({
+        where: { id: bloqueado },
+        data: { deletedAt: new Date() },
+        select: { deletedAt: true, status: true },
+      })
+      expect(borrado.deletedAt).not.toBeNull()
+      expect(borrado.status).toBe('BLOQUEADO')
     })
   })
 })

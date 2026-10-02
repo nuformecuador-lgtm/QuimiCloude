@@ -12,8 +12,8 @@ export type AssignedOrderView = {
   /** Cadena decimal, nunca `number` (`docs/architecture.md > Anti-patrones`). */
   readonly quantity: string;
   readonly priority: OrderPriority;
-  /** Dos literales y no `OrderStatus`: colar un estado final deja de compilar. */
-  readonly status: 'PENDIENTE' | 'EN_CURSO';
+  /** Los estados de trabajo y no `OrderStatus`: colar un estado final deja de compilar. */
+  readonly status: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO';
   /** Sin el propio actor. */
   readonly otherResponsibles: readonly OrderResponsible[];
   /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */

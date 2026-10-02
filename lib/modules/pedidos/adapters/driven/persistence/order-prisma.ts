@@ -719,7 +719,7 @@ async function setAliveOrderStatus(
   id: string,
   from: OrderStatus,
   to: OrderStatus,
-  actorId: string,
+  actorId: string | null,
   now: Date,
   scope: OrderScope,
   tx: PrismaLike,
@@ -742,6 +742,26 @@ async function setAliveOrderStatus(
   return stillAlive === null ? 'not_found' : 'stale';
 }
 
+/** `setIngredientsCost` de `OrderWriteRepository`: solo el importe y el sello de modificacion. */
+async function setAliveOrderIngredientsCost(
+  id: string,
+  ingredientsCost: string | null,
+  actorId: string | null,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<'ok' | 'not_found'> {
+  const { count } = await tx.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    data: {
+      ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
+      updatedAt: now,
+      updatedBy: actorId,
+    },
+  });
+  return count === 1 ? 'ok' : 'not_found';
+}
+
 /**
  * `setReservedAt` de `OrderWriteRepository`. `$executeRaw` y no la API tipada: un `update` de
  * Prisma siempre mueve `updated_at` con `@updatedAt`, y apartar o liberar material no es una
@@ -761,6 +781,17 @@ async function setOrderReservedAt(
        AND "company_id" = ${companyId}::uuid
        AND "deleted_at" IS NULL
   `);
+}
+
+/** `findBlockedIds`: el filtro y el orden coinciden con el indice parcial
+ *  `orders_blocked_company_created_idx`. */
+export async function findBlockedOrderIds(scope: OrderScope): Promise<readonly string[]> {
+  const rows = await prisma.order.findMany({
+    where: { AND: [orderCompanyScope(scope), { status: 'BLOQUEADO', deletedAt: null }] },
+    select: { id: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  return rows.map((row) => row.id);
 }
 
 /**
@@ -829,6 +860,8 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     cancelAlive: (id, reason, actorId, now, scope) => cancelAliveOrder(id, reason, actorId, now, scope, tx),
     softDeleteAlive: (id, actorId, now, scope) => softDeleteAliveOrder(id, actorId, now, scope, tx),
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
+    setIngredientsCost: (id, ingredientsCost, actorId, now, scope) =>
+      setAliveOrderIngredientsCost(id, ingredientsCost, actorId, now, scope, tx),
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
     updatePresentationLinesAlive: (id, unitId, lines, actorId, now, scope) =>
       updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),

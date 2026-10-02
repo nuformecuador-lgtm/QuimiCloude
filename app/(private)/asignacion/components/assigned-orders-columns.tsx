@@ -22,10 +22,12 @@ function MissingValue({ field }: { readonly field: string }) {
   );
 }
 
-export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<'PENDIENTE' | 'EN_CURSO', string>> = {
-  PENDIENTE: 'Pendiente',
-  EN_CURSO: 'En curso',
-};
+export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<AssignedOrderView['status'], string>> =
+  {
+    PENDIENTE: 'Pendiente',
+    EN_CURSO: 'En curso',
+    BLOQUEADO: 'Bloqueado',
+  };
 
 export const ASSIGNED_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
   BAJA: 'Baja',

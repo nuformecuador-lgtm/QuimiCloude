@@ -1,6 +1,14 @@
 'use client';
 
-import { useActionState, useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  startTransition,
+  useActionState,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { useFormStatus } from 'react-dom';
 
 import {
@@ -43,6 +51,7 @@ import type { UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { BlockedOrderDialog } from './blocked-order-dialog';
 import { OrderCostQuote } from './order-cost-quote';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
@@ -165,6 +174,8 @@ const PRESENTATION_LINES_FIELD = 'presentationLines';
  */
 export const ORDER_STATUS_FIELD = 'status';
 
+export const ORDER_CONFIRM_BLOCKED_FIELD = 'confirmBlocked';
+
 export const ORDER_PRIORITY_SELECT_TESTID = 'order-priority-select';
 export const ORDER_PRIORITY_OPTION_TESTID = 'order-priority-option';
 export const ORDER_STATUS_SELECT_TESTID = 'order-status-select';
@@ -254,6 +265,7 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
  * fabrica el formulario, no el servidor.
  */
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
+const WOULD_BLOCK_CODE = 'order_would_block' satisfies ErrorCode;
 const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
 
 type FieldErrors = Partial<Record<OrderFieldName, string>>;
@@ -281,6 +293,13 @@ type OrderFormState =
        */
       serverError: ErrorState;
       fieldErrors: FieldErrors;
+      values: FieldValues;
+    }
+  | {
+      status: 'wouldBlock';
+      message: string;
+      /** El envio que se repite, tal cual, si se confirma guardarlo bloqueado. */
+      formData: FormData;
       values: FieldValues;
     };
 
@@ -556,6 +575,10 @@ export function OrderForm({
 
     const result = await submit(order, formData);
 
+    if (result.status === 'error' && result.code === WOULD_BLOCK_CODE) {
+      return { status: 'wouldBlock', message: result.message, formData, values };
+    }
+
     if (result.status === 'error') {
       // R34: DONDE se pinta lo decide el `code`, nunca el texto del mensaje.
       const field = CODE_TO_FIELD[result.code];
@@ -570,15 +593,29 @@ export function OrderForm({
     return { status: 'success' };
   }
 
-  const [state, formAction] = useActionState(save, INITIAL_STATE);
+  const [state, formAction, isPending] = useActionState(save, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;
     onSaved();
   }, [state, onSaved]);
 
+  // Se recuerda que estado se cerro, no un booleano: un nuevo aviso es otro objeto y vuelve a abrir.
+  const [closedWarning, setClosedWarning] = useState<OrderFormState | null>(null);
+  const blockedOpen = state.status === 'wouldBlock' && closedWarning !== state;
+
+  function saveBlocked() {
+    if (state.status !== 'wouldBlock') return;
+    const confirmed = new FormData();
+    for (const [name, value] of state.formData) confirmed.append(name, value);
+    confirmed.set(ORDER_CONFIRM_BLOCKED_FIELD, 'true');
+    setClosedWarning(state);
+    startTransition(() => formAction(confirmed));
+  }
+
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
-  const values = state.status === 'error' ? state.values : undefined;
+  const values =
+    state.status === 'error' || state.status === 'wouldBlock' ? state.values : undefined;
 
   /** Valor inicial de un campo: lo escrito en el intento fallido; si no, el del pedido. */
   const initialValue = (field: OrderFieldName, fromOrder: string): string =>
@@ -615,8 +652,14 @@ export function OrderForm({
       data-testid="order-sheet"
       isForm
       formProps={{ action: formAction, noValidate: true, 'data-testid': ORDER_FORM_TESTID }}
-      footer={<FormActions canSave={canSave} />}
+      footer={<FormActions canSave={canSave} busy={isPending} />}
     >
+      <BlockedOrderDialog
+        open={blockedOpen}
+        message={state.status === 'wouldBlock' ? state.message : ''}
+        onConfirm={saveBlocked}
+        onDismiss={() => setClosedWarning(state)}
+      />
       <SheetHeader>
         <SheetTitle data-testid={ORDER_FORM_TITLE_TESTID}>
           {describeOrder(recipeName, quantity) ?? (isEdit ? EDIT_TITLE : CREATE_TITLE)}
@@ -903,7 +946,7 @@ function SelectField({
  * Cierra por el primitivo (`SheetClose`), asi que no necesita saber nada del estado de apertura,
  * y al no navegar la URL conserva pagina, tamano, orden y filtros (R25).
  */
-function FormActions({ canSave }: { canSave: boolean }) {
+function FormActions({ canSave, busy }: { canSave: boolean; busy: boolean }) {
   return (
     <>
       <SheetClose
@@ -918,7 +961,7 @@ function FormActions({ canSave }: { canSave: boolean }) {
       >
         Cancelar
       </SheetClose>
-      <SaveButton canSave={canSave} />
+      <SaveButton canSave={canSave} busy={busy} />
     </>
   );
 }
@@ -932,8 +975,9 @@ function FormActions({ canSave }: { canSave: boolean }) {
  * mientras la action esta en vuelo. Sin receta valida no tiene sentido llamar a la operacion: el
  * esquema del contrato la rechazaria igual, pero el boton le dice al usuario lo que le espera.
  */
-function SaveButton({ canSave }: { canSave: boolean }) {
-  const { pending } = useFormStatus();
+function SaveButton({ canSave, busy }: { canSave: boolean; busy: boolean }) {
+  // `useFormStatus` no ve el reenvio confirmado, que no sale del `<form>`.
+  const pending = useFormStatus().pending || busy;
 
   return (
     <Button

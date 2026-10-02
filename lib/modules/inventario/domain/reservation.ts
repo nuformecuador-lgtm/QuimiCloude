@@ -14,7 +14,13 @@ export type ReservationRequirementLine = {
   readonly quantity: string;
 };
 
-export type ReservationOutcome = { readonly kind: 'reserved' } | { readonly kind: 'not_reserved' };
+export type ReservationOutcome =
+  | { readonly kind: 'reserved' }
+  /** Nada que apartar: receta sin lineas o necesidad nula. */
+  | { readonly kind: 'not_reserved' }
+  /** El disponible no cubre la necesidad de estos productos; un producto sin lotes cuenta aqui.
+   *  No queda nada apartado: lo que el pedido tuviera se libera. */
+  | { readonly kind: 'insufficient'; readonly productIds: readonly ProductId[] };
 
 export type ConsumptionOutcome =
   | { readonly kind: 'consumed' }

@@ -111,8 +111,8 @@ describe('R41 - las etiquetas de estado cubren los seis valores del contrato', (
   });
 });
 
-describe('R24, R41 - la columna Estado declara el filtro select de los seis estados, en orden de flujo', () => {
-  it('la columna Estado trae `filter: select` con las seis opciones', () => {
+describe('R24, R41 - la columna Estado declara el filtro select de los siete estados, en orden de flujo', () => {
+  it('la columna Estado trae `filter: select` con las siete opciones', () => {
     const columns = buildCompanyOrdersColumns({ showFinishedAt: false });
     const status = columns.find((column) => column.id === COMPANY_ORDER_STATUS_COLUMN_ID);
 
@@ -124,6 +124,7 @@ describe('R24, R41 - la columna Estado declara el filtro select de los seis esta
       'EN_EMPAQUE',
       'ENTREGADO',
       'CANCELADO',
+      'BLOQUEADO',
     ]);
   });
 
@@ -166,5 +167,24 @@ describe('R25 - la presentación, la prioridad, el estado y los responsables', (
   it('responsables: sin responsables, la celda no da error', () => {
     renderCell(COMPANY_ORDER_RESPONSIBLES_COLUMN_ID, { ...BASE_ORDER, responsibles: [] });
     expect(screen.getByTestId('responsible-avatars')).toBeInTheDocument();
+  });
+});
+
+describe('R34 - «Todos» muestra y filtra BLOQUEADO', () => {
+  it('la celda Estado pinta «Bloqueado» con `data-status`, no el literal del enum', () => {
+    renderCell(COMPANY_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status: 'BLOQUEADO' });
+
+    const cell = screen.getByTestId('company-order-status');
+    expect(cell).toHaveAttribute('data-status', 'BLOQUEADO');
+    expect(cell).toHaveTextContent('Bloqueado');
+    expect(cell).not.toHaveTextContent('BLOQUEADO');
+  });
+
+  it('el filtro de Estado ofrece la opcion «Bloqueado»', () => {
+    expect(COMPANY_ORDER_STATUS_FILTER_OPTIONS).toContainEqual({
+      value: 'BLOQUEADO',
+      label: COMPANY_ORDER_STATUS_LABELS.BLOQUEADO,
+    });
+    expect(COMPANY_ORDER_STATUS_LABELS.BLOQUEADO).toBe('Bloqueado');
   });
 });

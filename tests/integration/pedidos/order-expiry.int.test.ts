@@ -458,3 +458,54 @@ describe('R17, R21 — aislamiento por empresa: la busqueda de A no devuelve ped
     }
   });
 });
+
+describe('QC-138 R29 — el proceso diario no toca un pedido BLOQUEADO', () => {
+  it('R29: un BLOQUEADO creado hace mas de 15 dias sigue BLOQUEADO, sin motivo ni movimientos', async () => {
+    const fixture = await crearFixture();
+    const { productId } = await crearProductoConLote(fixture, '5');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const creado = await createOrder(
+        { ...nuevoPedido(recipeId, fixture.unitId, '10.0000'), confirmBlocked: true },
+        actorDe(fixture),
+      );
+      const antiguo = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
+      // El ano del correlativo va atado al de `created_at` por un CHECK: se mueven juntos.
+      await prisma.$executeRaw`UPDATE "orders" SET "created_at" = ${antiguo}::timestamptz, "order_year" = ${antiguo.getUTCFullYear()} WHERE "id" = ${creado.id}::uuid`;
+      expect(await estadoDe(creado.id)).toEqual({ status: 'BLOQUEADO', cancellationReason: null, reservedAt: null });
+
+      await expireStaleOrders();
+
+      expect(await estadoDe(creado.id)).toEqual({ status: 'BLOQUEADO', cancellationReason: null, reservedAt: null });
+      expect(await movimientosDe(creado.id)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R29: el filtro es el estado, no solo reserved_at: un BLOQUEADO con un reserved_at vencido tampoco se cancela', async () => {
+    const fixture = await crearFixture();
+    const { productId } = await crearProductoConLote(fixture, '5');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const creado = await createOrder(
+        { ...nuevoPedido(recipeId, fixture.unitId, '10.0000'), confirmBlocked: true },
+        actorDe(fixture),
+      );
+      const vencido = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
+      await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${vencido}::timestamptz WHERE "id" = ${creado.id}::uuid`;
+
+      const resultado = await expireStaleOrders();
+
+      expect(resultado.failed.filter((f) => f.stage === 'order' && f.id === creado.id)).toEqual([]);
+      expect((await estadoDe(creado.id)).status).toBe('BLOQUEADO');
+      expect(await movimientosDe(creado.id)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+});

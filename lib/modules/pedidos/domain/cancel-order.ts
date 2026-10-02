@@ -17,14 +17,20 @@ export type CancelOrderDeps = {
 };
 
 /**
- * Los DOS estados desde los que se cancela. Desde `ENTREGADO` no se cancela -eso seria una
+ * Los TRES estados desde los que se cancela. Desde `ENTREGADO` no se cancela -eso seria una
  * devolucion, que no existe- y desde `CANCELADO` tampoco, porque es final. `POR_EMPACAR` y
  * `EN_EMPAQUE` tampoco: el material ya se consumio al dejar el pedido `POR_EMPACAR`, asi que
  * cancelar dejaria un consumo sin pedido que lo explique; un problema en esos dos estados se
  * corrige con un ajuste de inventario, no con esta lista. Escrita como lista para que anadir un
- * septimo estado obligue a decidir explicitamente si es cancelable.
+ * estado nuevo obligue a decidir explicitamente si es cancelable.
+ *
+ * `BLOQUEADO` SI se cancela, con las mismas reglas que un `PENDIENTE` y su motivo: la
+ * cancelacion es la unica salida manual de un pedido sin material, porque en lo demas no cabe
+ * cancelar -no se fabrico nada- y esperar lotes no es una cancelacion. Cancelar uno bloqueado no
+ * libera nada, porque no tiene nada apartado; la llamada a `releaseForOrder` no encuentra filas
+ * y no falla por eso.
  */
-const CANCELABLES: readonly OrderStatus[] = ['PENDIENTE', 'EN_CURSO'];
+const CANCELABLES: readonly OrderStatus[] = ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'];
 
 /**
  * Cancelacion. CASO DE USO PROPIO y UNICO camino capaz de escribir el estado `CANCELADO` y
@@ -32,7 +38,7 @@ const CANCELABLES: readonly OrderStatus[] = ['PENDIENTE', 'EN_CURSO'];
  * `NewOrder.status` es `EditableOrderStatus` y `cancelAlive` es el unico metodo del puerto
  * con `reason`.
  *
- * Es el UNICO de los seis que recibe y escribe un motivo. Y una vez escrito no se vuelve a
+ * Es el UNICO caso de uso que recibe y escribe un motivo. Y una vez escrito no se vuelve a
  * tocar: de `CANCELADO` no se sale -R21 lo deja sin edicion y su lista de transiciones esta
  * vacia- y `cancelAlive` solo acepta pedidos no cancelados. Eso es R29 sin necesidad de
  * ninguna columna inmutable.

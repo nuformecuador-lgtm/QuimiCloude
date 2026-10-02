@@ -85,15 +85,26 @@ export interface OrderWriteRepository {
   softDeleteAlive(id: string, actorId: string, now: Date, scope: OrderScope): Promise<'ok' | 'not_found'>;
 
   /** `UPDATE` condicional `WHERE status = from`: `'stale'` si la fila sigue viva pero ya no
-   *  esta en `from` -otra operacion la movio entre el bloqueo y esta escritura-. */
+   *  esta en `from` -otra operacion la movio entre el bloqueo y esta escritura-. `actorId`
+   *  admite `null` para los cambios que hace el sistema, como el desbloqueo al entrar material. */
   setStatus(
     id: string,
     from: OrderStatus,
     to: OrderStatus,
-    actorId: string,
+    actorId: string | null,
     now: Date,
     scope: OrderScope,
   ): Promise<'ok' | 'not_found' | 'stale'>;
+
+  /** Sustituye el importe, tambien por `null`, y sella `updated_at`/`updated_by` sin tocar los
+   *  datos de negocio ni el estado. */
+  setIngredientsCost(
+    id: string,
+    ingredientsCost: string | null,
+    actorId: string | null,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 
   /** Escribe `reserved_at` SIN mover `updated_at`: apartar o liberar material no es una edicion
    *  que el usuario deba ver en esa columna. */

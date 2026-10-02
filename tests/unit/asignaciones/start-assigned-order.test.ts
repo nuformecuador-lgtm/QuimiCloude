@@ -11,6 +11,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/start-assigned-order';
 import {
   AsignacionesError,
+  OrderBlockedError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
   OrderProducedFrozenError,
@@ -243,6 +244,31 @@ describe('startAssignedOrder — R14: ENTREGADO y CANCELADO no admiten reapertur
       OrderCancelledNotAssignableError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-138 — startAssignedOrder: un BLOQUEADO no se arranca', () => {
+  it('R28, R32 — arrancar un BLOQUEADO rechaza con `order_blocked` sin escribir', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['BLOQUEADO'] });
+    const startAssignedOrder = createStartAssignedOrder(deps);
+
+    const error = await startAssignedOrder(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(OrderBlockedError);
+    expect((error as OrderBlockedError).code).toBe('order_blocked');
+    expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R32 — bloqueado por una edicion entre la lectura y la transicion: `stale`, relee y rechaza con `order_blocked`', async () => {
+    const { deps, findAliveById, transitionAliveById } = montar({
+      ordenDeEstados: ['PENDIENTE', 'BLOQUEADO'],
+      transitionResults: ['stale'],
+    });
+    const startAssignedOrder = createStartAssignedOrder(deps);
+
+    await expect(startAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderBlockedError);
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+    expect(findAliveById).toHaveBeenCalledTimes(2);
   });
 });
 

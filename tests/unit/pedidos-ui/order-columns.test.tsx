@@ -389,6 +389,19 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
     expect(badge).toHaveTextContent(ORDER_STATUS_LABELS.EN_CURSO);
   });
 
+  it('R34: el filtro de estado ofrece «Bloqueado» y la celda pinta su etiqueta', () => {
+    const estado = ORDER_COLUMNS.find((column) => column.id === STATUS_COLUMN_ID)?.filter;
+    const opciones = estado?.kind === 'select' ? estado.options : [];
+    expect(opciones).toContainEqual({ value: 'BLOQUEADO', label: ORDER_STATUS_LABELS.BLOQUEADO });
+
+    pintarCelda(STATUS_COLUMN_ID, pedido({ status: 'BLOQUEADO' }));
+
+    const badge = screen.getByTestId('order-status');
+    expect(badge).toHaveAttribute('data-status', 'BLOQUEADO');
+    expect(badge).toHaveTextContent(ORDER_STATUS_LABELS.BLOQUEADO);
+    expect(badge.textContent).not.toBe('BLOQUEADO');
+  });
+
   it('cada prioridad del contrato tiene su etiqueta legible', () => {
     pintarCelda(PRIORITY_COLUMN_ID, pedido({ priority: 'CRITICA' }));
 

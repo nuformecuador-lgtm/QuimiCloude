@@ -162,7 +162,7 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
   })
 })
 
-describe('pedidos — el puerto declara los dos metodos de LECTURA de design.md > 5.3', () => {
+describe('pedidos — el puerto declara sus metodos de LECTURA: los dos de design.md > 5.3 y findBlockedIds', () => {
   it('un doble que implementa la interfaz completa compila', () => {
     // No se ejecuta ninguna operacion: lo que se comprueba es la FORMA del puerto. Si algun dia
     // se le anadiera un tercer metodo, este doble dejaria de compilar y habria que decidirlo.
@@ -175,8 +175,10 @@ describe('pedidos — el puerto declara los dos metodos de LECTURA de design.md 
       // caso de uso no tenga que calcular el `offset`, que es la reimplementacion que R37
       // prohibe. Quien pagina es el adaptador driven con `lib/shared/pagination`.
       listAlive: async () => ({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 0 }),
+      // QC-138: los bloqueados de la empresa, para la revision que los desbloquea.
+      findBlockedIds: async () => [],
     }
-    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'listAlive'])
+    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'findBlockedIds', 'listAlive'])
   })
 
   it('no existe ningun metodo de restaurar ni de listar borrados', () => {

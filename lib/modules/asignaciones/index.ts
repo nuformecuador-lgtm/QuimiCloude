@@ -59,6 +59,7 @@ export {
   OrderPackingTakenError,
   OrderNotPackableError,
   OrderProducedFrozenError,
+  OrderBlockedError,
   OrderWithoutDistributionError,
 } from './domain/errors';
 

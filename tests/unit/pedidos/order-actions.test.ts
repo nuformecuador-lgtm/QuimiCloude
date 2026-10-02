@@ -25,6 +25,7 @@ import {
   NotCancellableError,
   NotDeletableError,
   OrderNotFoundError,
+  OrderWouldBlockError,
   PresentationNotFoundError,
   RecipeNotFoundError,
   UnauthorizedError,
@@ -308,6 +309,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       priority: 'ALTA',
       unitId: UNIT_ID,
       presentationLines: [],
+      confirmBlocked: false,
     })
     // Y lo que el esquema no declara NO se envia: ni estado, ni motivo, ni correlativo, ni
     // autores (R6, R9). La action no puede colar por el formulario lo que el alta no acepta.
@@ -345,6 +347,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       priority: 'ALTA',
       unitId: UNIT_ID,
       presentationLines: [],
+      confirmBlocked: false,
     })
     expect(updateOrderMock.mock.calls[0]?.[1]).not.toHaveProperty('status')
     // Y NUNCA lleva motivo: cancelar es `cancelOrder` y solo el (R24, R26).
@@ -593,6 +596,61 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     expect(traducciones.length).toBe(catches.length)
     expect(catches.length).toBe(10)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
+  })
+})
+
+describe('QC-138 — la confirmacion de guardar bloqueado viaja por el formulario', () => {
+  beforeEach(() => {
+    createOrderMock.mockResolvedValue({
+      id: ORDER_ID,
+      number: { year: 2026, sequence: 1 },
+      numberText: '2026-0000001',
+    })
+    updateOrderMock.mockResolvedValue(undefined)
+  })
+
+  it('R8: confirmBlocked=true llega al alta y a la edicion como booleano verdadero', async () => {
+    await createOrderAction(CREATE_INITIAL, formDataOf({ ...VALID_CREATE_FIELDS, confirmBlocked: 'true' }))
+    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ confirmBlocked: true })
+
+    await updateOrderAction(
+      ORDER_ID,
+      MUTATION_INITIAL,
+      formDataOf({ ...VALID_CREATE_FIELDS, confirmBlocked: 'true' }),
+    )
+    expect(updateOrderMock.mock.calls[0]?.[1]).toMatchObject({ confirmBlocked: true })
+  })
+
+  it('R6: sin el campo, o con cualquier otro valor, no se confirma', async () => {
+    for (const valor of [undefined, 'false', 'TRUE', '1', 'on', '']) {
+      createOrderMock.mockClear()
+      const campos =
+        valor === undefined ? VALID_CREATE_FIELDS : { ...VALID_CREATE_FIELDS, confirmBlocked: valor }
+      await createOrderAction(CREATE_INITIAL, formDataOf(campos))
+      expect(createOrderMock.mock.calls[0]?.[0], `confirmBlocked=${String(valor)}`).toMatchObject({
+        confirmBlocked: false,
+      })
+    }
+  })
+
+  it('R6: order_would_block vuelve con su codigo estable en el alta y en la edicion', async () => {
+    createOrderMock.mockRejectedValueOnce(new OrderWouldBlockError())
+    expect(await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))).toEqual({
+      status: 'error',
+      code: 'order_would_block',
+      message: errorMessage('order_would_block'),
+    })
+
+    updateOrderMock.mockRejectedValueOnce(new OrderWouldBlockError())
+    expect(
+      await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_CREATE_FIELDS)),
+    ).toMatchObject({ status: 'error', code: 'order_would_block' })
+  })
+
+  it('R6: la action no envia ningun estado: lo decide el caso de uso', async () => {
+    await createOrderAction(CREATE_INITIAL, formDataOf({ ...VALID_CREATE_FIELDS, status: 'BLOQUEADO' }))
+    expect(createOrderMock.mock.calls[0]?.[0]).not.toHaveProperty('status')
+    expect(readActionsSource(), 'la action decide el estado bloqueado').not.toMatch(/BLOQUEADO/)
   })
 })
 
@@ -921,6 +979,7 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
       priority: 'ALTA',
       unitId: UNIT_ID,
       presentationLines: LINEAS_ESPERADAS,
+      confirmBlocked: false,
     })
     expect(result.status).toBe('success')
     expect(createOrderSchema.parse(createOrderMock.mock.calls[0]?.[0]).presentationLines).toEqual([
@@ -943,6 +1002,7 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
       priority: 'ALTA',
       unitId: UNIT_ID,
       presentationLines: LINEAS_ESPERADAS,
+      confirmBlocked: false,
     })
     expect(result).toEqual({ status: 'success' })
   })

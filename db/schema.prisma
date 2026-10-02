@@ -591,8 +591,10 @@ enum OrderStatus {
   ENTREGADO
   CANCELADO
   POR_EMPACAR
-  /// Va el ultimo: reordenar obligaria a recrear el tipo en vez de anadir un valor.
   EN_EMPAQUE
+  /// Un pedido cuyo material no alcanza queda en BLOQUEADO. Va el ultimo, como los dos de
+  /// empaque: reordenar obligaria a recrear el tipo en vez de anadir un valor.
+  BLOQUEADO
 }
 
 /// El orden de declaracion es el de la prioridad, de menor a mayor: Postgres ordena un enum por

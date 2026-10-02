@@ -1329,3 +1329,146 @@ describe('edicion con version de receta', () => {
     expect(updateAlive).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, R12, R26)', () => {
+  const INSUFICIENTE = { kind: 'insufficient' as const, productIds: [PRODUCTO_X] };
+  type Resultado = { kind: 'reserved' } | { kind: 'not_reserved' } | typeof INSUFICIENTE;
+
+  function edicionSobre(status: OrderStatus, outcome: Resultado, prod = catalogoDeProductos()) {
+    const fila = { ...filaExistente(), status };
+    const orders = {
+      findAliveById: vi.fn(async () => fila),
+      listAlive: vi.fn(),
+    } as unknown as OrderRepository;
+    const lockAliveById = vi.fn(async () => ({ ...fila, reservedAt: null }));
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const syncForOrder = vi.fn(async () => outcome);
+    const setStatus = vi.fn(async () => 'ok' as const);
+    const setIngredientsCost = vi.fn(async () => 'ok' as const);
+    const setReservedAt = vi.fn(async () => undefined);
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, updateAlive, setStatus, setIngredientsCost, setReservedAt },
+      reservations: { syncForOrder },
+    });
+    const updateOrder = createUpdateOrder({
+      orders,
+      unitOfWork,
+      recipes: catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]])).recipes,
+      products: prod.products,
+      units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+    return { updateOrder, updateAlive, syncForOrder, setStatus, setIngredientsCost, setReservedAt };
+  }
+
+  const ENTRADA = { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID };
+  const SCOPE = { companyId: EMPRESA_A };
+
+  it('R6: PENDIENTE que deja de alcanzar sin confirmacion -> order_would_block, sin mover estado ni reserva', async () => {
+    const caso = edicionSobre('PENDIENTE', INSUFICIENTE);
+
+    expect(await codigoDelFallo(() => caso.updateOrder(ORDER_ID, ENTRADA, ACTOR_A))).toBe('order_would_block');
+    expect(caso.setStatus).not.toHaveBeenCalled();
+    expect(caso.setReservedAt).not.toHaveBeenCalled();
+  });
+
+  it('R6: BLOQUEADO que sigue sin alcanzar sin confirmacion -> order_would_block', async () => {
+    const caso = edicionSobre('BLOQUEADO', INSUFICIENTE);
+
+    expect(await codigoDelFallo(() => caso.updateOrder(ORDER_ID, ENTRADA, ACTOR_A))).toBe('order_would_block');
+  });
+
+  it('R11: PENDIENTE que pasa a BLOQUEADO con confirmacion libera con quien edita como autor', async () => {
+    const caso = edicionSobre('PENDIENTE', INSUFICIENTE);
+
+    await caso.updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect(caso.syncForOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: ORDER_ID, actorId: ACTOR_A.id, now: AHORA }),
+    );
+    expect(caso.setStatus).toHaveBeenCalledWith(ORDER_ID, 'PENDIENTE', 'BLOQUEADO', ACTOR_A.id, AHORA, SCOPE);
+    expect(caso.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, SCOPE);
+  });
+
+  it('R26: BLOQUEADO que sigue sin alcanzar con confirmacion se guarda sin mover el estado', async () => {
+    const caso = edicionSobre('BLOQUEADO', INSUFICIENTE);
+
+    await caso.updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect(caso.updateAlive).toHaveBeenCalledTimes(1);
+    expect(caso.setStatus).not.toHaveBeenCalled();
+    expect(caso.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, SCOPE);
+  });
+
+  it('R5: al bloquear con confirmacion, un importe recien calculado se borra', async () => {
+    const caso = edicionSobre(
+      'PENDIENTE',
+      INSUFICIENTE,
+      catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]),
+    );
+
+    await caso.updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect((caso.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('30.0000');
+    expect(caso.setIngredientsCost).toHaveBeenCalledWith(ORDER_ID, null, ACTOR_A.id, AHORA, SCOPE);
+  });
+
+  it('R10: BLOQUEADO que ya alcanza -> PENDIENTE y aparta, sin pedir confirmacion', async () => {
+    const caso = edicionSobre('BLOQUEADO', { kind: 'reserved' });
+
+    await caso.updateOrder(ORDER_ID, ENTRADA, ACTOR_A);
+
+    expect(caso.setStatus).toHaveBeenCalledWith(ORDER_ID, 'BLOQUEADO', 'PENDIENTE', ACTOR_A.id, AHORA, SCOPE);
+    expect(caso.setReservedAt).toHaveBeenCalledWith(ORDER_ID, AHORA, SCOPE);
+  });
+
+  it('R2: BLOQUEADO cuya receta se quedo sin lineas -> PENDIENTE sin apartar', async () => {
+    const caso = edicionSobre('BLOQUEADO', { kind: 'not_reserved' });
+
+    await caso.updateOrder(ORDER_ID, ENTRADA, ACTOR_A);
+
+    expect(caso.setStatus).toHaveBeenCalledWith(ORDER_ID, 'BLOQUEADO', 'PENDIENTE', ACTOR_A.id, AHORA, SCOPE);
+    expect(caso.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, SCOPE);
+  });
+
+  it('R8: con confirmacion pero alcanzando, un PENDIENTE sigue PENDIENTE', async () => {
+    const caso = edicionSobre('PENDIENTE', { kind: 'reserved' });
+
+    await caso.updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, ACTOR_A);
+
+    expect(caso.setStatus).not.toHaveBeenCalled();
+    expect(caso.setReservedAt).toHaveBeenCalledWith(ORDER_ID, AHORA, SCOPE);
+  });
+
+  it('R12, R28: EN_CURSO que deja de alcanzar -> insufficient_material, aunque venga confirmado', async () => {
+    for (const confirmBlocked of [false, true]) {
+      const caso = edicionSobre('EN_CURSO', INSUFICIENTE);
+
+      expect(
+        await codigoDelFallo(() => caso.updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked }, ACTOR_A)),
+        `confirmBlocked=${String(confirmBlocked)}`,
+      ).toBe('insufficient_material');
+      expect(caso.setStatus).not.toHaveBeenCalled();
+      expect(caso.setReservedAt).not.toHaveBeenCalled();
+    }
+  });
+
+  it('EN_CURSO que sigue alcanzando se edita sin cambiar de estado', async () => {
+    const caso = edicionSobre('EN_CURSO', { kind: 'reserved' });
+
+    await caso.updateOrder(ORDER_ID, ENTRADA, ACTOR_A);
+
+    expect(caso.setStatus).not.toHaveBeenCalled();
+  });
+
+  it('R37: sin pedidos.modificar -> unauthorized antes de leer nada', async () => {
+    const catalogos = catalogosQueExplotan();
+    const updateOrder = createUpdateOrder({ ...catalogos, now: () => AHORA });
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['inventario.modificar'] };
+
+    await expect(
+      updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, SIN_PERMISO),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+});

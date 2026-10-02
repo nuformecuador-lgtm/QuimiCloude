@@ -2,7 +2,7 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, ValidationError } from './errors';
+import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
 import { createGetAssignedOrderExecution, type GetAssignedOrderExecutionDeps } from './get-assigned-order-execution';
 import { assertOrderAcceptsWrites } from './order-state';
 
@@ -19,8 +19,10 @@ export type StartAssignedOrderDeps = GetAssignedOrderExecutionDeps & {
 };
 
 /**
- * `PENDIENTE` transiciona a `EN_CURSO`; `EN_CURSO` no escribe nada y sigue; cualquier otro estado
- * -`POR_EMPACAR`, `EN_EMPAQUE`, `ENTREGADO`, `CANCELADO`- rechaza con el error de `order-state.ts`.
+ * `PENDIENTE` transiciona a `EN_CURSO`; `EN_CURSO` no escribe nada y sigue; `BLOQUEADO` rechaza con
+ * `order_blocked`, tambien si una edicion lo bloqueo entre la lectura y la transicion; cualquier
+ * otro estado -`POR_EMPACAR`, `EN_EMPAQUE`, `ENTREGADO`, `CANCELADO`- rechaza con el error de
+ * `order-state.ts`.
  * La legalidad de la escritura la decide `pedidos` dentro de `transitionAliveById`, nunca esta
  * funcion.
  */
@@ -71,6 +73,7 @@ export function createStartAssignedOrder(
       }
     }
     if (order === null) throw new OrderNotFoundError();
+    if (order.status === 'BLOQUEADO') throw new OrderBlockedError();
 
     if (order.status !== 'EN_CURSO') {
       assertOrderAcceptsWrites(order);

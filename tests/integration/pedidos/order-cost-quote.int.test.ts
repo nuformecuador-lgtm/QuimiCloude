@@ -21,6 +21,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
+  findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
@@ -69,6 +70,7 @@ function normalizeForTest(name: string): string {
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
+  findBlockedIds: findBlockedOrderIds,
 }
 
 // Mismo cableado que `lib/composition` para `orderUnitOfWork`: abre la transaccion compartida
@@ -341,13 +343,17 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
         presentations,
         now: () => new Date('2026-05-01T12:00:00.000Z'),
       })
+      // QC-138 R6/R8: sin confirmar, un alta que no alcanza no se guarda; confirmada queda
+      // BLOQUEADO y es ahi donde se compara el importe con la cotizacion.
       const creado = await alta(
-        { recipeId, quantity: '200.0000', priority: 'MEDIA', unitId },
+        { recipeId, quantity: '200.0000', priority: 'MEDIA', unitId, confirmBlocked: true },
         actorDe(A),
       )
       orderId = creado.id
 
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
+      const pedido = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } })
+      expect(pedido.status).toBe('BLOQUEADO')
     } finally {
       if (orderId !== null) await borrarPedido(orderId)
       await borrarReceta(recipeId)

@@ -1,5 +1,5 @@
 import { requirePermission, type Actor } from './actor';
-import { ValidationError } from './errors';
+import { OrderWouldBlockError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
@@ -101,7 +101,7 @@ export function createCreateOrder(
 
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const data = parsed.data;
+    const { confirmBlocked, ...data } = parsed.data;
 
     // Se comprueba antes de abrir la transaccion: un alta rechazada no crea ninguna fila. La
     // edicion es mas permisiva con una receta que no cambia (`update-order.ts`).
@@ -166,6 +166,16 @@ export function createCreateOrder(
         actorId: actor.id,
         now: instant,
       });
+
+      if (outcome.kind === 'insufficient') {
+        // Lanzar deshace el INSERT y lo apartado: sin confirmacion no queda nada escrito.
+        if (!confirmBlocked) throw new OrderWouldBlockError();
+        await transaction.orders.setStatus(order.id, STATUS_DE_ALTA, 'BLOQUEADO', actor.id, instant, scope);
+        // El importe se calculo fuera de la transaccion: otra alta pudo apartar entre medias.
+        if (ingredientsCost !== null) {
+          await transaction.orders.setIngredientsCost(order.id, null, actor.id, instant, scope);
+        }
+      }
 
       await transaction.orders.setReservedAt(
         order.id,

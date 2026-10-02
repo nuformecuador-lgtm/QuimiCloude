@@ -511,3 +511,59 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     expect(findNumberTexts).not.toHaveBeenCalled();
   });
 });
+
+describe('QC-138 — el ajuste positivo avisa de la entrada de material (R13, R19, R20, R23)', () => {
+  function oyente() {
+    const orden: string[] = [];
+    const onStockIncreased = vi.fn(async (input: { companyId: string; now: Date }) => {
+      void input;
+      orden.push('onStockIncreased');
+    });
+    return { stockIncreases: { onStockIncreased }, onStockIncreased, orden };
+  }
+
+  it('R13: un ajuste positivo avisa una vez, despues de que el puerto confirme, con la empresa del actor', async () => {
+    const dobles = montarDobles();
+    const o = oyente();
+    dobles.adjustBatchStock.mockImplementation(async () => {
+      o.orden.push('adjustBatchStock');
+      return { stock: 7 };
+    });
+    const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+    await ajustar({ batchId: LOTE, delta: '2.5', reason: 'conteo_fisico' }, ADMINISTRADOR);
+
+    expect(o.orden).toEqual(['adjustBatchStock', 'onStockIncreased']);
+    expect(o.onStockIncreased).toHaveBeenCalledTimes(1);
+    expect(o.onStockIncreased).toHaveBeenCalledWith({ companyId: 'company-a', now: AHORA });
+  });
+
+  it('R19, R20: un ajuste negativo no avisa', async () => {
+    const dobles = montarDobles();
+    const o = oyente();
+    const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+    await ajustar({ batchId: LOTE, delta: '-3', reason: 'merma' }, ADMINISTRADOR);
+
+    expect(o.onStockIncreased).not.toHaveBeenCalled();
+  });
+
+  it('R20: un ajuste rechazado no avisa: lote inexistente o producto terminado', async () => {
+    for (const respuesta of [null, 'increase_not_allowed'] as const) {
+      const dobles = montarDobles();
+      const o = oyente();
+      dobles.adjustBatchStock.mockResolvedValue(respuesta);
+      const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+      await expect(ajustar({ batchId: LOTE, delta: '1', reason: 'merma' }, ADMINISTRADOR)).rejects.toBeDefined();
+      expect(o.onStockIncreased, String(respuesta)).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R13: sin oyente cableado el ajuste positivo funciona igual', async () => {
+    const dobles = montarDobles();
+    const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+    await expect(ajustar({ batchId: LOTE, delta: '1', reason: 'merma' }, ADMINISTRADOR)).resolves.toEqual({ stock: 7 });
+  });
+});

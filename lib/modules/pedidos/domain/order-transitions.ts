@@ -20,6 +20,15 @@ import type { OrderStatus } from './order-classification';
  * `ENTREGADO` y `CANCELADO` tienen la lista VACIA porque un pedido final no admite NINGUNA
  * edicion, ni siquiera la que solo cambia la prioridad.
  *
+ * `BLOQUEADO` -el pedido cuyo material no alcanza- conecta con `PENDIENTE` en las dos
+ * direcciones y admite «quedarse igual», porque el ciclo es de ida y vuelta: se bloquea al
+ * crearlo o al editarlo, y se desbloquea al editarlo con material o al entrar lotes, sin que
+ * eso sea un paso del flujo sino una consecuencia de la disponibilidad. NO conecta con
+ * `EN_CURSO` ni con `ENTREGADO` por ninguna via, ni con `POR_EMPACAR` ni con `EN_EMPAQUE` en
+ * ninguna direccion: `BLOQUEADO` no aparta material, asi que no puede estar a mitad del empaque;
+ * y un pedido que ya esta en `EN_CURSO` no puede quedarse sin material, porque arrancar
+ * implicaba que habia con que producirlo.
+ *
  * ESTO NO BAJA A LA BASE: un `CHECK` evalua la fila RESULTANTE y no sabe de donde venia el
  * pedido; un trigger si podria, pero seria el primero del repositorio y no distinguiria
  * `updateOrder` de `cancelOrder` ni de las acciones de empaque. Coste asumido y escrito: un
@@ -28,15 +37,16 @@ import type { OrderStatus } from './order-classification';
  * quien empaca- si lo garantiza la base.
  */
 const ALLOWED: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
-  PENDIENTE: ['PENDIENTE', 'EN_CURSO'],
+  PENDIENTE: ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'],
   EN_CURSO: ['EN_CURSO', 'POR_EMPACAR'],
   POR_EMPACAR: ['EN_EMPAQUE'],
   EN_EMPAQUE: ['ENTREGADO'],
   ENTREGADO: [], // final: ni siquiera 'ENTREGADO', porque un ENTREGADO no admite EDICION
   CANCELADO: [], // final, por el mismo motivo
+  BLOQUEADO: ['BLOQUEADO', 'PENDIENTE'],
 };
 
-/** ¿Es legal pasar de `from` a `to` en una EDICION? Predicado puro, para poder probar los 16
+/** ¿Es legal pasar de `from` a `to` en una EDICION? Predicado puro, para poder probar los 49
  *  pares de la matriz sin capturar excepciones. */
 export function isAllowedTransition(from: OrderStatus, to: OrderStatus): boolean {
   return ALLOWED[from].includes(to);

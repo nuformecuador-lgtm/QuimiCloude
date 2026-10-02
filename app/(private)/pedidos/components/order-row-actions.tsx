@@ -46,6 +46,10 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
  * —no una comparacion suelta contra los literales— para que un estado nuevo rompa el
  * `typecheck` en vez de colarse como «editable» por defecto. `POR_EMPACAR` y `EN_EMPAQUE` ya
  * consumieron material y dieron de alta un lote: se cierran igual que `ENTREGADO`.
+ *
+ * `BLOQUEADO` NO es final: un pedido sin material se edita y se cancela como uno `PENDIENTE`, y
+ * bajar su cantidad puede bastar para desbloquearlo. Lo que no admite es el trabajo, y eso lo
+ * rechazan el backend y la lista del Operador, no estos tres controles.
  */
 const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   PENDIENTE: false,
@@ -54,6 +58,7 @@ const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   EN_EMPAQUE: true,
   ENTREGADO: true,
   CANCELADO: true,
+  BLOQUEADO: false,
 };
 
 /**
@@ -80,6 +85,8 @@ const ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT: Readonly<Record<OrderStatus, boole
   EN_EMPAQUE: false,
   ENTREGADO: false,
   CANCELADO: false,
+  // La edicion general sigue abierta en BLOQUEADO y ya cubre reparto y unidad.
+  BLOQUEADO: false,
 };
 
 export function acceptsDistributionEdit(status: OrderStatus): boolean {

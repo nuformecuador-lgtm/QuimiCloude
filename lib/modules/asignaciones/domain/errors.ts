@@ -280,6 +280,16 @@ export class InvalidTransitionError extends AsignacionesError {
   }
 }
 
+/** Abrir o iniciar la ejecucion de un pedido `BLOQUEADO`: no sale a `EN_CURSO` hasta que entre
+ *  material y vuelva a `PENDIENTE`. */
+export class OrderBlockedError extends AsignacionesError {
+  readonly code = 'order_blocked';
+
+  constructor(diagnostic?: string) {
+    super('order_blocked', diagnostic);
+  }
+}
+
 /** Comenzar sobre un pedido `POR_EMPACAR` sin ninguna linea de reparto. Mismo `code` que
  *  `OrderWithoutDistributionError` de `pedidos`. */
 export class OrderWithoutDistributionError extends AsignacionesError {
