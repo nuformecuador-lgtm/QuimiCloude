@@ -331,15 +331,21 @@ createOrder(input, actor):
 const stockIncreaseListener: StockIncreaseListener = {
   async onStockIncreased({ companyId, now }) {
     const result = await reviewBlockedOrders({ companyId, now });
-    if (result.failed.length > 0) blockedOrdersLog.error({ companyId, failed: result.failed }, 'blocked_orders_review_failed');
+    if (result.failed.length > 0)
+      blockedOrdersLog.error('blocked_orders_review_failed', {
+        companyId,
+        failedCount: result.failed.length,
+        failed: JSON.stringify(result.failed), // LogFields solo admite primitivas
+      });
   },
 };
 ```
 
 - **Enmienda del 2026-10-02 (decisión del humano en F2.1):** el fallo va al logger `pino` del
   repo (`forModule('pedidos')` de `lib/shared/observability/logger.ts`, como `documentJobLog` en
-  `lib/composition/index.ts`), no a `console.error`. El evento `blocked_orders_review_failed` y su
-  contenido (`companyId`, `failed`) no cambian. Sustituye a la frase anterior, que mandaba el fallo
+  `lib/composition/index.ts`), no a `console.error`. El evento `blocked_orders_review_failed` no cambia.
+  Como `SharedLogger.error(mensaje, campos)` solo admite campos primitivos, `failed` (ids y
+  códigos, nada más) va serializado con `JSON.stringify` y se añade `failedCount`. Sustituye a la frase anterior, que mandaba el fallo
   al mismo registro que la caducidad (`order-expiry-cron-route.ts`).
 - **Orden de declaración:** el `const inventario = {...}` está antes que el bloque de `pedidos`, y
   un `const` no existe antes de su línea. El listener se declara antes de la fachada de
