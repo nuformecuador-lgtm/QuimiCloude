@@ -4975,3 +4975,19 @@ podar.
   `finish-assigned-order` reintenta con un `for (;;)` sin tope si el puerto responde `stale`; no se toco.
 - **Arrastre del arnes:** dias perdidos por modelos (cuota de OpenRouter, Ollama 3B, glm-5.3 que toco el spec aprobado);
   ver `progress/current.md > Modelos`.
+
+## 2026-10-02 — QC-138-estado-bloqueado-por-inventario-insuficiente
+
+- **PR #138**, merge `3311586e`. Spec R1–R61, T0–T15. El pedido gana el estado `BLOQUEADO` (ultimo valor del enum, detras de
+  los de QC-168): al crear o editar, si la existencia no cubre la receta, un modal («Guardar bloqueado» / «Volver») avisa y
+  el pedido se guarda bloqueado. Solo la existencia insuficiente bloquea; receta sin lineas o unidades sin base comun no.
+  El alta de lote y el ajuste al alza desbloquean en automatico los pedidos cubiertos, recalculando su importe. El
+  Operador lo ve en su lista sin poder iniciarlo. Migraciones `20261001170000_order_status_blocked` y
+  `20261001170100_orders_blocked_index`.
+- **F2.0** esperando a QC-168 (#129): enum y migraciones rebasados segun `design.md > 10`.
+- **Review:** OK con 5 menores; 3 de spec corregidos (`0295adbf`).
+- **Sincronizaciones con dev:** QC-172 y `897a4f91` (3 rojos ajenos al baseline, `7e74709e`); tras QC-170 (#137) el PR
+  quedo en conflicto: 26 conflictos resueltos como suma (`e31e0835`), `BLOQUEADO` entra en la ventana del reparto.
+- **Gate:** completo verde (8/8 en baseline); rojo intermitente distinto por corrida (`user-table`,
+  `ciclo-de-vida-de-la-base`) declarado en el PR. E2E 8/8.
+- **Deuda local:** carpeta del worktree sin borrar (archivo en uso) y base `QuimiCloude_QC138`.
