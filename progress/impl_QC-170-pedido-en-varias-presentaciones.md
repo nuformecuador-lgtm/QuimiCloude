@@ -1101,3 +1101,5 @@ Los 3 rojos, ninguno del merge:
   byte-identicos a `origin/dev` (`git diff --quiet origin/dev HEAD -- ...`): rojo que trae QC-172 desde
   dev y NO esta en el baseline. Decision del leader (anadirlo al baseline o abrir la excepcion en la
   guardia).
+
+**E2E `e2e/versiones-de-receta.spec.ts` (QC-172) adaptado al reparto** (patron B2: unidad + una linea de reparto, limpieza de `order_presentation_lines` antes que `orders`; se mantiene lo que afirma de QC-172: guarda la version y reserva SUS lineas). `npx playwright test e2e/versiones-de-receta.spec.ts --workers=1 --reporter=line` -> `2 passed (1.6m)` (chromium + webkit). Ya estaba en las listas cerradas.
