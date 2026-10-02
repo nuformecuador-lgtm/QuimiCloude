@@ -20,7 +20,7 @@
 | QC-170 | pedido-en-varias-presentaciones | Pedidos | fullstack | done | feature/QC-170-pedido-en-varias-presentaciones | **CERRADA el 2026-10-02** (PR #137, merge `c8649e9d`): resumen en `progress/history.md`. Tarjeta en *Finalizado* y comentada. Deuda: QC-178 (precision de `unit_cost`). Regla de la vuelta 2+ acotada: escrita en `AGENTS.md > F2.2` (PR #140, merge `9e49f743`). |
 
 ## Evaluaciones
-**2026-10-02: QC-174** `crear-versiones-en-la-receta`: F1.0 (worktree desde origin/dev `d3535685`, indexado en el grafo) y F1.1 (`complexity:medium` en Jira: solo frontend, dos paginas nuevas, aviso de propagacion y un E2E; sin integraciones). Cupo `frontend` 0 de 2. F1.2: `spec_author` lanzado sobre la semilla acotada. F1.2/F1.3: R1-R39, T0-T12, semilla intacta (diff) y D1-D9 citadas; tarjeta a En revision. **Parada en F1.4** con P1 (propagated en updateRecipeAction) y tres comportamientos anadidos por spec_author (R7, R29, R33/R34). **F1.4 APROBADO el 2026-10-02** con P1 (a) y R7/R29/R33-R34 tal cual. **F2.0**: in_progress, En curso; cupo frontend 1 de 2; sin cruce (ninguna otra frontend en curso; QC-173 pending). F2.1: implementer lanzado. **2026-10-02**: T0-T12 hechos; E2E 2 passed (tambien tras el sync); reviewer OK (0 bloqueantes, m1 corregido). Sync con origin/dev (`dffd2490`): 897a4f91 rompe 3 tests de dev (pantallas-exigen-permiso, recetas/module-contract, recetas/scope); **el humano eligio dejarlos en el baseline** (`ff4cd933`) y arreglarlos aparte. `./init.sh` completo OK. **PR abierto**; esperando merge.
+**2026-10-02:** QC-174 cerrada (PR #139, merge `ca656d5c`; tarjeta a Finalizado; resumen en history). Deja abierta QC-180 (tres rojos de 897a4f91 en el baseline).
 
 
 ### QC-138 - F2.0 (2026-09-26)
@@ -56,8 +56,6 @@ cuenta cupo). Unica `in_progress` en todo el disco: QC-131, `backend` y de traba
 **Aviso al humano:** la tarjeta de QC-138 sigue en *Spec en revision* en el board. **El MCP de
 `atlassian` no esta disponible en esta sesion**, asi que el leader no puede moverla a *En curso*
 (F2.0 lo exige) ni comentarla. Moverla a mano.
-
-**2026-10-02:** QC-174 `crear-versiones-en-la-receta` **ACOTADA** con `/afinar-feature`: 9 decisiones (4 del humano, 5 heredadas de QC-172), ninguna abierta, en `specs/QC-174-crear-versiones-en-la-receta/requirements.md`; board actualizado (description). Sigue `pending`.
 
 **2026-10-02: columna "Miembros" en la tabla de grupos — AD HOC, fuera de `feature_list.json` y del proceso SDD por decision explicita del humano.** Pedido del chat: igual que `/asignacion` (admin) pinta "Responsables" por pedido, `/configuracion/usuarios` > Grupos debia pintar que personas forman cada grupo. La tabla de grupos solo tenia "Nombre" y "Acciones" **a proposito** (decision cerrada 5 de QC-84/QC-85): `WorkGroupRow` traia exactamente `id`+`name`, con un test que congelaba esas claves, porque el conteo de miembros ("3 de 5") era de **QC-100** (`pending`, sigue viva, es OTRO requisito: solo el numero, no los nombres). El humano, consultado primero, autorizo explicitamente saltarse spec/design/tasks para esto y pidio directo: "si trae los grupos agrega el join de users con los campos de los nombres y pasalos a la nueva columna".
 

@@ -4991,3 +4991,19 @@ podar.
 - **Gate:** completo verde (8/8 en baseline); rojo intermitente distinto por corrida (`user-table`,
   `ciclo-de-vida-de-la-base`) declarado en el PR. E2E 8/8.
 - **Deuda local:** carpeta del worktree sin borrar (archivo en uso) y base `QuimiCloude_QC138`.
+
+## 2026-10-02 — QC-174-crear-versiones-en-la-receta
+
+- **PR #139**, merge `ca656d5c`. Spec R1–R39, T0–T12. Desde la ficha de una receta se crean, editan, ven y borran
+  sus **versiones**: página propia por versión (`/produccion/formulas/[id]/versiones/{nueva,[versionId]}`) con el
+  editor de líneas de la receta, diferencia con la original marcada por línea, pasos de la original en solo
+  lectura, y **propagación asistida** al guardar la original (casilla por versión, todas marcadas; aviso fijo si
+  alguna queda por revisar). Único toque de servidor: `updateRecipeAction` devuelve `propagated`. Sin dependencias.
+- **Decisiones humanas:** acotada con `/afinar-feature` (4 decisiones + 5 heredadas de QC-172); F1.4 con P1 (a) y
+  R7, R29 y R33/R34 añadidos por `spec_author` aprobados tal cual.
+- **Review:** OK a la primera, 0 bloqueantes; m1 corregido («Versión borrada.»), m2 y m3 aceptados. E2E 2 passed;
+  gate completo verde tras el primer sync con dev.
+- **Arrastre:** `897a4f91` (grupos y usuarios, fuera del flujo) rompe tres tests de dev (`pantallas-exigen-permiso`,
+  `recetas/module-contract`, `recetas/scope`); el humano decidió dejarlos en el baseline y nace **QC-180** para
+  arreglarlos. Segundo sync (85 commits: QC-138, QC-170) con conflictos solo de bitácora; tras él, `--rapido` y
+  E2E (4 passed), sin repetir el gate completo.
