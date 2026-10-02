@@ -368,6 +368,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
   return (
     <SheetContent
       side="right"
+      minScreenWidth={70}
       className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
       data-testid={USER_SHEET_TESTID}
       isForm
@@ -402,65 +403,97 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
           </div>
         )}
 
-        <UserTextField
-          id={`${fieldId}-${USER_FIRST_NAMES_FIELD}`}
-          name={USER_FIRST_NAMES_FIELD}
-          value={valueOf(USER_FIRST_NAMES_FIELD)}
-          error={fieldErrors.firstNames}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_LAST_NAMES_FIELD}`}
-          name={USER_LAST_NAMES_FIELD}
-          value={valueOf(USER_LAST_NAMES_FIELD)}
-          error={fieldErrors.lastNames}
-        />
         {/*
-          `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera (R26).
+          Nombres y apellidos EN UNA FILA (decision humana): rejilla de 12 columnas que en angosto
+          se apila -movil primero (R45)- y en `sm` o mas ancho reparte 6+6.
         */}
-        <UserTextField
-          id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
-          name={USER_BIRTH_DATE_FIELD}
-          type="date"
-          value={valueOf(USER_BIRTH_DATE_FIELD)}
-          error={fieldErrors.birthDate}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_EMAIL_FIELD}`}
-          name={USER_EMAIL_FIELD}
-          type="email"
-          value={valueOf(USER_EMAIL_FIELD)}
-          error={fieldErrors.email}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_PHONE_FIELD}`}
-          name={USER_PHONE_FIELD}
-          type="tel"
-          value={valueOf(USER_PHONE_FIELD)}
-          error={fieldErrors.phone}
-        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-6">
+            <UserTextField
+              id={`${fieldId}-${USER_FIRST_NAMES_FIELD}`}
+              name={USER_FIRST_NAMES_FIELD}
+              value={valueOf(USER_FIRST_NAMES_FIELD)}
+              error={fieldErrors.firstNames}
+            />
+          </div>
+          <div className="sm:col-span-6">
+            <UserTextField
+              id={`${fieldId}-${USER_LAST_NAMES_FIELD}`}
+              name={USER_LAST_NAMES_FIELD}
+              value={valueOf(USER_LAST_NAMES_FIELD)}
+              error={fieldErrors.lastNames}
+            />
+          </div>
+        </div>
 
-        {/* R25: las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
-        <UserSelectField
-          idPrefix={`${fieldId}-${USER_DOCUMENT_TYPE_FIELD}`}
-          name={USER_DOCUMENT_TYPE_FIELD}
-          value={valueOf(USER_DOCUMENT_TYPE_FIELD)}
-          error={fieldErrors.documentTypeCode}
-          optionTestId={USER_DOCUMENT_TYPE_OPTION_TESTID}
-          options={DOCUMENT_TYPE_CODES.map((code) => ({ value: code, label: code }))}
-        />
+        {/* Fecha de nacimiento, correo y telefono EN UNA FILA (decision humana): 4+4+4 desde `sm`. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-4">
+            {/*
+              `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera
+              (R26).
+            */}
+            <UserTextField
+              id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
+              name={USER_BIRTH_DATE_FIELD}
+              type="date"
+              value={valueOf(USER_BIRTH_DATE_FIELD)}
+              error={fieldErrors.birthDate}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_EMAIL_FIELD}`}
+              name={USER_EMAIL_FIELD}
+              type="email"
+              value={valueOf(USER_EMAIL_FIELD)}
+              error={fieldErrors.email}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_PHONE_FIELD}`}
+              name={USER_PHONE_FIELD}
+              type="tel"
+              value={valueOf(USER_PHONE_FIELD)}
+              error={fieldErrors.phone}
+            />
+          </div>
+        </div>
 
-        <UserTextField
-          id={`${fieldId}-${USER_DOCUMENT_NUMBER_FIELD}`}
-          name={USER_DOCUMENT_NUMBER_FIELD}
-          value={valueOf(USER_DOCUMENT_NUMBER_FIELD)}
-          error={fieldErrors.documentNumber}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_USERNAME_FIELD}`}
-          name={USER_USERNAME_FIELD}
-          value={valueOf(USER_USERNAME_FIELD)}
-          error={fieldErrors.username}
-        />
+        {/*
+          Tipo y numero de documento y nombre de usuario EN UNA FILA (decision humana): 4+4+4 desde
+          `sm`.
+        */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-4">
+            {/* R25: las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
+            <UserSelectField
+              idPrefix={`${fieldId}-${USER_DOCUMENT_TYPE_FIELD}`}
+              name={USER_DOCUMENT_TYPE_FIELD}
+              value={valueOf(USER_DOCUMENT_TYPE_FIELD)}
+              error={fieldErrors.documentTypeCode}
+              optionTestId={USER_DOCUMENT_TYPE_OPTION_TESTID}
+              options={DOCUMENT_TYPE_CODES.map((code) => ({ value: code, label: code }))}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_DOCUMENT_NUMBER_FIELD}`}
+              name={USER_DOCUMENT_NUMBER_FIELD}
+              value={valueOf(USER_DOCUMENT_NUMBER_FIELD)}
+              error={fieldErrors.documentNumber}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_USERNAME_FIELD}`}
+              name={USER_USERNAME_FIELD}
+              value={valueOf(USER_USERNAME_FIELD)}
+              error={fieldErrors.username}
+            />
+          </div>
+        </div>
 
         {/*
           R24: las opciones vienen de la consulta de roles del modulo. SI esa consulta fallo, se
