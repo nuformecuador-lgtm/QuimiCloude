@@ -618,3 +618,55 @@ ninguna decision nueva fuera del spec.
 **E2E** (puerto 3117, `QuimiCloude_QC138`): `e2e/pedido-bloqueado.spec.ts` y
 `e2e/reserva-de-material.spec.ts` con `--project=chromium --project=webkit`: `4 passed (2.2m)`,
 `EXIT=0` (Chromium 2/2, WebKit 2/2).
+
+## F2.3 bis — Merge con QC-170 (2026-10-02)
+
+`origin/dev` integro QC-170 `pedido-en-varias-presentaciones` (PR #137, `c8649e9d`) y el PR #138
+quedo CONFLICTING. Merge (no rebase) sobre `5e80a517`; commit del merge `e31e0835`.
+
+**Conflictos (26 archivos), resueltos como suma, sin nombres repetidos:**
+- `order-input.ts` / `order-actions.ts`: `unitId` + `presentationLines` (QC-170) y `confirmBlocked`
+  (QC-138) conviven; la presentacion unica desaparece.
+- `create-order.ts` / `update-order.ts`: solo chocaban imports (sale `PresentationNotFoundError`, que
+  ahora lanza `resolve-distribution`). El cuerpo queda con el reparto/unidad de QC-170 y el
+  `order_would_block` + `confirmBlocked` + desbloqueo de QC-138 dentro de la transaccion.
+- `pedidos/errors.ts`, `asignaciones/errors.ts`, `pedidos/index.ts`, `asignaciones/index.ts`,
+  `composition/index.ts`, `get-assigned-order-execution.ts`, barrel de `pedidos/components`:
+  uniones. `error-codes.ts`/`error-catalog.ts`: 4 codigos de QC-170 + 2 de QC-138;
+  `catalogo.test.ts` 65 → **67**.
+- `tests/baseline-rojos.json`: version de dev (las tres entradas de `897a4f91` ya estaban, sin
+  duplicar). `feature_list.json`: version de dev. `progress/current.md`: tabla de dev + fila propia.
+- Tests en conflicto: version de dev + los casos de QC-138 (`confirmBlocked`, `unitId`).
+
+**Semantica cruzada (sin choque de reglas):**
+- QC-170 R30: el reparto NO participa en la reserva. La necesidad sigue siendo
+  `buildRequirement(lineas de la receta, quantity)` y el coste `resolveIngredientsCost(..., quantity)`,
+  sin cambios en dev. `syncForOrder`/`insufficient`, el alta/edicion bloqueada y
+  `reviewBlockedOrders` (que recalcula importe con `resolveIngredientsCost`) usan la misma necesidad
+  total y la misma formula vigente. Nada que decidir fuera del spec.
+- QC-170 R9/R11 preveian `BLOQUEADO` «si existe en el enum»: entra en `REPARTO_EDITABLE_STATUSES`
+  (y su test). En la UI, `ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT.BLOQUEADO = false`: la edicion
+  general sigue abierta en `BLOQUEADO` y ya cubre reparto y unidad (QC-170 `design.md` §5, tabla de
+  la accion acotada: «y BLOQUEADO si la edicion general esta cerrada en el»).
+
+**Ajustes tras el merge** (tipos y tests): `findBlockedIds` en los repos montados a mano de
+`qc170-distribution-*.int`; `units` en `batch-states.int`; el bloqueado ajeno de
+`order-repository.int` sin presentacion; bloques QC-138 de `create-order`, `update-order`,
+`order-actions`, `qc138-transversales`, `order-crud.int`, `order-expiry.int`,
+`review-blocked-orders.int` con `unitId` (backend_dev); `e2e/pedido-bloqueado.spec.ts` elige unidad
+en vez de presentacion y limpia `orderPresentationLine` (frontend_dev).
+
+**Migraciones:** sin renumerar (las de QC-170, `20260927120000/120100/120200`, son anteriores y no
+nombran `status`). En `QuimiCloude_QC138`: `db:migrate` aplico las tres de QC-170; `db:rollback` de
+`orders_blocked_index` y de `order_status_blocked` (apartando la carpeta del indice) y `db:migrate`
+las reaplico. Verde. `down.sql` sigue valido: QC-170 no anade CHECK ni indice sobre `status`.
+
+**Verificacion (salida real):**
+- Corridas acotadas: unit 138 archivos / 2273 passed; integracion 45 archivos / 412 passed.
+- `./init.sh` completo: `== init OK ==`, `EXIT=0`; `8 failed | 830 passed (838)` archivos,
+  `10 failed | 11644 passed | 128 skipped (11782)` tests; «sin rojos nuevos (8 rojos, todos en el
+  baseline de 8)». No salieron los intermitentes `user-table` ni `ciclo-de-vida-de-la-base`.
+- E2E (puerto 3117) `pedido-bloqueado`, `reserva-de-material`, `pedido-en-varias-presentaciones`,
+  Chromium + WebKit, `--workers=2`: `1 failed | 7 passed (3.9m)`. El rojo: WebKit,
+  `reserva-de-material:560` R48, `product-batches-sheet` no visible en 60 s (mismo patron de carga
+  que anoto QC-170 en ese spec). Re-corrido solo en los dos navegadores: `2 passed (1.5m)`.
