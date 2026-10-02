@@ -122,3 +122,20 @@ Dominio, puertos y barrel sin tocar.
 - `pnpm exec vitest related --run lib/modules/recetas/adapters/driving/recipe-actions.ts tests/unit/recetas/recipe-actions.test.ts`:
   `Test Files  1 failed | 44 passed (45)` / `Tests  1 failed | 754 passed (755)`. El rojo es
   `tests/unit/recetas-ui/recipe-page.test.tsx > R21 ...44x44`, listado en `tests/baseline-rojos.json` (deuda de dev).
+
+## T2 — Rutas de version
+- `lib/shared/routes.ts`: `newRecipeVersionRoute(id)`, `recipeVersionRoute(id, versionId)` sobre `recipeEditRoute`.
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts`: caso «las rutas de version cuelgan de recipeEditRoute con su forma exacta» + alta en la lista cerrada de exportaciones de `routes.ts` (QC-64 R12).
+- Sin R directo (base de R4/R7).
+
+## T3 — compareWithOriginal
+- `formulas/components/recipe-version-diff.ts` (nuevo, puro), `tests/unit/recetas-ui/recipe-version-diff.test.ts` (12 casos, R17/R18/R19 en el nombre).
+- Ingrediente repetido en la original: se compara con su primera linea.
+- `formulas/components/index.ts` reexporta `compareWithOriginal`, `VersionLineMark`, `RemovedLine` (lo exige el caso del barrel de `recipe-route-contract`, ~:898).
+- `tests/unit/recetas-ui/recipe-form.test.tsx:516`: doble de exito con `propagated: []` (tipo ampliado en T1).
+- `vitest run` recipe-form + recipe-route-contract + recipe-version-diff: `Test Files 3 passed (3)` / `Tests 74 passed (74)`.
+
+## Cierre tanda 1 (commit 757ec149) — `./init.sh --rapido`
+- `vitest related` sobre 8 archivos del diff: `Test Files 4 failed | 262 passed (266)` / `Tests 6 failed | 3819 passed | 44 skipped (3869)`.
+- Los 6 rojos son los casos ya listados en `tests/baseline-rojos.json` (unidades-viewport R27 x2, usuarios-viewport R21 x2, product-page R18, recipe-page R21; deuda de dev, QC-177). `--rapido` no consulta la lista. Ningun rojo propio.
+- typecheck y lint verdes; guardias verdes.
