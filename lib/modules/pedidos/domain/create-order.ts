@@ -1,13 +1,9 @@
 import { requirePermission, type Actor } from './actor';
-import {
-  OrderWouldBlockError,
-  PresentationNotFoundError,
-  RecipeNotFoundError,
-  ValidationError,
-} from './errors';
+import { OrderWouldBlockError, PresentationNotFoundError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
+import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildRequirement } from './order-requirement';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
@@ -105,13 +101,13 @@ export function createCreateOrder(
     if (!parsed.success) throw new ValidationError();
     const { confirmBlocked, ...data } = parsed.data;
 
-    // R15: la receta tiene que existir y estar VIVA, y se comprueba ANTES de llegar al
-    // repositorio, asi que un alta rechazada no crea ni modifica ninguna fila. Un id que no
-    // existe simplemente no vuelve del catalogo; uno dado de baja vuelve con
-    // `isDeleted: true`, y las dos cosas se rechazan igual en el alta (en la EDICION no: ver
-    // R25 en `update-order.ts`).
-    const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
-    if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
+    // Se comprueba antes de abrir la transaccion: un alta rechazada no crea ninguna fila. La
+    // edicion es mas permisiva con una receta que no cambia (`update-order.ts`).
+    const refs = await deps.recipes.findRefsIncludingDeleted(
+      orderRecipeIds(data.recipeId, data.recipeVersionId),
+      actor.companyId,
+    );
+    const effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
 
     // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
     // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
@@ -123,7 +119,7 @@ export function createCreateOrder(
       deps.recipes,
       deps.products,
       deps.units,
-      data.recipeId,
+      effectiveId,
       data.quantity,
       actor.companyId,
     );
@@ -134,7 +130,14 @@ export function createCreateOrder(
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
     const created = await deps.unitOfWork.run(async (transaction) => {
       const order = await transaction.orders.create(
-        { ...data, status: STATUS_DE_ALTA, presentationContent: presentation.content },
+        {
+          recipeId: effectiveId,
+          quantity: data.quantity,
+          priority: data.priority,
+          presentationId: data.presentationId,
+          status: STATUS_DE_ALTA,
+          presentationContent: presentation.content,
+        },
         instant.getUTCFullYear(),
         actor.id,
         instant,
@@ -146,7 +149,7 @@ export function createCreateOrder(
       // apartar nada ni fallar. Se lee con `scope.recipes`, sobre el cliente de ESTA
       // transaccion: pedir una segunda conexion mientras esta retiene la suya desperdiciaria
       // una conexion del pool.
-      const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
+      const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
       const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 
       const outcome = await transaction.reservations.syncForOrder({

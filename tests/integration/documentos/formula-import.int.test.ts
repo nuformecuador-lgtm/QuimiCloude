@@ -35,9 +35,12 @@ import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-s
 
 import {
   createRecipe,
+  createRecipeVersion,
   findAliveRecipeById,
   listAliveRecipes,
+  listAliveRecipeVersions,
   replaceAliveRecipe,
+  replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
@@ -90,6 +93,9 @@ const recipeRepository: RecipeRepository = {
   listAlive: listAliveRecipes,
   replaceAlive: replaceAliveRecipe,
   softDeleteAlive: softDeleteAliveRecipe,
+  createVersion: createRecipeVersion,
+  listAliveVersions: listAliveRecipeVersions,
+  replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
 /** Nadie del archivo sube ni borra imagen: reemplazar (R18) omite `image`, asi que el caso de

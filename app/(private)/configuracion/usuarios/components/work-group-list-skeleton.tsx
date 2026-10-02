@@ -28,14 +28,15 @@ export const WORK_GROUP_LIST_SKELETON_TESTID = 'work-group-list-skeleton';
 export const WORK_GROUP_ROW_SKELETON_TESTID = 'work-group-row-skeleton';
 
 /**
- * Cuantas celdas por fila pinta el esqueleto: la columna del nombre y la de acciones (R12).
+ * Cuantas celdas por fila pinta el esqueleto: la columna del nombre, la de miembros y la de
+ * acciones (R12).
  *
  * **No se importa `WORK_GROUP_COLUMN_COUNT`** a proposito: esa declaracion vive en un modulo de
  * **cliente** —su celda de acciones devuelve elementos— y este esqueleto lo renderiza un Server
  * Component. Para que el numero no se quede atras en silencio, el test lo ata a la constante real
  * de `work-group-columns.tsx`. Mismo criterio que `user-list-skeleton.tsx`.
  */
-export const WORK_GROUP_SKELETON_COLUMN_COUNT = 2;
+export const WORK_GROUP_SKELETON_COLUMN_COUNT = 3;
 
 export function WorkGroupListSkeleton({ rows }: { readonly rows: number }) {
   const columns = Array.from({ length: WORK_GROUP_SKELETON_COLUMN_COUNT }, (_, index) => index);

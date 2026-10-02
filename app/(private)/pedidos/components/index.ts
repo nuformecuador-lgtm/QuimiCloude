@@ -195,6 +195,15 @@ export {
   type RecipePickerProps,
 } from './recipe-picker';
 export {
+  ORIGINAL_VERSION_VALUE,
+  RECIPE_VERSION_FIELD,
+  RECIPE_VERSION_SELECT_TESTID,
+  RecipeVersionSelect,
+  type RecipeVersionChoice,
+  type RecipeVersionSelectProps,
+  type RecipeVersionSelectTexts,
+} from './recipe-version-select';
+export {
   ORDER_COVERAGE_LABELS,
   ORDER_PRIORITY_FILTER_OPTIONS,
   ORDER_PRIORITY_LABELS,

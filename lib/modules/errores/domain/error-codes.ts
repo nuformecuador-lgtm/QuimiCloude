@@ -116,6 +116,8 @@ export const ERROR_CODES = [
   // Distinto de `invalid_transition`: el pedido esta bloqueado por falta de material y no se puede
   // abrir ni iniciar hasta que se desbloquee.
   'order_blocked',
+  // Distinto de `recipe_not_found`: la version existe y esta viva, pero sus lineas no suman 100 %.
+  'recipe_version_under_review',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

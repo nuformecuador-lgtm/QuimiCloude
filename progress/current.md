@@ -54,8 +54,29 @@ cuenta cupo). Unica `in_progress` en todo el disco: QC-131, `backend` y de traba
 `atlassian` no esta disponible en esta sesion**, asi que el leader no puede moverla a *En curso*
 (F2.0 lo exige) ni comentarla. Moverla a mano.
 
-## Evaluaciones
+**2026-10-02:** QC-174 `crear-versiones-en-la-receta` **ACOTADA** con `/afinar-feature`: 9 decisiones (4 del humano, 5 heredadas de QC-172), ninguna abierta, en `specs/QC-174-crear-versiones-en-la-receta/requirements.md`; board actualizado (description). Sigue `pending`.
+
+**2026-10-02: columna "Miembros" en la tabla de grupos — AD HOC, fuera de `feature_list.json` y del proceso SDD por decision explicita del humano.** Pedido del chat: igual que `/asignacion` (admin) pinta "Responsables" por pedido, `/configuracion/usuarios` > Grupos debia pintar que personas forman cada grupo. La tabla de grupos solo tenia "Nombre" y "Acciones" **a proposito** (decision cerrada 5 de QC-84/QC-85): `WorkGroupRow` traia exactamente `id`+`name`, con un test que congelaba esas claves, porque el conteo de miembros ("3 de 5") era de **QC-100** (`pending`, sigue viva, es OTRO requisito: solo el numero, no los nombres). El humano, consultado primero, autorizo explicitamente saltarse spec/design/tasks para esto y pidio directo: "si trae los grupos agrega el join de users con los campos de los nombres y pasalos a la nueva columna".
+
+Dos subagentes en paralelo, sin cruce de archivos (`backend_dev` en `lib/modules/identity/**`, `frontend_dev` en `app/(private)/configuracion/usuarios/components/**`):
+- **Backend**: `WorkGroupRow` gana `members: readonly WorkGroupMemberRow[]` (reusa el tipo existente). `work-group-prisma.ts` lo resuelve con DOS consultas extra en `listAliveInCompany` (pertenencias de la pagina + personas vivas de la empresa, `buildDisplayName`), **sin** filtrar por `effectiveAccountStatus` -deliberado: esta columna es un vistazo informativo, no el flujo de alta/baja de `work-group-members.tsx`, que es el unico que sigue aplicando ese filtro-. Test de contrato (`work-group-input.test.ts`, antes `['id','name']`) actualizado a `['id','name','members']`.
+- **Frontend**: nueva columna `WORK_GROUP_MEMBERS_COLUMN_ID` entre Nombre y Acciones (sin sortable/filter, `WORK_GROUP_QUERYABLE` no los declara), nombres separados por coma o "Sin miembros" si el grupo esta vacio. `WORK_GROUP_COLUMN_COUNT` y el esqueleto 2->3.
+
+**Verificado por el leader tras los dos agentes**: `npx tsc --noEmit` y `npx vitest run tests/unit/configuracion-ui/grupos tests/unit/identity/grupos` (423 pasan, 21 skip, **0 fallos nuevos**) sobre el conjunto completo -ningun error de tipos ni de test sale de los archivos de grupos-. **NO se verifico en navegador** (ruta privada, requeriria sesion de prueba): la cobertura es de unitario/RTL (incluye `work-group-a11y.test.tsx`), no una pasada visual real.
+
+**Dos hallazgos AJENOS, ya existian al abrir la sesion, no los causo este cambio**:
+1. `assigned-orders-columns.tsx` y `user-columns.tsx` tienen cambios sin commitear de otra tarea (quitan `MissingValue`/cambian `align`); por eso `tsc` falla en `app/(private)/asignacion/components/index.ts` (`MISSING_VALUE_MARK` no exportado) y `alcance.test.ts` de grupos tiene 1 rojo pre-existente (R16, filtro en `user-columns.tsx`). Nadie los toco en esta sesion.
+2. Tras el merge de QC-172 (PR #136, `8303e0b8`) el cliente Prisma local parece desactualizado: `tsc` tiene ~25 errores sobre `parentRecipeId`/`parent` en `lib/modules/recetas/**` y sus tests. Pinta a `npx prisma generate` pendiente, no a un bug; no se toco porque es de otra ficha.
+3. **Pendiente de decision humana**: ni backend_dev ni el leader corrieron los tests de INTEGRACION de grupos (`work-group-crud.int.test.ts`, `work-group-membership.int.test.ts`) porque la base local no tiene `SEED_MAESTRO_USERNAME/PASSWORD/EMAIL` en `.env` (solo confirmadas en Vercel, ver QC-161 arriba). El test de integracion nuevo quedo escrito y compila, pero no corrio contra Postgres real.
+4. **Un conflicto de merge resuelto de paso**: `git stash pop` tras un `git pull` dejo un conflicto trivial en `feature_list.json` (descripcion de QC-172, solo un salto de linea de diferencia, cero semantica); resuelto por el leader quedandose con la version con el salto de linea.
+
+Bitacora del backend en `progress/impl_identity-work-group-members-en-listado.md`.
+
+**Mismo dia, seguimiento:** el humano pidio "usa el mismo componente que en /asignacion, el avatar group". La celda de texto (nombres separados por coma) se reemplazo por `<ResponsibleAvatars>` -el mismo componente de iniciales+tooltip+overflow que `/asignacion` usa para "Responsables"-, generalizandolo primero: `components/shared/responsible-avatars.tsx` dejo de importar `OrderResponsible` de `asignaciones` (su tipo local `AvatarGroupPerson` es estructuralmente compatible, cero cambio en el unico call site viejo) y gano un `overflowLabel` opcional para no decir "responsables" donde son miembros de un grupo. Verificado por el leader: 454 tests en verde sobre `grupos` + `shared-ui/responsible-avatars` + `asignaciones-ui/company-orders-columns` + `identity/grupos`, mismo unico rojo ajeno (R16, `user-columns.tsx`) de siempre.
+
 **2026-10-01:** QC-161 cerrada (PR #135, merge `b4afc965`; tarjeta a Finalizado; resumen en history). Desbloquea QC-162 y QC-165.
+
+**2026-10-02:** QC-172 cerrada (PR #136, merge `8303e0b8`; tarjeta a Finalizado; resumen en history). Desbloquea QC-174.
 
 **2026-10-01:** QC-171 cerrada (PR #134, merge `d17242a9`; tarjeta a Finalizado; resumen en history). Desbloquea QC-176. **T8 pendiente del humano**: bucket de recortes a publico antes de desplegar. Base local `QuimiCloude` migrada al dia (11 migraciones; `20260923150000`/`150100` marcadas `--applied` por ser identicas a las que QC-141 aplico antes de renumerarlas).
 
@@ -743,6 +764,8 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+- **2026-10-01 · QC-171 worktree retenido, HOLD por `wt.sh done`**: rama `feature/QC-171-recortes-con-url-publica` pusheada a `origin` (antes solo local, 8 commits). `./scripts/wt.sh done QC-171-recortes-con-url-publica` devolvio `HOLD` con razon «no mergeada en origin/dev» -correcto: no hay PR abierto todavia-. El worktree sigue montado en `.worktrees/QC-171-recortes-con-url-publica`. Falta abrir el PR y, tras mergear, reintentar `wt.sh done`.
+- **2026-10-02 · F0 (import de Jira): no-degradacion de `complexity` en QC-160**: el issue habia perdido la label `complexity:medium` (zone:frontend se conservaba). Se mantuvo el valor del disco y se re-escribio la label en Jira (`editJiraIssue`, labels finales: complexity:medium, sdd, slug:boton-de-subida-de-pdf, zone:frontend). Regla de no-degradacion de `docs/jira.md`.
 - **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-142-permiso-propio-de-documentos`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` y `.worktrees/QC-160-boton-de-subida-de-pdf` (2026-09-25) y `.worktrees/QC-150-producto-terminado` (2026-09-25) y `.worktrees/QC-168-estado-por-empacar` (2026-09-26) y `.worktrees/QC-155-pantalla-de-clientes` (2026-09-26) ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC142`, `QuimiCloude_QC145` y `QuimiCloude_QC147` y `QuimiCloude_QC160` y `QuimiCloude_QC150` y `QuimiCloude_QC168` y `QuimiCloude_QC155` y `QuimiCloude_QC159` (2026-09-26) sobran y se puede borrar.
 ### El E2E de dev tiene 11 rojos que no son de ninguna ficha en curso (2026-09-22)
 

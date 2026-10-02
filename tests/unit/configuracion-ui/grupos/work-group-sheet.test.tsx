@@ -78,7 +78,11 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
   };
 });
 
-const GRUPO: WorkGroupRow = { id: '11111111-1111-4111-8111-111111111111', name: 'Laboratorio' };
+const GRUPO: WorkGroupRow = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Laboratorio',
+  members: [],
+};
 
 /** Los cuatro archivos de las escrituras: ninguno monta una segunda region de avisos (R35). */
 const ARCHIVOS_DE_LAS_ESCRITURAS = [

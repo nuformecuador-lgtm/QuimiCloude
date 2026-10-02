@@ -202,3 +202,12 @@ export class OrderWouldBlockError extends PedidosError {
     super('order_would_block', diagnostic);
   }
 }
+
+/** La version elegida para el pedido existe y esta viva, pero sus lineas no suman 100 %. */
+export class RecipeVersionUnderReviewError extends PedidosError {
+  readonly code = 'recipe_version_under_review';
+
+  constructor(diagnostic?: string) {
+    super('recipe_version_under_review', diagnostic);
+  }
+}

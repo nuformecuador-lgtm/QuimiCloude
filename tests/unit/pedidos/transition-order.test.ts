@@ -61,7 +61,10 @@ function catalogoDeRecetas(lines: readonly RecipeExecutionLine[] = [{ productId:
  *  unidades, que ningun test de este archivo necesita distintos de vacios. */
 function catalogosGlobales(overrides: { readonly recipeName?: string } = {}) {
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) =>
-    ids.map((id) => ({ id, name: overrides.recipeName ?? 'Desengrasante industrial', isDeleted: false })),
+    ids.map((id) => {
+      const name = overrides.recipeName ?? 'Desengrasante industrial';
+      return { id, name, ownName: name, isUnderReview: false, original: null, isDeleted: false };
+    }),
   );
   const recipes = {
     findRefsIncludingDeleted,
@@ -544,5 +547,60 @@ describe('fakeFinishedGoodsIntake', () => {
         now: AHORA,
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe('createTransitionOrder — pedido con version de receta', () => {
+  it('R36: Finalizar un pedido con version llama al alta de producto terminado con el id de la version y el nombre compuesto', async () => {
+    const VERSION = 'r-version';
+    const { recipes: scopeRecipes, findExecutionContentById } = catalogoDeRecetas();
+    const lockAliveById = vi.fn(async () =>
+      filaBloqueada({ status: 'EN_CURSO', recipeId: VERSION, ingredientsCost: '0.0000' }),
+    );
+    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const setStatus = vi.fn(async () => 'ok' as const);
+    const setReservedAt = vi.fn(async () => undefined);
+    const receiveFromOrder = vi.fn(async () => ({
+      kind: 'received' as const,
+      productId: 'pt-version',
+      productName: 'Crema base · Sin perfume · Botella 1L',
+      packages: '10',
+    }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, setStatus, setReservedAt },
+      reservations: { consumeForOrder },
+      recipes: scopeRecipes,
+      finishedGoods: { receiveFromOrder },
+    });
+    const { products, units } = catalogosGlobales();
+    const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) =>
+      ids.map((id) => ({
+        id,
+        name: 'Crema base · Sin perfume',
+        ownName: 'Sin perfume',
+        isUnderReview: false,
+        original: { id: 'r-original', name: 'Crema base' },
+        isDeleted: false,
+      })),
+    );
+    const recipes = {
+      findRefsIncludingDeleted,
+      findExecutionContentById: vi.fn(),
+      findIdsMatchingName: vi.fn(),
+    } as unknown as TransitionOrderDeps['recipes'];
+    const transitionAliveById = createTransitionOrder({ unitOfWork, recipes, products, units });
+
+    const resultado = await transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA);
+
+    expect(findRefsIncludingDeleted).toHaveBeenCalledWith([VERSION], EMPRESA);
+    expect(findExecutionContentById).toHaveBeenCalledWith(VERSION, EMPRESA);
+    expect(receiveFromOrder).toHaveBeenCalledTimes(1);
+    expect(receiveFromOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ recipeId: VERSION, recipeName: 'Crema base · Sin perfume', presentationId: 'p-1' }),
+    );
+    expect(resultado).toEqual({
+      kind: 'ok',
+      finishedGoods: { productName: 'Crema base · Sin perfume · Botella 1L', packages: '10' },
+    });
   });
 });

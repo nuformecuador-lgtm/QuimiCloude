@@ -241,6 +241,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
 }));
@@ -290,6 +291,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
@@ -413,6 +415,9 @@ beforeEach(() => {
       updatedBy: null,
       steps: [],
       lines: [],
+      original: null,
+      isUnderReview: false,
+      displayName: RECETA.name,
     },
   });
   clearSidebarStateCookie();

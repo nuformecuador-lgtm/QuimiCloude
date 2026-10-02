@@ -50,7 +50,7 @@ function montar(options?: { readonly items?: readonly unknown[] }): Dobles {
   const deps = {
     orders: { listAliveSummariesByIds },
     assignments: { listByOrdersInCompany: vi.fn(async () => []) },
-    recipes: { findRefsIncludingDeleted: vi.fn(async () => [{ id: 'receta-1', name: 'Desengrasante' }]) },
+    recipes: { findRefsIncludingDeleted: vi.fn(async () => [{ id: 'receta-1', name: 'Desengrasante', ownName: 'Desengrasante', isUnderReview: false, original: null, isDeleted: false }]) },
     people: { findRefsIncludingDeletedInCompany: vi.fn(async () => []) },
     presentations: { findRefs: vi.fn(async () => [{ id: 'presentacion-1', name: 'Botella 1L' }]) },
     products: { findFinishedGoodsReceipts },

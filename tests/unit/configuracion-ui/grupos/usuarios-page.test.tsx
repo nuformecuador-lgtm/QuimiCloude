@@ -172,10 +172,11 @@ const FILA: UserRow = {
   accountStatus: 'active',
 };
 
-/** Una fila de grupo: DOS claves, `id` y `name`, y ninguna mas (R12). */
+/** Una fila de grupo: `id`, `name` y `members` (R12). */
 const GRUPO: WorkGroupRow = {
   id: '22222222-2222-4222-8222-222222222222',
   name: 'Laboratorio',
+  members: [],
 };
 
 function paginaDeGruposCon(items: readonly WorkGroupRow[]) {

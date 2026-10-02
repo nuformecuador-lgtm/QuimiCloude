@@ -466,3 +466,27 @@ describe('la pantalla de ejecucion no lleva importe (R15)', () => {
     expect(Object.keys(view)).not.toContain('ingredientsCost');
   });
 });
+
+describe('getAssignedOrderExecution — pedido con version de receta', () => {
+  it('R8, R11: la ejecucion de un pedido con version muestra el nombre compuesto, los pasos de la original y las lineas de la version', async () => {
+    const VERSION = uuid('9');
+    const pasosDeLaOriginal = [{ blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Mezclar en frio' }] }] }];
+    const { deps, findExecutionContentById } = montar({
+      summary: resumen({ recipeId: VERSION }),
+      content: contenido({
+        id: VERSION,
+        name: 'Jabon liquido · Sin perfume',
+        steps: pasosDeLaOriginal,
+        lines: [{ productId: PRODUCTO, productName: null, percentage: '25.00' }],
+      }),
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findExecutionContentById).toHaveBeenCalledWith(VERSION, EMPRESA);
+    expect(view.recipeName).toBe('Jabon liquido · Sin perfume');
+    expect(view.steps).toEqual(pasosDeLaOriginal);
+    expect(view.lines.map((line) => line.percentage)).toEqual(['25.00']);
+  });
+});

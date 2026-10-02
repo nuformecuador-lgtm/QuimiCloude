@@ -60,6 +60,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
 // El panel de edicion monta `OrderForm` en cada fila y su efecto pide el detalle de la receta
 // para los ingredientes: sin este doble, la llamada iria a la sesion real (R43).
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: vi.fn(async () => ({
     status: 'success' as const,
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
@@ -99,6 +100,7 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     numberText: formatOrderNumber({ year: 2026, sequence }),
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: `Receta ${sequence}`,
+    recipeVersion: null,
     quantity: '1.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',

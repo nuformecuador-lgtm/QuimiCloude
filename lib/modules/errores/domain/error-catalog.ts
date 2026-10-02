@@ -67,6 +67,7 @@ export const ERROR_MESSAGE_KEY = {
   order_produced_frozen: 'errors.order_produced_frozen',
   order_would_block: 'errors.order_would_block',
   order_blocked: 'errors.order_blocked',
+  recipe_version_under_review: 'errors.recipe_version_under_review',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -166,4 +167,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_would_block':
     'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
   'errors.order_blocked': 'Falta material: el pedido esta bloqueado y no se puede iniciar.',
+  'errors.recipe_version_under_review':
+    'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -4940,3 +4940,18 @@ podar.
 - **Arrastre:** bloqueada a mitad por dev rojo en typecheck (`pino`); arreglado en PR #132/#133.
 - **Condición de despliegue cumplida:** `SEED_MAESTRO_*` en Vercel (producción y preview), confirmado por el humano.
 - **Desbloquea:** QC-162 y QC-165.
+
+## 2026-10-02 — QC-172-versiones-de-receta
+
+- **PR #136**, merge `8303e0b8`. Spec R1–R45, T0–T14. Una receta tiene **versiones**: copia con vínculo a la
+  original (tabla `recipe_versions`, migración `20261001120000_recipe_versions`), 100 % por versión, propagación
+  asistida desde la original (la versión que deja de sumar 100 % queda **por revisar** y no se elige en un pedido),
+  pasos compartidos, un solo nivel. Selector de **versión** en el formulario de pedido; el pedido guarda la versión
+  como receta. Sin dependencias.
+- **Review:** OK a la primera, 0 bloqueantes, 7 menores (m2 y m4 corregidos en el spec). E2E 2 passed. Gate completo
+  verde sobre `8c33974e` (5 rojos, todos del baseline).
+- **Sync con dev antes del PR** (44 commits, QC-161): conflicto en la lista de migraciones del guard. Tras el sync,
+  **gate acotado por decisión del humano** (typecheck, lint, related, integración 52/52), no completo.
+- **Arrastre:** el seed de la base de pruebas pedía las `SEED_MAESTRO_*` de QC-161; añadidas al `.env` local con
+  valores provisionales que el humano cambiará.
+- **Desbloquea:** QC-174.

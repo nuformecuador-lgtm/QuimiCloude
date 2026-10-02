@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   RecipeNotFoundError,
+  RecipeVersionUnderReviewError,
   UnauthorizedError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors';
@@ -67,8 +68,8 @@ function filaExistente(): OrderRow {
  *  no existe (contrato de `RecipeCatalog.findRefsIncludingDeleted`). */
 function catalogoDeRecetas(lineasPorReceta: ReadonlyMap<string, readonly RecipeExecutionLine[]> = new Map()) {
   const recetas = new Map<string, { companyId: string; ref: RecipeRef }>([
-    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', isDeleted: false } }],
-    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', isDeleted: false } }],
+    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false } }],
+    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', ownName: 'Formula de B', isUnderReview: false, original: null, isDeleted: false } }],
   ]);
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
     ids.flatMap((id) => {
@@ -998,6 +999,230 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
 
     expect(findExecutionContentByIdGlobal).toHaveBeenCalledTimes(1);
     expect(findExecutionContentByIdDeLaTransaccion).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
+  });
+});
+
+describe('edicion con version de receta', () => {
+  const VERSION_DE_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const OTRA_VERSION_DE_A = 'abababab-abab-4bab-8bab-abababababab';
+  const VERSION_DE_OTRA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const OTRA_ORIGINAL = 'dededede-dede-4ede-8ede-dededededede';
+  const ORIGINAL_A = { id: RECETA_DE_A, name: 'Acido citrico 50%' };
+  const PRODUCTO_Y = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  function ref(id: string, overrides: Partial<RecipeRef> = {}): RecipeRef {
+    return { id, name: id, ownName: id, isDeleted: false, isUnderReview: false, original: null, ...overrides };
+  }
+
+  /** Lo que no esta en `refs` no vuelve del catalogo, como una receta de otra empresa. */
+  function catalogoConVersiones(
+    refs: readonly RecipeRef[],
+    lineas: ReadonlyMap<string, readonly RecipeExecutionLine[]> = new Map(),
+  ) {
+    const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
+      companyId === EMPRESA_A ? refs.filter((r) => ids.includes(r.id)) : [],
+    );
+    const contenido = (id: string) => ({ id, name: 'Receta', isDeleted: false, steps: [], lines: lineas.get(id) ?? [] });
+    const findExecutionContentById = vi.fn(async (id: string) => contenido(id));
+    const enTransaccion = vi.fn(async (id: string) => contenido(id));
+    return {
+      recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
+      findRefsIncludingDeleted,
+      findExecutionContentById,
+      enTransaccion,
+    };
+  }
+
+  /** Pedido PENDIENTE cuya receta guardada es `recetaGuardada`. */
+  function edicion(
+    recetaGuardada: string,
+    cat: ReturnType<typeof catalogoConVersiones>,
+    batches: readonly CostingBatch[] = [],
+  ) {
+    const fila = { ...filaExistente(), recipeId: recetaGuardada };
+    const orders = {
+      findAliveById: vi.fn(async () => fila),
+      listAlive: vi.fn(),
+    } as unknown as OrderRepository;
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: {
+        lockAliveById: vi.fn(async () => ({ ...fila, reservedAt: null })),
+        updateAlive,
+        setReservedAt: vi.fn(async () => undefined),
+      },
+      reservations: { syncForOrder },
+      recipes: { findExecutionContentById: cat.enTransaccion },
+    });
+    const run = vi.spyOn(unitOfWork, 'run');
+    const updateOrder = createUpdateOrder({
+      orders,
+      unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos(batches).products,
+      units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+    return { updateOrder, updateAlive, syncForOrder, run };
+  }
+
+  const entrada = (recipeVersionId: string | null, recipeId = RECETA_DE_A) => ({
+    recipeId,
+    quantity: '10.0000',
+    presentationId: PRESENTACION_DE_A,
+    recipeVersionId,
+  });
+
+  const lineas = new Map([
+    [RECETA_DE_A, [lineaDeReceta()]],
+    [VERSION_DE_A, [lineaDeReceta({ productId: PRODUCTO_Y })]],
+  ]);
+  const lotes = [
+    loteCosteable({ stock: '100', unitCost: '3.0000' }),
+    loteCosteable({ productId: PRODUCTO_Y, stock: '100', unitCost: '5.0000' }),
+  ];
+
+  function guardado(updateAlive: ReturnType<typeof vi.fn>) {
+    return updateAlive.mock.calls[0] as unknown as readonly [string, { recipeId: string }, unknown, unknown, string];
+  }
+
+  it('R34: pasar de la original a una version viva la guarda y recalcula coste y necesidad con sus lineas', async () => {
+    const cat = catalogoConVersiones([ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A })], lineas);
+    const { updateOrder, updateAlive, syncForOrder } = edicion(RECETA_DE_A, cat, lotes);
+
+    await updateOrder(ORDER_ID, entrada(VERSION_DE_A), ACTOR_A);
+
+    expect(cat.findRefsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_A, VERSION_DE_A], EMPRESA_A);
+    const [, datos, , , coste] = guardado(updateAlive);
+    expect(datos.recipeId).toBe(VERSION_DE_A);
+    expect(datos).not.toHaveProperty('recipeVersionId');
+    expect(coste).toBe('50.0000');
+    expect(cat.enTransaccion).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
+    const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
+  });
+
+  it('R34: volver de una version a «Original» exige la original viva y recalcula con sus lineas', async () => {
+    const cat = catalogoConVersiones([ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A })], lineas);
+    const { updateOrder, updateAlive } = edicion(VERSION_DE_A, cat, lotes);
+
+    await updateOrder(ORDER_ID, entrada(''), ACTOR_A);
+
+    expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_A], EMPRESA_A);
+    const [, datos, , , coste] = guardado(updateAlive);
+    expect(datos.recipeId).toBe(RECETA_DE_A);
+    expect(coste).toBe('30.0000');
+  });
+
+  it('R34, R33: cambiar a una version por revisar -> recipe_version_under_review sin abrir la unidad de trabajo', async () => {
+    const cat = catalogoConVersiones([
+      ref(RECETA_DE_A),
+      ref(VERSION_DE_A, { original: ORIGINAL_A, isUnderReview: true }),
+    ]);
+    const { updateOrder, updateAlive, run } = edicion(RECETA_DE_A, cat);
+
+    const error = await updateOrder(ORDER_ID, entrada(VERSION_DE_A), ACTOR_A).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(RecipeVersionUnderReviewError);
+    expect(run).not.toHaveBeenCalled();
+    expect(updateAlive).not.toHaveBeenCalled();
+  });
+
+  const rechazos: readonly (readonly [string, readonly RecipeRef[], string, string])[] = [
+    [
+      'a una version de baja',
+      [ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A, isDeleted: true })],
+      RECETA_DE_A,
+      VERSION_DE_A,
+    ],
+    [
+      'a una version de otra receta',
+      [ref(RECETA_DE_A), ref(OTRA_ORIGINAL), ref(VERSION_DE_OTRA, { original: { id: OTRA_ORIGINAL, name: 'Otra' } })],
+      RECETA_DE_A,
+      VERSION_DE_OTRA,
+    ],
+    ['a una version de otra empresa', [ref(RECETA_DE_A)], RECETA_DE_A, VERSION_DE_A],
+    ['a una receta que es version', [ref(VERSION_DE_A, { original: ORIGINAL_A })], VERSION_DE_A, ''],
+  ];
+
+  it.each(rechazos)(
+    'R34, R32: cambiar %s -> recipe_not_found sin abrir la unidad de trabajo',
+    async (_caso, refs, recipeId, recipeVersionId) => {
+      const cat = catalogoConVersiones(refs);
+      const { updateOrder, updateAlive, run } = edicion(RECETA_DE_A, cat);
+
+      const error = await updateOrder(ORDER_ID, entrada(recipeVersionId, recipeId), ACTOR_A).catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(RecipeNotFoundError);
+      expect(run).not.toHaveBeenCalled();
+      expect(updateAlive).not.toHaveBeenCalled();
+    },
+  );
+
+  it('R34: cambiar de una version a otra por revisar tambien se rechaza', async () => {
+    const cat = catalogoConVersiones([
+      ref(RECETA_DE_A),
+      ref(OTRA_VERSION_DE_A, { original: ORIGINAL_A, isUnderReview: true }),
+    ]);
+    const { updateOrder, run } = edicion(VERSION_DE_A, cat);
+
+    await expect(updateOrder(ORDER_ID, entrada(OTRA_VERSION_DE_A), ACTOR_A)).rejects.toBeInstanceOf(
+      RecipeVersionUnderReviewError,
+    );
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['por revisar', { isUnderReview: true }],
+    ['de baja', { isDeleted: true }],
+  ] as const)(
+    'R35, R25: conservar una version %s se acepta sin preguntar al catalogo y recalcula con sus lineas',
+    async (_caso, estado) => {
+      const cat = catalogoConVersiones([ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A, ...estado })], lineas);
+      const { updateOrder, updateAlive, syncForOrder } = edicion(VERSION_DE_A, cat, lotes);
+
+      await updateOrder(ORDER_ID, entrada(VERSION_DE_A), ACTOR_A);
+
+      expect(cat.findRefsIncludingDeleted).not.toHaveBeenCalled();
+      const [, datos, , , coste] = guardado(updateAlive);
+      expect(datos.recipeId).toBe(VERSION_DE_A);
+      expect(coste).toBe('50.0000');
+      const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+      expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
+    },
+  );
+
+  it('R31: sin version y sin cambiar la original, igual que hoy: no pregunta al catalogo', async () => {
+    const cat = catalogoConVersiones([ref(RECETA_DE_A)], lineas);
+    const { updateOrder, updateAlive } = edicion(RECETA_DE_A, cat, lotes);
+
+    await updateOrder(
+      ORDER_ID,
+      { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
+
+    expect(cat.findRefsIncludingDeleted).not.toHaveBeenCalled();
+    expect(guardado(updateAlive)[1].recipeId).toBe(RECETA_DE_A);
+  });
+
+  it('R39: con version se exige el mismo permiso de hoy y sin el no se lee nada', async () => {
+    const updateOrder = createUpdateOrder({ ...catalogosQueExplotan(), now: () => AHORA });
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
+
+    await expect(updateOrder(ORDER_ID, entrada(VERSION_DE_A), SIN_PERMISO)).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+
+    const cat = catalogoConVersiones([ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A })]);
+    const { updateOrder: conPermiso, updateAlive } = edicion(RECETA_DE_A, cat);
+    await conPermiso(ORDER_ID, entrada(VERSION_DE_A), { ...SIN_PERMISO, permissions: ['pedidos.modificar'] });
+    expect(updateAlive).toHaveBeenCalledTimes(1);
   });
 });
 
