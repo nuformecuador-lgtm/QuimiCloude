@@ -20,9 +20,11 @@
 > Escritos por `spec_author` en F1.2 (2026-10-03). Cada requisito cita entre corchetes la fila de
 > «Decisiones cerradas» que lo origina: **[D1]** envase y presentación, **[D2]** stock en envases,
 > **[D3]** qué lista el selector, **[D4]** reserva y aviso, **[D5]** cálculo del reparto, **[D6]**
-> pedidos existentes, **[D7]** costo (en el orden de la tabla). Los marcados **[P1]**, **[P3]** o
-> **[N<n>]** dependen de una decisión que el humano aún no ha tomado (`design.md > 1`): están
-> escritos con la opción **recomendada** y se reescriben en F1.4 si el humano elige otra.
+> pedidos existentes, **[D7]** costo (en el orden de la tabla). Las marcas **[P1]**, **[P3]** y
+> **[N<n>]** remiten a las decisiones que el humano tomó en F1.4 el **2026-10-03**
+> (`design.md > 1`): P1 = A (unidad `unidad`, símbolo `u`), P2 = A, P3 = b, y N1 a N10 con la
+> recomendación salvo **N1** y **N7**, donde eligió la alternativa. Los requisitos ya están
+> escritos con lo decidido (R8 y R38 por N1; R39-R41 por N7). **[P4]** sigue abierta.
 >
 > Vocabulario. *Envase*: producto de inventario de tipo PACKAGING. *Presentación del envase*: la
 > única presentación fija de ese producto. *Disponible*: el de QC-141 (existencia menos apartado,
@@ -53,8 +55,8 @@ FINISHED_PRODUCT tenga receta, ni que un FINISHED_PRODUCT carezca de receta o de
 
 **R6.** El sistema DEBE expresar en número de envases la existencia, la existencia de cada lote,
 los ajustes, lo apartado y el disponible de un producto PACKAGING dado de alta a partir de esta
-feature: un lote de 100 botellas tiene existencia `100` y se muestra como 100 envases `[D2]`
-`[P1]`.
+feature, en la unidad de sistema `unidad` (símbolo `u`): un lote de 100 botellas tiene existencia
+`100 u` `[D2]` `[P1]`.
 
 **R7.** SI la existencia declarada en el alta o en el ajuste de un lote de un producto PACKAGING no
 es un número entero de envases, ENTONCES el sistema DEBE rechazarla sin escribir nada `[D2]`
@@ -62,8 +64,9 @@ es un número entero de envases, ENTONCES el sistema DEBE rechazarla sin escribi
 
 ### B. El selector del reparto
 
-**R8.** CUANDO quien tiene `pedidos.modificar` busque envases para el reparto de un pedido con
-unidad, el sistema DEBE ofrecer solo productos PACKAGING vivos de su empresa, con presentación fija
+**R8.** CUANDO quien tiene `pedidos.modificar` e `inventario.consultar` busque envases para el
+reparto de un pedido con unidad, el sistema DEBE ofrecer, a través del listado de productos de
+inventario, solo productos PACKAGING vivos de su empresa, con presentación fija
 y con contenido, cuya presentación tenga la misma unidad base efectiva (`baseUnitId ?? id`) que la
 unidad del pedido: con el pedido en `l` aparecen los envases en `l` y en `ml`, y no aparecen los
 envases en `kg` ni en `g` `[D3]` `[N1]`.
@@ -200,6 +203,35 @@ envases y lo que cubre en la unidad del pedido, y el selector de R8 para añadir
 misma confirmación que muestra hoy el formulario del pedido, y solo con ella reenviar el guardado
 `[D4]`.
 
+**R38.** SI quien abre el formulario del pedido o el diálogo «Reparto y unidad» tiene
+`pedidos.modificar` pero no `inventario.consultar`, ENTONCES el selector de envases NO DEBE listar
+ningún envase y DEBE indicar que falta ese permiso; las líneas que el reparto ya tenga se siguen
+mostrando y el servidor sigue validando cualquier guardado con R11 `[D3]` `[N1]`.
+
+> Consecuencia de N1, registrada para quien administra roles: para **repartir** un pedido en envases
+> hace falta `inventario.consultar` además de `pedidos.modificar`. Sin él se puede crear o editar el
+> pedido con su reparto vacío o con las líneas que ya tenga, pero no añadir envases. Hoy el único
+> rol sembrado con `pedidos.modificar` es Administrador, que ya tiene los dos
+> (`lib/modules/identity/domain/permissions.ts:221-244`); el aviso afecta a roles personalizados.
+
+### H. El envase no es ingrediente
+
+**R39.** CUANDO se cree una receta o una versión de receta, SI alguna línea indicada en la entrada
+nombra un producto PACKAGING, ENTONCES el sistema DEBE rechazar la operación con
+`action_not_allowed` sin escribir nada, igual que hoy con un producto terminado `[N7]`.
+
+**R40.** CUANDO se edite una receta o una versión de receta, SI una línea que la receta no tenía
+nombra un producto PACKAGING, ENTONCES el sistema DEBE rechazar la edición con
+`action_not_allowed` sin modificar la receta `[N7]`.
+
+**R41.** CUANDO se previsualice o se confirme la importación de una fórmula desde un documento, el
+sistema NO DEBE proponer un producto PACKAGING como ingrediente emparejado, y SI la confirmación
+nombra uno, ENTONCES DEBE rechazarla con `action_not_allowed` sin crear la receta `[N7]`.
+
+> Qué pasa con las recetas que **ya** tienen un ingrediente PACKAGING —al editarlas, al crear una
+> versión copiando sus líneas, y al pedir con ellas— queda abierto como **P4** (abajo): R40 solo
+> fija las líneas que la receta no tenía.
+
 ## Preguntas abiertas
 
 - **Unidad «envase».** No existe una unidad de sistema para contar piezas. Hay que decidir si
@@ -211,13 +243,24 @@ misma confirmación que muestra hoy el formulario del pedido, y solo con ella re
 - **Cuándo se consume el envase.** Si es con las materias primas, al pasar a `POR_EMPACAR`, o
   al Terminar el empaque (`createFinishPacking`).
 
-> *(F1.2, `spec_author`, 2026-10-03.)* Las tres siguen **abiertas**: no las decide `spec_author`.
-> En `design.md > 1` van como **P1** (unidad «envase»), **P2** (envases ya cargados) y **P3**
-> (cuándo se consume), cada una con sus opciones y una recomendada, para F1.4. Los requisitos que
-> dependen de ellas llevan la marca `[P1]` o `[P3]` (P2 solo afecta a R9, que ya vale con cualquier
-> opción). Al investigar el código salieron además **N1 a N10**, decisiones que la acotación no
-> cubre; están en `design.md > 1.4`, también con recomendación, y las que tocan un requisito lo
-> marcan `[N<n>]`.
+> *(F1.2, `spec_author`, 2026-10-03.)* Las tres pasaron a `design.md > 1` como **P1**, **P2** y
+> **P3**, y salieron además **N1 a N10**.
+>
+> **Resueltas por el humano en F1.4, el 2026-10-03** (detalle en `design.md > 1`):
+> - **Unidad «envase» (P1) = A.** Unidad de sistema base `unidad`, símbolo `u`; el envase guarda su
+>   presentación en el producto y sus lotes no llevan presentación, así que
+>   `product_batches_check_unit` no cambia (R6).
+> - **Envases ya cargados (P2) = A.** Se quedan como están, como legado: sin presentación fija, el
+>   selector no los lista (R9); para repartir con ellos se dan de alta de nuevo.
+> - **Cuándo se consume el envase (P3) = b.** Al Terminar el empaque (R24-R26).
+> - N2, N3, N4, N5, N6, N8, N9 y N10 = la recomendación. **N1 y N7 = la alternativa** (R8, R38;
+>   R39-R41).
+
+- **P4 — Recetas que ya tienen un ingrediente PACKAGING.** *(Nueva, F1.4, 2026-10-03; ABIERTA.)*
+  El código actual no lo resuelve solo: la edición valida solo las líneas que la receta no tenía
+  (`update-recipe.ts:91-106`, `update-recipe-version.ts:42-55`), pero crear una versión valida
+  **todas** las líneas copiadas (`create-recipe-version.ts:42-56`), así que con R39 una original con
+  un envase dejaría de poder versionarse. Opciones y recomendación en `design.md > 1.5`.
 
 ## Decisiones cerradas (no reabrir)
 
