@@ -139,3 +139,88 @@ La primera corrida de `./init.sh --rapido`, antes del commit (sin diff contra `o
 
 **Veredicto:** T0 y TC hechos; sin rojos nuevos (los únicos rojos están en el baseline); la
 base `QuimiCloude_QC195` lista para T1.
+
+## T1 — Migración y esquema (backend_dev, 2026-10-03)
+
+Archivos:
+- `db/migrations/20261003120000_packaging_products_in_distribution/{migration.sql,down.sql}` (nuevos).
+- `db/schema.prisma`: `@@unique([companyId, id], map: "products_company_id_id_key")` en `Product`;
+  `packagingProductId` + `@@index` en `OrderPresentationLine`.
+- Tests nuevos: `tests/unit/inventario/schema/packaging-products-in-distribution-migration.test.ts`,
+  `tests/integration/inventario/qc195-packaging-constraints.int.test.ts` (censo `transaccion` en
+  `tests/integration/aislamiento.json`).
+- Tests ajustados: `tests/guards/guard-identificador-de-request.test.ts` (la lista cerrada de
+  migraciones gana la nueva, mismo patrón que las anteriores);
+  `tests/unit/inventario/schema/inventario-schema.test.ts` («products.name no tiene @@unique»: el
+  `@@unique` nuevo es `[companyId, id]`; el caso sigue prohibiendo cualquier `@@unique` sobre el nombre).
+
+Decisiones de implementación (dentro del spec):
+- Unidad `unidad`/`u` sembrada con `INSERT … WHERE NOT EXISTS` dentro del paréntesis
+  `NO FORCE`/`FORCE` de `units` (RLS forzada sin policies, mismo patrón que
+  `20260907190000`). Si ya existe una unidad de sistema `unidad` que deriva de otra, aborta.
+  Una empresa con su propia «unidad» no choca: los índices de nombre/símbolo de empresa son
+  parciales (`company_id IS NOT NULL`), los de sistema también (`company_id IS NULL`).
+- `down.sql` borra la unidad solo si nada la referencia (`foreign_key_violation` capturada → se
+  conserva con `NOTICE`), y al reponer el CHECK anterior **aborta** si hay un PACKAGING con
+  presentación (intencional, §2.4).
+
+R → test:
+| R | Test |
+|---|---|
+| R5 | `qc195-packaging-constraints.int.test.ts` › «R5 — un PRODUCT o un MACHINE con presentacion propia se rechaza…», «R5 — un FINISHED_PRODUCT sin receta, o sin presentacion, se rechaza; un PACKAGING con receta tambien»; texto: `packaging-products-in-distribution-migration.test.ts` › «R5 — reescribe el CHECK con el mismo nombre…» |
+| R1 (base) | `qc195-packaging-constraints.int.test.ts` › «R1/R5 — un PACKAGING con presentacion entra, y uno sin ella (envase anterior) tambien» |
+| R11 (FK) | `qc195-packaging-constraints.int.test.ts` › «R11 — una linea del reparto con un envase de otra empresa se rechaza por la FK compuesta» |
+| R14 (columna) | `packaging-products-in-distribution-migration.test.ts` › «R14 — la linea del reparto gana packaging_product_id anulable…» |
+| R6 (unidad) | `qc195-packaging-constraints.int.test.ts` › «R6 — existe la unidad de sistema «unidad» (u), base y sin derivacion»; texto › «R6 — siembra la unidad de sistema…» |
+| R32 | `qc195-packaging-constraints.int.test.ts` › «R32 — una linea guardada antes de la migracion queda intacta, sin envase y sin apartados»; texto › «R32 — no toca ninguna fila…» |
+
+Salida real:
+```
+$ pnpm run db:migrate          (.env → QuimiCloude_QC195, grep = 2)
+Applying migration `20261003120000_packaging_products_in_distribution`
+All migrations have been successfully applied.
+$ pnpm run db:test template
+✓ plantilla de esta rama: qct_tpl_4bbbe29e9081 (64 migraciones)
+$ pnpm exec vitest run tests/unit/inventario/schema/packaging-products-in-distribution-migration.test.ts
+ Test Files  1 passed (1)      Tests  7 passed (7)
+$ pnpm exec vitest run --project integration tests/integration/inventario/qc195-packaging-constraints.int.test.ts
+ Test Files  1 passed (1)      Tests  6 passed (6)
+$ pnpm exec vitest run --project integration (inventario-constraints, pedidos-constraints, company-scope x4,
+  product-batch-lot, reservations-and-decimal-stock-migration, reserve-existing-orders-migration,
+  order-packing-states-rollback, order-status-blocked-rollback, qc170-backfill, unidades/*)
+ Test Files  16 passed (16)    Tests  223 passed (223)
+$ pnpm exec vitest run tests/unit/inventario/schema tests/unit/pedidos/schema tests/unit/unidades guard
+ Test Files  99 passed (99)    (tras ajustar los dos tests citados arriba)
+```
+
+Rollback sobre base desechable (`QuimiCloude_QC195_rb`, copia de `qct_tpl_4bbbe29e9081`, borrada al final;
+script `pg` en el scratchpad de la sesión):
+```
+tras UP (plantilla): check nuevo, productsKey 1, column 1, fk 1, idx 1, unit 1, unitsForce true
+tras DOWN:           check = CHECK ((type='FINISHED_PRODUCT') = (recipe_id IS NOT NULL AND presentation_id IS NOT NULL)) AND ((recipe_id IS NULL) = (presentation_id IS NULL)),
+                     productsKey 0, column 0, fk 0, idx 0, unit 0, unitsForce true
+tras UP de nuevo:    igual que el primer UP
+bloque de unidad otra vez (idempotente): unit 1
+DOWN con un PACKAGING con presentacion: aborta 23514 «products_finished_identity_matches_type»
+base QuimiCloude_QC195_rb borrada
+```
+
+Gate `./init.sh --rapido` (antes del commit):
+```
+✓ typecheck paso
+✓ lint paso
+ Test Files  9 failed | 368 passed (377)
+      Tests  8 failed | 5518 passed | 7 skipped (5533)
+✗ 'pnpm run test:rapido' fallo
+```
+- 6 rojos en `tests/baseline-rojos.json` (los mismos de TC): `configuracion-ui/unidades-viewport`,
+  `configuracion-ui/usuarios-viewport`, `navegacion/pantallas-exigen-permiso`,
+  `inventario/product-page`, `recetas-ui/recipe-page`, `recetas/module-contract`.
+- 3 rojos **del carril frontend, no de T1**: `pedidos-ui/order-sheet`, `pedidos-ui/pedidos-viewport`,
+  `pedidos-ui/order-list-section` caen al cargar con «No "observabilidad" export is defined on the
+  "@/lib/composition" mock». Causa: el cambio sin commitear de frontend_dev en
+  `app/(private)/pedidos/components/index.ts` reexporta `PackagingSelect`, que importa
+  `listProductsAction` (`product-actions.ts` → `@/lib/composition`), y los `vi.mock` de esos tres
+  tests no lo cubren. No se tocó (carril ajeno); avisado en el informe.
+- Guardias aparte: `pnpm exec vitest run guard --passWithNoTests` → `Test Files 51 passed (51)`,
+  `Tests 670 passed | 11 skipped`.

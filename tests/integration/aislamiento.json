@@ -35,6 +35,7 @@
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
     "inventario/product-unit.int.test.ts",
+    "inventario/qc195-packaging-constraints.int.test.ts",
     "inventario/reservations-and-decimal-stock-migration.int.test.ts",
     "inventario/reserve-existing-orders-migration.int.test.ts",
     "pedidos/company-scope.int.test.ts",

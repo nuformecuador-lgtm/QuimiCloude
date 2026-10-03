@@ -413,6 +413,8 @@ export const MIGRACIONES_ESPERADAS = [
   // pedidos bloqueados. Ninguna toca el identificador de peticion.
   '20261001170000_order_status_blocked',
   '20261001170100_orders_blocked_index',
+  // El envase de la linea del reparto y la unidad de envases; no toca el identificador.
+  '20261003120000_packaging_products_in_distribution',
 ] as const
 
 export function hallazgosDeMigraciones(
