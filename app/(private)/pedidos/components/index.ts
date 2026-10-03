@@ -127,6 +127,19 @@ export {
   type OrderDistributionAvailabilityInput,
   type OrderDistributionLine,
 } from './use-order-distribution-availability';
+export {
+  PACKAGING_OPTION_AVAILABLE_TESTID,
+  PACKAGING_OPTION_PRESENTATION_TESTID,
+  PACKAGING_OPTION_TESTID,
+  PACKAGING_SELECT_EMPTY_TESTID,
+  PACKAGING_SELECT_FORBIDDEN_TESTID,
+  PACKAGING_SELECT_LOAD_ERROR_TESTID,
+  PACKAGING_SELECT_POPUP_TESTID,
+  PACKAGING_SELECT_TESTID,
+  PackagingSelect,
+  type PackagingOption,
+  type PackagingSelectProps,
+} from './packaging-select';
 export { compatibleUnitIds } from './compatible-unit-ids';
 export { useSavedPresentationContents } from './use-saved-line-contents';
 export { OrderListEmpty } from './order-list-empty';
