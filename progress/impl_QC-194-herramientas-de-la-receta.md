@@ -267,3 +267,132 @@ Programado contra `contrato-back.md` (b95a1732); sin tocar `lib/` ni los tests d
   `create-recipe-version.ts`, `recipe-version.ts`, `update-recipe-version.ts` no estan en
   `RECETAS_PERMITIDAS` (y la migracion de `recipe_tools` probablemente tampoco en `DB_PERMITIDAS`).
   Es la lista de ampliaciones nombradas por ficha; hay que anadir la de QC-194. No lo toque: no es UI.
+
+## Tanda 2 — T4-T8 (backend_dev)
+
+El MCP del grafo no se uso en esta tanda (exploracion con Grep/Read sobre el worktree).
+
+### T4 — escritura de herramientas en el adaptador (`6fe8f28f`)
+
+- `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`: `tools` anidado en
+  `createRecipe` y `createRecipeVersion`; `deleteMany` + `upsert` de `tx.recipeTool` escritos en
+  linea dentro de `replaceAliveRecipe` y `replaceAliveRecipeWithPropagation` (sin helper
+  `replaceToolsOn`, decision del leader), siempre tras el `updateMany` acotado y su salida
+  temprana. `tools: null` no toca herramientas ni las propaga. `beforeTools` se lee dentro de la
+  transaccion; por version, `propagateTools(beforeTools, tools, currentTools)`. `createdAt`
+  creciente por posicion (`toolCreatedAt`) para que el orden de alta no dependa del `id`.
+  `translateWriteError` traduce `23503`/`P2003` a `ValidationError`: medido contra Postgres, el
+  conector no expone la FK (`meta.constraint: null`), asi que no se distingue linea de
+  herramienta; en estas escrituras receta, empresa y autor ya estan probados.
+- `tests/guards/guard-ambito-empresa-recetas.test.ts`: `violacionesDeTransaccion` prohibe tambien
+  `prisma.recipeTool.`; nuevo `violacionesDeHerramientas` (cada `tx.recipeTool.*` despues del
+  `updateMany` acotado y su salida temprana, filtrando por `recipeId: id|versionId`, sin
+  `companyId`) aplicado a las dos funciones, con cuatro mutaciones anti-placebo.
+- `tests/integration/recetas/recipe-tools.int.test.ts` (nuevo) y alta en
+  `tests/integration/aislamiento.json` (`commit`, con motivo).
+
+### T5 — validacion en los casos de uso (`1885d0d7`)
+
+- `lib/modules/recetas/domain/recipe-tools.ts` (nuevo): `assertToolsValid(sent, alreadyThere,
+  products, companyId)` -> `ValidationError` si una nueva no la devuelve `findRefs` o no es MACHINE.
+- `create-recipe.ts` (antes de subir la imagen), `update-recipe.ts` y `update-recipe-version.ts`
+  (solo si llega `tools`, contra `existing.tools`), `create-recipe-version.ts` (las enviadas contra
+  las de la original; sin `tools` copia sin revalidar).
+- `tests/unit/recetas/recipe-tools.test.ts` (nuevo; agrupa los casos de los cuatro casos de uso y de
+  `getRecipe` en vez de repartirlos en sus archivos: `create-recipe.test.ts` no existe).
+- Casos de integracion de T5 en `recipe-tools.int.test.ts` (por `@/lib/composition`).
+- `contrato-back.md` §5/§6: escritura y validacion pasan de STUB a real (tipos sin cambios).
+
+### T6 — contenido de ejecucion (`d8e8b512`)
+
+- `recipe-catalog-prisma.ts`: `select.tools` en orden de alta y `toRecipeExecutionContent` las
+  mapea; `lines` no cambia. `recipe-catalog.ts` ya tenia el tipo. `pedidos` e `inventario` sin tocar.
+- `tests/unit/recetas/recipe-catalog.test.ts`: `tools: []` en las filas de los dobles y dos casos.
+- `tests/integration/pedidos/order-reservation-tools.int.test.ts` (nuevo) y alta en `aislamiento.json`.
+
+### T7 — import de PDF (`032782c2`)
+
+- `tests/integration/documentos/formula-import.int.test.ts`: dos casos. Sin codigo de produccion.
+
+### T8 — ejecucion del operador (`d6d2ac26`)
+
+- `get-assigned-order-execution.ts`: las unidades se piden solo para los productos de las lineas
+  (antes, una herramienta con lotes anadia su unidad a `units.findRefs`).
+- `tests/unit/asignaciones/get-assigned-order-execution.test.ts`: bloque nuevo.
+
+### Guardia de alcance del modulo (`95404bbf`)
+
+- `tests/unit/recetas/module-contract.test.ts`: lista `HERRAMIENTAS_DE_RECETA_QC194`. Sin ella el
+  archivo, ya en `baseline-rojos.json` por otra causa, sumaba un segundo motivo de rojo
+  (`recipe-tools.ts`). Queda rojo solo por la causa del baseline (`pedidos/page.tsx`).
+
+### Mapa R<n> -> test (backend, T4-T8)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R1 | `tests/integration/recetas/recipe-tools.int.test.ts` | `R1: el alta guarda las herramientas y la lectura las devuelve en orden de alta`; `R1: replaceAlive con herramientas cambia cantidades, quita y anade, conservando el id y el orden de la que sigue` |
+| R1 | `tests/unit/recetas/recipe-tools.test.ts` | `R1: pasa las herramientas validadas al repositorio` |
+| R2 | `recipe-tools.int.test.ts` | `R2: el alta sin herramientas deja la receta sin ninguna` |
+| R2 | `recipe-tools.test.ts` | `R2: sin tools llega [] al repositorio` |
+| R3 | `recipe-tools.test.ts` | `R3: una herramienta nueva que no es MACHINE es invalida`; `R3: una herramienta que no es MACHINE da ValidationError sin llamar al repositorio`; `R3, R5: una nueva que no es MACHINE o no esta viva da ValidationError sin escribir`; `R3: una nueva que no es MACHINE da ValidationError sin crear la version` |
+| R3 | `recipe-tools.int.test.ts` | `R3: una herramienta nueva que no es MACHINE se rechaza sin crear la receta` |
+| R5 | `recipe-tools.test.ts` | `R5: una herramienta nueva que el catalogo no devuelve (inexistente, de otra empresa o de baja) es invalida`; `R5: una herramienta inexistente, de otra empresa o de baja da ValidationError sin llamar al repositorio`; `R5: una nueva de baja da ValidationError sin escribir` |
+| R5 | `recipe-tools.int.test.ts` | `R5: un producto inexistente que llegara al adaptador se traduce a ValidationError y no escribe nada` |
+| R8, R9 | `tests/integration/pedidos/order-reservation-tools.int.test.ts` | `R8, R9: crear, revisar bloqueados, pasar a curso y Finalizar no tocan los lotes de las herramientas ni bloquean por ellas` |
+| R8 | `tests/unit/recetas/recipe-catalog.test.ts` | `R8: las herramientas van en tools, aparte, y lines queda identico al de una receta sin herramientas` |
+| R10 | `order-reservation-tools.int.test.ts` | `R10: el costo de ingredientes es el mismo con y sin herramientas` |
+| R11 | `recipe-tools.int.test.ts` | `R11: createVersion guarda las herramientas de la version` |
+| R11 | `recipe-tools.test.ts` | `R11: sin tools copia las de la original, incluida la de baja, sin consultarlas al catalogo`; `R11: con tools [] la version nace sin herramientas` |
+| R12 | `recipe-tools.test.ts` | `R12: con tools solo valida las que no estan en la original` |
+| R13 | `recipe-tools.int.test.ts` | `R13: editar las herramientas de una version no cambia las de la original` |
+| R13 | `recipe-tools.test.ts` | `R13, R19: valida solo contra las de la propia version y conserva la de baja` |
+| R14 | `recipe-tools.int.test.ts` | `R14, R15: la propagacion aplica la regla por producto y no toca las versiones no indicadas` |
+| R14 | `recipe-tools.test.ts` | `R14: con propagacion pasa las herramientas a replaceAliveWithPropagation` |
+| R15 | `recipe-tools.int.test.ts` | `R15: un versionId invalido revierte tambien las herramientas de la original`; `R15: un fallo forzado al escribir las herramientas de una version no deja nada cambiado` |
+| R17 | `recipe-tools.int.test.ts` | `R17: replaceAlive con tools null no toca las herramientas; con [] las borra`; `R17: la propagacion con tools null no toca las herramientas de la original ni de las versiones` |
+| R17 | `recipe-tools.test.ts` | `R17: sin tools llega tools null al repositorio y no consulta el catalogo por herramientas`; `R17: con [] llega [] (quitarlas todas)`; `R17: sin tools llega null; con [] llega []` |
+| R18 | `tests/integration/documentos/formula-import.int.test.ts` | `R18: reemplazar por PDF una receta con dos herramientas las deja intactas`; `R18: crear por PDF una receta nueva la deja sin herramientas` |
+| R19 | `recipe-tools.test.ts` | `R19: la que ya estaba no se consulta, aunque este de baja`; `R19: conserva la preexistente de baja y solo valida la nueva` |
+| R19, R21 | `recipe-tools.int.test.ts` | `R19, R21: dar de baja un MACHINE usado como herramienta funciona, y la receta se sigue editando conservandola` |
+| R20 | `recipe-tools.test.ts` | `R20: devuelve las herramientas en orden con su nombre, la de baja con productName null, en un solo findRefs` |
+| R22 | `recipe-tools.test.ts` | `R22: una version devuelve sus propias herramientas, no las de la original` (lado servidor) |
+| R28 | `tests/unit/asignaciones/get-assigned-order-execution.test.ts` | `R28: trae nombre y cantidad de cada herramienta de la receta del pedido, en su orden`; `R28: si el pedido es de una version, son las herramientas de esa receta (...)`; `R28: un solo findRefs de productos para lineas y herramientas, y las unidades solo de las lineas` |
+| R28 | `recipe-catalog.test.ts` | `R28: la consulta pide las herramientas en orden de alta` |
+| R29 | `get-assigned-order-execution.test.ts` | `R29: la cantidad no cambia con la cantidad del pedido` |
+| R30 | `get-assigned-order-execution.test.ts` | `R30: una herramienta de baja sale con productName null y su cantidad` |
+| R31 | `get-assigned-order-execution.test.ts` | `R31: sin herramientas, tools es []` |
+| R32 | `recipe-tools.test.ts` | `R32: <createRecipe/updateRecipe/createRecipeVersion/updateRecipeVersion> <sin actor/solo con recetas.consultar> rechaza sin tocar repositorio ni catalogo` (8 casos) |
+| R32 | `get-assigned-order-execution.test.ts` | `R32: sin asignaciones.consultar no toca ningun puerto, aunque la receta tenga herramientas` |
+| guardia | `tests/guards/guard-ambito-empresa-recetas.test.ts` | describe `recipe_tools: las herramientas se escriben solo tras probar su receta, y por su id` (2 estructurales + 4 MUERE) |
+
+### Salida real
+
+- `pnpm run typecheck`: sin errores (0 `error TS`).
+- `pnpm run lint`: `0 errors, 8 warnings` (preexistentes; ninguno en archivos de esta tanda).
+- `vitest run guard`: `Test Files 51 passed`, `Tests 676 passed | 11 skipped`.
+- Unitarios nuevos o ampliados: `recipe-tools.test.ts` `30 passed`; `recipe-catalog.test.ts` en
+  verde; `get-assigned-order-execution.test.ts` `31 passed`.
+- `vitest related --run` de cada task: solo rojos de `tests/baseline-rojos.json`
+  (`unidades-viewport`, `usuarios-viewport`, `product-page`, `pantallas-exigen-permiso`,
+  `recipe-page`, `module-contract`) mas `recipe-route-contract` (abajo).
+- Integracion (base efimera del arnes, la de desarrollo intacta): `recetas/*` +
+  `documentos/formula-import{,-versions}` + `pedidos/order-reservation{,-tools}` +
+  `order-ingredients-cost` + `review-blocked-orders` + `order-content-copy` ->
+  `Test Files 18 passed`, `Tests 207 passed`.
+- `./init.sh --rapido`: **rojo**; typecheck, lint y guardias pasan; `Test Files 7 failed | 328
+  passed (335)`, `Tests 9 failed | 5162 passed | 2 skipped`. Rojos: los seis archivos de
+  `baseline-rojos.json` y `tests/unit/recetas-ui/recipe-route-contract.test.ts > la feature no toca
+  lib/modules/recetas ni db/`.
+
+### Abierto para el leader
+
+- `recipe-route-contract.test.ts` (directorio de frontend_dev; ninguno de los dos lo toco): su lista
+  `RECETAS_PERMITIDAS` (`:470`) no nombra los archivos de QC-194 bajo `lib/modules/recetas/` (hoy
+  salen `create-recipe-version.ts`, `recipe-tools.ts`, `recipe-version.ts`,
+  `update-recipe-version.ts`) y probablemente `DB_PERMITIDAS` tampoco la migracion de
+  `recipe_tools`. Falta una lista nombrada de QC-194, como la de `module-contract.test.ts`.
+- Cambio de comportamiento menor: un `23503` en las escrituras de receta (tambien de lineas) sale
+  ahora como `ValidationError` (`invalid_input`) en vez de error crudo (`unexpected`).
+
+Veredicto: T4-T8 cerradas; typecheck, lint, guardias e integracion en verde; `--rapido` rojo solo por
+`recipe-route-contract` (lista de alcance sin QC-194) ademas de los rojos del baseline.
