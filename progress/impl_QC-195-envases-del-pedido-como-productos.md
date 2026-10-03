@@ -140,7 +140,7 @@ La primera corrida de `./init.sh --rapido`, antes del commit (sin diff contra `o
 **Veredicto:** T0 y TC hechos; sin rojos nuevos (los únicos rojos están en el baseline); la
 base `QuimiCloude_QC195` lista para T1.
 
-## T1 — Migración y esquema (backend_dev, 2026-10-03)
+## T1 — Migración y esquema (backend_dev, 2026-10-03) — commit `c4f21814`
 
 Archivos:
 - `db/migrations/20261003120000_packaging_products_in_distribution/{migration.sql,down.sql}` (nuevos).
@@ -261,7 +261,7 @@ Como el modo rápido se para en el typecheck, el resto se corrió aparte:
   `app/(private)/pedidos/components/order-distribution-dialog.tsx` (carril frontend, sin commitear).
   Avisado en el informe.
 
-## T2 — El envase en inventario: alta, lote y ajuste (backend_dev, 2026-10-03)
+## T2 — El envase en inventario: alta, lote y ajuste (backend_dev, 2026-10-03) — commit `7226b1ed`
 
 Archivos de producción:
 - `lib/modules/unidades/domain/package-unit.ts` (nuevo): `PACKAGE_UNIT_NAME = 'unidad'` y el puerto
@@ -403,7 +403,7 @@ version intermedia del dialogo, que aplanaba el aviso a `string`; la final guard
 borrador juntos y ademas `guard-catalogo-de-errores` pide no traducir con `instanceof`: ambas
 verdes).
 
-## T3 — `PackagingCatalog` (backend_dev, 2026-10-03) — commit `1fa8dc58`
+## T3 — `PackagingCatalog` (backend_dev, 2026-10-03) — commit `5c38bbb3`
 
 Archivos: `lib/modules/inventario/domain/packaging-catalog.ts` (nuevo: `PackagingRef`,
 `PackagingCostingBatch`, `PackagingCatalog` con la firma de §3.1), barrel de `inventario` (solo
@@ -447,3 +447,114 @@ Gate `./init.sh --rapido` tras el commit:
 Los 6 rojos, todos en `tests/baseline-rojos.json`: `recetas/module-contract`,
 `configuracion-ui/unidades-viewport`, `configuracion-ui/usuarios-viewport`, `inventario/product-page`,
 `navegacion/pantallas-exigen-permiso`, `recetas-ui/recipe-page`. Guardias corridas aparte (arriba): verdes.
+
+## T14 — El envase en la interfaz de inventario (frontend_dev, 2026-10-03) — commit `98bb74fd`
+
+Archivos: `app/(private)/inventario/components/product-form.tsx` (alta de Envase: nota de
+presentacion fija, «Existencia (envases)» con teclado numerico y entero obligatorio; edicion:
+presentacion de solo lectura o marca «Envase sin presentación fija»), `product-batches-panel.tsx`
+(prop `product`: un lote sin unidad propia se cuenta en la del producto, cabecera con la
+presentacion del envase o la marca del legado), `product-table.tsx` (pasa `product` y
+`wholePackages`), `adjust-batch-dialog.tsx` (`wholePackages`: delta entero), `product-field.tsx`
+(`inputMode` admite `numeric`); test nuevo `tests/unit/inventario-ui/envase-en-inventario.test.tsx`
+(los tests de UI de inventario viven en `tests/unit/inventario/`, carril de backend: no se tocaron).
+
+La validacion de entero en cliente (alta y ajuste) es la misma regla que T2 pone en el esquema;
+se escribe aparte para señalar el campo sin depender de que el esquema del cliente ya la tenga.
+
+| R | Test (`tests/unit/inventario-ui/envase-en-inventario.test.tsx`) |
+|---|---|
+| R1 | «R1: la presentacion del envase se pide como fija del producto», «R1: sin presentacion el alta del envase no llega a la operacion», «R1, R7: con presentacion y envases enteros el alta viaja con la presentacion y la existencia», «R1: la presentacion fija se muestra y no se puede cambiar», «R1: el envase legado sin presentacion fija lleva su marca» |
+| R6 | «R6: la existencia del envase se pide en envases», «R6: un lote de envase se pinta en u, con la presentacion del producto», «R6: el lote de un envase legado conserva la unidad de su presentacion y la marca» |
+| R7 | «R7: una existencia de envases no entera se rechaza junto al campo sin llamar a la operacion», «R7: la existencia decimal sigue valiendo para un producto que no es envase», «R7: el ajuste de un lote de envase no acepta envases no enteros» |
+
+Salida real:
+```
+$ pnpm exec vitest run tests/unit/inventario-ui
+ Test Files  1 passed (1)      Tests  11 passed (11)
+$ pnpm exec vitest related --run <5 componentes de inventario>
+ Test Files  2 failed | 9 passed (11)   Tests  2 failed | 211 passed (213)
+   (rojos: inventario/product-page R18 y navegacion/pantallas-exigen-permiso, ambos en el baseline)
+$ eslint app/(private)/inventario/components tests/unit/inventario-ui
+ 0 errores, 1 aviso preexistente (product-columns.tsx, no tocado)
+```
+Gate `./init.sh --rapido`: typecheck ✓, lint ✓, `test:rapido` `Test Files 6 failed | 393 passed
+(399)`, los 6 del baseline. Guardias aparte: `Test Files 51 passed (51) Tests 672 passed`.
+
+## T15 — Lecturas con lineas antiguas y con envase (frontend_dev, 2026-10-03)
+
+Archivos: `app/(private)/pedidos/components/order-columns.tsx` (la columna del reparto nombra la
+linea por `packagingName` y, si es `null`/ausente, por la presentacion como hoy; el componente
+compartido `OrderDistributionLabel` no cambia), `tests/unit/pedidos-ui/order-columns.test.tsx`,
+`tests/unit/asignaciones-ui/qc195-lineas-antiguas.test.tsx` (nuevo).
+
+- **Ficha** (el panel del pedido): la pinta `OrderDistributionField`, hecho en T13.
+- **Empaque y ejecucion**: leen `AssignedOrderPresentationLine`/`OrderDistributionLineView` de
+  `asignaciones`, que no traen `packagingName` (`design.md > 5` y `> 11.7`: «las vistas de
+  `asignaciones` no cambian»). Siguen pintando la presentacion de cada linea, que es R33 para las
+  antiguas; para pintar el envase en esas dos pantallas haria falta ampliar esas vistas en `lib/`
+  (fuera de este carril). Pregunta abierta en el informe.
+
+| R | Test |
+|---|---|
+| R33 (UI) | `order-columns.test.tsx` › «R33: una linea con envase se pinta con el nombre del envase», «R33: una linea antigua se sigue pintando con el nombre de su presentacion», «R33: un envase cuyo nombre no vuelve del catalogo se pinta con su presentacion»; `asignaciones-ui/qc195-lineas-antiguas.test.tsx` › «R33: la linea antigua se pinta con sus envases y el nombre de su presentacion»; ficha: `order-distribution-field.test.tsx` › «R35: la linea antigua se pinta con su presentacion, marcada como anterior a los envases» y «R33: la linea antigua resuelve su contenido en el catalogo y luego muestra lo que cubre» |
+
+Salida real:
+```
+$ pnpm exec vitest run tests/unit/pedidos-ui/order-columns.test.tsx tests/unit/asignaciones-ui/qc195-lineas-antiguas.test.tsx
+ Test Files  2 passed (2)      Tests  44 passed (44)
+```
+Gate `./init.sh --rapido`: typecheck ✓, lint ✓, `test:rapido` `Test Files 6 failed | 394 passed
+(400)`, los 6 del baseline. Guardias aparte: verdes (51/51).
+
+## T4 — Listado de productos para el selector (backend_dev, 2026-10-03) — commit `8002ad3f`
+
+Archivos: `lib/modules/inventario/domain/product-queryable.ts` (`PRODUCT_QUERYABLE.filterable` gana
+`[PRODUCT_PRESENTATION_UNIT_FILTER]: 'select'`, es decir `presentationUnitId`; la constante se movió
+encima de la lista), `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`:
+- `listAliveProducts` resuelve primero las presentaciones de la empresa **con contenido** cuya unidad
+  está en los valores del filtro y lo traduce a `presentationId IN (…)`: `Product` no tiene relación
+  Prisma con `Presentation`, así que no cabe un `where` anidado. Un producto sin presentación fija
+  nunca coincide (R9). `buildProductWhere` gana un tercer parámetro opcional con esas presentaciones;
+  sin él, el filtro no deja pasar nada (los dos llamantes de test siguen igual).
+- Rellena `presentationId`, `presentationName`, `presentationContent` (4 decimales) y
+  `presentationUnitId` en cada `ProductView` del listado (una consulta más por página, no por fila);
+  `null` en los cuatro si el producto no tiene presentación fija. (Un producto terminado también los
+  trae: su `presentation_id` es su presentación.)
+- No hay índice nuevo: `list-query-indexes.int.test.ts` no exige índice por filtro y sigue verde;
+  el filtro va por `products.presentation_id` (cubierto por la FK compuesta) tras resolver las
+  presentaciones por `presentations_unit_id_idx`.
+
+Tests: `tests/integration/inventario/qc195-packaging-list.int.test.ts` (nuevo, censo `commit`),
+casos nuevos en `tests/unit/inventario/list-use-cases.test.ts`, `product-prisma.test.ts`,
+`list-query.test.ts` (la lista blanca exacta de filtros se amplía con `presentationUnitId`, §8).
+
+R → test:
+| R | Test |
+|---|---|
+| R8 | `qc195-packaging-list.int.test.ts` › «R8, R9, R10 — con type=PACKAGING y presentationUnitId={ml, l} salen solo los envases en ml/l con contenido…» (no salen kg, g, sin contenido); `list-use-cases.test.ts` › «R8 — con inventario.consultar, el filtro presentationUnitId llega al puerto sin descartarse»; `product-prisma.test.ts` › «R8 — se traduce a las presentaciones ya resueltas…»; `list-query.test.ts` › «QC-195 R8, R9 — el listado de productos acepta el filtro presentationUnitId como select» |
+| R9 | mismo caso de integración (no salen el envase legado ni la materia prima; el legado sale con los cuatro campos a `null` sin el filtro); `product-prisma.test.ts` › «R9 — sin presentaciones resueltas no deja pasar ningun producto…» |
+| R10 | mismo caso de integración (`available` 120 tras apartar 30 de 150; el envase agotado sale con `0.0000`) |
+| R38 (servidor) | `list-use-cases.test.ts` › «R38 — con pedidos.modificar y sin inventario.consultar responde unauthorized sin tocar el puerto» |
+
+Salida real:
+```
+$ pnpm exec vitest run --project integration tests/integration/inventario/qc195-packaging-list.int.test.ts \
+    tests/integration/inventario/list-query-products.int.test.ts tests/integration/inventario/list-query-indexes.int.test.ts
+ Test Files  3 passed (3)      Tests  37 passed (37)
+$ pnpm exec vitest run --project node <list-query, list-use-cases, product-service, product-list-params,
+    shared/listas-blancas-listados, guard-contrato-listados, product-prisma, module-contract, qc195-contrato-tipos>
+ Test Files  9 passed (9)      (tras ampliar list-query.test.ts)
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)    Tests  672 passed | 11 skipped (683)
+```
+
+Gate `./init.sh --rapido` tras el commit:
+```
+✓ typecheck paso
+✓ lint paso
+ Test Files  6 failed | 394 passed (400)
+      Tests  8 failed | 5900 passed | 9 skipped (5917)
+✗ 'pnpm run test:rapido' fallo
+```
+Los 6 rojos son los de `tests/baseline-rojos.json` (los mismos de T3). Guardias aparte: verdes.
