@@ -99,7 +99,7 @@ pedido, revisar bloqueados, pasar a curso y consumir: cero filas de `reservation
 `inventory_movements` sobre lotes de herramientas, el pedido no queda `BLOQUEADO` por ellas (R8, R9), y
 `ingredients_cost` igual que con la receta sin herramientas (R10).
 
-### T7 [P] — Import de PDF conserva herramientas
+### T7 [P] — Import de PDF conserva herramientas [x]
 Tras T5. **Quién:** backend_dev. **Toca:** `tests/integration/documentos/formula-import.int.test.ts`.
 **Hacer:** §8. Sin código de producción.
 **Hecho cuando:** reemplazar por PDF una receta con dos herramientas las deja intactas; crear por PDF
