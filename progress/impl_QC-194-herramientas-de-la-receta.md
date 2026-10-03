@@ -416,3 +416,55 @@ Veredicto: T4-T8 cerradas; typecheck, lint, guardias e integracion en verde; `--
   - `tests/unit/configuracion-ui/unidades-viewport.test.tsx` > R27 (1280 y 375 px). En baseline (QC-177).
   - `tests/unit/configuracion-ui/usuarios-viewport.test.tsx` > R21 (1280 y 375 px). En baseline (QC-177).
 - Ningun rojo fuera del baseline.
+
+## Vuelta 2 — menores
+
+### m2 — `translateWriteError` acotado a la FK de producto: NO CERRADO
+Sonda temporal contra la base efimera del arnes (borrada, no commiteada), Prisma 6.19.3, con el
+`if (isProductForeignKeyViolation...)` desactivado para ver el error crudo. Las diez escrituras
+(alta, `replaceAlive`, alta de version y propagacion; con producto de herramienta, de linea y autor
+inexistentes) dan `PrismaClientKnownRequestError` `P2003` con `meta = { modelName, constraint: null }`
+y el mensaje «Foreign key constraint violated on the (not available)». Prisma no expone la constraint
+ni `field_name`. `modelName` tampoco sirve: en las escrituras anidadas sale `Recipe` para la FK de
+producto de linea, la de herramienta y la del autor por igual. No se puede identificar la constraint
+de forma fiable: paro aqui, sin tocar el codigo ni el comentario. En `origin/dev`
+`translateWriteError` solo traducia `23514`; la traduccion de `23503`/`P2003` es de esta rama.
+Opciones para el leader: (a) aceptar la traduccion amplia y reescribir el comentario con este
+motivo; (b) quitarla y dejar que la FK salga como `unexpected` (el dominio ya valida antes);
+(c) comprobar los productos dentro de la transaccion antes de escribir.
+
+### m3 — caso cruzado de herramientas (`90d3f204`)
+`recipe-tools.int.test.ts` siembra una segunda empresa; `replaceAlive` (original y version) y
+`replaceAliveWithPropagation` desde ella devuelven `not_found` y el retrato de la original y la
+version (fila, lineas, herramientas con id y `createdAt`) queda igual.
+Test: `R1, R14: desde otra empresa, replaceAlive y la propagacion no tocan las herramientas de la receta`.
+
+### m4 — par `deleteMany`+`upsert` (`1f4dad13`)
+No se extrae. La guardia `guard-ambito-empresa-recetas.test.ts` exige que (1) toda funcion que toque
+`tx.`/`prisma.` declare `scope: RecipeScope` y lo lleve a `./company-scope`, sin lista de excepciones
+salvo `replaceAliveRecipe`, y (2) que `violacionesDeHerramientas` encuentre los `tx.recipeTool.*` en
+el cuerpo de `replaceAliveRecipe` y `replaceAliveRecipeWithPropagation`, tras su `updateMany` acotado
+y su salida temprana. Una funcion interna sin `scope` rompe (1); darle un `scope` que solo pasa a
+`recipeCompanyScope` sin filtrar nada seria un placebo, y moverle las llamadas rompe (2). Solo se parte
+en varias lineas el `create` largo de la propagacion. Guardia: 44/44 verde.
+
+### m5 — design.md (`2b7b1f02`)
+§4: fuera `replaceToolsOn` (motivo de m4) y la FK descrita como es hoy (m2). §5: el test cubre
+tambien editar. §7: el repetido llega con `path ['tools']` y va como error general del tab.
+`contrato-back.md` ya lo decia asi; no se toca.
+
+### m6 — R8 en `update-order` (`17f3cfaa`)
+`order-reservation-tools.int.test.ts`: `R8: editar un pedido cuya receta tiene herramientas no aparta
+nada sobre ellas ni lo bloquea por ellas`. Edita a 50 (sigue PENDIENTE pese a la maquina sin stock),
+a 200 con `confirmBlocked` (BLOQUEADO por el ingrediente) y a 30 (vuelve a PENDIENTE); cero asientos
+nuevos sobre el lote de la herramienta y su stock intacto.
+
+### Salida real
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 8 warnings preexistentes; `eslint` sobre los tres archivos tocados: limpio.
+- `vitest run guard-ambito-empresa-recetas`: 44 passed.
+- `vitest run --project integration recipe-tools.int.test.ts`: 14 passed; `order-reservation-tools.int.test.ts`: 3 passed.
+- `vitest related --run` (recipe-prisma.ts y los dos .int): 243 archivos verdes, 5 rojos, los cinco en
+  `tests/baseline-rojos.json` (unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso, recipe-page).
+
+Veredicto: m3, m4 (sin extraer, por la guardia), m5 y m6 cerrados; m2 parado porque Prisma no identifica la constraint.
