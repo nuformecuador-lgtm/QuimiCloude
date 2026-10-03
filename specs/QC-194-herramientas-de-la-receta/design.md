@@ -190,11 +190,17 @@ la misma regla que ya cumplen las líneas, y los tests actuales de `propagateLin
   herramientas (antes = después, `propagateTools` sería la identidad); si no, escribe las de la
   original y, por versión, `propagateTools(beforeTools, data.tools, currentTools)` con el mismo
   `deleteMany` + `upsert`. Un fallo revierte todo (R15).
-- Helper `replaceToolsOn(tx, recipeId, tools)` para no repetir el par `deleteMany`/`upsert` tres
-  veces.
-- `translateWriteError`: el CHECK `recipe_tools_quantity_positive` (23514) y la FK de producto
-  (23503) se traducen a `ValidationError` como ya pasa con las líneas; en la práctica el dominio los
-  para antes.
+- No hay helper compartido: el par `deleteMany`/`upsert` de `recipeTool` va escrito dentro de cada
+  función (`replaceAliveRecipe`, la original y cada versión de `replaceAliveRecipeWithPropagation`).
+  `guard-ambito-empresa-recetas.test.ts` exige que toda función que toque `tx.` declare y consuma
+  `scope`, y que cada `tx.recipeTool.*` viva en la propia función, tras su `updateMany` acotado y su
+  salida temprana; una función interna sin `scope` no pasaría la guardia, y darle un `scope` que no
+  usa sería debilitarla.
+- `translateWriteError`: el CHECK `recipe_tools_quantity_positive` (23514) y cualquier violación de
+  FK (`23503`/`P2003`) de estas escrituras se traducen a `ValidationError`; en la práctica el dominio
+  los para antes. No se distingue la FK de producto de las demás (autor, `parent_recipe_id`): con
+  Prisma 6.19 el error llega con `meta.constraint: null` y el mensaje dice «Foreign key constraint
+  violated on the (not available)», tanto en las escrituras anidadas como en los `upsert`.
 
 ## 5. Lo que NO cambia: stock, consumo y costo (R8–R10)
 
@@ -212,7 +218,7 @@ llegan porque viven en otro campo, no porque alguien las filtre. `findExecutionC
 añade `tools: { select: { productId, quantity }, orderBy: … }` al `select`.
 
 La prueba de R8–R10 es de integración contra Postgres real (§10): una receta con una herramienta
-MACHINE con lotes y otra sin stock; crear el pedido, pasarlo a curso y consumir; afirmar sobre
+MACHINE con lotes y otra sin stock; crear, editar y revisar bloqueados, pasarlo a curso y consumir; afirmar sobre
 `reservation_movements` e `inventory_movements` que no hay ningún asiento con un lote de la
 herramienta, que el pedido no queda bloqueado por ella, y que `ingredients_cost` es el mismo que con
 la receta sin herramientas.
@@ -252,7 +258,9 @@ la receta sin herramientas.
   servidor como el import de PDF.
 - Validación previa con el esquema del contrato (como hoy): una fila sin producto o con cantidad no
   entera > 0 bloquea el envío y pinta el error en la fila (`toolErrors[index]`), mapeando el `path`
-  `['tools', i, …]` del issue de zod (R25). La suma de porcentajes se calcula solo con `lines`, así que
+  `['tools', i, …]` del issue de zod (R25). El issue de producto repetido llega con `path`
+  `['tools']`, sin índice: no apunta a ninguna fila y se pinta como error general del tab (el
+  selector ya excluye las elegidas, así que en la práctica no se da). La suma de porcentajes se calcula solo con `lines`, así que
   R26 (segunda mitad) se cumple sin cambio; un test lo fija.
 - Errores del servidor: los mismos estados de error que ya pinta el formulario (R27); no hay código de
   error nuevo.
