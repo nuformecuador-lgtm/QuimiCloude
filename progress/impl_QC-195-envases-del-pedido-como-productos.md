@@ -224,3 +224,39 @@ Gate `./init.sh --rapido` (antes del commit):
   tests no lo cubren. No se tocó (carril ajeno); avisado en el informe.
 - Guardias aparte: `pnpm exec vitest run guard --passWithNoTests` → `Test Files 51 passed (51)`,
   `Tests 670 passed | 11 skipped`.
+
+## T5 — `consumeForOrder` por subconjunto (backend_dev, 2026-10-03) — commit `c3872bb8`
+
+Archivos: `lib/modules/inventario/domain/reservation.ts` (`productIds?: readonly ProductId[]` en
+`MaterialReservations.consumeForOrder`), `lib/modules/inventario/adapters/driven/persistence/reservation-prisma.ts`
+(filtra lo apartado y el `fallbackRequirement` a esos productos; sin `productIds`, idéntico),
+`tests/integration/inventario/reservation.int.test.ts` (tres casos nuevos; los existentes sin tocar).
+
+R → test (`tests/integration/inventario/reservation.int.test.ts`, describe «QC-195 R25, R26 — consumeForOrder por subconjunto de productos»):
+- R26 › «R26 — con productIds solo consume lo apartado de esos productos y deja intacto lo demas del pedido»
+- R25 › «R25 — sin nada apartado de esos productos, el respaldo se filtra a productIds y no toca lo apartado de los demas»
+- R25 › «R25 — con productIds y respaldo que no alcanza devuelve insufficient sin consumir lo de los demas»
+(El R25/R26 de punta a punta, con Terminar y `POR_EMPACAR`, es T10.)
+
+Salida real:
+```
+$ pnpm exec vitest run --project integration tests/integration/inventario/reservation.int.test.ts \
+    tests/integration/pedidos/order-reservation.int.test.ts tests/integration/pedidos/order-packing.int.test.ts \
+    tests/integration/pedidos/finish-with-finished-goods.int.test.ts
+ Test Files  4 passed (4)      Tests  70 passed (70)
+$ pnpm exec vitest related --run --project node <los dos archivos de lib>
+ Test Files  62 passed (62)    Tests  1169 passed (1169)
+```
+
+Gate `./init.sh --rapido` tras el commit: **`✗ typecheck`** por un archivo del carril frontend sin
+commitear, no de T5:
+```
+tests/unit/pedidos-ui/order-distribution-field.test.tsx(85,9): error TS2322: Type 'readonly string[] | undefined' is not assignable to type 'readonly string[]'.
+```
+Como el modo rápido se para en el typecheck, el resto se corrió aparte:
+- `tsc --noEmit` sin errores fuera de `tests/unit/pedidos-ui/`.
+- `eslint` de los tres archivos de T5: 0 errores.
+- Guardias: `Test Files 1 failed | 50 passed (51)`. El rojo es
+  `guard-identificador-de-request` › «las superficies que aplanan un ErrorState…» sobre
+  `app/(private)/pedidos/components/order-distribution-dialog.tsx` (carril frontend, sin commitear).
+  Avisado en el informe.
