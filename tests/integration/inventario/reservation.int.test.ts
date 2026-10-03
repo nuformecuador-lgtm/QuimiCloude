@@ -692,6 +692,127 @@ describe('R27, R28 — entregar consume: baja el lote, asienta la salida y recal
   });
 });
 
+describe('QC-195 R25, R26 — consumeForOrder por subconjunto de productos', () => {
+  it('R26 — con productIds solo consume lo apartado de esos productos y deja intacto lo demas del pedido', async () => {
+    const fixture = await createFixture();
+    const a = await createProductWithBatch(fixture, { stock: '10' });
+    const b = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: [
+          { productId: a.productId, quantity: '4' },
+          { productId: b.productId, quantity: '3' },
+        ],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      const resultado = await reservations.consumeForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        fallbackRequirement: [{ productId: a.productId, quantity: '4' }],
+        productIds: [a.productId],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+      expect(resultado).toEqual({ kind: 'consumed' });
+
+      expect(await batchStockOf(a.batchId)).toBe('6.0000');
+      expect(await productStockOf(a.productId)).toBe('6.0000');
+      expect(await batchStockOf(b.batchId)).toBe('10.0000');
+      expect(await productStockOf(b.productId)).toBe('10.0000');
+      expect(await inventoryMovementsOf(b.batchId)).toEqual([expect.objectContaining({ kind: 'opening' })]);
+
+      const libro = await reservationMovementsOf(orderId);
+      expect(libro.filter((row) => row.batchId === b.batchId)).toEqual([
+        { batchId: b.batchId, kind: 'reserve', quantity: '3.0000' },
+      ]);
+      expect(libro.filter((row) => row.batchId === a.batchId)).toEqual([
+        { batchId: a.batchId, kind: 'reserve', quantity: '4.0000' },
+        { batchId: a.batchId, kind: 'consume', quantity: '4.0000' },
+      ]);
+    } finally {
+      await dropFixture(fixture, [a.productId, b.productId], [orderId]);
+    }
+  });
+
+  it('R25 — sin nada apartado de esos productos, el respaldo se filtra a productIds y no toca lo apartado de los demas', async () => {
+    const fixture = await createFixture();
+    const a = await createProductWithBatch(fixture, { stock: '10' });
+    const b = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(a.productId, '4'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      const resultado = await reservations.consumeForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        fallbackRequirement: [
+          { productId: a.productId, quantity: '4' },
+          { productId: b.productId, quantity: '3' },
+        ],
+        productIds: [b.productId],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+      expect(resultado).toEqual({ kind: 'consumed' });
+
+      expect(await batchStockOf(b.batchId)).toBe('7.0000');
+      expect(await batchStockOf(a.batchId)).toBe('10.0000');
+      expect(await reservationMovementsOf(orderId)).toEqual([
+        { batchId: a.batchId, kind: 'reserve', quantity: '4.0000' },
+      ]);
+    } finally {
+      await dropFixture(fixture, [a.productId, b.productId], [orderId]);
+    }
+  });
+
+  it('R25 — con productIds y respaldo que no alcanza devuelve insufficient sin consumir lo de los demas', async () => {
+    const fixture = await createFixture();
+    const a = await createProductWithBatch(fixture, { stock: '10' });
+    const b = await createProductWithBatch(fixture, { stock: '2' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(a.productId, '4'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      const resultado = await reservations.consumeForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        fallbackRequirement: [{ productId: b.productId, quantity: '3' }],
+        productIds: [b.productId],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+      expect(resultado).toEqual({ kind: 'insufficient', productIds: [b.productId] });
+      expect(await batchStockOf(a.batchId)).toBe('10.0000');
+      expect(await batchStockOf(b.batchId)).toBe('2.0000');
+    } finally {
+      await dropFixture(fixture, [a.productId, b.productId], [orderId]);
+    }
+  });
+});
+
 describe('R32 — el sistema no consume dos veces el material de un mismo pedido', () => {
   it('una segunda llamada de entrega, sin nada que respaldarla, no vuelve a tocar el lote', async () => {
     const fixture = await createFixture();

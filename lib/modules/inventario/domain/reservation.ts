@@ -53,6 +53,9 @@ export interface MaterialReservations {
     readonly companyId: string;
     /** Solo se usa si el pedido no tiene nada apartado. */
     readonly fallbackRequirement: readonly ReservationRequirementLine[];
+    /** Si llega, solo se consume lo de estos productos (apartado y respaldo); lo demas que el
+     *  pedido tenga apartado queda intacto. */
+    readonly productIds?: readonly ProductId[];
     readonly actorId: string;
     readonly now: Date;
   }): Promise<ConsumptionOutcome>;
