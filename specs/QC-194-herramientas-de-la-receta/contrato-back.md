@@ -206,7 +206,7 @@ type ErrorState =
 | Escritura de herramientas (`create`, `createVersion`, `replaceAlive`, `replaceAliveWithPropagation`) | **real** | — |
 | Validación de herramientas nuevas (MACHINE, existe, viva, empresa) | **real** | — |
 | Alta de versión sin `tools` | copia las de la original (`original.tools`), ya cableado | — (persiste en T4) |
-| `RecipeExecutionContent.tools` (`findExecutionContentByIdOn`) | **STUB**: siempre `[]` | T6 |
+| `RecipeExecutionContent.tools` (`findExecutionContentByIdOn`) | **real**, en orden de alta | — |
 | `getAssignedOrderExecution` → `tools` | mapeo real con nombre de `findRefs`, pero recibe `[]` del catálogo, así que hoy siempre `[]` | T6 (dato) / T8 (tests) |
 
 Para trabajar la UI sin base, montar los dobles con `tools` poblado: la forma es la definitiva.

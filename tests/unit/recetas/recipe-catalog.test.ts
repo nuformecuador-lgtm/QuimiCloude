@@ -282,6 +282,7 @@ describe('findRecipeExecutionContentById', () => {
       steps: [PASO_VALIDO],
       parent: null,
       lines: [LINEA_CLORO],
+      tools: [],
     })
 
     const receta = await findRecipeExecutionContentById('r-viva', EMPRESA)
@@ -304,6 +305,7 @@ describe('findRecipeExecutionContentById', () => {
       steps: [],
       parent: null,
       lines: [],
+      tools: [],
     })
 
     const receta = await findRecipeExecutionContentById('r-baja', EMPRESA)
@@ -319,7 +321,7 @@ describe('findRecipeExecutionContentById', () => {
   })
 
   it('no filtra por deletedAt: una receta de baja sigue pudiendo ejecutarse', async () => {
-    findFirst.mockResolvedValue({ id: 'r-1', name: 'X', deletedAt: null, steps: [], parent: null, lines: [] })
+    findFirst.mockResolvedValue({ id: 'r-1', name: 'X', deletedAt: null, steps: [], parent: null, lines: [], tools: [] })
 
     await findRecipeExecutionContentById('r-1', EMPRESA)
 
@@ -452,6 +454,7 @@ describe('toRecipeExecutionContent', () => {
       steps: [{ id: 'invalido' }, PASO_VALIDO],
       parent: null,
       lines: [],
+      tools: [],
     })
 
     expect(contenido.steps).toEqual([PASO_VALIDO])
@@ -465,6 +468,7 @@ describe('toRecipeExecutionContent', () => {
       steps: [],
       parent: null,
       lines: [LINEA_CLORO],
+      tools: [],
     })
 
     expect(contenido.lines[0]?.productName).toBeNull()
@@ -478,6 +482,7 @@ describe('toRecipeExecutionContent', () => {
       steps: [],
       parent: { name: 'Crema base', steps: [{ id: 'invalido' }, PASO_VALIDO] },
       lines: [LINEA_CLORO],
+      tools: [],
     })
 
     expect(contenido).toEqual({
@@ -498,9 +503,58 @@ describe('toRecipeExecutionContent', () => {
       steps: [PASO_VALIDO],
       parent: { name: 'Crema base', steps: [] },
       lines: [],
+      tools: [],
     })
 
     expect(contenido.steps).toEqual([])
+  })
+})
+
+describe('herramientas en el contenido de ejecucion', () => {
+  it('R8: las herramientas van en `tools`, aparte, y `lines` queda identico al de una receta sin herramientas', () => {
+    const base = {
+      id: 'r-1',
+      name: 'X',
+      deletedAt: null,
+      steps: [],
+      parent: null,
+      lines: [LINEA_CLORO],
+    }
+    const sin = toRecipeExecutionContent({ ...base, tools: [] })
+    const con = toRecipeExecutionContent({
+      ...base,
+      tools: [
+        { productId: 'p-batidora', quantity: 2 },
+        { productId: 'p-balanza', quantity: 1 },
+      ],
+    })
+
+    expect(con.lines).toEqual(sin.lines)
+    expect(con.tools).toEqual([
+      { productId: 'p-batidora', productName: null, quantity: 2 },
+      { productId: 'p-balanza', productName: null, quantity: 1 },
+    ])
+  })
+
+  it('R28: la consulta pide las herramientas en orden de alta', async () => {
+    findFirst.mockResolvedValue({
+      id: 'r-1',
+      name: 'X',
+      deletedAt: null,
+      steps: [],
+      parent: null,
+      lines: [],
+      tools: [{ productId: 'p-batidora', quantity: 3 }],
+    })
+
+    const receta = await findRecipeExecutionContentById('r-1', EMPRESA)
+
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.select.tools).toEqual({
+      select: { productId: true, quantity: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    })
+    expect(receta?.tools).toEqual([{ productId: 'p-batidora', productName: null, quantity: 3 }])
   })
 })
 
@@ -513,6 +567,7 @@ describe('findRecipeExecutionContentById de una version', () => {
       steps: [],
       parent: { name: 'Crema base', steps: [PASO_VALIDO] },
       lines: [LINEA_CLORO],
+      tools: [],
     })
 
     const receta = await findRecipeExecutionContentById('r-version', EMPRESA)

@@ -87,7 +87,7 @@ un único `findRefs` (R20). Integración en `recipe-tools.int.test.ts`: dar de b
 como herramienta funciona y la receta se sigue editando conservándola (R19, R21); editar una versión no
 cambia la original (R13).
 
-### T6 [P] — Contenido de ejecución y prueba de stock/costo
+### T6 [P] — Contenido de ejecución y prueba de stock/costo [x]
 Tras T4. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/domain/recipe-catalog.ts`,
 `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`,
 `tests/unit/recetas/recipe-catalog-prisma.test.ts` (o el que T0 identifique),

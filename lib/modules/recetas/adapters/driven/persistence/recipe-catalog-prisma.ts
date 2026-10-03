@@ -163,6 +163,10 @@ type RecipeExecutionContentRow = {
     readonly productId: string;
     readonly percentage: DecimalLike;
   }>;
+  readonly tools: ReadonlyArray<{
+    readonly productId: string;
+    readonly quantity: number;
+  }>;
 };
 
 /** Fila de Prisma -> `RecipeExecutionContent`. Funcion pura, testeable sin base. */
@@ -178,7 +182,11 @@ export function toRecipeExecutionContent(row: RecipeExecutionContentRow): Recipe
       productName: null,
       percentage: line.percentage.toFixed(2),
     })),
-    tools: [],
+    tools: row.tools.map((tool) => ({
+      productId: tool.productId,
+      productName: null,
+      quantity: tool.quantity,
+    })),
   };
 }
 
@@ -203,6 +211,10 @@ async function findExecutionContentByIdOn(
       steps: true,
       parent: { select: { name: true, steps: true } },
       lines: { select: { productId: true, percentage: true } },
+      tools: {
+        select: { productId: true, quantity: true },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      },
     },
   });
 
