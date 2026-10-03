@@ -10,11 +10,11 @@ import type { ListFilterValue, ListQuery } from './list-query';
 import type { OrderSummary } from './order-view';
 import type { Page } from './page';
 
-import type { PresentationCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-import { orderPresentationIds, unitLabelOf } from './get-order';
+import { findPackagingNames, orderPackagingIds, orderPresentationIds, unitLabelOf } from './get-order';
 
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { OrderRepository } from '../ports/order-repository';
@@ -26,6 +26,8 @@ export type ListOrdersDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de los envases de la pagina. */
+  readonly packaging: PackagingCatalog;
   /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de unidad de la pagina. */
   readonly units: UnitCatalog;
   readonly log: ListQueryLog;
@@ -182,8 +184,11 @@ export function createListOrders(
     const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, actor.companyId);
     const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
 
+    // Los envases de la pagina, deduplicados: una sola llamada.
+    const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds(page.items), actor.companyId);
+
     return {
-      items: page.items.map((row) => toOrderView(row, recipesById, presentationNames, unitLabels)),
+      items: page.items.map((row) => toOrderView(row, recipesById, presentationNames, unitLabels, packagingNames)),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

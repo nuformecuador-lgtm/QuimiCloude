@@ -28,6 +28,8 @@ export type OrderPresentationLineWrite = {
   readonly presentationId: string;
   readonly packages: number;
   readonly content: string | null;
+  /** `null` = linea antigua que se conserva sin envase. */
+  readonly packagingProductId: string | null;
 };
 
 /** Una linea del reparto tal como la lee el puerto: sin el contenido copiado, que solo
@@ -35,6 +37,8 @@ export type OrderPresentationLineWrite = {
 export type OrderPresentationLineRow = {
   readonly presentationId: string;
   readonly packages: number;
+  /** `null` en una linea anterior a que el reparto nombrara su envase. */
+  readonly packagingProductId: string | null;
 };
 
 /** Una linea del reparto en la ficha y el listado. */
@@ -43,7 +47,8 @@ export type OrderPresentationLineView = {
   /** `null` solo si la presentacion no vuelve del catalogo. */
   readonly presentationName: string | null;
   readonly packages: number;
-  /** `null` en una linea anterior a que el reparto nombrara su envase. */
+  /** `null` en una linea anterior a que el reparto nombrara su envase. `getOrder` y
+   *  `listOrders` siempre lo rellenan. */
   readonly packagingProductId?: string | null;
   /** `null` en esa linea antigua, o si el envase no vuelve del catalogo. */
   readonly packagingName?: string | null;

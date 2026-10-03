@@ -74,7 +74,7 @@ const ORDER_SELECT = {
   updatedBy: true,
   unitId: true,
   presentationLines: {
-    select: { presentationId: true, packages: true },
+    select: { presentationId: true, packages: true, packagingProductId: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   },
 } satisfies Prisma.OrderSelect;
@@ -114,6 +114,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     presentationLines: row.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
+      packagingProductId: line.packagingProductId,
     })),
   };
 }
@@ -440,13 +441,14 @@ async function replacePresentationLines(
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO "order_presentation_lines" (
         "order_id", "company_id", "presentation_id", "packages", "presentation_content",
-        "created_at", "updated_at"
+        "packaging_product_id", "created_at", "updated_at"
       ) VALUES (
         ${orderId}::uuid,
         ${companyId}::uuid,
         ${line.presentationId}::uuid,
         ${line.packages}::integer,
         ${line.content === null ? null : toDecimalInput(line.content)}::numeric,
+        ${line.packagingProductId}::uuid,
         ${now}::timestamptz,
         ${now}::timestamptz
       )
@@ -702,6 +704,7 @@ async function insertAliveOrder(
     presentationLines: data.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
+      packagingProductId: line.packagingProductId,
     })),
   };
 }

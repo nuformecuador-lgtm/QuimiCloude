@@ -19,8 +19,10 @@ import {
   EDITABLE_STATUS_VALUES,
   cancelOrderSchema,
   createOrderSchema,
+  orderPresentationAvailabilitySchema,
   presentationLinesSchema,
   quoteOrderCostSchema,
+  updateOrderDistributionSchema,
   updateOrderSchema,
 } from '@/lib/modules/pedidos/domain/order-input'
 import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
@@ -472,5 +474,77 @@ describe('pedidos — recipeVersionId en alta y edicion', () => {
         `recipeVersionId=${String(recipeVersionId)}`,
       ).toBe(false)
     }
+  })
+})
+
+describe('QC-195 — la linea del reparto nombra su envase', () => {
+  const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+  const OTRO_ENVASE_ID = 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2'
+
+  it('R11: una linea con envase se acepta y sale con el envase y los envases como numero', () => {
+    expect(presentationLinesSchema.parse([{ packagingProductId: ENVASE_ID, packages: '40' }])).toEqual([
+      { packagingProductId: ENVASE_ID, packages: 40 },
+    ])
+  })
+
+  it('R35: una linea antigua por su presentacion sigue teniendo forma valida', () => {
+    expect(presentationLinesSchema.parse([{ presentationId: PRESENTATION_ID, packages: 2 }])).toEqual([
+      { presentationId: PRESENTATION_ID, packages: 2 },
+    ])
+  })
+
+  it('R11: con los dos identificadores, o sin ninguno, la linea se rechaza', () => {
+    expect(
+      presentationLinesSchema.safeParse([{ packagingProductId: ENVASE_ID, presentationId: PRESENTATION_ID, packages: 1 }])
+        .success,
+    ).toBe(false)
+    expect(presentationLinesSchema.safeParse([{ packages: 1 }]).success).toBe(false)
+  })
+
+  it('R11: un envase que no es UUID se rechaza en el borde', () => {
+    expect(presentationLinesSchema.safeParse([{ packagingProductId: 'no-es-uuid', packages: 1 }]).success).toBe(false)
+  })
+
+  it('R7 (QC-170): los envases de una linea con envase son enteros positivos', () => {
+    for (const packages of ['0', '-1', '1.5', 'x']) {
+      expect(
+        presentationLinesSchema.safeParse([{ packagingProductId: ENVASE_ID, packages }]).success,
+        `packages=${packages}`,
+      ).toBe(false)
+    }
+  })
+
+  it('R12: el mismo envase dos veces se rechaza en el borde; dos envases distintos pasan', () => {
+    expect(
+      presentationLinesSchema.safeParse([
+        { packagingProductId: ENVASE_ID, packages: 1 },
+        { packagingProductId: ENVASE_ID, packages: 2 },
+      ]).success,
+    ).toBe(false)
+    expect(
+      presentationLinesSchema.safeParse([
+        { packagingProductId: ENVASE_ID, packages: 1 },
+        { packagingProductId: OTRO_ENVASE_ID, packages: 2 },
+      ]).success,
+    ).toBe(true)
+  })
+
+  it('R11: el alta, la edicion y el disponible aceptan lineas con envase con el mismo esquema', () => {
+    const conEnvase = { ...altaValida(), presentationLines: [{ packagingProductId: ENVASE_ID, packages: 3 }] }
+    expect(createOrderSchema.parse(conEnvase).presentationLines).toEqual([{ packagingProductId: ENVASE_ID, packages: 3 }])
+    expect(updateOrderSchema.safeParse(conEnvase).success).toBe(true)
+    expect(
+      orderPresentationAvailabilitySchema.safeParse({
+        quantity: '20',
+        unitId: UNIT_ID,
+        presentationLines: [{ packagingProductId: ENVASE_ID, packages: 40 }],
+      }).success,
+    ).toBe(true)
+    expect(
+      updateOrderDistributionSchema.safeParse({
+        unitId: UNIT_ID,
+        presentationLines: [{ packagingProductId: ENVASE_ID, packages: '30' }],
+      }).success,
+    ).toBe(true)
   })
 })

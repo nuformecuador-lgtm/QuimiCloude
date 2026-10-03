@@ -58,6 +58,12 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -99,10 +105,10 @@ const units: UnitCatalog = {
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
-const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
+const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrderPresentationLines = createUpdateOrderPresentationLines({
-  presentations,
+  presentations, packaging: packagingCatalog,
   units,
   transaction: createOrderDistributionTransaction(),
 });
@@ -121,6 +127,8 @@ type Fixture = {
   readonly unitConvertibleId: string;
   /** Contenido `10.0000`, en `unitId`. */
   readonly presentationId: string;
+  /** Envase con `presentationId` como presentacion fija. */
+  readonly packagingProductId: string;
   readonly recipeId: string;
 };
 
@@ -200,6 +208,7 @@ async function crearFixture(): Promise<Fixture> {
     unitId: unit.id,
     unitConvertibleId: unitConvertible.id,
     presentationId: presentation.id,
+    packagingProductId: await seedPackaging({ companyId: company.id, presentationId: presentation.id, createdBy: user.id }),
     recipeId: recipe.id,
   };
 }
@@ -211,6 +220,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
+  await dropPackaging([fixture.packagingProductId]);
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.unit.deleteMany({ where: { id: { in: [fixture.unitConvertibleId, fixture.unitId] } } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
@@ -243,7 +253,7 @@ function entradaDePedido(fixture: Fixture, quantity: string, unitId: string, pac
     quantity,
     priority: 'BAJA' as const,
     unitId,
-    presentationLines: [{ presentationId: fixture.presentationId, packages }],
+    presentationLines: [{ packagingProductId: fixture.packagingProductId, packages }],
   };
 }
 
@@ -299,7 +309,7 @@ describe('R29 — aislamiento: la edicion acotada del reparto y la unidad no cru
       // Entrada valida para B (su unidad y su presentacion): solo el ambito del pedido la rechaza.
       const resultado = await updateOrderPresentationLines(pedidoA, actorDe(b), {
         unitId: b.unitId,
-        lines: [{ presentationId: b.presentationId, packages: 2 }],
+        lines: [{ packagingProductId: b.packagingProductId, packages: 2 }],
       });
 
       expect(resultado).toBe('not_found');
@@ -314,7 +324,7 @@ describe('R29 — aislamiento: la edicion acotada del reparto y la unidad no cru
 
       const resultado = await updateOrderPresentationLines(pedidoA, actorDe(a), {
         unitId: a.unitConvertibleId,
-        lines: [{ presentationId: a.presentationId, packages: 2 }],
+        lines: [{ packagingProductId: a.packagingProductId, packages: 2 }],
       });
 
       expect(resultado).toBe('ok');
@@ -327,17 +337,17 @@ describe('R29 — aislamiento: la edicion acotada del reparto y la unidad no cru
     });
   });
 
-  it('R29: A no puede repartir su pedido en una presentacion de B: presentation_not_found y el pedido queda intacto', async () => {
+  it('R29 / QC-195 R11: A no puede repartir su pedido en un envase de B: packaging_not_found y el pedido queda intacto', async () => {
     await conDosEmpresas(async (a, b) => {
       const pedidoA = await pedidoDe(a, 'POR_EMPACAR');
       const antes = await foto(pedidoA);
 
       const resultado = await updateOrderPresentationLines(pedidoA, actorDe(a), {
         unitId: a.unitId,
-        lines: [{ presentationId: b.presentationId, packages: 2 }],
+        lines: [{ packagingProductId: b.packagingProductId, packages: 2 }],
       });
 
-      expect(resultado).toBe('presentation_not_found');
+      expect(resultado).toBe('packaging_not_found');
       expect(await foto(pedidoA)).toEqual(antes);
     });
   });
@@ -350,7 +360,7 @@ describe('R29 — aislamiento: la edicion acotada del reparto y la unidad no cru
       const resultado = await createOrderWriteRepository(prisma).updatePresentationLinesAlive(
         pedidoA,
         b.unitId,
-        [{ presentationId: b.presentationId, packages: 2, content: '10.0000' }],
+        [{ presentationId: b.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
         b.actorId,
         new Date(),
         { companyId: b.companyId },
@@ -369,7 +379,7 @@ describe('R29 — aislamiento: la edicion acotada del reparto y la unidad no cru
       const resultado = await createOrderWriteRepository(prisma).updatePresentationLinesAlive(
         pedidoA,
         a.unitConvertibleId,
-        [{ presentationId: a.presentationId, packages: 2, content: '10.0000' }],
+        [{ presentationId: a.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
         a.actorId,
         new Date(),
         { companyId: a.companyId },
@@ -430,7 +440,7 @@ describe('R29 — aislamiento: la edicion general (cantidad, unidad y reparto) n
           quantity: '80.0000',
           priority: 'BAJA',
           unitId: b.unitId,
-          presentationLines: [{ presentationId: b.presentationId, packages: 2, content: '10.0000' }],
+          presentationLines: [{ presentationId: b.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
         },
         b.actorId,
         new Date(),

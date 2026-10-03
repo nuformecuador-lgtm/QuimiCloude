@@ -64,26 +64,42 @@ const prioritySchema = z.enum(ORDER_PRIORITY_VALUES);
 const unitIdSchema = z.string().uuid();
 
 /**
- * Una linea del reparto: la presentacion en que se entrega parte de lo fabricado y cuantos
- * envases ENTEROS de ella. Aqui solo la FORMA; la existencia, el contenido copiado y el
- * total contra la cantidad del pedido los comprueba el caso de uso.
+ * Una linea del reparto: el envase en que se entrega parte de lo fabricado y cuantos envases
+ * ENTEROS, o -solo para conservar una linea antigua sin cambios- su presentacion. Lleva uno y
+ * solo uno de los dos identificadores. Aqui solo la FORMA; la existencia, el contenido copiado
+ * y el total contra la cantidad del pedido los comprueba el caso de uso.
  */
-const presentationLineSchema = z.object({
-  presentationId: z.string().uuid(),
-  packages: z.coerce.number().int().positive(),
-});
+export const distributionLineSchema = z
+  .object({
+    packagingProductId: z.string().uuid().optional(),
+    presentationId: z.string().uuid().optional(),
+    packages: z.coerce.number().int().positive(),
+  })
+  .refine((line) => (line.packagingProductId === undefined) !== (line.presentationId === undefined), {
+    message: 'Cada línea nombra un envase o una presentación, no las dos.',
+  })
+  .transform((line): DistributionLineInput => {
+    if (line.packagingProductId !== undefined) {
+      return { packagingProductId: line.packagingProductId, packages: line.packages };
+    }
+    return { presentationId: line.presentationId ?? '', packages: line.packages };
+  });
 
-/** Dos veces la MISMA presentacion en el reparto no son dos lineas: son la misma linea con los
- *  envases repetidos, y eso lo rechaza el borde en vez de sumarlos por su cuenta. */
-function hasNoDuplicatePresentation(lines: readonly { readonly presentationId: string }[]): boolean {
-  return new Set(lines.map((line) => line.presentationId)).size === lines.length;
+/** El mismo envase dos veces, o la misma presentacion antigua dos veces, no son dos lineas: el
+ *  borde lo rechaza en vez de sumarlas. Dos envases distintos con la misma presentacion solo se
+ *  ven al resolverlos, y los rechaza el caso de uso. */
+function hasNoDuplicateLine(lines: readonly DistributionLineInput[]): boolean {
+  const keys = lines.map((line) =>
+    'packagingProductId' in line ? `envase:${line.packagingProductId}` : `presentacion:${line.presentationId}`,
+  );
+  return new Set(keys).size === keys.length;
 }
 
 /** El reparto completo. `[]` es un pedido sin reparto todavia, valido: quien no reparte
  *  nada al dar de alta lo reparte despues, hasta que empieza el empaque. */
 export const presentationLinesSchema = z
-  .array(presentationLineSchema)
-  .refine(hasNoDuplicatePresentation, { message: 'Cada presentación aparece una sola vez.' })
+  .array(distributionLineSchema)
+  .refine(hasNoDuplicateLine, { message: 'Cada envase aparece una sola vez.' })
   .default([]);
 
 /** Nombres de los campos repetidos con que el formulario envia el reparto, en orden. */

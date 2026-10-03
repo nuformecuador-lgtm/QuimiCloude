@@ -22,6 +22,7 @@ import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const PEDIDO = '11111111-1111-4111-8111-111111111111';
@@ -105,9 +106,15 @@ function catalogoDeUnidades(extra: ReadonlyMap<string, UnitConversion> = new Map
   return { units: { findRefs, findRefsSharingBaseInCompany: vi.fn(async () => []) } as unknown as UnitCatalog, findRefs };
 }
 
-/** Catalogo de presentaciones: `PRESENTACION_A` con `content`/`unitId` configurables; con
- *  `presentaciones` explicito, se reemplaza el catalogo entero (para probar mas de una linea o
- *  una presentacion ausente). */
+/** Envase de cada presentacion del catalogo: el reparto nombra envases, y cada uno lleva su
+ *  presentacion fija. */
+const ENVASE_A = 'e6e6e6e6-e6e6-4e6e-8e6e-e6e6e6e6e6e6';
+const ENVASE_B = 'e9e9e9e9-e9e9-4e9e-8e9e-e9e9e9e9e9e9';
+const ENVASE_DE: Readonly<Record<string, string>> = { [PRESENTACION_A]: ENVASE_A, [PRESENTACION_B]: ENVASE_B };
+
+/** Catalogos de presentaciones y de envases: `PRESENTACION_A` (y su `ENVASE_A`) con
+ *  `content`/`unitId` configurables; con `presentaciones` explicito, se reemplazan enteros (para
+ *  probar mas de una linea o una ausente). */
 function catalogoDePresentaciones(
   presentaciones: ReadonlyMap<string, { readonly content: string | null; readonly unitId: string }> = new Map([
     [PRESENTACION_A, { content: '5.0000', unitId: UNIT_ID }],
@@ -119,16 +126,23 @@ function catalogoDePresentaciones(
       return p === undefined ? [] : [{ id, name: 'Presentacion', content: p.content, unitId: p.unitId }];
     }),
   );
-  return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
+  const packaging = fakePackagingCatalog(
+    [...presentaciones].map(([presentationId, p]) =>
+      packagingRef({ id: ENVASE_DE[presentationId] ?? presentationId, presentationId, content: p.content, unitId: p.unitId }),
+    ),
+  );
+  return { presentations: { findRefs } as unknown as PresentationCatalog, packaging, findRefs };
 }
 
 function montar(deps: {
   readonly orders: OrderWriteRepository;
-  readonly presentations?: PresentationCatalog;
+  readonly catalogos?: ReturnType<typeof catalogoDePresentaciones>;
   readonly units?: UnitCatalog;
 }) {
+  const catalogos = deps.catalogos ?? catalogoDePresentaciones();
   const fullDeps: UpdateOrderPresentationLinesDeps = {
-    presentations: deps.presentations ?? catalogoDePresentaciones().presentations,
+    presentations: catalogos.presentations,
+    packaging: catalogos.packaging,
     units: deps.units ?? catalogoDeUnidades().units,
     transaction: { run: (work) => work(deps.orders) },
     now: () => AHORA,
@@ -148,7 +162,7 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       const update = montar({ orders });
 
       await expect(
-        update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+        update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
       ).resolves.toBe('ok');
     },
   );
@@ -160,7 +174,7 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       const update = montar({ orders });
 
       await expect(
-        update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+        update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
       ).resolves.toBe('not_editable');
       expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
     },
@@ -181,7 +195,7 @@ describe('updateOrderPresentationLines — bloquea antes de validar (R37, R48)',
   it('llama lockAliveById con el pedido y el ambito de empresa antes de tocar ningun catalogo', async () => {
     const { orders } = ordersDoble(filaBloqueada());
     const cat = catalogoDePresentaciones();
-    const update = montar({ orders, presentations: cat.presentations });
+    const update = montar({ orders, catalogos: cat });
 
     await update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [] });
 
@@ -192,7 +206,7 @@ describe('updateOrderPresentationLines — bloquea antes de validar (R37, R48)',
 describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.2)', () => {
   it('unit_not_found: la unidad nueva no existe o no es visible, sin escribir nada', async () => {
     const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada());
-    const update = montar({ orders, units: catalogoDeUnidades().units, presentations: catalogoDePresentaciones().presentations });
+    const update = montar({ orders, units: catalogoDeUnidades().units });
 
     await expect(
       update(PEDIDO, ACTOR, { unitId: 'unidad-inexistente', lines: [] }),
@@ -200,23 +214,23 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
 
-  it('presentation_not_found: una linea nombra una presentacion que no vuelve del catalogo', async () => {
+  it('QC-195 R11: packaging_not_found: una linea nombra un envase que no vuelve del catalogo', async () => {
     const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada());
-    const update = montar({ orders, presentations: catalogoDePresentaciones(new Map()).presentations });
+    const update = montar({ orders, catalogos: catalogoDePresentaciones(new Map()) });
 
     await expect(
-      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
-    ).resolves.toBe('presentation_not_found');
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
+    ).resolves.toBe('packaging_not_found');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
 
-  it('R35: presentation_without_content, sin escribir nada', async () => {
+  it('R35 / QC-195 R13: presentation_without_content (la presentacion del envase no tiene contenido), sin escribir nada', async () => {
     const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada());
     const cat = catalogoDePresentaciones(new Map([[PRESENTACION_A, { content: null, unitId: UNIT_ID }]]));
-    const update = montar({ orders, presentations: cat.presentations });
+    const update = montar({ orders, catalogos: cat });
 
     await expect(
-      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
     ).resolves.toBe('presentation_without_content');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -228,13 +242,13 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
         [OTRA_UNIDAD_INCOMPATIBLE, { id: OTRA_UNIDAD_INCOMPATIBLE, baseUnitId: null, factor: null }],
       ]),
     ).units;
-    const presentations = catalogoDePresentaciones(
+    const catalogos = catalogoDePresentaciones(
       new Map([[PRESENTACION_A, { content: '5.0000', unitId: OTRA_UNIDAD_INCOMPATIBLE }]]),
-    ).presentations;
-    const update = montar({ orders, units, presentations });
+    );
+    const update = montar({ orders, units, catalogos });
 
     await expect(
-      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
     ).resolves.toBe('incompatible_units');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -244,7 +258,7 @@ describe('updateOrderPresentationLines — orden de comprobacion (design.md > 4.
     const update = montar({ orders });
 
     await expect(
-      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 3 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 3 }] }),
     ).resolves.toBe('exceeds_quantity');
     expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
   });
@@ -256,7 +270,7 @@ describe('updateOrderPresentationLines — R8, R9: igual al total, menor, y vaci
     const update = montar({ orders });
 
     await expect(
-      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 2 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 2 }] }),
     ).resolves.toBe('ok');
     expect(updatePresentationLinesAlive).toHaveBeenCalledTimes(1);
   });
@@ -266,7 +280,7 @@ describe('updateOrderPresentationLines — R8, R9: igual al total, menor, y vaci
     const update = montar({ orders });
 
     await expect(
-      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
     ).resolves.toBe('ok');
     expect(updatePresentationLinesAlive).toHaveBeenCalledTimes(1);
   });
@@ -292,20 +306,20 @@ describe('updateOrderPresentationLines — escritura conjunta y reemplazo comple
     const units = catalogoDeUnidades(
       new Map([[OTRA_UNIDAD_COMPATIBLE, { id: OTRA_UNIDAD_COMPATIBLE, baseUnitId: null, factor: null }]]),
     ).units;
-    const presentations = catalogoDePresentaciones(
+    const catalogos = catalogoDePresentaciones(
       new Map([
         [PRESENTACION_A, { content: '3.0000', unitId: OTRA_UNIDAD_COMPATIBLE }],
         [PRESENTACION_B, { content: '2.0000', unitId: OTRA_UNIDAD_COMPATIBLE }],
       ]),
-    ).presentations;
-    const update = montar({ orders, units, presentations });
+    );
+    const update = montar({ orders, units, catalogos });
 
     await expect(
       update(PEDIDO, ACTOR, {
         unitId: OTRA_UNIDAD_COMPATIBLE,
         lines: [
-          { presentationId: PRESENTACION_A, packages: 1 },
-          { presentationId: PRESENTACION_B, packages: 1 },
+          { packagingProductId: ENVASE_A, packages: 1 },
+          { packagingProductId: ENVASE_B, packages: 1 },
         ],
       }),
     ).resolves.toBe('ok');
@@ -314,8 +328,8 @@ describe('updateOrderPresentationLines — escritura conjunta y reemplazo comple
       PEDIDO,
       OTRA_UNIDAD_COMPATIBLE,
       [
-        { presentationId: PRESENTACION_A, packages: 1, content: '3.0000' },
-        { presentationId: PRESENTACION_B, packages: 1, content: '2.0000' },
+        { presentationId: PRESENTACION_A, packages: 1, content: '3.0000', packagingProductId: ENVASE_A },
+        { presentationId: PRESENTACION_B, packages: 1, content: '2.0000', packagingProductId: ENVASE_B },
       ],
       ACTOR_ID,
       AHORA,
@@ -324,15 +338,83 @@ describe('updateOrderPresentationLines — escritura conjunta y reemplazo comple
   });
 });
 
+describe('QC-195 updateOrderPresentationLines — lineas antiguas y dos envases con la misma presentacion', () => {
+  it('R35: una linea antigua que llega igual a la guardada se conserva sin envase', async () => {
+    const { orders, updatePresentationLinesAlive } = ordersDoble(
+      filaBloqueada({ presentationLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: null }] }),
+    );
+    const update = montar({ orders });
+
+    await expect(
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+    ).resolves.toBe('ok');
+    expect(updatePresentationLinesAlive).toHaveBeenCalledWith(
+      PEDIDO,
+      UNIT_ID,
+      [{ presentationId: PRESENTACION_A, packages: 1, content: '5.0000', packagingProductId: null }],
+      ACTOR_ID,
+      AHORA,
+      { companyId: EMPRESA },
+    );
+  });
+
+  it('R34: una linea antigua con los envases cambiados -> invalid_lines, sin escribir', async () => {
+    const { orders, updatePresentationLinesAlive } = ordersDoble(
+      filaBloqueada({ presentationLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: null }] }),
+    );
+    const update = montar({ orders });
+
+    await expect(
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 2 }] }),
+    ).resolves.toBe('invalid_lines');
+    expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
+  });
+
+  it('R34: una linea por presentacion que el pedido no tenia -> invalid_lines, sin escribir', async () => {
+    const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada());
+    const update = montar({ orders });
+
+    await expect(
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ presentationId: PRESENTACION_A, packages: 1 }] }),
+    ).resolves.toBe('invalid_lines');
+    expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
+  });
+
+  it('R12: dos envases con la misma presentacion -> invalid_lines, sin escribir', async () => {
+    const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada({ quantity: '10.0000' }));
+    const GEMELO = 'eaeaeaea-eaea-4eae-8eae-eaeaeaeaeaea';
+    const catalogos = {
+      ...catalogoDePresentaciones(),
+      packaging: fakePackagingCatalog([
+        packagingRef({ id: ENVASE_A, presentationId: PRESENTACION_A, content: '1.0000', unitId: UNIT_ID }),
+        packagingRef({ id: GEMELO, presentationId: PRESENTACION_A, content: '1.0000', unitId: UNIT_ID }),
+      ]),
+    };
+    const update = montar({ orders, catalogos });
+
+    await expect(
+      update(PEDIDO, ACTOR, {
+        unitId: UNIT_ID,
+        lines: [
+          { packagingProductId: ENVASE_A, packages: 1 },
+          { packagingProductId: GEMELO, packages: 1 },
+        ],
+      }),
+    ).resolves.toBe('invalid_lines');
+    expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
+  });
+});
+
 describe('updateOrderPresentationLines — R46, R30: no toca quantity, receta ni reserva', () => {
-  it('las dependencias declaradas son solo presentations, units, transaction y now', () => {
+  it('las dependencias declaradas son solo packaging, presentations, units, transaction y now', () => {
     const fullDeps: UpdateOrderPresentationLinesDeps = {
       presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDePresentaciones().packaging,
       units: catalogoDeUnidades().units,
       transaction: { run: (work) => work(ordersDoble(filaBloqueada()).orders) },
       now: () => AHORA,
     };
-    expect(Object.keys(fullDeps).sort()).toEqual(['now', 'presentations', 'transaction', 'units']);
+    expect(Object.keys(fullDeps).sort()).toEqual(['now', 'packaging', 'presentations', 'transaction', 'units']);
   });
 
   it('no llama a ningun otro metodo de OrderWriteRepository -ni create, ni updateAlive, ni setStatus-', async () => {

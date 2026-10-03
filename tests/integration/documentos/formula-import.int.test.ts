@@ -72,6 +72,10 @@ import type { Actor as OrderActor } from '@/lib/modules/pedidos';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -156,6 +160,7 @@ const createOrderUseCase = createCreateOrder({
   products: productCatalog,
   units: orderUnitCatalog,
   presentations: orderPresentationCatalog,
+  packaging: packagingCatalog,
   unitOfWork: orderUnitOfWork,
 });
 

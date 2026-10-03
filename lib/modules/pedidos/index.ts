@@ -65,6 +65,7 @@ export {
   OrderNotFoundError,
   RecipeNotFoundError,
   PresentationNotFoundError,
+  ProductNotFoundError,
   InvalidTransitionError,
   NotCancellableError,
   NotDeletableError,

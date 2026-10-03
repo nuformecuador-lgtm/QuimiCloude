@@ -15,14 +15,14 @@
 // `OrderUnitOfWork`.
 
 import type { Actor } from './actor';
-import { validateDistribution, type DistributionLine } from './order-distribution';
+import { validateDistribution } from './order-distribution';
 import type { OrderStatus } from './order-classification';
 import type { OrderScope } from './order-scope';
-import type { OrderPresentationLineWrite } from './order-view';
-import type { PresentationLineInput } from './resolve-distribution';
-
-import type { PresentationCatalog } from '@/lib/modules/inventario';
-import type { UnitCatalog } from '@/lib/modules/unidades';
+import {
+  resolveDistributionLines,
+  type DistributionCatalogs,
+  type DistributionLineInput,
+} from './resolve-distribution';
 
 import type { OrderDistributionTransaction } from '../ports/order-distribution-transaction';
 
@@ -40,17 +40,15 @@ export const REPARTO_EDITABLE_STATUSES: readonly OrderStatus[] = [
 
 export type UpdateOrderPresentationLinesInput = {
   readonly unitId: string;
-  readonly lines: readonly PresentationLineInput[];
+  readonly lines: readonly DistributionLineInput[];
 };
 
 /**
  * Discriminado, NO lanzado: a diferencia de `createOrder`/`updateOrder`, que
  * dejan subir los errores de `resolveDistribution`, este caso de uso devuelve el resultado para
- * que quien llama lo traduzca a su codigo. El orden de las comprobaciones es:
- * `not_found` -> `not_editable` -> `unit_not_found` -> `without_unit` ->
- * `presentation_not_found` -> `presentation_without_content` -> `incompatible_units` ->
- * `exceeds_quantity` -> escribir. El primer fallo aborta SIN escribir nada, ni la unidad ni las
- * lineas.
+ * que quien llama lo traduzca a su codigo. El primer fallo aborta SIN escribir nada, ni la
+ * unidad ni las lineas. `invalid_lines`: dos lineas con la misma presentacion, o una linea
+ * antigua que el pedido no tenia tal cual.
  */
 export type UpdateOrderPresentationLinesResult =
   | 'ok'
@@ -59,15 +57,13 @@ export type UpdateOrderPresentationLinesResult =
   | 'unit_not_found'
   | 'without_unit'
   | 'presentation_not_found'
+  | 'packaging_not_found'
+  | 'invalid_lines'
   | 'presentation_without_content'
   | 'incompatible_units'
   | 'exceeds_quantity';
 
-export type UpdateOrderPresentationLinesDeps = {
-  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto nuevo. */
-  readonly presentations: PresentationCatalog;
-  /** Contrato PUBLICO de `unidades`: la unidad nueva del pedido y las de cada presentacion. */
-  readonly units: UnitCatalog;
+export type UpdateOrderPresentationLinesDeps = DistributionCatalogs & {
   readonly transaction: OrderDistributionTransaction;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -96,52 +92,19 @@ export function createUpdateOrderPresentationLines(
 
       if (!REPARTO_EDITABLE_STATUSES.includes(locked.status)) return 'not_editable';
 
-      // La unidad NUEVA tiene que ser visible para la empresa de quien edita. Se resuelve
-      // ANTES que las presentaciones: sin unidad de pedido no hay a que
-      // convertir ninguna linea.
-      const [orderUnitRef] = await deps.units.findRefs([input.unitId], companyId);
-      if (orderUnitRef === undefined) return 'unit_not_found';
-
-      const presentationIds = input.lines.map((line) => line.presentationId);
-      const presentationRefs =
-        presentationIds.length === 0
-          ? []
-          : await deps.presentations.findRefs(presentationIds, companyId);
-      if (presentationRefs.length !== presentationIds.length) return 'presentation_not_found';
-      const presentationById = new Map(presentationRefs.map((ref) => [ref.id, ref] as const));
-
-      // Unidades de las presentaciones: UNA sola llamada mas, con los ids UNICOS que le falten
-      // al mapa que ya tiene la unidad del pedido.
-      const missingUnitIds = [
-        ...new Set(presentationRefs.map((ref) => ref.unitId).filter((id) => id !== input.unitId)),
-      ];
-      const presentationUnitRefs =
-        missingUnitIds.length === 0 ? [] : await deps.units.findRefs(missingUnitIds, companyId);
-      const unitById = new Map(
-        [orderUnitRef, ...presentationUnitRefs].map((ref) => [ref.id, ref] as const),
-      );
-
-      const distributionLines: DistributionLine[] = [];
-      for (const line of input.lines) {
-        const presentation = presentationById.get(line.presentationId);
-        // Defensa: ya se comprobo arriba que TODAS las presentaciones pedidas volvieron del
-        // catalogo, asi que esto nunca deberia disparar.
-        if (presentation === undefined) return 'presentation_not_found';
-        const presentationUnit = unitById.get(presentation.unitId);
-        // Defensa: un catalogo de presentaciones consistente nunca apunta a una unidad que
-        // `unidades` no conozca.
-        if (presentationUnit === undefined) return 'unit_not_found';
-        distributionLines.push({
-          presentationId: line.presentationId,
-          packages: line.packages,
-          content: presentation.content,
-          unit: presentationUnit,
-        });
-      }
+      // Una linea antigua solo se conserva si llega igual que una de las que el pedido ya tiene.
+      const resolution = await resolveDistributionLines(deps, companyId, input.unitId, input.lines, {
+        savedLines: locked.presentationLines,
+      });
+      if (resolution.kind !== 'resolved') return resolution.kind;
 
       // El disponible o el primer fallo, con la CANTIDAD del pedido
       // ya bloqueado -este caso de uso no la cambia-.
-      const result = validateDistribution(locked.quantity, orderUnitRef, distributionLines);
+      const result = validateDistribution(
+        locked.quantity,
+        resolution.orderUnit,
+        resolution.lines.map((line) => line.distribution),
+      );
       switch (result.kind) {
         case 'without_unit':
           return 'without_unit';
@@ -155,11 +118,7 @@ export function createUpdateOrderPresentationLines(
           break;
       }
 
-      const writeLines: readonly OrderPresentationLineWrite[] = distributionLines.map((line) => ({
-        presentationId: line.presentationId,
-        packages: line.packages,
-        content: line.content,
-      }));
+      const writeLines = resolution.lines.map((line) => line.write);
 
       const outcome = await orders.updatePresentationLinesAlive(
         orderId,

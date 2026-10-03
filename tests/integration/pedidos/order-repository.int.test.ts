@@ -700,7 +700,7 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
     try {
       const now = instantIn(YEAR_CATALOGO, 1, 10)
       const conReparto = await altaReal(creados, YEAR_CATALOGO, now, {
-        presentationLines: [{ presentationId, packages: 3, content: null }],
+        presentationLines: [{ presentationId, packages: 3, content: null, packagingProductId: null }],
       })
       // Un pedido «viejo» sin reparto ni unidad: se inserta con Prisma directo, sin pasar por
       // el adaptador -que ya los exige siempre-, para simular una fila anterior a esta ficha
@@ -742,14 +742,14 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
     const creados: string[] = []
     try {
       const conReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 10), {
-        presentationLines: [{ presentationId, packages: 4, content: null }],
+        presentationLines: [{ presentationId, packages: 4, content: null, packagingProductId: null }],
       })
       const sinReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11))
 
-      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4 }])
+      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
 
       const ficha = await findAliveOrderById(conReparto.id, scope())
-      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4 }])
+      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
       // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
       expect(ficha).toEqual(conReparto)
 
@@ -758,7 +758,7 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
 
       const todos = await recorrerTodo()
       expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
-        { presentationId, packages: 4 },
+        { presentationId, packages: 4, packagingProductId: null },
       ])
       expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
     } finally {

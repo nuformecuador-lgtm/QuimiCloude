@@ -14,7 +14,7 @@ import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -34,6 +34,8 @@ export type UpdateOrderDeps = {
   /** Contrato PUBLICO de `inventario`: las presentaciones del reparto. No se le pasan al
    *  coste, ver el comentario identico de `create-order.ts`. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
+  readonly packaging: PackagingCatalog;
   readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -132,14 +134,14 @@ export function createUpdateOrder(
 
       // La unidad y el reparto se resuelven y se validan contra
       // el total con la fila del pedido YA BLOQUEADA, para que dos ediciones simultaneas no
-      // dejen ninguna pasar del total.
-      const presentationLines = await resolveDistribution(
-        deps.presentations,
-        deps.units,
+      // dejen ninguna pasar del total. Una linea antigua solo se conserva si llega igual.
+      const distribution = await resolveDistribution(
+        deps,
         actor.companyId,
         data.quantity,
         data.unitId,
         data.presentationLines,
+        { savedLines: locked.presentationLines },
       );
 
       // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado
@@ -157,7 +159,7 @@ export function createUpdateOrder(
           quantity: data.quantity,
           priority: data.priority,
           unitId: data.unitId,
-          presentationLines,
+          presentationLines: distribution.lines,
         },
         actor.id,
         instant,

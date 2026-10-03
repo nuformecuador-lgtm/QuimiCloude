@@ -50,11 +50,12 @@ import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
 import { fakeFinishedGoodsIntake, fakeOrderUnitOfWork, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
@@ -75,6 +76,7 @@ const TODOS_LOS_PERMISOS = ['pedidos.consultar', 'pedidos.modificar']
 const ACTOR_A: Actor = { id: 'u-a', companyId: EMPRESA_A, permissions: TODOS_LOS_PERMISOS }
 
 const PRESENTACION = '77777777-7777-4777-8777-777777777777'
+const ENVASE = 'e7e7e7e7-e7e7-4e7e-8e7e-e7e7e7e7e7e7'
 /** QC-170 [Q4]: la unidad del pedido, obligatoria. `almacen()` la deja SIEMPRE resoluble. */
 const UNIDAD = '88888888-8888-4888-8888-888888888888'
 
@@ -84,7 +86,7 @@ const ENTRADA_EDICION = { ...ENTRADA_ALTA, status: 'EN_CURSO' }
  *  presentaciones -si `ENTRADA_ALTA` no tuviera ninguna, `resolveDistribution` no lo llamaria. */
 const ENTRADA_ALTA_CON_REPARTO = {
   ...ENTRADA_ALTA,
-  presentationLines: [{ presentationId: PRESENTACION, packages: 1 }],
+  presentationLines: [{ packagingProductId: ENVASE, packages: 1 }],
 }
 const ENTRADA_EDICION_CON_REPARTO = { ...ENTRADA_ALTA_CON_REPARTO, status: 'EN_CURSO' }
 
@@ -251,10 +253,10 @@ type Almacen = ReturnType<typeof almacen>
 function casosDeUso(a: Almacen) {
   const now = () => new Date('2026-09-15T10:00:00.000Z')
   return {
-    createOrder: createCreateOrder({ recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, unitOfWork: a.unitOfWork, now }),
-    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, units: a.units }),
-    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, units: a.units, log: a.log }),
-    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, unitOfWork: a.unitOfWork, now }),
+    createOrder: createCreateOrder({ recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
+    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units }),
+    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units, log: a.log }),
+    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
     cancelOrder: createCancelOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
     deleteOrder: createDeleteOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
   }
@@ -411,6 +413,7 @@ describe('QC-138 R38 — bloquear al crear o editar solo toca la empresa de quie
       products: a.products,
       units: a.units,
       presentations: a.presentations,
+      packaging: fakePackagingCatalog(),
       unitOfWork,
       now,
     }
@@ -529,6 +532,10 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
     }
     const presentations = { findRefs: explota('presentations.findRefs') }
+    const packaging = {
+      findRefs: explota('packaging.findRefs'),
+      findCostingBatches: explota('packaging.findCostingBatches'),
+    }
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
@@ -537,6 +544,7 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       products: products as unknown as ProductCatalog,
       units: units as unknown as UnitCatalog,
       presentations: presentations as unknown as PresentationCatalog,
+      packaging: packaging as unknown as PackagingCatalog,
       log,
     }
     return {
@@ -548,6 +556,7 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
         ...Object.values(products),
         ...Object.values(units),
         ...Object.values(presentations),
+        ...Object.values(packaging),
         log.ignoredFields,
       ],
     }
@@ -586,51 +595,58 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
   })
 })
 
-describe('R8: una presentación de otra empresa se rechaza como inexistente', () => {
-  /** Catalogo que solo devuelve la presentacion cuando la empresa pedida coincide con la suya,
-   *  igual que el contrato real de `inventario`. */
-  function presentacionesDe(companyId: string) {
+describe('R8 / QC-195 R11: un envase de otra empresa se rechaza como inexistente', () => {
+  /** Catalogo que solo devuelve el envase cuando la empresa pedida coincide con la suya, igual que
+   *  el contrato real de `inventario`. */
+  function envasesDe(companyId: string) {
     return {
       findRefs: vi.fn(async (ids: readonly string[], solicitante: string) =>
-        solicitante === companyId ? ids.map((id) => ({ id, name: 'Bidon' })) : [],
+        solicitante === companyId
+          ? ids.map((id) => ({ id, name: 'Bidon', presentationId: PRESENTACION, presentationName: 'Bidon', content: '1.0000', unitId: 'u', available: '1.0000' }))
+          : [],
       ),
-    } as unknown as PresentationCatalog
+      findCostingBatches: vi.fn(async () => []),
+    } as unknown as PackagingCatalog
   }
 
-  it('createOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin crear', async () => {
+  it('createOrder: el envase es de la empresa B y el actor es de A -> product_not_found, sin crear', async () => {
     const a = almacen()
-    const presentations = presentacionesDe(EMPRESA_B)
+    const presentations = a.presentations
+    const packaging = envasesDe(EMPRESA_B)
     const createOrder = createCreateOrder({
       recipes: a.recipes,
       products: a.products,
       units: a.units,
       presentations,
+      packaging,
       unitOfWork: a.unitOfWork,
       now: () => new Date('2026-09-15T10:00:00.000Z'),
     })
 
     const error = await capturar(createOrder(ENTRADA_ALTA_CON_REPARTO, ACTOR_A))
-    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
-    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect((error as Error).constructor.name).toBe('ProductNotFoundError')
+    expect((error as { code: string }).code).toBe('product_not_found')
     expect(a.espias.create).not.toHaveBeenCalled()
   })
 
-  it('updateOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin modificar', async () => {
+  it('updateOrder: el envase es de la empresa B y el actor es de A -> product_not_found, sin modificar', async () => {
     const a = almacen()
-    const presentations = presentacionesDe(EMPRESA_B)
+    const presentations = a.presentations
+    const packaging = envasesDe(EMPRESA_B)
     const updateOrder = createUpdateOrder({
       orders: a.orders,
       recipes: a.recipes,
       products: a.products,
       units: a.units,
       presentations,
+      packaging,
       unitOfWork: a.unitOfWork,
       now: () => new Date('2026-09-15T10:00:00.000Z'),
     })
 
     const error = await capturar(updateOrder(PEDIDO_DE_A, ENTRADA_EDICION_CON_REPARTO, ACTOR_A))
-    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
-    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect((error as Error).constructor.name).toBe('ProductNotFoundError')
+    expect((error as { code: string }).code).toBe('product_not_found')
     expect(a.espias.updateAlive).not.toHaveBeenCalled()
   })
 })

@@ -14,6 +14,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
@@ -109,7 +110,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       recipes: recipesConVigencia,
       products: d.products,
       units: d.units,
-      presentations,
+      presentations, packaging: fakePackagingCatalog(),
       now: () => new Date('2026-05-01T00:00:00.000Z'),
     })
     await alta(
@@ -137,7 +138,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       recipes: recipesConVigencia,
       products: d.products,
       units: d.units,
-      presentations,
+      presentations, packaging: fakePackagingCatalog(),
       now: () => new Date('2026-05-01T00:00:00.000Z'),
     })
     await edicion(

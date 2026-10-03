@@ -631,3 +631,125 @@ máquina libre.**
 
 Tasks marcadas [x]: T0, TC, T1-T5, T12-T14. Abiertas con pregunta al leader: T11 (lectura de P4 en
 versiones) y T15 (packagingName en pantallas de empaque/ejecucion de `asignaciones`).
+
+## T6 — Necesidad, resolucion del reparto y vistas (backend_dev, 2026-10-03)
+
+Archivos de produccion:
+- `lib/modules/pedidos/domain/order-requirement.ts`: `buildOrderRequirement({ recipeLines, quantity,
+  packagingLines, phase })` (`before_consumption` = receta + envases; `materials_consumed` = solo
+  envases), suma por producto exacta (sin recortar a 4 decimales); `packagingLinesOf(lines)`;
+  `buildRequirement` se conserva y la usa por dentro.
+- `lib/modules/pedidos/domain/resolve-distribution.ts`: una sola resolucion para los cuatro
+  llamadores, `resolveDistributionLines(catalogs, companyId, unitId, lines, { savedLines? })`, que no
+  lanza (`resolved | unit_not_found | presentation_not_found | packaging_not_found | invalid_lines`).
+  Linea con envase -> copia la presentacion fija y su contenido (`PackagingCatalog.findRefs`); linea
+  antigua -> solo si llega igual que una guardada sin envase (con `savedLines`; el disponible no
+  las compara); dos lineas con la misma presentacion -> `invalid_lines` (R12). Una sola llamada a
+  `UnitCatalog.findRefs`. `resolveDistribution` (alta/edicion) lanza: `ProductNotFoundError`
+  (`product_not_found`, clase nueva en `pedidos`, codigo existente) y `ValidationError` para
+  `invalid_lines`, y devuelve `{ lines, packagingLines }`.
+- `order-presentation-availability.ts` y `update-order-presentation-lines.ts`: sobre la resolucion
+  compartida. El disponible devuelve `OrderPresentationAvailabilityNext` (con `packaging_not_found`);
+  `invalid_lines` alli es `invalid_input`. «Reparto y unidad» gana `packaging_not_found` e
+  `invalid_lines` en su resultado (la accion los traduce a `product_not_found` / `invalid_input`).
+  Sigue en `OrderDistributionTransaction`: el cambio a la unidad de trabajo es T8.
+- `order-input.ts`: `distributionLineSchema` (exportado) = un objeto con `packagingProductId?` y
+  `presentationId?` (UUID), uno y solo uno, `packages` entero positivo, transformado a
+  `DistributionLineInput`; `presentationLinesSchema` es ahora el array de la union (rechaza el mismo
+  envase o la misma presentacion antigua repetidos). `createOrderSchema`, `updateOrderSchema`,
+  `orderPresentationAvailabilitySchema` y `updateOrderDistributionSchema` heredan la union.
+  `quoteOrderCostSchema` no cambia aqui (T9).
+- `order-view.ts`: `OrderPresentationLineWrite.packagingProductId` y
+  `OrderPresentationLineRow.packagingProductId` obligatorios (`string | null`).
+  `OrderPresentationLineView.packagingProductId`/`packagingName` **siguen opcionales** en el tipo
+  (ver «Lo que la UI tiene que cambiar»), aunque `getOrder`/`listOrders` los rellenan siempre.
+- `get-order.ts`/`list-orders.ts`: `orderPackagingIds`, `findPackagingNames` (una llamada a
+  `PackagingCatalog.findRefs` por ficha o por pagina, solo si hay envases); `toOrderView` gana el
+  mapa de nombres de envase. Un envase que ya no vuelve (baja) conserva el id y `packagingName: null`.
+- `order-prisma.ts`: lee y escribe `packaging_product_id` en `order_presentation_lines`.
+- `order-actions.ts`: `readPresentationLines` lee las tres listas (`ORDER_DISTRIBUTION_PACKAGING_FIELD`
+  incluido) y convierte la cadena vacia en ausencia; `OrderPresentationAvailabilityResult` lleva
+  `OrderPresentationAvailabilityNext`.
+- `create-order.ts`/`update-order.ts`: deps ganan `packaging`; el alta resuelve con `savedLines: []`
+  (una linea antigua en un alta es R34), la edicion con las lineas de la fila bloqueada. La
+  necesidad con envases es T7.
+- `lib/composition/index.ts`: `packagingCatalog` deja de exportarse (ya lo consumen los casos de uso)
+  y se cablea en alta, edicion, ficha, listado, «Reparto y unidad» y disponible.
+- `order-distribution.ts` no se toco.
+
+Tests: helpers nuevos `tests/helpers/packaging-catalog-double.ts` (doble de `PackagingCatalog`) y
+`tests/helpers/packaging-seed.ts` (siembra/borrado de un envase real para integracion). Los dobles
+de dependencias de ~25 archivos ganan `packaging`. Reescritos contra los requisitos nuevos (no para
+que pasen): los casos QC-170 de reparto de `create-order.test.ts`, `update-order.test.ts`,
+`update-order-presentation-lines.test.ts`, `company-isolation-service.test.ts` («presentacion de otra
+empresa» pasa a «envase de otra empresa» -> `product_not_found`), y en integracion
+`order-content-copy`, `finish-with-finished-goods`, `qc170-distribution-company-scope`,
+`qc170-distribution-concurrency` (siembran envases y reparten por envase; las aserciones sobre
+`presentation_id` y el contenido copiado siguen igual). `order-presentation-availability.test.ts`
+(«dos lineas: una sola llamada a units.findRefs») pasa de esperar 2 llamadas a 1, que es lo que
+dice su nombre.
+
+R -> test:
+| R | Test |
+|---|---|
+| R11 | `resolve-distribution.test.ts` › «R11: un envase que no vuelve del catalogo (…) -> ProductNotFoundError», «R11: un envase cuya presentacion no comparte unidad base con el pedido -> IncompatibleUnitsError»; «QC-195 resolveDistributionLines — R11: el envase que no vuelve sale como packaging_not_found con su id»; `create-order.test.ts` › «QC-195 R11: un envase que no vuelve del catalogo de la empresa -> product_not_found, sin escribir», «R7 / QC-195 R11: …incompatible_units, sin escribir»; `update-order-presentation-lines.test.ts` › «QC-195 R11: packaging_not_found…»; `company-isolation-service.test.ts` › «createOrder/updateOrder: el envase es de la empresa B y el actor es de A -> product_not_found…»; `order-input.test.ts` › «QC-195 — …» (5 casos R11); `order-actions.test.ts` › «QC-195 R11, R35: las tres listas se unen por posicion…», «QC-195 R11: una posicion con envase y presentacion a la vez, o con ninguno, es invalid_input»; `order-actions-distribution.test.ts` › «traduce packaging_not_found al codigo product_not_found…», «QC-195 R11: una linea con envase llega a la fachada…»; int `qc170-distribution-company-scope` › «R29 / QC-195 R11: A no puede repartir su pedido en un envase de B: packaging_not_found…» |
+| R12 | `resolve-distribution.test.ts` › «R12: dos envases distintos con la misma presentacion -> ValidationError», «R12: un envase con la misma presentacion que una linea antigua conservada -> ValidationError»; `order-input.test.ts` › «R12: el mismo envase dos veces se rechaza en el borde…»; `update-order-presentation-lines.test.ts` › «R12: dos envases con la misma presentacion -> invalid_lines, sin escribir» |
+| R13 | `resolve-distribution.test.ts` › «R13: un envase en ml y otro en l se suman convertidos…», «R13: un envase cuya presentacion no tiene contenido -> PresentationWithoutContentError»; `create-order.test.ts` › «R35 / QC-195 R13…», «R36 / QC-195 R13…»; `update-order.test.ts` › «R36, R38 / QC-195 R13…» |
+| R14 | `resolve-distribution.test.ts` › «R13, R14, R15: 40 botellas de 500 ml cubren 20 l, copian la presentacion y el contenido del envase y piden 40 envases»; `create-order.test.ts` › «R6, R8 / QC-195 R14: una linea con envase escribe la presentacion fija del envase y su contenido copiado»; `update-order.test.ts` › «R6, R8 / QC-195 R14…»; int `order-content-copy` › «la presentacion del envase tiene contenido: la linea copia ese valor (QC-195 R14)», «cambiar de envase sustituye la linea…(QC-195 R14)» |
+| R15 (necesidad) | `order-requirement.test.ts` › «R15: un reparto de 40 botellas pide 40 envases, junto a la receta, antes de consumir»; `resolve-distribution.test.ts` › «R13, R14, R15: … y piden 40 envases» |
+| R24 (necesidad) | `order-requirement.test.ts` › «R24: con la receta ya consumida (POR_EMPACAR) solo quedan los envases» |
+| R33 (vistas) | `get-order.test.ts` › «R33: la linea antigua sale con su presentacion y envase null; la de envase, con su id y su nombre», «R33: un pedido solo con lineas antiguas no consulta el catalogo de envases», «R33: toOrderView sin nombres de envase deja packagingName en null y conserva el id»; `list-orders.test.ts`/`order-service.test.ts` (las lineas antiguas salen con `packagingProductId: null, packagingName: null`) |
+| R34 | `resolve-distribution.test.ts` › «R34: una linea antigua con sus envases cambiados -> ValidationError sin consultar ningun catalogo», «R34: una linea por presentacion que el pedido no tenia (o en un alta) -> ValidationError», «R34: una linea guardada con envase no sirve para reenviarla por su presentacion»; `create-order.test.ts` › «QC-195 R34: un alta con una linea por presentacion (sin envase) -> invalid_input…»; `update-order.test.ts` › «QC-195 R34: una linea antigua con sus envases cambiados -> invalid_input, sin escribir»; `update-order-presentation-lines.test.ts` › «R34: …» (2 casos) |
+| R35 | `resolve-distribution.test.ts` › «R35: una linea antigua que llega igual (misma presentacion, mismos envases) se conserva sin envase»; `update-order.test.ts` › «QC-195 R35: una linea antigua que llega igual…»; `update-order-presentation-lines.test.ts` › «R35: una linea antigua que llega igual a la guardada se conserva sin envase»; `order-input.test.ts` › «R35: una linea antigua por su presentacion sigue teniendo forma valida» |
+
+Salida real:
+```
+$ pnpm exec vitest run --project node tests/unit/pedidos
+ Test Files  61 passed (61)      Tests  1088 passed | 3 skipped (1091)
+$ pnpm exec vitest run --project node tests/unit/pedidos/order-requirement.test.ts
+ Test Files  1 passed (1)        Tests  10 passed (10)
+$ pnpm exec vitest run --project integration tests/integration/pedidos tests/integration/documentos/formula-import.int.test.ts
+ Test Files  28 passed (28)      Tests  295 passed (295)     (tras el ultimo ajuste de order-repository)
+$ pnpm exec tsc --noEmit -p .     -> 0 errores
+$ pnpm exec eslint lib/modules/pedidos lib/composition/index.ts tests/unit/pedidos tests/helpers tests/integration/pedidos …
+ 0 errores, 2 avisos preexistentes (order-service.test.ts:16-17, imports sin usar que no toque)
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)      Tests  672 passed | 11 skipped (683)
+```
+(La primera corrida de integracion dio 38 rojos: todos por repartir en alta/edicion con una linea por
+presentacion, que ahora es R34; se reescribieron sembrando envases.)
+
+Gate `./init.sh --rapido` (antes del commit): `✓ typecheck`, `✓ lint`, `test:rapido`
+`Test Files 6 failed | 395 passed (401)`, `Tests 8 failed | 5951 passed | 9 skipped`. Los 6 son los
+de `tests/baseline-rojos.json` (`recetas/module-contract`, `configuracion-ui/unidades-viewport`,
+`configuracion-ui/usuarios-viewport`, `inventario/product-page`, `navegacion/pantallas-exigen-permiso`,
+`recetas-ui/recipe-page`). Guardias aparte: verdes (arriba).
+
+### Lo que la UI tiene que cambiar (frontend_dev, no hecho aqui)
+
+- **Validar el reparto con el esquema.** `createOrderSchema`/`updateOrderSchema`,
+  `orderPresentationAvailabilitySchema` y `updateOrderDistributionSchema` ya aceptan la union; se
+  publica tambien `distributionLineSchema` (una linea). Sustituir `distributionLinesValid`
+  (`app/(private)/pedidos/components/use-order-distribution-availability.ts:58`) por
+  `presentationLinesSchema.safeParse(toDistributionLinesInput(lines))` (envases enteros > 0, uno y
+  solo uno de los dos ids, sin envase ni presentacion antigua repetidos). La regla «dos envases con
+  la misma presentacion» no la puede ver el esquema (necesita el catalogo): `distributionLinesValid`
+  la comprueba en cliente y el servidor la rechaza con `invalid_input`; conviene conservar esa
+  comprobacion o pintar el `invalid_input`.
+- `order-form.tsx:564-571` valida con `{ ...values, presentationLines: [] }`: ya puede pasar las
+  lineas reales (`toDistributionLinesInput`).
+- `use-order-distribution-availability.ts:125` (`scalarsSchema = …pick({ quantity, unitId })`) puede
+  validar ya con el esquema entero.
+- `quoteOrderCostSchema` aun no lleva `presentationLines` (T9).
+- **Tipos de la vista**: `OrderPresentationLineView.packagingProductId`/`packagingName` siguen
+  opcionales porque hacerlos obligatorios rompe el typecheck de fixtures de UI que no toco:
+  `tests/unit/pedidos-ui/order-columns.test.tsx:343,355,356`,
+  `order-distribution-dialog.test.tsx:309`, `order-form-quote.test.tsx:246`,
+  `order-form.test.tsx:578`, `order-sheet.test.tsx:263`, `pedidos-viewport.test.tsx:315` (lineas
+  `{ presentationId, presentationName, packages }` sin los dos campos). Cuando frontend_dev anada
+  `packagingProductId: null, packagingName: null` a esas fixtures, se pueden hacer obligatorios
+  (`order-view.ts`) y actualizar el test de tipos `tests/unit/pedidos/qc195-contrato-tipos.test.ts`
+  (11.7).
+
+**Veredicto T6:** hecho; unit e integracion de pedidos verdes; gate rapido solo con los rojos del
+baseline; guardias verdes.

@@ -28,9 +28,10 @@ import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -77,7 +78,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5 }],
+    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null }],
     unitId: UNIT_ID,
     ...overrides,
   }
@@ -89,6 +90,7 @@ type Dobles = {
   readonly products: ProductCatalog
   readonly units: UnitCatalog
   readonly presentations: PresentationCatalog
+  readonly packaging: PackagingCatalog
   readonly unitOfWork: ReturnType<typeof fakeUnitOfWork>['unitOfWork']
   readonly now: () => Date
 }
@@ -160,6 +162,7 @@ function dobles(opciones: {
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
+    packaging: fakePackagingCatalog(),
     unitOfWork,
     now: () => AHORA,
     create,
@@ -326,7 +329,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       createdBy: 'admin-0',
       updatedBy: 'admin-0',
       // R26: el reparto, con el nombre de cada presentacion resuelto por el contrato.
-      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5 }],
+      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null }],
       // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
       unitId: UNIT_ID,
       unitLabel: 'L',
@@ -347,8 +350,8 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     const d = dobles({
       fila: fila({
         presentationLines: [
-          { presentationId: OTRA, packages: 2 },
-          { presentationId: PRESENTATION_ID, packages: 5 },
+          { presentationId: OTRA, packages: 2, packagingProductId: null },
+          { presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null },
         ],
       }),
     })
@@ -359,8 +362,8 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     expect(d.findPresentationRefs.mock.calls[0]?.[0]).toEqual([OTRA, PRESENTATION_ID])
     // `OTRA` no vuelve del doble del catalogo: la linea sigue saliendo, con el nombre a `null`.
     expect(vista.presentationLines).toEqual([
-      { presentationId: OTRA, presentationName: null, packages: 2 },
-      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5 },
+      { presentationId: OTRA, presentationName: null, packages: 2, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null },
     ])
   })
 
@@ -437,6 +440,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       orders,
       recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
       presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
+      packaging: fakePackagingCatalog(),
       units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
       log,
     })({ page: 1 }, ADMIN)

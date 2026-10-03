@@ -157,7 +157,9 @@ describe('updateOrderDistributionAction — T25', () => {
     ['presentation_without_content', 'presentation_without_content'],
     ['incompatible_units', 'incompatible_units'],
     ['exceeds_quantity', 'order_distribution_exceeds_quantity'],
-  ] as const)('traduce %s al codigo %s del catalogo (R7, R13, R35, R36, R41, R42)', async (resultado, codigo) => {
+    ['packaging_not_found', 'product_not_found'],
+    ['invalid_lines', 'invalid_input'],
+  ] as const)('traduce %s al codigo %s del catalogo (R7, R13, R35, R36, R41, R42; QC-195 R11, R12, R34)', async (resultado, codigo) => {
     updateOrderPresentationLinesMock.mockResolvedValue(resultado)
 
     const result = await updateOrderDistributionAction(ORDER_ID, {
@@ -166,6 +168,22 @@ describe('updateOrderDistributionAction — T25', () => {
     })
 
     expect(result).toEqual({ status: 'error', code: codigo, message: expect.any(String) })
+  })
+
+  it('QC-195 R11: una linea con envase llega a la fachada con el envase y los envases como numero', async () => {
+    updateOrderPresentationLinesMock.mockResolvedValue('ok')
+    const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+
+    const result = await updateOrderDistributionAction(ORDER_ID, {
+      unitId: UNIT_ID,
+      presentationLines: [{ packagingProductId: ENVASE_ID, packages: '30' }],
+    })
+
+    expect(result).toEqual({ status: 'success' })
+    expect(updateOrderPresentationLinesMock.mock.calls[0]?.[2]).toEqual({
+      unitId: UNIT_ID,
+      lines: [{ packagingProductId: ENVASE_ID, packages: 30 }],
+    })
   })
 
   it('un reparto vacio (R9) se acepta: presentationLines: [] pasa la validacion', async () => {

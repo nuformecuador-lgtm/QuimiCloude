@@ -4,7 +4,7 @@ import { formatOrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
 import type { OrderRow, OrderView } from './order-view';
 
-import type { PresentationCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -20,6 +20,8 @@ export type GetOrderDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve los nombres de las presentaciones del reparto. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de los envases del reparto. */
+  readonly packaging: PackagingCatalog;
   /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de `unitId`. */
   readonly units: UnitCatalog;
 };
@@ -34,6 +36,28 @@ export function unitLabelOf(unit: { readonly name: string; readonly symbol: stri
  *  en una sola llamada al catalogo. */
 export function orderPresentationIds(rows: readonly Pick<OrderRow, 'presentationLines'>[]): string[] {
   return [...new Set(rows.flatMap((row) => row.presentationLines.map((line) => line.presentationId)))];
+}
+
+/** Los ids unicos de los envases del reparto de las filas; las lineas antiguas no tienen. */
+export function orderPackagingIds(rows: readonly Pick<OrderRow, 'presentationLines'>[]): string[] {
+  return [
+    ...new Set(
+      rows.flatMap((row) =>
+        row.presentationLines.flatMap((line) => (line.packagingProductId === null ? [] : [line.packagingProductId])),
+      ),
+    ),
+  ];
+}
+
+/** Los nombres de los envases; uno dado de baja o sin presentacion fija no vuelve. */
+export async function findPackagingNames(
+  packaging: PackagingCatalog,
+  ids: readonly string[],
+  companyId: string,
+): Promise<ReadonlyMap<string, string>> {
+  if (ids.length === 0) return new Map();
+  const refs = await packaging.findRefs(ids, companyId);
+  return new Map(refs.map((ref) => [ref.id, ref.name]));
 }
 
 /**
@@ -57,6 +81,7 @@ export function toOrderView(
   recipes: ReadonlyMap<string, RecipeRef>,
   presentationNames: ReadonlyMap<string, string> = new Map(),
   unitLabels: ReadonlyMap<string, string> = new Map(),
+  packagingNames: ReadonlyMap<string, string> = new Map(),
 ): OrderView {
   const recipe = recipes.get(row.recipeId);
   return {
@@ -84,6 +109,8 @@ export function toOrderView(
       presentationId: line.presentationId,
       presentationName: presentationNames.get(line.presentationId) ?? null,
       packages: line.packages,
+      packagingProductId: line.packagingProductId,
+      packagingName: line.packagingProductId === null ? null : packagingNames.get(line.packagingProductId) ?? null,
     })),
     unitId: row.unitId,
     // `null` si el pedido esta sin unidad; la FK con RESTRICT hace imposible el caso
@@ -121,12 +148,14 @@ export function createGetOrder(
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
 
     const units = row.unitId === null ? [] : await deps.units.findRefs([row.unitId], actor.companyId);
+    const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds([row]), actor.companyId);
 
     return toOrderView(
       row,
       new Map(recipes.map((recipe) => [recipe.id, recipe])),
       new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
       new Map(units.map((unit) => [unit.id, unitLabelOf(unit)])),
+      packagingNames,
     );
   };
 }

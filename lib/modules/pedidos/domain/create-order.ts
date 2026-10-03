@@ -9,7 +9,7 @@ import { resolveDistribution } from './resolve-distribution';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -45,6 +45,8 @@ export type CreateOrderDeps = {
    *  existen en la empresa de quien escribe y copiar su contenido. No se le pasan al
    *  coste: el reparto no cambia nada de lo que ese calculo hace. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
+  readonly packaging: PackagingCatalog;
   /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
    *  `reserved_at`, las tres o ninguna. */
   readonly unitOfWork: OrderUnitOfWork;
@@ -121,14 +123,15 @@ export function createCreateOrder(
     );
 
     // La unidad y el reparto se resuelven y se validan contra el
-    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido.
-    const presentationLines = await resolveDistribution(
-      deps.presentations,
-      deps.units,
+    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido. Un pedido nuevo no tiene
+    // lineas antiguas que conservar.
+    const distribution = await resolveDistribution(
+      deps,
       actor.companyId,
       data.quantity,
       data.unitId,
       data.presentationLines,
+      { savedLines: [] },
     );
 
     const instant = now();
@@ -143,7 +146,7 @@ export function createCreateOrder(
           priority: data.priority,
           unitId: data.unitId,
           status: STATUS_DE_ALTA,
-          presentationLines,
+          presentationLines: distribution.lines,
         },
         instant.getUTCFullYear(),
         actor.id,

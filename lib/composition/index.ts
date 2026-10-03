@@ -889,7 +889,7 @@ export const inventario = {
 // ---------------------------------------------------------------------------------------
 
 /** Solo para el servidor de `pedidos`: validar el envase de cada linea del reparto y costearlo. */
-export const packagingCatalog: PackagingCatalog = {
+const packagingCatalog: PackagingCatalog = {
   findRefs: findPackagingRefs,
   findCostingBatches: findPackagingCostingBatches,
 };
@@ -1233,12 +1233,14 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
   }),
   getOrder: createGetOrder({
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     // La unidad vuelve al pedido: `getOrder` vuelve a necesitar `units`.
     units: unitCatalog,
   }),
@@ -1246,6 +1248,7 @@ export const pedidos = {
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     // Mismo motivo que `getOrder`, una llamada por pagina.
     units: unitCatalog,
     log: pedidosListQueryLog,
@@ -1256,6 +1259,7 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
@@ -1275,6 +1279,7 @@ export const pedidos = {
   // que `createOrder`/`updateOrder`- y su PROPIA transaccion, mas corta: no la unidad de trabajo
   // compartida con `inventario`, porque este caso de uso no toca material ni reserva.
   updateOrderPresentationLines: createUpdateOrderPresentationLines({
+    packaging: packagingCatalog,
     presentations: presentationCatalog,
     units: unitCatalog,
     transaction: orderDistributionTransaction,
@@ -1282,6 +1287,7 @@ export const pedidos = {
   // «Cuanto queda disponible», de solo lectura. Mismos DOS
   // catalogos que `updateOrderPresentationLines`, sin transaccion: no escribe nada.
   quoteOrderPresentationAvailability: createQuoteOrderPresentationAvailability({
+    packaging: packagingCatalog,
     presentations: presentationCatalog,
     units: unitCatalog,
   }),

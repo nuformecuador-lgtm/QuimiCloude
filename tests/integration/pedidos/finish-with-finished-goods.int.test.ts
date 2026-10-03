@@ -57,6 +57,12 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import type { Actor as AsignacionesActor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -107,8 +113,8 @@ const units: UnitCatalog = {
 
 const orderPackingRepository: OrderPackingRepository = { startPackingAlive: startPackingAliveOrder };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
-const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
+const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 
 const orderCatalog: OrderCatalog = {
   findAliveById: async (id, companyId) => {
@@ -167,6 +173,8 @@ type Fixture = {
   readonly roleId: string;
   readonly documentTypeCode: string;
   readonly presentationId: string;
+  /** Envase con `presentationId` como presentacion fija: lo que nombra el reparto. */
+  readonly packagingProductId: string;
   readonly unitId: string;
 };
 
@@ -229,6 +237,7 @@ async function crearFixture(content: string | null = '1.0000'): Promise<Fixture>
     roleId: role.id,
     documentTypeCode: documentType.code,
     presentationId: presentation.id,
+    packagingProductId: await seedPackaging({ companyId: company.id, presentationId: presentation.id, createdBy: user.id }),
     unitId: unit.id,
   };
 }
@@ -246,6 +255,7 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[]): P
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
+  await dropPackaging([fixture.packagingProductId]);
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
@@ -318,7 +328,7 @@ function nuevoPedido(recipeId: string, fixture: Fixture, quantity: string, packa
     priority: 'BAJA',
     status: 'PENDIENTE',
     unitId: fixture.unitId,
-    presentationLines: [{ presentationId: fixture.presentationId, packages }],
+    presentationLines: [{ packagingProductId: fixture.packagingProductId, packages }],
   };
 }
 
@@ -402,6 +412,11 @@ describe('R17 — Terminar da de alta el lote a partir del reparto fijado en Com
       },
       select: { id: true },
     });
+    const otroEnvase = await seedPackaging({
+      companyId: fixture.companyId,
+      presentationId: otraPresentacion.id,
+      createdBy: fixture.actorId,
+    });
     const { productId, batchId } = await crearProductoConLote(fixture, '100', '3.0000');
     const recipeId = await crearReceta(fixture);
     await crearLineaCompleta(recipeId, productId);
@@ -415,8 +430,8 @@ describe('R17 — Terminar da de alta el lote a partir del reparto fijado en Com
           status: 'PENDIENTE',
           unitId: fixture.unitId,
           presentationLines: [
-            { presentationId: fixture.presentationId, packages: 6 },
-            { presentationId: otraPresentacion.id, packages: 2 },
+            { packagingProductId: fixture.packagingProductId, packages: 6 },
+            { packagingProductId: otroEnvase, packages: 2 },
           ],
         },
         actorDe(fixture),
@@ -450,8 +465,10 @@ describe('R17 — Terminar da de alta el lote a partir del reparto fijado en Com
       // llegue a la unidad, y su producto terminado antes que la propia presentacion (FK
       // `RESTRICT`), igual que `borrarFixture` ya hace con `fixture.presentationId`. El
       // asiento de produccion de ese lote se limpia primero, mismo orden que `borrarFixture`.
+      await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+      await dropPackaging([otroEnvase]);
       await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, presentationId: otraPresentacion.id } } });
       await prisma.product.deleteMany({ where: { companyId: fixture.companyId, presentationId: otraPresentacion.id } });
       await prisma.presentation.deleteMany({ where: { id: otraPresentacion.id } });
@@ -561,7 +578,7 @@ describe('R20 — la edicion en Pedidos no da de alta producto terminado', () =>
       // esta entrada nunca podria mover el pedido a `ENTREGADO` aunque el dato viaje aqui.
       await updateOrder(
         creado.id,
-        { recipeId, quantity: '20.0000', unitId: fixture.unitId, presentationLines: [{ presentationId: fixture.presentationId, packages: 20 }], status: 'ENTREGADO' },
+        { recipeId, quantity: '20.0000', unitId: fixture.unitId, presentationLines: [{ packagingProductId: fixture.packagingProductId, packages: 20 }], status: 'ENTREGADO' },
         actorDe(fixture),
       );
 
@@ -846,7 +863,9 @@ describe('R18 — el coste del lote', () => {
 describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del pedido', () => {
   /** Unidad derivada de la de la fixture (1 = 0,001 de ella, como ml de L) y una presentacion
    *  de 200 en esa unidad. */
-  async function crearMililitro(fixture: Fixture): Promise<{ readonly unitId: string; readonly presentationId: string }> {
+  async function crearMililitro(
+    fixture: Fixture,
+  ): Promise<{ readonly unitId: string; readonly presentationId: string; readonly packagingProductId: string }> {
     const marca = token();
     const unit = await prisma.unit.create({
       data: { name: `Mili ${marca}`, nameNormalized: `mili${marca}`, symbol: `ml${marca}`, baseUnitId: fixture.unitId, factor: '0.0010' },
@@ -856,12 +875,22 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
       data: { name: `Frasco ${marca}`, nameNormalized: normalizeForTest(`Frasco ${marca}`), unitId: unit.id, companyId: fixture.companyId, content: '200.0000' },
       select: { id: true },
     });
-    return { unitId: unit.id, presentationId: presentation.id };
+    const packagingProductId = await seedPackaging({
+      companyId: fixture.companyId,
+      presentationId: presentation.id,
+      createdBy: fixture.actorId,
+    });
+    return { unitId: unit.id, presentationId: presentation.id, packagingProductId };
   }
 
-  async function borrarMililitro(fixture: Fixture, mililitro: { readonly unitId: string; readonly presentationId: string }): Promise<void> {
+  async function borrarMililitro(
+    fixture: Fixture,
+    mililitro: { readonly unitId: string; readonly presentationId: string; readonly packagingProductId: string },
+  ): Promise<void> {
+    await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
     await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+    await dropPackaging([mililitro.packagingProductId]);
     await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, presentationId: mililitro.presentationId } } });
     await prisma.product.deleteMany({ where: { companyId: fixture.companyId, presentationId: mililitro.presentationId } });
     await prisma.presentation.deleteMany({ where: { id: mililitro.presentationId } });
@@ -870,7 +899,7 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
 
   /** Pedido de 100 en la unidad de la fixture, coste guardado 1000 (100 x 10.0000), con 5 x 200
    *  en la unidad derivada y 60 x 1 en la de la fixture: 61 en la unidad del pedido. */
-  async function pedidoMixto(fixture: Fixture, mililitro: { readonly presentationId: string }, recipeId: string): Promise<string> {
+  async function pedidoMixto(fixture: Fixture, mililitro: { readonly packagingProductId: string }, recipeId: string): Promise<string> {
     const creado = await createOrder(
       {
         recipeId,
@@ -879,8 +908,8 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
         status: 'PENDIENTE',
         unitId: fixture.unitId,
         presentationLines: [
-          { presentationId: mililitro.presentationId, packages: 5 },
-          { presentationId: fixture.presentationId, packages: 60 },
+          { packagingProductId: mililitro.packagingProductId, packages: 5 },
+          { packagingProductId: fixture.packagingProductId, packages: 60 },
         ],
       },
       actorDe(fixture),

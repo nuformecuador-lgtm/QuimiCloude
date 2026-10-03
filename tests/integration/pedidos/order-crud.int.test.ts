@@ -59,6 +59,10 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento
@@ -1029,8 +1033,8 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
   } as unknown as UnitCatalog
   const now = () => new Date()
   return {
-    createOrder: createCreateOrder({ recipes, products, units, presentations, unitOfWork, now }),
-    updateOrder: createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now }),
+    createOrder: createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
+    updateOrder: createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
   }
 }
 
