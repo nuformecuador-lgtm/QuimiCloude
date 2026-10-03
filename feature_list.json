@@ -2726,7 +2726,7 @@
       "epic_name": "Recetas",
       "name": "herramientas-de-la-receta",
       "description": "Una receta debe poder declarar las herramientas que usa (agitador, estufa, condensador, pHmetro, etc.). Las herramientas son productos de inventario de tipo MACHINE.\n\n**Comportamiento esperado (lo pidió el humano):** se manejan igual que los productos de la receta, como un ingrediente adicional, con una diferencia: **no modifican las cantidades del stock**, porque no son consumibles.\n\n**Estado actual:**\n- El formulario de la receta ya tiene un tab \"Herramientas\" (`recipe-lines-field.tsx`), pero es solo UI. La lista vive en el estado local del componente y se pierde al guardar.\n- No existe en la DB nada que relacione una receta con sus herramientas.\n\n**Restricciones que hoy impiden meterlas como `recipe_lines`:**\n- `recipe_lines_percentage_range` exige un porcentaje mayor que 0.\n- `recipeLinesSchema` exige que las líneas sumen exactamente 100,00 %.\n- La reserva y el consumo del pedido descuentan stock de cada línea.\n\n**Decisiones abiertas para el spec:**\n- Dónde se guardan: una línea de tipo herramienta sin porcentaje en `recipe_lines`, o una tabla aparte (por ejemplo `recipe_machines`).\n- Si las versiones heredan las herramientas de su original o tienen las suyas.\n- Si la herramienta se muestra al operador al ejecutar la receta.\n- Qué pasa al dar de baja una herramienta que usan recetas.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",
