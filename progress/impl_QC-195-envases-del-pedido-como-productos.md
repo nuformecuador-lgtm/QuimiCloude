@@ -558,3 +558,62 @@ Gate `./init.sh --rapido` tras el commit:
 ✗ 'pnpm run test:rapido' fallo
 ```
 Los 6 rojos son los de `tests/baseline-rojos.json` (los mismos de T3). Guardias aparte: verdes.
+
+## T11 — El envase no es ingrediente (backend_dev, 2026-10-03) — commit `2a43b5c7`
+
+Archivos: `lib/modules/inventario/domain/product-type.ts` (`isIngredientType(type)`: ni
+FINISHED_PRODUCT ni PACKAGING; exportada por el barrel), y las seis llamadas de §3.5:
+`recetas/domain/create-recipe.ts`, `update-recipe.ts`, `update-recipe-version.ts`,
+`create-recipe-version.ts`, `documentos/domain/preview-formula-import.ts` (los candidatos excluyen
+envases), `confirm-formula-import.ts` (rechaza el envase elegido y no lo reutiliza como materia prima
+nueva homónima). Mismo error que el producto terminado: `ActionNotAllowedError` → `action_not_allowed`.
+
+P4 = A, cómo quedó en código:
+- Edición de receta y de versión: como ya hacían, solo se validan las líneas que no tenían → un envase
+  que ya era ingrediente se conserva.
+- **Alta de versión**: el producto terminado se sigue rechazando en cualquier línea (sin cambio); el
+  envase solo se rechaza si **no estaba en la original**. Motivo: el formulario de versión
+  (`app/(private)/produccion/formulas/components/recipe-version-form.tsx:77`) precarga las líneas de
+  la original y **siempre las envía** en `lines`, así que leer «líneas indicadas en la entrada» al pie
+  de la letra haría imposible versionar una original con un envase desde la pantalla, que es justo lo
+  que A descarta («una original con un envase dejaría de poder versionarse»). Las copiadas pasan «con
+  la misma exención que la edición» = las que la original ya tenía. **Para confirmar por el reviewer /
+  humano** (ver informe).
+- `requirements.md` no tiene un requisito escrito para P4 (la decisión está en `design.md > 1.5`);
+  los tests llevan `P4` en el nombre del caso.
+
+R → test:
+| R | Test |
+|---|---|
+| R39 | `tests/unit/recetas/qc195-envase-no-es-ingrediente.test.ts` › «R39 — el alta de una receta con un envase como ingrediente se rechaza con action_not_allowed sin escribir», «R39 — el alta de una version con un envase que la original no tenia se rechaza sin escribir», «R39 — PRODUCT y MACHINE siguen entrando como ingrediente en el alta» |
+| R40 | mismo archivo › «R40 — editar una receta anadiendo un envase que no tenia se rechaza sin modificarla», «R40 — editar una version anadiendo un envase que no tenia se rechaza sin modificarla» |
+| R41 | `tests/unit/documentos/preview-formula-import.test.ts` › «QC-195 R41 — un envase como UNICO homonimo: match "none", nunca se propone», «QC-195 R41 — un envase y una materia prima homonimos: se propone solo la materia prima»; `tests/unit/documentos/confirm-formula-import.test.ts` › «QC-195 R41 — el producto elegido es un ENVASE: action_not_allowed, cero escrituras», «QC-195 R41 — una materia prima nueva cuyo unico homonimo es un envase no lo reutiliza: crea la suya» |
+| P4 | `qc195-envase-no-es-ingrediente.test.ts` › «P4 — una version que copia las lineas de una original con un envase se crea», «P4 — una version que repite el envase que ya tenia la original (como lo envia el formulario) se crea», «P4 — editar una receta que ya tenia un envase como ingrediente lo conserva y se guarda», «P4 — editar una version que ya tenia un envase lo conserva y se guarda» |
+| — | mismo archivo › «isIngredientType: solo PRODUCT y MACHINE son ingredientes» |
+
+Los casos de FINISHED_PRODUCT existentes no se tocaron y siguen verdes.
+
+Salida real:
+```
+$ pnpm exec vitest run --project node tests/unit/recetas/qc195-envase-no-es-ingrediente.test.ts \
+    tests/unit/documentos/confirm-formula-import.test.ts tests/unit/documentos/preview-formula-import.test.ts \
+    tests/unit/recetas/create-recipe-version.test.ts tests/unit/recetas/update-recipe-version.test.ts tests/unit/recetas/recipe-service.test.ts
+ Test Files  6 passed (6)      Tests  108 passed (108)
+$ pnpm exec vitest run --project integration tests/integration/recetas tests/integration/documentos/formula-import.int.test.ts
+ Test Files  11 passed (11)    Tests  139 passed (139)
+$ pnpm exec vitest run guard --passWithNoTests      (incluye guard-tipos-de-producto)
+ Test Files  51 passed (51)    Tests  672 passed | 11 skipped (683)
+$ pnpm exec vitest related --run --project node <los 7 archivos de lib de T11>
+ Test Files  1 failed | 142 passed (143)   Tests  1 failed | 2657 passed | 6 skipped
+   (el rojo: tests/unit/recetas/module-contract.test.ts, en el baseline)
+$ pnpm exec vitest run --project node tests/unit/recetas tests/unit/documentos
+ Test Files  2 failed | 111 passed (113)  (recetas/module-contract y recetas/scope, los dos en el baseline;
+   scope cae por app/(private)/pedidos/page.tsx, fuera de este carril)
+```
+
+Gate `./init.sh --rapido`: `✓ typecheck`, `✓ lint`; la fase de tests **no terminó**: el proceso en
+segundo plano se cortó dos veces por el límite de tiempo de la herramienta, con la máquina cargada
+(`inventario/product-page.test.tsx` solo tardó 242 s y dio un rojo de tiempo de 20 s, además del de
+baseline). Lo que llegó a salir antes del corte son los mismos archivos del baseline. Sustituido por
+las corridas `related`/guardias de arriba. **El implementer debería repetir `./init.sh --rapido` con la
+máquina libre.**
