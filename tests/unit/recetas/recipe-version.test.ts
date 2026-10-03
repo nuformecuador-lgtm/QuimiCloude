@@ -1,4 +1,4 @@
-// Reglas puras de version: nombre mostrado, «por revisar» y propagacion de lineas.
+// Reglas puras de version: nombre mostrado, «por revisar» y propagacion de lineas y herramientas.
 // Importa del contrato del modulo: si el barrel dejara de exportarlas, no compilaria.
 
 import { describe, expect, it } from 'vitest'
@@ -7,6 +7,7 @@ import {
   VERSION_NAME_SEPARATOR,
   isVersionUnderReview,
   propagateLines,
+  propagateTools,
   recipeDisplayName,
 } from '@/lib/modules/recetas'
 
@@ -220,5 +221,82 @@ describe('propagateLines', () => {
       expect(after).toHaveLength(2)
       expect(version).toHaveLength(1)
     })
+  })
+})
+
+type Tool = { readonly productId: string; readonly quantity: number }
+
+const tool = (productId: string, quantity: number): Tool => ({ productId, quantity })
+
+describe('propagateTools', () => {
+  it('R14: herramienta que la version deja igual que antes sigue a la original (cantidad nueva)', () => {
+    const before = [tool('m', 1), tool('n', 2)]
+    const after = [tool('m', 3), tool('n', 2)]
+    const version = [tool('m', 1), tool('n', 2)]
+
+    expect(propagateTools(before, after, version)).toEqual([tool('m', 3), tool('n', 2)])
+  })
+
+  it('R14: la original la quita y la version no la habia cambiado → desaparece', () => {
+    const before = [tool('m', 1), tool('n', 2)]
+    const after = [tool('m', 1)]
+    const version = [tool('m', 1), tool('n', 2)]
+
+    expect(propagateTools(before, after, version)).toEqual([tool('m', 1)])
+  })
+
+  it('R14: la version cambio la cantidad → se queda la suya', () => {
+    const before = [tool('m', 1)]
+    const after = [tool('m', 5)]
+    const version = [tool('m', 2)]
+
+    expect(propagateTools(before, after, version)).toEqual([tool('m', 2)])
+  })
+
+  it('R14: la version la anadio (la original no la tenia) → se queda aunque la original no la tenga', () => {
+    const before = [tool('m', 1)]
+    const after = [tool('m', 4)]
+    const version = [tool('m', 1), tool('v', 7)]
+
+    expect(propagateTools(before, after, version)).toEqual([tool('m', 4), tool('v', 7)])
+  })
+
+  it('R14: la version la quito → no vuelve aunque la original la cambie', () => {
+    const before = [tool('m', 1), tool('n', 2)]
+    const after = [tool('m', 1), tool('n', 9)]
+    const version = [tool('m', 1)]
+
+    expect(propagateTools(before, after, version)).toEqual([tool('m', 1)])
+  })
+
+  it('R14: la original anade una que la version no tenia → se anade a la version', () => {
+    const before = [tool('m', 1)]
+    const after = [tool('m', 1), tool('nueva', 3)]
+    const version = [tool('m', 1)]
+
+    expect(propagateTools(before, after, version)).toEqual([tool('m', 1), tool('nueva', 3)])
+  })
+
+  it('R14: sin cambios en la original, la version queda exactamente como estaba', () => {
+    const before = [tool('m', 1), tool('n', 2)]
+    const version = [tool('n', 8), tool('v', 1)]
+
+    expect(propagateTools(before, before, version)).toEqual([tool('n', 8), tool('v', 1)])
+  })
+
+  it('R14: la original pasa a no tener herramientas → la version conserva solo las suyas propias', () => {
+    const before = [tool('m', 1), tool('n', 2)]
+    const version = [tool('m', 1), tool('n', 5)]
+
+    expect(propagateTools(before, [], version)).toEqual([tool('n', 5)])
+  })
+})
+
+describe('isVersionUnderReview no mira herramientas', () => {
+  it('R7, R16: solo recibe porcentajes de lineas: una version al 100 % no esta por revisar por tener herramientas', () => {
+    // La firma solo admite porcentajes: no hay forma de pasarle herramientas.
+    expect(isVersionUnderReview.length).toBe(2)
+    expect(isVersionUnderReview(true, ['60.00', '40.00'])).toBe(false)
+    expect(isVersionUnderReview(true, ['60.00'])).toBe(true)
   })
 })

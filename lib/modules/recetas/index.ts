@@ -52,6 +52,7 @@ export {
   recipeDisplayName,
   isVersionUnderReview,
   propagateLines,
+  propagateTools,
 } from './domain/recipe-version';
 export {
   MAX_IMAGE_BYTES,

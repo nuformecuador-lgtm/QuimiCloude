@@ -48,7 +48,7 @@ Tras T0. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/domain/recipe-i
 ausente rechazadas (R6); clave extra rechazada; alta sin `tools` → `[]` (R2); edición sin `tools` →
 `undefined` y con `[]` → `[]`, distinguibles (R17); líneas al 100 % + herramientas pasa (R7).
 
-### T3 [P] — `propagateByProduct` / `propagateTools`
+### T3 [P] — `propagateByProduct` / `propagateTools` [x]
 Tras T0. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/domain/recipe-version.ts`,
 `tests/unit/recetas/recipe-version.test.ts`.
 **Hacer:** §3.4, sin cambiar el comportamiento de `propagateLines`.
