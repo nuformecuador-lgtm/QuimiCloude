@@ -428,6 +428,11 @@
       "archivo": "inventario/qc195-packaging-catalog.int.test.ts",
       "motivo": "QC-195 T3: ejercita 'findPackagingRefs'/'findPackagingCostingBatches' (packaging-catalog-prisma.ts), que leen con el cliente Prisma GLOBAL, y siembra con 'createWithFirstBatch'/'addBatchToAlive' (product-prisma.ts) y 'syncForOrder' (reservation-prisma.ts), que abren su propia transaccion o escriben con el cliente global: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (usuario, rol, tipo de documento, receta, presentacion, envases, pedidos) y las limpia en un 'finally' en orden de FK (los dos libros -> pedidos -> lotes -> productos -> presentaciones -> recetas -> usuario -> empresa -> rol -> tipo de documento). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-03"
+    },
+    {
+      "archivo": "inventario/qc195-packaging-list.int.test.ts",
+      "motivo": "QC-195 T4: ejercita 'listAliveProducts' (product-prisma.ts) con el filtro 'presentationUnitId', que lee con el cliente Prisma GLOBAL, y siembra con 'createWithFirstBatch' (abre su propia transaccion) y 'syncForOrder' (reservation-prisma.ts): una transaccion del test con ROLLBACK no los envolveria. El caso fabrica su empresa efimera con randomUUID (usuario, rol, tipo de documento, receta, presentaciones, envases, pedidos) y la limpia en un 'finally' en orden de FK (los dos libros -> pedidos -> lotes -> productos -> presentaciones -> receta -> usuario -> empresa -> rol -> tipo de documento). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-03"
     }
   ]
 }

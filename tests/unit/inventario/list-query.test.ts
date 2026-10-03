@@ -161,7 +161,8 @@ describe('sanitize contra la lista blanca', () => {
     // `?filters[unitId]=...` en un marcador tiene que seguir pintando la lista.
     expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('unitId');
     expect(PRODUCT_QUERYABLE.sortable).not.toContain('unitId');
-    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt', 'type']);
+    // QC-195 R8: `presentationUnitId` filtra por la unidad de la presentacion fija, no por la del producto.
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt', 'type', 'presentationUnitId']);
 
     const resultado = sanitizeListQuery(
       query({ filters: { unitId: { kind: 'select', values: ['u1'] } } }),
@@ -170,6 +171,16 @@ describe('sanitize contra la lista blanca', () => {
 
     expect(resultado.query.filters).toEqual({});
     expect(resultado.ignored).toEqual(['unitId']);
+  });
+
+  it('QC-195 R8, R9 — el listado de productos acepta el filtro presentationUnitId como select', () => {
+    expect(PRODUCT_QUERYABLE.filterable.presentationUnitId).toBe('select');
+    const resultado = sanitizeListQuery(
+      query({ filters: { presentationUnitId: { kind: 'select', values: ['u-ml', 'u-l'] } } }),
+      PRODUCT_QUERYABLE,
+    );
+    expect(resultado.query.filters).toEqual({ presentationUnitId: { kind: 'select', values: ['u-ml', 'u-l'] } });
+    expect(resultado.ignored).toEqual([]);
   });
 
   it('el listado de productos vuelve a ordenar y filtrar por existencia (R15)', () => {

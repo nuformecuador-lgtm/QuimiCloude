@@ -42,7 +42,7 @@ import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
-import { PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
+import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
 // El ambito de empresa va como conjuncion aparte en un `AND` de primer nivel, para que ninguna otra
 // condicion del `where` pueda relajarlo. Una fila de otra empresa sale igual que una que no existe
@@ -221,11 +221,13 @@ function toDecimalRange(condition: NumberRangeCondition): { gte?: Prisma.Decimal
 function productFilterWhere(
   field: string,
   value: ListFilterValue,
+  presentationIdsByUnit: readonly string[],
 ): Prisma.ProductWhereInput | null {
   switch (value.kind) {
     case 'select': {
       const condition = selectCondition(value.values);
       if (condition === null) return null;
+      if (field === PRODUCT_PRESENTATION_UNIT_FILTER) return { presentationId: { in: [...presentationIdsByUnit] } };
       if (field === 'type') {
         const validValues = value.values.filter((v) => PRODUCT_TYPE_VALUES.includes(v as ProductType)) as ProductType[];
         if (validValues.length === 0) return null;
@@ -257,14 +259,16 @@ function productFilterWhere(
 }
 
 /** El termino se normaliza con la misma funcion que escribio `name_normalized`, para que la
- *  busqueda y la escritura no discrepen. */
+ *  busqueda y la escritura no discrepen. `presentationIdsByUnit` son las presentaciones que ya
+ *  resolvio el filtro por unidad de presentacion; sin ellas ese filtro no deja pasar nada. */
 export function buildProductWhere(
   query: ListQuery,
   scope: InventoryScope,
+  presentationIdsByUnit: readonly string[] = [],
 ): Prisma.ProductWhereInput {
   const search = normalizedSearchCondition(query.search, normalizeProductName);
   const filters = Object.entries(query.filters)
-    .map(([field, value]) => productFilterWhere(field, value))
+    .map(([field, value]) => productFilterWhere(field, value, presentationIdsByUnit))
     .filter((condition): condition is Prisma.ProductWhereInput => condition !== null);
 
   return {
@@ -284,17 +288,67 @@ export function buildProductWhere(
  * `totalPages` mentirian. El `count` usa el mismo `where` que el `findMany`, para que `total` no
  * cuente filas de otra empresa ni fuera del filtro.
  */
+/** Presentaciones de la empresa con contenido declarado cuya unidad esta entre `unitIds`. */
+async function findPresentationIdsWithContentInUnits(
+  unitIds: readonly string[],
+  scope: InventoryScope,
+): Promise<readonly string[]> {
+  if (unitIds.length === 0) return [];
+  const rows = await prisma.presentation.findMany({
+    where: { AND: [presentationCompanyScope(scope), { unitId: { in: [...unitIds] }, content: { not: null } }] },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
+}
+
+type FixedPresentationFields = Pick<
+  ProductView,
+  'presentationId' | 'presentationName' | 'presentationContent' | 'presentationUnitId'
+>;
+
+async function findFixedPresentations(
+  presentationIds: readonly string[],
+  scope: InventoryScope,
+): Promise<ReadonlyMap<string, FixedPresentationFields>> {
+  if (presentationIds.length === 0) return new Map();
+  const rows = await prisma.presentation.findMany({
+    where: { AND: [presentationCompanyScope(scope), { id: { in: [...presentationIds] } }] },
+    select: { id: true, name: true, content: true, unitId: true },
+  });
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        presentationId: row.id,
+        presentationName: row.name,
+        presentationContent: row.content === null ? null : row.content.toFixed(4),
+        presentationUnitId: row.unitId,
+      },
+    ]),
+  );
+}
+
+const NO_FIXED_PRESENTATION: FixedPresentationFields = {
+  presentationId: null,
+  presentationName: null,
+  presentationContent: null,
+  presentationUnitId: null,
+};
+
 export async function listAliveProducts(
   query: ListQuery,
   scope: InventoryScope,
 ): Promise<Page<ProductView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildProductWhere(query, scope);
+  const unitFilter = query.filters[PRODUCT_PRESENTATION_UNIT_FILTER];
+  const presentationIdsByUnit =
+    unitFilter?.kind === 'select' ? await findPresentationIdsWithContentInUnits(unitFilter.values, scope) : [];
+  const where = buildProductWhere(query, scope, presentationIdsByUnit);
 
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
       where,
-      select: PRODUCT_SELECT,
+      select: { ...PRODUCT_SELECT, presentationId: true },
       orderBy: productOrderBy(query.sort),
       skip: offset,
       take: limit,
@@ -309,9 +363,19 @@ export async function listAliveProducts(
     scope.companyId,
     rows.map((row) => row.id),
   );
+  const presentations = await findFixedPresentations(
+    [...new Set(rows.flatMap((row) => (row.presentationId === null ? [] : [row.presentationId])))],
+    scope,
+  );
   const items = rows.map((row) => {
     const aggregate = reservedByProduct.get(row.id);
-    return { ...toProductView(row), reserved: aggregate?.reserved ?? ZERO_QUANTITY, available: aggregate?.available ?? ZERO_QUANTITY };
+    const fixed = row.presentationId === null ? undefined : presentations.get(row.presentationId);
+    return {
+      ...toProductView(row),
+      reserved: aggregate?.reserved ?? ZERO_QUANTITY,
+      available: aggregate?.available ?? ZERO_QUANTITY,
+      ...(fixed ?? NO_FIXED_PRESENTATION),
+    };
   });
 
   return buildPage(items, total, query.page, limit);

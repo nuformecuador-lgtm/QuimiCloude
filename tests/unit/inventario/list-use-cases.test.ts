@@ -403,3 +403,36 @@ describe('QC-49 R31 — el ambito se anade al puerto y no cambia ni la firma ni 
     expect(ambitoRecibido(products.listAlive.mock.calls)).toEqual({ companyId: OTRA_EMPRESA });
   });
 });
+
+describe('QC-195 — el selector de envases del reparto va por el listado de productos', () => {
+  const CON_PEDIDOS_SIN_INVENTARIO: Actor = {
+    id: 'repartidor-1',
+    companyId: EMPRESA,
+    permissions: ['pedidos.consultar', 'pedidos.modificar'],
+  };
+  const CONSULTA_DEL_SELECTOR = {
+    page: 1,
+    pageSize: 25,
+    sort: null,
+    search: 'botella',
+    filters: {
+      type: { kind: 'select', values: ['PACKAGING'] },
+      presentationUnitId: { kind: 'select', values: ['u-ml', 'u-l'] },
+    },
+  };
+
+  it('R38 — con pedidos.modificar y sin inventario.consultar responde unauthorized sin tocar el puerto', async () => {
+    const { products, listProducts } = montarProductos();
+    await expect(listProducts(CONSULTA_DEL_SELECTOR, CON_PEDIDOS_SIN_INVENTARIO)).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(products.listAlive).not.toHaveBeenCalled();
+  });
+
+  it('R8 — con inventario.consultar, el filtro presentationUnitId llega al puerto sin descartarse', async () => {
+    const { products, log, listProducts } = montarProductos();
+    await listProducts(CONSULTA_DEL_SELECTOR, ADMIN);
+    expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual(CONSULTA_DEL_SELECTOR.filters);
+    expect(log.ignoredFields).toHaveBeenCalledWith(expect.any(String), []);
+  });
+});
