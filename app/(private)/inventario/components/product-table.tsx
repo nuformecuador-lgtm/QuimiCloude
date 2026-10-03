@@ -18,7 +18,12 @@ import {
 } from '@/components/ui/sheet';
 import { listProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
-import { productDisplayName, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
+import {
+  PRODUCT_TYPES,
+  productDisplayName,
+  type ProductBatchView,
+  type ProductView,
+} from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { AdjustBatchDialog } from './adjust-batch-dialog';
@@ -100,6 +105,7 @@ function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetP
           <ProductBatchesPanel
             batches={state.data}
             units={units}
+            product={product}
             renderBatchDetail={(batch) => (
               <BatchHistory batchId={batch.id} batchLot={batch.lot} />
             )}
@@ -108,6 +114,9 @@ function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetP
                 batch={batch}
                 canAdjust={canAdjust}
                 productType={product.type}
+                wholePackages={
+                  product.type === PRODUCT_TYPES.PACKAGING && product.presentationId != null
+                }
                 onAdjusted={fetchBatches}
               />
             )}

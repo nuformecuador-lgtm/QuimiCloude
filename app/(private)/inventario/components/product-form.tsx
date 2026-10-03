@@ -115,6 +115,19 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   purchaseDate: 'Elige la fecha de compra.',
 };
 
+/** Un envase se cuenta en piezas: no hay medio envase. */
+const WHOLE_PACKAGES_PATTERN = /^\d{1,10}$/;
+const WHOLE_PACKAGES_MESSAGE = 'Escribe un número entero de envases, 0 o más.';
+
+const PACKAGING_STOCK_LABEL = 'Existencia (envases)';
+const PACKAGING_STOCK_HELPER = 'El número de envases con el que entra este lote al inventario.';
+const PACKAGING_PRESENTATION_HELPER =
+  'La presentación de este envase (botella de 500 ml, bidón de 20 L…). Se elige al darlo de alta y no se puede cambiar después.';
+const PACKAGING_PRESENTATION_NOTE = 'Es la presentación fija del envase: no se puede cambiar después.';
+const PACKAGING_LEGACY_LABEL = 'Envase sin presentación fija';
+const PACKAGING_LEGACY_NOTE =
+  'Se dio de alta antes de los envases con presentación: no se ofrece en el reparto de pedidos.';
+
 /** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
 const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario o el costo total; basta con uno.';
 
@@ -382,6 +395,16 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     const isMachine = type === PRODUCT_TYPES.MACHINE;
     const isPackaging = type === PRODUCT_TYPES.PACKAGING;
 
+    if (
+      isCreate &&
+      isPackaging &&
+      fieldErrors.stock === undefined &&
+      decimals.stock !== undefined &&
+      !WHOLE_PACKAGES_PATTERN.test(decimals.stock)
+    ) {
+      fieldErrors.stock = WHOLE_PACKAGES_MESSAGE;
+    }
+
     /*
       EXACTAMENTE las claves del esquema, ni una mas (R24): los dos esquemas son `strictObject`,
       y en zod v4 una clave de sobra sale como un issue `unrecognized_keys` con `path: []` -la
@@ -516,6 +539,8 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       : undefined;
 
   const isEdit = product !== undefined;
+  const isPackaging = productType === PRODUCT_TYPES.PACKAGING;
+  const packagingPresentationName = product?.presentationName ?? null;
 
   return (
     /*
@@ -641,6 +666,13 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         -o recuperar lo escrito tras un rechazo- lo remonta con el valor nuevo. El campo sigue sin
         estar controlado, igual que `ProductField`.
       */}
+      {isEdit && isPackaging ? (
+        <PackagingPresentationSummary
+          presentationName={packagingPresentationName}
+          labelId={`${fieldId}-packaging-presentation`}
+        />
+      ) : null}
+
       {isEdit ? null : shouldShowField('presentationId', productType) && (
         <PresentationSelect
           key={`${initialValue('presentationId', '')}-${template?.presentationId ?? ''}`}
@@ -651,18 +683,35 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           // baja por props desde la pagina, que lo pide una sola vez; este formulario no consulta
           // nada. Sin catalogo, el alta rapida no se ofrece y solo se puede elegir una existente.
           units={units}
-          helper="La presentación en la que llega este lote (bidón de 20 L, saco de 25 kg…). Si no está en la lista, créala aquí mismo sin salir del panel."
+          helper={
+            isPackaging
+              ? PACKAGING_PRESENTATION_HELPER
+              : 'La presentación en la que llega este lote (bidón de 20 L, saco de 25 kg…). Si no está en la lista, créala aquí mismo sin salir del panel.'
+          }
         />
       )}
+
+      {!isEdit && isPackaging ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="product-packaging-presentation-note"
+        >
+          {PACKAGING_PRESENTATION_NOTE}
+        </p>
+      ) : null}
 
       {isEdit ? null : shouldShowField('stock', productType) && (
         <ProductField
           name="stock"
-          label={FIELD_LABELS.stock}
+          label={isPackaging ? PACKAGING_STOCK_LABEL : FIELD_LABELS.stock}
           type="text"
-          inputMode="decimal"
+          inputMode={isPackaging ? 'numeric' : 'decimal'}
           required
-          helper="La existencia con la que entra este lote al inventario."
+          helper={
+            isPackaging
+              ? PACKAGING_STOCK_HELPER
+              : 'La existencia con la que entra este lote al inventario.'
+          }
           value={stockValue}
           onChange={(event) => setStockValue(sanitizeQuantityInput(event.currentTarget.value))}
           error={fieldErrors.stock}
@@ -751,6 +800,45 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
       </div>
     </SheetContent>
+  );
+}
+
+/**
+ * La presentacion de un envase en la edicion: solo se muestra, porque no se puede cambiar. Sin
+ * ella es un envase legado, que se marca para no confundirlo con los que se reparten.
+ */
+function PackagingPresentationSummary({
+  presentationName,
+  labelId,
+}: {
+  readonly presentationName: string | null;
+  readonly labelId: string;
+}) {
+  if (presentationName === null) {
+    return (
+      <div
+        role="note"
+        className="flex flex-col gap-1 rounded-lg border p-3 text-sm"
+        data-testid="product-packaging-legacy"
+      >
+        <span className="font-medium">{PACKAGING_LEGACY_LABEL}</span>
+        <span className="text-muted-foreground">{PACKAGING_LEGACY_NOTE}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <span id={labelId} className="text-sm font-medium">
+        {FIELD_LABELS.presentationId}
+      </span>
+      <p
+        aria-labelledby={labelId}
+        className="flex min-h-11 items-center rounded-md border px-3 text-base text-muted-foreground"
+        data-testid="product-packaging-presentation"
+      >
+        {presentationName}
+      </p>
+    </div>
   );
 }
 

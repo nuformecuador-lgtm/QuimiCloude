@@ -54,6 +54,8 @@ const MISSING_REASON_MESSAGE = 'Elegi un motivo.';
 const OVER_RESERVED_MESSAGE =
   'El lote queda sobre-reservado: hay pedidos sin cobertura completa.';
 const FINISHED_PRODUCT_NOTICE = 'Solo se admiten ajustes que restan.';
+const WHOLE_PACKAGES_MESSAGE = 'Escribe un número entero de envases.';
+const WHOLE_DELTA_PATTERN = /^-?\d{1,10}$/;
 
 /** Mismo patron que la action: el signo se conserva, hasta 4 decimales pasan. */
 const DECIMAL_DELTA_PATTERN = /^-?\d{1,10}(\.\d{1,4})?$/;
@@ -88,6 +90,8 @@ export type AdjustBatchDialogProps = {
   readonly canAdjust: boolean;
   /** Tipo del producto dueño del lote. Con `FINISHED_PRODUCT` se avisa que solo se admite restar. */
   readonly productType?: ProductType;
+  /** Lote de un envase con presentacion fija: se ajusta en envases enteros. */
+  readonly wholePackages?: boolean;
   readonly onAdjusted?: () => void;
 };
 
@@ -105,22 +109,30 @@ export function AdjustBatchDialog({
   batch,
   canAdjust,
   productType,
+  wholePackages = false,
   onAdjusted,
 }: AdjustBatchDialogProps) {
   if (!canAdjust) return null;
 
   return (
-    <AdjustBatchDialogContent batch={batch} productType={productType} onAdjusted={onAdjusted} />
+    <AdjustBatchDialogContent
+      batch={batch}
+      productType={productType}
+      wholePackages={wholePackages}
+      onAdjusted={onAdjusted}
+    />
   );
 }
 
 function AdjustBatchDialogContent({
   batch,
   productType,
+  wholePackages,
   onAdjusted,
 }: {
   readonly batch: ProductBatchView;
   readonly productType?: ProductType;
+  readonly wholePackages: boolean;
   readonly onAdjusted?: () => void;
 }) {
   const fieldId = useId();
@@ -129,11 +141,13 @@ function AdjustBatchDialogContent({
   const errorId = `${fieldId}-error`;
   const zeroErrorId = `${fieldId}-zero-error`;
   const reasonErrorId = `${fieldId}-reason-error`;
+  const wholeErrorId = `${fieldId}-whole-error`;
 
   const router = useRouter();
   const [requestedOpen, setRequestedOpen] = useState(false);
   const [zeroError, setZeroError] = useState(false);
   const [reasonError, setReasonError] = useState(false);
+  const [wholeError, setWholeError] = useState(false);
   const [delta, setDelta] = useState('');
   const [state, formAction, isPending] = useActionState(adjustBatchStockAction, INITIAL_STATE);
 
@@ -163,15 +177,22 @@ function AdjustBatchDialogContent({
       DECIMAL_DELTA_PATTERN.test(typedDelta) &&
       ZERO_DELTA_PATTERN.test(typedDelta);
     const isMissingReason = typeof reason !== 'string' || reason.length === 0;
+    const isFractional =
+      wholePackages &&
+      typeof typedDelta === 'string' &&
+      typedDelta !== '' &&
+      !WHOLE_DELTA_PATTERN.test(typedDelta);
 
-    if (isZero || isMissingReason) {
+    if (isZero || isMissingReason || isFractional) {
       event.preventDefault();
       setZeroError(isZero);
       setReasonError(isMissingReason);
+      setWholeError(isFractional);
       return;
     }
     setZeroError(false);
     setReasonError(false);
+    setWholeError(false);
   }
 
   return (
@@ -182,6 +203,7 @@ function AdjustBatchDialogContent({
         if (next) {
           setZeroError(false);
           setReasonError(false);
+          setWholeError(false);
           setDelta('');
         }
       }}
@@ -217,6 +239,17 @@ function AdjustBatchDialogContent({
             data-testid="adjust-batch-zero-error"
           >
             {ZERO_DELTA_MESSAGE}
+          </p>
+        ) : null}
+
+        {wholeError ? (
+          <p
+            role="alert"
+            id={wholeErrorId}
+            className="text-sm text-destructive"
+            data-testid="adjust-batch-whole-error"
+          >
+            {WHOLE_PACKAGES_MESSAGE}
           </p>
         ) : null}
 
@@ -274,11 +307,13 @@ function AdjustBatchDialogContent({
               name={DELTA_FIELD}
               type="text"
               required
-              inputMode="decimal"
+              inputMode={wholePackages ? 'numeric' : 'decimal'}
               value={delta}
               onChange={(event) => setDelta(sanitizeDeltaInput(event.currentTarget.value))}
               className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-              aria-describedby={zeroError ? zeroErrorId : undefined}
+              aria-describedby={
+                zeroError ? zeroErrorId : wholeError ? wholeErrorId : undefined
+              }
               data-testid="adjust-batch-delta"
             />
           </div>
