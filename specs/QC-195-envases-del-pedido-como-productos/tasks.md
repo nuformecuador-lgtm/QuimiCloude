@@ -2,7 +2,7 @@
 
 > Escrito por `spec_author` en F1.2 y rehecho con las decisiones de F1.4 (2026-10-03): P1 = A
 > (`unidad`, `u`), P2 = A, P3 = b, N1 y N7 = alternativa, el resto = recomendación
-> (`design.md > 1`). **P4 sigue abierta** y solo bloquea T11. Ninguna task empieza antes de la
+> (`design.md > 1`). **P4 decidida 2026-10-03 (A)**: T11 desbloqueada. Ninguna task empieza antes de la
 > aprobación del spec.
 >
 > **Dos carriles en paralelo.** `backend_dev`: TC, T1-T11. `frontend_dev`: T12-T15. Las tasks de
@@ -25,7 +25,7 @@
   requisito en `requirements.md` y copiar la decisión a `design.md > 1.5`.
 
 **Hecho cuando:** `progress/impl_QC-195.md` tiene el recontraste y el `./init.sh --rapido` de partida
-en verde. (P4 puede seguir pendiente: solo bloquea T11.)
+en verde. (P4 decidida: A.)
 
 ## [ ] TC — Contrato front↔back: tipos y firmas `[backend_dev]` `[bloquea a T12-T15]`
 

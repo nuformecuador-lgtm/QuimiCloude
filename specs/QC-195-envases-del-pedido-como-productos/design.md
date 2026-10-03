@@ -27,7 +27,7 @@ reserva**: hoy `updateOrderPresentationLines` no la toca, y sus tests lo afirman
 
 Las decidió el humano una a una el **2026-10-03**. Se conservan las opciones para que se vea qué se
 descartó. Dos de ellas (**N1** y **N7**) van **contra** la recomendación de F1.2; el resto del
-diseño ya está escrito con lo decidido. Queda abierta **P4** (§1.5), que nació al aplicar N7.
+diseño ya está escrito con lo decidido. **P4** (§1.5), nacida al aplicar N7, decidida 2026-10-03: opción A.
 
 ### 1.1 P1 — Unidad «envase» — **Decidido 2026-10-03: A**, unidad `unidad`, símbolo `u`
 
@@ -84,12 +84,12 @@ Elegida = la recomendación en todas salvo **N1** y **N7**, donde el humano elig
 | N4 | ¿Dónde se guarda el costo de los envases? | **En el mismo importe** (`orders.ingredients_cost`): la cotización es una sola cifra y el lote de producto terminado ya se costea con ella (`order-packing.ts:181-192`). | Columna propia `orders.packaging_cost` y la UI suma; obliga a tocar el costeo del lote de producto terminado y todas las lecturas del importe. | Recomendación. | R27 |
 | N5 | Editar un pedido antiguo **sin tocar su reparto** (solo cantidad o prioridad). El formulario reenvía siempre las líneas. | Una línea antigua que llega **igual** (misma presentación, mismos envases) se conserva como antigua; una nueva o cambiada exige envase. | Exigir sustituir todas las líneas antiguas en cualquier guardado. | Recomendación. | R34, R35 |
 | N6 | ¿Puede un reparto llevar dos envases con la misma presentación (dos modelos de botella de 500 ml)? | **No**: se conserva el índice único `(order_id, presentation_id)` (`20260927120000_order_presentation_lines/migration.sql:31-32`) y la identidad del producto terminado `(receta, presentación)` sigue siendo una por línea. | Permitirlo: índice único por `(order_id, packaging_product_id)` y dos líneas que dan de alta el mismo producto terminado. | Recomendación. | R12 |
-| N7 | Un PACKAGING sigue pudiendo ser **ingrediente de una receta** (solo se rechaza FINISHED_PRODUCT, `create-recipe.ts:58`). Con P1-A su unidad sería `u` y el porcentaje de la receta no tiene sentido sobre ella. | Fuera de alcance, ficha aparte. | Prohibir PACKAGING como ingrediente en esta misma ficha. | **Alternativa.** Se prohíbe aquí, con `action_not_allowed`, en alta y edición de receta y de versión, y en la importación de fórmulas (§3.5, R39-R41). Las recetas que ya lo tienen: **P4**, abierta (§1.5). `buildOrderRequirement` sigue sumando por producto, por si P4 conserva esas líneas. | R39-R41 |
+| N7 | Un PACKAGING sigue pudiendo ser **ingrediente de una receta** (solo se rechaza FINISHED_PRODUCT, `create-recipe.ts:58`). Con P1-A su unidad sería `u` y el porcentaje de la receta no tiene sentido sobre ella. | Fuera de alcance, ficha aparte. | Prohibir PACKAGING como ingrediente en esta misma ficha. | **Alternativa.** Se prohíbe aquí, con `action_not_allowed`, en alta y edición de receta y de versión, y en la importación de fórmulas (§3.5, R39-R41). Las recetas que ya lo tienen: **P4**, decidida A (§1.5). `buildOrderRequirement` sigue sumando por producto, por si P4 conserva esas líneas. | R39-R41 |
 | N8 | Lote de producto terminado sin importe guardado: ¿su costo incluye los envases? | **Sí**, con la regla de R27 contando lo apartado del pedido. | Solo ingredientes, como hoy. | Recomendación. | R31 |
 | N9 | Falta de envase al editar un pedido `EN_CURSO` o `POR_EMPACAR`. | **Rechazar** con `insufficient_material`, igual que la edición completa de un `EN_CURSO` hoy (`update-order.ts:177-179`). `POR_EMPACAR → BLOQUEADO` no existe en la matriz. | Bloquear también: exigiría una transición nueva. | Recomendación. | R18 |
 | N10 | Alta de un envase con el nombre de otro envase vivo. Hoy el alta con homónimo **añade un lote** al existente (`create-product.ts:119-139`), buscando por nombre y unidad (`product-prisma.ts:324-349`). Con P1-A todos los envases comparten unidad. | Mismo camino que hoy (se añade lote al homónimo), y **R3** rechaza si la presentación pedida no es la suya. | Exigir nombre único entre envases y rechazar el homónimo con otro mensaje. | Recomendación. | R3 |
 
-### 1.5 P4 — Recetas que ya tienen un ingrediente PACKAGING — **ABIERTA (nueva en F1.4)**
+### 1.5 P4 — Recetas que ya tienen un ingrediente PACKAGING — **Decidido 2026-10-03: A (se conservan)**
 
 N7 prohíbe el envase como ingrediente **nuevo**, pero no dice qué pasa con las recetas que ya lo
 tienen, y el código no lo resuelve de una sola forma:

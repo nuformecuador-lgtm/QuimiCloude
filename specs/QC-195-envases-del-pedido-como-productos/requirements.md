@@ -24,7 +24,7 @@
 > **[N<n>]** remiten a las decisiones que el humano tomó en F1.4 el **2026-10-03**
 > (`design.md > 1`): P1 = A (unidad `unidad`, símbolo `u`), P2 = A, P3 = b, y N1 a N10 con la
 > recomendación salvo **N1** y **N7**, donde eligió la alternativa. Los requisitos ya están
-> escritos con lo decidido (R8 y R38 por N1; R39-R41 por N7). **[P4]** sigue abierta.
+> escritos con lo decidido (R8 y R38 por N1; R39-R41 por N7). **[P4]** decidida 2026-10-03: A (se conservan).
 >
 > Vocabulario. *Envase*: producto de inventario de tipo PACKAGING. *Presentación del envase*: la
 > única presentación fija de ese producto. *Disponible*: el de QC-141 (existencia menos apartado,
@@ -256,7 +256,7 @@ nombra uno, ENTONCES DEBE rechazarla con `action_not_allowed` sin crear la recet
 > - N2, N3, N4, N5, N6, N8, N9 y N10 = la recomendación. **N1 y N7 = la alternativa** (R8, R38;
 >   R39-R41).
 
-- **P4 — Recetas que ya tienen un ingrediente PACKAGING.** *(Nueva, F1.4, 2026-10-03; ABIERTA.)*
+- **P4 — Recetas que ya tienen un ingrediente PACKAGING.** *(Nueva, F1.4, 2026-10-03; DECIDIDA 2026-10-03: A, se conservan.)*
   El código actual no lo resuelve solo: la edición valida solo las líneas que la receta no tenía
   (`update-recipe.ts:91-106`, `update-recipe-version.ts:42-55`), pero crear una versión valida
   **todas** las líneas copiadas (`create-recipe-version.ts:42-56`), así que con R39 una original con
