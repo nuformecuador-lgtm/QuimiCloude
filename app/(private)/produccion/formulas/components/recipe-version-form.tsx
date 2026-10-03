@@ -20,6 +20,7 @@ import {
   updateRecipeVersionSchema,
   type RecipeDetail,
   type RecipeLineView,
+  type RecipeToolView,
 } from '@/lib/modules/recetas';
 import {
   createRecipeVersionAction,
@@ -37,6 +38,7 @@ import {
   extractGeneralLinesError,
   extractLineErrors,
   toLineFormValues,
+  toToolFormValues,
   type RecipeLineErrors,
   type RecipeVersionFormState,
 } from './recipe-form-state';
@@ -53,6 +55,7 @@ export type RecipeVersionFormOriginal = {
   readonly id: string;
   readonly name: string;
   readonly lines: readonly RecipeLineView[];
+  readonly tools: readonly RecipeToolView[];
 };
 
 type CommonProps = {
@@ -74,9 +77,17 @@ type FieldErrors = {
 
 function buildInitialState(props: RecipeVersionFormProps): RecipeVersionFormState {
   if (props.mode === 'create') {
-    return { name: '', lines: toLineFormValues(props.original.lines) };
+    return {
+      name: '',
+      lines: toLineFormValues(props.original.lines),
+      tools: toToolFormValues(props.original.tools),
+    };
   }
-  return { name: props.version.name, lines: toLineFormValues(props.version.lines) };
+  return {
+    name: props.version.name,
+    lines: toLineFormValues(props.version.lines),
+    tools: toToolFormValues(props.version.tools),
+  };
 }
 
 function noop(): void {}

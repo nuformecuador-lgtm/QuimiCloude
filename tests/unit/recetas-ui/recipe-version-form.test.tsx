@@ -76,7 +76,7 @@ const VERSION_LINES: readonly RecipeLineView[] = [
   lineView('v-c', PRODUCT_C, null, '30.00'),
 ];
 
-const ORIGINAL = { id: ORIGINAL_ID, name: 'Jabón', lines: ORIGINAL_LINES };
+const ORIGINAL = { id: ORIGINAL_ID, name: 'Jabón', lines: ORIGINAL_LINES, tools: [] };
 
 const CHECKLIST_STEP: RecipeStepView = {
   blocks: [
@@ -211,7 +211,7 @@ describe('RecipeVersionForm — guardar habilitado solo con 100,00 % y todo con 
 });
 
 describe('RecipeVersionForm — guardado con éxito', () => {
-  it('R12, R22 — el alta envía exactamente { name, lines } a la original, avisa y lleva a su ficha', async () => {
+  it('R12, R22 — el alta envía exactamente { name, lines, tools } a la original, avisa y lleva a su ficha', async () => {
     const user = setupUser();
     renderCreate();
     await user.type(screen.getByTestId('recipe-version-field-name'), 'Sin sal');
@@ -227,15 +227,16 @@ describe('RecipeVersionForm — guardado con éxito', () => {
         { productId: PRODUCT_A, percentage: '60.00' },
         { productId: PRODUCT_B, percentage: '40.00' },
       ],
+      tools: [],
     });
-    expect(Object.keys(payload as object).sort()).toEqual(['lines', 'name']);
+    expect(Object.keys(payload as object).sort()).toEqual(['lines', 'name', 'tools']);
     expect(updateVersionMock).not.toHaveBeenCalled();
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(recipeEditRoute(ORIGINAL_ID)));
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
     expect(toastSuccessSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('R13, R22 — la edición envía exactamente { name, lines } a la versión, sin pasos, descripción ni imagen', async () => {
+  it('R13, R22 — la edición envía exactamente { name, lines, tools } a la versión, sin pasos, descripción ni imagen', async () => {
     const user = setupUser();
     renderEdit();
     await user.clear(screen.getByTestId('recipe-version-field-name'));
@@ -252,6 +253,7 @@ describe('RecipeVersionForm — guardado con éxito', () => {
         { productId: PRODUCT_A, percentage: '70.00' },
         { productId: PRODUCT_C, percentage: '30.00' },
       ],
+      tools: [],
     });
     expect(payload).not.toHaveProperty('steps');
     expect(payload).not.toHaveProperty('description');

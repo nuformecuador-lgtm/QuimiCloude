@@ -170,6 +170,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
       name: 'Receta de prueba',
       description: '',
       lines,
+      tools: [],
       steps: [],
       image: { kind: 'untouched' },
     });

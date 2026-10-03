@@ -50,6 +50,7 @@ import {
   extractLineErrors,
   extractStepErrors,
   toLineFormValues,
+  toToolFormValues,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeStepErrors,
@@ -158,7 +159,14 @@ const UNDER_REVIEW_MESSAGE =
 
 function buildInitialState(props: RecipeFormProps): RecipeFormState {
   if (props.mode === 'create') {
-    return { name: '', description: '', lines: [], steps: [], image: { kind: 'untouched' } };
+    return {
+      name: '',
+      description: '',
+      lines: [],
+      tools: [],
+      steps: [],
+      image: { kind: 'untouched' },
+    };
   }
 
   const { recipe } = props;
@@ -166,6 +174,7 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
     name: recipe.name,
     description: recipe.description ?? '',
     lines: toLineFormValues(recipe.lines),
+    tools: toToolFormValues(recipe.tools),
     // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a
     // texto -el puente de QC-62 R19 se retiro con T4-, asi que reabrir una receta conserva sus
     // marcas y sus listas de verificacion intactas. `key` es una clave local de React.

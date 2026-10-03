@@ -133,7 +133,12 @@ export default async function EditarVersionPage({
       <RecipeVersionForm
         mode="edit"
         version={version}
-        original={{ id: original.id, name: original.name, lines: original.lines }}
+        original={{
+          id: original.id,
+          name: original.name,
+          lines: original.lines,
+          tools: original.tools,
+        }}
         units={unitsResult.data}
         initialProductPage={{
           items: productsResult.data.items.map((item) => ({
