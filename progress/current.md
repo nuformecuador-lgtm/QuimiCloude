@@ -21,7 +21,7 @@
 | QC-194 | herramientas-de-la-receta | Recetas | fullstack | pending | feature/QC-194-herramientas-de-la-receta | **F1.0 y F1.1 hechos el 2026-10-03** (`arranca 194` del humano). Worktree montado desde `origin/dev` (`555c62f6`) con `.env` copiado. `zone:fullstack` y `complexity:medium` ya venian como labels del board. No se parte en dos, como ninguna `fullstack` reciente. **Cupo `fullstack`: 0 de 3.** Acotada y sembrada (ver *Evaluaciones*). Sigue F1.2: `spec_author`. |
 
 ## Evaluaciones
-**2026-10-03:** QC-194 acotada con `/afinar-feature`: 8 decisiones cerradas y 2 preguntas abiertas en `specs/QC-194-herramientas-de-la-receta/requirements.md`. Board sin cambios. QC-195 tambien acotada en el chat, pero **sin sembrar**: el humano solo dio el si a QC-194.
+**2026-10-03:** QC-194 acotada con `/afinar-feature`: 8 decisiones cerradas y 2 preguntas abiertas en `specs/QC-194-herramientas-de-la-receta/requirements.md`. Board sin cambios. QC-195 acotada y sembrada aparte, en el arbol principal.
 
 **2026-10-02:** QC-174 cerrada (PR #139, merge `ca656d5c`; tarjeta a Finalizado; resumen en history). Deja abierta QC-180 (tres rojos de 897a4f91 en el baseline).
 
