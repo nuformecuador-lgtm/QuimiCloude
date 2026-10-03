@@ -47,6 +47,8 @@ function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
       onChange={setLines}
       units={[]}
       initialProductPage={INITIAL_PRODUCT_PAGE}
+      tools={[]}
+      onToolsChange={() => {}}
       initialMachinePage={INITIAL_PRODUCT_PAGE}
     />
   );

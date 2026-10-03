@@ -268,6 +268,8 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
       <RecipeLinesField
         lines={state.lines}
         onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
+        tools={state.tools}
+        onToolsChange={(tools) => setState((previous) => ({ ...previous, tools }))}
         units={props.units}
         initialProductPage={props.initialProductPage}
         initialMachinePage={props.initialMachinePage}

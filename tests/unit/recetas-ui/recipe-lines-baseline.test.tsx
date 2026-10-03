@@ -62,6 +62,8 @@ function Harness({
       onChange={setLines}
       units={[]}
       initialProductPage={EMPTY_PAGE}
+      tools={[]}
+      onToolsChange={() => {}}
       initialMachinePage={EMPTY_PAGE}
       baseline={baseline}
     />

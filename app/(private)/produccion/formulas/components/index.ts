@@ -76,8 +76,8 @@ export {
   clampPercentageToRemaining,
   referenceAmountForPercentage,
   sanitizePercentageInput,
+  sanitizeToolQuantityInput,
   type RecipeLinesFieldProps,
-  type RecipeMachineFormValue,
 } from './recipe-lines-field';
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';

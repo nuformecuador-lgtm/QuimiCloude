@@ -89,6 +89,8 @@ function Harness({
       }}
       units={[]}
       initialProductPage={INITIAL_PRODUCT_PAGE}
+      tools={[]}
+      onToolsChange={() => {}}
       initialMachinePage={INITIAL_PRODUCT_PAGE}
     />
   );

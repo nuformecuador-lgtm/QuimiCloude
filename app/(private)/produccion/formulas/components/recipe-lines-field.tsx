@@ -23,6 +23,8 @@ import {
   createLocalKey,
   type RecipeLineErrors,
   type RecipeLineFormValue,
+  type RecipeToolErrors,
+  type RecipeToolFormValue,
 } from './recipe-form-state';
 import { compareWithOriginal, type VersionLineMark } from './recipe-version-diff';
 
@@ -52,25 +54,25 @@ const FIELD_TEXT = 'text-base';
 /**
  * Texto del selector de ingrediente según el estado de la línea. Sin depender del copy en los
  * tests. Solo el nombre: la unidad ya no se concatena en fórmulas («Hipoclorito · kg» pasa a
- * «Hipoclorito»); el inventario la sigue mostrando. `emptyLabel` distingue el tab de máquinas
- * («Buscar máquina») del de ingredientes.
+ * «Hipoclorito»); el inventario la sigue mostrando.
  */
-function productPickerLabel(productName: string | null, emptyLabel = 'Buscar ingrediente'): string {
-  if (productName === null) return 'Ingrediente no disponible';
+function productPickerLabel(
+  productName: string | null,
+  emptyLabel = 'Buscar ingrediente',
+  unavailableLabel = 'Ingrediente no disponible',
+): string {
+  if (productName === null) return unavailableLabel;
   if (productName === '') return emptyLabel;
   return productName;
 }
 
-/**
- * Máquina seleccionada en el tab de máquinas. Selección pura: sin porcentaje ni cantidad de
- * referencia -el instrumento no lleva %-. UI-only por decisión de producto: no viaja al payload
- * ni al contrato; cuando se persista, este tipo alimenta la relación nueva.
- */
-export type RecipeMachineFormValue = {
-  readonly key: string;
-  readonly productId: string;
-  readonly productName: string | null;
-};
+/** Más dígitos que el tope del contrato no aportan nada y desbordarían el entero. */
+const MAX_TOOL_QUANTITY_DIGITS = 10;
+
+/** Solo dígitos: la cantidad de una herramienta es un entero, sin separador decimal. */
+export function sanitizeToolQuantityInput(raw: string): string {
+  return raw.replace(/[^0-9]/g, '').slice(0, MAX_TOOL_QUANTITY_DIGITS);
+}
 
 type LinesTab = 'ingredients' | 'machines';
 
@@ -151,17 +153,18 @@ export type RecipeLinesFieldProps = {
     readonly items: readonly ProductPickerOption[];
     readonly totalPages: number;
   };
-  /**
-   * Primera página de MÁQUINAS, ya filtrada por tipo desde la página del formulario. El tab de
-   * máquinas es UI-only: su selección vive en el estado interno de este campo y no sale al
-   * payload.
-   */
+  readonly tools: readonly RecipeToolFormValue[];
+  readonly onToolsChange: (tools: readonly RecipeToolFormValue[]) => void;
+  /** Primera página de herramientas, ya filtrada por tipo desde la página del formulario. */
   readonly initialMachinePage: {
     readonly items: readonly ProductPickerOption[];
     readonly totalPages: number;
   };
   readonly errors?: RecipeLineErrors;
   readonly generalError?: string;
+  readonly toolErrors?: RecipeToolErrors;
+  /** Error de las herramientas en conjunto (p. ej. una repetida), sin fila a la que atarlo. */
+  readonly toolsGeneralError?: string;
   /** Líneas de la original: con ellas el campo marca cada línea y lista lo quitado. */
   readonly baseline?: readonly RecipeLineView[];
 };
@@ -178,29 +181,53 @@ const MARK_VARIANT: Record<VersionLineMark['kind'], 'secondary' | 'outline' | 'd
   added: 'default',
 };
 
-/** Fantasma del tab de máquinas: misma idea que `GHOST_LINE`, sin porcentaje. */
-const GHOST_MACHINE: RecipeMachineFormValue = {
+/** Fantasma del tab de herramientas: misma idea que `GHOST_LINE`, sin porcentaje. */
+const GHOST_TOOL: RecipeToolFormValue = {
   key: 'maquina-en-blanco',
   productId: '',
   productName: '',
+  quantity: '',
 };
+
+function hasAnyError(errors: RecipeLineErrors | RecipeToolErrors | undefined): boolean {
+  return errors !== undefined && Object.keys(errors).length > 0;
+}
 
 export function RecipeLinesField({
   lines,
   onChange,
+  tools,
+  onToolsChange,
   units,
   initialProductPage,
   initialMachinePage,
   errors,
   generalError,
+  toolErrors,
+  toolsGeneralError,
   baseline,
 }: RecipeLinesFieldProps) {
   const headingId = useId();
   const sumId = useId();
   const removedHeadingId = useId();
   const diff = baseline === undefined ? null : compareWithOriginal(baseline, lines);
-  const [activeTab, setActiveTab] = useState<LinesTab>('ingredients');
-  const [machines, setMachines] = useState<readonly RecipeMachineFormValue[]>([]);
+  // Un rechazo que solo afecta a herramientas quedaría oculto tras el tab de ingredientes: al
+  // llegar errores nuevos se abre el tab que los tiene. Se ajusta en render, no en un efecto.
+  const onlyToolsFailed =
+    (hasAnyError(toolErrors) || toolsGeneralError !== undefined) &&
+    !hasAnyError(errors) &&
+    generalError === undefined;
+  const [activeTab, setActiveTab] = useState<LinesTab>(
+    onlyToolsFailed ? 'machines' : 'ingredients',
+  );
+  const [seenToolErrors, setSeenToolErrors] = useState({ toolErrors, toolsGeneralError });
+  if (
+    seenToolErrors.toolErrors !== toolErrors ||
+    seenToolErrors.toolsGeneralError !== toolsGeneralError
+  ) {
+    setSeenToolErrors({ toolErrors, toolsGeneralError });
+    if (onlyToolsFailed) setActiveTab('machines');
+  }
 
   // Derivado en CADA render, nunca cacheado: borrar este `.filter(` tiene que poner el test en
   // rojo, así que no puede sustituirse por un contador guardado en el estado.
@@ -275,44 +302,50 @@ export function RecipeLinesField({
     onChange(lines.filter((_, i) => i !== index));
   }
 
-  // --- Tab de máquinas (UI-only): el mismo ciclo fantasma/materializar del de ingredientes,
-  // pero sin porcentaje. Cada lista excluye lo suyo: son tipos disjuntos, así que no comparten
-  // `excludedIds` entre tabs.
-  const isMachineGhost = machines.length === 0;
-  const machineRows: readonly RecipeMachineFormValue[] = isMachineGhost
-    ? [GHOST_MACHINE]
-    : machines;
-  const unavailableMachines = machines.filter((machine) => machine.productName === null).length;
+  // Cada tab excluye lo suyo: son tipos disjuntos, así que no comparten `excludedIds`.
+  const isToolGhost = tools.length === 0;
+  const toolRows: readonly RecipeToolFormValue[] = isToolGhost ? [GHOST_TOOL] : tools;
+  const unavailableTools = tools.filter((tool) => tool.productName === null).length;
 
-  function blankMachine(): RecipeMachineFormValue {
-    return { key: createLocalKey('machine'), productId: '', productName: '' };
+  function blankTool(): RecipeToolFormValue {
+    return { key: createLocalKey('tool'), productId: '', productName: '', quantity: '' };
   }
 
-  function addMachineAfter(index: number) {
-    if (isMachineGhost) {
-      setMachines([blankMachine(), blankMachine()]);
+  function addToolAfter(index: number) {
+    if (isToolGhost) {
+      onToolsChange([blankTool(), blankTool()]);
       return;
     }
-    setMachines([...machines.slice(0, index + 1), blankMachine(), ...machines.slice(index + 1)]);
+    onToolsChange([...tools.slice(0, index + 1), blankTool(), ...tools.slice(index + 1)]);
   }
 
-  function updateMachine(index: number, patch: Partial<RecipeMachineFormValue>) {
-    if (isMachineGhost) {
-      setMachines([{ ...blankMachine(), ...patch }]);
+  function updateTool(index: number, patch: Partial<RecipeToolFormValue>) {
+    if (isToolGhost) {
+      onToolsChange([{ ...blankTool(), ...patch }]);
       return;
     }
-    setMachines(machines.map((machine, i) => (i === index ? { ...machine, ...patch } : machine)));
+    onToolsChange(tools.map((tool, i) => (i === index ? { ...tool, ...patch } : tool)));
   }
 
-  function removeMachine(index: number) {
-    if (isMachineGhost) return;
-    setMachines(machines.filter((_, i) => i !== index));
+  function selectTool(index: number, option: ProductPickerOption) {
+    const currentQuantity = toolRows[index]?.quantity ?? '';
+    updateTool(index, {
+      productId: option.id,
+      productName: option.name,
+      // Cambiar de herramienta no pisa una cantidad ya escrita.
+      quantity: currentQuantity === '' ? '1' : currentQuantity,
+    });
   }
 
-  function usedMachineIds(exceptIndex: number): readonly string[] {
-    return machineRows
-      .filter((machine, i) => i !== exceptIndex && machine.productId !== '')
-      .map((machine) => machine.productId);
+  function removeTool(index: number) {
+    if (isToolGhost) return;
+    onToolsChange(tools.filter((_, i) => i !== index));
+  }
+
+  function usedToolIds(exceptIndex: number): readonly string[] {
+    return toolRows
+      .filter((tool, i) => i !== exceptIndex && tool.productId !== '')
+      .map((tool) => tool.productId);
   }
 
   function handleTabChange(value: string) {
@@ -552,15 +585,23 @@ export function RecipeLinesField({
         </TabsContent>
 
         <TabsContent value="machines">
+          {toolsGeneralError === undefined ? null : (
+            <p role="alert" className="text-sm text-destructive" data-testid="recipe-machines-error">
+              {toolsGeneralError}
+            </p>
+          )}
+
           <div className="flex flex-col gap-4">
-            {machineRows.map((machine, index) => {
-              const isUnavailable = machine.productName === null;
+            {toolRows.map((tool, index) => {
+              const isUnavailable = tool.productName === null;
+              const rowErrors = toolErrors?.[index];
+              const quantityErrorId = `recipe-machine-quantity-error-${index}`;
 
               return (
                 <div
-                  key={machine.key}
+                  key={tool.key}
                   data-testid="recipe-machine-row"
-                  className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_auto] sm:items-start"
+                  className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_auto] sm:items-start"
                 >
                   <div
                     data-testid={isUnavailable ? `recipe-machine-unavailable-${index}` : undefined}
@@ -568,21 +609,45 @@ export function RecipeLinesField({
                   >
                     <Label className="text-sm">Herramienta</Label>
                     <ProductPicker
-                      value={machine.productId}
-                      label={productPickerLabel(machine.productName, 'Buscar herramienta')}
+                      value={tool.productId}
+                      label={productPickerLabel(
+                        tool.productName,
+                        'Buscar herramienta',
+                        'Herramienta no disponible',
+                      )}
                       ariaLabel={`Herramienta de la línea ${index + 1}`}
-                      onSelect={(option: ProductPickerOption) =>
-                        updateMachine(index, {
-                          productId: option.id,
-                          productName: option.name,
-                        })
-                      }
+                      onSelect={(option: ProductPickerOption) => selectTool(index, option)}
+                      error={rowErrors?.productId}
                       testId={`recipe-machine-product-${index}`}
                       initialPage={initialMachinePage}
-                      excludedIds={usedMachineIds(index)}
+                      excludedIds={usedToolIds(index)}
                       units={units}
                       productType={PRODUCT_TYPES.MACHINE}
                     />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor={`recipe-machine-quantity-input-${index}`} className="text-sm">
+                      Cantidad
+                    </Label>
+                    <Input
+                      id={`recipe-machine-quantity-input-${index}`}
+                      type="text"
+                      inputMode="numeric"
+                      value={tool.quantity}
+                      onChange={(event) =>
+                        updateTool(index, { quantity: sanitizeToolQuantityInput(event.target.value) })
+                      }
+                      className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+                      aria-invalid={rowErrors?.quantity === undefined ? undefined : true}
+                      aria-describedby={rowErrors?.quantity === undefined ? undefined : quantityErrorId}
+                      data-testid={`recipe-machine-quantity-${index}`}
+                    />
+                    {rowErrors?.quantity === undefined ? null : (
+                      <p id={quantityErrorId} className="text-sm text-destructive" data-testid={quantityErrorId}>
+                        {rowErrors.quantity}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex gap-1 self-start sm:mt-6">
@@ -593,7 +658,7 @@ export function RecipeLinesField({
                       className={TOUCH_TARGET}
                       aria-label={`Quitar herramienta ${index + 1}`}
                       data-testid={`recipe-machine-remove-${index}`}
-                      onClick={() => removeMachine(index)}
+                      onClick={() => removeTool(index)}
                     >
                       <XIcon aria-hidden />
                     </Button>
@@ -604,8 +669,8 @@ export function RecipeLinesField({
                       className={TOUCH_TARGET}
                       aria-label={`Añadir una herramienta después de la ${index + 1}`}
                       data-testid={`recipe-machine-add-${index}`}
-                      disabled={machine.productId === '' || machine.productName === null}
-                      onClick={() => addMachineAfter(index)}
+                      disabled={tool.productId === '' || tool.productName === null}
+                      onClick={() => addToolAfter(index)}
                     >
                       <PlusIcon aria-hidden />
                     </Button>
@@ -615,16 +680,16 @@ export function RecipeLinesField({
             })}
           </div>
 
-          {unavailableMachines > 0 ? (
+          {unavailableTools > 0 ? (
             <p
               role="status"
               data-testid="recipe-machines-unavailable-notice"
-              data-count={String(unavailableMachines)}
+              data-count={String(unavailableTools)}
               className="text-sm text-muted-foreground"
             >
-              {unavailableMachines === 1
+              {unavailableTools === 1
                 ? 'Hay 1 herramienta que ya no está disponible.'
-                : `Hay ${unavailableMachines} herramientas que ya no están disponibles.`}
+                : `Hay ${unavailableTools} herramientas que ya no están disponibles.`}
             </p>
           ) : null}
         </TabsContent>
