@@ -1,10 +1,5 @@
 import type { ExecutionToolView } from '@/lib/modules/asignaciones';
 
-/**
- * Herramientas de la receta, solo lectura. La cantidad es la de la receta: no se escala con la
- * del pedido. Sin herramientas no se monta nada, ni siquiera el título.
- */
-
 export const ORDER_EXECUTION_TOOLS_TESTID = 'order-execution-tools';
 export const ORDER_EXECUTION_TOOL_TESTID = 'order-execution-tool';
 export const ORDER_EXECUTION_TOOL_QUANTITY_TESTID = 'order-execution-tool-quantity';
@@ -16,6 +11,10 @@ export type OrderExecutionToolsProps = {
   readonly tools: readonly ExecutionToolView[];
 };
 
+/**
+ * Herramientas de la receta, solo lectura. La cantidad es la de la receta: no se escala con la
+ * del pedido. Sin herramientas no se monta nada, ni siquiera el título.
+ */
 export function OrderExecutionTools({ tools }: OrderExecutionToolsProps) {
   if (tools.length === 0) return null;
 
