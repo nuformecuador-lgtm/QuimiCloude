@@ -45,6 +45,7 @@ type Empresa = {
 };
 
 let A: Empresa;
+let B: Empresa;
 
 async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
   const marca = token();
@@ -102,17 +103,19 @@ async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
 
 beforeAll(async () => {
   A = await sembrarEmpresa('herramientas');
+  B = await sembrarEmpresa('ajena');
 });
 
 afterAll(async () => {
-  if (A !== undefined) {
-    await prisma.recipe.deleteMany({ where: { companyId: A.companyId, parentRecipeId: { not: null } } });
-    await prisma.recipe.deleteMany({ where: { companyId: A.companyId } });
-    await prisma.product.deleteMany({ where: { companyId: A.companyId } });
-    await prisma.user.deleteMany({ where: { id: A.userId } });
-    await prisma.role.deleteMany({ where: { id: A.roleId } });
-    await prisma.documentType.deleteMany({ where: { code: A.documentTypeCode } });
-    await prisma.company.deleteMany({ where: { id: A.companyId } });
+  for (const empresa of [A, B]) {
+    if (empresa === undefined) continue;
+    await prisma.recipe.deleteMany({ where: { companyId: empresa.companyId, parentRecipeId: { not: null } } });
+    await prisma.recipe.deleteMany({ where: { companyId: empresa.companyId } });
+    await prisma.product.deleteMany({ where: { companyId: empresa.companyId } });
+    await prisma.user.deleteMany({ where: { id: empresa.userId } });
+    await prisma.role.deleteMany({ where: { id: empresa.roleId } });
+    await prisma.documentType.deleteMany({ where: { code: empresa.documentTypeCode } });
+    await prisma.company.deleteMany({ where: { id: empresa.companyId } });
   }
   await prisma.$disconnect();
 });
@@ -338,6 +341,30 @@ describe('recipe-prisma — escritura y lectura de herramientas', () => {
     }
 
     expect([await retrato(crema), await retrato(v)]).toEqual(antes);
+  });
+
+  it('R1, R14: desde otra empresa, replaceAlive y la propagacion no tocan las herramientas de la receta', async () => {
+    const [x, y, z] = A.maquinas;
+    const crema = await original([tool(x, 2), tool(y, 5)]);
+    const v = await version(crema, [tool(x, 2), tool(y, 5)]);
+    const antes = [await retrato(crema), await retrato(v)];
+    const ajenas = datos({ tools: [tool(B.maquinas[0], 9)] });
+
+    expect(await replaceAliveRecipe(crema, ajenas, B.userId, new Date(), B.scope)).toBe('not_found');
+    expect(await replaceAliveRecipe(v, datos({ tools: [] }), B.userId, new Date(), B.scope)).toBe('not_found');
+    expect(
+      await replaceAliveRecipeWithPropagation(
+        crema,
+        datos({ tools: [tool(z, 1)] }),
+        [v],
+        B.userId,
+        new Date(),
+        B.scope,
+      ),
+    ).toBe('not_found');
+
+    expect([await retrato(crema), await retrato(v)]).toEqual(antes);
+    expect(await herramientasDe(crema)).toEqual([tool(x, 2), tool(y, 5)]);
   });
 
   it('R5: un producto inexistente que llegara al adaptador se traduce a ValidationError y no escribe nada', async () => {
