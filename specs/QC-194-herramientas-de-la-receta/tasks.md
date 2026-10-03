@@ -105,7 +105,7 @@ Tras T5. **Quién:** backend_dev. **Toca:** `tests/integration/documentos/formul
 **Hecho cuando:** reemplazar por PDF una receta con dos herramientas las deja intactas; crear por PDF
 una receta nueva la deja sin herramientas (R18).
 
-### T8 — Ejecución del operador (dominio)
+### T8 — Ejecución del operador (dominio) [x]
 Tras T6. **Quién:** backend_dev. **Toca:** `lib/modules/asignaciones/domain/{get-assigned-order-execution.ts,
 assigned-order-execution-view.ts}`, `tests/unit/asignaciones/get-assigned-order-execution.test.ts`.
 **Hacer:** §6, primera mitad.

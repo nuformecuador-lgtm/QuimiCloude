@@ -559,3 +559,103 @@ describe('getAssignedOrderExecution — pedido con version de receta', () => {
     expect(view.lines.map((line) => line.percentage)).toEqual(['25.00']);
   });
 });
+
+describe('getAssignedOrderExecution — herramientas de la receta', () => {
+  const BATIDORA = uuid('4');
+  const BALANZA = uuid('5');
+
+  function conHerramientas(): RecipeExecutionContent {
+    return contenido({
+      tools: [
+        { productId: BATIDORA, productName: null, quantity: 2 },
+        { productId: BALANZA, productName: null, quantity: 1 },
+      ],
+    });
+  }
+
+  const vivos = [
+    producto(),
+    producto({ id: BATIDORA, name: 'Batidora', unitId: null, type: 'MACHINE' }),
+    producto({ id: BALANZA, name: 'Balanza', unitId: KILOGRAMO, type: 'MACHINE' }),
+  ];
+
+  it('R28: trae nombre y cantidad de cada herramienta de la receta del pedido, en su orden', async () => {
+    const { deps, findExecutionContentById } = montar({ content: conHerramientas(), products: vivos });
+
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findExecutionContentById).toHaveBeenCalledWith(RECETA, EMPRESA);
+    expect(vista.tools).toEqual([
+      { productName: 'Batidora', quantity: 2 },
+      { productName: 'Balanza', quantity: 1 },
+    ]);
+  });
+
+  it('R28: si el pedido es de una version, son las herramientas de esa receta (la que lee el catalogo por recipeId)', async () => {
+    const VERSION = uuid('9');
+    const { deps, findExecutionContentById } = montar({
+      summary: resumen({ recipeId: VERSION }),
+      content: contenido({ id: VERSION, tools: [{ productId: BALANZA, productName: null, quantity: 4 }] }),
+      products: vivos,
+    });
+
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findExecutionContentById).toHaveBeenCalledWith(VERSION, EMPRESA);
+    expect(vista.tools).toEqual([{ productName: 'Balanza', quantity: 4 }]);
+  });
+
+  it('R29: la cantidad no cambia con la cantidad del pedido', async () => {
+    const vistas = await Promise.all(
+      ['1', '200', '99999.5'].map((quantity) =>
+        createGetAssignedOrderExecution(
+          montar({ summary: resumen({ quantity }), content: conHerramientas(), products: vivos }).deps,
+        )(ACTOR, { orderId: PEDIDO }),
+      ),
+    );
+
+    for (const vista of vistas) expect(vista.tools.map((t) => t.quantity)).toEqual([2, 1]);
+  });
+
+  it('R30: una herramienta de baja sale con productName null y su cantidad', async () => {
+    const { deps } = montar({ content: conHerramientas(), products: [producto(), vivos[1] as ProductRef] });
+
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(vista.tools).toEqual([
+      { productName: 'Batidora', quantity: 2 },
+      { productName: null, quantity: 1 },
+    ]);
+  });
+
+  it('R31: sin herramientas, tools es []', async () => {
+    const { deps } = montar();
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+    expect(vista.tools).toEqual([]);
+  });
+
+  it('R28: un solo findRefs de productos para lineas y herramientas, y las unidades solo de las lineas', async () => {
+    const { deps, productFindRefs, findRefs } = montar({ content: conHerramientas(), products: vivos });
+
+    await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(productFindRefs).toHaveBeenCalledTimes(1);
+    expect([...(productFindRefs.mock.calls[0]?.[0] as readonly string[])].sort()).toEqual(
+      [PRODUCTO, BATIDORA, BALANZA].sort(),
+    );
+    const unidadesPedidas = findRefs.mock.calls.flatMap((call) => [...(call[0] as readonly string[])]);
+    expect(unidadesPedidas).not.toContain(KILOGRAMO);
+  });
+
+  it('R32: sin asignaciones.consultar no toca ningun puerto, aunque la receta tenga herramientas', async () => {
+    const { deps, todos } = montar({ content: conHerramientas(), products: vivos });
+
+    await expect(
+      createGetAssignedOrderExecution(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['recetas.consultar', 'recetas.modificar'] },
+        { orderId: PEDIDO },
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+});

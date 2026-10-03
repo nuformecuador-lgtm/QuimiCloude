@@ -78,10 +78,11 @@ export function createGetAssignedOrderExecution(
     const productRefs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
     const productRefsById = new Map(productRefs.map((ref) => [ref.id, ref]));
 
+    // Solo las lineas llevan unidad: la cantidad de una herramienta es un conteo.
     const unitIds = [
       ...new Set(
-        productRefs
-          .map((ref) => ref.unitId)
+        lines
+          .map((line) => productRefsById.get(line.productId)?.unitId ?? null)
           .filter((unitId): unitId is string => unitId !== null),
       ),
     ];
