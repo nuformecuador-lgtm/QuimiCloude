@@ -40,7 +40,7 @@ como antes; el test de migración afirma tabla, FK a mano con RESTRICT, CHECK `>
 índice de `product_id`, `ENABLE` + `FORCE ROW LEVEL SECURITY` y que `down.sql` lo revierte; las dos
 guardias en verde con `recipe_tools` dado de alta.
 
-### T2 [P] — Contrato de herramientas
+### T2 [P] — Contrato de herramientas [x]
 Tras T0. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/domain/recipe-input.ts`,
 `lib/modules/recetas/index.ts`, `tests/unit/recetas/recipe-input.test.ts`.
 **Hacer:** §2. Exportar `recipeToolSchema`, `recipeToolsSchema`, `MAX_TOOL_QUANTITY` y los tipos.
