@@ -7,6 +7,7 @@ import {
 } from './errors';
 import { updateRecipeVersionSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
 
@@ -52,6 +53,9 @@ export function createUpdateRecipeVersion(
       if (refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT)) {
         throw new ActionNotAllowedError();
       }
+    }
+    if (data.tools !== undefined) {
+      await assertToolsValid(data.tools, existing.tools, deps.products, actor.companyId);
     }
 
     const result = await deps.recipes.replaceAlive(

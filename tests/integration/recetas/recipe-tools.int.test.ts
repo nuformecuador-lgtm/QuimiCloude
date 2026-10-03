@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { inventario, recetas } from '@/lib/composition';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { ValidationError } from '@/lib/modules/recetas';
 import {
@@ -351,5 +352,91 @@ describe('recipe-prisma — escritura y lectura de herramientas', () => {
       createRecipe(datos({ tools: [tool(randomUUID(), 1)] }), A.userId, new Date(), A.scope),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(await retrato(id)).toEqual(antes);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Casos de uso por `@/lib/composition`
+// ---------------------------------------------------------------------------
+
+describe('casos de uso de recetas — herramientas', () => {
+  const actor = (): { id: string; companyId: string; permissions: readonly string[] } => ({
+    id: A.userId,
+    companyId: A.companyId,
+    permissions: ['recetas.modificar', 'recetas.consultar', 'inventario.modificar'],
+  });
+
+  function entrada(tools?: readonly RecipeToolData[]): Record<string, unknown> {
+    const [a, b] = A.ingredientes;
+    return {
+      name: `Crema ${token()}`,
+      steps: [],
+      lines: [
+        { productId: a, percentage: '70.00' },
+        { productId: b, percentage: '30.00' },
+      ],
+      ...(tools === undefined ? {} : { tools }),
+    };
+  }
+
+  it('R19, R21: dar de baja un MACHINE usado como herramienta funciona, y la receta se sigue editando conservandola', async () => {
+    const [, , z] = A.maquinas;
+    const otra = (
+      await prisma.product.create({
+        data: { name: `MACHINE baja ${token()}`, nameNormalized: `machinebaja${token()}`, companyId: A.companyId, type: 'MACHINE' },
+        select: { id: true },
+      })
+    ).id;
+    const { id } = await recetas.createRecipe(entrada([tool(otra, 2), tool(z, 1)]), actor());
+
+    await inventario.deleteProduct(otra, actor());
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: otra } })).deletedAt).not.toBeNull();
+
+    const detalle = await recetas.getRecipe(id, actor());
+    expect(detalle.tools.map((t) => [t.productId, t.productName === null, t.quantity])).toEqual([
+      [otra, true, 2],
+      [z, false, 1],
+    ]);
+
+    // Se reenvia tal cual, con otra cantidad: la de baja se acepta porque ya estaba.
+    await recetas.updateRecipe(id, { ...entrada([tool(otra, 5), tool(z, 1)]), name: detalle.name }, actor());
+    expect(await herramientasDe(id)).toEqual([tool(otra, 5), tool(z, 1)]);
+
+    // Pero no puede entrar como nueva en otra receta.
+    await expect(recetas.createRecipe(entrada([tool(otra, 1)]), actor())).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('R13: editar las herramientas de una version no cambia las de la original', async () => {
+    const [x, y] = A.maquinas;
+    const { id: crema } = await recetas.createRecipe(entrada([tool(x, 1)]), actor());
+    const { id: v } = await recetas.createRecipeVersion(crema, { name: `V ${token()}` }, actor());
+    expect(await herramientasDe(v)).toEqual([tool(x, 1)]);
+    const antes = await retrato(crema);
+
+    const [a, b] = A.ingredientes;
+    await recetas.updateRecipeVersion(
+      v,
+      {
+        name: `V ${token()}`,
+        lines: [
+          { productId: a, percentage: '70.00' },
+          { productId: b, percentage: '30.00' },
+        ],
+        tools: [tool(x, 3), tool(y, 1)],
+      },
+      actor(),
+    );
+
+    expect(await herramientasDe(v)).toEqual([tool(x, 3), tool(y, 1)]);
+    expect(await retrato(crema)).toEqual(antes);
+  });
+
+  it('R3: una herramienta nueva que no es MACHINE se rechaza sin crear la receta', async () => {
+    const [a] = A.ingredientes;
+    const nombre = `Crema ${token()}`;
+    await expect(recetas.createRecipe({ ...entrada([tool(a, 1)]), name: nombre }, actor())).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(await prisma.recipe.count({ where: { companyId: A.companyId, name: nombre } })).toBe(0);
   });
 });

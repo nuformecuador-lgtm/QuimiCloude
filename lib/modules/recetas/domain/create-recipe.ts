@@ -3,6 +3,7 @@ import { ActionNotAllowedError, RecipeDuplicateNameError, ValidationError } from
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
@@ -58,6 +59,8 @@ export function createCreateRecipe(
       const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
       if (finished) throw new ActionNotAllowedError();
     }
+
+    await assertToolsValid(data.tools, [], deps.products, actor.companyId);
 
     // R21: sin imagen no se toca el almacenamiento en absoluto.
     let imagePath: string | null = null;

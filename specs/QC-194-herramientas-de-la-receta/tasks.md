@@ -71,7 +71,7 @@ propagación aplica `propagateTools` y no toca versiones no indicadas (R14, R15)
 revierte también las herramientas de la original (R15); la guardia exige que `tx.recipeTool.*` vaya
 después del `updateMany` acotado y filtre por `recipeId: id`.
 
-### T5 — Casos de uso de receta y versión
+### T5 — Casos de uso de receta y versión [x]
 Tras T4. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/domain/{recipe-tools.ts (nuevo),
 create-recipe.ts, update-recipe.ts, create-recipe-version.ts, update-recipe-version.ts, get-recipe.ts,
 recipe-view.ts}`, `lib/modules/recetas/index.ts`, `tests/unit/recetas/recipe-tools.test.ts` (nuevo),

@@ -192,7 +192,8 @@ type ErrorState =
   cliente valida antes.
 - Herramienta nueva que no es MACHINE, o que no existe / es de otra empresa / está de baja: el
   dominio lanza `ValidationError` → el mismo `{ status: 'error', code: 'invalid_input', message: 'La entrada recibida no es valida.' }`.
-  Tampoco dice qué fila. (**STUB**: esta validación entra en T5; hoy el servidor no la hace.)
+  Tampoco dice qué fila. Una herramienta que ya estaba en la receta (o en la original, al crear
+  una versión) no se revalida: se conserva aunque esté de baja.
 - Sin permiso `recetas.modificar`: `code: 'unauthorized'`, como hoy.
 - No hay ningún código de error nuevo.
 
@@ -202,8 +203,8 @@ type ErrorState =
 |---|---|---|
 | Lectura de `RecipeRow.tools` (`RECIPE_INCLUDE` + `toRecipeRow`) | **real**: lee la tabla `recipe_tools`, orden de alta | — |
 | `getRecipe` → `RecipeDetail.tools` con `productName` | **real** (un solo `findRefs`) | — |
-| Escritura de herramientas (`create`, `createVersion`, `replaceAlive`, `replaceAliveWithPropagation`) | **STUB**: el adaptador Prisma ignora `tools`; se guarda la receta pero no sus herramientas. Por eso, hoy cualquier lectura devuelve `tools: []` | T4 |
-| Validación de herramientas nuevas (MACHINE, existe, viva, empresa) | **STUB**: no se valida contra el catálogo | T5 |
+| Escritura de herramientas (`create`, `createVersion`, `replaceAlive`, `replaceAliveWithPropagation`) | **real** | — |
+| Validación de herramientas nuevas (MACHINE, existe, viva, empresa) | **real** | — |
 | Alta de versión sin `tools` | copia las de la original (`original.tools`), ya cableado | — (persiste en T4) |
 | `RecipeExecutionContent.tools` (`findExecutionContentByIdOn`) | **STUB**: siempre `[]` | T6 |
 | `getAssignedOrderExecution` → `tools` | mapeo real con nombre de `findRefs`, pero recibe `[]` del catálogo, así que hoy siempre `[]` | T6 (dato) / T8 (tests) |
