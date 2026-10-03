@@ -6,7 +6,8 @@ import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modu
 import { newRequestId } from '@/lib/modules/observabilidad';
 import {
   orderPresentationAvailabilitySchema,
-  type OrderPresentationAvailability,
+  type DistributionLineInput,
+  type OrderPresentationAvailabilityNext,
   type OrderPresentationLineView,
 } from '@/lib/modules/pedidos';
 import {
@@ -25,14 +26,55 @@ export type OrderDistributionLine = {
   readonly content: string | null;
   /** Unidad del contenido. `null` = linea guardada, aun sin resolver contra el catalogo. */
   readonly unitId: string | null;
+  /** Ausente o `null` = linea antigua, guardada antes de repartir en envases. */
+  readonly packagingProductId?: string | null;
+  readonly packagingName?: string | null;
+  /** Disponible del envase cuando se eligio; `null` si no se conoce. */
+  readonly available?: string | null;
 };
 
 export type OrderDistributionAvailability =
   | { readonly status: 'without_unit' }
   | { readonly status: 'idle' }
   | { readonly status: 'quoting' }
-  | { readonly status: 'ready'; readonly data: OrderPresentationAvailability }
+  | { readonly status: 'ready'; readonly data: OrderPresentationAvailabilityNext }
   | { readonly status: 'error'; readonly error: ErrorState };
+
+const POSITIVE_INTEGER = /^[1-9]\d*$/;
+
+export function isLegacyLine(line: OrderDistributionLine): boolean {
+  return line.packagingProductId === undefined || line.packagingProductId === null;
+}
+
+/** Identidad de la linea dentro del reparto: el envase o, en una antigua, su presentacion. */
+export function lineKey(line: OrderDistributionLine): string {
+  return line.packagingProductId ?? line.presentationId;
+}
+
+/**
+ * Lo mismo que el servidor rechazaria por forma: envases no enteros, el mismo envase dos veces o
+ * dos lineas con la misma presentacion.
+ */
+export function distributionLinesValid(lines: readonly OrderDistributionLine[]): boolean {
+  const keys = new Set(lines.map(lineKey));
+  const presentations = new Set(lines.map((line) => line.presentationId));
+  return (
+    lines.every((line) => POSITIVE_INTEGER.test(line.packages)) &&
+    keys.size === lines.length &&
+    presentations.size === lines.length
+  );
+}
+
+/** Las lineas con los envases ya como numero, para las consultas al servidor. */
+export function toDistributionLinesInput(
+  lines: readonly OrderDistributionLine[],
+): DistributionLineInput[] {
+  return lines.map((line) =>
+    isLegacyLine(line)
+      ? { presentationId: line.presentationId, packages: Number(line.packages) }
+      : { packagingProductId: line.packagingProductId ?? '', packages: Number(line.packages) },
+  );
+}
 
 export type OrderDistributionAvailabilityInput = {
   readonly quantity: string;
@@ -50,14 +92,21 @@ export function fromOrderPresentationLines(
     packages: String(line.packages),
     content: null,
     unitId: null,
+    packagingProductId: line.packagingProductId ?? null,
+    packagingName: line.packagingName ?? null,
+    available: null,
   }));
 }
 
-/** La forma que piden `presentationLinesSchema` y `updateOrderDistributionAction`. */
+/** La forma que pide `updateOrderDistributionAction`: una linea antigua viaja por su presentacion. */
 export function toPresentationLinesInput(
   lines: readonly OrderDistributionLine[],
-): { presentationId: string; packages: string }[] {
-  return lines.map((line) => ({ presentationId: line.presentationId, packages: line.packages }));
+): ({ packagingProductId: string; packages: string } | { presentationId: string; packages: string })[] {
+  return lines.map((line) =>
+    isLegacyLine(line)
+      ? { presentationId: line.presentationId, packages: line.packages }
+      : { packagingProductId: line.packagingProductId ?? '', packages: line.packages },
+  );
 }
 
 /** Lo que el servidor rechazaria igual al guardar: no se ofrece guardar. */
@@ -72,6 +121,19 @@ export function availabilityBlocksSave(availability: OrderDistributionAvailabili
 }
 
 type Settled = { readonly key: string; readonly result: OrderDistributionAvailability };
+
+const scalarsSchema = orderPresentationAvailabilitySchema.pick({ quantity: true, unitId: true });
+
+/** `null` = la entrada no tiene forma valida y no se pregunta al servidor. */
+function availabilityKey(
+  quantity: string,
+  unitId: string,
+  lines: readonly OrderDistributionLine[],
+): string | null {
+  const scalars = scalarsSchema.safeParse({ quantity, unitId });
+  if (!scalars.success || !distributionLinesValid(lines)) return null;
+  return JSON.stringify({ ...scalars.data, presentationLines: toDistributionLinesInput(lines) });
+}
 
 function unexpectedFromRejection(): ErrorState {
   return {
@@ -101,9 +163,7 @@ export function useOrderDistributionAvailability({
   const [settled, setSettled] = useState<Settled | null>(null);
   const latestKeyRef = useRef<string | null>(null);
 
-  const candidate = { quantity, unitId, presentationLines: toPresentationLinesInput(lines) };
-  const parsed = unitId === '' ? null : orderPresentationAvailabilitySchema.safeParse(candidate);
-  const key = parsed?.success === true ? JSON.stringify(parsed.data) : null;
+  const key = unitId === '' ? null : availabilityKey(quantity, unitId, lines);
 
   useEffect(() => {
     latestKeyRef.current = key;

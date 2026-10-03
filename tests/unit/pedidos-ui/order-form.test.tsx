@@ -37,7 +37,10 @@ import {
   ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
   ORDER_DISTRIBUTION_LINE_TESTID,
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  PACKAGING_OPTION_TESTID,
+  PACKAGING_SELECT_TESTID,
   ORDER_DISTRIBUTION_TESTID,
   ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID,
   ORDER_CONFIRM_BLOCKED_FIELD,
@@ -95,6 +98,7 @@ const {
   getRecipeActionMock,
   listRecipeVersionsActionMock,
   listPresentationsActionMock,
+  listProductsActionMock,
   quoteAvailabilityMock,
 } = vi.hoisted(() => {
   const noDebeInvocarse = (nombre: string) => () => {
@@ -116,6 +120,7 @@ const {
     getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
     listRecipeVersionsActionMock: vi.fn<(id: string) => Promise<RecipeVersionListResult>>(),
     listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
+    listProductsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
     quoteAvailabilityMock: vi.fn<(input: unknown) => Promise<unknown>>(),
   };
 });
@@ -177,6 +182,10 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   createPresentationAction: vi.fn(prohibida('createPresentationAction')),
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  listProductsAction: listProductsActionMock,
+}));
+
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 /** Segunda receta, esta CON imagen: es la que prueba que el marcador se sustituye (2026-09-08). */
 const RECETA_CON_IMAGEN = {
@@ -202,6 +211,33 @@ const PRESENTACION = {
   name: 'Bidón 20L',
   unitId: UNIDAD.id,
   content: '20.0000',
+};
+
+/** Envase del catalogo, ofrecido por `listProductsAction` en el selector del reparto. */
+const ENVASE = {
+  id: crypto.randomUUID(),
+  name: 'Bidón PET 20 L',
+  imagePath: null,
+  stock: '10.0000',
+  unitId: crypto.randomUUID(),
+  qtyAlert: null,
+  type: 'PACKAGING',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  available: '10.0000',
+  presentationId: PRESENTACION.id,
+  presentationName: PRESENTACION.name,
+  presentationContent: PRESENTACION.content,
+  presentationUnitId: PRESENTACION.unitId,
+};
+
+/** Linea de reparto con envase, como la devuelve el pedido guardado. */
+const LINEA_ENVASE = {
+  presentationId: PRESENTACION.id,
+  presentationName: PRESENTACION.name,
+  packages: 1,
+  packagingProductId: ENVASE.id,
+  packagingName: ENVASE.name,
 };
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta. */
@@ -257,9 +293,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
-    ],
+    presentationLines: [LINEA_ENVASE],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
     ...overrides,
@@ -287,10 +321,10 @@ async function elegirUnidad(user: ReturnType<typeof setupUser>) {
   await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
 }
 
-/** Anade al reparto la presentacion del catalogo que trae `listPresentationsAction`. */
+/** Anade al reparto el envase del catalogo que trae `listProductsAction`. */
 async function anadirLinea(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId('presentation-select'));
-  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
+  await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
+  await user.click(await esperarInteractiva(await screen.findByTestId(PACKAGING_OPTION_TESTID)));
   await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
 }
 
@@ -318,6 +352,10 @@ beforeEach(() => {
   listPresentationsActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
+  });
+  listProductsActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [ENVASE], page: 1, pageSize: 25, total: 1, totalPages: 1 },
   });
   quoteAvailabilityMock.mockResolvedValue({
     status: 'success',
@@ -351,6 +389,7 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
     expect(enviado.get('unitPrice')).toBeNull();
     // Sin lineas el reparto viaja vacio, que es valido en el alta.
     expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([]);
     expect(updateOrderActionMock).not.toHaveBeenCalled();
   });
 
@@ -499,23 +538,24 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
 
     expect(screen.getByTestId(ORDER_DISTRIBUTION_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID)).toBeInTheDocument();
-    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    expect(screen.queryByTestId(PACKAGING_SELECT_TESTID)).toBeNull();
     expect(screen.queryByTestId(ORDER_DISTRIBUTION_ADD_TESTID)).toBeNull();
   });
 
-  it('R4: el selector del reparto no ofrece crear presentaciones ni manda el campo de presentacion unica', async () => {
+  it('R36: el selector del reparto es de envases, no ofrece crear presentaciones ni manda el campo de presentacion unica', async () => {
     const user = setupUser();
     renderFormulario();
 
     await elegirUnidad(user);
 
-    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId(PACKAGING_SELECT_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
     expect(screen.queryByTestId('presentation-create-open')).toBeNull();
     const formulario = screen.getByTestId(ORDER_FORM_TESTID) as HTMLFormElement;
     expect([...new FormData(formulario).keys()]).not.toContain('presentationId');
   });
 
-  it('R41: las lineas anadidas viajan en el alta como pares de presentacion y envases', async () => {
+  it('R36: las lineas anadidas viajan en el alta con el envase, la presentacion vacia y los envases', async () => {
     const user = setupUser();
     renderFormulario();
 
@@ -525,17 +565,59 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
 
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
     const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([PRESENTACION.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual(['']);
     expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['1']);
   });
 
-  it('R41: la edicion precarga unidad y reparto, y permite cambiar los envases', async () => {
+  it('R35: una linea antigua se reenvia sin cambios por su presentacion y sin envase', async () => {
+    const user = setupUser();
+    renderFormulario(
+      pedido({
+        presentationLines: [
+          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2 },
+        ],
+      }),
+    );
+
+    const linea = screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID);
+    expect(linea).toHaveAttribute('data-legacy', 'true');
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([PRESENTACION.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual(['']);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['2']);
+  });
+
+  it('R11: el rechazo product_not_found del envase se pinta junto al reparto', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'product_not_found',
+      message: 'El envase no existe.',
+    });
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() =>
+      expect(screen.getByTestId(ORDER_DISTRIBUTION_ERROR_TESTID)).toHaveTextContent(
+        'El envase no existe.',
+      ),
+    );
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+  });
+
+  it('R36: la edicion precarga unidad y reparto en envases, y permite cambiar los envases', async () => {
     const user = setupUser();
     const elPedido = pedido();
     renderFormulario(elPedido);
 
     const linea = screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID);
-    expect(linea).toHaveAttribute('data-presentation-id', PRESENTACION.id);
+    expect(linea).toHaveAttribute('data-packaging-product-id', ENVASE.id);
+    expect(linea).toHaveTextContent(ENVASE.name);
     const envases = within(linea).getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
     expect(envases).toHaveValue(1);
 
@@ -546,7 +628,7 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
     await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
     const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
     expect(enviado.get('unitId')).toBe(UNIDAD.id);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([PRESENTACION.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
     expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['3']);
   });
 
@@ -573,7 +655,7 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
       expect(quoteAvailabilityMock).toHaveBeenCalledWith({
         quantity: CANTIDAD,
         unitId: UNIDAD.id,
-        presentationLines: [{ presentationId: PRESENTACION.id, packages: 1 }],
+        presentationLines: [{ packagingProductId: ENVASE.id, packages: 1 }],
       }),
     );
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveTextContent(
@@ -1155,6 +1237,7 @@ describe('pedido que no alcanza: el aviso de guardarlo bloqueado', () => {
     const reenvio = updateOrderActionMock.mock.calls[1]?.[2] as FormData;
     expect(reenvio.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBe('true');
     expect(camposDeNegocio(reenvio)).toEqual(camposDeNegocio(primero));
+    expect(reenvio.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull();

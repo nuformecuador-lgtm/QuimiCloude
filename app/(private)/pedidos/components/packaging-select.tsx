@@ -3,6 +3,8 @@
 import { CircleAlertIcon, Loader2Icon } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
 
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+
 import {
   Autocomplete,
   AutocompleteClear,
@@ -21,7 +23,9 @@ import {
   PRODUCT_TYPES,
   type ProductView,
 } from '@/lib/modules/inventario';
+import { newRequestId } from '@/lib/modules/observabilidad';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
+import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 
@@ -71,14 +75,13 @@ export type PackagingSelectProps = {
 
 const UNAUTHORIZED_CODE = 'unauthorized';
 
-/** Lleva el `code` del rechazo hasta el render: el hook solo conserva el error como `cause`. */
-class PackagingListError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
-  }
+function unexpectedFromRejection(): ErrorState {
+  return {
+    status: 'error',
+    code: UNEXPECTED_ERROR_CODE,
+    message: errorMessage(UNEXPECTED_ERROR_CODE),
+    reference: newRequestId(),
+  };
 }
 
 function optionLabel(option: PackagingOption): string {
@@ -96,24 +99,36 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
   const [draft, setDraft] = useState<string | null>(null);
   const [selected, setSelected] = useState<PackagingOption | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  /** El rechazo entero, para no perder la referencia de un inesperado: el hook solo guarda un `Error`. */
+  const [failure, setFailure] = useState<ErrorState | null>(null);
 
   const fetchPage = useCallback(
     async ({ query, page }: AsyncPageRequest) => {
       const search = query.trim();
-      const result = await listProductsAction({
-        page,
-        pageSize: MAX_PAGE_SIZE,
-        ...(search === '' ? {} : { search }),
-        filters: {
-          type: { kind: 'select', values: [PRODUCT_TYPES.PACKAGING] },
-          [PRODUCT_PRESENTATION_UNIT_FILTER]: { kind: 'select', values: unitIds },
-        },
-      });
+      let result: Awaited<ReturnType<typeof listProductsAction>>;
+      try {
+        result = await listProductsAction({
+          page,
+          pageSize: MAX_PAGE_SIZE,
+          ...(search === '' ? {} : { search }),
+          filters: {
+            type: { kind: 'select', values: [PRODUCT_TYPES.PACKAGING] },
+            [PRODUCT_PRESENTATION_UNIT_FILTER]: { kind: 'select', values: unitIds },
+          },
+        });
+      } catch {
+        // La accion no llego a responder: el mismo inesperado que fabricaria el servidor.
+        const unexpected = unexpectedFromRejection();
+        setFailure(unexpected);
+        throw new Error(unexpected.code);
+      }
 
       if (result.status === 'error') {
         if (result.code === UNAUTHORIZED_CODE) setForbidden(true);
-        throw new PackagingListError(result.code, result.message);
+        setFailure(result);
+        throw new Error(result.code);
       }
+      setFailure(null);
 
       return {
         items: result.data.items.map(
@@ -173,12 +188,7 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
   const selectable = forbidden ? [] : items;
   const displayValue = draft ?? (selected === null ? '' : optionLabel(selected));
   const loading = isLoading || isLoadingMore;
-  const loadMessage =
-    forbidden || loadError === undefined
-      ? null
-      : loadError.cause instanceof Error
-        ? loadError.cause.message
-        : loadError.message;
+  const loadFailure = forbidden || loadError === undefined ? null : failure;
 
   return (
     <div className="flex flex-col gap-2">
@@ -215,7 +225,7 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
             style={{ maxHeight: MAX_LIST_HEIGHT }}
             onScroll={handleScroll}
           >
-            {loadMessage === null ? (
+            {loadFailure === null ? (
               <>
                 <AutocompleteList>
                   {(option: PackagingOption, index: number) => (
@@ -257,7 +267,11 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
                 className="p-2 text-sm text-destructive"
                 data-testid={PACKAGING_SELECT_LOAD_ERROR_TESTID}
               >
-                {loadMessage}
+                {loadFailure.code === UNEXPECTED_ERROR_CODE ? (
+                  <UnexpectedErrorNotice state={loadFailure} />
+                ) : (
+                  loadFailure.message
+                )}
               </p>
             )}
 

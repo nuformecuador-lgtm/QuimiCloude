@@ -6,6 +6,10 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  BLOCKED_ORDER_CONFIRM_TESTID,
+  BLOCKED_ORDER_DIALOG_TESTID,
+  BLOCKED_ORDER_DISMISS_TESTID,
+  BLOCKED_ORDER_MESSAGE_TESTID,
   ORDER_ACTION_DISTRIBUTION_TESTID,
   ORDER_DISTRIBUTION_AVAILABLE_TESTID,
   ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID,
@@ -73,6 +77,13 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   }),
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  listProductsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
+}));
+
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
   listPresentationsAction: vi.fn(async () => ({
     status: 'success' as const,
@@ -85,6 +96,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 
 const UNIDAD_ID = '33333333-3333-4333-8333-333333333333';
 const PRESENTACION_ID = '44444444-4444-4444-8444-444444444444';
+const ENVASE_ID = '55555555-5555-4555-8555-555555555555';
 
 const UNIDADES: readonly UnitView[] = [
   { id: UNIDAD_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
@@ -108,7 +120,13 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
     createdBy: null,
     updatedBy: null,
     presentationLines: [
-      { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2 },
+      {
+        presentationId: PRESENTACION_ID,
+        presentationName: '20 L',
+        packages: 2,
+        packagingProductId: ENVASE_ID,
+        packagingName: 'Bidón PET 20 L',
+      },
     ],
     unitId: UNIDAD_ID,
     unitLabel: 'L',
@@ -209,7 +227,7 @@ describe('dialogo «Reparto y unidad»', () => {
     expect(id).toBe(pedido().id);
     expect(input).toEqual({
       unitId: UNIDAD_ID,
-      presentationLines: [{ presentationId: PRESENTACION_ID, packages: '2' }],
+      presentationLines: [{ packagingProductId: ENVASE_ID, packages: '2' }],
     });
     expect(Object.keys(input as object).sort()).toEqual(['presentationLines', 'unitId']);
     await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
@@ -254,6 +272,8 @@ describe('dialogo «Reparto y unidad»', () => {
     'unit_not_found',
     'order_without_unit',
     'unauthorized',
+    'product_not_found',
+    'insufficient_material',
   ] as const)('R13/R36/R12: el rechazo %s se pinta y se conserva lo escrito', async (code) => {
     const user = setupUser();
     updateDistributionMock.mockResolvedValue({
@@ -274,11 +294,50 @@ describe('dialogo «Reparto y unidad»', () => {
     expect(within(region).getByText(`mensaje de ${code}`)).toBeInTheDocument();
     expect(updateDistributionMock).toHaveBeenCalledWith(pedido().id, {
       unitId: UNIDAD_ID,
-      presentationLines: [{ presentationId: PRESENTACION_ID, packages: '3' }],
+      presentationLines: [{ packagingProductId: ENVASE_ID, packages: '3' }],
     });
     expect(screen.getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(3);
     expect(routerMock.refresh).not.toHaveBeenCalled();
     expect(cerrar.mock.calls.some(([abierto]) => abierto === false)).toBe(false);
+  });
+
+  it('R35: una linea antigua se reenvia tal cual, por su presentacion', async () => {
+    const user = setupUser();
+    montarDialogo(
+      pedido('POR_EMPACAR', {
+        presentationLines: [
+          { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2 },
+        ],
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveTextContent('60 L'),
+    );
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(1));
+    expect(updateDistributionMock.mock.calls[0]?.[1]).toEqual({
+      unitId: UNIDAD_ID,
+      presentationLines: [{ presentationId: PRESENTACION_ID, packages: '2' }],
+    });
+  });
+
+  it('R18: insufficient_material se pinta como error y el dialogo no pide confirmar', async () => {
+    const user = setupUser();
+    updateDistributionMock.mockResolvedValue({
+      status: 'error',
+      code: 'insufficient_material',
+      message: 'No hay envases suficientes.',
+    });
+    montarDialogo(pedido('EN_CURSO'));
+
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+
+    const region = await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID);
+    expect(region).toHaveAttribute('data-code', 'insufficient_material');
+    expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull();
+    expect(updateDistributionMock).toHaveBeenCalledTimes(1);
   });
 
   it('R42: sin unidad del pedido no se ofrece guardar', () => {
@@ -336,7 +395,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(2));
     expect(updateDistributionMock.mock.calls[1]?.[1]).toEqual({
       unitId: UNIDAD_ID,
-      presentationLines: [{ presentationId: PRESENTACION_ID, packages: '5' }],
+      presentationLines: [{ packagingProductId: ENVASE_ID, packages: '5' }],
     });
   });
 
@@ -349,7 +408,13 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
       accionesDeFila(
         pedido('POR_EMPACAR', {
           presentationLines: [
-            { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 7 },
+            {
+              presentationId: PRESENTACION_ID,
+              presentationName: '20 L',
+              packages: 7,
+              packagingProductId: ENVASE_ID,
+              packagingName: 'Bidón PET 20 L',
+            },
           ],
         }),
       ),
@@ -358,5 +423,64 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(7);
+  });
+});
+
+describe('«Reparto y unidad» con falta de envases (R17, R37)', () => {
+  const AVISO = 'Falta material: el pedido quedará bloqueado.';
+
+  beforeEach(() => {
+    updateDistributionMock.mockResolvedValueOnce({
+      status: 'error',
+      code: 'order_would_block',
+      message: AVISO,
+    });
+  });
+
+  it('R37: el aviso order_would_block muestra la misma confirmacion que el formulario del pedido', async () => {
+    const user = setupUser();
+    montarDialogo(pedido('PENDIENTE'));
+
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+
+    expect(await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(BLOCKED_ORDER_MESSAGE_TESTID)).toHaveTextContent(AVISO);
+    expect(screen.queryByTestId(ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID)).toBeNull();
+    expect(updateDistributionMock).toHaveBeenCalledTimes(1);
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+
+  it('R17/R37: confirmar reenvia el mismo reparto con confirmBlocked y cierra al guardar', async () => {
+    const user = setupUser();
+    montarDialogo(pedido('PENDIENTE'));
+
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_CONFIRM_TESTID));
+
+    await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(2));
+    expect(updateDistributionMock.mock.calls[0]?.[1]).toEqual({
+      unitId: UNIDAD_ID,
+      presentationLines: [{ packagingProductId: ENVASE_ID, packages: '2' }],
+    });
+    expect(updateDistributionMock.mock.calls[1]?.[1]).toEqual({
+      unitId: UNIDAD_ID,
+      presentationLines: [{ packagingProductId: ENVASE_ID, packages: '2' }],
+      confirmBlocked: true,
+    });
+    await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
+    expect(cerrar.mock.calls.some(([abierto]) => abierto === false)).toBe(true);
+  });
+
+  it('R37: sin confirmar no se reenvia nada y el dialogo sigue abierto', async () => {
+    const user = setupUser();
+    montarDialogo(pedido('BLOQUEADO'));
+
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_DISMISS_TESTID));
+
+    await waitFor(() => expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull());
+    expect(updateDistributionMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
+    expect(routerMock.refresh).not.toHaveBeenCalled();
   });
 });

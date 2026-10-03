@@ -3,10 +3,6 @@
 import { CircleAlertIcon, PlusIcon, TrashIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import {
-  PresentationSelect,
-  type PresentationOption,
-} from '@/components/shared/presentation-select';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,22 +10,32 @@ import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { UnitConversion } from '@/lib/modules/unidades';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
 } from '@/lib/modules/pedidos';
 import { formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { MISSING_VALUE_MARK } from './order-columns';
 import { lineCoverage, type LineCoverage } from './order-distribution-coverage';
-import type {
-  OrderDistributionAvailability,
-  OrderDistributionLine,
+import { PackagingSelect, type PackagingOption } from './packaging-select';
+import {
+  isLegacyLine,
+  lineKey,
+  type OrderDistributionAvailability,
+  type OrderDistributionLine,
 } from './use-order-distribution-availability';
 import { useSavedPresentationContents } from './use-saved-line-contents';
 
-export { ORDER_DISTRIBUTION_PACKAGES_FIELD, ORDER_DISTRIBUTION_PRESENTATION_FIELD };
+export {
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+};
 
 export const ORDER_DISTRIBUTION_TESTID = 'order-distribution-field';
 export const ORDER_DISTRIBUTION_LINE_TESTID = 'order-distribution-line';
+export const ORDER_DISTRIBUTION_LINE_PRESENTATION_TESTID = 'order-distribution-line-presentation';
+export const ORDER_DISTRIBUTION_LINE_LEGACY_TESTID = 'order-distribution-line-legacy';
 export const ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID = 'order-distribution-line-packages';
 export const ORDER_DISTRIBUTION_LINE_REMOVE_TESTID = 'order-distribution-line-remove';
 export const ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID = 'order-distribution-line-coverage';
@@ -51,22 +57,27 @@ const PERCENT_DIGITS = 2;
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
 
 const LABELS = {
-  title: 'Reparto en presentaciones',
+  title: 'Reparto en envases',
   packages: 'Envases',
   add: 'Añadir',
   remove: 'Quitar',
   available: 'Disponible',
   covers: 'Cubre',
   quoting: 'calculando…',
-  withoutUnit: 'Elige la unidad del pedido para repartirlo en presentaciones.',
+  withoutUnit: 'Elige la unidad del pedido para repartirlo en envases.',
   exceeds: 'El reparto pasa de la cantidad del pedido. Quita envases para poder guardar.',
-  incompatible: 'La unidad de esta presentación no se puede convertir a la del pedido.',
-  withoutContent: 'Esta presentación no tiene contenido.',
+  incompatible: 'La unidad de este envase no se puede convertir a la del pedido.',
+  withoutContent: 'La presentación de este envase no tiene contenido.',
+  packagingNotFound: 'Este envase ya no está disponible. Quítalo del reparto.',
   incompatibleSummary: 'Hay una línea con una unidad que no se puede convertir a la del pedido.',
-  withoutContentSummary: 'Hay una línea cuya presentación no tiene contenido.',
+  withoutContentSummary: 'Hay una línea cuyo envase no tiene contenido.',
   unitNotFound: 'La unidad del pedido ya no está disponible. Elige otra.',
   presentationNotFound: 'Una de las presentaciones ya no está disponible. Quítala del reparto.',
-  duplicate: 'Esa presentación ya está en el reparto.',
+  packagingNotFoundSummary: 'Uno de los envases ya no está disponible. Quítalo del reparto.',
+  duplicate: 'Ese envase, u otro con su misma presentación, ya está en el reparto.',
+  legacy: 'Anterior a los envases',
+  legacyNote: 'Se conserva tal cual. Para cambiarla, quítala y añade un envase.',
+  lineAvailable: (count: string) => `Disponible: ${count} envases`,
 } as const;
 
 export type OrderDistributionFieldProps = {
@@ -74,9 +85,8 @@ export type OrderDistributionFieldProps = {
   readonly onLinesChange: (lines: readonly OrderDistributionLine[]) => void;
   /** Unidad del pedido. Cadena vacia = sin unidad: no se puede repartir. */
   readonly unitId: string;
-  /** Unidades convertibles con la del pedido: el selector solo ofrece presentaciones en ellas.
-   *  Ausente = sin filtro. */
-  readonly compatibleUnitIds?: readonly string[];
+  /** Unidades convertibles con la del pedido: el selector solo ofrece envases en ellas. */
+  readonly compatibleUnitIds: readonly string[];
   /** Simbolo o nombre de la unidad del pedido, para el disponible. */
   readonly unitLabel: string | null;
   /** Cantidad del pedido, para el porcentaje que cubre cada linea. */
@@ -93,15 +103,18 @@ export type OrderDistributionFieldProps = {
 
 function lineProblem(
   availability: OrderDistributionAvailability,
-  presentationId: string,
+  line: OrderDistributionLine,
 ): string | null {
   if (availability.status !== 'ready') return null;
   const { data } = availability;
-  if (data.kind === 'incompatible_units' && data.presentationId === presentationId) {
+  if (data.kind === 'incompatible_units' && data.presentationId === line.presentationId) {
     return LABELS.incompatible;
   }
-  if (data.kind === 'presentation_without_content' && data.presentationId === presentationId) {
+  if (data.kind === 'presentation_without_content' && data.presentationId === line.presentationId) {
     return LABELS.withoutContent;
+  }
+  if (data.kind === 'packaging_not_found' && data.packagingProductId === line.packagingProductId) {
+    return LABELS.packagingNotFound;
   }
   return null;
 }
@@ -120,9 +133,10 @@ function formatCoverage(coverage: LineCoverage, unitLabel: string | null): strin
 }
 
 /**
- * Reparto de la cantidad del pedido en presentaciones: lineas con presentacion y envases, alta de
+ * Reparto de la cantidad del pedido en envases: lineas con envase y numero de envases, alta de
  * lineas y el disponible en la unidad del pedido. Controlado: las lineas y el disponible los
- * gobierna el anfitrion, que decide como se guardan.
+ * gobierna el anfitrion, que decide como se guardan. Una linea antigua (sin envase) se muestra y
+ * se reenvia tal cual, porque el servidor solo la acepta sin cambios.
  */
 export function OrderDistributionField({
   lines,
@@ -139,7 +153,7 @@ export function OrderDistributionField({
   const savedContents = useSavedPresentationContents(lines);
   const titleId = useId();
   const errorId = useId();
-  const [pending, setPending] = useState<PresentationOption | null>(null);
+  const [pending, setPending] = useState<PackagingOption | null>(null);
   const [pendingPackages, setPendingPackages] = useState('1');
   const [pickerKey, setPickerKey] = useState(0);
   const [pickerUnitId, setPickerUnitId] = useState(unitId);
@@ -151,24 +165,34 @@ export function OrderDistributionField({
   }
 
   const withoutUnit = unitId === '';
-  const duplicate = pending !== null && lines.some((line) => line.presentationId === pending.id);
+  const duplicate =
+    pending !== null &&
+    lines.some(
+      (line) =>
+        line.packagingProductId === pending.id || line.presentationId === pending.presentationId,
+    );
   const canAdd =
     !withoutUnit &&
     pending !== null &&
-    pending.content !== null &&
+    pending.presentationId != null &&
+    pending.presentationContent != null &&
+    pending.presentationUnitId != null &&
     !duplicate &&
     POSITIVE_INTEGER.test(pendingPackages);
 
   function addLine() {
-    if (!canAdd || pending === null) return;
+    if (!canAdd || pending === null || pending.presentationId == null) return;
     onLinesChange([
       ...lines,
       {
-        presentationId: pending.id,
-        presentationName: pending.name,
+        presentationId: pending.presentationId,
+        presentationName: pending.presentationName ?? null,
         packages: pendingPackages,
-        content: pending.content,
-        unitId: pending.unitId,
+        content: pending.presentationContent ?? null,
+        unitId: pending.presentationUnitId ?? null,
+        packagingProductId: pending.id,
+        packagingName: pending.name,
+        available: pending.available ?? null,
       },
     ]);
     setPending(null);
@@ -199,8 +223,11 @@ export function OrderDistributionField({
       {lines.length === 0 ? null : (
         <ul className="flex flex-col gap-2">
           {lines.map((line, index) => {
-            const problem = lineProblem(availability, line.presentationId);
-            const name = line.presentationName ?? MISSING_VALUE_MARK;
+            const problem = lineProblem(availability, line);
+            const legacy = isLegacyLine(line);
+            const name =
+              (legacy ? line.presentationName : line.packagingName) ?? MISSING_VALUE_MARK;
+            const legacyNoteId = `${titleId}-legacy-${index}`;
             const coverage = withoutUnit
               ? null
               : lineCoverage({
@@ -215,22 +242,46 @@ export function OrderDistributionField({
                 });
             return (
               <li
-                key={line.presentationId}
+                key={lineKey(line)}
                 className="flex flex-col gap-1 rounded-lg border p-2 data-[problem=true]:border-destructive"
                 data-testid={ORDER_DISTRIBUTION_LINE_TESTID}
                 data-presentation-id={line.presentationId}
+                data-packaging-product-id={line.packagingProductId ?? undefined}
+                data-legacy={legacy ? 'true' : undefined}
                 data-problem={problem === null ? undefined : 'true'}
               >
                 <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate">{name}</span>
+                    {legacy ? (
+                      <span
+                        className="w-fit rounded-full border px-2 text-xs text-muted-foreground"
+                        data-testid={ORDER_DISTRIBUTION_LINE_LEGACY_TESTID}
+                      >
+                        {LABELS.legacy}
+                      </span>
+                    ) : (
+                      <span
+                        className="truncate text-sm text-muted-foreground"
+                        data-testid={ORDER_DISTRIBUTION_LINE_PRESENTATION_TESTID}
+                      >
+                        {line.presentationName ?? MISSING_VALUE_MARK}
+                        {line.available == null
+                          ? null
+                          : ` · ${LABELS.lineAvailable(trimDecimal(line.available))}`}
+                      </span>
+                    )}
+                  </div>
                   <Input
                     type="number"
                     inputMode="numeric"
                     min={1}
                     step={1}
                     value={line.packages}
+                    readOnly={legacy}
                     onChange={(event) => changePackages(index, event.target.value)}
                     aria-label={`${LABELS.packages} · ${name}`}
+                    aria-describedby={legacy ? legacyNoteId : undefined}
                     aria-invalid={
                       problem !== null || !POSITIVE_INTEGER.test(line.packages) ? true : undefined
                     }
@@ -249,6 +300,11 @@ export function OrderDistributionField({
                     <TrashIcon aria-hidden />
                   </Button>
                 </div>
+                {legacy ? (
+                  <p id={legacyNoteId} className="text-sm text-muted-foreground">
+                    {LABELS.legacyNote}
+                  </p>
+                ) : null}
                 {coverage === null ? null : (
                   <p
                     className="text-sm text-muted-foreground"
@@ -271,8 +327,13 @@ export function OrderDistributionField({
                   <>
                     <input
                       type="hidden"
+                      name={ORDER_DISTRIBUTION_PACKAGING_FIELD}
+                      value={line.packagingProductId ?? ''}
+                    />
+                    <input
+                      type="hidden"
                       name={ORDER_DISTRIBUTION_PRESENTATION_FIELD}
-                      value={line.presentationId}
+                      value={legacy ? line.presentationId : ''}
                     />
                     <input
                       type="hidden"
@@ -299,10 +360,8 @@ export function OrderDistributionField({
       ) : (
         <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-12">
           <div className="sm:col-span-8">
-            <PresentationSelect
+            <PackagingSelect
               key={`${unitId}:${pickerKey}`}
-              name={null}
-              requireContent
               unitIds={compatibleUnitIds}
               onSelect={setPending}
             />
@@ -413,6 +472,7 @@ function AvailabilityWarning({
     without_unit: LABELS.withoutUnit,
     unit_not_found: LABELS.unitNotFound,
     presentation_not_found: LABELS.presentationNotFound,
+    packaging_not_found: LABELS.packagingNotFoundSummary,
   }[availability.data.kind];
   if (message === null) return null;
 

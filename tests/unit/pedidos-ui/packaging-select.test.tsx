@@ -13,6 +13,7 @@ import {
   type PackagingOption,
 } from '@/app/(private)/pedidos/components';
 import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPES } from '@/lib/modules/inventario';
+import { UNEXPECTED_ERROR_NOTICE_TESTID } from '@/components/shared/unexpected-error-notice';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
@@ -208,6 +209,17 @@ describe('selector de envases del reparto', () => {
     await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
 
     expect(await screen.findByText('Consulta no valida.')).toBeInTheDocument();
+    expect(screen.queryByTestId(PACKAGING_SELECT_FORBIDDEN_TESTID)).toBeNull();
+  });
+
+  it('R38: si la accion no responde se pinta el inesperado con su referencia, no el aviso de permiso', async () => {
+    listProductsActionMock.mockRejectedValue(new Error('red caida'));
+    const user = setupUser();
+    render(<PackagingSelect unitIds={[LITRO_ID]} onSelect={vi.fn()} />);
+
+    await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
+
+    expect(await screen.findByTestId(UNEXPECTED_ERROR_NOTICE_TESTID)).toBeInTheDocument();
     expect(screen.queryByTestId(PACKAGING_SELECT_FORBIDDEN_TESTID)).toBeNull();
   });
 });

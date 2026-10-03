@@ -9,8 +9,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MISSING_VALUE_MARK,
   ORDER_BUSINESS_FIELDS,
+  ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  ORDER_DISTRIBUTION_ADD_TESTID,
+  PACKAGING_OPTION_TESTID,
+  PACKAGING_SELECT_TESTID,
   ORDER_COST_QUOTE_ERROR_TESTID,
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
@@ -121,6 +126,13 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   getRecipeAction: getRecipeActionMock,
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  listProductsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [ENVASE_DEL_CATALOGO], page: 1, pageSize: 25, total: 1, totalPages: 1 },
+  })),
+}));
+
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
   listPresentationsAction: listPresentationsActionMock,
   createPresentationAction: vi.fn(() => {
@@ -146,6 +158,26 @@ const PRESENTACION = {
   name: 'Bidón 20L',
   unitId: UNIDAD.id,
   content: '20.0000',
+};
+
+const ENVASE_ID = crypto.randomUUID();
+
+/** Envase del catalogo, ofrecido por `listProductsAction` en el selector del reparto. */
+const ENVASE_DEL_CATALOGO = {
+  id: ENVASE_ID,
+  name: 'Bidón PET 20 L',
+  imagePath: null,
+  stock: '10.0000',
+  unitId: crypto.randomUUID(),
+  qtyAlert: null,
+  type: 'PACKAGING',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  available: '10.0000',
+  presentationId: PRESENTACION.id,
+  presentationName: PRESENTACION.name,
+  presentationContent: PRESENTACION.content,
+  presentationUnitId: PRESENTACION.unitId,
 };
 
 const LINEA_INGREDIENTE = {
@@ -220,6 +252,17 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
 }
 
 const onSaved = vi.fn();
+
+/** Linea de reparto con envase, como la devuelve el pedido guardado. */
+function lineaConEnvase(packages: number) {
+  return {
+    presentationId: PRESENTACION.id,
+    presentationName: PRESENTACION.name,
+    packages,
+    packagingProductId: ENVASE_ID,
+    packagingName: 'Bidón PET 20 L',
+  };
+}
 
 function renderFormulario(order?: OrderSummary) {
   return render(
@@ -423,6 +466,7 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
     expect([...enviado.keys()].sort()).toEqual(
       [
         ...ORDER_BUSINESS_FIELDS,
+        ORDER_DISTRIBUTION_PACKAGING_FIELD,
         ORDER_DISTRIBUTION_PRESENTATION_FIELD,
         ORDER_DISTRIBUTION_PACKAGES_FIELD,
       ].sort(),
@@ -691,5 +735,98 @@ describe('la cotizacion sigue a la version elegida', () => {
     );
     await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA2.id));
     await waitFor(() => expect(selectorDeVersion()).toBeDisabled());
+  });
+});
+
+describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
+  it('R29: cambiar los envases de una linea vuelve a cotizar con el reparto en envases', async () => {
+    const user = setupUser();
+    const elPedido = pedido({ presentationLines: [lineaConEnvase(1)] });
+    renderFormulario(elPedido);
+
+    const envases = screen.getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
+    await user.clear(envases);
+    await user.type(envases, '3');
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
+        recipeId: RECETA.id,
+        quantity: '5',
+        orderId: elPedido.id,
+        presentationLines: [{ packagingProductId: ENVASE_ID, packages: 3 }],
+      }),
+    );
+  });
+
+  it('R29: anadir un envase en el alta vuelve a cotizar con esa linea', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    await rellenarAlta(user, '5');
+    await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
+    await user.click(await esperarInteractiva(await screen.findByTestId(PACKAGING_OPTION_TESTID)));
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
+        recipeId: RECETA.id,
+        quantity: '5',
+        presentationLines: [{ packagingProductId: ENVASE_ID, packages: 1 }],
+      }),
+    );
+  });
+
+  it('R29: cambiar la cantidad cotiza con el reparto vigente', async () => {
+    const user = setupUser();
+    const elPedido = pedido({ presentationLines: [lineaConEnvase(2)] });
+    renderFormulario(elPedido);
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '8');
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
+        recipeId: RECETA.id,
+        quantity: '8',
+        orderId: elPedido.id,
+        presentationLines: [{ packagingProductId: ENVASE_ID, packages: 2 }],
+      }),
+    );
+  });
+
+  it('R29: las lineas antiguas no viajan a la cotizacion porque no tienen envase', async () => {
+    const user = setupUser();
+    const elPedido = pedido();
+    renderFormulario(elPedido);
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '8');
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
+        recipeId: RECETA.id,
+        quantity: '8',
+        orderId: elPedido.id,
+      }),
+    );
+  });
+
+  it('R29: con envases no validos en el reparto no cotiza y muestra el guion', async () => {
+    const user = setupUser();
+    quoteOrderCostActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ingredientsCost: '12.0000' },
+    });
+    const elPedido = pedido({ ingredientsCost: '12.0000', presentationLines: [lineaConEnvase(1)] });
+    renderFormulario(elPedido);
+
+    await user.clear(screen.getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID));
+
+    await waitFor(() =>
+      expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe(
+        MISSING_VALUE_MARK,
+      ),
+    );
+    expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
   });
 });
