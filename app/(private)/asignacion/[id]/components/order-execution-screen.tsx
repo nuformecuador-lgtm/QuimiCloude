@@ -14,6 +14,7 @@ import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import { OrderExecutionLines } from './order-execution-lines';
+import { OrderExecutionTools } from './order-execution-tools';
 
 /**
  * El recorrido completo de la pantalla: monta `StepReader` por props y termina en
@@ -85,6 +86,8 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
       </p>
 
       <OrderExecutionLines lines={execution.lines} />
+
+      <OrderExecutionTools tools={execution.tools} />
 
       <div data-testid={ORDER_EXECUTION_SCREEN_TESTID}>
         <StepReader
