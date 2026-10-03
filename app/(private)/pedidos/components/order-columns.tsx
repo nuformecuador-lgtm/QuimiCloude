@@ -3,7 +3,11 @@
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
-import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
+import {
+  formatOrderNumber,
+  type OrderPresentationLineView,
+  type OrderSummary,
+} from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
@@ -157,6 +161,11 @@ export type OrderColumnsDeps = {
  * sin cablear -los botones existian y no abrian nada-. Las columnas siguen siendo DATOS: lo que
  * cambia es que se construyen con sus dependencias.
  */
+/** Una linea con envase se nombra por el envase; una antigua, o sin nombre de envase, por su presentacion. */
+function distributionLabelLine(line: OrderPresentationLineView) {
+  return { presentationName: line.packagingName ?? line.presentationName, packages: line.packages };
+}
+
 export function buildOrderColumns({
   recipes,
   units,
@@ -221,7 +230,9 @@ export function buildOrderColumns({
       label: 'Presentación',
       align: 'center',
       // Solo informa, como el importe: sin `sortable` y sin `filter`.
-      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
+      cell: (order) => (
+        <OrderDistributionLabel lines={order.presentationLines.map(distributionLabelLine)} />
+      ),
     },
     {
       id: CREATED_AT_COLUMN_ID,

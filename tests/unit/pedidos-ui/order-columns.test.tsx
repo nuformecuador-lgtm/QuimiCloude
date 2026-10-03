@@ -371,6 +371,65 @@ describe('R20: la columna Presentación pinta el reparto o Sin presentación', (
   });
 });
 
+describe('el reparto del listado con lineas de envase y antiguas', () => {
+  it('R33: una linea con envase se pinta con el nombre del envase', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({
+        presentationLines: [
+          {
+            presentationId: 'p-1',
+            presentationName: '20 L',
+            packages: 2,
+            packagingProductId: 'e-1',
+            packagingName: 'Bidón PET 20 L',
+          },
+        ],
+      }),
+    );
+
+    expect(container.textContent).toBe('2 × Bidón PET 20 L');
+  });
+
+  it('R33: una linea antigua se sigue pintando con el nombre de su presentacion', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({
+        presentationLines: [
+          {
+            presentationId: 'p-1',
+            presentationName: 'Bidón 20L',
+            packages: 2,
+            packagingProductId: null,
+            packagingName: null,
+          },
+        ],
+      }),
+    );
+
+    expect(container.textContent).toBe('2 × Bidón 20L');
+  });
+
+  it('R33: un envase cuyo nombre no vuelve del catalogo se pinta con su presentacion', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({
+        presentationLines: [
+          {
+            presentationId: 'p-1',
+            presentationName: '20 L',
+            packages: 3,
+            packagingProductId: 'e-1',
+            packagingName: null,
+          },
+        ],
+      }),
+    );
+
+    expect(container.textContent).toBe('3 × 20 L');
+  });
+});
+
 describe('R21: Presentación no ordena ni filtra', () => {
   it('la columna no declara `sortable` ni `filter`', () => {
     const columna = ORDER_COLUMNS.find((c) => c.id === PRESENTATION_NAME_COLUMN_ID);
