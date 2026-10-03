@@ -116,7 +116,7 @@ null` (R30); un solo `findRefs` para líneas y herramientas; el permiso exigido 
 
 ## Tanda 3 — pantallas
 
-### T9 — Estado del formulario y payload
+### T9 — Estado del formulario y payload [x]
 Tras T2. **Quién:** frontend_dev. **Toca:** `app/(private)/produccion/formulas/components/recipe-form-state.ts`,
 `tests/unit/recetas-ui/recipe-form-state.test.ts`.
 **Hacer:** §7, `tools` en los dos estados y en los dos builders.
@@ -124,7 +124,7 @@ Tras T2. **Quién:** frontend_dev. **Toca:** `app/(private)/produccion/formulas/
 (R26); el estado inicial de edición sale de `recipe.tools` y el de alta de versión de `original.tools`
 (R22, R23).
 
-### T10 — Tab «Herramientas» controlado
+### T10 — Tab «Herramientas» controlado [x]
 Tras T9. **Quién:** frontend_dev. **Toca:** `formulas/components/recipe-lines-field.tsx`,
 `formulas/components/index.ts`, `tests/unit/recetas-ui/recipe-lines-field-tools.test.tsx` (nuevo).
 **Hacer:** §7: props `tools` / `onToolsChange` / `toolErrors`, campo de cantidad, cantidad 1 al elegir,
@@ -134,7 +134,7 @@ de baja (R20, R22); elegir pone `1` (R24); el selector excluye las elegidas (R24
 no cambia la suma ni lo que falta para 100 % (R26); el error de fila se pinta en su fila (R25);
 controles ≥ 44×44 px e input `text-base` (R33).
 
-### T11 — Formularios de receta y de versión
+### T11 — Formularios de receta y de versión [x]
 Tras T5, T10. **Quién:** frontend_dev. **Toca:** `formulas/components/{recipe-form.tsx,
 recipe-version-form.tsx}`, las cuatro `page.tsx` de `formulas` solo si hace falta pasar `tools`,
 `tests/unit/recetas-ui/recipe-form.test.tsx`, `tests/unit/recetas-ui/recipe-version-form.test.tsx`.
@@ -144,7 +144,7 @@ herramientas del tab (R26); fila sin herramienta o con cantidad `0`/vacía → n
 error sale en la fila (R25); un rechazo del servidor sale en la región de error sin navegar (R27); la
 página de alta de versión precarga las de la original (R23).
 
-### T12 [P] — Bloque del operador
+### T12 [P] — Bloque del operador [x]
 Tras T8. **Quién:** frontend_dev. **Toca:** `app/(private)/asignacion/[id]/components/{order-execution-tools.tsx
 (nuevo), index.ts, order-execution-screen.tsx}`, `tests/unit/asignaciones-ui/order-execution-tools.test.tsx`
 (nuevo).

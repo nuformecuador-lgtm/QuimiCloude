@@ -189,3 +189,81 @@ Verificacion: `pnpm run typecheck` limpio; `pnpm run lint` `0 errors, 8 warnings
 `vitest run guard` `51 passed`; `vitest related --run <tocados>` -> solo rojos de
 `tests/baseline-rojos.json` (`module-contract`, `recipe-page`, `product-page`, `pantallas-exigen-permiso`,
 `unidades-viewport`, `usuarios-viewport`).
+
+## Tanda 3 — UI (frontend_dev): T9-T12
+
+Programado contra `contrato-back.md` (b95a1732); sin tocar `lib/` ni los tests de backend.
+
+### Archivos por task
+
+- **T9** (`6bbf580a`): `formulas/components/recipe-form-state.ts` (`RecipeToolFormValue`, `tools` en
+  los dos estados y payloads, `toToolFormValues`, `extractToolErrors` con texto propio por `path`,
+  `extractGeneralToolsError` para `['tools']`), `components/index.ts`, estado inicial en
+  `recipe-form.tsx` / `recipe-version-form.tsx` (`RecipeVersionFormOriginal.tools`), las dos paginas
+  de version pasan `original.tools`. Test nuevo `tests/unit/recetas-ui/recipe-form-state.test.ts`;
+  ajustados `recipe-form-payload.test.ts`, `recipe-lines-unavailable.test.tsx`,
+  `recipe-version-form.test.tsx` (fixtures con `tools`, y el payload de version pasa a ser
+  `{ name, lines, tools }` porque el contrato exige mandar siempre la clave).
+- **T10** (`cfff6243`): `recipe-lines-field.tsx` controlado (`tools`/`onToolsChange`/`toolErrors`/
+  `toolsGeneralError`), campo de cantidad (`inputMode="numeric"`, solo digitos, `min-h-11`,
+  `text-base`), cantidad `1` al elegir si estaba vacia, «Herramienta no disponible», error general
+  del tab, se abre el tab Herramientas cuando solo ellas fallan; fuera `RecipeMachineFormValue` y los
+  comentarios «UI-only». Test nuevo `recipe-lines-field-tools.test.tsx`; harness con `tools` en
+  `recipe-lines-{baseline,no-finished-product,sum,tabs,unavailable}.test.tsx`.
+- **T11** (`9dc540aa`): validacion previa y errores por fila en `recipe-form.tsx` y
+  `recipe-version-form.tsx` (`RECIPE_TOOL_ERROR_MESSAGES`). Casos nuevos en `recipe-form.test.tsx`,
+  `recipe-version-form.test.tsx`, `recipe-version-pages.test.tsx`.
+- **T12** (`f035d9ff`): `asignacion/[id]/components/order-execution-tools.tsx` (nuevo), barrel y
+  montaje en `order-execution-screen.tsx` entre lineas y `StepReader`. Test nuevo
+  `tests/unit/asignaciones-ui/order-execution-tools.test.tsx`; fixture con `tools: []` en
+  `order-execution-page.test.tsx`.
+
+### Mapa R -> test (UI)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R20 | `tests/unit/recetas-ui/recipe-lines-field-tools.test.tsx` | `R20 — la de baja se pinta como no disponible, con su cantidad y el aviso del tab` |
+| R22 | `recipe-form-state.test.ts` | `R22 — el estado inicial de edición sale de recipe.tools con nombre y cantidad, en orden` |
+| R22 | `recipe-lines-field-tools.test.tsx` | `R22 — pinta nombre y cantidad de cada herramienta guardada` |
+| R22 | `recipe-form.test.tsx` | `R22, R26 — la edición precarga las guardadas y las reenvía, incluida la no disponible` |
+| R22 | `recipe-version-pages.test.tsx` | `R22: la pagina de una version pinta sus propias herramientas, no las de la original` |
+| R23 | `recipe-form-state.test.ts` | `R23 — la precarga de alta de versión conserva la no disponible y vuelve al payload intacta` |
+| R23 | `recipe-version-pages.test.tsx` | `R23: el alta de version precarga las herramientas de la original, incluida la no disponible` |
+| R23 | `recipe-version-form.test.tsx` | `R23, R26 — el alta precarga las de la original y envía exactamente esas, incluida la no disponible` |
+| R24 | `recipe-lines-field-tools.test.tsx` | `R24 — elegir una herramienta pone la cantidad en 1, editable`; `R24 — el selector no ofrece la herramienta ya elegida en otra fila`; `R24 — cambiar de herramienta no pisa la cantidad ya escrita` |
+| R25 | `recipe-form-state.test.ts` | `R25 — fila sin herramienta: error de producto en su índice, con el texto propio`; `R25 — cantidad "" / "0": error de cantidad en su fila`; `R25 — nunca pinta el mensaje en inglés de zod` |
+| R25 | `recipe-lines-field-tools.test.tsx` | `R25 — el error de cantidad se pinta en su fila y abre el tab de herramientas`; `R25 — el error de producto se pinta en el selector de su fila`; `R25 — la cantidad solo admite dígitos` |
+| R25 | `recipe-form.test.tsx` | `R25 — cantidad "" / "0": no invoca la acción, pinta el error en la fila y conserva lo escrito`; `R25 — una fila sin herramienta no invoca la acción y el error sale en su fila` |
+| R25 | `recipe-version-form.test.tsx` | `R25 — cantidad vacía: no invoca la acción y el error sale en su fila` |
+| R26 | `recipe-form-state.test.ts` | `R26 — el payload lleva siempre la clave tools, también vacía, en los dos builders`; `R26 — cada herramienta viaja como { productId, quantity } con la cantidad entera, sin key ni nombre`; `R26 — la herramienta no disponible viaja tal cual, con su cantidad` |
+| R26 | `recipe-lines-field-tools.test.tsx` | `R26 — añadir, cambiar y quitar herramientas no cambia la suma ni lo que falta` |
+| R26 | `recipe-form.test.tsx` | `R26 — el alta envía exactamente las herramientas del tab, con cantidad entera`; `R26 — la edición sin herramientas manda tools vacío, no omite la clave` |
+| R26 | `recipe-version-form.test.tsx` | `R26 — la edición envía las herramientas de la versión tras quitar una en el tab` |
+| R27 | `recipe-form.test.tsx` | `R27 — un rechazo del servidor por las herramientas sale en la región de error sin navegar` |
+| R27 | `recipe-version-form.test.tsx` | `R27 — un rechazo del servidor sale en la región de error sin navegar ni perder lo escrito` |
+| R28 | `tests/unit/asignaciones-ui/order-execution-tools.test.tsx` | `R28 — pinta cada herramienta con su nombre y su cantidad`; `R28 — es de solo lectura: ni botones, ni enlaces, ni campos`; `R28 — la pantalla monta el bloque con las herramientas de la vista` |
+| R29 | `order-execution-tools.test.tsx` | `R29 — la cantidad pintada es la de la receta, sea cual sea la del pedido` |
+| R30 | `order-execution-tools.test.tsx` | `R30 — la de baja se lee «Herramienta no disponible» con su cantidad` |
+| R31 | `order-execution-tools.test.tsx` | `R31 — sin herramientas el bloque no está en el DOM`; `R31 — la pantalla sin herramientas no monta el bloque` |
+| R33 | `recipe-lines-field-tools.test.tsx` | `R33 — controles de al menos 44×44 px y campo de cantidad a 16 px` |
+| R33 | `order-execution-tools.test.tsx` | `R33 — el texto del bloque va a 16 px` |
+
+### Salida real
+
+- `pnpm run typecheck`: limpio (0 errores).
+- `pnpm run lint`: `0 errors, 8 warnings` (preexistentes, ninguno en archivos de esta tanda).
+- `vitest run tests/unit/recetas-ui`: `Tests 2 failed | 438 passed (440)`. Rojos:
+  `recipe-page.test.tsx` (baseline) y `recipe-route-contract.test.ts > la feature no toca
+  lib/modules/recetas ni db/` (ver abajo).
+- `vitest run tests/unit/asignaciones-ui`: `Test Files 22 passed`, `Tests 226 passed`.
+- `vitest run tests/unit/pedidos-ui/order-form{,-quote}.test.tsx`: `Tests 71 passed`.
+- `vitest related --run <archivos de UI tocados>`: `Tests 2 failed | 488 passed (490)`; los dos rojos
+  (`recipe-page`, `pantallas-exigen-permiso`) estan en `tests/baseline-rojos.json`.
+
+### Abierto para el leader
+
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts > la feature no toca lib/modules/recetas ni db/`
+  se pone rojo en cuanto la rama toca la ruta de formulas y `lib/modules/recetas` a la vez:
+  `create-recipe-version.ts`, `recipe-version.ts`, `update-recipe-version.ts` no estan en
+  `RECETAS_PERMITIDAS` (y la migracion de `recipe_tools` probablemente tampoco en `DB_PERMITIDAS`).
+  Es la lista de ampliaciones nombradas por ficha; hay que anadir la de QC-194. No lo toque: no es UI.
