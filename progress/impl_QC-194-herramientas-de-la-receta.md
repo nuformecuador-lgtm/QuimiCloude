@@ -396,3 +396,23 @@ El MCP del grafo no se uso en esta tanda (exploracion con Grep/Read sobre el wor
 
 Veredicto: T4-T8 cerradas; typecheck, lint, guardias e integracion en verde; `--rapido` rojo solo por
 `recipe-route-contract` (lista de alcance sin QC-194) ademas de los rojos del baseline.
+
+## Cierre --rapido
+
+- `1dc70af4` `test(QC-194)`: `recipe-route-contract.test.ts` gana `HERRAMIENTAS_DE_LA_RECETA_QC194`
+  (los 14 archivos de `lib/modules/recetas/` del diff) en `RECETAS_PERMITIDAS` y `MIGRACION_QC194`
+  (`db/schema.prisma` + `20261003120000_recipe_tools/{migration,down}.sql`) en `DB_PERMITIDAS`.
+  Ninguna otra asercion del archivo fallaba. `vitest run` del archivo: 27/27 en verde.
+- `./init.sh --rapido` (2026-10-03): typecheck verde; lint 0 errores, 8 warnings; `test:rapido`
+  sobre 87 archivos del diff: **6 archivos / 8 casos rojos, 329 archivos / 5163 casos verdes**.
+  Todos los rojos estan en `tests/baseline-rojos.json`:
+  - `tests/unit/recetas/module-contract.test.ts` > "la feature no anade ningun route handler..." —
+    solo por `app/(private)/pedidos/page.tsx: segunda pantalla de recetas fuera de su carpeta`
+    (deuda de 897a4f91, QC-180). En baseline.
+  - `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` > "'/pedidos' se sirve con el
+    permiso". En baseline (QC-180).
+  - `tests/unit/inventario/product-page.test.tsx` > R18. En baseline (QC-177).
+  - `tests/unit/recetas-ui/recipe-page.test.tsx` > R21. En baseline (QC-177).
+  - `tests/unit/configuracion-ui/unidades-viewport.test.tsx` > R27 (1280 y 375 px). En baseline (QC-177).
+  - `tests/unit/configuracion-ui/usuarios-viewport.test.tsx` > R21 (1280 y 375 px). En baseline (QC-177).
+- Ningun rojo fuera del baseline.
