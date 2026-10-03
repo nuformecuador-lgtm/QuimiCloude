@@ -76,3 +76,92 @@ Si filtra por MACHINE y por vivos en todas las paginas, no solo en la primera:
 
 (Busqueda por nombre de tipo con `grep -rlw`; un test que construya el objeto sin nombrar el tipo no
 aparece aqui.)
+
+## Tanda 1 — T1, T2, T3 (backend_dev)
+
+Preparacion del worktree (no versionada): `pnpm install --frozen-lockfile` (el worktree no tenia
+`node_modules`; ninguna dependencia nueva, `package.json` y el lockfile sin cambios) y
+`pnpm exec next typegen` (sin `.next/types`, `tsc` fallaba en `LayoutProps` de `app/layout.tsx`).
+
+### T1 — migracion y esquema `recipe_tools` (`9f9b277b`)
+
+- `db/schema.prisma`: `model RecipeTool` (`/// @module recetas`) y `tools RecipeTool[]` en `Recipe`.
+- `db/migrations/20261003120000_recipe_tools/migration.sql` (nuevo): lo de Prisma + a mano la FK
+  `recipe_tools_product_id_fkey` RESTRICT, el CHECK `recipe_tools_quantity_positive`, `ENABLE` +
+  `FORCE ROW LEVEL SECURITY` sin policies.
+- `db/migrations/20261003120000_recipe_tools/down.sql` (nuevo): `DROP TABLE IF EXISTS "recipe_tools"`.
+- `tests/unit/recetas/schema/recipe-tools-migration.test.ts` (nuevo).
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de la migracion en la lista cerrada.
+- `tests/guards/guard-empresa-en-esquema.test.ts`: `recipe_tools` en `EXENTAS`, lista literal a nueve y
+  los bullets de prueba de R14 nombrandola.
+- `docs/architecture.md`: bullet de exentas «ocho» -> «nueve», con `recipe_tools`.
+- `tests/unit/recetas/schema/recetas-schema.test.ts`: los modelos de `recetas` pasan a ser
+  `Recipe`, `RecipeLine`, `RecipeTool` (afirmaba la lista cerrada de dos).
+- `tests/integration/aislamiento.json`: sin cambios en T1 (no hay test de integracion nuevo).
+
+Base `QuimiCloude` (la del `.env`): `prisma validate` OK; `db:migrate` aplico `20261003120000_recipe_tools`;
+`db:rollback` la revirtio (`prisma migrate diff` desde la base volvio a pedir `CREATE TABLE
+"recipe_tools"`); `db:migrate` la reaplico; `prisma generate` regenerado. Comprobado en `pg_constraint`:
+`recipe_tools_pkey`, `recipe_tools_product_id_fkey` (`ON UPDATE CASCADE ON DELETE RESTRICT`),
+`recipe_tools_quantity_positive` (`CHECK ((quantity > 0))`), `recipe_tools_recipe_id_fkey`
+(`ON DELETE CASCADE`); `relrowsecurity = relforcerowsecurity = true`. Datos de demo intactos (solo DDL
+sobre la tabla nueva).
+
+### T2 — contrato de herramientas (`a676c60e`)
+
+- `lib/modules/recetas/domain/recipe-input.ts`: `MAX_TOOL_QUANTITY`, `recipeToolSchema` (`.strict()`),
+  `recipeToolsSchema` (sin repetir producto), `RecipeToolInput`; `tools` en los cuatro esquemas
+  (`.default([])` solo en el alta; `.optional()` en edicion, alta de version y edicion de version).
+  `sinProductoRepetido` pasa a aceptar cualquier `{ productId }`.
+- `lib/modules/recetas/index.ts`: exporta `recipeToolSchema`, `recipeToolsSchema`, `MAX_TOOL_QUANTITY`,
+  `RecipeToolInput`.
+- `tests/unit/recetas/recipe-input.test.ts`: casos nuevos al final.
+
+### T3 — `propagateByProduct` / `propagateTools` (`2f5c818c`)
+
+- `lib/modules/recetas/domain/recipe-version.ts`: `propagateByProduct<T>(before, after, version, same)`
+  con el algoritmo de antes; `propagateLines` = `propagateByProduct(..., samePercentage)`;
+  `propagateTools` = mismo con `quantity ===`. Generico en `T` porque `RecipeToolData` del puerto llega en T4.
+- `lib/modules/recetas/index.ts`: exporta `propagateTools`.
+- `tests/unit/recetas/recipe-version.test.ts`: los casos de `propagateLines` sin tocar; bloques nuevos
+  `propagateTools` e `isVersionUnderReview no mira herramientas`.
+
+### Mapa R<n> -> test (lo cubierto en esta tanda)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R1 | `tests/unit/recetas/recipe-input.test.ts` | `R1: acepta producto y cantidad entera positiva, hasta el tope de la columna`; `R1: el alta conserva las herramientas enviadas` |
+| R1 | `tests/unit/recetas/schema/recipe-tools-migration.test.ts` | `R1: crea la tabla con cantidad entera NOT NULL y sin company_id`; `R1: la FK a la receta va en CASCADE y la de producto, escrita a mano, en RESTRICT` |
+| R2 | `recipe-input.test.ts` | `R2, R18: el alta sin tools las deja vacias` |
+| R4 | `recipe-input.test.ts` | `R4: rechaza dos herramientas con el mismo producto`; `R4, R6: los cuatro esquemas aplican la misma validacion de herramientas` |
+| R4 | `recipe-tools-migration.test.ts` | `R4: una herramienta no se repite en la misma receta (unico compuesto) y el producto lleva indice` |
+| R6 | `recipe-input.test.ts` | `R6: rechaza la cantidad %s` (0, -1, 1.5, '2'); `R6: rechaza la cantidad ausente y el producto ausente o que no es uuid` |
+| R6 | `recipe-tools-migration.test.ts` | `R6: la base rechaza una cantidad no positiva con un CHECK` |
+| R7 | `recipe-input.test.ts` | `R7: lineas al 100 % mas herramientas pasa; las herramientas no cuentan en la suma` |
+| R7, R16 | `tests/unit/recetas/recipe-version.test.ts` | `R7, R16: solo recibe porcentajes de lineas: ...` |
+| R11 | `recipe-input.test.ts` | `R11: el alta de version sin tools da undefined (copia de la original)` |
+| R14 | `recipe-version.test.ts` | los ocho casos `R14: ...` de `propagateTools` |
+| R17 | `recipe-input.test.ts` | `R17, R18: la edicion sin tools da undefined y con [] da [], distinguibles`; `R17: la edicion de version sin tools da undefined y con [] da []` |
+| R18 | `recipe-input.test.ts` | `R2, R18: ...`; `R17, R18: ...` (la parte de esquema; la de import de PDF es T7) |
+| R25 | `recipe-input.test.ts` | `R25: el issue de una fila invalida apunta a [tools, i, campo] dentro de la receta` (solo el `path` de zod; la UI es T10/T11) |
+
+Parciales a proposito: R3, R5 (MACHINE / inexistente) son de dominio (T5); R11 y R17 se completan en T5;
+R14 en persistencia en T4.
+
+### Verificacion
+
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `0 errors, 8 warnings`; ninguno en archivos de esta tanda (todos preexistentes,
+  p. ej. `tests/unit/pedidos/order-service.test.ts`).
+- Tests nuevos y guardias tocadas: `vitest run tests/unit/recetas/schema tests/guards/guard-empresa-en-esquema.test.ts
+  tests/guards/guard-identificador-de-request.test.ts tests/guards/guard-rls-force.test.ts
+  tests/guards/guard-arquitectura-modulos.test.ts tests/unit/inventario/scope.test.ts
+  tests/unit/pedidos/schema/pedidos-schema.test.ts` -> `14 passed (14)`, `224 passed`.
+  `recipe-input.test.ts` -> `48 passed`; `recipe-version.test.ts` -> `33 passed`.
+- `vitest related --run recipe-input.ts recipe-version.ts index.ts` -> `Test Files 6 failed | 318 passed (324)`,
+  `Tests 8 failed | 4952 passed | 2 skipped`. Los 6 archivos rojos estan todos en
+  `tests/baseline-rojos.json` (deuda ajena): `configuracion-ui/unidades-viewport`,
+  `configuracion-ui/usuarios-viewport`, `navegacion/pantallas-exigen-permiso`, `inventario/product-page`,
+  `recetas-ui/recipe-page`, `recetas/module-contract`. Ninguno toca herramientas.
+
+Veredicto: T0-T3 cerradas en verde; typecheck y lint limpios, sin rojos nuevos.
