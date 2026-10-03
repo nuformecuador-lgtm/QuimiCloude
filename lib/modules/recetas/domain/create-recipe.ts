@@ -7,7 +7,7 @@ import type { RecipeScope } from './recipe-scope';
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
 
-import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
+import { isIngredientType, type ProductCatalog } from '@/lib/modules/inventario';
 
 export type CreateRecipeDeps = {
   readonly recipes: RecipeRepository;
@@ -55,8 +55,7 @@ export function createCreateRecipe(
       const missing = productIds.some((id) => !foundIds.has(id));
       if (missing) throw new ValidationError();
 
-      const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
-      if (finished) throw new ActionNotAllowedError();
+      if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
 
     // R21: sin imagen no se toca el almacenamiento en absoluto.

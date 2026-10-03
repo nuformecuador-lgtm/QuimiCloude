@@ -10,7 +10,7 @@ import type { RecipeScope } from './recipe-scope';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
 
-import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
+import { isIngredientType, PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
 
 export type CreateRecipeVersionDeps = {
   readonly recipes: RecipeRepository;
@@ -52,6 +52,11 @@ export function createCreateRecipeVersion(
     const foundIds = new Set(refs.map((ref) => ref.id));
     if (productIds.some((id) => !foundIds.has(id))) throw new ValidationError();
     if (refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT)) {
+      throw new ActionNotAllowedError();
+    }
+    // Un envase que la original ya tenia como ingrediente se conserva al versionarla.
+    const inOriginal = new Set(original.lines.map((line) => line.productId));
+    if (refs.some((ref) => !inOriginal.has(ref.id) && !isIngredientType(ref.type))) {
       throw new ActionNotAllowedError();
     }
 

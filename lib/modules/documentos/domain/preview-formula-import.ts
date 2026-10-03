@@ -22,7 +22,7 @@ import type { DocumentBatchRepository } from '../ports/document-batch-repository
 import type { createCreateRawMaterial } from '@/lib/modules/inventario';
 import {
   normalizeProductName,
-  PRODUCT_TYPES,
+  isIngredientType,
   type ProductCatalog,
   type ProductNameLookup,
   type ProductNameMatch,
@@ -91,7 +91,7 @@ function matchIngredient(
 ): FormulaImportIngredientMatch {
   if (ingredient.name === null) return { kind: 'none' };
   const candidates = byNormalizedName.get(normalizeProductName(ingredient.name)) ?? [];
-  const eligible = candidates.filter((candidate) => candidate.type !== PRODUCT_TYPES.FINISHED_PRODUCT);
+  const eligible = candidates.filter((candidate) => isIngredientType(candidate.type));
   if (eligible.length === 0) return { kind: 'none' };
   if (eligible.length === 1) {
     const match = eligible[0] as ProductNameMatch;

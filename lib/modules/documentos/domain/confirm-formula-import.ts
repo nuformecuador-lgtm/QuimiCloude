@@ -11,7 +11,7 @@
 import { assertPermission } from '@/lib/modules/identity';
 import {
   normalizeProductName,
-  PRODUCT_TYPES,
+  isIngredientType,
   type ProductNameMatch,
 } from '@/lib/modules/inventario';
 import {
@@ -111,8 +111,7 @@ export function createConfirmFormulaImport(
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = existingProductIds.some((id) => !foundIds.has(id));
       if (missing) throw new ValidationError('formula-import: producto inexistente, de baja o de otra empresa');
-      const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
-      if (finished) throw new ActionNotAllowedError();
+      if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
 
     // Las materias primas NUEVAS, resueltas por nombre normalizado -0 crea, 1 reutiliza, mas de
@@ -135,7 +134,7 @@ export function createConfirmFormulaImport(
     let rawMaterialsReused = 0;
     for (const need of newMaterialNeeds) {
       const candidates = matchesByNormalizedName.get(need.normalizedName) ?? [];
-      const eligible = candidates.filter((candidate) => candidate.type !== PRODUCT_TYPES.FINISHED_PRODUCT);
+      const eligible = candidates.filter((candidate) => isIngredientType(candidate.type));
       if (eligible.length > 1) {
         throw new ValidationError('formula-import: mas de un producto vivo con el nombre de una materia prima nueva');
       }

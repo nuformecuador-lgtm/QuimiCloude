@@ -10,7 +10,7 @@ import type { RecipeScope } from './recipe-scope';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
 
-import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
+import { isIngredientType, type ProductCatalog } from '@/lib/modules/inventario';
 
 export type UpdateRecipeVersionDeps = {
   readonly recipes: RecipeRepository;
@@ -49,9 +49,7 @@ export function createUpdateRecipeVersion(
       const refs = await deps.products.findRefs(newProductIds, actor.companyId);
       const foundIds = new Set(refs.map((ref) => ref.id));
       if (newProductIds.some((id) => !foundIds.has(id))) throw new ValidationError();
-      if (refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT)) {
-        throw new ActionNotAllowedError();
-      }
+      if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
 
     const result = await deps.recipes.replaceAlive(
