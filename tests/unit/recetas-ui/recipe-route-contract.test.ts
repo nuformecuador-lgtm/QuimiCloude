@@ -467,12 +467,39 @@ const MIGRACION_QC147 = [
   'db/migrations/20260922160000_recipe_lines_percentage/down.sql',
 ];
 
+// QC-194 (2026-10-03): la receta y sus versiones ganan herramientas. Exactamente los archivos
+// que el diff de esta rama toca bajo `lib/modules/recetas/`, ninguno mas.
+const HERRAMIENTAS_DE_LA_RECETA_QC194 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/create-recipe-version.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/recipe-catalog.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-tools.ts',
+  'lib/modules/recetas/domain/recipe-version.ts',
+  'lib/modules/recetas/domain/recipe-view.ts',
+  'lib/modules/recetas/domain/update-recipe-version.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// La migracion que crea `recipe_tools` y `db/schema.prisma` con el modelo nuevo.
+const MIGRACION_QC194 = [
+  'db/schema.prisma',
+  'db/migrations/20261003120000_recipe_tools/migration.sql',
+  'db/migrations/20261003120000_recipe_tools/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
   ...RENOMBRADO_DE_COMENTARIOS_QC70,
   ...AISLAMIENTO_POR_EMPRESA_QC50,
   ...CANTIDADES_EN_PORCENTAJE_QC147,
+  ...HERRAMIENTAS_DE_LA_RECETA_QC194,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -491,6 +518,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC68,
   ...MIGRACION_QC121,
   ...MIGRACION_QC147,
+  ...MIGRACION_QC194,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
