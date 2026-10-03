@@ -1599,3 +1599,159 @@ describe('formulario de receta — el identificador del error inesperado (QC-71 
     expect(document.body.textContent ?? '').not.toContain(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
   });
 });
+
+describe('QC-194 — herramientas en el formulario de receta', () => {
+  const TOOL_A_ID = '88888888-8888-4888-8888-888888888888';
+  const TOOL_B_ID = '99999999-9999-4999-8999-999999999999';
+  const TOOL_PAGE = {
+    items: [
+      { id: TOOL_A_ID, name: 'Agitador', unitId: null },
+      { id: TOOL_B_ID, name: 'Balanza', unitId: null },
+    ],
+    totalPages: 1,
+  };
+
+  function renderWithTools(recipe?: RecipeDetail) {
+    return render(
+      recipe === undefined ? (
+        <RecipeForm mode="create" units={UNITS} initialProductPage={PRODUCT_PAGE_1} initialMachinePage={TOOL_PAGE} />
+      ) : (
+        <RecipeForm
+          mode="edit"
+          recipe={recipe}
+          versions={[]}
+          units={UNITS}
+          initialProductPage={PRODUCT_PAGE_1}
+          initialMachinePage={TOOL_PAGE}
+        />
+      ),
+    );
+  }
+
+  async function chooseTool(user: UserEvent, index: number, name: string) {
+    await user.click(screen.getByTestId(`recipe-machine-product-${index}`));
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name })));
+  }
+
+  it('R26 — el alta envía exactamente las herramientas del tab, con cantidad entera', async () => {
+    const user = setupUser();
+    renderWithTools();
+    await user.type(screen.getByTestId('recipe-field-name'), 'Con herramientas');
+    await addValidLine(user, 0);
+
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await chooseTool(user, 0, 'Agitador');
+    await user.click(screen.getByTestId('recipe-machine-add-0'));
+    await chooseTool(user, 1, 'Balanza');
+    await user.clear(screen.getByTestId('recipe-machine-quantity-1'));
+    await user.type(screen.getByTestId('recipe-machine-quantity-1'), '3');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [payload] = createRecipeActionMock.mock.calls[0] as [{ tools: unknown }];
+    expect(payload.tools).toStrictEqual([
+      { productId: TOOL_A_ID, quantity: 1 },
+      { productId: TOOL_B_ID, quantity: 3 },
+    ]);
+  });
+
+  it('R22, R26 — la edición precarga las guardadas y las reenvía, incluida la no disponible', async () => {
+    const user = setupUser();
+    renderWithTools(
+      recipeDetail({
+        tools: [
+          { id: 't1', productId: TOOL_A_ID, productName: 'Agitador', quantity: 2 },
+          { id: 't2', productId: TOOL_B_ID, productName: null, quantity: 4 },
+        ],
+      }),
+    );
+
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('2');
+    expect(screen.getByTestId('recipe-machine-unavailable-1')).toBeInTheDocument();
+    expect(screen.getByTestId('recipe-machine-quantity-1')).toHaveValue('4');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { tools: unknown }];
+    expect(payload.tools).toStrictEqual([
+      { productId: TOOL_A_ID, quantity: 2 },
+      { productId: TOOL_B_ID, quantity: 4 },
+    ]);
+  });
+
+  it('R26 — la edición sin herramientas manda tools vacío, no omite la clave', async () => {
+    const user = setupUser();
+    renderWithTools(recipeDetail());
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { tools: unknown }];
+    expect(payload.tools).toStrictEqual([]);
+  });
+
+  it.each(['', '0'])(
+    'R25 — cantidad %j: no invoca la acción, pinta el error en la fila y conserva lo escrito',
+    async (quantity) => {
+      const user = setupUser();
+      renderWithTools(
+        recipeDetail({ tools: [{ id: 't1', productId: TOOL_A_ID, productName: 'Agitador', quantity: 2 }] }),
+      );
+      await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+      await user.clear(screen.getByTestId('recipe-machine-quantity-0'));
+      if (quantity !== '') await user.type(screen.getByTestId('recipe-machine-quantity-0'), quantity);
+
+      await user.click(screen.getByTestId('recipe-form-submit'));
+
+      expect(await screen.findByTestId('recipe-machine-quantity-error-0')).toBeInTheDocument();
+      expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue(quantity);
+      expect(screen.getByTestId('recipe-form-error')).toBeInTheDocument();
+      expect(updateRecipeActionMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('R25 — una fila sin herramienta no invoca la acción y el error sale en su fila', async () => {
+    const user = setupUser();
+    renderWithTools(
+      recipeDetail({ tools: [{ id: 't1', productId: TOOL_A_ID, productName: 'Agitador', quantity: 2 }] }),
+    );
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await user.click(screen.getByTestId('recipe-machine-add-0'));
+    // Se vuelve a ingredientes: el formulario tiene que abrir el tab que tiene el error.
+    await user.click(screen.getByTestId('recipe-lines-tab-ingredients'));
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    expect(await screen.findByTestId('recipe-machine-product-1-field-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('recipe-machine-product-0-field-error')).toBeNull();
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('2');
+    expect(updateRecipeActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R27 — un rechazo del servidor por las herramientas sale en la región de error sin navegar', async () => {
+    const user = setupUser();
+    createRecipeActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'invalid_input',
+      message: 'La entrada recibida no es valida.',
+    });
+    renderWithTools();
+    await user.type(screen.getByTestId('recipe-field-name'), 'Con herramientas');
+    await addValidLine(user, 0);
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await chooseTool(user, 0, 'Agitador');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    expect(await screen.findByTestId('recipe-form-error-message')).toHaveTextContent(
+      'La entrada recibida no es valida.',
+    );
+    expect(screen.getByTestId('recipe-form-error-code')).toHaveTextContent('invalid_input');
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('1');
+    expect(screen.getByTestId('recipe-field-name')).toHaveValue('Con herramientas');
+  });
+});

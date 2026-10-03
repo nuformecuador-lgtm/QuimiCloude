@@ -31,15 +31,18 @@ import { recipeEditRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
 import type { RecipeFormProductPage } from './recipe-form';
-import { RecipeLinesField } from './recipe-lines-field';
+import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
 import {
   buildRecipeVersionPayload,
   extractFieldError,
   extractGeneralLinesError,
+  extractGeneralToolsError,
   extractLineErrors,
+  extractToolErrors,
   toLineFormValues,
   toToolFormValues,
   type RecipeLineErrors,
+  type RecipeToolErrors,
   type RecipeVersionFormState,
 } from './recipe-form-state';
 
@@ -73,6 +76,8 @@ type FieldErrors = {
   readonly name?: string;
   readonly lines?: RecipeLineErrors;
   readonly linesGeneral?: string;
+  readonly tools?: RecipeToolErrors;
+  readonly toolsGeneral?: string;
 };
 
 function buildInitialState(props: RecipeVersionFormProps): RecipeVersionFormState {
@@ -180,6 +185,8 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
         name: extractFieldError(issues, 'name'),
         lines: extractLineErrors(issues),
         linesGeneral: extractGeneralLinesError(issues),
+        tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
+        toolsGeneral: extractGeneralToolsError(issues),
       });
       setSaveError({ status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE });
       return;
@@ -275,6 +282,8 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
         initialMachinePage={props.initialMachinePage}
         errors={fieldErrors.lines}
         generalError={fieldErrors.linesGeneral}
+        toolErrors={fieldErrors.tools}
+        toolsGeneralError={fieldErrors.toolsGeneral}
         baseline={props.original.lines}
       />
 

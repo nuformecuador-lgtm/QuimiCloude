@@ -40,21 +40,24 @@ import { cn } from '@/lib/utils';
 import type { ProductPickerOption } from './product-picker';
 import { PropagateVersionsDialog } from './propagate-versions-dialog';
 import { RecipeImageField } from './recipe-image-field';
-import { RecipeLinesField } from './recipe-lines-field';
+import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
 import { RecipeStepsField } from './recipe-steps-field';
 import {
   buildRecipePayload,
   createLocalKey,
   extractFieldError,
   extractGeneralLinesError,
+  extractGeneralToolsError,
   extractLineErrors,
   extractStepErrors,
+  extractToolErrors,
   toLineFormValues,
   toToolFormValues,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeStepErrors,
   type RecipeStepFormValue,
+  type RecipeToolErrors,
 } from './recipe-form-state';
 
 /**
@@ -137,6 +140,8 @@ type FieldErrors = {
   readonly description?: string;
   readonly lines?: RecipeLineErrors;
   readonly linesGeneral?: string;
+  readonly tools?: RecipeToolErrors;
+  readonly toolsGeneral?: string;
   readonly steps?: RecipeStepErrors;
 };
 
@@ -233,6 +238,8 @@ export function RecipeForm(props: RecipeFormProps) {
         description: extractFieldError(issues, 'description'),
         lines: extractLineErrors(issues),
         linesGeneral: extractGeneralLinesError(issues),
+        tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
+        toolsGeneral: extractGeneralToolsError(issues),
         steps: extractStepErrors(issues),
       });
       // R23: la validación previa rechazada tampoco invoca la operación, pero SÍ es un rechazo
@@ -424,6 +431,8 @@ export function RecipeForm(props: RecipeFormProps) {
         initialMachinePage={props.initialMachinePage}
         errors={fieldErrors.lines}
         generalError={fieldErrors.linesGeneral}
+        toolErrors={fieldErrors.tools}
+        toolsGeneralError={fieldErrors.toolsGeneral}
       />
 
       <RecipeStepsField

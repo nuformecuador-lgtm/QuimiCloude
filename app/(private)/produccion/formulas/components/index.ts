@@ -72,6 +72,7 @@ export {
 } from './recipe-form-state';
 export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
 export {
+  RECIPE_TOOL_ERROR_MESSAGES,
   RecipeLinesField,
   clampPercentageToRemaining,
   referenceAmountForPercentage,

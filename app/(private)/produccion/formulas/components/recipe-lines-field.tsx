@@ -23,6 +23,7 @@ import {
   createLocalKey,
   type RecipeLineErrors,
   type RecipeLineFormValue,
+  type RecipeToolErrorMessages,
   type RecipeToolErrors,
   type RecipeToolFormValue,
 } from './recipe-form-state';
@@ -65,6 +66,11 @@ function productPickerLabel(
   if (productName === '') return emptyLabel;
   return productName;
 }
+
+export const RECIPE_TOOL_ERROR_MESSAGES: RecipeToolErrorMessages = {
+  productId: 'Elige una herramienta.',
+  quantity: 'La cantidad debe ser un número entero mayor que 0.',
+};
 
 /** Más dígitos que el tope del contrato no aportan nada y desbordarían el entero. */
 const MAX_TOOL_QUANTITY_DIGITS = 10;
