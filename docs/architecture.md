@@ -32,11 +32,11 @@ consecuencias de arquitectura que no son opinables:
      autoriza por si solo**.
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
      columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
-     y cerrada de ocho tablas: los catalogos compartidos por todas las empresas
+     y cerrada de nueve tablas: los catalogos compartidos por todas las empresas
      (`document_types`, `roles`, `permissions`, `role_permissions`), la propia empresa
      (`companies`), las que cuelgan de un usuario que ya tiene empresa
-     (`credential_setup_tokens`, `revoked_sessions`) y la que hereda la empresa de su
-     receta (`recipe_lines`). La tabla de usuarios no es exenta: lleva su empresa. La
+     (`credential_setup_tokens`, `revoked_sessions`) y las que heredan la empresa de su
+     receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La
      lista la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`, que la guarda
      con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por

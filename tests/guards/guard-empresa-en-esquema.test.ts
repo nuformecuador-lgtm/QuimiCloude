@@ -92,6 +92,7 @@ export const EXENTAS: readonly Exenta[] = [
   { tabla: 'credential_setup_tokens', motivo: 'cuelga de un usuario: la empresa es la de su ficha, o ninguna si es el Maestro' },
   { tabla: 'revoked_sessions', motivo: 'cuelga de un usuario: la empresa es la de su ficha, o ninguna si es el Maestro' },
   { tabla: 'recipe_lines', motivo: 'hereda la empresa de la receta a la que pertenece' },
+  { tabla: 'recipe_tools', motivo: 'hereda la empresa de la receta a la que pertenece' },
 ]
 
 function mensajeSinEmpresa(modelo: ModeloLeido): string {
@@ -258,7 +259,7 @@ describe('guardia — company_id en el esquema', () => {
     ])
   })
 
-  it('R7 EXENTAS son exactamente las ocho y users no esta', () => {
+  it('R7 EXENTAS son exactamente las nueve y users no esta', () => {
     const tablas = EXENTAS.map((exenta) => exenta.tabla)
     expect(new Set(tablas)).toEqual(
       new Set([
@@ -270,9 +271,10 @@ describe('guardia — company_id en el esquema', () => {
         'credential_setup_tokens',
         'revoked_sessions',
         'recipe_lines',
+        'recipe_tools',
       ]),
     )
-    expect(tablas).toHaveLength(8)
+    expect(tablas).toHaveLength(9)
     expect(tablas).not.toContain('users')
   })
 
@@ -335,7 +337,7 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens` y',
-      '     `revoked_sessions`.',
+      '     `revoked_sessions` y `recipe_tools`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletSinRecipeLines, EXENTAS)).toEqual([
@@ -346,7 +348,7 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens`,',
-      '     `revoked_sessions`, `recipe_lines` y `users`.',
+      '     `revoked_sessions`, `recipe_lines`, `recipe_tools` y `users`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletConUsersDeMas, EXENTAS)).toEqual([

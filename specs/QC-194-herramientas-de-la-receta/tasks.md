@@ -28,7 +28,7 @@ discrepancia con `design.md` está avisada al leader antes de T1.
 
 ## Tanda 1 — base, contrato y piezas puras
 
-### T1 [P] — Migración y esquema `recipe_tools`
+### T1 [P] — Migración y esquema `recipe_tools` [x]
 Tras T0 y P1. **Quién:** backend_dev. **Toca:** `db/schema.prisma`,
 `db/migrations/20261003120000_recipe_tools/{migration.sql,down.sql}` (nuevos),
 `tests/unit/recetas/schema/recipe-tools-migration.test.ts` (nuevo),
