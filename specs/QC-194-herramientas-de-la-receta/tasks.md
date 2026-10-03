@@ -11,7 +11,7 @@
 
 ## Tanda 0 — medición
 
-### T0 — Medir antes de tocar
+### T0 — Medir antes de tocar [x]
 **Quién:** implementer. **Toca:** solo `progress/impl_QC-194-herramientas-de-la-receta.md` (nuevo).
 **Hacer:**
 1. Reverificar cada fila de `design.md > 0` con archivo:línea (puede haber entrado `dev`), y el último
