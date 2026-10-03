@@ -329,3 +329,121 @@ Gate `./init.sh --rapido`: **`✗ typecheck`**, solo por el carril frontend sin 
 `tests/unit/inventario-ui/envase-en-inventario.test.tsx` (3 errores TS2322 contra
 `ProductBatchesPanelProps`/`AdjustBatchDialogProps`). `tsc --noEmit` sin errores fuera de
 `tests/unit/inventario-ui/` y `tests/unit/pedidos-ui/`. Lo demás, corrido aparte arriba.
+
+## T12 — Selector de envases (frontend_dev, 2026-10-03) — commit `7eb0553f`
+
+Archivos: `app/(private)/pedidos/components/packaging-select.tsx` (nuevo), `components/index.ts`
+(barrel), `tests/unit/pedidos-ui/packaging-select.test.tsx` (nuevo); dobles de
+`product-actions` añadidos a `order-list-section`, `order-sheet` y `pedidos-viewport` (su barrel
+ahora importa el selector, que arrastraria `@/lib/composition`).
+
+| R | Test (`tests/unit/pedidos-ui/packaging-select.test.tsx`) |
+|---|---|
+| R8 | «R8: pide solo envases con presentacion en las unidades compatibles con la del pedido», «R8: la busqueda viaja al servidor con los mismos filtros», «R8: escribir algo distinto de lo elegido retira la eleccion» |
+| R10 | «R10: cada opcion muestra nombre, presentacion y disponible en envases», «R10: el envase con disponible cero tambien se ofrece y se puede elegir» |
+| R38 | «R38: sin permiso de consultar inventario avisa y no lista ningun envase», «R38: un rechazo distinto del permiso no se pinta como falta de permiso», «R38: si la accion no responde se pinta el inesperado con su referencia…» (este ultimo, añadido en T13) |
+
+Salida real: `vitest run packaging-select.test.tsx` → `Tests 7 passed (7)`; tras T13, 8/8.
+Gate `./init.sh --rapido`: typecheck ✓, lint ✓, `test:rapido` `Test Files 9 failed | 368 passed`:
+6 en `tests/baseline-rojos.json` (`recetas/module-contract`, `configuracion-ui/unidades-viewport`,
+`configuracion-ui/usuarios-viewport`, `navegacion/pantallas-exigen-permiso`,
+`inventario/product-page`, `recetas-ui/recipe-page`) y 3 mios (`order-list-section`, `order-sheet`,
+`pedidos-viewport`: faltaba el doble de `product-actions`), arreglados antes del commit:
+`Test Files 4 passed (4) Tests 70 passed (70)`. Guardias aparte: `51 passed (51)`.
+
+## T13 — Formulario y «Reparto y unidad» en envases (frontend_dev, 2026-10-03) — commit `1fa8dc58`
+
+Archivos: `order-distribution-field.tsx`, `order-distribution-dialog.tsx`, `order-form.tsx`,
+`use-order-distribution-availability.ts` (gana `packagingProductId`/`packagingName`/`available`
+opcionales en `OrderDistributionLine`, `isLegacyLine`, `lineKey`, `distributionLinesValid`,
+`toDistributionLinesInput`), `use-order-cost-quote.ts` (`onDistributionChange`),
+`packaging-select.tsx` (conserva el `ErrorState` entero), barrel; tests de `pedidos-ui`
+`order-distribution-field`, `order-distribution-dialog`, `order-form`, `order-form-quote`.
+`use-saved-line-contents.ts` no cambia: una linea guardada con envase trae `presentationId` y
+`presentationName`, y resuelve su contenido igual que una antigua.
+
+Decisiones de interfaz (no cambian el contrato):
+- La linea antigua se pinta marcada («Anterior a los envases») y sus envases son de solo lectura:
+  R34 rechaza una antigua cambiada, asi que la UI solo permite conservarla (R35) o quitarla.
+- **Validacion previa del reparto en cliente, provisional.** `createOrderSchema`,
+  `orderPresentationAvailabilitySchema` y `quoteOrderCostSchema` siguen con la linea de hoy
+  (`presentationId` obligatorio) hasta T6/T8/T9. Para no depender de eso, el formulario valida con
+  el esquema el resto de campos (`presentationLines: []`) y el reparto con
+  `distributionLinesValid` (envases enteros > 0, sin envase ni presentacion repetidos); el hook
+  del disponible valida `quantity`/`unitId` con `orderPresentationAvailabilitySchema.pick`. Cuando
+  T6 publique el esquema con la union, conviene volver a validar el reparto con el esquema (T17).
+- La cotizacion solo envia `presentationLines` con lineas de envase (las antiguas no cuestan,
+  §11.6) y solo si hay alguna; con envases no validos no cotiza (guion).
+
+| R | Test |
+|---|---|
+| R29 (UI) | `order-form-quote.test.tsx` › «R29: cambiar los envases de una linea vuelve a cotizar con el reparto en envases», «R29: anadir un envase en el alta vuelve a cotizar con esa linea», «R29: cambiar la cantidad cotiza con el reparto vigente», «R29: las lineas antiguas no viajan a la cotizacion porque no tienen envase», «R29: con envases no validos en el reparto no cotiza y muestra el guion» |
+| R36 | `order-distribution-field.test.tsx` › «R36: el titulo dice que el reparto es en envases», «R36: el envase elegido se anade como linea con su nombre, su presentacion y sus envases», «R36: la linea muestra lo que cubre en la unidad del pedido, convirtiendo ml a L»; `order-form.test.tsx` › «R36: el selector del reparto es de envases…», «R36: las lineas anadidas viajan en el alta con el envase, la presentacion vacia y los envases», «R36: la edicion precarga unidad y reparto en envases, y permite cambiar los envases» |
+| R37 | `order-distribution-dialog.test.tsx` › «R37: el aviso order_would_block muestra la misma confirmacion que el formulario del pedido», «R17/R37: confirmar reenvia el mismo reparto con confirmBlocked y cierra al guardar», «R37: sin confirmar no se reenvia nada y el dialogo sigue abierto» |
+| R17 (UI) | `order-distribution-dialog.test.tsx` › «R17/R37: confirmar reenvia…»; `order-form.test.tsx` › «R8: en la edicion, «Guardar bloqueado» reenvia al mismo pedido…» (ahora comprueba tambien el campo del envase en el reenvio) |
+| R18 (UI) | `order-distribution-dialog.test.tsx` › «R18: insufficient_material se pinta como error y el dialogo no pide confirmar» |
+| R35 (UI) | `order-distribution-field.test.tsx` › «R35: la linea antigua se pinta con su presentacion, marcada…», «R35: sus envases no se pueden cambiar, solo quitar la linea», «R35: el disponible se pide con la linea antigua por su presentacion»; `order-form.test.tsx` › «R35: una linea antigua se reenvia sin cambios por su presentacion y sin envase»; `order-distribution-dialog.test.tsx` › «R35: una linea antigua se reenvia tal cual, por su presentacion» |
+| R8, R10, R12, R38 (UI del campo) | `order-distribution-field.test.tsx` › «R8: el selector solo pide envases…», «R10: un envase con disponible cero tambien se puede anadir al reparto», «R12: el mismo envase dos veces no se puede anadir», «R12: otro envase con la misma presentacion que una linea no se puede anadir», «R38: sin permiso de consultar inventario avisa, no lista envases y conserva las lineas» |
+| R11 (UI) | `order-distribution-field.test.tsx` › «R11: el envase que ya no vuelve del catalogo marca su linea y avisa»; `order-form.test.tsx` › «R11: el rechazo product_not_found del envase se pinta junto al reparto» |
+
+Salida real:
+```
+$ pnpm exec vitest run tests/unit/pedidos-ui tests/unit/shared-ui
+ Test Files  40 passed (40)      Tests  603 passed | 3 skipped (606)
+$ pnpm exec vitest run tests/unit/pedidos-ui   (tras el ajuste de packaging-select)
+ Test Files  37 passed (37)      Tests  569 passed | 3 skipped (572)
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)      Tests  671 passed | 11 skipped (682)
+$ eslint app/(private)/pedidos/components tests/unit/pedidos-ui   → 0 problemas
+```
+Gate `./init.sh --rapido`: typecheck ✓, lint ✓, `test:rapido` `Test Files 6 failed | 374 passed
+(380)`; los 6 son los de `tests/baseline-rojos.json` listados en T12. Guardias aparte arriba (la
+primera corrida de guardias de backend_dev vio `guard-identificador-de-request` rojo sobre una
+version intermedia del dialogo, que aplanaba el aviso a `string`; la final guarda mensaje y
+borrador juntos y ademas `guard-catalogo-de-errores` pide no traducir con `instanceof`: ambas
+verdes).
+
+## T3 — `PackagingCatalog` (backend_dev, 2026-10-03) — commit `1fa8dc58`
+
+Archivos: `lib/modules/inventario/domain/packaging-catalog.ts` (nuevo: `PackagingRef`,
+`PackagingCostingBatch`, `PackagingCatalog` con la firma de §3.1), barrel de `inventario` (solo
+tipos), `lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma.ts` (nuevo:
+`findPackagingRefs`, `findPackagingCostingBatches`), `lib/composition/index.ts`
+(`export const packagingCatalog: PackagingCatalog`; exportado porque aún no lo consume ningún caso
+de uso —lo hará T6 en `pedidos`— y una constante sin uso la marcaría el lint),
+`tests/integration/inventario/qc195-packaging-catalog.int.test.ts` (censo `commit`, con motivo).
+
+Notas: tipo vía `PRODUCT_TYPES.PACKAGING`, ámbito con `productCompanyScope`/
+`presentationCompanyScope`/`batchCompanyScope`, disponible con `findReservedAndAvailableByBatch`
+(el mismo agregado de siempre). `findCostingBatches` filtra lotes con `stock > 0`, `unit_cost` no
+nulo y disponible (tras `excludeOrderId`) > 0.
+
+R → test (`tests/integration/inventario/qc195-packaging-catalog.int.test.ts`):
+- R11 › «R11 — findRefs solo devuelve envases vivos, de la empresa y con presentacion fija» (fuera: legado sin presentación, materia prima, borrado, de otra empresa, inexistente)
+- R10, R30 › «R10, R30 — el disponible es en envases, descuenta lo apartado y con excludeOrderId cuenta lo del propio pedido»
+- R10 › «R10 — un envase con disponible cero tambien vuelve»
+- R27, R30 › «R27, R30 — findCostingBatches devuelve costo y disponible por lote, sin los lotes sin disponible»
+- R11 › «R11 — findCostingBatches ignora lo que no es un envase con presentacion fija de la empresa»
+
+Salida real:
+```
+$ pnpm exec vitest run --project integration tests/integration/inventario/qc195-packaging-catalog.int.test.ts
+ Test Files  1 passed (1)      Tests  5 passed (5)
+$ pnpm exec vitest run guard --passWithNoTests     (incluye guard-tipos-de-producto, guard-arquitectura-modulos, guard-ambito-empresa-inventario)
+ Test Files  51 passed (51)    Tests  672 passed | 11 skipped (683)
+```
+(Un primer intento con un envase de existencia 0 cayó por `inventory_movements_quantity_not_zero`:
+el alta con existencia 0 ya se rechaza hoy para cualquier producto; el caso se reescribió apartando
+todo el lote.)
+
+Gate `./init.sh --rapido` tras el commit:
+```
+✓ typecheck paso
+✓ lint paso
+ Test Files  6 failed | 392 passed (398)
+      Tests  8 failed | 5890 passed | 9 skipped (5907)
+✗ 'pnpm run test:rapido' fallo
+```
+Los 6 rojos, todos en `tests/baseline-rojos.json`: `recetas/module-contract`,
+`configuracion-ui/unidades-viewport`, `configuracion-ui/usuarios-viewport`, `inventario/product-page`,
+`navegacion/pantallas-exigen-permiso`, `recetas-ui/recipe-page`. Guardias corridas aparte (arriba): verdes.
