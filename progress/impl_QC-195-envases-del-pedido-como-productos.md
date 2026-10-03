@@ -617,3 +617,17 @@ segundo plano se cortó dos veces por el límite de tiempo de la herramienta, co
 baseline). Lo que llegó a salir antes del corte son los mismos archivos del baseline. Sustituido por
 las corridas `related`/guardias de arriba. **El implementer debería repetir `./init.sh --rapido` con la
 máquina libre.**
+
+## Implementer — gate de la tanda 1 (TC + T1-T5 + T11 + T12-T15), punta 4b18eec9
+
+`./init.sh --rapido` con la maquina libre (sin subagentes corriendo):
+- typecheck paso; lint paso.
+- `test:rapido` (related, 401 archivos): `Test Files 6 failed | 395 passed (401)`, `Tests 8 failed | 5914 passed | 9 skipped (5931)`.
+  Los 6 rojos estan todos en `tests/baseline-rojos.json`: `configuracion-ui/unidades-viewport`,
+  `configuracion-ui/usuarios-viewport`, `inventario/product-page`, `navegacion/pantallas-exigen-permiso`,
+  `recetas-ui/recipe-page`, `recetas/module-contract`. El modo rapido no consulta el baseline.
+- Como el related fallo, el script no lanzo las guardias; corridas aparte (`vitest run guard`):
+  `Test Files 51 passed (51)`, `Tests 672 passed | 11 skipped (683)`.
+
+Tasks marcadas [x]: T0, TC, T1-T5, T12-T14. Abiertas con pregunta al leader: T11 (lectura de P4 en
+versiones) y T15 (packagingName en pantallas de empaque/ejecucion de `asignaciones`).

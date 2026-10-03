@@ -55,7 +55,7 @@ backend necesita cambiarlo, lo dice antes en `progress/impl_QC-195.md` y avisa a
 
 ## Carril backend
 
-### [ ] T1 — Migración y esquema `[depende de T0]`
+### [x] T1 — Migración y esquema `[depende de T0]`
 
 - `db/migrations/<ts>_packaging_products_in_distribution/migration.sql` y `down.sql`
   (`design.md > 2`): CHECK `products_finished_identity_matches_type` con cuerpo nuevo y mismo
@@ -71,7 +71,7 @@ backend necesita cambiarlo, lo dice antes en `progress/impl_QC-195.md` y avisa a
 **Hecho cuando:** `pnpm run db:migrate` aplica y `down.sql` revierte sobre una base de prueba; R5 y
 R32 verdes; `inventario-constraints.int.test.ts` sigue verde.
 
-### [ ] T2 — El envase en inventario: alta, lote y ajuste `[depende de T1]`
+### [x] T2 — El envase en inventario: alta, lote y ajuste `[depende de T1]`
 
 - `product-input.ts`: el alta de PACKAGING lleva la presentación en el producto; existencia entera en
   alta y ajuste (N3).
@@ -82,7 +82,7 @@ R32 verdes; `inventario-constraints.int.test.ts` sigue verde.
 **Hecho cuando:** unit e integración verdes para **R1, R2, R3, R4, R6, R7**; los 6 casos PACKAGING de
 `product-input.test.ts` reescritos contra R1/R7; los errores coinciden con `design.md > 11.9`.
 
-### [ ] T3 — `PackagingCatalog` (solo servidor) `[depende de T1]` `[P con T2]`
+### [x] T3 — `PackagingCatalog` (solo servidor) `[depende de T1]` `[P con T2]`
 
 - Puerto, adaptador Prisma, barrel y cableado. `findRefs` y `findCostingBatches` (`design.md > 3.1`).
   Sin listado: el selector va por T4.
@@ -91,7 +91,7 @@ R32 verdes; `inventario-constraints.int.test.ts` sigue verde.
 disponible y costo por envase; `guard-tipos-de-producto`, `guard-arquitectura-modulos` y
 `guard-ambito-empresa-inventario` verdes.
 
-### [ ] T4 — Listado de productos para el selector `[depende de T1, TC]` `[P con T2, T3]`
+### [x] T4 — Listado de productos para el selector `[depende de T1, TC]` `[P con T2, T3]`
 
 - `PRODUCT_QUERYABLE` gana `presentationUnitId: 'select'` (solo presentación fija con contenido).
 - `listAliveProducts` rellena los cuatro campos de presentación de `ProductView`.
@@ -101,7 +101,7 @@ los envases en `l`/`ml` con contenido y no los de `kg`/`g` ni los legados (**R8,
 incluye los de cero (**R10**); sin `inventario.consultar` responde `unauthorized` (**R38**, lado
 servidor); los tests de listas blancas de `design.md > 8` ampliados y verdes.
 
-### [ ] T5 — `consumeForOrder` por subconjunto de productos `[depende de T0]` `[P con T1-T4]`
+### [x] T5 — `consumeForOrder` por subconjunto de productos `[depende de T0]` `[P con T1-T4]`
 
 - `MaterialReservations.consumeForOrder` gana `productIds?`; sin él, idéntico a hoy.
 
@@ -166,7 +166,7 @@ FINISHED_PRODUCT siguen verdes sin tocar; `guard-tipos-de-producto` verde.
 
 ## Carril frontend (dependen solo de TC)
 
-### [ ] T12 — Selector de envases `[frontend_dev]` `[depende de TC]` `[P con T13-T15 y con todo el carril backend]`
+### [x] T12 — Selector de envases `[frontend_dev]` `[depende de TC]` `[P con T13-T15 y con todo el carril backend]`
 
 - `PackagingSelect` en `app/(private)/pedidos/components/`, sobre `listProductsAction` con la
   consulta de `design.md > 11.2`. Firma de props (la usa T13 sin esperar a esta task):
@@ -185,7 +185,7 @@ FINISHED_PRODUCT siguen verdes sin tocar; `guard-tipos-de-producto` verde.
 
 **Hecho cuando:** unit de UI con doble de `listProductsAction` verdes para **R8, R10, R38**.
 
-### [ ] T13 — Formulario del pedido y diálogo «Reparto y unidad» `[frontend_dev]` `[depende de TC]` `[P con T12, T14, T15]`
+### [x] T13 — Formulario del pedido y diálogo «Reparto y unidad» `[frontend_dev]` `[depende de TC]` `[P con T12, T14, T15]`
 
 - `order-distribution-field.tsx`, `order-form.tsx`, `use-order-distribution-availability.ts`,
   `use-saved-line-contents.ts`, `use-order-cost-quote.ts`: líneas con envase y campo
@@ -198,7 +198,7 @@ FINISHED_PRODUCT siguen verdes sin tocar; `guard-tipos-de-producto` verde.
 **Hecho cuando:** unit de UI verdes para **R29 (UI), R36, R37** y el lado de interfaz de **R17,
 R35**; tests de `pedidos-ui` adaptados.
 
-### [ ] T14 — Inventario: formulario y panel de lotes del envase `[frontend_dev]` `[depende de TC]` `[P con T12, T13, T15]`
+### [x] T14 — Inventario: formulario y panel de lotes del envase `[frontend_dev]` `[depende de TC]` `[P con T12, T13, T15]`
 
 - `product-form.tsx`: presentación en el producto para Envase, existencia entera en envases.
 - `product-batches-panel.tsx`: lote de envase en `u`, con la presentación del producto.
