@@ -15,7 +15,7 @@
 > caso; el código de producción no cita fichas ni requisitos (`docs/conventions.md > Comentarios`).
 > `[P]` = paralelizable con las que se indican.
 
-## [ ] T0 — Recontraste y P4 `[backend_dev]` `[P con TC]`
+## [x] T0 — Recontraste y P4 `[backend_dev]` `[P con TC]`
 
 - Confirmar que las referencias `archivo:línea` de `design.md > 6` y `> 11` siguen valiendo sobre la
   punta de `dev`; anotar en `progress/impl_QC-195.md` las que se movieron.
@@ -27,7 +27,7 @@
 **Hecho cuando:** `progress/impl_QC-195.md` tiene el recontraste y el `./init.sh --rapido` de partida
 en verde. (P4 decidida: A.)
 
-## [ ] TC — Contrato front↔back: tipos y firmas `[backend_dev]` `[bloquea a T12-T15]`
+## [x] TC — Contrato front↔back: tipos y firmas `[backend_dev]` `[bloquea a T12-T15]`
 
 Escribe **solo** lo que `design.md > 11` marca como NEW en tipos exportados y constantes, sin
 comportamiento. `docs/conventions.md` no fija una convención de stubs, y un código
