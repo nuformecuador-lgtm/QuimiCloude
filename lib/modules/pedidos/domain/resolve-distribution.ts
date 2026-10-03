@@ -27,6 +27,11 @@ export type PresentationLineInput = {
   readonly packages: number;
 };
 
+/** Una linea del reparto que nombra su envase, o una antigua que se reenvia tal cual estaba. */
+export type DistributionLineInput =
+  | { readonly packagingProductId: string; readonly packages: number }
+  | PresentationLineInput;
+
 /**
  * Resuelve, valida y traduce. Sin fallo, devuelve las lineas YA con el contenido copiado en
  * este instante y listas para el puerto de escritura. Con fallo, lanza sin haber devuelto

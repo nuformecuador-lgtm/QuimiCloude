@@ -34,6 +34,7 @@ export {
   PRODUCT_QUERYABLE,
   PRODUCT_TYPE_VALUES,
   MANUAL_PRODUCT_TYPE_VALUES,
+  PRODUCT_PRESENTATION_UNIT_FILTER,
 } from './domain/product-queryable';
 export { PRODUCT_TYPES, type ProductType } from './domain/product-type';
 export { normalizePresentationName } from './domain/presentation-name';

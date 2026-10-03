@@ -6,6 +6,7 @@ import {
   ORDER_STATUS_VALUES,
   type OrderStatus,
 } from './order-classification';
+import type { DistributionLineInput } from './resolve-distribution';
 
 /**
  * Esquemas de entrada de los seis casos de uso (`design.md > 7.1-7.3`). Validacion de BORDE
@@ -88,6 +89,7 @@ export const presentationLinesSchema = z
 /** Nombres de los campos repetidos con que el formulario envia el reparto, en orden. */
 export const ORDER_DISTRIBUTION_PRESENTATION_FIELD = 'presentationLines.presentationId';
 export const ORDER_DISTRIBUTION_PACKAGES_FIELD = 'presentationLines.packages';
+export const ORDER_DISTRIBUTION_PACKAGING_FIELD = 'presentationLines.packagingProductId';
 
 /**
  * Alta (R8, R9). Lo que este esquema NO declara, no puede llegar: no hay `status`, ni
@@ -188,7 +190,10 @@ export const quoteOrderCostSchema = createOrderSchema
   .pick({ recipeId: true, quantity: true })
   .extend({ orderId: z.string().uuid().optional() });
 
-export type QuoteOrderCostInput = z.infer<typeof quoteOrderCostSchema>;
+export type QuoteOrderCostInput = z.infer<typeof quoteOrderCostSchema> & {
+  /** Las lineas antiguas no suman costo de envase. */
+  readonly presentationLines?: readonly DistributionLineInput[];
+};
 
 /**
  * «Cuanto queda disponible», de solo lectura. Comparte forma con el
@@ -217,4 +222,11 @@ export const updateOrderDistributionSchema = z
   })
   .strict();
 
-export type UpdateOrderDistributionInput = z.infer<typeof updateOrderDistributionSchema>;
+export type UpdateOrderDistributionInput = Omit<
+  z.infer<typeof updateOrderDistributionSchema>,
+  'presentationLines'
+> & {
+  readonly presentationLines: readonly DistributionLineInput[];
+  /** Permiso explicito para dejar el pedido bloqueado si un envase o material no alcanza. */
+  readonly confirmBlocked?: boolean;
+};

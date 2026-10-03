@@ -29,3 +29,6 @@ export const PRODUCT_QUERYABLE: ListQueryable = {
 } as const satisfies ListQueryable & { filterable: { type: 'select' } };
 
 export { PRODUCT_TYPE_VALUES, MANUAL_PRODUCT_TYPE_VALUES };
+
+/** Filtra por la unidad del contenido de la presentacion fija del producto, no por `unitId`. */
+export const PRODUCT_PRESENTATION_UNIT_FILTER = 'presentationUnitId';

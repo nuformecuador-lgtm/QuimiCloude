@@ -43,6 +43,10 @@ export type OrderPresentationLineView = {
   /** `null` solo si la presentacion no vuelve del catalogo. */
   readonly presentationName: string | null;
   readonly packages: number;
+  /** `null` en una linea anterior a que el reparto nombrara su envase. */
+  readonly packagingProductId?: string | null;
+  /** `null` en esa linea antigua, o si el envase no vuelve del catalogo. */
+  readonly packagingName?: string | null;
 };
 
 /**

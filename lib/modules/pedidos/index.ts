@@ -97,6 +97,7 @@ export {
   presentationLinesSchema,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   orderPresentationAvailabilitySchema,
   updateOrderDistributionSchema,
   EDITABLE_STATUS_VALUES,
@@ -215,4 +216,6 @@ export { createQuoteOrderPresentationAvailability } from './domain/order-present
 export type {
   OrderPresentationAvailability,
   OrderPresentationAvailabilityDeps,
+  OrderPresentationAvailabilityNext,
 } from './domain/order-presentation-availability';
+export type { DistributionLineInput, PresentationLineInput } from './domain/resolve-distribution';

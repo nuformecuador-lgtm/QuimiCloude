@@ -63,4 +63,10 @@ export type ProductView = {
   readonly reserved?: string;
   /** Suma de lo disponible en los lotes vivos del producto. Misma condicion que `reserved`. */
   readonly available?: string;
+  /** Presentacion fija del producto; `null` si no la tiene (un envase anterior a tenerla). */
+  readonly presentationId?: string | null;
+  readonly presentationName?: string | null;
+  /** Contenido de un envase, en `presentationUnitId`. */
+  readonly presentationContent?: string | null;
+  readonly presentationUnitId?: UnitId | null;
 };

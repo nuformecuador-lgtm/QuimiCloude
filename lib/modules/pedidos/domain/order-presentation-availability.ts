@@ -32,6 +32,12 @@ export type OrderPresentationAvailability =
   | { readonly kind: 'unit_not_found' }
   | { readonly kind: 'presentation_not_found' };
 
+/** Lo anterior mas el envase que no vuelve del catalogo: por separado para no abrir los `switch`
+ *  exhaustivos que hoy cubren `OrderPresentationAvailability`. */
+export type OrderPresentationAvailabilityNext =
+  | OrderPresentationAvailability
+  | { readonly kind: 'packaging_not_found'; readonly packagingProductId: string };
+
 export function createQuoteOrderPresentationAvailability(
   deps: OrderPresentationAvailabilityDeps,
 ): (input: unknown, actor: Actor | null | undefined) => Promise<OrderPresentationAvailability> {
