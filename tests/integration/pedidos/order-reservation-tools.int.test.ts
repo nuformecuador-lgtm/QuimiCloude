@@ -1,6 +1,6 @@
 /**
- * Las herramientas de una receta no reservan, no consumen y no cuestan: crear, revisar bloqueados,
- * pasar a curso y Finalizar contra Postgres real, con los casos de uso de `pedidos` cableados a
+ * Las herramientas de una receta no reservan, no consumen y no cuestan: crear, editar, revisar
+ * bloqueados, pasar a curso y Finalizar contra Postgres real, con los casos de uso de `pedidos` cableados a
  * mano con los adaptadores driven REALES de `pedidos`, `recetas`, `inventario` y `unidades`, igual
  * que `order-reservation.int.test.ts`.
  *
@@ -40,7 +40,12 @@ import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { createCreateOrder, createReviewBlockedOrders, createTransitionOrder } from '@/lib/modules/pedidos';
+import {
+  createCreateOrder,
+  createReviewBlockedOrders,
+  createTransitionOrder,
+  createUpdateOrder,
+} from '@/lib/modules/pedidos';
 
 import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -95,6 +100,7 @@ const units: UnitCatalog = {
 
 const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork });
+const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork });
 const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
 // ---------------------------------------------------------------------------
@@ -318,6 +324,42 @@ describe('herramientas frente a reserva y consumo', () => {
       expect(await stockDe(ingrediente.batchId)).toBe('90.0000');
       expect(
         await prisma.reservationMovement.count({ where: { orderId: { in: [creado.id, bloqueado.id] } } }),
+      ).toBeGreaterThan(0);
+    } finally {
+      await borrarFixture(fixture);
+    }
+  });
+
+  it('R8: editar un pedido cuya receta tiene herramientas no aparta nada sobre ellas ni lo bloquea por ellas', async () => {
+    const fixture = await crearFixture();
+    try {
+      const ingrediente = await productoConLote(fixture, 'PRODUCT', '100');
+      const conLotes = await productoConLote(fixture, 'MACHINE', '5');
+      const sinStock = await maquinaSinStock(fixture);
+      const recipeId = await receta(fixture, ingrediente.productId, [
+        { productId: conLotes.productId, quantity: 2 },
+        { productId: sinStock, quantity: 1 },
+      ]);
+      const herramientas = [conLotes.batchId];
+      const antes = await asientosSobre(herramientas);
+
+      const pedido = await createOrder({ recipeId, quantity: '10.0000', unitId: fixture.unitId }, actorDe(fixture));
+      const editar = (quantity: string, confirmBlocked = false): Promise<void> =>
+        updateOrder(pedido.id, { recipeId, quantity, unitId: fixture.unitId, confirmBlocked }, actorDe(fixture));
+
+      await editar('50.0000');
+      expect((await filaDe(pedido.id)).status).toBe('PENDIENTE');
+
+      await editar('200.0000', true);
+      expect((await filaDe(pedido.id)).status).toBe('BLOQUEADO');
+
+      await editar('30.0000');
+      expect((await filaDe(pedido.id)).status).toBe('PENDIENTE');
+
+      expect(await asientosSobre(herramientas)).toEqual(antes);
+      expect(await stockDe(conLotes.batchId)).toBe('5.0000');
+      expect(
+        await prisma.reservationMovement.count({ where: { orderId: pedido.id, batchId: ingrediente.batchId } }),
       ).toBeGreaterThan(0);
     } finally {
       await borrarFixture(fixture);
