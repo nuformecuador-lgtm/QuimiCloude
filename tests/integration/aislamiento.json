@@ -379,6 +379,11 @@
       "desde": "2026-10-01"
     },
     {
+      "archivo": "recetas/recipe-tools.int.test.ts",
+      "motivo": "QC-194 T4/T5: ejercita la escritura de herramientas de `recipe-prisma.ts` (`createRecipe`, `createRecipeVersion`, `replaceAliveRecipe`, `replaceAliveRecipeWithPropagation`) y los casos de uso de `recetas` e `inventario` cableados por `@/lib/composition`; todos usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no los envolveria, y R15 necesita ver la receta tal como quedo tras un rollback REAL del adaptador. Una empresa efimera (randomUUID) nace en `beforeAll` y muere en `afterAll` en el orden de las FK: versiones -> originales (sus lineas y herramientas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. El caso del fallo forzado crea un trigger acotado a UNA receta y lo borra en un `finally`. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-03"
+    },
+    {
       "archivo": "recetas/company-scope-queries.int.test.ts",
       "motivo": "Nacido con QC-77 ya en pie (QC-50 T23): siembra recetas y lineas de DOS empresas efimeras a la vez y llama directamente a los adaptadores driven de 'recetas' ('recipe-prisma.ts' y 'recipe-catalog-prisma.ts') y a las costuras de 'inventario' ('findProductRefs') y 'unidades' ('findUnitRefs'). Esos adaptadores usan el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria -correrian en otra conexion del pool y verian una base vacia-. Committea y limpia lo suyo en el afterAll, por el id exacto de cada empresa, en el orden que exigen las FK (recetas, cuyas lineas caen con ON DELETE CASCADE -> producto y unidad propios -> usuario -> rol y tipo de documento -> empresa; la unidad de sistema compartida se borra la ultima). Los sub-casos de R11 que necesitan el 'meta.target' REAL de un 23505 SI abren su propia 'prisma.$transaction' con SAVEPOINT alrededor de la escritura que se espera que falle, y no dejan ninguna fila. El caso de R30 relaja FORCE ROW LEVEL SECURITY sobre 'recipes' y 'recipe_lines' y lo restaura en un 'finally'.",
       "desde": "2026-09-16"

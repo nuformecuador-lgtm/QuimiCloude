@@ -59,7 +59,7 @@ añade (R14); `isVersionUnderReview` no recibe herramientas (R16).
 
 ## Tanda 2 — servidor
 
-### T4 — Puerto y adaptador Prisma
+### T4 — Puerto y adaptador Prisma [x]
 Tras T1, T2, T3. **Quién:** backend_dev. **Toca:** `lib/modules/recetas/ports/recipe-repository.ts`,
 `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`,
 `tests/guards/guard-ambito-empresa-recetas.test.ts`,

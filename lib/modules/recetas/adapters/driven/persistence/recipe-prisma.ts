@@ -4,7 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
-import { isVersionUnderReview, propagateLines } from '../../../domain/recipe-version';
+import { isVersionUnderReview, propagateLines, propagateTools } from '../../../domain/recipe-version';
 import { ValidationError } from '../../../domain/errors';
 import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
@@ -21,6 +21,7 @@ import type {
   RecipeLineData,
   RecipeLineRow,
   RecipeRow,
+  RecipeToolData,
   ReplaceWithPropagationResult,
 } from '../../../ports/recipe-repository';
 
@@ -187,6 +188,13 @@ function isUniqueNameViolation(error: unknown): boolean {
   return false;
 }
 
+/** `23503`: un producto de linea o de herramienta que ya no existe. El conector no dice que FK
+ *  salto, pero en estas escrituras la receta, la empresa y el autor ya estan probados, asi que
+ *  solo puede ser un producto. */
+function isProductForeignKeyViolation(error: unknown): boolean {
+  return sqlStateOf(error) === '23503' || sqlStateOf(error) === 'P2003';
+}
+
 /** `23514`: el `CHECK` de rango de `percentage`. Nunca `'duplicate'`. */
 function isPercentageCheckViolation(error: unknown): boolean {
   return sqlStateOf(error) === '23514';
@@ -195,6 +203,7 @@ function isPercentageCheckViolation(error: unknown): boolean {
 /** Traduce el SQLSTATE al resultado discriminado del puerto, o relanza si no lo reconoce. */
 function translateWriteError(error: unknown): never {
   if (isPercentageCheckViolation(error)) throw new ValidationError();
+  if (isProductForeignKeyViolation(error)) throw new ValidationError();
   throw error;
 }
 
@@ -223,6 +232,13 @@ export async function createRecipe(
           create: data.lines.map((line) => ({
             productId: line.productId,
             percentage: toDecimalInput(line.percentage),
+          })),
+        },
+        tools: {
+          create: (data.tools ?? []).map((tool, index) => ({
+            productId: tool.productId,
+            quantity: tool.quantity,
+            createdAt: toolCreatedAt(now, index),
           })),
         },
       },
@@ -390,8 +406,14 @@ export async function listAliveRecipes(
 }
 
 /** Ids de linea final, para el paso 2 (`DELETE ... NOT IN`) de la conciliacion. */
-function productIdsOf(lines: readonly RecipeLineData[]): readonly string[] {
+function productIdsOf(lines: readonly { readonly productId: string }[]): readonly string[] {
   return lines.map((line) => line.productId);
+}
+
+/** `createdAt` creciente por posicion: las herramientas de una misma escritura compartirian el
+ *  `now()` de la transaccion y su orden de alta quedaria al azar del `id`. */
+function toolCreatedAt(now: Date, index: number): Date {
+  return new Date(now.getTime() + index);
 }
 
 /**
@@ -451,6 +473,28 @@ export async function replaceAliveRecipe(
             percentage: toDecimalInput(line.percentage),
           },
         });
+      }
+
+      if (data.tools !== null) {
+        const finalToolIds = productIdsOf(data.tools);
+        await tx.recipeTool.deleteMany({
+          where: {
+            recipeId: id,
+            ...(finalToolIds.length > 0 ? { productId: { notIn: [...finalToolIds] } } : {}),
+          },
+        });
+        for (const [index, tool] of data.tools.entries()) {
+          await tx.recipeTool.upsert({
+            where: { recipeId_productId: { recipeId: id, productId: tool.productId } },
+            create: {
+              recipeId: id,
+              productId: tool.productId,
+              quantity: tool.quantity,
+              createdAt: toolCreatedAt(now, index),
+            },
+            update: { quantity: tool.quantity },
+          });
+        }
       }
 
       return 'ok';
@@ -540,6 +584,13 @@ export async function createRecipeVersion(
               percentage: toDecimalInput(line.percentage),
             })),
           },
+          tools: {
+            create: data.tools.map((tool, index) => ({
+              productId: tool.productId,
+              quantity: tool.quantity,
+              createdAt: toolCreatedAt(now, index),
+            })),
+          },
         },
         select: { id: true },
       });
@@ -565,6 +616,10 @@ export async function listAliveRecipeVersions(
 
 function toLineData(line: { productId: string; percentage: Prisma.Decimal }): RecipeLineData {
   return { productId: line.productId, percentage: fromDecimalPercentage(line.percentage) };
+}
+
+function toToolData(tool: { productId: string; quantity: number }): RecipeToolData {
+  return { productId: tool.productId, quantity: tool.quantity };
 }
 
 /**
@@ -597,6 +652,9 @@ export async function replaceAliveRecipeWithPropagation(
       if (updated.count === 0) return 'not_found';
 
       const before = (await tx.recipeLine.findMany({ where: { recipeId: id } })).map(toLineData);
+      const tools = data.tools;
+      const beforeTools =
+        tools === null ? [] : (await tx.recipeTool.findMany({ where: { recipeId: id } })).map(toToolData);
 
       const finalProductIds = productIdsOf(data.lines);
       await tx.recipeLine.deleteMany({
@@ -611,6 +669,23 @@ export async function replaceAliveRecipeWithPropagation(
           create: { recipeId: id, productId: line.productId, percentage: toDecimalInput(line.percentage) },
           update: { percentage: toDecimalInput(line.percentage) },
         });
+      }
+
+      if (tools !== null) {
+        const finalToolIds = productIdsOf(tools);
+        await tx.recipeTool.deleteMany({
+          where: {
+            recipeId: id,
+            ...(finalToolIds.length > 0 ? { productId: { notIn: [...finalToolIds] } } : {}),
+          },
+        });
+        for (const [index, tool] of tools.entries()) {
+          await tx.recipeTool.upsert({
+            where: { recipeId_productId: { recipeId: id, productId: tool.productId } },
+            create: { recipeId: id, productId: tool.productId, quantity: tool.quantity, createdAt: toolCreatedAt(now, index) },
+            update: { quantity: tool.quantity },
+          });
+        }
       }
 
       const propagated: PropagatedVersion[] = [];
@@ -637,6 +712,35 @@ export async function replaceAliveRecipeWithPropagation(
             create: { recipeId: versionId, productId: line.productId, percentage: toDecimalInput(line.percentage) },
             update: { percentage: toDecimalInput(line.percentage) },
           });
+        }
+
+        if (tools !== null) {
+          const currentTools = (
+            await tx.recipeTool.findMany({
+              where: { recipeId: versionId },
+              orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            })
+          ).map(toToolData);
+          const versionTools = propagateTools(beforeTools, tools, currentTools);
+          const keptToolIds = productIdsOf(versionTools);
+          await tx.recipeTool.deleteMany({
+            where: {
+              recipeId: versionId,
+              ...(keptToolIds.length > 0 ? { productId: { notIn: [...keptToolIds] } } : {}),
+            },
+          });
+          for (const [index, tool] of versionTools.entries()) {
+            await tx.recipeTool.upsert({
+              where: { recipeId_productId: { recipeId: versionId, productId: tool.productId } },
+              create: {
+                recipeId: versionId,
+                productId: tool.productId,
+                quantity: tool.quantity,
+                createdAt: toolCreatedAt(now, index),
+              },
+              update: { quantity: tool.quantity },
+            });
+          }
         }
 
         propagated.push({
