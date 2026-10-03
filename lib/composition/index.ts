@@ -81,6 +81,10 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
+  findPackagingCostingBatches,
+  findPackagingRefs,
+} from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import {
   addBatchToAlive,
   adjustBatchStock,
   createProduct,
@@ -114,6 +118,7 @@ import type { PresentationRepository } from '@/lib/modules/inventario/ports/pres
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type {
   OrderNumberDirectory,
+  PackagingCatalog,
   PresentationCatalog,
   ProductCatalog,
   ProductNameLookup,
@@ -882,6 +887,12 @@ export const inventario = {
 // nada de `identity` ni de `inventario` arriba -diff minimo, hay otra sesion (QC-22)
 // tocando este mismo archivo en paralelo-.
 // ---------------------------------------------------------------------------------------
+
+/** Solo para el servidor de `pedidos`: validar el envase de cada linea del reparto y costearlo. */
+export const packagingCatalog: PackagingCatalog = {
+  findRefs: findPackagingRefs,
+  findCostingBatches: findPackagingCostingBatches,
+};
 
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9

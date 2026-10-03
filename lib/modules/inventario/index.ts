@@ -117,6 +117,7 @@ export { deriveUnitCost } from './domain/unit-cost';
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
+export type { PackagingCatalog, PackagingCostingBatch, PackagingRef } from './domain/packaging-catalog';
 // Resolver ingredientes POR NOMBRE: interfaz nueva, no un metodo mas de ProductCatalog, para no
 // pisarse con otro cambio en paralelo sobre este ultimo.
 export type { ProductNameLookup, ProductNameMatch } from './domain/product-name-lookup';
