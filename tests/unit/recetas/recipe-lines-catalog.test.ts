@@ -53,6 +53,7 @@ function filaConLineaVieja(): RecipeRow {
     createdAt: AHORA,
     updatedAt: AHORA,
     lines: [{ id: 'linea-1', productId: LINEA_VIEJA.productId, percentage: '100.00' }],
+    tools: [],
     original: null,
   };
 }

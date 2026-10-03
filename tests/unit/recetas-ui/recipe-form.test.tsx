@@ -245,6 +245,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [stepView('Mezclar')],
     lines: [lineView()],
+    tools: [],
     original: null,
     isUnderReview: false,
     displayName: 'Detergente industrial',

@@ -36,6 +36,7 @@ export type {
   RecipeCatalog,
   RecipeExecutionContent,
   RecipeExecutionLine,
+  RecipeExecutionTool,
 } from './domain/recipe-catalog';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
@@ -94,6 +95,7 @@ export {
 export {
   type RecipeSummary,
   type RecipeLineView,
+  type RecipeToolView,
   type RecipeStepView,
   type RecipeDetail,
   type RecipeVersionSummary,

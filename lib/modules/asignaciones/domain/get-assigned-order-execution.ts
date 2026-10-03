@@ -70,8 +70,11 @@ export function createGetAssignedOrderExecution(
     const recipeName = content !== null && !content.isDeleted ? content.name : null;
     const steps = content?.steps ?? [];
     const lines = content?.lines ?? [];
+    const tools = content?.tools ?? [];
 
-    const productIds = [...new Set(lines.map((line) => line.productId))];
+    const productIds = [
+      ...new Set([...lines.map((line) => line.productId), ...tools.map((tool) => tool.productId)]),
+    ];
     const productRefs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
     const productRefsById = new Map(productRefs.map((ref) => [ref.id, ref]));
 
@@ -139,6 +142,10 @@ export function createGetAssignedOrderExecution(
       orderQuantity: summary.quantity,
       steps,
       lines: executionLines,
+      tools: tools.map((tool) => ({
+        productName: productRefsById.get(tool.productId)?.name ?? null,
+        quantity: tool.quantity,
+      })),
       presentationLines: toDistributionLines(summary.presentationLines, presentationNames),
       unitId: summary.unitId,
       unitLabel: orderUnit === undefined ? null : unitLabelOf(orderUnit),

@@ -57,7 +57,13 @@ export function createCreateRecipeVersion(
 
     const result = await deps.recipes.createVersion(
       originalId,
-      { name: data.name, lines: lines.data },
+      {
+        name: data.name,
+        lines: lines.data,
+        tools:
+          data.tools ??
+          original.tools.map((tool) => ({ productId: tool.productId, quantity: tool.quantity })),
+      },
       actor.id,
       now(),
       scope,

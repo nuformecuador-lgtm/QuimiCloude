@@ -58,6 +58,7 @@ function contenido(overrides?: Partial<RecipeExecutionContent>): RecipeExecution
     isDeleted: false,
     steps: [],
     lines: [{ productId: PRODUCTO, productName: null, percentage: '10.00' }],
+    tools: [],
     ...overrides,
   };
 }
@@ -330,6 +331,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
         'orderQuantity',
         'steps',
         'lines',
+        'tools',
         'presentationLines',
         'unitId',
         'unitLabel',

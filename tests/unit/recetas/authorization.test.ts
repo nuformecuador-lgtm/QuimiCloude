@@ -127,6 +127,7 @@ const FILA_RECETA: RecipeRow = {
   createdAt: AHORA,
   updatedAt: AHORA,
   lines: [],
+  tools: [],
   original: null,
 };
 

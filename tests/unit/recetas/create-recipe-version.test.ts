@@ -39,6 +39,7 @@ const ORIGINAL: RecipeRow = {
     { id: 'l-1', productId: P_A, percentage: '70.00' },
     { id: 'l-2', productId: P_B, percentage: '30.00' },
   ],
+  tools: [],
   original: null,
 };
 
@@ -110,7 +111,7 @@ describe('createRecipeVersion', () => {
     expect(recipes.findAliveById).toHaveBeenCalledWith(ORIGINAL.id, { companyId: EMPRESA });
     expect(recipes.createVersion).toHaveBeenCalledWith(
       ORIGINAL.id,
-      { name: 'Sin perfume', lines: LINEAS_VERSION },
+      { name: 'Sin perfume', lines: LINEAS_VERSION, tools: [] },
       ACTOR.id,
       AHORA,
       { companyId: EMPRESA },
@@ -133,6 +134,7 @@ describe('createRecipeVersion', () => {
           { productId: P_A, percentage: '70.00' },
           { productId: P_B, percentage: '30.00' },
         ],
+        tools: [],
       },
       ACTOR.id,
       AHORA,

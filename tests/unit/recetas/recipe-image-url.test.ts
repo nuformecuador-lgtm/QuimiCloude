@@ -108,6 +108,7 @@ describe('R24 — se persiste la ruta, no la URL', () => {
       createdAt: AHORA,
       updatedAt: AHORA,
       lines: [],
+      tools: [],
       original: null,
     };
     const recipesConDetalle = montarRepositorio({
@@ -134,6 +135,7 @@ describe('R24 — se persiste la ruta, no la URL', () => {
       createdAt: AHORA,
       updatedAt: AHORA,
       lines: [],
+      tools: [],
       original: null,
     };
     const recipes = montarRepositorio({
@@ -163,6 +165,7 @@ describe('R25 — la URL compuesta es publica, sin firma ni caducidad', () => {
       createdAt: AHORA,
       updatedAt: AHORA,
       lines: [],
+      tools: [],
       original: null,
     };
     const recipes = montarRepositorio({

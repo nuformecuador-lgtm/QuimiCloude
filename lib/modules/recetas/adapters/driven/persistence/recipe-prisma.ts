@@ -41,6 +41,7 @@ import type {
 
 const RECIPE_INCLUDE = {
   lines: true,
+  tools: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
   parent: { select: { id: true, name: true, description: true, imagePath: true, steps: true } },
 } satisfies Prisma.RecipeInclude;
 
@@ -99,6 +100,7 @@ export function toRecipeRow(row: RecipeWithLines): RecipeRow {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     lines: row.lines.map(toLineRow),
+    tools: row.tools.map((tool) => ({ id: tool.id, productId: tool.productId, quantity: tool.quantity })),
     original:
       row.parent === null
         ? null

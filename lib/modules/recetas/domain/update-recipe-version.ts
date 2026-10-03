@@ -56,7 +56,14 @@ export function createUpdateRecipeVersion(
 
     const result = await deps.recipes.replaceAlive(
       versionId,
-      { name: data.name, description: null, steps: [], lines: data.lines, imagePath: null },
+      {
+        name: data.name,
+        description: null,
+        steps: [],
+        lines: data.lines,
+        imagePath: null,
+        tools: data.tools ?? null,
+      },
       actor.id,
       now(),
       scope,

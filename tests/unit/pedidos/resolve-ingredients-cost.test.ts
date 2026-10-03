@@ -25,6 +25,7 @@ function contenido(overrides: Partial<RecipeExecutionContent> = {}): RecipeExecu
     isDeleted: false,
     steps: [],
     lines: [{ productId: PRODUCT_A, productName: null, percentage: '100.00' }],
+    tools: [],
     ...overrides,
   };
 }

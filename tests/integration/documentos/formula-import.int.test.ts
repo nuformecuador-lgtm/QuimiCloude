@@ -327,6 +327,7 @@ async function crearRecetaSembrada(
       steps: [paso('Paso original 1')],
       lines: overrides.lines ?? [],
       imagePath: overrides.imagePath ?? `recetas/${token()}.jpg`,
+      tools: [],
     } satisfies NewRecipe,
     empresa.userId,
     new Date(),

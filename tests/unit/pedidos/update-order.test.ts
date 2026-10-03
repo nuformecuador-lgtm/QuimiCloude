@@ -1055,6 +1055,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       isDeleted: false,
       steps: [],
       lines: lineas,
+      tools: [],
     }));
     const recipesGlobal = {
       findRefsIncludingDeleted: vi.fn(() => {
@@ -1070,6 +1071,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       isDeleted: false,
       steps: [],
       lines: lineas,
+      tools: [],
     }));
     const filaVista = filaExistente();
     const findAliveById = vi.fn(async () => filaVista);
@@ -1126,7 +1128,7 @@ describe('edicion con version de receta', () => {
     const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
       companyId === EMPRESA_A ? refs.filter((r) => ids.includes(r.id)) : [],
     );
-    const contenido = (id: string) => ({ id, name: 'Receta', isDeleted: false, steps: [], lines: lineas.get(id) ?? [] });
+    const contenido = (id: string) => ({ id, name: 'Receta', isDeleted: false, steps: [], lines: lineas.get(id) ?? [], tools: [] });
     const findExecutionContentById = vi.fn(async (id: string) => contenido(id));
     const enTransaccion = vi.fn(async (id: string) => contenido(id));
     return {

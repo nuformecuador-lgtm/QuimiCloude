@@ -292,6 +292,7 @@ describe('findRecipeExecutionContentById', () => {
       isDeleted: false,
       steps: [PASO_VALIDO],
       lines: [{ productId: 'p-cloro', productName: null, percentage: '10.00' }],
+      tools: [],
     })
   })
 
@@ -485,6 +486,7 @@ describe('toRecipeExecutionContent', () => {
       isDeleted: false,
       steps: [PASO_VALIDO],
       lines: [{ productId: 'p-cloro', productName: null, percentage: '10.00' }],
+      tools: [],
     })
   })
 

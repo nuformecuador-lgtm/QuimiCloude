@@ -37,6 +37,17 @@ export type RecipeLineRow = RecipeLineData & {
   readonly id: string;
 };
 
+/** Herramienta de la receta: un producto MACHINE y cuantas unidades hacen falta. No es
+ *  ingrediente, asi que no cuenta en la suma ni en la reserva de stock. */
+export type RecipeToolData = {
+  readonly productId: string;
+  readonly quantity: number;
+};
+
+export type RecipeToolRow = RecipeToolData & {
+  readonly id: string;
+};
+
 /**
  * Datos de negocio de una receta, ya validados por `recipe-input.ts`, listos para
  * `create`/`replaceAlive` (`design.md > 7.1`, `> 8`). `imagePath` es la ruta FINAL que el
@@ -49,6 +60,9 @@ export type NewRecipe = {
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineData[];
   readonly imagePath: string | null;
+  /** `null` = no tocar las que ya tiene. Releerlas y reenviarlas desde fuera de la
+   *  transaccion pisaria un guardado concurrente. */
+  readonly tools: readonly RecipeToolData[] | null;
 };
 
 /**
@@ -68,6 +82,8 @@ export type RecipeRow = {
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lines: readonly RecipeLineRow[];
+  /** En orden de alta. */
+  readonly tools: readonly RecipeToolRow[];
   /** `null` si la fila es una original; si es una version, la original de la que cuelga. */
   readonly original: RecipeOriginalRow | null;
 };
@@ -85,6 +101,7 @@ export type RecipeOriginalRow = {
 export type NewRecipeVersion = {
   readonly name: string;
   readonly lines: readonly RecipeLineData[];
+  readonly tools: readonly RecipeToolData[];
 };
 
 export type PropagatedVersion = {

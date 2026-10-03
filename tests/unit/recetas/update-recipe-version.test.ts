@@ -41,6 +41,7 @@ const ORIGINAL: RecipeRow = {
     { id: 'l-1', productId: P_A, percentage: '70.00' },
     { id: 'l-2', productId: P_B, percentage: '30.00' },
   ],
+  tools: [],
   original: null,
 };
 
@@ -112,7 +113,7 @@ describe('updateRecipeVersion', () => {
     expect(resultado).toEqual({ id: VERSION.id });
     expect(recipes.findAliveById).toHaveBeenCalledWith(VERSION.id, { companyId: EMPRESA });
     expect(recipes.replaceAlive).toHaveBeenCalledTimes(1);
-    const datos: NewRecipe = { name: 'Sin perfume 2', description: null, steps: [], lines: LINEAS, imagePath: null };
+    const datos: NewRecipe = { name: 'Sin perfume 2', description: null, steps: [], lines: LINEAS, imagePath: null, tools: null };
     expect(recipes.replaceAlive).toHaveBeenCalledWith(VERSION.id, datos, ACTOR.id, AHORA, { companyId: EMPRESA });
     expect(recipes.replaceAliveWithPropagation).not.toHaveBeenCalled();
   });

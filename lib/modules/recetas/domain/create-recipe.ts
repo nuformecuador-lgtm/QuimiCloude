@@ -77,6 +77,7 @@ export function createCreateRecipe(
       steps: data.steps,
       lines: data.lines,
       imagePath,
+      tools: data.tools,
     };
 
     // R8: el puerto traduce el `23505` del indice unico parcial a `'duplicate'`.

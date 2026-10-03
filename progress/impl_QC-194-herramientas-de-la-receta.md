@@ -165,3 +165,27 @@ R14 en persistencia en T4.
   `recetas-ui/recipe-page`, `recetas/module-contract`. Ninguno toca herramientas.
 
 Veredicto: T0-T3 cerradas en verde; typecheck y lint limpios, sin rojos nuevos.
+
+## Tanda contrato — tipos publicos para frontend en paralelo (backend_dev)
+
+Contrato congelado en `specs/QC-194-herramientas-de-la-receta/contrato-back.md`.
+
+- Tipos: `RecipeToolData`/`RecipeToolRow` y `tools` en `NewRecipe` (`| null`), `RecipeRow`,
+  `NewRecipeVersion` (`ports/recipe-repository.ts`); `RecipeToolView` y `RecipeDetail.tools`
+  (`recipe-view.ts`); `RecipeExecutionTool` y `RecipeExecutionContent.tools` (`recipe-catalog.ts`);
+  `ExecutionToolView` y `AssignedOrderExecutionView.tools` (`asignaciones`). Exportados por los dos barrels.
+- Implementacion minima: `RECIPE_INCLUDE` + `toRecipeRow` leen `tools` (real); `getRecipe` con un
+  solo `findRefs` sobre lineas + herramientas (real); casos de uso pasan `tools` al puerto (`?? null`
+  en edicion, copia de la original en alta de version) sin validar contra el catalogo (T5); el
+  adaptador no las escribe (T4); `toRecipeExecutionContent` devuelve `tools: []` (T6);
+  `getAssignedOrderExecution` las mapea con el mismo `findRefs` (T8 pone los tests).
+- Dobles: `tools: []` (o `null` donde la edicion no las manda) en los listados de T0 punto 4, mas
+  `company-scope`, `recipe-catalog`, `order-packing`, `create-order`, `update-order`,
+  `review-blocked-orders` y la lista de claves de `get-assigned-order-execution`.
+- Discrepancia con `design.md > 7`: el issue de producto repetido tiene `path: ['tools']`, no
+  `['tools', i, ...]` (es un `refine` del array); va como error general del tab.
+
+Verificacion: `pnpm run typecheck` limpio; `pnpm run lint` `0 errors, 8 warnings` (preexistentes);
+`vitest run guard` `51 passed`; `vitest related --run <tocados>` -> solo rojos de
+`tests/baseline-rojos.json` (`module-contract`, `recipe-page`, `product-page`, `pantallas-exigen-permiso`,
+`unidades-viewport`, `usuarios-viewport`).

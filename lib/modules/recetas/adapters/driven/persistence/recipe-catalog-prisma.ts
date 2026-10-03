@@ -178,6 +178,7 @@ export function toRecipeExecutionContent(row: RecipeExecutionContentRow): Recipe
       productName: null,
       percentage: line.percentage.toFixed(2),
     })),
+    tools: [],
   };
 }
 

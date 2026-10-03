@@ -135,6 +135,7 @@ export function createUpdateRecipe(
       steps: data.steps,
       lines: data.lines,
       imagePath,
+      tools: data.tools ?? null,
     };
 
     const propagated = await persist(

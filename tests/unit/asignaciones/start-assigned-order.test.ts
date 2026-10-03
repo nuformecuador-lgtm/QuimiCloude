@@ -61,6 +61,7 @@ function contenido(): RecipeExecutionContent {
     isDeleted: false,
     steps: [],
     lines: [{ productId: PRODUCTO, productName: null, percentage: '90.00' }],
+    tools: [],
   };
 }
 

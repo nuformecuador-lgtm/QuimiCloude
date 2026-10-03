@@ -171,6 +171,7 @@ function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {
     steps: [],
     lines: [],
     imagePath: null,
+    tools: [],
     ...overrides,
   };
 }
