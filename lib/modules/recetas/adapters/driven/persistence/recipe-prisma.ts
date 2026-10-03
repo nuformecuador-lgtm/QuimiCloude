@@ -682,7 +682,12 @@ export async function replaceAliveRecipeWithPropagation(
         for (const [index, tool] of tools.entries()) {
           await tx.recipeTool.upsert({
             where: { recipeId_productId: { recipeId: id, productId: tool.productId } },
-            create: { recipeId: id, productId: tool.productId, quantity: tool.quantity, createdAt: toolCreatedAt(now, index) },
+            create: {
+              recipeId: id,
+              productId: tool.productId,
+              quantity: tool.quantity,
+              createdAt: toolCreatedAt(now, index),
+            },
             update: { quantity: tool.quantity },
           });
         }
