@@ -260,3 +260,72 @@ Como el modo rápido se para en el typecheck, el resto se corrió aparte:
   `guard-identificador-de-request` › «las superficies que aplanan un ErrorState…» sobre
   `app/(private)/pedidos/components/order-distribution-dialog.tsx` (carril frontend, sin commitear).
   Avisado en el informe.
+
+## T2 — El envase en inventario: alta, lote y ajuste (backend_dev, 2026-10-03)
+
+Archivos de producción:
+- `lib/modules/unidades/domain/package-unit.ts` (nuevo): `PACKAGE_UNIT_NAME = 'unidad'` y el puerto
+  `PackageUnitSource.findPackageUnitId()`; barrel de `unidades` lo exporta.
+  `unit-catalog-prisma.ts` gana `findPackageUnitId` (unidad de sistema, base). Motivo: `units` es de
+  `unidades`; `inventario` no puede leer esa tabla (`guard-arquitectura-modulos`), así que la unidad
+  de envases le llega por puerto, cableado en `lib/composition` (`createCreateProduct({ …, packageUnit })`).
+- `lib/modules/inventario/domain/product-input.ts`: alta PACKAGING exige existencia entera
+  (`isWholeQuantity`, exportada para el adaptador). `presentationId` sigue llegando con el mismo nombre.
+- `lib/modules/inventario/domain/create-product.ts`: rama `createPackaging`: busca homónimo con
+  `findAlivePackagingByName` (solo PACKAGING vivos **con** presentación fija); misma presentación →
+  `addBatchToAlive(…, { presentationId })` con lote sin presentación; otra → `ActionNotAllowedError`
+  (R3/N10); sin homónimo → `createWithFirstBatch(…, { presentationId, unitId: u })`.
+- `lib/modules/inventario/domain/product-view.ts`: tipo `PackagingIdentity` (al final del archivo:
+  `NewProduct` sigue sin unidad, lo vigila `unidades/module-contract.test.ts`).
+- `lib/modules/inventario/ports/product-repository.ts`: `findAlivePackagingByName` nuevo;
+  `createWithFirstBatch` y `addBatchToAlive` ganan un parámetro opcional `packaging`.
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`:
+  - `createWithFirstBatch` con `packaging`: valida la presentación en el ámbito de la empresa
+    (`ValidationError` si no), escribe `products.presentation_id` y `unit_id = u`; el lote sin
+    presentación (el disparador `product_batches_check_unit` sale por `IF NOT FOUND`).
+  - `addBatchToAlive`: bajo el `FOR NO KEY UPDATE` del producto, si es un envase con presentación
+    fija exige `packaging` con esa misma presentación, y sin `packaging` lo rechaza →
+    `ActionNotAllowedError` (R2/R3; cierra también que una materia prima con presentación en `u`
+    cuelgue un lote con presentación de un envase).
+  - `adjustBatchStock`: envase con presentación fija y `delta` no entero → `ValidationError` (R7/N3).
+    Los envases legados (sin presentación) siguen aceptando decimal.
+  - Se lanzan errores de dominio desde el adaptador (como ya hacía con `ValidationError`) en vez de
+    ampliar las uniones de resultado: no cambia la forma de ningún resultado existente.
+- `lib/composition/index.ts`: cablea `findAlivePackagingByName` y `packageUnit`.
+
+Tests: nuevos `tests/integration/inventario/qc195-packaging-product.int.test.ts` (censo `commit`, con
+motivo); casos nuevos en `tests/unit/inventario/create-product.test.ts` y
+`tests/unit/inventario/product-input.test.ts` (el caso PACKAGING reescrito contra R1, más R7 y R2).
+Dobles de `ProductRepository` ampliados con `findAlivePackagingByName` en 8 archivos de test
+(compilan contra el puerto entero).
+
+R → test:
+| R | Test |
+|---|---|
+| R1 | `qc195-packaging-product.int.test.ts` › «R1, R6 — el alta guarda la presentacion en el producto…», «R1 — el alta de un envase sin presentacion, o con una de otra empresa, se rechaza sin escribir nada»; `create-product.test.ts` › «R1, R6 — nace con su presentacion fija…», «R1 — sin presentacion se rechaza con invalid_input sin tocar el puerto»; `product-input.test.ts` › «R1 — PACKAGING exige su presentacion fija y rechaza expiryDate» |
+| R2 | `qc195-packaging-product.int.test.ts` › «R2, R3 — un lote sobre un envase homonimo con otra presentacion se rechaza…», «R2 — bajo el bloqueo, el adaptador rechaza un lote con otra presentacion o con presentacion propia sobre un envase»; `product-input.test.ts` › «R2 — la edicion de un PACKAGING no acepta presentacion»; `create-product.test.ts` › «R2, R3 — con un envase homonimo en OTRA presentacion…» |
+| R3 | `qc195-packaging-product.int.test.ts` › «R3 — un lote sobre un envase homonimo entra en su presentacion fija, sin presentacion propia»; `create-product.test.ts` › «R3 — con un envase homonimo en la misma presentacion, anade el lote sin presentacion propia» |
+| R4 | `qc195-packaging-product.int.test.ts` › «R4 — dos envases con presentaciones distintas son productos distintos…» |
+| R6 | `qc195-packaging-product.int.test.ts` › «R1, R6 — …existencia en «u»…»; `create-product.test.ts` › «R6 — sin la unidad de envases sembrada, el alta falla sin escribir» |
+| R7 | `qc195-packaging-product.int.test.ts` › «R7 — la existencia del alta y el ajuste de un envase son enteros…»; `product-input.test.ts` › «R7 — la existencia del alta de un PACKAGING es un numero entero de envases»; `create-product.test.ts` › «R7 — una existencia no entera se rechaza…» |
+
+Salida real:
+```
+$ pnpm exec vitest run --project integration tests/integration/inventario/qc195-packaging-product.int.test.ts
+ Test Files  1 passed (1)      Tests  7 passed (7)
+$ pnpm exec vitest run --project integration tests/integration/inventario tests/integration/unidades
+ Test Files  34 passed (34)    Tests  337 passed (337)
+$ pnpm exec vitest run --project node tests/unit/inventario
+ Test Files  63 passed (63)    Tests  936 passed | 5 skipped (941)
+$ pnpm exec vitest related --run --project node <8 archivos de lib de T2>
+ Test Files  1 failed | 152 passed (153)   Tests  1 failed | 2760 passed | 8 skipped
+   (el rojo: tests/unit/recetas/module-contract.test.ts, en tests/baseline-rojos.json)
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)    Tests  671 passed | 11 skipped (682)
+$ eslint (lib/modules/inventario, lib/modules/unidades, composition, tests tocados): 0 errores, 0 avisos
+```
+
+Gate `./init.sh --rapido`: **`✗ typecheck`**, solo por el carril frontend sin commitear:
+`tests/unit/inventario-ui/envase-en-inventario.test.tsx` (3 errores TS2322 contra
+`ProductBatchesPanelProps`/`AdjustBatchDialogProps`). `tsc --noEmit` sin errores fuera de
+`tests/unit/inventario-ui/` y `tests/unit/pedidos-ui/`. Lo demás, corrido aparte arriba.

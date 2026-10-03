@@ -158,6 +158,7 @@ describe('createProductSchema', () => {
       softDeleteAlive: vi.fn(),
       listAlive: vi.fn(),
       findAliveIdByNameInPresentationUnit: vi.fn(),
+      findAlivePackagingByName: vi.fn(),
       createWithFirstBatch: vi.fn(),
       addBatchToAlive: vi.fn(),
       adjustBatchStock: vi.fn(),
@@ -327,7 +328,7 @@ describe('union discriminada por tipo de producto', () => {
     ).toBe(false);
   });
 
-  it('PACKAGING acepta lote pero rechaza expiryDate', () => {
+  it('R1 — PACKAGING exige su presentacion fija y rechaza expiryDate', () => {
     const packaging = {
       name: 'Bidon',
       type: PRODUCT_TYPES.PACKAGING,
@@ -336,8 +337,35 @@ describe('union discriminada por tipo de producto', () => {
     };
     expect(createProductSchema.safeParse(packaging).success).toBe(true);
 
+    const sinPresentacion = Object.fromEntries(Object.entries(packaging).filter(([key]) => key !== 'presentationId'));
+    expect(createProductSchema.safeParse(sinPresentacion).success).toBe(false);
+    expect(createProductSchema.safeParse({ ...packaging, presentationId: null }).success).toBe(false);
+
     expect(
       createProductSchema.safeParse({ ...packaging, expiryDate: '2027-01-31' }).success,
+    ).toBe(false);
+  });
+
+  it('R7 — la existencia del alta de un PACKAGING es un numero entero de envases', () => {
+    const packaging = { name: 'Botella', type: PRODUCT_TYPES.PACKAGING, ...REQUERIDOS, ...LOTE_MINIMO };
+    for (const stock of ['0', '100', '100.0000', '7.0']) {
+      expect(createProductSchema.safeParse({ ...packaging, stock }).success, stock).toBe(true);
+    }
+    for (const stock of ['2.5', '0.0001', '10.25']) {
+      expect(createProductSchema.safeParse({ ...packaging, stock }).success, stock).toBe(false);
+    }
+    // El decimal sigue valiendo para una materia prima.
+    expect(createProductSchema.safeParse({ ...ALTA_PRODUCTO, stock: '2.5' }).success).toBe(true);
+  });
+
+  it('R2 — la edicion de un PACKAGING no acepta presentacion: no se puede cambiar', () => {
+    expect(
+      updateProductSchema.safeParse({
+        name: 'Botella',
+        type: PRODUCT_TYPES.PACKAGING,
+        qtyAlert: '0',
+        presentationId: UNIDAD_FIXTURE,
+      }).success,
     ).toBe(false);
   });
 

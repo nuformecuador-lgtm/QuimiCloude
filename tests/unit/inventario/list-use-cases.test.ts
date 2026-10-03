@@ -55,6 +55,7 @@ function montarProductos() {
     findAliveIdByNameInPresentationUnit: vi.fn<
       ProductRepository['findAliveIdByNameInPresentationUnit']
     >(),
+    findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(),
     // QC-92: mismo criterio, el listado tampoco los usa.

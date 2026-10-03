@@ -66,6 +66,7 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
       totalPages: 1,
     })),
     findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => null),
+    findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-nuevo-1',
       batchId: 'lote-1',
@@ -93,6 +94,7 @@ function afirmarPuertoIntacto(products: Repositorio): void {
   expect(products.softDeleteAlive).not.toHaveBeenCalled();
   expect(products.listAlive).not.toHaveBeenCalled();
   expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
+  expect(products.findAlivePackagingByName).not.toHaveBeenCalled();
   expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }
@@ -947,5 +949,93 @@ describe('QC-138 — el alta de un lote avisa de la entrada de material (R13, R2
     await expect(createProduct({ ...ALTA_VALIDA, stock: 'x' }, ADMIN)).rejects.toBeInstanceOf(ValidationError);
     await expect(createProduct(ALTA_VALIDA, SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError);
     expect(o.onStockIncreased).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-195 — alta de envase (PACKAGING)', () => {
+  const UNIDAD_ENVASES = 'unidad-u';
+  const OTRA_PRESENTACION = '22222222-2222-4222-8222-222222222222';
+  const ALTA_ENVASE = {
+    name: 'Botella PET 500 ml',
+    type: PRODUCT_TYPES.PACKAGING,
+    qtyAlert: '0',
+    presentationId: PRESENTACION,
+    stock: '100',
+    unitCost: '0.5000',
+  };
+  const packageUnit = { findPackageUnitId: vi.fn(async () => UNIDAD_ENVASES) };
+
+  it('R1, R6 — nace con su presentacion fija y la unidad de envases; el lote va sin presentacion', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await createProduct(ALTA_ENVASE, ADMIN);
+
+    expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
+    expect(products.findAlivePackagingByName).toHaveBeenCalledWith('Botella PET 500 ml', { companyId: EMPRESA });
+    const llamada = products.createWithFirstBatch.mock.calls[0];
+    expect(llamada?.[0]).toEqual({ name: 'Botella PET 500 ml', qtyAlert: '0', type: PRODUCT_TYPES.PACKAGING });
+    expect(llamada?.[1]).toEqual(expect.objectContaining({ presentationId: null, stock: '100', unitCost: '0.5000', expiryDate: null }));
+    expect(llamada?.[4]).toEqual({ presentationId: PRESENTACION, unitId: UNIDAD_ENVASES });
+  });
+
+  it('R1 — sin presentacion se rechaza con invalid_input sin tocar el puerto', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+    const sinPresentacion = Object.fromEntries(Object.entries(ALTA_ENVASE).filter(([key]) => key !== 'presentationId'));
+
+    await expect(createProduct(sinPresentacion, ADMIN)).rejects.toBeInstanceOf(ValidationError);
+    afirmarPuertoIntacto(products);
+  });
+
+  it('R7 — una existencia no entera se rechaza con invalid_input sin tocar el puerto', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await expect(createProduct({ ...ALTA_ENVASE, stock: '2.5' }, ADMIN)).rejects.toBeInstanceOf(ValidationError);
+    afirmarPuertoIntacto(products);
+  });
+
+  it('R3 — con un envase homonimo en la misma presentacion, anade el lote sin presentacion propia', async () => {
+    const products = montarRepositorio({
+      findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => ({
+        id: 'envase-1',
+        presentationId: PRESENTACION,
+      })),
+    });
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await expect(createProduct(ALTA_ENVASE, ADMIN)).resolves.toEqual({ id: 'envase-1', lot: '1' });
+    const llamada = products.addBatchToAlive.mock.calls[0];
+    expect(llamada?.[0]).toBe('envase-1');
+    expect(llamada?.[1]).toEqual(expect.objectContaining({ presentationId: null }));
+    expect(llamada?.[4]).toEqual({ presentationId: PRESENTACION });
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+
+  it('R2, R3 — con un envase homonimo en OTRA presentacion, se rechaza con action_not_allowed sin escribir', async () => {
+    const products = montarRepositorio({
+      findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => ({
+        id: 'envase-1',
+        presentationId: OTRA_PRESENTACION,
+      })),
+    });
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await expect(createProduct(ALTA_ENVASE, ADMIN)).rejects.toBeInstanceOf(ActionNotAllowedError);
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+
+  it('R6 — sin la unidad de envases sembrada, el alta falla sin escribir', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({
+      products,
+      packageUnit: { findPackageUnitId: async () => null },
+      now: () => AHORA,
+    });
+
+    await expect(createProduct(ALTA_ENVASE, ADMIN)).rejects.toThrow(/unidad de sistema de envases/);
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   });
 });

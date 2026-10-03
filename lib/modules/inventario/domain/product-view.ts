@@ -70,3 +70,9 @@ export type ProductView = {
   readonly presentationContent?: string | null;
   readonly presentationUnitId?: UnitId | null;
 };
+
+/** Lo que fija el alta de un envase: su presentacion y la unidad en que se cuenta su existencia. */
+export type PackagingIdentity = {
+  readonly presentationId: string;
+  readonly unitId: UnitId;
+};

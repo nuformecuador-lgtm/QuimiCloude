@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { PACKAGE_UNIT_NAME } from '../../../domain/package-unit';
 import type { UnitId, UnitRef } from '../../../domain/unit-catalog';
 
 import { companyScopeWhere } from './unit-prisma';
@@ -57,4 +58,12 @@ export async function findUnitRefs(
   });
 
   return rows.map(toUnitRef);
+}
+
+export async function findPackageUnitId(): Promise<UnitId | null> {
+  const row = await prisma.unit.findFirst({
+    where: { companyId: null, nameNormalized: PACKAGE_UNIT_NAME, baseUnitId: null },
+    select: { id: true },
+  });
+  return row?.id ?? null;
 }

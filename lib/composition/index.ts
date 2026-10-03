@@ -86,6 +86,7 @@ import {
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
+  findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
   findFinishedGoodsReceipts,
@@ -121,7 +122,7 @@ import type {
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { forModule } from '@/lib/shared/observability/logger';
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { findPackageUnitId, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findUnitRefsSharingBaseInCompany,
   listUnits,
@@ -778,6 +779,7 @@ const productRepository: ProductRepository = {
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
   findAliveIdByNameInPresentationUnit,
+  findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
   adjustBatchStock,
@@ -836,7 +838,11 @@ const stockIncreaseListener: StockIncreaseListener = {
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
 export const inventario = {
-  createProduct: createCreateProduct({ products: productRepository, stockIncreases: stockIncreaseListener }),
+  createProduct: createCreateProduct({
+    products: productRepository,
+    stockIncreases: stockIncreaseListener,
+    packageUnit: { findPackageUnitId },
+  }),
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),

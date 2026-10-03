@@ -4,8 +4,14 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { compareQuantities } from '../../../domain/decimal-quantity';
-import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
+import {
+  ActionNotAllowedError,
+  BatchDuplicateLotError,
+  BatchStockNegativeError,
+  ValidationError,
+} from '../../../domain/errors';
 import { planFinishedGoodsLine } from '../../../domain/finished-goods';
+import { isWholeQuantity } from '../../../domain/product-input';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
 
@@ -34,7 +40,7 @@ import type { MovementReason } from '../../../domain/movement-reason';
 import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
-import type { NewProduct, ProductView, ProductType } from '../../../domain/product-view';
+import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
@@ -356,6 +362,29 @@ export async function findAliveIdByNameInPresentationUnit(
   return row === null ? null : { id: row.id, type: row.type as ProductType };
 }
 
+/** Mismo desempate que `findAliveIdByNameInPresentationUnit`. */
+export async function findAlivePackagingByName(
+  name: string,
+  scope: InventoryScope,
+): Promise<{ id: string; presentationId: string } | null> {
+  const row = await prisma.product.findFirst({
+    where: {
+      AND: [
+        productCompanyScope(scope),
+        {
+          nameNormalized: normalizeProductName(name),
+          type: PRODUCT_TYPES.PACKAGING,
+          presentationId: { not: null },
+          deletedAt: null,
+        },
+      ],
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true, presentationId: true },
+  });
+  return row?.presentationId == null ? null : { id: row.id, presentationId: row.presentationId };
+}
+
 /**
  * Suma los lotes vivos-de-empresa del producto y escribe `products.stock`. No toca
  * `product_batches`: quien la llama ya escribio el lote (o el ajuste) y su asiento antes de
@@ -646,10 +675,18 @@ export async function createWithFirstBatch(
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
+  packaging?: PackagingIdentity,
 ): Promise<{ id: string; batchId: string; lot: string }> {
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
     let unitId: string | null = null;
-    if (batch.presentationId !== null) {
+    if (packaging !== undefined) {
+      const presentation = await tx.presentation.findFirst({
+        where: { AND: [presentationCompanyScope(scope), { id: packaging.presentationId }] },
+        select: { id: true },
+      });
+      if (presentation === null) throw new ValidationError();
+      unitId = packaging.unitId;
+    } else if (batch.presentationId !== null) {
       const presentation = await tx.presentation.findFirst({
         where: { AND: [presentationCompanyScope(scope), { id: batch.presentationId }] },
         select: { unitId: true },
@@ -665,6 +702,7 @@ export async function createWithFirstBatch(
         unitId,
         qtyAlert: product.qtyAlert ?? null,
         type: product.type ?? PRODUCT_TYPES.PRODUCT,
+        presentationId: packaging?.presentationId ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,
         updatedAt: now,
@@ -700,7 +738,7 @@ export async function createWithFirstBatch(
   });
 }
 
-type AliveProductRow = { readonly id: string; readonly type: string };
+type AliveProductRow = { readonly id: string; readonly type: string; readonly presentationId: string | null };
 
 /** Con `productId` escalar y no como escritura anidada desde `product`, que dispararia el
  *  `@updatedAt` de `products`. */
@@ -709,6 +747,7 @@ export async function addBatchToAlive(
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
+  packaging?: { readonly presentationId: string },
 ): Promise<{ batchId: string; lot: string } | null | 'finished_product'> {
   const { companyId } = companyScopeColumns(scope);
 
@@ -716,7 +755,7 @@ export async function addBatchToAlive(
     // El borrado logico toma este mismo lock sobre la fila, asi que uno espera al otro. En READ
     // COMMITTED, el SELECT que espera vuelve a evaluar el WHERE y ya no ve la fila borrada.
     const rows = await tx.$queryRaw<ReadonlyArray<AliveProductRow>>(Prisma.sql`
-      SELECT "id", "type"
+      SELECT "id", "type", "presentation_id" AS "presentationId"
         FROM "products"
        WHERE "id" = ${productId}::uuid
          AND "company_id" = ${companyId}::uuid
@@ -725,6 +764,12 @@ export async function addBatchToAlive(
     `);
     const alive = rows[0];
     if (alive === undefined) return null;
+
+    // Un envase con presentacion fija solo admite lotes sin presentacion y por su misma presentacion.
+    const isFixedPackaging = alive.type === PRODUCT_TYPES.PACKAGING && alive.presentationId !== null;
+    if (packaging !== undefined ? !isFixedPackaging || alive.presentationId !== packaging.presentationId : isFixedPackaging) {
+      throw new ActionNotAllowedError();
+    }
 
     // Bajo la misma fila bloqueada, cierra la carrera con un alta manual que naciera
     // terminado despues de que `findAliveIdByNameInPresentationUnit` ya lo hubiera leido.
@@ -825,7 +870,7 @@ function isBatchNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
 
-type AdjustProductRow = { readonly id: string; readonly type: string };
+type AdjustProductRow = { readonly id: string; readonly type: string; readonly presentationId: string | null };
 
 /**
  * `stock: { increment: delta } }` es un `UPDATE ... SET stock = stock + $delta` relativo: dos
@@ -853,7 +898,7 @@ export async function adjustBatchStock(
   try {
     return await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<ReadonlyArray<AdjustProductRow>>(Prisma.sql`
-        SELECT p."id", p."type"
+        SELECT p."id", p."type", p."presentation_id" AS "presentationId"
           FROM "products" p
           JOIN "product_batches" b ON b."product_id" = p."id"
          WHERE b."id" = ${batchId}::uuid
@@ -867,6 +912,10 @@ export async function adjustBatchStock(
       // bloqueada, antes de tocar el lote o el libro.
       if (product.type === PRODUCT_TYPES.FINISHED_PRODUCT && compareQuantities(delta, '0') > 0) {
         return 'increase_not_allowed';
+      }
+
+      if (product.type === PRODUCT_TYPES.PACKAGING && product.presentationId !== null && !isWholeQuantity(delta)) {
+        throw new ValidationError('delta: un envase se ajusta en envases enteros');
       }
 
       const updated = await tx.productBatch.update({

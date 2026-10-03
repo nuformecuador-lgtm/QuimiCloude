@@ -161,6 +161,7 @@ function montar() {
       // cubre `create-product.test.ts`.
       return fila === undefined ? null : { id: fila.id, type: PRODUCT_TYPES.PRODUCT };
     }),
+    findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(
       async (product, _batch, _now, scope) => {
         const id = `product-nuevo-${productos.length}`;

@@ -4,7 +4,7 @@ import type { MovementReason } from '../domain/movement-reason';
 import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
-import type { NewProduct, ProductType, ProductView } from '../domain/product-view';
+import type { NewProduct, PackagingIdentity, ProductType, ProductView } from '../domain/product-view';
 import type { BatchHistoryEntry } from '../domain/reservation';
 
 /**
@@ -113,6 +113,9 @@ export interface ProductRepository {
    * transaccion: `stock` no lo escribe quien llama, es el adaptador el que suma tras crear el
    * lote.
    *
+   * Con `packaging` (envase), el producto nace con esa presentacion y esa unidad, y el lote va sin
+   * presentacion; una presentacion de otra empresa es `ValidationError`.
+   *
    * El `lot` devuelto es el TEXTO que quedo escrito en la fila -el que tecleo la persona o el
    * que genero el correlativo-, no el `batchId`. El adaptador ya lo calcula para escribir la
    * fila; aqui solo se propaga hacia arriba.
@@ -122,7 +125,15 @@ export interface ProductRepository {
     batch: NewProductBatch,
     now: Date,
     scope: InventoryScope,
+    packaging?: PackagingIdentity,
   ): Promise<{ id: string; batchId: string; lot: string }>;
+
+  /** El envase vivo con presentacion fija y ese nombre (el mas antiguo si hay varios). Los
+   *  envases sin presentacion fija no cuentan. */
+  findAlivePackagingByName(
+    name: string,
+    scope: InventoryScope,
+  ): Promise<{ id: string; presentationId: string } | null>;
 
   /**
    * Agrega el lote a un producto que YA EXISTE.
@@ -146,12 +157,17 @@ export interface ProductRepository {
    * Devuelve `'finished_product'` cuando, bajo el mismo bloqueo con el que va a escribir,
    * el producto resulta ser `FINISHED_PRODUCT`: cierra la carrera contra un alta manual que
    * empezo a evaluarse antes de que el producto naciera terminado, sin escribir lote ni asiento.
+   *
+   * Lanza `ActionNotAllowedError`, bajo el mismo bloqueo, si el lote no cuadra con la presentacion
+   * fija del envase: con `packaging`, el producto tiene que ser un envase con esa presentacion; sin
+   * el, no puede serlo.
    */
   addBatchToAlive(
     productId: string,
     batch: NewProductBatch,
     now: Date,
     scope: InventoryScope,
+    packaging?: { readonly presentationId: string },
   ): Promise<{ batchId: string; lot: string } | null | 'finished_product'>;
 
   /**
@@ -177,6 +193,9 @@ export interface ProductRepository {
    * es positivo: se decide con el producto ya bloqueado, sin llegar a mover el lote ni a
    * escribir el asiento. Un `delta` negativo sobre un producto terminado sigue las mismas reglas
    * que cualquier otro lote, incluido el rechazo de una existencia final negativa.
+   *
+   * Lanza `ValidationError` si el lote es de un envase con presentacion fija y `delta` no es un
+   * numero entero de envases.
    */
   adjustBatchStock(
     batchId: string,
