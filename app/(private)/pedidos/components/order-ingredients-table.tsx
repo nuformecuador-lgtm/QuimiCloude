@@ -18,8 +18,8 @@ import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shar
 import { subtractDecimal } from './order-decimal';
 
 /**
- * Los ingredientes de la receta elegida, con los datos de sus productos (nombre, porcentaje,
- * unidad y stock), dentro del formulario de pedido.
+ * Los ingredientes de la receta elegida, con los datos de sus productos (nombre, porcentaje
+ * y stock con su unidad), dentro del formulario de pedido.
  *
  * **Pieza puramente PRESENTACIONAL**: las lineas, las unidades y el estado de la consulta
  * llegan por props. Quien decide CUANDO pedir el detalle de la receta -y que hacer con el
@@ -33,9 +33,10 @@ import { subtractDecimal } from './order-decimal';
  * lote, asi que no hay presentacion por ingrediente que mostrar.
  *
  * **La unidad es la del PRODUCTO, no de la linea** (`productUnitId`): la receta ya no guarda
- * unidad. Se traduce aqui con el catalogo que la seccion baja por props: simbolo si lo
- * hay, nombre si no, y el marcador cuando el insumo no tiene unidad resoluble —sin lotes o
- * dado de baja— o cuando el id no existe en el catalogo.
+ * unidad. No tiene columna propia: va pegada a la cifra en «stock» y «restante» («720 L»),
+ * tambien en su `aria-label`. Se traduce con el catalogo que la seccion baja por props: simbolo
+ * si lo hay, nombre si no. Si el insumo no tiene unidad resoluble —sin lotes o dado de baja— o
+ * el id no existe en el catalogo, se pinta solo la cifra.
  *
  * **Una linea cuyo producto esta de baja llega con `productName: null`**: la linea
  * se conserva y aqui se dice que el producto no esta disponible, en vez de dejar la celda
@@ -83,14 +84,15 @@ const MISSING_PRODUCT_LABEL = 'Producto no disponible';
 /** Marcador de ausencia. Constante para que ningun test dependa del caracter. */
 const MISSING_VALUE_MARK = '—';
 
-/**
- * Etiqueta visible de la unidad del insumo: simbolo, nombre, o el marcador cuando el insumo no
- * tiene unidad resoluble (`productUnitId === null`) o el id no existe en el catalogo.
- */
-function unitLabel(productUnitId: string | null, units: readonly UnitView[]): string {
-  if (productUnitId === null) return MISSING_VALUE_MARK;
+/** Simbolo o nombre de la unidad del insumo; `null` si no hay unidad resoluble. */
+function unitLabel(productUnitId: string | null, units: readonly UnitView[]): string | null {
+  if (productUnitId === null) return null;
   const unit = units.find((candidate) => candidate.id === productUnitId);
-  return unit?.symbol ?? unit?.name ?? MISSING_VALUE_MARK;
+  return unit?.symbol ?? unit?.name ?? null;
+}
+
+function withUnit(value: string, unit: string | null): string {
+  return unit === null ? value : `${value} ${unit}`;
 }
 
 export type OrderIngredientsTableProps = {
@@ -159,7 +161,6 @@ export function OrderIngredientsTable({
             <TableRow>
               <TableHead>Producto</TableHead>
               <TableHead className="text-right">Porcentaje</TableHead>
-              <TableHead>Unidad</TableHead>
               <TableHead className="text-right">Stock</TableHead>
               <TableHead className="text-right">Cantidad requerida</TableHead>
               <TableHead className="text-right">Restante</TableHead>
@@ -169,6 +170,7 @@ export function OrderIngredientsTable({
             {lines.map((line, index) => {
               const required = requiredOf(line);
               const remaining = remainingOf(line);
+              const unit = unitLabel(line.productUnitId, units);
               return (
                 <TableRow key={line.id} data-testid={`order-ingredient-${index}`}>
                   <TableCell data-testid="order-ingredient-product">
@@ -180,18 +182,19 @@ export function OrderIngredientsTable({
                   >
                     {formatPercentage(line.percentage)} %
                   </TableCell>
-                  <TableCell data-testid="order-ingredient-unit">
-                    {unitLabel(line.productUnitId, units)}
-                  </TableCell>
                   <TableCell
                     className="text-right"
                     title={line.productStock === null ? undefined : exactDecimalTitle(line.productStock)}
-                    aria-label={line.productStock === null ? undefined : trimDecimal(line.productStock)}
+                    aria-label={
+                      line.productStock === null
+                        ? undefined
+                        : withUnit(trimDecimal(line.productStock), unit)
+                    }
                     data-testid="order-ingredient-stock"
                   >
                     {line.productStock === null
                       ? MISSING_VALUE_MARK
-                      : formatDecimalDisplay(line.productStock)}
+                      : withUnit(formatDecimalDisplay(line.productStock), unit)}
                   </TableCell>
                   <TableCell
                     className="text-right"
@@ -204,7 +207,9 @@ export function OrderIngredientsTable({
                   <TableCell
                     className="text-right"
                     title={remaining === null ? undefined : exactDecimalTitle(remaining)}
-                    aria-label={remaining === null ? undefined : trimDecimal(remaining)}
+                    aria-label={
+                      remaining === null ? undefined : withUnit(trimDecimal(remaining), unit)
+                    }
                     data-testid="order-ingredient-remaining"
                   >
                     {remaining === null ? (
@@ -217,7 +222,7 @@ export function OrderIngredientsTable({
                             : undefined
                         }
                       >
-                        {formatDecimalDisplay(remaining)}
+                        {withUnit(formatDecimalDisplay(remaining), unit)}
                       </span>
                     )}
                   </TableCell>

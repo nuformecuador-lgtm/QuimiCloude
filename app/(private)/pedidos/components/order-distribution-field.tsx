@@ -11,6 +11,7 @@ import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-noti
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import type { UnitConversion } from '@/lib/modules/unidades';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
@@ -18,10 +19,12 @@ import {
 import { formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { MISSING_VALUE_MARK } from './order-columns';
+import { lineCoverage, type LineCoverage } from './order-distribution-coverage';
 import type {
   OrderDistributionAvailability,
   OrderDistributionLine,
 } from './use-order-distribution-availability';
+import { useSavedPresentationContents } from './use-saved-line-contents';
 
 export { ORDER_DISTRIBUTION_PACKAGES_FIELD, ORDER_DISTRIBUTION_PRESENTATION_FIELD };
 
@@ -29,6 +32,7 @@ export const ORDER_DISTRIBUTION_TESTID = 'order-distribution-field';
 export const ORDER_DISTRIBUTION_LINE_TESTID = 'order-distribution-line';
 export const ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID = 'order-distribution-line-packages';
 export const ORDER_DISTRIBUTION_LINE_REMOVE_TESTID = 'order-distribution-line-remove';
+export const ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID = 'order-distribution-line-coverage';
 export const ORDER_DISTRIBUTION_LINE_PROBLEM_TESTID = 'order-distribution-line-problem';
 export const ORDER_DISTRIBUTION_ADD_PACKAGES_TESTID = 'order-distribution-add-packages';
 export const ORDER_DISTRIBUTION_ADD_TESTID = 'order-distribution-add';
@@ -42,6 +46,7 @@ const FIELD_TEXT = 'text-base md:text-base';
 
 /** Cuatro decimales: la conversion entre unidades puede dejar fracciones que dos esconderian. */
 const AVAILABLE_DIGITS = 4;
+const PERCENT_DIGITS = 2;
 
 const POSITIVE_INTEGER = /^[1-9]\d*$/;
 
@@ -51,6 +56,7 @@ const LABELS = {
   add: 'Añadir',
   remove: 'Quitar',
   available: 'Disponible',
+  covers: 'Cubre',
   quoting: 'calculando…',
   withoutUnit: 'Elige la unidad del pedido para repartirlo en presentaciones.',
   exceeds: 'El reparto pasa de la cantidad del pedido. Quita envases para poder guardar.',
@@ -68,8 +74,16 @@ export type OrderDistributionFieldProps = {
   readonly onLinesChange: (lines: readonly OrderDistributionLine[]) => void;
   /** Unidad del pedido. Cadena vacia = sin unidad: no se puede repartir. */
   readonly unitId: string;
+  /** Unidades convertibles con la del pedido: el selector solo ofrece presentaciones en ellas.
+   *  Ausente = sin filtro. */
+  readonly compatibleUnitIds?: readonly string[];
   /** Simbolo o nombre de la unidad del pedido, para el disponible. */
   readonly unitLabel: string | null;
+  /** Cantidad del pedido, para el porcentaje que cubre cada linea. */
+  readonly quantity?: string;
+  /** Catalogo de unidades, para llevar lo que cubre cada linea a la unidad del pedido.
+   *  Ausente = las lineas no muestran lo que cubren. */
+  readonly units?: readonly UnitConversion[];
   /** Lo devuelve `useOrderDistributionAvailability`; el anfitrion lo usa tambien para Guardar. */
   readonly availability: OrderDistributionAvailability;
   readonly error?: string;
@@ -98,6 +112,13 @@ function formatAvailable(raw: string): string {
   return raw.startsWith('-') && !shown.startsWith('-') ? `-${shown}` : shown;
 }
 
+function formatCoverage(coverage: LineCoverage, unitLabel: string | null): string {
+  const amount = `${formatAvailable(coverage.amount)}${unitLabel === null ? '' : ` ${unitLabel}`}`;
+  return coverage.percent === null
+    ? amount
+    : `${amount} · ${formatDecimalDisplay(coverage.percent, PERCENT_DIGITS)}%`;
+}
+
 /**
  * Reparto de la cantidad del pedido en presentaciones: lineas con presentacion y envases, alta de
  * lineas y el disponible en la unidad del pedido. Controlado: las lineas y el disponible los
@@ -107,16 +128,27 @@ export function OrderDistributionField({
   lines,
   onLinesChange,
   unitId,
+  compatibleUnitIds,
   unitLabel,
+  quantity = '',
+  units = [],
   availability,
   error,
   submitLines = false,
 }: OrderDistributionFieldProps) {
+  const savedContents = useSavedPresentationContents(lines);
   const titleId = useId();
   const errorId = useId();
   const [pending, setPending] = useState<PresentationOption | null>(null);
   const [pendingPackages, setPendingPackages] = useState('1');
   const [pickerKey, setPickerKey] = useState(0);
+  const [pickerUnitId, setPickerUnitId] = useState(unitId);
+
+  // Lo elegido con la unidad anterior puede no convertir a la nueva: se descarta.
+  if (pickerUnitId !== unitId) {
+    setPickerUnitId(unitId);
+    setPending(null);
+  }
 
   const withoutUnit = unitId === '';
   const duplicate = pending !== null && lines.some((line) => line.presentationId === pending.id);
@@ -131,7 +163,13 @@ export function OrderDistributionField({
     if (!canAdd || pending === null) return;
     onLinesChange([
       ...lines,
-      { presentationId: pending.id, presentationName: pending.name, packages: pendingPackages },
+      {
+        presentationId: pending.id,
+        presentationName: pending.name,
+        packages: pendingPackages,
+        content: pending.content,
+        unitId: pending.unitId,
+      },
     ]);
     setPending(null);
     setPendingPackages('1');
@@ -163,6 +201,18 @@ export function OrderDistributionField({
           {lines.map((line, index) => {
             const problem = lineProblem(availability, line.presentationId);
             const name = line.presentationName ?? MISSING_VALUE_MARK;
+            const coverage = withoutUnit
+              ? null
+              : lineCoverage({
+                  packages: line.packages,
+                  presentation:
+                    line.unitId === null
+                      ? savedContents.get(line.presentationId)
+                      : { content: line.content, unitId: line.unitId },
+                  unitId,
+                  quantity,
+                  units,
+                });
             return (
               <li
                 key={line.presentationId}
@@ -199,6 +249,15 @@ export function OrderDistributionField({
                     <TrashIcon aria-hidden />
                   </Button>
                 </div>
+                {coverage === null ? null : (
+                  <p
+                    className="text-sm text-muted-foreground"
+                    data-testid={ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID}
+                  >
+                    <span className="sr-only">{LABELS.covers} </span>
+                    {formatCoverage(coverage, unitLabel)}
+                  </p>
+                )}
                 {problem === null ? null : (
                   <p
                     className="flex items-center gap-1 text-sm text-destructive"
@@ -241,9 +300,10 @@ export function OrderDistributionField({
         <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-12">
           <div className="sm:col-span-8">
             <PresentationSelect
-              key={pickerKey}
+              key={`${unitId}:${pickerKey}`}
               name={null}
               requireContent
+              unitIds={compatibleUnitIds}
               onSelect={setPending}
             />
           </div>

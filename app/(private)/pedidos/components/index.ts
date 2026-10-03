@@ -51,7 +51,13 @@ export {
   type OrderColumnsDeps,
 } from './order-columns';
 export { OrderField, type OrderFieldProps } from './order-field';
-export { multiplyDecimal, subtractDecimal } from './order-decimal';
+export { divideDecimal, multiplyDecimal, subtractDecimal } from './order-decimal';
+export {
+  lineCoverage,
+  type LineCoverage,
+  type LineCoverageInput,
+  type PresentationContent,
+} from './order-distribution-coverage';
 export { ORDER_AMOUNT_SYMBOL, formatOrderAmount, orderAmountTitle } from './order-amount';
 export {
   ORDER_COST_QUOTE_ERROR_TESTID,
@@ -89,6 +95,7 @@ export {
   ORDER_DISTRIBUTION_ADD_TESTID,
   ORDER_DISTRIBUTION_AVAILABLE_TESTID,
   ORDER_DISTRIBUTION_ERROR_TESTID,
+  ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID,
   ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
   ORDER_DISTRIBUTION_LINE_PROBLEM_TESTID,
   ORDER_DISTRIBUTION_LINE_REMOVE_TESTID,
@@ -120,6 +127,8 @@ export {
   type OrderDistributionAvailabilityInput,
   type OrderDistributionLine,
 } from './use-order-distribution-availability';
+export { compatibleUnitIds } from './compatible-unit-ids';
+export { useSavedPresentationContents } from './use-saved-line-contents';
 export { OrderListEmpty } from './order-list-empty';
 export {
   ORDER_INGREDIENTS_EMPTY_TESTID,

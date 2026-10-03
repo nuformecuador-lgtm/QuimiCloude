@@ -21,6 +21,10 @@ export type OrderDistributionLine = {
   readonly presentationId: string;
   readonly presentationName: string | null;
   readonly packages: string;
+  /** Contenido por envase; `null` si no lo declara o no se conoce. */
+  readonly content: string | null;
+  /** Unidad del contenido. `null` = linea guardada, aun sin resolver contra el catalogo. */
+  readonly unitId: string | null;
 };
 
 export type OrderDistributionAvailability =
@@ -44,6 +48,8 @@ export function fromOrderPresentationLines(
     presentationId: line.presentationId,
     presentationName: line.presentationName,
     packages: String(line.packages),
+    content: null,
+    unitId: null,
   }));
 }
 

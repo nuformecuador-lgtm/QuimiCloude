@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -52,6 +53,7 @@ import type { UnitView } from '@/lib/modules/unidades';
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { BlockedOrderDialog } from './blocked-order-dialog';
+import { compatibleUnitIds } from './compatible-unit-ids';
 import { OrderCostQuote } from './order-cost-quote';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
@@ -453,6 +455,7 @@ export function OrderForm({
   );
   const availability = useOrderDistributionAvailability({ quantity, unitId, lines });
   const unitLabel = orderUnitLabel(units, unitId, order);
+  const compatibleIds = useMemo(() => compatibleUnitIds(units, unitId), [units, unitId]);
 
   const recipeName = recipe?.name ?? '';
   const recipeImageUrl = recipe?.imageUrl ?? null;
@@ -804,7 +807,10 @@ export function OrderForm({
               lines={lines}
               onLinesChange={setLines}
               unitId={unitId}
+              compatibleUnitIds={compatibleIds}
               unitLabel={unitLabel}
+              quantity={quantity}
+              units={units}
               availability={availability}
               error={fieldErrors.presentationLines}
               submitLines

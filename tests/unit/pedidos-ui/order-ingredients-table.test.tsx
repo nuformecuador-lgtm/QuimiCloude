@@ -16,6 +16,9 @@ import type { UnitView } from '@/lib/modules/unidades';
 
 const UNIDADES: readonly UnitView[] = [
   { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
+  { id: 'u-kilo', name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null, isSystem: true },
+  { id: 'u-gramo', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null, isSystem: true },
+  { id: 'u-unidad', name: 'Unidad', symbol: null, baseUnitId: null, factor: null, isSystem: false },
 ];
 
 const LINEA: RecipeLineView = {
@@ -58,18 +61,17 @@ describe('R25 — el porcentaje se pinta con coma y dos decimales', () => {
 });
 
 describe('R17 — la cantidad requerida y el restante escalan con la cantidad del pedido', () => {
-  it('pedido 200 y linea al 10 % en L con existencia 15: unidad L, requerida 20, restante -5 resaltado', () => {
+  it('pedido 200 y linea al 10 % en L con existencia 15: requerida 20, restante -5 L resaltado', () => {
     renderTabla({ quantity: '200' });
 
     const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-    expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
-    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
-      formatDecimalDisplay(LINEA.productStock ?? ''),
+    expect(within(tabla).getByTestId('order-ingredient-stock').textContent).toBe(
+      `${formatDecimalDisplay(LINEA.productStock ?? '')} L`,
     );
     expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('20');
 
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
-    expect(restante).toHaveTextContent('-5');
+    expect(restante).toHaveTextContent('-5 L');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 
@@ -93,16 +95,71 @@ describe('R17 — la cantidad requerida y el restante escalan con la cantidad de
 });
 
 describe('R24 — un insumo sin unidad resoluble se muestra sin unidad', () => {
-  it('con `productUnitId: null` se pinta el marcador, y el porcentaje y la requerida se siguen mostrando', () => {
+  it('con `productUnitId: null`, el porcentaje y la requerida se siguen mostrando', () => {
     const linea: RecipeLineView = { ...LINEA, productUnitId: null, productStock: null };
     renderTabla({ lines: [linea], quantity: '200' });
 
     const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-    expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('—');
     expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('10,00 %');
     expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('20');
     // Sin stock (insumo sin unidad tampoco tiene existencia resuelta), el restante es el marcador.
     expect(within(tabla).getByTestId('order-ingredient-remaining')).toHaveTextContent('—');
+  });
+});
+
+describe('la unidad del producto va pegada a la cifra de stock y restante', () => {
+  it('no hay columna «Unidad» propia', () => {
+    renderTabla();
+
+    const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).queryByTestId('order-ingredient-unit')).toBeNull();
+    expect(within(tabla).queryByRole('columnheader', { name: 'Unidad' })).toBeNull();
+  });
+
+  it.each([
+    ['L', 'u-litro'],
+    ['kg', 'u-kilo'],
+    ['g', 'u-gramo'],
+  ])('stock 720 en %s se lee «720 %s», tambien en el restante y en su aria-label', (simbolo, unitId) => {
+    renderTabla({ lines: [{ ...LINEA, productUnitId: unitId, productStock: '720.0000' }], quantity: '' });
+
+    const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    const stock = within(tabla).getByTestId('order-ingredient-stock');
+    const restante = within(tabla).getByTestId('order-ingredient-remaining');
+    expect(stock.textContent).toBe(`720 ${simbolo}`);
+    expect(stock).toHaveAttribute('aria-label', `720 ${simbolo}`);
+    expect(restante.textContent).toBe(`720 ${simbolo}`);
+    expect(restante).toHaveAttribute('aria-label', `720 ${simbolo}`);
+  });
+
+  it('sin simbolo se usa el nombre de la unidad', () => {
+    renderTabla({ lines: [{ ...LINEA, productUnitId: 'u-unidad', productStock: '720.0000' }], quantity: '' });
+
+    const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).getByTestId('order-ingredient-stock').textContent).toBe('720 Unidad');
+  });
+
+  it.each([
+    ['sin `productUnitId`', null],
+    ['con un id que no esta en el catalogo', 'u-inexistente'],
+  ])('%s se pinta solo la cifra, sin marcador pegado', (_caso, unitId) => {
+    renderTabla({ lines: [{ ...LINEA, productUnitId: unitId, productStock: '720.0000' }], quantity: '' });
+
+    const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    const stock = within(tabla).getByTestId('order-ingredient-stock');
+    const restante = within(tabla).getByTestId('order-ingredient-remaining');
+    expect(stock.textContent).toBe('720');
+    expect(stock).toHaveAttribute('aria-label', '720');
+    expect(restante.textContent).toBe('720');
+    expect(restante).toHaveAttribute('aria-label', '720');
+  });
+
+  it('sin stock se pinta solo el marcador, aunque la unidad se resuelva', () => {
+    renderTabla({ lines: [{ ...LINEA, productStock: null }] });
+
+    const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).getByTestId('order-ingredient-stock').textContent).toBe('—');
+    expect(within(tabla).getByTestId('order-ingredient-remaining').textContent).toBe('—');
   });
 });
 

@@ -863,12 +863,12 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     );
     // La columna «porcentaje» pinta la parte del insumo con coma y dos decimales.
     expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('10,00 %');
-    // La unidad es la del PRODUCTO (`productUnitId`) y se resuelve con el catalogo bajado por
-    // props.
-    expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
-    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
-      formatDecimalDisplay(LINEA_INGREDIENTE.productStock ?? ''),
+    // La unidad es la del PRODUCTO (`productUnitId`), se resuelve con el catalogo bajado por
+    // props y va pegada a la cifra del stock.
+    expect(within(tabla).getByTestId('order-ingredient-stock').textContent).toBe(
+      `${formatDecimalDisplay(LINEA_INGREDIENTE.productStock ?? '')} L`,
     );
+    expect(within(tabla).queryByTestId('order-ingredient-unit')).toBeNull();
   });
 
   it('la edicion pide el detalle de la receta YA elegida al montar el panel', async () => {
@@ -914,9 +914,9 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     await waitFor(() => expect(requerida.textContent).toBe('0.01'));
     expect(requerida).toHaveAttribute('title', '0.01005');
     expect(requerida).toHaveAttribute('aria-label', '0.01005');
-    expect(restante.textContent).toBe('39.99');
+    expect(restante.textContent).toBe('39.99 L');
     expect(restante).toHaveAttribute('title', '39.98995');
-    expect(restante).toHaveAttribute('aria-label', '39.98995');
+    expect(restante).toHaveAttribute('aria-label', '39.98995 L');
     expect(restante.firstChild).not.toHaveClass('text-destructive');
   });
 
@@ -941,9 +941,9 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
 
     // 0.005 − 0.01005 = −0.00505, resaltado. A dos decimales eso se pinta «-0.01», y el `title`
     // lleva la cifra exacta. El resalte (`isShort`) mira el exacto, no el pintado.
-    await waitFor(() => expect(restante.textContent).toBe('-0.01'));
+    await waitFor(() => expect(restante.textContent).toBe('-0.01 L'));
     expect(restante).toHaveAttribute('title', '-0.00505');
-    expect(restante).toHaveAttribute('aria-label', '-0.00505');
+    expect(restante).toHaveAttribute('aria-label', '-0.00505 L');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 
@@ -998,9 +998,9 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     // El resalte de faltante (`isShort`) se decide con el restante EXACTO, nunca con el pintado.
     // En telefono o impreso no hay `title`, y alli el color es el unico aviso; se acepta a
     // sabiendas.
-    await waitFor(() => expect(restante.textContent).toBe('-0.01'));
+    await waitFor(() => expect(restante.textContent).toBe('-0.01 L'));
     expect(restante).toHaveAttribute('title', '-0.01005');
-    expect(restante).toHaveAttribute('aria-label', '-0.01005');
+    expect(restante).toHaveAttribute('aria-label', '-0.01005 L');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 

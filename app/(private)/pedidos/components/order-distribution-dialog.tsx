@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { PresentationUnitSelect } from '@/components/shared/presentation-unit-select';
@@ -26,6 +26,7 @@ import {
 import type { UnitView } from '@/lib/modules/unidades';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 
+import { compatibleUnitIds } from './compatible-unit-ids';
 import { OrderDistributionField } from './order-distribution-field';
 import {
   availabilityBlocksSave,
@@ -114,6 +115,7 @@ export function OrderDistributionDialog({
     unitId,
     lines,
   });
+  const compatibleIds = useMemo(() => compatibleUnitIds(units, unitId), [units, unitId]);
   const canSave = unitId !== '' && !isPending && !availabilityBlocksSave(availability);
 
   function save() {
@@ -169,7 +171,10 @@ export function OrderDistributionDialog({
             lines={lines}
             onLinesChange={setLines}
             unitId={unitId}
+            compatibleUnitIds={compatibleIds}
             unitLabel={resolveUnitLabel(units, unitId, order)}
+            quantity={trimDecimal(order.quantity)}
+            units={units}
             availability={availability}
             submitLines={false}
           />

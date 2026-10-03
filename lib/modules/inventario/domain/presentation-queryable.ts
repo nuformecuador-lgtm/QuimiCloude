@@ -5,12 +5,16 @@
  *
  * `deletedAt` no esta y no puede estar (R7); `nameNormalized` tampoco, porque es el COMO de la
  * busqueda y no un campo que se pida.
+ *
+ * `unitId` es filtrable (`select`) para que el reparto en presentaciones del pedido liste solo las
+ * presentaciones cuya unidad convierte a la del pedido. No es ordenable: ordenar por un uuid no
+ * dice nada a quien mira la lista.
  */
 
 import type { ListQueryable } from './list-query';
 
 export const PRESENTATION_QUERYABLE: ListQueryable = {
   sortable: ['name', 'createdAt', 'updatedAt'],
-  filterable: { createdAt: 'dateRange' },
+  filterable: { createdAt: 'dateRange', unitId: 'select' },
   searchable: true,
 };

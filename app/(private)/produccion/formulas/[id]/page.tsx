@@ -144,8 +144,8 @@ export default async function EditarRecetaPage({
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <h1 data-testid="recipe-form-title" className="text-2xl font-semibold">
-        Editar fórmula
+      <h1 data-testid="recipe-form-title" className="text-2xl font-semibold break-words">
+        Editar fórmula · {recipeResult.data.name}
       </h1>
       <RecipeForm
         mode="edit"

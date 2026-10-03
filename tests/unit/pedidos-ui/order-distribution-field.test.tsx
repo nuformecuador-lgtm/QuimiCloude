@@ -10,6 +10,7 @@ import {
   ORDER_DISTRIBUTION_ADD_PACKAGES_TESTID,
   ORDER_DISTRIBUTION_ADD_TESTID,
   ORDER_DISTRIBUTION_AVAILABLE_TESTID,
+  ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID,
   ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
   ORDER_DISTRIBUTION_LINE_PROBLEM_TESTID,
   ORDER_DISTRIBUTION_LINE_REMOVE_TESTID,
@@ -42,6 +43,11 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 }));
 
 const UNIDAD_ID = crypto.randomUUID();
+const MILILITRO_ID = crypto.randomUUID();
+const UNIDADES = [
+  { id: UNIDAD_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
+  { id: MILILITRO_ID, name: 'Mililitro', symbol: 'ml', baseUnitId: UNIDAD_ID, factor: '0.001' },
+];
 const CON_CONTENIDO = {
   id: crypto.randomUUID(),
   name: 'Bidón 20L',
@@ -59,10 +65,12 @@ const SAVE_TESTID = 'host-save';
 
 function Anfitrion({
   unitId = UNIDAD_ID,
+  compatibleUnitIds,
   quantity = '100',
   initialLines = [],
 }: {
   readonly unitId?: string;
+  readonly compatibleUnitIds?: readonly string[];
   readonly quantity?: string;
   readonly initialLines?: readonly OrderDistributionLine[];
 }) {
@@ -74,7 +82,10 @@ function Anfitrion({
         lines={lines}
         onLinesChange={setLines}
         unitId={unitId}
+        compatibleUnitIds={compatibleUnitIds}
         unitLabel="L"
+        quantity={quantity}
+        units={UNIDADES}
         availability={availability}
       />
       <button type="button" disabled={availabilityBlocksSave(availability)} data-testid={SAVE_TESTID}>
@@ -88,6 +99,8 @@ const LINEA: OrderDistributionLine = {
   presentationId: CON_CONTENIDO.id,
   presentationName: CON_CONTENIDO.name,
   packages: '2',
+  content: CON_CONTENIDO.content,
+  unitId: UNIDAD_ID,
 };
 
 beforeEach(() => {
@@ -269,9 +282,113 @@ describe('control de reparto del pedido', () => {
     expect(quoteAvailabilityMock).not.toHaveBeenCalled();
   });
 
+  it('el selector solo pide presentaciones en unidades compatibles con la del pedido', async () => {
+    const user = setupUser();
+    const derivada = crypto.randomUUID();
+    render(<Anfitrion compatibleUnitIds={[UNIDAD_ID, derivada]} />);
+
+    await abrirSelector(user);
+
+    expect(listPresentationsActionMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        filters: { unitId: { kind: 'select', values: [UNIDAD_ID, derivada] } },
+      }),
+    );
+  });
+
+  it('cambiar la unidad del pedido descarta la presentacion elegida sin anadir', async () => {
+    const user = setupUser();
+    const { rerender } = render(<Anfitrion />);
+
+    await abrirSelector(user);
+    await user.click(await esperarInteractiva(opcion(CON_CONTENIDO.id)));
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID)).toBeEnabled();
+
+    rerender(<Anfitrion unitId={crypto.randomUUID()} />);
+
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID)).toBeDisabled();
+    expect(screen.getByTestId('presentation-select')).toHaveValue('');
+  });
+
   it('R46: las lineas salen con la forma que pide la edicion acotada', () => {
     expect(toPresentationLinesInput([LINEA])).toEqual([
       { presentationId: CON_CONTENIDO.id, packages: '2' },
     ]);
+  });
+});
+
+describe('lo que cubre cada linea del reparto', () => {
+  function cobertura(): HTMLElement | null {
+    return within(screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID)).queryByTestId(
+      ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID,
+    );
+  }
+
+  it('misma unidad: 2 × 5 L en un pedido de 20 L cubre 10 L, el 50%', () => {
+    render(<Anfitrion quantity="20" initialLines={[{ ...LINEA, content: '5.0000' }]} />);
+
+    expect(cobertura()).toHaveTextContent('10 L · 50%');
+  });
+
+  it('otra unidad: 4 × 500 ml en un pedido de 4 L cubre 2 L, el 50%', () => {
+    render(
+      <Anfitrion
+        quantity="4"
+        initialLines={[{ ...LINEA, packages: '4', content: '500', unitId: MILILITRO_ID }]}
+      />,
+    );
+
+    expect(cobertura()).toHaveTextContent('2 L · 50%');
+  });
+
+  it('se recalcula al cambiar los envases y no muestra nada con envases no validos', async () => {
+    const user = setupUser();
+    render(<Anfitrion quantity="20" initialLines={[{ ...LINEA, content: '5.0000' }]} />);
+
+    const envases = screen.getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
+    await user.clear(envases);
+    expect(cobertura()).toBeNull();
+
+    await user.type(envases, '3');
+    expect(cobertura()).toHaveTextContent('15 L · 75%');
+  });
+
+  it('sin cantidad del pedido muestra lo que cubre sin porcentaje', () => {
+    render(<Anfitrion quantity="" initialLines={[{ ...LINEA, content: '5.0000' }]} />);
+
+    expect(cobertura()).toHaveTextContent('10 L');
+    expect(cobertura()?.textContent).not.toContain('%');
+  });
+
+  it('sin contenido conocido no muestra nada', () => {
+    render(<Anfitrion initialLines={[{ ...LINEA, content: null }]} />);
+
+    expect(cobertura()).toBeNull();
+  });
+
+  it('la linea anadida desde el selector muestra lo que cubre', async () => {
+    const user = setupUser();
+    render(<Anfitrion />);
+
+    await abrirSelector(user);
+    await user.click(await esperarInteractiva(opcion(CON_CONTENIDO.id)));
+    const envases = screen.getByTestId(ORDER_DISTRIBUTION_ADD_PACKAGES_TESTID);
+    await user.clear(envases);
+    await user.type(envases, '3');
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
+
+    expect(cobertura()).toHaveTextContent('60 L · 60%');
+  });
+
+  it('la linea guardada resuelve su contenido en el catalogo y luego muestra lo que cubre', async () => {
+    render(
+      <Anfitrion quantity="100" initialLines={[{ ...LINEA, content: null, unitId: null }]} />,
+    );
+
+    expect(cobertura()).toBeNull();
+    await waitFor(() => expect(cobertura()).toHaveTextContent('40 L · 40%'));
+    expect(listPresentationsActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ search: CON_CONTENIDO.name }),
+    );
   });
 });

@@ -708,6 +708,18 @@ describe('QC-174 — la ficha de la original y el id de una version', () => {
     );
   });
 
+  it('el titulo de la edicion nombra la formula que se esta editando', async () => {
+    getRecipeActionMock.mockResolvedValue({ status: 'success', data: recipeDetail() });
+    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
+
+    const tree = await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) });
+    render(tree);
+
+    expect(screen.getByTestId('recipe-form-title')).toHaveTextContent(
+      'Editar fórmula · Detergente industrial',
+    );
+  });
+
   it('R5: si falla la lista de versiones presenta el error propio y ningun formulario', async () => {
     getRecipeActionMock.mockResolvedValue({ status: 'success', data: recipeDetail() });
     listRecipeVersionsActionMock.mockResolvedValue({
