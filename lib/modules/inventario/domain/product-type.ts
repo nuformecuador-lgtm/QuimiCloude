@@ -39,3 +39,8 @@ export const MANUAL_PRODUCT_TYPE_VALUES = [
   PRODUCT_TYPES.MACHINE,
   PRODUCT_TYPES.PACKAGING,
 ] as const satisfies readonly ProductType[];
+
+/** Lo que puede ser ingrediente de una receta: ni un producto terminado ni un envase. */
+export function isIngredientType(type: ProductType): boolean {
+  return type !== PRODUCT_TYPES.FINISHED_PRODUCT && type !== PRODUCT_TYPES.PACKAGING;
+}

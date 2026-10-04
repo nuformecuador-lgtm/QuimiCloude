@@ -16,7 +16,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import {
+  errorMessage,
+  UNEXPECTED_ERROR_CODE,
+  type ErrorCode,
+  type ErrorState,
+} from '@/lib/modules/errores';
 import { newRequestId } from '@/lib/modules/observabilidad';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import {
@@ -26,6 +31,7 @@ import {
 import type { UnitView } from '@/lib/modules/unidades';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 
+import { BlockedOrderDialog } from './blocked-order-dialog';
 import { compatibleUnitIds } from './compatible-unit-ids';
 import { OrderDistributionField } from './order-distribution-field';
 import {
@@ -43,10 +49,12 @@ export const ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID = 'order-distribution-dialog
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
+const WOULD_BLOCK_CODE = 'order_would_block' satisfies ErrorCode;
+
 const LABELS = {
   title: 'Reparto y unidad',
   description: (numberText: string) =>
-    `Pedido ${numberText}. Solo se cambian la unidad y el reparto en presentaciones.`,
+    `Pedido ${numberText}. Solo se cambian la unidad y el reparto en envases.`,
   submit: 'Guardar',
   saving: 'Guardando…',
   dismiss: 'Cancelar',
@@ -108,6 +116,10 @@ export function OrderDistributionDialog({
     () => saved?.lines ?? fromOrderPresentationLines(order.presentationLines),
   );
   const [error, setError] = useState<ErrorState | null>(null);
+  const [blocked, setBlocked] = useState<{
+    readonly message: string;
+    readonly draft: OrderDistributionDraft;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const availability = useOrderDistributionAvailability({
@@ -120,14 +132,27 @@ export function OrderDistributionDialog({
 
   function save() {
     if (!canSave) return;
-    const input = { unitId, presentationLines: toPresentationLinesInput(lines) };
-    const draft: OrderDistributionDraft = { unitId, lines };
+    send({ unitId, lines }, false);
+  }
+
+  /** `confirmBlocked` solo viaja tras aceptar el aviso, y con el mismo reparto que lo provoco. */
+  function send(draft: OrderDistributionDraft, confirmBlocked: boolean) {
+    const input = {
+      unitId: draft.unitId,
+      presentationLines: toPresentationLinesInput(draft.lines),
+      ...(confirmBlocked ? { confirmBlocked: true } : {}),
+    };
     startTransition(async () => {
       let result: OrderMutationFormState;
       try {
         result = await updateOrderDistributionAction(order.id, input);
       } catch {
         setError(unexpectedFromRejection());
+        return;
+      }
+      if (result.status === 'error' && result.code === WOULD_BLOCK_CODE) {
+        setError(null);
+        setBlocked({ message: result.message, draft });
         return;
       }
       if (result.status === 'error') {
@@ -148,6 +173,16 @@ export function OrderDistributionDialog({
         className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"
         data-testid={ORDER_DISTRIBUTION_DIALOG_TESTID}
       >
+        <BlockedOrderDialog
+          open={blocked !== null}
+          message={blocked?.message ?? ''}
+          onConfirm={() => {
+            if (blocked === null) return;
+            setBlocked(null);
+            send(blocked.draft, true);
+          }}
+          onDismiss={() => setBlocked(null)}
+        />
         <DialogHeader>
           <DialogTitle>{LABELS.title}</DialogTitle>
           <DialogDescription>{LABELS.description(order.numberText)}</DialogDescription>

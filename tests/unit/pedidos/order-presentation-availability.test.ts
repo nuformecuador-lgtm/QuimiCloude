@@ -13,6 +13,7 @@ import { createQuoteOrderPresentationAvailability } from '@/lib/modules/pedidos/
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const ACTOR: Actor = { id: 'admin-a', companyId: EMPRESA, permissions: ['pedidos.modificar'] };
@@ -54,6 +55,7 @@ function catalogoDePresentaciones(
 function montar(overrides: { readonly presentations?: PresentationCatalog; readonly units?: UnitCatalog } = {}) {
   return createQuoteOrderPresentationAvailability({
     presentations: overrides.presentations ?? catalogoDePresentaciones().presentations,
+    packaging: fakePackagingCatalog(),
     units: overrides.units ?? catalogoDeUnidades().units,
   });
 }
@@ -265,9 +267,8 @@ describe('quoteOrderPresentationAvailability — resolucion de catalogos', () =>
       ACTOR,
     );
 
-    // Una llamada para la unidad del pedido (`unitId`) y otra para las de las presentaciones
-    // (con los ids UNICOS que le faltan): dos en total, ninguna repite `UNIT_ID`.
-    expect(unidades.units.findRefs).toHaveBeenCalledTimes(2);
-    expect(unidades.units.findRefs).toHaveBeenNthCalledWith(2, [OTRA_UNIDAD_COMPATIBLE], EMPRESA);
+    // La unidad del pedido y las de las presentaciones en la misma llamada, sin repetir ninguna.
+    expect(unidades.units.findRefs).toHaveBeenCalledTimes(1);
+    expect(unidades.units.findRefs).toHaveBeenCalledWith([UNIT_ID, OTRA_UNIDAD_COMPATIBLE], EMPRESA);
   });
 });

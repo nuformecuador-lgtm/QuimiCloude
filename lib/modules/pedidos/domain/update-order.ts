@@ -8,13 +8,13 @@ import {
 import type { OrderStatus } from './order-classification';
 import { updateOrderSchema } from './order-input';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
-import { buildRequirement } from './order-requirement';
-import { resolveDistribution } from './resolve-distribution';
+import { buildOrderRequirement } from './order-requirement';
+import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -34,6 +34,8 @@ export type UpdateOrderDeps = {
   /** Contrato PUBLICO de `inventario`: las presentaciones del reparto. No se le pasan al
    *  coste, ver el comentario identico de `create-order.ts`. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
+  readonly packaging: PackagingCatalog;
   readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -110,12 +112,11 @@ export function createUpdateOrder(
     // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
     // disponible para si mismo: editarlo sin cambiar nada no le hace perder de su propio
     // promedio el lote que el mismo aparto entero.
-    const ingredientsCost = await resolveIngredientsCost(
-      deps.recipes,
-      deps.products,
-      deps.units,
+    const cost = await resolveStoredOrderCost(
+      deps,
       effectiveId,
       data.quantity,
+      packagingLinesOfInput(data.presentationLines),
       actor.companyId,
       { orderId: id },
     );
@@ -132,23 +133,25 @@ export function createUpdateOrder(
 
       // La unidad y el reparto se resuelven y se validan contra
       // el total con la fila del pedido YA BLOQUEADA, para que dos ediciones simultaneas no
-      // dejen ninguna pasar del total.
-      const presentationLines = await resolveDistribution(
-        deps.presentations,
-        deps.units,
+      // dejen ninguna pasar del total. Una linea antigua solo se conserva si llega igual.
+      const distribution = await resolveDistribution(
+        deps,
         actor.companyId,
         data.quantity,
         data.unitId,
         data.presentationLines,
+        { savedLines: locked.presentationLines },
       );
 
-      // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado
-      // por otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las
-      // lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido-. Se lee con
-      // `scope.recipes`, sobre el cliente de ESTA transaccion, para que la lectura vea la
-      // misma instantanea que acaba de bloquear `lockAliveById`.
+      // La receta se lee con el cliente de ESTA transaccion, para ver la misma instantanea que
+      // acaba de bloquear `lockAliveById`. La edicion solo llega antes de consumir la receta.
       const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
-      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
+      const requirement = buildOrderRequirement({
+        recipeLines: content?.lines ?? [],
+        quantity: data.quantity,
+        packagingLines: distribution.packagingLines,
+        phase: 'before_consumption',
+      });
 
       const result = await transaction.orders.updateAlive(
         id,
@@ -157,11 +160,11 @@ export function createUpdateOrder(
           quantity: data.quantity,
           priority: data.priority,
           unitId: data.unitId,
-          presentationLines,
+          presentationLines: distribution.lines,
         },
         actor.id,
         instant,
-        ingredientsCost,
+        cost,
         scope,
       );
       if (result === 'not_found') throw new OrderNotFoundError();
@@ -181,7 +184,7 @@ export function createUpdateOrder(
         if (locked.status !== 'BLOQUEADO') {
           await moveStatus(transaction.orders, id, locked.status, 'BLOQUEADO', actor.id, instant, scope);
         }
-        if (ingredientsCost !== null) {
+        if (cost !== null) {
           await transaction.orders.setIngredientsCost(id, null, actor.id, instant, scope);
         }
       } else if (locked.status === 'BLOQUEADO') {

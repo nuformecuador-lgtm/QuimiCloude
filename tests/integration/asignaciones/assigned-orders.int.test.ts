@@ -32,7 +32,6 @@ import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/d
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
@@ -45,6 +44,9 @@ import {
   inRolledBackTransaction,
   withSavepoint,
 } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 describe('asignaciones · los pedidos de una persona en su empresa (integracion)', () => {
   it('R8: la asignacion de OTRA empresa no vuelve, y no se distingue de una que no existe', async () => {
@@ -245,7 +247,7 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
         assignments: createOrderAssignmentRepository(fixture.tx),
         orders: {
           findAliveById: findAliveOrderTargetById,
-          listAliveSummariesByIds: listAliveOrderSummariesByIds,
+          listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
           listAliveSummariesInCompany: async () => {
             throw new Error('QC-144: listAssignedOrders no lista toda la empresa')
           },

@@ -289,12 +289,15 @@ model Product {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(6)
-  /// Solo en productos terminados: de que receta y en que presentacion se fabrica.
+  /// Solo en productos terminados: de que receta se fabrica.
   recipeId       String?     @map("recipe_id") @db.Uuid
+  /// Producto terminado: en que presentacion se fabrica. Envase: su presentacion fija; NULL en
+  /// los envases dados de alta cuando el envase no la llevaba.
   presentationId String?     @map("presentation_id") @db.Uuid
 
   batches ProductBatch[]
 
+  @@unique([companyId, id], map: "products_company_id_id_key")
   @@index([companyId], map: "products_company_id_idx")
   @@index([unitId], map: "products_unit_id_idx")
   @@index([recipeId], map: "products_recipe_id_idx")
@@ -656,6 +659,9 @@ model Order {
   /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
   /// escribio. NULL = no se pudo calcular; nunca 0.
   ingredientsCost     Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
+  /// Parte de envases incluida en `ingredientsCost`, que sigue siendo el total. NULL si y solo si
+  /// `ingredientsCost` lo es: CHECK `orders_packaging_cost_matches_ingredients_cost`.
+  packagingCost       Decimal?      @map("packaging_cost") @db.Decimal(14, 4)
   /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
   /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
   /// entregar lo vacian.
@@ -703,6 +709,10 @@ model OrderPresentationLine {
   /// Copia del contenido de la presentacion al anadir la linea o al cambiar su presentacion.
   /// NULL = la presentacion no tenia contenido en ese instante.
   presentationContent Decimal? @map("presentation_content") @db.Decimal(14, 4)
+  /// Envase (producto PACKAGING) de la linea. NULL = linea guardada antes de que el reparto
+  /// nombrara envases. Sin `@relation`: `Product` es de `inventario`; FK compuesta
+  /// `(company_id, packaging_product_id)` escrita a mano, drift.
+  packagingProductId String? @map("packaging_product_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -711,6 +721,7 @@ model OrderPresentationLine {
   @@unique([orderId, presentationId], map: "order_presentation_lines_order_id_presentation_id_key")
   @@index([companyId], map: "order_presentation_lines_company_id_idx")
   @@index([presentationId], map: "order_presentation_lines_presentation_id_idx")
+  @@index([packagingProductId], map: "order_presentation_lines_packaging_product_id_idx")
   @@map("order_presentation_lines")
 }
 

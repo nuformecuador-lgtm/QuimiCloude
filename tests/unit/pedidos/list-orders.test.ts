@@ -39,6 +39,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -149,6 +150,7 @@ function dobles(opciones: {
     orders,
     recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
     presentations: { findRefs } as unknown as PresentationCatalog,
+    packaging: fakePackagingCatalog(),
     units: { findRefs: findUnitRefs } as unknown as UnitCatalog,
     log,
     listAlive,
@@ -735,11 +737,11 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
       fila({
         id: 'o-1',
         presentationLines: [
-          { presentationId: PRESENTACION_A, packages: 5 },
-          { presentationId: PRESENTACION_B, packages: 1 },
+          { presentationId: PRESENTACION_A, packages: 5, packagingProductId: null },
+          { presentationId: PRESENTACION_B, packages: 1, packagingProductId: null },
         ],
       }),
-      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3 }] }),
+      fila({ id: 'o-2', presentationLines: [{ presentationId: PRESENTACION_A, packages: 3, packagingProductId: null }] }),
       fila({ id: 'o-3', presentationLines: [] }),
     ]
     const d = dobles({
@@ -755,11 +757,11 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
     expect(d.findRefs).toHaveBeenCalledTimes(1)
     expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A, PRESENTACION_B])
     expect(salida.items[0]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5 },
-      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1 },
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1, packagingProductId: null, packagingName: null },
     ])
     expect(salida.items[1]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3 },
+      { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3, packagingProductId: null, packagingName: null },
     ])
     // R27: sin reparto, lista vacia; no es un error de carga.
     expect(salida.items[2]?.presentationLines).toEqual([])

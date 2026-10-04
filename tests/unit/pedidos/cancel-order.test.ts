@@ -76,7 +76,7 @@ function dobles(opciones: { fila?: OrderRow | null; cancelacion?: 'ok' | 'not_fo
   // `lockAliveById` bloquea la MISMA fila que `findAliveById` -en estos tests no hay carrera
   // que las separe-. Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- para poder
   // afirmar sobre `mock.calls[0]`: sin ellos, TypeScript infiere una tupla vacia.
-  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null, packagingCost: null }))
   const cancelAlive = vi.fn(
     async (id: string, reason: string, actorId: string | null, when: Date) => {
       // El doble no usa los argumentos; los DECLARA para que `mock.calls` tenga tipo.
@@ -280,7 +280,7 @@ describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
     const orden: string[] = []
     d.lockAliveById.mockImplementation(async () => {
       orden.push('orders.lockAliveById')
-      return { ...fila('PENDIENTE'), reservedAt: null }
+      return { ...fila('PENDIENTE'), reservedAt: null, packagingCost: null }
     })
     d.cancelAlive.mockImplementation(async () => {
       orden.push('orders.cancelAlive')

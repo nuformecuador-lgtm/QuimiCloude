@@ -378,6 +378,8 @@ type WritableColumn =
   | 'created_at'
   | 'deleted_at'
   | 'unit_id'
+  | 'ingredients_cost'
+  | 'packaging_cost'
 
 /**
  * `INSERT` crudo en `orders`. `columns` decide que se escribe: omitir una entrada es
@@ -512,6 +514,10 @@ describe('el pedido como fila completa', () => {
       'ingredients_cost',
       'order_sequence',
       'order_year',
+      // `packaging_cost` es la parte de envases incluida en `ingredients_cost` (QC-195 R47): un
+      // desglose del costo, no un precio, un total, un impuesto ni un cliente. Entre `order_year`
+      // y `packed_by` por el mismo `sort()` lexicografico ('packag' < 'packed').
+      'packaging_cost',
       // `packed_by` es quien tiene el pedido en empaque: no es un total, un impuesto ni un
       // cliente. Entre `order_year` y `priority` por el mismo `sort()` lexicografico.
       'packed_by',
@@ -585,6 +591,35 @@ describe('la cantidad', () => {
         'cantidad ausente',
       )
       expect(ausente).toBe(NOT_NULL_VIOLATION)
+    })
+  })
+
+  it('QC-195 R47: el importe y su parte de envases son NULL juntos o con valor juntos (23514 si no)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+
+      const soloTotal = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertOrder(tx, { ...baseColumns(f, freshSequence()), ingredients_cost: asDecimal('10') }),
+        'importe sin parte de envases',
+      )
+      expect(soloTotal).toBe(CHECK_VIOLATION)
+
+      const soloEnvases = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertOrder(tx, { ...baseColumns(f, freshSequence()), packaging_cost: asDecimal('0') }),
+        'parte de envases sin importe',
+      )
+      expect(soloEnvases).toBe(CHECK_VIOLATION)
+
+      expect(
+        await rawInsertOrder(tx, {
+          ...baseColumns(f, freshSequence()),
+          ingredients_cost: asDecimal('10'),
+          packaging_cost: asDecimal('2.5'),
+        }),
+      ).toBe(1)
+      expect(await rawInsertOrder(tx, baseColumns(f, freshSequence()))).toBe(1)
     })
   })
 

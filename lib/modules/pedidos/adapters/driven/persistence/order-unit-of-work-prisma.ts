@@ -4,9 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { DuplicateOrderNumberError } from '../../../domain/errors';
 
-import { CREATE_ORDER_MAX_ATTEMPTS, createOrderWriteRepository, isDuplicateOrderNumber } from './order-prisma';
-
-import type { OrderDistributionTransaction } from '../../../ports/order-distribution-transaction';
+import { CREATE_ORDER_MAX_ATTEMPTS, isDuplicateOrderNumber } from './order-prisma';
 
 /**
  * `withOrderTransaction`: abre la transaccion compartida con `maxWait`/`timeout` explicitos -el
@@ -32,18 +30,4 @@ export async function withOrderTransaction<T>(
       if (attempt >= CREATE_ORDER_MAX_ATTEMPTS) throw new DuplicateOrderNumberError();
     }
   }
-}
-
-/**
- * Implementa `OrderDistributionTransaction`: la transaccion CORTA propia
- * de `updateOrderPresentationLines`, sin la unidad de trabajo compartida con `inventario` -este
- * caso de uso no toca material ni reserva-. Vive en ESTE archivo, y no en `order-prisma.ts`, por
- * el mismo motivo que `withOrderTransaction`: es el UNICO archivo de `pedidos` que abre un
- * `prisma.$transaction` sin filtrar ninguna tabla por su cuenta. Sin el reintento de
- * `withOrderTransaction`: aqui no hay `INSERT` con correlativo que pueda chocar.
- */
-export function createOrderDistributionTransaction(): OrderDistributionTransaction {
-  return {
-    run: (work) => prisma.$transaction((tx) => work(createOrderWriteRepository(tx))),
-  };
 }

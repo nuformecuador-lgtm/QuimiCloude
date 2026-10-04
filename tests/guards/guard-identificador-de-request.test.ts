@@ -253,6 +253,11 @@ export const E2E_ESPERADOS = [
   // Alta por el mismo motivo que las demas. Recorre el pedido repartido en varias presentaciones
   // de punta a punta; no lee ni afirma nada sobre el identificador de peticion.
   'pedido-en-varias-presentaciones.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el reparto en envases: alta con envases
+  // apartados, falta de envase que bloquea, cotizacion con envases y Terminar que los consume; y
+  // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'envases-del-pedido.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -415,6 +420,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20261001170100_orders_blocked_index',
   // Crea la tabla de herramientas de receta; no toca el identificador de peticion.
   '20261003120000_recipe_tools',
+  // El envase de la linea del reparto y la unidad de envases; no toca el identificador.
+  '20261003130000_packaging_products_in_distribution',
+  // La parte de envases del importe del pedido; no toca el identificador.
+  '20261004120000_orders_packaging_cost',
 ] as const
 
 export function hallazgosDeMigraciones(

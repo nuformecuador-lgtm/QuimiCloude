@@ -208,6 +208,15 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   }),
 }));
 
+// El selector de envases del reparto lista productos: sin este doble, su modulo arrastraria
+// `@/lib/composition` real.
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  listProductsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
+}));
+
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
@@ -251,7 +260,13 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedBy: null,
     presentationLines: [
 
-      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
+      {
+        presentationId: PRESENTACION.id,
+        presentationName: PRESENTACION.name,
+        packages: 1,
+        packagingProductId: null,
+        packagingName: null,
+      },
 
     ],
     unitId: UNIDAD.id,

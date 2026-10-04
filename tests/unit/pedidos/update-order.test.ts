@@ -27,9 +27,10 @@ import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classificat
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
-import type { CostingBatch, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import type { CostingBatch, PackagingCatalog, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444';
@@ -140,6 +141,16 @@ function catalogoDePresentaciones(
   return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
 
+const ENVASE_DE_A = 'e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1';
+
+/** Catalogo de envases: `ENVASE_DE_A`, con su presentacion fija `PRESENTACION_DE_A` y el
+ *  contenido y la unidad que le pase el test. */
+function catalogoDeEnvases(content: string | null = null, unitId: string = UNIT_ID) {
+  return fakePackagingCatalog([
+    packagingRef({ id: ENVASE_DE_A, name: 'Bidon 20L', presentationId: PRESENTACION_DE_A, content, unitId }),
+  ]);
+}
+
 function repositorioDePedidos() {
   const filaVista = filaExistente();
   const findAliveById = vi.fn(async () => filaVista);
@@ -154,7 +165,7 @@ function repositorioDePedidos() {
 
   // `lockAliveById` bloquea la MISMA fila que `findAliveById`: en estos tests no hay carrera
   // que las separe.
-  const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
+  const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
   const updateAlive = vi.fn(async () => 'ok' as const);
   const setReservedAt = vi.fn(async () => undefined);
   const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
@@ -199,7 +210,7 @@ function repositorioConEstado(status: OrderStatus) {
     listAlive: explota('listAlive'),
   } as unknown as OrderRepository;
 
-  const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
+  const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
   const updateAlive = vi.fn(async () => 'ok' as const);
   const setReservedAt = vi.fn(async () => undefined);
   const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
@@ -222,6 +233,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -241,6 +253,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
         presentations: catalogoDePresentaciones().presentations,
+        packaging: fakePackagingCatalog(),
         now: () => AHORA,
       })(ORDER_ID, EDICION_HACIA_B, ACTOR_A),
     ).rejects.toBeInstanceOf(RecipeNotFoundError);
@@ -255,6 +268,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     })(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_INEXISTENTE }, ACTOR_A).catch((e: unknown) => e);
 
@@ -273,6 +287,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -291,6 +306,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -309,6 +325,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -331,6 +348,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: pres.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -354,6 +372,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: pres.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -381,6 +400,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
         products: catalogoDeProductos().products,
         units: unidades.units,
         presentations: catalogoDePresentaciones().presentations,
+        packaging: fakePackagingCatalog(),
         now: () => AHORA,
       });
 
@@ -408,6 +428,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
         presentations: pres.presentations,
+        packaging: fakePackagingCatalog(),
         now: () => AHORA,
       });
 
@@ -434,6 +455,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: pres.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -450,7 +472,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     expect(repo.updateAlive).not.toHaveBeenCalled();
   });
 
-  it('R6, R8: una linea con contenido escribe el reparto con el contenido copiado en este instante', async () => {
+  it('R6, R8 / QC-195 R14: una linea con envase escribe su presentacion fija y el contenido copiado en este instante', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
@@ -459,7 +481,8 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('7.0000').presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('7.0000'),
       now: () => AHORA,
     });
 
@@ -468,16 +491,18 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       {
         ...EDICION_HACIA_B,
         recipeId: RECETA_DE_A,
-        presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+        presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 1 }],
       },
       ACTOR_A,
     );
 
     const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [
       string,
-      { presentationLines: readonly { presentationId: string; packages: number; content: string | null }[] },
+      { presentationLines: readonly { presentationId: string; packages: number; content: string | null; packagingProductId: string | null }[] },
     ];
-    expect(dataEscrita.presentationLines).toEqual([{ presentationId: PRESENTACION_DE_A, packages: 1, content: '7.0000' }]);
+    expect(dataEscrita.presentationLines).toEqual([
+      { presentationId: PRESENTACION_DE_A, packages: 1, content: '7.0000', packagingProductId: ENVASE_DE_A },
+    ]);
   });
 
   it('R9: sin ningun reparto en la entrada, la edicion escribe el conjunto vacio', async () => {
@@ -490,6 +515,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases(),
       now: () => AHORA,
     });
 
@@ -499,7 +525,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     expect(dataEscrita.presentationLines).toEqual([]);
   });
 
-  it('R35: una linea sin contenido -> presentation_without_content, sin escribir', async () => {
+  it('R35 / QC-195 R13: un envase cuya presentacion no tiene contenido -> presentation_without_content, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
@@ -508,7 +534,8 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones(null).presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases(null),
       now: () => AHORA,
     });
 
@@ -518,7 +545,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
         {
           ...EDICION_HACIA_B,
           recipeId: RECETA_DE_A,
-          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+          presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 1 }],
         },
         ACTOR_A,
       ),
@@ -528,7 +555,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     expect(repo.updateAlive).not.toHaveBeenCalled();
   });
 
-  it('R7, R38: la unidad nueva deja el reparto vigente inconvertible -> incompatible_units, sin escribir', async () => {
+  it('R7, R38 / QC-195 R11: la unidad nueva deja el envase vigente inconvertible -> incompatible_units, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const unidades = catalogoDeUnidades(
@@ -540,7 +567,8 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: unidades.units,
-      presentations: catalogoDePresentaciones('5.0000', UNIT_ID).presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('5.0000', UNIT_ID),
       now: () => AHORA,
     });
 
@@ -551,7 +579,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
           ...EDICION_HACIA_B,
           recipeId: RECETA_DE_A,
           unitId: OTRA_UNIDAD_INCOMPATIBLE,
-          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+          presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 1 }],
         },
         ACTOR_A,
       ),
@@ -561,7 +589,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     expect(repo.updateAlive).not.toHaveBeenCalled();
   });
 
-  it('R36, R38: bajar la cantidad deja el reparto vigente por encima del total -> order_distribution_exceeds_quantity', async () => {
+  it('R36, R38 / QC-195 R13: bajar la cantidad deja los envases vigentes por encima del total -> order_distribution_exceeds_quantity', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
@@ -570,7 +598,8 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('5.0000').presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('5.0000'),
       now: () => AHORA,
     });
 
@@ -582,13 +611,77 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
           recipeId: RECETA_DE_A,
           quantity: '4.0000',
           // 3 envases x 5 = 15, mas que los 4 de la cantidad bajada.
-          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 3 }],
+          presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 3 }],
         },
         ACTOR_A,
       ),
     );
 
     expect(codigo).toBe('order_distribution_exceeds_quantity');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
+
+  it('QC-195 R35: una linea antigua que llega igual (misma presentacion y envases) se conserva sin envase', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    repo.lockAliveById.mockResolvedValue({
+      ...filaExistente(),
+      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null }],
+      reservedAt: null,
+      packagingCost: null,
+    });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('5.0000').presentations,
+      packaging: catalogoDeEnvases('5.0000'),
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }] },
+      ACTOR_A,
+    );
+
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationLines: readonly unknown[] }];
+    expect(dataEscrita.presentationLines).toEqual([
+      { presentationId: PRESENTACION_DE_A, packages: 1, content: '5.0000', packagingProductId: null },
+    ]);
+  });
+
+  it('QC-195 R34: una linea antigua con sus envases cambiados -> invalid_input, sin escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    repo.lockAliveById.mockResolvedValue({
+      ...filaExistente(),
+      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null }],
+      reservedAt: null,
+      packagingCost: null,
+    });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones('5.0000').presentations,
+      packaging: catalogoDeEnvases('5.0000'),
+      now: () => AHORA,
+    });
+
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(
+        ORDER_ID,
+        { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 2 }] },
+        ACTOR_A,
+      ),
+    );
+
+    expect(codigo).toBe('invalid_input');
     expect(repo.updateAlive).not.toHaveBeenCalled();
   });
 });
@@ -604,6 +697,7 @@ describe('QC-145 R6 — la edicion no mueve el estado', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -628,6 +722,7 @@ describe('QC-145 R6 — la edicion no mueve el estado', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -658,6 +753,7 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -685,6 +781,7 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -709,6 +806,7 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -735,6 +833,7 @@ describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
         presentations: pres.presentations,
+        packaging: fakePackagingCatalog(),
         now: () => AHORA,
       });
 
@@ -802,6 +901,10 @@ function catalogosQueExplotan() {
     presentations: {
       findRefs: explota('presentations.findRefs'),
     } as unknown as PresentationCatalog,
+    packaging: {
+      findRefs: explota('packaging.findRefs'),
+      findCostingBatches: explota('packaging.findCostingBatches'),
+    } as unknown as PackagingCatalog,
   };
 }
 
@@ -818,6 +921,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       products: prod.products,
       units: uni.units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -825,7 +929,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
 
     // necesaria = 20 * 100 % = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
     expect(repo.updateAlive).toHaveBeenCalledTimes(1);
-    expect((repo.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('60.0000');
+    expect((repo.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '60.0000', packaging: '0.0000' });
   });
 
   it('el catalogo de recetas se pregunta por la del DATO ENTRANTE, no por la de la fila vieja', async () => {
@@ -840,6 +944,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       products: prod.products,
       units: uni.units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -869,6 +974,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
         products: prod.products,
         units: uni.units,
         presentations: catalogoDePresentaciones().presentations,
+        packaging: fakePackagingCatalog(),
         now: () => AHORA,
       });
 
@@ -891,6 +997,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       products: prod.products,
       units: uni.units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -913,6 +1020,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       products: catalogos.products,
       units: catalogos.units,
       presentations: catalogos.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -933,7 +1041,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     const orders = { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository;
 
     const orden: string[] = [];
-    const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
+    const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
     const updateAlive = vi.fn(async () => {
       orden.push('orders.updateAlive');
       return 'ok' as const;
@@ -967,6 +1075,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -987,6 +1096,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -1006,6 +1116,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     })
 
@@ -1034,6 +1145,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
     const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
@@ -1075,7 +1187,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     }));
     const filaVista = filaExistente();
     const findAliveById = vi.fn(async () => filaVista);
-    const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
+    const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
     const updateAlive = vi.fn(async () => 'ok' as const);
     const setReservedAt = vi.fn(async () => undefined);
     const syncForOrder = vi.fn(async (input: { requirement: readonly unknown[] }) => {
@@ -1094,6 +1206,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -1154,7 +1267,7 @@ describe('edicion con version de receta', () => {
     const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
     const { unitOfWork } = fakeUnitOfWork({
       orders: {
-        lockAliveById: vi.fn(async () => ({ ...fila, reservedAt: null })),
+        lockAliveById: vi.fn(async () => ({ ...fila, reservedAt: null, packagingCost: null })),
         updateAlive,
         setReservedAt: vi.fn(async () => undefined),
       },
@@ -1169,6 +1282,7 @@ describe('edicion con version de receta', () => {
       products: catalogoDeProductos(batches).products,
       units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
     return { updateOrder, updateAlive, syncForOrder, run };
@@ -1191,7 +1305,7 @@ describe('edicion con version de receta', () => {
   ];
 
   function guardado(updateAlive: ReturnType<typeof vi.fn>) {
-    return updateAlive.mock.calls[0] as unknown as readonly [string, { recipeId: string }, unknown, unknown, string];
+    return updateAlive.mock.calls[0] as unknown as readonly [string, { recipeId: string }, unknown, unknown, unknown];
   }
 
   it('R34: pasar de la original a una version viva la guarda y recalcula coste y necesidad con sus lineas', async () => {
@@ -1205,7 +1319,7 @@ describe('edicion con version de receta', () => {
     const [, datos, , , coste] = guardado(updateAlive);
     expect(datos.recipeId).toBe(VERSION_DE_A);
     expect(datos).not.toHaveProperty('recipeVersionId');
-    expect(coste).toBe('50.0000');
+    expect(coste).toEqual({ total: '50.0000', packaging: '0.0000' });
     expect(cat.enTransaccion).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
     const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
     expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
@@ -1220,7 +1334,7 @@ describe('edicion con version de receta', () => {
     expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_A], EMPRESA_A);
     const [, datos, , , coste] = guardado(updateAlive);
     expect(datos.recipeId).toBe(RECETA_DE_A);
-    expect(coste).toBe('30.0000');
+    expect(coste).toEqual({ total: '30.0000', packaging: '0.0000' });
   });
 
   it('R34, R33: cambiar a una version por revisar -> recipe_version_under_review sin abrir la unidad de trabajo', async () => {
@@ -1297,7 +1411,7 @@ describe('edicion con version de receta', () => {
       expect(cat.findRefsIncludingDeleted).not.toHaveBeenCalled();
       const [, datos, , , coste] = guardado(updateAlive);
       expect(datos.recipeId).toBe(VERSION_DE_A);
-      expect(coste).toBe('50.0000');
+      expect(coste).toEqual({ total: '50.0000', packaging: '0.0000' });
       const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
       expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
     },
@@ -1342,7 +1456,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
       findAliveById: vi.fn(async () => fila),
       listAlive: vi.fn(),
     } as unknown as OrderRepository;
-    const lockAliveById = vi.fn(async () => ({ ...fila, reservedAt: null }));
+    const lockAliveById = vi.fn(async () => ({ ...fila, reservedAt: null, packagingCost: null }));
     const updateAlive = vi.fn(async () => 'ok' as const);
     const syncForOrder = vi.fn(async () => outcome);
     const setStatus = vi.fn(async () => 'ok' as const);
@@ -1359,6 +1473,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
       products: prod.products,
       units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
     return { updateOrder, updateAlive, syncForOrder, setStatus, setIngredientsCost, setReservedAt };
@@ -1412,7 +1527,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
 
     await caso.updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, ACTOR_A);
 
-    expect((caso.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('30.0000');
+    expect((caso.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '30.0000', packaging: '0.0000' });
     expect(caso.setIngredientsCost).toHaveBeenCalledWith(ORDER_ID, null, ACTOR_A.id, AHORA, SCOPE);
   });
 

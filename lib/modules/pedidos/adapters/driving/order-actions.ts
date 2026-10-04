@@ -8,22 +8,26 @@ import {
 } from '@/lib/modules/errores';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   IncompatibleUnitsError,
+  InsufficientMaterialError,
   OrderDistributionExceedsQuantityError,
   OrderNotFoundError,
   OrderPresentationLineNotEditableError,
   OrderWithoutUnitError,
+  OrderWouldBlockError,
   PedidosError,
   PresentationNotFoundError,
   PresentationWithoutContentError,
+  ProductNotFoundError,
   UnitNotFoundError,
   ValidationError,
   requirePermission,
   updateOrderDistributionSchema,
   type Actor,
   type OrderCostQuote,
-  type OrderPresentationAvailability,
+  type OrderPresentationAvailabilityNext,
   type OrderSummary,
   type OrderView,
   type Page,
@@ -174,17 +178,25 @@ function readFormStrings(formData: FormData, name: string): string[] {
   return formData.getAll(name).map((value) => (typeof value === 'string' ? value : ''));
 }
 
+/** La cadena vacia es la marca del identificador que no lleva esa posicion. */
+function emptyAsAbsent(value: string | undefined): string | undefined {
+  return value === '' ? undefined : value;
+}
+
 /**
- * Las lineas llegan como dos listas de campos repetidos, unidas por posicion. Si las longitudes
- * difieren, la posicion sin pareja queda `undefined` y la rechaza `presentationLinesSchema`:
- * el borde no rellena ni descarta.
+ * Las lineas llegan como tres listas de campos repetidos, unidas por posicion: en cada una va el
+ * envase o la presentacion de una linea antigua, y el otro vacio. Si las longitudes difieren, la
+ * posicion sin pareja queda `undefined` y la rechaza `presentationLinesSchema`: el borde no
+ * rellena ni descarta.
  */
 function readPresentationLines(formData: FormData): unknown[] {
+  const packagingProductIds = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGING_FIELD);
   const presentationIds = readFormStrings(formData, ORDER_DISTRIBUTION_PRESENTATION_FIELD);
   const packages = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGES_FIELD);
-  const length = Math.max(presentationIds.length, packages.length);
+  const length = Math.max(packagingProductIds.length, presentationIds.length, packages.length);
   return Array.from({ length }, (_, index) => ({
-    presentationId: presentationIds[index],
+    packagingProductId: emptyAsAbsent(packagingProductIds[index]),
+    presentationId: emptyAsAbsent(presentationIds[index]),
     packages: packages[index],
   }));
 }
@@ -386,7 +398,7 @@ export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuo
 // ---------------------------------------------------------------------------------------------
 
 export type OrderPresentationAvailabilityResult =
-  | { status: 'success'; data: OrderPresentationAvailability }
+  | { status: 'success'; data: OrderPresentationAvailabilityNext }
   | ErrorState;
 
 /**
@@ -434,6 +446,7 @@ export async function updateOrderDistributionAction(
     const result = await pedidos.updateOrderPresentationLines(id, actor, {
       unitId: parsed.data.unitId,
       lines: parsed.data.presentationLines,
+      confirmBlocked: parsed.data.confirmBlocked,
     });
 
     switch (result) {
@@ -449,12 +462,20 @@ export async function updateOrderDistributionAction(
         throw new OrderWithoutUnitError();
       case 'presentation_not_found':
         throw new PresentationNotFoundError();
+      case 'packaging_not_found':
+        throw new ProductNotFoundError();
+      case 'invalid_lines':
+        throw new ValidationError();
       case 'presentation_without_content':
         throw new PresentationWithoutContentError();
       case 'incompatible_units':
         throw new IncompatibleUnitsError();
       case 'exceeds_quantity':
         throw new OrderDistributionExceedsQuantityError();
+      case 'would_block':
+        throw new OrderWouldBlockError();
+      case 'insufficient_material':
+        throw new InsufficientMaterialError();
     }
   } catch (error) {
     return toErrorState(error);

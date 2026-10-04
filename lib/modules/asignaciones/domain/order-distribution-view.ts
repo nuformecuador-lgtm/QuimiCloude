@@ -11,6 +11,8 @@ export type OrderDistributionLineView = {
   /** `null` = la presentacion no volvio del catalogo: la pantalla pinta el marcador de ausencia. */
   readonly presentationName: string | null;
   readonly packages: number;
+  /** `null` = linea antigua o envase que no volvio: la pantalla cae al nombre de la presentacion. */
+  readonly packagingName: string | null;
 };
 
 /** Los ids unicos de las presentaciones de todas las lineas, para resolverlos en una sola llamada. */
@@ -31,6 +33,7 @@ export function toDistributionLines(
     presentationId: line.presentationId,
     presentationName: presentationNames.get(line.presentationId) ?? null,
     packages: line.packages,
+    packagingName: line.packagingName,
   }));
 }
 

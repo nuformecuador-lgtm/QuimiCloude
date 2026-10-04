@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -67,7 +67,7 @@ const EXECUTION: AssignedOrderExecutionView = {
     },
   ],
   tools: [],
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,
 };
@@ -347,8 +347,8 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
         execution={{
           ...EXECUTION,
           presentationLines: [
-            { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packages: 5 },
-            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packages: 1 },
+            { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
           ],
         }}
       />,
@@ -483,5 +483,36 @@ describe('R18 — el asistente heredado solo puede cambiar step-reader.tsx (list
       fueraDeLaLista,
       `esta rama modifico un archivo del asistente fuera de la lista cerrada: ${fueraDeLaLista.join(', ')}`,
     ).toEqual([]);
+  });
+});
+
+describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
+  it('R44: una linea con envase pinta el nombre del envase, no el de la presentacion', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{
+          ...EXECUTION,
+          presentationLines: [
+            { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
+            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+          ],
+        }}
+      />,
+    );
+
+    const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
+    expect(linea.textContent).toBe('Presentación: 5 × Caja cartón 12 u +1');
+    expect(within(linea).getByTestId('order-distribution')).toHaveAttribute(
+      'title',
+      '5 × Caja cartón 12 u, 1 × Bidón 20L',
+    );
+  });
+
+  it('R44: una linea antigua (`packagingName` null) pinta el nombre de su presentacion', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
+      'Presentación: 5 × Caja x 12',
+    );
   });
 });

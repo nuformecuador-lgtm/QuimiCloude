@@ -53,6 +53,10 @@ import type { RecipeScope } from '@/lib/modules/recetas/domain/recipe-scope'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
@@ -300,7 +304,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
     let orderId: string | null = null
 
     try {
-      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
       const cotizacion = await cotizar({ recipeId, quantity: '6.0000' }, actorDe(A))
       expect(cotizacion.ingredientsCost).toBe('30.0000')
 
@@ -309,7 +313,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
         recipes,
         products,
         units,
-        presentations,
+        presentations, packaging: packagingCatalog,
         now: () => new Date('2026-05-01T12:00:00.000Z'),
       })
       const creado = await alta(
@@ -332,7 +336,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
     let orderId: string | null = null
 
     try {
-      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
       const cotizacion = await cotizar({ recipeId, quantity: '200.0000' }, actorDe(A))
       expect(cotizacion.ingredientsCost).toBeNull()
 
@@ -341,7 +345,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
         recipes,
         products,
         units,
-        presentations,
+        presentations, packaging: packagingCatalog,
         now: () => new Date('2026-05-01T12:00:00.000Z'),
       })
       // QC-138 R6/R8: sin confirmar, un alta que no alcanza no se guarda; confirmada queda
@@ -372,7 +376,7 @@ describe('R2: cotizar no escribe ninguna fila', () => {
       const antes = await fotoDeInventario(A)
       const pedidosAntes = await contarPedidos(A)
 
-      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
       await cotizar({ recipeId, quantity: '6.0000' }, actorDe(A))
       await cotizar({ recipeId, quantity: '200.0000' }, actorDe(A))
 
@@ -393,7 +397,7 @@ describe('R6: una receta de otra empresa da sin importe, igual que una receta si
     const recipeIdQ = await crearReceta(Q, productIdQ)
 
     try {
-      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
       const cotizacion = await cotizar({ recipeId: recipeIdQ, quantity: '6.0000' }, actorDe(A))
       expect(cotizacion.ingredientsCost).toBeNull()
 
@@ -416,8 +420,8 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
 
     try {
       const now = () => new Date('2026-05-12T12:00:00.000Z')
-      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
+      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
 
       // necesaria = 6 * 100 % = 6: aparta el UNICO lote entero. Sin excluir la reserva propia del
       // pedido, el lote quedaria con disponible cero para el calculo de la propia edicion y el
@@ -431,7 +435,7 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
       // La cotizacion de EDICION, con el `orderId` del propio pedido, coincide con lo guardado.
-      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
       const cotizacion = await cotizar({ recipeId, quantity: '6.0000', orderId }, actorDe(A))
       expect(cotizacion.ingredientsCost).toBe('30.0000')
 
@@ -457,7 +461,7 @@ describe('aislamiento: `orderId` de OTRA empresa no cambia nada (R65, ambito)', 
 
     try {
       const now = () => new Date('2026-05-13T12:00:00.000Z')
-      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
+      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
 
       // El unico pedido que existe aparta el material de Q, no el de A: el lote de A sigue
       // entero disponible para la cotizacion de abajo.
@@ -467,7 +471,7 @@ describe('aislamiento: `orderId` de OTRA empresa no cambia nada (R65, ambito)', 
       )
       orderIdDeQ = creadoQ.id
 
-      const cotizar = createQuoteOrderCost({ recipes, products, units })
+      const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
       const sinOrderId = await cotizar({ recipeId, quantity: '6.0000' }, actorDe(A))
       // El `orderId` es de Q, de OTRA empresa: la consulta de A sigue acotada a `companyId` de A,
       // asi que excluirlo no puede devolver nada distinto de no excluir nada.

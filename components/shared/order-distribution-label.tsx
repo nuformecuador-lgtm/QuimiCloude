@@ -10,6 +10,8 @@
 
 export type OrderDistributionLabelLine = {
   readonly presentationName: string | null;
+  /** `null` en una linea antigua, que se pinta con el nombre de su presentacion. */
+  readonly packagingName?: string | null;
   readonly packages: number;
 };
 
@@ -22,7 +24,7 @@ const EMPTY_TEXT = 'Sin presentación';
 const MISSING_NAME_MARK = '—';
 
 function lineText(line: OrderDistributionLabelLine): string {
-  return `${line.packages} × ${line.presentationName ?? MISSING_NAME_MARK}`;
+  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? MISSING_NAME_MARK}`;
 }
 
 export function OrderDistributionLabel({ lines }: OrderDistributionLabelProps) {

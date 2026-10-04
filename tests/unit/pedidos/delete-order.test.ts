@@ -70,7 +70,7 @@ function dobles(opciones: { fila?: OrderRow | null; borrado?: 'ok' | 'not_found'
     listAlive: explota('orders.listAlive'),
   } as unknown as OrderRepository
 
-  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null, packagingCost: null }))
   const softDeleteAlive = vi.fn(async () => opciones.borrado ?? 'ok')
   const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => { void [id, reservedAt] })
   const releaseForOrder = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
@@ -221,7 +221,7 @@ describe('QC-141 T9 — borrar libera (R19, R41, N5)', () => {
     const orden: string[] = []
     d.lockAliveById.mockImplementation(async () => {
       orden.push('orders.lockAliveById')
-      return { ...fila('PENDIENTE'), reservedAt: null }
+      return { ...fila('PENDIENTE'), reservedAt: null, packagingCost: null }
     })
     d.softDeleteAlive.mockImplementation(async () => {
       orden.push('orders.softDeleteAlive')

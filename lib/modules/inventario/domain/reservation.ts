@@ -51,8 +51,13 @@ export interface MaterialReservations {
   consumeForOrder(input: {
     readonly orderId: string;
     readonly companyId: string;
-    /** Solo se usa si el pedido no tiene nada apartado. */
+    /** Solo se usa si el pedido no tiene nada apartado. Con `productIds`, si NINGUNO de esos
+     *  productos tiene nada apartado; no se decide producto a producto: si alguno tiene algo, se
+     *  consume solo lo apartado y un producto del subconjunto sin apartado no se consume. */
     readonly fallbackRequirement: readonly ReservationRequirementLine[];
+    /** Si llega, solo se consume lo de estos productos (apartado y respaldo); lo demas que el
+     *  pedido tenga apartado queda intacto. */
+    readonly productIds?: readonly ProductId[];
     readonly actorId: string;
     readonly now: Date;
   }): Promise<ConsumptionOutcome>;

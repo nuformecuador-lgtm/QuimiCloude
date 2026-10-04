@@ -31,6 +31,7 @@ import {
   UnauthorizedError,
   ValidationError,
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   createOrderSchema,
   updateOrderSchema,
@@ -58,7 +59,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
@@ -819,6 +820,10 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       products: products as unknown as ProductCatalog,
       units: units as unknown as UnitCatalog,
       presentations: presentations as unknown as PresentationCatalog,
+      packaging: {
+        findRefs: explota('packaging.findRefs'),
+        findCostingBatches: explota('packaging.findCostingBatches'),
+      } as unknown as PackagingCatalog,
       log,
     }
 
@@ -1040,5 +1045,39 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
     expect(candidato).toMatchObject({ unitId: '', presentationLines: [] })
     expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
     expect(readActionsSource()).not.toMatch(/['"]presentationId['"]/)
+  })
+
+  it('QC-195 R11, R35: las tres listas se unen por posicion y la cadena vacia es ausencia', async () => {
+    const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+    const formData = formDataOf(VALID_CREATE_FIELDS)
+    formData.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, ENVASE_ID)
+    formData.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, '')
+    formData.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '40')
+    formData.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, '')
+    formData.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, PRESENTATION_ID)
+    formData.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '2')
+
+    const result = await createOrderAction(CREATE_INITIAL, formData)
+
+    expect(result.status).toBe('success')
+    expect(createOrderSchema.parse(createOrderMock.mock.calls[0]?.[0]).presentationLines).toEqual([
+      { packagingProductId: ENVASE_ID, packages: 40 },
+      { presentationId: PRESENTATION_ID, packages: 2 },
+    ])
+  })
+
+  it('QC-195 R11: una posicion con envase y presentacion a la vez, o con ninguno, es invalid_input', async () => {
+    const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+    const ambos = formDataOf(VALID_CREATE_FIELDS)
+    ambos.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, ENVASE_ID)
+    ambos.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, PRESENTATION_ID)
+    ambos.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '1')
+    expect(await createOrderAction(CREATE_INITIAL, ambos)).toMatchObject({ status: 'error', code: 'invalid_input' })
+
+    const ninguno = formDataOf(VALID_CREATE_FIELDS)
+    ninguno.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, '')
+    ninguno.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, '')
+    ninguno.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '1')
+    expect(await createOrderAction(CREATE_INITIAL, ninguno)).toMatchObject({ status: 'error', code: 'invalid_input' })
   })
 })

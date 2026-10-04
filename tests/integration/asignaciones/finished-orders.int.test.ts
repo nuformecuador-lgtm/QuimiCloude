@@ -35,8 +35,6 @@ import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/d
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   createOrderWriteRepository,
@@ -49,6 +47,9 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 
 import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransaction } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
 if (PERMISOS_DEL_EMPACADOR === undefined) {
@@ -80,8 +81,8 @@ async function transitionAliveByIdReal(
 function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepository>[0]) {
   const orders: OrderCatalog = {
     findAliveById: findAliveOrderTargetById,
-    listAliveSummariesByIds: listAliveOrderSummariesByIds,
-    listAliveSummariesInCompany,
+    listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
+    listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
     transitionAliveById: transitionAliveByIdReal,
     // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.

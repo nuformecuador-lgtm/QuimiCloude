@@ -14,12 +14,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { cancelAliveOrder, createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
-import { listAliveSummariesInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
 import type { NewOrder, OrderScope } from '@/lib/modules/pedidos'
+import { realOrderSummaries } from '../../helpers/order-summaries'
+
+const { listAliveSummariesInCompany } = realOrderSummaries()
 
 const YEAR = 2889
 

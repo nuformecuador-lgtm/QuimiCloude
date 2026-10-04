@@ -81,11 +81,16 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
+  findPackagingCostingBatches,
+  findPackagingRefs,
+} from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import {
   addBatchToAlive,
   adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
+  findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
   findFinishedGoodsReceipts,
@@ -113,6 +118,7 @@ import type { PresentationRepository } from '@/lib/modules/inventario/ports/pres
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type {
   OrderNumberDirectory,
+  PackagingCatalog,
   PresentationCatalog,
   ProductCatalog,
   ProductNameLookup,
@@ -121,7 +127,7 @@ import type {
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { forModule } from '@/lib/shared/observability/logger';
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { findPackageUnitId, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findUnitRefsSharingBaseInCompany,
   listUnits,
@@ -222,6 +228,8 @@ import {
   createFindCoverage,
   createFinishPacking,
   createGetOrder,
+  createListAliveSummariesByIds,
+  createListAliveSummariesInCompany,
   createListOrders,
   createQuoteOrderCost,
   createQuoteOrderPresentationAvailability,
@@ -241,12 +249,12 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
-  createOrderDistributionTransaction,
   withOrderTransaction,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
+import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
@@ -356,7 +364,7 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
+  listAliveOrderSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
@@ -778,6 +786,7 @@ const productRepository: ProductRepository = {
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
   findAliveIdByNameInPresentationUnit,
+  findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
   adjustBatchStock,
@@ -836,7 +845,11 @@ const stockIncreaseListener: StockIncreaseListener = {
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
 export const inventario = {
-  createProduct: createCreateProduct({ products: productRepository, stockIncreases: stockIncreaseListener }),
+  createProduct: createCreateProduct({
+    products: productRepository,
+    stockIncreases: stockIncreaseListener,
+    packageUnit: { findPackageUnitId },
+  }),
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
@@ -876,6 +889,12 @@ export const inventario = {
 // nada de `identity` ni de `inventario` arriba -diff minimo, hay otra sesion (QC-22)
 // tocando este mismo archivo en paralelo-.
 // ---------------------------------------------------------------------------------------
+
+/** Solo para el servidor de `pedidos`: validar el envase de cada linea del reparto y costearlo. */
+const packagingCatalog: PackagingCatalog = {
+  findRefs: findPackagingRefs,
+  findCostingBatches: findPackagingCostingBatches,
+};
 
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
@@ -1155,14 +1174,6 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 
-/**
- * `OrderDistributionTransaction`: la transaccion CORTA propia de
- * `updateOrderPresentationLines`, sin `inventario` en su ambito -este caso de uso no toca
- * material ni reserva-. NO reutiliza `orderUnitOfWork`: son dos transacciones con un alcance
- * distinto a proposito.
- */
-const orderDistributionTransaction = createOrderDistributionTransaction();
-
 /** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
  *  `findCoverage` la usa una vez por pagina. */
 const reservationQueries: ReservationQueries = createReservationQueries();
@@ -1186,6 +1197,7 @@ const reviewBlockedOrders = createReviewBlockedOrders({
   recipes: recipeCatalog,
   products: productCatalog,
   units: unitCatalog,
+  packaging: packagingCatalog,
   unitOfWork: orderUnitOfWork,
 });
 
@@ -1216,12 +1228,14 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
   }),
   getOrder: createGetOrder({
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     // La unidad vuelve al pedido: `getOrder` vuelve a necesitar `units`.
     units: unitCatalog,
   }),
@@ -1229,6 +1243,7 @@ export const pedidos = {
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     // Mismo motivo que `getOrder`, una llamada por pagina.
     units: unitCatalog,
     log: pedidosListQueryLog,
@@ -1239,6 +1254,7 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
@@ -1248,23 +1264,27 @@ export const pedidos = {
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
+    packaging: packagingCatalog,
   }),
   // El proceso diario y su puerta: sin usuario delante, asi que ninguno de los dos recibe actor.
   // El handler los llama en ese orden -primero la puerta- y `lib/composition` no impone el
   // orden por su cuenta.
   verifyCronSecret,
   expireStaleOrders,
-  // La edicion ACOTADA del reparto y la unidad. Recibe `presentations`/`units` -mismos catalogos
-  // que `createOrder`/`updateOrder`- y su PROPIA transaccion, mas corta: no la unidad de trabajo
-  // compartida con `inventario`, porque este caso de uso no toca material ni reserva.
+  // La edicion ACOTADA del reparto y la unidad: aparta los envases, asi que va en la unidad de
+  // trabajo compartida con `inventario`. `recipes` y `products` son para recalcular el importe.
   updateOrderPresentationLines: createUpdateOrderPresentationLines({
+    recipes: recipeCatalog,
+    products: productCatalog,
+    packaging: packagingCatalog,
     presentations: presentationCatalog,
     units: unitCatalog,
-    transaction: orderDistributionTransaction,
+    unitOfWork: orderUnitOfWork,
   }),
-  // «Cuanto queda disponible», de solo lectura. Mismos DOS
-  // catalogos que `updateOrderPresentationLines`, sin transaccion: no escribe nada.
+  // «Cuanto queda disponible», de solo lectura. Los catalogos del reparto de
+  // `updateOrderPresentationLines`, sin transaccion: no escribe nada.
   quoteOrderPresentationAvailability: createQuoteOrderPresentationAvailability({
+    packaging: packagingCatalog,
     presentations: presentationCatalog,
     units: unitCatalog,
   }),
@@ -1319,10 +1339,18 @@ const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
 };
 
+const orderSummaryReader: OrderSummaryReader = {
+  listAliveByIds: listAliveOrderSummariesByIds,
+  listAliveInCompany: listAliveOrderSummariesInCompany,
+};
+
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
-  listAliveSummariesByIds: listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
+  listAliveSummariesByIds: createListAliveSummariesByIds({ summaries: orderSummaryReader, packaging: packagingCatalog }),
+  listAliveSummariesInCompany: createListAliveSummariesInCompany({
+    summaries: orderSummaryReader,
+    packaging: packagingCatalog,
+  }),
   // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
@@ -1338,6 +1366,7 @@ const orderCatalog: OrderCatalog = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
   }),
 };
 

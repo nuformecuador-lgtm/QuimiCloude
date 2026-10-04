@@ -57,6 +57,7 @@ import { compatibleUnitIds } from './compatible-unit-ids';
 import { OrderCostQuote } from './order-cost-quote';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   OrderDistributionField,
 } from './order-distribution-field';
@@ -80,7 +81,9 @@ import { ORDER_PRIORITY_LABELS, OrderCoverageBadge } from './order-status-badge'
 import { useOrderCostQuote } from './use-order-cost-quote';
 import {
   availabilityBlocksSave,
+  distributionLinesValid,
   fromOrderPresentationLines,
+  toDistributionLinesInput,
   useOrderDistributionAvailability,
   type OrderDistributionLine,
 } from './use-order-distribution-availability';
@@ -224,7 +227,7 @@ const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
   quantity: 'Escribe una cantidad decimal mayor que cero.',
   unitId: 'Elige la unidad del pedido.',
   presentationLines:
-    'Revisa el reparto: envases enteros mayores que cero, una línea por presentación.',
+    'Revisa el reparto: envases enteros mayores que cero, una línea por envase y por presentación.',
   priority: 'Elige una de las prioridades disponibles.',
   recipeVersionId: 'Elige una versión de la lista.',
 };
@@ -253,6 +256,7 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
   presentation_without_content: PRESENTATION_LINES_FIELD,
   incompatible_units: PRESENTATION_LINES_FIELD,
   order_distribution_exceeds_quantity: PRESENTATION_LINES_FIELD,
+  product_not_found: PRESENTATION_LINES_FIELD,
 };
 
 /**
@@ -320,15 +324,22 @@ function readValues(formData: FormData): FieldValues {
   return values;
 }
 
-function readPresentationLines(
-  formData: FormData,
-): { presentationId: string; packages: string }[] {
-  const packages = formData.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD);
-  return formData.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD).map((id, index) => {
-    const count = packages[index];
+/** Las tres listas repetidas del reparto, unidas por posicion: cada linea lleva envase o, si es
+ *  antigua, presentacion. */
+function readDistributionLines(formData: FormData): OrderDistributionLine[] {
+  const text = (value: FormDataEntryValue | undefined): string =>
+    typeof value === 'string' ? value : '';
+  const packagingIds = formData.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD);
+  const presentationIds = formData.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD);
+  return formData.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD).map((count, index) => {
+    const packagingProductId = text(packagingIds[index]);
     return {
-      presentationId: typeof id === 'string' ? id : '',
-      packages: typeof count === 'string' ? count : '',
+      presentationId: text(presentationIds[index]),
+      presentationName: null,
+      packages: text(count),
+      content: null,
+      unitId: null,
+      packagingProductId: packagingProductId === '' ? null : packagingProductId,
     };
   });
 }
@@ -447,12 +458,11 @@ export function OrderForm({
 
   /** Arranca con el importe guardado en la edicion; `null` en el alta. `order.id` solo viaja en la
    *  edicion, para que la cotizacion cuente como disponible lo que el propio pedido tiene apartado. */
-  const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id);
-
   const [unitId, setUnitId] = useState(order?.unitId ?? '');
   const [lines, setLines] = useState<readonly OrderDistributionLine[]>(() =>
     fromOrderPresentationLines(order?.presentationLines ?? []),
   );
+  const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id, lines);
   const availability = useOrderDistributionAvailability({ quantity, unitId, lines });
   const unitLabel = orderUnitLabel(units, unitId, order);
   const compatibleIds = useMemo(() => compatibleUnitIds(units, unitId), [units, unitId]);
@@ -550,22 +560,25 @@ export function OrderForm({
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
     const values = readValues(formData);
-    const candidate = { ...values, presentationLines: readPresentationLines(formData) };
+    const lines = readDistributionLines(formData);
+    const candidate = { ...values, presentationLines: toDistributionLinesInput(lines) };
 
     // El esquema del alta y el de la edicion son el mismo objeto (reemplazo completo); se
     // nombran los dos para que quede escrito de donde sale cada regla.
     const parsed = isEdit
       ? updateOrderSchema.safeParse(candidate)
       : createOrderSchema.safeParse(candidate);
+    const linesValid = distributionLinesValid(lines);
 
-    if (!parsed.success) {
+    if (!parsed.success || !linesValid) {
       const fieldErrors: FieldErrors = {};
-      for (const issue of parsed.error.issues) {
+      for (const issue of parsed.success ? [] : parsed.error.issues) {
         const field = String(issue.path[0] ?? '') as OrderFieldName;
         if (field in FIELD_MESSAGES && fieldErrors[field] === undefined) {
           fieldErrors[field] = FIELD_MESSAGES[field];
         }
       }
+      if (!linesValid) fieldErrors[PRESENTATION_LINES_FIELD] = FIELD_MESSAGES[PRESENTATION_LINES_FIELD];
 
       // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
       return {
@@ -805,7 +818,10 @@ export function OrderForm({
 
             <OrderDistributionField
               lines={lines}
-              onLinesChange={setLines}
+              onLinesChange={(next) => {
+                setLines(next);
+                quote.onDistributionChange(effectiveRecipeId, quantity, next);
+              }}
               unitId={unitId}
               compatibleUnitIds={compatibleIds}
               unitLabel={unitLabel}

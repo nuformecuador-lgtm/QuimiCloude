@@ -62,6 +62,12 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  addPackagingLine,
+  openOrderRowMenu,
+  orderMenuTrigger,
+} from './helpers/order-distribution';
+import { seedPackaging } from './helpers/packaging';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc151_e2e_';
@@ -130,11 +136,20 @@ const COST_AMOUNT = '$ 370.00';
 const PRESENTATION_CONTENT = '1';
 const ORDER_PACKAGES = '1';
 
+/** El envase de esa linea: su costo se suma al de los ingredientes. */
+const packagingName = `${SHARED_TOKEN}_envase`;
+const PACKAGING_STOCK = '10';
+const PACKAGING_UNIT_COST = '2.4500';
+/** (d) con el envase: 12752,5500 + 1 x 2,4500 = 12755,0000. */
+const AMOUNT_B_WITH_PACKAGING = '$ 12,755.00';
+const SAVED_AMOUNT_WITH_PACKAGING = '12755.0000';
+
 let companyId: string;
 let adminUserId: string;
 let unitId: string;
 let productId: string;
 let presentationId: string;
+let packagingId: string;
 let recipeId: string;
 let costProductId: string;
 let costRecipeId: string;
@@ -284,6 +299,18 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
+  packagingId = (
+    await seedPackaging({
+      companyId,
+      name: packagingName,
+      presentationId,
+      stock: PACKAGING_STOCK,
+      unitCost: PACKAGING_UNIT_COST,
+      lot: `E2E-QC151-ENVASE-${RUN_ID}`,
+      createdBy: adminUserId,
+    })
+  ).productId;
+
   // Receta SEMBRADA con una unica linea al 10 %. El `INSERT` directo no pasa por el servicio, asi
   // que la suma de 10 % no la rechaza nada: mismo criterio que `e2e/recetas-porcentaje.spec.ts`.
   recipeId = (
@@ -421,8 +448,8 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await quantity.fill(QUANTITY_C);
     await expect(quoteValue).toHaveText(MISSING_VALUE_MARK, { timeout: 60_000 });
 
-    // (d) vuelta a 5001, se elige la unidad, una linea de reparto con la presentacion y se guarda:
-    // la Server Action REAL de `pedidos` contra Postgres.
+    // (d) vuelta a 5001, se elige la unidad, una linea de reparto con el envase y se guarda: la
+    // Server Action REAL de `pedidos` contra Postgres.
     await quantity.fill(QUANTITY_B);
     await expect(quoteValue).toHaveText(AMOUNT_B, { timeout: 60_000 });
 
@@ -430,26 +457,19 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
     const distribution = page.getByTestId('order-distribution-field');
-    const presentationPicker = distribution.getByTestId('presentation-select');
-    await presentationPicker.click();
-    await presentationPicker.fill(presentationName);
-    const presentationOption = page
-      .getByTestId('presentation-option')
-      .filter({ hasText: presentationName });
-    await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-    await presentationOption.click();
-    await distribution.getByTestId('order-distribution-add-packages').fill(ORDER_PACKAGES);
-    await distribution.getByTestId('order-distribution-add').click();
-    await expect(
-      distribution.locator(
-        `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
-      ),
-    ).toHaveCount(1);
+    await addPackagingLine(
+      page,
+      page.getByTestId('order-form'),
+      { productId: packagingId, name: packagingName },
+      ORDER_PACKAGES,
+    );
     await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
       'data-state',
       'ready',
       { timeout: 60_000 },
     );
+    // El reparto cambia la cotizacion: el envase se suma a los ingredientes.
+    await expect(quoteValue).toHaveText(AMOUNT_B_WITH_PACKAGING, { timeout: 60_000 });
 
     await page.getByTestId('order-form-submit').click();
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
@@ -458,7 +478,7 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
       where: { recipeId, companyId, deletedAt: null },
       select: { id: true, orderYear: true, orderSequence: true },
     });
-    expect(await ingredientsCostText(created.id)).toBe('12752.5500');
+    expect(await ingredientsCostText(created.id)).toBe(SAVED_AMOUNT_WITH_PACKAGING);
 
     // El pedido en la lista, localizado POR SU CORRELATIVO -nunca por «la primera fila»-, y su
     // edicion reabierta desde la fila muestra el mismo importe SIN teclear nada (R11).
@@ -468,9 +488,14 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
       timeout: 60_000,
     });
 
-    await row.getByTestId('order-action-edit').click();
+    const editAction = await openOrderRowMenu(
+      page,
+      orderMenuTrigger(page, created.id),
+      'order-action-edit',
+    );
+    await editAction.click();
     await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId('order-cost-quote-value')).toHaveText(AMOUNT_B, {
+    await expect(page.getByTestId('order-cost-quote-value')).toHaveText(AMOUNT_B_WITH_PACKAGING, {
       timeout: 60_000,
     });
   });

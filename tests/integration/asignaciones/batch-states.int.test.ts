@@ -36,7 +36,6 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 
@@ -47,6 +46,9 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { NOW, actorOf, codeOf, createOrder, createPerson, inRolledBackTransaction, type Fixture } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 const ESTADOS = ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO'] as const;
 
@@ -129,7 +131,7 @@ function noUsado(nombre: string): () => Promise<never> {
 function casosDelOperador(fixture: Fixture) {
   const orders: OrderCatalog = {
     findAliveById: findAliveOrderTargetById,
-    listAliveSummariesByIds: listAliveOrderSummariesByIds,
+    listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: noUsado('listAliveSummariesInCompany'),
     transitionAliveById: noUsado('transitionAliveById'),
     startPackingAliveById: noUsado('startPackingAliveById'),

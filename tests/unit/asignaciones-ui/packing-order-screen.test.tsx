@@ -26,9 +26,9 @@ function fila(overrides: Partial<PackingOrderRow> = {}): PackingOrderRow {
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5 },
-      { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packages: 2 },
-      { presentationId: 'p-3', presentationName: null, packages: 1 },
+      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+      { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
+      { presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
@@ -131,5 +131,37 @@ describe('pantalla del Empacador — ni disponible ni aviso de exceso', () => {
 
     expect(screen.queryByText(/disponible/i)).toBeNull();
     expect(screen.queryByText(/excede|se pasa|supera/i)).toBeNull();
+  });
+});
+
+describe('pantalla del Empacador — el nombre del envase de cada linea', () => {
+  it('R44: una linea con envase pinta el nombre del envase, no el de la presentacion', () => {
+    pintar(
+      fila({
+        presentationLines: [
+          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
+        ],
+      }),
+    );
+
+    const lineas = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    expect(lineas.map((linea) => linea.textContent)).toEqual(['5 × Botella PET ámbar 200 ml']);
+  });
+
+  it('R44: una linea antigua (`packagingName` null) pinta el nombre de su presentacion', () => {
+    pintar(
+      fila({
+        presentationLines: [
+          { presentationId: 'p-1', presentationName: 'Botella PET', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
+          { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
+        ],
+      }),
+    );
+
+    const lineas = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    expect(lineas.map((linea) => linea.textContent)).toEqual([
+      '5 × Botella PET ámbar 200 ml',
+      '2 × Garrafa 5 l',
+    ]);
   });
 });

@@ -14,6 +14,7 @@ import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
@@ -48,7 +49,7 @@ import {
 } from '@/lib/modules/pedidos';
 
 import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -98,9 +99,10 @@ const units: UnitCatalog = {
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
-const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork });
-const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork });
+const packaging: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
+const createOrder = createCreateOrder({ recipes, products, packaging, units, presentations, unitOfWork, now: () => new Date() });
+const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, packaging, units, unitOfWork });
+const updateOrder = createUpdateOrder({ orders, recipes, products, packaging, units, presentations, unitOfWork });
 const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
 // ---------------------------------------------------------------------------

@@ -4,12 +4,12 @@ import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
-import { buildRequirement } from './order-requirement';
-import { resolveDistribution } from './resolve-distribution';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { buildOrderRequirement } from './order-requirement';
+import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
+import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -45,6 +45,8 @@ export type CreateOrderDeps = {
    *  existen en la empresa de quien escribe y copiar su contenido. No se le pasan al
    *  coste: el reparto no cambia nada de lo que ese calculo hace. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
+  readonly packaging: PackagingCatalog;
   /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
    *  `reserved_at`, las tres o ninguna. */
   readonly unitOfWork: OrderUnitOfWork;
@@ -111,24 +113,24 @@ export function createCreateOrder(
     );
     const effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
 
-    const ingredientsCost = await resolveIngredientsCost(
-      deps.recipes,
-      deps.products,
-      deps.units,
+    const cost = await resolveStoredOrderCost(
+      deps,
       effectiveId,
       data.quantity,
+      packagingLinesOfInput(data.presentationLines),
       actor.companyId,
     );
 
     // La unidad y el reparto se resuelven y se validan contra el
-    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido.
-    const presentationLines = await resolveDistribution(
-      deps.presentations,
-      deps.units,
+    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido. Un pedido nuevo no tiene
+    // lineas antiguas que conservar.
+    const distribution = await resolveDistribution(
+      deps,
       actor.companyId,
       data.quantity,
       data.unitId,
       data.presentationLines,
+      { savedLines: [] },
     );
 
     const instant = now();
@@ -143,12 +145,12 @@ export function createCreateOrder(
           priority: data.priority,
           unitId: data.unitId,
           status: STATUS_DE_ALTA,
-          presentationLines,
+          presentationLines: distribution.lines,
         },
         instant.getUTCFullYear(),
         actor.id,
         instant,
-        ingredientsCost,
+        cost,
         scope,
       );
 
@@ -157,7 +159,12 @@ export function createCreateOrder(
       // transaccion: pedir una segunda conexion mientras esta retiene la suya desperdiciaria
       // una conexion del pool.
       const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
-      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
+      const requirement = buildOrderRequirement({
+        recipeLines: content?.lines ?? [],
+        quantity: data.quantity,
+        packagingLines: distribution.packagingLines,
+        phase: 'before_consumption',
+      });
 
       const outcome = await transaction.reservations.syncForOrder({
         orderId: order.id,
@@ -172,7 +179,7 @@ export function createCreateOrder(
         if (!confirmBlocked) throw new OrderWouldBlockError();
         await transaction.orders.setStatus(order.id, STATUS_DE_ALTA, 'BLOQUEADO', actor.id, instant, scope);
         // El importe se calculo fuera de la transaccion: otra alta pudo apartar entre medias.
-        if (ingredientsCost !== null) {
+        if (cost !== null) {
           await transaction.orders.setIngredientsCost(order.id, null, actor.id, instant, scope);
         }
       }

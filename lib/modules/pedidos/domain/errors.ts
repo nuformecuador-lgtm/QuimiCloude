@@ -104,6 +104,16 @@ export class PresentationNotFoundError extends PedidosError {
   }
 }
 
+/** El envase de una linea del reparto no existe, es de otra empresa, esta dado de baja, no es un
+ *  envase o no tiene presentacion fija. Codigo compartido con `inventario`. */
+export class ProductNotFoundError extends PedidosError {
+  readonly code = 'product_not_found';
+
+  constructor(diagnostic?: string) {
+    super('product_not_found', diagnostic);
+  }
+}
+
 /** R21, R22: la transicion de estado pedida no esta permitida, o se intenta editar un
  *  pedido final (`ENTREGADO` o `CANCELADO`), que no admite ninguna edicion.
  *

@@ -285,6 +285,39 @@ describe('createConfirmFormulaImport', () => {
       expect(deps.createRecipe).not.toHaveBeenCalled();
     });
 
+    it('QC-195 R41 — el producto elegido es un ENVASE: action_not_allowed, cero escrituras', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        products: dobleDeProductos(bitacora, [
+          { id: PRODUCTO_AGUA, name: 'Botella', unitId: null, stockByUnit: [], type: PRODUCT_TYPES.PACKAGING },
+        ]) as unknown as FormulaImportDeps['products'],
+      });
+      const confirm = createConfirmFormulaImport(deps);
+
+      await expect(confirm(actorConPermiso(), entradaBase())).rejects.toBeInstanceOf(ActionNotAllowedError);
+
+      expect(deps.createRawMaterial).not.toHaveBeenCalled();
+      expect(deps.createRecipe).not.toHaveBeenCalled();
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+    });
+
+    it('QC-195 R41 — una materia prima nueva cuyo unico homonimo es un envase no lo reutiliza: crea la suya', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        productNames: dobleDeNombresDeProducto(bitacora, [
+          { id: PRODUCTO_SODA, name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PACKAGING, unitId: null },
+        ]) as unknown as FormulaImportDeps['productNames'],
+      });
+      const confirm = createConfirmFormulaImport(deps);
+
+      const resumen = await confirm(
+        actorConPermiso(),
+        entradaBase({ lines: [filaExistente(PRODUCTO_AGUA, '50.00'), filaNueva('Sosa', '50.00')] }),
+      );
+      expect(deps.createRawMaterial).toHaveBeenCalledWith({ name: 'Sosa' }, expect.anything());
+      expect(resumen.rawMaterialsReused).toBe(0);
+    });
+
     it('R27 — el rechazo del producto ocurre ANTES de crear ninguna materia prima nueva', async () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora, {

@@ -67,7 +67,6 @@ import {
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
-import { listAliveOrderSummariesByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
@@ -81,6 +80,11 @@ import type {
   OrderScope,
   OrderStatus,
 } from '@/lib/modules/pedidos'
+import { realOrderSummaries } from '../../helpers/order-summaries'
+
+import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed'
+
+const { listAliveSummariesByIds: listAliveOrderSummariesByIds } = realOrderSummaries()
 
 // ---------------------------------------------------------------------------
 // Anos de prueba y limpieza de secuencias
@@ -700,7 +704,7 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
     try {
       const now = instantIn(YEAR_CATALOGO, 1, 10)
       const conReparto = await altaReal(creados, YEAR_CATALOGO, now, {
-        presentationLines: [{ presentationId, packages: 3, content: null }],
+        presentationLines: [{ presentationId, packages: 3, content: null, packagingProductId: null }],
       })
       // Un pedido «viejo» sin reparto ni unidad: se inserta con Prisma directo, sin pasar por
       // el adaptador -que ya los exige siempre-, para simular una fila anterior a esta ficha
@@ -727,12 +731,39 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
 
       const resumenConReparto = pagina.items.find((item) => item.id === conReparto.id)
       const resumenSinReparto = pagina.items.find((item) => item.id === filaSinReparto.id)
-      expect(resumenConReparto?.presentationLines).toEqual([{ presentationId, packages: 3 }])
+      expect(resumenConReparto?.presentationLines).toEqual([{ presentationId, packages: 3, packagingName: null }])
       expect(resumenConReparto?.unitId).toBe(unitId)
       expect(resumenSinReparto?.presentationLines).toEqual([])
       expect(resumenSinReparto?.unitId).toBeNull()
     } finally {
       await limpiar(creados)
+    }
+  })
+
+  it('R44, R33: la linea con envase lleva el nombre del envase y la antigua lleva null', async () => {
+    const creados: string[] = []
+    const nombreEnvase = `Envase ${token().slice(0, 8)}`
+    const envaseId = await seedPackaging({ companyId, presentationId, createdBy: actorId, name: nombreEnvase })
+    try {
+      const now = instantIn(YEAR_CATALOGO, 2, 10)
+      const conEnvase = await altaReal(creados, YEAR_CATALOGO, now, {
+        presentationLines: [{ presentationId, packages: 2, content: null, packagingProductId: envaseId }],
+      })
+      const antiguo = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11), {
+        presentationLines: [{ presentationId, packages: 5, content: null, packagingProductId: null }],
+      })
+
+      const pagina = await listAliveOrderSummariesByIds(companyId, [conEnvase.id, antiguo.id], ['PENDIENTE'], 1)
+
+      expect(pagina.items.find((item) => item.id === conEnvase.id)?.presentationLines).toEqual([
+        { presentationId, packages: 2, packagingName: nombreEnvase },
+      ])
+      expect(pagina.items.find((item) => item.id === antiguo.id)?.presentationLines).toEqual([
+        { presentationId, packages: 5, packagingName: null },
+      ])
+    } finally {
+      await limpiar(creados)
+      await dropPackaging([envaseId])
     }
   })
 })
@@ -742,14 +773,14 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
     const creados: string[] = []
     try {
       const conReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 10), {
-        presentationLines: [{ presentationId, packages: 4, content: null }],
+        presentationLines: [{ presentationId, packages: 4, content: null, packagingProductId: null }],
       })
       const sinReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11))
 
-      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4 }])
+      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
 
       const ficha = await findAliveOrderById(conReparto.id, scope())
-      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4 }])
+      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
       // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
       expect(ficha).toEqual(conReparto)
 
@@ -758,7 +789,7 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
 
       const todos = await recorrerTodo()
       expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
-        { presentationId, packages: 4 },
+        { presentationId, packages: 4, packagingProductId: null },
       ])
       expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
     } finally {
@@ -862,7 +893,7 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
     }
   })
 
-  it('R15 — setIngredientsCost sustituye el importe, tambien por null, sin tocar estado ni datos', async () => {
+  it('R15, QC-195 R47 — setIngredientsCost sustituye el importe y su parte de envases, tambien por null, sin tocar estado ni datos', async () => {
     const creados: string[] = []
     try {
       const now = instantIn(YEAR_BLOQUEADOS, 3, 1)
@@ -871,11 +902,12 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
       await bloquear(pedido.id, now)
 
       const conImporte = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, '123.4500', null, despues, scope()),
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '123.4500', packaging: '3.4500' }, null, despues, scope()),
       )
       expect(conImporte).toBe('ok')
       const tras = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
       expect(tras.ingredientsCost?.toFixed(4)).toBe('123.4500')
+      expect(tras.packagingCost?.toFixed(4)).toBe('3.4500')
       expect(tras.status).toBe('BLOQUEADO')
       expect(tras.quantity.toFixed(4)).toBe('10.0000')
       expect(tras.updatedBy).toBeNull()
@@ -887,11 +919,12 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
       expect(sinImporte).toBe('ok')
       const final = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
       expect(final.ingredientsCost).toBeNull()
+      expect(final.packagingCost).toBeNull()
       expect(final.updatedBy).toBe(actorId)
 
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
       const borrado = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, '1', null, despues, scope()),
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '1', packaging: '0' }, null, despues, scope()),
       )
       expect(borrado).toBe('not_found')
     } finally {

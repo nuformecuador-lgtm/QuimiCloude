@@ -13,7 +13,7 @@ import { assertToolsValid } from './recipe-tools';
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, PropagatedVersion, RecipeRepository } from '../ports/recipe-repository';
 
-import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
+import { isIngredientType, type ProductCatalog } from '@/lib/modules/inventario';
 
 /** Advertencia de un borrado de almacenamiento que fallo, con su contexto (R49). */
 export type StorageWarning = {
@@ -102,8 +102,7 @@ export function createUpdateRecipe(
       const missing = idsANuevoValidar.some((productId) => !foundIds.has(productId));
       if (missing) throw new ValidationError();
 
-      const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
-      if (finished) throw new ActionNotAllowedError();
+      if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
 
     if (data.tools !== undefined) {

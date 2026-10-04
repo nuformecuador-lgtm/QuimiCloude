@@ -33,9 +33,10 @@ import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
-import type { CostingBatch, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import type { CostingBatch, PackagingCatalog, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444';
@@ -150,6 +151,16 @@ function catalogoDePresentaciones(
   return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
 
+const ENVASE_DE_A = 'e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1';
+
+/** Catalogo de envases: `ENVASE_DE_A`, con su presentacion fija `PRESENTACION_DE_A` y el
+ *  contenido y la unidad que le pase el test. */
+function catalogoDeEnvases(content: string | null = null, unitId: string = UNIT_ID) {
+  return fakePackagingCatalog([
+    packagingRef({ id: ENVASE_DE_A, name: 'Bidon 20L', presentationId: PRESENTACION_DE_A, content, unitId }),
+  ]);
+}
+
 function repositorioDePedidos() {
   const create = vi.fn(async () => filaCreada());
   const setReservedAt = vi.fn(async () => undefined);
@@ -180,6 +191,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -200,6 +212,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
         presentations: catalogoDePresentaciones().presentations,
+        packaging: fakePackagingCatalog(),
         now: () => AHORA,
       })({ recipeId: RECETA_DE_B, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A),
     ).rejects.toBeInstanceOf(RecipeNotFoundError);
@@ -213,6 +226,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     })({ recipeId: RECETA_INEXISTENTE, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A).catch((e: unknown) => e);
 
@@ -229,6 +243,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -246,6 +261,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -267,6 +283,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: pres.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -287,6 +304,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: pres.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -310,6 +328,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: pres.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -342,6 +361,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -356,7 +376,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     expect(data.presentationLines).toEqual([]);
   });
 
-  it('R6, R8: una linea que existe en la empresa del actor escribe el reparto con el contenido copiado', async () => {
+  it('R6, R8 / QC-195 R14: una linea con envase escribe la presentacion fija del envase y su contenido copiado', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
@@ -364,7 +384,8 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('5.0000').presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('5.0000'),
       now: () => AHORA,
     });
 
@@ -373,27 +394,29 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
         recipeId: RECETA_DE_A,
         quantity: '10.0000',
         unitId: UNIT_ID,
-        presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 2 }],
+        presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 2 }],
       },
       ACTOR_A,
     );
 
     const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
-      presentationLines: readonly { presentationId: string; packages: number; content: string | null }[];
+      presentationLines: readonly { presentationId: string; packages: number; content: string | null; packagingProductId: string | null }[];
     };
-    expect(data.presentationLines).toEqual([{ presentationId: PRESENTACION_DE_A, packages: 2, content: '5.0000' }]);
+    expect(data.presentationLines).toEqual([
+      { presentationId: PRESENTACION_DE_A, packages: 2, content: '5.0000', packagingProductId: ENVASE_DE_A },
+    ]);
   });
 
-  it('una presentacion ausente del catalogo de la empresa -> presentation_not_found, sin escribir', async () => {
+  it('QC-195 R11: un envase que no vuelve del catalogo de la empresa -> product_not_found, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
-    const pres = catalogoDePresentaciones();
     const createOrder = createCreateOrder({
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: pres.presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases(),
       now: () => AHORA,
     });
 
@@ -405,16 +428,16 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
             recipeId: RECETA_DE_A,
             quantity: '10.0000',
             unitId: UNIT_ID,
-            presentationLines: [{ presentationId: AJENA, packages: 1 }],
+            presentationLines: [{ packagingProductId: AJENA, packages: 1 }],
           },
           ACTOR_A,
         ),
       ),
-    ).toBe('presentation_not_found');
+    ).toBe('product_not_found');
     expect(repo.create).not.toHaveBeenCalled();
   });
 
-  it('R35: una presentacion sin contenido en el reparto -> presentation_without_content, sin escribir', async () => {
+  it('R35 / QC-195 R13: un envase cuya presentacion no tiene contenido -> presentation_without_content, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
@@ -422,7 +445,8 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones(null).presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases(null),
       now: () => AHORA,
     });
 
@@ -433,7 +457,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
             recipeId: RECETA_DE_A,
             quantity: '10.0000',
             unitId: UNIT_ID,
-            presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+            presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 1 }],
           },
           ACTOR_A,
         ),
@@ -442,7 +466,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     expect(repo.create).not.toHaveBeenCalled();
   });
 
-  it('R7: la unidad de la presentacion no comparte base con la del pedido -> incompatible_units, sin escribir', async () => {
+  it('R7 / QC-195 R11: la presentacion del envase no comparte base con la unidad del pedido -> incompatible_units, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const unidades = catalogoDeUnidades(
@@ -453,7 +477,8 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: unidades.units,
-      presentations: catalogoDePresentaciones('5.0000', OTRA_UNIDAD_INCOMPATIBLE).presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('5.0000', OTRA_UNIDAD_INCOMPATIBLE),
       now: () => AHORA,
     });
 
@@ -464,7 +489,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
             recipeId: RECETA_DE_A,
             quantity: '10.0000',
             unitId: UNIT_ID,
-            presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+            presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 1 }],
           },
           ACTOR_A,
         ),
@@ -473,7 +498,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     expect(repo.create).not.toHaveBeenCalled();
   });
 
-  it('R36: el reparto pasa de la cantidad del pedido -> order_distribution_exceeds_quantity, sin escribir', async () => {
+  it('R36 / QC-195 R13: el reparto en envases pasa de la cantidad del pedido -> order_distribution_exceeds_quantity, sin escribir', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
@@ -481,7 +506,8 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('5.0000').presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('5.0000'),
       now: () => AHORA,
     });
 
@@ -493,7 +519,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
             quantity: '10.0000',
             unitId: UNIT_ID,
             // 3 envases x 5 = 15, mas que los 10 del pedido.
-            presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 3 }],
+            presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 3 }],
           },
           ACTOR_A,
         ),
@@ -512,7 +538,8 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones('5.0000').presentations,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('5.0000'),
       now: () => AHORA,
     });
 
@@ -522,11 +549,43 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
           recipeId: RECETA_DE_A,
           quantity: '10.0000',
           unitId: UNIT_ID,
-          presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+          presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 1 }],
         },
         ACTOR_A,
       ),
     ).resolves.toMatchObject({ id: filaCreada().id });
+  });
+
+  it('QC-195 R34: un alta con una linea por presentacion (sin envase) -> invalid_input, sin consultar ni escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones('5.0000');
+    const envases = catalogoDeEnvases('5.0000');
+    const createOrder = createCreateOrder({
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      packaging: envases,
+      now: () => AHORA,
+    });
+
+    expect(
+      await codigoDelFallo(() =>
+        createOrder(
+          {
+            recipeId: RECETA_DE_A,
+            quantity: '10.0000',
+            unitId: UNIT_ID,
+            presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1 }],
+          },
+          ACTOR_A,
+        ),
+      ),
+    ).toBe('invalid_input');
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(pres.findRefs).not.toHaveBeenCalled();
   });
 });
 
@@ -580,6 +639,10 @@ function catalogosQueExplotan() {
     presentations: {
       findRefs: explota('presentations.findRefs'),
     } as unknown as PresentationCatalog,
+    packaging: {
+      findRefs: explota('packaging.findRefs'),
+      findCostingBatches: explota('packaging.findCostingBatches'),
+    } as unknown as PackagingCatalog,
   };
 }
 
@@ -595,6 +658,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       products: prod.products,
       units: uni.units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -605,7 +669,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
 
     // necesaria = 20 * 100 % = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
     expect(repo.create).toHaveBeenCalledTimes(1);
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('60.0000');
+    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '60.0000', packaging: '0.0000' });
   });
 
   it('las lecturas de lotes son UNA sola y las de unidades DOS -coste y reparto-, tenga la receta 1 o 20 lineas', async () => {
@@ -626,6 +690,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
         products: prod.products,
         units: uni.units,
         presentations: catalogoDePresentaciones().presentations,
+        packaging: fakePackagingCatalog(),
         now: () => AHORA,
       });
 
@@ -652,6 +717,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       products: catalogos.products,
       units: catalogos.units,
       presentations: catalogos.presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -673,6 +739,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       products: prod.products,
       units: uni.units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -694,6 +761,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       products: prod.products,
       units: uni.units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -740,6 +808,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -758,6 +827,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -779,6 +849,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
     const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
@@ -799,6 +870,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -858,6 +930,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
 
@@ -918,6 +991,7 @@ describe('alta con version de receta', () => {
       products: catalogoDeProductos(batches).products,
       units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
     return { createOrder, create, syncForOrder, run };
@@ -953,11 +1027,11 @@ describe('alta con version de receta', () => {
       unknown,
       unknown,
       unknown,
-      string,
+      unknown,
     ];
     expect(nuevo.recipeId).toBe(VERSION_DE_A);
     expect(nuevo).not.toHaveProperty('recipeVersionId');
-    expect(coste).toBe('50.0000');
+    expect(coste).toEqual({ total: '50.0000', packaging: '0.0000' });
     expect(cat.findExecutionContentById).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
     expect(cat.enTransaccion).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
     const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
@@ -1081,6 +1155,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
       products: prod.products,
       units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
       presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
   }
@@ -1132,7 +1207,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
 
     await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
 
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('30.0000');
+    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '30.0000', packaging: '0.0000' });
     expect(repo.setIngredientsCost).toHaveBeenCalledWith(filaCreada().id, null, ACTOR_A.id, AHORA, {
       companyId: EMPRESA_A,
     });
@@ -1191,5 +1266,73 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
     await expect(createOrder({ ...ENTRADA, confirmBlocked: true }, SIN_PERMISO)).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
+  });
+});
+
+describe('QC-195 — el alta aparta los envases del reparto', () => {
+  const MATERIA = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  function montarConEnvases(resultado: 'reserved' | 'insufficient') {
+    const cat = catalogoDeRecetas(
+      new Map([[RECETA_DE_A, [{ productId: MATERIA, productName: null, percentage: '100.00' }]]]),
+    );
+    const create = vi.fn(async () => filaCreada());
+    const setReservedAt = vi.fn(async () => undefined);
+    const setStatus = vi.fn(async () => 'ok' as const);
+    const setIngredientsCost = vi.fn(async () => 'ok' as const);
+    const syncForOrder = vi.fn(async () =>
+      resultado === 'reserved' ? ({ kind: 'reserved' } as const) : ({ kind: 'insufficient', productIds: [ENVASE_DE_A] } as const),
+    );
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create, setReservedAt, setStatus, setIngredientsCost },
+      reservations: { syncForOrder },
+      recipes: cat.recipes,
+    });
+    const createOrder = createCreateOrder({
+      unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('1.0000'),
+      now: () => AHORA,
+    });
+    return { createOrder, create, setStatus, setReservedAt, syncForOrder };
+  }
+
+  const ALTA = {
+    recipeId: RECETA_DE_A,
+    quantity: '40',
+    unitId: UNIT_ID,
+    presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 40 }],
+  };
+
+  it('R15: la necesidad que se aparta lleva la receta y 40 envases por un reparto de 40 botellas', async () => {
+    const m = montarConEnvases('reserved');
+
+    await m.createOrder(ALTA, ACTOR_A);
+
+    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(entrada.requirement).toEqual([
+      { productId: MATERIA, quantity: '40' },
+      { productId: ENVASE_DE_A, quantity: '40' },
+    ]);
+    expect(m.syncForOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('R16, R17: si falta un envase y no se confirma, lanza order_would_block (la transaccion no deja nada)', async () => {
+    const m = montarConEnvases('insufficient');
+
+    expect(await codigoDelFallo(() => m.createOrder(ALTA, ACTOR_A))).toBe('order_would_block');
+    expect(m.setStatus).not.toHaveBeenCalled();
+  });
+
+  it('R17: con la confirmacion, el pedido queda BLOQUEADO y sin reserved_at', async () => {
+    const m = montarConEnvases('insufficient');
+
+    await m.createOrder({ ...ALTA, confirmBlocked: true }, ACTOR_A);
+
+    expect(m.setStatus).toHaveBeenCalledWith(filaCreada().id, 'PENDIENTE', 'BLOQUEADO', ACTOR_A.id, AHORA, { companyId: EMPRESA_A });
+    expect(m.setReservedAt).toHaveBeenCalledWith(filaCreada().id, null, { companyId: EMPRESA_A });
   });
 });

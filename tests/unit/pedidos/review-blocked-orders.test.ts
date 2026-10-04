@@ -6,8 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createReviewBlockedOrders } from '@/lib/modules/pedidos/domain/review-blocked-orders';
 import { fakeOrderRow, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import { fakePackagingCatalog } from '@/tests/helpers/packaging-catalog-double';
 
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
+import type { StoredOrderCost } from '@/lib/modules/pedidos/domain/order-cost';
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
@@ -85,7 +87,7 @@ function montar(escenario: Escenario = {}) {
     },
   );
   const setIngredientsCost = vi.fn(
-    async (id: string, cost: string | null, actorId: string | null, now: Date, scope: OrderScope) => {
+    async (id: string, cost: StoredOrderCost | null, actorId: string | null, now: Date, scope: OrderScope) => {
       void [id, cost, actorId, now, scope];
       return 'ok' as const;
     },
@@ -121,7 +123,7 @@ function montar(escenario: Escenario = {}) {
     findRefsSharingBaseInCompany: vi.fn(async () => []),
   } as unknown as UnitCatalog;
 
-  const review = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork: uow.unitOfWork });
+  const review = createReviewBlockedOrders({ orders, recipes, products, units, packaging: fakePackagingCatalog(), unitOfWork: uow.unitOfWork });
   return {
     review,
     orden,
@@ -145,7 +147,7 @@ describe('reviewBlockedOrders — desbloqueo', () => {
     expect(resultado).toEqual({ unblocked: 1, failed: [] });
     expect(m.setStatus).toHaveBeenCalledWith(PEDIDO_1, 'BLOQUEADO', 'PENDIENTE', null, AHORA, SCOPE);
     // 10 * 100 % = 10 unidades a 2.0000.
-    expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, '20.0000', null, AHORA, SCOPE);
+    expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, { total: '20.0000', packaging: '0.0000' }, null, AHORA, SCOPE);
     expect(m.setReservedAt).toHaveBeenCalledWith(PEDIDO_1, AHORA, SCOPE);
   });
 
@@ -332,5 +334,45 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
 
     expect(resultado.failed).toEqual([{ orderId: PEDIDO_1, code: 'unexpected' }]);
     expect(resultado.unblocked).toBe(1);
+  });
+});
+
+describe('QC-195 reviewBlockedOrders — los envases del reparto', () => {
+  const ENVASE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const PRESENTACION = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+  function conReparto(): LockedOrderRow {
+    return bloqueado(PEDIDO_1, {
+      presentationLines: [
+        { presentationId: PRESENTACION, packages: 10, packagingProductId: ENVASE },
+        { presentationId: 'antigua', packages: 3, packagingProductId: null },
+      ],
+    });
+  }
+
+  it('R21: la necesidad que se evalua lleva la receta y los envases del reparto (las lineas antiguas no aportan)', async () => {
+    const m = montar({ filas: new Map([[PEDIDO_1, conReparto()]]) });
+
+    await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(entrada.requirement).toEqual([
+      { productId: PRODUCTO_X, quantity: '10' },
+      { productId: ENVASE, quantity: '10' },
+    ]);
+  });
+
+  it('R21: si falta un envase no se desbloquea: ni estado, ni importe, ni reserved_at', async () => {
+    const m = montar({
+      filas: new Map([[PEDIDO_1, conReparto()]]),
+      resultado: () => ({ kind: 'insufficient', productIds: [ENVASE] }),
+    });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({ unblocked: 0, failed: [] });
+    expect(m.setStatus).not.toHaveBeenCalled();
+    expect(m.setIngredientsCost).not.toHaveBeenCalled();
+    expect(m.setReservedAt).not.toHaveBeenCalled();
   });
 });

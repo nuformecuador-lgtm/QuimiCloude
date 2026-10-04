@@ -218,14 +218,26 @@ const createMachineSchema = z.strictObject({
   expiryDate: expiryDateSchema.nullish(),
 });
 
-/** Esquema para PACKAGING: lote sin expiryDate, lot opcional. */
+const WHOLE_QUANTITY_PATTERN = /^\d{1,10}(\.0{1,4})?$/;
+
+/** Un envase se cuenta en piezas: no hay medio envase. */
+export function isWholeQuantity(quantity: string): boolean {
+  return WHOLE_QUANTITY_PATTERN.test(quantity.trim().replace(/^-/, ''));
+}
+
+/** Esquema para PACKAGING: `presentationId` es la presentacion fija del envase, no del lote. */
 const createPackagingSchema = z
   .strictObject({
     ...productFieldsShape,
     ...batchFieldsCommon,
     type: z.literal(PRODUCT_TYPES.PACKAGING),
   })
-  .superRefine(exigirCostoDelLote);
+  .superRefine((value, ctx) => {
+    exigirCostoDelLote(value, ctx);
+    if (DECIMAL_PATTERN.test(value.stock) && !isWholeQuantity(value.stock)) {
+      ctx.addIssue({ code: 'custom', message: 'La existencia de un envase es un numero entero.', path: ['stock'] });
+    }
+  });
 
 /** Unión discriminada para la CREACION. */
 const createUnion = z.discriminatedUnion('type', [

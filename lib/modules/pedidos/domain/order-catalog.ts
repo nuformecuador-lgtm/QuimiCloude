@@ -146,6 +146,9 @@ export interface OrderCatalog {
    * `'incompatible_units'` y `'order_without_unit'` son defensa en profundidad: el coste se
    * reparte en la unidad del pedido, y una linea que no se puede pasar a ella -o un pedido sin
    * unidad- solo llega aqui con una fila escrita fuera de la aplicacion. Tambien deshacen todo.
+   *
+   * Consume los envases del reparto en la misma transaccion; `'insufficient_material'` es que el
+   * disponible no alcanza para consumirlos todos, y tambien deshace todo.
    */
   finishPackingAliveById(
     id: string,
@@ -161,6 +164,7 @@ export interface OrderCatalog {
     | 'presentation_without_content'
     | 'incompatible_units'
     | 'order_without_unit'
+    | 'insufficient_material'
   >;
 }
 
@@ -173,6 +177,9 @@ export interface OrderCatalog {
 export type AssignedOrderPresentationLine = {
   readonly presentationId: string;
   readonly packages: number;
+  /** `null` = linea guardada antes de que el reparto nombrara envases, o envase que ya no vuelve
+   *  del catalogo. */
+  readonly packagingName: string | null;
 };
 
 /**

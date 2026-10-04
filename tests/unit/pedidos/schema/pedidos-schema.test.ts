@@ -129,7 +129,7 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los DIECINUEVE campos escalares de `Order`, con la columna en ingles que le toca. Fueron
+/** Los VEINTE campos escalares de `Order`, con la columna en ingles que le toca. Fueron
  *  catorce y quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id`
  *  y `unit_price` de la tabla
  *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
@@ -138,7 +138,8 @@ const user = parseModel('User')
  *  dieciocho, `presentationContent` a diecinueve y `packedBy` a veinte. `unitId` vuelve a la
  *  tabla y las lleva a veintiuno: la decision [Q4] deroga la salida del 2026-09-07 (`design.md`
  *  seccion 0.6). El reparto por presentacion retira `presentationId` y `presentationContent`
- *  (pasan a `OrderPresentationLine`) y quedan diecinueve. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
+ *  (pasan a `OrderPresentationLine`) y quedan diecinueve. QC-195 (P6) anade `packagingCost`, la parte de
+ *  envases del importe, y son veinte. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
  *  test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
@@ -156,6 +157,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
   ['ingredientsCost', 'ingredients_cost'],
+  ['packagingCost', 'packaging_cost'], // QC-195 R47: parte de envases incluida en ingredients_cost
   ['reservedAt', 'reserved_at'],
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
   ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
@@ -310,11 +312,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Los DOS unicos decimales del modelo: la cantidad y el importe de ingredientes. La copia del
-    // contenido de la presentacion vive en la linea de reparto.
+    // Los TRES unicos decimales del modelo: la cantidad, el importe y su parte de envases
+    // (QC-195 R47). La copia del contenido de la presentacion vive en la linea de reparto.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['ingredientsCost', 'quantity'])
+    ).toEqual(['ingredientsCost', 'packagingCost', 'quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -711,6 +713,15 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .sort()
     expect(pedidosModels).toEqual(['Order', 'OrderPresentationLine'])
     expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
+  })
+
+  it('QC-195 R47: orders gana packagingCost, decimal(14,4) opcional y sin default, junto a ingredientsCost', () => {
+    const packagingCost = field(order, 'packagingCost')
+    expect(packagingCost.type).toBe('Decimal')
+    expect(packagingCost.isOptional).toBe(true)
+    expect(packagingCost.attributes).toContain('@map("packaging_cost")')
+    expect(packagingCost.attributes).toMatch(/@db\.Decimal\(\s*14\s*,\s*4\s*\)/)
+    expect(packagingCost.attributes).not.toMatch(/@default\(/)
   })
 
   it('la presentacion unica ya no existe en el pedido: ni presentationId, ni presentationContent, ni su indice', () => {

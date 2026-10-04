@@ -71,6 +71,13 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  addPackagingLine,
+  openOrderRowMenu,
+  packagingLine,
+  rowMenuTrigger,
+} from './helpers/order-distribution';
+import { seedPackaging } from './helpers/packaging';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc35_e2e_';
@@ -102,6 +109,9 @@ const ORDER_QUANTITY = '12.5';
 
 const PRESENTATION_CONTENT = '1';
 const ORDER_PACKAGES = '12';
+/** Envases de sobra para la linea del reparto: el alta los aparta. */
+const PACKAGING_STOCK = '100';
+const PACKAGING_UNIT_COST = '0.5000';
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -119,6 +129,9 @@ const operatorUser: Credentials = {
 const recipeName = `${FIXTURE_PREFIX}receta_${RUN_ID}`;
 const unitName = `${FIXTURE_PREFIX}unidad_${RUN_ID}`;
 const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
+/** El envase del reparto, con la presentacion de arriba como presentacion fija. */
+const packagingName = `${FIXTURE_PREFIX}envase_${RUN_ID}`;
+const packagingLot = `${FIXTURE_PREFIX}lote_envase_${RUN_ID}`;
 
 /** Motivo de la cancelacion. Lleva el `RUN_ID` para que el assert no case con el de otro worker. */
 const cancellationReason = `Cancelado por el E2E ${RUN_ID}`;
@@ -134,6 +147,7 @@ let adminUserId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
 let unitId: string | null = null;
+let packagingId: string | null = null;
 
 async function createUserWithRole(user: Credentials, roleName: string): Promise<string> {
   if (!companyId) {
@@ -237,6 +251,24 @@ test.beforeAll(async () => {
   });
   const orphanRecipeIds = orphanRecipes.map((recipe) => recipe.id);
 
+  // Los asientos de los envases huerfanos restringen el borrado de sus pedidos y de sus lotes.
+  const orphanPackagingBatchIds = (
+    await prisma.productBatch.findMany({
+      where: {
+        product: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+      },
+      select: { id: true },
+    })
+  ).map((batch) => batch.id);
+  if (orphanPackagingBatchIds.length > 0) {
+    await prisma.reservationMovement.deleteMany({
+      where: { batchId: { in: orphanPackagingBatchIds } },
+    });
+    await prisma.inventoryMovement.deleteMany({
+      where: { batchId: { in: orphanPackagingBatchIds } },
+    });
+  }
+
   // Los pedidos huerfanos se identifican por SU receta de fixture: la tabla `orders` no tiene
   // ningun campo de texto donde llevar el prefijo, y desde el 2026-09-07 tampoco tiene unidad.
   // Por eso van primero, y por eso este borrado no puede alcanzar ningun pedido que no sea de un
@@ -248,6 +280,13 @@ test.beforeAll(async () => {
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
   }
   await prisma.recipe.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
+  // El envase, despues de sus pedidos y antes que su presentacion fija.
+  if (orphanPackagingBatchIds.length > 0) {
+    await prisma.productBatch.deleteMany({ where: { id: { in: orphanPackagingBatchIds } } });
+  }
+  await prisma.product.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
   // La presentacion se borra antes que su unidad: su FK hacia `units` la rechaza si no.
@@ -325,6 +364,18 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+
+  packagingId = (
+    await seedPackaging({
+      companyId: empresaDelWorker,
+      name: packagingName,
+      presentationId,
+      stock: PACKAGING_STOCK,
+      unitCost: PACKAGING_UNIT_COST,
+      lot: packagingLot,
+      createdBy: adminUserId,
+    })
+  ).productId;
 });
 
 test.afterAll(async () => {
@@ -340,6 +391,11 @@ test.afterAll(async () => {
   // El pedido se borra FISICAMENTE: el borrado de la pantalla es logico (`deleted_at`) y dejaria
   // la fila contando en los tests de integracion de otras features.
   try {
+    if (companyId !== null) {
+      // Lo que el alta aparto y libero del envase restringe el borrado del pedido y del lote.
+      await prisma.reservationMovement.deleteMany({ where: { companyId } });
+      await prisma.inventoryMovement.deleteMany({ where: { companyId } });
+    }
     if (recipeId !== null) {
       await prisma.orderPresentationLine.deleteMany({ where: { order: { recipeId } } });
       await prisma.order.deleteMany({ where: { recipeId } });
@@ -347,6 +403,11 @@ test.afterAll(async () => {
   } finally {
     try {
       await prisma.recipe.deleteMany({ where: { name: recipeName } });
+      // El envase, ANTES que su presentacion fija.
+      if (packagingId !== null) {
+        await prisma.productBatch.deleteMany({ where: { productId: packagingId } });
+        await prisma.product.deleteMany({ where: { id: packagingId } });
+      }
     } finally {
       try {
         // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
@@ -407,23 +468,19 @@ test.describe('pantalla de pedidos', () => {
     await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
     await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
-    // --- 4b. Una linea de reparto con la presentacion, tomada del selector con busqueda.
+    // --- 4b. Una linea de reparto con el envase, tomado del selector de envases con busqueda.
+    const orderForm = page.getByTestId('order-form');
     const distribution = page.getByTestId('order-distribution-field');
-    const presentationPicker = distribution.getByTestId('presentation-select');
-    await presentationPicker.click();
-    await presentationPicker.fill(presentationName);
-    const presentationOption = page
-      .getByTestId('presentation-option')
-      .filter({ hasText: presentationName });
-    await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-    await presentationOption.click();
-    await distribution.getByTestId('order-distribution-add-packages').fill(ORDER_PACKAGES);
-    await distribution.getByTestId('order-distribution-add').click();
-    await expect(
-      distribution.locator(
-        `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
-      ),
-    ).toHaveCount(1);
+    await addPackagingLine(
+      page,
+      orderForm,
+      { productId: packagingId ?? '', name: packagingName },
+      ORDER_PACKAGES,
+    );
+    await expect(packagingLine(distribution, packagingId ?? '')).toHaveAttribute(
+      'data-presentation-id',
+      presentationId ?? '',
+    );
     await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
       'data-state',
       'ready',
@@ -454,7 +511,7 @@ test.describe('pantalla de pedidos', () => {
         orderSequence: true,
         priority: true,
         quantity: true,
-        presentationLines: { select: { presentationId: true } },
+        presentationLines: { select: { presentationId: true, packagingProductId: true } },
       },
     });
     const numberText = formatOrderNumber({
@@ -467,9 +524,9 @@ test.describe('pantalla de pedidos', () => {
     expect(created.priority).toBe(DEFAULT_ORDER_PRIORITY);
     expect(Number(created.quantity)).toBe(Number(ORDER_QUANTITY));
     expect(
-      created.presentationLines.map((line) => line.presentationId),
-      'el reparto guardado lleva la presentacion elegida (R29)',
-    ).toContain(presentationId);
+      created.presentationLines.map((line) => [line.packagingProductId, line.presentationId]),
+      'el reparto guardado lleva el envase elegido y la presentacion fija de ese envase (R29)',
+    ).toContainEqual([packagingId, presentationId]);
 
     // --- 10. Y el pedido esta en la lista, localizado POR SU CORRELATIVO (R7, R10).
     const row = await findOrderRow(page, numberText);
@@ -479,11 +536,11 @@ test.describe('pantalla de pedidos', () => {
     await expect(row.getByTestId('data-table-cell-recipeName')).toHaveText(recipeName);
     await expect(
       row.getByTestId('order-distribution'),
-      'la fila del listado muestra el reparto con la presentacion elegida (R29)',
-    ).toHaveText(`${ORDER_PACKAGES} × ${presentationName}`);
+      'la fila del listado muestra el reparto con el envase elegido (R29)',
+    ).toHaveText(`${ORDER_PACKAGES} × ${packagingName}`);
 
     // --- 11. Cancelacion con motivo (R37): el dialogo pide el motivo y solo entonces confirma.
-    await row.getByTestId('order-action-cancel').click();
+    await (await openOrderRowMenu(page, rowMenuTrigger(row), 'order-action-cancel')).click();
     await expect(page.getByTestId('cancel-order-dialog')).toBeVisible({ timeout: 60_000 });
     // Sin motivo no hay cancelacion posible: el control de confirmar nace deshabilitado.
     await expect(page.getByTestId('cancel-order-confirm')).toBeDisabled();
@@ -502,7 +559,9 @@ test.describe('pantalla de pedidos', () => {
     ).toHaveText(cancellationReason, { timeout: 60_000 });
     // Con el pedido en estado final los tres controles quedan inertes y con su motivo a la vista
     // (R24), sin depender de ningun `title`.
-    await expect(cancelledRow.getByTestId('order-action-edit')).toBeDisabled();
+    await expect(
+      await openOrderRowMenu(page, rowMenuTrigger(cancelledRow), 'order-action-edit'),
+    ).toBeDisabled();
 
     // Lo cancelo el backend de verdad, no solo lo pinto la pantalla. El CHECK
     // `orders_cancellation_reason_matches_status` (QC-34) garantiza que un motivo guardado

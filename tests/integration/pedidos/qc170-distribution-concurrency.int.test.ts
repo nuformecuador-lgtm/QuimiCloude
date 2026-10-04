@@ -51,7 +51,7 @@ import {
   createOrderWriteRepository,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
-import { withOrderTransaction, createOrderDistributionTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
   createRecipeExecutionReader,
   findRecipeExecutionContentById,
@@ -80,6 +80,12 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -129,13 +135,14 @@ const units: UnitCatalog = {
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
-const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
-const orderDistributionTransaction = createOrderDistributionTransaction();
+const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrderPresentationLines = createUpdateOrderPresentationLines({
-  presentations,
+  recipes,
+  products,
+  presentations, packaging: packagingCatalog,
   units,
-  transaction: orderDistributionTransaction,
+  unitOfWork,
 });
 const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
@@ -156,6 +163,8 @@ type Fixture = {
   readonly unitConvertibleId: string;
   /** Presentacion con contenido `10.0000`, en `unitId`. */
   readonly presentationId: string;
+  /** Envase con `presentationId` como presentacion fija: lo que nombra el reparto. */
+  readonly packagingProductId: string;
   readonly recipeId: string;
 };
 
@@ -244,6 +253,7 @@ async function crearFixture(): Promise<Fixture> {
     unitIncompatibleId: unitIncompatible.id,
     unitConvertibleId: unitConvertible.id,
     presentationId: presentation.id,
+    packagingProductId: await seedPackaging({ companyId: company.id, presentationId: presentation.id, createdBy: user.id }),
     recipeId: recipe.id,
   };
 }
@@ -257,6 +267,7 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[] = [
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
+  await dropPackaging([fixture.packagingProductId]);
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.unit.deleteMany({
     where: { id: { in: [fixture.unitConvertibleId, fixture.unitIncompatibleId, fixture.unitId] } },
@@ -271,7 +282,7 @@ function actorDe(fixture: Fixture): Actor {
   return { id: fixture.actorId, companyId: fixture.companyId, permissions: ['pedidos.consultar', 'pedidos.modificar'] };
 }
 
-/** La entrada tal como la validan `createOrderSchema`/`updateOrderSchema`: solo `presentationId`
+/** La entrada tal como la validan `createOrderSchema`/`updateOrderSchema`: el envase
  *  + `packages` por linea, SIN `content` -eso lo copia `resolveDistribution` del catalogo, no lo
  *  trae quien llama-. `createOrder`/`updateOrder` reciben `unknown` y parsean con `zod`, asi que
  *  este tipo NUNCA es `NewOrder`/`OrderEdit` -esos son la salida YA resuelta-. */
@@ -280,7 +291,7 @@ type PedidoInput = {
   readonly quantity: string;
   readonly priority: 'BAJA';
   readonly unitId: string;
-  readonly presentationLines: ReadonlyArray<{ readonly presentationId: string; readonly packages: number }>;
+  readonly presentationLines: ReadonlyArray<{ readonly packagingProductId: string; readonly packages: number }>;
 };
 
 function nuevoPedido(fixture: Fixture, quantity: string, lines: PedidoInput['presentationLines'] = []): PedidoInput {
@@ -321,13 +332,13 @@ describe('R38 — una edicion que deja el reparto vigente sin caber se rechaza y
     const fixture = await crearFixture();
     try {
       const creado = await createOrder(
-        nuevoPedido(fixture, '100.0000', [{ presentationId: fixture.presentationId, packages: 5 }]),
+        nuevoPedido(fixture, '100.0000', [{ packagingProductId: fixture.packagingProductId, packages: 5 }]),
         actorDe(fixture),
       );
       // 5 envases x 10.0000 = 50.0000, cabe en 100.0000 (disponible 50).
 
       await expect(
-        updateOrder(creado.id, nuevoPedido(fixture, '40.0000', [{ presentationId: fixture.presentationId, packages: 5 }]), actorDe(fixture)),
+        updateOrder(creado.id, nuevoPedido(fixture, '40.0000', [{ packagingProductId: fixture.packagingProductId, packages: 5 }]), actorDe(fixture)),
       ).rejects.toBeInstanceOf(OrderDistributionExceedsQuantityError);
 
       const fila = await leerOrden(creado.id);
@@ -344,14 +355,14 @@ describe('R38 — una edicion que deja el reparto vigente sin caber se rechaza y
     const fixture = await crearFixture();
     try {
       const creado = await createOrder(
-        nuevoPedido(fixture, '100.0000', [{ presentationId: fixture.presentationId, packages: 5 }]),
+        nuevoPedido(fixture, '100.0000', [{ packagingProductId: fixture.packagingProductId, packages: 5 }]),
         actorDe(fixture),
       );
 
       await expect(
         updateOrder(
           creado.id,
-          { ...nuevoPedido(fixture, '100.0000', [{ presentationId: fixture.presentationId, packages: 5 }]), unitId: fixture.unitIncompatibleId },
+          { ...nuevoPedido(fixture, '100.0000', [{ packagingProductId: fixture.packagingProductId, packages: 5 }]), unitId: fixture.unitIncompatibleId },
           actorDe(fixture),
         ),
       ).rejects.toBeInstanceOf(IncompatibleUnitsError);
@@ -385,11 +396,11 @@ describe('R37 — guardados simultaneos del reparto nunca dejan una suma que pas
         // nunca una mezcla, y nunca pasa del total.
         const a = updateOrderPresentationLines(creado.id, actorDe(fixture), {
           unitId: fixture.unitId,
-          lines: [{ presentationId: fixture.presentationId, packages: 6 }],
+          lines: [{ packagingProductId: fixture.packagingProductId, packages: 6 }],
         });
         const b = updateOrderPresentationLines(creado.id, actorDe(fixture), {
           unitId: fixture.unitId,
-          lines: [{ presentationId: fixture.presentationId, packages: 7 }],
+          lines: [{ packagingProductId: fixture.packagingProductId, packages: 7 }],
         });
 
         const [resultadoA, resultadoB] = await Promise.all([a, b]);
@@ -414,7 +425,7 @@ describe('R37 — guardados simultaneos del reparto nunca dejan una suma que pas
       try {
         // Reparto inicial de 5 envases (50.0000), cantidad 100: cabe con margen amplio.
         const creado = await createOrder(
-          nuevoPedido(fixture, '100.0000', [{ presentationId: fixture.presentationId, packages: 5 }]),
+          nuevoPedido(fixture, '100.0000', [{ packagingProductId: fixture.packagingProductId, packages: 5 }]),
           actorDe(fixture),
         );
 
@@ -425,11 +436,11 @@ describe('R37 — guardados simultaneos del reparto nunca dejan una suma que pas
         // bloqueo de la fila hace que quien entre segundo vea lo que escribio el primero.
         const guardado = updateOrderPresentationLines(creado.id, actorDe(fixture), {
           unitId: fixture.unitId,
-          lines: [{ presentationId: fixture.presentationId, packages: 8 }],
+          lines: [{ packagingProductId: fixture.packagingProductId, packages: 8 }],
         });
         const edicion = updateOrder(
           creado.id,
-          nuevoPedido(fixture, '55.0000', [{ presentationId: fixture.presentationId, packages: 5 }]),
+          nuevoPedido(fixture, '55.0000', [{ packagingProductId: fixture.packagingProductId, packages: 5 }]),
           actorDe(fixture),
         ).then(
           () => ({ ok: true as const }),
@@ -501,7 +512,7 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
 
       await updateOrder(
         legado.id,
-        nuevoPedido(fixture, '30.0000', [{ presentationId: fixture.presentationId, packages: 2 }]),
+        nuevoPedido(fixture, '30.0000', [{ packagingProductId: fixture.packagingProductId, packages: 2 }]),
         actorDe(fixture),
       );
 
@@ -536,7 +547,7 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
 
       const resultado = await updateOrderPresentationLines(legado.id, actorDe(fixture), {
         unitId: fixture.unitId,
-        lines: [{ presentationId: fixture.presentationId, packages: 3 }],
+        lines: [{ packagingProductId: fixture.packagingProductId, packages: 3 }],
       });
       expect(resultado).toBe('ok');
 
@@ -596,7 +607,7 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
     const holder = new Client({ connectionString: connectionString() });
     try {
       const creado = await createOrder(
-        nuevoPedido(fixture, '100.0000', [{ presentationId: fixture.presentationId, packages: 3 }]),
+        nuevoPedido(fixture, '100.0000', [{ packagingProductId: fixture.packagingProductId, packages: 3 }]),
         actorDe(fixture),
       );
       await prisma.order.update({ where: { id: creado.id }, data: { status: 'POR_EMPACAR' } });
@@ -645,7 +656,7 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
     const holder = new Client({ connectionString: connectionString() });
     try {
       const creado = await createOrder(
-        nuevoPedido(fixture, '100.0000', [{ presentationId: fixture.presentationId, packages: 3 }]),
+        nuevoPedido(fixture, '100.0000', [{ packagingProductId: fixture.packagingProductId, packages: 3 }]),
         actorDe(fixture),
       );
       await prisma.order.update({ where: { id: creado.id }, data: { status: 'POR_EMPACAR' } });
@@ -661,7 +672,7 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
       const guardado = vigilar(
         updateOrderPresentationLines(creado.id, actorDe(fixture), {
           unitId: fixture.unitId,
-          lines: [{ presentationId: fixture.presentationId, packages: 9 }],
+          lines: [{ packagingProductId: fixture.packagingProductId, packages: 9 }],
         }),
       );
       await esperarBloqueada(guardado, 'el guardado no quedo esperando el FOR UPDATE de Comenzar (orden b)');
@@ -722,7 +733,7 @@ describe('R30, R46 — cambiar la unidad en POR_EMPACAR no altera reservas ni as
       });
 
       const creado = await createOrder(
-        nuevoPedido(fixture, '20.0000', [{ presentationId: fixture.presentationId, packages: 2 }]),
+        nuevoPedido(fixture, '20.0000', [{ packagingProductId: fixture.packagingProductId, packages: 2 }]),
         actorDe(fixture),
       );
       await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
@@ -741,7 +752,7 @@ describe('R30, R46 — cambiar la unidad en POR_EMPACAR no altera reservas ni as
       // `unitId`, factor 1: la conversion es trivial y valida).
       const resultado = await updateOrderPresentationLines(creado.id, actorDe(fixture), {
         unitId: fixture.unitConvertibleId,
-        lines: [{ presentationId: fixture.presentationId, packages: 2 }],
+        lines: [{ packagingProductId: fixture.packagingProductId, packages: 2 }],
       });
       expect(resultado).toBe('ok');
 

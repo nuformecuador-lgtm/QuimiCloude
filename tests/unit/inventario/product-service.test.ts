@@ -86,6 +86,7 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
     findAliveIdByNameInPresentationUnit: vi.fn<
       ProductRepository['findAliveIdByNameInPresentationUnit']
     >(async () => null),
+    findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-1',
       batchId: 'lote-1',

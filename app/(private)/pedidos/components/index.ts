@@ -96,11 +96,14 @@ export {
   ORDER_DISTRIBUTION_AVAILABLE_TESTID,
   ORDER_DISTRIBUTION_ERROR_TESTID,
   ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID,
+  ORDER_DISTRIBUTION_LINE_LEGACY_TESTID,
   ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
+  ORDER_DISTRIBUTION_LINE_PRESENTATION_TESTID,
   ORDER_DISTRIBUTION_LINE_PROBLEM_TESTID,
   ORDER_DISTRIBUTION_LINE_REMOVE_TESTID,
   ORDER_DISTRIBUTION_LINE_TESTID,
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   ORDER_DISTRIBUTION_TESTID,
   ORDER_DISTRIBUTION_WARNING_TESTID,
@@ -120,13 +123,30 @@ export {
 export {
   ORDER_DISTRIBUTION_DEBOUNCE_MS,
   availabilityBlocksSave,
+  distributionLinesValid,
   fromOrderPresentationLines,
+  isLegacyLine,
+  lineKey,
+  toDistributionLinesInput,
   toPresentationLinesInput,
   useOrderDistributionAvailability,
   type OrderDistributionAvailability,
   type OrderDistributionAvailabilityInput,
   type OrderDistributionLine,
 } from './use-order-distribution-availability';
+export {
+  PACKAGING_OPTION_AVAILABLE_TESTID,
+  PACKAGING_OPTION_PRESENTATION_TESTID,
+  PACKAGING_OPTION_TESTID,
+  PACKAGING_SELECT_EMPTY_TESTID,
+  PACKAGING_SELECT_FORBIDDEN_TESTID,
+  PACKAGING_SELECT_LOAD_ERROR_TESTID,
+  PACKAGING_SELECT_POPUP_TESTID,
+  PACKAGING_SELECT_TESTID,
+  PackagingSelect,
+  type PackagingOption,
+  type PackagingSelectProps,
+} from './packaging-select';
 export { compatibleUnitIds } from './compatible-unit-ids';
 export { useSavedPresentationContents } from './use-saved-line-contents';
 export { OrderListEmpty } from './order-list-empty';

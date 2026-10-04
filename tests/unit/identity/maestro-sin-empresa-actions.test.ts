@@ -20,6 +20,7 @@ import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-a
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { createListUnits } from '@/lib/modules/unidades/domain/list-units';
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 const { getSessionUserMock, getSessionContextMock, readRequestIdHeaderMock, cableado } =
   vi.hoisted(() => ({
@@ -102,6 +103,7 @@ beforeEach(() => {
     orders: trampa('orders', llamadas),
     recipes: trampa('recipes', llamadas),
     presentations: trampa('presentations', llamadas),
+    packaging: fakePackagingCatalog(),
     units: trampa('units', llamadas),
     log: LOG_MUDO,
   }) as (input: unknown, actor: unknown) => Promise<unknown>;

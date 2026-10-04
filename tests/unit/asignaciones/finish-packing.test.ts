@@ -5,6 +5,7 @@ import { createFinishPacking, type FinishPackingDeps } from '@/lib/modules/asign
 import {
   AsignacionesError,
   IncompatibleUnitsError,
+  MaterialShortageError,
   OrderNotFoundError,
   OrderNotPackableError,
   OrderPackingTakenError,
@@ -35,7 +36,8 @@ type Resultado =
   | 'recipe_not_found'
   | 'presentation_without_content'
   | 'incompatible_units'
-  | 'order_without_unit';
+  | 'order_without_unit'
+  | 'insufficient_material';
 
 function montar(options?: {
   readonly target?: { readonly id: string; readonly status: string } | null;
@@ -157,6 +159,15 @@ describe('finishPacking — R17-R21: da de alta el lote por linea del reparto', 
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderWithoutUnitError);
+  });
+
+  it('QC-195 R25: `insufficient_material` (los envases no alcanzan) rechaza con `MaterialShortageError`, code insufficient_material', async () => {
+    const { deps } = montar({ resultado: 'insufficient_material' });
+    const finishPacking = createFinishPacking(deps);
+
+    const fallo = finishPacking(ACTOR, { orderId: PEDIDO });
+    await expect(fallo).rejects.toBeInstanceOf(MaterialShortageError);
+    await expect(fallo).rejects.toMatchObject({ code: 'insufficient_material' });
   });
 });
 

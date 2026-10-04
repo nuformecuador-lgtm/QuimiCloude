@@ -1,3 +1,5 @@
+import type { PackageUnitSource } from '@/lib/modules/unidades';
+
 import { requirePermission, type Actor } from './actor';
 import { ActionNotAllowedError, ProductNotFoundError, ValidationError } from './errors';
 import {
@@ -16,6 +18,8 @@ export type CreateProductDeps = {
   readonly products: ProductRepository;
   /** Recibe el aviso despues de escribir el lote. Sin el, el alta no avisa a nadie. */
   readonly stockIncreases?: StockIncreaseListener;
+  /** De donde sale la unidad en que se cuentan los envases. Sin ella, el alta de un envase falla. */
+  readonly packageUnit?: PackageUnitSource;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };
@@ -100,15 +104,16 @@ export function createCreateProduct(
 
     const purchaseDate = resolverFechaDeCompra(entrada, instante);
 
-    // PACKAGING no tiene expiryDate; PRODUCT y MACHINE si (la unión discriminada estrecha por `type`).
-    const expiryDate = entrada.type === PRODUCT_TYPES.PACKAGING ? null : entrada.expiryDate ?? null;
+    if (entrada.type === PRODUCT_TYPES.PACKAGING) {
+      return createPackaging(deps, entrada, actor, instante, purchaseDate, scope);
+    }
 
     const batch: NewProductBatch = {
       presentationId: entrada.presentationId ?? null,
       stock: entrada.stock,
       unitCost: resolverCostoUnitario(entrada),
       lot: entrada.lot ?? null,
-      expiryDate,
+      expiryDate: entrada.expiryDate ?? null,
       purchaseDate,
       createdBy: actor.id,
     };
@@ -150,4 +155,58 @@ export function createCreateProduct(
     await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
     return { id: creado.id, lot: creado.lot };
   };
+}
+type EntradaEnvase = Extract<CreateProductInput, { type: typeof PRODUCT_TYPES.PACKAGING }>;
+
+/**
+ * El envase lleva su presentacion en el producto y cuenta su existencia en la unidad de envases;
+ * sus lotes no llevan presentacion. Un homonimo vivo con otra presentacion se rechaza: la
+ * presentacion de un envase no cambia.
+ */
+async function createPackaging(
+  deps: CreateProductDeps,
+  entrada: EntradaEnvase,
+  actor: Actor,
+  instante: Date,
+  purchaseDate: string,
+  scope: { readonly companyId: string },
+): Promise<{ id: string; lot?: string }> {
+  const batch: NewProductBatch = {
+    presentationId: null,
+    stock: entrada.stock,
+    unitCost: resolverCostoUnitario(entrada),
+    lot: entrada.lot ?? null,
+    expiryDate: null,
+    purchaseDate,
+    createdBy: actor.id,
+  };
+
+  const existente = await deps.products.findAlivePackagingByName(entrada.name, scope);
+  if (existente !== null) {
+    if (existente.presentationId !== entrada.presentationId) throw new ActionNotAllowedError();
+
+    const agregado = await deps.products.addBatchToAlive(existente.id, batch, instante, scope, {
+      presentationId: entrada.presentationId,
+    });
+    if (agregado === 'finished_product') throw new ActionNotAllowedError();
+    if (agregado === null) throw new ProductNotFoundError(existente.id);
+
+    await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
+    return { id: existente.id, lot: agregado.lot };
+  }
+
+  const unitId = await deps.packageUnit?.findPackageUnitId();
+  if (unitId === undefined || unitId === null) {
+    throw new Error('alta de envase sin la unidad de sistema de envases: falta la siembra o el cableado');
+  }
+
+  const creado = await deps.products.createWithFirstBatch(
+    { name: entrada.name, qtyAlert: entrada.qtyAlert, type: PRODUCT_TYPES.PACKAGING },
+    batch,
+    instante,
+    scope,
+    { presentationId: entrada.presentationId, unitId },
+  );
+  await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
+  return { id: creado.id, lot: creado.lot };
 }

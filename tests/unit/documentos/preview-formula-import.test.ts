@@ -224,6 +224,35 @@ describe('createPreviewFormulaImport', () => {
       });
     });
 
+    it('QC-195 R41 — un envase como UNICO homonimo: match "none", nunca se propone', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        productNames: dobleDeNombresDeProducto(bitacora, [
+          { id: PRODUCTO_AGUA, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PACKAGING, unitId: null },
+        ]) as unknown as FormulaImportDeps['productNames'],
+      });
+      const preview = createPreviewFormulaImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+      expect(resultado.ingredients[0]?.match).toEqual({ kind: 'none' });
+    });
+
+    it('QC-195 R41 — un envase y una materia prima homonimos: se propone solo la materia prima', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        productNames: dobleDeNombresDeProducto(bitacora, [
+          { id: PRODUCTO_AGUA, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PRODUCT, unitId: null },
+          { id: PRODUCTO_AGUA_2, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PACKAGING, unitId: null },
+        ]) as unknown as FormulaImportDeps['productNames'],
+      });
+      const preview = createPreviewFormulaImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+      expect(resultado.ingredients[0]?.match).toEqual({ kind: 'one', productId: PRODUCTO_AGUA, productName: 'Agua', unitId: null });
+    });
+
     it('un terminado como UNICO homonimo: match "none", nunca "one"', async () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora, {

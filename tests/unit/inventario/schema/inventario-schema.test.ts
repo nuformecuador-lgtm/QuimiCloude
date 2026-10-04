@@ -561,7 +561,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('products.name no tiene @unique ni @@unique', () => {
     // Dos productos pueden llamarse igual: se aparta a proposito del precedente de `users`.
     expect(field(product, 'name').attributes).not.toMatch(/@unique/)
-    expect(product.body).not.toMatch(/@@unique\(/)
+    // `@@unique([companyId, id])` es la clave candidata de la FK del envase del reparto: no toca el nombre.
+    expect(product.body).not.toMatch(/@@unique\(\[[^\]]*\bname/i)
     expect(product.body).not.toMatch(/@@index\([^)]*name/)
   })
 

@@ -19,7 +19,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { addBatchToAlive, createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
@@ -44,7 +44,15 @@ import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { createCreateOrder, createFinishPacking, createStartPacking, createTransitionOrder, createUpdateOrder } from '@/lib/modules/pedidos';
+import {
+  createCreateOrder,
+  createFinishPacking,
+  createListAliveSummariesByIds,
+  createStartPacking,
+  createTransitionOrder,
+  createUpdateOrder,
+  createUpdateOrderPresentationLines,
+} from '@/lib/modules/pedidos';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
@@ -57,6 +65,12 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import type { Actor as AsignacionesActor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -107,8 +121,10 @@ const units: UnitCatalog = {
 
 const orderPackingRepository: OrderPackingRepository = { startPackingAlive: startPackingAliveOrder };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date() });
-const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
+const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+
+const updateDistribution = createUpdateOrderPresentationLines({ recipes, products, packaging: packagingCatalog, presentations, units, unitOfWork });
 
 const orderCatalog: OrderCatalog = {
   findAliveById: async (id, companyId) => {
@@ -117,7 +133,15 @@ const orderCatalog: OrderCatalog = {
   },
   listAliveSummariesByIds: async (companyId, ids, statuses, page, pageSize) => {
     const { listAliveOrderSummariesByIds } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');
-    return listAliveOrderSummariesByIds(companyId, ids, statuses, page, pageSize);
+    return createListAliveSummariesByIds({
+      summaries: {
+        listAliveByIds: listAliveOrderSummariesByIds,
+        listAliveInCompany: async () => {
+          throw new Error('este archivo no ejercita listAliveSummariesInCompany');
+        },
+      },
+      packaging: packagingCatalog,
+    })(companyId, ids, statuses, page, pageSize);
   },
   listAliveSummariesInCompany: async () => {
     throw new Error('este archivo no ejercita listAliveSummariesInCompany');
@@ -126,7 +150,7 @@ const orderCatalog: OrderCatalog = {
   transitionAliveById: createTransitionOrder({ unitOfWork }),
   // T14: Comenzar y Terminar, cableados exactamente como `lib/composition`.
   startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations }),
+  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations, packaging: packagingCatalog }),
 };
 
 function finishAssignedOrderPara(orderId: string) {
@@ -167,6 +191,8 @@ type Fixture = {
   readonly roleId: string;
   readonly documentTypeCode: string;
   readonly presentationId: string;
+  /** Envase con `presentationId` como presentacion fija: lo que nombra el reparto. */
+  readonly packagingProductId: string;
   readonly unitId: string;
 };
 
@@ -229,6 +255,7 @@ async function crearFixture(content: string | null = '1.0000'): Promise<Fixture>
     roleId: role.id,
     documentTypeCode: documentType.code,
     presentationId: presentation.id,
+    packagingProductId: await seedPackaging({ companyId: company.id, presentationId: presentation.id, createdBy: user.id }),
     unitId: unit.id,
   };
 }
@@ -246,6 +273,7 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[]): P
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
+  await dropPackaging([fixture.packagingProductId]);
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
@@ -318,7 +346,7 @@ function nuevoPedido(recipeId: string, fixture: Fixture, quantity: string, packa
     priority: 'BAJA',
     status: 'PENDIENTE',
     unitId: fixture.unitId,
-    presentationLines: [{ presentationId: fixture.presentationId, packages }],
+    presentationLines: [{ packagingProductId: fixture.packagingProductId, packages }],
   };
 }
 
@@ -402,6 +430,11 @@ describe('R17 — Terminar da de alta el lote a partir del reparto fijado en Com
       },
       select: { id: true },
     });
+    const otroEnvase = await seedPackaging({
+      companyId: fixture.companyId,
+      presentationId: otraPresentacion.id,
+      createdBy: fixture.actorId,
+    });
     const { productId, batchId } = await crearProductoConLote(fixture, '100', '3.0000');
     const recipeId = await crearReceta(fixture);
     await crearLineaCompleta(recipeId, productId);
@@ -415,8 +448,8 @@ describe('R17 — Terminar da de alta el lote a partir del reparto fijado en Com
           status: 'PENDIENTE',
           unitId: fixture.unitId,
           presentationLines: [
-            { presentationId: fixture.presentationId, packages: 6 },
-            { presentationId: otraPresentacion.id, packages: 2 },
+            { packagingProductId: fixture.packagingProductId, packages: 6 },
+            { packagingProductId: otroEnvase, packages: 2 },
           ],
         },
         actorDe(fixture),
@@ -439,19 +472,22 @@ describe('R17 — Terminar da de alta el lote a partir del reparto fijado en Com
 
       const loteUno = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoUno?.id }, select: { stock: true, unitCost: true } });
       const loteDos = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoDos?.id }, select: { stock: true, unitCost: true } });
-      // 30.0000 (importe guardado: 10 x 3.0000) / (6x1 + 2x2) = 30.0000 / 10 = 3.0000 para las DOS.
+      // Importe guardado: 10 x 3.0000 de ingredientes + (6 + 2) envases a 0.5000 = 34.0000, entre
+      // (6x1 + 2x2) = 10 -> 3.4000 para las DOS (QC-195 R27: el importe incluye los envases).
       expect(loteUno.stock.toFixed(4)).toBe('6.0000');
       expect(loteDos.stock.toFixed(4)).toBe('4.0000');
-      expect(loteUno.unitCost?.toFixed(4)).toBe('3.0000');
-      expect(loteDos.unitCost?.toFixed(4)).toBe('3.0000');
+      expect(loteUno.unitCost?.toFixed(4)).toBe('3.4000');
+      expect(loteDos.unitCost?.toFixed(4)).toBe('3.4000');
       expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('90.0000');
     } finally {
       // `otraPresentacion` referencia `fixture.unitId`: se borra ANTES que `borrarFixture`
       // llegue a la unidad, y su producto terminado antes que la propia presentacion (FK
       // `RESTRICT`), igual que `borrarFixture` ya hace con `fixture.presentationId`. El
       // asiento de produccion de ese lote se limpia primero, mismo orden que `borrarFixture`.
+      await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+      await dropPackaging([otroEnvase]);
       await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, presentationId: otraPresentacion.id } } });
       await prisma.product.deleteMany({ where: { companyId: fixture.companyId, presentationId: otraPresentacion.id } });
       await prisma.presentation.deleteMany({ where: { id: otraPresentacion.id } });
@@ -561,7 +597,7 @@ describe('R20 — la edicion en Pedidos no da de alta producto terminado', () =>
       // esta entrada nunca podria mover el pedido a `ENTREGADO` aunque el dato viaje aqui.
       await updateOrder(
         creado.id,
-        { recipeId, quantity: '20.0000', unitId: fixture.unitId, presentationLines: [{ presentationId: fixture.presentationId, packages: 20 }], status: 'ENTREGADO' },
+        { recipeId, quantity: '20.0000', unitId: fixture.unitId, presentationLines: [{ packagingProductId: fixture.packagingProductId, packages: 20 }], status: 'ENTREGADO' },
         actorDe(fixture),
       );
 
@@ -619,6 +655,7 @@ describe('R19 — un fallo forzado tras el lote deshace la transaccion entera', 
       products,
       units,
       presentations,
+      packaging: packagingCatalog,
     });
 
     try {
@@ -755,7 +792,8 @@ describe('R18 — el coste del lote', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture, '10.0000', 10), actorDe(fixture));
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
-      expect(antes.ingredientsCost?.toFixed(4)).toBe('20.0000');
+      // 10 x 2.0000 de ingredientes + 10 envases a 0.5000 (QC-195 R27).
+      expect(antes.ingredientsCost?.toFixed(4)).toBe('25.0000');
 
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
@@ -763,11 +801,11 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // 20.0000 (importe guardado) / 10 (cantidad que entra) = 2.0000
-      expect(lote.unitCost?.toFixed(4)).toBe('2.0000');
+      // 25.0000 (importe guardado) / 10 (cantidad que entra) = 2.5000
+      expect(lote.unitCost?.toFixed(4)).toBe('2.5000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
-      expect(despues.ingredientsCost?.toFixed(4)).toBe('20.0000');
+      expect(despues.ingredientsCost?.toFixed(4)).toBe('25.0000');
     } finally {
       await borrarFixture(fixture, [productId]);
     }
@@ -797,9 +835,9 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeConLinea, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // Sin importe guardado, se recalcula: 10 (100% de 10) x 3.0000 = 30.0000, dividido entre
-      // 10 (cantidad que entra) = 3.0000.
-      expect(lote.unitCost?.toFixed(4)).toBe('3.0000');
+      // Sin importe guardado, se recalcula: 10 (100% de 10) x 3.0000 = 30.0000 mas 10 envases a
+      // 0.5000 (QC-195 R31), dividido entre 10 (cantidad que entra) = 3.5000.
+      expect(lote.unitCost?.toFixed(4)).toBe('3.5000');
       expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('90.0000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
@@ -831,9 +869,9 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // Solo el ingrediente con costo cuenta: 60% de 10 x 5.0000 = 30.0000, entre 10 (cantidad
-      // que entra) = 3.0000. El de la maquina sin costo aporta cero.
-      expect(lote.unitCost?.toFixed(4)).toBe('3.0000');
+      // Solo el ingrediente con costo cuenta: 60% de 10 x 5.0000 = 30.0000, mas 10 envases a
+      // 0.5000 (QC-195 R31), entre 10 (cantidad que entra) = 3.5000. La maquina sin costo aporta cero.
+      expect(lote.unitCost?.toFixed(4)).toBe('3.5000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
       expect(despues.ingredientsCost).toBeNull();
@@ -846,7 +884,9 @@ describe('R18 — el coste del lote', () => {
 describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del pedido', () => {
   /** Unidad derivada de la de la fixture (1 = 0,001 de ella, como ml de L) y una presentacion
    *  de 200 en esa unidad. */
-  async function crearMililitro(fixture: Fixture): Promise<{ readonly unitId: string; readonly presentationId: string }> {
+  async function crearMililitro(
+    fixture: Fixture,
+  ): Promise<{ readonly unitId: string; readonly presentationId: string; readonly packagingProductId: string }> {
     const marca = token();
     const unit = await prisma.unit.create({
       data: { name: `Mili ${marca}`, nameNormalized: `mili${marca}`, symbol: `ml${marca}`, baseUnitId: fixture.unitId, factor: '0.0010' },
@@ -856,12 +896,22 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
       data: { name: `Frasco ${marca}`, nameNormalized: normalizeForTest(`Frasco ${marca}`), unitId: unit.id, companyId: fixture.companyId, content: '200.0000' },
       select: { id: true },
     });
-    return { unitId: unit.id, presentationId: presentation.id };
+    const packagingProductId = await seedPackaging({
+      companyId: fixture.companyId,
+      presentationId: presentation.id,
+      createdBy: fixture.actorId,
+    });
+    return { unitId: unit.id, presentationId: presentation.id, packagingProductId };
   }
 
-  async function borrarMililitro(fixture: Fixture, mililitro: { readonly unitId: string; readonly presentationId: string }): Promise<void> {
+  async function borrarMililitro(
+    fixture: Fixture,
+    mililitro: { readonly unitId: string; readonly presentationId: string; readonly packagingProductId: string },
+  ): Promise<void> {
+    await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
     await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+    await dropPackaging([mililitro.packagingProductId]);
     await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, presentationId: mililitro.presentationId } } });
     await prisma.product.deleteMany({ where: { companyId: fixture.companyId, presentationId: mililitro.presentationId } });
     await prisma.presentation.deleteMany({ where: { id: mililitro.presentationId } });
@@ -870,7 +920,7 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
 
   /** Pedido de 100 en la unidad de la fixture, coste guardado 1000 (100 x 10.0000), con 5 x 200
    *  en la unidad derivada y 60 x 1 en la de la fixture: 61 en la unidad del pedido. */
-  async function pedidoMixto(fixture: Fixture, mililitro: { readonly presentationId: string }, recipeId: string): Promise<string> {
+  async function pedidoMixto(fixture: Fixture, mililitro: { readonly packagingProductId: string }, recipeId: string): Promise<string> {
     const creado = await createOrder(
       {
         recipeId,
@@ -879,8 +929,8 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
         status: 'PENDIENTE',
         unitId: fixture.unitId,
         presentationLines: [
-          { presentationId: mililitro.presentationId, packages: 5 },
-          { presentationId: fixture.presentationId, packages: 60 },
+          { packagingProductId: mililitro.packagingProductId, packages: 5 },
+          { packagingProductId: fixture.packagingProductId, packages: 60 },
         ],
       },
       actorDe(fixture),
@@ -900,7 +950,8 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
     try {
       const orderId = await pedidoMixto(fixture, mililitro, recipeId);
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { ingredientsCost: true } });
-      expect(antes.ingredientsCost?.toFixed(4)).toBe('1000.0000');
+      // 100 x 10.0000 de ingredientes + (5 + 60) envases a 0.5000 (QC-195 R27).
+      expect(antes.ingredientsCost?.toFixed(4)).toBe('1032.5000');
 
       const resultado = await empacarYTerminar(orderId, fixture.companyId, fixture.actorId, new Date());
       expect(resultado).toMatchObject({ kind: 'ok' });
@@ -910,18 +961,18 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
       const loteMl = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoMl?.id }, select: { stock: true, unitCost: true } });
       const loteL = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoL?.id }, select: { stock: true, unitCost: true } });
 
-      // 1000 / 61 = 16.3934 por unidad del pedido; en la derivada, 1000 / 61000 = 0.0164.
+      // 1032.5 / 61 = 16.9262 por unidad del pedido; en la derivada, 1032.5 / 61000 = 0.0169.
       expect(loteL.stock.toFixed(4)).toBe('60.0000');
-      expect(loteL.unitCost?.toFixed(4)).toBe('16.3934');
+      expect(loteL.unitCost?.toFixed(4)).toBe('16.9262');
       expect(loteMl.stock.toFixed(4)).toBe('1000.0000');
-      expect(loteMl.unitCost?.toFixed(4)).toBe('0.0164');
+      expect(loteMl.unitCost?.toFixed(4)).toBe('0.0169');
 
-      // 16.4000 + 983.6040: el resto es el redondeo a cuatro decimales del coste unitario.
+      // 16.9000 + 1015.5720: el resto es el redondeo a cuatro decimales del coste unitario.
       const valorMl = loteMl.stock.mul(loteMl.unitCost ?? 0);
       const valorL = loteL.stock.mul(loteL.unitCost ?? 0);
-      expect(valorMl.toFixed(2)).toBe('16.40');
-      expect(valorL.toFixed(2)).toBe('983.60');
-      expect(valorMl.add(valorL).toFixed(1)).toBe('1000.0');
+      expect(valorMl.toFixed(2)).toBe('16.90');
+      expect(valorL.toFixed(2)).toBe('1015.57');
+      expect(valorMl.add(valorL).toFixed(1)).toBe('1032.5');
     } finally {
       await borrarMililitro(fixture, mililitro);
       await borrarFixture(fixture, [productId]);
@@ -954,6 +1005,289 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
     } finally {
       await borrarMililitro(fixture, mililitro);
       await borrarFixture(fixture, [productId]);
+    }
+  });
+});
+
+describe('QC-195 — Terminar consume los envases del reparto', () => {
+  /** Lo apartado neto del pedido en los lotes de un producto (reserve - release - consume). */
+  async function apartadoNeto(orderId: string, productId: string): Promise<string> {
+    const rows = await prisma.$queryRaw<{ neto: string | null }[]>`
+      SELECT SUM(CASE WHEN m."kind" = 'reserve' THEN m."quantity" ELSE -m."quantity" END)::text AS "neto"
+        FROM "reservation_movements" m
+        JOIN "product_batches" b ON b."id" = m."batch_id"
+       WHERE m."order_id" = ${orderId}::uuid AND b."product_id" = ${productId}::uuid`;
+    return Number(rows[0]?.neto ?? '0').toFixed(4);
+  }
+
+  async function existenciaDe(productId: string): Promise<string> {
+    const row = await prisma.product.findUniqueOrThrow({ where: { id: productId }, select: { stock: true } });
+    return row.stock.toFixed(4);
+  }
+
+  /** Un pedido de `quantity` en `packages` envases de la fixture, ya en `EN_EMPAQUE`. */
+  async function pedidoEnEmpaque(fixture: Fixture, recipeId: string, quantity: string, packages: number): Promise<string> {
+    const creado = await createOrder(nuevoPedido(recipeId, fixture, quantity, packages), actorDe(fixture));
+    expect(await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date())).toBe('ok');
+    expect(await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date())).toBe('ok');
+    expect(await orderCatalog.startPackingAliveById(creado.id, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
+    return creado.id;
+  }
+
+  it('R25: Terminar consume los envases apartados en la misma transaccion que da de alta el producto terminado', async () => {
+    const fixture = await crearFixture('1.0000');
+    const { productId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const orderId = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
+      // Hasta Terminar los envases siguen apartados y con su existencia entera.
+      expect(await apartadoNeto(orderId, fixture.packagingProductId)).toBe('10.0000');
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('1000.0000');
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '10' }] });
+
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('990.0000');
+      expect(await apartadoNeto(orderId, fixture.packagingProductId)).toBe('0.0000');
+      const consumo = await prisma.inventoryMovement.findFirst({
+        where: { orderId, kind: 'consumption', batch: { productId: fixture.packagingProductId } },
+        select: { quantity: true, createdBy: true },
+      });
+      expect(consumo?.quantity.abs().toFixed(4)).toBe('10.0000');
+      expect(consumo?.createdBy).toBe(fixture.actorId);
+      expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).not.toBeNull();
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R25: si el disponible de los envases no alcanza, Terminar rechaza con insufficient_material sin mover el estado ni dar de alta producto terminado', async () => {
+    const fixture = await crearFixture('1.0000');
+    const { productId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const orderId = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
+      // Merma escrita fuera de la aplicacion: quedan 4 envases fisicos de los 10 apartados.
+      await prisma.productBatch.updateMany({ where: { productId: fixture.packagingProductId }, data: { stock: '4' } });
+      await prisma.product.update({ where: { id: fixture.packagingProductId }, data: { stock: '4' } });
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toBe('insufficient_material');
+
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true, finishedAt: true } });
+      expect(row.status).toBe('EN_EMPAQUE');
+      expect(row.finishedAt).toBeNull();
+      expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).toBeNull();
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('4.0000');
+      expect(await apartadoNeto(orderId, fixture.packagingProductId)).toBe('10.0000');
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R14: el producto terminado entra en la presentacion y el contenido copiados al guardar, aunque el envase y su presentacion cambien despues', async () => {
+    const fixture = await crearFixture('1.0000');
+    const { productId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+    const marca = token();
+    const otra = await prisma.presentation.create({
+      data: { name: `Garrafa ${marca}`, nameNormalized: `garrafa${marca}`, unitId: fixture.unitId, companyId: fixture.companyId, content: '5.0000' },
+      select: { id: true },
+    });
+
+    try {
+      const orderId = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
+      await prisma.product.update({ where: { id: fixture.packagingProductId }, data: { presentationId: otra.id } });
+      await prisma.presentation.update({ where: { id: fixture.presentationId }, data: { content: '2.0000' } });
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '10' }] });
+
+      const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
+      expect(producto).not.toBeNull();
+      expect(await finishedProductDe(fixture.companyId, recipeId, otra.id)).toBeNull();
+      const lote = await prisma.productBatch.findFirstOrThrow({
+        where: { productId: producto?.id },
+        select: { stock: true, packageContent: true, presentationId: true },
+      });
+      expect(lote.presentationId).toBe(fixture.presentationId);
+      expect(lote.packageContent?.toFixed(4)).toBe('1.0000');
+      expect(lote.stock.toFixed(4)).toBe('10.0000');
+    } finally {
+      await prisma.product.update({ where: { id: fixture.packagingProductId }, data: { presentationId: fixture.presentationId } });
+      await prisma.presentation.deleteMany({ where: { id: otra.id } });
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R33: una linea antigua, sin envase ni nada apartado por ella, termina como hoy y no consume ningun envase', async () => {
+    const fixture = await crearFixture('1.0000');
+    const { productId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const orderId = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
+      // Asi queda un pedido guardado antes de los envases: la linea sin envase y nada apartado por ella.
+      const batchIds = (await prisma.productBatch.findMany({ where: { productId: fixture.packagingProductId }, select: { id: true } })).map((b) => b.id);
+      await prisma.reservationMovement.deleteMany({ where: { orderId, batchId: { in: batchIds } } });
+      await prisma.orderPresentationLine.updateMany({ where: { orderId }, data: { packagingProductId: null } });
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '10' }] });
+
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } });
+      expect(row.status).toBe('ENTREGADO');
+      expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).not.toBeNull();
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('1000.0000');
+      expect(await prisma.inventoryMovement.count({ where: { orderId, batchId: { in: batchIds } } })).toBe(0);
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R32: Terminar un pedido con una linea antigua no consume nada: ni envases ni otro material, ni toca lo apartado', async () => {
+    const fixture = await crearFixture('1.0000');
+    const { productId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const orderId = await pedidoEnEmpaque(fixture, recipeId, '10.0000', 10);
+      const batchIds = (await prisma.productBatch.findMany({ where: { productId: fixture.packagingProductId }, select: { id: true } })).map((b) => b.id);
+      await prisma.reservationMovement.deleteMany({ where: { orderId, batchId: { in: batchIds } } });
+      await prisma.orderPresentationLine.updateMany({ where: { orderId }, data: { packagingProductId: null } });
+      const consumosAntes = await prisma.inventoryMovement.count({ where: { orderId, kind: 'consumption' } });
+      const apartadoAntes = await prisma.reservationMovement.count({ where: { orderId } });
+      const materiaAntes = await existenciaDe(productId);
+
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '10' }] });
+
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } })).status).toBe('ENTREGADO');
+      expect(await prisma.inventoryMovement.count({ where: { orderId, kind: 'consumption' } })).toBe(consumosAntes);
+      expect(await prisma.reservationMovement.count({ where: { orderId } })).toBe(apartadoAntes);
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('1000.0000');
+      expect(await existenciaDe(productId)).toBe(materiaAntes);
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+});
+
+describe('QC-195 — un envase que es tambien ingrediente no se consume dos veces', () => {
+  async function apartadoNeto(orderId: string, productId: string): Promise<string> {
+    const rows = await prisma.$queryRaw<{ neto: string | null }[]>`
+      SELECT SUM(CASE WHEN m."kind" = 'reserve' THEN m."quantity" ELSE -m."quantity" END)::text AS "neto"
+        FROM "reservation_movements" m
+        JOIN "product_batches" b ON b."id" = m."batch_id"
+       WHERE m."order_id" = ${orderId}::uuid AND b."product_id" = ${productId}::uuid`;
+    return Number(rows[0]?.neto ?? '0').toFixed(4);
+  }
+
+  async function existenciaDe(productId: string): Promise<string> {
+    const row = await prisma.product.findUniqueOrThrow({ where: { id: productId }, select: { stock: true } });
+    return row.stock.toFixed(4);
+  }
+
+  async function lotesDe(productId: string): Promise<Readonly<Record<string, string>>> {
+    const rows = await prisma.productBatch.findMany({ where: { productId }, select: { id: true, stock: true } });
+    return Object.fromEntries(rows.map((row) => [row.id, row.stock.toFixed(4)]));
+  }
+
+  function consumosDe(orderId: string, productId: string): Promise<number> {
+    return prisma.inventoryMovement.count({ where: { orderId, kind: 'consumption', batch: { productId } } });
+  }
+
+  /**
+   * Receta al 50 % materia prima y 50 % el envase de la fixture -como una receta de antes de que
+   * el envase dejara de ser ingrediente, escrita directo en la base- y un pedido de 10 en 10
+   * envases ya en POR_EMPACAR. El envase tiene un segundo lote para ver que nadie lo toca.
+   */
+  async function sembrar(fixture: Fixture): Promise<{ readonly productId: string; readonly recipeId: string; readonly orderId: string }> {
+    const { productId } = await crearProductoConLote(fixture, '100');
+    await addBatchToAlive(
+      fixture.packagingProductId,
+      { presentationId: null, stock: '50', unitCost: '0.7000', lot: null, purchaseDate: '2026-09-02', expiryDate: null, createdBy: fixture.actorId },
+      new Date(),
+      { companyId: fixture.companyId },
+      { presentationId: fixture.presentationId },
+    );
+    const recipeId = await crearReceta(fixture);
+    await crearLinea(recipeId, productId, '50.00');
+    await crearLinea(recipeId, fixture.packagingProductId, '50.00');
+
+    const creado = await createOrder(nuevoPedido(recipeId, fixture, '10.0000', 10), actorDe(fixture));
+    // 5 por la receta + 10 por el reparto.
+    expect(await apartadoNeto(creado.id, fixture.packagingProductId)).toBe('15.0000');
+    expect(await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date())).toBe('ok');
+    expect(await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date())).toBe('ok');
+    return { productId, recipeId, orderId: creado.id };
+  }
+
+  it('R43: POR_EMPACAR consume lo apartado del envase como ingrediente; Terminar no consume nada mas de el, no baja su disponible ni otros lotes y deja el pedido ENTREGADO', async () => {
+    const fixture = await crearFixture('1.0000');
+    const productIds: string[] = [];
+    try {
+      const { productId, orderId, recipeId } = await sembrar(fixture);
+      productIds.push(productId);
+      expect(await apartadoNeto(orderId, fixture.packagingProductId)).toBe('0.0000');
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('1035.0000');
+      const lotesAntes = await lotesDe(fixture.packagingProductId);
+      const consumosAntes = await consumosDe(orderId, fixture.packagingProductId);
+
+      expect(await orderCatalog.startPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '10' }] });
+
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } })).status).toBe('ENTREGADO');
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('1035.0000');
+      expect(await lotesDe(fixture.packagingProductId)).toEqual(lotesAntes);
+      expect(await consumosDe(orderId, fixture.packagingProductId)).toBe(consumosAntes);
+      expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).not.toBeNull();
+    } finally {
+      await borrarFixture(fixture, productIds);
+    }
+  });
+
+  it('R43: si en POR_EMPACAR se edito el reparto y quedo algo apartado del envase, Terminar consume exactamente eso', async () => {
+    const fixture = await crearFixture('1.0000');
+    const productIds: string[] = [];
+    try {
+      const { productId, orderId } = await sembrar(fixture);
+      productIds.push(productId);
+
+      const editado = await updateDistribution(orderId, actorDe(fixture), {
+        unitId: fixture.unitId,
+        lines: [{ packagingProductId: fixture.packagingProductId, packages: 6 }],
+      });
+      expect(editado).toBe('ok');
+      expect(await apartadoNeto(orderId, fixture.packagingProductId)).toBe('6.0000');
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('1035.0000');
+      const consumosAntes = await consumosDe(orderId, fixture.packagingProductId);
+
+      expect(await orderCatalog.startPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
+      const resultado = await orderCatalog.finishPackingAliveById(orderId, fixture.companyId, fixture.actorId, new Date());
+      expect(resultado).toMatchObject({ kind: 'ok', finishedGoods: [{ packages: '6' }] });
+
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } })).status).toBe('ENTREGADO');
+      expect(await existenciaDe(fixture.packagingProductId)).toBe('1029.0000');
+      expect(await apartadoNeto(orderId, fixture.packagingProductId)).toBe('0.0000');
+      const nuevos = await prisma.inventoryMovement.findMany({
+        where: { orderId, kind: 'consumption', batch: { productId: fixture.packagingProductId } },
+        select: { quantity: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(nuevos.length).toBeGreaterThan(consumosAntes);
+      const consumidoAlTerminar = nuevos.slice(consumosAntes).reduce((total, m) => total + Number(m.quantity.abs()), 0);
+      expect(consumidoAlTerminar.toFixed(4)).toBe('6.0000');
+    } finally {
+      await borrarFixture(fixture, productIds);
     }
   });
 });

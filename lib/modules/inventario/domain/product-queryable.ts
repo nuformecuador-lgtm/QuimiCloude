@@ -17,6 +17,10 @@
 import type { ListQueryable } from './list-query';
 import { MANUAL_PRODUCT_TYPE_VALUES, PRODUCT_TYPE_VALUES } from './product-type';
 
+/** Filtra por la unidad del contenido de la presentacion fija del producto, no por `unitId`: solo
+ *  coincide un producto con presentacion fija con contenido. */
+export const PRODUCT_PRESENTATION_UNIT_FILTER = 'presentationUnitId';
+
 export const PRODUCT_QUERYABLE: ListQueryable = {
   sortable: ['name', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
   filterable: {
@@ -24,6 +28,7 @@ export const PRODUCT_QUERYABLE: ListQueryable = {
     qtyAlert: 'numberRange',
     createdAt: 'dateRange',
     type: 'select',
+    [PRODUCT_PRESENTATION_UNIT_FILTER]: 'select',
   },
   searchable: true,
 } as const satisfies ListQueryable & { filterable: { type: 'select' } };

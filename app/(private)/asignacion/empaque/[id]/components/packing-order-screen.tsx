@@ -67,7 +67,7 @@ const BACK_HREF = `${ASSIGNED_ORDERS_ROUTE}?vista=por_empacar`;
 const PACKER_UNKNOWN_TEXT = 'Lo esta empacando otra persona.';
 
 function distributionLineText(line: OrderDistributionLineView): string {
-  return `${line.packages} × ${line.presentationName ?? MISSING_VALUE_MARK}`;
+  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? MISSING_VALUE_MARK}`;
 }
 
 function packerLabel(order: PackingOrderRow): string {
