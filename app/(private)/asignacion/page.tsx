@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { identity } from '@/lib/composition';
-import { resolveAssignmentView, resolveAssignmentViews } from '@/lib/modules/asignaciones';
+import {
+  canExecuteAssignedOrders,
+  resolveAssignmentView,
+  resolveAssignmentViews,
+} from '@/lib/modules/asignaciones';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { ASSIGNED_ORDERS_LABEL, BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import {
@@ -57,6 +61,7 @@ export default async function AsignacionPage({
   // memoizado por peticion, asi que esto no es una segunda consulta a la base.
   const sessionUser = await identity.getSessionUser();
   const views = resolveAssignmentViews(sessionUser);
+  const canExecute = canExecuteAssignedOrders(sessionUser);
   const vista = resolveAssignmentView(firstSearchParamValue(resolvedSearchParams[VIEW_PARAM]), views);
 
   const deliveredOrderNumber = firstSearchParamValue(
@@ -93,8 +98,16 @@ export default async function AsignacionPage({
       ) : null}
       {views.length > 1 ? <AssignmentViewTabs current={vista} views={views} /> : null}
       {vista === 'asignados' ? (
-        <Suspense fallback={<AssignedOrdersSkeleton rows={assignedOrdersParams.pageSize} />}>
-          <AssignedOrdersListSection params={assignedOrdersParams} vista={vista} />
+        <Suspense
+          fallback={
+            <AssignedOrdersSkeleton rows={assignedOrdersParams.pageSize} canExecute={canExecute} />
+          }
+        >
+          <AssignedOrdersListSection
+            params={assignedOrdersParams}
+            vista={vista}
+            canExecute={canExecute}
+          />
         </Suspense>
       ) : null}
       {vista === 'terminados' ? (

@@ -37,7 +37,7 @@ const BASE_ORDER: AssignedOrderView = {
 };
 
 function renderCell(columnId: string, order: AssignedOrderView) {
-  const columns = buildAssignedOrdersColumns();
+  const columns = buildAssignedOrdersColumns({ canExecute: true });
   const column = columns.find((entry) => entry.id === columnId);
   if (column === undefined) throw new Error(`no existe la columna ${columnId}`);
   return render(<>{column.cell(order)}</>);
@@ -45,7 +45,7 @@ function renderCell(columnId: string, order: AssignedOrderView) {
 
 describe('las OCHO columnas, en el orden de design.md > 6.4', () => {
   it('declara exactamente Numero, Receta, Cantidad, Presentacion, Prioridad, Estado, Responsables y Entrar', () => {
-    const columns = buildAssignedOrdersColumns();
+    const columns = buildAssignedOrdersColumns({ canExecute: true });
 
     expect(columns.map((column) => column.id)).toEqual([
       ASSIGNED_ORDER_NUMBER_COLUMN_ID,
@@ -60,7 +60,7 @@ describe('las OCHO columnas, en el orden de design.md > 6.4', () => {
   });
 
   it('ninguna columna es sortable ni declara filter (esta lista no ordena ni filtra)', () => {
-    for (const column of buildAssignedOrdersColumns()) {
+    for (const column of buildAssignedOrdersColumns({ canExecute: true })) {
       expect(column.sortable).toBeFalsy();
       expect(column.filter).toBeUndefined();
     }

@@ -45,8 +45,15 @@ export const ASSIGNED_ORDER_STATUS_COLUMN_ID = 'status';
 export const ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
 export const ASSIGNED_ORDER_ENTER_COLUMN_ID = 'enter';
 
-export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedOrderView>[] {
-  return [
+export type AssignedOrdersColumnsOptions = {
+  /** Decidido en servidor; sin el, la columna «Entrar» no se emite. */
+  readonly canExecute: boolean;
+};
+
+export function buildAssignedOrdersColumns({
+  canExecute,
+}: AssignedOrdersColumnsOptions): readonly DataTableColumn<AssignedOrderView>[] {
+  const columns: DataTableColumn<AssignedOrderView>[] = [
     {
       id: ASSIGNED_ORDER_NUMBER_COLUMN_ID,
       label: 'Nº de pedido',
@@ -102,12 +109,17 @@ export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedO
       // Sin `onShowAll`: esta pantalla no tiene panel de edicion donde desplegar el resto.
       cell: (order) => <ResponsibleAvatars responsibles={order.otherResponsibles} />,
     },
-    {
+  ];
+
+  if (canExecute) {
+    columns.push({
       id: ASSIGNED_ORDER_ENTER_COLUMN_ID,
       label: 'Entrar',
       align: 'end',
       pinnable: false,
       cell: (order) => <AssignedOrderEnterTrigger order={order} />,
-    },
-  ];
+    });
+  }
+
+  return columns;
 }

@@ -26,6 +26,7 @@ export {
   ASSIGNED_ORDER_STATUS_LABELS,
   MISSING_VALUE_MARK,
   buildAssignedOrdersColumns,
+  type AssignedOrdersColumnsOptions,
 } from './assigned-orders-columns';
 export { AssignedOrdersEmpty } from './assigned-orders-empty';
 export { AssignedOrdersError } from './assigned-orders-error';
@@ -43,6 +44,7 @@ export { AssignedOrdersListSection } from './assigned-orders-list-section';
 export {
   ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT,
   AssignedOrdersSkeleton,
+  assignedOrdersSkeletonColumnCount,
 } from './assigned-orders-skeleton';
 export {
   ASSIGNED_ORDERS_TABLE_ID,

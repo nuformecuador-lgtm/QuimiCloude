@@ -79,12 +79,12 @@ completo.
 
 ## Bloque C — ruta y UI
 
-- [ ] **T9. Página de ejecución** — dep: T1.
+- [x] **T9. Página de ejecución** — dep: T1.
   `app/(private)/asignacion/[id]/page.tsx` exige `asignaciones.ejecutar`.
   Hecho: `tests/unit/asignaciones-ui/order-execution-page.test.tsx` cubre 404 sin el permiso (sin
   llamar a `startAssignedOrderAction`) y render con él; `guard-pantallas-exigen-permiso` verde.
   Caso `R8`.
-- [ ] **T10. Columna «Entrar» por props** — dep: T5.
+- [x] **T10. Columna «Entrar» por props** — dep: T5.
   `page.tsx` → `AssignedOrdersListSection` → `AssignedOrdersTable` → `buildAssignedOrdersColumns({ canExecute })`
   y `AssignedOrdersSkeleton` según `design.md > 4.2`.
   Hecho: tests de `asignaciones-ui` verifican que con `canExecute=false` no hay columna `enter` ni
