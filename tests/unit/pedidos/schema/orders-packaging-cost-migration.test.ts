@@ -1,9 +1,9 @@
 // Contrato ESTATICO del SQL de `orders_packaging_cost` (QC-195, P6 = A, R47).
 //
 // La columna desglosa la parte de envases del importe; `ingredients_cost` sigue siendo el total.
-// Se vigila que nazca opcional, que el relleno solo ponga 0 donde ya hay importe, que aborte con
-// importes que ya incluyan envases, que el CHECK ate las dos columnas y que el `down.sql` revierta
-// exactamente eso.
+// Se vigila que nazca opcional, que un importe que ya incluya envases quede en NULL (E6) en vez de
+// abortar, que el resto del relleno solo ponga 0 donde ya hay importe, que el CHECK ate las dos
+// columnas y que el `down.sql` revierta exactamente eso.
 //
 // PATRON: predicados puros sobre el texto SQL, aplicados al archivo real (pasa) y a una version
 // mutada en memoria (falla). El archivo en disco no se toca nunca.
@@ -60,27 +60,22 @@ function addsNullableColumn(sql: string): boolean {
   return /ALTER TABLE "orders" ADD COLUMN "packaging_cost" DECIMAL\(14,4\);/.test(normalized(sql))
 }
 
-/** El unico relleno pone 0 solo donde ya hay importe. */
-function fillsZeroWhereCosted(sql: string): boolean {
-  const updates = normalized(sql).match(/UPDATE "orders" SET [^;]*;/g) ?? []
-  return (
-    updates.length === 1 &&
-    updates[0] === 'UPDATE "orders" SET "packaging_cost" = 0 WHERE "ingredients_cost" IS NOT NULL;'
-  )
+const NULLS_COST_WITH_PACKAGING =
+  'UPDATE "orders" o SET "ingredients_cost" = NULL, "packaging_cost" = NULL WHERE o."ingredients_cost" IS NOT NULL AND EXISTS ( SELECT 1 FROM "order_presentation_lines" l WHERE l."order_id" = o."id" AND l."packaging_product_id" IS NOT NULL );'
+const FILLS_ZERO = 'UPDATE "orders" SET "packaging_cost" = 0 WHERE "ingredients_cost" IS NOT NULL;'
+
+function orderUpdates(sql: string): string[] {
+  return normalized(sql).match(/UPDATE "orders"[^;]*;/g) ?? []
 }
 
-/** Antes de rellenar, aborta si un importe ya incluye envases. */
-function abortsOnCostWithPackaging(sql: string): boolean {
-  const text = normalized(sql)
-  const guard = text.indexOf('RAISE EXCEPTION')
-  const update = text.indexOf('UPDATE "orders"')
-  return (
-    guard >= 0 &&
-    update > guard &&
-    /"ingredients_cost" IS NOT NULL AND EXISTS \( SELECT 1 FROM "order_presentation_lines" l WHERE l\."order_id" = o\."id" AND l\."packaging_product_id" IS NOT NULL \)/.test(
-      text,
-    )
-  )
+/** Los dos unicos rellenos: primero anula los importes con envases, luego pone 0 al resto. */
+function fillsInOrder(sql: string): boolean {
+  const updates = orderUpdates(sql)
+  return updates.length === 2 && updates[0] === NULLS_COST_WITH_PACKAGING && updates[1] === FILLS_ZERO
+}
+
+function neverAborts(sql: string): boolean {
+  return !normalized(sql).includes('RAISE EXCEPTION')
 }
 
 function addsCheck(sql: string): boolean {
@@ -114,17 +109,32 @@ describe('migration.sql de orders_packaging_cost — QC-195 R47 (P6 = A)', () =>
   })
 
   it('R47: el relleno pone 0 solo en los pedidos con importe', () => {
-    expect(fillsZeroWhereCosted(upSource)).toBe(true)
+    expect(fillsInOrder(upSource)).toBe(true)
     const sinFiltro = upSource.replace(' WHERE "ingredients_cost" IS NOT NULL;', ';')
     expect(sinFiltro).not.toBe(upSource)
-    expect(fillsZeroWhereCosted(sinFiltro)).toBe(false)
+    expect(fillsInOrder(sinFiltro)).toBe(false)
   })
 
-  it('R47: aborta antes de rellenar si un pedido con importe ya tiene envases en el reparto', () => {
-    expect(abortsOnCostWithPackaging(upSource)).toBe(true)
-    const sinGuardia = upSource.replace(/DO \$\$[\s\S]*?END \$\$;/, '')
-    expect(sinGuardia).not.toBe(upSource)
-    expect(abortsOnCostWithPackaging(sinGuardia)).toBe(false)
+  it('R47 E6: un pedido con importe y envases en el reparto queda sin importe, antes de rellenar con 0', () => {
+    expect(fillsInOrder(upSource)).toBe(true)
+    const soloElTotal = upSource.replace(
+      'SET "ingredients_cost" = NULL, "packaging_cost" = NULL',
+      'SET "ingredients_cost" = NULL',
+    )
+    expect(soloElTotal).not.toBe(upSource)
+    expect(fillsInOrder(soloElTotal)).toBe(false)
+    const ordenInverso = upSource.replace(
+      /(UPDATE "orders" o SET[\s\S]*?\);)\s*(UPDATE "orders" SET "packaging_cost" = 0[^;]*;)/,
+      '$2\n$1',
+    )
+    expect(ordenInverso).not.toBe(upSource)
+    expect(fillsInOrder(ordenInverso)).toBe(false)
+  })
+
+  it('R47 E6: no aborta la migracion', () => {
+    expect(neverAborts(upSource)).toBe(true)
+    const conGuardia = `${upSource}\nDO $$ BEGIN RAISE EXCEPTION 'orders_packaging_cost_unknown'; END $$;`
+    expect(neverAborts(conGuardia)).toBe(false)
   })
 
   it('R47: el CHECK exige packaging_cost NULL si y solo si ingredients_cost es NULL', () => {
