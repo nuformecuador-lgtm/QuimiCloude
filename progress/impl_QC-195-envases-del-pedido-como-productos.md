@@ -955,3 +955,64 @@ $ pnpm exec vitest run --project node tests/unit/pedidos/order-cost.test.ts test
 Los de integracion de T9 se reejecutan con todo `tests/integration/pedidos` en el cierre de T10.
 
 **Veredicto T9:** hecho.
+
+## T10 — Consumo al Terminar (backend_dev, 2026-10-03) — commit `2b28d72b`
+
+Archivos de produccion:
+- `transition-order.ts`: sin cambio en T10. `POR_EMPACAR` ya pasa `productIds` = productos de la
+  receta a `consumeForOrder` desde T7 (`aa6418fa`); los envases siguen apartados.
+- `order-packing.ts`: tras `finishPackingAlive` y antes del alta de producto terminado, si el
+  reparto tiene lineas con envase, `consumeForOrder({ productIds: envases, fallbackRequirement:
+  envases sumados por producto })` en la misma unidad de trabajo; `insufficient` lanza
+  `InsufficientMaterialError` -> rollback -> `'insufficient_material'`. Solo lineas antiguas: no
+  se llama a `consumeForOrder`.
+- `order-catalog.ts`: `finishPackingAliveById` gana `'insufficient_material'`.
+- `asignaciones/domain/finish-packing.ts`: `'insufficient_material'` -> `MaterialShortageError`
+  (code `insufficient_material`, el que ya publica la acción). `finishPackingAction` no cambia: el
+  traductor de errores ya lo pasa como `ErrorState`.
+
+Tests: `tests/unit/pedidos/order-packing.test.ts` (4 casos nuevos; `montar` acepta y devuelve
+`consumeForOrder`), `tests/unit/asignaciones/finish-packing.test.ts` (1 caso),
+`tests/integration/pedidos/finish-with-finished-goods.int.test.ts` (describe nuevo con 4 casos).
+`transition-order.test.ts:206-260` sigue valido contra R26 sin tocarlo (no comprueba
+`productIds`); el caso de R26 ya existia (T7).
+
+R -> test:
+| R | Test |
+|---|---|
+| R25 | unit `order-packing.test.ts` › «QC-195 R25: consume los envases del reparto (solo esos productos) ANTES de dar de alta el producto terminado», «QC-195 R25: si los envases no alcanzan, Terminar rechaza con insufficient_material y NO da de alta ningun lote», «QC-195 R25, R33: con una linea antigua y una con envase…»; unit `asignaciones/finish-packing.test.ts` › «QC-195 R25: `insufficient_material` (los envases no alcanzan) rechaza con `MaterialShortageError`…»; int `finish-with-finished-goods` › «R25: Terminar consume los envases apartados en la misma transaccion…», «R25: si el disponible de los envases no alcanza, Terminar rechaza con insufficient_material sin mover el estado ni dar de alta producto terminado» |
+| R26 | unit `transition-order.test.ts` › «R26: consumeForOrder recibe como productIds los productos de la receta, no los envases del reparto»; int `qc195-packaging-reservation` › «R26: la materia prima se consume y los envases siguen apartados, con su existencia intacta»; int `finish-with-finished-goods` › «R25: Terminar consume…» (comprueba apartado 10 y existencia 1000 antes de Terminar) |
+| R14 | int `finish-with-finished-goods` › «R14: el producto terminado entra en la presentacion y el contenido copiados al guardar, aunque el envase y su presentacion cambien despues» |
+| R33 | unit `order-packing.test.ts` › «QC-195 R33: un reparto solo con lineas antiguas, sin envase, no consume nada…»; int `finish-with-finished-goods` › «R33: una linea antigua, sin envase ni nada apartado por ella, termina como hoy y no consume ningun envase» |
+
+Salida real:
+```
+$ pnpm exec vitest run --project node tests/unit/pedidos tests/unit/asignaciones
+ Test Files  94 passed (94)      Tests  1741 passed | 3 skipped (1744)
+$ pnpm exec vitest run --project integration tests/integration/pedidos tests/integration/asignaciones
+ Test Files  45 passed (45)      Tests  411 passed (411)
+$ pnpm exec tsc --noEmit -p .   -> 0 errores; eslint de los 6 archivos -> 0
+$ ./init.sh --rapido
+ ✓ typecheck paso   ✓ lint paso   ✗ test:rapido
+ Test Files  6 failed | 405 passed (411)      Tests  8 failed | 6215 passed | 9 skipped (6232)
+ rojos: recetas/module-contract, configuracion-ui/unidades-viewport, configuracion-ui/usuarios-viewport,
+        inventario/product-page, navegacion/pantallas-exigen-permiso, recetas-ui/recipe-page (los 6 del baseline)
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)      Tests  672 passed | 11 skipped (683)
+```
+
+Nota: una primera corrida del caso R14 fallo en el `finally` (borraba la unidad antes que la
+presentacion extra); corregido el orden. Esa corrida dejo una empresa efimera huerfana en
+`QuimiCloude_QC195` (no afecta a otros casos: todos filtran por su empresa).
+
+Decision dentro del spec: si el pedido no tiene nada apartado de un envase (p. ej. la reserva se
+libero), `consumeForOrder` consume del disponible con el respaldo filtrado a los envases, igual que
+hace `POR_EMPACAR` con la receta; si no alcanza, `insufficient_material` (R25).
+
+Abierto para el leader: si una receta conservada por P4 lleva como ingrediente el mismo producto
+PACKAGING que el reparto usa como envase, `POR_EMPACAR` consume todo lo apartado de ese producto
+(receta + envases, porque se apartan sumados) y Terminar consumiria los envases otra vez desde el
+disponible. Solo afecta a envases legados en receta; el spec no lo cubre.
+
+**Veredicto T10:** hecho; unit e integracion de pedidos/asignaciones verdes; gate rapido solo con
+los rojos del baseline; guardias verdes.
