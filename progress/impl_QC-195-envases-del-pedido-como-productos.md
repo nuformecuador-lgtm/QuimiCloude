@@ -143,7 +143,7 @@ base `QuimiCloude_QC195` lista para T1.
 ## T1 — Migración y esquema (backend_dev, 2026-10-03) — commit `c4f21814`
 
 Archivos:
-- `db/migrations/20261003120000_packaging_products_in_distribution/{migration.sql,down.sql}` (nuevos).
+- `db/migrations/20261003130000_packaging_products_in_distribution/{migration.sql,down.sql}` (nuevos; nacio como `20261003120000_…` y se renumero en F2.3 tras `recipe_tools`).
 - `db/schema.prisma`: `@@unique([companyId, id], map: "products_company_id_id_key")` en `Product`;
   `packagingProductId` + `@@index` en `OrderPresentationLine`.
 - Tests nuevos: `tests/unit/inventario/schema/packaging-products-in-distribution-migration.test.ts`,
@@ -1433,3 +1433,57 @@ Generado con `git diff 555c62f6 HEAD -- tests e2e` sobre las lineas `it(`/`test(
 ### Comentarios
 
 Barrido de las lineas añadidas en `lib/ app/ components/ db/`: ninguna cita de ficha, requisito (R<n>), P<n>/N<n> ni Enmienda.
+
+## F2.3 — merge de `origin/dev` (backend_dev, 2026-10-04) — merge `c51912ed`
+
+Punta previa `13cfdce5`; `origin/dev` traia 39 commits, entre ellos QC-194 (PR #141, herramientas de la receta).
+
+### Conflictos textuales y como se resolvieron
+
+| Archivo | Resolucion |
+|---|---|
+| `feature_list.json` | Version de `origin/dev`; solo se reaplica el `status` de QC-195 (`pending` en dev -> `in_progress`). El resto de la entrada era identico. |
+| `progress/current.md` | Version de `origin/dev`; se reinserta la fila de QC-195 de la rama tras la de QC-194. |
+| `tests/guards/guard-identificador-de-request.test.ts` | Las dos entradas: `20261003120000_recipe_tools` y despues la nuestra con el nombre nuevo. |
+| `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` | Las dos: `tools: []` de dev y `packagingName: null` de la rama en el fixture. |
+
+Union semantica (auto-merge limpio pero `typecheck` rojo, corregido en el mismo merge):
+- `tests/integration/pedidos/order-reservation-tools.int.test.ts` (nuevo de dev): faltaba la dep `packaging` (`PackagingCatalog`) en `createCreateOrder`, `createReviewBlockedOrders` y `createUpdateOrder`.
+- `tests/unit/pedidos/order-packing.test.ts`, `tests/unit/pedidos/update-order-presentation-lines.test.ts`: `tools: []` en el doble de `findExecutionContentById`.
+- `tests/unit/recetas/qc195-envase-no-es-ingrediente.test.ts`: `tools: []` en `RecipeRow`.
+- Hizo falta `prisma generate` (cliente sin `recipeTool`).
+
+### Chequeo semantico de recetas (R39-R42)
+
+`create-recipe.ts:59`, `update-recipe.ts:105`, `update-recipe-version.ts:53` siguen rechazando con `ActionNotAllowedError` las lineas nuevas que no son `isIngredientType` (excluye PACKAGING); `create-recipe-version.ts:58-62` conserva la regla de R42 (solo se admite un envase que ya estaba en la original). Importacion de formula: `confirm-formula-import.ts:114,137` y `preview-formula-import.ts:94` intactos.
+La via nueva de QC-194, las herramientas, no abre hueco: `recipe-tools.ts` (`assertToolsValid`) exige `type === MACHINE` para toda herramienta nueva, asi que un PACKAGING no puede entrar como herramienta, y las herramientas no son lineas (tabla aparte `recipe_tools`), asi que R42 no aplica. Sin preguntas abiertas.
+
+### Migracion renumerada
+
+`20261003120000_packaging_products_in_distribution` -> **`20261003130000_packaging_products_in_distribution`** (`git mv`, dentro del merge). Referencias actualizadas: la lista de la guardia `guard-identificador-de-request.test.ts` y la linea de archivos de esta bitacora. `tests/unit/inventario/schema/packaging-products-in-distribution-migration.test.ts` y `tests/integration/inventario/qc195-packaging-constraints.int.test.ts` buscan la carpeta por sufijo y no cambian. Sin referencias en `e2e/` ni `scripts/`.
+Compatibilidad con `recipe_tools`: su FK a `products` apunta a `products(id)` (pkey), no a `products_company_id_id_key`, y no toca `products_finished_identity_matches_type` ni `order_presentation_lines`/`units`; nuestro `down.sql` no toca nada suyo. `prisma migrate diff` base-vs-esquema: sin diferencias estructurales (solo FKs/indices escritos a mano que Prisma no modela).
+
+### Base `QuimiCloude_QC195`
+
+`.env` verificado (`grep -cE` = 2). Camino **limpio**: la base tenia 0 productos PACKAGING con presentacion y 0 lineas con envase, asi que el `down.sql` no podia abortar. Se ejecuto en una transaccion `down.sql` + `DELETE` de la fila `20261003120000_packaging_products_in_distribution` de `_prisma_migrations`; luego `pnpm run db:migrate` aplico `20261003120000_recipe_tools` y `20261003130000_packaging_products_in_distribution`; `prisma migrate status`: `65 migrations found … Database schema is up to date!`.
+
+### Rollback en base efimera
+
+`pnpm run db:test template` -> `qct_tpl_3bf30f6ce4ca (65 migraciones)`; `CREATE DATABASE "QuimiCloude_QC195_rb" TEMPLATE "qct_tpl_3bf30f6ce4ca"`.
+
+| Estado | migs | fila nuestra | col `packaging_product_id` | constraints nuestras | indice nuestro | unidad `unidad` | CHECK finished | `recipe_tools` tabla / constraints / indices / FORCE |
+|---|---|---|---|---|---|---|---|---|
+| tras template | 65 | 1 | 1 | 2 | 1 | 1 | texto nuevo (PACKAGING admite presentacion) | 1 / 4 / 2 / true |
+| tras `down.sql` + DELETE | 64 | 0 | 0 | 0 | 0 | 0 | texto anterior literal | 1 / 4 / 2 / true |
+| tras `prisma migrate deploy` | 65 | 1 | 1 | 2 | 1 | 1 | texto nuevo | 1 / 4 / 2 / true |
+
+`Applying migration 20261003130000_packaging_products_in_distribution` · `All migrations have been successfully applied.` Base efimera borrada (`pg_database` = 0).
+
+### Verificacion (punta del merge)
+
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: `✖ 8 problems (0 errors, 8 warnings)`, todos en archivos que el merge no toca (`product-columns.tsx`, `confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest run guard --passWithNoTests`: `Test Files 51 passed (51)`, `Tests 678 passed | 11 skipped (689)`.
+- `pnpm exec vitest related --run` (archivos de receta, conflictos, union semantica, migracion, int de pedidos/documentos/recetas): `Test Files 6 failed | 338 passed (344)`, `Tests 8 failed | 5268 passed | 2 skipped (5278)`. Los 6 archivos rojos estan todos en `tests/baseline-rojos.json` (module-contract de recetas, unidades-viewport, usuarios-viewport, pantallas-exigen-permiso, recipe-page, product-page). Ningun rojo nuevo.
+
+Veredicto: merge cerrado, migracion renumerada y rollback probado; sin rojos fuera del baseline.
