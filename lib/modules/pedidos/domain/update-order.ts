@@ -12,7 +12,7 @@ import { buildOrderRequirement } from './order-requirement';
 import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
-import { resolveOrderCost } from './resolve-ingredients-cost';
+import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -112,7 +112,7 @@ export function createUpdateOrder(
     // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
     // disponible para si mismo: editarlo sin cambiar nada no le hace perder de su propio
     // promedio el lote que el mismo aparto entero.
-    const ingredientsCost = await resolveOrderCost(
+    const cost = await resolveStoredOrderCost(
       deps,
       effectiveId,
       data.quantity,
@@ -164,7 +164,7 @@ export function createUpdateOrder(
         },
         actor.id,
         instant,
-        ingredientsCost,
+        cost,
         scope,
       );
       if (result === 'not_found') throw new OrderNotFoundError();
@@ -184,7 +184,7 @@ export function createUpdateOrder(
         if (locked.status !== 'BLOQUEADO') {
           await moveStatus(transaction.orders, id, locked.status, 'BLOQUEADO', actor.id, instant, scope);
         }
-        if (ingredientsCost !== null) {
+        if (cost !== null) {
           await transaction.orders.setIngredientsCost(id, null, actor.id, instant, scope);
         }
       } else if (locked.status === 'BLOQUEADO') {

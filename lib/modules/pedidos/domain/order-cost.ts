@@ -303,3 +303,26 @@ export function calculateOrderCost(ingredientsCost: string | null, packagingCost
   if (total > MAX_OUTPUT_UNSCALED) return null
   return formatFixedOutputScale(total)
 }
+
+/** Lo que se guarda del importe: el total (ingredientes mas envases) y la parte de envases que
+ *  incluye, para poder recalcular solo los envases cuando la receta ya se consumio. */
+export type StoredOrderCost = { readonly total: string; readonly packaging: string }
+
+/** Importe a guardar a partir de sus dos partes; `null` en los mismos casos que
+ *  `calculateOrderCost`. */
+export function storedOrderCost(ingredientsCost: string | null, packagingCost: string | null): StoredOrderCost | null {
+  const total = calculateOrderCost(ingredientsCost, packagingCost)
+  if (total === null || packagingCost === null) return null
+  return { total, packaging: packagingCost }
+}
+
+/** Parte de ingredientes de un importe guardado: el total menos sus envases. `null` si la resta
+ *  sale negativa, que solo pasa con una fila escrita fuera de la aplicacion. */
+export function ingredientsPartOf(cost: StoredOrderCost): string | null {
+  const total = parseDecimal(cost.total)
+  const packaging = parseDecimal(cost.packaging)
+  if (total === null || packaging === null) return null
+  const differenceInternal = toInternal(total) - toInternal(packaging)
+  if (differenceInternal < ZERO) return null
+  return formatFixedOutputScale(roundHalfUpToOutputScale(differenceInternal))
+}

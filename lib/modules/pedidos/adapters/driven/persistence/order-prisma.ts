@@ -15,6 +15,7 @@ import { dateRangeCondition, numberRangeCondition, selectCondition } from './lis
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { StoredOrderCost } from '../../../domain/order-cost';
 import type { OrderScope } from '../../../domain/order-scope';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../../../domain/order-view';
 import type {
@@ -84,6 +85,16 @@ type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
 /** Cadena decimal(14,4) del puerto -> `Prisma.Decimal` para escribir. */
 export function toDecimalInput(value: string): Prisma.Decimal {
   return new Prisma.Decimal(value);
+}
+
+/** Las dos columnas del importe van siempre juntas: el CHECK
+ *  `orders_packaging_cost_matches_ingredients_cost` rechaza una sin la otra. */
+function costColumns(cost: StoredOrderCost | null): {
+  ingredientsCost: Prisma.Decimal | null;
+  packagingCost: Prisma.Decimal | null;
+} {
+  if (cost === null) return { ingredientsCost: null, packagingCost: null };
+  return { ingredientsCost: toDecimalInput(cost.total), packagingCost: toDecimalInput(cost.packaging) };
 }
 
 /** `Prisma.Decimal` de una lectura -> cadena con la escala EXACTA de la columna. */
@@ -486,7 +497,7 @@ export async function updateAliveOrder(
   data: OrderEdit,
   actorId: string,
   now: Date,
-  ingredientsCost: string | null,
+  cost: StoredOrderCost | null,
   scope: OrderScope,
   tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
@@ -496,7 +507,7 @@ export async function updateAliveOrder(
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
-      ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
+      ...costColumns(cost),
       updatedAt: now,
       updatedBy: actorId,
       unitId: data.unitId,
@@ -599,7 +610,11 @@ export async function softDeleteAliveOrder(
 /** Fila minima del bloqueo: el identificador para saber que la fila existia, era viva y de esta
  *  empresa, y `reserved_at` para que quien recomprueba el plazo bajo el candado no pida una
  *  segunda lectura; el resto de columnas se relee con la API tipada. */
-type LockedOrderIdRow = { readonly id: string; readonly reserved_at: Date | null };
+type LockedOrderIdRow = {
+  readonly id: string;
+  readonly reserved_at: Date | null;
+  readonly packaging_cost: string | null;
+};
 
 /**
  * `lockAliveById` de `OrderWriteRepository`: `SELECT ... FOR UPDATE` de un pedido vivo, con el
@@ -613,7 +628,7 @@ async function lockAliveOrderById(
 ): Promise<LockedOrderRow | null> {
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<LockedOrderIdRow>>(Prisma.sql`
-    SELECT "id", "reserved_at"
+    SELECT "id", "reserved_at", "packaging_cost"::text AS "packaging_cost"
       FROM "orders"
      WHERE "id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -624,7 +639,12 @@ async function lockAliveOrderById(
   if (alive === undefined) return null;
 
   const row = await tx.order.findUnique({ where: { id: alive.id }, select: ORDER_SELECT });
-  return row === null ? null : { ...toOrderRow(row), reservedAt: alive.reserved_at };
+  if (row === null) return null;
+  return {
+    ...toOrderRow(row),
+    reservedAt: alive.reserved_at,
+    packagingCost: alive.packaging_cost === null ? null : fromDecimal(toDecimalInput(alive.packaging_cost)),
+  };
 }
 
 /**
@@ -640,7 +660,7 @@ async function insertAliveOrder(
   year: number,
   actorId: string,
   now: Date,
-  ingredientsCost: string | null,
+  cost: StoredOrderCost | null,
   scope: OrderScope,
 ): Promise<OrderRow> {
   const { companyId } = companyScopeColumns(scope);
@@ -653,8 +673,8 @@ async function insertAliveOrder(
   const filas = await tx.$queryRaw<readonly CreatedOrderRow[]>(Prisma.sql`
     INSERT INTO "orders" (
       "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
-      "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
-      "updated_at", "unit_id"
+      "priority", "status", "ingredients_cost", "packaging_cost", "created_by", "updated_by",
+      "created_at", "updated_at", "unit_id"
     ) VALUES (
       ${companyId}::uuid,
       ${year}::integer,
@@ -666,7 +686,8 @@ async function insertAliveOrder(
       ${data.quantity}::numeric,
       ${data.priority}::"OrderPriority",
       ${data.status}::"OrderStatus",
-      ${ingredientsCost}::numeric,
+      ${cost?.total ?? null}::numeric,
+      ${cost?.packaging ?? null}::numeric,
       ${actorId}::uuid,
       ${actorId}::uuid,
       ${now}::timestamptz,
@@ -695,7 +716,7 @@ async function insertAliveOrder(
     priority: data.priority,
     status: data.status,
     cancellationReason: null,
-    ingredientsCost: ingredientsCost === null ? null : fromDecimal(toDecimalInput(ingredientsCost)),
+    ingredientsCost: cost === null ? null : fromDecimal(toDecimalInput(cost.total)),
     createdAt: now,
     updatedAt: now,
     createdBy: actorId,
@@ -745,10 +766,11 @@ async function setAliveOrderStatus(
   return stillAlive === null ? 'not_found' : 'stale';
 }
 
-/** `setIngredientsCost` de `OrderWriteRepository`: solo el importe y el sello de modificacion. */
+/** `setIngredientsCost` de `OrderWriteRepository`: solo el importe, su parte de envases y el sello
+ *  de modificacion. */
 async function setAliveOrderIngredientsCost(
   id: string,
-  ingredientsCost: string | null,
+  cost: StoredOrderCost | null,
   actorId: string | null,
   now: Date,
   scope: OrderScope,
@@ -756,11 +778,7 @@ async function setAliveOrderIngredientsCost(
 ): Promise<'ok' | 'not_found'> {
   const { count } = await tx.order.updateMany({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
-    data: {
-      ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
-      updatedAt: now,
-      updatedBy: actorId,
-    },
+    data: { ...costColumns(cost), updatedAt: now, updatedBy: actorId },
   });
   return count === 1 ? 'ok' : 'not_found';
 }
@@ -856,15 +874,12 @@ export async function findExpirableOrders(
 export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteRepository {
   return {
     lockAliveById: (id, scope) => lockAliveOrderById(id, scope, tx),
-    create: (data, year, actorId, now, ingredientsCost, scope) =>
-      insertAliveOrder(tx, data, year, actorId, now, ingredientsCost, scope),
-    updateAlive: (id, data, actorId, now, ingredientsCost, scope) =>
-      updateAliveOrder(id, data, actorId, now, ingredientsCost, scope, tx),
+    create: (data, year, actorId, now, cost, scope) => insertAliveOrder(tx, data, year, actorId, now, cost, scope),
+    updateAlive: (id, data, actorId, now, cost, scope) => updateAliveOrder(id, data, actorId, now, cost, scope, tx),
     cancelAlive: (id, reason, actorId, now, scope) => cancelAliveOrder(id, reason, actorId, now, scope, tx),
     softDeleteAlive: (id, actorId, now, scope) => softDeleteAliveOrder(id, actorId, now, scope, tx),
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
-    setIngredientsCost: (id, ingredientsCost, actorId, now, scope) =>
-      setAliveOrderIngredientsCost(id, ingredientsCost, actorId, now, scope, tx),
+    setIngredientsCost: (id, cost, actorId, now, scope) => setAliveOrderIngredientsCost(id, cost, actorId, now, scope, tx),
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
     updatePresentationLinesAlive: (id, unitId, lines, actorId, now, scope) =>
       updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),

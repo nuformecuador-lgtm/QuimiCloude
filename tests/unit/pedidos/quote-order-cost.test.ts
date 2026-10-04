@@ -117,7 +117,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       { recipeId: RECIPE_ID, quantity: '4.0000', unitId: '99999999-9999-4999-8999-999999999999' },
       actorCon('pedidos.modificar'),
     )
-    const ingredientsCostDelAlta = (create.mock.calls[0] as unknown as readonly unknown[])[4] as string | null
+    const ingredientsCostDelAlta = ((create.mock.calls[0] as unknown as readonly unknown[])[4] as { total: string } | null)?.total ?? null
 
     const filaVista = filaExistente()
     const orders = {
@@ -126,7 +126,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
     const updateAlive = vi.fn(async () => 'ok' as const)
     const { unitOfWork: unitOfWorkDeEdicion } = fakeUnitOfWork({
       orders: {
-        lockAliveById: vi.fn(async () => ({ ...filaVista, reservedAt: null })),
+        lockAliveById: vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null })),
         updateAlive,
         setReservedAt: vi.fn(async () => undefined),
       },
@@ -150,7 +150,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
       },
       actorCon('pedidos.modificar'),
     )
-    const ingredientsCostDeLaEdicion = (updateAlive.mock.calls[0] as unknown as readonly unknown[])[4] as string | null
+    const ingredientsCostDeLaEdicion = ((updateAlive.mock.calls[0] as unknown as readonly unknown[])[4] as { total: string } | null)?.total ?? null
 
     const cotizar = createQuoteOrderCost(depsDe(d))
     const cotizacion = await cotizar(
@@ -421,7 +421,7 @@ describe('QC-195 — la cotizacion suma los envases del reparto', () => {
       actorCon('pedidos.modificar'),
     )
 
-    const guardado = (create.mock.calls[0] as unknown as readonly unknown[])[4]
+    const guardado = ((create.mock.calls[0] as unknown as readonly unknown[])[4] as { total: string } | null)?.total
     expect(cotizacion.ingredientsCost).toBe('64.0000')
     expect(guardado).toBe(cotizacion.ingredientsCost)
   })

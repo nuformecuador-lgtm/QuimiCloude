@@ -659,6 +659,9 @@ model Order {
   /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
   /// escribio. NULL = no se pudo calcular; nunca 0.
   ingredientsCost     Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
+  /// Parte de envases incluida en `ingredientsCost`, que sigue siendo el total. NULL si y solo si
+  /// `ingredientsCost` lo es: CHECK `orders_packaging_cost_matches_ingredients_cost`.
+  packagingCost       Decimal?      @map("packaging_cost") @db.Decimal(14, 4)
   /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
   /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
   /// entregar lo vacian.

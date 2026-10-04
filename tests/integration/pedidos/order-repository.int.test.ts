@@ -893,7 +893,7 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
     }
   })
 
-  it('R15 — setIngredientsCost sustituye el importe, tambien por null, sin tocar estado ni datos', async () => {
+  it('R15, QC-195 R47 — setIngredientsCost sustituye el importe y su parte de envases, tambien por null, sin tocar estado ni datos', async () => {
     const creados: string[] = []
     try {
       const now = instantIn(YEAR_BLOQUEADOS, 3, 1)
@@ -902,11 +902,12 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
       await bloquear(pedido.id, now)
 
       const conImporte = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, '123.4500', null, despues, scope()),
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '123.4500', packaging: '3.4500' }, null, despues, scope()),
       )
       expect(conImporte).toBe('ok')
       const tras = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
       expect(tras.ingredientsCost?.toFixed(4)).toBe('123.4500')
+      expect(tras.packagingCost?.toFixed(4)).toBe('3.4500')
       expect(tras.status).toBe('BLOQUEADO')
       expect(tras.quantity.toFixed(4)).toBe('10.0000')
       expect(tras.updatedBy).toBeNull()
@@ -918,11 +919,12 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
       expect(sinImporte).toBe('ok')
       const final = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
       expect(final.ingredientsCost).toBeNull()
+      expect(final.packagingCost).toBeNull()
       expect(final.updatedBy).toBe(actorId)
 
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
       const borrado = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, '1', null, despues, scope()),
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '1', packaging: '0' }, null, despues, scope()),
       )
       expect(borrado).toBe('not_found')
     } finally {

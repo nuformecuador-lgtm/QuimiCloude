@@ -1272,15 +1272,17 @@ export const pedidos = {
   verifyCronSecret,
   expireStaleOrders,
   // La edicion ACOTADA del reparto y la unidad: aparta los envases, asi que va en la unidad de
-  // trabajo compartida con `inventario`.
+  // trabajo compartida con `inventario`. `recipes` y `products` son para recalcular el importe.
   updateOrderPresentationLines: createUpdateOrderPresentationLines({
+    recipes: recipeCatalog,
+    products: productCatalog,
     packaging: packagingCatalog,
     presentations: presentationCatalog,
     units: unitCatalog,
     unitOfWork: orderUnitOfWork,
   }),
-  // «Cuanto queda disponible», de solo lectura. Mismos DOS
-  // catalogos que `updateOrderPresentationLines`, sin transaccion: no escribe nada.
+  // «Cuanto queda disponible», de solo lectura. Los catalogos del reparto de
+  // `updateOrderPresentationLines`, sin transaccion: no escribe nada.
   quoteOrderPresentationAvailability: createQuoteOrderPresentationAvailability({
     packaging: packagingCatalog,
     presentations: presentationCatalog,

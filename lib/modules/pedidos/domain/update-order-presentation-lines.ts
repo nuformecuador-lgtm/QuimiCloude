@@ -11,14 +11,17 @@
 // `finishAssignedOrder` con `startAssignedOrder`—: solo hay un llamador.
 //
 // Corre en la unidad de trabajo compartida con `inventario`: el reparto nombra envases y lo
-// apartado tiene que seguirlo. Nunca toca `quantity` ni la receta.
+// apartado tiene que seguirlo. Nunca toca `quantity` ni la receta, pero si el importe, que
+// incluye los envases.
 
 import type { Actor } from './actor';
 import { InsufficientMaterialError, OrderNotFoundError, OrderWouldBlockError } from './errors';
+import { ingredientsPartOf, storedOrderCost, type PackagingCostLine, type StoredOrderCost } from './order-cost';
 import { validateDistribution } from './order-distribution';
 import type { OrderStatus } from './order-classification';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
 import type { OrderScope } from './order-scope';
+import { resolvePackagingCost, resolveStoredOrderCost, type OrderCostCatalogs } from './resolve-ingredients-cost';
 import {
   resolveDistributionLines,
   type DistributionCatalogs,
@@ -26,7 +29,7 @@ import {
 } from './resolve-distribution';
 
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
-import type { OrderWriteRepository } from '../ports/order-write-repository';
+import type { LockedOrderRow, OrderWriteRepository } from '../ports/order-write-repository';
 
 /**
  * El reparto y la unidad se pueden editar hasta Comenzar empaque. `'BLOQUEADO'` entra porque el
@@ -70,7 +73,8 @@ export type UpdateOrderPresentationLinesResult =
   | 'would_block'
   | 'insufficient_material';
 
-export type UpdateOrderPresentationLinesDeps = DistributionCatalogs & {
+export type UpdateOrderPresentationLinesDeps = DistributionCatalogs &
+  Pick<OrderCostCatalogs, 'recipes' | 'products'> & {
   readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -146,10 +150,11 @@ export function createUpdateOrderPresentationLines(
         const content = materialsConsumed
           ? null
           : await transaction.recipes.findExecutionContentById(locked.recipeId, companyId);
+        const packagingLines = packagingLinesOf(writeLines);
         const requirement = buildOrderRequirement({
           recipeLines: content?.lines ?? [],
           quantity: locked.quantity,
-          packagingLines: packagingLinesOf(writeLines),
+          packagingLines,
           phase: materialsConsumed ? 'materials_consumed' : 'before_consumption',
         });
 
@@ -171,8 +176,19 @@ export function createUpdateOrderPresentationLines(
           if (locked.ingredientsCost !== null) {
             await transaction.orders.setIngredientsCost(orderId, null, actorId, instant, scope);
           }
-        } else if (locked.status === 'BLOQUEADO') {
-          await moveStatus(transaction.orders, orderId, 'BLOQUEADO', 'PENDIENTE', actorId, instant, scope);
+        } else {
+          if (locked.status === 'BLOQUEADO') {
+            await moveStatus(transaction.orders, orderId, 'BLOQUEADO', 'PENDIENTE', actorId, instant, scope);
+          }
+          // La receta y la cantidad salen de la fila bloqueada, asi que el importe se calcula aqui
+          // y no antes de abrir la transaccion. Los catalogos leen lo ya confirmado, igual que la
+          // cotizacion, y `orderId` cuenta lo apartado por este pedido como suyo.
+          const cost = materialsConsumed
+            ? await packedOrderCost(deps, locked, packagingLines, companyId, orderId)
+            : await resolveStoredOrderCost(deps, locked.recipeId, locked.quantity, packagingLines, companyId, {
+                orderId,
+              });
+          await transaction.orders.setIngredientsCost(orderId, cost, actorId, instant, scope);
         }
 
         await transaction.orders.setReservedAt(orderId, reservation.kind === 'reserved' ? instant : null, scope);
@@ -185,6 +201,23 @@ export function createUpdateOrderPresentationLines(
       throw error;
     }
   };
+}
+
+/** Con la receta ya consumida sus ingredientes no tienen disponible que costear: se conserva la
+ *  parte de ingredientes guardada y solo se recalculan los envases. Sin importe guardado, sin
+ *  importe. */
+async function packedOrderCost(
+  deps: UpdateOrderPresentationLinesDeps,
+  locked: LockedOrderRow,
+  packagingLines: readonly PackagingCostLine[],
+  companyId: string,
+  orderId: string,
+): Promise<StoredOrderCost | null> {
+  if (locked.ingredientsCost === null || locked.packagingCost === null) return null;
+  const ingredients = ingredientsPartOf({ total: locked.ingredientsCost, packaging: locked.packagingCost });
+  if (ingredients === null) return null;
+  const packaging = await resolvePackagingCost(deps.packaging, packagingLines, companyId, { orderId });
+  return storedOrderCost(ingredients, packaging);
 }
 
 /** La fila ya esta bloqueada por `lockAliveById`: cualquier resultado distinto de `ok` es que el

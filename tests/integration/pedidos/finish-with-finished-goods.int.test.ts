@@ -124,7 +124,7 @@ const orderPackingRepository: OrderPackingRepository = { startPackingAlive: star
 const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrder = createUpdateOrder({ orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 
-const updateDistribution = createUpdateOrderPresentationLines({ packaging: packagingCatalog, presentations, units, unitOfWork });
+const updateDistribution = createUpdateOrderPresentationLines({ recipes, products, packaging: packagingCatalog, presentations, units, unitOfWork });
 
 const orderCatalog: OrderCatalog = {
   findAliveById: async (id, companyId) => {

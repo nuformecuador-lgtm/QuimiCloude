@@ -94,7 +94,7 @@ const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date(
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 const transition = createTransitionOrder({ unitOfWork });
 const quoteOrderCost = createQuoteOrderCost({ recipes, products, units, packaging });
-const updateDistribution = createUpdateOrderPresentationLines({ packaging, presentations, units, unitOfWork });
+const updateDistribution = createUpdateOrderPresentationLines({ recipes, products, packaging, presentations, units, unitOfWork });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging, unitOfWork });
 
 type Fixture = {
@@ -620,6 +620,139 @@ describe('QC-195 — el importe suma los envases', () => {
 
       const creado = await createOrder(entrada(f, '40', lineas, true), actorDe(f));
       expect((await estadoDe(creado.id)).ingredientsCost).toBeNull();
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+});
+
+describe('QC-195 — Reparto y unidad guarda el importe', () => {
+  /** Las dos columnas del importe: el total y su parte de envases. */
+  async function costoDe(orderId: string) {
+    const fila = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { status: true, ingredientsCost: true, packagingCost: true },
+    });
+    return {
+      status: fila.status,
+      total: fila.ingredientsCost === null ? null : fila.ingredientsCost.toFixed(4),
+      packaging: fila.packagingCost === null ? null : fila.packagingCost.toFixed(4),
+    };
+  }
+
+  /** Envase con dos lotes, 100 a 0.50 y 50 a 0.70: 40 envases cuestan 24.0000. */
+  async function botellaDeDosLotes(f: Fixture): Promise<string> {
+    const botella = await seedPackaging({ companyId: f.companyId, presentationId: f.presentationId, createdBy: f.actorId, stock: '100', unitCost: '0.5000' });
+    f.productIds.push(botella);
+    await addBatchToAlive(
+      botella,
+      { presentationId: null, stock: '50', unitCost: '0.7000', lot: null, purchaseDate: '2026-09-02', expiryDate: null, createdBy: f.actorId },
+      new Date(),
+      { companyId: f.companyId },
+      { presentationId: f.presentationId },
+    );
+    return botella;
+  }
+
+  it.each(['PENDIENTE', 'EN_CURSO'] as const)(
+    'R45, R27, R29: en %s, tras anadir 40 botellas por el dialogo el importe guardado es el de quoteOrderCost con ese reparto y orderId',
+    async (estado) => {
+      const f = await crearFixture();
+      try {
+        const botella = await botellaDeDosLotes(f);
+        const creado = await createOrder(entrada(f, '40', []), actorDe(f));
+        expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: '40.0000', packaging: '0.0000' });
+        if (estado === 'EN_CURSO') {
+          expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
+        }
+
+        const lineas = [{ packagingProductId: botella, packages: 40 }];
+        expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
+
+        const cotizacion = await quoteOrderCost(
+          { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+          actorDe(f),
+        );
+        expect(cotizacion.ingredientsCost).toBe('64.0000');
+        expect(await costoDe(creado.id)).toEqual({ status: estado, total: cotizacion.ingredientsCost, packaging: '24.0000' });
+      } finally {
+        await borrarFixture(f);
+      }
+    },
+  );
+
+  it('R45: si el envase nuevo no tiene lote con costo, el dialogo guarda «sin importe», igual que la cotizacion', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await envase(f, '100');
+      await prisma.productBatch.updateMany({ where: { productId: botella }, data: { unitCost: null } });
+      const creado = await createOrder(entrada(f, '40', []), actorDe(f));
+      expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: '40.0000', packaging: '0.0000' });
+
+      const lineas = [{ packagingProductId: botella, packages: 40 }];
+      expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
+
+      const cotizacion = await quoteOrderCost(
+        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        actorDe(f),
+      );
+      expect(cotizacion.ingredientsCost).toBeNull();
+      expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: null, packaging: null });
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R46, R19: un BLOQUEADO que el dialogo desbloquea queda PENDIENTE con el importe de quoteOrderCost, no sin importe', async () => {
+    const f = await crearFixture();
+    try {
+      const corta = await envase(f, '10');
+      const botella = await botellaDeDosLotes(f);
+      const creado = await createOrder(entrada(f, '40', [{ packagingProductId: corta, packages: 40 }], true), actorDe(f));
+      expect(await costoDe(creado.id)).toEqual({ status: 'BLOQUEADO', total: null, packaging: null });
+
+      const lineas = [{ packagingProductId: botella, packages: 40 }];
+      expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
+
+      const cotizacion = await quoteOrderCost(
+        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        actorDe(f),
+      );
+      expect(cotizacion.ingredientsCost).toBe('64.0000');
+      expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: '64.0000', packaging: '24.0000' });
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R47: en POR_EMPACAR, el importe es la parte de ingredientes guardada mas los envases nuevos, y no el de quoteOrderCost', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await botellaDeDosLotes(f);
+      const tapa = await seedPackaging({ companyId: f.companyId, presentationId: f.presentationId, createdBy: f.actorId, stock: '100', unitCost: '0.9000' });
+      f.productIds.push(tapa);
+      const creado = await createOrder(entrada(f, '40', [{ packagingProductId: botella, packages: 40 }]), actorDe(f));
+      expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: '64.0000', packaging: '24.0000' });
+      expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
+      expect(await transition(creado.id, f.companyId, 'EN_CURSO', 'POR_EMPACAR', f.actorId, new Date())).toBe('ok');
+      // Un lote de materia mas caro, posterior al consumo: la cotizacion de hoy cambia, lo guardado no.
+      await addBatchToAlive(
+        f.materialId,
+        { presentationId: f.presentationId, stock: '100', unitCost: '3.0000', lot: null, purchaseDate: '2026-09-03', expiryDate: null, createdBy: f.actorId },
+        new Date(),
+        { companyId: f.companyId },
+      );
+
+      const lineas = [{ packagingProductId: tapa, packages: 30 }];
+      expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
+
+      // (64 - 24) de ingredientes guardados + 30 x 0.90 de envases.
+      expect(await costoDe(creado.id)).toEqual({ status: 'POR_EMPACAR', total: '67.0000', packaging: '27.0000' });
+      const cotizacion = await quoteOrderCost(
+        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        actorDe(f),
+      );
+      expect(cotizacion.ingredientsCost).not.toBe('67.0000');
     } finally {
       await borrarFixture(f);
     }

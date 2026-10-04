@@ -6,7 +6,7 @@ import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildOrderRequirement } from './order-requirement';
 import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
-import { resolveOrderCost } from './resolve-ingredients-cost';
+import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -113,7 +113,7 @@ export function createCreateOrder(
     );
     const effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
 
-    const ingredientsCost = await resolveOrderCost(
+    const cost = await resolveStoredOrderCost(
       deps,
       effectiveId,
       data.quantity,
@@ -150,7 +150,7 @@ export function createCreateOrder(
         instant.getUTCFullYear(),
         actor.id,
         instant,
-        ingredientsCost,
+        cost,
         scope,
       );
 
@@ -179,7 +179,7 @@ export function createCreateOrder(
         if (!confirmBlocked) throw new OrderWouldBlockError();
         await transaction.orders.setStatus(order.id, STATUS_DE_ALTA, 'BLOQUEADO', actor.id, instant, scope);
         // El importe se calculo fuera de la transaccion: otra alta pudo apartar entre medias.
-        if (ingredientsCost !== null) {
+        if (cost !== null) {
           await transaction.orders.setIngredientsCost(order.id, null, actor.id, instant, scope);
         }
       }

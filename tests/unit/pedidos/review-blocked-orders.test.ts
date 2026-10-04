@@ -9,6 +9,7 @@ import { fakeOrderRow, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work
 import { fakePackagingCatalog } from '@/tests/helpers/packaging-catalog-double';
 
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
+import type { StoredOrderCost } from '@/lib/modules/pedidos/domain/order-cost';
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
@@ -86,7 +87,7 @@ function montar(escenario: Escenario = {}) {
     },
   );
   const setIngredientsCost = vi.fn(
-    async (id: string, cost: string | null, actorId: string | null, now: Date, scope: OrderScope) => {
+    async (id: string, cost: StoredOrderCost | null, actorId: string | null, now: Date, scope: OrderScope) => {
       void [id, cost, actorId, now, scope];
       return 'ok' as const;
     },
@@ -146,7 +147,7 @@ describe('reviewBlockedOrders — desbloqueo', () => {
     expect(resultado).toEqual({ unblocked: 1, failed: [] });
     expect(m.setStatus).toHaveBeenCalledWith(PEDIDO_1, 'BLOQUEADO', 'PENDIENTE', null, AHORA, SCOPE);
     // 10 * 100 % = 10 unidades a 2.0000.
-    expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, '20.0000', null, AHORA, SCOPE);
+    expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, { total: '20.0000', packaging: '0.0000' }, null, AHORA, SCOPE);
     expect(m.setReservedAt).toHaveBeenCalledWith(PEDIDO_1, AHORA, SCOPE);
   });
 

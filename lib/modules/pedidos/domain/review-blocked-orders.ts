@@ -14,7 +14,7 @@ import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 
 import { OrderNotFoundError } from './errors';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
-import { resolveOrderCost } from './resolve-ingredients-cost';
+import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
 import type { OrderScope } from './order-scope';
 import type { PackagingCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -97,7 +97,7 @@ async function reviewOne(
 
   // Fuera de la transaccion, igual que en la edicion: el pedido no tiene nada apartado, asi que
   // es el coste con el disponible general de este instante.
-  const ingredientsCost = await resolveOrderCost(
+  const cost = await resolveStoredOrderCost(
     deps,
     row.recipeId,
     row.quantity,
@@ -142,7 +142,7 @@ async function reviewOne(
     // Con la fila bloqueada no deberia pasar; si pasa, lanzar deshace lo apartado.
     if (moved !== 'ok') throw new OrderNotFoundError();
 
-    const costed = await transaction.orders.setIngredientsCost(id, ingredientsCost, null, now, scope);
+    const costed = await transaction.orders.setIngredientsCost(id, cost, null, now, scope);
     if (costed !== 'ok') throw new OrderNotFoundError();
 
     await transaction.orders.setReservedAt(id, outcome.kind === 'reserved' ? now : null, scope);

@@ -40,6 +40,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     presentationLines: [],
     unitId: null,
     reservedAt: null,
+    packagingCost: null,
     ...overrides,
   };
 }

@@ -669,7 +669,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
 
     // necesaria = 20 * 100 % = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
     expect(repo.create).toHaveBeenCalledTimes(1);
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('60.0000');
+    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '60.0000', packaging: '0.0000' });
   });
 
   it('las lecturas de lotes son UNA sola y las de unidades DOS -coste y reparto-, tenga la receta 1 o 20 lineas', async () => {
@@ -1027,11 +1027,11 @@ describe('alta con version de receta', () => {
       unknown,
       unknown,
       unknown,
-      string,
+      unknown,
     ];
     expect(nuevo.recipeId).toBe(VERSION_DE_A);
     expect(nuevo).not.toHaveProperty('recipeVersionId');
-    expect(coste).toBe('50.0000');
+    expect(coste).toEqual({ total: '50.0000', packaging: '0.0000' });
     expect(cat.findExecutionContentById).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
     expect(cat.enTransaccion).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
     const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
@@ -1207,7 +1207,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
 
     await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
 
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('30.0000');
+    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '30.0000', packaging: '0.0000' });
     expect(repo.setIngredientsCost).toHaveBeenCalledWith(filaCreada().id, null, ACTOR_A.id, AHORA, {
       companyId: EMPRESA_A,
     });

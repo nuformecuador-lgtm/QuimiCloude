@@ -157,6 +157,7 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
     presentationLines: [],
     unitId: null,
     reservedAt: new Date('2026-01-02T03:04:05.000Z'),
+    packagingCost: null,
     ...overrides,
   };
 }

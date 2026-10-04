@@ -138,6 +138,8 @@ const units: UnitCatalog = {
 const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrderPresentationLines = createUpdateOrderPresentationLines({
+  recipes,
+  products,
   presentations, packaging: packagingCatalog,
   units,
   unitOfWork,

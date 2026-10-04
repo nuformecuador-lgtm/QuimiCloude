@@ -4,9 +4,11 @@ import {
   calculateLotPackagingCost,
   calculateOrderCost,
   calculatePackagingCost,
+  storedOrderCost,
   type CostInput,
   type PackagingCostLine,
   type RecipeCostLine,
+  type StoredOrderCost,
 } from './order-cost';
 
 import type { PackagingCatalog, PackagingCostingBatch, ProductCatalog } from '@/lib/modules/inventario';
@@ -123,11 +125,35 @@ export async function resolveOrderCost(
   companyId: string,
   options?: { readonly orderId?: string },
 ): Promise<string | null> {
-  const [ingredientsCost, batches] = await Promise.all([
+  const cost = await resolveStoredOrderCost(catalogs, recipeId, orderQuantity, packagingLines, companyId, options);
+  return cost === null ? null : cost.total;
+}
+
+/** El mismo importe que `resolveOrderCost`, con la parte de envases aparte para guardarla. */
+export async function resolveStoredOrderCost(
+  catalogs: OrderCostCatalogs,
+  recipeId: string,
+  orderQuantity: string,
+  packagingLines: readonly PackagingCostLine[],
+  companyId: string,
+  options?: { readonly orderId?: string },
+): Promise<StoredOrderCost | null> {
+  const [ingredientsCost, packagingCost] = await Promise.all([
     resolveIngredientsCost(catalogs.recipes, catalogs.products, catalogs.units, recipeId, orderQuantity, companyId, options),
-    loadPackagingBatches(catalogs.packaging, packagingLines, companyId, options),
+    resolvePackagingCost(catalogs.packaging, packagingLines, companyId, options),
   ]);
-  return calculateOrderCost(ingredientsCost, calculatePackagingCost(packagingLines, batches));
+  return storedOrderCost(ingredientsCost, packagingCost);
+}
+
+/** Solo el costo de los envases del reparto, con la regla de `calculatePackagingCost`. */
+export async function resolvePackagingCost(
+  packaging: PackagingCatalog,
+  packagingLines: readonly PackagingCostLine[],
+  companyId: string,
+  options?: { readonly orderId?: string },
+): Promise<string | null> {
+  const batches = await loadPackagingBatches(packaging, packagingLines, companyId, options);
+  return calculatePackagingCost(packagingLines, batches);
 }
 
 /** Coste del LOTE de producto terminado con sus envases: nunca `null`. */

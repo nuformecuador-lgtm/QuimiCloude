@@ -422,6 +422,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261003120000_recipe_tools',
   // El envase de la linea del reparto y la unidad de envases; no toca el identificador.
   '20261003130000_packaging_products_in_distribution',
+  // La parte de envases del importe del pedido; no toca el identificador.
+  '20261004120000_orders_packaging_cost',
 ] as const
 
 export function hallazgosDeMigraciones(

@@ -1,5 +1,5 @@
 // tests/unit/pedidos/update-order-presentation-lines.test.ts — R7, R11-R14, R35, R36, R38, R41,
-// R42, R46, R48, [D3'].
+// R42, R46, R48, [D3']. QC-195 R45-R47: el importe que guarda.
 //
 // `updateOrderPresentationLines` (`design.md > 4.2`): la edicion ACOTADA del reparto y la
 // unidad, aparte de `updateOrder`. Bloquea la fila ANTES de validar, comprueba
@@ -20,8 +20,15 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
-import type { MaterialReservations, PresentationCatalog, ReservationOutcome } from '@/lib/modules/inventario';
-import type { RecipeExecutionLine } from '@/lib/modules/recetas';
+import type {
+  CostingBatch,
+  MaterialReservations,
+  PackagingCostingBatch,
+  PresentationCatalog,
+  ProductCatalog,
+  ReservationOutcome,
+} from '@/lib/modules/inventario';
+import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
 import {
   fakeFinishedGoodsIntake,
   fakeMaterialReservations,
@@ -43,7 +50,7 @@ const PRESENTACION_B = '99999999-9999-4999-8999-999999999999';
 
 const AHORA = new Date('2026-09-27T10:00:00.000Z');
 
-function filaBloqueada(overrides: Partial<OrderRow> = {}): LockedOrderRow {
+function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
   const base: OrderRow = {
     id: PEDIDO,
     number: { year: 2026, sequence: 7 },
@@ -60,7 +67,7 @@ function filaBloqueada(overrides: Partial<OrderRow> = {}): LockedOrderRow {
     presentationLines: [],
     unitId: UNIT_ID,
   };
-  return { ...base, ...overrides, reservedAt: null };
+  return { ...base, reservedAt: null, packagingCost: null, ...overrides };
 }
 
 /** Doble de `OrderWriteRepository`: los metodos que este caso de uso llama -bloquear, escribir el
@@ -131,6 +138,7 @@ function catalogoDePresentaciones(
   presentaciones: ReadonlyMap<string, { readonly content: string | null; readonly unitId: string }> = new Map([
     [PRESENTACION_A, { content: '5.0000', unitId: UNIT_ID }],
   ]),
+  lotesDeEnvase: readonly PackagingCostingBatch[] = [],
 ) {
   const findRefs = vi.fn(async (ids: readonly string[]) =>
     ids.flatMap((id) => {
@@ -142,8 +150,29 @@ function catalogoDePresentaciones(
     [...presentaciones].map(([presentationId, p]) =>
       packagingRef({ id: ENVASE_DE[presentationId] ?? presentationId, presentationId, content: p.content, unitId: p.unitId }),
     ),
+    lotesDeEnvase,
   );
   return { presentations: { findRefs } as unknown as PresentationCatalog, packaging, findRefs };
+}
+
+const UNIDAD_MATERIA = '30303030-3030-4303-8303-303030303030';
+
+/** Catalogos del importe: la receta (`recipes`) y los lotes de sus ingredientes (`products`),
+ *  que se leen fuera del cliente de la transaccion. */
+function catalogosDeCosto(recipeLines: readonly RecipeExecutionLine[], lotes: readonly CostingBatch[]) {
+  const findExecutionContentById = vi.fn(async (id: string) => ({
+    id,
+    name: 'Receta',
+    isDeleted: false,
+    steps: [],
+    lines: recipeLines,
+    tools: [],
+  }));
+  const recipes = { findExecutionContentById, findRefsIncludingDeleted: vi.fn() } as unknown as RecipeCatalog;
+  const findCostingBatches = vi.fn(async () => lotes);
+  const findRefs = vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, unitId: UNIDAD_MATERIA })));
+  const products = { findCostingBatches, findRefs } as unknown as ProductCatalog;
+  return { recipes, products, findExecutionContentById, findCostingBatches };
 }
 
 function montar(deps: {
@@ -152,6 +181,7 @@ function montar(deps: {
   readonly units?: UnitCatalog;
   readonly reservations?: MaterialReservations;
   readonly recipeLines?: readonly RecipeExecutionLine[];
+  readonly costo?: ReturnType<typeof catalogosDeCosto>;
 }) {
   const reservations = deps.reservations ?? fakeMaterialReservations();
   const recipes = fakeRecipeExecutionReader({
@@ -165,7 +195,10 @@ function montar(deps: {
     })),
   });
   const catalogos = deps.catalogos ?? catalogoDePresentaciones();
+  const costo = deps.costo ?? catalogosDeCosto(deps.recipeLines ?? [], []);
   const fullDeps: UpdateOrderPresentationLinesDeps = {
+    recipes: costo.recipes,
+    products: costo.products,
     presentations: catalogos.presentations,
     packaging: catalogos.packaging,
     units: deps.units ?? catalogoDeUnidades().units,
@@ -436,15 +469,26 @@ describe('QC-195 updateOrderPresentationLines — lineas antiguas y dos envases 
 });
 
 describe('updateOrderPresentationLines — R46: no toca quantity ni receta; QC-195 R15, R20: la reserva si, porque el reparto aparta sus envases', () => {
-  it('las dependencias declaradas son solo packaging, presentations, units, unitOfWork y now', () => {
+  it('QC-195 R45: las dependencias declaradas son las del reparto mas recipes y products para el importe', () => {
+    const costo = catalogosDeCosto([], []);
     const fullDeps: UpdateOrderPresentationLinesDeps = {
+      recipes: costo.recipes,
+      products: costo.products,
       presentations: catalogoDePresentaciones().presentations,
       packaging: catalogoDePresentaciones().packaging,
       units: catalogoDeUnidades().units,
       unitOfWork: { run: () => Promise.reject(new Error('no se usa')) },
       now: () => AHORA,
     };
-    expect(Object.keys(fullDeps).sort()).toEqual(['now', 'packaging', 'presentations', 'unitOfWork', 'units']);
+    expect(Object.keys(fullDeps).sort()).toEqual([
+      'now',
+      'packaging',
+      'presentations',
+      'products',
+      'recipes',
+      'unitOfWork',
+      'units',
+    ]);
   });
 
   it('R46: no escribe cantidad ni receta -ni create, ni updateAlive- y, con todo apartado, no mueve el estado', async () => {
@@ -555,5 +599,139 @@ describe('QC-195 updateOrderPresentationLines — falta de envases y bloqueo', (
     expect(reservations.syncForOrder).toHaveBeenCalledWith(
       expect.objectContaining({ requirement: [{ productId: ENVASE_A, quantity: '2' }] }),
     );
+  });
+});
+
+describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que guarda', () => {
+  const ESCOPO = { companyId: EMPRESA };
+  const LINEAS = { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 2 }] };
+  const RECETA: readonly RecipeExecutionLine[] = [{ productId: 'materia', productName: null, percentage: '100.00' }];
+  // 10 de materia a 2.0000 = 20.0000 de ingredientes.
+  const LOTE_MATERIA: CostingBatch = {
+    productId: 'materia',
+    unitId: UNIDAD_MATERIA,
+    lot: '1',
+    stock: '100',
+    available: '100',
+    unitCost: '2.0000',
+    purchaseDate: '2026-01-01',
+  };
+  // Dos lotes del envase a 0.50 y 0.70: 2 envases x 0.60 = 1.2000.
+  const LOTES_ENVASE: readonly PackagingCostingBatch[] = [
+    { productId: ENVASE_A, unitCost: '0.5000', available: '100' },
+    { productId: ENVASE_A, unitCost: '0.7000', available: '50' },
+  ];
+
+  function montarConCosto(fila: LockedOrderRow, lotesEnvase: readonly PackagingCostingBatch[] = LOTES_ENVASE) {
+    const doble = ordersDoble(fila);
+    const costo = catalogosDeCosto(RECETA, [LOTE_MATERIA]);
+    const catalogos = catalogoDePresentaciones(undefined, lotesEnvase);
+    const update = montar({
+      orders: doble.orders,
+      catalogos,
+      units: catalogoDeUnidades(new Map([[UNIDAD_MATERIA, { id: UNIDAD_MATERIA, baseUnitId: null, factor: null }]])).units,
+      recipeLines: RECETA,
+      costo,
+    });
+    return { ...doble, update, costo, packaging: catalogos.packaging };
+  }
+
+  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO'])(
+    'R45: en %s guarda el importe nuevo -ingredientes 20 + envases 1.2- con el apartado del propio pedido',
+    async (status) => {
+      const { update, setIngredientsCost, costo, packaging } = montarConCosto(
+        filaBloqueada({ status, ingredientsCost: '99.0000', packagingCost: '0.0000' }),
+      );
+
+      await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+      expect(setIngredientsCost).toHaveBeenCalledTimes(1);
+      expect(setIngredientsCost).toHaveBeenCalledWith(
+        PEDIDO,
+        { total: '21.2000', packaging: '1.2000' },
+        ACTOR_ID,
+        AHORA,
+        ESCOPO,
+      );
+      expect(costo.findCostingBatches).toHaveBeenCalledWith(['materia'], EMPRESA, { excludeOrderId: PEDIDO });
+      expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE_A], EMPRESA, { excludeOrderId: PEDIDO });
+    },
+  );
+
+  it('R45: un envase sin lote con costo deja el pedido sin importe (null), como la cotizacion', async () => {
+    const { update, setIngredientsCost } = montarConCosto(
+      filaBloqueada({ status: 'PENDIENTE', ingredientsCost: '99.0000', packagingCost: '0.0000' }),
+      [],
+    );
+
+    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+    expect(setIngredientsCost).toHaveBeenCalledWith(PEDIDO, null, ACTOR_ID, AHORA, ESCOPO);
+  });
+
+  it('R46: BLOQUEADO -> PENDIENTE escribe el importe calculado, no lo deja sin importe', async () => {
+    const { update, setStatus, setIngredientsCost } = montarConCosto(filaBloqueada({ status: 'BLOQUEADO' }));
+
+    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+    expect(setStatus).toHaveBeenCalledWith(PEDIDO, 'BLOQUEADO', 'PENDIENTE', ACTOR_ID, AHORA, ESCOPO);
+    expect(setIngredientsCost).toHaveBeenCalledWith(
+      PEDIDO,
+      { total: '21.2000', packaging: '1.2000' },
+      ACTOR_ID,
+      AHORA,
+      ESCOPO,
+    );
+  });
+
+  it('R45, R17: si queda BLOQUEADO el importe es null y no se calcula', async () => {
+    const doble = ordersDoble(filaBloqueada({ status: 'PENDIENTE', ingredientsCost: '12.0000', packagingCost: '0.0000' }));
+    const costo = catalogosDeCosto(RECETA, [LOTE_MATERIA]);
+    const update = montar({
+      orders: doble.orders,
+      reservations: fakeMaterialReservations({
+        syncForOrder: vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'insufficient', productIds: [ENVASE_A] })),
+      }),
+      recipeLines: RECETA,
+      costo,
+    });
+
+    await expect(update(PEDIDO, ACTOR, { ...LINEAS, confirmBlocked: true })).resolves.toBe('ok');
+    expect(doble.setIngredientsCost).toHaveBeenCalledTimes(1);
+    expect(doble.setIngredientsCost).toHaveBeenCalledWith(PEDIDO, null, ACTOR_ID, AHORA, ESCOPO);
+    expect(costo.findCostingBatches).not.toHaveBeenCalled();
+  });
+
+  it('R47: en POR_EMPACAR conserva la parte de ingredientes guardada (25 - 5 = 20) y suma los envases nuevos (1.2)', async () => {
+    const { update, setIngredientsCost, costo, packaging } = montarConCosto(
+      filaBloqueada({ status: 'POR_EMPACAR', ingredientsCost: '25.0000', packagingCost: '5.0000' }),
+    );
+
+    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+    expect(setIngredientsCost).toHaveBeenCalledWith(
+      PEDIDO,
+      { total: '21.2000', packaging: '1.2000' },
+      ACTOR_ID,
+      AHORA,
+      ESCOPO,
+    );
+    // Los ingredientes no se recalculan: ni la receta ni sus lotes se leen.
+    expect(costo.findExecutionContentById).not.toHaveBeenCalled();
+    expect(costo.findCostingBatches).not.toHaveBeenCalled();
+    expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE_A], EMPRESA, { excludeOrderId: PEDIDO });
+  });
+
+  it('R47: en POR_EMPACAR sin importe guardado queda sin importe', async () => {
+    const { update, setIngredientsCost } = montarConCosto(filaBloqueada({ status: 'POR_EMPACAR' }));
+
+    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+    expect(setIngredientsCost).toHaveBeenCalledWith(PEDIDO, null, ACTOR_ID, AHORA, ESCOPO);
+  });
+
+  it('R47: en POR_EMPACAR, si el costo de los envases nuevos es «sin importe», queda sin importe', async () => {
+    const { update, setIngredientsCost } = montarConCosto(
+      filaBloqueada({ status: 'POR_EMPACAR', ingredientsCost: '25.0000', packagingCost: '5.0000' }),
+      [],
+    );
+
+    await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
+    expect(setIngredientsCost).toHaveBeenCalledWith(PEDIDO, null, ACTOR_ID, AHORA, ESCOPO);
   });
 });

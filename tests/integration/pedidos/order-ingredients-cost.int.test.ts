@@ -443,7 +443,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
       // Simula un pedido anterior a la columna: se pone en NULL por fuera de la aplicacion.
-      await prisma.$executeRaw`UPDATE "orders" SET "ingredients_cost" = NULL WHERE "id" = ${orderId}::uuid`
+      await prisma.$executeRaw`UPDATE "orders" SET "ingredients_cost" = NULL, "packaging_cost" = NULL WHERE "id" = ${orderId}::uuid`
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
 
       // La LECTURA -ficha y listado- no recibe `products` ni `units`: no puede recalcular
