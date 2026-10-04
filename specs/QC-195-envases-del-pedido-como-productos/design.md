@@ -194,6 +194,8 @@ migración encuentra un pedido con importe guardado y líneas con producto PACKA
 bases de desarrollo de esta rama, porque la columna del envase nace en esta misma ficha), **no
 aborta**: deja `ingredients_cost` y `packaging_cost` de ese pedido en `NULL`, como un pedido sin
 importe, y R31 lo costea al Terminar. Los demás pedidos se rellenan con `packaging_cost = 0`.
+El `down.sql` **no restaura** los importes que el relleno dejó en `NULL`; solo puede pasar en las
+bases de desarrollo de esta rama, nunca en una base desplegada desde `dev`.
 
 ## 2. Modelo de datos
 

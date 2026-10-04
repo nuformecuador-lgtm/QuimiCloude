@@ -280,7 +280,7 @@ verdes.
 
 ### [x] T18 — «Reparto y unidad» guarda el importe (B1 + E5) `[backend_dev]` `[depende de T8, T9]` `[P con T19]`
 
-- `update-order-presentation-lines.ts`: deps `recipes` y `products`; importe calculado fuera de la
+- `update-order-presentation-lines.ts`: deps `recipes` y `products`; importe calculado dentro de la
   transacción con `resolveOrderCost(…, envases del reparto nuevo, …, { orderId })` y escrito con
   `setIngredientsCost` cuando el pedido no queda `BLOQUEADO`, también en `BLOQUEADO → PENDIENTE`;
   cableado en `lib/composition`.
