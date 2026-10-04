@@ -41,10 +41,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACTIONS_COLUMN_ID,
   ACCOUNT_STATUS_COLUMN_ID,
+  CHANGE_USER_STATUS_ACTION_LABEL,
+  DELETE_USER_ACTION_LABEL,
   DELETE_USER_CONFIRM_TESTID,
   DELETE_USER_DIALOG_TESTID,
   DELETE_USER_DISMISS_TESTID,
   DISPLAY_NAME_COLUMN_ID,
+  EDIT_USER_ACTION_LABEL,
   EMAIL_COLUMN_ID,
   ROLE_NAME_COLUMN_ID,
   USERNAME_COLUMN_ID,
@@ -65,9 +68,6 @@ import {
   USER_STATUS_DIALOG_TESTID,
   USER_STATUS_DISMISS_TESTID,
   USER_STATUS_SELECT_TESTID,
-  changeUserStatusLabel,
-  deleteUserLabel,
-  editUserLabel,
 } from '@/app/(private)/configuracion/usuarios/components';
 import UsuariosPage from '@/app/(private)/configuracion/usuarios/page';
 import type { RoleOption, UserRow } from '@/lib/modules/identity';
@@ -548,9 +548,9 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
       await user.click(disparador);
 
       for (const [testid, nombre] of [
-        [USER_ACTION_EDIT_TESTID, editUserLabel(usuario.displayName)],
-        [USER_ACTION_STATUS_TESTID, changeUserStatusLabel(usuario.displayName)],
-        [USER_ACTION_DELETE_TESTID, deleteUserLabel(usuario.displayName)],
+        [USER_ACTION_EDIT_TESTID, EDIT_USER_ACTION_LABEL],
+        [USER_ACTION_STATUS_TESTID, CHANGE_USER_STATUS_ACTION_LABEL],
+        [USER_ACTION_DELETE_TESTID, DELETE_USER_ACTION_LABEL],
       ] as const) {
         const item = await screen.findByTestId(testid);
         expect(item, `${testid} de ${usuario.id} a ${ancho}px`).toBeVisible();

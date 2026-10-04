@@ -3,7 +3,7 @@
 //
 // **Ningun caso afirma sobre el copy** (R41): lo que se comprueba es que hay etiqueta para los
 // cuatro estados del contrato y **para ninguno mas**, que las opciones del filtro se derivan del
-// conjunto cerrado —no de una segunda lista— y que los nombres accesibles NOMBRAN al usuario.
+// conjunto cerrado —no de una segunda lista— y que las acciones del menu dicen solo el verbo.
 // El texto concreto se toma de las constantes exportadas, nunca de un literal copiado.
 //
 // **La garantia fuerte de exhaustividad es el TIPO**, no este archivo: el mapa esta declarado
@@ -14,11 +14,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHANGE_USER_STATUS_ACTION_LABEL,
+  DELETE_USER_ACTION_LABEL,
+  EDIT_USER_ACTION_LABEL,
   USER_ACCOUNT_STATUS_LABELS,
   USER_STATUS_FILTER_OPTIONS,
-  changeUserStatusLabel,
-  deleteUserLabel,
-  editUserLabel,
   endUserSessionsLabel,
   endUserSessionsMessage,
   endUserSessionsSuccess,
@@ -67,17 +67,22 @@ describe('las opciones del filtro se DERIVAN del conjunto cerrado (R13)', () => 
   });
 });
 
-describe('los nombres accesibles NOMBRAN al usuario (R41)', () => {
-  it('las tres acciones incluyen el nombre mostrable', () => {
-    for (const componer of [editUserLabel, deleteUserLabel, changeUserStatusLabel]) {
-      expect(componer(NOMBRE)).toContain(NOMBRE);
+const ACCIONES_DEL_MENU = [
+  EDIT_USER_ACTION_LABEL,
+  DELETE_USER_ACTION_LABEL,
+  CHANGE_USER_STATUS_ACTION_LABEL,
+] as const;
+
+// Decision humana puntual (2026-10-04): los items del menu de fila dicen solo el verbo.
+describe('las acciones del menu de fila son solo el verbo (R41)', () => {
+  it('R41 — las tres etiquetas son texto no vacio', () => {
+    for (const etiqueta of ACCIONES_DEL_MENU) {
+      expect(etiqueta.trim().length).toBeGreaterThan(0);
     }
   });
 
-  it('las tres se distinguen entre si: tres botones por fila con el mismo nombre no sirven', () => {
-    const nombres = [editUserLabel(NOMBRE), deleteUserLabel(NOMBRE), changeUserStatusLabel(NOMBRE)];
-
-    expect(new Set(nombres).size).toBe(3);
+  it('R41 — las tres se distinguen entre si: tres items con el mismo nombre no sirven', () => {
+    expect(new Set(ACCIONES_DEL_MENU).size).toBe(3);
   });
 });
 
@@ -103,9 +108,7 @@ describe('los textos del cierre de sesiones NOMBRAN a la persona y no prometen n
   it('los cuatro se distinguen entre si y de las tres acciones de la fila', () => {
     const textos = [
       ...TEXTOS_DE_CIERRE.map((componer) => componer(NOMBRE)),
-      editUserLabel(NOMBRE),
-      deleteUserLabel(NOMBRE),
-      changeUserStatusLabel(NOMBRE),
+      ...ACCIONES_DEL_MENU,
     ];
 
     expect(new Set(textos).size).toBe(textos.length);

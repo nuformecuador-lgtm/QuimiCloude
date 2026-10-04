@@ -35,12 +35,12 @@ export {
   type UserListSearchParams,
 } from './user-list-params';
 export {
+  CHANGE_USER_STATUS_ACTION_LABEL,
+  DELETE_USER_ACTION_LABEL,
+  EDIT_USER_ACTION_LABEL,
   USERS_TITLE_TESTID,
   USER_ACCOUNT_STATUS_LABELS,
   USER_STATUS_FILTER_OPTIONS,
-  changeUserStatusLabel,
-  deleteUserLabel,
-  editUserLabel,
   endUserSessionsLabel,
   endUserSessionsMessage,
   endUserSessionsSuccess,

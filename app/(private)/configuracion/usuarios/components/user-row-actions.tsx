@@ -5,7 +5,11 @@ import { PencilIcon, TrashIcon, UserCogIcon } from 'lucide-react';
 import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
 import type { UserRow } from '@/lib/modules/identity';
 
-import { changeUserStatusLabel, deleteUserLabel, editUserLabel } from './user-labels';
+import {
+  CHANGE_USER_STATUS_ACTION_LABEL,
+  DELETE_USER_ACTION_LABEL,
+  EDIT_USER_ACTION_LABEL,
+} from './user-labels';
 
 /**
  * Las TRES acciones de fila de un usuario: editar, borrar y cambiar el estado de cuenta (R6
@@ -31,6 +35,9 @@ import { changeUserStatusLabel, deleteUserLabel, editUserLabel } from './user-la
  * que cambia es que las tres acciones individuales viven dentro del menu que ese disparador abre
  * con un clic, no como tres controles sueltos. No es una derogacion general de R40 para el resto
  * del repo: las demas pantallas con botones en linea siguen con ellos.
+ *
+ * **Decision humana puntual (2026-10-04):** los items del menu dicen solo el verbo, sin el nombre
+ * del usuario. El contexto de la fila lo conserva el nombre accesible del disparador.
  *
  * **UNA sola accion para el estado de cuenta** (R32), no un verbo por transicion: quien elige
  * entre los cuatro valores es el dialogo de T11, y la pantalla no decide que transiciones son
@@ -75,7 +82,7 @@ export type UserRowActionsProps = {
   readonly onStatusChange?: UserRowActionHandler;
 };
 
-/** Nombre accesible del disparador: el verbo mas el nombre del usuario, igual criterio que R41. */
+/** Nombre accesible del disparador: nombra al usuario para que el menu tenga el contexto de la fila. */
 function userRowActionsTriggerLabel(displayName: string): string {
   return `Acciones de ${displayName}`;
 }
@@ -94,21 +101,21 @@ export function UserRowActions({
   const items: RowActionMenuItem[] = [
     {
       key: 'edit',
-      label: editUserLabel(user.displayName),
+      label: EDIT_USER_ACTION_LABEL,
       icon: PencilIcon,
       onSelect: () => onEdit?.(user),
       testId: USER_ACTION_EDIT_TESTID,
     },
     {
       key: 'status',
-      label: changeUserStatusLabel(user.displayName),
+      label: CHANGE_USER_STATUS_ACTION_LABEL,
       icon: UserCogIcon,
       onSelect: () => onStatusChange?.(user),
       testId: USER_ACTION_STATUS_TESTID,
     },
     {
       key: 'delete',
-      label: deleteUserLabel(user.displayName),
+      label: DELETE_USER_ACTION_LABEL,
       icon: TrashIcon,
       onSelect: () => onDelete?.(user),
       destructive: true,

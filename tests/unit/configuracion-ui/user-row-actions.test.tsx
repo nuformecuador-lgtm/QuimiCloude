@@ -11,9 +11,9 @@
 // en DOS mitades: el disparador esta siempre presente y mide 44x44 px sin ninguna interaccion
 // previa (eso no cambio), y las tres acciones solo llegan al arbol tras abrirlo con un clic.
 //
-// **Los items se localizan por ROL ARIA y por su nombre accesible compuesto** (R41), con las
-// mismas funciones que los componen (`editUserLabel`, `deleteUserLabel`, `changeUserStatusLabel`):
-// unica fuente de ese texto, y por tanto ningun literal de copy en este archivo.
+// **Los items se localizan por ROL ARIA y por su nombre accesible** (R41), tomado de las constantes
+// exportadas: ningun literal de copy en este archivo. Por decision humana puntual (2026-10-04) los
+// items dicen solo el verbo; el nombre del usuario queda en el disparador.
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -23,10 +23,10 @@ import {
   USER_ACTION_EDIT_TESTID,
   USER_ACTION_STATUS_TESTID,
   USER_ROW_ACTIONS_TESTID,
+  CHANGE_USER_STATUS_ACTION_LABEL,
+  DELETE_USER_ACTION_LABEL,
+  EDIT_USER_ACTION_LABEL,
   UserRowActions,
-  changeUserStatusLabel,
-  deleteUserLabel,
-  editUserLabel,
   endUserSessionsLabel,
 } from '@/app/(private)/configuracion/usuarios/components';
 import { USER_ACCOUNT_STATUSES, type UserRow } from '@/lib/modules/identity';
@@ -132,21 +132,22 @@ describe('al abrir el disparador, el menu trae las TRES acciones y ninguna mas (
     expect(screen.getAllByTestId(USER_ACTION_STATUS_TESTID)).toHaveLength(1);
   });
 
-  it('cada accion NOMBRA al usuario sobre el que actua (R41)', async () => {
+  it('R41 — cada accion dice solo su verbo, sin el nombre del usuario', async () => {
     render(<UserRowActions user={USUARIO} canModify />);
 
     abrirMenu();
     await screen.findByTestId(USER_ACTION_EDIT_TESTID);
 
-    expect(
-      screen.getByRole('menuitem', { name: editUserLabel(USUARIO.displayName) }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('menuitem', { name: deleteUserLabel(USUARIO.displayName) }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('menuitem', { name: changeUserStatusLabel(USUARIO.displayName) }),
-    ).toBeInTheDocument();
+    for (const nombre of [
+      EDIT_USER_ACTION_LABEL,
+      DELETE_USER_ACTION_LABEL,
+      CHANGE_USER_STATUS_ACTION_LABEL,
+    ]) {
+      expect(screen.getByRole('menuitem', { name: nombre })).toBeInTheDocument();
+    }
+    for (const item of screen.getAllByRole('menuitem')) {
+      expect(item.textContent).not.toContain(USUARIO.displayName);
+    }
   });
 
   it('QC-101 no anade nada al menu: exactamente las tres acciones de siempre, ninguna de sesiones', async () => {

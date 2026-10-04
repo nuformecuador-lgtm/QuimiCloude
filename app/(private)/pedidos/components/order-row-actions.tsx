@@ -18,6 +18,9 @@ import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
  * que ese disparador abre con un clic, no como controles sueltos. No es una derogacion general de
  * R45 para el resto del repo: las demas pantallas con botones en linea siguen con ellos.
  *
+ * **Decision humana puntual (2026-10-04):** los items del menu dicen solo el verbo, sin el numero
+ * del pedido. El contexto de la fila lo conserva el nombre accesible del disparador.
+ *
  * **La fila llega por props** (R43). Este componente no importa `lib/composition`, ni el cliente
  * de base de datos, ni pide nada por su cuenta: lo que muestra ya lo trajo la consulta de la
  * lista, hecha una sola vez por el Server Component de la seccion.
@@ -132,7 +135,7 @@ export function OrderRowActions({
   const items: RowActionMenuItem[] = [
     {
       key: 'edit',
-      label: `Editar el pedido ${order.numberText}`,
+      label: 'Editar',
       icon: PencilIcon,
       onSelect: () => onEdit?.(order),
       disabled: isFinal,
@@ -140,7 +143,7 @@ export function OrderRowActions({
     },
     {
       key: 'cancel',
-      label: `Cancelar el pedido ${order.numberText}`,
+      label: 'Cancelar',
       icon: XCircleIcon,
       onSelect: () => onCancel?.(order),
       disabled: isFinal,
@@ -148,7 +151,7 @@ export function OrderRowActions({
     },
     {
       key: 'delete',
-      label: `Eliminar el pedido ${order.numberText}`,
+      label: 'Eliminar',
       icon: TrashIcon,
       onSelect: () => onDelete?.(order),
       disabled: isFinal,
@@ -160,7 +163,7 @@ export function OrderRowActions({
     // de edicion: abre el MISMO panel en su seccion.
     {
       key: 'responsibles',
-      label: `Responsables del pedido ${order.numberText}`,
+      label: 'Responsables',
       icon: UsersIcon,
       onSelect: () => onResponsibles?.(order),
       testId: 'order-action-responsibles',
@@ -170,7 +173,7 @@ export function OrderRowActions({
   if (showDistribution) {
     items.push({
       key: 'distribution',
-      label: `Reparto y unidad del pedido ${order.numberText}`,
+      label: 'Reparto y unidad',
       icon: PackageIcon,
       onSelect: () => onDistribution?.(order),
       testId: ORDER_ACTION_DISTRIBUTION_TESTID,
