@@ -189,10 +189,15 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
             packagingLines,
             phase: 'materials_consumed',
           });
+          // Un envase que es tambien ingrediente ya se consumio con la receta al pasar a
+          // POR_EMPACAR: aqui solo cuenta lo que siga apartado de el, nunca su disponible.
+          const content = await scope.recipes.findExecutionContentById(updated.recipeId, companyId);
+          if (content === null) throw new RecipeNotFoundError();
+          const ingredientIds = new Set(content.lines.map((line) => line.productId));
           const consumption = await scope.reservations.consumeForOrder({
             orderId: id,
             companyId,
-            fallbackRequirement: packagingRequirement,
+            fallbackRequirement: packagingRequirement.filter((line) => !ingredientIds.has(line.productId)),
             productIds: packagingRequirement.map((line) => line.productId),
             actorId: packerId,
             now,
