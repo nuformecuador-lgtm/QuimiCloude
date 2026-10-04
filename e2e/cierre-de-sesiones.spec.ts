@@ -14,8 +14,9 @@
  *
  * DATOS (mismo molde que `e2e/usuarios.spec.ts` y `e2e/session.spec.ts`):
  *  - roles REALES del seed: `Administrador` —trae `usuarios.consultar` y `usuarios.modificar`— para
- *    quien cierra, y `Operador` —solo `inventario.consultar`— para la victima, que por eso aterriza
- *    en `INVENTORY_ROUTE`. Con roles inventados se probaria el fixture, no el permiso;
+ *    quien cierra, y `Operador` para la victima, cuyo aterrizaje deriva `loginAndLand` de sus
+ *    permisos reales; su rol trae `inventario.consultar`, asi que `INVENTORY_ROUTE` le es visible
+ *    y sirve para el paso 5. Con roles inventados se probaria el fixture, no el permiso;
  *  - empresa efimera propia (nunca la del seed: `companies_name_unique` es global) y, dentro, SOLO
  *    estas dos personas: el listado esta acotado a la empresa del actor;
  *  - prefijo `qc101_e2e_` + `RUN_ID` por proceso en nombre de usuario, correo y documento —los
@@ -277,10 +278,9 @@ test.describe('cierre de sesiones de otra persona desde la pantalla', () => {
 
       // --- 1. LA VICTIMA ENTRA por el formulario real y aterriza en una pantalla privada. Esta es
       // la sesion viva que la ficha promete cortar.
-      await loginAndLand(victimPage, victimUser);
-      await expect(victimPage.getByTestId(INVENTORY_TITLE_TESTID)).toBeVisible({
-        timeout: 60_000,
-      });
+      const victimLanding = await loginAndLand(victimPage, victimUser);
+      expect(new URL(victimPage.url()).pathname).toBe(victimLanding);
+      await expect(victimPage.getByTestId(LOGIN_FORM_TESTID)).toHaveCount(0);
       // Sin esto, el paso 5 no distinguiria «no hay sesion» de «nunca la hubo».
       expect(
         (await victimContext.cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
