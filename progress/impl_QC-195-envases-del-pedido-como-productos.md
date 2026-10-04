@@ -1241,3 +1241,24 @@ Salida real:
   `pedidos/order-service.test.ts`).
 
 **Veredicto:** T15 completa (datos + interfaz); falta el `./init.sh` del implementer.
+
+## Implementer — gate de la tanda 3 (Enmienda 1: T10.E1, T11/R42, T15/R44), punta be91e75b
+
+`./init.sh --rapido` con la maquina libre: typecheck paso; lint paso; `test:rapido` (related, 421 archivos):
+`Test Files 6 failed | 415 passed (421)`, `Tests 8 failed | 6270 passed | 9 skipped (6287)`. Los 6 rojos son
+los del baseline (`configuracion-ui/unidades-viewport`, `configuracion-ui/usuarios-viewport`,
+`inventario/product-page`, `navegacion/pantallas-exigen-permiso`, `recetas-ui/recipe-page`,
+`recetas/module-contract`). Guardias aparte: `Test Files 51 passed (51)`, `Tests 672 passed | 11 skipped (683)`.
+
+Tasks marcadas [x]: T10.E1, T11, T15. Quedan T16 (E2E) y T17 (cierre).
+
+Notas para el reviewer:
+- T15 datos: `packagingName` se resuelve en `pedidos/domain` (`list-order-summaries.ts`, puerto
+  `order-summary-reader.ts`) y no en el adaptador, porque el adaptador de `pedidos` no puede leer `products`
+  (`guard-arquitectura-modulos`). Contrato igual. `guard-ambito-empresa-pedidos` gana dos entradas en
+  `METODOS_DELEGADOS_EN_DOMINIO` (regex exacta).
+- Entre `3072bac4` y `c63496e9`, `finish-with-finished-goods.int.test.ts` no compila (edicion intermedia
+  mezclada entre carriles); en la punta compila y pasa.
+- Pregunta abierta (sin cambio): `consumeForOrder` usa el respaldo solo si no hay nada apartado de ninguno
+  de los `productIds`; un estado mixto (envase-ingrediente con apartado + envase normal sin apartado) no
+  tomaria el normal del disponible. La aplicacion no produce ese estado (todo o nada apartado).

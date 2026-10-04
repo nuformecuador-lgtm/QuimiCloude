@@ -154,7 +154,7 @@ R23**.
 **Hecho cuando:** integración verde para **R25, R26**, **R14** (alta en la presentación copiada) y
 **R33** (línea antigua termina como hoy).
 
-#### [ ] T10.E1 — Enmienda 1 (F2.1, 2026-10-03): sin doble consumo `[depende de T10]`
+#### [x] T10.E1 — Enmienda 1 (F2.1, 2026-10-03): sin doble consumo `[depende de T10]`
 
 Reabre T10 en lo que toca a R43 (`design.md > 1.6`, E3 y E4).
 
@@ -174,7 +174,7 @@ Reabre T10 en lo que toca a R43 (`design.md > 1.6`, E3 y E4).
 **Hecho cuando:** verdes **R43** (los dos casos) y **R32** en Terminar; los tests de R25 siguen
 verdes.
 
-### [ ] T11 — El envase no es ingrediente `[depende de T0 y de P4]` `[P con T1-T10]`
+### [x] T11 — El envase no es ingrediente `[depende de T0 y de P4]` `[P con T1-T10]`
 
 - `create-recipe.ts`, `create-recipe-version.ts`, `update-recipe.ts`, `update-recipe-version.ts`,
   `preview-formula-import.ts`, `confirm-formula-import.ts`: rechazan o excluyen PACKAGING con
@@ -230,7 +230,7 @@ R35**; tests de `pedidos-ui` adaptados.
 
 **Hecho cuando:** unit de UI verdes para **R1, R6, R7** en la interfaz.
 
-### [ ] T15 — Lecturas con líneas antiguas y con envase `[frontend_dev]` `[depende de TC]` `[P con T12-T14]`
+### [x] T15 — Lecturas con líneas antiguas y con envase `[frontend_dev]` `[depende de TC]` `[P con T12-T14]`
 
 - Ficha, listado, pantalla de empaque y de ejecución pintan `packagingName` y, si es `null`, la
   presentación como hoy.
