@@ -1498,3 +1498,17 @@ Veredicto: merge cerrado, migracion renumerada y rollback probado; sin rojos fue
 E2E tras el merge (una a una, chromium, puerto 3117, `.next/dev/types` borrado antes de cada una):
 `envases-del-pedido` 2 passed (37.6s) · `recetas` 3 passed (19.2s) · `versiones-de-receta` 1 passed (16.4s) ·
 `versiones-en-la-receta` 1 passed (22.9s) · `pedidos` 2 passed (17.9s) · `empaque` 1 passed (25.1s).
+
+## frontend_dev — T19 m4 (commit 46c73416)
+
+- `app/(private)/inventario/components/adjust-batch-dialog.tsx`: el ajuste de un lote de envase
+  (`wholePackages`) pasa de `inputMode="numeric"` a `inputMode="text"` para que iOS ofrezca el signo
+  menos. Sin `pattern`: la validacion nativa del navegador taparia el aviso propio de envases enteros
+  (R7). El resto de lotes sigue en `decimal`.
+- `tests/unit/inventario-ui/envase-en-inventario.test.tsx`: casos «R7: el ajuste de un lote de envase
+  usa un teclado con signo menos y conserva el negativo» y «R7: el ajuste de un lote que no es envase
+  sigue con teclado decimal»; se quita la asercion `numeric` del caso R7 previo.
+- Verificacion: typecheck paso; lint 0 errores (8 warnings preexistentes); guardias
+  `51 passed (51)`, `678 passed | 11 skipped`; `vitest related` `Test Files 2 failed | 9 passed (11)`,
+  `Tests 2 failed | 213 passed (215)`: los 2 rojos (`product-page` R18, `pantallas-exigen-permiso`
+  `/pedidos`) estan en `tests/baseline-rojos.json`; los casos nuevos, verdes.
