@@ -1016,3 +1016,36 @@ disponible. Solo afecta a envases legados en receta; el spec no lo cubre.
 
 **Veredicto T10:** hecho; unit e integracion de pedidos/asignaciones verdes; gate rapido solo con
 los rojos del baseline; guardias verdes.
+
+## T13 (cont.) — la UI valida el reparto con los esquemas del contrato (frontend_dev, 63fd3a6d)
+
+Comprobado antes en `lib/modules/pedidos/domain/order-input.ts`: `presentationLinesSchema`
+(barrel) acepta linea con envase o con presentacion, y `createOrderSchema`/`updateOrderSchema`,
+`orderPresentationAvailabilitySchema` y `quoteOrderCostSchema` lo usan. Sin hallazgos en lib.
+
+Archivos:
+- `app/(private)/pedidos/components/use-order-distribution-availability.ts`: `distributionLinesValid`
+  = `presentationLinesSchema.safeParse(toDistributionLinesInput(lines))` + chequeo local de
+  presentacion repetida; `availabilityKey` usa `orderPresentationAvailabilitySchema` entero
+  (fuera `scalarsSchema` y la regex local).
+- `app/(private)/pedidos/components/order-form.tsx`: `save` valida con las lineas reales
+  (`toDistributionLinesInput(readDistributionLines(formData))`) contra `createOrderSchema`/`updateOrderSchema`.
+- `app/(private)/pedidos/components/use-order-cost-quote.ts`: `canQuote` pasa `presentationLines`
+  a `quoteOrderCostSchema`.
+- Fixtures `OrderPresentationLineView` antiguas con `packagingProductId: null, packagingName: null`:
+  order-columns (3), order-distribution-dialog, order-form-quote, order-form, order-sheet,
+  pedidos-viewport. Ninguna otra en `tests/unit/pedidos-ui` le faltaba.
+
+Matiz: los envases se validan ahora con `z.coerce.number().int().positive()` (el del servidor)
+en vez de `/^[1-9]\d*$/`; un texto como `01` deja de bloquear la consulta y el servidor lo acepta igual.
+
+Salida real:
+- `pnpm exec tsc --noEmit`: sin errores.
+- `pnpm exec vitest run tests/unit/pedidos-ui`: 37 archivos, 572 passed | 3 skipped.
+- `./init.sh --rapido`: typecheck y lint pasan (0 errores, 8 warnings ajenos); test:rapido
+  405 passed / 6 failed, todos en baseline (configuracion-ui/unidades-viewport,
+  configuracion-ui/usuarios-viewport, inventario/product-page, navegacion/pantallas-exigen-permiso,
+  recetas-ui/recipe-page, recetas/module-contract).
+- `pnpm exec vitest run guard --passWithNoTests`: 51 archivos, 672 passed | 11 skipped.
+
+**Veredicto:** hecho; sin cambio visible; gate rapido solo con rojos del baseline; guardias verdes.
