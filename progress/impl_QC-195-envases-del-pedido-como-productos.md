@@ -1649,3 +1649,38 @@ Veredicto: T18 (R45-R47 con P6 = A) y T19 backend (m1, m3) hechos, migracion apl
   `tests/unit/pedidos` 1602 passed; schema 164 passed; 16 `.int` tocados verdes tras corregir
   `order-ingredients-cost.int` (47/47 con `pedidos-constraints.int`); `related` solo con rojos del baseline.
 - T18 y T19 quedan SIN marcar en tasks.md hasta que el `--rapido` termine en verde.
+
+## E6 — relleno de `packaging_cost` sin abortar (backend_dev, 2026-10-04) — commit `c71ab3a9`
+
+Decision humana E6 (design §1.7, `17bd7648`).
+
+### Cambio
+
+- `db/migrations/20261004120000_orders_packaging_cost/migration.sql`: fuera el bloque `DO $$ … RAISE EXCEPTION 'orders_packaging_cost_unknown'`. En su lugar, un `UPDATE` que deja `ingredients_cost` y `packaging_cost` en `NULL` en los pedidos con importe y alguna linea con `packaging_product_id`; despues, el `UPDATE … SET "packaging_cost" = 0 WHERE "ingredients_cost" IS NOT NULL` de siempre para el resto. El CHECK `orders_packaging_cost_matches_ingredients_cost` y el parentesis de RLS no cambian.
+- `down.sql`: sin cambios (quita CHECK y columna). **No restaura** los `ingredients_cost` que el UP dejo en `NULL`: ese importe se pierde y R31 lo recalcula al Terminar.
+- `tests/unit/pedidos/schema/orders-packaging-cost-migration.test.ts`: el caso «aborta …» se sustituye por `R47 E6: un pedido con importe y envases en el reparto queda sin importe, antes de rellenar con 0` (mutaciones: anular solo el total, invertir el orden de los dos `UPDATE`) y `R47 E6: no aborta la migracion`. El caso `R47: el relleno pone 0 …` comprueba ahora los dos `UPDATE` en orden. No hay `.int` que ejercite este relleno.
+
+### Base `QuimiCloude_QC195`
+
+`.env` verificado (`grep -cE` = 2). La base tenia 0 pedidos. En una transaccion: `down.sql` + `DELETE` de la fila `20261004120000_orders_packaging_cost` de `_prisma_migrations` (1 fila; columna ausente despues). `pnpm run db:migrate` aplico `20261004120000_orders_packaging_cost`; `prisma migrate status`: `66 migrations found … Database schema is up to date!`.
+
+### Prueba del relleno en base efimera
+
+`CREATE DATABASE "QuimiCloude_QC195_e6tmp" TEMPLATE "QuimiCloude_QC195"` (antes de reaplicar, sin la columna). Siembra con `session_replication_role = replica` (sin FKs; los CHECK si aplican): un pedido con importe 12.5 y una linea con envase, uno con importe 7.25 y una linea sin envase, uno sin importe. `migration.sql` aplicado en una transaccion:
+
+| Pedido | ingredients_cost / packaging_cost |
+|---|---|
+| importe + envase | null / null |
+| importe sin envase | 7.2500 / 0.0000 |
+| sin importe | null / null |
+
+CHECK presente; `order_presentation_lines` vuelve a FORCE. Base efimera borrada (0 filas en `pg_database`).
+
+### Verificacion (ligera, por memoria)
+
+- `pnpm run typecheck`: limpio.
+- `pnpm run lint`: `✖ 8 problems (0 errors, 8 warnings)`.
+- `pnpm exec vitest run tests/unit/pedidos/schema/orders-packaging-cost-migration.test.ts`: `Test Files 1 passed (1)`, `Tests 7 passed (7)`.
+- No se corrieron guardias, `./init.sh` ni la suite (instruccion de memoria baja).
+
+Veredicto: E6 implementado; la migracion ya no aborta y el relleno queda probado en base efimera.
