@@ -20,6 +20,7 @@ import {
   updateRecipeVersionSchema,
   type RecipeDetail,
   type RecipeLineView,
+  type RecipeToolView,
 } from '@/lib/modules/recetas';
 import {
   createRecipeVersionAction,
@@ -30,14 +31,18 @@ import { recipeEditRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
 import type { RecipeFormProductPage } from './recipe-form';
-import { RecipeLinesField } from './recipe-lines-field';
+import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
 import {
   buildRecipeVersionPayload,
   extractFieldError,
   extractGeneralLinesError,
+  extractGeneralToolsError,
   extractLineErrors,
+  extractToolErrors,
   toLineFormValues,
+  toToolFormValues,
   type RecipeLineErrors,
+  type RecipeToolErrors,
   type RecipeVersionFormState,
 } from './recipe-form-state';
 
@@ -53,6 +58,7 @@ export type RecipeVersionFormOriginal = {
   readonly id: string;
   readonly name: string;
   readonly lines: readonly RecipeLineView[];
+  readonly tools: readonly RecipeToolView[];
 };
 
 type CommonProps = {
@@ -70,13 +76,23 @@ type FieldErrors = {
   readonly name?: string;
   readonly lines?: RecipeLineErrors;
   readonly linesGeneral?: string;
+  readonly tools?: RecipeToolErrors;
+  readonly toolsGeneral?: string;
 };
 
 function buildInitialState(props: RecipeVersionFormProps): RecipeVersionFormState {
   if (props.mode === 'create') {
-    return { name: '', lines: toLineFormValues(props.original.lines) };
+    return {
+      name: '',
+      lines: toLineFormValues(props.original.lines),
+      tools: toToolFormValues(props.original.tools),
+    };
   }
-  return { name: props.version.name, lines: toLineFormValues(props.version.lines) };
+  return {
+    name: props.version.name,
+    lines: toLineFormValues(props.version.lines),
+    tools: toToolFormValues(props.version.tools),
+  };
 }
 
 function noop(): void {}
@@ -169,6 +185,8 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
         name: extractFieldError(issues, 'name'),
         lines: extractLineErrors(issues),
         linesGeneral: extractGeneralLinesError(issues),
+        tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
+        toolsGeneral: extractGeneralToolsError(issues),
       });
       setSaveError({ status: 'error', code: INVALID_INPUT_CODE, message: INVALID_INPUT_MESSAGE });
       return;
@@ -257,11 +275,15 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
       <RecipeLinesField
         lines={state.lines}
         onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
+        tools={state.tools}
+        onToolsChange={(tools) => setState((previous) => ({ ...previous, tools }))}
         units={props.units}
         initialProductPage={props.initialProductPage}
         initialMachinePage={props.initialMachinePage}
         errors={fieldErrors.lines}
         generalError={fieldErrors.linesGeneral}
+        toolErrors={fieldErrors.tools}
+        toolsGeneralError={fieldErrors.toolsGeneral}
         baseline={props.original.lines}
       />
 

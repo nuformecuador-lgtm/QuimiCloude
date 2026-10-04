@@ -2718,6 +2718,36 @@
       "branch": "feature/QC-178-precision-del-coste-unitario",
       "depends_on": [],
       "spec_path": "specs/QC-178-precision-del-coste-unitario"
+    },
+    {
+      "key": "QC-194",
+      "id": 194,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "herramientas-de-la-receta",
+      "description": "Una receta debe poder declarar las herramientas que usa (agitador, estufa, condensador, pHmetro, etc.). Las herramientas son productos de inventario de tipo MACHINE.\n\n**Comportamiento esperado (lo pidió el humano):** se manejan igual que los productos de la receta, como un ingrediente adicional, con una diferencia: **no modifican las cantidades del stock**, porque no son consumibles.\n\n**Estado actual:**\n- El formulario de la receta ya tiene un tab \"Herramientas\" (`recipe-lines-field.tsx`), pero es solo UI. La lista vive en el estado local del componente y se pierde al guardar.\n- No existe en la DB nada que relacione una receta con sus herramientas.\n\n**Restricciones que hoy impiden meterlas como `recipe_lines`:**\n- `recipe_lines_percentage_range` exige un porcentaje mayor que 0.\n- `recipeLinesSchema` exige que las líneas sumen exactamente 100,00 %.\n- La reserva y el consumo del pedido descuentan stock de cada línea.\n\n**Decisiones abiertas para el spec:**\n- Dónde se guardan: una línea de tipo herramienta sin porcentaje en `recipe_lines`, o una tabla aparte (por ejemplo `recipe_machines`).\n- Si las versiones heredan las herramientas de su original o tienen las suyas.\n- Si la herramienta se muestra al operador al ejecutar la receta.\n- Qué pasa al dar de baja una herramienta que usan recetas.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "fullstack",
+      "branch": "feature/QC-194-herramientas-de-la-receta",
+      "depends_on": [],
+      "spec_path": "specs/QC-194-herramientas-de-la-receta"
+    },
+    {
+      "key": "QC-195",
+      "id": 195,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "envases-del-pedido-como-productos",
+      "description": "Al crear un pedido nuevo hoy se eligen **presentaciones** para el reparto. Ese selector debe pasar a elegir **productos de inventario de tipo PACKAGING** (envases).\n\n**Comportamiento esperado (lo pidió el humano):**\n- Se mantienen la funcionalidad y los cálculos actuales del reparto, basados en la **presentación asociada** a cada producto PACKAGING (contenido, unidad, número de envases).\n- El selector **solo lista productos PACKAGING cuya presentación tiene una unidad compatible con la unidad de la cantidad del pedido**. Ejemplo: si el pedido está en litros (l), solo aparecen envases con presentación en l o ml (la misma familia de unidades, por la equivalencia de QC-76); un envase en kg o g no aparece.\n- Al elegir cada envase se **valida su stock** y se **aparta (reserva)** con el mismo flujo que ya usan los demás productos del pedido (las materias primas de la receta).\n- Si no hay stock suficiente del envase, se **avisa** igual que con los demás productos.\n\n**Decisiones abiertas para el spec:**\n- Cómo se asocia un producto PACKAGING a su presentación. Hoy `products.presentation_id` solo se permite en FINISHED_PRODUCT (CHECK `products_finished_identity_matches_type`), y un PACKAGING solo se relaciona con presentaciones a través de sus lotes. ¿Columna propia, relación por lote o regla de \"una sola presentación por producto PACKAGING\"?\n- Qué significa \"compatible\": misma unidad base por la equivalencia de unidades (l ↔ ml), o también otras reglas.\n- Qué pasa con las `order_presentation_lines` de los pedidos que ya existen: si se migran a un producto PACKAGING o se dejan como están.\n- Qué cantidad se reserva: un envase por unidad del reparto, en la unidad del producto.\n- Si un pedido sin stock de envases queda bloqueado igual que con la falta de materia prima (ver QC-138).\n- Cómo se consume el envase al producir y al recibir el producto terminado.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-195-envases-del-pedido-como-productos",
+      "depends_on": [],
+      "spec_path": "specs/QC-195-envases-del-pedido-como-productos"
     }
   ]
 }

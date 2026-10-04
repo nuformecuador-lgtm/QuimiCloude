@@ -64,6 +64,7 @@ const EXECUCION_MINIMA = {
   orderQuantity: '250',
   steps: [],
   lines: [],
+  tools: [],
   presentationLines: [],
   unitId: null,
   unitLabel: null,

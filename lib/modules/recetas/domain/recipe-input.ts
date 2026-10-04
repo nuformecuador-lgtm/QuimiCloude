@@ -207,7 +207,7 @@ export const MAX_RECIPE_STEPS = 50;
 const recipeStepsSchema = z.array(recipeStepSchema).max(MAX_RECIPE_STEPS).default([]);
 
 /** Rechaza que la lista de lineas repita el mismo `productId` (R16). */
-function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {
+function sinProductoRepetido(lines: readonly { readonly productId: string }[]): boolean {
   const ids = lines.map((line) => line.productId);
   return new Set(ids).size === ids.length;
 }
@@ -234,6 +234,23 @@ export const recipeLinesSchema = z
     }
   });
 
+// Tope de la columna `integer`: la cantidad de una herramienta es informativa, no de stock.
+export const MAX_TOOL_QUANTITY = 2147483647;
+
+export const recipeToolSchema = z
+  .object({
+    productId: z.string().uuid(),
+    quantity: z.number().int().min(1).max(MAX_TOOL_QUANTITY),
+  })
+  .strict();
+
+export type RecipeToolInput = z.infer<typeof recipeToolSchema>;
+
+// Sin `.default()`: cada esquema decide que significa omitirla, y fuera de la suma de porcentajes.
+export const recipeToolsSchema = z.array(recipeToolSchema).refine(sinProductoRepetido, {
+  message: 'No puede haber dos herramientas con el mismo producto.',
+});
+
 /**
  * Bytes de una imagen nueva, sin validar todavia formato ni tamano -eso es
  * `validateRecipeImage` (T2), que corre en el caso de uso antes de subir-.
@@ -252,6 +269,7 @@ export const createRecipeSchema = z.object({
   description: recipeDescriptionSchema,
   steps: recipeStepsSchema,
   lines: recipeLinesSchema,
+  tools: recipeToolsSchema.default([]),
   image: recipeImageUploadSchema.optional(),
 });
 
@@ -271,6 +289,9 @@ export const updateRecipeSchema = z.object({
   steps: recipeStepsSchema,
   lines: recipeLinesSchema,
   image: recipeImageUploadSchema.nullable().optional(),
+  // Omitidas = conservar las que tiene; `[]` = quitarlas todas. Con `.default([])` el reemplazo
+  // por PDF, que no las manda, las borraria.
+  tools: recipeToolsSchema.optional(),
   propagateToVersionIds: z
     .array(z.string().uuid())
     .refine((ids) => new Set(ids).size === ids.length, {
@@ -284,11 +305,14 @@ export const updateRecipeSchema = z.object({
 export const createRecipeVersionSchema = z.object({
   name: recipeNameSchema,
   lines: recipeLinesSchema.optional(),
+  // Sin `tools`, la version nace con las de su original.
+  tools: recipeToolsSchema.optional(),
 });
 
 export const updateRecipeVersionSchema = z.object({
   name: recipeNameSchema,
   lines: recipeLinesSchema,
+  tools: recipeToolsSchema.optional(),
 });
 
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;

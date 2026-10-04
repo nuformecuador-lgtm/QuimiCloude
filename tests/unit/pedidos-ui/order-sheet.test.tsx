@@ -353,6 +353,7 @@ beforeEach(() => {
       updatedBy: null,
       steps: [],
       lines: [],
+      tools: [],
       original: null,
       isUnderReview: false,
       displayName: RECETA.name,

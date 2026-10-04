@@ -1,6 +1,8 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setupUser } from '../../helpers/user-event';
+
 import NuevaVersionPage from '@/app/(private)/produccion/formulas/[id]/versiones/nueva/page';
 import EditarVersionPage from '@/app/(private)/produccion/formulas/[id]/versiones/[versionId]/page';
 import { errorMessage } from '@/lib/modules/errores';
@@ -88,6 +90,7 @@ function detail(overrides: Partial<RecipeDetail>): RecipeDetail {
     updatedBy: null,
     steps: [],
     lines: [lineView('l-a', PRODUCT_A, 'Agua', '60.00'), lineView('l-b', PRODUCT_B, 'Sal', '40.00')],
+    tools: [],
     original: null,
     isUnderReview: false,
     displayName: 'Jabón',
@@ -337,5 +340,52 @@ describe('R10 — version que no cuelga de [id] o [id] que no es original', () =
     expect(screen.getByTestId('recipe-list-error')).toBeInTheDocument();
     expect(screen.queryByTestId('recipe-not-found')).toBeNull();
     expect(screen.queryByTestId('recipe-version-form')).toBeNull();
+  });
+});
+
+describe('QC-194 — herramientas en las paginas de version', () => {
+  const TOOL_ID = '99999999-9999-4999-8999-999999999999';
+  const GONE_TOOL_ID = '88888888-8888-4888-8888-888888888888';
+
+  it('R23: el alta de version precarga las herramientas de la original, incluida la no disponible', async () => {
+    recetasPorId({
+      [ORIGINAL_ID]: {
+        status: 'success',
+        data: detail({
+          tools: [
+            { id: 't1', productId: TOOL_ID, productName: 'Agitador', quantity: 2 },
+            { id: 't2', productId: GONE_TOOL_ID, productName: null, quantity: 5 },
+          ],
+        }),
+      },
+    });
+    await abrirAlta();
+
+    await setupUser().click(screen.getByTestId('recipe-lines-tab-machines'));
+
+    expect(screen.getByTestId('recipe-machine-product-0')).toHaveAttribute('placeholder', 'Agitador');
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('2');
+    expect(screen.getByTestId('recipe-machine-unavailable-1')).toBeInTheDocument();
+    expect(screen.getByTestId('recipe-machine-quantity-1')).toHaveValue('5');
+  });
+
+  it('R22: la pagina de una version pinta sus propias herramientas, no las de la original', async () => {
+    recetasPorId({
+      [ORIGINAL_ID]: {
+        status: 'success',
+        data: detail({ tools: [{ id: 't1', productId: TOOL_ID, productName: 'Agitador', quantity: 2 }] }),
+      },
+      [VERSION_ID]: {
+        status: 'success',
+        data: { ...VERSION, tools: [{ id: 't9', productId: GONE_TOOL_ID, productName: 'Balanza', quantity: 7 }] },
+      },
+    });
+    await abrirVersion();
+
+    await setupUser().click(screen.getByTestId('recipe-lines-tab-machines'));
+
+    expect(screen.getAllByTestId('recipe-machine-row')).toHaveLength(1);
+    expect(screen.getByTestId('recipe-machine-product-0')).toHaveAttribute('placeholder', 'Balanza');
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('7');
   });
 });

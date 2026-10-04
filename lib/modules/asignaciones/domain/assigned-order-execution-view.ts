@@ -18,6 +18,8 @@ export type AssignedOrderExecutionView = {
   readonly orderQuantity: string;
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly ExecutionLineView[];
+  /** Solo lectura; la cantidad es la de la receta, no se escala con el pedido. */
+  readonly tools: readonly ExecutionToolView[];
   /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */
   readonly presentationLines: readonly OrderDistributionLineView[];
   /** La unidad de `orderQuantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
@@ -35,4 +37,10 @@ export type ExecutionLineView = {
   readonly unit: UnitRef | null;
   /** Misma base efectiva que `unit`, sin ella misma; vacio si `unit` es `null`. */
   readonly alternativeUnits: readonly UnitRef[];
+};
+
+export type ExecutionToolView = {
+  /** `null` = producto dado de baja. */
+  readonly productName: string | null;
+  readonly quantity: number;
 };

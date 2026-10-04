@@ -82,6 +82,7 @@ function recipeDetail(): RecipeDetail {
     updatedBy: null,
     steps: [],
     lines: [lineView()],
+    tools: [],
     original: null,
     isUnderReview: false,
     displayName: 'Jabón',

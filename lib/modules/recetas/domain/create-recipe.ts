@@ -3,6 +3,7 @@ import { ActionNotAllowedError, RecipeDuplicateNameError, ValidationError } from
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
@@ -59,6 +60,8 @@ export function createCreateRecipe(
       if (finished) throw new ActionNotAllowedError();
     }
 
+    await assertToolsValid(data.tools, [], deps.products, actor.companyId);
+
     // R21: sin imagen no se toca el almacenamiento en absoluto.
     let imagePath: string | null = null;
     if (data.image !== undefined) {
@@ -77,6 +80,7 @@ export function createCreateRecipe(
       steps: data.steps,
       lines: data.lines,
       imagePath,
+      tools: data.tools,
     };
 
     // R8: el puerto traduce el `23505` del indice unico parcial a `'duplicate'`.

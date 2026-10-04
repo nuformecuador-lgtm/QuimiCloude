@@ -413,6 +413,8 @@ export const MIGRACIONES_ESPERADAS = [
   // pedidos bloqueados. Ninguna toca el identificador de peticion.
   '20261001170000_order_status_blocked',
   '20261001170100_orders_blocked_index',
+  // Crea la tabla de herramientas de receta; no toca el identificador de peticion.
+  '20261003120000_recipe_tools',
 ] as const
 
 export function hallazgosDeMigraciones(

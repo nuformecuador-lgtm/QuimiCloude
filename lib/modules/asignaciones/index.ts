@@ -152,6 +152,7 @@ export {
 export type {
   AssignedOrderExecutionView,
   ExecutionLineView,
+  ExecutionToolView,
 } from './domain/assigned-order-execution-view';
 
 // Que vistas de `/asignacion` puede ver un usuario, solo por permiso. `app/**` compone la

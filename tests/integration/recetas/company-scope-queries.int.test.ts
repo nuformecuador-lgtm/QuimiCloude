@@ -160,6 +160,7 @@ function recetaNueva(overrides: Partial<NewRecipe> = {}): NewRecipe {
     steps: [],
     lines: [],
     imagePath: null,
+    tools: [],
     ...overrides,
   };
 }
@@ -547,7 +548,7 @@ describe('versiones en el catalogo publico (R8, R25, R37, R40, R41)', () => {
   async function version(empresa: Empresa, originalId: string, name: string): Promise<string> {
     const resultado = await createRecipeVersion(
       originalId,
-      { name, lines: lineaDe(empresa) },
+      { name, lines: lineaDe(empresa), tools: [] },
       empresa.userId,
       AHORA,
       ambitoDe(empresa),

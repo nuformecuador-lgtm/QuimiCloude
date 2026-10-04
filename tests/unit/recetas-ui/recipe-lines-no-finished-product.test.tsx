@@ -30,6 +30,8 @@ function renderField() {
       onChange={() => {}}
       units={[]}
       initialProductPage={EMPTY_PAGE}
+      tools={[]}
+      onToolsChange={() => {}}
       initialMachinePage={EMPTY_PAGE}
     />,
   );
@@ -82,6 +84,8 @@ describe('R30: el selector de insumos nunca pide productos terminados', () => {
           items: [{ id: 'finished-1', name: 'Desengrasante industrial · Botella 1L', unitId: null }],
           totalPages: 1,
         }}
+        tools={[]}
+        onToolsChange={() => {}}
         initialMachinePage={{
           items: [{ id: 'finished-1', name: 'Desengrasante industrial · Botella 1L', unitId: null }],
           totalPages: 1,

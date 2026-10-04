@@ -36,6 +36,7 @@ export type {
   RecipeCatalog,
   RecipeExecutionContent,
   RecipeExecutionLine,
+  RecipeExecutionTool,
 } from './domain/recipe-catalog';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
@@ -52,6 +53,7 @@ export {
   recipeDisplayName,
   isVersionUnderReview,
   propagateLines,
+  propagateTools,
 } from './domain/recipe-version';
 export {
   MAX_IMAGE_BYTES,
@@ -80,6 +82,10 @@ export {
   updateRecipeSchema,
   createRecipeVersionSchema,
   updateRecipeVersionSchema,
+  recipeToolSchema,
+  recipeToolsSchema,
+  MAX_TOOL_QUANTITY,
+  type RecipeToolInput,
   type RecipeLineInput,
   type CreateRecipeInput,
   type UpdateRecipeInput,
@@ -89,6 +95,7 @@ export {
 export {
   type RecipeSummary,
   type RecipeLineView,
+  type RecipeToolView,
   type RecipeStepView,
   type RecipeDetail,
   type RecipeVersionSummary,

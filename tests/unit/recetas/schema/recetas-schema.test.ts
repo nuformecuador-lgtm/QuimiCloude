@@ -444,7 +444,7 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
       .filter(([, moduleName]) => moduleName === 'recetas')
       .map(([modelName]) => modelName)
       .sort()
-    expect(recetasModels).toEqual(['Recipe', 'RecipeLine'])
+    expect(recetasModels).toEqual(['Recipe', 'RecipeLine', 'RecipeTool'])
     // Esta feature no adopta modelos ajenos: siguen siendo de su modulo.
     expect(owners.get('Product')).toBe('inventario')
     expect(owners.get('Presentation')).toBe('inventario')

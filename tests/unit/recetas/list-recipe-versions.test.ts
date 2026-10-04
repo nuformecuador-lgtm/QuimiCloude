@@ -22,6 +22,7 @@ const ORIGINAL: RecipeRow = {
   createdAt: AHORA,
   updatedAt: AHORA,
   lines: [],
+  tools: [],
   original: null,
 };
 
