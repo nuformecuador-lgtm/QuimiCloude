@@ -120,3 +120,59 @@ Nota: `git status` marca `lib/modules/recetas/adapters/driven/persistence/recipe
 ### Veredicto
 
 **OK** — sin bloqueantes. Hay 7 menores. m1 debe cerrarse (T13 `[x]` + mapa consolidado) tras el `./init.sh` completo del leader y antes de `done`.
+
+## Vuelta 2 (acotada a 7d2c7d9f..HEAD)
+
+Commits revisados: `2440008f`, `1f4dad13`, `90d3f204`, `17f3cfaa`, `2b7b1f02`, `7d52c061`, `75969350`.
+
+### Verificación ejecutada
+
+- `tsc --noEmit`: verde.
+- `eslint` sobre los 5 archivos de código/test del diff: verde.
+- Guardias (`vitest run guard`): 51/51 archivos, 676 tests verdes.
+- `vitest related` de `order-execution-tools.tsx` y `recipe-prisma.ts`: 7 rojos en 5 archivos
+  (`unidades-viewport`, `usuarios-viewport`, `product-page`, `pantallas-exigen-permiso`,
+  `recipe-page`). Los cinco están en `tests/baseline-rojos.json`: heredados, no son hallazgo.
+- `.int` tocados (`order-reservation-tools`, `recipe-lines`, `recipe-tools`): 3 archivos, 23 tests verdes.
+
+### Estado de los menores de la vuelta 1
+
+- **m1 — abierto, fuera de alcance.** Lo cierra el leader tras el `./init.sh` completo (T13 + mapa consolidado con R34).
+- **m2 — cerrado.** Se mantiene la conversión amplia `23503`/`P2003` → `ValidationError` por decisión humana.
+  El comentario ya no dice «solo puede ser un producto». Ahora dice que Prisma no expone la FK
+  (`meta.constraint` null), que cualquier FK rota se reporta como entrada inválida, y que solo ocurre con un borrado físico
+  concurrente. Es honesto y no cita requisitos. La función pasa a llamarse `isForeignKeyViolation`.
+  El test nuevo `recipe-lines.int > FK rota de producto de linea` borra físicamente el producto y afirma que llega
+  `ValidationError` y que no queda receta. `design.md > 4` lo recoge.
+  Detalle sin peso: la enumeración del comentario (línea, herramienta, autor) omite `parent_recipe_id`, que sí figura en `design.md`.
+- **m3 — cerrado.** `recipe-tools.int` siembra la empresa B y llama a `replaceAliveRecipe` (original y versión) y a
+  `replaceAliveRecipeWithPropagation` con `B.scope`. Las tres dan `not_found`. El retrato de original y versión
+  queda igual, y las herramientas siguen siendo `[x:2, y:5]`. Este test prueba algo más que `[]`.
+- **m4 — parcial; aceptable.** Ahora el `create` de la propagación va en varias líneas, igual que en los otros dos sitios.
+  El par sigue escrito tres veces. La razón está en `design.md > 4`, y la comprobé contra la guardia:
+  `guard-ambito-empresa-recetas` exige que cada función que toca `tx.` declare y consuma `scope: RecipeScope`.
+  Un helper sin `scope` no pasaría, y pasarle uno que no use debilitaría la guardia. Prefiero la duplicación
+  a debilitar la guardia de aislamiento. Lo doy por cerrado.
+- **m5 — cerrado.** `design.md > 4` ya no promete `replaceToolsOn`, explica por qué no existe y describe la FK amplia.
+  `> 7` documenta que el producto repetido llega con path `['tools']` y se pinta como error general del tab.
+  `> 5` incluye editar. Solo hay ajustes a `design.md`; `requirements.md` no cambia.
+- **m6 — cerrado.** `order-reservation-tools.int` añade el caso R8 de editar con `createUpdateOrder` y los adaptadores reales.
+  La secuencia es 50 → PENDIENTE (la herramienta sin stock no bloquea), 200 → BLOQUEADO (por el
+  ingrediente) y 30 → PENDIENTE. Los asientos sobre el lote de la herramienta quedan intactos, su stock sigue en 5,
+  y hay reservas sobre el ingrediente. Pasa contra Postgres.
+- **m7 — cerrado.** El JSDoc va encima de `OrderExecutionTools`.
+
+### Regresiones en el diff
+
+No encontré ninguna. El cambio de producción se limita a renombrar una función privada, reescribir un comentario y formatear un literal.
+No hay comportamiento nuevo. Los comentarios añadidos no citan `QC-`, `R<n>`, `design.md` ni «decisión cerrada».
+No hay UI nueva (el diff solo mueve un JSDoc) y `package.json` no cambia.
+
+### Hallazgos nuevos
+
+Ninguno.
+
+### Veredicto
+
+**OK**. No hay bloqueantes. m2–m7 quedan cerrados (m4 se acepta con la duplicación justificada por la guardia).
+Sigue abierto m1, que corresponde al leader tras el gate completo y antes de `done`.
