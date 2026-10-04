@@ -189,6 +189,12 @@ Hasta que el humano decida P6, T18 implementa R45 y R46 y deja el caso `POR_EMPA
 después de la decisión. Con A, T18 incluye la migración, la columna en `db/schema.prisma` y la
 escritura doble; con B, solo la resta en el caso de uso.
 
+**E6 — Relleno de `packaging_cost` con datos imposibles (decisión humana 2026-10-04).** Si la
+migración encuentra un pedido con importe guardado y líneas con producto PACKAGING (solo posible en
+bases de desarrollo de esta rama, porque la columna del envase nace en esta misma ficha), **no
+aborta**: deja `ingredients_cost` y `packaging_cost` de ese pedido en `NULL`, como un pedido sin
+importe, y R31 lo costea al Terminar. Los demás pedidos se rellenan con `packaging_cost = 0`.
+
 ## 2. Modelo de datos
 
 Una migración escrita a mano, `db/migrations/<ts>_packaging_products_in_distribution/` con
