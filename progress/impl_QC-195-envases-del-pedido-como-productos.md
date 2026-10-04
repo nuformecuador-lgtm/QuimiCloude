@@ -1330,3 +1330,16 @@ Dudas para quien las corra:
 - `toBeDisabled()` sobre un item del menu de Base UI se apoya en su `aria-disabled`.
 - Los envases de los fixtures se siembran por Prisma con el mismo estado que deja el alta real (T2);
   no pasan por `createWithFirstBatch`.
+
+### T16 — diagnostico del alta bloqueada en el E2E (frontend_dev)
+
+- **Causa:** `app/(private)/pedidos/components/use-order-distribution-availability.ts:64`
+  (`hasUniquePresentations`). Al enviar, `readDistributionLines` (order-form.tsx:329) lee del
+  FormData `presentationId = ''` en cada linea de envase (el hidden de presentacion va vacio salvo en
+  lineas antiguas). Con dos envases, las dos `''` contaban como presentacion repetida,
+  `distributionLinesValid` daba `false` y `save` rechazaba sin llamar a `createOrderAction`. Viene
+  de 1fa8dc58 (T13), no de 63fd3a6d; los unit solo anadian un envase.
+- **Fix:** las presentaciones vacias no cuentan al comprobar duplicados; el duplicado envase/presentacion
+  lo sigue viendo `addLine` con la presentacion conocida, y el servidor al resolver.
+- **Test:** `tests/unit/pedidos-ui/order-form.test.tsx` caso «R17: dos envases de presentaciones
+  distintas se guardan…», con el esquema real; falla sin el fix.
