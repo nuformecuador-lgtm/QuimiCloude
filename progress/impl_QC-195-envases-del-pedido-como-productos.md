@@ -1094,3 +1094,60 @@ Preguntas abiertas para el leader/humano:
    del reparto -> POR_EMPACAR consume lo apartado (sumado) y Terminar vuelve a consumir del disponible.
    Probablemente inalcanzable bajo P2-A (legado sin `u`), no verificado; el spec no lo cubre.
 4. Texto de `insufficient_material` en Terminar reutiliza el del catalogo («...para entregar el pedido»).
+
+## Backend — Enmienda 1: T11 (R42) y T10.E1 (R43, R32 en Terminar)
+
+### T11 / R42 — commit aa12b4e4
+El codigo de 2a43b5c7 ya cumplia R42; solo faltaba la trazabilidad. En
+`tests/unit/recetas/qc195-envase-no-es-ingrediente.test.ts` se renombran los tres casos de version
+(sin tocar los de FINISHED_PRODUCT) y el de la copia comprueba ademas que la linea del envase llega a
+`createVersion`:
+- `R39, R42 — el alta de una version con un envase que la original no tenia se rechaza con action_not_allowed sin escribir`
+- `R42 — una version que copia las lineas de una original con un envase se crea`
+- `R42 — una version que repite el envase que ya tenia la original (como lo envia el formulario) se crea`
+
+Salida: `Test Files 1 passed (1)`, `Tests 10 passed (10)`.
+
+### T10.E1 — commit 3072bac4
+- `lib/modules/pedidos/domain/order-packing.ts`: Terminar lee las lineas de la receta del pedido con
+  `scope.recipes.findExecutionContentById` (dentro de la transaccion) y quita del
+  `fallbackRequirement` los envases que son ingrediente; `productIds` sigue con todos los envases del
+  reparto, asi que lo que quede apartado de un envase-ingrediente se consume y nada mas. Las lineas
+  antiguas siguen sin aportar (`packagingLinesOf`). `insufficient_material` sin cambios (texto del catalogo).
+- `tests/unit/pedidos/order-packing.test.ts`: `montar` acepta `ingredientes`; dos casos nuevos.
+- `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`: caso R32 y un `describe` nuevo
+  con los dos casos R43 (receta 50 % materia / 50 % envase sembrada en la base, envase con dos lotes).
+  Ya estaba en el censo `aislamiento.json` como `commit`.
+
+Mapa:
+| R | Test |
+|---|---|
+| R42 | `tests/unit/recetas/qc195-envase-no-es-ingrediente.test.ts` > los tres casos de arriba |
+| R43 | int `finish-with-finished-goods.int.test.ts` > `R43: POR_EMPACAR consume lo apartado del envase como ingrediente; Terminar no consume nada mas de el, no baja su disponible ni otros lotes y deja el pedido ENTREGADO` |
+| R43 | int, mismo archivo > `R43: si en POR_EMPACAR se edito el reparto y quedo algo apartado del envase, Terminar consume exactamente eso` |
+| R43 | unit `order-packing.test.ts` > `QC-195 R43: un envase que es tambien ingrediente de la receta sale del respaldo; ...` y `QC-195 R43: si todos los envases son ingredientes, el respaldo va vacio y Terminar no falla por ellos` |
+| R32 | int `finish-with-finished-goods.int.test.ts` > `R32: Terminar un pedido con una linea antigua no consume nada: ni envases ni otro material, ni toca lo apartado` |
+| R25 | los dos `R25:` de siempre en el mismo archivo y los unit `QC-195 R25` siguen verdes |
+
+Prueba de mutacion: con el respaldo de antes (`fallbackRequirement: packagingRequirement`) el primer
+caso R43 falla (`Tests 1 failed | 1 passed | 20 skipped`); con el arreglo pasa.
+
+Salida real:
+- `vitest run` de order-packing.test.ts, qc195-envase-no-es-ingrediente.test.ts,
+  finish-with-finished-goods.int.test.ts, qc195-packaging-reservation.int.test.ts:
+  `Test Files 4 passed (4)`, `Tests 79 passed (79)` (int contra copia de `QuimiCloude_QC195`).
+- `eslint` de los 4 archivos tocados: limpio.
+- `pnpm run typecheck`: ROJO, pero todo en archivos que el otro backend_dev esta cambiando para T15
+  (`tests/unit/asignaciones/**` falta `packagingName`; `tests/unit/pedidos/order-catalog.test.ts`).
+  Cero errores en los archivos de esta tanda.
+- `vitest run guard`: `Test Files 1 failed | 50 passed (51)`, `Tests 3 failed | 669 passed | 11 skipped`.
+  Los 3 son de `guard-ambito-empresa-pedidos` (OrderCatalog: `listAliveSummariesByIds`,
+  `listAliveSummariesInCompany`), en `order-catalog-prisma.ts` que esta tocando T15. Ninguno por esta tanda.
+
+Nota (sin cambiar): `consumeForOrder` solo usa el respaldo si el pedido no tiene NADA apartado de los
+`productIds`. Si quedara apartado un envase-ingrediente y a la vez faltara lo apartado de un envase
+normal, ese envase normal no se consumiria del disponible. No es nuevo en esta tanda y la aplicacion no
+lo produce (un pedido o tiene todo apartado o nada).
+
+**Veredicto:** T10.E1 y R42 hechos; R43 y R32 verdes en Terminar, R25 sigue verde; typecheck y la
+guardia de ambito quedan rojos por el trabajo de T15 en curso.
