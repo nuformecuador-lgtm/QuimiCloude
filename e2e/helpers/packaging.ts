@@ -36,7 +36,13 @@ export async function findPackageUnitId(): Promise<string> {
   return unit.id;
 }
 
+// Espejo de `product_batches_lot_length`: falla aqui, con el lote a la vista, y no con un 23514.
+const MAX_LOT_LENGTH = 60;
+
 export async function seedPackaging(input: SeedPackagingInput): Promise<SeededPackaging> {
+  if (input.lot.length > MAX_LOT_LENGTH) {
+    throw new Error(`lote de ${input.lot.length} caracteres (max ${MAX_LOT_LENGTH}): ${input.lot}`);
+  }
   const unitId = await findPackageUnitId();
   const purchaseDate = new Date('2026-01-01T00:00:00Z');
 

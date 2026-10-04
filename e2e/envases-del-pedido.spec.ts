@@ -364,7 +364,7 @@ test.beforeAll(async () => {
     presentationId: halfLiterPresentationId,
     stock: BOTTLE_STOCK,
     unitCost: BOTTLE_UNIT_COST,
-    lot: `${BOTTLE_NAME}_lote`,
+    lot: `${SHARED_TOKEN}_lote_botella`,
     createdBy: adminUserId,
   });
   bottle = { ...seededBottle, name: BOTTLE_NAME };
@@ -374,7 +374,7 @@ test.beforeAll(async () => {
     presentationId: literPresentationId,
     stock: JUG_STOCK,
     unitCost: JUG_UNIT_COST,
-    lot: `${JUG_NAME}_lote`,
+    lot: `${SHARED_TOKEN}_lote_garrafa`,
     createdBy: adminUserId,
   });
   jug = { ...seededJug, name: JUG_NAME };

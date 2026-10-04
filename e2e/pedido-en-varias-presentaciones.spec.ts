@@ -447,7 +447,7 @@ test.beforeAll(async () => {
     presentationId: presentationAId,
     stock: PACKAGING_STOCK,
     unitCost: PACKAGING_UNIT_COST,
-    lot: `${PACKAGING_A_NAME}_lote`,
+    lot: `${SHARED_TOKEN}_lote_envase_a`,
     createdBy: adminUserId,
   });
   packagingAId = packagingA.productId;
@@ -458,7 +458,7 @@ test.beforeAll(async () => {
     presentationId: presentationBId,
     stock: PACKAGING_STOCK,
     unitCost: PACKAGING_UNIT_COST,
-    lot: `${PACKAGING_B_NAME}_lote`,
+    lot: `${SHARED_TOKEN}_lote_envase_b`,
     createdBy: adminUserId,
   });
   packagingBId = packagingB.productId;
