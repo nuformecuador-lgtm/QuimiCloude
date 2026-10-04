@@ -1512,3 +1512,130 @@ E2E tras el merge (una a una, chromium, puerto 3117, `.next/dev/types` borrado a
   `51 passed (51)`, `678 passed | 11 skipped`; `vitest related` `Test Files 2 failed | 9 passed (11)`,
   `Tests 2 failed | 213 passed (215)`: los 2 rojos (`product-page` R18, `pantallas-exigen-permiso`
   `/pedidos`) estan en `tests/baseline-rojos.json`; los casos nuevos, verdes.
+
+## backend_dev — T18 (R45, R46, R47; B1 + E5 + P6 = A) — commit `ebc645a0`
+
+### Archivos
+
+- **Migracion nueva `db/migrations/20261004120000_orders_packaging_cost/`** (`migration.sql` + `down.sql`):
+  parentesis NO FORCE/FORCE de RLS en `orders` y `order_presentation_lines`; `ADD COLUMN "packaging_cost"
+  DECIMAL(14,4)` (NULL, sin default); guardia `orders_packaging_cost_unknown` que aborta si existe un
+  pedido con importe y lineas con envase (no se puede saber que parte se sumo; inalcanzable en
+  produccion porque `packaging_product_id` llega en esta misma ficha); relleno
+  `packaging_cost = 0 WHERE ingredients_cost IS NOT NULL`; CHECK
+  `orders_packaging_cost_matches_ingredients_cost` `(("packaging_cost" IS NULL) = ("ingredients_cost" IS NULL))`.
+  `down.sql`: `DROP CONSTRAINT` + `DROP COLUMN`, nada mas (el total no se toca).
+- `db/schema.prisma`: `Order.packagingCost Decimal? @map("packaging_cost") @db.Decimal(14, 4)`.
+- `lib/modules/pedidos/domain/order-cost.ts`: tipo `StoredOrderCost { total, packaging }`,
+  `storedOrderCost(ingredientes, envases)` e `ingredientsPartOf(cost)` (resta exacta, `null` si sale negativa).
+- `lib/modules/pedidos/domain/resolve-ingredients-cost.ts`: `resolveStoredOrderCost` (mismo calculo que
+  `resolveOrderCost`, que ahora devuelve su `total`) y `resolvePackagingCost`.
+- `lib/modules/pedidos/ports/order-write-repository.ts`: `create`, `updateAlive` y `setIngredientsCost`
+  reciben `StoredOrderCost | null`; `LockedOrderRow` gana `packagingCost`.
+- `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`: `costColumns` escribe las dos
+  columnas juntas en `updateAlive` y `setIngredientsCost`; el `INSERT` crudo del alta escribe las dos;
+  `lockAliveById` lee `packaging_cost`.
+- Escrituras del importe (todas; `grep ingredients_cost|ingredientsCost` en `lib/`): alta
+  (`create-order.ts`, incluido el `null` al bloquear), edicion (`update-order.ts`, incluido el `null`),
+  revision de bloqueados (`review-blocked-orders.ts`) y «Reparto y unidad»
+  (`update-order-presentation-lines.ts`). Terminar (`order-packing.ts`) solo LEE el total: no cambia.
+- `lib/modules/pedidos/domain/update-order-presentation-lines.ts`: deps ganan `recipes` y `products`;
+  si el pedido no queda `BLOQUEADO` escribe `resolveStoredOrderCost(…, envases del reparto nuevo, …,
+  { orderId })` (R45, R46); en `POR_EMPACAR`, `ingredientsPartOf(guardado) + resolvePackagingCost(envases
+  nuevos, { orderId })` (R47), `null` si lo guardado o los envases son «sin importe».
+- `lib/composition/index.ts`: cableado de `recipes`/`products` en `updateOrderPresentationLines`.
+
+**Desviacion respecto a `design.md > 1.7` (para el reviewer):** el importe del dialogo se calcula
+**dentro** de la transaccion, tras `lockAliveById` y `syncForOrder`, no antes de abrirla. Motivo: la
+receta, la cantidad, el estado y el importe guardado salen de la fila bloqueada, y las dependencias que
+fija el design (`recipes` y `products`, sin lector de pedidos) no permiten leerlos antes. Los catalogos
+de costo usan el cliente global, igual que `resolveDistributionLines`, que ya corre dentro de esta
+misma transaccion; leen lo confirmado, y `orderId` cuenta lo apartado por el propio pedido, como la
+cotizacion. El review de la vuelta 1 admitia «fuera de la transaccion … o dentro».
+
+Tests tocados por el requisito nuevo (no solo para pasar): `pedidos-schema.test.ts` (lista cerrada de
+columnas a veinte, decimales del modelo con `packagingCost`, caso nuevo), `pedidos-constraints.int`
+(`packaging_cost` en la lista cerrada de `information_schema`, caso nuevo del CHECK),
+`order-ingredients-cost.int` (el pedido «anterior a la columna» se simula con las dos columnas a NULL:
+el CHECK ya no deja una sola), `guard-identificador-de-request` (migracion nueva en la lista cerrada),
+`order-repository.int` (`setIngredientsCost` con las dos partes) y las aserciones del importe de
+`create-order`, `update-order`, `review-blocked-orders` y `quote-order-cost` (ahora `{ total, packaging }`).
+Nuevo: `tests/unit/pedidos/schema/orders-packaging-cost-migration.test.ts` (contrato del SQL con mutaciones).
+
+### Base `QuimiCloude_QC195`
+
+`grep -cE '^(DATABASE_URL|DIRECT_URL)=.*QuimiCloude_QC195' .env` = 2. `pnpm run db:migrate`:
+`Applying … 20261004120000_orders_packaging_cost … All migrations have been successfully applied.`
+`prisma migrate status`: `66 migrations found in prisma/migrations` · `Database schema is up to date!`
+
+### Rollback en base efimera
+
+`pnpm run db:test template` -> `qct_tpl_4ad3ba613e9e (66 migraciones)`;
+`CREATE DATABASE "QuimiCloude_QC195_rb" TEMPLATE "qct_tpl_4ad3ba613e9e"`; se siembran dos pedidos
+(uno con importe 12.3400/2.0000, otro sin importe); script `pg` temporal, borrado al final.
+
+```
+tras template (UP)         {"migs":66,"fila":1,"col":1,"chk":1,"orders_force":true,"lines_force":true,"pedidos":0,"suma_total":"0"}
+con 2 pedidos sembrados    {"migs":66,"fila":1,"col":1,"chk":1,"orders_force":true,"lines_force":true,"pedidos":2,"suma_total":"12.3400"}
+tras down.sql + DELETE     {"migs":65,"fila":0,"col":0,"chk":0,"orders_force":true,"lines_force":true,"pedidos":2,"suma_total":"12.3400"}
+totales tras down          [{"order_sequence":1,"ingredients_cost":"12.3400"},{"order_sequence":2,"ingredients_cost":null}]
+prisma migrate deploy:     Applying migration `20261004120000_orders_packaging_cost` · All migrations have been successfully applied. · Database schema is up to date!
+tras re-aplicar (deploy)   {"migs":66,"chk":1,"pedidos":[{"seq":1,"total":"12.3400","envases":"0.0000"},{"seq":2,"total":null,"envases":null}],"orders_force":true}
+base efimera borrada, pg_database = 0
+```
+
+El re-apply ejercita tambien el relleno: el pedido con importe y sin envases queda con
+`packaging_cost = 0`; el que no tiene importe sigue con las dos a NULL.
+
+## backend_dev — T19 m1 (commit `0fcbb1a2`) y m3 (commit `fa00cb85`)
+
+- m1: `tests/integration/inventario/qc195-packaging-catalog.int.test.ts` «R30 — un lote de envase sin
+  costo unitario no entra en el promedio, aunque tenga disponible» (lote de 50 sin costo junto a uno de
+  100 a 0.50: `findPackagingCostingBatches` solo devuelve el segundo y 40 envases cuestan 20.0000);
+  `tests/integration/inventario/qc195-packaging-product.int.test.ts` «R6 — con una unidad propia de la
+  empresa llamada «unidad» y simbolo «u», el alta del envase toma la de sistema y no choca».
+- m3: comentario en `lib/modules/inventario/domain/reservation.ts`, `consumeForOrder.fallbackRequirement`:
+  con `productIds`, el respaldo solo se usa si NINGUNO tiene nada apartado; no se decide por producto.
+  Cotejado con `reservation-prisma.ts:196-228`. Sin citas de ficha.
+
+### Mapa R -> test (T18, T19 backend)
+
+| R | Test |
+|---|---|
+| R45 | unit `update-order-presentation-lines.test.ts`: «R45: en %s guarda el importe nuevo -ingredientes 20 + envases 1.2- con el apartado del propio pedido» (PENDIENTE, EN_CURSO), «R45: un envase sin lote con costo deja el pedido sin importe (null), como la cotizacion», «R45, R17: si queda BLOQUEADO el importe es null y no se calcula», «QC-195 R45: las dependencias declaradas son las del reparto mas recipes y products para el importe». `.int` `qc195-packaging-reservation.int.test.ts`: «R45, R27, R29: en %s, tras anadir 40 botellas por el dialogo el importe guardado es el de quoteOrderCost con ese reparto y orderId» (PENDIENTE, EN_CURSO), «R45: si el envase nuevo no tiene lote con costo, el dialogo guarda «sin importe», igual que la cotizacion» |
+| R46 | unit «R46: BLOQUEADO -> PENDIENTE escribe el importe calculado, no lo deja sin importe»; `.int` «R46, R19: un BLOQUEADO que el dialogo desbloquea queda PENDIENTE con el importe de quoteOrderCost, no sin importe» |
+| R47 | unit «R47: en POR_EMPACAR conserva la parte de ingredientes guardada (25 - 5 = 20) y suma los envases nuevos (1.2)», «R47: en POR_EMPACAR sin importe guardado queda sin importe», «R47: en POR_EMPACAR, si el costo de los envases nuevos es «sin importe», queda sin importe»; `.int` «R47: en POR_EMPACAR, el importe es la parte de ingredientes guardada mas los envases nuevos, y no el de quoteOrderCost» (67.0000 = 40 + 27; la cotizacion da otra cifra); `pedidos-constraints.int` «QC-195 R47: el importe y su parte de envases son NULL juntos o con valor juntos (23514 si no)»; `order-repository.int` «R15, QC-195 R47 — setIngredientsCost sustituye el importe y su parte de envases…»; `orders-packaging-cost-migration.test.ts` (6 casos); `pedidos-schema.test.ts` «QC-195 R47: orders gana packagingCost…» |
+| R30 | `.int` `qc195-packaging-catalog.int.test.ts` «R30 — un lote de envase sin costo unitario no entra en el promedio, aunque tenga disponible» (mas los casos R30 previos) |
+| R6 | `.int` `qc195-packaging-product.int.test.ts` «R6 — con una unidad propia de la empresa llamada «unidad» y simbolo «u», el alta del envase toma la de sistema y no choca» |
+
+R17, R19 y R27-R30 siguen verdes (unit de pedidos entera y los `.int` de abajo).
+
+### Verificacion (salida real)
+
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: `✖ 8 problems (0 errors, 8 warnings)`, los 8 preexistentes (`product-columns.tsx`,
+  `confirm-catalog-import.test.ts`, `order-service.test.ts`); ninguno en archivos tocados.
+- `pnpm exec vitest run tests/unit/pedidos` (antes del test de migracion nuevo): `Test Files 89 passed`,
+  `Tests 1602 passed | 3 skipped`; `tests/unit/pedidos/schema` con el nuevo: `Test Files 11 passed (11)`,
+  `Tests 164 passed (164)`.
+- `.int` (16 archivos: qc195-packaging-reservation, order-repository, pedidos-constraints,
+  qc195-packaging-catalog, qc195-packaging-product, finish-with-finished-goods,
+  qc170-distribution-company-scope, qc170-distribution-concurrency, review-blocked-orders, order-crud,
+  order-ingredients-cost, order-cost-quote, company-scope-queries, qc170-backfill,
+  order-reservation-tools, order-unit-of-work): primera corrida `Test Files 1 failed | 15 passed (16)`,
+  `Tests 1 failed | 225 passed (226)`; el rojo era `order-ingredients-cost.int` «con `ingredients_cost`
+  en NULL por fuera de la aplicacion…», que ponia solo el total a NULL y chocaba con el CHECK nuevo:
+  corregido para poner las dos. Re-corrida `order-ingredients-cost.int` + `pedidos-constraints.int`:
+  `Test Files 2 passed (2)`, `Tests 47 passed (47)`. Los 9 casos nuevos de `.int`, en verbose: verdes.
+- `pnpm exec vitest run guard --passWithNoTests`: `Test Files 51 passed (51)`, `Tests 678 passed | 11 skipped (689)`.
+- `pnpm exec vitest related --run <11 archivos de lib/ y db/>`: `Test Files 5 failed | 304 passed (309)`,
+  `Tests 7 failed | 4684 passed | 1 skipped (4692)`. Los 5 archivos rojos estan en
+  `tests/baseline-rojos.json` (unidades-viewport, usuarios-viewport, product-page,
+  pantallas-exigen-permiso, recipe-page). Ningun rojo nuevo.
+
+### Para la UI
+
+Nada cambia: `packagingCost` no sale en `OrderRow`/`OrderView` ni en ninguna lectura; la ficha, el
+listado, la cotizacion y Terminar siguen leyendo el total de `ingredients_cost`.
+
+Veredicto: T18 (R45-R47 con P6 = A) y T19 backend (m1, m3) hechos, migracion aplicada y rollback probado; sin rojos fuera del baseline.
