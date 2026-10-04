@@ -21,6 +21,7 @@ import {
   createWithFirstBatch,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
+import { calculatePackagingCost } from '@/lib/modules/pedidos/domain/order-cost';
 import { findPackageUnitId } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -98,7 +99,7 @@ async function dropCompany(c: Company): Promise<void> {
   await prisma.documentType.delete({ where: { code: c.documentTypeCode } });
 }
 
-function lote(c: Company, stock: string, unitCost: string, presentationId: string | null = null): NewProductBatch {
+function lote(c: Company, stock: string, unitCost: string | null, presentationId: string | null = null): NewProductBatch {
   return { presentationId, stock, unitCost, lot: null, purchaseDate: '2026-09-01', expiryDate: null, createdBy: c.userId };
 }
 
@@ -230,6 +231,30 @@ describe('QC-195 — PackagingCatalog', () => {
         { productId: botella.id, unitCost: '0.5000', available: '100.0000' },
         { productId: botella.id, unitCost: '0.7000', available: '50.0000' },
       ]);
+    } finally {
+      await dropCompany(c);
+    }
+  });
+
+  it('R30 — un lote de envase sin costo unitario no entra en el promedio, aunque tenga disponible', async () => {
+    const c = await createCompany();
+    try {
+      const botella = await envase(c, '100', '0.5000');
+      const sinCosto = await addBatchToAlive(botella.id, lote(c, '50', null), new Date(), { companyId: c.companyId }, {
+        presentationId: c.p500,
+      });
+      expect(sinCosto).not.toBeNull();
+      const sinCostoGuardado = await prisma.productBatch.findFirstOrThrow({
+        where: { productId: botella.id, unitCost: null },
+        select: { stock: true },
+      });
+      expect(sinCostoGuardado.stock.toFixed(4)).toBe('50.0000');
+
+      const lotes = await findPackagingCostingBatches([botella.id], c.companyId);
+      expect(lotes).toEqual([{ productId: botella.id, unitCost: '0.5000', available: '100.0000' }]);
+
+      // El promedio es el del unico lote con costo: 40 envases x 0.50.
+      expect(calculatePackagingCost([{ productId: botella.id, packages: 40 }], lotes)).toBe('20.0000');
     } finally {
       await dropCompany(c);
     }

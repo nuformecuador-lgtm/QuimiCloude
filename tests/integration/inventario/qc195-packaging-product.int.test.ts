@@ -181,6 +181,42 @@ describe('QC-195 — el envase como producto de inventario', () => {
     }
   });
 
+  it('R6 — con una unidad propia de la empresa llamada «unidad» y simbolo «u», el alta del envase toma la de sistema y no choca', async () => {
+    const f = await createFixture();
+    try {
+      const sistema = await packageUnitId();
+      const propia = await prisma.unit.create({
+        data: { name: 'unidad', nameNormalized: 'unidad', symbol: 'u', companyId: f.companyId },
+        select: { id: true },
+      });
+      try {
+        expect(propia.id).not.toBe(sistema);
+        expect(await findPackageUnitId()).toBe(sistema);
+
+        const { id } = await altaDeProducto(altaEnvase(`Botella PET ${token()}`, f.p500, '100'), f.actor);
+        const product = await productRow(id);
+        expect(product.unitId).toBe(sistema);
+        expect(product.stock.toFixed(4)).toBe('100.0000');
+        const batches = await batchesOf(id);
+        expect(batches).toHaveLength(1);
+        expect(batches[0]?.presentationId).toBeNull();
+
+        const sinTocar = await prisma.unit.findUniqueOrThrow({
+          where: { id: propia.id },
+          select: { name: true, symbol: true, companyId: true },
+        });
+        expect(sinTocar).toEqual({ name: 'unidad', symbol: 'u', companyId: f.companyId });
+      } finally {
+        await prisma.inventoryMovement.deleteMany({ where: { companyId: f.companyId } });
+        await prisma.productBatch.deleteMany({ where: { companyId: f.companyId } });
+        await prisma.product.deleteMany({ where: { companyId: f.companyId } });
+        await prisma.unit.delete({ where: { id: propia.id } });
+      }
+    } finally {
+      await dropFixture(f);
+    }
+  });
+
   it('R1 — el alta de un envase sin presentacion, o con una de otra empresa, se rechaza sin escribir nada', async () => {
     const f = await createFixture();
     const other = await createFixture();
