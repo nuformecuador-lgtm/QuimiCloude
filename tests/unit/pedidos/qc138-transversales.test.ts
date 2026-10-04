@@ -1,8 +1,7 @@
 // QC-138 T13 — lo que la ficha NO debe cambiar (R37, R39) ni ofrecer (R21).
 //
-// Permisos y dependencias se comparan con el padre de la rama -el `merge-base` con `origin/dev`-,
-// no con una cifra: otra ficha puede sumar un permiso o una dependencia aprobada en paralelo y eso
-// no es trabajo de esta. Si no hay git o no hay `origin/dev`, el caso falla diciendolo: «no pude
+// Las dependencias se comparan con el padre de la rama -el `merge-base` con `origin/dev`-, no con
+// una cifra: otra ficha puede sumar una dependencia aprobada en paralelo y eso no es trabajo de esta. Si no hay git o no hay `origin/dev`, el caso falla diciendolo: «no pude
 // mirar» no es un verde.
 //
 // El borrado fisico y los identificadores de base se miran sobre el fuente, sin historia: todo
@@ -68,28 +67,12 @@ function stripComments(source: string): string {
 }
 
 // ---------------------------------------------------------------------------------------------
-// R37 — ningun permiso nuevo
+// R37 — permisos de crear, editar y revisar
 // ---------------------------------------------------------------------------------------------
 
-/** Los codigos `code: '<modulo>.<accion>'` de un fuente de catalogo de permisos. */
-export function codigosDePermiso(fuente: string): string[] {
-  return [...stripComments(fuente).matchAll(/\bcode\s*:\s*'([a-z_]+\.[a-z_]+)'/g)]
-    .map((match) => match[1] as string)
-    .sort();
-}
-
-describe('R37 — el catalogo de permisos no gana ningun codigo', () => {
-  it('R37: todo codigo del catalogo actual ya estaba en el catalogo del padre de la rama', () => {
-    const delPadre = new Set(codigosDePermiso(enElPadre('lib/modules/identity/domain/permissions.ts')));
-    expect(delPadre.size, 'el catalogo del padre no se pudo leer').toBeGreaterThan(0);
-
-    const nuevos = PERMISSIONS.map((permiso) => permiso.code)
-      .filter((code) => !delPadre.has(code))
-      .sort();
-
-    expect(nuevos, `Codigos de permiso nuevos: ${nuevos.join(', ')}`).toEqual([]);
-  });
-
+// «Ningun codigo de permiso nuevo frente al padre de la rama» era regla de QC-138 mientras la ficha
+// estaba abierta; ya cerro y otras fichas pueden sumar permisos.
+describe('R37 — crear, editar y revisar siguen con sus permisos', () => {
   it('R37: crear y editar siguen con pedidos.modificar, y la revision con inventario.modificar', () => {
     const codigos = PERMISSIONS.map((permiso) => permiso.code);
     expect(codigos.filter((code) => code.startsWith('pedidos.')).sort()).toEqual([
@@ -100,11 +83,6 @@ describe('R37 — el catalogo de permisos no gana ningun codigo', () => {
       'inventario.consultar',
       'inventario.modificar',
     ]);
-  });
-
-  it('el extractor ve un codigo sintetico nuevo y no ve uno comentado', () => {
-    const sintetico = "{ code: 'pedidos.desbloquear', module: 'pedidos' }\n// code: 'pedidos.otro'";
-    expect(codigosDePermiso(sintetico)).toEqual(['pedidos.desbloquear']);
   });
 });
 
