@@ -1639,3 +1639,13 @@ Nada cambia: `packagingCost` no sale en `OrderRow`/`OrderView` ni en ninguna lec
 listado, la cotizacion y Terminar siguen leyendo el total de `ingredients_cost`.
 
 Veredicto: T18 (R45-R47 con P6 = A) y T19 backend (m1, m3) hechos, migracion aplicada y rollback probado; sin rojos fuera del baseline.
+
+## Implementer — vuelta 2 (Enmienda 2: T18, T19), punta a65387f0
+
+- `./init.sh --rapido`: base `QuimiCloude_QC195` al dia (66 migraciones), typecheck paso, lint paso.
+  `test:rapido` **no termino**: Claude Code detuvo la corrida en segundo plano por memoria del sistema
+  critica (no es un fallo del comando). No se relanzo por instruccion del harness; queda pendiente.
+- Lo verificado por los subagentes (salida real en sus secciones arriba): guardias 51/51 (678 passed);
+  `tests/unit/pedidos` 1602 passed; schema 164 passed; 16 `.int` tocados verdes tras corregir
+  `order-ingredients-cost.int` (47/47 con `pedidos-constraints.int`); `related` solo con rojos del baseline.
+- T18 y T19 quedan SIN marcar en tasks.md hasta que el `--rapido` termine en verde.
