@@ -109,7 +109,7 @@ describe('QC-195 — el envase no es ingrediente', () => {
     expect(recipes.create).not.toHaveBeenCalled();
   });
 
-  it('R39 — el alta de una version con un envase que la original no tenia se rechaza sin escribir', async () => {
+  it('R39, R42 — el alta de una version con un envase que la original no tenia se rechaza con action_not_allowed sin escribir', async () => {
     const recipes = repositorio(ORIGINAL_CON_ENVASE);
     const run = createCreateRecipeVersion({ recipes, products: catalogo(), now: () => AHORA });
 
@@ -123,15 +123,17 @@ describe('QC-195 — el envase no es ingrediente', () => {
     expect(recipes.createVersion).not.toHaveBeenCalled();
   });
 
-  it('P4 — una version que copia las lineas de una original con un envase se crea', async () => {
+  it('R42 — una version que copia las lineas de una original con un envase se crea', async () => {
     const recipes = repositorio(ORIGINAL_CON_ENVASE);
     const run = createCreateRecipeVersion({ recipes, products: catalogo(), now: () => AHORA });
 
     await expect(run(ORIGINAL_CON_ENVASE.id, { name: 'Copia' }, ACTOR)).resolves.toEqual({ id: 'version-nueva' });
     expect(recipes.createVersion).toHaveBeenCalledTimes(1);
+    const escritas = vi.mocked(recipes.createVersion).mock.calls[0]![1].lines.map((l) => l.productId);
+    expect(escritas).toContain(ENVASE);
   });
 
-  it('P4 — una version que repite el envase que ya tenia la original (como lo envia el formulario) se crea', async () => {
+  it('R42 — una version que repite el envase que ya tenia la original (como lo envia el formulario) se crea', async () => {
     const recipes = repositorio(ORIGINAL_CON_ENVASE);
     const run = createCreateRecipeVersion({ recipes, products: catalogo(), now: () => AHORA });
 
