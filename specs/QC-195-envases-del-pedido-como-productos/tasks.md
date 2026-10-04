@@ -108,7 +108,7 @@ servidor); los tests de listas blancas de `design.md > 8` ampliados y verdes.
 **Hecho cuando:** integración verde: con `productIds` solo consume esos lotes y deja intacto lo
 demás; los tests de consumo existentes siguen verdes sin tocar.
 
-### [ ] T6 — Necesidad, resolución del reparto y vistas `[depende de T3, TC]`
+### [x] T6 — Necesidad, resolución del reparto y vistas `[depende de T3, TC]`
 
 - `buildOrderRequirement` (receta + envases, fase, suma por producto).
 - Resolución compartida de líneas (envase o antigua sin cambios) en `resolve-distribution.ts`,
@@ -122,14 +122,14 @@ demás; los tests de consumo existentes siguen verdes sin tocar.
 botellas → línea de 40) y las vistas de **R33**; errores y formas iguales a `design.md > 11.3`,
 `> 11.5` y `> 11.7`.
 
-### [ ] T7 — Alta, edición y revisión de bloqueados con envases `[depende de T6]`
+### [x] T7 — Alta, edición y revisión de bloqueados con envases `[depende de T6]`
 
 - `create-order.ts`, `update-order.ts`, `review-blocked-orders.ts` con `buildOrderRequirement`.
 
 **Hecho cuando:** integración verde para **R15, R16, R17, R18 y R19 (edición completa), R21, R22,
 R23**.
 
-### [ ] T8 — «Reparto y unidad» toca la reserva `[depende de T6]` `[P con T7]`
+### [x] T8 — «Reparto y unidad» toca la reserva `[depende de T6]` `[P con T7]`
 
 - `update-order-presentation-lines.ts` sobre `OrderUnitOfWork`, con `confirmBlocked` y los dos
   resultados nuevos; `updateOrderDistributionAction` los traduce (`design.md > 11.4`).
@@ -137,14 +137,14 @@ R23**.
 
 **Hecho cuando:** verdes **R17, R18, R19, R20, R24** por esta vía; `qc170-*.int.test.ts` verdes.
 
-### [ ] T9 — Costo de los envases `[depende de T3, T6]` `[P con T7, T8]`
+### [x] T9 — Costo de los envases `[depende de T3, T6]` `[P con T7, T8]`
 
 - `calculatePackagingCost`/`calculateOrderCost`, `resolveOrderCost`, costeo del lote con envases;
   `quoteOrderCostSchema` con el reparto (`design.md > 11.6`).
 
 **Hecho cuando:** unit verdes para **R27** (ejemplo `24.0000`), **R28, R29 (dominio), R30, R31**.
 
-### [ ] T10 — Consumo al Terminar `[depende de T5, T7]`
+### [x] T10 — Consumo al Terminar `[depende de T5, T7]`
 
 - `transition-order.ts`: `POR_EMPACAR` consume solo receta.
 - `order-packing.ts`: consume envases antes del alta del producto terminado;

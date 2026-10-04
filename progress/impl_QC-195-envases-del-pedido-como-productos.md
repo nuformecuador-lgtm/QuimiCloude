@@ -1071,3 +1071,26 @@ No hubo que tocar ningun doble ni fixture del backend: el typecheck queda limpio
 - `pnpm exec vitest run guard --passWithNoTests`: 51 archivos, 672 passed | 11 skipped.
 
 **Veredicto:** hecho; contrato 11.7 cerrado; typecheck limpio; guardias verdes.
+
+## Implementer — gate de la tanda 2 (T6-T10 + validacion UI + vista obligatoria), punta 63e23fd7
+
+`./init.sh --rapido` con la maquina libre:
+- typecheck paso; lint paso.
+- `test:rapido` (related, 411 archivos): `Test Files 6 failed | 405 passed (411)`, `Tests 8 failed | 6215 passed | 9 skipped (6232)`.
+  Los 6 rojos son los mismos del baseline (`tests/baseline-rojos.json`): `configuracion-ui/unidades-viewport`,
+  `configuracion-ui/usuarios-viewport`, `inventario/product-page`, `navegacion/pantallas-exigen-permiso`,
+  `recetas-ui/recipe-page`, `recetas/module-contract`.
+- Guardias aparte (`vitest run guard`): `Test Files 51 passed (51)`, `Tests 672 passed | 11 skipped (683)`.
+
+Tasks marcadas [x]: T6-T10. Siguen abiertas: T11 y T15 (preguntas al leader), T16 (E2E, la corre el
+leader), T17 (cierre, `./init.sh` completo).
+
+Preguntas abiertas para el leader/humano:
+1. T11/P4: al crear version, se rechaza un envase solo si el original no lo tenia (el formulario de
+   version reenvia siempre las lineas del original). requirements.md no tiene requisito escrito para P4.
+2. T15: ¿las vistas de `asignaciones` (`AssignedOrderPresentationLine`, `OrderDistributionLineView`)
+   ganan `packagingName`, o empaque/ejecucion siguen pintando la presentacion? Hoy pintan la presentacion.
+3. Doble consumo posible (T10): receta conservada por P4 con un envase como ingrediente igual al envase
+   del reparto -> POR_EMPACAR consume lo apartado (sumado) y Terminar vuelve a consumir del disponible.
+   Probablemente inalcanzable bajo P2-A (legado sin `u`), no verificado; el spec no lo cubre.
+4. Texto de `insufficient_material` en Terminar reutiliza el del catalogo («...para entregar el pedido»).
