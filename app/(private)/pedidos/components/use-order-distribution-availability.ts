@@ -61,8 +61,10 @@ export function distributionLinesValid(lines: readonly OrderDistributionLine[]):
   );
 }
 
+// Leidas del formulario, las lineas de envase llegan sin presentacion (''): no cuentan como repetidas.
 function hasUniquePresentations(lines: readonly OrderDistributionLine[]): boolean {
-  return new Set(lines.map((line) => line.presentationId)).size === lines.length;
+  const known = lines.map((line) => line.presentationId).filter((id) => id !== '');
+  return new Set(known).size === known.length;
 }
 
 /** Las lineas con los envases ya como numero, para las consultas al servidor. */

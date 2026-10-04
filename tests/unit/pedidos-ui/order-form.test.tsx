@@ -591,6 +591,38 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
     expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['2']);
   });
 
+  it('R17: dos envases de presentaciones distintas se guardan: la presentacion vacia del envio no los hace repetidos', async () => {
+    const user = setupUser();
+    const otraPresentacion = { id: crypto.randomUUID(), name: 'Bidón 5L', content: '5.0000' };
+    const otroEnvase = {
+      ...ENVASE,
+      id: crypto.randomUUID(),
+      name: 'Bidón PET 5 L',
+      presentationId: otraPresentacion.id,
+      presentationName: otraPresentacion.name,
+      presentationContent: otraPresentacion.content,
+    };
+    listProductsActionMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [ENVASE, otroEnvase], page: 1, pageSize: 25, total: 2, totalPages: 1 },
+    });
+    renderFormulario();
+
+    await rellenarAlta(user);
+    for (const indice of [0, 1]) {
+      await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
+      const opciones = await screen.findAllByTestId(PACKAGING_OPTION_TESTID);
+      await user.click(await esperarInteractiva(opciones[indice]!));
+      await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
+    }
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id, otroEnvase.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual(['', '']);
+  });
+
   it('R11: el rechazo product_not_found del envase se pinta junto al reparto', async () => {
     const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
