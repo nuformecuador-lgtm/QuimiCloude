@@ -263,6 +263,27 @@ describe('R6: el CHECK de rango de porcentaje', () => {
   });
 });
 
+describe('FK rota de producto de linea', () => {
+  it('el adaptador traduce la FK rota de una linea a ValidationError sin dejar receta', async () => {
+    const productId = await createTestProduct(prisma);
+    // Borrado fisico: el producto deja de existir y la FK de la linea queda rota.
+    await deleteTestProduct(prisma, productId);
+    const input = baseRecipeInput({ lines: [{ productId, percentage: '50.00' }] });
+    const scope: RecipeScope = { companyId: await andamiajeCompanyId(prisma) };
+
+    try {
+      await expect(
+        createRecipe(input, null as unknown as string, new Date(), scope),
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      const orphan = await prisma.recipe.findFirst({ where: { name: input.name } });
+      expect(orphan).toBeNull();
+    } finally {
+      await prisma.recipe.deleteMany({ where: { name: input.name } });
+    }
+  });
+});
+
 describe('R16: unicidad de (recipe_id, product_id)', () => {
   it('rechaza con SQLSTATE 23505 la segunda linea del mismo producto en la misma receta', async () => {
     await inRolledBackTransaction(async (tx) => {

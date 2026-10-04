@@ -188,10 +188,7 @@ function isUniqueNameViolation(error: unknown): boolean {
   return false;
 }
 
-/** `23503`: un producto de linea o de herramienta que ya no existe. El conector no dice que FK
- *  salto, pero en estas escrituras la receta, la empresa y el autor ya estan probados, asi que
- *  solo puede ser un producto. */
-function isProductForeignKeyViolation(error: unknown): boolean {
+function isForeignKeyViolation(error: unknown): boolean {
   return sqlStateOf(error) === '23503' || sqlStateOf(error) === 'P2003';
 }
 
@@ -200,10 +197,12 @@ function isPercentageCheckViolation(error: unknown): boolean {
   return sqlStateOf(error) === '23514';
 }
 
-/** Traduce el SQLSTATE al resultado discriminado del puerto, o relanza si no lo reconoce. */
+/** Prisma no expone que FK salto (`meta.constraint` llega null): cualquier FK rota (producto de
+ *  linea, de herramienta o autor) se reporta como entrada invalida. Solo ocurre con un borrado
+ *  fisico concurrente, porque la baja normal es logica. */
 function translateWriteError(error: unknown): never {
   if (isPercentageCheckViolation(error)) throw new ValidationError();
-  if (isProductForeignKeyViolation(error)) throw new ValidationError();
+  if (isForeignKeyViolation(error)) throw new ValidationError();
   throw error;
 }
 

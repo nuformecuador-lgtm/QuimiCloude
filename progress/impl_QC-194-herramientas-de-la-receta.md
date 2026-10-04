@@ -433,6 +433,14 @@ Opciones para el leader: (a) aceptar la traduccion amplia y reescribir el coment
 motivo; (b) quitarla y dejar que la FK salga como `unexpected` (el dominio ya valida antes);
 (c) comprobar los productos dentro de la transaccion antes de escribir.
 
+**Cierre de m2: CERRADO con la opcion (a), elegida por el humano.** La traduccion de
+`23503`/`P2003` a `ValidationError` se queda como estaba. El comentario de `translateWriteError`
+da ahora el motivo real, y el predicado pasa a llamarse `isForeignKeyViolation`. Test nuevo en
+`recipe-lines.int.test.ts`: `el adaptador traduce la FK rota de una linea a ValidationError sin dejar receta`.
+
+**Estado de m4: PARCIAL** por la guardia de ambito (`guard-ambito-empresa-recetas.test.ts`);
+motivo abajo.
+
 ### m3 — caso cruzado de herramientas (`90d3f204`)
 `recipe-tools.int.test.ts` siembra una segunda empresa; `replaceAlive` (original y version) y
 `replaceAliveWithPropagation` desde ella devuelven `not_found` y el retrato de la original y la
