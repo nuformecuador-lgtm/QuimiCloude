@@ -419,6 +419,7 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'deletedAt',
       'parentRecipeId',
       'lines',
+      'tools',
       'parent',
       'versions',
       '@@index([createdBy], map: "recipes_created_by_idx")',
@@ -443,6 +444,19 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       '@@map("recipe_lines")',
     ]
 
+    const EXPECTED_RECIPE_TOOL_FIELDS = [
+      'id',
+      'recipeId',
+      'productId',
+      'quantity',
+      'createdAt',
+      'updatedAt',
+      'recipe',
+      '@@unique([recipeId, productId], map: "recipe_tools_recipe_id_product_id_key")',
+      '@@index([productId], map: "recipe_tools_product_id_idx")',
+      '@@map("recipe_tools")',
+    ]
+
     expect(
       fieldNamesOf(normalizedLines(bodyOfModel('Recipe'))),
       'model Recipe gano, perdio o renombro un campo, indice o restriccion respecto al estado que dejo QC-24',
@@ -451,5 +465,9 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       fieldNamesOf(normalizedLines(bodyOfModel('RecipeLine'))),
       'model RecipeLine gano, perdio o renombro un campo, indice o restriccion respecto al estado que dejo QC-24',
     ).toEqual(EXPECTED_RECIPE_LINE_FIELDS)
+    expect(
+      fieldNamesOf(normalizedLines(bodyOfModel('RecipeTool'))),
+      'model RecipeTool gano, perdio o renombro un campo, indice o restriccion respecto a la migracion recipe_tools',
+    ).toEqual(EXPECTED_RECIPE_TOOL_FIELDS)
   })
 })

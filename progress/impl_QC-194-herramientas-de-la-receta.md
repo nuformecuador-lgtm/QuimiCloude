@@ -476,3 +476,31 @@ nuevos sobre el lote de la herramienta y su stock intacto.
   `tests/baseline-rojos.json` (unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso, recipe-page).
 
 Veredicto: m3, m4 (sin extraer, por la guardia), m5 y m6 cerrados; m2 parado porque Prisma no identifica la constraint.
+
+## Rojo enmascarado por el baseline en `tests/unit/recetas/scope.test.ts`
+
+El baseline va por archivo y `scope.test.ts` ya estaba en `tests/baseline-rojos.json` por la
+pantalla de recetas en `app/(private)/pedidos/page.tsx`. Eso escondia un rojo propio de esta
+rama: el caso «el conjunto de columnas, indices y restricciones de recipes y recipe_lines es
+exactamente el esperado» fallaba porque `Recipe` gano `tools RecipeTool[]` y
+`EXPECTED_RECIPE_FIELDS` no se amplio. Arreglo (commit `test(QC-194): da de alta recipe_tools en
+las listas cerradas de scope`): `tools` entra en `EXPECTED_RECIPE_FIELDS` entre `lines` y
+`parent` (orden del schema), y `RecipeTool` gana su lista cerrada `EXPECTED_RECIPE_TOOL_FIELDS`
+(campos, `@@unique`, `@@index`, `@@map` de `db/schema.prisma` y la migracion
+`20261003120000_recipe_tools`) con su propia asercion, igual que `RecipeLine`. Ninguna asercion
+se relaja.
+
+### Casos rojos por archivo del baseline, rama frente a `origin/dev` (555c62f6)
+
+Dev medido en un worktree temporal (ya borrado), un archivo por corrida.
+
+| Archivo | Rojos en la rama | Rojos en dev | Coincide |
+|---|---|---|---|
+| inventario/product-page.test.tsx | R18 nombre junto a la unidad guardada (1) | igual (1) | si |
+| recetas-ui/recipe-page.test.tsx | R21 columna de acciones no fijable, 44x44 (1) | igual (1) | si |
+| configuracion-ui/unidades-viewport.test.tsx | R27 equivalencia dentro del desplazador (2) | igual (2) | si |
+| configuracion-ui/usuarios-viewport.test.tsx | R21 correo dentro del desplazador (2) | igual (2) | si |
+| identity/account-status-scope.test.ts | lista cerrada del estado de cuenta (1) | igual (1) | si |
+| recetas/scope.test.ts | pantalla de recetas solo donde la declara QC-26 (1) | igual (1) | si |
+| recetas/module-contract.test.ts | sin route handler / forma del modulo: falla en l.600 por `pedidos/page.tsx` (1) | mismo caso (1), pero en dev corta antes (l.335) porque `origin/dev...HEAD` esta vacio | si (mismo caso; en la rama todas las aserciones previas pasan y solo queda el motivo del baseline) |
+| navegacion/pantallas-exigen-permiso.test.tsx | '/pedidos' se sirve con el permiso (1) | igual (1) | si |
