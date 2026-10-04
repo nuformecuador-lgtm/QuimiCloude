@@ -936,3 +936,22 @@ $ pnpm exec vitest run guard --passWithNoTests
 Decision dentro del spec: en el lote de producto terminado (R31) un envase sin ningun lote con costo
 cuenta cero, como un ingrediente sin costo en `calculateLotIngredientsCost` (el lote siempre entra
 con costo). La cobertura no se exige ahi: al Terminar los envases estan apartados por el pedido.
+
+Cierre de la seccion (backend_dev siguiente, 2026-10-03; el anterior se detuvo antes de esta
+linea). Archivos de `git show --stat ccd7dbfb`: `lib/composition/index.ts`,
+`pedidos/adapters/driven/persistence/order-prisma.ts`, `pedidos/domain/{create-order,order-cost,
+order-input,order-packing,quote-order-cost,resolve-distribution,resolve-ingredients-cost,
+review-blocked-orders,update-order}.ts`, `pedidos/ports/order-write-repository.ts`,
+`tests/guards/guard-ambito-empresa-pedidos.test.ts`, `tests/integration/pedidos/{finish-with-
+finished-goods,order-cost-quote,order-packing,qc195-packaging-reservation,review-blocked-orders}
+.int.test.ts`, `tests/unit/pedidos/{order-cost,order-packing,quote-order-cost,review-blocked-
+orders}.test.ts` y esta bitacora (23 archivos, +579 -84).
+
+Reejecucion de los unit de T9 (arbol con T10 en curso, sin commit):
+```
+$ pnpm exec vitest run --project node tests/unit/pedidos/order-cost.test.ts tests/unit/pedidos/quote-order-cost.test.ts tests/unit/pedidos/order-packing.test.ts tests/unit/pedidos/review-blocked-orders.test.ts
+ Test Files  4 passed (4)      Tests  109 passed (109)
+```
+Los de integracion de T9 se reejecutan con todo `tests/integration/pedidos` en el cierre de T10.
+
+**Veredicto T9:** hecho.
