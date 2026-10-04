@@ -59,6 +59,8 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc141_e2e_';
 
@@ -81,6 +83,12 @@ const PRODUCT_NAME = `${SHARED_TOKEN}_producto`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 const BATCH_LOT = `${SHARED_TOKEN}_lote`;
+/** El envase del reparto. Su nombre no contiene `PRODUCT_NAME`: la busqueda de Inventario no lo trae. */
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_lote_envase`;
+/** Envases de sobra para los dos pedidos a la vez: lo que compite es la materia prima. */
+const PACKAGING_STOCK = '5000';
+const PACKAGING_UNIT_COST = '0.1000';
 
 /** La existencia del unico lote: suficiente para uno de los dos pedidos, no para los dos juntos. */
 const BATCH_STOCK = '2000.0000';
@@ -141,6 +149,7 @@ let batchId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
 let unitId: string | null = null;
+let packagingId: string | null = null;
 let adminUserId: string | null = null;
 let operatorUserId: string | null = null;
 
@@ -212,21 +221,12 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
 
   // Toda la cantidad en una sola linea: con contenido 1, un envase por unidad del pedido.
   const distribution = page.getByTestId('order-distribution-field');
-  const presentationPicker = distribution.getByTestId('presentation-select');
-  await presentationPicker.click();
-  await presentationPicker.fill(PRESENTATION_NAME);
-  const presentationOption = page
-    .getByTestId('presentation-option')
-    .filter({ hasText: PRESENTATION_NAME });
-  await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-  await presentationOption.click();
-  await distribution.getByTestId('order-distribution-add-packages').fill(quantity);
-  await distribution.getByTestId('order-distribution-add').click();
-  await expect(
-    distribution.locator(
-      `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
-    ),
-  ).toHaveCount(1);
+  await addPackagingLine(
+    page,
+    page.getByTestId('order-form'),
+    { productId: packagingId ?? '', name: PACKAGING_NAME },
+    quantity,
+  );
   await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
     'data-state',
     'ready',
@@ -259,7 +259,7 @@ async function openEdit(page: Page, numberText: string): Promise<void> {
   // La fila llega pintada por el servidor: en WebKit un clic antes de hidratar se pierde sin
   // abrir el formulario, asi que se reintenta hasta que aparece.
   await expect(async () => {
-    await row.getByTestId('order-action-edit').click();
+    await (await openOrderRowMenu(page, rowMenuTrigger(row), 'order-action-edit')).click();
     await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 60_000 });
 }
@@ -474,6 +474,18 @@ test.beforeAll(async () => {
     },
   });
 
+  packagingId = (
+    await seedPackaging({
+      companyId,
+      name: PACKAGING_NAME,
+      presentationId: presentation.id,
+      stock: PACKAGING_STOCK,
+      unitCost: PACKAGING_UNIT_COST,
+      lot: PACKAGING_LOT,
+      createdBy: adminUserId,
+    })
+  ).productId;
+
   recipeId = (
     await prisma.recipe.create({
       data: {
@@ -621,7 +633,7 @@ test.describe('reserva de material del pedido', () => {
     // --- 4. Cancelar A libera todo lo que tenia apartado: el lote vuelve a estar libre entero.
     await page.goto(ordersUrl());
     const rowA = await findOrderRow(page, orderANumber);
-    await rowA.getByTestId('order-action-cancel').click();
+    await (await openOrderRowMenu(page, rowMenuTrigger(rowA), 'order-action-cancel')).click();
     await expect(page.getByTestId('cancel-order-dialog')).toBeVisible({ timeout: 60_000 });
     await page.getByTestId('cancel-order-reason').fill(CANCELLATION_REASON);
     await page.getByTestId('cancel-order-confirm').click();

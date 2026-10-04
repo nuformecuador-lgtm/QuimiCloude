@@ -253,6 +253,11 @@ export const E2E_ESPERADOS = [
   // Alta por el mismo motivo que las demas. Recorre el pedido repartido en varias presentaciones
   // de punta a punta; no lee ni afirma nada sobre el identificador de peticion.
   'pedido-en-varias-presentaciones.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el reparto en envases: alta con envases
+  // apartados, falta de envase que bloquea, cotizacion con envases y Terminar que los consume; y
+  // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'envases-del-pedido.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

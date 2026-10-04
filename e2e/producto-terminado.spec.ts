@@ -68,6 +68,8 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { addPackagingLine } from './helpers/order-distribution';
+import { batchStock, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -89,6 +91,11 @@ const PRODUCT_NAME = `${SHARED_TOKEN}_ingrediente`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_Botella 1L`;
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 const BATCH_LOT = `${SHARED_TOKEN}_lote`;
+/** El envase del reparto, con la presentacion del fixture como presentacion fija. */
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_lote_envase`;
+const PACKAGING_STOCK = '100';
+const PACKAGING_UNIT_COST = '0.5000';
 
 /** Muy por encima de `ORDER_QUANTITY`: la entrega debe alcanzar sin agotar el lote del ingrediente. */
 const BATCH_STOCK = '200.0000';
@@ -150,6 +157,8 @@ let unitId: string | null = null;
 let productId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
+let packagingId: string | null = null;
+let packagingBatchId: string | null = null;
 let adminUserId: string | null = null;
 let operatorUserId: string | null = null;
 let empacadorUserId: string | null = null;
@@ -239,8 +248,8 @@ async function setPresentationContent(page: Page, content: string): Promise<void
   await expect(page.getByTestId('presentation-sheet')).toHaveCount(0, { timeout: 60_000 });
 }
 
-/** Crea un pedido de `quantity` para la receta del fixture, repartido en `packages` envases de
- *  su presentacion, por la pantalla. */
+/** Crea un pedido de `quantity` para la receta del fixture, repartido en `packages` envases del
+ *  envase del fixture, por la pantalla. */
 async function createOrder(page: Page, quantity: string, packages: string): Promise<void> {
   await gotoSettled(page, ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
@@ -260,22 +269,14 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
   await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
+  // El selector solo ofrece el envase cuando su presentacion ya tiene contenido.
   const distribution = page.getByTestId('order-distribution-field');
-  const presentationPicker = distribution.getByTestId('presentation-select');
-  await presentationPicker.click();
-  await presentationPicker.fill(PRESENTATION_NAME);
-  const presentationOption = page
-    .getByTestId('presentation-option')
-    .filter({ hasText: PRESENTATION_NAME });
-  await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-  await presentationOption.click();
-  await distribution.getByTestId('order-distribution-add-packages').fill(packages);
-  await distribution.getByTestId('order-distribution-add').click();
-  await expect(
-    distribution.locator(
-      `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
-    ),
-  ).toHaveCount(1);
+  await addPackagingLine(
+    page,
+    page.getByTestId('order-form'),
+    { productId: packagingId ?? '', name: PACKAGING_NAME },
+    packages,
+  );
   await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
     'data-state',
     'ready',
@@ -485,6 +486,18 @@ test.beforeAll(async () => {
     },
   });
 
+  const packaging = await seedPackaging({
+    companyId,
+    name: PACKAGING_NAME,
+    presentationId: presentation.id,
+    stock: PACKAGING_STOCK,
+    unitCost: PACKAGING_UNIT_COST,
+    lot: PACKAGING_LOT,
+    createdBy: adminUserId,
+  });
+  packagingId = packaging.productId;
+  packagingBatchId = packaging.batchId;
+
   recipeId = (
     await prisma.recipe.create({
       data: {
@@ -683,6 +696,11 @@ test.describe('producto terminado', () => {
       select: { id: true, name: true },
     });
     expect(finishedProduct.name).toBe(finishedProductName);
+
+    // Terminar consumio los envases del reparto.
+    expect(await batchStock(packagingBatchId!)).toBe(
+      Number(PACKAGING_STOCK) - Number(ORDER_PACKAGES),
+    );
 
     // --- 5. Inventario, pestana «Producto terminado»: el producto con su lote de 50 y «50
     // envases».

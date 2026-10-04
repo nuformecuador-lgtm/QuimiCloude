@@ -51,6 +51,8 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { addPackagingLine, openOrderRowMenu } from './helpers/order-distribution';
+import { batchStock, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc170_e2e_';
 
@@ -72,6 +74,13 @@ const PRESENTATION_A_NAME = `${SHARED_TOKEN}_botella_litro`;
 const PRESENTATION_B_NAME = `${SHARED_TOKEN}_frasco_medio`;
 const PRESENTATION_A_CONTENT = '1';
 const PRESENTATION_B_CONTENT = '0.5';
+
+/** Un envase por presentacion. Tampoco aqui un nombre es prefijo del otro. */
+const PACKAGING_A_NAME = `${SHARED_TOKEN}_envase_litro`;
+const PACKAGING_B_NAME = `${SHARED_TOKEN}_envase_medio`;
+/** Envases de sobra para los dos recorridos: aqui no se prueba la falta de envase. */
+const PACKAGING_STOCK = '20';
+const PACKAGING_UNIT_COST = '0.5000';
 
 /** Muy por encima de lo que piden los dos pedidos: la reserva y el consumo no agotan el lote. */
 const INGREDIENT_STOCK = '200.0000';
@@ -126,13 +135,9 @@ const UNIT_OPTION_TESTID = 'presentation-unit-option';
 const DISTRIBUTION_FIELD_TESTID = 'order-distribution-field';
 const DISTRIBUTION_LINE_TESTID = 'order-distribution-line';
 const DISTRIBUTION_LINE_PACKAGES_TESTID = 'order-distribution-line-packages';
-const DISTRIBUTION_ADD_PACKAGES_TESTID = 'order-distribution-add-packages';
-const DISTRIBUTION_ADD_TESTID = 'order-distribution-add';
 const DISTRIBUTION_AVAILABLE_TESTID = 'order-distribution-available';
 const DISTRIBUTION_WARNING_TESTID = 'order-distribution-warning';
 const DISTRIBUTION_ERROR_TESTID = 'order-distribution-error';
-const PRESENTATION_PICKER_TESTID = 'presentation-select';
-const PRESENTATION_OPTION_TESTID = 'presentation-option';
 
 const DISTRIBUTION_DIALOG_TESTID = 'order-distribution-dialog';
 const DISTRIBUTION_DIALOG_SUBMIT_TESTID = 'order-distribution-dialog-submit';
@@ -185,6 +190,10 @@ let recipeId: string | null = null;
 let litroUnitId: string | null = null;
 let presentationAId: string | null = null;
 let presentationBId: string | null = null;
+let packagingAId: string | null = null;
+let packagingBId: string | null = null;
+let packagingABatchId: string | null = null;
+let packagingBBatchId: string | null = null;
 let operatorUserId: string | null = null;
 let empacadorUserId: string | null = null;
 
@@ -252,30 +261,24 @@ async function chooseLitro(page: Page, scope: Locator): Promise<void> {
   await expect(scope.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toBeVisible({ timeout: 60_000 });
 }
 
-/** Elige la presentacion en el selector del reparto, escribe los envases y anade la linea. */
+/** Una linea del reparto: el envase que se elige y la presentacion fija que la linea copia. */
+type DistributionChoice = {
+  readonly id: string;
+  readonly productId: string;
+  readonly name: string;
+};
+
+/** Elige el envase en el selector del reparto, escribe los envases y anade la linea. */
 async function addDistributionLine(
   page: Page,
   scope: Locator,
-  presentation: { readonly id: string; readonly name: string },
+  choice: DistributionChoice,
   packages: string,
 ): Promise<void> {
+  await addPackagingLine(page, scope, { productId: choice.productId, name: choice.name }, packages);
   const field = scope.getByTestId(DISTRIBUTION_FIELD_TESTID);
-  const picker = field.getByTestId(PRESENTATION_PICKER_TESTID);
-  await picker.click();
-  await picker.fill(presentation.name);
-  const option = page
-    .getByTestId(PRESENTATION_OPTION_TESTID)
-    .filter({ hasText: presentation.name });
-  await expect(option).toHaveCount(1, { timeout: 60_000 });
-  await option.click();
-
-  await field.getByTestId(DISTRIBUTION_ADD_PACKAGES_TESTID).fill(packages);
-  const add = field.getByTestId(DISTRIBUTION_ADD_TESTID);
-  await expect(add).toBeEnabled({ timeout: 60_000 });
-  await add.click();
-
   await expect(
-    distributionLine(field, presentation.id).getByTestId(DISTRIBUTION_LINE_PACKAGES_TESTID),
+    distributionLine(field, choice.id).getByTestId(DISTRIBUTION_LINE_PACKAGES_TESTID),
   ).toHaveValue(packages);
 }
 
@@ -438,6 +441,29 @@ test.beforeAll(async () => {
     })
   ).id;
 
+  const packagingA = await seedPackaging({
+    companyId,
+    name: PACKAGING_A_NAME,
+    presentationId: presentationAId,
+    stock: PACKAGING_STOCK,
+    unitCost: PACKAGING_UNIT_COST,
+    lot: `${PACKAGING_A_NAME}_lote`,
+    createdBy: adminUserId,
+  });
+  packagingAId = packagingA.productId;
+  packagingABatchId = packagingA.batchId;
+  const packagingB = await seedPackaging({
+    companyId,
+    name: PACKAGING_B_NAME,
+    presentationId: presentationBId,
+    stock: PACKAGING_STOCK,
+    unitCost: PACKAGING_UNIT_COST,
+    lot: `${PACKAGING_B_NAME}_lote`,
+    createdBy: adminUserId,
+  });
+  packagingBId = packagingB.productId;
+  packagingBBatchId = packagingB.batchId;
+
   const purchaseDate = new Date('2026-01-01T00:00:00Z');
   const batch = await prisma.productBatch.create({
     data: {
@@ -535,12 +561,14 @@ test.describe('pedido en varias presentaciones', () => {
       companyId === null ||
       presentationAId === null ||
       presentationBId === null ||
+      packagingAId === null ||
+      packagingBId === null ||
       operatorUserId === null
     ) {
       return;
     }
-    const presentationA = { id: presentationAId, name: PRESENTATION_A_NAME };
-    const presentationB = { id: presentationBId, name: PRESENTATION_B_NAME };
+    const presentationA = { id: presentationAId, productId: packagingAId, name: PACKAGING_A_NAME };
+    const presentationB = { id: presentationBId, productId: packagingBId, name: PACKAGING_B_NAME };
 
     // --- 1. Alta por la pantalla: receta, cantidad, unidad y dos lineas de reparto.
     await loginAndLand(page, adminUser);
@@ -604,7 +632,7 @@ test.describe('pedido en varias presentaciones', () => {
     await openOrders(page);
     const actions = rowActions(page, orderId);
     await expect(actions).toBeVisible({ timeout: 60_000 });
-    await actions.getByTestId(ORDER_ACTION_EDIT_TESTID).click();
+    await (await openOrderRowMenu(page, actions, ORDER_ACTION_EDIT_TESTID)).click();
     const editForm = page.getByTestId(ORDER_FORM_TESTID);
     await expect(editForm).toBeVisible({ timeout: 60_000 });
 
@@ -650,11 +678,11 @@ test.describe('pedido en varias presentaciones', () => {
     const packingScreen = await openPackingScreen(page, orderId);
     const packingLines = packingScreen.getByTestId(PACKING_LINE_TESTID);
     await expect(packingLines).toHaveCount(2);
-    await expect(packingLines.filter({ hasText: PRESENTATION_A_NAME })).toHaveText(
-      `${PACKAGES_A} × ${PRESENTATION_A_NAME}`,
+    await expect(packingLines.filter({ hasText: PACKAGING_A_NAME })).toHaveText(
+      `${PACKAGES_A} × ${PACKAGING_A_NAME}`,
     );
-    await expect(packingLines.filter({ hasText: PRESENTATION_B_NAME })).toHaveText(
-      `${PACKAGES_B} × ${PRESENTATION_B_NAME}`,
+    await expect(packingLines.filter({ hasText: PACKAGING_B_NAME })).toHaveText(
+      `${PACKAGES_B} × ${PACKAGING_B_NAME}`,
     );
 
     await page.getByTestId(PACKING_START_TESTID).click();
@@ -675,6 +703,12 @@ test.describe('pedido en varias presentaciones', () => {
     });
     expect(delivered.status).toBe('ENTREGADO');
     expect(delivered.ingredientsCost, 'el pedido guardo el coste de sus ingredientes').not.toBeNull();
+    expect(await batchStock(packagingABatchId!), 'Terminar consume los envases de A').toBe(
+      Number(PACKAGING_STOCK) - Number(PACKAGES_A),
+    );
+    expect(await batchStock(packagingBBatchId!), 'Terminar consume los envases de B').toBe(
+      Number(PACKAGING_STOCK) - Number(PACKAGES_B),
+    );
     const expectedUnitCost = deriveUnitCost(
       delivered.ingredientsCost!.toFixed(4),
       EXPECTED_TOTAL_PRODUCED,
@@ -729,12 +763,13 @@ test.describe('pedido en varias presentaciones', () => {
       recipeId === null ||
       companyId === null ||
       presentationAId === null ||
+      packagingAId === null ||
       operatorUserId === null ||
       empacadorUserId === null
     ) {
       return;
     }
-    const presentationA = { id: presentationAId, name: PRESENTATION_A_NAME };
+    const presentationA = { id: presentationAId, productId: packagingAId, name: PACKAGING_A_NAME };
 
     // Sin unidad ni reparto: el caso de un pedido anterior a la unidad obligatoria.
     const year = new Date().getUTCFullYear();
@@ -797,7 +832,7 @@ test.describe('pedido en varias presentaciones', () => {
 
       const actions = rowActions(adminPage, orderId);
       await expect(actions).toBeVisible({ timeout: 60_000 });
-      await actions.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID).click();
+      await (await openOrderRowMenu(adminPage, actions, ORDER_ACTION_DISTRIBUTION_TESTID)).click();
       let dialog = adminPage.getByTestId(DISTRIBUTION_DIALOG_TESTID);
       await expect(dialog).toBeVisible({ timeout: 60_000 });
 
@@ -823,10 +858,8 @@ test.describe('pedido en varias presentaciones', () => {
       // Se recarga para que la fila traiga el reparto guardado, y se deja abierto el dialogo: lo
       // que se guarde desde aqui llegara despues de Comenzar.
       await openOrders(adminPage);
-      await expect(actions.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID)).toBeVisible({
-        timeout: 60_000,
-      });
-      await actions.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID).click();
+      await expect(actions).toBeVisible({ timeout: 60_000 });
+      await (await openOrderRowMenu(adminPage, actions, ORDER_ACTION_DISTRIBUTION_TESTID)).click();
       dialog = adminPage.getByTestId(DISTRIBUTION_DIALOG_TESTID);
       await expect(dialog).toBeVisible({ timeout: 60_000 });
       const staleLine = distributionLine(dialog, presentationA.id).getByTestId(
@@ -837,7 +870,7 @@ test.describe('pedido en varias presentaciones', () => {
       // --- 5. R47: el Empacador ve el reparto en solo lectura y comienza.
       packingScreen = await openPackingScreen(page, orderId);
       await expect(packingScreen.getByTestId(PACKING_LINE_TESTID)).toHaveText([
-        `${BARE_PACKAGES} × ${PRESENTATION_A_NAME}`,
+        `${BARE_PACKAGES} × ${PACKAGING_A_NAME}`,
       ]);
       await expect(packingScreen.getByTestId(PACKING_MISSING_DISTRIBUTION_TESTID)).toHaveCount(0);
       await expect(packingScreen.locator(EDITING_CONTROLS)).toHaveCount(0);
@@ -876,7 +909,11 @@ test.describe('pedido en varias presentaciones', () => {
       await openOrders(adminPage);
       const frozenActions = rowActions(adminPage, orderId);
       await expect(frozenActions).toBeVisible({ timeout: 60_000 });
-      await expect(frozenActions.getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID)).toHaveCount(0);
+      // El menu se abre por una accion que sigue en el; la del reparto ya no esta.
+      await openOrderRowMenu(adminPage, frozenActions, ORDER_ACTION_EDIT_TESTID);
+      await expect(
+        adminPage.getByRole('menu').getByTestId(ORDER_ACTION_DISTRIBUTION_TESTID),
+      ).toHaveCount(0);
     } finally {
       await adminContext.close();
     }

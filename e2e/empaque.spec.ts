@@ -46,6 +46,8 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { batchStock, seedPackaging } from './helpers/packaging';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc168_e2e_';
@@ -72,6 +74,11 @@ const WORK_GROUP_NAME = `${SHARED_TOKEN}_turno`;
 const PRODUCT_NAME = `${SHARED_TOKEN}_producto`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
 const BATCH_LOT = `${SHARED_TOKEN}_lote`;
+/** El envase de la linea del reparto: Terminar lo consume. */
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_lote_envase`;
+const PACKAGING_STOCK = '10';
+const PACKAGING_UNIT_COST = '0.5000';
 
 /** Muy por encima de `ORDER_QUANTITY`: el consumo debe alcanzar sin agotar el lote. */
 const BATCH_STOCK = '100.0000';
@@ -161,7 +168,6 @@ const DATA_TABLE_TESTID = 'data-table';
 const DATA_TABLE_NEXT_TESTID = 'data-table-next';
 const ORDER_STATUS_TESTID = 'order-status';
 const ORDER_ACTION_CANCEL_TESTID = 'order-action-cancel';
-const ORDER_ROW_ACTIONS_REASON_TESTID = 'order-row-actions-reason';
 
 const LIST_PAGE_SIZE = '25';
 const LIST_SORT = 'createdAt:desc';
@@ -170,6 +176,7 @@ let companyId: string | null = null;
 let recipeId: string | null = null;
 let productId: string | null = null;
 let presentationId: string | null = null;
+let packagingBatchId: string | null = null;
 let operatorUserId: string | null = null;
 let empacadorUserId: string | null = null;
 let workGroupId: string | null = null;
@@ -399,6 +406,17 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
+  const packaging = await seedPackaging({
+    companyId,
+    name: PACKAGING_NAME,
+    presentationId: presentation.id,
+    stock: PACKAGING_STOCK,
+    unitCost: PACKAGING_UNIT_COST,
+    lot: PACKAGING_LOT,
+    createdBy: operatorUserId,
+  });
+  packagingBatchId = packaging.batchId;
+
   recipeId = (
     await prisma.recipe.create({
       data: {
@@ -429,6 +447,7 @@ test.beforeAll(async () => {
             presentationId,
             packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
             presentationContent: PRESENTATION_CONTENT,
+            packagingProductId: packaging.productId,
           },
         ],
       },
@@ -596,8 +615,8 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(page.getByTestId(PACKING_ORDERS_SECTION_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNED_ORDERS_EMPTY_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // --- 3. «Por empacar» no se puede cancelar desde Pedidos: la acción va deshabilitada con el
-    // motivo visible (R29, R42).
+    // --- 3. «Por empacar» no se puede cancelar desde Pedidos: la acción va deshabilitada en
+    // el menu de la fila (R29, R42).
     await page.context().clearCookies();
     await loginAndLand(page, adminUser);
     await page.goto(ordersUrl());
@@ -610,8 +629,9 @@ test.describe('el recorrido de empaque (R48)', () => {
       'data-status',
       'POR_EMPACAR',
     );
-    await expect(ordersRow.getByTestId(ORDER_ACTION_CANCEL_TESTID)).toBeDisabled();
-    await expect(ordersRow.getByTestId(ORDER_ROW_ACTIONS_REASON_TESTID)).toBeVisible();
+    await expect(
+      await openOrderRowMenu(page, rowMenuTrigger(ordersRow), ORDER_ACTION_CANCEL_TESTID),
+    ).toBeDisabled();
 
     // --- 4. Un Empacador lo comienza y lo termina (R18, R21).
     await page.context().clearCookies();
@@ -646,6 +666,10 @@ test.describe('el recorrido de empaque (R48)', () => {
     );
 
     expect(await orderStatus(orderId)).toBe('ENTREGADO');
+    // Terminar consumio los envases de la linea.
+    expect(await batchStock(packagingBatchId!)).toBe(
+      Number(PACKAGING_STOCK) - Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+    );
 
     const packedNotice = page.getByTestId(PACKED_ORDER_NOTICE_TESTID);
     await expect(packedNotice).toBeVisible({ timeout: 60_000 });
