@@ -1049,3 +1049,25 @@ Salida real:
 - `pnpm exec vitest run guard --passWithNoTests`: 51 archivos, 672 passed | 11 skipped.
 
 **Veredicto:** hecho; sin cambio visible; gate rapido solo con rojos del baseline; guardias verdes.
+
+## Tanda backend — vista de la linea con envase obligatorio (design 11.7)
+
+Commit `4e080619`.
+
+**Archivos modificados**
+- `lib/modules/pedidos/domain/order-view.ts`: `OrderPresentationLineView.packagingProductId` y
+  `packagingName` pasan de opcionales a obligatorios `string | null`.
+- `tests/unit/pedidos/qc195-contrato-tipos.test.ts`: el caso R33 afirma la forma obligatoria.
+
+No hubo que tocar ningun doble ni fixture del backend: el typecheck queda limpio sin mas cambios.
+
+**Salida real**
+- `pnpm run typecheck` (`tsc --noEmit`): exit 0, sin errores.
+- `pnpm exec vitest related --run lib/modules/pedidos/domain/order-view.ts`: "No test files found,
+  exiting with code 0". El modulo solo exporta tipos y los importadores lo traen con `import type`,
+  que se borra al compilar, asi que `related` no encuentra a nadie. Para suplirlo:
+- `pnpm exec vitest run --project node tests/unit/pedidos tests/unit/asignaciones`: 94 archivos,
+  1741 passed | 3 skipped.
+- `pnpm exec vitest run guard --passWithNoTests`: 51 archivos, 672 passed | 11 skipped.
+
+**Veredicto:** hecho; contrato 11.7 cerrado; typecheck limpio; guardias verdes.
