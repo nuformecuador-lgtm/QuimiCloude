@@ -1487,3 +1487,14 @@ Compatibilidad con `recipe_tools`: su FK a `products` apunta a `products(id)` (p
 - `pnpm exec vitest related --run` (archivos de receta, conflictos, union semantica, migracion, int de pedidos/documentos/recetas): `Test Files 6 failed | 338 passed (344)`, `Tests 8 failed | 5268 passed | 2 skipped (5278)`. Los 6 archivos rojos estan todos en `tests/baseline-rojos.json` (module-contract de recetas, unidades-viewport, usuarios-viewport, pantallas-exigen-permiso, recipe-page, product-page). Ningun rojo nuevo.
 
 Veredicto: merge cerrado, migracion renumerada y rollback probado; sin rojos fuera del baseline.
+
+## Implementer — gate tras F2.3 (merge de origin/dev, migracion renumerada a 20261003130000), punta 17519ec8
+
+`./init.sh` completo: base `QuimiCloude_QC195` al dia (65 migraciones); typecheck paso; lint paso;
+`Test Files  8 failed | 859 passed (867)`, `Tests  10 failed | 12186 passed | 128 skipped (12324)`;
+`✓ los tres proyectos corrieron (ui, node, integration)` · `✓ tests: sin rojos nuevos (8 rojos, todos en el baseline de 8)` ·
+`✓ todas las migraciones tienen down.sql` · `== init OK ==`. Los 8 son los del baseline (mismos que en T17).
+
+E2E tras el merge (una a una, chromium, puerto 3117, `.next/dev/types` borrado antes de cada una):
+`envases-del-pedido` 2 passed (37.6s) · `recetas` 3 passed (19.2s) · `versiones-de-receta` 1 passed (16.4s) ·
+`versiones-en-la-receta` 1 passed (22.9s) · `pedidos` 2 passed (17.9s) · `empaque` 1 passed (25.1s).
