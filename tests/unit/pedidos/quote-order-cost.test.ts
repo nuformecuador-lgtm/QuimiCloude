@@ -14,7 +14,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
-import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
+import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
@@ -62,7 +62,7 @@ function dobles() {
 }
 
 function depsDe(dobles: ReturnType<typeof crearDobles>): QuoteOrderCostDeps {
-  return { recipes: dobles.recipes, products: dobles.products, units: dobles.units }
+  return { recipes: dobles.recipes, products: dobles.products, units: dobles.units, packaging: fakePackagingCatalog() }
 }
 
 function crearDobles() {
@@ -192,10 +192,10 @@ describe('R2: solo lecturas, y el tipo de dependencias no admite el repositorio 
   })
 
   it('QuoteOrderCostDeps no tiene orders (asercion de tipo)', () => {
-    const deps: QuoteOrderCostDeps = { recipes: {} as never, products: {} as never, units: {} as never }
+    const deps: QuoteOrderCostDeps = { recipes: {} as never, products: {} as never, units: {} as never, packaging: {} as never }
     // @ts-expect-error `orders` no pertenece a QuoteOrderCostDeps: es solo-lectura por construccion.
     void deps.orders
-    expect(Object.keys(deps).sort()).toEqual(['products', 'recipes', 'units'])
+    expect(Object.keys(deps).sort()).toEqual(['packaging', 'products', 'recipes', 'units'])
   })
 })
 
@@ -323,5 +323,106 @@ describe('R8: `orderId` opcional en la entrada llega a `findCostingBatches` como
       ),
     ).rejects.toBeInstanceOf(ValidationError)
     expect(d.products.findCostingBatches).not.toHaveBeenCalled()
+  })
+})
+
+describe('QC-195 — la cotizacion suma los envases del reparto', () => {
+  const ENVASE = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+  const LOTES = [
+    { productId: ENVASE, unitCost: '0.5000', available: '100.0000' },
+    { productId: ENVASE, unitCost: '0.7000', available: '50.0000' },
+  ]
+
+  it('R27, R29: con 40 envases suma 24.0000 a los ingredientes (4 x 10.0000 = 40.0000)', async () => {
+    const d = crearDobles()
+    const packaging = fakePackagingCatalog([], LOTES)
+    const cotizar = createQuoteOrderCost({ ...depsDe(d), packaging })
+
+    const cotizacion = await cotizar(
+      { recipeId: RECIPE_ID, quantity: '4.0000', presentationLines: [{ packagingProductId: ENVASE, packages: 40 }] },
+      actorCon('pedidos.modificar'),
+    )
+
+    expect(cotizacion).toEqual({ ingredientsCost: '64.0000' })
+    expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE], COMPANY_ID, { excludeOrderId: undefined })
+  })
+
+  it('R30: en la edicion, lo apartado por el propio pedido cuenta como disponible del envase', async () => {
+    const d = crearDobles()
+    const packaging = fakePackagingCatalog([], LOTES)
+    const cotizar = createQuoteOrderCost({ ...depsDe(d), packaging })
+
+    await cotizar(
+      {
+        recipeId: RECIPE_ID,
+        quantity: '4.0000',
+        orderId: ORDER_ID,
+        presentationLines: [{ packagingProductId: ENVASE, packages: 40 }],
+      },
+      actorCon('pedidos.modificar'),
+    )
+
+    expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE], COMPANY_ID, { excludeOrderId: ORDER_ID })
+  })
+
+  it('R28: si el disponible del envase no cubre el reparto, la cotizacion queda sin importe', async () => {
+    const d = crearDobles()
+    const cotizar = createQuoteOrderCost({ ...depsDe(d), packaging: fakePackagingCatalog([], LOTES) })
+
+    const cotizacion = await cotizar(
+      { recipeId: RECIPE_ID, quantity: '4.0000', presentationLines: [{ packagingProductId: ENVASE, packages: 151 }] },
+      actorCon('pedidos.modificar'),
+    )
+
+    expect(cotizacion).toEqual({ ingredientsCost: null })
+  })
+
+  it('R29: las lineas antiguas, sin envase, no cuestan ni consultan el catalogo de envases', async () => {
+    const d = crearDobles()
+    const packaging = fakePackagingCatalog([], LOTES)
+    const cotizar = createQuoteOrderCost({ ...depsDe(d), packaging })
+
+    const cotizacion = await cotizar(
+      { recipeId: RECIPE_ID, quantity: '4.0000', presentationLines: [{ presentationId: PRESENTATION_ID, packages: 3 }] },
+      actorCon('pedidos.modificar'),
+    )
+
+    expect(cotizacion).toEqual({ ingredientsCost: '40.0000' })
+    expect(packaging.findCostingBatches).not.toHaveBeenCalled()
+  })
+
+  it('R29: el alta guarda el mismo importe que da la cotizacion con el mismo reparto', async () => {
+    const d = crearDobles()
+    const packaging = fakePackagingCatalog(
+      [packagingRef({ id: ENVASE, presentationId: PRESENTATION_ID, content: '0.1000', unitId: '99999999-9999-4999-8999-999999999999' })],
+      LOTES,
+    )
+    const lineas = [{ packagingProductId: ENVASE, packages: 40 }]
+    const cotizacion = await createQuoteOrderCost({ ...depsDe(d), packaging })(
+      { recipeId: RECIPE_ID, quantity: '4.0000', presentationLines: lineas },
+      actorCon('pedidos.modificar'),
+    )
+
+    const create = vi.fn(async () => filaExistente())
+    const { unitOfWork } = fakeUnitOfWork({ orders: { create, setReservedAt: vi.fn(async () => undefined) } })
+    await createCreateOrder({
+      unitOfWork,
+      recipes: {
+        ...d.recipes,
+        findRefsIncludingDeleted: vi.fn(async () => [{ id: RECIPE_ID, isDeleted: false, isUnderReview: false, original: null }]),
+      } as unknown as RecipeCatalog,
+      products: d.products,
+      units: d.units,
+      presentations: { findRefs: vi.fn(async () => []), findByNormalizedNames: vi.fn(async () => []) },
+      packaging,
+      now: () => new Date('2026-05-01T00:00:00.000Z'),
+    })(
+      { recipeId: RECIPE_ID, quantity: '4.0000', unitId: '99999999-9999-4999-8999-999999999999', presentationLines: lineas },
+      actorCon('pedidos.modificar'),
+    )
+
+    const guardado = (create.mock.calls[0] as unknown as readonly unknown[])[4]
+    expect(cotizacion.ingredientsCost).toBe('64.0000')
+    expect(guardado).toBe(cotizacion.ingredientsCost)
   })
 })

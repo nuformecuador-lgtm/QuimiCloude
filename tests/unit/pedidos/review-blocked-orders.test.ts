@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createReviewBlockedOrders } from '@/lib/modules/pedidos/domain/review-blocked-orders';
 import { fakeOrderRow, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import { fakePackagingCatalog } from '@/tests/helpers/packaging-catalog-double';
 
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
@@ -120,7 +121,7 @@ function montar(escenario: Escenario = {}) {
     findRefsSharingBaseInCompany: vi.fn(async () => []),
   } as unknown as UnitCatalog;
 
-  const review = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork: uow.unitOfWork });
+  const review = createReviewBlockedOrders({ orders, recipes, products, units, packaging: fakePackagingCatalog(), unitOfWork: uow.unitOfWork });
   return {
     review,
     orden,

@@ -19,11 +19,14 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateIngredientsCost,
   calculateLotIngredientsCost,
+  calculateLotPackagingCost,
+  calculateOrderCost,
+  calculatePackagingCost,
   type CostInput,
   type RecipeCostLine,
 } from '@/lib/modules/pedidos/domain/order-cost';
 
-import type { CostingBatch } from '@/lib/modules/inventario';
+import type { CostingBatch, PackagingCostingBatch } from '@/lib/modules/inventario';
 import type { UnitConversion } from '@/lib/modules/unidades';
 
 const PRODUCT_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -555,3 +558,63 @@ describe('calculateLotIngredientsCost', () => {
     expect(resultado).toMatch(/^\d+\.\d{4}$/);
   });
 });
+
+describe('QC-195 — costo de los envases del reparto', () => {
+  const BOTELLA = 'botella'
+  const LOTE_A: PackagingCostingBatch = { productId: BOTELLA, unitCost: '0.5000', available: '100.0000' }
+  const LOTE_B: PackagingCostingBatch = { productId: BOTELLA, unitCost: '0.7000', available: '50.0000' }
+
+  it('R27: 40 botellas con lotes A (100 a 0.50) y B (50 a 0.70) cuestan 40 x (0.50 + 0.70) / 2 = 24.0000', () => {
+    expect(calculatePackagingCost([{ productId: BOTELLA, packages: 40 }], [LOTE_A, LOTE_B])).toBe('24.0000')
+  })
+
+  it('R27: el importe del pedido es ingredientes + envases (500 + 24 = 524.0000)', () => {
+    expect(calculateOrderCost('500.0000', calculatePackagingCost([{ productId: BOTELLA, packages: 40 }], [LOTE_A, LOTE_B]))).toBe(
+      '524.0000',
+    )
+  })
+
+  it('R27: el promedio es simple, sin ponderar por el disponible de cada lote', () => {
+    const grande: PackagingCostingBatch = { productId: BOTELLA, unitCost: '1.0000', available: '1000.0000' }
+    const chico: PackagingCostingBatch = { productId: BOTELLA, unitCost: '3.0000', available: '1.0000' }
+    expect(calculatePackagingCost([{ productId: BOTELLA, packages: 10 }], [grande, chico])).toBe('20.0000')
+  })
+
+  it('R28: si la suma de los disponibles no cubre los envases, el pedido queda sin importe', () => {
+    expect(calculatePackagingCost([{ productId: BOTELLA, packages: 151 }], [LOTE_A, LOTE_B])).toBeNull()
+    expect(calculateOrderCost('500.0000', null)).toBeNull()
+  })
+
+  it('R28: un envase sin ningun lote con costo y disponible deja el pedido sin importe', () => {
+    expect(calculatePackagingCost([{ productId: BOTELLA, packages: 1 }], [])).toBeNull()
+  })
+
+  it('R30: un lote sin disponible no entra en el promedio', () => {
+    const agotado: PackagingCostingBatch = { productId: BOTELLA, unitCost: '9.0000', available: '0.0000' }
+    expect(calculatePackagingCost([{ productId: BOTELLA, packages: 40 }], [LOTE_A, agotado])).toBe('20.0000')
+  })
+
+  it('R32, R35: sin envases el importe es el de los ingredientes, igual que hoy', () => {
+    expect(calculatePackagingCost([], [])).toBe('0.0000')
+    expect(calculateOrderCost('12.3456', '0.0000')).toBe('12.3456')
+    expect(calculateOrderCost(null, '0.0000')).toBeNull()
+  })
+
+  it('cada linea con su envase: dos envases distintos se suman', () => {
+    const tapa: PackagingCostingBatch = { productId: 'tapa', unitCost: '0.1000', available: '500.0000' }
+    expect(
+      calculatePackagingCost(
+        [
+          { productId: BOTELLA, packages: 40 },
+          { productId: 'tapa', packages: 40 },
+        ],
+        [LOTE_A, LOTE_B, tapa],
+      ),
+    ).toBe('28.0000')
+  })
+
+  it('R31: para el lote de producto terminado un envase sin lote con costo cuenta cero, nunca null', () => {
+    expect(calculateLotPackagingCost([{ productId: BOTELLA, packages: 40 }], [LOTE_A, LOTE_B])).toBe('24.0000')
+    expect(calculateLotPackagingCost([{ productId: 'sin-lotes', packages: 5 }], [])).toBe('0.0000')
+  })
+})

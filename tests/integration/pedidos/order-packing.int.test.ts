@@ -48,6 +48,10 @@ import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-p
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
@@ -85,7 +89,7 @@ const units: UnitCatalog = {
 };
 
 const startPackingAliveById = createStartPacking({ packing: orderPackingRepository });
-const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations });
+const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations, packaging: packagingCatalog });
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');

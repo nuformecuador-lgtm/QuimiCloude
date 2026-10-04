@@ -9,10 +9,10 @@ import type { OrderStatus } from './order-classification';
 import { updateOrderSchema } from './order-input';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildOrderRequirement } from './order-requirement';
-import { resolveDistribution } from './resolve-distribution';
+import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { resolveOrderCost } from './resolve-ingredients-cost';
 
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -112,12 +112,11 @@ export function createUpdateOrder(
     // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
     // disponible para si mismo: editarlo sin cambiar nada no le hace perder de su propio
     // promedio el lote que el mismo aparto entero.
-    const ingredientsCost = await resolveIngredientsCost(
-      deps.recipes,
-      deps.products,
-      deps.units,
+    const ingredientsCost = await resolveOrderCost(
+      deps,
       effectiveId,
       data.quantity,
+      packagingLinesOfInput(data.presentationLines),
       actor.companyId,
       { orderId: id },
     );

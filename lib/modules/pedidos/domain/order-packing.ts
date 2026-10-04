@@ -20,7 +20,8 @@ import {
   RecipeNotFoundError,
 } from './errors';
 import { sumInOrderUnit } from './order-distribution';
-import { resolveLotIngredientsCost } from './resolve-ingredients-cost';
+import { packagingLinesOf } from './order-requirement';
+import { resolveLotCost } from './resolve-ingredients-cost';
 import { assertTransition } from './order-transitions';
 
 import type { FinishedGoodsReceipt, OrderCatalog } from './order-catalog';
@@ -29,7 +30,7 @@ import type { OrderPackingRepository } from '../ports/order-packing-repository';
 import type { FinishPackingLine } from '../ports/order-write-repository';
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -51,6 +52,8 @@ export type FinishPackingDeps = {
    *  contenido vigente con el que rescatar una linea sin contenido copiado. Lectura global,
    *  fuera de la transaccion, igual que `recipes`/`products`. */
   readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
+  /** El costo de los envases del reparto, para el lote sin importe guardado. */
+  readonly packaging: PackagingCatalog;
 };
 
 /** Firma exacta de `OrderCatalog['startPackingAliveById']`. `'without_distribution'` sale
@@ -181,12 +184,11 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         const lotCost =
           updated.ingredientsCost !== null
             ? updated.ingredientsCost
-            : await resolveLotIngredientsCost(
-                deps.recipes,
-                deps.products,
-                deps.units,
+            : await resolveLotCost(
+                deps,
                 updated.recipeId,
                 updated.quantity,
+                packagingLinesOf(lines),
                 companyId,
                 { orderId: id },
               );

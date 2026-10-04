@@ -875,3 +875,64 @@ Pregunta abierta (no decidida aqui): «Reparto y unidad» cambia los envases per
 `null` al bloquear). Con T9 el importe incluye envases, asi que tras cambiar el reparto por esta via
 el importe guardado queda con los envases anteriores hasta la siguiente edicion completa, y un
 `BLOQUEADO` que se desbloquea por aqui queda `PENDIENTE` con importe `null`. ¿Debe recalcularlo?
+
+Gate `./init.sh --rapido` tras el commit de T8: `✓ typecheck`, `✓ lint`, `test:rapido`
+`Test Files 6 failed | 404 passed (410)`, `Tests 8 failed | 6146 passed | 9 skipped`; los 6 del
+baseline. Guardias aparte: `51 passed (51)`. **Veredicto T8:** hecho.
+
+## T9 — Costo de los envases (backend_dev, 2026-10-03)
+
+Archivos de produccion:
+- `order-cost.ts`: `calculatePackagingCost(lines, batches)` (por linea, envases x promedio simple
+  del costo de sus lotes con disponible > 0; `null` si un envase no tiene lote o su disponible no
+  cubre sus envases; sin envases `'0.0000'`), `calculateLotPackagingCost` (mismo calculo; un envase
+  sin lote cuenta cero, nunca `null`), `calculateOrderCost(ingredientes, envases)` (`null` si
+  cualquiera lo es; redondeo mitad arriba a 4 decimales; los dos sumandos ya vienen a 4 decimales,
+  asi que la suma no cambia el redondeo de cada uno).
+- `resolve-ingredients-cost.ts`: `resolveOrderCost(catalogs, recipeId, quantity, packagingLines,
+  companyId, { orderId })` y `resolveLotCost(...)`; leen `PackagingCatalog.findCostingBatches` con
+  `excludeOrderId` (R30) solo si hay envases.
+- `create-order.ts`/`update-order.ts`: el importe guardado es `resolveOrderCost` con los envases de
+  la entrada (`packagingLinesOfInput`, nuevo en `resolve-distribution.ts`); la edicion cuenta lo
+  apartado por el propio pedido.
+- `quote-order-cost.ts` + `quoteOrderCostSchema`: acepta `presentationLines` (opcional, la union);
+  las lineas antiguas no cuestan. Deps ganan `packaging`.
+- `review-blocked-orders.ts`: el importe al desbloquear incluye los envases de la fila; si el
+  reparto cambio entre la lectura y el candado, el pedido se deja para la siguiente revision (igual
+  que ya se hacia con receta y cantidad).
+- `order-packing.ts`: lote sin importe guardado -> `resolveLotCost` con los envases de las lineas
+  (R31). `FinishPackingLine` gana `packagingProductId` (lo lee `findPresentationLinesForFinish`).
+- `lib/composition/index.ts`: `packaging` en cotizacion, revision de bloqueados y Terminar.
+
+Tests: nuevos casos en `order-cost.test.ts`, `quote-order-cost.test.ts`, `order-packing.test.ts`,
+`qc195-packaging-reservation.int.test.ts`. Ajustados contra R27/R31 (el importe y el lote ahora
+incluyen los envases): `finish-with-finished-goods.int.test.ts` (5 expectativas recalculadas con el
+envase sembrado a 0.5000 por envase, la formula en el comentario de cada una; el costo cero no es
+posible: `product_batches_unit_cost_positive`). Dobles de `packaging` en `review-blocked-orders`,
+`quote-order-cost`, `order-packing` (unit e int), `order-cost-quote.int`. Guardia
+`guard-ambito-empresa-pedidos.test.ts`: la firma exacta del cableado de `finishPackingAliveById`
+gana `packaging: packagingCatalog` (el catalogo filtra por empresa en `inventario`).
+
+R -> test:
+| R | Test |
+|---|---|
+| R27 | `order-cost.test.ts` › «R27: 40 botellas con lotes A (100 a 0.50) y B (50 a 0.70) cuestan 40 x (0.50 + 0.70) / 2 = 24.0000», «R27: el importe del pedido es ingredientes + envases (500 + 24 = 524.0000)», «R27: el promedio es simple, sin ponderar por el disponible de cada lote»; `quote-order-cost.test.ts` › «R27, R29: con 40 envases suma 24.0000 a los ingredientes…»; int › «R27, R29, R30: 40 l y 40 botellas (lotes a 0.50 y 0.70): cotizacion, alta y edicion guardan 40 + 24 = 64.0000» |
+| R28 | `order-cost.test.ts` › «R28: si la suma de los disponibles no cubre los envases, el pedido queda sin importe», «R28: un envase sin ningun lote con costo y disponible deja el pedido sin importe»; `quote-order-cost.test.ts` › «R28: …la cotizacion queda sin importe»; int › «R28: si los envases disponibles no cubren el reparto, la cotizacion y lo guardado quedan sin importe» |
+| R29 (dominio) | `quote-order-cost.test.ts` › «R29: el alta guarda el mismo importe que da la cotizacion con el mismo reparto», «R29: las lineas antiguas, sin envase, no cuestan ni consultan el catalogo de envases»; int › «R27, R29, R30: …» |
+| R30 | `quote-order-cost.test.ts` › «R30: en la edicion, lo apartado por el propio pedido cuenta como disponible del envase»; `order-cost.test.ts` › «R30: un lote sin disponible no entra en el promedio»; int › «R27, R29, R30: …» (la edicion sin cambios conserva 64.0000); el lote sin costo lo excluye el adaptador (`qc195-packaging-catalog.int.test.ts` › «R27, R30 — findCostingBatches…», T3) |
+| R31 | `order-packing.test.ts` › «QC-195 R31: sin importe guardado, el lote se costea con sus envases…», «QC-195 R31: con importe guardado el lote usa ese importe y no vuelve a costear los envases»; `order-cost.test.ts` › «R31: para el lote de producto terminado un envase sin lote con costo cuenta cero, nunca null»; int `finish-with-finished-goods` › «con importe nulo, se recalcula al Terminar…» (30 + 10 x 0.50 = 3.5000 por unidad) |
+
+Salida real:
+```
+$ pnpm exec vitest run --project node tests/unit/pedidos tests/unit/asignaciones
+ Test Files  94 passed (94)      Tests  1736 passed | 3 skipped (1739)
+$ pnpm exec vitest run --project integration tests/integration/pedidos tests/integration/asignaciones tests/integration/documentos/formula-import.int.test.ts
+ Test Files  46 passed (46)      Tests  415 passed (415)
+$ pnpm exec tsc --noEmit -p .   -> 0 errores;  eslint -> 0 errores, 2 avisos preexistentes
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)      Tests  672 passed | 11 skipped (683)   (tras ampliar la firma de la guardia)
+```
+
+Decision dentro del spec: en el lote de producto terminado (R31) un envase sin ningun lote con costo
+cuenta cero, como un ingrediente sin costo en `calculateLotIngredientsCost` (el lote siempre entra
+con costo). La cobertura no se exige ahi: al Terminar los envases estan apartados por el pedido.

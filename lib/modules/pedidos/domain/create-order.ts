@@ -5,8 +5,8 @@ import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildOrderRequirement } from './order-requirement';
-import { resolveDistribution } from './resolve-distribution';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
+import { resolveOrderCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -113,12 +113,11 @@ export function createCreateOrder(
     );
     const effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
 
-    const ingredientsCost = await resolveIngredientsCost(
-      deps.recipes,
-      deps.products,
-      deps.units,
+    const ingredientsCost = await resolveOrderCost(
+      deps,
       effectiveId,
       data.quantity,
+      packagingLinesOfInput(data.presentationLines),
       actor.companyId,
     );
 

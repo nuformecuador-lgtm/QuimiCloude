@@ -1000,6 +1000,7 @@ type FinishPackingLineRow = {
   readonly presentation_id: string;
   readonly packages: number;
   readonly presentation_content: string | null;
+  readonly packaging_product_id: string | null;
 };
 
 async function findPresentationLinesForFinishOrder(
@@ -1009,7 +1010,8 @@ async function findPresentationLinesForFinishOrder(
 ): Promise<readonly FinishPackingLine[]> {
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<FinishPackingLineRow>>(Prisma.sql`
-    SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content"
+    SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content",
+           "packaging_product_id"
       FROM "order_presentation_lines"
      WHERE "order_id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -1021,5 +1023,6 @@ async function findPresentationLinesForFinishOrder(
     presentationId: row.presentation_id,
     packages: row.packages,
     presentationContent: row.presentation_content,
+    packagingProductId: row.packaging_product_id,
   }));
 }

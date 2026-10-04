@@ -132,7 +132,7 @@ const orderCatalog: OrderCatalog = {
   transitionAliveById: createTransitionOrder({ unitOfWork }),
   // T14: Comenzar y Terminar, cableados exactamente como `lib/composition`.
   startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations }),
+  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations, packaging: packagingCatalog }),
 };
 
 function finishAssignedOrderPara(orderId: string) {
@@ -454,11 +454,12 @@ describe('R17 — Terminar da de alta el lote a partir del reparto fijado en Com
 
       const loteUno = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoUno?.id }, select: { stock: true, unitCost: true } });
       const loteDos = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoDos?.id }, select: { stock: true, unitCost: true } });
-      // 30.0000 (importe guardado: 10 x 3.0000) / (6x1 + 2x2) = 30.0000 / 10 = 3.0000 para las DOS.
+      // Importe guardado: 10 x 3.0000 de ingredientes + (6 + 2) envases a 0.5000 = 34.0000, entre
+      // (6x1 + 2x2) = 10 -> 3.4000 para las DOS (QC-195 R27: el importe incluye los envases).
       expect(loteUno.stock.toFixed(4)).toBe('6.0000');
       expect(loteDos.stock.toFixed(4)).toBe('4.0000');
-      expect(loteUno.unitCost?.toFixed(4)).toBe('3.0000');
-      expect(loteDos.unitCost?.toFixed(4)).toBe('3.0000');
+      expect(loteUno.unitCost?.toFixed(4)).toBe('3.4000');
+      expect(loteDos.unitCost?.toFixed(4)).toBe('3.4000');
       expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('90.0000');
     } finally {
       // `otraPresentacion` referencia `fixture.unitId`: se borra ANTES que `borrarFixture`
@@ -636,6 +637,7 @@ describe('R19 — un fallo forzado tras el lote deshace la transaccion entera', 
       products,
       units,
       presentations,
+      packaging: packagingCatalog,
     });
 
     try {
@@ -772,7 +774,8 @@ describe('R18 — el coste del lote', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture, '10.0000', 10), actorDe(fixture));
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
-      expect(antes.ingredientsCost?.toFixed(4)).toBe('20.0000');
+      // 10 x 2.0000 de ingredientes + 10 envases a 0.5000 (QC-195 R27).
+      expect(antes.ingredientsCost?.toFixed(4)).toBe('25.0000');
 
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
@@ -780,11 +783,11 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // 20.0000 (importe guardado) / 10 (cantidad que entra) = 2.0000
-      expect(lote.unitCost?.toFixed(4)).toBe('2.0000');
+      // 25.0000 (importe guardado) / 10 (cantidad que entra) = 2.5000
+      expect(lote.unitCost?.toFixed(4)).toBe('2.5000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
-      expect(despues.ingredientsCost?.toFixed(4)).toBe('20.0000');
+      expect(despues.ingredientsCost?.toFixed(4)).toBe('25.0000');
     } finally {
       await borrarFixture(fixture, [productId]);
     }
@@ -814,9 +817,9 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeConLinea, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // Sin importe guardado, se recalcula: 10 (100% de 10) x 3.0000 = 30.0000, dividido entre
-      // 10 (cantidad que entra) = 3.0000.
-      expect(lote.unitCost?.toFixed(4)).toBe('3.0000');
+      // Sin importe guardado, se recalcula: 10 (100% de 10) x 3.0000 = 30.0000 mas 10 envases a
+      // 0.5000 (QC-195 R31), dividido entre 10 (cantidad que entra) = 3.5000.
+      expect(lote.unitCost?.toFixed(4)).toBe('3.5000');
       expect(await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } }).then((b) => b.stock.toFixed(4))).toBe('90.0000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
@@ -848,9 +851,9 @@ describe('R18 — el coste del lote', () => {
 
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { unitCost: true } });
-      // Solo el ingrediente con costo cuenta: 60% de 10 x 5.0000 = 30.0000, entre 10 (cantidad
-      // que entra) = 3.0000. El de la maquina sin costo aporta cero.
-      expect(lote.unitCost?.toFixed(4)).toBe('3.0000');
+      // Solo el ingrediente con costo cuenta: 60% de 10 x 5.0000 = 30.0000, mas 10 envases a
+      // 0.5000 (QC-195 R31), entre 10 (cantidad que entra) = 3.5000. La maquina sin costo aporta cero.
+      expect(lote.unitCost?.toFixed(4)).toBe('3.5000');
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true } });
       expect(despues.ingredientsCost).toBeNull();
@@ -929,7 +932,8 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
     try {
       const orderId = await pedidoMixto(fixture, mililitro, recipeId);
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { ingredientsCost: true } });
-      expect(antes.ingredientsCost?.toFixed(4)).toBe('1000.0000');
+      // 100 x 10.0000 de ingredientes + (5 + 60) envases a 0.5000 (QC-195 R27).
+      expect(antes.ingredientsCost?.toFixed(4)).toBe('1032.5000');
 
       const resultado = await empacarYTerminar(orderId, fixture.companyId, fixture.actorId, new Date());
       expect(resultado).toMatchObject({ kind: 'ok' });
@@ -939,18 +943,18 @@ describe('R18 — reparto en dos unidades: el coste se reparte en la unidad del 
       const loteMl = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoMl?.id }, select: { stock: true, unitCost: true } });
       const loteL = await prisma.productBatch.findFirstOrThrow({ where: { productId: productoL?.id }, select: { stock: true, unitCost: true } });
 
-      // 1000 / 61 = 16.3934 por unidad del pedido; en la derivada, 1000 / 61000 = 0.0164.
+      // 1032.5 / 61 = 16.9262 por unidad del pedido; en la derivada, 1032.5 / 61000 = 0.0169.
       expect(loteL.stock.toFixed(4)).toBe('60.0000');
-      expect(loteL.unitCost?.toFixed(4)).toBe('16.3934');
+      expect(loteL.unitCost?.toFixed(4)).toBe('16.9262');
       expect(loteMl.stock.toFixed(4)).toBe('1000.0000');
-      expect(loteMl.unitCost?.toFixed(4)).toBe('0.0164');
+      expect(loteMl.unitCost?.toFixed(4)).toBe('0.0169');
 
-      // 16.4000 + 983.6040: el resto es el redondeo a cuatro decimales del coste unitario.
+      // 16.9000 + 1015.5720: el resto es el redondeo a cuatro decimales del coste unitario.
       const valorMl = loteMl.stock.mul(loteMl.unitCost ?? 0);
       const valorL = loteL.stock.mul(loteL.unitCost ?? 0);
-      expect(valorMl.toFixed(2)).toBe('16.40');
-      expect(valorL.toFixed(2)).toBe('983.60');
-      expect(valorMl.add(valorL).toFixed(1)).toBe('1000.0');
+      expect(valorMl.toFixed(2)).toBe('16.90');
+      expect(valorL.toFixed(2)).toBe('1015.57');
+      expect(valorMl.add(valorL).toFixed(1)).toBe('1032.5');
     } finally {
       await borrarMililitro(fixture, mililitro);
       await borrarFixture(fixture, [productId]);

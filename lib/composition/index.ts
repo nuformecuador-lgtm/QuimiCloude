@@ -1194,6 +1194,7 @@ const reviewBlockedOrders = createReviewBlockedOrders({
   recipes: recipeCatalog,
   products: productCatalog,
   units: unitCatalog,
+  packaging: packagingCatalog,
   unitOfWork: orderUnitOfWork,
 });
 
@@ -1260,6 +1261,7 @@ export const pedidos = {
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
+    packaging: packagingCatalog,
   }),
   // El proceso diario y su puerta: sin usuario delante, asi que ninguno de los dos recibe actor.
   // El handler los llama en ese orden -primero la puerta- y `lib/composition` no impone el
@@ -1351,6 +1353,7 @@ const orderCatalog: OrderCatalog = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
   }),
 };
 

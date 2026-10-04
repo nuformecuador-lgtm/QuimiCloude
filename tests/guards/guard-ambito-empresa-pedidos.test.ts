@@ -504,8 +504,10 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     // abre `orderUnitOfWork` directamente -ya no cablea `OrderPackingRepository.finishPackingAlive`,
     // que T13 retiro del puerto- y necesita los mismos catalogos globales que `transitionAliveById`
     // usaba antes de R15/R16, mas `presentationCatalog` para la defensa en profundidad de R19.
+    // QC-195 (R31): y `packagingCatalog`, para costear los envases del lote; filtra por empresa en
+    // `inventario` (lo vigila `guard-ambito-empresa-inventario`).
     'finishPackingAliveById',
-    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,?\s*\}\s*\)$/,
+    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
   ],
 ])
 

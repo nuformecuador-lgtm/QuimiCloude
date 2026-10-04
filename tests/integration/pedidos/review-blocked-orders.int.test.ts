@@ -124,7 +124,7 @@ const units: UnitCatalog = {
 
 const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
-const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork });
+const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging: packagingCatalog, unitOfWork });
 
 // ---------------------------------------------------------------------------
 // Empresa efimera

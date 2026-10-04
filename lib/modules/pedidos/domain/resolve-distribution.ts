@@ -73,6 +73,14 @@ function isPackagingLine(
   return 'packagingProductId' in line;
 }
 
+/** Los envases de unas lineas tal como llegan del borde, antes de resolverlas: lo que cuesta el
+ *  reparto. Las lineas antiguas no aportan. */
+export function packagingLinesOfInput(lines: readonly DistributionLineInput[]): readonly PackagingRequirementLine[] {
+  return lines.flatMap((line) =>
+    isPackagingLine(line) ? [{ productId: line.packagingProductId, packages: line.packages }] : [],
+  );
+}
+
 function legacyLineIsKept(line: PresentationLineInput, saved: readonly OrderPresentationLineRow[]): boolean {
   return saved.some(
     (row) =>

@@ -18,6 +18,8 @@ import type { FinishPackingLine, FinishPackingUpdateOutcome } from '@/lib/module
 import type { FinishedGoodsIntake, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
 
 const EMPRESA = 'c-1';
 const PEDIDO = 'o-1';
@@ -50,6 +52,7 @@ function lineaDe(overrides: Partial<FinishPackingLine> = {}): FinishPackingLine 
     presentationId: 'p-1',
     packages: 10,
     presentationContent: '1.0000',
+    packagingProductId: null,
     ...overrides,
   };
 }
@@ -169,6 +172,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     readonly lines?: readonly FinishPackingLine[];
     readonly receiveFromOrder?: ReturnType<typeof vi.fn>;
     readonly catalogos?: ReturnType<typeof catalogosGlobales>;
+    readonly packaging?: PackagingCatalog;
   } = {}): {
     readonly finishPackingAliveById: ReturnType<typeof createFinishPacking>;
     readonly finishPackingAlive: ReturnType<typeof vi.fn>;
@@ -203,6 +207,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
       products: catalogos.products,
       units: catalogos.units,
       presentations: catalogos.presentations,
+      packaging: options.packaging ?? fakePackagingCatalog(),
     };
 
     return {
@@ -364,6 +369,39 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
 
     expect(catalogos.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA], EMPRESA);
+  });
+
+  it('QC-195 R31: sin importe guardado, el lote se costea con sus envases (promedio de sus lotes, contando lo del propio pedido)', async () => {
+    const packaging = fakePackagingCatalog(
+      [],
+      [
+        { productId: 'envase-1', unitCost: '0.5000', available: '100.0000' },
+        { productId: 'envase-1', unitCost: '0.7000', available: '50.0000' },
+      ],
+    );
+    const { finishPackingAliveById, receiveFromOrder } = montar({
+      lines: [lineaDe({ packages: 10, presentationContent: '1.0000', packagingProductId: 'envase-1' })],
+      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '10.0000', ingredientsCost: null, unitId: LITRO },
+      packaging,
+    });
+
+    await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
+
+    expect(packaging.findCostingBatches).toHaveBeenCalledWith(['envase-1'], EMPRESA, { excludeOrderId: PEDIDO });
+    // Receta sin lineas (0.0000) + 10 envases x 0.60 = 6.0000, entre las 10 unidades que entran.
+    expect(receiveFromOrder).toHaveBeenCalledWith(expect.objectContaining({ unitCost: '0.6000' }));
+  });
+
+  it('QC-195 R31: con importe guardado el lote usa ese importe y no vuelve a costear los envases', async () => {
+    const packaging = fakePackagingCatalog();
+    const { finishPackingAliveById } = montar({
+      lines: [lineaDe({ packages: 10, presentationContent: '1.0000', packagingProductId: 'envase-1' })],
+      packaging,
+    });
+
+    await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
+
+    expect(packaging.findCostingBatches).not.toHaveBeenCalled();
   });
 
   it('R19: una linea sin contenido copiado ni vigente rechaza con presentation_without_content y NO da de alta ningun lote', async () => {

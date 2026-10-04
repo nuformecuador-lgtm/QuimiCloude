@@ -43,6 +43,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import {
   createCancelOrder,
   createCreateOrder,
+  createQuoteOrderCost,
   createDeleteOrder,
   createReviewBlockedOrders,
   createTransitionOrder,
@@ -92,8 +93,9 @@ const updateOrder = createUpdateOrder({ orders, recipes, products, units, presen
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 const transition = createTransitionOrder({ unitOfWork });
+const quoteOrderCost = createQuoteOrderCost({ recipes, products, units, packaging });
 const updateDistribution = createUpdateOrderPresentationLines({ packaging, presentations, units, unitOfWork });
-const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork });
+const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging, unitOfWork });
 
 type Fixture = {
   readonly companyId: string;
@@ -567,6 +569,57 @@ describe('QC-195 — Reparto y unidad toca la reserva de los envases', () => {
       expect(resultado).toBe('insufficient_material');
       expect(await apartadoPorProducto(creado.id)).toEqual(antes);
       expect(await lineasDe(creado.id)).toEqual([{ packagingProductId: botella, packages: 40 }]);
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+});
+
+describe('QC-195 — el importe suma los envases', () => {
+  it('R27, R29, R30: 40 l y 40 botellas (lotes a 0.50 y 0.70): cotizacion, alta y edicion guardan 40 + 24 = 64.0000', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await seedPackaging({ companyId: f.companyId, presentationId: f.presentationId, createdBy: f.actorId, stock: '100', unitCost: '0.5000' });
+      f.productIds.push(botella);
+      await addBatchToAlive(
+        botella,
+        { presentationId: null, stock: '50', unitCost: '0.7000', lot: null, purchaseDate: '2026-09-02', expiryDate: null, createdBy: f.actorId },
+        new Date(),
+        { companyId: f.companyId },
+        { presentationId: f.presentationId },
+      );
+      const lineas = [{ packagingProductId: botella, packages: 40 }];
+
+      const cotizacion = await quoteOrderCost({ recipeId: f.recipeId, quantity: '40', presentationLines: lineas }, actorDe(f));
+      expect(cotizacion.ingredientsCost).toBe('64.0000');
+
+      const creado = await createOrder(entrada(f, '40', lineas), actorDe(f));
+      expect((await estadoDe(creado.id)).ingredientsCost?.toFixed(4)).toBe('64.0000');
+
+      // Lo apartado por el propio pedido cuenta como disponible: la edicion sin cambios no lo pierde.
+      await updateOrder(creado.id, entrada(f, '40', lineas), actorDe(f));
+      expect((await estadoDe(creado.id)).ingredientsCost?.toFixed(4)).toBe('64.0000');
+      const cotizacionEdicion = await quoteOrderCost(
+        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        actorDe(f),
+      );
+      expect(cotizacionEdicion.ingredientsCost).toBe('64.0000');
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R28: si los envases disponibles no cubren el reparto, la cotizacion y lo guardado quedan sin importe', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await envase(f, '10');
+      const lineas = [{ packagingProductId: botella, packages: 40 }];
+
+      const cotizacion = await quoteOrderCost({ recipeId: f.recipeId, quantity: '40', presentationLines: lineas }, actorDe(f));
+      expect(cotizacion.ingredientsCost).toBeNull();
+
+      const creado = await createOrder(entrada(f, '40', lineas, true), actorDe(f));
+      expect((await estadoDe(creado.id)).ingredientsCost).toBeNull();
     } finally {
       await borrarFixture(f);
     }

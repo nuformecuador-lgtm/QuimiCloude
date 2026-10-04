@@ -14,10 +14,10 @@ import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 
 import { OrderNotFoundError } from './errors';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { resolveOrderCost } from './resolve-ingredients-cost';
 
 import type { OrderScope } from './order-scope';
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import type { OrderRepository } from '../ports/order-repository';
@@ -28,6 +28,7 @@ export type ReviewBlockedOrdersDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
+  readonly packaging: PackagingCatalog;
   readonly unitOfWork: OrderUnitOfWork;
 };
 
@@ -96,12 +97,11 @@ async function reviewOne(
 
   // Fuera de la transaccion, igual que en la edicion: el pedido no tiene nada apartado, asi que
   // es el coste con el disponible general de este instante.
-  const ingredientsCost = await resolveIngredientsCost(
-    deps.recipes,
-    deps.products,
-    deps.units,
+  const ingredientsCost = await resolveOrderCost(
+    deps,
     row.recipeId,
     row.quantity,
+    packagingLinesOf(row.presentationLines),
     scope.companyId,
     { orderId: id },
   );
@@ -115,7 +115,8 @@ async function reviewOne(
       locked === null ||
       locked.status !== 'BLOQUEADO' ||
       locked.recipeId !== row.recipeId ||
-      locked.quantity !== row.quantity
+      locked.quantity !== row.quantity ||
+      !samePackaging(locked.presentationLines, row.presentationLines)
     ) {
       return false;
     }
@@ -147,4 +148,11 @@ async function reviewOne(
     await transaction.orders.setReservedAt(id, outcome.kind === 'reserved' ? now : null, scope);
     return true;
   });
+}
+
+function samePackaging(
+  a: readonly { readonly packagingProductId: string | null; readonly packages: number }[],
+  b: readonly { readonly packagingProductId: string | null; readonly packages: number }[],
+): boolean {
+  return JSON.stringify(packagingLinesOf(a)) === JSON.stringify(packagingLinesOf(b));
 }

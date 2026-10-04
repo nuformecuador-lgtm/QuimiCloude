@@ -32,6 +32,8 @@ export type FinishPackingLine = {
   readonly presentationId: string;
   readonly packages: number;
   readonly presentationContent: string | null;
+  /** `null` en una linea antigua, sin envase. */
+  readonly packagingProductId: string | null;
 };
 
 /**

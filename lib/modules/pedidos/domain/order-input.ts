@@ -95,12 +95,13 @@ function hasNoDuplicateLine(lines: readonly DistributionLineInput[]): boolean {
   return new Set(keys).size === keys.length;
 }
 
+const distributionLinesSchema = z
+  .array(distributionLineSchema)
+  .refine(hasNoDuplicateLine, { message: 'Cada envase aparece una sola vez.' });
+
 /** El reparto completo. `[]` es un pedido sin reparto todavia, valido: quien no reparte
  *  nada al dar de alta lo reparte despues, hasta que empieza el empaque. */
-export const presentationLinesSchema = z
-  .array(distributionLineSchema)
-  .refine(hasNoDuplicateLine, { message: 'Cada envase aparece una sola vez.' })
-  .default([]);
+export const presentationLinesSchema = distributionLinesSchema.default([]);
 
 /** Nombres de los campos repetidos con que el formulario envia el reparto, en orden. */
 export const ORDER_DISTRIBUTION_PRESENTATION_FIELD = 'presentationLines.presentationId';
@@ -204,9 +205,9 @@ export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
  */
 export const quoteOrderCostSchema = createOrderSchema
   .pick({ recipeId: true, quantity: true })
-  .extend({ orderId: z.string().uuid().optional() });
+  .extend({ orderId: z.string().uuid().optional(), presentationLines: distributionLinesSchema.optional() });
 
-export type QuoteOrderCostInput = z.infer<typeof quoteOrderCostSchema> & {
+export type QuoteOrderCostInput = Omit<z.infer<typeof quoteOrderCostSchema>, 'presentationLines'> & {
   /** Las lineas antiguas no suman costo de envase. */
   readonly presentationLines?: readonly DistributionLineInput[];
 };

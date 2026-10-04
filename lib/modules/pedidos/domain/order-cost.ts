@@ -3,7 +3,7 @@
 // Dominio puro: sin Prisma, sin framework, sin reloj y sin estado. Recibe datos ya leidos por
 // quien orquesta (alta o edicion) y devuelve el importe, o `null` cuando no se puede calcular.
 
-import type { CostingBatch, ProductId } from '@/lib/modules/inventario'
+import type { CostingBatch, PackagingCostingBatch, ProductId } from '@/lib/modules/inventario'
 import { consumedQuantity } from '@/lib/modules/recetas'
 import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades'
 
@@ -224,4 +224,82 @@ export function calculateLotIngredientsCost(input: CostInput): string {
   }
 
   return formatFixedOutputScale(roundedOutput)
+}
+
+/** Un envase del reparto y cuantos lleva. */
+export type PackagingCostLine = {
+  readonly productId: ProductId
+  readonly packages: number
+}
+
+/** Costo (escalado a `INTERNAL_SCALE`) de un envase: sus envases por el promedio simple del
+ *  costo de sus lotes. `null` si no tiene lotes o, con `requireCoverage`, si su disponible no
+ *  alcanza. */
+function calculatePackagingLineCost(
+  line: PackagingCostLine,
+  batches: readonly PackagingCostingBatch[],
+  requireCoverage: boolean,
+): bigint | null {
+  let coveredInternal = ZERO
+  const unitCostsInternal: bigint[] = []
+  for (const batch of batches) {
+    if (batch.productId !== line.productId) continue
+    const available = parseDecimal(batch.available)
+    const unitCost = parseDecimal(batch.unitCost)
+    if (available === null || unitCost === null) return null
+    if (toInternal(available) <= ZERO) continue
+    coveredInternal += toInternal(available)
+    unitCostsInternal.push(toInternal(unitCost))
+  }
+
+  if (unitCostsInternal.length === 0) return null
+  const packagesInternal = BigInt(line.packages) * pow10(INTERNAL_SCALE)
+  if (requireCoverage && coveredInternal < packagesInternal) return null
+  return multiplyInternal(averageInternal(unitCostsInternal), packagesInternal)
+}
+
+/** Costo de los envases del reparto, o `null` si alguno no tiene lote con costo o su disponible
+ *  no cubre sus envases. Sin envases, `'0.0000'`. */
+export function calculatePackagingCost(
+  lines: readonly PackagingCostLine[],
+  batches: readonly PackagingCostingBatch[],
+): string | null {
+  let totalInternal = ZERO
+  for (const line of lines) {
+    const lineCostInternal = calculatePackagingLineCost(line, batches, true)
+    if (lineCostInternal === null) return null
+    totalInternal += lineCostInternal
+  }
+  const roundedOutput = roundHalfUpToOutputScale(totalInternal)
+  if (roundedOutput > MAX_OUTPUT_UNSCALED) return null
+  return formatFixedOutputScale(roundedOutput)
+}
+
+/** Lo mismo para el lote de producto terminado: un envase sin lote con costo cuenta cero, como
+ *  un ingrediente sin costo en `calculateLotIngredientsCost`. Nunca `null`. */
+export function calculateLotPackagingCost(
+  lines: readonly PackagingCostLine[],
+  batches: readonly PackagingCostingBatch[],
+): string {
+  let totalInternal = ZERO
+  for (const line of lines) {
+    totalInternal += calculatePackagingLineCost(line, batches, false) ?? ZERO
+  }
+  const roundedOutput = roundHalfUpToOutputScale(totalInternal)
+  if (roundedOutput > MAX_OUTPUT_UNSCALED) {
+    throw new Error('calculateLotPackagingCost: el costo del lote desborda decimal(14,4)')
+  }
+  return formatFixedOutputScale(roundedOutput)
+}
+
+/** Importe del pedido: ingredientes mas envases, los dos ya con cuatro decimales. `null` si
+ *  cualquiera de los dos lo es o la suma desborda la columna. */
+export function calculateOrderCost(ingredientsCost: string | null, packagingCost: string | null): string | null {
+  if (ingredientsCost === null || packagingCost === null) return null
+  const ingredients = parseDecimal(ingredientsCost)
+  const packaging = parseDecimal(packagingCost)
+  if (ingredients === null || packaging === null) return null
+  const total = roundHalfUpToOutputScale(toInternal(ingredients) + toInternal(packaging))
+  if (total > MAX_OUTPUT_UNSCALED) return null
+  return formatFixedOutputScale(total)
 }
