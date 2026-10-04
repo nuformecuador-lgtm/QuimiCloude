@@ -5015,3 +5015,11 @@ podar.
 - **Review:** vuelta 1 OK con 7 menores; vuelta 2 OK (m2 con la opcion (a) del humano: 23503 -> `invalid_input`; m4 parcial por la guardia de ambito).
 - **Gate:** completo verde (8/8 en baseline). Escondia un rojo nuevo en `recetas/scope.test.ts` por ir el baseline por archivo; cerrado en `0503f35f`. Sin E2E (decision humana).
 - **Deuda local:** carpeta del worktree sin borrar.
+
+## 2026-10-04 — QC-195-envases-del-pedido-como-productos
+
+- **PR #142**, merge `f6f69dad`. Spec R1–R47, T0–T19 (+TC, T10.E1). El reparto del pedido deja de elegir presentaciones y elige **productos PACKAGING** (envases) con una presentacion fija en `products.presentation_id`; la linea gana `packaging_product_id` y sigue copiando la presentacion, asi que `order-distribution.ts` no cambio. Stock de envases en la unidad de sistema nueva **`unidad`/`u`** (entera), lotes sin presentacion. Los envases se apartan con la reserva de materias primas (todo o nada, aviso y `BLOQUEADO`), se consumen al **Terminar el empaque** y su costo (promedio D22) va en el importe; `orders.packaging_cost` guarda la parte de envases. PACKAGING ya no puede ser ingrediente de receta (las que ya lo tenian se conservan).
+- **Migraciones:** `20261003130000_packaging_products_in_distribution` (renumerada tras chocar con `recipe_tools` de QC-194) y `20261004120000_orders_packaging_cost`; rollback probado en bases efimeras.
+- **Decisiones humanas:** P1-P6, N1-N10 (N1 y N7 por la alternativa), Enmienda 1 (R42-R44) y Enmienda 2 (R45-R47, E5, P6-A, E6). Contrato front-back congelado primero (TC) para hacer la UI en paralelo.
+- **Review:** vuelta 1 RECHAZADO (B1: «Reparto y unidad» no recalculaba el importe); vuelta 2 OK, menores m5-m7 cerrados o a deudas.
+- **Gate:** completo verde (8/8 en baseline), 12 E2E en chromium; webkit no corrido. El E2E nuevo cazo un bug real (alta con dos envases). Tres E2E rojos heredados de dev (`527a9902`) quedan para ficha propia.
