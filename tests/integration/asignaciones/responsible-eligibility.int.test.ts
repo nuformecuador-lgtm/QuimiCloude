@@ -39,7 +39,6 @@ import { createStartAssignedOrder } from '@/lib/modules/asignaciones/domain/star
 import { findRecipeExecutionContentById } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
@@ -63,6 +62,9 @@ import {
   withSavepoint,
   type Fixture,
 } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 /** El error que ningun caso de este archivo tiene que disparar: si algo llama a estos catalogos,
  *  algo cambio en el contenido de la receta o de la orden que este archivo asume vacio. */
@@ -117,7 +119,7 @@ async function transitionAliveByIdReal(
 function ordersReales(): OrderCatalog {
   return {
     findAliveById: findAliveOrderTargetById,
-    listAliveSummariesByIds: listAliveOrderSummariesByIds,
+    listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),

@@ -6,12 +6,12 @@ import { orderCompanyScope } from './company-scope';
 
 import type { OrderStatus } from '../../../domain/order-classification';
 import type {
-  AssignedOrderPresentationLine,
   AssignedOrderSummary,
   OrderAssignmentTarget,
   OrderSummaryOrdering,
 } from '../../../domain/order-catalog';
 import type { Page } from '../../../domain/page';
+import type { OrderSummaryLineRecord, OrderSummaryRecord } from '../../../ports/order-summary-reader';
 
 /**
  * Implementa `OrderCatalog['findAliveById']` (`domain/order-catalog.ts`, QC-87
@@ -64,6 +64,7 @@ export async function findAliveOrderTargetById(
 type AssignedOrderPresentationLineRow = {
   readonly presentationId: string;
   readonly packages: number;
+  readonly packagingProductId: string | null;
 };
 
 type AssignedOrderSummaryRow = {
@@ -97,7 +98,7 @@ const SUMMARY_SELECT = {
   status: true,
   unitId: true,
   presentationLines: {
-    select: { presentationId: true, packages: true },
+    select: { presentationId: true, packages: true, packagingProductId: true },
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
   },
   finishedAt: true,
@@ -126,7 +127,7 @@ const FINISHED_RECENT_FIRST_ORDER_BY = [
 
 /** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
  *  `@prisma/client`- y se fija a 4 decimales, la escala de la columna `Decimal(14,4)`. */
-export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOrderSummary {
+export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummaryRecord {
   return {
     id: row.id,
     number: { year: row.orderYear, sequence: row.orderSequence },
@@ -136,9 +137,10 @@ export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOr
     status: row.status as OrderStatus,
     unitId: row.unitId,
     presentationLines: row.presentationLines.map(
-      (line): AssignedOrderPresentationLine => ({
+      (line): OrderSummaryLineRecord => ({
         presentationId: line.presentationId,
         packages: line.packages,
+        packagingProductId: line.packagingProductId,
       }),
     ),
     finishedAt: row.finishedAt,
@@ -159,7 +161,7 @@ export async function listAliveOrderSummariesByIds(
   statuses: readonly OrderStatus[],
   page: number,
   pageSize?: number,
-): Promise<Page<AssignedOrderSummary>> {
+): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
     AND: [
@@ -179,21 +181,21 @@ export async function listAliveOrderSummariesByIds(
     prisma.order.count({ where }),
   ]);
 
-  return buildPage(rows.map(toAssignedOrderSummary), total, page, limit);
+  return buildPage(rows.map(toOrderSummaryRecord), total, page, limit);
 }
 
 /**
- * Implementa `OrderCatalog['listAliveSummariesInCompany']`: el mismo
- * resumen que `listAliveSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
+ * Implementa `OrderSummaryReader['listAliveInCompany']`: el mismo
+ * resumen que `listAliveOrderSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
  * «Terminados» y «Todos», que no acotan por quien esta asignado.
  */
-export async function listAliveSummariesInCompany(
+export async function listAliveOrderSummariesInCompany(
   companyId: string,
   statuses: readonly OrderStatus[],
   ordering: OrderSummaryOrdering,
   page: number,
   pageSize?: number,
-): Promise<Page<AssignedOrderSummary>> {
+): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
     AND: [orderCompanyScope({ companyId }), { status: { in: [...statuses] }, deletedAt: null }],
@@ -214,6 +216,6 @@ export async function listAliveSummariesInCompany(
     prisma.order.count({ where }),
   ]);
 
-  return buildPage(rows.map(toAssignedOrderSummary), total, page, limit);
+  return buildPage(rows.map(toOrderSummaryRecord), total, page, limit);
 }
 

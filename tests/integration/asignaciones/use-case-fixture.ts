@@ -47,8 +47,6 @@ import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/drive
 import { DOCUMENT_TYPE_CC, normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -59,6 +57,9 @@ import type { AssignOutcome } from '@/lib/modules/asignaciones/domain/assign-res
 import type { OrderResponsible } from '@/lib/modules/asignaciones/domain/assignment-view';
 import type { OrderResponsiblesEntry } from '@/lib/modules/asignaciones/domain/list-responsibles-for-orders';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 // ---------------------------------------------------------------------------------------------
 // Los casos de uso, cableados con los adaptadores REALES
@@ -71,8 +72,8 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
  */
 const orders: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
-  listAliveSummariesByIds: listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
+  listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
+  listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
   transitionAliveById: async () => {
     throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
   },

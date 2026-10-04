@@ -35,11 +35,23 @@ vi.mock('@/lib/shared/db/prisma', () => ({
 
 const {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
-  toAssignedOrderSummary,
+  listAliveOrderSummariesByIds: listAliveRecordsByIds,
+  listAliveOrderSummariesInCompany,
+  toOrderSummaryRecord,
   toOrderAssignmentTarget,
 } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma')
+const { createListAliveSummariesByIds, createListAliveSummariesInCompany } = await import('@/lib/modules/pedidos')
+
+/** Doble del catalogo de envases de `inventario`: solo devuelve los ids que conoce. */
+const findPackagingRefs = vi.fn(async (ids: readonly string[]) =>
+  ids.filter((id) => id === 'env-1').map((id) => ({ id, name: 'Envase PET 1L' })),
+)
+const summaryDeps = {
+  summaries: { listAliveByIds: listAliveRecordsByIds, listAliveInCompany: listAliveOrderSummariesInCompany },
+  packaging: { findRefs: findPackagingRefs, findCostingBatches: async () => [] },
+} as unknown as Parameters<typeof createListAliveSummariesByIds>[0]
+const listAliveOrderSummariesByIds = createListAliveSummariesByIds(summaryDeps)
+const listAliveSummariesInCompany = createListAliveSummariesInCompany(summaryDeps)
 
 // `transitionAliveOrder` se retiro -sin llamantes
 // desde que `createTransitionOrder` cablea el Finalizar sobre la unidad de trabajo-, y con ella
@@ -199,9 +211,9 @@ describe('toOrderAssignmentTarget', () => {
   })
 })
 
-describe('toAssignedOrderSummary — el resumen publicado lleva el reparto, la unidad y la fecha de terminado', () => {
+describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la unidad y la fecha de terminado', () => {
   it('T10: copia presentationLines EN EL ORDEN de la fila (createdAt, desempate id), con y sin reparto', () => {
-    const conReparto = toAssignedOrderSummary({
+    const conReparto = toOrderSummaryRecord({
       id: 'o-1',
       orderYear: 2026,
       orderSequence: 7,
@@ -211,18 +223,18 @@ describe('toAssignedOrderSummary — el resumen publicado lleva el reparto, la u
       status: 'PENDIENTE',
       unitId: 'u-1',
       presentationLines: [
-        { presentationId: 'p-1', packages: 5 },
-        { presentationId: 'p-2', packages: 1 },
+        { presentationId: 'p-1', packages: 5, packagingProductId: null },
+        { presentationId: 'p-2', packages: 1, packagingProductId: null },
       ],
       finishedAt: null,
       packedBy: null,
     })
     expect(conReparto.presentationLines).toEqual([
-      { presentationId: 'p-1', packages: 5 },
-      { presentationId: 'p-2', packages: 1 },
+      { presentationId: 'p-1', packages: 5, packagingProductId: null },
+      { presentationId: 'p-2', packages: 1, packagingProductId: null },
     ])
 
-    const sinReparto = toAssignedOrderSummary({
+    const sinReparto = toOrderSummaryRecord({
       id: 'o-2',
       orderYear: 2026,
       orderSequence: 8,
@@ -252,13 +264,13 @@ describe('toAssignedOrderSummary — el resumen publicado lleva el reparto, la u
       packedBy: null,
     } as const
 
-    expect(toAssignedOrderSummary({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
-    expect(toAssignedOrderSummary({ ...filaBase, id: 'o-1c', unitId: null }).unitId).toBeNull()
+    expect(toOrderSummaryRecord({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
+    expect(toOrderSummaryRecord({ ...filaBase, id: 'o-1c', unitId: null }).unitId).toBeNull()
   })
 
   it('R20: copia finishedAt tal cual, con y sin fecha', () => {
     const fecha = new Date('2026-09-23T10:00:00.000Z')
-    const conFecha = toAssignedOrderSummary({
+    const conFecha = toOrderSummaryRecord({
       id: 'o-3',
       orderYear: 2026,
       orderSequence: 9,
@@ -273,7 +285,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva el reparto, la u
     })
     expect(conFecha.finishedAt).toBe(fecha)
 
-    const sinFecha = toAssignedOrderSummary({
+    const sinFecha = toOrderSummaryRecord({
       id: 'o-4',
       orderYear: 2026,
       orderSequence: 10,
@@ -290,7 +302,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva el reparto, la u
   })
 
   it('R14, R17: copia packedBy tal cual, con y sin empacador', () => {
-    const conEmpacador = toAssignedOrderSummary({
+    const conEmpacador = toOrderSummaryRecord({
       id: 'o-5',
       orderYear: 2026,
       orderSequence: 11,
@@ -305,7 +317,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva el reparto, la u
     })
     expect(conEmpacador.packedBy).toBe('u-1')
 
-    const sinEmpacador = toAssignedOrderSummary({
+    const sinEmpacador = toOrderSummaryRecord({
       id: 'o-6',
       orderYear: 2026,
       orderSequence: 12,
@@ -533,10 +545,58 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     const seleccion = findMany.mock.calls[0]?.[0]?.select
     expect(seleccion.unitId).toBe(true)
     expect(seleccion.presentationLines).toEqual({
-      select: { presentationId: true, packages: true },
+      select: { presentationId: true, packages: true, packagingProductId: true },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     })
     // Y ya no pide la columna que retiro T10: el reparto vive en `order_presentation_lines`.
     expect(seleccion).not.toHaveProperty('presentationId')
+  })
+})
+
+describe('listAliveSummariesByIds — el nombre del envase de cada linea', () => {
+  beforeEach(() => {
+    findPackagingRefs.mockClear()
+    count.mockResolvedValue(1)
+  })
+
+  it('R44, R33: la linea con envase lleva su nombre, la antigua y la de un envase que no vuelve llevan null, en una sola llamada', async () => {
+    findMany.mockResolvedValue([
+      {
+        id: 'o-1',
+        orderYear: 2026,
+        orderSequence: 1,
+        recipeId: 'r-1',
+        quantity: { toFixed: () => '10.0000' },
+        priority: 'MEDIA',
+        status: 'POR_EMPACAR',
+        unitId: null,
+        presentationLines: [
+          { presentationId: 'p-1', packages: 4, packagingProductId: 'env-1' },
+          { presentationId: 'p-2', packages: 2, packagingProductId: null },
+          { presentationId: 'p-3', packages: 1, packagingProductId: 'env-de-baja' },
+        ],
+        finishedAt: null,
+        packedBy: null,
+      },
+    ])
+
+    const pagina = await listAliveOrderSummariesByIds(EMPRESA, ['o-1'], ['POR_EMPACAR'], 1)
+
+    expect(findPackagingRefs).toHaveBeenCalledTimes(1)
+    expect(findPackagingRefs).toHaveBeenCalledWith(['env-1', 'env-de-baja'], EMPRESA)
+    expect(pagina.items[0]?.presentationLines).toEqual([
+      { presentationId: 'p-1', packages: 4, packagingName: 'Envase PET 1L' },
+      { presentationId: 'p-2', packages: 2, packagingName: null },
+      { presentationId: 'p-3', packages: 1, packagingName: null },
+    ])
+  })
+
+  it('R33: una pagina sin envases no consulta el catalogo de envases', async () => {
+    findMany.mockResolvedValue([])
+    count.mockResolvedValue(0)
+
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    expect(findPackagingRefs).not.toHaveBeenCalled()
   })
 })

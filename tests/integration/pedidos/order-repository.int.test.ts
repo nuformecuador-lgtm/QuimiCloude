@@ -67,7 +67,6 @@ import {
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
-import { listAliveOrderSummariesByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
@@ -81,6 +80,11 @@ import type {
   OrderScope,
   OrderStatus,
 } from '@/lib/modules/pedidos'
+import { realOrderSummaries } from '../../helpers/order-summaries'
+
+import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed'
+
+const { listAliveSummariesByIds: listAliveOrderSummariesByIds } = realOrderSummaries()
 
 // ---------------------------------------------------------------------------
 // Anos de prueba y limpieza de secuencias
@@ -727,12 +731,39 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
 
       const resumenConReparto = pagina.items.find((item) => item.id === conReparto.id)
       const resumenSinReparto = pagina.items.find((item) => item.id === filaSinReparto.id)
-      expect(resumenConReparto?.presentationLines).toEqual([{ presentationId, packages: 3 }])
+      expect(resumenConReparto?.presentationLines).toEqual([{ presentationId, packages: 3, packagingName: null }])
       expect(resumenConReparto?.unitId).toBe(unitId)
       expect(resumenSinReparto?.presentationLines).toEqual([])
       expect(resumenSinReparto?.unitId).toBeNull()
     } finally {
       await limpiar(creados)
+    }
+  })
+
+  it('R44, R33: la linea con envase lleva el nombre del envase y la antigua lleva null', async () => {
+    const creados: string[] = []
+    const nombreEnvase = `Envase ${token().slice(0, 8)}`
+    const envaseId = await seedPackaging({ companyId, presentationId, createdBy: actorId, name: nombreEnvase })
+    try {
+      const now = instantIn(YEAR_CATALOGO, 2, 10)
+      const conEnvase = await altaReal(creados, YEAR_CATALOGO, now, {
+        presentationLines: [{ presentationId, packages: 2, content: null, packagingProductId: envaseId }],
+      })
+      const antiguo = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11), {
+        presentationLines: [{ presentationId, packages: 5, content: null, packagingProductId: null }],
+      })
+
+      const pagina = await listAliveOrderSummariesByIds(companyId, [conEnvase.id, antiguo.id], ['PENDIENTE'], 1)
+
+      expect(pagina.items.find((item) => item.id === conEnvase.id)?.presentationLines).toEqual([
+        { presentationId, packages: 2, packagingName: nombreEnvase },
+      ])
+      expect(pagina.items.find((item) => item.id === antiguo.id)?.presentationLines).toEqual([
+        { presentationId, packages: 5, packagingName: null },
+      ])
+    } finally {
+      await limpiar(creados)
+      await dropPackaging([envaseId])
     }
   })
 })

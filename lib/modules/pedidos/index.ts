@@ -174,6 +174,11 @@ export type { TransitionOrderDeps } from './domain/transition-order';
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
 export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
 
+/** Implementan los dos listados de resumen de `OrderCatalog`, con el nombre del envase de cada
+ *  linea ya resuelto. */
+export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from './domain/list-order-summaries';
+export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
+
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
 export { createFindCoverage, MAX_ORDERS_PER_COVERAGE_BATCH } from './domain/find-coverage';

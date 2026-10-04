@@ -47,6 +47,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import {
   createCreateOrder,
   createFinishPacking,
+  createListAliveSummariesByIds,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
@@ -131,8 +132,16 @@ const orderCatalog: OrderCatalog = {
     return row === null ? null : { id: row.id, status: row.status };
   },
   listAliveSummariesByIds: async (companyId, ids, statuses, page, pageSize) => {
-    const { createOrderSummaryReaders } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');
-    return createOrderSummaryReaders(packagingCatalog).listAliveSummariesByIds(companyId, ids, statuses, page, pageSize);
+    const { listAliveOrderSummariesByIds } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');
+    return createListAliveSummariesByIds({
+      summaries: {
+        listAliveByIds: listAliveOrderSummariesByIds,
+        listAliveInCompany: async () => {
+          throw new Error('este archivo no ejercita listAliveSummariesInCompany');
+        },
+      },
+      packaging: packagingCatalog,
+    })(companyId, ids, statuses, page, pageSize);
   },
   listAliveSummariesInCompany: async () => {
     throw new Error('este archivo no ejercita listAliveSummariesInCompany');

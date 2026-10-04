@@ -24,7 +24,7 @@ const RESUMEN = {
   quantity: '10.0000',
   priority: 'ALTA',
   status: 'POR_EMPACAR',
-  presentationLines: [{ presentationId: 'presentacion-1', packages: 1 }],
+  presentationLines: [{ presentationId: 'presentacion-1', packages: 1, packagingName: null }],
   unitId: 'unidad-1',
   finishedAt: null,
   packedBy: null,
@@ -101,7 +101,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       numberText: expect.any(String),
       recipeName: 'Desengrasante',
       quantity: '10.0000',
-      presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1 }],
+      presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null }],
       unitId: 'unidad-1',
       unitLabel: 'L',
       packages: '5',
@@ -135,8 +135,8 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const conDosLineas = {
       ...RESUMEN,
       presentationLines: [
-        { presentationId: 'presentacion-2', packages: 5 },
-        { presentationId: 'presentacion-1', packages: 1 },
+        { presentationId: 'presentacion-2', packages: 5, packagingName: null },
+        { presentationId: 'presentacion-1', packages: 1, packagingName: null },
       ],
     };
     const { deps } = montar({ items: [conDosLineas] });
@@ -145,8 +145,8 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
 
     expect(row.presentationLines).toEqual([
-      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 5 },
-      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1 },
+      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
+      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null },
     ]);
     expect(row.quantity).toBe('10.0000');
     expect(row.unitLabel).toBe('L');
@@ -160,6 +160,25 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
 
     expect(row.status).toBe('POR_EMPACAR');
     expect(row.presentationLines).toEqual([]);
+  });
+
+  it('R44: la linea con envase llega a la pantalla de empaque con su nombre y la antigua con `packagingName: null` (R33)', async () => {
+    const conEnvase = {
+      ...RESUMEN,
+      presentationLines: [
+        { presentationId: 'presentacion-1', packages: 3, packagingName: 'Envase PET 1L' },
+        { presentationId: 'presentacion-2', packages: 2, packagingName: null },
+      ],
+    };
+    const { deps } = montar({ items: [conEnvase] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.presentationLines).toEqual([
+      { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 3, packagingName: 'Envase PET 1L' },
+      { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 2, packagingName: null },
+    ]);
   });
 
   it('R42: un pedido sin unidad sale con `unitId` y `unitLabel` a null', async () => {

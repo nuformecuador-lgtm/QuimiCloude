@@ -346,7 +346,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
 describe('getAssignedOrderExecution — la presentacion del pedido asignado', () => {
   it('R25: la vista lleva el nombre de la presentacion cuando el pedido tiene una', async () => {
     const { deps, findRefsPresentations } = montar({
-      summary: resumen({ presentationLines: [{ presentationId: PRESENTACION, packages: 1 }] }),
+      summary: resumen({ presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] }),
       presentations: [presentacion()],
     });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
@@ -375,8 +375,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const { deps, findRefsPresentations } = montar({
       summary: resumen({
         presentationLines: [
-          { presentationId: SEGUNDA_PRESENTACION, packages: 5 },
-          { presentationId: PRESENTACION, packages: 1 },
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: null },
+          { presentationId: PRESENTACION, packages: 1, packagingName: null },
         ],
       }),
       presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
@@ -388,8 +388,28 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
     expect(view.presentationLines).toEqual([
-      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5 },
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1 },
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+    ]);
+  });
+
+  it('R44: la pantalla de ejecucion recibe el nombre del envase en la linea con envase y `null` en la antigua (R33)', async () => {
+    const { deps } = montar({
+      summary: resumen({
+        presentationLines: [
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: 'Envase PET 200 ml' },
+          { presentationId: PRESENTACION, packages: 1, packagingName: null },
+        ],
+      }),
+      presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view.presentationLines).toEqual([
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: 'Envase PET 200 ml' },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
     ]);
   });
 

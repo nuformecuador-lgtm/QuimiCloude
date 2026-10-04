@@ -35,20 +35,40 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
     expect(
       toDistributionLines(
         [
-          { presentationId: 'p-2', packages: 5 },
-          { presentationId: 'p-1', packages: 1 },
+          { presentationId: 'p-2', packages: 5, packagingName: null },
+          { presentationId: 'p-1', packages: 1, packagingName: null },
         ],
         names,
       ),
     ).toEqual([
-      { presentationId: 'p-2', presentationName: 'Botella 200 ml', packages: 5 },
-      { presentationId: 'p-1', presentationName: 'Botella 1L', packages: 1 },
+      { presentationId: 'p-2', presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
+      { presentationId: 'p-1', presentationName: 'Botella 1L', packages: 1, packagingName: null },
     ]);
   });
 
   it('R26: una presentacion que no vuelve del catalogo deja `presentationName: null` y no se descarta', () => {
-    expect(toDistributionLines([{ presentationId: 'p-x', packages: 2 }], new Map())).toEqual([
-      { presentationId: 'p-x', presentationName: null, packages: 2 },
+    expect(toDistributionLines([{ presentationId: 'p-x', packages: 2, packagingName: null }], new Map())).toEqual([
+      { presentationId: 'p-x', presentationName: null, packages: 2, packagingName: null },
+    ]);
+  });
+
+  it('R44: copia el `packagingName` de la linea con envase y deja `null` en la linea antigua (R33)', () => {
+    const names = new Map([
+      ['p-1', 'Botella 1L'],
+      ['p-2', 'Bidon 20L'],
+    ]);
+
+    expect(
+      toDistributionLines(
+        [
+          { presentationId: 'p-1', packages: 4, packagingName: 'Envase PET 1L' },
+          { presentationId: 'p-2', packages: 2, packagingName: null },
+        ],
+        names,
+      ),
+    ).toEqual([
+      { presentationId: 'p-1', presentationName: 'Botella 1L', packages: 4, packagingName: 'Envase PET 1L' },
+      { presentationId: 'p-2', presentationName: 'Bidon 20L', packages: 2, packagingName: null },
     ]);
   });
 
@@ -59,9 +79,9 @@ describe('QC-170 — order-distribution-view: el reparto en solo lectura', () =>
   it('R26: los ids de presentacion de toda la pagina salen unicos, para una sola llamada al catalogo', () => {
     expect(
       distributionPresentationIds([
-        { presentationLines: [{ presentationId: 'p-1', packages: 1 }, { presentationId: 'p-2', packages: 2 }] },
+        { presentationLines: [{ presentationId: 'p-1', packages: 1, packagingName: null }, { presentationId: 'p-2', packages: 2, packagingName: null }] },
         { presentationLines: [] },
-        { presentationLines: [{ presentationId: 'p-1', packages: 3 }] },
+        { presentationLines: [{ presentationId: 'p-1', packages: 3, packagingName: null }] },
       ]),
     ).toEqual(['p-1', 'p-2']);
   });

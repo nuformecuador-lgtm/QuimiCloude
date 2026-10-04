@@ -457,7 +457,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
   it('R24: cada fila lleva el nombre de la presentacion, o null, con una sola llamada al catalogo', async () => {
     const ids = [pedidoId(1), pedidoId(2)];
     const items = [
-      resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1 }] }),
+      resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] }),
       resumen(pedidoId(2), { presentationLines: [] }),
     ];
     const { deps, findRefsPresentations } = montar({
@@ -494,7 +494,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
   it('R26: un actor con solo asignaciones.consultar recibe la presentacion de sus pedidos asignados', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1 }] })];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] })];
     const { deps } = montar({
       ids,
       page: { items, total: 1 },
@@ -516,11 +516,11 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
     const items = [
       resumen(pedidoId(1), {
         presentationLines: [
-          { presentationId: SEGUNDA_PRESENTACION, packages: 5 },
-          { presentationId: PRESENTACION, packages: 1 },
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: null },
+          { presentationId: PRESENTACION, packages: 1, packagingName: null },
         ],
       }),
-      resumen(pedidoId(2), { presentationLines: [{ presentationId: PRESENTACION, packages: 2 }] }),
+      resumen(pedidoId(2), { presentationLines: [{ presentationId: PRESENTACION, packages: 2, packagingName: null }] }),
     ];
     const { deps, findRefsPresentations } = montar({
       ids,
@@ -535,11 +535,11 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5 },
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1 },
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
     ]);
     expect(pagina.items[1]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2 },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2, packagingName: null },
     ]);
   });
 
@@ -561,14 +561,14 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
 
   it('R26: una presentacion que no vuelve del catalogo deja la linea con `presentationName: null`, no la descarta', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 3 }] })];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 3, packagingName: null }] })];
     const { deps } = montar({ ids, page: { items, total: 1 }, refs: [receta()] });
     const listAssignedOrders = createListAssignedOrders(deps);
 
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION, presentationName: null, packages: 3 },
+      { presentationId: PRESENTACION, presentationName: null, packages: 3, packagingName: null },
     ]);
   });
 

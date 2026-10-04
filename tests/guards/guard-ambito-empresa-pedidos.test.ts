@@ -509,6 +509,18 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     'finishPackingAliveById',
     /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
   ],
+  // QC-195 (R44): los dos listados de resumen resuelven el nombre del envase en
+  // `pedidos/domain`, sobre `OrderSummaryReader`. Quien toca la base son
+  // `listAliveOrderSummariesByIds` y `listAliveOrderSummariesInCompany` (`order-catalog-prisma.ts`),
+  // que el barrido sin lista de excepciones de mas abajo sigue exigiendo con `companyId`.
+  [
+    'listAliveSummariesByIds',
+    /^createListAliveSummariesByIds\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
+  ],
+  [
+    'listAliveSummariesInCompany',
+    /^createListAliveSummariesInCompany\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
+  ],
 ])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {

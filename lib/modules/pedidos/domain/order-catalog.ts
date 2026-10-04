@@ -177,6 +177,9 @@ export interface OrderCatalog {
 export type AssignedOrderPresentationLine = {
   readonly presentationId: string;
   readonly packages: number;
+  /** `null` = linea guardada antes de que el reparto nombrara envases, o envase que ya no vuelve
+   *  del catalogo. */
+  readonly packagingName: string | null;
 };
 
 /**
