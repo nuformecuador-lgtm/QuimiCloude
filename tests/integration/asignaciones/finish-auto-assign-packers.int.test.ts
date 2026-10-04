@@ -115,7 +115,7 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         now: () => NOW,
       });
-      const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar'] };
+      const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido });
 
       const filas = await readRows(fixture.tx, pedido);
@@ -150,7 +150,7 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         now: () => NOW,
       });
-      const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar'] };
+      const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido });
 
       const filas = await readRows(fixture.tx, pedido);
@@ -185,7 +185,7 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         groups: assignmentDirectoryPrisma,
         now: () => NOW,
       });
-      const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar'] };
+      const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       await finish(actor, { orderId: pedido });
 
       const filas = await readRows(fixture.tx, pedido);

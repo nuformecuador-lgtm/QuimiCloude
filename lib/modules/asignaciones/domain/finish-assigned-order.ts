@@ -171,7 +171,7 @@ export function createFinishAssignedOrder(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<FinishAssignedOrderResult> {
-    requirePermission(actor, 'asignaciones.consultar');
+    requirePermission(actor, 'asignaciones.ejecutar');
 
     const parsed = finishAssignedOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

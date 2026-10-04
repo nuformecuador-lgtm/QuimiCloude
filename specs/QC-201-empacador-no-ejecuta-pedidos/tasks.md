@@ -28,12 +28,12 @@ completo.
 
 ## Bloque B — dominio `asignaciones`
 
-- [ ] **T5. Predicado `canExecuteAssignedOrders`** — dep: T1.
+- [x] **T5. Predicado `canExecuteAssignedOrders`** — dep: T1.
   En `domain/actor.ts` + barril. Hecho: `tests/unit/asignaciones/authorization.test.ts` (o archivo
   hermano) cubre `true` con el permiso, `false` sin él / con solo `asignaciones.consultar` / solo
   `empaque.modificar` / actor nulo / conjunto vacío, y que coincide con `requirePermission` para
   los mismos conjuntos. Caso `R9`.
-- [ ] **T6. Autorización de los tres casos de uso** [P con T7] — dep: T1.
+- [x] **T6. Autorización de los tres casos de uso** [P con T7] — dep: T1.
   Cambiar la primera línea de `get-assigned-order-execution.ts`, `start-assigned-order.ts` y
   `finish-assigned-order.ts` a `asignaciones.ejecutar`.
   Hecho: en `get-assigned-order-execution.test.ts`, `start-assigned-order.test.ts` y
@@ -41,18 +41,18 @@ completo.
   `asignaciones.consultar` + `empaque.modificar`) **sin invocar ningún puerto ni transicionar ni
   crear asignaciones**, y casos que conceden con solo `asignaciones.ejecutar`. Fixtures existentes
   actualizados. Casos `R5`, `R6`, `R7`, `R7a`, `R7b`.
-- [ ] **T7. Filtro de «Mis asignados»** [P con T6] — dep: T5.
+- [x] **T7. Filtro de «Mis asignados»** [P con T6] — dep: T5.
   `list-assigned-orders.ts` según `design.md > 3.3`.
   Hecho: en `list-assigned-orders.test.ts`, sin `ejecutar` → página vacía `total 0` sin llamar a
   `assignments` ni `orders`; con `ejecutar` → resultado idéntico al de hoy. Casos `R16`, `R17`.
-- [ ] **T8. Tests de Empacador y contrato del módulo** — dep: T6, T7.
+- [x] **T8. Tests de Empacador y contrato del módulo** — dep: T6, T7.
   `empacador-authorization.test.ts`: leer/comenzar/terminar pasan a **rechazar sin tocar puertos**;
   la lista concede y devuelve vacío. `module-contract.test.ts` regla (e): vigilar
   `asignaciones.ejecutar` y mover/añadir consumidores legítimos según `design.md > 6`, con una
   mutación que lo nombre en un archivo no permitido y salga en rojo.
   Hecho: verdes; casos `R4`, `R15`, `R16`.
 
-- [ ] **T7b. Vistas de `/asignacion`** [P con T6, T7] — dep: T5.
+- [x] **T7b. Vistas de `/asignacion`** [P con T6, T7] — dep: T5.
   `assignment-views.ts > resolveAssignmentViews` según `design.md > 3.4`.
   Hecho: `tests/unit/asignaciones/assignment-views.test.ts` cubre la matriz: seed Administrador →
   `['todos']`; Operador → `['asignados']`; Empacador → `['terminados','por_empacar']`; solo
@@ -66,7 +66,7 @@ completo.
   `tests/integration/pedidos/order-catalog-company-summary.int.test.ts` verifican que con
   `packedBy` solo vuelven los de ese empacador (total y paginación incluidos), que sin él el
   resultado no cambia y que `packed_by NULL` no entra; guardia de ámbito de empresa verde. Caso `R20`.
-- [ ] **T7d. «Terminados» filtrado** — dep: T5, T7c.
+- [x] **T7d. «Terminados» filtrado** — dep: T5, T7c.
   `list-finished-orders.ts` según `design.md > 3.5`.
   Hecho: `tests/unit/asignaciones/list-finished-orders.test.ts`: sin `ejecutar` llama al puerto
   con `{ packedBy: actor.id }`; con `ejecutar` lo llama sin filtro (resultado idéntico al de hoy).

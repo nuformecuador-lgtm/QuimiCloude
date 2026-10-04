@@ -119,3 +119,19 @@ export function canModifyAssignments(actor: PermissionBearer | null | undefined)
     return false;
   }
 }
+
+const ASIGNACIONES_EJECUTAR: PermissionCode = 'asignaciones.ejecutar';
+
+/**
+ * ¿Este portador de permisos puede entrar, comenzar y terminar la ejecucion de sus pedidos
+ * asignados? Mismo criterio que la autorizacion de esos tres casos de uso, leido sin lanzar, para
+ * que la pantalla y las listas no escriban el codigo del permiso.
+ */
+export function canExecuteAssignedOrders(actor: PermissionBearer | null | undefined): boolean {
+  try {
+    assertPermission(actor, ASIGNACIONES_EJECUTAR, () => DENEGADO);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -45,11 +45,13 @@ function sesionCon(permissions: readonly string[]): SessionUser {
   };
 }
 
-const OPERADOR = ['inventario.consultar', 'asignaciones.consultar'];
-const EMPACADOR = ['asignaciones.consultar', 'terminados.consultar'];
-const ADMINISTRADOR = ['pedidos.consultar', 'asignaciones.consultar', 'terminados.consultar'];
+// `asignaciones.ejecutar` es lo que ofrece «Mis asignados»; sin el, el Empacador del seed ya no la ve.
+const OPERADOR = ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'];
+const EMPACADOR = ['asignaciones.consultar', 'asignaciones.ejecutar', 'terminados.consultar'];
+const ADMINISTRADOR = ['pedidos.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar', 'terminados.consultar'];
 const EMPACADOR_CON_EMPAQUE = [
   'asignaciones.consultar',
+  'asignaciones.ejecutar',
   'terminados.consultar',
   'empaque.modificar',
 ];

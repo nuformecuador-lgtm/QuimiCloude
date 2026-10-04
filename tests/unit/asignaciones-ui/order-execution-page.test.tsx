@@ -75,7 +75,7 @@ function arbolDeLaPagina(id = 'order-1') {
 }
 
 beforeEach(() => {
-  getSessionUserMock.mockResolvedValue(sesionCon(['asignaciones.consultar']));
+  getSessionUserMock.mockResolvedValue(sesionCon(['asignaciones.consultar', 'asignaciones.ejecutar']));
   startAssignedOrderActionMock.mockResolvedValue({ status: 'success', data: EXECUCION_MINIMA });
 });
 
@@ -95,7 +95,7 @@ describe('pagina de ejecucion — el corte por permiso ocurre ANTES de leer nada
     expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('con sesion pero sin `asignaciones.consultar` responde 404, nunca 403', async () => {
+  it('con sesion pero sin `asignaciones.ejecutar` responde 404, nunca 403', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(['inventario.consultar']));
 
     await expect(arbolDeLaPagina()).rejects.toThrow();

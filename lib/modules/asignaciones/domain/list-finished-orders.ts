@@ -1,12 +1,11 @@
 // lib/modules/asignaciones/domain/list-finished-orders.ts
 /**
- * Los pedidos `ENTREGADO` de toda la empresa, sin filtro por usuario asignado: la fecha de
- * terminado los ordena y la composicion de responsables no descarta al actor, porque aqui no hay
- * un «yo» al que restar de la lista.
+ * Los pedidos `ENTREGADO` de la empresa: la fecha de terminado los ordena y la composicion de
+ * responsables no descarta al actor, porque aqui no hay un «yo» al que restar de la lista.
  */
 import { z } from 'zod';
 
-import { requirePermission, type Actor } from './actor';
+import { canExecuteAssignedOrders, requirePermission, type Actor } from './actor';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
 import { ValidationError } from './errors';
 
@@ -37,12 +36,17 @@ export function createListFinishedOrders(
     if (!parsed.success) throw new ValidationError();
     const { page, pageSize } = parsed.data;
 
+    // Quien no ejecuta pedidos solo ve los que empaco el mismo. El filtro va en la consulta para
+    // que `total` y la paginacion describan lo que se muestra.
+    const filter = canExecuteAssignedOrders(actor) ? undefined : { packedBy: actor.id };
+
     const ordersPage = await deps.orders.listAliveSummariesInCompany(
       actor.companyId,
       ['ENTREGADO'],
       'finished_recent_first',
       page,
       pageSize,
+      filter,
     );
 
     const composed = await composeOrderRows(deps, actor.companyId, ordersPage.items);

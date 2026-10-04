@@ -2,13 +2,15 @@
 /**
  * Que vistas de `/asignacion` puede ver un usuario, decidido solo por sus permisos: nunca por el
  * nombre de su rol. Quien tiene `pedidos.consultar` ve unicamente «Todos», aunque tenga tambien el
- * permiso de terminados o pedidos asignados a el. Quien no lo tiene ve «Mis asignados» y,
- * ademas, «Terminados» si tiene ese permiso.
+ * permiso de terminados o pedidos asignados a el. Quien no lo tiene ve «Mis asignados» si puede
+ * ejecutar pedidos asignados y «Terminados» si tiene ese permiso.
  *
  * La pertenencia se resuelve con `assertPermission` capturado en `try/catch`, el mismo patron que
  * `canModifyAssignments` de `actor.ts`: es la unica implementacion de la regla y no se reimplementa
  * con un `includes` propio, que podria divergir el dia que la regla cambie.
  */
+import { canExecuteAssignedOrders } from './actor';
+
 import { assertPermission, type PermissionBearer, type PermissionCode } from '@/lib/modules/identity';
 
 export type AssignmentViewKind = 'asignados' | 'terminados' | 'todos' | 'por_empacar';
@@ -37,7 +39,7 @@ function hasPermission(
 
 /**
  * Las vistas que este usuario puede ver, en el orden en que se ofrecen. Nunca vacio: quien no
- * tiene ninguno de los cuatro permisos igual recibe `['asignados']`, porque esta funcion no decide
+ * tiene ninguno de los permisos igual recibe `['asignados']`, porque esta funcion no decide
  * si el usuario puede entrar a `/asignacion` en absoluto, solo que vistas le tocan si entra.
  *
  * `por_empacar` se anade SIEMPRE AL FINAL, sea cual sea la vista por defecto que ya se calculo:
@@ -46,14 +48,15 @@ function hasPermission(
 export function resolveAssignmentViews(
   bearer: PermissionBearer | null | undefined,
 ): readonly AssignmentViewKind[] {
-  const views: AssignmentViewKind[] = hasPermission(bearer, PEDIDOS_CONSULTAR)
-    ? ['todos']
-    : hasPermission(bearer, TERMINADOS_CONSULTAR)
-      ? ['asignados', 'terminados']
-      : ['asignados'];
-
+  const views: AssignmentViewKind[] = [];
+  if (hasPermission(bearer, PEDIDOS_CONSULTAR)) views.push('todos');
+  else {
+    if (canExecuteAssignedOrders(bearer)) views.push('asignados');
+    if (hasPermission(bearer, TERMINADOS_CONSULTAR)) views.push('terminados');
+  }
   if (hasPermission(bearer, EMPAQUE_MODIFICAR)) views.push('por_empacar');
-  return views;
+  // La vista vacia de «Mis asignados» es el aterrizaje de quien no tiene ninguna otra.
+  return views.length > 0 ? views : ['asignados'];
 }
 
 /**

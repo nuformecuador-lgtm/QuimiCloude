@@ -126,6 +126,10 @@ export {
 // primera linea de los tres casos de uso de escritura de QC-87.
 export { canModifyAssignments } from './domain/actor';
 
+// Si el usuario puede ejecutar sus pedidos asignados; decide la columna «Entrar» sin que `app/**`
+// escriba el codigo del permiso.
+export { canExecuteAssignedOrders } from './domain/actor';
+
 // La Server Action de esta operacion NO se reexporta aqui: un `'use server'` en el cierre de
 // imports volveria este contrato inimportable desde un componente de cliente.
 export { createListAssignedOrders, type ListAssignedOrdersDeps } from './domain/list-assigned-orders';
@@ -163,7 +167,7 @@ export {
   type AssignmentViewKind,
 } from './domain/assignment-views';
 
-// La vista «Terminados»: los `ENTREGADO` de toda la empresa, sin filtro por usuario.
+// La vista «Terminados»: los `ENTREGADO` de la empresa; quien no ejecuta solo ve los que empaco.
 export {
   createListFinishedOrders,
   type ListFinishedOrdersDeps,
