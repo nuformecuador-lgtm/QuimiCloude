@@ -307,7 +307,9 @@ function AdjustBatchDialogContent({
               name={DELTA_FIELD}
               type="text"
               required
-              inputMode={wholePackages ? 'numeric' : 'decimal'}
+              // `numeric` en iOS no trae el signo menos y el ajuste de envases puede restar. Sin
+              // `pattern`: la validacion nativa taparia el aviso propio de envases enteros.
+              inputMode={wholePackages ? 'text' : 'decimal'}
               value={delta}
               onChange={(event) => setDelta(sanitizeDeltaInput(event.currentTarget.value))}
               className={`${TOUCH_TARGET} ${FIELD_TEXT}`}

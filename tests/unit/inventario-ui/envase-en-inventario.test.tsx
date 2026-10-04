@@ -310,7 +310,6 @@ describe('lotes de un envase', () => {
 
     await user.click(screen.getByTestId('adjust-batch-open'));
     const delta = await screen.findByTestId('adjust-batch-delta');
-    expect(delta).toHaveAttribute('inputmode', 'numeric');
     await user.type(delta, '-2.5');
     await user.click(screen.getByTestId('adjust-batch-reason'));
     await user.click(await esperarInteractiva((await screen.findAllByRole('option'))[0]!));
@@ -320,5 +319,25 @@ describe('lotes de un envase', () => {
       'número entero de envases',
     );
     expect(adjustBatchStockActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R7: el ajuste de un lote de envase usa un teclado con signo menos y conserva el negativo', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust productType={PRODUCT_TYPES.PACKAGING} wholePackages />);
+
+    await user.click(screen.getByTestId('adjust-batch-open'));
+    const delta = await screen.findByTestId('adjust-batch-delta');
+    expect(delta).toHaveAttribute('inputmode', 'text');
+    expect(delta).not.toHaveAttribute('inputmode', 'numeric');
+    await user.type(delta, '-3');
+    expect(delta).toHaveValue('-3');
+  });
+
+  it('R7: el ajuste de un lote que no es envase sigue con teclado decimal', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await user.click(screen.getByTestId('adjust-batch-open'));
+    expect(await screen.findByTestId('adjust-batch-delta')).toHaveAttribute('inputmode', 'decimal');
   });
 });
