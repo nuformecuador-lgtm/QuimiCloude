@@ -278,7 +278,7 @@ verdes.
 > Viene del review de la vuelta 1 (RECHAZADO por B1) y de la decisión E5 del humano
 > (`design.md > 1.7`). Al terminar T18 y T19 se repite T17 (gate completo y mapa `R1..R47 -> test`).
 
-### [ ] T18 — «Reparto y unidad» guarda el importe (B1 + E5) `[backend_dev]` `[depende de T8, T9]` `[P con T19]`
+### [x] T18 — «Reparto y unidad» guarda el importe (B1 + E5) `[backend_dev]` `[depende de T8, T9]` `[P con T19]`
 
 - `update-order-presentation-lines.ts`: deps `recipes` y `products`; importe calculado fuera de la
   transacción con `resolveOrderCost(…, envases del reparto nuevo, …, { orderId })` y escrito con
@@ -302,7 +302,7 @@ verdes.
 **Hecho cuando:** verdes **R45, R46, R47** (unit e `.int`), y los tests de R17, R19 y R27-R30 siguen
 verdes.
 
-### [ ] T19 — Menores del review: m1, m3, m4 `[backend_dev, frontend_dev]` `[depende de T9]` `[P con T18]`
+### [x] T19 — Menores del review: m1, m3, m4 `[backend_dev, frontend_dev]` `[depende de T9]` `[P con T18]`
 
 - **m1** (`backend_dev`): caso que siembra un lote de envase **sin costo unitario** y comprueba que no
   entra en el promedio (R30, segunda mitad), en `qc195-packaging-catalog.int.test.ts` o en

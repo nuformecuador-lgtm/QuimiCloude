@@ -1684,3 +1684,19 @@ CHECK presente; `order_presentation_lines` vuelve a FORCE. Base efimera borrada 
 - No se corrieron guardias, `./init.sh` ni la suite (instruccion de memoria baja).
 
 Veredicto: E6 implementado; la migracion ya no aborta y el relleno queda probado en base efimera.
+
+## Implementer — gate de la vuelta 2 tras E6, punta 23d9bf75 (un proceso pesado a la vez)
+
+- `./init.sh --rapido`: base `QuimiCloude_QC195` al dia (66 migraciones); typecheck paso; lint paso;
+  `test:rapido`: `Test Files  6 failed | 425 passed (431)`, `Tests  8 failed | 6499 passed | 9 skipped (6516)`.
+  Los 6 son los del baseline: configuracion-ui/unidades-viewport, configuracion-ui/usuarios-viewport,
+  inventario/product-page, navegacion/pantallas-exigen-permiso, recetas/module-contract, recetas-ui/recipe-page.
+- Guardias (`vitest run guard`): `Test Files  51 passed (51)`, `Tests  678 passed | 11 skipped (689)`.
+- `.int` tocados en la vuelta 2 (qc195-packaging-catalog, qc195-packaging-product, finish-with-finished-goods,
+  order-ingredients-cost, order-repository, pedidos-constraints, qc170-distribution-company-scope,
+  qc170-distribution-concurrency, qc195-packaging-reservation): `Test Files  9 passed (9)`, `Tests  137 passed (137)`.
+- Rollback de `20261004120000_orders_packaging_cost`: `down.sql` (sin cambios con E6) ya probado en base
+  desechable en T18; con E6 se volvio a correr sobre `QuimiCloude_QC195` (down + borrar fila + re-aplicar) y
+  el relleno E6 se probo en la copia desechable `QuimiCloude_QC195_e6tmp` (borrada).
+
+Tasks marcadas [x]: T18, T19.
