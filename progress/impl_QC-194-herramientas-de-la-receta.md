@@ -504,3 +504,45 @@ Dev medido en un worktree temporal (ya borrado), un archivo por corrida.
 | recetas/scope.test.ts | pantalla de recetas solo donde la declara QC-26 (1) | igual (1) | si |
 | recetas/module-contract.test.ts | sin route handler / forma del modulo: falla en l.600 por `pedidos/page.tsx` (1) | mismo caso (1), pero en dev corta antes (l.335) porque `origin/dev...HEAD` esta vacio | si (mismo caso; en la rama todas las aserciones previas pasan y solo queda el motivo del baseline) |
 | navegacion/pantallas-exigen-permiso.test.tsx | '/pedidos' se sirve con el permiso (1) | igual (1) | si |
+
+
+## T13 — Cierre (leader, 2026-10-03)
+
+Mapa consolidado R1-R34 -> test: es el que el reviewer comprobó caso por caso en la vuelta 1 (`progress/review_QC-194-herramientas-de-la-receta.md > Mapa R → test`), copiado aquí para que la bitácora lo tenga entero, R34 incluido.
+
+| R | Test |
+|---|---|
+| R1 | `recipe-tools.int` «R1: el alta guarda…», «R1: replaceAlive con herramientas…»; `recipe-input` R1; `recipe-tools-migration` R1 |
+| R2 | `recipe-tools.int` R2; `recipe-tools.test` R2; `recipe-input` R2 |
+| R3 | `recipe-tools.test` (4 casos R3); `recipe-tools.int` R3 |
+| R4 | `recipe-input` R4 (2); `recipe-tools-migration` R4 (único compuesto) |
+| R5 | `recipe-tools.test` R5 (3); `recipe-tools.int` R5 (FK → ValidationError) |
+| R6 | `recipe-input` R6 (5 valores); `recipe-tools-migration` R6 (CHECK) |
+| R7 | `recipe-input` R7; `recipe-version.test` «R7, R16» |
+| R8, R9 | `order-reservation-tools.int` «R8, R9» (crear, revisar bloqueados, pasar a curso, Finalizar); `recipe-catalog.test` R8 |
+| R10 | `order-reservation-tools.int` R10 |
+| R11 | `recipe-tools.test` R11 (2); `recipe-tools.int` R11; `recipe-input` R11 |
+| R12 | `recipe-tools.test` R12 |
+| R13 | `recipe-tools.int` R13; `recipe-tools.test` «R13, R19» |
+| R14 | `recipe-version.test` (8 casos de `propagateTools`); `recipe-tools.int` «R14, R15»; `recipe-tools.test` R14 |
+| R15 | `recipe-tools.int` R15 (versionId inválido; fallo forzado por trigger) |
+| R16 | `recipe-version.test` «R7, R16» |
+| R17 | `recipe-tools.int` R17 (2); `recipe-tools.test` R17 (3); `recipe-input` R17 (2) |
+| R18 | `formula-import.int` R18 (2) |
+| R19, R21 | `recipe-tools.int` «R19, R21»; `recipe-tools.test` R19 (2) |
+| R20 | `recipe-tools.test` R20; `recipe-lines-field-tools` R20 |
+| R22 | `recipe-form-state`, `recipe-lines-field-tools`, `recipe-form`, `recipe-version-pages`, `recipe-tools.test` |
+| R23 | `recipe-form-state`, `recipe-version-pages`, `recipe-version-form` |
+| R24 | `recipe-lines-field-tools` R24 (3) |
+| R25 | `recipe-form-state` (3), `recipe-lines-field-tools` (3), `recipe-form` (2), `recipe-version-form` (1) |
+| R26 | `recipe-form-state` (3), `recipe-lines-field-tools` (suma), `recipe-form` (2), `recipe-version-form` (2) |
+| R27 | `recipe-form` R27; `recipe-version-form` R27 |
+| R28 | `order-execution-tools` (3); `get-assigned-order-execution` (3); `recipe-catalog.test` R28 |
+| R29 | `order-execution-tools` R29; `get-assigned-order-execution` R29 |
+| R30 | `order-execution-tools` R30; `get-assigned-order-execution` R30 |
+| R31 | `order-execution-tools` R31 (2); `get-assigned-order-execution` R31 |
+| R32 | `recipe-tools.test` R32 (8); `get-assigned-order-execution` R32 |
+| R33 | `recipe-lines-field-tools` R33; `order-execution-tools` R33 |
+| R34 | `tests/guards/guard-dependencias-aprobadas.test.ts`; `package.json` fuera del diff |
+
+**Gate completo** (`./init.sh` sin flags) sobre `75969350`: `init OK`, 8 archivos rojos y los 8 en el baseline. Escondía un rojo nuevo de la rama en `tests/unit/recetas/scope.test.ts` (lista cerrada de campos de `Recipe` sin `tools`), porque el baseline va por archivo y ese archivo ya estaba por otro motivo; cerrado en `0503f35f`. Tras el arreglo, `scope.test.ts` solo falla en el caso del motivo del baseline (1 de 5), y el resto de archivos del baseline fallan en los mismos casos que `origin/dev`. `package.json` y lockfile sin cambios (R34).

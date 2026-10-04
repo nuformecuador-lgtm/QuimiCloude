@@ -155,7 +155,7 @@ no está en el DOM (R31); texto ≥ 16 px (R33).
 
 ## Tanda 4 — cierre
 
-### T13 — Trazabilidad y gate completo
+### T13 — Trazabilidad y gate completo [x]
 Tras todas. **Quién:** implementer. **Toca:** `progress/impl_QC-194-herramientas-de-la-receta.md`.
 **Hacer:** mapa `R1…R34 → test` con ruta y nombre del caso; confirmar que `package.json` no cambió
 (R34); `./init.sh` completo.
