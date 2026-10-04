@@ -1207,3 +1207,37 @@ Nota: el commit `3072bac4` (T10.E1) se llevó un cambio intermedio mío en
 dos commits ese archivo no compila.
 
 **Veredicto:** T15 lado de datos hecho; R44 cubierto en unit e int; typecheck espera las fixtures de UI.
+
+## T15 — lado de interfaz (R44) `[frontend_dev]`
+
+Commit `449db75d`.
+
+Archivos:
+- `components/shared/order-distribution-label.tsx`: `packagingName?: string | null` en la linea; pinta
+  `packagingName ?? presentationName ?? '—'`.
+- `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx`: misma regla en cada linea.
+- `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`: sin cambios; pinta la linea con
+  `OrderDistributionLabel`, asi que hereda la regla.
+- Fixtures con `packagingName: null` (cierran los 15 `TS2741`) en `tests/unit/asignaciones-ui/`:
+  assigned-orders-columns, company-orders-columns, company-orders-list-section, finished-orders-columns,
+  finished-orders-list-section, packing-orders-columns, qc195-lineas-antiguas.
+
+R44 -> test:
+- `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`:
+  "R44: una linea con envase pinta el nombre del envase, no el de la presentacion";
+  "R44: una linea antigua (`packagingName` null) pinta el nombre de su presentacion".
+- `tests/unit/asignaciones-ui/order-execution-screen.test.tsx`: los dos mismos casos.
+- `tests/unit/shared/order-distribution-label.test.tsx`:
+  "R44: una linea con envase pinta el nombre del envase; sin envase, el de la presentacion".
+- Los casos R33 siguen verdes.
+
+Salida real:
+- `pnpm run typecheck`: exit 0.
+- `vitest run tests/unit/asignaciones-ui tests/unit/shared/order-distribution-label.test.tsx`:
+  `Test Files 23 passed (23)`, `Tests 228 passed (228)`.
+- `vitest run guard --passWithNoTests`: `Test Files 51 passed (51)`, `Tests 672 passed | 11 skipped (683)`.
+- `pnpm run lint`: `0 errors, 8 warnings`, ninguno en archivos de este cambio (preexistentes en
+  `inventario/components/product-columns.tsx`, `documentos/confirm-catalog-import.test.ts`,
+  `pedidos/order-service.test.ts`).
+
+**Veredicto:** T15 completa (datos + interfaz); falta el `./init.sh` del implementer.
