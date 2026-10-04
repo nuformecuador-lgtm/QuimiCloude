@@ -87,6 +87,7 @@ function recetaNueva(overrides: Partial<NewRecipe> = {}): NewRecipe {
     steps: [],
     lines: [],
     imagePath: null,
+    tools: [],
     ...overrides,
   };
 }

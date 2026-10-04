@@ -161,6 +161,7 @@ function montar(deps: {
       isDeleted: false,
       steps: [],
       lines: deps.recipeLines ?? [],
+      tools: [],
     })),
   });
   const catalogos = deps.catalogos ?? catalogoDePresentaciones();

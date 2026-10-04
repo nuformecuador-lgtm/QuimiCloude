@@ -7,6 +7,7 @@ import {
 } from './errors';
 import { createRecipeVersionSchema, recipeLinesSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
 
@@ -60,9 +61,15 @@ export function createCreateRecipeVersion(
       throw new ActionNotAllowedError();
     }
 
+    // Las herramientas copiadas no se revalidan: una de baja se conserva, a diferencia de las lineas.
+    const originalTools = original.tools.map((tool) => ({ productId: tool.productId, quantity: tool.quantity }));
+    if (data.tools !== undefined) {
+      await assertToolsValid(data.tools, originalTools, deps.products, actor.companyId);
+    }
+
     const result = await deps.recipes.createVersion(
       originalId,
-      { name: data.name, lines: lines.data },
+      { name: data.name, lines: lines.data, tools: data.tools ?? originalTools },
       actor.id,
       now(),
       scope,

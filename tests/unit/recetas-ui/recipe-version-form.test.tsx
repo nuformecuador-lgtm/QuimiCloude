@@ -76,7 +76,7 @@ const VERSION_LINES: readonly RecipeLineView[] = [
   lineView('v-c', PRODUCT_C, null, '30.00'),
 ];
 
-const ORIGINAL = { id: ORIGINAL_ID, name: 'Jabón', lines: ORIGINAL_LINES };
+const ORIGINAL = { id: ORIGINAL_ID, name: 'Jabón', lines: ORIGINAL_LINES, tools: [] };
 
 const CHECKLIST_STEP: RecipeStepView = {
   blocks: [
@@ -98,6 +98,7 @@ function versionDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [CHECKLIST_STEP],
     lines: VERSION_LINES,
+    tools: [],
     original: { id: ORIGINAL_ID, name: 'Jabón' },
     isUnderReview: false,
     displayName: 'Jabón · Sin sal',
@@ -210,7 +211,7 @@ describe('RecipeVersionForm — guardar habilitado solo con 100,00 % y todo con 
 });
 
 describe('RecipeVersionForm — guardado con éxito', () => {
-  it('R12, R22 — el alta envía exactamente { name, lines } a la original, avisa y lleva a su ficha', async () => {
+  it('R12, R22 — el alta envía exactamente { name, lines, tools } a la original, avisa y lleva a su ficha', async () => {
     const user = setupUser();
     renderCreate();
     await user.type(screen.getByTestId('recipe-version-field-name'), 'Sin sal');
@@ -226,15 +227,16 @@ describe('RecipeVersionForm — guardado con éxito', () => {
         { productId: PRODUCT_A, percentage: '60.00' },
         { productId: PRODUCT_B, percentage: '40.00' },
       ],
+      tools: [],
     });
-    expect(Object.keys(payload as object).sort()).toEqual(['lines', 'name']);
+    expect(Object.keys(payload as object).sort()).toEqual(['lines', 'name', 'tools']);
     expect(updateVersionMock).not.toHaveBeenCalled();
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(recipeEditRoute(ORIGINAL_ID)));
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
     expect(toastSuccessSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('R13, R22 — la edición envía exactamente { name, lines } a la versión, sin pasos, descripción ni imagen', async () => {
+  it('R13, R22 — la edición envía exactamente { name, lines, tools } a la versión, sin pasos, descripción ni imagen', async () => {
     const user = setupUser();
     renderEdit();
     await user.clear(screen.getByTestId('recipe-version-field-name'));
@@ -251,6 +253,7 @@ describe('RecipeVersionForm — guardado con éxito', () => {
         { productId: PRODUCT_A, percentage: '70.00' },
         { productId: PRODUCT_C, percentage: '30.00' },
       ],
+      tools: [],
     });
     expect(payload).not.toHaveProperty('steps');
     expect(payload).not.toHaveProperty('description');
@@ -454,5 +457,96 @@ describe('RecipeVersionForm — multiplataforma', () => {
     for (const testId of ['recipe-version-form-submit', 'recipe-version-form-cancel']) {
       expect(screen.getByTestId(testId)).toHaveClass('min-h-11', 'min-w-11');
     }
+  });
+});
+
+describe('RecipeVersionForm — herramientas', () => {
+  const TOOL_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const GONE_TOOL_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const ORIGINAL_TOOLS = [
+    { id: 'ot1', productId: TOOL_ID, productName: 'Agitador', quantity: 2 },
+    { id: 'ot2', productId: GONE_TOOL_ID, productName: null, quantity: 1 },
+  ];
+
+  function renderWith(mode: { mode: 'create' } | { mode: 'edit'; version: RecipeDetail }) {
+    const props: RecipeVersionFormProps = {
+      original: { ...ORIGINAL, tools: ORIGINAL_TOOLS },
+      units: [],
+      initialProductPage: EMPTY_PAGE,
+      initialMachinePage: EMPTY_PAGE,
+      ...mode,
+    };
+    return render(<RecipeVersionForm {...props} />);
+  }
+
+  it('R23, R26 — el alta precarga las de la original y envía exactamente esas, incluida la no disponible', async () => {
+    const user = setupUser();
+    renderWith({ mode: 'create' });
+    await user.type(screen.getByTestId('recipe-version-field-name'), 'Sin sal');
+
+    await user.click(screen.getByTestId('recipe-version-form-submit'));
+
+    await waitFor(() => expect(createVersionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = createVersionMock.mock.calls[0]!;
+    expect((payload as { tools: unknown }).tools).toStrictEqual([
+      { productId: TOOL_ID, quantity: 2 },
+      { productId: GONE_TOOL_ID, quantity: 1 },
+    ]);
+  });
+
+  it('R26 — la edición envía las herramientas de la versión tras quitar una en el tab', async () => {
+    const user = setupUser();
+    renderWith({
+      mode: 'edit',
+      version: versionDetail({
+        tools: [
+          { id: 'vt1', productId: TOOL_ID, productName: 'Agitador', quantity: 3 },
+          { id: 'vt2', productId: GONE_TOOL_ID, productName: 'Balanza', quantity: 4 },
+        ],
+      }),
+    });
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await user.click(screen.getByTestId('recipe-machine-remove-0'));
+
+    await user.click(screen.getByTestId('recipe-version-form-submit'));
+
+    await waitFor(() => expect(updateVersionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = updateVersionMock.mock.calls[0]!;
+    expect((payload as { tools: unknown }).tools).toStrictEqual([
+      { productId: GONE_TOOL_ID, quantity: 4 },
+    ]);
+  });
+
+  it('R25 — cantidad vacía: no invoca la acción y el error sale en su fila', async () => {
+    const user = setupUser();
+    renderWith({ mode: 'create' });
+    await user.type(screen.getByTestId('recipe-version-field-name'), 'Sin sal');
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await user.clear(screen.getByTestId('recipe-machine-quantity-0'));
+
+    await user.click(screen.getByTestId('recipe-version-form-submit'));
+
+    expect(await screen.findByTestId('recipe-machine-quantity-error-0')).toBeInTheDocument();
+    expect(screen.getByTestId('recipe-version-form-error')).toBeInTheDocument();
+    expect(createVersionMock).not.toHaveBeenCalled();
+  });
+
+  it('R27 — un rechazo del servidor sale en la región de error sin navegar ni perder lo escrito', async () => {
+    const user = setupUser();
+    createVersionMock.mockResolvedValue({
+      status: 'error',
+      code: 'invalid_input',
+      message: 'La entrada recibida no es valida.',
+    });
+    renderWith({ mode: 'create' });
+    await user.type(screen.getByTestId('recipe-version-field-name'), 'Sin sal');
+
+    await user.click(screen.getByTestId('recipe-version-form-submit'));
+
+    expect(await screen.findByTestId('recipe-version-form-error-message')).toHaveTextContent(
+      'La entrada recibida no es valida.',
+    );
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(screen.getByTestId('recipe-version-field-name')).toHaveValue('Sin sal');
   });
 });

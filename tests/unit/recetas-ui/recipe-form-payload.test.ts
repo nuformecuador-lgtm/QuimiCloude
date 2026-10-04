@@ -76,6 +76,7 @@ function baseState(overrides: Partial<RecipeFormState> = {}): RecipeFormState {
     name: 'Receta de prueba',
     description: '',
     lines: [],
+    tools: [],
     steps: [],
     image: { kind: 'untouched' },
     ...overrides,
@@ -269,10 +270,11 @@ describe('buildRecipePayload — las líneas van completas y quitar una la saca 
 });
 
 describe('buildRecipeVersionPayload — la versión solo envía su nombre y sus líneas', () => {
-  it('R22 — el payload es exactamente { name, lines }, sin pasos, descripción ni imagen', () => {
+  it('R22 — el payload es exactamente { name, lines, tools }, sin pasos, descripción ni imagen', () => {
     const payload = buildRecipeVersionPayload({
       name: 'Sin sal',
       lines: [line({ key: 'l1', productId: 'p1', percentage: '60,5' }), line({ key: 'l2', productId: 'p2', percentage: '39.5' })],
+      tools: [],
     });
 
     expect(payload).toStrictEqual({
@@ -281,8 +283,9 @@ describe('buildRecipeVersionPayload — la versión solo envía su nombre y sus 
         { productId: 'p1', percentage: '60.5' },
         { productId: 'p2', percentage: '39.5' },
       ],
+      tools: [],
     });
-    expect(Object.keys(payload).sort()).toEqual(['lines', 'name']);
+    expect(Object.keys(payload).sort()).toEqual(['lines', 'name', 'tools']);
   });
 
   it('R22 — sanea las líneas igual que buildRecipePayload', () => {
@@ -291,7 +294,7 @@ describe('buildRecipeVersionPayload — la versión solo envía su nombre y sus 
       line({ key: 'l2', productId: 'p2', percentage: '87.75' }),
     ];
 
-    const version = buildRecipeVersionPayload({ name: 'V', lines });
+    const version = buildRecipeVersionPayload({ name: 'V', lines, tools: [] });
     const recipe = buildRecipePayload('edit', baseState({ lines }));
 
     expect(version.lines).toStrictEqual(recipe.lines);
@@ -301,6 +304,7 @@ describe('buildRecipeVersionPayload — la versión solo envía su nombre y sus 
     const payload = buildRecipeVersionPayload({
       name: 'Versión',
       lines: [line({ productId: '11111111-1111-4111-8111-111111111111', percentage: '100,00' })],
+      tools: [],
     });
 
     expect(updateRecipeVersionSchema.safeParse(payload).success).toBe(true);

@@ -460,6 +460,26 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
       'lib/modules/recetas/adapters/driving/recipe-actions.ts',
     ]
+    // QC-194 (2026-10-03): herramientas de la receta. Los archivos de `lib/modules/recetas/` que
+    // `tasks.md` asigna a T2-T6 y ninguno mas: contrato de entrada y propagacion (T2, T3), puerto
+    // y adaptador (T4), la validacion nueva y los cuatro casos de uso de escritura mas el detalle
+    // (T5), y el contenido de ejecucion con su adaptador (T6).
+    const HERRAMIENTAS_DE_RECETA_QC194 = [
+      'lib/modules/recetas/index.ts',
+      'lib/modules/recetas/domain/recipe-input.ts',
+      'lib/modules/recetas/domain/recipe-version.ts',
+      'lib/modules/recetas/ports/recipe-repository.ts',
+      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+      'lib/modules/recetas/domain/recipe-tools.ts',
+      'lib/modules/recetas/domain/create-recipe.ts',
+      'lib/modules/recetas/domain/update-recipe.ts',
+      'lib/modules/recetas/domain/create-recipe-version.ts',
+      'lib/modules/recetas/domain/update-recipe-version.ts',
+      'lib/modules/recetas/domain/get-recipe.ts',
+      'lib/modules/recetas/domain/recipe-view.ts',
+      'lib/modules/recetas/domain/recipe-catalog.ts',
+      'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+    ]
     const AMPLIACIONES_APROBADAS = [
       ...AMPLIACION_QC34,
       ...CAMBIO_DE_FORMA_DEL_PASO_QC62,
@@ -467,6 +487,7 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       ...AISLAMIENTO_POR_EMPRESA_QC50,
       ...CANTIDADES_EN_PORCENTAJE_QC147,
       ...VERSIONES_DE_RECETA_QC172,
+      ...HERRAMIENTAS_DE_RECETA_QC194,
     ]
     expect(
       diff

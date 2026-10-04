@@ -44,6 +44,15 @@ export type RecipeLineView = {
   readonly productStock: string | null;
 };
 
+/** Herramienta tal como sale en el detalle. `productName` es `null` cuando el producto esta
+ *  dado de baja: la herramienta se conserva igual. */
+export type RecipeToolView = {
+  readonly id: string;
+  readonly productId: string;
+  readonly productName: string | null;
+  readonly quantity: number;
+};
+
 /** Detalle de una receta (D14, R33): el resumen mas los pasos y las lineas completas. */
 /**
  * Un paso tal y como sale del detalle: EL MISMO DOCUMENTO que entra (QC-62 R10,
@@ -59,6 +68,7 @@ export type RecipeStepView = RecipeStepDocument;
 export type RecipeDetail = RecipeSummary & {
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineView[];
+  readonly tools: readonly RecipeToolView[];
   /** `null` en una original. */
   readonly original: { readonly id: string; readonly name: string } | null;
   readonly isUnderReview: boolean;

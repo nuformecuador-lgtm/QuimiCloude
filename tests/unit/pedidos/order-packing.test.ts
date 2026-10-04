@@ -76,7 +76,7 @@ function catalogosGlobales(overrides: {
   const findRefsIncludingDeleted = vi.fn(async () =>
     overrides.recipeFound === false ? [] : [{ id: RECETA, name: overrides.recipeName ?? 'Desengrasante', ownName: overrides.recipeName ?? 'Desengrasante', isUnderReview: false, original: null, isDeleted: false }],
   );
-  const findExecutionContentById = vi.fn(async () => ({ id: RECETA, name: 'Desengrasante', isDeleted: false, steps: [], lines: [] }));
+  const findExecutionContentById = vi.fn(async () => ({ id: RECETA, name: 'Desengrasante', isDeleted: false, steps: [], lines: [], tools: [] }));
   const findPresentationRefs = vi.fn(async (ids: readonly string[]) =>
     ids.map((id) => {
       const ref = overrides.presentationRefs?.find((candidate) => candidate.id === id);
@@ -213,6 +213,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
                 isDeleted: false,
                 steps: [],
                 lines: (options.ingredientes ?? []).map((productId) => ({ productId, productName: null, percentage: '50.00' })),
+                tools: [],
               })),
             },
           }),

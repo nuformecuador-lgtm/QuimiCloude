@@ -2720,6 +2720,21 @@
       "spec_path": "specs/QC-178-precision-del-coste-unitario"
     },
     {
+      "key": "QC-194",
+      "id": 194,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "herramientas-de-la-receta",
+      "description": "Una receta debe poder declarar las herramientas que usa (agitador, estufa, condensador, pHmetro, etc.). Las herramientas son productos de inventario de tipo MACHINE.\n\n**Comportamiento esperado (lo pidió el humano):** se manejan igual que los productos de la receta, como un ingrediente adicional, con una diferencia: **no modifican las cantidades del stock**, porque no son consumibles.\n\n**Estado actual:**\n- El formulario de la receta ya tiene un tab \"Herramientas\" (`recipe-lines-field.tsx`), pero es solo UI. La lista vive en el estado local del componente y se pierde al guardar.\n- No existe en la DB nada que relacione una receta con sus herramientas.\n\n**Restricciones que hoy impiden meterlas como `recipe_lines`:**\n- `recipe_lines_percentage_range` exige un porcentaje mayor que 0.\n- `recipeLinesSchema` exige que las líneas sumen exactamente 100,00 %.\n- La reserva y el consumo del pedido descuentan stock de cada línea.\n\n**Decisiones abiertas para el spec:**\n- Dónde se guardan: una línea de tipo herramienta sin porcentaje en `recipe_lines`, o una tabla aparte (por ejemplo `recipe_machines`).\n- Si las versiones heredan las herramientas de su original o tienen las suyas.\n- Si la herramienta se muestra al operador al ejecutar la receta.\n- Qué pasa al dar de baja una herramienta que usan recetas.",
+      "status": "done",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "fullstack",
+      "branch": "feature/QC-194-herramientas-de-la-receta",
+      "depends_on": [],
+      "spec_path": "specs/QC-194-herramientas-de-la-receta"
+    },
+    {
       "key": "QC-195",
       "id": 195,
       "epic": "QC-31",
@@ -2733,6 +2748,36 @@
       "branch": "feature/QC-195-envases-del-pedido-como-productos",
       "depends_on": [],
       "spec_path": "specs/QC-195-envases-del-pedido-como-productos"
+    },
+    {
+      "key": "QC-196",
+      "id": 196,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "reserva-por-vencimiento",
+      "description": "Hoy la reserva y el consumo de material eligen los lotes **por fecha de compra** (el más antiguo primero, desempate por número de lote: `compareBatchesOldestFirst` en `inventario/domain/batch-order.ts`, usado por `planReservation`). La fecha de vencimiento no se mira. En un laboratorio químico lo correcto es **sacar primero lo que vence antes** (FEFO).\n\n**Comportamiento esperado (lo pidió el humano):**\n- Al apartar material para un pedido, el sistema ordena los lotes por **fecha de vencimiento**, el que vence antes primero.\n- Los lotes **sin vencimiento** van después de los que sí tienen. Entre ellos se mantiene el orden actual por fecha de compra y número de lote.\n- A igual vencimiento, desempata la fecha de compra y luego el número de lote.\n- Aplica igual a la reserva al crear o editar el pedido, a la revisión de pedidos bloqueados y al consumo sin reserva previa.\n\n**No bloquea a QC-195.** El flujo actual funciona; esto es una mejora del orden. QC-195 (envases) aparta con el mismo flujo, así que heredará el orden nuevo sin cambios propios. Los envases PACKAGING no tienen vencimiento y caen en el grupo «sin vencimiento».\n\n**Decisiones abiertas para el spec:**\n- **Lotes ya vencidos:** si se excluyen de la reserva (no se pueden apartar), se apartan con aviso o se dejan como hoy. Si se excluyen y no alcanza, el pedido queda `BLOQUEADO` como en QC-138.\n- **Qué es «vencido»:** vence hoy cuenta o no, y con la fecha de qué zona horaria.\n- **Reservas ya hechas** sobre un lote que vence después de reservar: si se re-planifican o se mantienen.\n- Si el **costo promedio** de la cotización (QC-141 D22) debe excluir los lotes vencidos.\n- Si la pantalla de lotes del producto debe mostrar los lotes en el mismo orden y marcar los vencidos.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-196-reserva-por-vencimiento",
+      "depends_on": [],
+      "spec_path": "specs/QC-196-reserva-por-vencimiento"
+    },
+    {
+      "key": "QC-197",
+      "id": 197,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "lote-real-usado-por-el-operador",
+      "description": "Hoy el sistema aparta stock de lotes concretos al crear el pedido (por ejemplo el lote 1A) y, al consumir (`consumeForOrder`, al pasar a `POR_EMPACAR`), registra el consumo **contra esos mismos lotes**. Si en bodega el operador tomó otro lote del mismo producto (por ejemplo el 1B porque estaba más a mano):\n- el **stock queda mal en los dos lotes**: 1A figura consumido pero sigue lleno, 1B figura lleno pero está gastado;\n- la **traza miente**: dice que el pedido usó 1A. Ante un retiro de producto el sistema apunta al lote equivocado.\n\n**Comportamiento esperado (lo pidió el humano; opción A de la conversación):**\n- En la pantalla del operador (`/asignacion/<id>`), cada ingrediente muestra el **lote sugerido** por el sistema: «Glicerina USP · 2,5 kg · lote 1A».\n- Por defecto está **aceptado**: si el operador usó el sugerido, no hace nada.\n- Si usó otro, lo **cambia**, eligiendo entre los lotes del mismo producto con stock disponible. Puede **repartir** la cantidad entre varios lotes si hace falta.\n- Al consumir, el asiento va contra el **lote realmente usado**. La reserva del sugerido se libera y se aparta el elegido.\n- Se guarda el **lote sugerido junto al usado**, con quién lo cambió y cuándo, para auditar con qué frecuencia no se sigue el orden del sistema.\n\n**Relación con otras fichas (no bloqueantes):**\n- QC-196 (reserva por vencimiento) decide qué lote se sugiere; conviene que vaya antes, pero esta ficha funciona con el orden actual.\n- QC-195 (envases): si los envases también se consumen por lote, el mismo selector aplica a ellos. Se decide al acotar.\n\n**Decisiones abiertas para el spec:**\n- **Cuándo se confirma:** durante la ejecución (antes de pasar a `POR_EMPACAR`, que es cuando hoy se consume) o al Terminar.\n- **Si el lote elegido no tiene stock disponible** porque está apartado por otro pedido: se rechaza, o se permite y se re-planifica el otro pedido.\n- **Lote vencido o no aprobado** elegido a mano: se bloquea o se permite con aviso.\n- **Quién puede cambiar** el lote: el operador asignado, o hace falta un permiso propio.\n- Si los **envases** (QC-195) y las **herramientas** (QC-194, no consumen) entran o quedan fuera.\n- Si existe una consulta de traza («¿qué lotes terminaron en este pedido?») o se deja para otra ficha.\n\n**Lo que NO entra:** escanear códigos de barras en cada pesada (opción B); corregir después con ajustes (opción C).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-197-lote-real-usado-por-el-operador",
+      "depends_on": [],
+      "spec_path": "specs/QC-197-lote-real-usado-por-el-operador"
     }
   ]
 }

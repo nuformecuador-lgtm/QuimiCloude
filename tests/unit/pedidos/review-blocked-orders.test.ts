@@ -100,6 +100,7 @@ function montar(escenario: Escenario = {}) {
     isDeleted: false,
     steps: [],
     lines: lineas,
+    tools: [],
   }));
 
   const uow = fakeUnitOfWork({

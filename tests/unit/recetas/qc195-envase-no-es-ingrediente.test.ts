@@ -44,6 +44,7 @@ const ORIGINAL_CON_ENVASE: RecipeRow = {
     { id: 'l-1', productId: MATERIA, percentage: '90.00' },
     { id: 'l-2', productId: ENVASE, percentage: '10.00' },
   ],
+  tools: [],
   original: null,
 };
 

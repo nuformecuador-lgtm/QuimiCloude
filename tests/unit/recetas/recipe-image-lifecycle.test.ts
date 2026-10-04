@@ -45,6 +45,7 @@ function filaCon(imagePath: string | null): RecipeRow {
     createdAt: AHORA,
     updatedAt: AHORA,
     lines: [{ id: 'linea-1', ...LINEA_100 }],
+    tools: [],
     original: null,
   };
 }

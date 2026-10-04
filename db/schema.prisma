@@ -460,7 +460,8 @@ model Recipe {
   parentRecipeId String?   @map("parent_recipe_id") @db.Uuid
 
   lines    RecipeLine[]
-  parent   Recipe?      @relation("RecipeVersions", fields: [parentRecipeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tools    RecipeTool[]
+  parent  Recipe?      @relation("RecipeVersions", fields: [parentRecipeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   versions Recipe[]     @relation("RecipeVersions")
 
   @@index([createdBy], map: "recipes_created_by_idx")
@@ -486,6 +487,25 @@ model RecipeLine {
   @@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")
   @@index([productId], map: "recipe_lines_product_id_idx")
   @@map("recipe_lines")
+}
+
+/// Sin `companyId`: hereda la empresa de su receta y cae con ella por el CASCADE.
+/// `productId` no lleva `@relation` porque apunta a otro modulo; su FK esta escrita a mano.
+/// El CHECK de cantidad positiva tambien vive solo en la migracion.
+/// @module recetas
+model RecipeTool {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipeId  String   @map("recipe_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([recipeId, productId], map: "recipe_tools_recipe_id_product_id_key")
+  @@index([productId], map: "recipe_tools_product_id_idx")
+  @@map("recipe_tools")
 }
 
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la

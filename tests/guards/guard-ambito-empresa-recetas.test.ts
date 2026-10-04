@@ -749,7 +749,7 @@ function violacionesDeTransaccion(funcion: FuncionDeclarada): readonly string[] 
       violaciones.push(`${funcion.nombre}: usa \`tx.\` fuera de la transaccion (indice ${String(match.index)})`)
     }
   }
-  if (/\bprisma\s*\.\s*recipe(?:Line)?\s*\./.test(funcion.cuerpo)) {
+  if (/\bprisma\s*\.\s*recipe(?:Line|Tool)?\s*\./.test(funcion.cuerpo)) {
     violaciones.push(`${funcion.nombre}: consulta por el cliente global (\`prisma.recipe*\`) en vez de por \`tx.\``)
   }
   return violaciones
@@ -902,6 +902,53 @@ function violacionesDeBajaEnCascada(source: string): readonly string[] {
   return violaciones
 }
 
+const CONSULTA_DE_HERRAMIENTAS = /\btx\s*\.\s*recipeTool\s*\.\s*\w+\s*\(/
+
+/**
+ * `recipe_tools`, como `recipe_lines`, no lleva empresa propia: cada `tx.recipeTool.*` tiene que
+ * ir DESPUES del `updateMany` acotado que probo su receta (y de su salida temprana) y filtrar por
+ * ese mismo id, nunca por un ambito propio.
+ */
+function violacionesDeHerramientas(source: string, nombre: string): readonly string[] {
+  const funcion = funcionDeTexto(source, nombre)
+  if (funcion === undefined) return [`recipe-prisma.ts no declara ${nombre}`]
+  const violaciones = [...violacionesDeTransaccion(funcion)]
+
+  const herramientas = llamadasA(funcion, CONSULTA_DE_HERRAMIENTAS)
+  if (herramientas.length === 0) return [...violaciones, `${nombre} no toca recipeTool en absoluto`]
+
+  const updates = llamadasA(funcion, UPDATE_MANY_DE_RECETA)
+  const original = updates[0]
+  if (original === undefined) return [...violaciones, `${nombre} no tiene tx.recipe.updateMany`]
+  if (!CON_AMBITO.test(original.argumentos)) {
+    violaciones.push(`${nombre}: el updateMany de la receta no acota con \`...recipeCompanyScope(scope)\``)
+  }
+  const version = updates.find((u) => /\bid\s*:\s*versionId\b/.test(u.argumentos))
+
+  for (const herramienta of herramientas) {
+    const donde = `${nombre}: una consulta de herramientas (indice ${String(herramienta.indice)})`
+    if (/\bcompanyId\b/.test(herramienta.argumentos)) {
+      violaciones.push(`${donde} menciona \`companyId\`: su ambito es el de su receta, ya probado`)
+    }
+    if (/\brecipeId\s*:\s*versionId\b/.test(herramienta.argumentos)) {
+      if (version === undefined || herramienta.indice < version.cierra) {
+        violaciones.push(`${donde} toca una version antes del updateMany acotado de la version`)
+      } else if (!saleSiNoHayFila(funcion, version.cierra, herramienta.indice, /\bthrow\b/)) {
+        violaciones.push(`${donde}: entre el updateMany de la version y ella falta \`count === 0\` -> \`throw\``)
+      }
+    } else if (/\brecipeId\s*:\s*id\b/.test(herramienta.argumentos)) {
+      if (herramienta.indice < original.cierra) {
+        violaciones.push(`${donde} va antes del updateMany acotado de la receta`)
+      } else if (!saleSiNoHayFila(funcion, original.cierra, herramienta.indice, /return\s+'not_found'/)) {
+        violaciones.push(`${donde}: entre el updateMany de la receta y ella falta \`count === 0\` -> \`return 'not_found'\``)
+      }
+    } else {
+      violaciones.push(`${donde} no filtra por \`recipeId: id\` ni \`recipeId: versionId\``)
+    }
+  }
+  return violaciones
+}
+
 /** Aplica una mutacion y exige que cambie el texto: una mutacion que no casa no prueba nada. */
 function mutar(source: string, patron: RegExp, por: string): string {
   const mutado = source.replace(patron, por)
@@ -965,5 +1012,49 @@ describe('QC-172 — `softDeleteAliveRecipe`: la baja en cascada de las versione
       '$1',
     )
     expect(violacionesDeBajaEnCascada(mutado)).toContainEqual(expect.stringMatching(/versiones no acota/))
+  })
+})
+
+describe('`recipe_tools`: las herramientas se escriben solo tras probar su receta, y por su id', () => {
+  for (const nombre of ['replaceAliveRecipe', 'replaceAliveRecipeWithPropagation']) {
+    it(`${nombre}: cumple la estructura en el fuente real`, () => {
+      expect(violacionesDeHerramientas(RECIPE_PRISMA_SOURCE, nombre)).toEqual([])
+    })
+  }
+
+  it('MUERE si una consulta de herramientas va antes del updateMany acotado', () => {
+    const mutado = mutar(
+      RECIPE_PRISMA_SOURCE,
+      /(return await prisma\.\$transaction\(async \(tx\) => \{\s*)(const updated = await tx\.recipe\.updateMany)/,
+      '$1await tx.recipeTool.deleteMany({ where: { recipeId: id } });\n$2',
+    )
+    expect(violacionesDeHerramientas(mutado, 'replaceAliveRecipe')).toContainEqual(
+      expect.stringMatching(/antes del updateMany acotado de la receta/),
+    )
+  })
+
+  it('MUERE si el deleteMany de herramientas deja de filtrar por `recipeId: id`', () => {
+    const mutado = mutar(
+      RECIPE_PRISMA_SOURCE,
+      /(tx\.recipeTool\.deleteMany\(\{\s*where:\s*\{\s*)recipeId: id,/,
+      '$1companyId: id,',
+    )
+    expect(violacionesDeHerramientas(mutado, 'replaceAliveRecipe')).toEqual(
+      expect.arrayContaining([expect.stringMatching(/no filtra por/), expect.stringMatching(/menciona `companyId`/)]),
+    )
+  })
+
+  it('MUERE si una version que no existe deja de abortar antes de tocar sus herramientas', () => {
+    const mutado = mutar(RECIPE_PRISMA_SOURCE, /if \(touched\.count === 0\) throw new VersionNotFound\(\);/, '')
+    expect(violacionesDeHerramientas(mutado, 'replaceAliveRecipeWithPropagation')).toContainEqual(
+      expect.stringMatching(/-> `throw`/),
+    )
+  })
+
+  it('MUERE si las herramientas se tocan por el cliente global', () => {
+    const mutado = mutar(RECIPE_PRISMA_SOURCE, /await tx\.recipeTool\.deleteMany\(/, 'await prisma.recipeTool.deleteMany(')
+    expect(violacionesDeHerramientas(mutado, 'replaceAliveRecipe')).toContainEqual(
+      expect.stringMatching(/cliente global/),
+    )
   })
 })

@@ -332,6 +332,7 @@ async function crearRecetaSembrada(
       steps: [paso('Paso original 1')],
       lines: overrides.lines ?? [],
       imagePath: overrides.imagePath ?? `recetas/${token()}.jpg`,
+      tools: [],
     } satisfies NewRecipe,
     empresa.userId,
     new Date(),
@@ -449,6 +450,67 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } });
       expect(JSON.stringify(despues)).toBe(antesTextual);
+    });
+  });
+
+  describe('QC-194 R18 — el import de PDF y las herramientas de la receta', () => {
+    async function crearMaquina(companyId: string): Promise<string> {
+      const created = await createProduct(
+        { name: `Maquina ${token()}`, type: PRODUCT_TYPES.MACHINE, qtyAlert: null },
+        new Date(),
+        { companyId } satisfies InventoryScope,
+      );
+      return created.id;
+    }
+
+    it('R18: reemplazar por PDF una receta con dos herramientas las deja intactas', async () => {
+      const empresa = await crearEmpresa();
+      const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+      const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+      const sembrada = await crearRecetaSembrada(empresa, { lines: [{ productId: ingrediente, percentage: '100.00' }] });
+      const batidora = await crearMaquina(empresa.companyId);
+      const balanza = await crearMaquina(empresa.companyId);
+      await prisma.recipeTool.createMany({
+        data: [
+          { recipeId: sembrada.id, productId: batidora, quantity: 2 },
+          { recipeId: sembrada.id, productId: balanza, quantity: 1 },
+        ],
+      });
+      const herramientas = () =>
+        prisma.recipeTool.findMany({ where: { recipeId: sembrada.id }, orderBy: { productId: 'asc' } });
+      const antes = await herramientas();
+
+      const otroIngrediente = await crearProducto(empresa.companyId, `Otro ingrediente ${token()}`);
+      const resumen = await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+        documentFileId,
+        name: sembrada.name,
+        description: 'Formula reemplazada',
+        lines: [{ kind: 'existing', productId: otroIngrediente, percentage: '100.00' }],
+        steps: [],
+        replaceRecipeId: sembrada.id,
+      });
+
+      expect(resumen.outcome).toBe('replaced');
+      expect(antes).toHaveLength(2);
+      expect(await herramientas()).toEqual(antes);
+    });
+
+    it('R18: crear por PDF una receta nueva la deja sin herramientas', async () => {
+      const empresa = await crearEmpresa();
+      const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+      const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+
+      const resumen = await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+        documentFileId,
+        name: `Formula nueva ${token()}`,
+        description: null,
+        lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+        steps: [],
+        replaceRecipeId: null,
+      });
+
+      expect(resumen.outcome).toBe('created');
+      expect(await prisma.recipeTool.count({ where: { recipeId: resumen.recipeId } })).toBe(0);
     });
   });
 

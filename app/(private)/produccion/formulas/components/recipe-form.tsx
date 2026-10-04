@@ -40,20 +40,24 @@ import { cn } from '@/lib/utils';
 import type { ProductPickerOption } from './product-picker';
 import { PropagateVersionsDialog } from './propagate-versions-dialog';
 import { RecipeImageField } from './recipe-image-field';
-import { RecipeLinesField } from './recipe-lines-field';
+import { RECIPE_TOOL_ERROR_MESSAGES, RecipeLinesField } from './recipe-lines-field';
 import { RecipeStepsField } from './recipe-steps-field';
 import {
   buildRecipePayload,
   createLocalKey,
   extractFieldError,
   extractGeneralLinesError,
+  extractGeneralToolsError,
   extractLineErrors,
   extractStepErrors,
+  extractToolErrors,
   toLineFormValues,
+  toToolFormValues,
   type RecipeFormState,
   type RecipeLineErrors,
   type RecipeStepErrors,
   type RecipeStepFormValue,
+  type RecipeToolErrors,
 } from './recipe-form-state';
 
 /**
@@ -136,6 +140,8 @@ type FieldErrors = {
   readonly description?: string;
   readonly lines?: RecipeLineErrors;
   readonly linesGeneral?: string;
+  readonly tools?: RecipeToolErrors;
+  readonly toolsGeneral?: string;
   readonly steps?: RecipeStepErrors;
 };
 
@@ -158,7 +164,14 @@ const UNDER_REVIEW_MESSAGE =
 
 function buildInitialState(props: RecipeFormProps): RecipeFormState {
   if (props.mode === 'create') {
-    return { name: '', description: '', lines: [], steps: [], image: { kind: 'untouched' } };
+    return {
+      name: '',
+      description: '',
+      lines: [],
+      tools: [],
+      steps: [],
+      image: { kind: 'untouched' },
+    };
   }
 
   const { recipe } = props;
@@ -166,6 +179,7 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
     name: recipe.name,
     description: recipe.description ?? '',
     lines: toLineFormValues(recipe.lines),
+    tools: toToolFormValues(recipe.tools),
     // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a
     // texto -el puente de QC-62 R19 se retiro con T4-, asi que reabrir una receta conserva sus
     // marcas y sus listas de verificacion intactas. `key` es una clave local de React.
@@ -224,6 +238,8 @@ export function RecipeForm(props: RecipeFormProps) {
         description: extractFieldError(issues, 'description'),
         lines: extractLineErrors(issues),
         linesGeneral: extractGeneralLinesError(issues),
+        tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
+        toolsGeneral: extractGeneralToolsError(issues),
         steps: extractStepErrors(issues),
       });
       // R23: la validación previa rechazada tampoco invoca la operación, pero SÍ es un rechazo
@@ -408,11 +424,15 @@ export function RecipeForm(props: RecipeFormProps) {
       <RecipeLinesField
         lines={state.lines}
         onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
+        tools={state.tools}
+        onToolsChange={(tools) => setState((previous) => ({ ...previous, tools }))}
         units={props.units}
         initialProductPage={props.initialProductPage}
         initialMachinePage={props.initialMachinePage}
         errors={fieldErrors.lines}
         generalError={fieldErrors.linesGeneral}
+        toolErrors={fieldErrors.tools}
+        toolsGeneralError={fieldErrors.toolsGeneral}
       />
 
       <RecipeStepsField

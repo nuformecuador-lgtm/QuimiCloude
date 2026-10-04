@@ -7,6 +7,7 @@ import {
 } from './errors';
 import { updateRecipeVersionSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
 
@@ -51,10 +52,20 @@ export function createUpdateRecipeVersion(
       if (newProductIds.some((id) => !foundIds.has(id))) throw new ValidationError();
       if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
+    if (data.tools !== undefined) {
+      await assertToolsValid(data.tools, existing.tools, deps.products, actor.companyId);
+    }
 
     const result = await deps.recipes.replaceAlive(
       versionId,
-      { name: data.name, description: null, steps: [], lines: data.lines, imagePath: null },
+      {
+        name: data.name,
+        description: null,
+        steps: [],
+        lines: data.lines,
+        imagePath: null,
+        tools: data.tools ?? null,
+      },
       actor.id,
       now(),
       scope,

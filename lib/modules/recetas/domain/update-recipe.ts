@@ -8,6 +8,7 @@ import {
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, PropagatedVersion, RecipeRepository } from '../ports/recipe-repository';
@@ -104,6 +105,10 @@ export function createUpdateRecipe(
       if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
 
+    if (data.tools !== undefined) {
+      await assertToolsValid(data.tools, existing.tools, deps.products, actor.companyId);
+    }
+
     // R47 (`design.md > 7.1`, `> 9.3`): los TRES estados de `image`.
     let imagePath: string | null = existing.imagePath;
     let pathToRemove: string | null = null;
@@ -134,6 +139,7 @@ export function createUpdateRecipe(
       steps: data.steps,
       lines: data.lines,
       imagePath,
+      tools: data.tools ?? null,
     };
 
     const propagated = await persist(

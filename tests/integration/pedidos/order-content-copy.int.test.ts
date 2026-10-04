@@ -224,6 +224,7 @@ async function crearReceta(empresa: Empresa): Promise<string> {
       steps: [],
       lines: [],
       imagePath: null,
+      tools: [],
     },
     empresa.actorId,
     new Date(),

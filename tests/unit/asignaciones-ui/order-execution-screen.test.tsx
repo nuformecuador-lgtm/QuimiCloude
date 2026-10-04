@@ -66,6 +66,7 @@ const EXECUTION: AssignedOrderExecutionView = {
       alternativeUnits: [MILILITRO],
     },
   ],
+  tools: [],
   presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,

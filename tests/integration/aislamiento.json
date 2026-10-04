@@ -320,6 +320,11 @@
       "desde": "2026-09-23"
     },
     {
+      "archivo": "pedidos/order-reservation-tools.int.test.ts",
+      "motivo": "QC-194 T6 (R8-R10): crear, revisar bloqueados, pasar a curso y Finalizar con los casos de uso de `pedidos` cableados a mano con los adaptadores driven REALES de `pedidos`, `recetas`, `inventario` y `unidades`, igual que `order-reservation.int.test.ts`: `withOrderTransaction` y el alta de lotes abren SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, asi que una transaccion del test no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, productos con lotes, recetas con herramientas y pedidos) y la limpia en un `finally` en el orden de las FK (reservas -> asientos -> pedidos -> recetas, cuyas lineas y herramientas caen con ON DELETE CASCADE -> lotes -> productos -> presentacion -> unidad -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-03"
+    },
+    {
       "archivo": "pedidos/order-reservation.int.test.ts",
       "motivo": "QC-141 T9: crear/editar/cancelar/borrar ('createCreateOrder'/'createUpdateOrder'/'createCancelOrder'/'createDeleteOrder') cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', igual que 'order-ingredients-cost.int.test.ts' y 'order-unit-of-work.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. Los casos de R30/R15 y R50 comprueban con el cliente global que un rechazo -'insufficient_material', 'recipe_without_lines'- no dejo escrito ni el pedido ni la reserva.",
       "desde": "2026-09-23"
@@ -378,6 +383,11 @@
       "archivo": "recetas/recipe-versions-repository.int.test.ts",
       "motivo": "QC-172 T4: ejercita `createRecipeVersion`, `softDeleteAliveRecipe`, `replaceAliveRecipeWithPropagation` y las lecturas de `recipe-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria; R17 y R18 necesitan ver la receta tal como quedo tras un rollback REAL del adaptador. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa; el caso de R9 hace lo mismo con su empresa propia en un `finally`. El caso de R18 crea un trigger acotado a UNA receta y lo borra en un `finally`. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-01"
+    },
+    {
+      "archivo": "recetas/recipe-tools.int.test.ts",
+      "motivo": "QC-194 T4/T5: ejercita la escritura de herramientas de `recipe-prisma.ts` (`createRecipe`, `createRecipeVersion`, `replaceAliveRecipe`, `replaceAliveRecipeWithPropagation`) y los casos de uso de `recetas` e `inventario` cableados por `@/lib/composition`; todos usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no los envolveria, y R15 necesita ver la receta tal como quedo tras un rollback REAL del adaptador. Una empresa efimera (randomUUID) nace en `beforeAll` y muere en `afterAll` en el orden de las FK: versiones -> originales (sus lineas y herramientas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. El caso del fallo forzado crea un trigger acotado a UNA receta y lo borra en un `finally`. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-03"
     },
     {
       "archivo": "recetas/company-scope-queries.int.test.ts",

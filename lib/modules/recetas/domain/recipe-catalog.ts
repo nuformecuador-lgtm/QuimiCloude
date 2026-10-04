@@ -80,6 +80,15 @@ export type RecipeExecutionLine = {
   readonly percentage: string;
 };
 
+/** Herramienta de la receta para la ejecucion. Va en un campo aparte de `lines` para que
+ *  reserva, consumo y costo, que solo leen `lines`, no la vean nunca. `productName` sale
+ *  siempre `null` por el mismo motivo que en `RecipeExecutionLine`. */
+export type RecipeExecutionTool = {
+  readonly productId: string;
+  readonly productName: string | null;
+  readonly quantity: number;
+};
+
 /** Lo que hace falta para EJECUTAR una receta: pasos y lineas, y nada de lo que la pantalla no
  *  pinta (ni `imageUrl`, ni autoria, ni marcas de tiempo). */
 export type RecipeExecutionContent = {
@@ -88,4 +97,5 @@ export type RecipeExecutionContent = {
   readonly isDeleted: boolean;
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly RecipeExecutionLine[];
+  readonly tools: readonly RecipeExecutionTool[];
 };

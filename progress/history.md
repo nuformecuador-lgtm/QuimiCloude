@@ -5007,3 +5007,11 @@ podar.
   `recetas/module-contract`, `recetas/scope`); el humano decidió dejarlos en el baseline y nace **QC-180** para
   arreglarlos. Segundo sync (85 commits: QC-138, QC-170) con conflictos solo de bitácora; tras él, `--rapido` y
   E2E (4 passed), sin repetir el gate completo.
+
+## 2026-10-04 — QC-194-herramientas-de-la-receta
+
+- **PR #141**, merge `1ea13ba9`. Spec R1–R34, T0–T13. Una receta (original o version) declara sus **herramientas**: productos MACHINE con cantidad entera, en la tabla nueva `recipe_tools` (migracion `20261003120000_recipe_tools`, novena tabla exenta de `company_id`). Se editan en el tab «Herramientas» del formulario y el operador las ve en `/asignacion/<id>`. **No** apartan, consumen ni suman costo, y no cuentan en el 100 %: van en un campo `tools` aparte de `lines`, asi que `pedidos` e `inventario` no cambiaron.
+- **Acotada** con `/afinar-feature` (8 decisiones). **F1.4:** el humano pregunto por `recipe_lines` + `type`; se mantuvo la tabla aparte (design §11.1). Contrato de back congelado primero (`b95a1732`) para hacer la UI en paralelo.
+- **Review:** vuelta 1 OK con 7 menores; vuelta 2 OK (m2 con la opcion (a) del humano: 23503 -> `invalid_input`; m4 parcial por la guardia de ambito).
+- **Gate:** completo verde (8/8 en baseline). Escondia un rojo nuevo en `recetas/scope.test.ts` por ir el baseline por archivo; cerrado en `0503f35f`. Sin E2E (decision humana).
+- **Deuda local:** carpeta del worktree sin borrar.

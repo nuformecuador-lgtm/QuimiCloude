@@ -241,6 +241,7 @@ async function crearReceta(empresa: Empresa, productId: string): Promise<string>
       steps: [],
       lines: [{ productId, percentage: '100.00' }],
       imagePath: null,
+      tools: [],
     },
     empresa.actorId,
     new Date(),

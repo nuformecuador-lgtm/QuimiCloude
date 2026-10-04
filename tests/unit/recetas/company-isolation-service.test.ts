@@ -91,6 +91,7 @@ function filaBase(id: string, overrides: Partial<RecipeRow> = {}): RecipeRow {
     createdAt: AHORA,
     updatedAt: AHORA,
     lines: [],
+    tools: [],
     original: null,
     ...overrides,
   };
@@ -131,6 +132,7 @@ function almacen() {
         createdAt: now,
         updatedAt: now,
         lines: data.lines.map((line, index) => ({ id: `linea-${contador}-${index}`, ...line })),
+        tools: [],
         original: null,
       };
       filas.set(id, { row, companyId: scope.companyId, deleted: false });

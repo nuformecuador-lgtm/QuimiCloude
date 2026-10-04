@@ -31,6 +31,7 @@ const ORIGINAL: RecipeRow = {
     { id: 'l-1', productId: P_A, percentage: '70.00' },
     { id: 'l-2', productId: P_B, percentage: '30.00' },
   ],
+  tools: [],
   original: null,
 };
 

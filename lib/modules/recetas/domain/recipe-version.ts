@@ -21,43 +21,66 @@ function percentageKey(percentage: string): bigint | string {
   return percentageToHundredths(percentage) ?? percentage;
 }
 
-function byProduct(lines: readonly RecipeLineData[]): Map<string, RecipeLineData> {
-  return new Map(lines.map((line) => [line.productId, line]));
+type ByProduct = { readonly productId: string };
+
+function byProduct<T extends ByProduct>(items: readonly T[]): Map<string, T> {
+  return new Map(items.map((item) => [item.productId, item]));
 }
 
-function sameLine(left: RecipeLineData | undefined, right: RecipeLineData | undefined): boolean {
-  if (left === undefined || right === undefined) return left === right;
+function samePercentage(left: RecipeLineData, right: RecipeLineData): boolean {
   return percentageKey(left.percentage) === percentageKey(right.percentage);
 }
 
 /**
- * Un ingrediente que la version deja igual que la original de antes sigue a la original de
- * despues (incluido desaparecer); uno que la version cambio, quito o anadio se queda como esta.
- * El resultado puede no sumar 100 o quedar vacio.
+ * Lo que la version deja igual que la original de antes sigue a la original de despues (incluido
+ * desaparecer); lo que la version cambio, quito o anadio se queda como esta. `same` dice que es
+ * «igual» para cada tipo de fila.
  */
+export function propagateByProduct<T extends ByProduct>(
+  before: readonly T[],
+  after: readonly T[],
+  version: readonly T[],
+  same: (left: T, right: T) => boolean,
+): readonly T[] {
+  const beforeByProduct = byProduct(before);
+  const afterByProduct = byProduct(after);
+  const versionByProduct = byProduct(version);
+
+  const unchanged = (own: T | undefined, previous: T | undefined): boolean =>
+    own === undefined || previous === undefined ? own === previous : same(own, previous);
+
+  const resolve = (productId: string): T | undefined => {
+    const own = versionByProduct.get(productId);
+    return unchanged(own, beforeByProduct.get(productId)) ? afterByProduct.get(productId) : own;
+  };
+
+  const result: T[] = [];
+  for (const item of after) {
+    const resolved = resolve(item.productId);
+    if (resolved !== undefined) result.push(resolved);
+  }
+  for (const item of version) {
+    if (afterByProduct.has(item.productId)) continue;
+    const resolved = resolve(item.productId);
+    if (resolved !== undefined) result.push(resolved);
+  }
+  return result;
+}
+
+/** Por producto y porcentaje. El resultado puede no sumar 100 o quedar vacio. */
 export function propagateLines(
   before: readonly RecipeLineData[],
   after: readonly RecipeLineData[],
   version: readonly RecipeLineData[],
 ): readonly RecipeLineData[] {
-  const beforeByProduct = byProduct(before);
-  const afterByProduct = byProduct(after);
-  const versionByProduct = byProduct(version);
+  return propagateByProduct(before, after, version, samePercentage);
+}
 
-  const resolve = (productId: string): RecipeLineData | undefined => {
-    const own = versionByProduct.get(productId);
-    return sameLine(own, beforeByProduct.get(productId)) ? afterByProduct.get(productId) : own;
-  };
-
-  const result: RecipeLineData[] = [];
-  for (const line of after) {
-    const resolved = resolve(line.productId);
-    if (resolved !== undefined) result.push(resolved);
-  }
-  for (const line of version) {
-    if (afterByProduct.has(line.productId)) continue;
-    const resolved = resolve(line.productId);
-    if (resolved !== undefined) result.push(resolved);
-  }
-  return result;
+/** Por producto y cantidad. */
+export function propagateTools<T extends ByProduct & { readonly quantity: number }>(
+  before: readonly T[],
+  after: readonly T[],
+  version: readonly T[],
+): readonly T[] {
+  return propagateByProduct(before, after, version, (left, right) => left.quantity === right.quantity);
 }

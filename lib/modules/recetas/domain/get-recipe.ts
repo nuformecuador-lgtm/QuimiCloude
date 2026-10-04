@@ -49,7 +49,9 @@ export function createGetRecipe(
     // R18: se pide `findRefs` sobre TODAS las lineas -incluida la de un producto de baja,
     // que sale con `productName: null`-. Es el uso que DECORA, distinto del que VALIDA en
     // el alta y en la edicion (`design.md > 6`).
-    const productIds = row.lines.map((line) => line.productId);
+    const productIds = [
+      ...new Set([...row.lines.map((line) => line.productId), ...row.tools.map((tool) => tool.productId)]),
+    ];
     const refs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
     const namesById = new Map(refs.map((ref) => [ref.id, ref.name]));
     const refsById = new Map(refs.map((ref) => [ref.id, ref]));
@@ -86,6 +88,12 @@ export function createGetRecipe(
           productStock: ref === undefined ? null : stockInProductUnit(ref),
         };
       }),
+      tools: row.tools.map((tool) => ({
+        id: tool.id,
+        productId: tool.productId,
+        productName: namesById.get(tool.productId) ?? null,
+        quantity: tool.quantity,
+      })),
     };
   };
 }
