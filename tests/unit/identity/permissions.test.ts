@@ -794,7 +794,7 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
 
   it('R1: el catalogo contiene asignaciones.ejecutar con su modulo, accion y descripcion exactos, una sola vez', () => {
     expect(PERMISSIONS).toContainEqual(EJECUTAR)
-    expect(codigos.filter((codigo) => codigo === 'asignaciones.ejecutar')).toHaveLength(1)
+    expect(codigos.indexOf('asignaciones.ejecutar')).toBe(codigos.lastIndexOf('asignaciones.ejecutar'))
   })
 
   it('R1: el catalogo es el previo mas asignaciones.ejecutar justo detras de asignaciones.modificar', () => {
