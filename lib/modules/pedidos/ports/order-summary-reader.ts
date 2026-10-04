@@ -30,5 +30,6 @@ export interface OrderSummaryReader {
     ordering: OrderSummaryOrdering,
     page: number,
     pageSize?: number,
+    filter?: { readonly packedBy?: string },
   ): Promise<Page<OrderSummaryRecord>>;
 }

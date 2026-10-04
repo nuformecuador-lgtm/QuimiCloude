@@ -424,6 +424,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261003130000_packaging_products_in_distribution',
   // La parte de envases del importe del pedido; no toca el identificador.
   '20261004120000_orders_packaging_cost',
+  // El permiso asignaciones.ejecutar y sus asignaciones; no toca el identificador.
+  '20261004150000_execution_permission',
 ] as const
 
 export function hallazgosDeMigraciones(

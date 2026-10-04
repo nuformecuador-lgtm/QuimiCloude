@@ -35,6 +35,7 @@ const CODIGOS_DEL_REQUISITO = [
   'usuarios.modificar',
   'asignaciones.consultar',
   'asignaciones.modificar',
+  'asignaciones.ejecutar',
   'terminados.consultar',
   'clientes.consultar',
   'clientes.modificar',
@@ -209,12 +210,29 @@ const MODULOS_SOLO_ESCRITURA = ['empaque']
 
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
 
+/** Toda accion es `consultar` o `modificar`, salvo `ejecutar`, que solo se admite en `asignaciones`. */
+function accionAdmitida(permiso: { module: string; action: string }): boolean {
+  if (permiso.action === 'consultar' || permiso.action === 'modificar') return true
+  return permiso.action === 'ejecutar' && permiso.module === 'asignaciones'
+}
+
+/** El Operador, escrito a mano: el conjunto exacto es el contrato, no «al menos estos». */
+const PERMISOS_DEL_OPERADOR = [
+  'inventario.consultar',
+  'asignaciones.consultar',
+  'asignaciones.ejecutar',
+] as const
+
+/** Las acciones de cada modulo con escritura; `asignaciones` es el unico que suma `ejecutar`. */
+const accionesEsperadasConEscritura = (modulo: string): string[] =>
+  modulo === 'asignaciones' ? ['consultar', 'ejecutar', 'modificar'] : ['consultar', 'modificar']
+
 describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
   it('R1: cada codigo es `<modulo>.<accion>` en español y en minusculas', () => {
     for (const permiso of PERMISSIONS) {
       expect(permiso.code).toBe(`${permiso.module}.${permiso.action}`)
       expect(permiso.code).toMatch(/^[a-z]+\.[a-z]+$/)
-      expect(permiso.action === 'consultar' || permiso.action === 'modificar').toBe(true)
+      expect(accionAdmitida(permiso), permiso.code).toBe(true)
     }
   })
 
@@ -279,11 +297,11 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     }
   })
 
-  it('R3: cada modulo con escritura declara consultar Y modificar', () => {
+  it('R3: cada modulo con escritura declara consultar Y modificar (y asignaciones, ademas, ejecutar)', () => {
     for (const modulo of MODULOS_CON_ESCRITURA) {
       const acciones = PERMISSIONS.filter((p) => p.module === modulo).map((p) => p.action)
 
-      expect([...acciones].sort()).toEqual(['consultar', 'modificar'])
+      expect([...acciones].sort(), modulo).toEqual(accionesEsperadasConEscritura(modulo))
     }
   })
 
@@ -479,14 +497,8 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     }
   })
 
-  // QC-74 R9 decia «exactamente un permiso»; QC-86 R26 le suma `asignaciones.consultar` y pasan a
-  // ser DOS, y ni uno mas (QC-86 R27). La lista sigue escrita entera a mano: el conjunto exacto es
-  // el contrato, no «al menos estos».
-  it('R9 (enmendado por QC-86 R26): el Operador tiene exactamente dos permisos: inventario.consultar y asignaciones.consultar', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+  it('R9 (enmendado por QC-86 R26 y QC-201 R3): el Operador tiene exactamente inventario.consultar, asignaciones.consultar y asignaciones.ejecutar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
   })
 
   it('QC-38 R4: el Administrador tiene unidades.modificar Y unidades.consultar, escritos uno a uno', () => {
@@ -495,10 +507,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('QC-38 R4: el Operador no recibe ninguno de unidades (su conjunto exacto lo enmendo QC-86)', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.consultar')
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.modificar')
   })
@@ -509,10 +518,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('QC-86 R27: el Operador recibe asignaciones.consultar y NO asignaciones.modificar', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('asignaciones.modificar')
   })
 
@@ -522,10 +528,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('QC-66 R9: el Operador no recibe ninguno de los dos permisos de usuarios', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.consultar')
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.modificar')
   })
@@ -544,10 +547,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('R36: el Operador no cambia y no recibe empaque.modificar', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('empaque.modificar')
   })
 
@@ -563,10 +563,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('R22: el Operador y el Empacador conservan exactamente los permisos que tenian, sin clientes.*', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
       'asignaciones.consultar',
       'terminados.consultar',
@@ -578,11 +575,8 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).not.toContain('clientes.modificar')
   })
 
-  it('QC-144 R10: el Operador sigue con exactamente inventario.consultar y asignaciones.consultar, sin terminados.consultar', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+  it('QC-144 R10 (enmendado por QC-201 R3): el Operador sigue con exactamente sus permisos, sin terminados.consultar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('terminados.consultar')
   })
 
@@ -591,10 +585,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   // arriba, copiado del requisito- en vez de duplicar la verdad en una lista nueva.
   it('el catalogo sigue siendo el del requisito, sin cambios en el Operador (R15, QC-144)', () => {
     expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
   })
 
   it('QC-142 R12 (enmendado por R36): el Administrador incluye documentos.consultar y documentos.modificar, escritos uno a uno', () => {
@@ -604,10 +595,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
   })
 
   it('QC-142 R12: el Operador y el Empacador conservan exactamente los permisos que tenian, sin documentos.*', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
       'asignaciones.consultar',
       'terminados.consultar',
@@ -750,10 +738,7 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
   })
 
   it('R9: Operador y Empacador conservan exactamente sus permisos y ninguno tiene empresas.*', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
-      'inventario.consultar',
-      'asignaciones.consultar',
-    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
     expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
       'asignaciones.consultar',
       'terminados.consultar',
@@ -762,5 +747,164 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
     for (const rol of [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR]) {
       expect((SEED_ROLE_PERMISSIONS[rol] ?? []).filter(esDeEmpresas), rol).toEqual([])
     }
+  })
+})
+
+describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', () => {
+  const EJECUTAR = {
+    code: 'asignaciones.ejecutar',
+    module: 'asignaciones',
+    action: 'ejecutar',
+    description: 'Entrar, comenzar y terminar la ejecución de los pedidos asignados.',
+  } as const
+
+  /** Las entradas posteriores a `PERMISOS_PREVIOS`, copiadas a mano con sus tres campos. */
+  const PERMISOS_POSTERIORES = [
+    {
+      code: 'documentos.consultar',
+      module: 'documentos',
+      action: 'consultar',
+      description: 'Consultar los documentos de la empresa y el estado de su procesamiento.',
+    },
+    {
+      code: 'documentos.modificar',
+      module: 'documentos',
+      action: 'modificar',
+      description: 'Subir documentos PDF y encolar su procesamiento.',
+    },
+    {
+      code: 'empaque.modificar',
+      module: 'empaque',
+      action: 'modificar',
+      description: 'Comenzar y terminar el empaque de los pedidos de la empresa.',
+    },
+    {
+      code: 'empresas.consultar',
+      module: 'empresas',
+      action: 'consultar',
+      description: 'Consultar las empresas de la plataforma.',
+    },
+    {
+      code: 'empresas.modificar',
+      module: 'empresas',
+      action: 'modificar',
+      description: 'Dar de alta, editar y dar de baja empresas de la plataforma.',
+    },
+  ] as const
+
+  it('R1: el catalogo contiene asignaciones.ejecutar con su modulo, accion y descripcion exactos, una sola vez', () => {
+    expect(PERMISSIONS).toContainEqual(EJECUTAR)
+    expect(codigos.filter((codigo) => codigo === 'asignaciones.ejecutar')).toHaveLength(1)
+  })
+
+  it('R1: el catalogo es el previo mas asignaciones.ejecutar justo detras de asignaciones.modificar', () => {
+    const sinEjecutar = codigos.filter((codigo) => codigo !== 'asignaciones.ejecutar')
+    const indice = sinEjecutar.indexOf('asignaciones.modificar')
+
+    expect(sinEjecutar).toEqual([...PERMISOS_PREVIOS, ...PERMISOS_POSTERIORES].map((p) => p.code))
+    expect(codigos).toEqual([
+      ...sinEjecutar.slice(0, indice + 1),
+      'asignaciones.ejecutar',
+      ...sinEjecutar.slice(indice + 1),
+    ])
+  })
+
+  it('R1: todas las entradas previas conservan su modulo, accion y descripcion exactos', () => {
+    const previas = PERMISSIONS.filter((permiso) => permiso.code !== 'asignaciones.ejecutar')
+
+    expect(previas).toEqual([...PERMISOS_PREVIOS, ...PERMISOS_POSTERIORES])
+  })
+
+  it('R2: ejecutar solo existe en asignaciones; el resto de modulos declara unicamente consultar y/o modificar', () => {
+    expect(PERMISSIONS.filter((p) => p.action === 'ejecutar').map((p) => p.module)).toEqual([
+      'asignaciones',
+    ])
+    for (const permiso of PERMISSIONS.filter((p) => p.module !== 'asignaciones')) {
+      expect(['consultar', 'modificar'], permiso.code).toContain(permiso.action)
+    }
+  })
+
+  it('R2: la regla de acciones rechaza ejecutar en cualquier otro modulo y cualquier otra accion', () => {
+    expect(accionAdmitida({ module: 'asignaciones', action: 'ejecutar' })).toBe(true)
+    expect(accionAdmitida({ module: 'pedidos', action: 'ejecutar' })).toBe(false)
+    expect(accionAdmitida({ module: 'empaque', action: 'ejecutar' })).toBe(false)
+    expect(accionAdmitida({ module: 'asignaciones', action: 'borrar' })).toBe(false)
+    expect(accionesEsperadasConEscritura('pedidos')).toEqual(['consultar', 'modificar'])
+  })
+
+  it('R2: el JSDoc del catalogo explica la accion ejecutar sin citar ficha ni requisito', () => {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    const parrafo = jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .find((bloque) => bloque.includes('asignaciones.ejecutar'))
+
+    expect(parrafo).toBeDefined()
+    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
+    expect(parrafo).not.toMatch(/QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i)
+  })
+
+  it('R3: el Administrador recibe asignaciones.ejecutar justo tras asignaciones.modificar y el resto no cambia', () => {
+    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+    const sinEjecutar = admin.filter((codigo) => codigo !== 'asignaciones.ejecutar')
+
+    expect(admin).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
+    expect(admin.indexOf('asignaciones.ejecutar')).toBe(admin.indexOf('asignaciones.modificar') + 1)
+    expect(sinEjecutar).toEqual([
+      'dashboard.consultar',
+      'inventario.consultar',
+      'inventario.modificar',
+      'recetas.consultar',
+      'recetas.modificar',
+      'unidades.consultar',
+      'unidades.modificar',
+      'proveedores.consultar',
+      'proveedores.modificar',
+      'pedidos.consultar',
+      'pedidos.modificar',
+      'usuarios.consultar',
+      'usuarios.modificar',
+      'asignaciones.consultar',
+      'asignaciones.modificar',
+      'terminados.consultar',
+      'clientes.consultar',
+      'clientes.modificar',
+      'documentos.consultar',
+      'documentos.modificar',
+    ])
+  })
+
+  it('R3: el Operador recibe asignaciones.ejecutar y conserva exactamente lo que tenia', () => {
+    const operador = SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] ?? []
+
+    expect(operador).toEqual(['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'])
+    expect(operador.filter((codigo) => codigo !== 'asignaciones.ejecutar')).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
+  })
+
+  it('R4: ni el Empacador ni el Maestro reciben asignaciones.ejecutar y el Empacador sigue igual', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+      'empaque.modificar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).not.toContain('asignaciones.ejecutar')
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).not.toContain('asignaciones.ejecutar')
+  })
+
+  it('R14: asignaciones.ejecutar no entra en ADMIN_EXCLUDED_PERMISSIONS, que no cambia', () => {
+    expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain('asignaciones.ejecutar')
+    expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual([
+      'empaque.modificar',
+      'empresas.consultar',
+      'empresas.modificar',
+    ])
   })
 })

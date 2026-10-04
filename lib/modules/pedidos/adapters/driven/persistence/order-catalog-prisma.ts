@@ -195,10 +195,18 @@ export async function listAliveOrderSummariesInCompany(
   ordering: OrderSummaryOrdering,
   page: number,
   pageSize?: number,
+  filter?: { readonly packedBy?: string },
 ): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
-    AND: [orderCompanyScope({ companyId }), { status: { in: [...statuses] }, deletedAt: null }],
+    AND: [
+      orderCompanyScope({ companyId }),
+      {
+        status: { in: [...statuses] },
+        deletedAt: null,
+        ...(filter?.packedBy === undefined ? {} : { packedBy: filter.packedBy }),
+      },
+    ],
   };
   const orderBy =
     ordering === 'finished_recent_first'

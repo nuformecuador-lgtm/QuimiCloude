@@ -6,21 +6,21 @@ completo.
 
 ## Bloque A — catálogo y migración
 
-- [ ] **T1. Catálogo y seed** (`lib/modules/identity/domain/permissions.ts`).
+- [x] **T1. Catálogo y seed** (`lib/modules/identity/domain/permissions.ts`).
   Añadir `asignaciones.ejecutar` a `PERMISSIONS` tras `asignaciones.modificar`; añadirlo a
   Administrador y Operador en `SEED_ROLE_PERMISSIONS`; JSDoc sin citas de fichas.
   Hecho: typecheck verde; `PermissionCode` incluye el literal.
-- [ ] **T2. Tests de catálogo y roles** — dep: T1.
+- [x] **T2. Tests de catálogo y roles** — dep: T1.
   Actualizar `tests/unit/identity/permissions.test.ts` (lista de códigos, entradas previas, regla
   de acción con `ejecutar` solo en `asignaciones`, módulos con escritura, listas exactas de Operador
   y Administrador, Empacador sin cambios), `seed-initial-access.test.ts` y
   `identity-seed.int.test.ts`. Sin relajar asertos ajenos.
   Hecho: tests nuevos/ajustados verdes; casos con `R1`, `R2`, `R3`, `R4`, `R14` en el nombre.
-- [ ] **T3. Migración de datos** [P con T2] — dep: T1.
+- [x] **T3. Migración de datos** [P con T2] — dep: T1.
   Crear `db/migrations/<ts>_execution_permission/{migration.sql,down.sql}` según `design.md > 1`,
   `<ts>` posterior a la última migración.
   Hecho: `pnpm run db:migrate` y `pnpm run db:rollback` aplican sin error en local.
-- [ ] **T4. Test de migración** — dep: T3.
+- [x] **T4. Test de migración** — dep: T3.
   `tests/integration/identity/execution-permission-migration.int.test.ts`, calcado de
   `packing-permission-migration.int.test.ts`: UP crea permiso y dos asignaciones, deja Empacador y
   Maestro sin él, idempotente; DOWN retira todo y nada más; literales del SQL == constantes TS.
@@ -59,7 +59,7 @@ completo.
   `asignaciones.ejecutar`+`terminados.consultar` → `['asignados','terminados']`; conjunto vacío →
   `['asignados']`; y `resolveAssignmentView('asignados', vistasDelEmpacador)` → `'terminados'`.
   Casos `R19`, `R19a`.
-- [ ] **T7c. Puerto de pedidos con filtro `packedBy`** [P con T6] — dep: ninguna.
+- [x] **T7c. Puerto de pedidos con filtro `packedBy`** [P con T6] — dep: ninguna.
   Parámetro opcional `filter` en `OrderCatalog.listAliveSummariesInCompany` y en su adaptador Prisma
   (`design.md > 3.5`); doble de tests actualizado.
   Hecho: `tests/unit/pedidos/order-catalog.test.ts` y
@@ -72,7 +72,7 @@ completo.
   con `{ packedBy: actor.id }`; con `ejecutar` lo llama sin filtro (resultado idéntico al de hoy).
   `tests/integration/asignaciones/finished-orders.int.test.ts`: dos empacadores, cada uno ve solo
   lo suyo. Casos `R20`, `R20a`.
-- [ ] **T7e. Elegibilidad sin cambios** [P] — dep: T1.
+- [x] **T7e. Elegibilidad sin cambios** [P] — dep: T1.
   Hecho: test en `tests/unit/asignaciones/list-responsible-candidates.test.ts` (o
   `responsible-eligibility`) con el conjunto del seed del Empacador leído de
   `SEED_ROLE_PERMISSIONS`: sigue siendo candidato. Caso `R22`.

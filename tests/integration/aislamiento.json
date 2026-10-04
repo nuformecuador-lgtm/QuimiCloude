@@ -23,6 +23,7 @@
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/documents-permissions-migration.int.test.ts",
+    "identity/execution-permission-migration.int.test.ts",
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
     "identity/maestro-migration.int.test.ts",

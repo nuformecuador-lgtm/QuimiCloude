@@ -72,6 +72,8 @@ export interface OrderCatalog {
    * decide el `ORDER BY`: `work_queue` es el mismo que `listAliveSummariesByIds`, extraido a
    * una constante compartida para que no diverjan; `finished_recent_first` ordena por fecha de
    * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
+   *
+   * `filter.packedBy` deja solo los pedidos de ese empacador; un `packedBy` nulo no entra.
    */
   listAliveSummariesInCompany(
     companyId: string,
@@ -79,6 +81,7 @@ export interface OrderCatalog {
     ordering: OrderSummaryOrdering,
     page: number,
     pageSize?: number,
+    filter?: { readonly packedBy?: string },
   ): Promise<Page<AssignedOrderSummary>>;
 
   /**

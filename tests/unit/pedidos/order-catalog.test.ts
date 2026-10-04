@@ -486,6 +486,42 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     expect(JSON.stringify(llamada.where)).not.toContain('"id"')
   })
 
+  it('R20: con `packedBy`, el WHERE de la pagina y el del total llevan empresa, estado y ese empacador', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 2, 10, { packedBy: 'emp-1' })
+
+    const esperado = {
+      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null, packedBy: 'emp-1' }],
+    }
+    const llamada = findMany.mock.calls[0]?.[0]
+    expect(llamada.where).toEqual(esperado)
+    expect(llamada.skip).toBe(10)
+    expect(llamada.take).toBe(10)
+    expect(count.mock.calls[0]?.[0]?.where).toEqual(esperado)
+  })
+
+  it('R20: con `packedBy`, el total y las paginas salen del recuento ya filtrado', async () => {
+    count.mockResolvedValue(3)
+
+    const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1, 2, {
+      packedBy: 'emp-1',
+    })
+
+    expect(pagina.total).toBe(3)
+    expect(pagina.totalPages).toBe(2)
+  })
+
+  it('R20: sin filtro, o con un filtro vacio, el WHERE no cambia y no acota por empacador', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1, undefined, {})
+
+    const sinFiltro = {
+      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null }],
+    }
+    expect(findMany.mock.calls[0]?.[0]?.where).toEqual(sinFiltro)
+    expect(findMany.mock.calls[1]?.[0]?.where).toEqual(sinFiltro)
+    expect(JSON.stringify(findMany.mock.calls[1]?.[0]?.where)).not.toContain('packedBy')
+  })
+
   it('con `work_queue`, el ORDER BY es IDENTICO al de listAliveSummariesByIds', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE', 'EN_CURSO'], 'work_queue', 1)
     const deTodaLaEmpresa = findMany.mock.calls[0]?.[0]?.orderBy
