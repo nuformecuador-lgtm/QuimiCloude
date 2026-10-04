@@ -94,7 +94,7 @@ completo.
 
 ## Bloque D — punta a punta y cierre
 
-- [ ] **T11. E2E del Empacador** — dep: T3, T7, T7b, T7d, T9, T10.
+- [x] **T11. E2E del Empacador** — dep: T3, T7, T7b, T7d, T9, T10.
   Nuevo caso (en `e2e/empaque.spec.ts` o `e2e/pedidos-asignados.spec.ts`): un Empacador responsable
   de un pedido `PENDIENTE` no lo ve en ninguna vista de `/asignacion`, no ve la pestaña
   «Mis asignados» (`?vista=asignados` aterriza en «Terminados») y `/asignacion/<id>` responde 404
