@@ -1151,3 +1151,59 @@ lo produce (un pedido o tiene todo apartado o nada).
 
 **Veredicto:** T10.E1 y R42 hechos; R43 y R32 verdes en Terminar, R25 sigue verde; typecheck y la
 guardia de ambito quedan rojos por el trabajo de T15 en curso.
+
+## T15 (lado de datos, R44) — backend_dev, 2026-10-03
+
+Commit `c63496e9`.
+
+Archivos:
+- `lib/modules/pedidos/domain/order-catalog.ts`: `AssignedOrderPresentationLine.packagingName: string | null`.
+- `lib/modules/asignaciones/domain/order-distribution-view.ts`: `OrderDistributionLineView.packagingName`,
+  que `toDistributionLines` copia de la línea.
+- NUEVO `lib/modules/pedidos/ports/order-summary-reader.ts` (`OrderSummaryReader`, `OrderSummaryRecord`
+  con `packagingProductId` por línea) y NUEVO `lib/modules/pedidos/domain/list-order-summaries.ts`
+  (`createListAliveSummariesByIds`, `createListAliveSummariesInCompany`, que resuelven los nombres con
+  `findPackagingNames` sobre `PackagingCatalog`, una llamada por página). Se exportan en el barrel.
+- `order-catalog-prisma.ts`: el `select` pide `packagingProductId`; `toAssignedOrderSummary` pasa a llamarse
+  `toOrderSummaryRecord`; `listAliveSummariesInCompany` pasa a llamarse `listAliveOrderSummariesInCompany`.
+  Las dos devuelven `OrderSummaryRecord`.
+- `lib/composition/index.ts`: `orderSummaryReader` y los dos métodos de `orderCatalog` cableados con las
+  fábricas de dominio y `packagingCatalog`.
+- `tests/guards/guard-ambito-empresa-pedidos.test.ts`: los dos métodos se añaden a
+  `METODOS_DELEGADOS_EN_DOMINIO`, con su regex exacta. Las funciones del adaptador que tocan la base siguen
+  dentro del barrido por `companyId`.
+- NUEVO `tests/helpers/order-summaries.ts` (`realOrderSummaries()`, el mismo cableado para los int).
+- Tests adaptados: 6 int de `asignaciones`, 3 int de `pedidos`, 5 unit de `asignaciones` y
+  `tests/unit/pedidos/order-catalog.test.ts`.
+
+Desviación de `design.md > 1.6 E2`: el diseño decía «lo rellena el adaptador de `pedidos`». Pero el
+adaptador no puede leer `products` (es de `inventario`, `guard-arquitectura-modulos` R16), y la guardia de
+ámbito no deja cablear un spread ni una lambda. Por eso el nombre se resuelve en `pedidos/domain`, igual
+que ya hacen `getOrder` y `listOrders`. El contrato (`packagingName` en los dos tipos) no cambia.
+
+Mapa:
+| R | Test |
+|---|---|
+| R44 | `tests/unit/asignaciones/order-distribution-view.test.ts` > `R44: copia el \`packagingName\` de la linea con envase y deja \`null\` en la linea antigua (R33)` |
+| R44 | `tests/unit/asignaciones/get-packing-order.test.ts` > `R44: la linea con envase llega a la pantalla de empaque con su nombre y la antigua con \`packagingName: null\` (R33)` |
+| R44 | `tests/unit/asignaciones/get-assigned-order-execution.test.ts` > `R44: la pantalla de ejecucion recibe el nombre del envase en la linea con envase y \`null\` en la antigua (R33)` |
+| R44 | `tests/unit/pedidos/order-catalog.test.ts` > `R44, R33: la linea con envase lleva su nombre, la antigua y la de un envase que no vuelve llevan null, en una sola llamada`, y `R33: una pagina sin envases no consulta el catalogo de envases` |
+| R44 | int `tests/integration/pedidos/order-repository.int.test.ts` > `R44, R33: la linea con envase lleva el nombre del envase y la antigua lleva null` |
+
+Salida real:
+- `vitest run --project node tests/unit/asignaciones tests/unit/pedidos`: `Test Files 94 passed (94)`,
+  `Tests 1748 passed | 3 skipped (1751)`.
+- `vitest run --project integration` (order-repository, order-catalog-company-summary,
+  finish-with-finished-goods y 5 int de asignaciones): `Test Files 8 passed (8)`, `Tests 66 passed (66)`
+  (copia de `QuimiCloude_QC195`).
+- `vitest run guard`: `Test Files 51 passed (51)`, `Tests 672 passed | 11 skipped (683)`.
+- `eslint` de los archivos tocados: limpio.
+- `pnpm run typecheck`: ROJO, 15 errores, todos `TS2741 packagingName` en fixtures de
+  `tests/unit/asignaciones-ui/**` (le toca a frontend_dev). Cero errores en `lib/`, `app/`, `components/`
+  y en los tests de backend.
+
+Nota: el commit `3072bac4` (T10.E1) se llevó un cambio intermedio mío en
+`finish-with-finished-goods.int.test.ts` (`createOrderSummaryReaders`). `c63496e9` lo reemplaza; entre los
+dos commits ese archivo no compila.
+
+**Veredicto:** T15 lado de datos hecho; R44 cubierto en unit e int; typecheck espera las fixtures de UI.
