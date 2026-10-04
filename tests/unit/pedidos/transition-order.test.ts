@@ -309,3 +309,33 @@ describe('createTransitionOrder', () => {
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 });
+
+describe('QC-195 — pasar a POR_EMPACAR consume solo la receta', () => {
+  it('R26: consumeForOrder recibe como productIds los productos de la receta, no los envases del reparto', async () => {
+    const { recipes } = catalogoDeRecetas([
+      { productId: 'p-1', productName: null, percentage: '60.00' },
+      { productId: 'p-2', productName: null, percentage: '40.00' },
+    ]);
+    const lockAliveById = vi.fn(async () =>
+      filaBloqueada({
+        status: 'EN_CURSO',
+        presentationLines: [{ presentationId: 'pres-1', packages: 40, packagingProductId: 'envase-1' }],
+      }),
+    );
+    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, setStatus: vi.fn(async () => 'ok' as const), setReservedAt: vi.fn() },
+      reservations: { consumeForOrder },
+      recipes,
+    });
+
+    await expect(
+      createTransitionOrder({ unitOfWork })('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+    ).resolves.toBe('ok');
+
+    expect(consumeForOrder).toHaveBeenCalledTimes(1);
+    expect(consumeForOrder).toHaveBeenCalledWith(expect.objectContaining({ productIds: ['p-1', 'p-2'] }));
+    const entrada = (consumeForOrder.mock.calls[0] as unknown as readonly [{ fallbackRequirement: readonly { productId: string }[] }])[0];
+    expect(entrada.fallbackRequirement.map((line) => line.productId)).toEqual(['p-1', 'p-2']);
+  });
+});

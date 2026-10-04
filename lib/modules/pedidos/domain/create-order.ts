@@ -4,7 +4,7 @@ import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
-import { buildRequirement } from './order-requirement';
+import { buildOrderRequirement } from './order-requirement';
 import { resolveDistribution } from './resolve-distribution';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
@@ -160,7 +160,12 @@ export function createCreateOrder(
       // transaccion: pedir una segunda conexion mientras esta retiene la suya desperdiciaria
       // una conexion del pool.
       const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
-      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
+      const requirement = buildOrderRequirement({
+        recipeLines: content?.lines ?? [],
+        quantity: data.quantity,
+        packagingLines: distribution.packagingLines,
+        phase: 'before_consumption',
+      });
 
       const outcome = await transaction.reservations.syncForOrder({
         orderId: order.id,

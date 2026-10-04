@@ -13,7 +13,7 @@
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 
 import { OrderNotFoundError } from './errors';
-import { buildRequirement } from './order-requirement';
+import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 
 import type { OrderScope } from './order-scope';
@@ -121,7 +121,12 @@ async function reviewOne(
     }
 
     const content = await transaction.recipes.findExecutionContentById(locked.recipeId, scope.companyId);
-    const requirement = buildRequirement(content?.lines ?? [], locked.quantity);
+    const requirement = buildOrderRequirement({
+      recipeLines: content?.lines ?? [],
+      quantity: locked.quantity,
+      packagingLines: packagingLinesOf(locked.presentationLines),
+      phase: 'before_consumption',
+    });
 
     const outcome = await transaction.reservations.syncForOrder({
       orderId: id,

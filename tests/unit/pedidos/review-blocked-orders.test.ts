@@ -333,3 +333,43 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
     expect(resultado.unblocked).toBe(1);
   });
 });
+
+describe('QC-195 reviewBlockedOrders — los envases del reparto', () => {
+  const ENVASE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const PRESENTACION = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+  function conReparto(): LockedOrderRow {
+    return bloqueado(PEDIDO_1, {
+      presentationLines: [
+        { presentationId: PRESENTACION, packages: 10, packagingProductId: ENVASE },
+        { presentationId: 'antigua', packages: 3, packagingProductId: null },
+      ],
+    });
+  }
+
+  it('R21: la necesidad que se evalua lleva la receta y los envases del reparto (las lineas antiguas no aportan)', async () => {
+    const m = montar({ filas: new Map([[PEDIDO_1, conReparto()]]) });
+
+    await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(entrada.requirement).toEqual([
+      { productId: PRODUCTO_X, quantity: '10' },
+      { productId: ENVASE, quantity: '10' },
+    ]);
+  });
+
+  it('R21: si falta un envase no se desbloquea: ni estado, ni importe, ni reserved_at', async () => {
+    const m = montar({
+      filas: new Map([[PEDIDO_1, conReparto()]]),
+      resultado: () => ({ kind: 'insufficient', productIds: [ENVASE] }),
+    });
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({ unblocked: 0, failed: [] });
+    expect(m.setStatus).not.toHaveBeenCalled();
+    expect(m.setIngredientsCost).not.toHaveBeenCalled();
+    expect(m.setReservedAt).not.toHaveBeenCalled();
+  });
+});

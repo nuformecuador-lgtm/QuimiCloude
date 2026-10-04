@@ -69,12 +69,15 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           // Con el cliente de ESTA transaccion (`scope.recipes`), no con el lector global: pedir
           // una segunda conexion mientras esta retiene la suya es espera o error bajo carga.
           const content = await scope.recipes.findExecutionContentById(locked.recipeId, companyId);
-          const requirement = buildRequirement(content?.lines ?? [], locked.quantity);
+          const recipeLines = content?.lines ?? [];
+          const requirement = buildRequirement(recipeLines, locked.quantity);
 
+          // Solo la receta: los envases del reparto siguen apartados hasta Terminar el empaque.
           const outcome = await scope.reservations.consumeForOrder({
             orderId: id,
             companyId,
             fallbackRequirement: requirement,
+            productIds: recipeLines.map((line) => line.productId),
             actorId,
             now,
           });

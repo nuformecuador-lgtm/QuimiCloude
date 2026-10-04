@@ -1266,3 +1266,71 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
     );
   });
 });
+
+describe('QC-195 — el alta aparta los envases del reparto', () => {
+  const MATERIA = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  function montarConEnvases(resultado: 'reserved' | 'insufficient') {
+    const cat = catalogoDeRecetas(
+      new Map([[RECETA_DE_A, [{ productId: MATERIA, productName: null, percentage: '100.00' }]]]),
+    );
+    const create = vi.fn(async () => filaCreada());
+    const setReservedAt = vi.fn(async () => undefined);
+    const setStatus = vi.fn(async () => 'ok' as const);
+    const setIngredientsCost = vi.fn(async () => 'ok' as const);
+    const syncForOrder = vi.fn(async () =>
+      resultado === 'reserved' ? ({ kind: 'reserved' } as const) : ({ kind: 'insufficient', productIds: [ENVASE_DE_A] } as const),
+    );
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create, setReservedAt, setStatus, setIngredientsCost },
+      reservations: { syncForOrder },
+      recipes: cat.recipes,
+    });
+    const createOrder = createCreateOrder({
+      unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: catalogoDeEnvases('1.0000'),
+      now: () => AHORA,
+    });
+    return { createOrder, create, setStatus, setReservedAt, syncForOrder };
+  }
+
+  const ALTA = {
+    recipeId: RECETA_DE_A,
+    quantity: '40',
+    unitId: UNIT_ID,
+    presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 40 }],
+  };
+
+  it('R15: la necesidad que se aparta lleva la receta y 40 envases por un reparto de 40 botellas', async () => {
+    const m = montarConEnvases('reserved');
+
+    await m.createOrder(ALTA, ACTOR_A);
+
+    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(entrada.requirement).toEqual([
+      { productId: MATERIA, quantity: '40' },
+      { productId: ENVASE_DE_A, quantity: '40' },
+    ]);
+    expect(m.syncForOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('R16, R17: si falta un envase y no se confirma, lanza order_would_block (la transaccion no deja nada)', async () => {
+    const m = montarConEnvases('insufficient');
+
+    expect(await codigoDelFallo(() => m.createOrder(ALTA, ACTOR_A))).toBe('order_would_block');
+    expect(m.setStatus).not.toHaveBeenCalled();
+  });
+
+  it('R17: con la confirmacion, el pedido queda BLOQUEADO y sin reserved_at', async () => {
+    const m = montarConEnvases('insufficient');
+
+    await m.createOrder({ ...ALTA, confirmBlocked: true }, ACTOR_A);
+
+    expect(m.setStatus).toHaveBeenCalledWith(filaCreada().id, 'PENDIENTE', 'BLOQUEADO', ACTOR_A.id, AHORA, { companyId: EMPRESA_A });
+    expect(m.setReservedAt).toHaveBeenCalledWith(filaCreada().id, null, { companyId: EMPRESA_A });
+  });
+});

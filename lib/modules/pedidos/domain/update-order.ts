@@ -8,7 +8,7 @@ import {
 import type { OrderStatus } from './order-classification';
 import { updateOrderSchema } from './order-input';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
-import { buildRequirement } from './order-requirement';
+import { buildOrderRequirement } from './order-requirement';
 import { resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
@@ -144,13 +144,15 @@ export function createUpdateOrder(
         { savedLines: locked.presentationLines },
       );
 
-      // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado
-      // por otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las
-      // lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido-. Se lee con
-      // `scope.recipes`, sobre el cliente de ESTA transaccion, para que la lectura vea la
-      // misma instantanea que acaba de bloquear `lockAliveById`.
+      // La receta se lee con el cliente de ESTA transaccion, para ver la misma instantanea que
+      // acaba de bloquear `lockAliveById`. La edicion solo llega antes de consumir la receta.
       const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
-      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
+      const requirement = buildOrderRequirement({
+        recipeLines: content?.lines ?? [],
+        quantity: data.quantity,
+        packagingLines: distribution.packagingLines,
+        phase: 'before_consumption',
+      });
 
       const result = await transaction.orders.updateAlive(
         id,

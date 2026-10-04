@@ -753,3 +753,52 @@ de `tests/baseline-rojos.json` (`recetas/module-contract`, `configuracion-ui/uni
 
 **Veredicto T6:** hecho; unit e integracion de pedidos verdes; gate rapido solo con los rojos del
 baseline; guardias verdes.
+
+## T7 — Alta, edicion y revision de bloqueados con envases (backend_dev, 2026-10-03)
+
+Archivos de produccion:
+- `create-order.ts`, `update-order.ts`, `review-blocked-orders.ts`: la necesidad sale de
+  `buildOrderRequirement({ recipeLines, quantity, packagingLines, phase: 'before_consumption' })`.
+  Alta y edicion usan los `packagingLines` de `resolveDistribution`; la revision de bloqueados, los
+  de las lineas de la fila bloqueada (`packagingLinesOf(locked.presentationLines)`). El aviso, el
+  `BLOQUEADO`, el rechazo en `EN_CURSO` y el paso `BLOQUEADO -> PENDIENTE` ya existian y no cambian.
+- **`transition-order.ts` (adelantado de T10):** `EN_CURSO -> POR_EMPACAR` consume con
+  `productIds` = productos de la receta. Motivo: desde T7 los envases quedan apartados desde el
+  alta, y `consumeForOrder` sin `productIds` consume **todo** lo apartado del pedido, envases
+  incluidos (R26 roto) y, si solo habia envases apartados, deja de usar el respaldo de la receta:
+  `finish-with-finished-goods` › «con importe nulo, se recalcula al Terminar…» se puso rojo (la
+  materia prima quedaba sin consumir, 100 en vez de 90). Lo que queda en T10 es el consumo de los
+  envases al Terminar.
+
+Tests: `tests/integration/pedidos/qc195-packaging-reservation.int.test.ts` (nuevo, censo `commit` en
+`tests/integration/aislamiento.json` con motivo), casos nuevos en `create-order.test.ts`,
+`review-blocked-orders.test.ts` y `transition-order.test.ts`.
+
+R -> test:
+| R | Test |
+|---|---|
+| R15 | int `qc195-packaging-reservation` › «R15: un pedido de 40 l en 40 botellas aparta 40 envases junto a la materia prima, en la misma operacion», «R15, R20: bajar los envases de una linea libera lo que sobra en la misma operacion»; `create-order.test.ts` › «R15: la necesidad que se aparta lleva la receta y 40 envases por un reparto de 40 botellas» |
+| R16 | int › «R16, R17: si el envase no alcanza, el alta avisa con order_would_block y no deja nada escrito», «R16, R17: con la confirmacion queda BLOQUEADO, sin nada apartado (ni la materia prima) y sin importe»; `create-order.test.ts` › «R16, R17: si falta un envase y no se confirma, lanza order_would_block…» |
+| R17 (alta y edicion completa) | int › los dos de arriba y «R17: editar un PENDIENTE con un envase que no alcanza avisa; con la confirmacion queda BLOQUEADO sin nada apartado»; `create-order.test.ts` › «R17: con la confirmacion, el pedido queda BLOQUEADO y sin reserved_at» |
+| R18 (edicion completa) | int › «R18: editar un EN_CURSO con un envase que no alcanza rechaza con insufficient_material y no cambia nada» |
+| R19 (edicion completa) | int › «R19: guardar un BLOQUEADO cuando ya hay envases lo deja PENDIENTE con todo apartado» |
+| R20 (edicion completa) | int › «R15, R20: bajar los envases…» |
+| R21 | int › «R21: la revision no desbloquea un pedido mientras falte un envase, y lo desbloquea cuando entra»; `review-blocked-orders.test.ts` › «R21: la necesidad que se evalua lleva la receta y los envases del reparto (las lineas antiguas no aportan)», «R21: si falta un envase no se desbloquea: ni estado, ni importe, ni reserved_at» |
+| R22 | int › «R22: cancelar y borrar un pedido liberan tambien lo apartado de sus envases» (la caducidad usa el mismo `releaseForOrder` sin filtro de producto que la cancelacion: `expire-stale-orders.ts`, sin cambio) |
+| R23 | int › «R23: apartar, liberar y editar los envases de un pedido no cambia lo que otro pedido tiene apartado» |
+| R26 | int › «R26: la materia prima se consume y los envases siguen apartados, con su existencia intacta»; `transition-order.test.ts` › «R26: consumeForOrder recibe como productIds los productos de la receta, no los envases del reparto» |
+
+Salida real:
+```
+$ pnpm exec vitest run --project integration tests/integration/pedidos/qc195-packaging-reservation.int.test.ts
+ Test Files  1 passed (1)        Tests  11 passed (11)
+$ pnpm exec vitest run --project integration tests/integration/pedidos tests/integration/asignaciones tests/integration/documentos/formula-import.int.test.ts
+ Test Files  46 passed (46)      Tests  407 passed (407)
+$ pnpm exec vitest run --project node tests/unit/pedidos
+ Test Files  61 passed (61)      Tests  1098 passed | 3 skipped (1101)   (antes de los casos de transition-order)
+$ pnpm exec vitest run --project node tests/unit/pedidos/transition-order.test.ts
+ Test Files  1 passed (1)        Tests  13 passed (13)
+$ pnpm exec tsc --noEmit -p .   -> 0 errores;  eslint (pedidos) -> 0 errores, 2 avisos preexistentes
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)      Tests  672 passed | 11 skipped (683)
+```
