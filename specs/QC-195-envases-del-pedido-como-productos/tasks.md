@@ -251,7 +251,7 @@ R35**; tests de `pedidos-ui` adaptados.
 
 ## Cierre
 
-### [ ] T16 — E2E `[depende de T1-T15]`
+### [x] T16 — E2E `[depende de T1-T15]`
 
 - Adaptar las E2E de `design.md > 8` sembrando envases. Nueva: pedido en litros con un envase de
   500 ml y otro de 1 l, 40 botellas apartadas, falta de envase con aviso y `BLOQUEADO`, cotización
@@ -262,7 +262,7 @@ R35**; tests de `pedidos-ui` adaptados.
 **Hecho cuando:** las E2E de pedidos, empaque, producto terminado, cotización, reserva y recetas
 verdes.
 
-### [ ] T17 — Cierre `[depende de todas]`
+### [x] T17 — Cierre `[depende de todas]`
 
 - `./init.sh` completo en verde.
 - `progress/impl_QC-195.md` con el mapa `R1..R44 -> test` sin huecos, y los tests de

@@ -1369,3 +1369,67 @@ Rojos heredados de `dev`, NO de esta feature (evidencia):
   Los tres hacen clic en la accion dentro de la fila; `527a9902` (en `origin/dev`, antes de la base `555c62f6`
   de esta rama) movio esas acciones a un menu de 3 puntos fuera de la fila. `git diff 555c62f6 HEAD` sobre
   esos tres archivos esta vacio: esta rama no los toca. No se arreglan aqui (ajeno al alcance).
+
+## Implementer — T17 cierre
+
+### `./init.sh` completo (punta 379b7bd6, maquina libre)
+
+- `Test Files  8 failed | 852 passed (860)`, `Tests  10 failed | 12041 passed | 128 skipped (12179)`.
+- `✓ los tres proyectos corrieron (ui, node, integration)` · `✓ tests: sin rojos nuevos (8 rojos, todos en el baseline de 8)` · `✓ todas las migraciones tienen down.sql` · `== init OK ==`.
+- Los 8 del baseline: configuracion-ui/unidades-viewport, configuracion-ui/usuarios-viewport, identity/account-status-scope, inventario/product-page, navegacion/pantallas-exigen-permiso, recetas/module-contract, recetas/scope, recetas-ui/recipe-page.
+- `e2e/versiones-de-receta.spec.ts` (adaptado en 379b7bd6) re-corrido por el implementer: `1 passed (16.6s)`.
+
+### Mapa R1..R44 -> casos añadidos por la rama (nombre del caso con R<n>; conteo y archivos principales)
+
+Generado con `git diff 555c62f6 HEAD -- tests e2e` sobre las lineas `it(`/`test(` nuevas (254 casos). Ningun R sin caso. El detalle por caso esta en las secciones de cada task arriba.
+
+| R | casos | archivos |
+|---|---|---|
+| R1 | 11 | unit/inventario-ui/envase-en-inventario.test.tsx, unit/inventario/create-product.test.ts, integration/inventario/qc195-packaging-product.int.test.ts |
+| R2 | 4 | integration/inventario/qc195-packaging-product.int.test.ts, unit/inventario/product-input.test.ts, unit/inventario/create-product.test.ts |
+| R3 | 4 | unit/inventario/create-product.test.ts, integration/inventario/qc195-packaging-product.int.test.ts |
+| R4 | 1 | integration/inventario/qc195-packaging-product.int.test.ts |
+| R5 | 4 | integration/inventario/qc195-packaging-constraints.int.test.ts, unit/inventario/schema/packaging-products-in-distribution-migration.test.ts |
+| R6 | 11 | unit/inventario-ui/envase-en-inventario.test.tsx, unit/inventario/create-product.test.ts, unit/pedidos-ui/order-distribution-field.test.tsx |
+| R7 | 10 | unit/inventario-ui/envase-en-inventario.test.tsx, unit/pedidos/update-order.test.ts, unit/pedidos/order-input.test.ts |
+| R8 | 14 | unit/pedidos-ui/packaging-select.test.tsx, unit/inventario/qc195-contrato-tipos.test.ts, unit/pedidos-ui/order-distribution-field.test.tsx |
+| R9 | 6 | unit/inventario/qc195-contrato-tipos.test.ts, unit/pedidos/resolve-distribution.test.ts, unit/inventario/product-prisma.test.ts |
+| R10 | 9 | unit/pedidos-ui/packaging-select.test.tsx, integration/inventario/qc195-packaging-catalog.int.test.ts, unit/pedidos-ui/order-distribution-field.test.tsx |
+| R11 | 23 | unit/pedidos/order-input.test.ts, unit/pedidos/resolve-distribution.test.ts, unit/pedidos/qc195-contrato-tipos.test.ts |
+| R12 | 6 | unit/pedidos-ui/order-distribution-field.test.tsx, unit/pedidos/resolve-distribution.test.ts, unit/pedidos/update-order-presentation-lines.test.ts |
+| R13 | 9 | unit/pedidos/resolve-distribution.test.ts, unit/pedidos/update-order.test.ts, unit/pedidos/create-order.test.ts |
+| R14 | 8 | integration/pedidos/order-content-copy.int.test.ts, unit/pedidos/update-order.test.ts, unit/pedidos/resolve-distribution.test.ts |
+| R15 | 7 | integration/pedidos/qc195-packaging-reservation.int.test.ts, unit/pedidos/update-order-presentation-lines.test.ts, unit/pedidos/resolve-distribution.test.ts |
+| R16 | 4 | integration/pedidos/qc195-packaging-reservation.int.test.ts, unit/pedidos/create-order.test.ts, e2e/envases-del-pedido.spec.ts |
+| R17 | 13 | integration/pedidos/qc195-packaging-reservation.int.test.ts, unit/pedidos/update-order-presentation-lines.test.ts, unit/pedidos/create-order.test.ts |
+| R18 | 4 | integration/pedidos/qc195-packaging-reservation.int.test.ts, unit/pedidos-ui/order-distribution-dialog.test.tsx |
+| R19 | 3 | integration/pedidos/qc195-packaging-reservation.int.test.ts, unit/pedidos/update-order-presentation-lines.test.ts |
+| R20 | 3 | integration/pedidos/qc195-packaging-reservation.int.test.ts, unit/pedidos/update-order-presentation-lines.test.ts |
+| R21 | 3 | unit/pedidos/review-blocked-orders.test.ts, integration/pedidos/qc195-packaging-reservation.int.test.ts |
+| R22 | 1 | integration/pedidos/qc195-packaging-reservation.int.test.ts |
+| R23 | 1 | integration/pedidos/qc195-packaging-reservation.int.test.ts |
+| R24 | 3 | unit/pedidos/update-order-presentation-lines.test.ts, unit/pedidos/order-requirement.test.ts, integration/pedidos/qc195-packaging-reservation.int.test.ts |
+| R25 | 9 | unit/pedidos/order-packing.test.ts, integration/pedidos/finish-with-finished-goods.int.test.ts, integration/inventario/reservation.int.test.ts |
+| R26 | 4 | unit/pedidos/transition-order.test.ts, integration/pedidos/qc195-packaging-reservation.int.test.ts, integration/inventario/reservation.int.test.ts |
+| R27 | 7 | unit/pedidos/order-cost.test.ts, unit/pedidos/quote-order-cost.test.ts, integration/pedidos/qc195-packaging-reservation.int.test.ts |
+| R28 | 5 | unit/pedidos/order-cost.test.ts, unit/pedidos/quote-order-cost.test.ts, integration/pedidos/qc195-packaging-reservation.int.test.ts |
+| R29 | 12 | unit/pedidos-ui/order-form-quote.test.tsx, unit/pedidos/quote-order-cost.test.ts, unit/pedidos/qc195-contrato-tipos.test.ts |
+| R30 | 5 | integration/inventario/qc195-packaging-catalog.int.test.ts, unit/pedidos/quote-order-cost.test.ts, unit/pedidos/order-cost.test.ts |
+| R31 | 3 | unit/pedidos/order-packing.test.ts, unit/pedidos/order-cost.test.ts |
+| R32 | 6 | unit/pedidos/order-requirement.test.ts, unit/pedidos/order-cost.test.ts, unit/inventario/schema/packaging-products-in-distribution-migration.test.ts |
+| R33 | 18 | unit/pedidos-ui/order-columns.test.tsx, unit/pedidos/get-order.test.ts, unit/pedidos/order-packing.test.ts |
+| R34 | 7 | unit/pedidos/resolve-distribution.test.ts, unit/pedidos/update-order-presentation-lines.test.ts, unit/pedidos/update-order.test.ts |
+| R35 | 18 | unit/pedidos-ui/order-distribution-field.test.tsx, unit/pedidos/update-order-presentation-lines.test.ts, unit/pedidos/update-order.test.ts |
+| R36 | 8 | unit/pedidos-ui/order-form.test.tsx, unit/pedidos-ui/order-distribution-field.test.tsx, unit/pedidos/update-order.test.ts |
+| R37 | 5 | unit/pedidos-ui/order-distribution-dialog.test.tsx, unit/pedidos/qc195-contrato-tipos.test.ts, unit/pedidos/order-actions-distribution.test.ts |
+| R38 | 7 | unit/pedidos-ui/packaging-select.test.tsx, unit/pedidos/update-order.test.ts, unit/pedidos-ui/order-distribution-field.test.tsx |
+| R39 | 4 | unit/recetas/qc195-envase-no-es-ingrediente.test.ts, e2e/envases-del-pedido.spec.ts |
+| R40 | 2 | unit/recetas/qc195-envase-no-es-ingrediente.test.ts |
+| R41 | 4 | unit/documentos/preview-formula-import.test.ts, unit/documentos/confirm-formula-import.test.ts |
+| R42 | 3 | unit/recetas/qc195-envase-no-es-ingrediente.test.ts |
+| R43 | 4 | unit/pedidos/order-packing.test.ts, integration/pedidos/finish-with-finished-goods.int.test.ts |
+| R44 | 11 | unit/asignaciones-ui/packing-order-screen.test.tsx, unit/asignaciones-ui/order-execution-screen.test.tsx, unit/shared/order-distribution-label.test.tsx |
+
+### Comentarios
+
+Barrido de las lineas añadidas en `lib/ app/ components/ db/`: ninguna cita de ficha, requisito (R<n>), P<n>/N<n> ni Enmienda.
