@@ -47,29 +47,19 @@ export const USER_STATUS_FILTER_OPTIONS: readonly { value: string; label: string
   USER_ACCOUNT_STATUSES.map((value) => ({ value, label: USER_ACCOUNT_STATUS_LABELS[value] }));
 
 /**
- * Nombre accesible de cada accion de fila, **compuesto con el nombre del usuario**. Con diez o
- * veinticinco filas en pantalla, «Editar» a secas no dice cual.
- *
- * Se exportan como funciones para que los tests localicen los botones por rol y nombre sin copiar
- * el copy (R41): quien decide el texto es este archivo, y sigue habiendo un solo sitio donde
- * cambiarlo.
+ * Etiqueta de cada item del menu de fila: solo el verbo, sin el nombre del usuario (decision humana
+ * puntual, 2026-10-04). El contexto de la fila lo da el nombre accesible del disparador del menu.
  */
-export function editUserLabel(displayName: string): string {
-  return `Editar al usuario ${displayName}`;
-}
+export const EDIT_USER_ACTION_LABEL = 'Editar';
 
-export function deleteUserLabel(displayName: string): string {
-  return `Eliminar al usuario ${displayName}`;
-}
+export const DELETE_USER_ACTION_LABEL = 'Eliminar';
 
 /**
  * La UNICA accion del estado de cuenta (R32): «cambiar estado», no un verbo por transicion. La
  * pantalla no traduce estados a verbos ni decide que transiciones son posibles, porque eso seria
  * regla de negocio escrita en la interfaz.
  */
-export function changeUserStatusLabel(displayName: string): string {
-  return `Cambiar el estado de la cuenta de ${displayName}`;
-}
+export const CHANGE_USER_STATUS_ACTION_LABEL = 'Cambiar estado';
 
 /**
  * Los textos del cierre de todas las sesiones de OTRA persona (QC-101 R7, R9, R13, R19;

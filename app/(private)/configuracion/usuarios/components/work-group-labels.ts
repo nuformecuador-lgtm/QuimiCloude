@@ -54,8 +54,8 @@ export const WORK_GROUP_ACTIONS_COLUMN_LABEL = 'Acciones';
  * Nombre accesible de cada accion de fila (R40, R41): la etiqueta NOMBRA al grupo, de modo que
  * quien usa lector de pantalla oye sobre cual va a actuar en vez de oir «editar» tres veces.
  *
- * Son funciones y no plantillas sueltas por el mismo motivo que `editUserLabel`: el dia que haya
- * i18n, el texto se sustituye en un solo sitio.
+ * Son funciones y no plantillas sueltas para que, el dia que haya i18n, el texto se sustituya en
+ * un solo sitio.
  */
 export function editWorkGroupLabel(name: string): string {
   return `Abrir el grupo ${name}`;

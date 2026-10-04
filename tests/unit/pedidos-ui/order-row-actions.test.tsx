@@ -163,6 +163,20 @@ describe('al abrir el disparador, el menu trae las CUATRO acciones y ninguna mas
     expect(screen.getByTestId(RESPONSABLES_TESTID)).toBeInTheDocument();
     expect(screen.getAllByRole('menuitem')).toHaveLength(4);
   });
+
+  // Decision humana puntual (2026-10-04): los items dicen solo el verbo; el numero queda en el
+  // disparador.
+  it('R41 — ningun item repite el numero del pedido', async () => {
+    const elPedido = pedido('PENDIENTE');
+    render(<OrderRowActions order={elPedido} />);
+
+    abrirMenu();
+    await screen.findByTestId('order-action-edit');
+
+    for (const item of screen.getAllByRole('menuitem')) {
+      expect(item.textContent).not.toContain(elPedido.numberText);
+    }
+  });
 });
 
 describe('con el pedido abierto, pulsar una accion emite su enganche con la fila recibida por props (R43)', () => {

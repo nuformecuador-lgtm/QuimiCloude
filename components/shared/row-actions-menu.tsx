@@ -32,6 +32,12 @@ import {
 /** Objetivo tactil minimo (44x44 px). Los primitivos miden 32 px de alto por defecto. */
 const TRIGGER_TOUCH_TARGET = 'min-h-11 min-w-11';
 
+/** El primitivo trae `px-1.5 py-1 gap-1.5` (~28 px): demasiado justo para tocar con el dedo. */
+const ITEM_TOUCH_TARGET = 'min-h-11 gap-2.5 px-3 py-2.5';
+
+/** Aire alrededor de los items; el primitivo trae `p-1`. */
+const CONTENT_PADDING = 'p-1.5';
+
 export type RowActionMenuItem = {
   readonly key: string;
   readonly label: string;
@@ -84,7 +90,7 @@ export function RowActionsMenu({
         <MoreVerticalIcon aria-hidden="true" />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="min-w-[200px]">
+      <DropdownMenuContent align="end" className={`min-w-[200px] ${CONTENT_PADDING}`}>
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -93,6 +99,7 @@ export function RowActionsMenu({
               variant={item.destructive ? 'destructive' : 'default'}
               disabled={item.disabled}
               data-testid={item.testId}
+              className={ITEM_TOUCH_TARGET}
               // El primitivo de Base UI (`components/ui/dropdown-menu.tsx`) expone `onClick`, no
               // `onSelect`: aqui se traduce el callback semantico del item a ese evento.
               onClick={item.onSelect}
