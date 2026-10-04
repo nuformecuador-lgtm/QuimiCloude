@@ -1700,3 +1700,17 @@ Veredicto: E6 implementado; la migracion ya no aborta y el relleno queda probado
   el relleno E6 se probo en la copia desechable `QuimiCloude_QC195_e6tmp` (borrada).
 
 Tasks marcadas [x]: T18, T19.
+
+## Implementer — F2.4, punta 943323d4 (m6 `fa9f2f3f` + merge de `origin/dev` `ffd5f4a8`, limpio)
+
+`./init.sh` completo: base `QuimiCloude_QC195` al dia (66 migraciones); typecheck paso; lint paso;
+`Test Files  8 failed | 860 passed (868)`, `Tests  10 failed | 12213 passed | 128 skipped (12351)`;
+`✓ los tres proyectos corrieron (ui, node, integration)` · `✓ tests: sin rojos nuevos (8 rojos, todos en el baseline de 8)` ·
+`✓ todas las migraciones tienen down.sql` · `== init OK ==`.
+
+E2E una a una (chromium, puerto 3117, `.next/dev/types` borrado antes de cada una):
+envases-del-pedido 2 passed · pedidos 2 passed · pedido-bloqueado 1 passed · reserva-de-material 1 passed ·
+producto-terminado 1 passed · pedidos-cotizacion 2 passed · aislamiento-pedidos 1 passed · empaque 1 passed ·
+pedido-en-varias-presentaciones 2 passed · recetas 3 passed · versiones-de-receta 1 passed · versiones-en-la-receta 1 passed.
+
+Pendiente de m6 fuera del codigo: la misma advertencia en E6 de `design.md` (la escribe el leader; el implementer no enmienda el spec).
