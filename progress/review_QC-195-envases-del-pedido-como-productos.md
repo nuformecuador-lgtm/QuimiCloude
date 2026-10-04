@@ -172,3 +172,84 @@ tiene, así que no lo empeora. Queda anotado para una ficha aparte.
 **RECHAZADO**, por un bloqueante: B1. «Reparto y unidad» no guarda el importe con los envases nuevos,
 lo que incumple R27/R29, la paridad de R19 con la edición completa y `design.md > 4.1`. Los menores
 m1-m4 no bloquean; m1 y m2 conviene cerrarlos en la misma vuelta.
+
+## Vuelta 2 (acotada a cd0336dc..91ee1b6f, ampliada a la Enmienda 2)
+
+Ampliación por regla: la corrección enmienda el spec (R45-R47, E5, P6-A, E6 en `design.md > 1.7`) y
+toca el esquema (`20261004120000_orders_packaging_cost`).
+
+### Verificación ejecutada
+
+| Comando | Resultado |
+|---|---|
+| typecheck | 0 errores |
+| lint | `0 errors, 8 warnings` (los mismos de la vuelta 1, ajenos) |
+| guardias | `44 passed`, `608 passed / 5 skipped` |
+| vitest related sobre `lib/ app/ db/` del diff + `tests/unit/pedidos` + `envase-en-inventario` | `304 passed / 5 failed`; los 5 están en `tests/baseline-rojos.json` (unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso, recipe-page) |
+| `.int` tocados (qc195-packaging-reservation, pedidos-constraints, order-repository, qc170 x2, finish-with-finished-goods, order-ingredients-cost, review-blocked-orders, order-crud, qc195-packaging-catalog, qc195-packaging-product) | `11 files / 179 tests passed` |
+
+### Estado de los hallazgos de la vuelta 1
+
+- **B1 — CERRADO.**
+  - `update-order-presentation-lines.ts` calcula y escribe el importe siempre que el pedido no queda `BLOQUEADO`, también en `BLOQUEADO -> PENDIENTE`. En `PENDIENTE`/`EN_CURSO`/`BLOQUEADO` usa `resolveStoredOrderCost` con `{ orderId }`, el mismo cálculo que `quoteOrderCost`.
+  - En `POR_EMPACAR` (R47) conserva la parte de ingredientes guardada (`ingredients_cost - packaging_cost`) y suma los envases recalculados.
+  - Cubierto por unit (PENDIENTE/EN_CURSO, «sin importe», `BLOQUEADO -> PENDIENTE`, queda `BLOQUEADO` -> null, y los tres casos de `POR_EMPACAR`) y por `.int` (importe igual a `quoteOrderCost` en PENDIENTE y EN_CURSO, R45 «sin importe», R46, y R47 distinto de la cotización).
+- **m1 — CERRADO.** «R30 — un lote de envase sin costo unitario no entra en el promedio…» (`qc195-packaging-catalog`). También «R6 — con una unidad propia de la empresa llamada «unidad» y símbolo «u»…» (`qc195-packaging-product`).
+- **m2 — CERRADO.** El design anota la resolución de `packagingName` en el dominio (§5) y añade `module-contract.test.ts` y `e2e/versiones-de-receta.spec.ts` a §8.
+- **m3 — CERRADO.** El comentario de `consumeForOrder` en `reservation.ts` dice que el respaldo no se decide producto a producto. Sin citas de ficha.
+- **m4 — CERRADO.** `inputMode="text"` solo para el lote de envase, que trae el signo menos en iOS; el resto sigue en `decimal`. Va sin `pattern`, con motivo: la validación nativa taparía el aviso propio de envases enteros. `sanitizeDeltaInput` sigue filtrando a dígitos y signo, y el aviso de enteros queda. Dos tests de UI fijan el atributo y conservan el negativo. El campo mantiene `text-base` y el target de 44 px.
+
+### Enmienda 2: trazabilidad R45-R47
+
+| R | Tests |
+|---|---|
+| R45 | unit `update-order-presentation-lines.test.ts`: `it.each(PENDIENTE, EN_CURSO)`, «R45: un envase sin lote con costo deja el pedido sin importe», «R45, R17: si queda BLOQUEADO el importe es null…»; `.int` `qc195-packaging-reservation`: `it.each(PENDIENTE, EN_CURSO)`, «R45: si el envase nuevo no tiene lote con costo…» |
+| R46 | unit «R46: BLOQUEADO -> PENDIENTE escribe el importe calculado…»; `.int` «R46, R19: un BLOQUEADO que el diálogo desbloquea queda PENDIENTE con el importe de quoteOrderCost» |
+| R47 | unit, los tres casos de `POR_EMPACAR` (25 - 5 + 1.2; sin importe guardado; envases sin importe); `.int` «R47: en POR_EMPACAR, el importe es la parte de ingredientes guardada más los envases nuevos, y no el de quoteOrderCost»; esquema y migración: `orders-packaging-cost-migration.test.ts` (6 casos), `pedidos-schema.test.ts`, `pedidos-constraints` (CHECK 23514), `order-repository` (`setIngredientsCost` con las dos columnas) |
+
+El mapa R1-R44 de la vuelta 1 sigue valiendo. R19, R27, R29 y R31 siguen verdes (`.int` de arriba).
+
+### Migración `20261004120000_orders_packaging_cost`
+
+- Columna `DECIMAL(14,4)` anulable y sin default, en `db/schema.prisma` con su comentario. El paréntesis de RLS (`NO FORCE`/`FORCE`) abarca `orders` y `order_presentation_lines`.
+- Relleno según E6: primero pone a `NULL` el importe de los pedidos con importe y con alguna línea con envase; después pone `packaging_cost = 0` donde hay importe. Es exacto: antes de esta ficha el importe no incluía envases. No aborta.
+- El CHECK `orders_packaging_cost_matches_ingredients_cost` exige que las dos columnas sean `NULL` juntas o tengan valor juntas.
+- **`down.sql`.** Quita el CHECK y la columna, y no restaura los totales que el UP dejó a `NULL`. **Es aceptable y no bloquea.**
+  - Las líneas con envase nacen en `20261003130000`, de esta misma ficha, así que en una base desplegada desde `dev` el UP no anula nada.
+  - Solo pierde datos en bases de desarrollo de esta rama, y esos pedidos se costean igual al Terminar (R31).
+  - Pero el comentario del `down.sql` («quitar el desglose no cambia ningún importe») es cierto solo para el DOWN, y ni el `down.sql` ni E6 dicen que el UP es irreversible en esas filas. Hay que declararlo (m6).
+
+### Doble escritura `ingredients_cost`/`packaging_cost`
+
+Todo lo que escribe el importe pasa por `costColumns`/`StoredOrderCost` del adaptador. Revisé estos
+puntos:
+- `insertAliveOrder`: alta.
+- `updateAliveOrder`: edición completa.
+- `setAliveOrderIngredientsCost`: lo usan la revisión de bloqueados, el `null` al bloquear en el alta, en la edición y en «Reparto y unidad», y el importe de «Reparto y unidad».
+
+Busqué las escrituras de `ingredients_cost`/`ingredientsCost:` en `lib/`, `e2e/`, `tests/integration`,
+`scripts` y `db`: no hay otra. Lo demás son lecturas, y `finishPackingAlive` no escribe el importe.
+Ninguna siembra de `e2e/` ni de `.int` escribe `ingredientsCost` a mano. El CHECK garantiza el resto
+en la base. **Sin huecos.**
+
+### Decisión del implementer: el importe se calcula DENTRO de la transacción
+
+**Aceptable; no bloquea.**
+- Es correcto: los catálogos leen lo confirmado. Con `excludeOrderId` lo apartado por el propio pedido cuenta como disponible igual dentro que fuera. La receta y la cantidad salen de la fila ya bloqueada, así que no hay carrera con otra edición; fuera habría que releerlas y compararlas bajo el candado, como hace `review-blocked-orders`.
+- Hay precedente: Terminar (`order-packing.ts`) ya llama a `resolveLotCost` con los lectores globales dentro de `unitOfWork.run`.
+- El coste: mientras la transacción retiene su conexión, `resolveStoredOrderCost` pide otras (en paralelo) al pool, el riesgo que el comentario de `transition-order.ts` describe. Queda como m7.
+- El design (§1.7) y T18 siguen diciendo **«fuera de la transacción»**: hay que alinearlos con lo construido (m5).
+
+### Hallazgos nuevos
+
+- **m5 — menor.** `design.md > 1.7` («el importe se calcula **fuera** de la transacción») y la viñeta de T18 en `tasks.md` contradicen el código, que lo calcula dentro con motivo. Hay que actualizar el design con la decisión y su porqué.
+- **m6 — menor.** Hay que declarar en el comentario de `down.sql` (y en E6) que el DOWN no repone los importes que el UP anuló en pedidos con líneas con envase, y que eso solo puede pasar en bases de desarrollo de esta rama.
+- **m7 — menor.** «Reparto y unidad» lee los catálogos de costo (varias conexiones en paralelo) mientras la transacción retiene la suya. Igual que Terminar, que ya lo hace. Si el pool se queda corto bajo carga, es el primer sitio a mirar. Sin acción en esta ficha; anotar en `progress/current.md > Deudas`.
+
+Sin regresiones: los R1-R44 que tocan los archivos del diff siguen verdes.
+
+### Veredicto vuelta 2
+
+**OK.** Cerrados B1, m1, m2, m3 y m4. Los nuevos m5, m6 y m7 son menores y no bloquean: m5 y m6 son
+texto (design/`down.sql`) y pueden ir en el cierre; m7 es una deuda que se anota. Quedan para F2.4 el
+`./init.sh` completo y las E2E.
