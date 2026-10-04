@@ -915,4 +915,33 @@ describe('StepReader — espera minima por paso', () => {
 
     expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 3');
   });
+
+  it('en "ejecucion", retroceder varias veces sin esperar deja un solo anillo y un solo contador', () => {
+    vi.useFakeTimers();
+    render(
+      <StepReader
+        steps={[...TRES_PASOS_SIN_ITEMS, PASO_SIN_ITEMS_A]}
+        onFinish={vi.fn()}
+        title="Receta de prueba"
+        mode="ejecucion"
+        minStepSeconds={5}
+      />,
+    );
+
+    for (let paso = 0; paso < 3; paso += 1) {
+      avanzarReloj(5000);
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+    }
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 4 de 4');
+
+    for (let paso = 0; paso < 3; paso += 1) {
+      avanzarReloj(1000);
+      fireEvent.click(screen.getByTestId('step-reader-previous'));
+    }
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 4');
+
+    const motivo = screen.getByTestId('step-reader-wait-reason');
+    expect(screen.getAllByTestId('step-reader-wait-ring')).toHaveLength(1);
+    expect(within(motivo).getAllByTestId('countdown-timer')).toHaveLength(1);
+  });
 });
