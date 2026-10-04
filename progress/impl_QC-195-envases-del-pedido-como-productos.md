@@ -1262,3 +1262,71 @@ Notas para el reviewer:
 - Pregunta abierta (sin cambio): `consumeForOrder` usa el respaldo solo si no hay nada apartado de ninguno
   de los `productIds`; un estado mixto (envase-ingrediente con apartado + envase normal sin apartado) no
   tomaria el normal del disponible. La aplicacion no produce ese estado (todo o nada apartado).
+
+## T16 — E2E con envases en el reparto (frontend_dev, 2026-10-04) — commit `7fed225e`
+
+Escritas y adaptadas, **no ejecutadas** (las corre el implementer, una a una, con `.next/dev/types`
+borrado). Comprobado: `pnpm run typecheck` sin errores, `eslint e2e tests/guards/guard-identificador-de-request.test.ts`
+sin avisos, y las guardias que recorren `e2e/` en verde (`guard-identificador-de-request`,
+`data-table-alcance`, `inventario/scope`, `pedidos/scope`, `clientes/scope`, `grupos/alcance`,
+`guard-e2e-landing`, `guard-editor-aislado`, `catalogo-sin-total-fijo`, `guard-dobles-e2e`,
+`guard-tipos-de-producto`: `Test Files 11 passed (11)`).
+
+Ayudantes nuevos (no son `.spec.ts`, ninguna guardia los lista):
+- `e2e/helpers/packaging.ts`: `seedPackaging` (PACKAGING con presentacion fija, `unit_id` = la unidad
+  de sistema `unidad`, existencia entera, un lote **sin** presentacion y su asiento `opening`, por
+  Prisma como el resto de la siembra de `e2e/`), `findPackageUnitId`, `netReservedInBatch`, `batchStock`.
+- `e2e/helpers/order-distribution.ts`: `addPackagingLine`/`searchPackagingOption` sobre
+  `packaging-select` y `packaging-option[data-product-id]`, `packagingLine`
+  (`order-distribution-line[data-packaging-product-id]`) y `openOrderRowMenu` para el menu de 3 puntos.
+
+Archivos:
+
+| E2E | Que cambia y por que |
+|---|---|
+| `e2e/envases-del-pedido.spec.ts` (nuevo) | Recorrido de la ficha: pedido de 30 l con 40 botellas de 500 ml (ml) y 10 garrafas de 1 l (l) elegidas en «Reparto en envases»; cotizacion `$ 300.00` → `$ 332.00` al anadir el reparto e importe guardado `332.0000`; lineas con envase, presentacion y contenido copiados; 40 y 10 apartados con la materia prima. Segundo pedido de 6 garrafas con 5 libres: el selector muestra «Disponible: 5 envases», la cotizacion queda en `—`, el alta abre el aviso y confirmado queda `BLOQUEADO` sin nada apartado ni importe. Finalizar consume la materia prima y deja los envases apartados; la ejecucion y el empaque nombran los envases; Terminar los consume (100→60, 15→5) y nacen dos lotes de producto terminado. Segundo caso: el selector de ingredientes de la receta nueva no ofrece el envase y si la materia prima. |
+| `e2e/pedidos.spec.ts` | Siembra un envase con la presentacion del fixture y lo elige en el selector de envases; el reparto guardado lleva `[packagingProductId, presentationId]`; la celda del listado dice `12 × <envase>`. La limpieza borra asientos, lote y envase (antes de la presentacion). |
+| `e2e/reserva-de-material.spec.ts` | Siembra un envase con existencia de sobra (lo que compite sigue siendo la materia prima) y lo elige en el alta; el nombre del envase no contiene el del producto, asi que la busqueda de Inventario sigue trayendo una fila. |
+| `e2e/producto-terminado.spec.ts` | El envase se siembra con la presentacion SIN contenido; el selector solo lo ofrece despues del paso 1 (contenido por la pantalla). Tras Terminar, el lote del envase baja en 50. |
+| `e2e/pedidos-cotizacion.spec.ts` | Envase de 2,45 en la linea del reparto: la cotizacion pasa de `$ 12,752.55` a `$ 12,755.00` al anadirlo, se guarda `12755.0000` y la edicion reabierta muestra `$ 12,755.00`. |
+| `e2e/aislamiento-pedidos.spec.ts` | Envase de la empresa A para el reparto del alta; limpieza de asientos, lotes y productos por empresa. |
+| `e2e/empaque.spec.ts` | La linea sembrada por Prisma lleva `packagingProductId` (sin apartado: el pedido nace `EN_CURSO` por Prisma); tras Terminar el lote del envase baja en 3 (respaldo del disponible). |
+| `e2e/pedido-en-varias-presentaciones.spec.ts` | Un envase por presentacion (1 l y 0,5 l); `addDistributionLine` elige el envase y comprueba la linea por su presentacion; las lineas del empaque dicen `4 × <envase>`; tras Terminar, los dos lotes de envase bajan en 4 y 6. |
+| `e2e/pedido-bloqueado.spec.ts` | **Sin cambios.** Su pedido no lleva reparto (solo receta y unidad) y el `presentation-select` que usa es el del alta de lote en Inventario, de un producto de tipo materia prima, que esta ficha no cambia. |
+| `tests/guards/guard-identificador-de-request.test.ts` | Alta de `envases-del-pedido.spec.ts` en `E2E_ESPERADOS`. El nuevo no referencia `data-table`, asi que `data-table-alcance` no cambia. |
+
+**Fuera del alcance de la ficha, pero necesario para que estas E2E pasen:** el menu de 3 puntos de
+`527a9902` (en `dev` antes de esta rama) movio las acciones de la fila de pedidos a un menu que se
+monta fuera de la fila y quito el parrafo `order-row-actions-reason`. Las E2E tocadas buscaban
+`order-action-*` dentro de la fila, asi que estaban rotas de partida. Ahora abren el menu con
+`openOrderRowMenu` (en `pedidos`, `reserva-de-material`, `pedidos-cotizacion`, `aislamiento-pedidos`,
+`empaque` y `pedido-en-varias-presentaciones`); en `empaque` se quita el aserto del motivo visible, que
+ya no existe. **No tocadas y con el mismo problema** (no estan en la lista de T16):
+`e2e/pedidos-busqueda.spec.ts`, `e2e/pedidos-responsables.spec.ts`, `e2e/pedidos-terminados.spec.ts`.
+
+Mapa R → E2E (`e2e/envases-del-pedido.spec.ts`, caso «R8, R10, R14, R15, R16, R17, R25, R26, R27,
+R28, R29, R44 - pedido en litros…» salvo donde se dice):
+
+| R | Caso |
+|---|---|
+| R8 | Pedido en l: el selector ofrece el envase de 500 ml (ml) y el de 1 l |
+| R10 | Opcion con «Disponible: 5 envases»; se elige y se anade aunque no alcance |
+| R14 | Lineas con `packagingProductId`, `presentationId` y `presentationContent` del envase; tambien `pedidos.spec.ts` |
+| R15 | 40 y 10 envases apartados con la materia prima |
+| R16, R17 | Segundo pedido: aviso, sin escribir antes de confirmar; `BLOQUEADO` sin nada apartado ni importe |
+| R25 | Terminar consume 40 y 10 y no queda nada apartado; tambien `producto-terminado`, `empaque` y `pedido-en-varias-presentaciones` |
+| R26 | Tras Finalizar: materia prima consumida, envases intactos y apartados |
+| R27, R29 | Cotizacion `$ 300.00` → `$ 332.00` con el reparto e importe guardado igual; tambien `pedidos-cotizacion.spec.ts` |
+| R28 | Cotizacion `—` con 6 garrafas y 5 libres |
+| R36 | Todas las adaptadas eligen por el selector de envases de «Reparto en envases» |
+| R39 | Caso «R39 - el selector de ingredientes de la receta no ofrece un envase…» (lado de interfaz; el rechazo `action_not_allowed` del servidor esta en unit) |
+| R44 | Etiqueta de la ejecucion y lineas del empaque con el nombre del envase; tambien `pedido-en-varias-presentaciones.spec.ts` |
+
+Dudas para quien las corra:
+- `«Disponible: 5 envases»` asume que `ProductView.available` descuenta lo apartado por otros pedidos
+  (es lo que pinta la opcion). Si cuenta existencia, el aserto falla y hay que mirar cual es el dato.
+- R28 (`—`) asume que el costo de envases de un pedido nuevo cuenta el disponible sin lo apartado por el
+  primero (5 < 6).
+- `toBeDisabled()` sobre un item del menu de Base UI se apoya en su `aria-disabled`.
+- Los envases de los fixtures se siembran por Prisma con el mismo estado que deja el alta real (T2);
+  no pasan por `createWithFirstBatch`.
