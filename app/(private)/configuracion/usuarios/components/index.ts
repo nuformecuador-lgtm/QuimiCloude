@@ -155,11 +155,14 @@ export {
   USER_ROLES_ERROR_TESTID,
   USER_SHEET_TESTID,
   USER_USERNAME_FIELD,
+  USER_USERNAME_SUGGESTION_APPLY_TESTID,
+  USER_USERNAME_SUGGESTION_TESTID,
   UserForm,
   type UserFieldName,
   type UserFormEndSessions,
   type UserFormProps,
 } from './user-form';
+export { nextUsernameCandidate, usernameFromNames } from './username-from-names';
 export {
   USER_SHEET_ERROR_CODE_TESTID,
   USER_SHEET_ERROR_TESTID,
