@@ -2,7 +2,8 @@
 
 > Escrito por `spec_author` en F1.2 y rehecho con las decisiones de F1.4 (2026-10-03): P1 = A
 > (`unidad`, `u`), P2 = A, P3 = b, N1 y N7 = alternativa, el resto = recomendación
-> (`design.md > 1`). **P4 decidida 2026-10-03 (A)**: T11 desbloqueada. Ninguna task empieza antes de la
+> (`design.md > 1`). **P4 decidida 2026-10-03 (A)**: T11 desbloqueada. **Enmienda 1 (F2.1,
+> 2026-10-03)**: R42 en T11, R43 en la nueva T10.E1, R44 en T15 ampliada (`design.md > 1.6`). Ninguna task empieza antes de la
 > aprobación del spec.
 >
 > **Dos carriles en paralelo.** `backend_dev`: TC, T1-T11. `frontend_dev`: T12-T15. Las tasks de
@@ -153,16 +154,39 @@ R23**.
 **Hecho cuando:** integración verde para **R25, R26**, **R14** (alta en la presentación copiada) y
 **R33** (línea antigua termina como hoy).
 
+#### [ ] T10.E1 — Enmienda 1 (F2.1, 2026-10-03): sin doble consumo `[depende de T10]`
+
+Reabre T10 en lo que toca a R43 (`design.md > 1.6`, E3 y E4).
+
+- `order-packing.ts`: el respaldo (`fallbackRequirement`) de Terminar lleva solo los envases que
+  **no** son ingrediente de la receta del pedido. Un envase que es también ingrediente se consume
+  solo por lo que siga apartado; sin nada apartado, no se toca su disponible y Terminar no falla por
+  él. Lo de hoy («consumir del disponible un envase sin apartado») queda solo para los envases que no
+  son ingrediente, y nunca para las líneas antiguas, que no aportan nada (R32).
+- `insufficient_material` sale con el texto del catálogo; no se añade mensaje propio (E4).
+- Test de integración que lo fija, sembrando el caso en la base (la aplicación no lo produce, ver
+  la nota de R43): receta con un envase como ingrediente y el mismo envase en el reparto; pasar a
+  `POR_EMPACAR` consume lo apartado de ese envase; Terminar no consume nada más de él, no baja su
+  disponible ni otros lotes y termina en `ENTREGADO`. Caso hermano: si en `POR_EMPACAR` se editó el
+  reparto y quedó algo apartado del envase, Terminar consume exactamente eso.
+- Test que fija que una línea antigua no consume nada al Terminar (R32).
+
+**Hecho cuando:** verdes **R43** (los dos casos) y **R32** en Terminar; los tests de R25 siguen
+verdes.
+
 ### [ ] T11 — El envase no es ingrediente `[depende de T0 y de P4]` `[P con T1-T10]`
 
 - `create-recipe.ts`, `create-recipe-version.ts`, `update-recipe.ts`, `update-recipe-version.ts`,
   `preview-formula-import.ts`, `confirm-formula-import.ts`: rechazan o excluyen PACKAGING con
   `action_not_allowed` (`design.md > 3.5`), con una sola función de tipos elegibles del contrato de
   `inventario`.
-- Lo que P4 decida sobre las recetas que ya tienen un envase (líneas existentes y versiones copiadas).
+- P4-A concretado por la Enmienda 1 (R42): al crear una versión, una línea PACKAGING que la
+  original ya tenía pasa (copiada o indicada); una que la original no tenía se rechaza con
+  `action_not_allowed`. Misma diferencia de conjuntos que la edición (`update-recipe.ts:91-106`).
 
-**Hecho cuando:** unit verdes para **R39, R40, R41** y el requisito de P4; los casos de
-FINISHED_PRODUCT siguen verdes sin tocar; `guard-tipos-de-producto` verde.
+**Hecho cuando:** unit verdes para **R39, R40, R41, R42** (versión copiada con envase de la
+original: acepta; versión con envase nuevo: `action_not_allowed`); los casos de FINISHED_PRODUCT
+siguen verdes sin tocar; `guard-tipos-de-producto` verde.
 
 ## Carril frontend (dependen solo de TC)
 
@@ -210,8 +234,20 @@ R35**; tests de `pedidos-ui` adaptados.
 
 - Ficha, listado, pantalla de empaque y de ejecución pintan `packagingName` y, si es `null`, la
   presentación como hoy.
+- **Ampliada por la Enmienda 1 (E2, R44):** `AssignedOrderPresentationLine`
+  (`lib/modules/pedidos/domain/order-catalog.ts:177`) y `OrderDistributionLineView`
+  (`lib/modules/asignaciones/domain/order-distribution-view.ts:9`) ganan `packagingName: string | null`.
+  El lado de datos (rellenarlo en el adaptador de `pedidos` y copiarlo en `toDistributionLines`) lo
+  hace `backend_dev` dentro de esta misma task, antes de la UI. Pantallas:
+  `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx`,
+  `app/(private)/asignacion/[id]/components/order-execution-screen.tsx` y
+  `components/shared/order-distribution-label.tsx` (las columnas de listado de `asignacion` la usan).
+- Tests: `tests/unit/asignaciones/order-distribution-view.test.ts` (copia `packagingName`, `null` en
+  línea antigua), `tests/unit/asignaciones/get-packing-order.test.ts` y
+  `get-assigned-order-execution.test.ts`, y `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`
+  y `order-execution-screen.test.tsx` (pinta el envase; con `null`, la presentación).
 
-**Hecho cuando:** unit de UI verdes para **R33** en la interfaz.
+**Hecho cuando:** unit verdes para **R33** y **R44** en datos e interfaz.
 
 ## Cierre
 
@@ -229,7 +265,7 @@ verdes.
 ### [ ] T17 — Cierre `[depende de todas]`
 
 - `./init.sh` completo en verde.
-- `progress/impl_QC-195.md` con el mapa `R1..R41 -> test` (más el de P4) sin huecos, y los tests de
+- `progress/impl_QC-195.md` con el mapa `R1..R44 -> test` sin huecos, y los tests de
   `design.md > 8` reescritos con su motivo.
 - Limpieza de comentarios en las líneas tocadas.
 
@@ -242,14 +278,16 @@ verdes.
 | R1 | T1, T2, T14 | R15 | T6, T7, T8 | R29 | T9, T13 |
 | R2 | T2 | R16 | T7 | R30 | T9 |
 | R3 | T2 | R17 | T7, T8, T13 | R31 | T9 |
-| R4 | T2 | R18 | T7, T8 | R32 | T1 |
+| R4 | T2 | R18 | T7, T8 | R32 | T1, T10.E1 |
 | R5 | T1 | R19 | T7, T8 | R33 | T6, T10, T15 |
 | R6 | T2, T14 | R20 | T8 | R34 | T6 |
 | R7 | T2, T14 | R21 | T7 | R35 | T6, T13 |
 | R8 | T4, T12 | R22 | T7 | R36 | T13 |
 | R9 | T4 | R23 | T7 | R37 | T13 |
 | R10 | T4, T12 | R24 | T8 | R38 | T4, T12 |
-| R11 | T6 | R25 | T10 | R39 | T11 |
+| R11 | T6 | R25 | T10, T10.E1 | R39 | T11 |
 | R12 | T6 | R26 | T10 | R40 | T11 |
 | R13 | T6 | R27 | T9 | R41 | T11 |
-| R14 | T6, T10 | R28 | T9 | P4 | T11 |
+| R14 | T6, T10 | R28 | T9 | R42 | T11 |
+| | | | | R43 | T10.E1 |
+| | | | | R44 | T15 |

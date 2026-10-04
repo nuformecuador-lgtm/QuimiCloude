@@ -144,9 +144,11 @@ consumida `[D4]` `[P3]`.
 misma transacción que da de alta el producto terminado, los envases que el pedido tiene apartados;
 SI el disponible no alcanza para consumirlos todos, ENTONCES DEBE rechazar Terminar con
 `insufficient_material` sin mover el estado ni dar de alta producto terminado `[D2]` `[D4]` `[P3]`.
+*(Acotado por la Enmienda 1: no se aplica a lo que R43 deja sin consumir.)*
 
 **R26.** CUANDO un pedido pase a `POR_EMPACAR`, el sistema DEBE consumir sus materias primas como
-hoy y NO DEBE consumir sus envases `[P3]`.
+hoy y NO DEBE consumir sus envases `[P3]`. *(Enmienda 1: un envase que fuera también ingrediente
+se consumiría aquí como ingrediente; ver R43.)*
 
 ### E. Costo
 
@@ -231,6 +233,35 @@ nombra uno, ENTONCES DEBE rechazarla con `action_not_allowed` sin crear la recet
 > Qué pasa con las recetas que **ya** tienen un ingrediente PACKAGING —al editarlas, al crear una
 > versión copiando sus líneas, y al pedir con ellas— queda abierto como **P4** (abajo): R40 solo
 > fija las líneas que la receta no tenía.
+
+### Enmienda 1 (F2.1, 2026-10-03)
+
+> Decidida por el humano el 2026-10-03 sobre cuatro preguntas que salieron al implementar. No toca
+> el Alcance ni D1-D7, P1-P4 o N1-N10. Detalle en `design.md > 1.6`.
+
+**R42.** CUANDO se cree una versión de receta, SI una línea copiada de la original nombra un producto
+PACKAGING que la original ya tenía, ENTONCES el sistema DEBE aceptarla; y SI una línea nombra un
+producto PACKAGING que la original no tenía, ENTONCES DEBE rechazar la versión con
+`action_not_allowed` sin escribir nada. Es la misma exención que la edición `[N7]` `[P4]`.
+
+**R43.** CUANDO se termine el empaque de un pedido cuya receta —conservada por P4— tiene como
+ingrediente el mismo envase que una línea de su reparto, el sistema DEBE consumir de ese envase solo
+lo que el pedido siga teniendo apartado de él; SI no le queda nada apartado —porque se consumió con
+las materias primas al pasar a `POR_EMPACAR`—, ENTONCES NO DEBE consumir nada del disponible de ese
+envase y NO DEBE rechazar Terminar por él `[D4]` `[P3]` `[P4]`.
+
+> Nota de `spec_author`: con las reglas ya escritas este caso **no se puede producir** a través de
+> la aplicación. Un envase que puede estar en un reparto tiene presentación fija (R9, R11) y nació
+> con esta feature, así que no puede ser ingrediente (R39-R42). Un envase legado puede ser
+> ingrediente (P4) pero no tiene presentación fija, y el alta con homónimo nunca se la pone (solo
+> busca envases que ya la tienen). R43 queda como salvaguarda y su test siembra el caso directamente
+> en la base.
+
+**R44.** La pantalla de empaque y la de ejecución DEBEN mostrar en cada línea con envase el nombre
+del envase, y en cada línea antigua el nombre de su presentación `[D5]` `[D6]`.
+
+> **Mensaje.** `insufficient_material` al Terminar el empaque usa el texto del catálogo tal cual, sin
+> un mensaje propio (`design.md > 1.6`).
 
 ## Preguntas abiertas
 

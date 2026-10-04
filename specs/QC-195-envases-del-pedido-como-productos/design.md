@@ -115,6 +115,33 @@ No sé cuántas recetas así hay: el dato no está en disco.
 Requisitos que dependen: R39 (alcance de «líneas indicadas») y un requisito nuevo que se escribirá
 en F1.4 con la opción elegida. T0 no cierra hasta que P4 esté decidida.
 
+### 1.6 Enmienda 1 (F2.1, 2026-10-03) — decidida por el humano
+
+Cuatro preguntas que salieron al implementar, decididas una a una. No reabren nada de §1.1-§1.5.
+
+| # | Pregunta | Decisión | Requisito | Task |
+|---|---|---|---|---|
+| E1 | Versión que copia de la original una línea PACKAGING | **Pasa si la original ya la tenía**; una línea PACKAGING que la original no tenía se rechaza con `action_not_allowed`. Misma exención que la edición (concreta P4-A). | R42 | T11 |
+| E2 | Nombre del envase en las pantallas de `asignaciones` | `AssignedOrderPresentationLine` y `OrderDistributionLineView` ganan `packagingName: string \| null` (`null` en la línea antigua; la UI cae al nombre de la presentación). **Revierte** lo que §5 y §11.7 decían («`asignaciones` no cambia»). | R44 | T15 |
+| E3 | Doble consumo si el envase del reparto es también ingrediente | Terminar consume de ese envase **solo lo que siga apartado**; si no queda nada (se consumió en `POR_EMPACAR` como ingrediente), no consume del disponible y no falla. | R43 | T10 |
+| E4 | Texto de `insufficient_material` al Terminar | **El del catálogo, tal cual.** Sin mensaje propio ni código nuevo. | R25 | T10 |
+
+**Lo que E3 cambia de lo escrito.** §3.3 decía que Terminar llama a
+`consumeForOrder({ productIds: envases, fallbackRequirement: envases })`, y así está hecho
+(`order-packing.ts:192-200`). Con nada apartado, `consumeForOrder` cae a `consumeWithoutReservation`
+(`reservation-prisma.ts:208-210`) y **consume del disponible**: eso contradice R43. Se corrige así:
+los envases que son también ingrediente de la receta del pedido salen del respaldo
+(`fallbackRequirement`) de Terminar; para ellos solo cuenta lo apartado. Los envases que no son
+ingrediente siguen como estaban (R25). Las líneas antiguas no aportan nada ni al `productIds` ni al
+respaldo (R32).
+
+**Alcance real de E3.** Con las reglas ya escritas, el caso no se alcanza desde la aplicación: un
+envase que puede estar en un reparto tiene presentación fija y no puede ser ingrediente (R9, R11,
+R39-R42), y un envase legado puede ser ingrediente pero no tiene presentación fija, porque el alta
+con homónimo solo busca envases que ya la tienen (`findAlivePackagingByName`,
+`product-prisma.ts:430-450`; `addBatchToAlive`, `:832-836`). R43 es una salvaguarda; su test siembra
+el caso directamente en la base.
+
 ## 2. Modelo de datos
 
 Una migración escrita a mano, `db/migrations/<ts>_packaging_products_in_distribution/` con
@@ -226,7 +253,7 @@ SQL (`guard-tipos-de-producto`, que barre `lib/` y `app/`). El disponible sale d
 | `resolve-ingredients-cost.ts` | `resolveOrderCost(..., packagingLines, { orderId })` lee también `PackagingCatalog.findCostingBatches` (R30). `resolveLotIngredientsCost` suma envases (N8). |
 | `quote-order-cost.ts`, `order-input.ts:187-189` | `quoteOrderCostSchema` gana las líneas del reparto (R29). |
 | `transition-order.ts:74-80` (P3-b) | `consumeForOrder({ …, productIds: productos de la receta })` (R26). |
-| `order-packing.ts:171-223` (P3-b) | Antes de dar de alta el producto terminado, `consumeForOrder({ productIds: envases de las líneas, fallbackRequirement: envases })`; `insufficient` → lanza y Terminar devuelve `'insufficient_material'` (R25). Las líneas antiguas no aportan envases. |
+| `order-packing.ts:171-223` (P3-b) | Antes de dar de alta el producto terminado, `consumeForOrder({ productIds: envases de las líneas, fallbackRequirement: envases que no son ingrediente de la receta })`; `insufficient` → lanza y Terminar devuelve `'insufficient_material'` con el texto del catálogo (R25). Un envase que es también ingrediente solo consume lo que siga apartado (R43, Enmienda 1). Las líneas antiguas no aportan envases (R32). |
 
 Códigos de error: **ninguno nuevo**. Se reutilizan `product_not_found` (R11 envase inválido),
 `incompatible_units`, `presentation_without_content`, `order_distribution_exceeds_quantity`,
@@ -273,7 +300,7 @@ nuevo):
 | Caso de uso | Archivo:línea | Cambio |
 |---|---|---|
 | Alta de receta | `lib/modules/recetas/domain/create-recipe.ts:58-59` | Rechaza también `PRODUCT_TYPES.PACKAGING` (R39) |
-| Alta de versión | `lib/modules/recetas/domain/create-recipe-version.ts:54-56` | Ídem para las líneas **indicadas**; las copiadas de la original dependen de P4 (R39) |
+| Alta de versión | `lib/modules/recetas/domain/create-recipe-version.ts:54-56` | Una línea PACKAGING pasa si la original ya la tenía y se rechaza si no (R39, R42, Enmienda 1) |
 | Edición de receta | `lib/modules/recetas/domain/update-recipe.ts:104-105` | Ídem, solo líneas que la receta no tenía (R40) |
 | Edición de versión | `lib/modules/recetas/domain/update-recipe-version.ts:52-54` | Ídem (R40) |
 | Vista previa de importación | `lib/modules/documentos/domain/preview-formula-import.ts:94` | Los candidatos excluyen PACKAGING (R41) |
@@ -300,7 +327,8 @@ hermanas), así que la UI no ofrece envases hoy: el cambio es de servidor.
 
 `EN_CURSO → POR_EMPACAR` consume solo receta; `POR_EMPACAR` permite editar el reparto y solo mueve
 envases; Terminar consume envases y da de alta el producto terminado en la misma transacción.
-Caducidad, cancelación y borrado ya liberan todo lo del pedido (`releaseForOrder` no filtra por
+Terminar consume solo lo apartado de un envase que sea también ingrediente, sin caer al disponible
+(R43, §1.6 E3); las líneas antiguas no consumen nada (R32). Caducidad, cancelación y borrado ya liberan todo lo del pedido (`releaseForOrder` no filtra por
 producto), así que R22 sale gratis; se cubre con test.
 
 ## 5. Interfaz
@@ -312,7 +340,10 @@ producto), así que R22 sale gratis; se cubre con test.
 | Diálogo «Reparto y unidad» | Misma confirmación de bloqueo que el formulario del pedido (R37). |
 | `app/(private)/inventario/components/product-form.tsx:383-415` | Para Envase: presentación en el producto (obligatoria en el alta, fija después), existencia y ajuste «en envases», enteros. |
 | `app/(private)/inventario/components/product-batches-panel.tsx` | Un lote de envase se pinta en envases y sin presentación propia. |
-| `lib/modules/asignaciones/domain/order-distribution-view.ts:9-35` | Sin cambio obligatorio: sigue leyendo `presentationId`, que la línea conserva. |
+| ~~`lib/modules/asignaciones/domain/order-distribution-view.ts:9-35` — sin cambio obligatorio~~ | **Revertido por la Enmienda 1 (E2):** ver las tres filas siguientes. |
+| `lib/modules/pedidos/domain/order-catalog.ts:177-180` (`AssignedOrderPresentationLine`) | Gana `packagingName: string \| null`; lo rellena el adaptador de `pedidos` que ya lee las líneas (R44). |
+| `lib/modules/asignaciones/domain/order-distribution-view.ts:9-35` (`OrderDistributionLineView`, `toDistributionLines`) | Gana `packagingName: string \| null`, copiado de la línea; llega a `compose-order-rows.ts:93` y `get-assigned-order-execution.ts:142` sin más cambios (R44). |
+| `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx:69-70`, `app/(private)/asignacion/[id]/components/order-execution-screen.tsx:84`, `components/shared/order-distribution-label.tsx` | Pintan `packagingName ?? presentationName ?? MISSING_VALUE_MARK` (R44, R33). Las columnas de listados de `asignacion` usan `OrderDistributionLabel` y heredan el cambio. |
 
 ## 6. Sitios afectados
 
@@ -664,8 +695,28 @@ export type OrderPresentationLineView = {
 ```
 
 `OrderView.ingredientsCost` (`order-view.ts:146`) sigue siendo `string | null` e incluye envases.
-`OrderView.status` puede ser `'BLOQUEADO'` como hoy. Las vistas de `asignaciones`
-(`order-distribution-view.ts:9-14`) no cambian.
+`OrderView.status` puede ser `'BLOQUEADO'` como hoy.
+
+~~Las vistas de `asignaciones` (`order-distribution-view.ts:9-14`) no cambian.~~ **Enmienda 1 (E2):**
+cambian las dos siguientes, que alimentan la pantalla de empaque, la de ejecución y las columnas de
+listado de `asignacion` (R44):
+
+```ts
+// lib/modules/pedidos/domain/order-catalog.ts:177
+export type AssignedOrderPresentationLine = {
+  readonly presentationId: string;
+  readonly packages: number;
+  readonly packagingName: string | null;   // NEW (Enmienda 1). null = línea antigua
+};
+
+// lib/modules/asignaciones/domain/order-distribution-view.ts:9
+export type OrderDistributionLineView = {
+  readonly presentationId: string;
+  readonly presentationName: string | null;
+  readonly packages: number;
+  readonly packagingName: string | null;   // NEW (Enmienda 1). La UI pinta packagingName ?? presentationName
+};
+```
 
 Tipo de cliente que ya existe y cambia (`app/(private)/pedidos/components/use-order-distribution-availability.ts:20-28`):
 
@@ -691,7 +742,9 @@ export async function finishPackingAction(prev: FinishPackingResult, formData: F
 ```
 
 **Permiso:** `empaque.modificar` (`finish-packing.ts:49`). **Error NEW en esta acción:**
-`insufficient_material` cuando no hay envases que consumir (R25). Los demás, como hoy.
+`insufficient_material` cuando no hay envases que consumir (R25), con el **texto del catálogo tal
+cual** (Enmienda 1, E4). No salta por un envase que es también ingrediente y ya no tiene nada
+apartado (R43). Los demás, como hoy.
 
 ### 11.9 Alta, lote y ajuste del envase en inventario (existentes, con cambios)
 
