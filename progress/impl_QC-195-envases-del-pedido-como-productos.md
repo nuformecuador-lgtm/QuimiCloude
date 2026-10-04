@@ -802,3 +802,76 @@ $ pnpm exec tsc --noEmit -p .   -> 0 errores;  eslint (pedidos) -> 0 errores, 2 
 $ pnpm exec vitest run guard --passWithNoTests
  Test Files  51 passed (51)      Tests  672 passed | 11 skipped (683)
 ```
+
+Gate `./init.sh --rapido` tras el commit de T7 (`aa6418fa`): `✓ typecheck`, `✓ lint`, `test:rapido`
+`Test Files 6 failed | 404 passed (410)`, `Tests 8 failed | 6128 passed | 9 skipped`; los 6 del
+baseline (los mismos de T6). Guardias aparte: `51 passed (51)`.
+
+**Veredicto T7:** hecho; R15-R23 y R26 verdes en integracion; sin rojos fuera del baseline.
+
+## T8 — «Reparto y unidad» toca la reserva (backend_dev, 2026-10-03)
+
+Archivos de produccion:
+- `update-order-presentation-lines.ts`: corre en `OrderUnitOfWork` (deps `packaging`,
+  `presentations`, `units`, `unitOfWork`, `now`). Tras escribir unidad y lineas arma la necesidad con
+  `buildOrderRequirement` (`POR_EMPACAR` -> `materials_consumed`, solo envases y sin leer la receta;
+  el resto -> receta + envases) y llama a `syncForOrder`. Con falta: `PENDIENTE`/`BLOQUEADO` sin
+  `confirmBlocked` -> `'would_block'`; con confirmacion -> `BLOQUEADO` (si no lo estaba) e importe a
+  `null`; `EN_CURSO`/`POR_EMPACAR` -> `'insufficient_material'` aunque llegue la confirmacion. Sin
+  falta y `BLOQUEADO` -> `PENDIENTE`. `reserved_at` como en `update-order.ts`. Los dos rechazos se
+  lanzan dentro de la transaccion para deshacer lineas, unidad y apartado, y se traducen al
+  resultado fuera. Entrada gana `confirmBlocked?`.
+- `order-input.ts`: `updateOrderDistributionSchema` gana `confirmBlocked: z.boolean().default(false)`
+  (sigue `.strict()`); `UpdateOrderDistributionInput` conserva `confirmBlocked?: boolean` (contrato
+  11.4, el test de tipos de TC sigue verde).
+- `order-actions.ts`: `updateOrderDistributionAction` pasa `confirmBlocked` y traduce
+  `'would_block'` -> `order_would_block`, `'insufficient_material'` -> `insufficient_material`.
+- `lib/composition/index.ts`: cablea `orderUnitOfWork`. **Retirados** el puerto
+  `ports/order-distribution-transaction.ts` y `createOrderDistributionTransaction`
+  (`order-unit-of-work-prisma.ts`): su unico consumidor era este caso de uso. Los dos censos de
+  `aislamiento.json` que lo nombraban dicen ahora `withOrderTransaction`.
+
+Tests:
+- `tests/unit/pedidos/update-order-presentation-lines.test.ts`: dobles sobre la unidad de trabajo
+  (`fakeOrderUnitOfWork` + `fakeMaterialReservations` + `fakeRecipeExecutionReader`). El caso de la
+  linea 327 («no toca quantity, receta ni reserva») **reescrito contra R15/R20**, con el motivo en el
+  nombre: describe «R46: no toca quantity ni receta; QC-195 R15, R20: la reserva si, porque el
+  reparto aparta sus envases», casos «R46: no escribe cantidad ni receta -ni create, ni updateAlive- y,
+  con todo apartado, no mueve el estado» y «R15, R20: la reserva se sincroniza con la necesidad
+  completa -receta y envases del reparto nuevo-, en la misma unidad de trabajo». Las dependencias
+  declaradas pasan a `now, packaging, presentations, unitOfWork, units`.
+- `qc170-distribution-concurrency`/`-company-scope` (int): construyen el caso de uso con la unidad de
+  trabajo; sus aserciones no cambian (R37/R48 siguen probando la serializacion sobre la fila; «R30,
+  R46 — cambiar la unidad en POR_EMPACAR no altera reservas ni asientos» sigue valiendo: el mismo
+  reparto no escribe asientos nuevos).
+- `qc195-packaging-reservation.int.test.ts`: describe «QC-195 — Reparto y unidad toca la reserva de
+  los envases».
+
+R -> test:
+| R | Test |
+|---|---|
+| R17 (Reparto y unidad) | int › «R17: en PENDIENTE, si falta envase avisa sin escribir nada; con la confirmacion queda BLOQUEADO sin nada apartado ni importe»; unit › «R17: en %s, sin confirmacion, falta de envase -> would_block…» (PENDIENTE, BLOQUEADO), «R17: con la confirmacion, un PENDIENTE pasa a BLOQUEADO sin importe y sin reserved_at», «R17: con la confirmacion, un BLOQUEADO sigue BLOQUEADO…»; `order-actions-distribution.test.ts` › «traduce would_block al codigo order_would_block…», «QC-195 R17, R37: confirmBlocked viaja al caso de uso; solo un booleano lo confirma» |
+| R18 (Reparto y unidad) | int › «R18: en EN_CURSO, si falta envase rechaza con insufficient_material…», «R18: en POR_EMPACAR, si falta envase rechaza con insufficient_material sin tocar nada»; unit › «R18: en %s, falta de envase -> insufficient_material aunque llegue la confirmacion» (EN_CURSO, POR_EMPACAR); acciones › «traduce insufficient_material…» |
+| R19 (Reparto y unidad) | int › «R19: un BLOQUEADO cuyo reparto nuevo ya queda cubierto pasa a PENDIENTE con todo apartado»; unit › «R19: un BLOQUEADO cuyo reparto nuevo ya queda cubierto pasa a PENDIENTE con reserved_at» |
+| R20 | int › «R20: bajar los envases de una linea libera lo que sobra en la misma operacion»; unit › «R15, R20: la reserva se sincroniza con la necesidad completa…» |
+| R24 | int › «R24: en POR_EMPACAR solo se sincronizan los envases y la materia prima consumida no se vuelve a apartar»; unit › «R24: en POR_EMPACAR solo se sincronizan los envases: la receta ni se lee» |
+| R15 (Reparto y unidad) | unit › «R15, R20: la reserva se sincroniza con la necesidad completa…» |
+
+Salida real:
+```
+$ pnpm exec vitest run --project node tests/unit/pedidos
+ Test Files  61 passed (61)      Tests  1111 passed | 3 skipped (1114)
+$ pnpm exec vitest run --project integration tests/integration/pedidos/qc195-packaging-reservation.int.test.ts
+ Test Files  1 passed (1)        Tests  17 passed (17)
+$ pnpm exec vitest run --project integration tests/integration/pedidos tests/integration/asignaciones
+ Test Files  45 passed (45)      Tests  405 passed (405)     (qc170-* incluidos)
+$ pnpm exec tsc --noEmit -p .   -> 0 errores;  eslint -> 0 errores, 2 avisos preexistentes
+$ pnpm exec vitest run guard --passWithNoTests
+ Test Files  51 passed (51)      Tests  672 passed | 11 skipped (683)
+```
+
+Pregunta abierta (no decidida aqui): «Reparto y unidad» cambia los envases pero **no recalcula
+`orders.ingredients_cost`** (`design.md > 3.3` no lo pide para este caso de uso; solo lo pone a
+`null` al bloquear). Con T9 el importe incluye envases, asi que tras cambiar el reparto por esta via
+el importe guardado queda con los envases anteriores hasta la siguiente edicion completa, y un
+`BLOQUEADO` que se desbloquea por aqui queda `PENDIENTE` con importe `null`. ¿Debe recalcularlo?

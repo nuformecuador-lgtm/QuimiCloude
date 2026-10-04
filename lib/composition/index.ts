@@ -247,7 +247,6 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
-  createOrderDistributionTransaction,
   withOrderTransaction,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
@@ -1172,14 +1171,6 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 
-/**
- * `OrderDistributionTransaction`: la transaccion CORTA propia de
- * `updateOrderPresentationLines`, sin `inventario` en su ambito -este caso de uso no toca
- * material ni reserva-. NO reutiliza `orderUnitOfWork`: son dos transacciones con un alcance
- * distinto a proposito.
- */
-const orderDistributionTransaction = createOrderDistributionTransaction();
-
 /** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
  *  `findCoverage` la usa una vez por pagina. */
 const reservationQueries: ReservationQueries = createReservationQueries();
@@ -1275,14 +1266,13 @@ export const pedidos = {
   // orden por su cuenta.
   verifyCronSecret,
   expireStaleOrders,
-  // La edicion ACOTADA del reparto y la unidad. Recibe `presentations`/`units` -mismos catalogos
-  // que `createOrder`/`updateOrder`- y su PROPIA transaccion, mas corta: no la unidad de trabajo
-  // compartida con `inventario`, porque este caso de uso no toca material ni reserva.
+  // La edicion ACOTADA del reparto y la unidad: aparta los envases, asi que va en la unidad de
+  // trabajo compartida con `inventario`.
   updateOrderPresentationLines: createUpdateOrderPresentationLines({
     packaging: packagingCatalog,
     presentations: presentationCatalog,
     units: unitCatalog,
-    transaction: orderDistributionTransaction,
+    unitOfWork: orderUnitOfWork,
   }),
   // «Cuanto queda disponible», de solo lectura. Mismos DOS
   // catalogos que `updateOrderPresentationLines`, sin transaccion: no escribe nada.

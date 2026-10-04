@@ -235,12 +235,13 @@ export const updateOrderDistributionSchema = z
   .object({
     unitId: unitIdSchema,
     presentationLines: presentationLinesSchema,
+    confirmBlocked: z.boolean().default(false),
   })
   .strict();
 
 export type UpdateOrderDistributionInput = Omit<
   z.infer<typeof updateOrderDistributionSchema>,
-  'presentationLines'
+  'presentationLines' | 'confirmBlocked'
 > & {
   readonly presentationLines: readonly DistributionLineInput[];
   /** Permiso explicito para dejar el pedido bloqueado si un envase o material no alcanza. */

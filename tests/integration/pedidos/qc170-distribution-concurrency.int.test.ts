@@ -51,7 +51,7 @@ import {
   createOrderWriteRepository,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
-import { withOrderTransaction, createOrderDistributionTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
   createRecipeExecutionReader,
   findRecipeExecutionContentById,
@@ -137,11 +137,10 @@ const units: UnitCatalog = {
 
 const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
-const orderDistributionTransaction = createOrderDistributionTransaction();
 const updateOrderPresentationLines = createUpdateOrderPresentationLines({
   presentations, packaging: packagingCatalog,
   units,
-  transaction: orderDistributionTransaction,
+  unitOfWork,
 });
 const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 

@@ -11,10 +11,12 @@ import {
   ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   IncompatibleUnitsError,
+  InsufficientMaterialError,
   OrderDistributionExceedsQuantityError,
   OrderNotFoundError,
   OrderPresentationLineNotEditableError,
   OrderWithoutUnitError,
+  OrderWouldBlockError,
   PedidosError,
   PresentationNotFoundError,
   PresentationWithoutContentError,
@@ -444,6 +446,7 @@ export async function updateOrderDistributionAction(
     const result = await pedidos.updateOrderPresentationLines(id, actor, {
       unitId: parsed.data.unitId,
       lines: parsed.data.presentationLines,
+      confirmBlocked: parsed.data.confirmBlocked,
     });
 
     switch (result) {
@@ -469,6 +472,10 @@ export async function updateOrderDistributionAction(
         throw new IncompatibleUnitsError();
       case 'exceeds_quantity':
         throw new OrderDistributionExceedsQuantityError();
+      case 'would_block':
+        throw new OrderWouldBlockError();
+      case 'insufficient_material':
+        throw new InsufficientMaterialError();
     }
   } catch (error) {
     return toErrorState(error);

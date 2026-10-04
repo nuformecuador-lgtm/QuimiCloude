@@ -47,6 +47,7 @@ import {
   createReviewBlockedOrders,
   createTransitionOrder,
   createUpdateOrder,
+  createUpdateOrderPresentationLines,
 } from '@/lib/modules/pedidos';
 
 import type { Actor } from '@/lib/modules/pedidos';
@@ -91,6 +92,7 @@ const updateOrder = createUpdateOrder({ orders, recipes, products, units, presen
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 const transition = createTransitionOrder({ unitOfWork });
+const updateDistribution = createUpdateOrderPresentationLines({ packaging, presentations, units, unitOfWork });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, unitOfWork });
 
 type Fixture = {
@@ -417,6 +419,154 @@ describe('QC-195 — pasar a POR_EMPACAR no consume los envases', () => {
         [botella]: '100.0000',
         [f.materialId]: '960.0000',
       });
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+});
+
+describe('QC-195 — Reparto y unidad toca la reserva de los envases', () => {
+  async function lineasDe(orderId: string) {
+    return prisma.orderPresentationLine.findMany({ where: { orderId }, select: { packagingProductId: true, packages: true } });
+  }
+
+  it('R20: bajar los envases de una linea libera lo que sobra en la misma operacion', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await envase(f, '100');
+      const creado = await createOrder(entrada(f, '40', [{ packagingProductId: botella, packages: 40 }]), actorDe(f));
+
+      const resultado = await updateDistribution(creado.id, actorDe(f), {
+        unitId: f.unitId,
+        lines: [{ packagingProductId: botella, packages: 25 }],
+      });
+
+      expect(resultado).toBe('ok');
+      expect(await apartadoPorProducto(creado.id)).toEqual({ [botella]: '25.0000', [f.materialId]: '40.0000' });
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R17: en PENDIENTE, si falta envase avisa sin escribir nada; con la confirmacion queda BLOQUEADO sin nada apartado ni importe', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await envase(f, '30');
+      const creado = await createOrder(entrada(f, '40', [{ packagingProductId: botella, packages: 20 }]), actorDe(f));
+      const antes = await apartadoPorProducto(creado.id);
+
+      const sinConfirmar = await updateDistribution(creado.id, actorDe(f), {
+        unitId: f.unitId,
+        lines: [{ packagingProductId: botella, packages: 40 }],
+      });
+      expect(sinConfirmar).toBe('would_block');
+      expect(await lineasDe(creado.id)).toEqual([{ packagingProductId: botella, packages: 20 }]);
+      expect(await apartadoPorProducto(creado.id)).toEqual(antes);
+      expect((await estadoDe(creado.id)).status).toBe('PENDIENTE');
+
+      const confirmado = await updateDistribution(creado.id, actorDe(f), {
+        unitId: f.unitId,
+        lines: [{ packagingProductId: botella, packages: 40 }],
+        confirmBlocked: true,
+      });
+      expect(confirmado).toBe('ok');
+      const fila = await estadoDe(creado.id);
+      expect(fila.status).toBe('BLOQUEADO');
+      expect(fila.reservedAt).toBeNull();
+      expect(fila.ingredientsCost).toBeNull();
+      expect(await apartadoPorProducto(creado.id)).toEqual({ [botella]: '0.0000', [f.materialId]: '0.0000' });
+      expect(await lineasDe(creado.id)).toEqual([{ packagingProductId: botella, packages: 40 }]);
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R18: en EN_CURSO, si falta envase rechaza con insufficient_material y no cambia reparto, unidad ni apartado', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await envase(f, '30');
+      const creado = await createOrder(entrada(f, '40', [{ packagingProductId: botella, packages: 20 }]), actorDe(f));
+      expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
+      const antes = await apartadoPorProducto(creado.id);
+
+      const resultado = await updateDistribution(creado.id, actorDe(f), {
+        unitId: f.unitId,
+        lines: [{ packagingProductId: botella, packages: 40 }],
+        confirmBlocked: true,
+      });
+
+      expect(resultado).toBe('insufficient_material');
+      expect((await estadoDe(creado.id)).status).toBe('EN_CURSO');
+      expect(await lineasDe(creado.id)).toEqual([{ packagingProductId: botella, packages: 20 }]);
+      expect(await apartadoPorProducto(creado.id)).toEqual(antes);
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R19: un BLOQUEADO cuyo reparto nuevo ya queda cubierto pasa a PENDIENTE con todo apartado', async () => {
+    const f = await crearFixture();
+    try {
+      const corta = await envase(f, '10');
+      const creado = await createOrder(entrada(f, '40', [{ packagingProductId: corta, packages: 40 }], true), actorDe(f));
+      expect((await estadoDe(creado.id)).status).toBe('BLOQUEADO');
+
+      const resultado = await updateDistribution(creado.id, actorDe(f), {
+        unitId: f.unitId,
+        lines: [{ packagingProductId: corta, packages: 10 }],
+      });
+
+      expect(resultado).toBe('ok');
+      const fila = await estadoDe(creado.id);
+      expect(fila.status).toBe('PENDIENTE');
+      expect(fila.reservedAt).not.toBeNull();
+      expect(await apartadoPorProducto(creado.id)).toEqual({ [corta]: '10.0000', [f.materialId]: '40.0000' });
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R24: en POR_EMPACAR solo se sincronizan los envases y la materia prima consumida no se vuelve a apartar', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await envase(f, '100');
+      const creado = await createOrder(entrada(f, '40', [{ packagingProductId: botella, packages: 40 }]), actorDe(f));
+      expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
+      expect(await transition(creado.id, f.companyId, 'EN_CURSO', 'POR_EMPACAR', f.actorId, new Date())).toBe('ok');
+      const materiaAntes = await prisma.productBatch.findFirstOrThrow({ where: { productId: f.materialId }, select: { stock: true } });
+
+      const resultado = await updateDistribution(creado.id, actorDe(f), {
+        unitId: f.unitId,
+        lines: [{ packagingProductId: botella, packages: 30 }],
+      });
+
+      expect(resultado).toBe('ok');
+      expect((await estadoDe(creado.id)).status).toBe('POR_EMPACAR');
+      expect(await apartadoPorProducto(creado.id)).toEqual({ [botella]: '30.0000', [f.materialId]: '0.0000' });
+      const materiaDespues = await prisma.productBatch.findFirstOrThrow({ where: { productId: f.materialId }, select: { stock: true } });
+      expect(materiaDespues.stock.toFixed(4)).toBe(materiaAntes.stock.toFixed(4));
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R18: en POR_EMPACAR, si falta envase rechaza con insufficient_material sin tocar nada', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await envase(f, '50');
+      const creado = await createOrder(entrada(f, '60', [{ packagingProductId: botella, packages: 40 }]), actorDe(f));
+      expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
+      expect(await transition(creado.id, f.companyId, 'EN_CURSO', 'POR_EMPACAR', f.actorId, new Date())).toBe('ok');
+      const antes = await apartadoPorProducto(creado.id);
+
+      const resultado = await updateDistribution(creado.id, actorDe(f), {
+        unitId: f.unitId,
+        lines: [{ packagingProductId: botella, packages: 60 }],
+      });
+
+      expect(resultado).toBe('insufficient_material');
+      expect(await apartadoPorProducto(creado.id)).toEqual(antes);
+      expect(await lineasDe(creado.id)).toEqual([{ packagingProductId: botella, packages: 40 }]);
     } finally {
       await borrarFixture(f);
     }
