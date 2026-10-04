@@ -5,9 +5,10 @@
 // `inventario`, sin tocar material ni producto terminado.
 //
 // `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar):
-// abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive` -en la
-// MISMA transaccion- y da de alta, por cada linea del reparto, un lote de producto terminado con
-// un unico coste por unidad del pedido, expresado en la unidad de cada lote. `asignaciones` solo
+// abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive`, consume
+// los envases del reparto y da de alta, por cada linea, un lote de producto terminado con un
+// unico coste por unidad del pedido, expresado en la unidad de cada lote; todo en la MISMA
+// transaccion. `asignaciones` solo
 // conoce la firma de `OrderCatalog`, nunca este archivo.
 
 import { planFinishedGoodsLine } from '@/lib/modules/inventario';
@@ -15,12 +16,13 @@ import { convertQuantity, type UnitConversion } from '@/lib/modules/unidades';
 
 import {
   IncompatibleUnitsError,
+  InsufficientMaterialError,
   OrderWithoutUnitError,
   PresentationWithoutContentError,
   RecipeNotFoundError,
 } from './errors';
 import { sumInOrderUnit } from './order-distribution';
-import { packagingLinesOf } from './order-requirement';
+import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
 import { resolveLotCost } from './resolve-ingredients-cost';
 import { assertTransition } from './order-transitions';
 
@@ -178,6 +180,26 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         const lines = await scope.orders.findPresentationLinesForFinish(id, { companyId });
         if (lines.length === 0) return { kind: 'ok' as const, finishedGoods: [] };
 
+        // Las lineas antiguas no tienen envase: sin envases no hay nada que consumir.
+        const packagingLines = packagingLinesOf(lines);
+        if (packagingLines.length > 0) {
+          const packagingRequirement = buildOrderRequirement({
+            recipeLines: [],
+            quantity: updated.quantity,
+            packagingLines,
+            phase: 'materials_consumed',
+          });
+          const consumption = await scope.reservations.consumeForOrder({
+            orderId: id,
+            companyId,
+            fallbackRequirement: packagingRequirement,
+            productIds: packagingRequirement.map((line) => line.productId),
+            actorId: packerId,
+            now,
+          });
+          if (consumption.kind === 'insufficient') throw new InsufficientMaterialError();
+        }
+
         const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([updated.recipeId], companyId);
         if (recipeRef === undefined) throw new RecipeNotFoundError();
 
@@ -188,7 +210,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
                 deps,
                 updated.recipeId,
                 updated.quantity,
-                packagingLinesOf(lines),
+                packagingLines,
                 companyId,
                 { orderId: id },
               );
@@ -225,6 +247,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         return { kind: 'ok' as const, finishedGoods };
       });
     } catch (err) {
+      if (err instanceof InsufficientMaterialError) return 'insufficient_material';
       if (err instanceof RecipeNotFoundError) return 'recipe_not_found';
       if (err instanceof PresentationWithoutContentError) return 'presentation_without_content';
       if (err instanceof IncompatibleUnitsError) return 'incompatible_units';

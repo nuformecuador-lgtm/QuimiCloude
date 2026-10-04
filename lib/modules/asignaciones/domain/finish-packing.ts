@@ -3,7 +3,7 @@
  * Terminar: `EN_EMPAQUE -> ENTREGADO`, con `finished_at` en la misma escritura que el cambio de
  * estado, solo si el actor es quien tiene el pedido en empaque. Sin comprobacion de asignacion:
  * cualquier actor con `empaque.modificar` puede terminar cualquier pedido vivo de su empresa, y
- * sin ningun puerto de inventario: el material ya se consumio al iniciar la produccion.
+ * sin ningun puerto de inventario: los envases los consume `pedidos` dentro de Terminar.
  *
  * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `ENTREGADO`, el
  * filtro de estado con el que se leyo ya no lo encontraria (mismo motivo que
@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { requirePermission, type Actor } from './actor';
 import {
   IncompatibleUnitsError,
+  MaterialShortageError,
   OrderNotFoundError,
   OrderNotPackableError,
   OrderPackingTakenError,
@@ -78,6 +79,7 @@ export function createFinishPacking(
     if (result === 'presentation_without_content') throw new PresentationWithoutContentError();
     if (result === 'incompatible_units') throw new IncompatibleUnitsError();
     if (result === 'order_without_unit') throw new OrderWithoutUnitError();
+    if (result === 'insufficient_material') throw new MaterialShortageError();
     throw new OrderNotFoundError(); // 'not_found'
   };
 }

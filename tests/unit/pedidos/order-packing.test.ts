@@ -15,7 +15,7 @@ import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { FinishPackingLine, FinishPackingUpdateOutcome } from '@/lib/modules/pedidos/ports/order-write-repository';
-import type { FinishedGoodsIntake, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { FinishedGoodsIntake, MaterialReservations, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
@@ -173,11 +173,13 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     readonly receiveFromOrder?: ReturnType<typeof vi.fn>;
     readonly catalogos?: ReturnType<typeof catalogosGlobales>;
     readonly packaging?: PackagingCatalog;
+    readonly consumeForOrder?: ReturnType<typeof vi.fn>;
   } = {}): {
     readonly finishPackingAliveById: ReturnType<typeof createFinishPacking>;
     readonly finishPackingAlive: ReturnType<typeof vi.fn>;
     readonly findPresentationLinesForFinish: ReturnType<typeof vi.fn>;
     readonly receiveFromOrder: ReturnType<typeof vi.fn>;
+    readonly consumeForOrder: ReturnType<typeof vi.fn>;
     readonly catalogos: ReturnType<typeof catalogosGlobales>;
   } {
     const catalogos = options.catalogos ?? catalogosGlobales();
@@ -195,8 +197,9 @@ describe('createFinishPacking (T14, R17-R21)', () => {
         packages: String(input.packages),
       }));
 
-    const { unitOfWork } = fakeUnitOfWork({
+    const { unitOfWork, reservations } = fakeUnitOfWork({
       orders: { finishPackingAlive, findPresentationLinesForFinish },
+      ...(options.consumeForOrder === undefined ? {} : { reservations: { consumeForOrder: options.consumeForOrder as unknown as MaterialReservations['consumeForOrder'] } }),
       finishedGoods: { receiveFromOrder: receiveFromOrder as unknown as FinishedGoodsIntake['receiveFromOrder'] },
     });
 
@@ -215,6 +218,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
       finishPackingAlive,
       findPresentationLinesForFinish,
       receiveFromOrder,
+      consumeForOrder: reservations.consumeForOrder,
       catalogos,
     };
   }
@@ -402,6 +406,79 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
 
     expect(packaging.findCostingBatches).not.toHaveBeenCalled();
+  });
+
+  it('QC-195 R25: consume los envases del reparto (solo esos productos) ANTES de dar de alta el producto terminado', async () => {
+    const orden: string[] = [];
+    const consumeForOrder = vi.fn(async () => {
+      orden.push('consumeForOrder');
+      return { kind: 'consumed' as const };
+    });
+    const receiveFromOrder = vi.fn(async (input: { readonly presentationId: string; readonly packages: number }) => {
+      orden.push('receiveFromOrder');
+      return { kind: 'received' as const, productId: 'pt-1', productName: 'Desengrasante', packages: String(input.packages) };
+    });
+    const { finishPackingAliveById } = montar({
+      lines: [
+        lineaDe({ id: 'linea-1', packages: 6, packagingProductId: 'envase-1' }),
+        lineaDe({ id: 'linea-2', presentationId: 'p-2', packages: 4, packagingProductId: 'envase-2' }),
+        lineaDe({ id: 'linea-3', presentationId: 'p-3', packages: 2, packagingProductId: 'envase-1' }),
+      ],
+      consumeForOrder,
+      receiveFromOrder,
+    });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toMatchObject({ kind: 'ok' });
+
+    expect(consumeForOrder).toHaveBeenCalledTimes(1);
+    expect(consumeForOrder).toHaveBeenCalledWith({
+      orderId: PEDIDO,
+      companyId: EMPRESA,
+      fallbackRequirement: [
+        { productId: 'envase-1', quantity: '8' },
+        { productId: 'envase-2', quantity: '4' },
+      ],
+      productIds: ['envase-1', 'envase-2'],
+      actorId: EMPACADOR,
+      now: AHORA,
+    });
+    expect(orden).toEqual(['consumeForOrder', 'receiveFromOrder', 'receiveFromOrder', 'receiveFromOrder']);
+  });
+
+  it('QC-195 R25: si los envases no alcanzan, Terminar rechaza con insufficient_material y NO da de alta ningun lote', async () => {
+    const consumeForOrder = vi.fn(async () => ({ kind: 'insufficient' as const, productIds: ['envase-1'] }));
+    const { finishPackingAliveById, receiveFromOrder } = montar({
+      lines: [lineaDe({ packages: 10, packagingProductId: 'envase-1' })],
+      consumeForOrder,
+    });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('insufficient_material');
+    expect(receiveFromOrder).not.toHaveBeenCalled();
+  });
+
+  it('QC-195 R33: un reparto solo con lineas antiguas, sin envase, no consume nada y da de alta su producto terminado como hoy', async () => {
+    const { finishPackingAliveById, receiveFromOrder, consumeForOrder } = montar({
+      lines: [lineaDe({ packages: 10, packagingProductId: null })],
+    });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toMatchObject({ kind: 'ok' });
+    expect(consumeForOrder).not.toHaveBeenCalled();
+    expect(receiveFromOrder).toHaveBeenCalledWith(expect.objectContaining({ presentationId: 'p-1', packages: 10 }));
+  });
+
+  it('QC-195 R25, R33: con una linea antigua y una con envase, solo se consume el envase y se dan de alta las dos', async () => {
+    const { finishPackingAliveById, receiveFromOrder, consumeForOrder } = montar({
+      lines: [
+        lineaDe({ id: 'linea-antigua', packages: 3, packagingProductId: null }),
+        lineaDe({ id: 'linea-nueva', presentationId: 'p-2', packages: 7, packagingProductId: 'envase-1' }),
+      ],
+    });
+
+    await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toMatchObject({ kind: 'ok' });
+    expect(consumeForOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ productIds: ['envase-1'], fallbackRequirement: [{ productId: 'envase-1', quantity: '7' }] }),
+    );
+    expect(receiveFromOrder).toHaveBeenCalledTimes(2);
   });
 
   it('R19: una linea sin contenido copiado ni vigente rechaza con presentation_without_content y NO da de alta ningun lote', async () => {
