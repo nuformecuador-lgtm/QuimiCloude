@@ -272,9 +272,9 @@ export function StepReader({ steps, onFinish, title, minStepSeconds, mode = 'lec
 
   const waitReason = waiting && (
     <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
-      {isEjecucion && <WaitRing key={arrival} seconds={minStepSeconds ?? 0} />}
+      {isEjecucion && <WaitRing key={`ring-${arrival}`} seconds={minStepSeconds ?? 0} />}
       {TEXTS.waitPrefix}{' '}
-      <CountdownTimer key={arrival} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
+      <CountdownTimer key={`timer-${arrival}`} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
       {' '}
       {TEXTS.waitSuffix}
     </p>
