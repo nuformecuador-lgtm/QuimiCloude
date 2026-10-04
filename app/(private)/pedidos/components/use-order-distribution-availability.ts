@@ -6,6 +6,7 @@ import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modu
 import { newRequestId } from '@/lib/modules/observabilidad';
 import {
   orderPresentationAvailabilitySchema,
+  presentationLinesSchema,
   type DistributionLineInput,
   type OrderPresentationAvailabilityNext,
   type OrderPresentationLineView,
@@ -40,8 +41,6 @@ export type OrderDistributionAvailability =
   | { readonly status: 'ready'; readonly data: OrderPresentationAvailabilityNext }
   | { readonly status: 'error'; readonly error: ErrorState };
 
-const POSITIVE_INTEGER = /^[1-9]\d*$/;
-
 export function isLegacyLine(line: OrderDistributionLine): boolean {
   return line.packagingProductId === undefined || line.packagingProductId === null;
 }
@@ -52,17 +51,18 @@ export function lineKey(line: OrderDistributionLine): string {
 }
 
 /**
- * Lo mismo que el servidor rechazaria por forma: envases no enteros, el mismo envase dos veces o
- * dos lineas con la misma presentacion.
+ * La forma la valida el esquema del contrato. Dos envases con la misma presentacion solo los ve
+ * el servidor al resolverlos; aqui ya se conoce la presentacion y se rechaza antes.
  */
 export function distributionLinesValid(lines: readonly OrderDistributionLine[]): boolean {
-  const keys = new Set(lines.map(lineKey));
-  const presentations = new Set(lines.map((line) => line.presentationId));
   return (
-    lines.every((line) => POSITIVE_INTEGER.test(line.packages)) &&
-    keys.size === lines.length &&
-    presentations.size === lines.length
+    hasUniquePresentations(lines) &&
+    presentationLinesSchema.safeParse(toDistributionLinesInput(lines)).success
   );
+}
+
+function hasUniquePresentations(lines: readonly OrderDistributionLine[]): boolean {
+  return new Set(lines.map((line) => line.presentationId)).size === lines.length;
 }
 
 /** Las lineas con los envases ya como numero, para las consultas al servidor. */
@@ -122,17 +122,19 @@ export function availabilityBlocksSave(availability: OrderDistributionAvailabili
 
 type Settled = { readonly key: string; readonly result: OrderDistributionAvailability };
 
-const scalarsSchema = orderPresentationAvailabilitySchema.pick({ quantity: true, unitId: true });
-
 /** `null` = la entrada no tiene forma valida y no se pregunta al servidor. */
 function availabilityKey(
   quantity: string,
   unitId: string,
   lines: readonly OrderDistributionLine[],
 ): string | null {
-  const scalars = scalarsSchema.safeParse({ quantity, unitId });
-  if (!scalars.success || !distributionLinesValid(lines)) return null;
-  return JSON.stringify({ ...scalars.data, presentationLines: toDistributionLinesInput(lines) });
+  if (!hasUniquePresentations(lines)) return null;
+  const parsed = orderPresentationAvailabilitySchema.safeParse({
+    quantity,
+    unitId,
+    presentationLines: toDistributionLinesInput(lines),
+  });
+  return parsed.success ? JSON.stringify(parsed.data) : null;
 }
 
 function unexpectedFromRejection(): ErrorState {

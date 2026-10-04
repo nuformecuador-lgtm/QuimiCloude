@@ -64,7 +64,11 @@ function canQuote(
   return (
     recipeId !== null &&
     distributionLinesValid(lines) &&
-    quoteOrderCostSchema.safeParse({ recipeId, quantity }).success
+    quoteOrderCostSchema.safeParse({
+      recipeId,
+      quantity,
+      presentationLines: toDistributionLinesInput(lines),
+    }).success
   );
 }
 

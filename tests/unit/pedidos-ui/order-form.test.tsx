@@ -575,7 +575,7 @@ describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
     renderFormulario(
       pedido({
         presentationLines: [
-          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2 },
+          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null },
         ],
       }),
     );

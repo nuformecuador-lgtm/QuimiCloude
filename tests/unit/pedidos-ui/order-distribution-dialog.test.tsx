@@ -306,7 +306,7 @@ describe('dialogo «Reparto y unidad»', () => {
     montarDialogo(
       pedido('POR_EMPACAR', {
         presentationLines: [
-          { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2 },
+          { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null },
         ],
       }),
     );

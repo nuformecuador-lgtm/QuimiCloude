@@ -340,7 +340,7 @@ describe('R20: la columna Presentación pinta el reparto o Sin presentación', (
     const { container } = pintarCelda(
       PRESENTATION_NAME_COLUMN_ID,
       pedido({
-        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2 }],
+        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null }],
       }),
     );
 
@@ -352,8 +352,8 @@ describe('R20: la columna Presentación pinta el reparto o Sin presentación', (
       PRESENTATION_NAME_COLUMN_ID,
       pedido({
         presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5 },
-          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1 },
+          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5, packagingProductId: null, packagingName: null },
+          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1, packagingProductId: null, packagingName: null },
         ],
       }),
     );

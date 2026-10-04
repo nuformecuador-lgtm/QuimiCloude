@@ -83,6 +83,7 @@ import {
   availabilityBlocksSave,
   distributionLinesValid,
   fromOrderPresentationLines,
+  toDistributionLinesInput,
   useOrderDistributionAvailability,
   type OrderDistributionLine,
 } from './use-order-distribution-availability';
@@ -559,16 +560,15 @@ export function OrderForm({
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
     const values = readValues(formData);
-    // El reparto se comprueba aparte: una linea lleva envase o presentacion, y el esquema solo
-    // valida aqui el resto de campos. El servidor revalida el reparto entero.
-    const candidate = { ...values, presentationLines: [] };
-    const linesValid = distributionLinesValid(readDistributionLines(formData));
+    const lines = readDistributionLines(formData);
+    const candidate = { ...values, presentationLines: toDistributionLinesInput(lines) };
 
     // El esquema del alta y el de la edicion son el mismo objeto (reemplazo completo); se
     // nombran los dos para que quede escrito de donde sale cada regla.
     const parsed = isEdit
       ? updateOrderSchema.safeParse(candidate)
       : createOrderSchema.safeParse(candidate);
+    const linesValid = distributionLinesValid(lines);
 
     if (!parsed.success || !linesValid) {
       const fieldErrors: FieldErrors = {};

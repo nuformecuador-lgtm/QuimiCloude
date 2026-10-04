@@ -260,7 +260,13 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedBy: null,
     presentationLines: [
 
-      { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 1 },
+      {
+        presentationId: PRESENTACION.id,
+        presentationName: PRESENTACION.name,
+        packages: 1,
+        packagingProductId: null,
+        packagingName: null,
+      },
 
     ],
     unitId: UNIDAD.id,
