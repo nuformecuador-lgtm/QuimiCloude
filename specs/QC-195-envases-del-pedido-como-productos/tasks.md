@@ -3,7 +3,9 @@
 > Escrito por `spec_author` en F1.2 y rehecho con las decisiones de F1.4 (2026-10-03): P1 = A
 > (`unidad`, `u`), P2 = A, P3 = b, N1 y N7 = alternativa, el resto = recomendación
 > (`design.md > 1`). **P4 decidida 2026-10-03 (A)**: T11 desbloqueada. **Enmienda 1 (F2.1,
-> 2026-10-03)**: R42 en T11, R43 en la nueva T10.E1, R44 en T15 ampliada (`design.md > 1.6`). Ninguna task empieza antes de la
+> 2026-10-03)**: R42 en T11, R43 en la nueva T10.E1, R44 en T15 ampliada (`design.md > 1.6`). **Enmienda 2 (F2.2, 2026-10-04)**: R45-R47 en
+> T18 y los menores del review en T19 (`design.md > 1.7`); **P6 decidida 2026-10-04 (A)**: ya no bloquea la parte
+> `POR_EMPACAR` de T18. Ninguna task empieza antes de la
 > aprobación del spec.
 >
 > **Dos carriles en paralelo.** `backend_dev`: TC, T1-T11. `frontend_dev`: T12-T15. Las tasks de
@@ -265,11 +267,58 @@ verdes.
 ### [x] T17 — Cierre `[depende de todas]`
 
 - `./init.sh` completo en verde.
-- `progress/impl_QC-195.md` con el mapa `R1..R44 -> test` sin huecos, y los tests de
+- `progress/impl_QC-195.md` con el mapa `R1..R44 -> test` (`R1..R47` tras la Enmienda 2) sin huecos, y los tests de
   `design.md > 8` reescritos con su motivo.
 - Limpieza de comentarios en las líneas tocadas.
 
 **Hecho cuando:** gate completo verde y trazabilidad completa.
+
+## Enmienda 2 (F2.2, 2026-10-04)
+
+> Viene del review de la vuelta 1 (RECHAZADO por B1) y de la decisión E5 del humano
+> (`design.md > 1.7`). Al terminar T18 y T19 se repite T17 (gate completo y mapa `R1..R47 -> test`).
+
+### [ ] T18 — «Reparto y unidad» guarda el importe (B1 + E5) `[backend_dev]` `[depende de T8, T9]` `[P con T19]`
+
+- `update-order-presentation-lines.ts`: deps `recipes` y `products`; importe calculado fuera de la
+  transacción con `resolveOrderCost(…, envases del reparto nuevo, …, { orderId })` y escrito con
+  `setIngredientsCost` cuando el pedido no queda `BLOQUEADO`, también en `BLOQUEADO → PENDIENTE`;
+  cableado en `lib/composition`.
+- `POR_EMPACAR` (R47, E5): parte de ingredientes guardada + envases recalculados. **El mecanismo
+  sigue P6-A** (`design.md > 1.7`), decidida 2026-10-04: esta parte ya puede
+  empezar. Con P6-A se suman a esta task la migración de `orders.packaging_cost` (con relleno y
+  CHECK), la columna en `db/schema.prisma` y la escritura doble en alta, edición, revisión de
+  bloqueados, bloqueo y «Reparto y unidad».
+- Unit (`tests/unit/pedidos/update-order-presentation-lines.test.ts`): escribe el importe nuevo en
+  `PENDIENTE` y `EN_CURSO`; `BLOQUEADO → PENDIENTE` lo escribe; queda `BLOQUEADO` → `null`;
+  `POR_EMPACAR` conserva la parte de ingredientes y suma los envases nuevos. Reescribir el caso de las
+  dependencias declaradas.
+- `.int` (`tests/integration/pedidos/qc195-*`): tras añadir 40 botellas por el diálogo, el importe
+  guardado es igual a `quoteOrderCost` con ese reparto y `orderId`, en `PENDIENTE` y en `EN_CURSO`;
+  un `BLOQUEADO` desbloqueado por el diálogo queda `PENDIENTE` con importe igual a `quoteOrderCost`;
+  en `POR_EMPACAR`, tras cambiar los envases, importe = parte de ingredientes guardada antes + costo
+  de los envases nuevos (R27), y **no** igual a `quoteOrderCost` (excepción de R47 a R29).
+
+**Hecho cuando:** verdes **R45, R46, R47** (unit e `.int`), y los tests de R17, R19 y R27-R30 siguen
+verdes.
+
+### [ ] T19 — Menores del review: m1, m3, m4 `[backend_dev, frontend_dev]` `[depende de T9]` `[P con T18]`
+
+- **m1** (`backend_dev`): caso que siembra un lote de envase **sin costo unitario** y comprueba que no
+  entra en el promedio (R30, segunda mitad), en `qc195-packaging-catalog.int.test.ts` o en
+  `order-cost.test.ts`. Además, un `.int` con una empresa que tiene **su propia unidad «unidad»** (y
+  símbolo `u`): el alta de un envase sigue tomando la unidad de sistema y no choca con la de la
+  empresa (R6).
+- **m3** (`backend_dev`): comentario en `lib/modules/inventario/domain/reservation.ts`, en
+  `consumeForOrder`: el respaldo solo se usa cuando, dentro de `productIds`, **ningún** producto tiene
+  nada apartado; no es por producto. Sin citar fichas (`docs/conventions.md > Comentarios`).
+- **m4** (`frontend_dev`): en `app/(private)/inventario/components/adjust-batch-dialog.tsx`, el campo
+  del ajuste con signo de un lote de envase usa un `inputMode` que en iOS permita el signo menos
+  (por ejemplo `text` con `pattern` de entero con signo, en vez de `numeric`), con test de UI que fije
+  el atributo.
+
+**Hecho cuando:** verdes los dos tests de m1 y el de m4; el comentario de m3 está y no cita fichas;
+`./init.sh --rapido` verde.
 
 ## Mapa R -> task
 
@@ -291,3 +340,8 @@ verdes.
 | R14 | T6, T10 | R28 | T9 | R42 | T11 |
 | | | | | R43 | T10.E1 |
 | | | | | R44 | T15 |
+| | | | | R45 | T18 |
+| | | | | R46 | T18 |
+| | | | | R47 | T18 (tras P6) |
+
+R6 y R30 ganan además T19 (m1).

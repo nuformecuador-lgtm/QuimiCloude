@@ -142,6 +142,53 @@ con homónimo solo busca envases que ya la tienen (`findAlivePackagingByName`,
 `product-prisma.ts:430-450`; `addBatchToAlive`, `:832-836`). R43 es una salvaguarda; su test siembra
 el caso directamente en la base.
 
+### 1.7 Enmienda 2 (F2.2, 2026-10-04) — B1 del review y decisión E5
+
+**B1 (bloqueante del review, vuelta 1).** `update-order-presentation-lines.ts` sincroniza la reserva
+pero no recalcula el importe. Solo lo pone a `null` cuando el pedido queda `BLOQUEADO`
+(`update-order-presentation-lines.ts:171-172`), y sus dependencias no incluyen los catálogos de
+costo. Desde N4 el importe incluye los envases, así que guardar el reparto por el diálogo deja el
+importe viejo (rompe R27/R29) y un `BLOQUEADO → PENDIENTE` queda sin importe (rompe R19). Se corrige
+con **R45-R47**:
+
+| Estado al guardar | Resultado | Importe guardado | R |
+|---|---|---|---|
+| `PENDIENTE`, `EN_CURSO` | no queda `BLOQUEADO` | `resolveOrderCost(catalogs, receta, cantidad, envases del reparto nuevo, companyId, { orderId })`, el mismo cálculo que `quoteOrderCost` | R45 |
+| `BLOQUEADO` | pasa a `PENDIENTE` | Ídem | R46 |
+| `PENDIENTE`, `BLOQUEADO` | queda `BLOQUEADO` (con confirmación) | `null`, como hoy | R17 |
+| `POR_EMPACAR` | — | parte de ingredientes guardada + `calculatePackagingCost(envases nuevos, lotes con { excludeOrderId })` | R47 (E5) |
+
+Igual que la edición completa (`update-order.ts:113-121`), el importe se calcula **fuera** de la
+transacción con `{ orderId }` y se escribe dentro con `setIngredientsCost` cuando el resultado no es
+`BLOQUEADO`. `UpdateOrderPresentationLinesDeps` gana `recipes` y `products`, los mismos catálogos que
+ya recibe `updateOrder`. El test «las dependencias declaradas son solo packaging, presentations,
+units, unitOfWork y now» se reescribe contra R45.
+
+**E5 (decisión del humano, 2026-10-04).** En `POR_EMPACAR` la receta ya se consumió, así que sus
+ingredientes no tienen disponible que costear: el importe es **la parte de ingredientes ya guardada,
+que se conserva, más el costo de los envases recalculado** con R27 (R47).
+
+**P6 — Cómo se separa la parte de ingredientes — Decidido 2026-10-04: A (columna `orders.packaging_cost`).**
+
+Lo que hay en el código:
+- `orders.ingredients_cost` guarda un solo número: `calculateOrderCost(ingredientes, envases)`
+  (`order-cost.ts:297-305`, `resolve-ingredients-cost.ts:118-130`), que es lo que N4 decidió.
+- Nada guarda el desglose. Terminar usa el total guardado como costo del lote si no es `null`, y si
+  lo es lo recalcula con `resolveLotCost` (R31, `order-packing.ts`).
+- El costo de los envases depende de los lotes **de cada momento** (promedio de los que tienen
+  disponible, R27, R30), así que el de hoy no tiene por qué ser el que se sumó al guardar.
+
+| Opción | Qué es | A favor | En contra |
+|---|---|---|---|
+| **A (recomendada)** | **Columna nueva `orders.packaging_cost DECIMAL(14,4) NULL`** con la parte de envases del importe guardado. `ingredients_cost` sigue siendo el **total**, así que N4, Terminar, la ficha, el listado y la cotización no cambian. Toda escritura del importe (alta, edición, revisión de bloqueados, «Reparto y unidad», el `null` al bloquear) escribe las dos columnas a la vez. En `POR_EMPACAR`: `total nuevo = (ingredients_cost − packaging_cost) + envases recalculados`. La migración rellena `packaging_cost = 0` donde `ingredients_cost IS NOT NULL` y el pedido no tiene líneas con envase: es exacto, porque antes de esta feature el importe no incluía envases. CHECK: `packaging_cost` es `NULL` si y solo si `ingredients_cost` lo es. | Exacto. No cambia lo que se lee ni lo que decidió N4: solo añade el desglose. | Una columna y un CHECK más, y seis sitios de escritura que tienen que mantener las dos columnas iguales (el CHECK lo garantiza). La migración ya está mergeada en la rama, así que va en una migración nueva de esta misma ficha. |
+| B | **Sin columna: restar el costo viejo de los envases recalculado con la misma regla.** `parte de ingredientes = ingredients_cost − calculatePackagingCost(envases viejos, lotes de hoy)`. | Sin migración. | **Inexacto.** Si cambiaron los lotes o sus costos, la resta no devuelve lo que se sumó: la parte de ingredientes deriva, e incluso puede salir negativa. Además, si hoy un envase viejo no tiene lote con costo, la resta es «sin importe» aunque el importe guardado no lo fuera. |
+| C | **Cambiar N4: guardar las dos partes por separado** (`ingredients_cost` solo ingredientes y `packaging_cost` solo envases) y que quien lee las sume. | Nombres honestos. | Reabre N4 y obliga a cambiar todas las lecturas del importe (ficha, listado, cotización, Terminar, R31). Es lo que N4 descartó. |
+| D | **Dejar sin importe** el pedido en `POR_EMPACAR` al cambiar el reparto. | Trivial. | Contradice E5. Solo se lista para completar; el review lo planteó como alternativa antes de E5. |
+
+Hasta que el humano decida P6, T18 implementa R45 y R46 y deja el caso `POR_EMPACAR` (R47) para
+después de la decisión. Con A, T18 incluye la migración, la columna en `db/schema.prisma` y la
+escritura doble; con B, solo la resta en el caso de uso.
+
 ## 2. Modelo de datos
 
 Una migración escrita a mano, `db/migrations/<ts>_packaging_products_in_distribution/` con
@@ -321,7 +368,8 @@ hermanas), así que la UI no ofrece envases hoy: el cambio es de servidor.
 3. Dentro de la unidad de trabajo: escribir pedido y líneas (con `packaging_product_id`,
    `presentation_id` y `presentation_content` copiados, R14); `buildOrderRequirement` con la fase
    del estado bloqueado; `syncForOrder`; tratar `insufficient` según el estado (R16-R19).
-4. Importe calculado fuera de la transacción como hoy, y a `null` si queda `BLOQUEADO`.
+4. Importe calculado fuera de la transacción como hoy, y a `null` si queda `BLOQUEADO`. *(Enmienda 2:
+   también en «Reparto y unidad», que no lo hacía; en `POR_EMPACAR` con la regla de R47, §1.7.)*
 
 ### 4.2 Consumo (P3-b)
 
@@ -341,7 +389,7 @@ producto), así que R22 sale gratis; se cubre con test.
 | `app/(private)/inventario/components/product-form.tsx:383-415` | Para Envase: presentación en el producto (obligatoria en el alta, fija después), existencia y ajuste «en envases», enteros. |
 | `app/(private)/inventario/components/product-batches-panel.tsx` | Un lote de envase se pinta en envases y sin presentación propia. |
 | ~~`lib/modules/asignaciones/domain/order-distribution-view.ts:9-35` — sin cambio obligatorio~~ | **Revertido por la Enmienda 1 (E2):** ver las tres filas siguientes. |
-| `lib/modules/pedidos/domain/order-catalog.ts:177-180` (`AssignedOrderPresentationLine`) | Gana `packagingName: string \| null`; lo rellena el adaptador de `pedidos` que ya lee las líneas (R44). |
+| `lib/modules/pedidos/domain/order-catalog.ts:177-180` (`AssignedOrderPresentationLine`) | Gana `packagingName: string \| null` (R44). *(Enmienda 2, m2: no lo rellena el adaptador de `pedidos`, que no puede leer `products` por `guard-arquitectura-modulos`. Lo resuelve el **dominio**: `lib/modules/pedidos/domain/list-order-summaries.ts` lee las líneas por el puerto `lib/modules/pedidos/ports/order-summary-reader.ts` y pide los nombres a `PackagingCatalog` con `companyId`.)* |
 | `lib/modules/asignaciones/domain/order-distribution-view.ts:9-35` (`OrderDistributionLineView`, `toDistributionLines`) | Gana `packagingName: string \| null`, copiado de la línea; llega a `compose-order-rows.ts:93` y `get-assigned-order-execution.ts:142` sin más cambios (R44). |
 | `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx:69-70`, `app/(private)/asignacion/[id]/components/order-execution-screen.tsx:84`, `components/shared/order-distribution-label.tsx` | Pintan `packagingName ?? presentationName ?? MISSING_VALUE_MARK` (R44, R33). Las columnas de listados de `asignacion` usan `OrderDistributionLabel` y heredan el cambio. |
 
@@ -407,6 +455,9 @@ Previstos, no ejecutados (F1.2 no corre la suite). T0 los confirma y el implemen
 | `tests/guards/guard-contrato-listados.test.ts`, `tests/unit/shared/listas-blancas-listados.test.ts`, `tests/unit/inventario/list-query.test.ts`, `list-use-cases.test.ts`, `product-service.test.ts`, `product-list-params.test.ts`, `tests/integration/inventario/list-query-indexes.int.test.ts` | `PRODUCT_QUERYABLE` gana `presentationUnitId` | Ampliar la lista blanca esperada; índice si `list-query-indexes` lo exige |
 | `tests/unit/recetas/*` (alta, edición y versiones), `tests/unit/documentos/*formula-import*` | Nuevo rechazo de PACKAGING | Añadir los casos R39-R41; los de FINISHED_PRODUCT siguen igual |
 | E2E: `pedido-en-varias-presentaciones.spec.ts`, `pedidos.spec.ts`, `pedido-bloqueado.spec.ts`, `empaque.spec.ts`, `producto-terminado.spec.ts`, `pedidos-cotizacion.spec.ts`, `reserva-de-material.spec.ts`, `aislamiento-pedidos.spec.ts` | Siembran y eligen presentaciones en el reparto | Sembrar envases; una E2E a la vez |
+| `tests/unit/inventario/module-contract.test.ts` *(Enmienda 2, m2)* | Afirmaba «`ProductView` sin presentación»; §3.4/§11.2 le añaden cuatro campos | Reescrito: exige exactamente esos cuatro, en compilación y en test (aceptado por el review) |
+| `e2e/versiones-de-receta.spec.ts` *(Enmienda 2, m2)* | Siembra repartos y versiones de receta; le alcanzan el reparto en envases y R42 | Sembrar envases donde reparte |
+| `tests/unit/pedidos/update-order-presentation-lines.test.ts` («las dependencias declaradas son solo packaging, presentations, units, unitOfWork y now») *(Enmienda 2, B1)* | Gana `recipes` y `products` para el importe | Reescribir contra R45 |
 
 ## 9. Alternativas descartadas
 

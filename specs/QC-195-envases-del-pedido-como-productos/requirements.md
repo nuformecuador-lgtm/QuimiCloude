@@ -263,6 +263,33 @@ del envase, y en cada línea antigua el nombre de su presentación `[D5]` `[D6]`
 > **Mensaje.** `insufficient_material` al Terminar el empaque usa el texto del catálogo tal cual, sin
 > un mensaje propio (`design.md > 1.6`).
 
+### Enmienda 2 (F2.2, 2026-10-04)
+
+> Viene del rechazo del review de la vuelta 1 (`progress/review_QC-195-envases-del-pedido-como-productos.md`,
+> B1) y de la decisión del humano **E5** (2026-10-04). No toca el Alcance, D1-D7, P1-P4, N1-N10 ni la
+> Enmienda 1. Detalle en `design.md > 1.7`. **P6** (cómo separar la parte de ingredientes) queda
+> decidida 2026-10-04 (A, columna `orders.packaging_cost`); solo afecta al *cómo* de R47, no a su comportamiento.
+
+**R45.** CUANDO se guarde el reparto de un pedido `PENDIENTE` o `EN_CURSO` por «Reparto y unidad» y
+el pedido no quede `BLOQUEADO`, el sistema DEBE guardar como importe el mismo valor que daría la
+cotización con su receta, su cantidad, el reparto nuevo y su propio apartado (R27, R29, R30),
+incluido «sin importe» `[D7]` `[N4]`.
+
+**R46.** CUANDO «Reparto y unidad» lleve un pedido de `BLOQUEADO` a `PENDIENTE` (R19), el sistema DEBE
+guardar el importe calculado como en R45, igual que la edición completa, y NO DEBE dejarlo sin
+importe salvo que ese cálculo dé «sin importe» `[D4]` `[D7]`.
+
+**R47.** CUANDO se guarde el reparto de un pedido `POR_EMPACAR`, el sistema DEBE guardar como importe
+la **parte de ingredientes del importe ya guardado, sin recalcularla**, más el costo de los envases
+del reparto nuevo calculado con R27 y R30; SI el importe guardado es «sin importe» o el costo de los
+envases lo es, ENTONCES el pedido DEBE quedar sin importe `[D7]` `[E5]`. *(Cómo se obtiene la parte
+de ingredientes: P6.)*
+
+> En `POR_EMPACAR` la receta ya se consumió, así que la cotización del formulario recalcularía los
+> ingredientes con los lotes de hoy y daría otra cifra. R47 es por eso una **excepción a la paridad
+> de R29** en ese estado. No se ve en pantalla: el diálogo «Reparto y unidad» no muestra la cotización
+> y la edición completa no admite `POR_EMPACAR`.
+
 ## Preguntas abiertas
 
 - **Unidad «envase».** No existe una unidad de sistema para contar piezas. Hay que decidir si
@@ -292,6 +319,13 @@ del envase, y en cada línea antigua el nombre de su presentación `[D5]` `[D6]`
   (`update-recipe.ts:91-106`, `update-recipe-version.ts:42-55`), pero crear una versión valida
   **todas** las líneas copiadas (`create-recipe-version.ts:42-56`), así que con R39 una original con
   un envase dejaría de poder versionarse. Opciones y recomendación en `design.md > 1.5`.
+
+- **P6 — Cómo separar la parte de ingredientes del importe guardado (R47).** *(Nueva, Enmienda 2,
+  2026-10-04; DECIDIDA 2026-10-04: A, columna `orders.packaging_cost`.)* Hoy `orders.ingredients_cost` guarda un solo número,
+  ingredientes más envases (N4), y nada guarda el desglose. Restar el costo viejo de los envases
+  recalculándolo no es exacto, porque los lotes y sus costos pueden haber cambiado desde que se
+  guardó. La opción recomendada añade una columna con la parte de envases y deja N4 como está (el
+  total sigue en `ingredients_cost`). Opciones en `design.md > 1.7`.
 
 ## Decisiones cerradas (no reabrir)
 
