@@ -57,6 +57,7 @@ import { INVENTORY_ROUTE, LOGIN_ROUTE, USERS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc101_e2e_';
@@ -294,13 +295,15 @@ test.describe('cierre de sesiones de otra persona desde la pantalla', () => {
       await expect(adminPage.getByTestId(USERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
       await expect(adminPage.getByTestId(USER_LIST_TESTID)).toBeVisible({ timeout: 60_000 });
 
-      // --- 3. ABRE EL PANEL DE DETALLE de la victima con el disparador de edicion de SU fila,
+      // --- 3. ABRE EL PANEL DE DETALLE de la victima con el item de edicion del menu de SU fila,
       // localizada por el identificador que puso la base —nunca por posicion—.
       const victimRowActions = adminPage.locator(
         `[data-testid="${USER_ROW_ACTIONS_TESTID}"][data-user-id="${victimId}"]`,
       );
       await expect(victimRowActions).toHaveCount(1, { timeout: 60_000 });
-      await victimRowActions.getByTestId(USER_ACTION_EDIT_TESTID).click();
+      await (
+        await openRowActionsMenuItem(adminPage, victimRowActions, USER_ACTION_EDIT_TESTID)
+      ).click();
 
       const sheet = adminPage.getByTestId(USER_SHEET_TESTID);
       await expect(sheet).toBeVisible({ timeout: 60_000 });

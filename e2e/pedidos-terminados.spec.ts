@@ -78,6 +78,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc145_e2e_';
@@ -651,7 +652,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(row).toHaveCount(1, { timeout: 60_000 });
 
     // --- El panel de edicion no ofrece NINGUN control de estado.
-    await row.getByTestId(ORDER_ACTION_EDIT_TESTID).click();
+    await (await openOrderRowMenu(page, rowMenuTrigger(row), ORDER_ACTION_EDIT_TESTID)).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ORDER_STATUS_SELECT_TESTID)).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: /estado/i })).toHaveCount(0);
@@ -662,7 +663,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     // Administrador-, y SI sigue ofreciendo a quien no lo tiene -el Operador-, control positivo de
     // que la lista de candidatos cargo de verdad.
     const urlBeforeOpen = page.url();
-    await row.getByTestId(ORDER_ACTION_RESPONSIBLES_TESTID).click();
+    await (await openOrderRowMenu(page, rowMenuTrigger(row), ORDER_ACTION_RESPONSIBLES_TESTID)).click();
     const anchor = page.getByTestId(SHEET_RESPONSIBLES_TESTID);
     await expect(anchor).toBeVisible({ timeout: 60_000 });
     await expect(anchor).toHaveAttribute('data-section', RESPONSIBLES_SECTION_VALUE);
