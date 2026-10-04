@@ -77,8 +77,8 @@ describe('QC-195 contrato de pedidos — 11.7 vista de la linea', () => {
   it('R33: la linea expone su envase; null es una linea antigua', () => {
     type Envase = Pick<OrderPresentationLineView, 'packagingProductId' | 'packagingName'>
     expectTypeOf<Envase>().toEqualTypeOf<{
-      readonly packagingProductId?: string | null
-      readonly packagingName?: string | null
+      readonly packagingProductId: string | null
+      readonly packagingName: string | null
     }>()
     expectTypeOf<OrderPresentationLineView['presentationId']>().toEqualTypeOf<string>()
     expectTypeOf<OrderPresentationLineView['packages']>().toEqualTypeOf<number>()
