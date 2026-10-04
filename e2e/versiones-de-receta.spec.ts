@@ -28,6 +28,8 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { addPackagingLine } from './helpers/order-distribution';
+import { seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc172_e2e_';
 
@@ -44,6 +46,10 @@ const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
 const ORIGINAL_NAME = `${SHARED_TOKEN}_original`;
 const VERSION_NAME = `${SHARED_TOKEN}_version`;
 const PLAIN_RECIPE_NAME = `${SHARED_TOKEN}_sinversiones`;
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_lote_envase`;
+const PACKAGING_STOCK = '2000';
+const PACKAGING_UNIT_COST = '0.1000';
 
 const PRODUCT_KEYS = ['a', 'b', 'c'] as const;
 type ProductKey = (typeof PRODUCT_KEYS)[number];
@@ -63,11 +69,12 @@ const adminUser = {
 } as const;
 
 let companyId: string | null = null;
-let presentationId: string | null = null;
 let unitId: string | null = null;
 let originalId: string | null = null;
 let versionId: string | null = null;
 let plainRecipeId: string | null = null;
+let packagingId: string | null = null;
+let packagingBatchId: string | null = null;
 const productIds = new Map<ProductKey, string>();
 const batchIds = new Map<ProductKey, string>();
 
@@ -152,7 +159,6 @@ test.beforeAll(async () => {
     },
     select: { id: true },
   });
-  presentationId = presentation.id;
 
   const purchaseDate = new Date('2026-01-01T00:00:00Z');
   for (const key of PRODUCT_KEYS) {
@@ -197,6 +203,18 @@ test.beforeAll(async () => {
       },
     });
   }
+
+  const packaging = await seedPackaging({
+    companyId: company.id,
+    name: PACKAGING_NAME,
+    presentationId: presentation.id,
+    stock: PACKAGING_STOCK,
+    unitCost: PACKAGING_UNIT_COST,
+    lot: PACKAGING_LOT,
+    createdBy: admin.id,
+  });
+  packagingId = packaging.productId;
+  packagingBatchId = packaging.batchId;
 
   const productA = productIds.get('a')!;
   const productB = productIds.get('b')!;
@@ -349,21 +367,12 @@ test.describe('version de receta en el pedido', () => {
     await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
     const distribution = page.getByTestId('order-distribution-field');
-    const presentationPicker = distribution.getByTestId('presentation-select');
-    await presentationPicker.click();
-    await presentationPicker.fill(PRESENTATION_NAME);
-    const presentationOption = page
-      .getByTestId('presentation-option')
-      .filter({ hasText: PRESENTATION_NAME });
-    await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-    await presentationOption.click();
-    await distribution.getByTestId('order-distribution-add-packages').fill(ORDER_QUANTITY);
-    await distribution.getByTestId('order-distribution-add').click();
-    await expect(
-      distribution.locator(
-        `[data-testid="order-distribution-line"][data-presentation-id="${presentationId}"]`,
-      ),
-    ).toHaveCount(1);
+    await addPackagingLine(
+      page,
+      page.getByTestId('order-form'),
+      { productId: packagingId ?? '', name: PACKAGING_NAME },
+      ORDER_QUANTITY,
+    );
     await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
       'data-state',
       'ready',
@@ -386,8 +395,10 @@ test.describe('version de receta en el pedido', () => {
       where: { orderId: order.id },
       select: { batchId: true, kind: true, quantity: true },
     });
+    // El envase tambien queda apartado; aqui solo cuentan las lineas de la receta.
     const reservedByBatch = new Map<string, number>();
     for (const movement of movements) {
+      if (movement.batchId === packagingBatchId) continue;
       const sign = movement.kind === 'reserve' ? 1 : -1;
       reservedByBatch.set(
         movement.batchId,
