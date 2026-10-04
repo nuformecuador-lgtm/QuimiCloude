@@ -1343,3 +1343,29 @@ Dudas para quien las corra:
   lo sigue viendo `addLine` con la presentacion conocida, y el servidor al resolver.
 - **Test:** `tests/unit/pedidos-ui/order-form.test.tsx` caso «R17: dos envases de presentaciones
   distintas se guardan…», con el esquema real; falla sin el fix.
+
+## Implementer — T16, E2E corridas una a una (chromium, puerto 3117, base `QuimiCloude_QC195`, `.next/dev/types` borrado antes de cada una)
+
+Punta 21651d8d (con el fix a9714d4d del alta con dos envases, encontrado por el E2E nuevo):
+
+| Spec | Resultado |
+|---|---|
+| `e2e/envases-del-pedido.spec.ts` (nueva) | `2 passed (38.8s)` |
+| `e2e/pedidos.spec.ts` | `2 passed (17.7s)` |
+| `e2e/pedido-bloqueado.spec.ts` | `1 passed (33.6s)` |
+| `e2e/reserva-de-material.spec.ts` | `1 passed (45.1s)` |
+| `e2e/producto-terminado.spec.ts` | `1 passed (35.7s)` |
+| `e2e/pedidos-cotizacion.spec.ts` | `2 passed (20.2s)` |
+| `e2e/aislamiento-pedidos.spec.ts` | `1 passed (16.8s)` |
+| `e2e/empaque.spec.ts` | `1 passed (25.4s)` |
+| `e2e/pedido-en-varias-presentaciones.spec.ts` | `2 passed (41.1s)` |
+| `e2e/recetas.spec.ts` | `3 passed (17.4s)` |
+| `e2e/versiones-en-la-receta.spec.ts` | `1 passed (27.1s)` |
+| `e2e/versiones-de-receta.spec.ts` | 1 failed: elegia una presentacion en el reparto (`presentation-select`, :353). Afectado por esta feature y no listado en `design.md > 8`; se adapta. |
+
+Rojos heredados de `dev`, NO de esta feature (evidencia):
+- `e2e/pedidos-busqueda.spec.ts` (1 failed / 4 passed, :331 `order-action-edit`), `e2e/pedidos-responsables.spec.ts`
+  (:322 `order-action-responsibles`), `e2e/pedidos-terminados.spec.ts` (1 failed / 3 passed, :645 `order-action-edit`).
+  Los tres hacen clic en la accion dentro de la fila; `527a9902` (en `origin/dev`, antes de la base `555c62f6`
+  de esta rama) movio esas acciones a un menu de 3 puntos fuera de la fila. `git diff 555c62f6 HEAD` sobre
+  esos tres archivos esta vacio: esta rama no los toca. No se arreglan aqui (ajeno al alcance).
