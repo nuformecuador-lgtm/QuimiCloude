@@ -15,4 +15,7 @@ export type ProductBatchView = {
   readonly available?: string;
   /** El apartado supera la existencia. Misma condicion que `reserved`. */
   readonly overReserved?: boolean;
+  /** Nombre de la presentacion del lote. Solo lo rellena `findBatchesOfOrder`: un pedido puede
+   *  tener lotes de varias presentaciones. */
+  readonly presentationName?: string | null;
 };

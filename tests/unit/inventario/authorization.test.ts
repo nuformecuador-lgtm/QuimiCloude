@@ -33,6 +33,8 @@ import {
 } from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListBatchMovements } from '@/lib/modules/inventario/domain/list-batch-movements';
+import { createListFinishedStock } from '@/lib/modules/inventario/domain/list-finished-stock';
+import { createListOrderBatches } from '@/lib/modules/inventario/domain/list-order-batches';
 import { createListProductBatches } from '@/lib/modules/inventario/domain/list-product-batches';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
@@ -41,7 +43,9 @@ import { createProductSchema, updateProductSchema } from '@/lib/modules/inventar
 import type { OrderNumberDirectory } from '@/lib/modules/inventario/domain/reservation';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
+import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
+import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
@@ -190,6 +194,8 @@ type Repos = {
   readonly log: ListQueryLog;
   readonly people: PeopleDirectory;
   readonly orders: OrderNumberDirectory;
+  readonly finishedOrders: FinishedOrderRepository;
+  readonly orderNumbers: OrderNumberFormatter;
 };
 
 /** El hueco que `inventario` declara para el numero visible de un pedido: sin permiso el
@@ -209,6 +215,19 @@ function montarReposQueFallan(): Repos {
     log: logQueFalla(),
     people: directorioQueFalla(),
     orders: directorioDePedidosQueFalla(),
+    finishedOrders: {
+      findBatchesOfOrder: vi.fn<FinishedOrderRepository['findBatchesOfOrder']>(() => {
+        throw new Error('el repositorio de pedidos terminados no debe ser llamado');
+      }),
+      listStockGroups: vi.fn<FinishedOrderRepository['listStockGroups']>(() => {
+        throw new Error('el repositorio de pedidos terminados no debe ser llamado');
+      }),
+    },
+    orderNumbers: {
+      format: vi.fn<OrderNumberFormatter['format']>(() => {
+        throw new Error('el formato del numero de pedido no debe ser llamado');
+      }),
+    },
   };
 }
 
@@ -279,6 +298,11 @@ function montarReposPermisivos(): Repos {
     orders: {
       findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(async () => new Map()),
     },
+    finishedOrders: {
+      findBatchesOfOrder: vi.fn<FinishedOrderRepository['findBatchesOfOrder']>(async () => []),
+      listStockGroups: vi.fn<FinishedOrderRepository['listStockGroups']>(async () => PAGINA_VACIA),
+    },
+    orderNumbers: { format: vi.fn<OrderNumberFormatter['format']>(() => '2026-0000001') },
   };
 }
 
@@ -310,6 +334,9 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.people.findRefsIncludingDeletedInCompany).not.toHaveBeenCalled(),
     // Sin permiso tampoco se pregunta el numero visible de ningun pedido.
     () => expect(repos.orders.findNumberTexts).not.toHaveBeenCalled(),
+    () => expect(repos.finishedOrders.findBatchesOfOrder).not.toHaveBeenCalled(),
+    () => expect(repos.finishedOrders.listStockGroups).not.toHaveBeenCalled(),
+    () => expect(repos.orderNumbers.format).not.toHaveBeenCalled(),
   ];
 }
 
@@ -438,6 +465,33 @@ const CASOS_DE_USO: ReadonlyArray<{
       })('lote-1', actor),
     invocarConEntradaInvalida: null,
   },
+  {
+    nombre: 'list-order-batches',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) =>
+      createListOrderBatches({ finishedOrders: repos.finishedOrders })(
+        '7d3f0c1e-2b4a-4c5d-8e9f-0a1b2c3d4e5f',
+        actor,
+      ),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createListOrderBatches({ finishedOrders: repos.finishedOrders })('no-es-un-uuid', actor),
+  },
+  {
+    nombre: 'list-finished-stock',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) =>
+      createListFinishedStock({
+        finishedOrders: repos.finishedOrders,
+        orderNumbers: repos.orderNumbers,
+        log: repos.log,
+      })({}, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createListFinishedStock({
+        finishedOrders: repos.finishedOrders,
+        orderNumbers: repos.orderNumbers,
+        log: repos.log,
+      })(ENTRADA_INVALIDA, actor),
+  },
 ];
 
 const CASOS_DE_LECTURA = CASOS_DE_USO.filter((caso) => caso.permiso === CONSULTAR);
@@ -484,8 +538,8 @@ async function esperarConcesion(
  * ser entrada valida-, todo lo de abajo seguiria en verde midiendo otra cosa.
  */
 describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => {
-  it('cubre los doce casos de uso: siete de modificacion y cinco de consulta', () => {
-    expect(CASOS_DE_USO).toHaveLength(12);
+  it('cubre los catorce casos de uso: siete de modificacion y siete de consulta', () => {
+    expect(CASOS_DE_USO).toHaveLength(14);
     expect(CASOS_DE_ESCRITURA.map((caso) => caso.nombre)).toEqual([
       'create-product',
       'update-product',
@@ -501,6 +555,8 @@ describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => 
       'list-presentations',
       'list-product-batches',
       'list-batch-movements',
+      'list-order-batches',
+      'list-finished-stock',
     ]);
   });
 
@@ -571,7 +627,7 @@ describe('QC-74 R12/R15 — rechazo sin el permiso exigido, sin efectos y con el
     // aqui saldria `ValidationError` -y un actor sin permiso habria averiguado algo del
     // sistema que no tenia derecho a preguntar-.
     const conEntrada = CASOS_DE_USO.filter((caso) => caso.invocarConEntradaInvalida !== null);
-    expect(conEntrada).toHaveLength(7);
+    expect(conEntrada).toHaveLength(9);
 
     for (const caso of conEntrada) {
       const invocar = caso.invocarConEntradaInvalida;
@@ -599,8 +655,8 @@ describe('QC-74 R13 — pertenencia exacta, sin jerarquia ni implicacion entre p
     }
   });
 
-  it('un actor con solo inventario.modificar es rechazado en los cinco casos de lectura', async () => {
-    expect(CASOS_DE_LECTURA).toHaveLength(5);
+  it('un actor con solo inventario.modificar es rechazado en los siete casos de lectura', async () => {
+    expect(CASOS_DE_LECTURA).toHaveLength(7);
 
     for (const caso of CASOS_DE_LECTURA) {
       await esperarRechazoSinEfectos(

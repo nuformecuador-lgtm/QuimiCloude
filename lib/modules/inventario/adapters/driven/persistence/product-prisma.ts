@@ -929,6 +929,51 @@ export async function findBatchesOfAliveProduct(
   });
 }
 
+/** Lotes que entraron por el asiento `production` del pedido. El ambito va en el lote y en el
+ *  asiento: un `orderId` de otra empresa no encuentra ninguno de los dos. Con `orderId` `null`,
+ *  los lotes sin asiento `production`, y entonces solo los de `productId`. */
+export async function findBatchesOfOrder(
+  orderId: string | null,
+  scope: InventoryScope,
+  productId: string | null = null,
+): Promise<readonly ProductBatchView[]> {
+  if (orderId === null && productId === null) return [];
+  const production = { AND: [movementCompanyScope(scope), { kind: 'production' as const }] };
+  const rows = await prisma.productBatch.findMany({
+    where: {
+      AND: [
+        batchCompanyScope(scope),
+        {
+          ...(productId === null ? {} : { productId }),
+          product: { deletedAt: null },
+          movements:
+            orderId === null
+              ? { none: production }
+              : { some: { AND: [movementCompanyScope(scope), { kind: 'production', orderId }] } },
+        },
+      ],
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    select: { ...BATCH_VIEW_SELECT, presentation: { select: { unitId: true, name: true } } },
+  });
+
+  const reservedByBatch = await findReservedAndAvailableByBatch(
+    prisma,
+    scope.companyId,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => {
+    const aggregate = reservedByBatch.get(row.id);
+    return {
+      ...toBatchView(row),
+      presentationName: row.presentation?.name ?? null,
+      reserved: aggregate?.reserved ?? ZERO_QUANTITY,
+      available: aggregate?.available ?? row.stock.toFixed(4),
+      overReserved: aggregate?.overReserved ?? false,
+    };
+  });
+}
+
 /** `P2025`: el `where` unico mas el filtro de empresa no encontraron fila que actualizar. */
 function isBatchNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
