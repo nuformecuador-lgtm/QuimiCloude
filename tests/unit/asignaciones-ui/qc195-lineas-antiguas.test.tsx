@@ -20,7 +20,7 @@ function fila(overrides: Partial<PackingOrderRow> = {}): PackingOrderRow {
     numberText: '2026-0000030',
     recipeName: 'Jarabe simple',
     quantity: '12.5',
-    presentationLines: [{ presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5 }],
+    presentationLines: [{ presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 }],
     unitId: 'unit-1',
     unitLabel: 'l',
     packages: '5',

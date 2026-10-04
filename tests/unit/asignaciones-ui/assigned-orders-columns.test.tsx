@@ -31,7 +31,7 @@ const BASE_ORDER: AssignedOrderView = {
   otherResponsibles: [
     { userId: 'user-2', displayName: 'Ana López García', origin: { kind: 'direct' } },
   ],
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,
 };
@@ -118,8 +118,8 @@ describe('R24: columna Presentación', () => {
     renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, {
       ...BASE_ORDER,
       presentationLines: [
-        { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packages: 5 },
-        { presentationId: 'pres-2', presentationName: 'Caja x 12', packages: 1 },
+        { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+        { presentationId: 'pres-2', presentationName: 'Caja x 12', packagingName: null, packages: 1 },
       ],
     });
 

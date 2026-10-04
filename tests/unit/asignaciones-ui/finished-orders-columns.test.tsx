@@ -21,7 +21,7 @@ const BASE_ORDER: FinishedOrderView = {
   numberText: '2026-000123',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 5 }],
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,
   finishedAt: new Date('2026-09-20T15:30:00.000Z'),
