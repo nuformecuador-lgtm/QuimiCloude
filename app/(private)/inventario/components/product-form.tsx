@@ -44,9 +44,9 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
 /**
  * Campos de texto del producto.
  *
- * **El costo no esta**: QC-52 lo saco del producto entero -junto con la compra minima y el
- * tiempo de entrega- porque son terminos comerciales del catalogo de cada proveedor. Ya no hay
- * campo, ni oculto, ni valor precargado que enviar (R5).
+ * **El costo no esta** -ni la compra minima ni el tiempo de entrega- porque son terminos
+ * comerciales del catalogo de cada proveedor. Ya no hay campo, ni oculto, ni valor precargado
+ * que enviar.
  */
 const TEXT_FIELDS = ['name'] as const;
 
