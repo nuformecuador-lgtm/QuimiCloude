@@ -16,7 +16,142 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+**Términos.** *Necesidad de una línea*: cantidad del pedido × porcentaje ÷ 100, expresada en la
+unidad del pedido. *Unidad del insumo*: la unidad guardada del producto de la línea. *Familia de
+volumen*: las unidades cuya base efectiva es el **mililitro de sistema**; *familia de masa*: las
+cuya base efectiva es el **gramo de sistema** (ver N1). *Línea exacta / aproximada / no
+convertible*: el resultado de R2, R3 y R4. *Recálculo*: alta, edición, desbloqueo, cambio de
+reparto, costo del lote al terminar el empaque, consumo al finalizar y cotización.
+
+### Conversión de la necesidad (D1–D4)
+
+- **R1** (ubicuo) El sistema DEBE calcular la necesidad de cada línea de receta de un pedido con
+  unidad como cantidad del pedido × porcentaje ÷ 100 **en la unidad del pedido**, y convertirla a
+  la unidad del insumo antes de usarla para costear, apartar, consumir o mostrar.
+- **R2** (condicional) SI la unidad del pedido y la unidad del insumo comparten base efectiva,
+  ENTONCES el sistema DEBE convertir la necesidad de forma **exacta** con los factores del catálogo
+  de unidades. *Ejemplo verificable:* pedido de 1000 g, línea al 10 %, insumo en kg → 0,1 kg.
+- **R3** (condicional) SI una de las dos unidades pertenece a la familia de volumen y la otra a la
+  familia de masa, ENTONCES el sistema DEBE convertir la necesidad a la base de su familia, tomar
+  esa misma cifra en la base de la otra familia (1 ml ≈ 1 g) y convertirla a la unidad del insumo,
+  y DEBE clasificar la línea como **aproximada**. *Ejemplo verificable:* pedido de 2 l, línea al
+  50 %, insumo en kg → 1 kg, aproximada.
+- **R4** (condicional) SI la unidad del pedido y la del insumo no cumplen ni R2 ni R3, ENTONCES el
+  sistema DEBE clasificar la línea como **no convertible** y NO DEBE producir ninguna cantidad para
+  ella.
+
+### Costo (D4, D6, D8)
+
+- **R5** (por evento) CUANDO se calcula el costo de ingredientes de un pedido con unidad en
+  cualquier recálculo, el sistema DEBE usar la necesidad convertida por R1–R3. *Ejemplo
+  verificable:* misma receta y mismos lotes, un pedido de 1000 kg cuesta 1000 veces lo que uno de
+  1000 g.
+- **R6** (condicional) SI alguna línea de la receta es no convertible, ENTONCES el costo del pedido
+  —el que se guarda y el que devuelve la cotización— DEBE ser «sin costo» (`null`).
+- **R7** (condicional) SI al terminar el empaque se calcula el costo del lote de un pedido con una
+  línea no convertible, ENTONCES esa línea DEBE contar como cero, con la misma regla que ya aplica
+  hoy a un ingrediente sin costo (ver N4).
+- **R8** (por evento) CUANDO el formulario de pedido pide una cotización, DEBE enviar la unidad del
+  pedido, y CUANDO cambia la unidad elegida, el formulario DEBE pedir una cotización nueva.
+- **R9** (condicional) SI la cotización llega sin unidad del pedido, o con una unidad que no existe
+  o no es visible para la empresa del actor, ENTONCES el sistema DEBE devolver «sin costo» sin
+  calcular nada.
+
+### Reserva y consumo (D8)
+
+- **R10** (por evento) CUANDO se aparta material para un pedido con unidad (alta, edición,
+  desbloqueo, cambio de reparto), el sistema DEBE apartar de cada insumo la necesidad convertida,
+  en la unidad del insumo. *Ejemplo verificable:* pedido de 1000 g, línea al 10 %, insumo en kg →
+  se apartan 0,1 kg.
+- **R11** (por evento) CUANDO se finaliza un pedido con unidad que no tiene nada apartado, la
+  necesidad de respaldo con la que se consume DEBE ser la necesidad convertida.
+- **R12** (condicional) SI alguna línea de la receta es no convertible al guardar el pedido,
+  ENTONCES el sistema DEBE aplicar la regla que cierre la **Pregunta abierta 1**. *Provisional,
+  pendiente de esa respuesta:* con la opción A, el pedido se trata como falta de material
+  (`BLOQUEADO` con confirmación, sin nada apartado, igual que QC-138); con la opción B, el guardado
+  se rechaza con un error que nombra los insumos no convertibles y no se escribe nada.
+
+### Lo que se muestra (D4, D7, D8)
+
+- **R13** (ubicuo) La tabla de ingredientes del formulario de pedido DEBE mostrar la «cantidad
+  requerida» y el «restante» de cada línea con la necesidad convertida y en la unidad del insumo,
+  y DEBE recalcularlos CUANDO cambia la cantidad o la unidad del pedido.
+- **R14** (condicional) SI una línea es no convertible, ENTONCES la tabla de ingredientes DEBE
+  mostrar en esa línea un aviso de que la unidad del pedido no es convertible a la del insumo, sin
+  cifra de «cantidad requerida» ni de «restante».
+- **R15** (condicional) SI una línea es aproximada, ENTONCES la tabla de ingredientes DEBE mostrarla
+  con la marca «aprox.».
+- **R16** (ubicuo) La pantalla de ejecución del operario DEBE mostrar la cantidad de cada línea con
+  la necesidad convertida y en la unidad del insumo; el cambio de unidad de visualización que ya
+  ofrece DEBE partir de esa cantidad convertida.
+- **R17** (condicional) SI una línea de la ejecución es aproximada, ENTONCES DEBE mostrarse con la
+  marca «aprox.»; SI es no convertible, ENTONCES DEBE mostrarse sin cifra y con el aviso de R14.
+- **R18** (de estado) MIENTRAS el bloque de costo del formulario muestre un importe y alguna línea
+  de la receta sea aproximada, el bloque DEBE indicar que el importe incluye una aproximación.
+- **R19** (de estado) MIENTRAS el formulario no tenga unidad del pedido elegida, la tabla de
+  ingredientes NO DEBE mostrar cifra de «cantidad requerida» ni de «restante», y el bloque de costo
+  DEBE mostrar el guion (ver N2).
+
+### Pedidos sin unidad, insumos sin unidad y pedidos ya guardados (D5, D6)
+
+- **R20** (condicional) SI el pedido no tiene unidad (`unit_id` NULL), ENTONCES el costo, la
+  reserva, el consumo y la ejecución DEBEN calcular la necesidad como hoy —cantidad × porcentaje ÷
+  100 leída directamente en la unidad del insumo— y ninguna línea DEBE marcarse «aprox.» ni
+  «no convertible».
+- **R21** (condicional) SI el insumo de una línea no tiene unidad, ENTONCES esa línea DEBE
+  comportarse como hoy: sin costo, tratada como falta de material por la reserva y mostrada con la
+  cifra sin convertir y sin unidad; NO DEBE clasificarse como no convertible (ver N3).
+- **R22** (ubicuo) El sistema NO DEBE recalcular ni migrar el costo ni lo apartado de los pedidos ya
+  guardados; un pedido guardado DEBE conservar ambos hasta que lo alcance un recálculo.
+
+### Permisos, contrato y escenarios de extremo a extremo (D9–D11)
+
+- **R23** (condicional) SI el actor no tiene `pedidos.modificar`, ENTONCES la cotización con unidad
+  DEBE rechazarse en el service antes de validar la entrada y sin leer ningún catálogo.
+- **R24** (por evento) CUANDO se crea un pedido de una cantidad en **g** sobre una receta cuyo insumo
+  está en **kg**, el costo guardado y la cantidad apartada DEBEN corresponder a la conversión
+  exacta de R2 (verificado E2E).
+- **R25** (por evento) CUANDO se crea un pedido de una cantidad en **l** sobre una receta cuyo
+  insumo está en **kg**, el costo guardado y la cantidad apartada DEBEN corresponder a la
+  aproximación de R3, y la línea y el costo DEBEN llevar las marcas de R15 y R18 (verificado E2E).
+- **R26** (ubicuo) Los identificadores nuevos DEBEN estar en inglés, el borrado lógico del pedido NO
+  DEBE cambiar y la feature NO DEBE añadir dependencias de terceros.
+
+### Cobertura de las decisiones cerradas
+
+| Decisión | Requisitos |
+|---|---|
+| D1 Necesidad en la unidad del pedido | R1 |
+| D2 Misma familia, exacta | R2, R24 |
+| D3 Masa ↔ volumen, aproximación | R3, R25 |
+| D4 Otra combinación, no convertible | R4, R6, R12, R14, R17 |
+| D5 Sin migración | R22 |
+| D6 Recálculos con la fórmula nueva; sin unidad como hoy | R5, R7, R10, R11, R20 |
+| D7 Marca «aprox.» y aviso en el costo | R15, R17, R18, R25 |
+| D8 Quién usa el cálculo | R5, R8, R9, R10, R11, R13, R16 |
+| D9 Permisos | R23 |
+| D10 E2E | R24, R25 |
+| D11 Identificadores, borrado, dependencias | R26 |
+
+### Decisiones nuevas que este spec propone (las aprueba el humano con el spec)
+
+- **N1 — Qué es «masa» y «volumen».** La familia de volumen es la de base efectiva **mililitro de
+  sistema** y la de masa la de **gramo de sistema**. Una unidad propia que derive de ellos entra en
+  su familia; una base propia de la empresa (por ejemplo un «gramo» propio sin derivar del de
+  sistema) no entra en ninguna y cruza solo con su propia familia. Sin esto R3 no tiene a qué
+  agarrarse: el catálogo no guarda «dimensión».
+- **N2 — Formulario sin unidad elegida.** Hasta elegir unidad, la tabla no muestra cantidades y el
+  costo va con guion (R19), en vez de mostrar la cifra sin convertir que hoy induce al error que
+  esta ficha corrige.
+- **N3 — Insumo sin unidad.** Se queda como hoy (R21) y no pasa a «no convertible»: si pasara, la
+  Pregunta 1 cambiaría también cómo se guardan los pedidos cuyo insumo aún no tiene lotes.
+- **N4 — Costo del lote con una línea no convertible.** Cuenta cero (R7), la regla que ya rige para
+  un ingrediente sin costo. Solo es alcanzable si la unidad del insumo cambia después de guardar
+  (QC-206).
+- **N5 — Redondeo de la conversión.** No se añade redondeo propio: la conversión trunca a 12
+  decimales cuando la división no termina (QC-76), el costo redondea una vez a 4 al final, la
+  reserva aparta redondeando hacia arriba a 4 (QC-141) y la pantalla pinta 2. Cierra la pregunta 2
+  de QC-164 sin regla nueva.
 
 ## Preguntas abiertas
 
