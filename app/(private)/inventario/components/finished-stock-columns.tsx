@@ -60,6 +60,21 @@ export function finishedStockRowTitle(row: FinishedStockRow): string {
   return row.recipeName === null ? order : `${order} · ${row.recipeName}`;
 }
 
+/** Lo que pinta la columna «Nombre» en la fila agrupadora: el producto, sin el pedido. */
+export function finishedStockRowName(row: FinishedStockRow): string {
+  if (row.kind === 'withoutOrder') return row.products[0].product.name;
+  return row.recipeName ?? EMPTY_CELL;
+}
+
+function orderNumberCell(row: FinishedStockRow): ReactNode {
+  const text = row.kind === 'order' ? row.numberText : 'Sin pedido';
+  return (
+    <span className="font-medium" data-testid="finished-stock-order-number">
+      {text}
+    </span>
+  );
+}
+
 function packagedStockCell(
   entries: readonly PackagedStockEntry[] | null,
   units: readonly UnitRef[] | undefined,
@@ -130,6 +145,12 @@ export function buildFinishedStockColumns({
         ),
     },
     {
+      id: 'orderNumber',
+      label: '# Pedido',
+      align: 'start',
+      cell: (item) => (item.kind === 'group' ? orderNumberCell(item.row) : null),
+    },
+    {
       id: 'name',
       label: 'Nombre',
       align: 'start',
@@ -162,7 +183,7 @@ export function buildFinishedStockColumns({
               />
             </Button>
             <span className="font-medium" data-testid="finished-stock-name">
-              {title}
+              {finishedStockRowName(item.row)}
             </span>
           </div>
         );

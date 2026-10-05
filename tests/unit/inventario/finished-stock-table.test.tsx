@@ -171,7 +171,7 @@ describe('rotulo de existencia en envases', () => {
 });
 
 describe('fila de pedido', () => {
-  it('pinta «Pedido <numero> · <receta>» y la existencia con aria-label y title exactos', () => {
+  it('pinta el numero en «# Pedido», la receta en «Nombre» y la existencia con aria-label y title exactos', () => {
     montar([
       pedido({
         packagedStock: [
@@ -182,9 +182,10 @@ describe('fila de pedido', () => {
     ]);
 
     const fila = filaDeGrupo('order-1');
-    expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(
-      'Pedido 2026-0007 · Desengrasante',
+    expect(within(fila).getByTestId('finished-stock-order-number')).toHaveTextContent(
+      /^2026-0007$/,
     );
+    expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(/^Desengrasante$/);
     const rotulo = '6 × Botella 250 ml + 200 ml, 1 × Botella 1 L';
     const celda = within(fila).getByTestId('finished-stock-packaged');
     expect(celda).toHaveTextContent(rotulo);
@@ -192,11 +193,28 @@ describe('fila de pedido', () => {
     expect(celda).toHaveAttribute('title', rotulo);
   });
 
-  it('sin receta, solo «Pedido <numero>»', () => {
+  it('sin receta, el numero sigue en «# Pedido» y «Nombre» pinta el marcador de vacio', () => {
     montar([pedido({ recipeName: null })]);
-    expect(within(filaDeGrupo('order-1')).getByTestId('finished-stock-name')).toHaveTextContent(
-      /^Pedido 2026-0007$/,
+    const fila = filaDeGrupo('order-1');
+    expect(within(fila).getByTestId('finished-stock-order-number')).toHaveTextContent(
+      /^2026-0007$/,
     );
+    expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(EMPTY_CELL);
+  });
+
+  it('la columna «# Pedido» va entre la imagen y «Nombre» y queda vacia en las sub-filas', async () => {
+    const user = setupUser();
+    montar([pedido()]);
+    const cabeceras = screen
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent?.trim() ?? '');
+    const posicion = cabeceras.indexOf('# Pedido');
+    expect(posicion).toBeGreaterThan(-1);
+    expect(cabeceras[posicion + 1]).toBe('Nombre');
+
+    await user.click(screen.getByTestId('finished-stock-toggle'));
+    const sub = screen.getByTestId('data-table-row-order-1--product-1');
+    expect(within(sub).queryByTestId('finished-stock-order-number')).toBeNull();
   });
 
   it('sin existencia en envases pinta el marcador de vacio', () => {
@@ -291,11 +309,14 @@ describe('desplegar', () => {
 });
 
 describe('fila «Sin pedido»', () => {
-  it('pinta «Sin pedido · <producto>» y la existencia con su unidad', () => {
+  it('pinta «Sin pedido» en «# Pedido», el producto en «Nombre» y la existencia con su unidad', () => {
     montar([sinPedido()]);
     const fila = filaDeGrupo('without-product-2');
+    expect(within(fila).getByTestId('finished-stock-order-number')).toHaveTextContent(
+      /^Sin pedido$/,
+    );
     expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(
-      'Sin pedido · Jabon · Garrafa 5 L',
+      /^Jabon · Garrafa 5 L$/,
     );
     const existencia = within(fila).getByTestId('product-stock');
     expect(existencia).toHaveTextContent(/^12\.5 L$/);
