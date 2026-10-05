@@ -102,7 +102,6 @@ const noInventoryUser: Credentials = {
 
 /** Nombres de los datos de catalogo que crea el recorrido del Administrador. */
 const productName = `${FIXTURE_PREFIX}producto_${RUN_ID}`;
-const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
 
 /**
  * Empresa efimera de este worker. QC-47 R9 hizo `users.company_id` obligatoria, asi que el
@@ -113,15 +112,12 @@ const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
 
 let companyId: string | null = null;
 
-/** Unidad de sistema del recorrido de nombre repetido en otra unidad, resuelta en `beforeAll`: id y etiqueta. */
+/** Unidad de sistema que eligen los altas de insumo, resuelta en `beforeAll`: id y etiqueta. */
 type SystemUnitFixture = { readonly id: string; readonly label: string };
 let kilogramUnit: SystemUnitFixture | null = null;
 let literUnit: SystemUnitFixture | null = null;
 
-/**
- * Existencia que se escribe en el alta. Constante para que el assert de «crear la presentacion no
- * pierde lo ya escrito» compare contra el mismo valor que se tecleo, sin repetir el literal.
- */
+/** Existencia del alta; el assert de «elegir la unidad no pierde lo escrito» compara contra ella. */
 const stockValue = '7';
 
 /**
@@ -142,17 +138,10 @@ const qtyAlertValue = '3';
 const unitCostValue = '3.75';
 
 /**
- * Recorrido de QC-90 R32: presentacion y SOLO costo total. Los nombres cuelgan de `productName` y
- * de `presentationName` a proposito, para que la limpieza por `startsWith` de `afterAll` los
- * arrastre sin tener que enumerarlos uno a uno.
+ * Alta con SOLO costo total. Los nombres cuelgan de `productName` para que la limpieza por
+ * `startsWith` de `afterAll` los arrastre sin enumerarlos.
  */
 const costProductName = `${productName}_costo`;
-/**
- * OJO con el largo: el nombre de presentacion admite 60 caracteres
- * (`presentation-input.ts`), y el prefijo mas el `RUN_ID` ya gastan 54. Por eso el sufijo es de
- * una letra: con uno mas largo el alta en linea rechaza y el rojo que sale no habla de QC-90.
- */
-const costPresentationName = `${presentationName}_c`;
 
 /**
  * Los numeros del alta que escribe SOLO el costo total. NO son divisibles de forma exacta ni
@@ -175,7 +164,6 @@ const derivedUnitCostStored = '1142.8600';
  * IGNORARSE: el producto queda como estaba y solo gana un lote.
  */
 const repeatProductName = `${productName}_repetido`;
-const repeatPresentationName = `${presentationName}_r`;
 const repeatStockValue = '4';
 const repeatQtyAlertValue = '2';
 const firstBatchUnitCost = '5.50';
@@ -186,21 +174,19 @@ const ignoredQtyAlertValue = '77';
 /**
  * Recorrido de `lote-y-fecha-de-compra-en-el-alta` (R14, R17): el lote se deja vacio a proposito,
  * para que el servidor genere el correlativo, y la fecha de compra no se toca -queda "hoy" por
- * defecto (R2)-. Los nombres cuelgan de `productName`/`presentationName` para que la limpieza por
- * prefijo de `afterAll` los arrastre sin enumerarlos.
+ * defecto (R2)-. El nombre cuelga de `productName` para que la limpieza por prefijo de
+ * `afterAll` lo arrastre.
  */
 const lotProductName = `${productName}_lote`;
-const lotPresentationName = `${presentationName}_l`;
 const lotStockValue = '5';
 const lotQtyAlertValue = '2';
 const lotUnitCostValue = '4.25';
 
 /**
- * Segundo lote sobre un producto ya existente, con la MISMA presentacion en los dos altas: al
- * compartir unidad, la existencia del listado debe sumar ambos lotes en un solo valor.
+ * Segundo lote sobre un producto ya existente, en la MISMA unidad: la existencia del listado debe
+ * sumar ambos lotes en un solo valor.
  */
 const twoBatchesProductName = `${productName}_2lotes`;
-const twoBatchesPresentationName = `${presentationName}_2`;
 const twoBatchesQtyAlertValue = '2';
 const firstBatchStockValue = '6';
 const secondBatchStockValue = '5';
@@ -215,8 +201,6 @@ const secondBatchUnitCostForSum = '3.1000';
  * falta limpiarlas.
  */
 const sameNameProductName = `${productName}_igual`;
-const sameNameKgPresentationName = `${presentationName}_kg`;
-const sameNameLiterPresentationName = `${presentationName}_l`;
 const sameNameKgFirstStock = '10';
 const sameNameKgSecondStock = '4';
 const sameNameLiterStock = '6';
@@ -299,45 +283,23 @@ async function abrirPanelDeAlta(page: Page): Promise<void> {
   await expect(page.getByTestId('product-sheet')).toBeVisible({ timeout: 60_000 });
 }
 
-/**
- * Crea una presentacion desde el propio selector, sin salir del panel, y la deja elegida.
- *
- * `unitId`: cuando el recorrido necesita una unidad CONCRETA -no cualquiera- se localiza la
- * opcion por su `data-value` (mismo criterio que `e2e/aislamiento-inventario.spec.ts`); sin el,
- * se queda con la primera, como antes.
- */
-async function crearPresentacionEnLinea(page: Page, nombre: string, unitId?: string): Promise<void> {
-  await page.getByTestId('presentation-create-open').click();
-  await page.getByTestId('presentation-create-name').fill(nombre);
-  // El alta rapida exige unidad antes de enviar (R11, R17): sin elegirla el envio se rechaza.
-  await page.getByTestId('presentation-unit-select').click();
-  const unitOption =
-    unitId === undefined
-      ? page.getByTestId('presentation-unit-option').first()
-      : page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`);
-  await unitOption.click();
-  await page.getByTestId('presentation-create-submit').click();
-
-  await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
-  // El selector es un campo de autocompletado, asi que lo elegido se lee en su VALOR.
-  await expect(page.getByTestId('presentation-select')).toHaveValue(nombre, { timeout: 60_000 });
+/** La unidad de sistema resuelta en `beforeAll`; sin ella el recorrido no puede elegir unidad. */
+function unidadDelFixture(unit: SystemUnitFixture | null): SystemUnitFixture {
+  if (unit === null) {
+    throw new Error('las unidades de sistema del fixture no existen: fallo el beforeAll');
+  }
+  return unit;
 }
 
 /**
- * Elige del desplegable una presentacion que YA existe: se escribe el nombre -la busqueda la
- * resuelve el servidor, con rebote- y se pulsa la opcion. El filtro es por ESTE nombre, que lleva
- * el `RUN_ID`, nunca «la primera opcion»: el otro proyecto crea las suyas a la vez.
+ * Elige la unidad del alta de insumo. La opcion se localiza por su `data-value` y no por su texto:
+ * el simbolo de una unidad de la empresa podria coincidir con el de una de sistema.
  */
-async function elegirPresentacionExistente(page: Page, nombre: string): Promise<void> {
-  const campo = page.getByTestId('presentation-select');
-  await campo.click();
-  await campo.fill(nombre);
-
-  const opcion = page.getByTestId('presentation-option').filter({ hasText: nombre });
-  await expect(opcion.first()).toBeVisible({ timeout: 60_000 });
-  await opcion.first().click();
-
-  await expect(campo).toHaveValue(nombre, { timeout: 60_000 });
+async function elegirUnidad(page: Page, unit: SystemUnitFixture): Promise<void> {
+  const selector = page.getByTestId('presentation-unit-select');
+  await selector.click();
+  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unit.id}"]`).click();
+  await expect(selector).toHaveText(unit.label, { timeout: 60_000 });
 }
 
 /**
@@ -493,7 +455,6 @@ test.afterAll(async () => {
         where: { product: { name: { startsWith: productName } } },
       }),
     () => prisma.product.deleteMany({ where: { name: { startsWith: productName } } }),
-    () => prisma.presentation.deleteMany({ where: { name: { startsWith: presentationName } } }),
     () =>
       prisma.user.deleteMany({
         where: { username: { in: [adminUser.username, noInventoryUser.username] } },
@@ -526,9 +487,10 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('catalogo de productos', () => {
-  test('el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24)', async ({
+  test('el Administrador entra, da de alta un insumo eligiendo su unidad y lo ve en la lista (R4, R17, R18, R21)', async ({
     page,
   }) => {
+    const kg = unidadDelFixture(kilogramUnit);
     await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a un Administrador (R4, la mitad que deja pasar).
@@ -542,32 +504,21 @@ test.describe('catalogo de productos', () => {
     await expect(page.getByTestId('product-sheet')).toBeVisible({ timeout: 60_000 });
     expect(page.url(), 'abrir el panel no debe navegar').toBe(urlBeforeSheet);
 
-    // --- 3. Se escriben los campos del producto ANTES de crear la presentacion, para poder
-    // afirmar despues que crearla no se llevo por delante lo escrito (R24). Son el nombre y la
-    // existencia: el costo dejo de existir en el producto con QC-52, y con el se fue su campo.
+    // --- 3. Se escriben los campos del producto ANTES de elegir la unidad.
     await page.getByTestId('product-field-name').fill(productName);
     await page.getByTestId('product-field-stock').fill(stockValue);
     await page.getByTestId('product-field-qtyAlert').fill(qtyAlertValue);
 
-    // --- 4. La presentacion se crea desde el propio selector y queda SELECCIONADA (R24).
-    await page.getByTestId('presentation-create-open').click();
-    await page.getByTestId('presentation-create-name').fill(presentationName);
-    // El alta rapida exige unidad antes de enviar (R11, R17): sin elegirla el envio se rechaza.
-    await page.getByTestId('presentation-unit-select').click();
-    await page.getByTestId('presentation-unit-option').first().click();
-    await page.getByTestId('presentation-create-submit').click();
-
-    await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
-    // Desde el 2026-09-07 el selector es un campo de autocompletado, asi que lo elegido se lee
-    // en su VALOR y no en su texto contenido.
-    await expect(page.getByTestId('presentation-select')).toHaveValue(presentationName);
+    // --- 4. El insumo no pide presentacion: pide la unidad.
+    await expect(page.getByTestId('presentation-select')).toHaveCount(0);
+    await elegirUnidad(page, kg);
     await expect(
       page.getByTestId('product-field-name'),
-      'crear la presentacion no puede perder lo ya escrito',
+      'elegir la unidad no puede perder lo ya escrito',
     ).toHaveValue(productName);
     await expect(
       page.getByTestId('product-field-stock'),
-      'crear la presentacion no puede perder lo ya escrito',
+      'elegir la unidad no puede perder lo ya escrito',
     ).toHaveValue(stockValue);
 
     // --- 4 bis. El costo unitario del PRIMER LOTE. No estaba en este recorrido y desde QC-90
@@ -597,7 +548,7 @@ test.describe('catalogo de productos', () => {
     ).toBe(1);
   });
 
-  test('el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7)', async ({
+  test('el alta con solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7)', async ({
     page,
   }) => {
     // POR QUE EN E2E Y NO SOLO EN INTEGRACION: la derivacion ya tiene su test de dominio (T1) y su
@@ -621,8 +572,7 @@ test.describe('catalogo de productos', () => {
     await page.getByTestId('product-field-stock').fill(costStockValue);
     await page.getByTestId('product-field-qtyAlert').fill(qtyAlertValue);
 
-    // La presentacion es OBLIGATORIA en el alta (QC-90 R2) y se crea aqui mismo.
-    await crearPresentacionEnLinea(page, costPresentationName);
+    await elegirUnidad(page, unidadDelFixture(kilogramUnit));
 
     // SOLO se ESCRIBE el costo total. El unitario no se teclea: lo rellena la pantalla al vuelo,
     // dividiendo por la existencia.
@@ -667,14 +617,16 @@ test.describe('catalogo de productos', () => {
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
-    // --- 1. Primera alta: el producto NACE aqui, con su presentacion y su primer lote. No se
+    const kg = unidadDelFixture(kilogramUnit);
+
+    // --- 1. Primera alta: el producto NACE aqui, con su unidad y su primer lote. No se
     // siembra por Prisma a proposito: el segundo alta tiene que poder encontrarlo con el
     // autocomplete real, que es lo que dispara el camino de R17.
     await abrirPanelDeAlta(page);
     await page.getByTestId('product-field-name').fill(repeatProductName);
     await page.getByTestId('product-field-stock').fill(repeatStockValue);
     await page.getByTestId('product-field-qtyAlert').fill(repeatQtyAlertValue);
-    await crearPresentacionEnLinea(page, repeatPresentationName);
+    await elegirUnidad(page, kg);
     await page.getByTestId('product-field-unitCost').fill(firstBatchUnitCost);
     await guardarAlta(page);
 
@@ -688,9 +640,10 @@ test.describe('catalogo de productos', () => {
     // alerta se escriben DISTINTAS a proposito: son las que el servidor tiene que ignorar (R18).
     await abrirPanelDeAlta(page);
     await elegirProductoExistente(page, repeatProductName);
-    // La presentacion queda vacia al elegir un producto: el listado no la devuelve (R31), asi que
-    // se elige a mano. Se reusa la misma, que ya existe.
-    await elegirPresentacionExistente(page, repeatPresentationName);
+    // Elegir el insumo deja preseleccionada su unidad: no se toca.
+    await expect(page.getByTestId('presentation-unit-select')).toHaveText(kg.label, {
+      timeout: 60_000,
+    });
     await page.getByTestId('product-field-stock').fill(ignoredStockValue);
     await page.getByTestId('product-field-qtyAlert').fill(ignoredQtyAlertValue);
     await page.getByTestId('product-field-unitCost').fill(secondBatchUnitCost);
@@ -723,30 +676,17 @@ test.describe('catalogo de productos', () => {
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
-    // --- 1. El producto nace con su primer lote y su presentacion.
+    const kg = unidadDelFixture(kilogramUnit);
+    const unitLabel = kg.label;
+
+    // --- 1. El producto nace con su primer lote y su unidad.
     await abrirPanelDeAlta(page);
     await page.getByTestId('product-field-name').fill(twoBatchesProductName);
     await page.getByTestId('product-field-stock').fill(firstBatchStockValue);
     await page.getByTestId('product-field-qtyAlert').fill(twoBatchesQtyAlertValue);
-    await crearPresentacionEnLinea(page, twoBatchesPresentationName);
+    await elegirUnidad(page, kg);
     await page.getByTestId('product-field-unitCost').fill(firstBatchUnitCostForSum);
     await guardarAlta(page);
-
-    const presentation = await prisma.presentation.findFirst({
-      where: { name: twoBatchesPresentationName },
-      select: { unitId: true },
-    });
-    if (!presentation) {
-      throw new Error('la presentacion del primer lote no existe: fallo el alta');
-    }
-    const unit = await prisma.unit.findUnique({
-      where: { id: presentation.unitId },
-      select: { symbol: true, name: true },
-    });
-    const unitLabel = unit?.symbol ?? unit?.name;
-    if (!unitLabel) {
-      throw new Error('la unidad del primer lote no existe: fallo el alta');
-    }
 
     const primeraCelda = await findProductCell(page, twoBatchesProductName);
     const primeraFila = primeraCelda.first().locator('xpath=ancestor::tr[1]');
@@ -755,11 +695,13 @@ test.describe('catalogo de productos', () => {
       { timeout: 60_000 },
     );
 
-    // --- 2. Segundo lote sobre el MISMO producto y la MISMA presentacion, ambos elegidos del
-    // desplegable: el campo de lote se deja vacio para que el correlativo lo genere el servidor.
+    // --- 2. Segundo lote sobre el MISMO producto, elegido del desplegable, con la unidad que trae
+    // preseleccionada. El lote se deja vacio para que el correlativo lo genere el servidor.
     await abrirPanelDeAlta(page);
     await elegirProductoExistente(page, twoBatchesProductName);
-    await elegirPresentacionExistente(page, twoBatchesPresentationName);
+    await expect(page.getByTestId('presentation-unit-select')).toHaveText(unitLabel, {
+      timeout: 60_000,
+    });
     await page.getByTestId('product-field-stock').fill(secondBatchStockValue);
     await page.getByTestId('product-field-qtyAlert').fill(twoBatchesQtyAlertValue);
     await page.getByTestId('product-field-unitCost').fill(secondBatchUnitCostForSum);
@@ -803,7 +745,7 @@ test.describe('catalogo de productos', () => {
     await page.getByTestId('product-field-name').fill(lotProductName);
     await page.getByTestId('product-field-stock').fill(lotStockValue);
     await page.getByTestId('product-field-qtyAlert').fill(lotQtyAlertValue);
-    await crearPresentacionEnLinea(page, lotPresentationName);
+    await elegirUnidad(page, unidadDelFixture(kilogramUnit));
     await page.getByTestId('product-field-unitCost').fill(lotUnitCostValue);
 
     // NO se toca la fecha de compra (queda "hoy" por defecto, R2) ni el lote (queda vacio, para
@@ -812,9 +754,7 @@ test.describe('catalogo de productos', () => {
     await guardarAlta(page);
 
     // El toast contiene la palabra "Lote" seguida de un valor no vacio. Sin fijar el correlativo
-    // exacto: este spec corre en paralelo con otro proyecto que escribe en la misma serie (mismo
-    // criterio que `elegirPresentacionExistente`, que filtra por `RUN_ID` en vez de «la primera
-    // opcion»).
+    // exacto: este spec corre en paralelo con otro proyecto que escribe en la misma serie.
     const toast = page.locator('[data-sonner-toast]').first();
     await expect(toast).toBeVisible({ timeout: 60_000 });
     await expect(toast).toContainText('Lote');
@@ -848,22 +788,22 @@ test.describe('catalogo de productos', () => {
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
-    // --- 1. Alta de "X" con una presentacion en kg: nace el primer producto.
+    // --- 1. Alta de "X" en kg: nace el primer producto.
     await abrirPanelDeAlta(page);
     await page.getByTestId('product-field-name').fill(sameNameProductName);
     await page.getByTestId('product-field-stock').fill(sameNameKgFirstStock);
     await page.getByTestId('product-field-qtyAlert').fill(sameNameQtyAlert);
-    await crearPresentacionEnLinea(page, sameNameKgPresentationName, kg.id);
+    await elegirUnidad(page, kg);
     await page.getByTestId('product-field-unitCost').fill(sameNameKgUnitCost);
     await guardarAlta(page);
 
-    // --- 2. Alta de "X" OTRA VEZ, con una presentacion en L: el alta busca por nombre Y unidad,
-    // asi que esto NO agrega un lote al producto de kg -nace OTRO producto-.
+    // --- 2. Alta de "X" OTRA VEZ, en L: el alta busca por nombre Y unidad, asi que esto NO
+    // agrega un lote al producto de kg -nace OTRO producto-.
     await abrirPanelDeAlta(page);
     await page.getByTestId('product-field-name').fill(sameNameProductName);
     await page.getByTestId('product-field-stock').fill(sameNameLiterStock);
     await page.getByTestId('product-field-qtyAlert').fill(sameNameQtyAlert);
-    await crearPresentacionEnLinea(page, sameNameLiterPresentationName, liter.id);
+    await elegirUnidad(page, liter);
     await page.getByTestId('product-field-unitCost').fill(sameNameLiterUnitCost);
     await guardarAlta(page);
 
@@ -912,12 +852,12 @@ test.describe('catalogo de productos', () => {
       'la existencia guardada del producto en L debe ser la de su unico lote',
     ).toBe(Number(sameNameLiterStock));
 
-    // --- 4. Un segundo lote en la MISMA unidad (kg): se elige el producto del desplegable -las
-    // dos opciones muestran el mismo nombre, cualquiera vale- y SU presentacion, que es lo que
-    // de verdad desambigua. Sube solo la fila kg; la de L queda igual.
+    // --- 4. Un segundo lote en kg: las dos opciones del desplegable muestran el mismo nombre y
+    // cualquiera vale, porque lo que desambigua es la unidad, que se elige despues. Sube solo la
+    // fila kg; la de L queda igual.
     await abrirPanelDeAlta(page);
     await elegirProductoExistente(page, sameNameProductName);
-    await elegirPresentacionExistente(page, sameNameKgPresentationName);
+    await elegirUnidad(page, kg);
     await page.getByTestId('product-field-stock').fill(sameNameKgSecondStock);
     await page.getByTestId('product-field-qtyAlert').fill(sameNameQtyAlert);
     await page.getByTestId('product-field-unitCost').fill(sameNameKgSecondUnitCost);
