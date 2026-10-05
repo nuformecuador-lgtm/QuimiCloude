@@ -284,6 +284,9 @@ test.describe('alta de insumo por unidad', () => {
     );
     await expect(filaDelProducto(page)).toHaveCount(1);
 
+    // El panel guarda los lotes de su primera apertura y el refresh tras el alta no lo vacia.
+    await abrirInventarioFiltrado(page);
+    await expect(filaDelProducto(page)).toHaveCount(1, { timeout: 60_000 });
     sheet = await abrirPanelDeLotes(page);
     const quantities = sheet.getByTestId('product-batch-quantity');
     await expect(quantities).toHaveCount(2, { timeout: 60_000 });
