@@ -113,7 +113,7 @@ los 25 dobles de `UnitCatalog` del contrato, `tests/integration/aislamiento.json
 | R16 | `product-unit-without-presentation.int.test.ts` › «R16 un lote de insumo sin presentacion muestra la unidad del producto», «R16 un lote antiguo con presentacion muestra la unidad del producto», «R16 apartado y disponible del lote salen junto a la unidad del producto»; T11 |
 | R17 | `tests/unit/inventario/product-catalog-costing.test.ts` › «R17 toCostingBatch toma la unidad del producto»; `tests/integration/pedidos/order-cost-quote.int.test.ts` › «R17 un insumo con lotes solo sin presentacion tiene coste en la cotizacion»; `tests/integration/pedidos/order-ingredients-cost.int.test.ts` › «R17 el importe guardado del pedido cuenta el lote sin presentacion», «R17 el coste del lote de producto terminado no cuenta ese ingrediente como cero» |
 | R18 | `tests/integration/inventario/order-batches.int.test.ts` › «R18 lote de envase y de producto terminado conservan su unidad»; `order-ingredients-cost.int.test.ts` › «R18 los lotes sin costo y los de instrumento siguen fuera», «R18 los lotes de envase siguen fuera de findCostingBatches y los de terminado dentro» |
-| R19 | `e2e/insumo-por-unidad.spec.ts` › «R19 el Administrador da de alta un insumo eligiendo kg, lo ve en el listado y en el panel de lotes en kg, y un segundo alta del mismo nombre en kg suma a ese producto» (escrito; sin ejecutar) |
+| R19 | `e2e/insumo-por-unidad.spec.ts` › «R19 el Administrador da de alta un insumo eligiendo kg, lo ve en el listado y en el panel de lotes en kg, y un segundo alta del mismo nombre en kg suma a ese producto» (verde en chromium y webkit) |
 | R20 | `tests/unit/inventario/list-product-form-units.test.ts` › «R20 con inventario.modificar y sin unidades.consultar devuelve las unidades visibles», «R20 sin inventario.modificar rechaza con error de permiso y no consulta unidades»; `tests/integration/unidades/unit-catalog-visible.int.test.ts` › «R20 listVisibleRefs devuelve las unidades de la empresa y las de sistema, incluida unidad, y ninguna de otra empresa»; `tests/unit/inventario/product-page.test.tsx` › «R20 la pagina pasa al formulario las unidades de la accion de inventario y no las de listUnitsAction» |
 
 ## Salida de tests
@@ -144,9 +144,30 @@ recipe-page (1), recetas/module-contract (1). Ninguno es de esta ficha.
 - `17d01ea2`: `e2e/pedido-bloqueado.spec.ts` › `addBatchThroughInventory` ya no elige presentación; comprueba que la unidad del
   insumo viene preseleccionada. Barrido del resto de `e2e/`: ningún otro recorrido da de alta un insumo por el formulario.
 - Validado: typecheck, lint y `playwright test --list` (16 tests en los dos specs; 2 en pedido-bloqueado).
-- **No ejecutados.** T11 y T12 quedan sin marcar hasta que pasen en Playwright:
+- Ejecución: ver la subsección siguiente. Comando:
   `pnpm run e2e e2e/insumo-por-unidad.spec.ts e2e/inventario.spec.ts e2e/pedido-bloqueado.spec.ts`
   (base migrada y sembrada).
+
+### Ejecución (2026-10-05)
+
+Arreglos solo en los tests, con el componente sin tocar:
+- `2be0ca6f`: la unidad elegida se lee en `[data-slot="select-value"]`, porque el texto del disparador incluye el glifo «▼».
+- `19e81a1d`: R19 recarga el listado antes de reabrir el panel de lotes. `product-batches-sheet.tsx`, igual que en `dev`,
+  pide los lotes solo en la primera apertura, y el `router.refresh()` del alta conserva ese estado.
+- `595387de`: QC-90 R32 compara `Number(stock)`, porque `$queryRaw` devuelve el decimal como texto.
+- `13b04679`: R19 espera sin navegar a que el listado refleje el alta antes del `goto` siguiente. Si no, WebKit aborta
+  la navegación con el refresco todavía en vuelo; es el mismo patrón que `pedido-bloqueado.spec.ts`.
+
+`pnpm run e2e e2e/insumo-por-unidad.spec.ts e2e/inventario.spec.ts e2e/pedido-bloqueado.spec.ts --project=<b>`:
+
+| Navegador | Pasados | Fallados |
+|---|---|---|
+| chromium | 8 | 1: `inventario.spec.ts:783` R26 |
+| webkit | 8 | 1: `inventario.spec.ts:783` R26 |
+
+R26 busca la celda «<nombre> · kg», que el listado no pinta desde `a543c84d`. Es la misma deuda que `product-page.test.tsx`
+R18 del baseline y queda pendiente de decisión humana. T11 queda marcada; T12 sigue sin marcar solo por R26.
+Logs: `progress/e2e_QC-199_chromium.log`, `progress/e2e_QC-199_webkit.log`.
 
 ## T13 — gate completo
 

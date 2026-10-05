@@ -121,7 +121,7 @@
 
 ## Bloque D — recorrido y regresión
 
-- [ ] **T11 — E2E del alta de un insumo con unidad** (`e2e/insumo-por-unidad.spec.ts`). Depende de T0-T10 y T14.
+- [x] **T11 — E2E del alta de un insumo con unidad** (`e2e/insumo-por-unidad.spec.ts`). Depende de T0-T10 y T14.
   Caso `R19 el Administrador da de alta un insumo eligiendo kg, lo ve en el listado y en el panel de lotes en kg, y un segundo alta del mismo nombre en kg suma a ese producto`.
   Comprobación contra Postgres dentro del caso: `products.unit_id` = kg y los dos lotes con
   `presentation_id` NULL, un solo producto vivo con ese nombre. Incluye ver la opción «u» en el
@@ -131,6 +131,7 @@
   que crean un PRODUCT con `crearPresentacionEnLinea`/`elegirPresentacionExistente`, :529-1000
   aprox.) pasan a elegir unidad; los recorridos de envase no cambian. Depende de T10.
   *Hecho:* `e2e/inventario.spec.ts` verde sin casos saltados.
+  *Nota (2026-10-05):* sin marcar solo por R26 (`e2e/inventario.spec.ts:783`, «el mismo nombre en dos unidades son dos filas»), rojo en Chromium y WebKit por la deuda de `a543c84d` (la columna de nombre ya no pinta «· unidad»); pendiente de decisión humana. El resto de `e2e/inventario.spec.ts` pasa en los dos navegadores.
 - [x] **T13 — Gate completo y trazabilidad.** `./init.sh` completo en verde; mapa `R1..R20 -> test`
   en `progress/impl_QC-199-presentacion-por-unidad-en-alta-de-producto.md`. Depende de todo lo anterior.
   *Hecho:* gate verde y cada `R<n>` con al menos un test nombrado.
