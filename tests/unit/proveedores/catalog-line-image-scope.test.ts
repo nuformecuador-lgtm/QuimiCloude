@@ -74,6 +74,7 @@ function fuentesDe(dir: string): readonly string[] {
 // acoplamiento que tiene que salir en rojo aqui en vez de pasar en silencio.
 const units: UnitCatalog = {
   findRefs: vi.fn(async () => []),
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: vi.fn(async () => {
     throw new Error('proveedores no pide unidades hermanas de base');
   }),

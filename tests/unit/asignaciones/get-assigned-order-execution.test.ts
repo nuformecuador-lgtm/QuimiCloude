@@ -155,7 +155,7 @@ function montar(options?: {
     } as OrderAssignmentRepository,
     orders: { findAliveById, listAliveSummariesByIds, transitionAliveById } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
-    units: { findRefs, findRefsSharingBaseInCompany } as UnitCatalog,
+    units: { findRefs, findRefsSharingBaseInCompany, listVisibleRefs: () => Promise.reject(new Error('no se usa')) } as UnitCatalog,
     products: {
       findRefs: productFindRefs,
       findCostingBatches: vi.fn(async () => {

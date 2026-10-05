@@ -114,6 +114,7 @@ function montar(options?: {
     } as unknown as RecipeCatalog,
     units: {
       findRefs: vi.fn(async () => [unidad()]),
+      listVisibleRefs: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as UnitCatalog,
     products: {

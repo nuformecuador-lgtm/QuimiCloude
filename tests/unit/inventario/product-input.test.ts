@@ -289,7 +289,7 @@ describe('union discriminada por tipo de producto', () => {
       name: 'Instrumento',
       stock: '1',
     });
-    expect(parsed.presentationId ?? null).toBeNull();
+    expect((parsed as { presentationId?: string | null }).presentationId ?? null).toBeNull();
     expect(parsed.unitCost ?? null).toBeNull();
 
     // purchaseDate viaja en el lote; presentationId y unitCost pueden venir si el llamante

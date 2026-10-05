@@ -41,12 +41,9 @@ const productTypeSchema = z
   .default(PRODUCT_TYPES.PRODUCT);
 
 /**
- * El producto no declara unidad en el borde: la unidad la declara la PRESENTACION
- * (`presentations.unit_id`, NOT NULL), y `products.unit_id` la escribe `createWithFirstBatch`
- * copiandola de esa presentacion -el disparador solo RECHAZA lo que no cuadra-, asi que es un
- * dato que se lee (`ProductView.unitId`), no uno que se envie. Por eso
- * el alta y la edicion no aceptan `unitId` -y con `strictObject`, enviarlo es `invalid_input`,
- * no un campo ignorado en silencio-.
+ * Solo el alta de insumo declara unidad: sus lotes no llevan presentacion y se cuentan en la
+ * unidad del producto. El envase la recibe del sistema y el instrumento no tiene. La edicion
+ * no acepta `unitId`: con `strictObject`, enviarlo es `invalid_input`.
  */
 
 /**
@@ -71,7 +68,7 @@ export const productFieldsShape = {
 
 /**
  * Esquema de CREACION discriminado por tipo:
- * - PRODUCT: producto (con qtyAlert) + lote completo (presentationId, stock, unitCost|totalCost, lot opcional, expiryDate opcional, purchaseDate opcional)
+ * - PRODUCT: producto (con qtyAlert y unitId) + lote sin presentacion (stock, unitCost|totalCost, lot opcional, expiryDate opcional, purchaseDate opcional)
  * - MACHINE: producto SIN qtyAlert + lote igual que PRODUCT (sin qtyAlert; campos opcionales pueden quedar en null)
  * - PACKAGING: producto (con qtyAlert) + lote (presentationId, stock, unitCost|totalCost, lot opcional -backend genera-, purchaseDate opcional, SIN expiryDate)
  *
@@ -91,6 +88,10 @@ const amountSchema = z
   .refine((value) => !ZERO_PATTERN.test(value));
 
 const presentationIdSchema = z.string().uuid();
+
+const MESSAGE_SIN_UNIDAD = 'Elige una unidad.';
+
+const unitIdSchema = z.string({ error: MESSAGE_SIN_UNIDAD }).uuid({ error: MESSAGE_SIN_UNIDAD });
 
 /** La existencia es del lote que se crea, no del producto: el alta la declara por su cuenta.
  *  Decimal de hasta diez enteros y cuatro decimales, sin signo: el cero es una existencia
@@ -145,7 +146,6 @@ const MESSAGE_TOTAL_INSUFICIENTE =
 /** Campos de lote comunes (sin qtyAlert, sin expiryDate). */
 const batchFieldsCommon = {
   stock: stockSchema,
-  presentationId: presentationIdSchema,
   unitCost: amountSchema.nullish(),
   totalCost: amountSchema.nullish(),
   lot: lotSchema.nullish(),
@@ -189,11 +189,12 @@ function exigirCostoDelLote(
   }
 }
 
-/** Esquema para PRODUCT: lote completo con expiryDate opcional. El literal va DESPUES del spread. */
+/** Esquema para PRODUCT: lote con expiryDate opcional. El literal va DESPUES del spread. */
 const createProductWithBatchSchema = z
   .strictObject({
     ...productFieldsShape,
     type: z.literal(PRODUCT_TYPES.PRODUCT),
+    unitId: unitIdSchema,
     ...batchFieldsCommon,
     expiryDate: expiryDateSchema.nullish(),
   })
@@ -230,6 +231,7 @@ const createPackagingSchema = z
   .strictObject({
     ...productFieldsShape,
     ...batchFieldsCommon,
+    presentationId: presentationIdSchema,
     type: z.literal(PRODUCT_TYPES.PACKAGING),
   })
   .superRefine((value, ctx) => {

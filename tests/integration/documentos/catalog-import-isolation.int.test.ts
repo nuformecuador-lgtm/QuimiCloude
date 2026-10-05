@@ -191,6 +191,7 @@ const presentationCatalog: PresentationCatalog = {
 
 const unitCatalog: UnitCatalog = {
   findRefs: findUnitRefs,
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 

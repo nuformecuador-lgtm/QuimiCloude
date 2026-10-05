@@ -75,6 +75,7 @@ const units: UnitCatalog = {
   findRefs: vi.fn(async (ids: readonly string[]) =>
     ids.map((id) => ({ id, name: 'kg', symbol: 'kg', baseUnitId: null, factor: null })),
   ),
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: sinHermanasDeBase(),
 }
 
@@ -187,6 +188,7 @@ describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T3
     )
     const conUnidad: UnitCatalog = {
       findRefs,
+      listVisibleRefs: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: sinHermanasDeBase(),
     }
 
@@ -218,6 +220,7 @@ describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T3
     const { repo, spies } = makeCatalog()
     const ajena: UnitCatalog = {
       findRefs: vi.fn(async () => []),
+      listVisibleRefs: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: sinHermanasDeBase(),
     }
 

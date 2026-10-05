@@ -90,7 +90,7 @@ function dobleDePresentaciones(bitacora: Bitacora, encontradas: readonly { id: s
 }
 
 function dobleDeUnidades() {
-  return { findRefs: vi.fn(), findRefsSharingBaseInCompany: vi.fn() };
+  return { findRefs: vi.fn(), listVisibleRefs: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: vi.fn() };
 }
 
 /** Puerto de ESCRITURA que falla si alguien lo llama: la vista previa no debe escribir

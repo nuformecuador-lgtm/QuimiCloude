@@ -108,6 +108,10 @@ export function createCreateProduct(
       return createPackaging(deps, entrada, actor, instante, purchaseDate, scope);
     }
 
+    if (entrada.type === PRODUCT_TYPES.PRODUCT) {
+      throw new Error('alta de insumo por unidad: falta el repositorio que busca y escribe por unidad');
+    }
+
     const batch: NewProductBatch = {
       presentationId: entrada.presentationId ?? null,
       stock: entrada.stock,
@@ -119,8 +123,7 @@ export function createCreateProduct(
     };
 
     // Normalizar el nombre, filtrar los borrados y resolver la unidad de la presentacion es
-    // del adaptador: busca por nombre Y unidad, no por nombre solo. Sin presentacion (MACHINE),
-    // busca solo por nombre entre los vivos.
+    // del adaptador. Sin presentacion, busca solo por nombre entre los vivos.
     const existente = await deps.products.findAliveIdByNameInPresentationUnit(
       entrada.name,
       entrada.presentationId ?? null,
@@ -144,12 +147,8 @@ export function createCreateProduct(
     }
 
     // Una sola operacion del puerto para producto y lote, para que el dominio no pueda dejar
-    // escrita solo la mitad. El producto no lleva unidad: la declara la presentacion del lote.
-    // MACHINE no declara qtyAlert en el borde: la clave no viaja y el producto se queda en null.
-    const producto: NewProduct =
-      entrada.type === PRODUCT_TYPES.MACHINE
-        ? { name: entrada.name, type: PRODUCT_TYPES.MACHINE }
-        : { name: entrada.name, qtyAlert: entrada.qtyAlert, type: entrada.type };
+    // escrita solo la mitad. El instrumento no declara qtyAlert: el producto se queda en null.
+    const producto: NewProduct = { name: entrada.name, type: PRODUCT_TYPES.MACHINE };
 
     const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);
     await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
