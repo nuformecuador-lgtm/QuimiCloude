@@ -489,3 +489,24 @@ describe('aislamiento: `orderId` de OTRA empresa no cambia nada (R65, ambito)', 
     }
   })
 })
+
+describe('QC-199 — insumo contado por unidad, con lotes sin presentacion', () => {
+  it('R17 un insumo con lotes solo sin presentacion tiene coste en la cotizacion', async () => {
+    const creado = await createWithFirstBatch(
+      { name: `Insumo ${token()}`, qtyAlert: '0', type: 'PRODUCT', unitId },
+      newBatch(A, { presentationId: null, stock: '10', unitCost: '5.0000' }),
+      new Date(),
+      { companyId: A.companyId } satisfies InventoryScope,
+    )
+    const recipeId = await crearReceta(A, creado.id)
+
+    try {
+      const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
+      const cotizacion = await cotizar({ recipeId, quantity: '6.0000' }, actorDe(A))
+      expect(cotizacion.ingredientsCost).toBe('30.0000')
+    } finally {
+      await borrarReceta(recipeId)
+      await borrarProducto(creado.id)
+    }
+  })
+})

@@ -59,6 +59,7 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma'
 
 import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
+import { resolveLotIngredientsCost } from '@/lib/modules/pedidos/domain/resolve-ingredients-cost'
 
 import type { Actor, NewOrder, OrderScope } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -786,6 +787,130 @@ describe('el pedido queda creado con el importe en blanco y la base no lanza 220
       if (orderId !== null) await borrarPedido(orderId)
       await borrarReceta(recipeId)
       await borrarProducto(productId)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Insumos contados por unidad: sus lotes no llevan presentacion
+// ---------------------------------------------------------------------------
+
+/** Insumo dado de alta por unidad: el producto lleva la unidad y el lote va sin presentacion. */
+async function crearInsumoPorUnidad(
+  empresa: Empresa,
+  overrides: Partial<NewProductBatch> = {},
+): Promise<{ readonly productId: string; readonly batchId: string }> {
+  const creado = await createWithFirstBatch(
+    { name: `Insumo ${token()}`, qtyAlert: '0', type: 'PRODUCT', unitId },
+    newBatch(empresa, { presentationId: null, ...overrides }),
+    new Date(),
+    { companyId: empresa.companyId } satisfies InventoryScope,
+  )
+  return { productId: creado.id, batchId: creado.batchId }
+}
+
+describe('QC-199 — los lotes de insumo sin presentacion cuentan en el costeo', () => {
+  it('R17 el importe guardado del pedido cuenta el lote sin presentacion', async () => {
+    const { productId } = await crearInsumoPorUnidad(A, { stock: '10', unitCost: '5.0000' })
+    const recipeId = await crearReceta(A, productId)
+    let orderId: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
+      orderId = creado.id
+
+      // 6.0000 * 100 % = 6.0000 cubiertos por el lote sin presentacion: 6.0000 * 5.0000.
+      expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
+    } finally {
+      if (orderId !== null) await borrarPedido(orderId)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+
+  it('R17 el coste del lote de producto terminado no cuenta ese ingrediente como cero', async () => {
+    const { productId } = await crearInsumoPorUnidad(A, { stock: '10', unitCost: '5.0000' })
+    const recipeId = await crearReceta(A, productId)
+
+    try {
+      const coste = await resolveLotIngredientsCost(recipes, products, units, recipeId, '4.0000', A.companyId)
+      expect(coste).toBe('20.0000')
+    } finally {
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+
+  it('R18 los lotes sin costo y los de instrumento siguen fuera', async () => {
+    const sinCosto = await crearInsumoPorUnidad(A, { stock: '10', unitCost: null })
+    const instrumento = await createWithFirstBatch(
+      { name: `Balanza ${token()}`, type: 'MACHINE' },
+      newBatch(A, { presentationId: null, stock: '2', unitCost: '100.0000' }),
+      new Date(),
+      { companyId: A.companyId } satisfies InventoryScope,
+    )
+
+    try {
+      const lotes = await findCostingBatches([sinCosto.productId, instrumento.id], A.companyId)
+      expect(lotes).toEqual([])
+    } finally {
+      await borrarProducto(sinCosto.productId)
+      await borrarProducto(instrumento.id)
+    }
+  })
+
+  it('R18 los lotes de envase siguen fuera de findCostingBatches y los de terminado dentro', async () => {
+    const unidadDeEnvases = await prisma.unit.findFirstOrThrow({
+      where: { companyId: null, nameNormalized: 'unidad' },
+      select: { id: true },
+    })
+    const envase = await createWithFirstBatch(
+      { name: `Botella ${token()}`, qtyAlert: '0', type: 'PACKAGING' },
+      newBatch(A, { presentationId: null, stock: '50', unitCost: '0.5000' }),
+      new Date(),
+      { companyId: A.companyId } satisfies InventoryScope,
+      { presentationId: A.presentationId, unitId: unidadDeEnvases.id },
+    )
+    const recetaDelTerminado = await prisma.recipe.create({
+      data: { name: `Receta terminado ${token()}`, nameNormalized: `recetaterminado${token()}`, companyId: A.companyId },
+      select: { id: true },
+    })
+    const nombreTerminado = `Terminado ${token()}`
+    const terminado = await prisma.product.create({
+      data: {
+        name: nombreTerminado,
+        nameNormalized: normalizeForTest(nombreTerminado),
+        type: 'FINISHED_PRODUCT',
+        recipeId: recetaDelTerminado.id,
+        presentationId: A.presentationId,
+        unitId,
+        companyId: A.companyId,
+      },
+      select: { id: true },
+    })
+    // El lote del terminado entra por Terminar, no por el alta: se escribe directo.
+    await prisma.productBatch.create({
+      data: {
+        productId: terminado.id,
+        presentationId: A.presentationId,
+        stock: '4',
+        unitCost: '7.0000',
+        lot: `T-${token()}`,
+        purchaseDate: new Date('2026-01-01T00:00:00.000Z'),
+        companyId: A.companyId,
+      },
+    })
+
+    try {
+      const lotes = await findCostingBatches([envase.id, terminado.id], A.companyId)
+      expect(lotes.map((lote) => [lote.productId, lote.unitId, lote.unitCost])).toEqual([
+        [terminado.id, unitId, '7.0000'],
+      ])
+    } finally {
+      await borrarProducto(envase.id)
+      await borrarProducto(terminado.id)
+      await prisma.recipe.deleteMany({ where: { id: recetaDelTerminado.id } })
     }
   })
 })
