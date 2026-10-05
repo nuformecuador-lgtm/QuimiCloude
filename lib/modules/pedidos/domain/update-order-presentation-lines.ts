@@ -156,12 +156,14 @@ export function createUpdateOrderPresentationLines(
           quantity: locked.quantity,
           packagingLines,
           phase: materialsConsumed ? 'materials_consumed' : 'before_consumption',
+          units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
         });
+        if (requirement.kind !== 'ok') throw new Error('updateOrderPresentationLines: necesidad no convertible sin tratar');
 
         const reservation = await transaction.reservations.syncForOrder({
           orderId,
           companyId,
-          requirement,
+          requirement: requirement.lines,
           actorId,
           now: instant,
         });

@@ -165,12 +165,14 @@ export function createCreateOrder(
         quantity: data.quantity,
         packagingLines: distribution.packagingLines,
         phase: 'before_consumption',
+        units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
       });
+      if (requirement.kind !== 'ok') throw new Error('createOrder: necesidad no convertible sin tratar');
 
       const outcome = await transaction.reservations.syncForOrder({
         orderId: order.id,
         companyId: actor.companyId,
-        requirement,
+        requirement: requirement.lines,
         actorId: actor.id,
         now: instant,
       });

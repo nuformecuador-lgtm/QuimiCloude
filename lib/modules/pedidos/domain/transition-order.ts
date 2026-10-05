@@ -70,13 +70,19 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           // una segunda conexion mientras esta retiene la suya es espera o error bajo carga.
           const content = await scope.recipes.findExecutionContentById(locked.recipeId, companyId);
           const recipeLines = content?.lines ?? [];
-          const requirement = buildRequirement(recipeLines, locked.quantity);
+          const requirement = buildRequirement(recipeLines, locked.quantity, {
+            orderUnitId: null,
+            orderUnit: null,
+            bridge: null,
+            productUnits: new Map(),
+          });
+          if (requirement.kind !== 'ok') throw new Error('transitionOrder: necesidad no convertible sin tratar');
 
           // Solo la receta: los envases del reparto siguen apartados hasta Terminar el empaque.
           const outcome = await scope.reservations.consumeForOrder({
             orderId: id,
             companyId,
-            fallbackRequirement: requirement,
+            fallbackRequirement: requirement.lines,
             productIds: recipeLines.map((line) => line.productId),
             actorId,
             now,

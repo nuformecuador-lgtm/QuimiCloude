@@ -183,12 +183,16 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         // Las lineas antiguas no tienen envase: sin envases no hay nada que consumir.
         const packagingLines = packagingLinesOf(lines);
         if (packagingLines.length > 0) {
-          const packagingRequirement = buildOrderRequirement({
+          // Sin receta no hay ninguna linea que convertir: las unidades no se leen.
+          const requirement = buildOrderRequirement({
             recipeLines: [],
             quantity: updated.quantity,
             packagingLines,
             phase: 'materials_consumed',
+            units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
           });
+          if (requirement.kind !== 'ok') throw new Error('finishPacking: necesidad no convertible sin tratar');
+          const packagingRequirement = requirement.lines;
           // Un envase que es tambien ingrediente ya se consumio con la receta al pasar a
           // POR_EMPACAR: aqui solo cuenta lo que siga apartado de el, nunca su disponible.
           const content = await scope.recipes.findExecutionContentById(updated.recipeId, companyId);

@@ -128,12 +128,14 @@ async function reviewOne(
       quantity: locked.quantity,
       packagingLines: packagingLinesOf(locked.presentationLines),
       phase: 'before_consumption',
+      units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
     });
+    if (requirement.kind !== 'ok') throw new Error('reviewBlockedOrders: necesidad no convertible sin tratar');
 
     const outcome = await transaction.reservations.syncForOrder({
       orderId: id,
       companyId: scope.companyId,
-      requirement,
+      requirement: requirement.lines,
       actorId: null,
       now,
     });

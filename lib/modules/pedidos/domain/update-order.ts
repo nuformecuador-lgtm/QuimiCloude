@@ -152,7 +152,9 @@ export function createUpdateOrder(
         quantity: data.quantity,
         packagingLines: distribution.packagingLines,
         phase: 'before_consumption',
+        units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
       });
+      if (requirement.kind !== 'ok') throw new Error('updateOrder: necesidad no convertible sin tratar');
 
       const result = await transaction.orders.updateAlive(
         id,
@@ -173,7 +175,7 @@ export function createUpdateOrder(
       const outcome = await transaction.reservations.syncForOrder({
         orderId: id,
         companyId: actor.companyId,
-        requirement,
+        requirement: requirement.lines,
         actorId: actor.id,
         now: instant,
       });
