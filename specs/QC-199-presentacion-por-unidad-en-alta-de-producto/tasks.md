@@ -17,19 +17,19 @@
 
 ## Bloque A — base de datos
 
-- [ ] **T1 — Migración del disparador.** Crear
+- [x] **T1 — Migración del disparador.** Crear
   `db/migrations/20261004170000_product_batches_require_product_unit/{migration.sql,down.sql}`
   según `design.md > 2`. `down.sql` restituye el cuerpo exacto de
   `20260918130000/migration.sql:70-98`.
   *Hecho:* `pnpm run db:migrate` aplica; `pnpm run db:rollback` revierte y `prisma migrate status`
   queda limpio; se vuelve a aplicar.
-- [ ] **T2 — Test estático de la migración** (`tests/unit/inventario/schema/product-batches-require-product-unit-migration.test.ts`). Depende de T1.
+- [x] **T2 — Test estático de la migración** (`tests/unit/inventario/schema/product-batches-require-product-unit-migration.test.ts`). Depende de T1.
   Casos: `R12 la rama sin presentacion rechaza el insumo sin unidad con 23514 y product_batches_product_without_unit`;
   `R13 la rama con presentacion conserva el cuerpo vigente`;
   `R14 down.sql restituye la funcion anterior identica`;
   `R15 la migracion no escribe datos ni toca presentations` (sin `UPDATE`/`DELETE`/`INSERT`, sin `ALTER TABLE "presentations"`).
   *Hecho:* verde.
-- [ ] **T3 — Test de integración del disparador** (`tests/integration/inventario/product-batch-require-unit.int.test.ts`). Depende de T1.
+- [x] **T3 — Test de integración del disparador** (`tests/integration/inventario/product-batch-require-unit.int.test.ts`). Depende de T1.
   Casos: `R12 un lote sin presentacion de un insumo sin unidad se rechaza`;
   `R13 un lote sin presentacion de un instrumento sin unidad entra`;
   `R13 un lote sin presentacion de un envase entra`;
@@ -40,13 +40,13 @@
 
 ## Bloque B — dominio y persistencia (depende de A solo para los tests de integración)
 
-- [ ] **T4 [P] — Esquema de alta.** `domain/product-input.ts` según `design.md > 3.1`.
+- [x] **T4 [P] — Esquema de alta.** `domain/product-input.ts` según `design.md > 3.1`.
   Tests en `tests/unit/inventario/product-input.test.ts`:
   `R6 el alta de insumo exige unitId`, `R6 el alta de insumo con presentationId es invalid_input`,
   `R6 unitId con forma invalida da Elige una unidad.`, `R11 el alta de envase sigue exigiendo presentationId`,
   `R11 el alta de instrumento no cambia`. Ajustar los casos existentes que mandaban `presentationId` en PRODUCT.
   *Hecho:* verde.
-- [ ] **T5 [P] — Repositorio: búsqueda por unidad y alta con unidad.** `ports/product-repository.ts`,
+- [x] **T5 [P] — Repositorio: búsqueda por unidad y alta con unidad.** `ports/product-repository.ts`,
   `domain/product-view.ts` (`NewProduct.unitId?`), `pp` (`findAliveIdByNameInUnit`,
   `createWithFirstBatch`, `translateBatchWriteError`) según `design.md > 5.1`; cableado del método
   nuevo en `lib/composition/index.ts`.
@@ -56,7 +56,7 @@
   `R10 findAliveIdByNameInUnit encuentra el homonimo de la misma unidad y no el de otra`,
   `R12 el rechazo product_batches_product_without_unit se traduce a ValidationError`.
   *Hecho:* verde.
-- [ ] **T6 [P] — Vista de lotes por la unidad del producto.** Depende de T0 (cero filas). `BATCH_VIEW_SELECT`/`toBatchView` y
+- [x] **T6 [P] — Vista de lotes por la unidad del producto.** Depende de T0 (cero filas). `BATCH_VIEW_SELECT`/`toBatchView` y
   `findBatchesOfOrder` en `pp`; comentario de `domain/product-batch-view.ts`.
   Tests de integración (`tests/integration/inventario/order-batches.int.test.ts` o nuevo):
   `R16 un lote de insumo sin presentacion muestra la unidad del producto`,
@@ -64,7 +64,7 @@
   `R16 apartado y disponible del lote salen junto a la unidad del producto`;
   regresión: `R18 lote de envase y de producto terminado conservan su unidad`.
   *Hecho:* verde.
-- [ ] **T7 [P] — Costeo.** Depende de T0 (cero filas). `pcp` según `design.md > 5.2`.
+- [x] **T7 [P] — Costeo.** Depende de T0 (cero filas). `pcp` según `design.md > 5.2`.
   Unit en `tests/unit/inventario/product-catalog-costing.test.ts`:
   `R17 toCostingBatch toma la unidad del producto`.
   Integración en `tests/integration/pedidos/order-ingredients-cost.int.test.ts` y
@@ -75,7 +75,7 @@
   `R18 los lotes sin costo y los de instrumento siguen fuera`,
   `R18 los lotes de envase siguen fuera de findCostingBatches y los de terminado dentro`.
   *Hecho:* verde.
-- [ ] **T8 — Servicio de alta.** `domain/create-product.ts` según `design.md > 4`; `CreateProductDeps.units`
+- [x] **T8 — Servicio de alta.** `domain/create-product.ts` según `design.md > 4`; `CreateProductDeps.units`
   cableado en `lib/composition/index.ts`. Depende de T4 y T5.
   Tests en `tests/unit/inventario/create-product.test.ts` y `tests/unit/inventario/authorization.test.ts`:
   `R7 una unidad inexistente o de otra empresa es invalid_input y no escribe`,
@@ -85,12 +85,12 @@
   `R10 con homonimo de otra unidad crea otro producto`,
   `R11 envase e instrumento siguen por su camino`.
   *Hecho:* verde.
-- [ ] **T9 — Acción.** `adapters/driving/product-actions.ts` según `design.md > 3.2`. Depende de T4.
+- [x] **T9 — Acción.** `adapters/driving/product-actions.ts` según `design.md > 3.2`. Depende de T4.
   Test en `tests/unit/inventario/product-actions.test.ts`:
   `R6 el alta de insumo envia unitId y no presentationId`, `R11 el alta de envase sigue enviando presentationId`.
   *Hecho:* verde.
 
-- [ ] **T14 [P] — Unidades del formulario con `inventario.modificar`.** Según `design.md > 6.1`:
+- [x] **T14 [P] — Unidades del formulario con `inventario.modificar`.** Según `design.md > 6.1`:
   `UnitCatalog.listVisibleRefs` en `unidades` (contrato y `unit-catalog-prisma.ts`), caso de uso
   `inventario/domain/list-product-form-units.ts`, `listProductFormUnitsAction` y cableado en
   `lib/composition/index.ts`.
