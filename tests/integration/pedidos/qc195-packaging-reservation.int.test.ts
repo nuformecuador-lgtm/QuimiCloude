@@ -592,7 +592,7 @@ describe('QC-195 — el importe suma los envases', () => {
       );
       const lineas = [{ packagingProductId: botella, packages: 40 }];
 
-      const cotizacion = await quoteOrderCost({ recipeId: f.recipeId, quantity: '40', presentationLines: lineas }, actorDe(f));
+      const cotizacion = await quoteOrderCost({ recipeId: f.recipeId, quantity: '40', unitId: f.unitId, presentationLines: lineas }, actorDe(f));
       expect(cotizacion.ingredientsCost).toBe('64.0000');
 
       const creado = await createOrder(entrada(f, '40', lineas), actorDe(f));
@@ -602,7 +602,7 @@ describe('QC-195 — el importe suma los envases', () => {
       await updateOrder(creado.id, entrada(f, '40', lineas), actorDe(f));
       expect((await estadoDe(creado.id)).ingredientsCost?.toFixed(4)).toBe('64.0000');
       const cotizacionEdicion = await quoteOrderCost(
-        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
         actorDe(f),
       );
       expect(cotizacionEdicion.ingredientsCost).toBe('64.0000');
@@ -617,7 +617,7 @@ describe('QC-195 — el importe suma los envases', () => {
       const botella = await envase(f, '10');
       const lineas = [{ packagingProductId: botella, packages: 40 }];
 
-      const cotizacion = await quoteOrderCost({ recipeId: f.recipeId, quantity: '40', presentationLines: lineas }, actorDe(f));
+      const cotizacion = await quoteOrderCost({ recipeId: f.recipeId, quantity: '40', unitId: f.unitId, presentationLines: lineas }, actorDe(f));
       expect(cotizacion.ingredientsCost).toBeNull();
 
       const creado = await createOrder(entrada(f, '40', lineas, true), actorDe(f));
@@ -672,7 +672,7 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
         expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
 
         const cotizacion = await quoteOrderCost(
-          { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+          { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
           actorDe(f),
         );
         expect(cotizacion.ingredientsCost).toBe('64.0000');
@@ -695,7 +695,7 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
       expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
 
       const cotizacion = await quoteOrderCost(
-        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
         actorDe(f),
       );
       expect(cotizacion.ingredientsCost).toBeNull();
@@ -717,7 +717,7 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
       expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
 
       const cotizacion = await quoteOrderCost(
-        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
         actorDe(f),
       );
       expect(cotizacion.ingredientsCost).toBe('64.0000');
@@ -751,7 +751,7 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
       // (64 - 24) de ingredientes guardados + 30 x 0.90 de envases.
       expect(await costoDe(creado.id)).toEqual({ status: 'POR_EMPACAR', total: '67.0000', packaging: '27.0000' });
       const cotizacion = await quoteOrderCost(
-        { recipeId: f.recipeId, quantity: '40', orderId: creado.id, presentationLines: lineas },
+        { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
         actorDe(f),
       );
       expect(cotizacion.ingredientsCost).not.toBe('67.0000');

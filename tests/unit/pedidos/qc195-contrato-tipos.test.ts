@@ -68,7 +68,7 @@ describe('QC-195 contrato de pedidos — 11.6 cotizacion', () => {
     expectTypeOf<QuoteOrderCostInput['presentationLines']>().toEqualTypeOf<
       readonly DistributionLineInput[] | undefined
     >()
-    expectTypeOf<{ recipeId: string; quantity: string }>().toExtend<QuoteOrderCostInput>()
+    expectTypeOf<{ recipeId: string; quantity: string; unitId: string }>().toExtend<QuoteOrderCostInput>()
     expectTypeOf<QuoteOrderCostInput['orderId']>().toEqualTypeOf<string | undefined>()
   })
 })
