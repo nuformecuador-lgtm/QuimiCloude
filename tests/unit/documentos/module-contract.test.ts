@@ -147,7 +147,7 @@ const CARPETAS_PERMITIDAS = ['adapters', 'domain', 'ports'];
 
 /** Paquetes que el contrato no puede arrastrar, ni directa ni transitivamente. */
 const EXTERNOS_PROHIBIDOS =
-  /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*|@google\/genai)$/;
+  /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*|@google\/genai|@anthropic-ai\/sdk)$/;
 
 /** Lo unico que `domain/` y `ports/` pueden importar de fuera del modulo. */
 const PAQUETES_PUROS = ['zod'];
@@ -440,7 +440,7 @@ export function findFrozenListFindings(
  * pueden vivir— en los adaptadores driven.
  */
 const PAQUETES_DE_SERVIDOR =
-  /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*|@google\/genai)$/;
+  /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*|@google\/genai|@anthropic-ai\/sdk)$/;
 
 /**
  * Los dos paquetes que los casos de abajo necesitan ESCRIBIR dentro de fuentes fabricados, para
@@ -666,6 +666,7 @@ describe('documentos — la lectura con IA se publica sin arrastrar al tercero (
     const contrato = await import('@/lib/modules/documentos');
     expect('AiReader' in contrato).toBe(false);
     expect('readWithGenai' in contrato).toBe(false);
+    expect('readWithAnthropic' in contrato).toBe(false);
     const especificadores = extractExportFromSpecifiers(barril);
     expect(especificadores.some((spec) => resolveSpecifier(BARRIL, spec)?.includes('/ports/'))).toBe(
       false,

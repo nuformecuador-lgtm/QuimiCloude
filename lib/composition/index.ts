@@ -400,8 +400,8 @@ import {
   type CatalogImportDeps,
   type FormulaImportDeps,
 } from '@/lib/modules/documentos';
+import { readWithAnthropic } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
-import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
 import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
@@ -1630,15 +1630,16 @@ const pdfConverter: PdfConverter = {
 };
 
 /**
- * `AiReader` cableado con el adaptador de Gemini. La clave del objeto es la del PUERTO
- * (`read`) y el valor, la funcion del adaptador (`readWithGenai`) —se llaman distinto a
+ * `AiReader` cableado con el adaptador de Claude; el de Gemini se conserva sin cablear como
+ * futuro respaldo. La clave del objeto es la del PUERTO
+ * (`read`) y el valor, la funcion del adaptador (`readWithAnthropic`) —se llaman distinto a
  * proposito, igual que `documentStorage` y `pdfConverter` arriba—. Aqui no se invoca nada,
  * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
  * toca la red: la suite entera arranca sin claves de IA.
  */
 const aiReader: AiReader = {
   read: (request) =>
-    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithGenai(request),
+    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithAnthropic(request),
 };
 
 /**

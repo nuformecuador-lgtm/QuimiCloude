@@ -2,7 +2,7 @@
 //
 // Lo que se afirma aqui es el CABLEADO, no el dominio: que `lib/composition` publica
 // `readPdfWithAi` y `processPdfByStrategy` junto a las cuatro claves que ya tenia, que construir la
-// fachada NO lee las variables de Gemini ni las del texto de los prompts (R2) ni toca la red, y
+// fachada NO lee las variables del proveedor de IA ni las del texto de los prompts (R2) ni toca la red, y
 // que el adaptador de IA no se invoca al importar.
 //
 // Mismo criterio que `tests/unit/composition/asignaciones-facade.test.ts`: se sustituye el
@@ -11,25 +11,27 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { readWithGenaiMock, descargaRealMock, descargaDobleMock } = vi.hoisted(() => {
+const { readWithAnthropicMock, descargaRealMock, descargaDobleMock } = vi.hoisted(() => {
   // Borradas ANTES del `import` de mas abajo. Desde 2026-09-21 estas cuatro ya no se
   // verifican con `expect` (ver el caso de R22/R26/R2 de QC-129 mas abajo: Vitest recarga
   // `.env` despues de este borrado, asi que la ausencia no se sostiene). El borrado se deja
   // igual, como intencion declarada, y siguen vivos los mocks de mas abajo.
+  delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_MODEL;
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_MODEL;
   delete process.env.CATALOG_PROMPT;
   delete process.env.FORMULA_PROMPT;
   return {
-    readWithGenaiMock: vi.fn(),
+    readWithAnthropicMock: vi.fn(),
     descargaRealMock: vi.fn(async () => new Uint8Array([1])),
     descargaDobleMock: vi.fn(async () => new Uint8Array([2])),
   };
 });
 
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
-vi.mock('@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai', () => ({
-  readWithGenai: readWithGenaiMock,
+vi.mock('@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic', () => ({
+  readWithAnthropic: readWithAnthropicMock,
 }));
 // Los DOS adaptadores del almacenamiento, doblados a la vez: la eleccion se observa mirando cual
 // de los dos recibio la llamada, que es la unica forma de afirmar sobre el cableado sin bucket.
@@ -106,7 +108,7 @@ describe('documentos — la fachada expone la lectura con IA (fachada cableada)'
   });
 
   it('R26 — el cableado no invoca el adaptador de IA al construirse', () => {
-    expect(readWithGenaiMock).not.toHaveBeenCalled();
+    expect(readWithAnthropicMock).not.toHaveBeenCalled();
   });
 });
 
