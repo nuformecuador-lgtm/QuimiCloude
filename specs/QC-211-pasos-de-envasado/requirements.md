@@ -34,6 +34,7 @@
 | D13 | Las fórmulas existentes no se migran: quedan sin pasos de envasado. | Heredado, patrón QC-173 y D1 | R1, R5 |
 
 ## Preguntas abiertas
+n> **F1.4 aprobado por el humano el 2026-10-05** con un «aprobado» sin matices: se toma el spec tal cual. Prompt de `design.md > 6.2` aprobado como está (T15 manual del humano); P1 = sin control para mover pasos; P2 = el botón del último paso sigue diciendo «Terminar»; al editar, `packingSteps` ausente = lista vacía.
 
 - ~~Cómo separa la IA los pasos de envasado en la importación cuando el PDF no los distingue
   (heurística o prompt). Esto es diseño, lo resuelve `spec_author` en design.md.~~
