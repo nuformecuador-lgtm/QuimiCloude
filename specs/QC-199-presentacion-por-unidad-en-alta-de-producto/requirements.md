@@ -89,6 +89,13 @@ producto vivo de la misma empresa con el mismo nombre normalizado.
   instrumento, y NO DEBE cambiar el conjunto de lotes que cuenta para envases y productos
   terminados.
 
+### Catálogo de unidades del formulario
+
+- **R20** — CUANDO un usuario con `inventario.modificar` abre el alta de inventario, el sistema DEBE
+  entregar al formulario las unidades visibles para su empresa aunque no tenga `unidades.consultar`;
+  SI no tiene `inventario.modificar`, ENTONCES esa lectura DEBE rechazarse con error de permiso y no
+  devolver ninguna unidad.
+
 ### Recorrido completo
 
 - **R19** — CUANDO un usuario con `inventario.modificar` da de alta desde la pantalla de inventario
@@ -109,6 +116,9 @@ producto vivo de la misma empresa con el mismo nombre normalizado.
 | Permiso heredado `inventario.modificar`, en el servicio | R8 |
 | Identidad del insumo: nombre + unidad | R10 |
 | E2E | R19 |
+| Unidades del formulario con `inventario.modificar` | R20 |
+| Control de la base solo para `PRODUCT` | R12, R13 |
+| Medir lotes con unidad distinta antes de cambiar lecturas | Sin R: es una comprobación previa (T0 de `tasks.md`) |
 
 ## Preguntas abiertas
 
@@ -127,3 +137,6 @@ Ninguna.
 | 2026-10-04 | Permiso | Heredado: `inventario.modificar`, validado en el servicio. |
 | 2026-10-04 | Identidad del insumo | Heredada de QC-121: nombre + unidad. |
 | 2026-10-04 | E2E | Sí: el alta de un lote es un movimiento de inventario (`CHECKPOINTS.md`). |
+| 2026-10-04 | ¿El alta de insumo exige `unidades.consultar` para ver las unidades? | No. El formulario trae las unidades con el permiso del alta, `inventario.modificar`. |
+| 2026-10-04 | ¿A qué tipos se aplica el control de la base? | Solo a insumos (`PRODUCT`). Máquinas e instrumentos (`MACHINE`) siguen como hoy. |
+| 2026-10-04 | ¿Lotes antiguos con unidad de presentación distinta de la del producto? | Antes de cambiar las lecturas se miden en la base. Si hay alguno, se para y se devuelve al humano con los datos; si no hay, se sigue. |

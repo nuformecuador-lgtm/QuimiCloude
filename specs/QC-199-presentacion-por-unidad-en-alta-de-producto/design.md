@@ -69,7 +69,8 @@ BEGIN
 - Solo cambia la rama `presentation_id IS NULL`. La rama con presentación es la vigente, letra
   por letra (R13).
 - Restringido a `type = 'PRODUCT'`: un instrumento no tiene unidad por diseño y sus lotes no llevan
-  presentación; aplicar la regla a todos los tipos rompería su alta (R11, R13). Ver §9, P2.
+  presentación; aplicar la regla a todos los tipos rompería su alta (R11, R13). Decisión del humano
+  del 2026-10-04 (§9).
 - Sin `UPDATE`, `DELETE` ni `INSERT` de datos, y sin tocar `presentations` (R15). No hace falta el
   paréntesis de `NO FORCE ROW LEVEL SECURITY`: no se lee ni se escribe ninguna fila al migrar. La
   función lee `products` igual que la vigente.
@@ -178,8 +179,8 @@ nullish, como hoy). PACKAGING no se toca.
   `FIELD_MESSAGES.unitId = 'Elige una unidad.'`.
 - `shouldShowField`: `presentationId` solo para PACKAGING; `unitId` solo para PRODUCT (R1, R3).
 - El campo «Unidad» reutiliza `components/shared/presentation-unit-select.tsx` en modo no
-  controlado, con `name="unitId"`, `units` (ya llega por props desde `page.tsx` → `ProductSheet` →
-  `ProductForm`), `defaultValue` = lo escrito tras un fallo o la unidad del insumo elegido como
+  controlado, con `name="unitId"`, las unidades de §6.1 (bajan por props desde `page.tsx` →
+  `ProductSheet` → `ProductForm`), `defaultValue` = lo escrito tras un fallo o la unidad del insumo elegido como
   plantilla, y `key` de remontaje como hoy hace `PresentationSelect` (pf:678). No ofrece «sin
   unidad» ni texto libre (R2). Helper: «La unidad en que se cuenta este insumo. Todos sus lotes se
   registran en ella.»
@@ -191,6 +192,32 @@ nullish, como hoy). PACKAGING no se toca.
 - El comentario «AQUI IBA LA UNIDAD» (pf:721-727) y los de :649-668 que dicen que la presentación
   es obligatoria para todos se reescriben o se quitan.
 - Edición: sin cambios (no muestra ni envía unidad).
+
+### 6.1 Unidades del formulario con `inventario.modificar` (R20)
+
+Hoy el formulario recibe `units` de `listUnitsAction()` (`app/(private)/inventario/page.tsx:70-74`),
+que exige `unidades.consultar` (`lib/modules/unidades/domain/list-units.ts:108`). Decisión del humano:
+el alta las trae con su propio permiso.
+
+- **`unidades`**: `UnitCatalog` (contrato público, `domain/unit-catalog.ts`) gana
+  `listVisibleRefs(companyId): Promise<readonly UnitRef[]>`: todas las unidades de la empresa más
+  las de sistema, con la misma definición de ámbito que ya usa el adaptador
+  (`unit-prisma.ts:138`), orden por nombre. Lo implementa `unit-catalog-prisma.ts` (el único que
+  puede tocar `prisma.unit`). Es un servicio entre módulos: no comprueba permisos, igual que
+  `findRefs`.
+- **`inventario`**: caso de uso nuevo `domain/list-product-form-units.ts`:
+  `requirePermission(actor, 'inventario.modificar')` primero y después `deps.units.listVisibleRefs`.
+  Server Action `listProductFormUnitsAction()` en `adapters/driving/` (mismo patrón
+  actor → caso de uso → `toErrorState` que `product-actions.ts`). Cableado en `lib/composition`.
+- **Página**: `page.tsx` llama a la acción nueva junto a `listUnitsAction()` (en el mismo
+  `Promise.all`). Las unidades del formulario salen de la nueva; las etiquetas del listado siguen
+  saliendo de `listUnitsAction()`, sin cambios. `ProductSheet` y `ProductForm` reciben la lista
+  nueva por la prop `formUnits` (la prop `units` sigue para el alta rápida de presentación del
+  envase). Si la acción falla, el formulario se pinta con el selector vacío y el envío lo rechaza
+  el esquema (R4).
+- Alternativa descartada: relajar `listUnits` para aceptar `inventario.modificar`. Haría que
+  `unidades` conociera permisos de otro módulo y abriría la pantalla de unidades entera, con
+  filtros y paginación, a quien solo debería ver la lista del selector.
 
 ## 7. Integraciones y permisos
 
@@ -213,22 +240,30 @@ todo (R8). No hay dependencias nuevas.
    API la opción «sin unidad», que aquí está prohibida (R2); uno nuevo duplicaría
    `PresentationUnitSelect`, que ya es `shared`, ya no ofrece «sin unidad» y ya admite `name`.
 
-## 9. Preguntas nuevas (no salen de la semilla; sin respuesta inventada)
+## 9. Decisiones del humano sobre las preguntas del diseño (2026-10-04)
 
-- **P1 — Alta de insumo sin `unidades.consultar`.** El catálogo de unidades del formulario sale de
-  `listUnitsAction()` (`app/(private)/inventario/page.tsx:70-74`), que exige `unidades.consultar`
-  (`lib/modules/unidades/domain/list-units.ts:108`). Hoy, sin ese permiso, el alta sigue siendo
-  posible eligiendo una presentación existente; con esta ficha el selector de unidad quedaría vacío
-  y **no se podría dar de alta ningún insumo**. ¿Se acepta (todo rol con `inventario.modificar`
-  tiene `unidades.consultar`), o la página debe obtener las unidades por otra vía que solo pida
-  `inventario.modificar`? El diseño de arriba asume lo primero hasta que se responda; si es lo
-  segundo, añade una task.
-- **P2 — Lectura de la decisión del disparador.** La decisión dice «un lote sin presentación solo
-  entra si su producto tiene unidad», bajo la pregunta «lote de insumo». Aplicada a todos los tipos,
-  rompe el alta de instrumentos (que no tienen unidad y la decisión «MACHINE sin cambios» protege).
-  El diseño la aplica solo a `type = 'PRODUCT'`. Confirmar en la aprobación.
-- **P3 — Lotes de antes de QC-121 en otra unidad.** La migración `20260918130000` no partió los
-  productos cuyos lotes ya mezclaban unidades (su comentario, :24-27). Con R16/R17, esos lotes se
-  mostrarán y costearán en la unidad del producto, aunque su presentación diga otra. Es lo que pide
-  la decisión «las lecturas usan la unidad del producto»; se deja escrito por si el humano quiere
-  saber cuántos hay antes de desplegar (no se ha medido: el arnés no consulta la base de producción).
+Ya no queda ninguna pregunta abierta. Las tres están también en la tabla de decisiones de
+`requirements.md`.
+
+- **Unidades sin `unidades.consultar`.** El formulario trae las unidades con `inventario.modificar`.
+  Se hace como describe §6.1 (R20, T14).
+- **Alcance del control de la base.** Solo se aplica a insumos (`PRODUCT`), como describe §2.
+  Instrumentos (`MACHINE`) y el resto de tipos siguen como hoy (R12, R13).
+- **Lotes con unidad de presentación distinta de la del producto.** La migración `20260918130000`
+  no partió los productos cuyos lotes ya mezclaban unidades (:24-27). Antes de cambiar las
+  lecturas (T6, T7), T0 cuenta en la base los lotes **vivos** que tienen presentación y cuya
+  `presentations.unit_id` no coincide con `products.unit_id`. Si hay alguno, el implementer
+  **para** y devuelve al humano la lista con producto, lote, unidad del producto y unidad de la
+  presentación. Si no hay ninguno, sigue. Consulta de referencia:
+
+  ```sql
+  SELECT b."company_id", p."id" AS product_id, p."name", b."id" AS batch_id, b."lot",
+         p."unit_id" AS product_unit_id, pr."unit_id" AS presentation_unit_id, b."stock"
+    FROM "product_batches" b
+    JOIN "products" p       ON p."id" = b."product_id" AND p."deleted_at" IS NULL
+    JOIN "presentations" pr ON pr."id" = b."presentation_id"
+   WHERE p."unit_id" IS DISTINCT FROM pr."unit_id";
+  ```
+
+  Aquí, «vivo» quiere decir que el producto no está borrado. Los lotes con existencia 0 también
+  entran en la cuenta, porque se ven en el panel.

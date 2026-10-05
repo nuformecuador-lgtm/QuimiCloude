@@ -5,6 +5,16 @@
 > Los nombres de los casos llevan `R<n>` (`docs/conventions.md > Tests`). Los comentarios de
 > producción, sin citar fichas ni requisitos.
 
+## Bloque 0 — comprobación previa (bloqueante)
+
+- [ ] **T0 — Medir los lotes cuya unidad de presentación no coincide con la del producto.** Antes de
+  T6 y T7, ejecutar en la base de destino la consulta de `design.md > 9`. No cambia código ni
+  datos.
+  *Hecho:* el resultado (número y, si hay alguno, las filas) queda en
+  `progress/impl_QC-199-presentacion-por-unidad-en-alta-de-producto.md`. **Si sale alguna fila, el
+  implementer PARA y lo devuelve al humano con esos datos**, sin seguir con T6, T7 ni con lo que
+  dependa de ellas. Con cero filas, sigue.
+
 ## Bloque A — base de datos
 
 - [ ] **T1 — Migración del disparador.** Crear
@@ -46,7 +56,7 @@
   `R10 findAliveIdByNameInUnit encuentra el homonimo de la misma unidad y no el de otra`,
   `R12 el rechazo product_batches_product_without_unit se traduce a ValidationError`.
   *Hecho:* verde.
-- [ ] **T6 [P] — Vista de lotes por la unidad del producto.** `BATCH_VIEW_SELECT`/`toBatchView` y
+- [ ] **T6 [P] — Vista de lotes por la unidad del producto.** Depende de T0 (cero filas). `BATCH_VIEW_SELECT`/`toBatchView` y
   `findBatchesOfOrder` en `pp`; comentario de `domain/product-batch-view.ts`.
   Tests de integración (`tests/integration/inventario/order-batches.int.test.ts` o nuevo):
   `R16 un lote de insumo sin presentacion muestra la unidad del producto`,
@@ -54,7 +64,7 @@
   `R16 apartado y disponible del lote salen junto a la unidad del producto`;
   regresión: `R18 lote de envase y de producto terminado conservan su unidad`.
   *Hecho:* verde.
-- [ ] **T7 [P] — Costeo.** `pcp` según `design.md > 5.2`.
+- [ ] **T7 [P] — Costeo.** Depende de T0 (cero filas). `pcp` según `design.md > 5.2`.
   Unit en `tests/unit/inventario/product-catalog-costing.test.ts`:
   `R17 toCostingBatch toma la unidad del producto`.
   Integración en `tests/integration/pedidos/order-ingredients-cost.int.test.ts` y
@@ -80,10 +90,25 @@
   `R6 el alta de insumo envia unitId y no presentationId`, `R11 el alta de envase sigue enviando presentationId`.
   *Hecho:* verde.
 
-## Bloque C — interfaz (depende de T4)
+- [ ] **T14 [P] — Unidades del formulario con `inventario.modificar`.** Según `design.md > 6.1`:
+  `UnitCatalog.listVisibleRefs` en `unidades` (contrato y `unit-catalog-prisma.ts`), caso de uso
+  `inventario/domain/list-product-form-units.ts`, `listProductFormUnitsAction` y cableado en
+  `lib/composition/index.ts`.
+  Tests:
+  `tests/unit/inventario/list-product-form-units.test.ts`:
+  `R20 con inventario.modificar y sin unidades.consultar devuelve las unidades visibles`,
+  `R20 sin inventario.modificar rechaza con error de permiso y no consulta unidades`.
+  `tests/integration/unidades/unit-catalog-visible.int.test.ts`:
+  `R20 listVisibleRefs devuelve las unidades de la empresa y las de sistema, incluida unidad, y ninguna de otra empresa`.
+  *Hecho:* verde.
+
+## Bloque C — interfaz (depende de T4 y T14)
 
 - [ ] **T10 — Formulario y selector de nombre.** `product-form.tsx` y `product-name-picker.tsx`
-  según `design.md > 6`. Limpiar los comentarios de las líneas tocadas.
+  según `design.md > 6`. Incluye `page.tsx` y `product-sheet.tsx` con la prop `formUnits`
+  (`design.md > 6.1`). Limpiar los comentarios de las líneas tocadas.
+  Además, en `tests/unit/inventario/product-page.test.tsx`:
+  `R20 la pagina pasa al formulario las unidades de la accion de inventario y no las de listUnitsAction`.
   Tests en `tests/unit/inventario-ui/product-form-unidad.test.tsx` (nuevo):
   `R1 el alta de insumo muestra Unidad y no Presentacion`,
   `R2 el selector ofrece todas las unidades recibidas incluida unidad (u) y no ofrece sin unidad`,
@@ -96,7 +121,7 @@
 
 ## Bloque D — recorrido y regresión
 
-- [ ] **T11 — E2E del alta de un insumo con unidad** (`e2e/insumo-por-unidad.spec.ts`). Depende de T1-T10.
+- [ ] **T11 — E2E del alta de un insumo con unidad** (`e2e/insumo-por-unidad.spec.ts`). Depende de T0-T10 y T14.
   Caso `R19 el Administrador da de alta un insumo eligiendo kg, lo ve en el listado y en el panel de lotes en kg, y un segundo alta del mismo nombre en kg suma a ese producto`.
   Comprobación contra Postgres dentro del caso: `products.unit_id` = kg y los dos lotes con
   `presentation_id` NULL, un solo producto vivo con ese nombre. Incluye ver la opción «u» en el
@@ -106,7 +131,7 @@
   que crean un PRODUCT con `crearPresentacionEnLinea`/`elegirPresentacionExistente`, :529-1000
   aprox.) pasan a elegir unidad; los recorridos de envase no cambian. Depende de T10.
   *Hecho:* `e2e/inventario.spec.ts` verde sin casos saltados.
-- [ ] **T13 — Gate completo y trazabilidad.** `./init.sh` completo en verde; mapa `R1..R19 -> test`
+- [ ] **T13 — Gate completo y trazabilidad.** `./init.sh` completo en verde; mapa `R1..R20 -> test`
   en `progress/impl_QC-199-presentacion-por-unidad-en-alta-de-producto.md`. Depende de todo lo anterior.
   *Hecho:* gate verde y cada `R<n>` con al menos un test nombrado.
 
@@ -133,3 +158,4 @@
 | R17 | T7 |
 | R18 | T6; T7 |
 | R19 | T11 |
+| R20 | T14 `list-product-form-units.test.ts`, `unit-catalog-visible.int.test.ts`; T10 `product-page.test.tsx` |
