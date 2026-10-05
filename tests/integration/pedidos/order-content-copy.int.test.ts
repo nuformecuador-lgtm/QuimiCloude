@@ -119,6 +119,7 @@ const presentations: PresentationCatalog = {
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
   listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+  findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 }
 

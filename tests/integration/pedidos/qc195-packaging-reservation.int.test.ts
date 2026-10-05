@@ -85,7 +85,7 @@ const recipes: RecipeCatalog = {
 };
 const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts };
 const presentations: PresentationCatalog = { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames };
-const units: UnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
+const units: UnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
 const packaging: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });

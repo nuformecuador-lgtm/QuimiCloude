@@ -135,7 +135,12 @@ import type {
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { forModule } from '@/lib/shared/observability/logger';
-import { findPackageUnitId, findUnitRefs, listVisibleUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import {
+  findMassVolumeBridge,
+  findPackageUnitId,
+  findUnitRefs,
+  listVisibleUnitRefs,
+} from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findUnitRefsSharingBaseInCompany,
   listUnits,
@@ -947,6 +952,7 @@ const unitCatalog: UnitCatalog = {
   findRefs: findUnitRefs,
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
   listVisibleRefs: listVisibleUnitRefs,
+  findMassVolumeBridge: () => findMassVolumeBridge(),
 };
 
 const recipeRepository: RecipeRepository = {

@@ -115,6 +115,7 @@ function montar(options?: {
     units: {
       findRefs: vi.fn(async () => [unidad()]),
       listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+      findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as UnitCatalog,
     products: {

@@ -154,7 +154,7 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 const orderPresentationCatalog = { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames };
-const orderUnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
+const orderUnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
 const createOrderUseCase = createCreateOrder({
   recipes: recipeCatalog,
   products: productCatalog,
