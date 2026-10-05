@@ -256,24 +256,68 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
  * «siguiente» queda deshabilitado. El assert NUNCA mira «la primera fila» ni el total: solo si
  * existe una celda con ESTE nombre.
  */
-async function findProductCell(page: Page, name: string): Promise<Locator> {
+async function findProductCell(
+  page: Page,
+  name: string,
+  { exact = false }: { readonly exact?: boolean } = {},
+): Promise<Locator> {
   // Desde el 2026-09-07 la lista monta la tabla compartida: la celda y el control de pagina
   // llevan sus `data-testid` (`data-table-cell-<columna>`, `data-table-next`).
-  const cell = page.getByTestId('data-table-cell-name').filter({ hasText: name });
-  const next = page.getByTestId('data-table-next');
+  const cell = page
+    .getByTestId('data-table-cell-name')
+    .filter({ hasText: exact ? textoExacto(name) : name });
 
   for (;;) {
     if ((await cell.count()) > 0) return cell;
-    if ((await next.count()) === 0 || (await next.isDisabled())) return cell;
+    if (!(await avanzarPagina(page))) return cell;
+  }
+}
 
-    const before = new URL(page.url()).searchParams.get('page');
-    await next.click();
-    await page.waitForFunction(
-      (previous) => new URL(window.location.href).searchParams.get('page') !== previous,
-      before,
-      { timeout: 60_000 },
-    );
-    await expect(page.getByTestId('product-list')).toBeVisible({ timeout: 60_000 });
+/** Pasa a la pagina siguiente de la lista; `false` si ya no la hay. */
+async function avanzarPagina(page: Page): Promise<boolean> {
+  const next = page.getByTestId('data-table-next');
+  if ((await next.count()) === 0 || (await next.isDisabled())) return false;
+
+  const before = new URL(page.url()).searchParams.get('page');
+  await next.click();
+  await page.waitForFunction(
+    (previous) => new URL(window.location.href).searchParams.get('page') !== previous,
+    before,
+    { timeout: 60_000 },
+  );
+  await expect(page.getByTestId('product-list')).toBeVisible({ timeout: 60_000 });
+  return true;
+}
+
+/** `hasText` con cadena busca subcadena: un nombre que contenga a otro casaria con ambos. */
+function textoExacto(texto: string): RegExp {
+  return new RegExp(`^\\s*${texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
+}
+
+/**
+ * La existencia de CADA fila cuyo nombre es exactamente `name`, recargando la lista desde la
+ * primera pagina. Los homonimos salen contiguos (nombre y luego id), pero pueden partirse entre
+ * dos paginas: si la ultima fila de una pagina es uno, se sigue en la siguiente.
+ */
+async function existenciasDeHomonimos(page: Page, name: string): Promise<string[]> {
+  await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+  await expect(page.getByTestId('product-list')).toBeVisible({ timeout: 60_000 });
+
+  const exacto = textoExacto(name);
+  const celdas = await findProductCell(page, name, { exact: true });
+  const existencias: string[] = [];
+
+  for (;;) {
+    const textos = await celdas
+      .locator('xpath=ancestor::tr[1]')
+      .getByTestId('product-stock')
+      .allTextContents();
+    existencias.push(...textos.map((texto) => texto.replace(/\s+/g, ' ').trim()));
+
+    const ultimaCelda = page.getByTestId('data-table-cell-name').last();
+    if ((await ultimaCelda.count()) === 0) return existencias;
+    if (!exacto.test((await ultimaCelda.textContent()) ?? '')) return existencias;
+    if (!(await avanzarPagina(page))) return existencias;
   }
 }
 
@@ -813,23 +857,13 @@ test.describe('catalogo de productos', () => {
     await page.getByTestId('product-field-unitCost').fill(sameNameLiterUnitCost);
     await guardarAlta(page);
 
-    // --- 3. El listado muestra DOS filas «X · kg» y «X · <litro>», cada una con su propia
-    // existencia.
-    const kgRowName = `${sameNameProductName} · ${kg.label}`;
-    const literRowName = `${sameNameProductName} · ${liter.label}`;
-
-    const kgCell = await findProductCell(page, kgRowName);
-    const kgRow = kgCell.first().locator('xpath=ancestor::tr[1]');
-    await expect(kgRow.getByTestId('product-stock')).toHaveText(
-      `${sameNameKgFirstStock} ${kg.label}`,
-      { timeout: 60_000 },
-    );
-
-    const literCell = await findProductCell(page, literRowName);
-    const literRow = literCell.first().locator('xpath=ancestor::tr[1]');
-    await expect(literRow.getByTestId('product-stock')).toHaveText(
-      `${sameNameLiterStock} ${liter.label}`,
-      { timeout: 60_000 },
+    // --- 3. El listado muestra DOS filas «X», y es la existencia, con su unidad, lo que las
+    // distingue: la celda de nombre ya no lleva la unidad.
+    expect(
+      (await existenciasDeHomonimos(page, sameNameProductName)).sort(),
+      'dos filas con el mismo nombre, cada una con su propia existencia y su unidad',
+    ).toEqual(
+      [`${sameNameKgFirstStock} ${kg.label}`, `${sameNameLiterStock} ${liter.label}`].sort(),
     );
 
     // Contra Postgres: dos productos vivos "X", con unidad distinta y la existencia que muestra
@@ -870,19 +904,10 @@ test.describe('catalogo de productos', () => {
     await guardarAlta(page);
 
     const kgStockAfter = Number(sameNameKgFirstStock) + Number(sameNameKgSecondStock);
-    const kgCellAfter = await findProductCell(page, kgRowName);
-    const kgRowAfter = kgCellAfter.first().locator('xpath=ancestor::tr[1]');
-    await expect(kgRowAfter.getByTestId('product-stock')).toHaveText(
-      `${kgStockAfter} ${kg.label}`,
-      { timeout: 60_000 },
-    );
-
-    const literCellAfter = await findProductCell(page, literRowName);
-    const literRowAfter = literCellAfter.first().locator('xpath=ancestor::tr[1]');
-    await expect(literRowAfter.getByTestId('product-stock')).toHaveText(
-      `${sameNameLiterStock} ${liter.label}`,
-      { timeout: 60_000 },
-    );
+    expect(
+      (await existenciasDeHomonimos(page, sameNameProductName)).sort(),
+      'sube solo la fila en kg; la de L queda igual y no aparece una tercera',
+    ).toEqual([`${kgStockAfter} ${kg.label}`, `${sameNameLiterStock} ${liter.label}`].sort());
 
     const productosTrasSegundoLote = await prisma.product.findMany({
       where: { name: sameNameProductName, deletedAt: null },
