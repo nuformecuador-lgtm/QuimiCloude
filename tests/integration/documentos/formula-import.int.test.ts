@@ -330,6 +330,7 @@ async function crearRecetaSembrada(
       name,
       description: 'Descripcion original',
       steps: [paso('Paso original 1')],
+      packingSteps: [],
       lines: overrides.lines ?? [],
       imagePath: overrides.imagePath ?? `recetas/${token()}.jpg`,
       tools: [],

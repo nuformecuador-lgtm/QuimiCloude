@@ -432,6 +432,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261004150000_execution_permission',
   // La regla de unidad del lote de insumo sin presentacion; no toca el identificador.
   '20261004170000_product_batches_require_product_unit',
+  // Los pasos de envasado de la receta; no toca el identificador.
+  '20261005120000_recipe_packing_steps',
 ] as const
 
 export function hallazgosDeMigraciones(

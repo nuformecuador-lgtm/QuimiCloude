@@ -58,6 +58,7 @@ export type NewRecipe = {
   readonly name: string;
   readonly description: string | null;
   readonly steps: readonly RecipeStepView[];
+  readonly packingSteps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineData[];
   readonly imagePath: string | null;
   /** `null` = no tocar las que ya tiene. Releerlas y reenviarlas desde fuera de la
@@ -76,6 +77,7 @@ export type RecipeRow = {
   readonly name: string;
   readonly description: string | null;
   readonly steps: readonly RecipeStepView[];
+  readonly packingSteps: readonly RecipeStepView[];
   readonly imagePath: string | null;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
@@ -95,6 +97,7 @@ export type RecipeOriginalRow = {
   readonly description: string | null;
   readonly imagePath: string | null;
   readonly steps: readonly RecipeStepView[];
+  readonly packingSteps: readonly RecipeStepView[];
 };
 
 /** Datos de una version nueva: nombre y lineas; lo demas sale de la original. */

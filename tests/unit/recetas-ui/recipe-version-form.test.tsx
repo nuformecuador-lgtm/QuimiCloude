@@ -97,6 +97,7 @@ function versionDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     createdBy: null,
     updatedBy: null,
     steps: [CHECKLIST_STEP],
+    packingSteps: [],
     lines: VERSION_LINES,
     tools: [],
     original: { id: ORIGINAL_ID, name: 'Jabón' },

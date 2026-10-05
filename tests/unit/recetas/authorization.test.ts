@@ -121,6 +121,7 @@ const FILA_RECETA: RecipeRow = {
   name: 'Desengrasante 5%',
   description: null,
   steps: [],
+  packingSteps: [],
   imagePath: null,
   createdBy: 'actor-1',
   updatedBy: 'actor-1',

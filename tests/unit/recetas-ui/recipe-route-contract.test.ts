@@ -493,6 +493,29 @@ const MIGRACION_QC194 = [
   'db/migrations/20261003120000_recipe_tools/down.sql',
 ];
 
+// QC-211 (2026-10-05): pasos de envasado. Exactamente los archivos que el diff de esta rama toca
+// bajo `lib/modules/recetas/`, ninguno mas.
+const PASOS_DE_ENVASADO_QC211 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-packing-steps-reader.ts',
+  'lib/modules/recetas/domain/recipe-view.ts',
+  'lib/modules/recetas/domain/update-recipe-version.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// La columna `packing_steps` de `recipes` y `db/schema.prisma` con el campo nuevo.
+const MIGRACION_QC211 = [
+  'db/schema.prisma',
+  'db/migrations/20261005120000_recipe_packing_steps/migration.sql',
+  'db/migrations/20261005120000_recipe_packing_steps/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -500,6 +523,7 @@ export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AISLAMIENTO_POR_EMPRESA_QC50,
   ...CANTIDADES_EN_PORCENTAJE_QC147,
   ...HERRAMIENTAS_DE_LA_RECETA_QC194,
+  ...PASOS_DE_ENVASADO_QC211,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -519,6 +543,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC121,
   ...MIGRACION_QC147,
   ...MIGRACION_QC194,
+  ...MIGRACION_QC211,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */

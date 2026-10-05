@@ -30,6 +30,7 @@ const ORIGINAL: RecipeRow = {
   name: 'Crema base',
   description: null,
   steps: [PASO],
+  packingSteps: [],
   imagePath: null,
   createdBy: null,
   updatedBy: null,
@@ -48,7 +49,7 @@ const VERSION: RecipeRow = {
   id: 'version-1',
   name: 'Sin perfume',
   steps: [],
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, steps: [PASO] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], steps: [PASO] },
 };
 
 const ENTRADA = {
@@ -64,6 +65,7 @@ const DATOS: NewRecipe = {
   name: 'Crema base',
   description: null,
   steps: [PASO],
+  packingSteps: [],
   lines: ENTRADA.lines,
   imagePath: null,
   tools: null,

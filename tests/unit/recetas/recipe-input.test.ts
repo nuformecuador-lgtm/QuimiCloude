@@ -508,3 +508,75 @@ describe('tools en los cuatro esquemas — omitir no es lo mismo que []', () => 
     expect(incompletas.success).toBe(false);
   });
 });
+
+describe('packingSteps en los esquemas de receta — pasos de envasado (QC-211)', () => {
+  const pasos = (n: number, prefijo: string) => Array.from({ length: n }, (_, i) => paso(`${prefijo} ${i}`));
+
+  it('R1: el alta y la edicion sin packingSteps los dejan en lista vacia', () => {
+    expect(createRecipeSchema.parse(RECETA_VALIDA).packingSteps).toEqual([]);
+    expect(updateRecipeSchema.parse(RECETA_VALIDA).packingSteps).toEqual([]);
+  });
+
+  it('R1: el alta y la edicion aceptan packingSteps: []', () => {
+    expect(createRecipeSchema.parse({ ...RECETA_VALIDA, packingSteps: [] }).packingSteps).toEqual([]);
+    expect(updateRecipeSchema.parse({ ...RECETA_VALIDA, packingSteps: [] }).packingSteps).toEqual([]);
+  });
+
+  it('R4: los pasos de envasado salen en su orden y separados de steps', () => {
+    const envasado = [paso('Envasar'), paso('Etiquetar')];
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const parsed = schema.parse({ ...RECETA_VALIDA, packingSteps: envasado });
+      expect(parsed.packingSteps).toEqual(envasado);
+      expect(parsed.steps).toEqual(RECETA_VALIDA.steps);
+    }
+  });
+
+  it('R3: 50 pasos del operador y 50 de envasado se aceptan; 51 de envasado se rechazan', () => {
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      expect(
+        schema.safeParse({ ...RECETA_VALIDA, steps: pasos(50, 'Mezclar'), packingSteps: pasos(50, 'Envasar') }).success,
+      ).toBe(true);
+      const result = schema.safeParse({ ...RECETA_VALIDA, packingSteps: pasos(51, 'Envasar') });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map((issue) => issue.path[0])).toEqual(['packingSteps']);
+      }
+    }
+  });
+
+  it('R2: rechaza el paso de envasado vacio, con mas de 30 elementos o con una clave desconocida en un bloque', () => {
+    const parrafos = (n: number) => ({
+      blocks: Array.from({ length: n }, (_, i) => ({ kind: 'paragraph', spans: [{ text: `Linea ${i}` }] })),
+    });
+    const invalidos: readonly unknown[] = [
+      paso(''),
+      paso('   '),
+      { blocks: [] },
+      parrafos(MAX_STEP_ELEMENTS + 1),
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Sellar' }], color: 'rojo' }] },
+      'Envasar',
+    ];
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      expect(schema.safeParse({ ...RECETA_VALIDA, packingSteps: [parrafos(MAX_STEP_ELEMENTS)] }).success).toBe(true);
+      for (const invalido of invalidos) {
+        const result = schema.safeParse({ ...RECETA_VALIDA, packingSteps: [paso('Envasar'), invalido] });
+        expect(result.success, JSON.stringify(invalido)).toBe(false);
+        if (!result.success) {
+          for (const issue of result.error.issues) expect(issue.path.slice(0, 2)).toEqual(['packingSteps', 1]);
+        }
+      }
+      expect(schema.safeParse({ ...RECETA_VALIDA, packingSteps: 'no es una lista' }).success).toBe(false);
+    }
+  });
+
+  it('R10: los esquemas de version descartan packingSteps sin rechazar la entrada', () => {
+    const alta = createRecipeVersionSchema.parse({ name: 'Version A', packingSteps: [paso('Envasar')] });
+    const edicion = updateRecipeVersionSchema.parse({
+      name: 'Version A',
+      lines: [LINEA_VALIDA],
+      packingSteps: [paso('Envasar')],
+    });
+    expect(alta).not.toHaveProperty('packingSteps');
+    expect(edicion).not.toHaveProperty('packingSteps');
+  });
+});

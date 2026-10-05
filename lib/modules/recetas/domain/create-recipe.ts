@@ -77,6 +77,7 @@ export function createCreateRecipe(
       name: data.name,
       description: data.description ?? null,
       steps: data.steps,
+      packingSteps: data.packingSteps,
       lines: data.lines,
       imagePath,
       tools: data.tools,
