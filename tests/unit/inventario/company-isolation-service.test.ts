@@ -41,12 +41,12 @@ import type { ProductView } from '@/lib/modules/inventario/domain/product-view';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const EMPRESA_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const EMPRESA_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 const UNIDAD = '11111111-1111-4111-8111-111111111111';
-const PRESENTACION = '22222222-2222-4222-8222-222222222222';
 
 /** Quien opera: de la empresa A y con los dos permisos del modulo. */
 const ACTOR_A: Actor = {
@@ -65,7 +65,7 @@ const ALTA_VALIDA = {
   name: 'Acido sulfurico',
   stock: '10',
   qtyAlert: '2',
-  presentationId: PRESENTACION,
+  unitId: UNIDAD,
   unitCost: '10.0000',
 };
 
@@ -145,12 +145,10 @@ function montar() {
       ),
     ),
     // R18: solo los homonimos VIVOS de la empresa del ambito. Es el filtro entero de la regla.
-    // La unidad no la mide este doble -no hay presentaciones que resolver aqui-: el fixture
+    // La unidad no la mide este doble: el fixture
     // solo tiene un producto y una unidad, y lo que este archivo cubre es el aislamiento por
     // empresa, no la busqueda por unidad (eso es `create-product.test.ts`).
-    findAliveIdByNameInPresentationUnit: vi.fn<
-      ProductRepository['findAliveIdByNameInPresentationUnit']
-    >(async (name, _presentationId, scope) => {
+    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async (name, _unitId, scope) => {
       const fila = productos.find(
         (candidata) =>
           candidata.alive &&
@@ -161,6 +159,7 @@ function montar() {
       // cubre `create-product.test.ts`.
       return fila === undefined ? null : { id: fila.id, type: PRODUCT_TYPES.PRODUCT };
     }),
+    findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => null),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(
       async (product, _batch, _now, scope) => {
@@ -223,6 +222,12 @@ function montar() {
   } satisfies PresentationRepository;
 
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };
+  // La unidad del alta es visible para las dos empresas: es de sistema.
+  const units = {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
+      ids.map((id) => ({ id, name: 'kilogramo', symbol: 'kg', baseUnitId: null, factor: null })),
+    ),
+  };
   const now = (): Date => AHORA;
 
   return {
@@ -232,7 +237,7 @@ function montar() {
     productos,
     presentaciones,
     creados,
-    createProduct: createCreateProduct({ products, now }),
+    createProduct: createCreateProduct({ products, units, now }),
     updateProduct: createUpdateProduct({ products, now }),
     deleteProduct: createDeleteProduct({ products, now }),
     getProduct: createGetProduct({ products }),
@@ -259,7 +264,7 @@ const CASOS_DE_USO: ReadonlyArray<{
   {
     nombre: 'create-product',
     invocar: (m, actor) => m.createProduct(ALTA_VALIDA, actor),
-    puerto: (m) => m.products.findAliveIdByNameInPresentationUnit,
+    puerto: (m) => m.products.findAliveIdByNameInUnit,
   },
   {
     nombre: 'update-product',
@@ -572,15 +577,15 @@ describe('QC-49 R17 — la empresa de la entrada no se escribe, no cuenta y se r
 describe('QC-49 R18 — el homonimo de otra empresa no existe para quien da de alta', () => {
   it('el alta en B con el nombre de un producto de A crea uno NUEVO en B', async () => {
     // El fixture tiene «Acido sulfurico» VIVO en la empresa A. Quien da de alta desde B escribe
-    // el mismo nombre: si `findAliveIdByNameInPresentationUnit` no estuviera acotado, el caso de
+    // el mismo nombre: si `findAliveIdByNameInUnit` no estuviera acotado, el caso de
     // uso le colgaria el lote al producto de A -una escritura en la empresa ajena, por el
     // camino mas tonto-.
     const m = montar();
 
     const resultado = await m.createProduct(ALTA_VALIDA, ACTOR_B);
 
-    expect(m.products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledTimes(1);
-    expect(ambitoRecibido(m.products.findAliveIdByNameInPresentationUnit)).toEqual({
+    expect(m.products.findAliveIdByNameInUnit).toHaveBeenCalledTimes(1);
+    expect(ambitoRecibido(m.products.findAliveIdByNameInUnit)).toEqual({
       companyId: EMPRESA_B,
     });
     expect(m.products.addBatchToAlive).not.toHaveBeenCalled();
@@ -598,7 +603,7 @@ describe('QC-49 R18 — el homonimo de otra empresa no existe para quien da de a
 
   it('el mismo alta en A SI encuentra su homonimo y le agrega el lote', async () => {
     // La mitad simetrica, y lo que impide leer el caso de arriba como «el alta nunca reusa».
-    // Si esto no estuviera, un `findAliveIdByNameInPresentationUnit` que devolviera siempre
+    // Si esto no estuviera, un `findAliveIdByNameInUnit` que devolviera siempre
     // `null` -o sea, el ambito roto por el otro lado- pasaria el test anterior sin despeinarse.
     const m = montar();
 

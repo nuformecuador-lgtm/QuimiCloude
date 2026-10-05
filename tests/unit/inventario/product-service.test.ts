@@ -17,6 +17,7 @@ import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-prod
 import type { ProductView } from '@/lib/modules/inventario/domain/product-view';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
  *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
@@ -41,14 +42,19 @@ const PRODUCTO_VALIDO = {
 };
 
 /** QC-90 (R1): el ALTA siempre crea su primer lote, asi que su entrada valida minima lleva
- *  ademas la existencia del lote, presentacion y uno de los dos costos. Los casos propios
+ *  ademas la existencia del lote, la unidad y uno de los dos costos. Los casos propios
  *  de QC-90 -derivacion, producto ya existente, autoria del lote- viven en
  *  `create-product.test.ts`. */
 const ALTA_VALIDA = {
   ...PRODUCTO_VALIDO,
   stock: '0',
-  presentationId: '11111111-1111-4111-8111-111111111111',
+  unitId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
+};
+
+/** Catalogo de unidades en el que la unidad del alta es visible. */
+const UNIDADES: Pick<UnitCatalog, 'findRefs'> = {
+  findRefs: async (ids) => ids.map((id) => ({ id, name: 'kilogramo', symbol: 'kg', baseUnitId: null, factor: null })),
 };
 
 const VISTA_PRODUCTO: ProductView = {
@@ -86,6 +92,7 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
     findAliveIdByNameInPresentationUnit: vi.fn<
       ProductRepository['findAliveIdByNameInPresentationUnit']
     >(async () => null),
+    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-1',
@@ -107,7 +114,7 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
 describe('R5 — alta de producto', () => {
   it('crea el producto y devuelve su identificador cuando el actor es Administrador', async () => {
     const products = montarRepositorio();
-    const createProduct = createCreateProduct({ products, now: () => AHORA });
+    const createProduct = createCreateProduct({ products, units: UNIDADES, now: () => AHORA });
 
     const resultado = await createProduct(ALTA_VALIDA, ADMIN);
 
@@ -122,7 +129,7 @@ describe('R5 — alta de producto', () => {
 describe('R12 — nombres duplicados', () => {
   it('acepta dos productos con el mismo nombre', async () => {
     const products = montarRepositorio();
-    const createProduct = createCreateProduct({ products, now: () => AHORA });
+    const createProduct = createCreateProduct({ products, units: UNIDADES, now: () => AHORA });
 
     await createProduct(ALTA_VALIDA, ADMIN);
     await createProduct(ALTA_VALIDA, ADMIN);
@@ -131,7 +138,7 @@ describe('R12 — nombres duplicados', () => {
     // al puerto, ninguna rechazada.
     //
     // QC-90 acota lo que este caso mide, y conviene decirlo: quien decide si hay homonimo
-    // es el PUERTO (`findAliveIdByNameInPresentationUnit`), y aqui devuelve `null` -no hay producto vivo con
+    // es el PUERTO (`findAliveIdByNameInUnit`), y aqui devuelve `null` -no hay producto vivo con
     // ese nombre-. Lo que sigue vigente es que el DOMINIO no rechaza por nombre repetido;
     // con un producto vivo homonimo, el alta agrega lote en vez de crear (R17), y eso se
     // prueba en `create-product.test.ts`.
@@ -226,6 +233,7 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
 function afirmarPuertoIntacto(products: ProductRepository): void {
   expect(products.create).not.toHaveBeenCalled();
   expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
+  expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
   expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }
@@ -233,7 +241,7 @@ function afirmarPuertoIntacto(products: ProductRepository): void {
 describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
   it('R9 — nombre vacio', async () => {
     const products = montarRepositorio();
-    const createProduct = createCreateProduct({ products, now: () => AHORA });
+    const createProduct = createCreateProduct({ products, units: UNIDADES, now: () => AHORA });
 
     await expect(createProduct({ ...ALTA_VALIDA, name: '   ' }, ADMIN)).rejects.toBeInstanceOf(
       ValidationError,
@@ -246,7 +254,7 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
   // el costo y la compra minima, y por el mismo motivo (`strictObject`).
   it('QC-52 R1 — costo, compra minima o tiempo de entrega en la entrada', async () => {
     const products = montarRepositorio();
-    const createProduct = createCreateProduct({ products, now: () => AHORA });
+    const createProduct = createCreateProduct({ products, units: UNIDADES, now: () => AHORA });
 
     for (const sobra of [{ cost: '10.0000' }, { minPurchase: 0 }, { deliveryTime: 3 }]) {
       await expect(createProduct({ ...ALTA_VALIDA, ...sobra }, ADMIN)).rejects.toBeInstanceOf(
@@ -258,7 +266,7 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
 
   it('D22 — nombre de mas de 200 caracteres', async () => {
     const products = montarRepositorio();
-    const createProduct = createCreateProduct({ products, now: () => AHORA });
+    const createProduct = createCreateProduct({ products, units: UNIDADES, now: () => AHORA });
 
     await expect(
       createProduct({ ...ALTA_VALIDA, name: 'x'.repeat(201) }, ADMIN),
@@ -268,7 +276,7 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
 
   it('R2 (QC-150) — el alta manual con type FINISHED_PRODUCT se rechaza sin escribir nada', async () => {
     const products = montarRepositorio();
-    const createProduct = createCreateProduct({ products, now: () => AHORA });
+    const createProduct = createCreateProduct({ products, units: UNIDADES, now: () => AHORA });
 
     await expect(
       createProduct({ ...ALTA_VALIDA, type: 'FINISHED_PRODUCT' }, ADMIN),

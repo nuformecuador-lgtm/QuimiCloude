@@ -864,6 +864,7 @@ export const inventario = {
     products: productRepository,
     stockIncreases: stockIncreaseListener,
     packageUnit: { findPackageUnitId },
+    units: { findRefs: findUnitRefs },
   }),
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
