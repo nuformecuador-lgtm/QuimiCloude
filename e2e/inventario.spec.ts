@@ -919,11 +919,11 @@ test.describe('catalogo de productos', () => {
     const kgProduct = productosVivos.find((product) => product.unitId === kg.id);
     const literProduct = productosVivos.find((product) => product.unitId === liter.id);
     expect(
-      kgProduct?.stock,
+      Number(kgProduct?.stock),
       'la existencia guardada del producto en kg debe ser la de su unico lote',
     ).toBe(Number(sameNameKgFirstStock));
     expect(
-      literProduct?.stock,
+      Number(literProduct?.stock),
       'la existencia guardada del producto en L debe ser la de su unico lote',
     ).toBe(Number(sameNameLiterStock));
 
@@ -958,11 +958,11 @@ test.describe('catalogo de productos', () => {
       (product) => product.unitId === liter.id,
     );
     expect(
-      kgProductAfter?.stock,
+      Number(kgProductAfter?.stock),
       'el segundo lote en kg debe sumarse a la existencia guardada del producto en kg',
     ).toBe(kgStockAfter);
     expect(
-      literProductAfter?.stock,
+      Number(literProductAfter?.stock),
       'el producto en L no cambia con un lote agregado al de kg',
     ).toBe(Number(sameNameLiterStock));
   });
