@@ -66,10 +66,8 @@ reparto, costo del lote al terminar el empaque, consumo al finalizar y cotizaci�
 - **R11** (por evento) CUANDO se finaliza un pedido con unidad que no tiene nada apartado, la
   necesidad de respaldo con la que se consume DEBE ser la necesidad convertida.
 - **R12** (condicional) SI alguna línea de la receta es no convertible al guardar el pedido,
-  ENTONCES el sistema DEBE aplicar la regla que cierre la **Pregunta abierta 1**. *Provisional,
-  pendiente de esa respuesta:* con la opción A, el pedido se trata como falta de material
-  (`BLOQUEADO` con confirmación, sin nada apartado, igual que QC-138); con la opción B, el guardado
-  se rechaza con un error que nombra los insumos no convertibles y no se escribe nada.
+  ENTONCES el sistema DEBE rechazar el guardado con el error `order_unit_not_convertible`, que nombra
+  los insumos no convertibles, y NO DEBE escribir nada (Pregunta 1, opción B, cerrada el 2026-10-05).
 
 ### Lo que se muestra (D4, D7, D8)
 
@@ -155,11 +153,7 @@ reparto, costo del lote al terminar el empaque, consumo al finalizar y cotizaci�
 
 ## Preguntas abiertas
 
-1. **Reserva y Finalizar con una línea no convertible (D4).** D4 solo cierra el costo. Falta decidir
-   si un pedido con un insumo no convertible pasa a `BLOQUEADO` como falta de material (QC-138), o
-   se rechaza al guardar.
-2. **Cómo se muestra «incluye una aproximación» en el costo** (texto, icono o tooltip) y la marca
-   «aprox.» de la línea (D7). Es de `design.md`.
+Ninguna. Las dos se cerraron el 2026-10-05 al aprobar el spec (ver la tabla).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -176,3 +170,6 @@ reparto, costo del lote al terminar el empaque, consumo al finalizar y cotizaci�
 | 2026-10-05 | ¿Permisos? | **Sin cambios**: `pedidos.modificar`, validado en el service. Heredado de **QC-86**. |
 | 2026-10-05 | ¿E2E? | **Sí**, toca importes (`CHECKPOINTS.md`): pedido en g sobre insumo en kg (exacto) y pedido en l sobre insumo en kg (aproximado), comprobando costo y cantidad apartada. |
 | 2026-10-05 | Identificadores, borrado y dependencias | **Heredado**: identificadores en inglés y borrado lógico (**QC-4**). Sin dependencias nuevas. |
+| 2026-10-05 | Pregunta 1: ¿reserva y guardado con una línea no convertible? | **Opción B**: el guardado se rechaza con `order_unit_not_convertible`, que nombra los insumos; no se escribe nada (R12). Humano, al aprobar el spec. |
+| 2026-10-05 | Pregunta 2: ¿cómo se ve «aprox.» y el aviso en el costo? | **Opción a**: texto «aprox.» junto a la cifra y una línea bajo el importe (`design.md > 8`). Humano, al aprobar el spec. |
+| 2026-10-05 | N1–N5 de `design.md` | **Aprobadas** con el spec. |

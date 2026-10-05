@@ -5,8 +5,8 @@
 > Los nombres de los casos llevan `R<n>` (`docs/conventions.md > Tests`). Los comentarios de
 > producción, sin citar fichas ni requisitos. Sin migración y sin dependencias nuevas (R26).
 >
-> **Bloqueante antes de T9 y T13:** el humano cierra las Preguntas abiertas 1 y 2
-> (`design.md > 8`). El resto puede avanzar.
+> Preguntas abiertas 1 y 2 **cerradas el 2026-10-05**: T9 implementa la opción B (rechazo con
+> `order_unit_not_convertible`) y T13 la opción a (texto «aprox.»). Nada queda bloqueado.
 
 ## Bloque A — `unidades` (base de todo lo demás)
 
@@ -89,9 +89,9 @@
   *Hecho:* verde.
 - [ ] **T9 — Llamantes de reserva y consumo.** `create-order.ts`, `update-order.ts`,
   `update-order-presentation-lines.ts`, `review-blocked-orders.ts`, `transition-order.ts` usan
-  `loadRequirementUnits` + `buildOrderRequirement`/`buildRequirement`. **Depende de la respuesta a
-  la Pregunta 1** para el tratamiento de `not_convertible` en alta, edición y reparto
-  (`design.md > 8`); si es B, añade `OrderUnitNotConvertibleError` + código y mensaje en el
+  `loadRequirementUnits` + `buildOrderRequirement`/`buildRequirement`. **Pregunta 1 cerrada:
+  opción B** para el tratamiento de `not_convertible` en alta, edición y reparto
+  (`design.md > 8`): añade `OrderUnitNotConvertibleError` + código y mensaje en el
   catálogo de errores + traducción en `order-actions.ts`. Depende de T6 y T7.
   Tests:
   `R10 el alta aparta la necesidad convertida`;
@@ -99,8 +99,8 @@
   `R11 finalizar sin nada apartado consume la necesidad convertida`;
   `R11 finalizar con una linea no convertible devuelve insufficient_material sin consumir`;
   `R12 el desbloqueo deja BLOQUEADO un pedido con una linea no convertible`;
-  `R12 <segun Pregunta 1> el alta con una linea no convertible ...` (rechaza / bloquea);
-  `R12 <segun Pregunta 1> la edicion y el reparto con una linea no convertible ...`.
+  `R12 el alta con una linea no convertible se rechaza con order_unit_not_convertible y no escribe nada`;
+  `R12 la edicion y el reparto con una linea no convertible se rechazan con order_unit_not_convertible`.
   Integración `tests/integration/pedidos/order-unit-conversion.int.test.ts`:
   `R10 el alta de 1000 g sobre insumo en kg deja 0.1000 en reservation_movements`;
   `R22 un pedido guardado antes del cambio conserva su costo y lo apartado al leerlo`.
@@ -115,7 +115,7 @@
   `R23 sin pedidos.modificar se rechaza antes de validar y sin leer catalogos`.
   *Hecho:* verde.
 
-## Bloque D — presentación (D depende de B; T13 depende de la Pregunta 2)
+## Bloque D — presentación (D depende de B)
 
 - [ ] **T11 [P] — Ejecución.** `get-assigned-order-execution.ts` y `ExecutionLineView`
   (`design.md > 5.1`). Depende de T4 y T2.
@@ -134,7 +134,7 @@
 - [ ] **T13 — Marcas y avisos en pantalla.** `order-ingredients-table.tsx` (props `orderUnitId`,
   `bridge`), `order-cost-quote.tsx` (`approximate`), `order-form.tsx` (cálculo de `approximate`,
   bajar `bridge` desde `page.tsx` por `OrderSheet`/`OrderListSection`), `order-execution-lines.tsx`.
-  **Copy según la Pregunta 2.** Depende de T3, T4, T11, T12.
+  **Copy de la opción a** (Pregunta 2 cerrada): texto «aprox.» y línea bajo el importe. Depende de T3, T4, T11, T12.
   Tests (Testing Library, por `data-testid`):
   `R13 la cantidad requerida y el restante salen convertidos y con la unidad del insumo`;
   `R13 cambiar la unidad del pedido recalcula la tabla`;
@@ -170,5 +170,5 @@ T2 ─┤      │      └─ T10 ─ T12 ─┐
     │      │      T7 ─ T9 ──────┤
     │      └─ T11 ──────────────┤
 T3 ─┴───────────────────────────┴─ T13 ─ T14 ─ T15
-Pregunta 1 ─ T9      Pregunta 2 ─ T13
+(Preguntas 1 y 2 cerradas el 2026-10-05)
 ```

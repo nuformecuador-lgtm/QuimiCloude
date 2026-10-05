@@ -228,7 +228,10 @@ Ninguna integración externa. Permisos sin cambio (D9): `pedidos.modificar` en l
 escrituras, `asignaciones.ejecutar` en la ejecución; los dos se comprueban en el service antes de
 validar la entrada.
 
-## 8. Preguntas abiertas — opciones (no se cierran aquí)
+## 8. Preguntas abiertas — CERRADAS el 2026-10-05
+
+El humano aprobó el spec con las dos recomendaciones: **Pregunta 1 → B** y **Pregunta 2 → a**. Las
+tablas quedan como registro de las opciones que se valoraron.
 
 ### Pregunta 1 — Reserva y guardado con una línea no convertible
 
