@@ -108,14 +108,22 @@ particion en `progress/current.md > Evaluaciones`.
 | `medium` | 2-3 capas, condiciones, multiples archivos |
 | `high` | multi-feature, webhooks, integraciones externas |
 
-## Modelos (2026-09-16)
+## Modelos (2026-09-27)
 
-**Los tres agentes que ejecutan declaran `model: sonnet`: `frontend_dev`, `backend_dev` y
-`extractor`.** Los otros cuatro —`spec_author`, `reviewer`, `implementer` y `leader`— **heredan el
-de la sesion** y no llevan `model:`: son los que escriben el spec, lo juzgan y coordinan, y ahi un
-error cuesta mas de lo que ahorra el modelo.
+**Los tres agentes que ejecutan declaran `model: qwen2.5-coder:3b`, un modelo local de Ollama:
+`frontend_dev`, `backend_dev` y `extractor`.** Los otros cuatro —`spec_author`, `reviewer`,
+`implementer` y `leader`— **heredan el de la sesion**: son los que escriben el spec, lo juzgan y
+coordinan, y ahi un error cuesta mas de lo que ahorra el modelo. Llevan una linea
+`# model: glm-4.7:cloud` comentada en el frontmatter; comentada no es una declaracion.
 
-**Solo el alias, nunca un id con fecha.** Antes habia una tabla que asignaba `opus-4.8` a los seis
+**Requisito de Ollama.** `qwen2.5-coder:3b` solo existe en el servidor de Ollama. Si la sesion
+habla con la API de Anthropic (sin `ANTHROPIC_BASE_URL` apuntando a Ollama o a un proxy que
+enrute ese nombre a Ollama), esos tres agentes mueren al arrancar. El modelo tiene que estar
+descargado: `ollama pull qwen2.5-coder:3b`.
+
+**Solo el alias o un tag de Ollama aprobado, nunca un id con fecha.** Los tags de Ollama admitidos
+estan listados en la guardia (`TAGS_OLLAMA_VALIDOS`); uno nuevo entra ahi a proposito, no por
+omision. Antes habia una tabla que asignaba `opus-4.8` a los seis
 agentes por igual — la misma columna repetida tres veces, o sea que no discriminaba nada por
 `complexity`. El 2026-07-31 ese id dejo de estar disponible y en un proyecto anterior con este arnes
 **un `backend_dev` murio al arrancar** sin escribir una linea; `spec_author` y `reviewer` siguieron
@@ -127,9 +135,10 @@ concreta —un `reviewer` con mas capacidad en una feature `complexity: high`, p
 **el motivo en `progress/current.md`**. Lo que no vale es cambiar el frontmatter para una feature y
 olvidarse de devolverlo.
 
-**Lo que esto cuesta, dicho en voz alta:** los tres que bajan a sonnet son justo los que escriben
-codigo. Si la calidad cae, se paga en rondas de review, y hoy **nadie mide eso**. Si aparecen mas
-rondas de las habituales, esta es la primera sospechosa.
+**Lo que esto cuesta, dicho en voz alta:** los tres que bajan a un modelo local de 3B son justo los
+que escriben codigo. Un 3B es flojo con tool use largo y MCP. Si la calidad cae, se paga en rondas
+de review, y hoy **nadie mide eso**. Si aparecen mas rondas de las habituales, esta es la primera
+sospechosa.
 
 Lo hace cumplir `tests/guards/guard-modelos-de-agentes.test.ts`.
 
@@ -234,6 +243,8 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
      Es idempotente: si ya existe, lo reporta y sigue. **No hagas `git checkout` en el
      worktree principal**, que se queda en `dev` (ver `## Worktrees`).
    - Actualiza `feature_list.json` con `zone`, `complexity` y `branch`.
+   - Indexa el worktree en el grafo (`index_repository` sobre `.worktrees/<key>-<slug>`).
+     Cuándo se reindexa y cuándo se borra: `docs/grafo-de-codigo.md`.
    - **Escribe `zone` y `complexity` como labels en el issue de Jira**
      (`zone:backend`, `complexity:medium`). Es el unico empujon hacia Jira del ciclo, y
      sin el la importacion de la proxima sesion (F0) borraria la evaluacion. Si la
@@ -307,7 +318,7 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
     - Reporta la URL del PR al humano.
 11. (F2.5) Cuando el humano aprueba y mergea el PR en GitHub, cambia la feature a
     `done`, **mueve la tarjeta a *Hecho* y comenta la URL del PR en el issue**, y
-    **desmonta su worktree**: `./scripts/wt.sh done <key>-<slug>`.
+    **desmonta su worktree**: `./scripts/wt.sh done <key>-<slug>`. Si desmontó, borra su proyecto del grafo (`delete_project`).
     - Si el script devuelve HOLD (arbol sucio, rama sin integrar, worktree bloqueado),
       **no insistas ni fuerces**: anota el worktree y su razon en
       `progress/current.md > Deudas y cosas abiertas` y sigue. Un worktree retenido no
@@ -332,7 +343,7 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
 | --- | --- |
 | `frontend_dev` / `backend_dev` | `pnpm typecheck`, `pnpm lint`, y **solo** sus archivos nuevos + los que su cambio pueda romper (`pnpm exec vitest related --run <archivos>`) |
 | `reviewer` | lo que necesite para verificar sus hallazgos, incluida la suite si sospecha una regresion |
-| **leader** | `./init.sh --rapido` al cerrar cada tanda · `./init.sh` **completo** al cerrar la feature y antes del PR |
+| **leader** | `./init.sh --rapido` al cerrar cada tanda · reindexa el worktree en el grafo al cerrar cada tanda · `./init.sh` **completo** al cerrar la feature y antes del PR |
 
 **Por que, y no es teorico.** En una sesion del 2026-08-02 de un proyecto anterior **cinco subagentes
 murieron por cortes de stream de la API**, y los cinco cayeron en la fase de verificacion larga:

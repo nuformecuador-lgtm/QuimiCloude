@@ -54,10 +54,13 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
 
 1. Importa el board de Jira a `feature_list.json` (paso F0 de `AGENTS.md`).
 2. Corre `./init.sh`. Debe terminar en verde — también valida lo que acabas de importar.
-3. Lee `progress/current.md` para ver si hay una sesión a medias.
-4. Lee `feature_list.json` y toma la primera feature en `pending` (o retoma la
+3. Comprueba que el MCP `codebase-memory-mcp` responde (`list_projects`). Si no responde,
+   para y pide instalarlo (`docs/grafo-de-codigo.md > Instalación`). Indexa el árbol
+   principal si falta o va detrás de `origin/dev`.
+4. Lee `progress/current.md` para ver si hay una sesión a medias.
+5. Lee `feature_list.json` y toma la primera feature en `pending` (o retoma la
    que esté en `spec_ready` / `in_progress`).
-5. Sigue el flujo de `AGENTS.md`.
+6. Sigue el flujo de `AGENTS.md`.
 
 ## Mapa rápido
 
@@ -68,6 +71,7 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
 - Cómo demostrar que funciona → `docs/verification.md`
 - Qué dependencias están aprobadas y cómo se aprueba una → `docs/dependencias.md`
 - Un worktree por feature: montar y desmontar → `docs/worktrees.md`
+- Explorar código con el grafo y quién mantiene el índice → `docs/grafo-de-codigo.md`
 - El board manda, el disco trabaja: contrato con Jira → `docs/jira.md`
 - Conectar tu cuenta de Jira y ver a qué proyectos accedes → `/jira-connect`
 - Criterios de estado final correcto → `CHECKPOINTS.md`
