@@ -59,6 +59,7 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -72,6 +73,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        ...orderScopeReaders(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
       };
       return work(scope);

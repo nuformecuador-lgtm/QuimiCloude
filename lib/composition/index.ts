@@ -136,6 +136,7 @@ import type {
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { forModule } from '@/lib/shared/observability/logger';
 import {
+  createUnitCatalogReader,
   findMassVolumeBridge,
   findPackageUnitId,
   findUnitRefs,
@@ -1187,12 +1188,10 @@ const orderRepository: OrderRepository = {
 };
 
 /**
- * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
- * MISMO `tx`, el repositorio de escritura de `pedidos`, las reservas de `inventario` y el
- * lector de contenido de receta, para que las tres lecturas y escrituras vean la misma
- * instantanea sin abrir una segunda conexion mientras esta retiene la suya. Sin `unitCatalog`:
- * la necesidad ya llega en la unidad del producto, asi que `createMaterialReservations` no
- * convierte nada.
+ * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye cada
+ * pieza del scope con el MISMO `tx`, para que todas vean la misma instantanea sin abrir una
+ * segunda conexion mientras esta retiene la suya. `createMaterialReservations` no convierte
+ * nada: la necesidad le llega ya en la unidad del producto.
  */
 const orderUnitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -1202,6 +1201,8 @@ const orderUnitOfWork: OrderUnitOfWork = {
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
+        products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
+        units: createUnitCatalogReader(tx),
       };
       return work(scope);
     }),

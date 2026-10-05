@@ -69,6 +69,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -96,6 +97,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        ...orderScopeReaders(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
       };
       return work(scope);
@@ -644,6 +646,7 @@ describe('R19 — un fallo forzado tras el lote deshace la transaccion entera', 
             orders: createOrderWriteRepository(tx),
             reservations: createMaterialReservations(tx),
             recipes: createRecipeExecutionReader(tx),
+            ...orderScopeReaders(tx),
             finishedGoods: {
               receiveFromOrder: async (input) => {
                 await real.receiveFromOrder(input);

@@ -31,6 +31,8 @@ import type {
 import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
 import {
   fakeFinishedGoodsIntake,
+  fakeScopeProducts,
+  fakeScopeUnits,
   fakeMaterialReservations,
   fakeOrderUnitOfWork,
   fakeRecipeExecutionReader,
@@ -211,6 +213,8 @@ function montar(deps: {
       reservations,
       recipes,
       finishedGoods: fakeFinishedGoodsIntake(),
+      products: fakeScopeProducts(),
+      units: fakeScopeUnits(),
     }),
     now: () => AHORA,
   };

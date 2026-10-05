@@ -62,6 +62,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades'
 import { findMassVolumeBridge } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -980,6 +981,7 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
           orders: createOrderWriteRepository(tx),
           reservations: createMaterialReservations(tx),
           recipes: createRecipeExecutionReader(tx),
+          ...orderScopeReaders(tx),
           finishedGoods: createFinishedGoodsIntake(tx),
         })
         await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${savepoint}`)

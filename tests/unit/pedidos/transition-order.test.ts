@@ -261,7 +261,7 @@ describe('createTransitionOrder', () => {
     const setStatus = vi.fn(async () => 'stale' as const);
     const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
     const setReservedAt = vi.fn();
-    const { orders, reservations, recipes: scopeRecipes, finishedGoods } = fakeUnitOfWork({
+    const { orders, reservations, recipes: scopeRecipes, finishedGoods, products, units } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
       reservations: { consumeForOrder },
       recipes,
@@ -270,7 +270,7 @@ describe('createTransitionOrder', () => {
     const unitOfWork: OrderUnitOfWork = {
       run: async <T>(work: (scope: OrderTransactionScope) => Promise<T>) => {
         try {
-          return await work({ orders, reservations, recipes: scopeRecipes, finishedGoods });
+          return await work({ orders, reservations, recipes: scopeRecipes, finishedGoods, products, units });
         } catch (err) {
           vioLaExcepcion = true;
           throw err;
