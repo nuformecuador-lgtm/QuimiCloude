@@ -594,7 +594,7 @@ test.describe('catalogo de productos', () => {
     // como `number`: es un importe y compararlo contra un literal numerico dejaria pasar
     // exactamente el error que esta ficha evita (QC-90 R4). Se filtra por ESTE nombre, no por «el
     // ultimo lote»: el otro proyecto esta dando de alta el suyo en el mismo instante.
-    const lotes = await prisma.$queryRaw<Array<{ unit_cost: string; stock: number }>>`
+    const lotes = await prisma.$queryRaw<Array<{ unit_cost: string; stock: string }>>`
       SELECT b.unit_cost::text AS unit_cost, b.stock AS stock
       FROM product_batches b
       JOIN products p ON p.id = b.product_id
@@ -606,7 +606,7 @@ test.describe('catalogo de productos', () => {
       lotes[0]?.unit_cost,
       `${costTotalValue} / ${costStockValue} redondeado a 2 decimales por el panel, guardado en decimal(14,4)`,
     ).toBe(derivedUnitCostStored);
-    expect(lotes[0]?.stock, 'la existencia escrita tambien va al lote').toBe(
+    expect(Number(lotes[0]?.stock), 'la existencia escrita tambien va al lote').toBe(
       Number(costStockValue),
     );
   });
