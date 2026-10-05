@@ -14,8 +14,9 @@
  *
  * DATOS (mismo molde que `e2e/usuarios.spec.ts` y `e2e/session.spec.ts`):
  *  - roles REALES del seed: `Administrador` —trae `usuarios.consultar` y `usuarios.modificar`— para
- *    quien cierra, y `Operador` —solo `inventario.consultar`— para la victima, que por eso aterriza
- *    en `INVENTORY_ROUTE`. Con roles inventados se probaria el fixture, no el permiso;
+ *    quien cierra, y `Operador` para la victima, cuyo aterrizaje deriva `loginAndLand` de sus
+ *    permisos reales; su rol trae `inventario.consultar`, asi que `INVENTORY_ROUTE` le es visible
+ *    y sirve para el paso 5. Con roles inventados se probaria el fixture, no el permiso;
  *  - empresa efimera propia (nunca la del seed: `companies_name_unique` es global) y, dentro, SOLO
  *    estas dos personas: el listado esta acotado a la empresa del actor;
  *  - prefijo `qc101_e2e_` + `RUN_ID` por proceso en nombre de usuario, correo y documento —los
@@ -57,6 +58,7 @@ import { INVENTORY_ROUTE, LOGIN_ROUTE, USERS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc101_e2e_';
@@ -276,10 +278,9 @@ test.describe('cierre de sesiones de otra persona desde la pantalla', () => {
 
       // --- 1. LA VICTIMA ENTRA por el formulario real y aterriza en una pantalla privada. Esta es
       // la sesion viva que la ficha promete cortar.
-      await loginAndLand(victimPage, victimUser);
-      await expect(victimPage.getByTestId(INVENTORY_TITLE_TESTID)).toBeVisible({
-        timeout: 60_000,
-      });
+      const victimLanding = await loginAndLand(victimPage, victimUser);
+      expect(new URL(victimPage.url()).pathname).toBe(victimLanding);
+      await expect(victimPage.getByTestId(LOGIN_FORM_TESTID)).toHaveCount(0);
       // Sin esto, el paso 5 no distinguiria «no hay sesion» de «nunca la hubo».
       expect(
         (await victimContext.cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
@@ -294,13 +295,15 @@ test.describe('cierre de sesiones de otra persona desde la pantalla', () => {
       await expect(adminPage.getByTestId(USERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
       await expect(adminPage.getByTestId(USER_LIST_TESTID)).toBeVisible({ timeout: 60_000 });
 
-      // --- 3. ABRE EL PANEL DE DETALLE de la victima con el disparador de edicion de SU fila,
+      // --- 3. ABRE EL PANEL DE DETALLE de la victima con el item de edicion del menu de SU fila,
       // localizada por el identificador que puso la base —nunca por posicion—.
       const victimRowActions = adminPage.locator(
         `[data-testid="${USER_ROW_ACTIONS_TESTID}"][data-user-id="${victimId}"]`,
       );
       await expect(victimRowActions).toHaveCount(1, { timeout: 60_000 });
-      await victimRowActions.getByTestId(USER_ACTION_EDIT_TESTID).click();
+      await (
+        await openRowActionsMenuItem(adminPage, victimRowActions, USER_ACTION_EDIT_TESTID)
+      ).click();
 
       const sheet = adminPage.getByTestId(USER_SHEET_TESTID);
       await expect(sheet).toBeVisible({ timeout: 60_000 });

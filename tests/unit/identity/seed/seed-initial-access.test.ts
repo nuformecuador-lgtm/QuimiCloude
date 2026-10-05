@@ -827,8 +827,8 @@ describe('seedInitialAccess', () => {
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
         .map((par) => par.permissionCode),
-    ).toEqual(['inventario.consultar', 'asignaciones.consultar']);
-    // El Empacador nace con exactamente sus dos permisos, en el orden de
+    ).toEqual(['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar']);
+    // El Empacador nace con exactamente sus tres permisos, en el orden de
     // `SEED_ROLE_PERMISSIONS`.
     expect(
       paresCreados
@@ -966,6 +966,60 @@ describe('seedInitialAccess', () => {
     });
     const llamadasDeLaSegunda = repository.llamadas.slice(llamadasTrasLaPrimera);
     expect(llamadasDeEscritura(llamadasDeLaSegunda)).toEqual([]);
+    expect(segundaCorrida.createdPermissions).toEqual([]);
+    expect(segundaCorrida.createdRolePermissions).toBe(0);
+  });
+
+  it('QC-201 R3, R4: sobre una base sembrada antes de esta feature -todo salvo asignaciones.ejecutar- el seed crea ese permiso y solo las asignaciones del Administrador y el Operador, y la segunda corrida no cambia nada', async () => {
+    const EJECUTAR = 'asignaciones.ejecutar';
+    const administradorId = ROLES_YA_SEMBRADOS.get(ROLE_ADMINISTRADOR) ?? '';
+    const operadorId = ROLES_YA_SEMBRADOS.get(ROLE_OPERADOR) ?? '';
+    const empacadorId = ROLES_YA_SEMBRADOS.get(ROLE_EMPACADOR) ?? '';
+    const maestroId = ROLES_YA_SEMBRADOS.get(ROLE_MAESTRO) ?? '';
+
+    const yaExistentes = PERMISSIONS.map((permission) => permission.code).filter((code) => code !== EJECUTAR);
+    const asignacionesExistentes = new Set(
+      [...asignacionesDelSeed(ROLES_YA_SEMBRADOS)].filter((asignacion) => !asignacion.endsWith(`|${EJECUTAR}`)),
+    );
+
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      permisosExistentes: new Set(yaExistentes),
+      asignacionesExistentes,
+    });
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+    const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
+
+    const primeraCorrida = await seedInitialAccess({
+      repository,
+      passwordHasher,
+      credentials,
+      maestroCredentials,
+      checkCredentialPolicy,
+    });
+
+    expect(primeraCorrida.createdPermissions).toEqual([EJECUTAR]);
+    expect(primeraCorrida.createdRolePermissions).toBe(2);
+    const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
+      ?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    expect(new Set(paresCreados.map((par) => `${par.roleId}|${par.permissionCode}`))).toEqual(
+      new Set([`${administradorId}|${EJECUTAR}`, `${operadorId}|${EJECUTAR}`]),
+    );
+    expect(repository.asignacionesExistentes.has(`${empacadorId}|${EJECUTAR}`)).toBe(false);
+    expect(repository.asignacionesExistentes.has(`${maestroId}|${EJECUTAR}`)).toBe(false);
+
+    const llamadasTrasLaPrimera = repository.llamadas.length;
+    const segundaCorrida = await seedInitialAccess({
+      repository,
+      passwordHasher,
+      credentials,
+      maestroCredentials,
+      checkCredentialPolicy,
+    });
+    expect(llamadasDeEscritura(repository.llamadas.slice(llamadasTrasLaPrimera))).toEqual([]);
     expect(segundaCorrida.createdPermissions).toEqual([]);
     expect(segundaCorrida.createdRolePermissions).toBe(0);
   });

@@ -201,7 +201,11 @@ function actorDe(fixture: Fixture): Actor {
 }
 
 function asignacionesActorDe(fixture: Fixture): AsignacionesActor {
-  return { id: fixture.actorId, companyId: fixture.companyId, permissions: ['asignaciones.consultar'] };
+  return {
+    id: fixture.actorId,
+    companyId: fixture.companyId,
+    permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+  };
 }
 
 async function crearFixture(content: string | null = '1.0000'): Promise<Fixture> {

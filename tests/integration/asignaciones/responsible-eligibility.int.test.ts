@@ -234,7 +234,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       const actor: Actor = {
         id: administradorId,
         companyId: fixture.companyA,
-        permissions: ['asignaciones.consultar', 'pedidos.consultar'],
+        permissions: ['asignaciones.consultar', 'asignaciones.ejecutar', 'pedidos.consultar'],
       };
       const ejecucion = wireExecutionUseCases(fixture);
 
@@ -287,7 +287,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       const actor: Actor = {
         id: administradorId,
         companyId: fixture.companyA,
-        permissions: ['asignaciones.consultar', 'pedidos.consultar'],
+        permissions: ['asignaciones.consultar', 'asignaciones.ejecutar', 'pedidos.consultar'],
       };
       const ejecucion = wireExecutionUseCases(fixture);
 

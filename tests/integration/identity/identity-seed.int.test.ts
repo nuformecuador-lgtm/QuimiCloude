@@ -630,15 +630,15 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       });
       expect(second.createdRoles).toEqual([ROLE_OPERADOR]);
       expect(second.createdAdmin).toBe(false);
-      // QC-74 R9, R10: el rol vuelve con sus permisos, y el catalogo ya estaba. Eran uno hasta
-      // QC-86 R26, que le suma `asignaciones.consultar`: ahora son DOS.
+      // El rol vuelve con sus tres permisos, y el catalogo ya estaba.
       expect(second.createdPermissions).toEqual([]);
-      expect(second.createdRolePermissions).toBe(2);
+      expect(second.createdRolePermissions).toBe(3);
 
       const operadorAfter = await tx.role.findUnique({ where: { name: ROLE_OPERADOR } });
       expect(operadorAfter).not.toBeNull();
       expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
         'asignaciones.consultar',
+        'asignaciones.ejecutar',
         'inventario.consultar',
       ]);
 
@@ -805,7 +805,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
   });
 
   // Caso 10 (QC-74 R7, R8, R9, R10): el catalogo y las asignaciones, contra base real.
-  it('la primera corrida deja el catalogo completo, el Administrador con todos sus permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo', async () => {
+  it('la primera corrida deja el catalogo completo, el Administrador con todos sus permisos y el Operador solo con inventario.consultar, asignaciones.consultar y asignaciones.ejecutar (QC-201 R3); la segunda no cambia ningun conteo', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       expect(await tx.permission.count()).toBe(0);
@@ -834,14 +834,15 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       // El Administrador tiene el catalogo menos los codigos excluidos, escrito uno a uno — sin
       // comodin ni regla implicita: se leen de `role_permissions`, no de su nombre de rol.
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
-      // R9 (enmendado por QC-86 R26): el Operador, exactamente DOS, ni uno mas (QC-86 R27).
-      // Los dos helpers devuelven la lista ORDENADA alfabeticamente, de ahi el orden de aqui.
+      // El Operador, exactamente sus tres permisos y ni uno mas. Los dos helpers devuelven la lista ORDENADA alfabeticamente, de ahi el orden de aqui.
       expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
         'asignaciones.consultar',
+        'asignaciones.ejecutar',
         'inventario.consultar',
       ]);
       expect(codigosSembradosDe(ROLE_OPERADOR)).toEqual([
         'asignaciones.consultar',
+        'asignaciones.ejecutar',
         'inventario.consultar',
       ]);
       // QC-86 R27, dicho EN NEGATIVO y por su nombre: `recetas.consultar` abre hoy tambien el
@@ -874,6 +875,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
       expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
         'asignaciones.consultar',
+        'asignaciones.ejecutar',
         'inventario.consultar',
       ]);
     });
@@ -926,6 +928,56 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(second.createdRolePermissions).toBe(0);
       expect(await tx.permission.count()).toBe(permisosAntes + codigosDeDocumentos.length);
       expect(await tx.rolePermission.count()).toBe(asignacionesAntes + codigosDeDocumentos.length);
+    });
+  });
+
+  it('QC-201 R3, R4: sobre la base ya sembrada salvo asignaciones.ejecutar, el seed crea ese permiso y solo las asignaciones del Administrador y el Operador, y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const EJECUTAR = 'asignaciones.ejecutar';
+      await tx.rolePermission.deleteMany({ where: { permissionCode: EJECUTAR } });
+      await tx.permission.deleteMany({ where: { code: EJECUTAR } });
+
+      const permisosAntes = await tx.permission.count();
+      const asignacionesAntes = await tx.rolePermission.count();
+      const empacadorAntes = await codigosEnBaseDe(tx, ROLE_EMPACADOR);
+      const maestroAntes = await codigosEnBaseDe(tx, ROLE_MAESTRO);
+
+      const repository = createInitialAccessRepository(tx);
+      const first = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+
+      expect(first.createdPermissions).toEqual([EJECUTAR]);
+      expect(first.createdRolePermissions).toBe(2);
+      expect(await tx.permission.count()).toBe(permisosAntes + 1);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + 2);
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toContain(EJECUTAR);
+      expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
+        'asignaciones.consultar',
+        EJECUTAR,
+        'inventario.consultar',
+      ]);
+      expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).toEqual(empacadorAntes);
+      expect(empacadorAntes).toEqual(['asignaciones.consultar', 'empaque.modificar', 'terminados.consultar']);
+      expect(await codigosEnBaseDe(tx, ROLE_MAESTRO)).toEqual(maestroAntes);
+      expect(maestroAntes).not.toContain(EJECUTAR);
+
+      const second = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await tx.permission.count()).toBe(permisosAntes + 1);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + 2);
     });
   });
 
@@ -1115,6 +1167,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
         expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).toEqual([
           'asignaciones.consultar',
+          'asignaciones.ejecutar',
           'inventario.consultar',
         ]);
         expect(await codigosEnBaseDe(tx, ROLE_OPERADOR)).not.toContain('recetas.consultar');

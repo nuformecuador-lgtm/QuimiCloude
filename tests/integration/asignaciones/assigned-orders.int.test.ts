@@ -308,18 +308,23 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
         NOW,
       );
 
-      // El actor ES el Empacador: su id es el de la persona asignada, y sus permisos son
-      // EXACTAMENTE los que el seed le declara.
+      // El actor ES la persona asignada, con los permisos que el seed le declara al Empacador mas
+      // `asignaciones.ejecutar`: sin este ultimo la lista sale vacia (R16, abajo).
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: [...PERMISOS_DEL_EMPACADOR, 'asignaciones.ejecutar'],
       };
 
       const pagina = await listAssignedOrders(actorEmpacador, { page: 1 });
 
       expect(pagina.items.map((item) => item.id)).toEqual([pedidoDelEmpacador]);
       expect(pagina.total).toBe(1);
+
+      // R16: con EXACTAMENTE los permisos del Empacador, su pedido PENDIENTE no aparece.
+      const vacia = await listAssignedOrders({ ...actorEmpacador, permissions: PERMISOS_DEL_EMPACADOR }, { page: 1 });
+      expect(vacia.items).toEqual([]);
+      expect(vacia.total).toBe(0);
     });
   });
 });

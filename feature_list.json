@@ -2778,6 +2778,21 @@
       "branch": "feature/QC-197-lote-real-usado-por-el-operador",
       "depends_on": [],
       "spec_path": "specs/QC-197-lote-real-usado-por-el-operador"
+    },
+    {
+      "key": "QC-201",
+      "id": 201,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "empacador-no-ejecuta-pedidos",
+      "description": "Ver tarjeta QC-201: permiso asignaciones.ejecutar (Administrador y Operador); el Empacador no entra, ni comienza, ni termina la ejecución de pedidos, solo ve pedidos desde POR_EMPACAR, no tiene la pestaña «Mis asignados» y en «Terminados» solo ve los que empacó él.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "fullstack",
+      "branch": "feature/QC-201-empacador-no-ejecuta-pedidos",
+      "depends_on": [],
+      "spec_path": "specs/QC-201-empacador-no-ejecuta-pedidos"
     }
   ]
 }

@@ -103,6 +103,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
 import { loginAndLand } from './helpers/landing';
+import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc102_e2e_';
@@ -319,7 +320,7 @@ async function openOrdersListAndFindRow(page: Page, numberText: string): Promise
  */
 async function openResponsiblesPanel(page: Page, row: Locator): Promise<Locator> {
   const urlBeforeOpen = page.url();
-  await row.getByTestId(ROW_ACTION_RESPONSIBLES_TESTID).click();
+  await (await openOrderRowMenu(page, rowMenuTrigger(row), ROW_ACTION_RESPONSIBLES_TESTID)).click();
 
   const anchor = page.getByTestId(SHEET_RESPONSIBLES_TESTID);
   await expect(anchor).toBeVisible({ timeout: 60_000 });

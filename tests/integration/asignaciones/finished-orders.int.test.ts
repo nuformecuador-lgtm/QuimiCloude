@@ -56,6 +56,9 @@ if (PERMISOS_DEL_EMPACADOR === undefined) {
   throw new Error('SEED_ROLE_PERMISSIONS no declara al Empacador: este archivo no puede construir su actor');
 }
 
+/** Los permisos del Empacador mas `asignaciones.ejecutar`: quien ejecuta ve todos los terminados. */
+const PERMISOS_CON_EJECUCION: readonly string[] = [...PERMISOS_DEL_EMPACADOR, 'asignaciones.ejecutar'];
+
 /**
  * `OrderCatalog['transitionAliveById']` real: `assertTransition` seguida del mismo `UPDATE`
  * condicional, `setStatus` de `createOrderWriteRepository()` sobre el cliente global -aqui, el
@@ -140,7 +143,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
 }
 
 describe('asignaciones · listFinishedOrders con los permisos del Empacador (integracion)', () => {
-  it('R17, R19: solo ENTREGADO de toda la empresa, sin filtro por asignado; otra empresa no vuelve', async () => {
+  it('R17, R19, R20a: con `asignaciones.ejecutar`, solo ENTREGADO de toda la empresa, sin filtro por asignado; otra empresa no vuelve', async () => {
     await inRolledBackTransaction(async (fixture) => {
       const { listFinishedOrders } = wireListFinishedOrders(fixture.tx);
 
@@ -166,7 +169,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: PERMISOS_CON_EJECUCION,
       };
 
       const pagina = await listFinishedOrders(actorEmpacador, { page: 1 });
@@ -204,7 +207,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: PERMISOS_CON_EJECUCION,
       };
 
       const primeraPagina = await listFinishedOrders(actorEmpacador, { page: 1, pageSize: 2 });
@@ -246,7 +249,8 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
 
       // El Finalizar de QC-168 deja el pedido POR_EMPACAR, no ENTREGADO: el lote de producto
       // terminado que entra viene en la respuesta, pero `finished_at` lo escribe Terminar.
-      await finishAssignedOrder(actorEmpacador, { orderId: pedido });
+      // Finalizar exige `asignaciones.ejecutar`, que el Empacador no tiene.
+      await finishAssignedOrder({ ...actorEmpacador, permissions: PERMISOS_CON_EJECUCION }, { orderId: pedido });
 
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
     });
@@ -271,7 +275,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorOperario: Actor = {
         id: operario,
         companyId: fixture.companyA,
-        permissions: ['asignaciones.consultar'],
+        permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
       };
       const actorEmpacador: Actor = {
         id: empacador,
@@ -311,7 +315,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: PERMISOS_CON_EJECUCION,
       };
 
       const pagina = await listFinishedOrders(actorEmpacador, { page: 1 });
@@ -333,6 +337,46 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
           { page: 1 },
         ),
       ).rejects.toMatchObject({ code: 'unauthorized' });
+    });
+  });
+
+  it('R20: dos empacadores sin `asignaciones.ejecutar` ven cada uno solo lo que empacaron, con total y paginas del conjunto filtrado', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const { listFinishedOrders } = wireListFinishedOrders(fixture.tx);
+
+      const empacadorA = await createPerson(fixture, fixture.companyA);
+      const empacadorB = await createPerson(fixture, fixture.companyA);
+
+      async function entregado(packedBy: string | null, finishedAt: Date): Promise<string> {
+        const id = await createOrder(fixture, { status: 'ENTREGADO' });
+        await fixture.tx.order.update({ where: { id }, data: { packedBy, finishedAt } });
+        return id;
+      }
+
+      const deA1 = await entregado(empacadorA, new Date('2026-03-01T00:00:00.000Z'));
+      const deA2 = await entregado(empacadorA, new Date('2026-03-02T00:00:00.000Z'));
+      const deA3 = await entregado(empacadorA, new Date('2026-03-03T00:00:00.000Z'));
+      const deB = await entregado(empacadorB, new Date('2026-03-04T00:00:00.000Z'));
+      const sinEmpacador = await entregado(null, new Date('2026-03-05T00:00:00.000Z'));
+
+      const actorA: Actor = { id: empacadorA, companyId: fixture.companyA, permissions: PERMISOS_DEL_EMPACADOR };
+      const actorB: Actor = { id: empacadorB, companyId: fixture.companyA, permissions: PERMISOS_DEL_EMPACADOR };
+
+      const primeraDeA = await listFinishedOrders(actorA, { page: 1, pageSize: 2 });
+      const segundaDeA = await listFinishedOrders(actorA, { page: 2, pageSize: 2 });
+      expect(primeraDeA.items.map((item) => item.id)).toEqual([deA3, deA2]);
+      expect(segundaDeA.items.map((item) => item.id)).toEqual([deA1]);
+      expect(primeraDeA.total).toBe(3);
+      expect(primeraDeA.totalPages).toBe(2);
+
+      const deEmpacadorB = await listFinishedOrders(actorB, { page: 1 });
+      expect(deEmpacadorB.items.map((item) => item.id)).toEqual([deB]);
+      expect(deEmpacadorB.total).toBe(1);
+
+      // R20a: con `asignaciones.ejecutar` vuelven todos, tambien el que no tiene empacador.
+      const todos = await listFinishedOrders({ ...actorA, permissions: PERMISOS_CON_EJECUCION }, { page: 1 });
+      expect(todos.items.map((item) => item.id)).toEqual([sinEmpacador, deB, deA3, deA2, deA1]);
+      expect(todos.total).toBe(5);
     });
   });
 });

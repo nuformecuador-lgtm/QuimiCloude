@@ -39,7 +39,7 @@ export function createGetAssignedOrderExecution(
     input: unknown,
   ): Promise<AssignedOrderExecutionView> {
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
-    requirePermission(actor, 'asignaciones.consultar');
+    requirePermission(actor, 'asignaciones.ejecutar');
 
     const parsed = getAssignedOrderExecutionSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

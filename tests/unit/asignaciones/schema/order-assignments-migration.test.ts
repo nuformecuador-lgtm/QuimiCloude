@@ -546,7 +546,10 @@ function mutateModel(schema: string, model: string, from: string, to: string): s
 }
 
 /** Las dos entradas del catalogo que estrena esta ficha, LEIDAS del barril (R28). */
-const PERMISOS_DE_LA_FICHA = PERMISSIONS.filter((permiso) => permiso.module === 'asignaciones').map(
+// `asignaciones.ejecutar` lo trae una migracion posterior, no esta.
+const PERMISOS_DE_LA_FICHA = PERMISSIONS.filter(
+  (permiso) => permiso.module === 'asignaciones' && permiso.code !== 'asignaciones.ejecutar',
+).map(
   ({ code, module, action, description }) => ({ code, module, action, description }),
 )
 
@@ -867,6 +870,7 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
     // el DOWN se lleva y menos lo que sumaron las fichas posteriores, comparada contra la lista de
     // codigos de QC-66.
     const CODIGOS_DE_FICHAS_POSTERIORES = [
+      'asignaciones.ejecutar',
       'terminados.consultar',
       'clientes.consultar',
       'clientes.modificar',

@@ -1,7 +1,6 @@
-// El Empacador se autoriza EXACTAMENTE como cualquier otro conjunto de permisos, por los mismos
-// casos de uso que ya existen. No hay codigo de produccion nuevo que probar aqui: lo que este
-// archivo fija es que el conjunto de permisos que el seed le da al Empacador concede en los
-// cuatro casos de uso de pedidos asignados y rechaza en los seis que exigen
+// El Empacador se autoriza como cualquier otro conjunto de permisos. Este archivo fija que el
+// conjunto que el seed le da no ejecuta pedidos asignados (leer, comenzar, terminar), que su lista
+// de «Mis asignados» sale vacia, y que rechaza en los casos de uso que exigen
 // `inventario.consultar`, `inventario.modificar` o `asignaciones.modificar`.
 //
 // El actor se construye con `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, NUNCA con una lista copiada a
@@ -93,104 +92,91 @@ function explode<T extends (...args: never[]) => unknown>(): T {
   }) as unknown as T;
 }
 
-describe('QC-144 R12 — el Empacador concede en los cuatro casos de uso de pedidos asignados', () => {
-  it('listAssignedOrders no lanza el error de autorizacion', async () => {
+function asignacionesQueExplotan() {
+  return {
+    insertMissing: explode(),
+    listByOrderInCompany: explode(),
+    listByOrdersInCompany: explode(),
+    deleteOne: explode(),
+    deleteByWorkGroup: explode(),
+    listOrderIdsByUserInCompany: explode(),
+  };
+}
+
+function doblesDe(deps: object): unknown[] {
+  return Object.values(deps as Record<string, unknown>).flatMap((value) =>
+    vi.isMockFunction(value) ? [value] : value !== null && typeof value === 'object' ? doblesDe(value) : [],
+  );
+}
+
+describe('el Empacador no ejecuta pedidos asignados', () => {
+  it('R4: el conjunto del seed del Empacador no trae `asignaciones.ejecutar`', () => {
+    expect([...PERMISOS_DEL_EMPACADOR].sort()).toEqual(
+      ['asignaciones.consultar', 'empaque.modificar', 'terminados.consultar'].sort(),
+    );
+  });
+
+  it('R16: listAssignedOrders concede pero devuelve la pagina vacia sin tocar ningun puerto', async () => {
     const deps = {
-      assignments: {
-        insertMissing: explode(),
-        listByOrderInCompany: explode(),
-        listByOrdersInCompany: explode(),
-        deleteOne: explode(),
-        deleteByWorkGroup: explode(),
-        // Sin ids asignados: el caso de uso corta antes de tocar ningun otro puerto.
-        listOrderIdsByUserInCompany: vi.fn(async () => []),
-      },
+      assignments: asignacionesQueExplotan(),
       orders: { findAliveById: explode(), listAliveSummariesByIds: explode() },
       recipes: { findRefsIncludingDeleted: explode() },
       people: { findAliveRefsInCompany: explode(), findRefsIncludingDeletedInCompany: explode() },
       now: () => new Date('2026-09-22T10:00:00.000Z'),
     } as unknown as ListAssignedOrdersDeps;
 
-    const listAssignedOrders = createListAssignedOrders(deps);
+    const pagina = await createListAssignedOrders(deps)(ACTOR_ASIGNACIONES, { page: 1 });
 
-    const capturado = await listAssignedOrders(ACTOR_ASIGNACIONES, { page: 1 }).catch((e: unknown) => e);
-    // Sin ids asignados el resultado es la pagina vacia, no un error: la concesion es total.
-    expect(capturado).toEqual({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 });
-    expect(capturado).not.toBeInstanceOf(AsignacionesUnauthorizedError);
+    expect(pagina).toEqual({ items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 });
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
   });
 
-  it('getAssignedOrderExecution no lanza el error de autorizacion', async () => {
+  it('R5: getAssignedOrderExecution rechaza con `unauthorized` sin tocar ningun puerto', async () => {
     const deps = {
-      assignments: {
-        insertMissing: explode(),
-        listByOrderInCompany: explode(),
-        listByOrdersInCompany: explode(),
-        deleteOne: explode(),
-        deleteByWorkGroup: explode(),
-        // Sin ids asignados: la ejecucion rechaza con `order_not_found`, que NO es de autorizacion.
-        listOrderIdsByUserInCompany: vi.fn(async () => []),
-      },
+      assignments: asignacionesQueExplotan(),
       orders: { findAliveById: explode(), listAliveSummariesByIds: explode(), transitionAliveById: explode() },
       recipes: { findRefsIncludingDeleted: explode(), findExecutionContentById: explode() },
       units: { findRefs: explode(), findRefsSharingBaseInCompany: explode() },
       products: { findRefs: explode(), findCostingBatches: explode() },
+      presentations: { findRefs: explode() },
     } as unknown as GetAssignedOrderExecutionDeps;
 
-    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
-
-    const capturado = await getAssignedOrderExecution(ACTOR_ASIGNACIONES, { orderId: PEDIDO }).catch(
-      (e: unknown) => e,
-    );
-
-    expect(capturado).toBeInstanceOf(AsignacionesError);
-    expect(capturado).not.toBeInstanceOf(AsignacionesUnauthorizedError);
+    await expect(
+      createGetAssignedOrderExecution(deps)(ACTOR_ASIGNACIONES, { orderId: PEDIDO }),
+    ).rejects.toBeInstanceOf(AsignacionesUnauthorizedError);
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
   });
 
-  it('startAssignedOrder no lanza el error de autorizacion', async () => {
+  it('R6: startAssignedOrder rechaza con `unauthorized` sin tocar ningun puerto ni transicionar', async () => {
     const deps = {
-      assignments: {
-        insertMissing: explode(),
-        listByOrderInCompany: explode(),
-        listByOrdersInCompany: explode(),
-        deleteOne: explode(),
-        deleteByWorkGroup: explode(),
-        listOrderIdsByUserInCompany: vi.fn(async () => []),
-      },
+      assignments: asignacionesQueExplotan(),
       orders: { findAliveById: explode(), listAliveSummariesByIds: explode(), transitionAliveById: explode() },
       recipes: { findRefsIncludingDeleted: explode(), findExecutionContentById: explode() },
       units: { findRefs: explode(), findRefsSharingBaseInCompany: explode() },
       products: { findRefs: explode(), findCostingBatches: explode() },
+      presentations: { findRefs: explode() },
       now: () => new Date('2026-09-22T10:00:00.000Z'),
     } as unknown as StartAssignedOrderDeps;
 
-    const startAssignedOrder = createStartAssignedOrder(deps);
-
-    const capturado = await startAssignedOrder(ACTOR_ASIGNACIONES, { orderId: PEDIDO }).catch((e: unknown) => e);
-
-    expect(capturado).toBeInstanceOf(AsignacionesError);
-    expect(capturado).not.toBeInstanceOf(AsignacionesUnauthorizedError);
+    await expect(createStartAssignedOrder(deps)(ACTOR_ASIGNACIONES, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      AsignacionesUnauthorizedError,
+    );
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
   });
 
-  it('finishAssignedOrder no lanza el error de autorizacion', async () => {
+  it('R7: finishAssignedOrder rechaza con `unauthorized` sin tocar ningun puerto ni crear asignaciones', async () => {
     const deps = {
-      assignments: {
-        insertMissing: explode(),
-        listByOrderInCompany: explode(),
-        listByOrdersInCompany: explode(),
-        deleteOne: explode(),
-        deleteByWorkGroup: explode(),
-        listOrderIdsByUserInCompany: vi.fn(async () => []),
-      },
+      assignments: asignacionesQueExplotan(),
       orders: { findAliveById: explode(), listAliveSummariesByIds: explode(), transitionAliveById: explode() },
+      people: { findAliveRefsInCompany: explode(), findRefsIncludingDeletedInCompany: explode() },
+      groups: { findSnapshotAliveInCompany: explode() },
       now: () => new Date('2026-09-22T10:00:00.000Z'),
     } as unknown as FinishAssignedOrderDeps;
 
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    const capturado = await finishAssignedOrder(ACTOR_ASIGNACIONES, { orderId: PEDIDO }).catch((e: unknown) => e);
-
-    expect(capturado).toBeInstanceOf(AsignacionesError);
-    expect(capturado).not.toBeInstanceOf(AsignacionesUnauthorizedError);
+    await expect(createFinishAssignedOrder(deps)(ACTOR_ASIGNACIONES, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      AsignacionesUnauthorizedError,
+    );
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
   });
 });
 

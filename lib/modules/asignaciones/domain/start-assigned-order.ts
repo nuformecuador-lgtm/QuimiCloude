@@ -35,7 +35,7 @@ export function createStartAssignedOrder(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<AssignedOrderExecutionView> {
-    requirePermission(actor, 'asignaciones.consultar');
+    requirePermission(actor, 'asignaciones.ejecutar');
 
     const parsed = startAssignedOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

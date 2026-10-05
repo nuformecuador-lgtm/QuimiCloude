@@ -352,7 +352,7 @@ export function findForeignPrismaAccessFindings(
 // (e) R29 en negativo: los dos permisos se declaran y casi nadie los consume
 // ---------------------------------------------------------------------------
 
-export const CODIGOS_NUEVOS = ['asignaciones.consultar', 'asignaciones.modificar'] as const
+export const CODIGOS_NUEVOS = ['asignaciones.consultar', 'asignaciones.modificar', 'asignaciones.ejecutar'] as const
 
 /** Las cuatro raices de CODIGO de aplicacion donde R29 exige silencio. */
 const RAICES_VIGILADAS = ['app/', 'components/', 'lib/shared/', 'lib/modules/'] as const
@@ -405,6 +405,11 @@ export function isScopedForPermissionCodes(relPath: string): boolean {
  * (`get-assigned-order-execution.ts`, `start-assigned-order.ts`, `finish-assigned-order.ts`)
  * exigen el mismo `asignaciones.consultar` en su primera linea. Se nombran los TRES archivos
  * exactos, no la carpeta: `list-order-responsibles.ts` sigue sin poder exigirlo.
+ *
+ * **ENMENDADO por QC-201** (R15): nace `asignaciones.ejecutar`. Lo exigen esos tres casos de uso y
+ * la pantalla de ejecucion, que DEJAN de poder nombrar `asignaciones.consultar`; y lo nombra
+ * `domain/actor.ts`, que define `canExecuteAssignedOrders`. Las vistas, «Mis asignados» y
+ * «Terminados» preguntan a esa funcion, no escriben el codigo.
  */
 type ConsumoLegitimo =
   /** Toda una carpeta del dominio puede exigir el codigo. */
@@ -429,6 +434,8 @@ const NAV_PRIVADO = 'lib/shared/navigation/private-nav.ts'
 // el archivo EXACTO, como los otros dos: la carpeta sigue sin estar permitida.
 const PAGINA_EJECUCION = 'app/(private)/asignacion/[id]/page.tsx'
 
+const PREDICADO_DE_EJECUCION = `${ASIGNACIONES}/domain/actor.ts`
+
 const CASOS_DE_USO_QC63 = [
   `${ASIGNACIONES}/domain/get-assigned-order-execution.ts`,
   `${ASIGNACIONES}/domain/start-assigned-order.ts`,
@@ -439,10 +446,11 @@ const CONSUMO_LEGITIMO: ReadonlyArray<ConsumoLegitimo> = [
   { tipo: 'carpeta', prefijo: `${ASIGNACIONES}/domain/`, codigo: 'asignaciones.modificar' },
   { tipo: 'archivo', archivo: CASO_DE_USO_QC88, codigo: 'asignaciones.consultar' },
   { tipo: 'archivo', archivo: PAGINA_QC88, codigo: 'asignaciones.consultar' },
-  { tipo: 'archivo', archivo: PAGINA_EJECUCION, codigo: 'asignaciones.consultar' },
+  { tipo: 'archivo', archivo: PAGINA_EJECUCION, codigo: 'asignaciones.ejecutar' },
   { tipo: 'archivo', archivo: NAV_PRIVADO, codigo: 'asignaciones.consultar' },
+  { tipo: 'archivo', archivo: PREDICADO_DE_EJECUCION, codigo: 'asignaciones.ejecutar' },
   ...CASOS_DE_USO_QC63.map(
-    (archivo): ConsumoLegitimo => ({ tipo: 'archivo', archivo, codigo: 'asignaciones.consultar' }),
+    (archivo): ConsumoLegitimo => ({ tipo: 'archivo', archivo, codigo: 'asignaciones.ejecutar' }),
   ),
 ]
 
@@ -1024,5 +1032,43 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
       )
       expect(findPermissionUsageFindings(mutados)).toEqual([`${objetivo} nombra 'asignaciones.consultar' (R29)`])
     })
+
+    function conLinea(objetivo: string, linea: string): ReadonlyArray<{ relPath: string; content: string }> {
+      expect(
+        appSources.some((file) => file.relPath === objetivo),
+        `no se leyo ${objetivo}`,
+      ).toBe(true)
+      return appSources.map((file) =>
+        file.relPath === objetivo ? { relPath: file.relPath, content: `${file.content}
+${linea}` } : file,
+      )
+    }
+
+    it('R15: asignaciones.ejecutar se nombra solo en los tres casos de uso, actor.ts y la pantalla de ejecucion', () => {
+      const nombran = appSources
+        .filter((file) => isScopedForPermissionCodes(file.relPath))
+        .filter((file) => stripComments(file.content).includes('asignaciones.ejecutar'))
+        .map((file) => file.relPath)
+        .sort()
+      expect(nombran).toEqual([PAGINA_EJECUCION, PREDICADO_DE_EJECUCION, ...CASOS_DE_USO_QC63].sort())
+    })
+
+    it.each([
+      `${ASIGNACIONES}/domain/assignment-views.ts`,
+      `${ASIGNACIONES}/domain/list-assigned-orders.ts`,
+      `${ASIGNACIONES}/domain/list-finished-orders.ts`,
+      'app/(private)/asignacion/page.tsx',
+    ])('R15 mutacion: nombrar asignaciones.ejecutar en %s pone la regla en rojo', (objetivo) => {
+      const mutados = conLinea(objetivo, "const p = 'asignaciones.ejecutar';")
+      expect(findPermissionUsageFindings(mutados)).toEqual([`${objetivo} nombra 'asignaciones.ejecutar' (R29)`])
+    })
+
+    it.each([...CASOS_DE_USO_QC63, PAGINA_EJECUCION])(
+      'R15 mutacion: %s ya no puede nombrar asignaciones.consultar',
+      (objetivo) => {
+        const mutados = conLinea(objetivo, "const p = 'asignaciones.consultar';")
+        expect(findPermissionUsageFindings(mutados)).toEqual([`${objetivo} nombra 'asignaciones.consultar' (R29)`])
+      },
+    )
   })
 })

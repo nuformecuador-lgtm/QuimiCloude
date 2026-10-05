@@ -186,7 +186,7 @@ describe('QC-138 — el Operador ve el pedido BLOQUEADO y no lo arranca (integra
       const bloqueado = await asignar('BLOQUEADO');
       const entregado = await asignar('ENTREGADO');
 
-      const actor: Actor = { id: operador, companyId: fixture.companyA, permissions: ['asignaciones.consultar'] };
+      const actor: Actor = { id: operador, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       const pagina = await casosDelOperador(fixture).list(actor, { page: 1 });
 
       const estados = new Map(pagina.items.map((item) => [item.id, item.status]));
@@ -205,7 +205,7 @@ describe('QC-138 — el Operador ve el pedido BLOQUEADO y no lo arranca (integra
       await fixture.useCases.assign(actorOf(fixture.companyA), { orderId: pedido, userIds: [operador], workGroupIds: [] }, NOW);
       await fixture.tx.order.update({ where: { id: pedido }, data: { status: 'BLOQUEADO' } });
 
-      const actor: Actor = { id: operador, companyId: fixture.companyA, permissions: ['asignaciones.consultar'] };
+      const actor: Actor = { id: operador, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       const error = await casosDelOperador(fixture)
         .start(actor, { orderId: pedido })
         .catch((e: unknown) => e);

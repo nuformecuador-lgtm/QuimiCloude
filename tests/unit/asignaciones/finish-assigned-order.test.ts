@@ -42,7 +42,11 @@ const EMPACADOR = uuid('4');
 const OTRO_EMPACADOR = uuid('5');
 const GRUPO = uuid('6');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+};
 
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
 
@@ -145,7 +149,7 @@ function montar(options?: {
 }
 
 describe('finishAssignedOrder — autorizacion', () => {
-  it('R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto', async () => {
+  it('R5: exige `asignaciones.ejecutar` ANTES de tocar ningun puerto', async () => {
     const { deps, listOrderIdsByUserInCompany, findAliveById, transitionAliveById } = montar();
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
@@ -575,5 +579,51 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     expect(listByOrderInCompany).not.toHaveBeenCalled();
     expect(insertMissing).not.toHaveBeenCalled();
     expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+});
+
+function doblesDe(deps: object): unknown[] {
+  return Object.values(deps as Record<string, unknown>).flatMap((value) =>
+    vi.isMockFunction(value) ? [value] : value !== null && typeof value === 'object' ? doblesDe(value) : [],
+  );
+}
+
+const SIN_EJECUTAR: readonly (readonly [string, readonly string[]])[] = [
+  ['solo asignaciones.consultar', ['asignaciones.consultar']],
+  ['solo empaque.modificar', ['empaque.modificar']],
+  ['asignaciones.consultar + empaque.modificar', ['asignaciones.consultar', 'empaque.modificar']],
+  ['el conjunto vacio', []],
+];
+
+describe('finishAssignedOrder — exige `asignaciones.ejecutar`', () => {
+  it.each(SIN_EJECUTAR)('R7, R7a: con %s rechaza con `unauthorized` sin invocar ningun puerto', async (_caso, permissions) => {
+    const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await expect(
+      createFinishAssignedOrder(deps)({ id: ANA, companyId: EMPRESA, permissions }, { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('R7: sin el permiso rechaza antes de validar la entrada', async () => {
+    const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await expect(
+      createFinishAssignedOrder(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] },
+        { orderId: 'no-es-un-uuid' },
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it('R7b: con solo `asignaciones.ejecutar` terminar resuelve igual que con el conjunto del Operador', async () => {
+    const soloEjecutar: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
+    const conEjecutar = montar({ ordenDeEstados: ['EN_CURSO'] });
+    const deReferencia = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    const resultado = await createFinishAssignedOrder(conEjecutar.deps)(soloEjecutar, { orderId: PEDIDO });
+    const referencia = await createFinishAssignedOrder(deReferencia.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(resultado).toEqual(referencia);
   });
 });

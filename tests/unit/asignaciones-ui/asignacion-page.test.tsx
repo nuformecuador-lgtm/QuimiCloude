@@ -6,8 +6,11 @@
 // componentes de servidor `async` que jsdom no ejecuta, así que no hace falta doblar la base de
 // datos ni las Server Actions: basta con comprobar CUÁL elemento se coloca en el árbol y con qué
 // props, nunca lo que pinta por dentro.
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { cleanup, render, screen } from '@testing-library/react';
-import type { ReactElement, ReactNode } from 'react';
+import { Suspense, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SessionUser } from '@/lib/modules/identity';
@@ -29,6 +32,7 @@ vi.mock('@/lib/composition', () => ({
 import AsignacionPage from '@/app/(private)/asignacion/page';
 import {
   AssignedOrdersListSection,
+  AssignedOrdersSkeleton,
   AssignmentViewTabs,
   CompanyOrdersListSection,
   FinishedOrdersListSection,
@@ -45,11 +49,15 @@ function sesionCon(permissions: readonly string[]): SessionUser {
   };
 }
 
-const OPERADOR = ['inventario.consultar', 'asignaciones.consultar'];
-const EMPACADOR = ['asignaciones.consultar', 'terminados.consultar'];
-const ADMINISTRADOR = ['pedidos.consultar', 'asignaciones.consultar', 'terminados.consultar'];
-const EMPACADOR_CON_EMPAQUE = [
+const OPERADOR = ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'];
+/** Exactamente los permisos sembrados del Empacador: consulta, pero no ejecuta. */
+const EMPACADOR = ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'];
+const ADMINISTRADOR = ['pedidos.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar', 'terminados.consultar'];
+// Sesiones sin rol sembrado: ejecutan y ademas ven «Terminados» (y, la segunda, «Por empacar»).
+const EJECUTOR_CON_TERMINADOS = ['asignaciones.consultar', 'asignaciones.ejecutar', 'terminados.consultar'];
+const EJECUTOR_CON_EMPAQUE = [
   'asignaciones.consultar',
+  'asignaciones.ejecutar',
   'terminados.consultar',
   'empaque.modificar',
 ];
@@ -102,9 +110,9 @@ describe('R11 — Operador: solo «Mis asignados», sin pestañas', () => {
   });
 });
 
-describe('R12 — Empacador: «Mis asignados» + «Terminados», con pestañas', () => {
+describe('R12 — quien ejecuta y ve terminados: «Mis asignados» + «Terminados», con pestañas', () => {
   it('ofrece las dos vistas en `AssignmentViewTabs` y, sin `vista` en la URL, monta la primera', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_TERMINADOS));
 
     const arbol = await invocar();
 
@@ -116,7 +124,7 @@ describe('R12 — Empacador: «Mis asignados» + «Terminados», con pestañas',
   });
 
   it('con `?vista=terminados`, monta `FinishedOrdersListSection` y no `AssignedOrdersListSection`', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_TERMINADOS));
 
     const arbol = await invocar('terminados');
 
@@ -149,8 +157,8 @@ describe('R15 — una vista inexistente o no permitida cae a la primera, sin err
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(1);
   });
 
-  it('«todos» pedido por un Empacador -que no la tiene- cae a «Mis asignados», y las pestañas siguen ofreciendo solo las suyas', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+  it('«todos» pedido por quien no la tiene cae a «Mis asignados», y las pestañas siguen ofreciendo solo las suyas', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_TERMINADOS));
 
     const arbol = await invocar('todos');
 
@@ -172,7 +180,7 @@ describe('R15 — una vista inexistente o no permitida cae a la primera, sin err
 
 describe('R27 — «Terminados» y «Todos» reciben los mismos parametros de pagina tolerantes', () => {
   it('un `page`/`pageSize` invalidos no hacen fallar la pantalla y llegan acotados a la seccion', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_TERMINADOS));
 
     const arbol = await AsignacionPage({
       searchParams: Promise.resolve({ vista: 'terminados', page: '-3', pageSize: '999' }),
@@ -185,7 +193,7 @@ describe('R27 — «Terminados» y «Todos» reciben los mismos parametros de pa
 
 describe('R39 — la pestaña «Por empacar» solo aparece con `empaque.modificar`, y al final', () => {
   it('sin el permiso, no se ofrece la pestaña ni se monta la seccion', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_TERMINADOS));
 
     const arbol = await invocar();
 
@@ -195,7 +203,7 @@ describe('R39 — la pestaña «Por empacar» solo aparece con `empaque.modifica
   });
 
   it('con el permiso, la pestaña se ofrece al final y `?vista=por_empacar` monta la seccion', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR_CON_EMPAQUE));
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
 
     const arbol = await invocar('por_empacar');
 
@@ -205,7 +213,7 @@ describe('R39 — la pestaña «Por empacar» solo aparece con `empaque.modifica
   });
 
   it('pedida por la direccion sin el permiso, cae a la vista por defecto sin revelar que existe', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_TERMINADOS));
 
     const arbol = await invocar('por_empacar');
 
@@ -214,12 +222,88 @@ describe('R39 — la pestaña «Por empacar» solo aparece con `empaque.modifica
   });
 
   it('con el permiso, aterriza en «Mis asignados» igual que antes: R39 no cambia el aterrizaje', async () => {
-    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR_CON_EMPAQUE));
+    getSessionUserMock.mockResolvedValue(sesionCon(EJECUTOR_CON_EMPAQUE));
 
     const arbol = await invocar();
 
     expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(0);
+  });
+});
+
+describe('QC-201 — el Empacador sembrado no ejecuta: sin «Mis asignados»', () => {
+  it('R19: ve «Terminados» y «Por empacar», aterriza en «Terminados» y no monta «Mis asignados»', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+
+    const arbol = await invocar();
+
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    expect(pestanas.props).toMatchObject({ current: 'terminados', views: ['terminados', 'por_empacar'] });
+    expect(encontrarPorTipo(arbol, FinishedOrdersListSection)).toHaveLength(1);
+    expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(0);
+  });
+
+  it('R19a: `?vista=asignados` aterriza en «Terminados» sin revelar la vista', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+
+    const arbol = await invocar('asignados');
+
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    expect(pestanas.props).toMatchObject({ current: 'terminados', views: ['terminados', 'por_empacar'] });
+    expect(encontrarPorTipo(arbol, FinishedOrdersListSection)).toHaveLength(1);
+    expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(0);
+  });
+
+  it('R19: `?vista=por_empacar` monta la seccion de empaque', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(EMPACADOR));
+
+    const arbol = await invocar('por_empacar');
+
+    expect(encontrarPorTipo(arbol, PackingOrdersListSection)).toHaveLength(1);
+    expect(encontrarPorTipo(arbol, AssignedOrdersListSection)).toHaveLength(0);
+  });
+});
+
+describe('QC-201 — `canExecute` baja por props desde la sesion (R10, R11, R11a)', () => {
+  it('R11: con `asignaciones.ejecutar`, seccion y skeleton reciben `canExecute: true`', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
+
+    const arbol = await invocar();
+
+    const [seccion] = encontrarPorTipo(arbol, AssignedOrdersListSection);
+    expect(seccion.props).toMatchObject({ canExecute: true });
+    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const fallback = (limite.props as { fallback: ReactElement }).fallback;
+    expect(fallback.type).toBe(AssignedOrdersSkeleton);
+    expect(fallback.props).toMatchObject({ canExecute: true });
+  });
+
+  it('R10: sin `asignaciones.ejecutar`, aunque el rol se llame «Operador», la seccion recibe `canExecute: false`', async () => {
+    // Solo una sesion artificial llega a la vista «asignados» sin ejecutar: la del fallback de
+    // `resolveAssignmentViews` cuando no hay ninguna otra vista.
+    getSessionUserMock.mockResolvedValue({
+      ...sesionCon(['asignaciones.consultar']),
+      roleName: 'Operador',
+    });
+
+    const arbol = await invocar();
+
+    const [seccion] = encontrarPorTipo(arbol, AssignedOrdersListSection);
+    expect(seccion.props).toMatchObject({ canExecute: false });
+    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const fallback = (limite.props as { fallback: ReactElement }).fallback;
+    expect(fallback.props).toMatchObject({ canExecute: false });
+  });
+
+  it('R11a: la pagina decide con `canExecuteAssignedOrders(sessionUser)` y no escribe el codigo del permiso para ello', () => {
+    const fuente = readFileSync(
+      path.join(process.cwd(), 'app', '(private)', 'asignacion', 'page.tsx'),
+      'utf8',
+    );
+
+    expect(fuente).toMatch(/canExecuteAssignedOrders\(sessionUser\)/);
+    expect(fuente).not.toContain('asignaciones.ejecutar');
+    expect(fuente).not.toMatch(/roleName/);
   });
 });
 

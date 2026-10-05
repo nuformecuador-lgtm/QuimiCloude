@@ -53,6 +53,10 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO } from 
  * ver y mantener las empresas de la plataforma. Cambia el recuento; como `usuarios`, su modulo no
  * es una carpeta de `lib/modules/`. Solo los recibe el Maestro: ningun rol de empresa los tiene.
  *
+ * `asignaciones.ejecutar` es la unica accion que no es `consultar` ni `modificar`: separa ver los
+ * pedidos asignados de entrar a ejecutarlos, para que quien solo empaca los vea sin ejecutarlos.
+ * Lo reciben el Administrador y el Operador.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -148,6 +152,12 @@ export const PERMISSIONS = [
     description: 'Asignar y desasignar responsables de un pedido.',
   },
   {
+    code: 'asignaciones.ejecutar',
+    module: 'asignaciones',
+    action: 'ejecutar',
+    description: 'Entrar, comenzar y terminar la ejecución de los pedidos asignados.',
+  },
+  {
     code: 'terminados.consultar',
     module: 'terminados',
     action: 'consultar',
@@ -207,9 +217,8 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
 /**
  * Los permisos que el seed asigna a cada rol, ESCRITOS UNO A UNO (decision 2026-09-07 nº2). Sin
  * comodin y sin derivarlos de `PERMISSIONS`: el Administrador pasa por la MISMA ruta de permiso
- * que cualquier otro rol (R8), y el Operador nace con exactamente los que se le escriben aqui
- * —QC-74 R9 decia «uno»; QC-86 R26 le suma `asignaciones.consultar` y pasan a ser DOS, y ni uno
- * mas: al Operador NO se le da `recetas.consultar` ni ningun otro (QC-86 R27)—. Las claves salen de
+ * que cualquier otro rol, y el Operador nace con exactamente los que se le escriben aqui: ni
+ * `recetas.consultar` ni ningun otro. Las claves salen de
  * `./roles`, nunca del literal. Sin empresa: el permiso cuelga del rol y de nada mas (R6).
  *
  * El Empacador nace con exactamente `asignaciones.consultar`, `terminados.consultar` y
@@ -235,13 +244,14 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'usuarios.modificar',
     'asignaciones.consultar',
     'asignaciones.modificar',
+    'asignaciones.ejecutar',
     'terminados.consultar',
     'clientes.consultar',
     'clientes.modificar',
     'documentos.consultar',
     'documentos.modificar',
   ],
-  [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
+  [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
   [ROLE_MAESTRO]: ['empresas.consultar', 'empresas.modificar'],
 };

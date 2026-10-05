@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 /**
  * Pantalla de ejecucion de la receta de un pedido asignado.
  *
- * El corte por permiso es la PRIMERA linea, antes de resolver `params`: sin `asignaciones.consultar`
+ * El corte por permiso es la PRIMERA linea, antes de resolver `params`: sin `asignaciones.ejecutar`
  * responde 404, nunca 403. La direccion sale de `assignedOrderRoute` (`lib/shared/routes.ts`); esta
  * carpeta es solo la forma en que el App Router materializa esa constante.
  *
@@ -26,7 +26,7 @@ export default async function AssignedOrderExecutionPage({
 }: {
   readonly params: Promise<{ id: string }>;
 }) {
-  await requirePagePermission('asignaciones.consultar');
+  await requirePagePermission('asignaciones.ejecutar');
 
   const { id } = await params;
   const result = await startAssignedOrderAction(id);

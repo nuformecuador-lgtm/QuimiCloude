@@ -51,10 +51,10 @@ export function createListAliveSummariesByIds(deps: ListOrderSummariesDeps): Ord
 export function createListAliveSummariesInCompany(
   deps: ListOrderSummariesDeps,
 ): OrderCatalog['listAliveSummariesInCompany'] {
-  return async (companyId, statuses, ordering, page, pageSize) =>
+  return async (companyId, statuses, ordering, page, pageSize, filter) =>
     withPackagingNames(
       deps.packaging,
       companyId,
-      await deps.summaries.listAliveInCompany(companyId, statuses, ordering, page, pageSize),
+      await deps.summaries.listAliveInCompany(companyId, statuses, ordering, page, pageSize, filter),
     );
 }

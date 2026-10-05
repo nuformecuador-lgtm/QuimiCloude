@@ -16,10 +16,15 @@ type AssignedOrdersListSectionProps = {
   readonly params: DataTableParams;
   /** La vista vigente: viaja a cada `href` de paginacion para que no se pierda al navegar. */
   readonly vista: AssignmentViewKind;
+  readonly canExecute: boolean;
 };
 
 /** La accion se importa por su ruta exacta: el barrel del modulo no la reexporta a proposito. */
-export async function AssignedOrdersListSection({ params, vista }: AssignedOrdersListSectionProps) {
+export async function AssignedOrdersListSection({
+  params,
+  vista,
+  canExecute,
+}: AssignedOrdersListSectionProps) {
   const result = await listAssignedOrdersAction(toAssignedOrdersQuery(params));
 
   if (result.status === 'error') {
@@ -41,6 +46,12 @@ export async function AssignedOrdersListSection({ params, vista }: AssignedOrder
   }
 
   return (
-    <AssignedOrdersTable rows={items} params={params} totalPages={totalPages} vista={vista} />
+    <AssignedOrdersTable
+      rows={items}
+      params={params}
+      totalPages={totalPages}
+      vista={vista}
+      canExecute={canExecute}
+    />
   );
 }

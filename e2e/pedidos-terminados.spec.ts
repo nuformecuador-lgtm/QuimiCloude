@@ -5,9 +5,8 @@
  * `beforeAll` -cada uno inicia su propia sesion, asi que no hay estado de un caso que otro
  * necesite-:
  *   A. el Operador entra y ve SOLO «Mis asignados», sin pestañas;
- *   B. el Empacador ve «Mis asignados» + «Terminados» + «Por empacar» -con el pedido ENTREGADO
- *      ajeno, su fecha y sus responsables, y el ENTREGADO sin fecha al final marcado «Sin fecha»-
- *      y no ve «Todos»;
+ *   B. el Empacador ve solo «Terminados» + «Por empacar» -con los ENTREGADO que empaco el, su
+ *      fecha y sus responsables, y el sin fecha al final marcado «Sin fecha»-;
  *   C. el Administrador ve SOLO «Todos», con los cuatro estados; al filtrar exactamente por
  *      Entregado aparece la columna de fecha y el orden de terminados; sin ninguna entrada a
  *      ejecucion; y `/asignacion/<id>` de un pedido al que no esta asignado le responde
@@ -79,6 +78,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc145_e2e_';
@@ -199,6 +199,7 @@ let recipeId: string | null = null;
 let adminUserId: string | null = null;
 let otherAdminUserId: string | null = null;
 let operatorUserId: string | null = null;
+let empacadorUserId: string | null = null;
 
 let orderPendingId: string | null = null;
 let orderDeliveredWithDateId: string | null = null;
@@ -274,6 +275,7 @@ async function seedOrder(params: {
   sequence: number;
   status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO';
   finishedAt?: Date | null;
+  packedBy?: string | null;
   cancellationReason?: string;
 }): Promise<{ id: string; numberText: string }> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -289,6 +291,7 @@ async function seedOrder(params: {
       quantity: ORDER_QUANTITY,
       status: params.status,
       finishedAt: params.finishedAt ?? null,
+      packedBy: params.packedBy ?? null,
       cancellationReason: params.cancellationReason ?? null,
     },
     select: { id: true },
@@ -355,7 +358,7 @@ test.beforeAll(async () => {
 
   adminUserId = await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   otherAdminUserId = await createUserWithRole(otherAdminUser, ROLE_ADMINISTRADOR);
-  await createUserWithRole(empacadorUser, ROLE_EMPACADOR);
+  empacadorUserId = await createUserWithRole(empacadorUser, ROLE_EMPACADOR);
   operatorUserId = await createUserWithRole(operatorUser, ROLE_OPERADOR);
 
   recipeId = (
@@ -373,9 +376,19 @@ test.beforeAll(async () => {
   const [pending, inProgress, deliveredWithDate, deliveredNoDate, cancelled] = await Promise.all([
     seedOrder({ sequence: SEQUENCE_PENDING, status: 'PENDIENTE' }),
     seedOrder({ sequence: SEQUENCE_IN_PROGRESS, status: 'EN_CURSO' }),
-    seedOrder({ sequence: SEQUENCE_DELIVERED_WITH_DATE, status: 'ENTREGADO', finishedAt: FINISHED_AT }),
-    // Entregado sin fecha de terminado registrada.
-    seedOrder({ sequence: SEQUENCE_DELIVERED_NO_DATE, status: 'ENTREGADO', finishedAt: null }),
+    // Empacados por el Empacador: sin `asignaciones.ejecutar` solo ve en «Terminados» lo suyo.
+    seedOrder({
+      sequence: SEQUENCE_DELIVERED_WITH_DATE,
+      status: 'ENTREGADO',
+      finishedAt: FINISHED_AT,
+      packedBy: empacadorUserId,
+    }),
+    seedOrder({
+      sequence: SEQUENCE_DELIVERED_NO_DATE,
+      status: 'ENTREGADO',
+      finishedAt: null,
+      packedBy: empacadorUserId,
+    }),
     seedOrder({
       sequence: SEQUENCE_CANCELLED,
       status: 'CANCELADO',
@@ -392,9 +405,8 @@ test.beforeAll(async () => {
   orderDeliveredNoDateNumber = deliveredNoDate.numberText;
   orderCancelledNumber = cancelled.numberText;
 
-  // El unico responsable de todo el fixture: el Operador, sobre el ENTREGADO CON fecha. Es el
-  // pedido ajeno para el Empacador -no esta asignado a el- y de paso prueba que
-  // «Terminados» pinta los responsables de CUALQUIERA, no solo los del actor.
+  // El Operador es responsable del ENTREGADO CON fecha: «Terminados» del Empacador pinta los
+  // responsables de cualquiera, no solo los del actor.
   await prisma.orderAssignment.create({
     data: { orderId: orderDeliveredWithDateId, userId: operatorUserId, companyId },
   });
@@ -459,7 +471,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toHaveCount(0);
   });
 
-  test('el Empacador ve «Terminados» con el pedido ajeno, su fecha y sus responsables, el «sin fecha» al final, ve «Por empacar» y no ve «Todos» (R28, R30)', async ({
+  test('el Empacador ve «Terminados» con el pedido que empaco, su fecha y sus responsables, el «sin fecha» al final, ve «Por empacar» y no ve «Mis asignados» ni «Todos» (R28, R30)', async ({
     page,
   }) => {
     const withDateNumber = orderDeliveredWithDateNumber;
@@ -485,10 +497,9 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await loginAndLand(page, empacadorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Tres pestañas exactas: «Mis asignados», «Terminados» y «Por empacar» -el Empacador del seed
-    // tambien tiene `empaque.modificar`-. Nunca «Todos».
+    // Sin `asignaciones.ejecutar` no hay «Mis asignados»: «Terminados» y «Por empacar», nunca «Todos».
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toBeVisible();
+    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.todos)).toHaveCount(0);
@@ -496,9 +507,8 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados).click();
     await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // El pedido «ajeno» -no asignado al Empacador- SI aparece: «Terminados» es de toda la empresa.
-    // Con su fecha y su responsable, que es OTRA persona -todos los responsables, sin excluir a
-    // nadie-.
+    // No esta asignado al Empacador pero lo empaco el: aparece, con su fecha y su responsable,
+    // que es otra persona.
     const withDateRow = rowByNumber(page, withDateNumber);
     await expect(withDateRow).toHaveCount(1, { timeout: 60_000 });
     const withDateDate = withDateRow.getByTestId(FINISHED_ORDER_DATE_TESTID);
@@ -642,7 +652,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(row).toHaveCount(1, { timeout: 60_000 });
 
     // --- El panel de edicion no ofrece NINGUN control de estado.
-    await row.getByTestId(ORDER_ACTION_EDIT_TESTID).click();
+    await (await openOrderRowMenu(page, rowMenuTrigger(row), ORDER_ACTION_EDIT_TESTID)).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ORDER_STATUS_SELECT_TESTID)).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: /estado/i })).toHaveCount(0);
@@ -653,7 +663,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     // Administrador-, y SI sigue ofreciendo a quien no lo tiene -el Operador-, control positivo de
     // que la lista de candidatos cargo de verdad.
     const urlBeforeOpen = page.url();
-    await row.getByTestId(ORDER_ACTION_RESPONSIBLES_TESTID).click();
+    await (await openOrderRowMenu(page, rowMenuTrigger(row), ORDER_ACTION_RESPONSIBLES_TESTID)).click();
     const anchor = page.getByTestId(SHEET_RESPONSIBLES_TESTID);
     await expect(anchor).toBeVisible({ timeout: 60_000 });
     await expect(anchor).toHaveAttribute('data-section', RESPONSIBLES_SECTION_VALUE);

@@ -73,17 +73,17 @@ describe('R28 - el estado de error, fuera de la tabla y sin ningun dato', () => 
 
 describe('R30 - el esqueleto declara tantas columnas como la tabla', () => {
   it('la constante del esqueleto coincide con cuantas columnas declara la tabla', () => {
-    expect(ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT).toBe(buildAssignedOrdersColumns().length);
+    expect(ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT).toBe(buildAssignedOrdersColumns({ canExecute: true }).length);
   });
 
   it('lo pintado coincide con lo declarado: tantas cabeceras como columnas', () => {
-    render(<AssignedOrdersSkeleton rows={3} />);
+    render(<AssignedOrdersSkeleton rows={3} canExecute />);
 
     expect(screen.getAllByRole('columnheader')).toHaveLength(ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT);
   });
 
   it('tantas filas como pide `rows`, y tantas celdas por fila como columnas', () => {
-    render(<AssignedOrdersSkeleton rows={3} />);
+    render(<AssignedOrdersSkeleton rows={3} canExecute />);
 
     const filas = screen.getAllByTestId('assigned-order-row-skeleton');
     expect(filas).toHaveLength(3);

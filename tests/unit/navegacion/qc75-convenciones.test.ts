@@ -66,6 +66,7 @@ export const CODIGOS_QC74 = [
   'usuarios.modificar',
   'asignaciones.consultar',
   'asignaciones.modificar',
+  'asignaciones.ejecutar',
   'terminados.consultar',
   'clientes.consultar',
   'clientes.modificar',
@@ -162,9 +163,12 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     expect(modulos).toContain('unidades');
   });
 
-  it('las acciones del catalogo son solo consultar y modificar', () => {
+  it('las acciones del catalogo son solo consultar y modificar, mas ejecutar unicamente en asignaciones (QC-201 R2)', () => {
     const acciones = [...new Set(catalogo.map((permiso) => permiso.action))].sort();
-    expect(acciones).toEqual(['consultar', 'modificar']);
+    expect(acciones).toEqual(['consultar', 'ejecutar', 'modificar']);
+    expect(
+      catalogo.filter((permiso) => permiso.action === 'ejecutar').map((permiso) => permiso.code),
+    ).toEqual(['asignaciones.ejecutar']);
   });
 
   it('la regla dispara con un catalogo fabricado que si trae comodines', () => {

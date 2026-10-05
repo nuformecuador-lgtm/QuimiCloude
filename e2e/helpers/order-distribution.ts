@@ -2,6 +2,8 @@
 // envases» y abrir una accion del menu de 3 puntos de una fila.
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import { openRowActionsMenuItem } from './row-actions-menu';
+
 export const DISTRIBUTION_FIELD_TESTID = 'order-distribution-field';
 export const DISTRIBUTION_LINE_TESTID = 'order-distribution-line';
 export const DISTRIBUTION_LINE_PACKAGES_TESTID = 'order-distribution-line-packages';
@@ -59,22 +61,12 @@ export async function addPackagingLine(
   ).toHaveValue(packages);
 }
 
-/**
- * Abre el menu de acciones de la fila y devuelve el item pedido. El menu se monta fuera de la
- * fila, asi que el item se busca en el menu abierto. En WebKit un clic antes de hidratar se
- * pierde sin error: se repite hasta que el menu aparece.
- */
 export async function openOrderRowMenu(
   page: Page,
   trigger: Locator,
   actionTestId: string,
 ): Promise<Locator> {
-  const item = page.getByRole('menu').getByTestId(actionTestId);
-  await expect(async () => {
-    if ((await item.count()) === 0) await trigger.click();
-    await expect(item).toBeVisible({ timeout: 5_000 });
-  }).toPass({ timeout: 60_000 });
-  return item;
+  return openRowActionsMenuItem(page, trigger, actionTestId);
 }
 
 /** El disparador del menu de 3 puntos dentro de una fila ya localizada. */

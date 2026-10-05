@@ -33,7 +33,11 @@ const LITRO = uuid('d');
 const MILILITRO = uuid('e');
 const KILOGRAMO = uuid('f');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+};
 
 function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
@@ -193,7 +197,7 @@ function montar(options?: {
 }
 
 describe('getAssignedOrderExecution — autorizacion', () => {
-  it('R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto', async () => {
+  it('R5: exige `asignaciones.ejecutar` ANTES de tocar ningun puerto', async () => {
     const { deps, todos } = montar();
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
 
@@ -667,7 +671,7 @@ describe('getAssignedOrderExecution — herramientas de la receta', () => {
     expect(unidadesPedidas).not.toContain(KILOGRAMO);
   });
 
-  it('R32: sin asignaciones.consultar no toca ningun puerto, aunque la receta tenga herramientas', async () => {
+  it('R32: sin asignaciones.ejecutar no toca ningun puerto, aunque la receta tenga herramientas', async () => {
     const { deps, todos } = montar({ content: conHerramientas(), products: vivos });
 
     await expect(
@@ -677,5 +681,51 @@ describe('getAssignedOrderExecution — herramientas de la receta', () => {
       ),
     ).rejects.toThrow(UnauthorizedError);
     for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+});
+
+function doblesDe(deps: object): unknown[] {
+  return Object.values(deps as Record<string, unknown>).flatMap((value) =>
+    vi.isMockFunction(value) ? [value] : value !== null && typeof value === 'object' ? doblesDe(value) : [],
+  );
+}
+
+const SIN_EJECUTAR: readonly (readonly [string, readonly string[]])[] = [
+  ['solo asignaciones.consultar', ['asignaciones.consultar']],
+  ['solo empaque.modificar', ['empaque.modificar']],
+  ['asignaciones.consultar + empaque.modificar', ['asignaciones.consultar', 'empaque.modificar']],
+  ['el conjunto vacio', []],
+];
+
+describe('getAssignedOrderExecution — exige `asignaciones.ejecutar`', () => {
+  it.each(SIN_EJECUTAR)('R5, R7a: con %s rechaza con `unauthorized` sin invocar ningun puerto', async (_caso, permissions) => {
+    const { deps } = montar();
+
+    await expect(
+      createGetAssignedOrderExecution(deps)({ id: ANA, companyId: EMPRESA, permissions }, { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('R5: sin el permiso rechaza antes de validar la entrada', async () => {
+    const { deps } = montar();
+
+    await expect(
+      createGetAssignedOrderExecution(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] },
+        { orderId: 'no-es-un-uuid' },
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it('R7b: con solo `asignaciones.ejecutar` leer la ejecucion resuelve igual que con el conjunto del Operador', async () => {
+    const soloEjecutar: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
+    const conEjecutar = montar();
+    const deReferencia = montar();
+
+    const resultado = await createGetAssignedOrderExecution(conEjecutar.deps)(soloEjecutar, { orderId: PEDIDO });
+    const referencia = await createGetAssignedOrderExecution(deReferencia.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(resultado).toEqual(referencia);
   });
 });

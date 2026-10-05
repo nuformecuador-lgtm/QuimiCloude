@@ -30,7 +30,11 @@ const ANA = uuid('1');
 const BEA = uuid('2');
 const RECETA = uuid('a');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+};
 
 function pedidoId(i: number): string {
   const sufijo = i.toString(16).padStart(2, '0');
@@ -492,7 +496,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
     expect(pagina.items[0]?.presentationLines).toEqual([]);
   });
 
-  it('R26: un actor con solo asignaciones.consultar recibe la presentacion de sus pedidos asignados', async () => {
+  it('R26: un actor sin permisos de presentaciones recibe la presentacion de sus pedidos asignados', async () => {
     const ids = [pedidoId(1)];
     const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] })];
     const { deps } = montar({
@@ -505,7 +509,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
-    expect(ACTOR.permissions).toEqual(['asignaciones.consultar']);
+    expect(ACTOR.permissions).toEqual(['asignaciones.consultar', 'asignaciones.ejecutar']);
     expect(pagina.items[0]?.presentationLines[0]?.presentationName).toBe('Bidon 20L');
   });
 });
@@ -610,5 +614,44 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
     expect(findRefsUnits).not.toHaveBeenCalled();
     expect(pagina.items[0]?.unitId).toBeNull();
     expect(pagina.items[0]?.unitLabel).toBeNull();
+  });
+});
+
+describe('listAssignedOrders — sin `asignaciones.ejecutar` no hay pedidos previos al empaque', () => {
+  it.each([
+    ['solo asignaciones.consultar', ['asignaciones.consultar']],
+    ['asignaciones.consultar + empaque.modificar + terminados.consultar', ['asignaciones.consultar', 'empaque.modificar', 'terminados.consultar']],
+  ] as const)('R16: con %s devuelve la pagina vacia sin consultar asignaciones ni pedidos', async (_caso, permissions) => {
+    const ids = [pedidoId(1)];
+    const { deps, todos } = montar({ ids, page: { items: [resumen(pedidoId(1))], total: 1 }, refs: [receta()] });
+
+    const pagina = await createListAssignedOrders(deps)({ id: ANA, companyId: EMPRESA, permissions }, { page: 2, pageSize: 5 });
+
+    expect(pagina).toEqual({ items: [], total: 0, page: 2, pageSize: 5, totalPages: 1 });
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('R16: sin el permiso la entrada se sigue validando', async () => {
+    const { deps } = montar();
+
+    await expect(
+      createListAssignedOrders(deps)({ id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] }, { page: 0 }),
+    ).rejects.toThrow(ValidationError);
+  });
+
+  it('R17: con `asignaciones.ejecutar` lista sus pedidos de trabajo como siempre', async () => {
+    const ids = [pedidoId(1)];
+    const { deps, listOrderIdsByUserInCompany, listAliveSummariesByIds } = montar({
+      ids,
+      page: { items: [resumen(pedidoId(1))], total: 1 },
+      refs: [receta()],
+    });
+
+    const pagina = await createListAssignedOrders(deps)(ACTOR, { page: 1 });
+
+    expect(listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, ANA);
+    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, ids, ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'], 1, undefined);
+    expect(pagina.total).toBe(1);
+    expect(pagina.items.map((item) => item.id)).toEqual(ids);
   });
 });
