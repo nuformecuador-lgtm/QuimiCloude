@@ -69,7 +69,7 @@
 
 ## Bloque C — transacción y llamantes (depende de B)
 
-- [ ] **T7 — Scope transaccional con productos y unidades.** `ports/order-unit-of-work.ts`
+- [x] **T7 — Scope transaccional con productos y unidades.** `ports/order-unit-of-work.ts`
   (`products`, `units`), cableado en `lib/composition/index.ts > orderUnitOfWork` con el mismo `tx`;
   cliente opcional en `findProductRefs` (inventario) igual que en T2; helper
   `pedidos/domain/order-requirement-units.ts > loadRequirementUnits` (`design.md > 4.3`).
@@ -77,7 +77,7 @@
   Tests: `R20 loadRequirementUnits sin unidad de pedido no lee el puente`;
   `R10 loadRequirementUnits resuelve la unidad de cada insumo y la del pedido`.
   *Hecho:* `tsc` y suites existentes verdes.
-- [ ] **T8 — Llamantes de costo.** Pasar `orderUnitId` en `create-order.ts`, `update-order.ts`,
+- [x] **T8 — Llamantes de costo.** Pasar `orderUnitId` en `create-order.ts`, `update-order.ts`,
   `update-order-presentation-lines.ts` (la unidad **nueva**), `review-blocked-orders.ts`,
   `order-packing.ts`. Depende de T5.
   Tests unitarios por caso de uso (ampliar los existentes):
@@ -105,7 +105,7 @@
   `R10 el alta de 1000 g sobre insumo en kg deja 0.1000 en reservation_movements`;
   `R22 un pedido guardado antes del cambio conserva su costo y lo apartado al leerlo`.
   *Hecho:* verde.
-- [ ] **T10 — Cotización.** `quoteOrderCostSchema` con `unitId` obligatorio y `quote-order-cost.ts`
+- [x] **T10 — Cotización.** `quoteOrderCostSchema` con `unitId` obligatorio y `quote-order-cost.ts`
   (`design.md > 6`). Depende de T5.
   Tests `tests/unit/pedidos/quote-order-cost.test.ts` (ampliar):
   `R8 la cotizacion usa la unidad recibida`;
