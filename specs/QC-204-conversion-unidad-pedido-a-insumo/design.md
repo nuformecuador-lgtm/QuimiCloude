@@ -81,6 +81,9 @@ export type OrderLineNeed =
   | { readonly kind: 'not_convertible' }                          // R4
 
 export type LineNeedUnits = {
+  /** Id guardado en el pedido; `null` = pedido sin unidad (R20). */
+  readonly orderUnitId: string | null
+  /** La unidad ya resuelta del catálogo; `null` si no hay id o si el id no se encontró. */
   readonly orderUnit: UnitConversion | null
   readonly bridge: MassVolumeBridge | null
 }
@@ -93,6 +96,10 @@ export function resolveLineNeed(
 `consumedQuantity` sigue siendo la única multiplicación; `resolveLineNeed` la envuelve y convierte.
 Una `orderUnit` que el llamante no pudo resolver (id que no aparece en el catálogo) se trata como
 `not_convertible`, no como `unconverted`: un pedido **con** unidad nunca vuelve a la fórmula vieja.
+La distinción la hace `orderUnitId` (enmienda del 2026-10-05, decidida por el humano en F2.1):
+`orderUnitId === null` → `unconverted` (R20); `orderUnitId !== null && orderUnit === null` →
+`not_convertible` (R9). Mismo nombre y tipo que `CostInput.orderUnitId` (§4.2) y que el parámetro
+de `loadRequirementUnits` (§4.3).
 
 Se exporta por el barrel de `pedidos`: lo consumen `asignaciones` (que ya importa de
 `@/lib/modules/pedidos`) y la tabla de ingredientes (que ya importa `createOrderSchema` de ahí).
