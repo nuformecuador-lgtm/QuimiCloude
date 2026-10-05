@@ -185,9 +185,15 @@ export function createUpdateOrderPresentationLines(
           // cotizacion, y `orderId` cuenta lo apartado por este pedido como suyo.
           const cost = materialsConsumed
             ? await packedOrderCost(deps, locked, packagingLines, companyId, orderId)
-            : await resolveStoredOrderCost(deps, locked.recipeId, locked.quantity, packagingLines, companyId, {
-                orderId,
-              });
+            : await resolveStoredOrderCost(
+                deps,
+                locked.recipeId,
+                locked.quantity,
+                input.unitId,
+                packagingLines,
+                companyId,
+                { orderId },
+              );
           await transaction.orders.setIngredientsCost(orderId, cost, actorId, instant, scope);
         }
 

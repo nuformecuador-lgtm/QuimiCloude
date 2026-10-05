@@ -214,6 +214,7 @@ function almacen() {
       ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'Unidad', symbol: null, baseUnitId: null, factor: null }] : [],
     ),
     findRefsSharingBaseInCompany: vi.fn(async () => []),
+    findMassVolumeBridge: vi.fn(async () => null),
   }
   const presentations = {
     findRefs: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'Bidon' }))),
@@ -530,6 +531,7 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
     const units = {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+      findMassVolumeBridge: explota('units.findMassVolumeBridge'),
     }
     const presentations = { findRefs: explota('presentations.findRefs') }
     const packaging = {

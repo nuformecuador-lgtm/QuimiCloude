@@ -215,6 +215,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
                 deps,
                 updated.recipeId,
                 updated.quantity,
+                updated.unitId,
                 packagingLines,
                 companyId,
                 { orderId: id },

@@ -135,7 +135,11 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
     }),
   );
   const findRefsSharingBaseInCompany = vi.fn(async () => []);
-  return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
+  const findMassVolumeBridge = vi.fn(async () => null);
+  return {
+    units: { findRefs, findRefsSharingBaseInCompany, findMassVolumeBridge } as unknown as UnitCatalog,
+    findRefs,
+  };
 }
 
 /** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
@@ -593,7 +597,8 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
 // exige: despues del permiso, la validacion y la receta.
 
 const PRODUCTO_X = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-const LITRO: UnitConversion = { id: 'l', baseUnitId: null, factor: null };
+/** Deriva de la unidad del pedido con factor 1: la necesidad pasa al insumo sin cambiar de cifra. */
+const LITRO: UnitConversion = { id: 'l', baseUnitId: UNIT_ID, factor: '1' };
 
 /** Una unica linea al 100 %: la cantidad necesaria queda igual a la del pedido, y cada test
  *  pone la necesaria que le conviene directamente en `quantity` del pedido. */
@@ -635,6 +640,7 @@ function catalogosQueExplotan() {
     units: {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+      findMassVolumeBridge: explota('units.findMassVolumeBridge'),
     } as unknown as UnitCatalog,
     presentations: {
       findRefs: explota('presentations.findRefs'),

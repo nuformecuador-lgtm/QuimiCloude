@@ -4,8 +4,14 @@
 // quien orquesta (alta o edicion) y devuelve el importe, o `null` cuando no se puede calcular.
 
 import type { CostingBatch, PackagingCostingBatch, ProductId } from '@/lib/modules/inventario'
-import { consumedQuantity } from '@/lib/modules/recetas'
-import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades'
+import {
+  convertQuantity,
+  IncompatibleUnitsError,
+  type MassVolumeBridge,
+  type UnitConversion,
+} from '@/lib/modules/unidades'
+
+import { resolveLineNeed } from './order-line-need'
 
 /** Linea de receta, vista con lo minimo que este calculo necesita. `unitId` es la unidad guardada
  *  del insumo (`ProductRef.unitId`) y es `null` cuando el producto no tiene unidad guardada; en
@@ -18,9 +24,13 @@ export type RecipeCostLine = {
 
 export type CostInput = {
   readonly orderQuantity: string
+  /** Unidad guardada en el pedido; `null` = pedido sin unidad, la necesidad se lee tal cual en la
+   *  unidad del insumo. Si no esta en `units`, ninguna linea tiene coste. */
+  readonly orderUnitId: string | null
   readonly lines: readonly RecipeCostLine[]
   readonly batches: readonly CostingBatch[]
   readonly units: ReadonlyMap<string, UnitConversion>
+  readonly bridge: MassVolumeBridge | null
 }
 
 /**
@@ -95,18 +105,26 @@ function formatFixedOutputScale(unscaled: bigint): string {
 }
 
 /** Coste (escalado a `INTERNAL_SCALE`) de un ingrediente, o `null` si no se puede componer. */
-function calculateLineCost(
-  line: RecipeCostLine,
-  orderQuantity: string,
-  batches: readonly CostingBatch[],
-  units: ReadonlyMap<string, UnitConversion>,
-): bigint | null {
+function calculateLineCost(line: RecipeCostLine, input: CostInput): bigint | null {
+  const { batches, units } = input
   if (line.unitId === null) {
     return null
   }
   const lineUnit = units.get(line.unitId)
-  const neededQuantity = parseDecimal(consumedQuantity(orderQuantity, line.percentage))
-  if (lineUnit === undefined || neededQuantity === null) {
+  if (lineUnit === undefined) {
+    return null
+  }
+  const orderUnit = input.orderUnitId === null ? null : (units.get(input.orderUnitId) ?? null)
+  const need = resolveLineNeed(input.orderQuantity, line.percentage, lineUnit, {
+    orderUnitId: input.orderUnitId,
+    orderUnit,
+    bridge: input.bridge,
+  })
+  if (need.kind === 'not_convertible') {
+    return null
+  }
+  const neededQuantity = parseDecimal(need.quantity)
+  if (neededQuantity === null) {
     return null
   }
 
@@ -184,7 +202,7 @@ export function calculateIngredientsCost(input: CostInput): string | null {
 
   let totalInternal = ZERO
   for (const line of input.lines) {
-    const lineCostInternal = calculateLineCost(line, input.orderQuantity, input.batches, input.units)
+    const lineCostInternal = calculateLineCost(line, input)
     if (lineCostInternal === null) {
       return null
     }
@@ -213,7 +231,7 @@ export function calculateLotIngredientsCost(input: CostInput): string {
 
   let totalInternal = ZERO
   for (const line of input.lines) {
-    const lineCostInternal = calculateLineCost(line, input.orderQuantity, input.batches, input.units)
+    const lineCostInternal = calculateLineCost(line, input)
     if (lineCostInternal !== null) {
       totalInternal += lineCostInternal
     }

@@ -36,7 +36,7 @@ import {
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -85,7 +85,7 @@ const recipes: RecipeCatalog = {
 };
 const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts };
 const presentations: PresentationCatalog = { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames };
-const units: UnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
+const units: UnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => findMassVolumeBridge(), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
 const packaging: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });

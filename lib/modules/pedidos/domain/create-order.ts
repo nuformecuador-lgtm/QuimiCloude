@@ -117,6 +117,7 @@ export function createCreateOrder(
       deps,
       effectiveId,
       data.quantity,
+      data.unitId,
       packagingLinesOfInput(data.presentationLines),
       actor.companyId,
     );

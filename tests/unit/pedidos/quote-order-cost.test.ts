@@ -50,12 +50,14 @@ function dobles() {
     findRefs: vi.fn(async () => [PRODUCT_REF]),
   } as unknown as ProductCatalog
 
-  // Devuelve el mismo `UNIT_REF` con el id PEDIDO: asi resuelve tanto la unidad de costeo -que
-  // pide 'u-1'- como la unidad del pedido -que pide un UUID, exigido por `unitIdSchema`-, sin
-  // ninguna conversion real entre las dos (las dos declaran `baseUnitId: null`).
+  // Resuelve cualquier id pedido: 'u-1' es la unidad de costeo y cualquier otro -la del pedido,
+  // un UUID por `unitIdSchema`- deriva de ella con factor 1, asi la necesidad no cambia de cifra.
   const units = {
-    findRefs: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ ...UNIT_REF, id }))),
+    findRefs: vi.fn(async (ids: readonly string[]) =>
+      ids.map((id) => (id === UNIT_REF.id ? UNIT_REF : { id, baseUnitId: UNIT_REF.id, factor: '1' })),
+    ),
     findRefsSharingBaseInCompany: vi.fn(),
+    findMassVolumeBridge: vi.fn(async () => null),
   } as unknown as UnitCatalog
 
   return { recipes, products, units }

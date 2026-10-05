@@ -53,6 +53,7 @@ export function createQuoteOrderCost(
       { recipes: deps.recipes, products: deps.products, units: deps.units, packaging: deps.packaging },
       data.recipeId,
       data.quantity,
+      null,
       packagingLinesOfInput(data.presentationLines ?? []),
       actor.companyId,
       { orderId: data.orderId },

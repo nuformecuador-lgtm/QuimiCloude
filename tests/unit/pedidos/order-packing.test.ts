@@ -107,6 +107,7 @@ function catalogosGlobales(overrides: {
       findRefsSharingBaseInCompany: async () => {
         throw new Error('sin uso en este test');
       },
+      findMassVolumeBridge: async () => null,
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs },
     findRefsIncludingDeleted,

@@ -122,7 +122,11 @@ function catalogoDeUnidades(extra: ReadonlyMap<string, UnitConversion> = new Map
       return unidad === undefined ? [] : [unidad];
     }),
   );
-  return { units: { findRefs, findRefsSharingBaseInCompany: vi.fn(async () => []) } as unknown as UnitCatalog, findRefs };
+  const findMassVolumeBridge = vi.fn(async () => null);
+  return {
+    units: { findRefs, findRefsSharingBaseInCompany: vi.fn(async () => []), findMassVolumeBridge } as unknown as UnitCatalog,
+    findRefs,
+  };
 }
 
 /** Envase de cada presentacion del catalogo: el reparto nombra envases, y cada uno lleva su
@@ -629,7 +633,7 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
     const update = montar({
       orders: doble.orders,
       catalogos,
-      units: catalogoDeUnidades(new Map([[UNIDAD_MATERIA, { id: UNIDAD_MATERIA, baseUnitId: null, factor: null }]])).units,
+      units: catalogoDeUnidades(new Map([[UNIDAD_MATERIA, { id: UNIDAD_MATERIA, baseUnitId: UNIT_ID, factor: '1' }]])).units,
       recipeLines: RECETA,
       costo,
     });

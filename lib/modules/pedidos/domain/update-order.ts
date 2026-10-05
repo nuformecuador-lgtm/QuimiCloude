@@ -116,6 +116,7 @@ export function createUpdateOrder(
       deps,
       effectiveId,
       data.quantity,
+      data.unitId,
       packagingLinesOfInput(data.presentationLines),
       actor.companyId,
       { orderId: id },

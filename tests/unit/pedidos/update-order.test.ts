@@ -126,7 +126,11 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
     }),
   );
   const findRefsSharingBaseInCompany = vi.fn(async () => []);
-  return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
+  const findMassVolumeBridge = vi.fn(async () => null);
+  return {
+    units: { findRefs, findRefsSharingBaseInCompany, findMassVolumeBridge } as unknown as UnitCatalog,
+    findRefs,
+  };
 }
 
 /** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
@@ -851,7 +855,8 @@ describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE
 // T5 — la edicion RECALCULA el importe de los ingredientes con la receta del DATO ENTRANTE.
 
 const PRODUCTO_X = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-const LITRO: UnitConversion = { id: 'l', baseUnitId: null, factor: null };
+/** Deriva de la unidad del pedido con factor 1: la necesidad pasa al insumo sin cambiar de cifra. */
+const LITRO: UnitConversion = { id: 'l', baseUnitId: UNIT_ID, factor: '1' };
 
 /** Una unica linea al 100 %: la cantidad necesaria queda igual a la del pedido. */
 function lineaDeReceta(overrides: Partial<RecipeExecutionLine> = {}): RecipeExecutionLine {
@@ -897,6 +902,7 @@ function catalogosQueExplotan() {
     units: {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+      findMassVolumeBridge: explota('units.findMassVolumeBridge'),
     } as unknown as UnitCatalog,
     presentations: {
       findRefs: explota('presentations.findRefs'),

@@ -64,7 +64,7 @@ import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { createCreateOrder } from '@/lib/modules/pedidos';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -154,7 +154,7 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 const orderPresentationCatalog = { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames };
-const orderUnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
+const orderUnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => findMassVolumeBridge(), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
 const createOrderUseCase = createCreateOrder({
   recipes: recipeCatalog,
   products: productCatalog,

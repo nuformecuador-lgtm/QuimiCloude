@@ -101,6 +101,7 @@ async function reviewOne(
     deps,
     row.recipeId,
     row.quantity,
+    row.unitId,
     packagingLinesOf(row.presentationLines),
     scope.companyId,
     { orderId: id },

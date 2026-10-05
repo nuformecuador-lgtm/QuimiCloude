@@ -59,6 +59,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
+import { findMassVolumeBridge } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 
@@ -1030,6 +1031,7 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
         })
       ).map((u) => ({ ...u, factor: u.factor === null ? null : u.factor.toFixed(4) })),
     findRefsSharingBaseInCompany: async () => [],
+    findMassVolumeBridge: () => findMassVolumeBridge(tx),
   } as unknown as UnitCatalog
   const now = () => new Date()
   return {

@@ -160,6 +160,7 @@ function dobles(opciones: {
     units: {
       findRefs: findUnitRefs,
       findRefsSharingBaseInCompany: vi.fn(async () => []),
+      findMassVolumeBridge: vi.fn(async () => null),
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),
