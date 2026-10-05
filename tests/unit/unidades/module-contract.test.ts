@@ -712,6 +712,7 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     ]
     expect(funcionesExportadas).toEqual([
       'listUnitsAction',
+      'getMassVolumeBridgeAction',
       'createUnitAction',
       'updateUnitAction',
       'deleteUnitAction',

@@ -159,6 +159,7 @@ import type { UnitWriteRepository } from '@/lib/modules/unidades/ports/unit-writ
 import {
   createCreateUnit,
   createDeleteUnit,
+  createGetMassVolumeBridge,
   createListUnits,
   createUpdateUnit,
   type UnitCatalog,
@@ -1142,6 +1143,7 @@ export const unidades = {
   createUnit: createCreateUnit({ units: unitWriteRepository }),
   updateUnit: createUpdateUnit({ units: unitWriteRepository }),
   deleteUnit: createDeleteUnit({ units: unitWriteRepository }),
+  getMassVolumeBridge: createGetMassVolumeBridge({ units: unitCatalog }),
 } as const;
 
 
