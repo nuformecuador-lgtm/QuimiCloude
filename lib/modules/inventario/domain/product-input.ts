@@ -202,9 +202,8 @@ const createProductWithBatchSchema = z
 
 /**
  * Esquema para MACHINE (Instrumento): solo `name`, `type`, `stock` y `purchaseDate` viajan
- * en el borde (2026-09-23). `presentationId` y `unitCost` son anulables UNICAMENTE aqui
- * (la migracion `20260923140000_product_batch_nullable_machine`); PRODUCT y PACKAGING
- * siguen exigiendolos. `strictObject`: sin `qtyAlert`, y las claves no pintadas no viajan.
+ * en el borde (2026-09-23). `presentationId` y `unitCost` son opcionales UNICAMENTE aqui.
+ * `strictObject`: sin `qtyAlert`, y las claves no pintadas no viajan.
  * Sin `exigirCostoDelLote`: un instrumento no lleva costo de lote.
  */
 const createMachineSchema = z.strictObject({
