@@ -539,7 +539,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     // 200 x 10 % = 20.
     await expect(page.getByTestId('order-ingredients-table')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('order-ingredient-percentage')).toHaveText('10,00 %');
-    await expect(page.getByTestId('order-ingredient-required')).toHaveText('20');
+    await expect(page.getByTestId('order-ingredient-required')).toHaveText(`20 ${unitSymbol}`);
 
     // Guardar: la Server Action REAL de `pedidos` contra Postgres.
     await page.getByTestId('order-form-submit').click();

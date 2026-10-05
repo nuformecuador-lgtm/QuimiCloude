@@ -1025,10 +1025,10 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
     // 0.1005 × 10,00 % = 0.01005 y 40 − 0.01005 = 39.98995. Se CALCULAN exactos y se PINTAN a dos
-    // decimales: «0.01» y «39.99». El valor exacto no se pierde, viaja en el `title`.
-    await waitFor(() => expect(requerida.textContent).toBe('0.01'));
+    // decimales: «0.01 L» y «39.99 L». El valor exacto no se pierde, viaja en el `title`.
+    await waitFor(() => expect(requerida.textContent).toBe('0.01 L'));
     expect(requerida).toHaveAttribute('title', '0.01005');
-    expect(requerida).toHaveAttribute('aria-label', '0.01005');
+    expect(requerida).toHaveAttribute('aria-label', '0.01005 L');
     expect(restante.textContent).toBe('39.99 L');
     expect(restante).toHaveAttribute('title', '39.98995');
     expect(restante).toHaveAttribute('aria-label', '39.98995 L');
