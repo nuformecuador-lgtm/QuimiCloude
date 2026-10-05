@@ -37,6 +37,8 @@ const RUN_ID = randomUUID().replace(/-/g, '');
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 const LIST_PAGE_SIZE = '25';
+/** El valor del selector de unidad sin el glifo de la flecha, que tambien vive en el disparador. */
+const SELECT_VALUE = '[data-slot="select-value"]';
 const ORDERS_SORT = 'createdAt:desc';
 const INVENTORY_SEARCH_PARAM = 'q';
 
@@ -171,7 +173,7 @@ async function addBatchThroughInventory(page: Page): Promise<void> {
   });
 
   const unitSelect = page.getByTestId('product-sheet').getByTestId('presentation-unit-select');
-  await expect(unitSelect).toHaveText(unitLabel ?? '', {
+  await expect(unitSelect.locator(SELECT_VALUE)).toHaveText(unitLabel ?? '', {
     timeout: 60_000,
   });
 

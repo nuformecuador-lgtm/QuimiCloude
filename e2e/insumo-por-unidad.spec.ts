@@ -23,6 +23,8 @@ const FIXTURE_PREFIX = 'qc199_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 const LIST_PAGE_SIZE = '25';
+/** El valor del selector de unidad sin el glifo de la flecha, que tambien vive en el disparador. */
+const SELECT_VALUE = '[data-slot="select-value"]';
 const INVENTORY_SEARCH_PARAM = 'q';
 
 type Credentials = { readonly username: string; readonly password: string };
@@ -232,7 +234,7 @@ test.describe('alta de insumo por unidad', () => {
     ).toHaveCount(0);
 
     await page.locator(`[data-testid="presentation-unit-option"][data-value="${kg.id}"]`).click();
-    await expect(unitSelect).toHaveText(kg.label, { timeout: 60_000 });
+    await expect(unitSelect.locator(SELECT_VALUE)).toHaveText(kg.label, { timeout: 60_000 });
 
     await page.getByTestId('product-field-unitCost').fill(firstUnitCost);
     await guardarAlta(page);
@@ -263,7 +265,9 @@ test.describe('alta de insumo por unidad', () => {
     await expect(page.getByTestId('product-name-value')).toHaveValue(productName, {
       timeout: 60_000,
     });
-    await expect(page.getByTestId('presentation-unit-select')).toHaveText(kg.label, {
+    await expect(
+      page.getByTestId('presentation-unit-select').locator(SELECT_VALUE),
+    ).toHaveText(kg.label, {
       timeout: 60_000,
     });
 

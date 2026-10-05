@@ -77,6 +77,8 @@ const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 /** Tamano de pagina maximo que ofrece la pantalla: menos paginas que recorrer al buscar la fila. */
 const LIST_PAGE_SIZE = '25';
+/** El valor del selector de unidad sin el glifo de la flecha, que tambien vive en el disparador. */
+const SELECT_VALUE = '[data-slot="select-value"]';
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -299,7 +301,7 @@ async function elegirUnidad(page: Page, unit: SystemUnitFixture): Promise<void> 
   const selector = page.getByTestId('presentation-unit-select');
   await selector.click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unit.id}"]`).click();
-  await expect(selector).toHaveText(unit.label, { timeout: 60_000 });
+  await expect(selector.locator(SELECT_VALUE)).toHaveText(unit.label, { timeout: 60_000 });
 }
 
 /**
@@ -641,7 +643,9 @@ test.describe('catalogo de productos', () => {
     await abrirPanelDeAlta(page);
     await elegirProductoExistente(page, repeatProductName);
     // Elegir el insumo deja preseleccionada su unidad: no se toca.
-    await expect(page.getByTestId('presentation-unit-select')).toHaveText(kg.label, {
+    await expect(
+      page.getByTestId('presentation-unit-select').locator(SELECT_VALUE),
+    ).toHaveText(kg.label, {
       timeout: 60_000,
     });
     await page.getByTestId('product-field-stock').fill(ignoredStockValue);
@@ -699,7 +703,9 @@ test.describe('catalogo de productos', () => {
     // preseleccionada. El lote se deja vacio para que el correlativo lo genere el servidor.
     await abrirPanelDeAlta(page);
     await elegirProductoExistente(page, twoBatchesProductName);
-    await expect(page.getByTestId('presentation-unit-select')).toHaveText(unitLabel, {
+    await expect(
+      page.getByTestId('presentation-unit-select').locator(SELECT_VALUE),
+    ).toHaveText(unitLabel, {
       timeout: 60_000,
     });
     await page.getByTestId('product-field-stock').fill(secondBatchStockValue);
