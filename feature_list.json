@@ -2825,6 +2825,38 @@
       "branch": "feature/QC-199-presentacion-por-unidad-en-alta-de-producto",
       "depends_on": [],
       "spec_path": "specs/QC-199-presentacion-por-unidad-en-alta-de-producto"
+    },
+    {
+      "key": "QC-211",
+      "id": 211,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "pasos-de-envasado",
+      "description": "Al crear una fórmula hace falta un diferenciador para los pasos de envasado: la fórmula puede tener sus propios pasos de envasado, separados de los pasos del operador, y solo los ve el empacador. El empaque reutiliza el sistema de pasos del operador para hacer el paso a paso. NACE DEL CHAT el 2026-10-05.\n\nDECIDIDO POR EL HUMANO EL 2026-10-05\n\n1. LOS PASOS DE ENVASADO SON OPCIONALES. Una fórmula puede no tener ninguno.\n2. SE EDITAN EN CREAR, EDITAR Y VERSIÓN. Mismo trato que los pasos del operador: se crean con la fórmula, se editan después, y una versión los lleva igual que lleva los pasos del operador.\n3. REUTILIZA EL SISTEMA DE PASOS DEL OPERADOR: mismo editor y mismo paso a paso en ejecución (QC-62, QC-64, QC-125), ahora para el empacador.\n4. VISIBILIDAD SEPARADA. El empacador ve solo los pasos de envasado; el operador no los ve en su ejecución.\n5. REGLA DE AVANCE IGUAL QUE EL OPERADOR. Si la fórmula tiene pasos de envasado, completarlos para terminar el empaque sigue la misma regla que el paso a paso del operador.\n6. INDEPENDIENTE DE QC-173. QC-173 (fases dentro de los pasos del operador) sigue aparte; no depende de esta ficha ni la bloquea.\n\nQUÉ ENTRA. Guardar los pasos de envasado con la fórmula; editarlos en alta, edición y versión; mostrarlos en el paso a paso del empaque.\n\nLO QUE NO ENTRA. Fases en los pasos (QC-173). Cambios del estado del pedido al terminar el empaque (QC-202).\n\nABIERTO, se acota con /afinar-feature: qué pasa con los pedidos ya en empaque cuando se editan los pasos de envasado; si el empaque sin pasos se ve como hoy; si el registro de ejecución (QC-82) también aplica al empaque.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "fullstack",
+      "branch": "feature/QC-211-pasos-de-envasado",
+      "depends_on": [],
+      "spec_path": "specs/QC-211-pasos-de-envasado"
+    },
+    {
+      "key": "QC-210",
+      "id": 210,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "versiones-desde-el-alta-de-formula",
+      "description": "Hoy las versiones de una fórmula solo se crean desde la pantalla de edición (sección «Versiones» → «Nueva versión»). El alta (/produccion/formulas/nueva) no permite crearlas. BLOQUEADA POR QC-174.\n\nQUÉ ENTRA\n1. En el alta de fórmula se pueden añadir una o varias versiones antes de guardar. Cada versión nace como copia viva de las líneas de la original: las líneas que la versión no cambió siguen a la original hasta guardar.\n2. Los formularios de fórmula y de versión (alta y edición) tienen tres acciones:\n- Guardar: guarda y se queda. En el alta pasa a la edición (/produccion/formulas/[id]), para que un segundo «Guardar» no duplique.\n- Guardar y salir: guarda y vuelve (fórmula → lista; versión → ficha de la original).\n- Cancelar: vuelve sin guardar; pide confirmación si hay cambios sin guardar.\n\nLO QUE NO ENTRA. Versiones en línea dentro de la edición de la fórmula: allí sigue el enlace «Nueva versión» (QC-174). Ningún cambio de modelo, propagación ni «por revisar» (QC-172).\n\nACOTADA el 2026-10-05 con /afinar-feature. La original se guarda aunque falle una versión. Las versiones inválidas no se guardan y quedan en la edición con su error. «Guardar y salir» no sale mientras alguna falle. Sin E2E: tests de componente e integración. Permisos y reglas de versión heredados de QC-172/QC-174. Ver specs/QC-210-versiones-desde-el-alta-de-formula/requirements.md.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "frontend",
+      "branch": "feature/QC-210-versiones-desde-el-alta-de-formula",
+      "depends_on": [
+        "QC-174"
+      ],
+      "spec_path": "specs/QC-210-versiones-desde-el-alta-de-formula"
     }
   ]
 }
