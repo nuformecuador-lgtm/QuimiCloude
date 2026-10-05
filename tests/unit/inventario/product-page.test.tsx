@@ -2142,6 +2142,25 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
   });
 
+  it('R20 el alta del estado vacio ofrece las unidades del formulario y no las de listUnitsAction', async () => {
+    // El estado vacio monta su propio panel de alta, aparte del de la cabecera.
+    const DEL_CATALOGO = { ...UNIDAD, id: crypto.randomUUID(), name: 'Galón', symbol: 'gal' };
+    const DEL_ALTA = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [DEL_CATALOGO] });
+    listProductFormUnitsActionMock.mockResolvedValue({ status: 'success', data: [DEL_ALTA] });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([], { total: 0 }));
+    const user = setupUser();
+
+    await renderPantalla();
+    const vacio = screen.getByTestId(testId.vacio);
+    await user.click(within(vacio).getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+    const opciones = await screen.findAllByTestId(PRESENTATION_UNIT_OPTION_TESTID);
+    expect(opciones.map((opcion) => opcion.getAttribute('data-value'))).toEqual([DEL_ALTA.id]);
+  });
+
   // QC-70 R32 — AQUI vivia el caso «un nombre de presentacion repetido pinta el mensaje DEL BACK,
   // no un texto propio», junto a los dos de R24 sobre el selector de presentaciones. Los tres se
   // van con `dev` (2026-09-09): la presentacion se mudo de `products` a `product_batches` y este
