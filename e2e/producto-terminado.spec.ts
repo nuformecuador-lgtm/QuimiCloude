@@ -128,6 +128,14 @@ const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
 const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const NAME_CELL_TESTID = 'data-table-cell-name';
+const ORDER_GROUP_NAME_TESTID = 'finished-stock-name';
+const ORDER_GROUP_TOGGLE_TESTID = 'finished-stock-toggle';
+
+/** «Pedido <numero> · <receta>», el nombre de la fila de pedido en la pestana de terminado. */
+function exactOrderGroupText(recipeName: string): RegExp {
+  const escaped = recipeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^\\s*Pedido \\S+ · ${escaped}\\s*$`);
+}
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -298,6 +306,18 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
     undefined,
     { timeout: 60_000 },
   );
+
+  // La pestana lista pedidos: el producto aparece al desplegar el pedido de la receta.
+  const orderName = page
+    .getByTestId(ORDER_GROUP_NAME_TESTID)
+    .filter({ hasText: exactOrderGroupText(RECIPE_NAME) });
+  await expect(orderName).toHaveCount(1, { timeout: 60_000 });
+  const orderRow = page
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
+    .filter({ has: orderName });
+  const toggle = orderRow.getByTestId(ORDER_GROUP_TOGGLE_TESTID);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
   const nameCell = page
     .getByTestId(NAME_CELL_TESTID)

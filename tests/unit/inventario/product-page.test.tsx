@@ -32,9 +32,10 @@ import {
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
-import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type FinishedStockRow, type ProductView } from '@/lib/modules/inventario';
 import type {
   CreateProductFormState,
+  FinishedStockListResult,
   ProductListResult,
   ProductMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -107,6 +108,7 @@ const {
   cookiesMock,
   getSessionUserMock,
   listProductsActionMock,
+  listFinishedStockActionMock,
   createProductActionMock,
   updateProductActionMock,
   deleteProductActionMock,
@@ -114,6 +116,7 @@ const {
   createPresentationActionMock,
   listUnitsActionMock,
   listProductBatchesActionMock,
+  listOrderBatchesActionMock,
   listBatchMovementsActionMock,
   adjustBatchStockActionMock,
 } = vi.hoisted(() => ({
@@ -131,6 +134,7 @@ const {
   cookiesMock: vi.fn<() => Promise<CookieStoreStub>>(),
   getSessionUserMock: vi.fn(),
   listProductsActionMock: vi.fn<(query: unknown) => Promise<ProductListResult>>(),
+  listFinishedStockActionMock: vi.fn<(query: unknown) => Promise<FinishedStockListResult>>(),
   createProductActionMock:
     vi.fn<(prev: CreateProductFormState, data: FormData) => Promise<CreateProductFormState>>(),
   updateProductActionMock:
@@ -154,6 +158,7 @@ const {
   // La fila abre un panel con los lotes del producto: sin este doble, montar la tabla
   // carga el modulo real y este intenta resolver la sesion.
   listProductBatchesActionMock: vi.fn(),
+  listOrderBatchesActionMock: vi.fn(),
   listBatchMovementsActionMock: vi.fn(),
   adjustBatchStockActionMock: vi.fn(),
 }));
@@ -177,6 +182,7 @@ vi.mock('@/lib/composition', () => ({
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
   listProductsAction: listProductsActionMock,
+  listFinishedStockAction: listFinishedStockActionMock,
   createProductAction: createProductActionMock,
   updateProductAction: updateProductActionMock,
   deleteProductAction: deleteProductActionMock,
@@ -193,6 +199,7 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 
 vi.mock('@/lib/modules/inventario/adapters/driving/batch-actions', () => ({
   listProductBatchesAction: listProductBatchesActionMock,
+  listOrderBatchesAction: listOrderBatchesActionMock,
   listBatchMovementsAction: listBatchMovementsActionMock,
   adjustBatchStockAction: adjustBatchStockActionMock,
 }));
@@ -299,6 +306,29 @@ function paginaDeProductos(
       totalPages: extra.totalPages ?? Math.max(1, Math.ceil(total / pageSize)),
     },
   };
+}
+
+/** La pestana «Producto terminado» lista pedidos: un pedido con un unico producto terminado. */
+function paginaDeProductoTerminado(productoTerminado: ProductView): FinishedStockListResult {
+  const fila: FinishedStockRow = {
+    kind: 'order',
+    key: 'order-1',
+    orderId: 'order-1',
+    orderNumber: { year: 2026, sequence: 1 },
+    numberText: '2026-0001',
+    recipeName: 'Desengrasante industrial',
+    packagedStock: null,
+    products: [{ product: productoTerminado, stock: productoTerminado.stock, packagedStock: null }],
+  };
+  return {
+    status: 'success',
+    data: { items: [fila], total: 1, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
+  };
+}
+
+/** Despliega el pedido de la pestana «Producto terminado» para ver sus productos. */
+async function desplegarPedido(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId('finished-stock-toggle'));
 }
 
 /** Unidad de las presentaciones de los dobles (QC-80 R1: `PresentationView.unitId` es
@@ -1094,8 +1124,8 @@ describe('pantalla de productos — lista', () => {
   });
 
   it('R5 — con el filtro de tipo en la URL, la pestaña llega marcada y la consulta lo lleva', async () => {
-    listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ type: PRODUCT_TYPES.FINISHED_PRODUCT })]),
+    listFinishedStockActionMock.mockResolvedValue(
+      paginaDeProductoTerminado(producto({ type: PRODUCT_TYPES.FINISHED_PRODUCT })),
     );
 
     await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
@@ -1103,13 +1133,16 @@ describe('pantalla de productos — lista', () => {
     expect(screen.getByRole('tab', { name: 'Producto terminado', selected: true })).toBeInTheDocument();
     expect(screen.getByText('Producto terminado', { selector: 'strong' })).toBeInTheDocument();
 
-    // La pantalla no filtra en el cliente: el backend ya recibio el filtro (el backend lo
-    // resuelve contra los cuatro valores del tipo, T6).
-    expect(listProductsActionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filters: { type: { kind: 'select', values: [PRODUCT_TYPES.FINISHED_PRODUCT] } },
-      }),
-    );
+    // La pantalla no filtra en el cliente: la pestana pide al backend su propia lista, la
+    // agrupada por pedido, que no ordena ni filtra.
+    expect(listFinishedStockActionMock).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      search: '',
+      sort: null,
+      filters: {},
+    });
+    expect(listProductsActionMock).not.toHaveBeenCalled();
   });
 });
 
@@ -1923,9 +1956,10 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       name: 'Desengrasante industrial · Botella 1L',
       type: PRODUCT_TYPES.FINISHED_PRODUCT,
     });
-    listProductsActionMock.mockResolvedValue(paginaDeProductos([productoTerminado]));
+    listFinishedStockActionMock.mockResolvedValue(paginaDeProductoTerminado(productoTerminado));
 
-    await renderPantalla();
+    await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
+    await desplegarPedido(user);
     await user.click(screen.getByTestId(testId.abrirEdicion));
     await screen.findByTestId(testId.formulario);
 
@@ -1952,9 +1986,10 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       type: PRODUCT_TYPES.FINISHED_PRODUCT,
       qtyAlert: '2',
     });
-    listProductsActionMock.mockResolvedValue(paginaDeProductos([productoTerminado]));
+    listFinishedStockActionMock.mockResolvedValue(paginaDeProductoTerminado(productoTerminado));
 
-    await renderPantalla();
+    await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
+    await desplegarPedido(user);
     await user.click(screen.getByTestId(testId.abrirEdicion));
     await screen.findByTestId(testId.formulario);
 

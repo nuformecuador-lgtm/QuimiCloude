@@ -115,6 +115,21 @@ export async function listProductBatchesAction(productId: string): Promise<Produ
   }
 }
 
+/** `orderId` `null` pide los lotes sin pedido de `productId`, el de la fila «Sin pedido». */
+export async function listOrderBatchesAction(
+  orderId: string | null,
+  productId: string | null = null,
+): Promise<ProductBatchesResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await inventario.listOrderBatches(orderId, actor, productId);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
 export async function listBatchMovementsAction(batchId: string): Promise<BatchMovementsResult> {
   const actor = await currentActor();
 

@@ -2,7 +2,14 @@
 
 import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import { InventarioError, PRODUCT_TYPES, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
+import {
+  InventarioError,
+  PRODUCT_TYPES,
+  type Actor,
+  type FinishedStockRow,
+  type Page,
+  type ProductView,
+} from '@/lib/modules/inventario';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Aqui no se repite `requirePermission`: es la primera linea de cada caso de uso.
@@ -23,6 +30,10 @@ export type ProductQueryResult =
 
 export type ProductListResult =
   | { status: 'success'; data: Page<ProductView> }
+  | ErrorState;
+
+export type FinishedStockListResult =
+  | { status: 'success'; data: Page<FinishedStockRow> }
   | ErrorState;
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
@@ -235,6 +246,18 @@ export async function listProductsAction(query: unknown): Promise<ProductListRes
 
   try {
     const data = await inventario.listProducts(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** La pestana de producto terminado, una fila por pedido. `query` llega `unknown`, como arriba. */
+export async function listFinishedStockAction(query: unknown): Promise<FinishedStockListResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await inventario.listFinishedStock(query, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

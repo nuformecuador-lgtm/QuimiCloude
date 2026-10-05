@@ -77,8 +77,10 @@ const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
  * | 2026-09-17 | `user-create-action.tsx` y `work-group-create-action.tsx`: los dos disparadores
  * |            | del alta, sacados de sus tablas para que se ofrezcan tambien con la lista
  * |            | vacia —que es el estado en el que nace toda instalacion— | 30 |
+ * | 2026-10-04 | `username-from-names.ts`: el nombre de usuario propuesto en el alta y el
+ * |            | siguiente numero libre tras un `duplicate_username` | 31 |
  */
-const COMPONENTES_ESPERADOS = 30;
+const COMPONENTES_ESPERADOS = 31;
 
 /** Carpetas del repo que se barren buscando importes por ruta profunda (R38). */
 const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;

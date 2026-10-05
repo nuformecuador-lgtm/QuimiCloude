@@ -68,6 +68,8 @@ import {
   createDeleteProduct,
   createGetProduct,
   createListBatchMovements,
+  createListFinishedStock,
+  createListOrderBatches,
   createListPresentations,
   createListProductBatches,
   createListProducts,
@@ -93,6 +95,7 @@ import {
   findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
+  findBatchesOfOrder,
   findFinishedGoodsReceipts,
   listAliveProducts,
   softDeleteAliveProduct,
@@ -113,7 +116,10 @@ import {
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
+import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
+import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type {
@@ -238,6 +244,7 @@ import {
   createTransitionOrder,
   createUpdateOrder,
   createUpdateOrderPresentationLines,
+  formatOrderNumber,
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
@@ -794,6 +801,11 @@ const productRepository: ProductRepository = {
   findBatchMovements,
 };
 
+const finishedOrderRepository: FinishedOrderRepository = { findBatchesOfOrder, listStockGroups };
+
+/** El formato del numero de pedido es de `pedidos`; `inventario` solo declara el hueco. */
+const orderNumberFormatter: OrderNumberFormatter = { format: formatOrderNumber };
+
 const presentationRepository: PresentationRepository = {
   create: createPresentation,
   replace: replacePresentation,
@@ -876,6 +888,12 @@ export const inventario = {
     products: productRepository,
     people: assignmentDirectoryPrisma,
     orders: orderNumberDirectory,
+  }),
+  listOrderBatches: createListOrderBatches({ finishedOrders: finishedOrderRepository }),
+  listFinishedStock: createListFinishedStock({
+    finishedOrders: finishedOrderRepository,
+    orderNumbers: orderNumberFormatter,
+    log: inventarioListQueryLog,
   }),
 } as const;
 

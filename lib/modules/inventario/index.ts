@@ -91,6 +91,19 @@ export {
   createListProductBatches,
   type ListProductBatchesDeps,
 } from './domain/list-product-batches';
+export { createListOrderBatches, type ListOrderBatchesDeps } from './domain/list-order-batches';
+export { createListFinishedStock, type ListFinishedStockDeps } from './domain/list-finished-stock';
+export { FINISHED_STOCK_QUERYABLE } from './domain/finished-stock-queryable';
+export type {
+  FinishedOrderNumber,
+  FinishedOrderStockRow,
+  FinishedStockBatch,
+  FinishedStockGroup,
+  FinishedStockProductLine,
+  FinishedStockRow,
+  FinishedWithoutOrderStockRow,
+} from './domain/finished-stock';
+export type { PackagedStockEntry } from './domain/packaged-stock';
 export {
   createListBatchMovements,
   type ListBatchMovementsDeps,

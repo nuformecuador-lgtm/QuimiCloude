@@ -729,6 +729,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // 2026-09-18 (QC-92): entran las tres que publica esta ficha -`createAdjustBatchStock` (R1),
     // `createListProductBatches` (R22) y `createListBatchMovements` (R23)-, y el barrel pasa de
     // nueve a doce. Sigue siendo igualdad exacta: una factoria de mas o de menos lo pone rojo.
+    // 2026-10-04 (producto terminado por pedido): entran `createListFinishedStock` y
+    // `createListOrderBatches`, y el barrel pasa de trece a quince.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
@@ -741,6 +743,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createDeleteProduct',
       'createGetProduct',
       'createListBatchMovements',
+      'createListFinishedStock',
+      'createListOrderBatches',
       'createListPresentations',
       'createListProductBatches',
       'createListProducts',
