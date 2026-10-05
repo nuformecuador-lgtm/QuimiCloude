@@ -6,12 +6,13 @@
 // Tres reglas, y la tercera es la que duele:
 //
 // 1. Los tres agentes que ESCRIBEN CODIGO —`frontend_dev`, `backend_dev`, `extractor`— declaran
-//    `model: sonnet`.
+//    `model: qwen2.5-coder:3b`, un modelo local de Ollama.
 // 2. Los otros cuatro —`spec_author`, `reviewer`, `implementer`, `leader`— HEREDAN el modelo de la
 //    sesion y no declaran ninguno: escriben el spec, lo juzgan y coordinan, y ahi un error cuesta
 //    mas de lo que ahorra bajar de modelo. Un override puntual se pasa en la llamada y se justifica
 //    en `progress/current.md`; NO se arregla editando el frontmatter.
-// 3. Solo el alias pelado (`sonnet`, `opus`, `haiku`), nunca un id con fecha o version. Un id
+// 3. Solo el alias pelado (`sonnet`, `opus`, `haiku`) o un tag de Ollama listado a proposito en
+//    `TAGS_OLLAMA_VALIDOS`, nunca un id con fecha o version. Un id
 //    escrito a mano envejece en silencio: el 2026-07-31 uno dejo de existir y mato a un
 //    `backend_dev` al arrancar, sin una linea escrita. Los agentes que no fijaban modelo siguieron
 //    funcionando.
@@ -48,14 +49,27 @@ const REGLA = 'AGENTS.md > Modelos'
 /** Los unicos valores admisibles: alias pelados, sin fecha ni version. */
 const ALIAS_VALIDOS = ['sonnet', 'opus', 'haiku'] as const
 
+/** Tags de Ollama admitidos. Un tag nuevo entra aqui a proposito, no por omision. */
+const TAGS_OLLAMA_VALIDOS = ['qwen2.5-coder:3b'] as const
+
 /**
- * El censo. `modelo: 'sonnet'` = lo declara; `modelo: null` = lo hereda de la sesion y no declara
+ * 2026-09-28, orden humana: Ollama y OpenRouter RETIRADOS del arnes. Los siete agentes van al
+ * modelo de la sesion (NVIDIA, `nvidia/z-ai/glm-5.3`), cableado en `opencode.json` y emitido
+ * por `scripts/gen-opencode.mjs`. Aqui ya no queda nada que declarar: el frontmatter de
+ * `.claude/agents` lo lee Claude Code y un id de otro proveedor lo mata al arrancar con 404 -
+ * el incidente del 2026-07-31 con `opus-4.8`, repetido el 2026-09-27 con `qwen2.5-coder:*`.
+ * Todos heredan.
+ */
+const MODELO_EJECUTORES = null
+
+/**
+ * El censo. `modelo: '<tag>'` = lo declara; `modelo: null` = lo hereda de la sesion y no declara
  * nada. Escrito a mano a proposito: si nace un agente nuevo, alguien decide aqui de que lado cae.
  */
 export const AGENTES_ESPERADOS = [
-  { nombre: 'frontend_dev', modelo: 'sonnet' },
-  { nombre: 'backend_dev', modelo: 'sonnet' },
-  { nombre: 'extractor', modelo: 'sonnet' },
+  { nombre: 'frontend_dev', modelo: MODELO_EJECUTORES },
+  { nombre: 'backend_dev', modelo: MODELO_EJECUTORES },
+  { nombre: 'extractor', modelo: MODELO_EJECUTORES },
   { nombre: 'spec_author', modelo: null },
   { nombre: 'reviewer', modelo: null },
   { nombre: 'implementer', modelo: null },
@@ -83,6 +97,11 @@ export function esAliasPelado(modelo: string): boolean {
   return (ALIAS_VALIDOS as readonly string[]).includes(modelo)
 }
 
+/** `true` si el valor es un alias pelado o un tag de Ollama aprobado. */
+export function esModeloAdmitido(modelo: string): boolean {
+  return esAliasPelado(modelo) || (TAGS_OLLAMA_VALIDOS as readonly string[]).includes(modelo)
+}
+
 /**
  * Hallazgos sobre el censo de agentes. Lista vacia = el frontmatter dice lo que manda la regla.
  *
@@ -108,7 +127,7 @@ export function findModelFindings(archivos: ReadonlyMap<string, string>): readon
     if (!censados.has(nombre)) {
       findings.push(
         `${DIR_AGENTES}/${nombre}.md no esta clasificado en esta guardia. Anade su fila a ` +
-          `AGENTES_ESPERADOS diciendo si declara \`model: sonnet\` o hereda el de la sesion ` +
+          `AGENTES_ESPERADOS diciendo si declara \`model: ${MODELO_EJECUTORES}\` o hereda el de la sesion ` +
           `(${REGLA}). Un agente sin decidir no se cuela por omision.`,
       )
     }
@@ -121,10 +140,10 @@ export function findModelFindings(archivos: ReadonlyMap<string, string>): readon
     const declarado = leerModeloDeclarado(contenido)
 
     // Regla 3, la que mato a un agente al arrancar: un id con fecha o version no es un alias.
-    if (declarado !== null && !esAliasPelado(declarado)) {
+    if (declarado !== null && !esModeloAdmitido(declarado)) {
       findings.push(
         `${DIR_AGENTES}/${nombre}.md declara \`model: ${declarado}\`, que no es un alias pelado. ` +
-          `Se esperaba uno de: ${ALIAS_VALIDOS.join(', ')}. Un id con fecha o version envejece y ` +
+          `Se esperaba uno de: ${[...ALIAS_VALIDOS, ...TAGS_OLLAMA_VALIDOS].join(', ')}. Un id con fecha o version envejece y ` +
           `mata al agente al arrancar en silencio; ya paso el 2026-07-31 (${REGLA}).`,
       )
     }
@@ -196,28 +215,28 @@ describe('guardia: casos sinteticos -- cada comprobacion, con su rojo y su verde
     expect(findModelFindings(censoValido())).toEqual([])
   })
 
-  it('rojo (regla 1): un agente que escribe codigo sin `model:`', () => {
+  it('rojo (regla 1): un agente que escribe codigo declara `model:`', () => {
     const archivos = censoValido()
-    archivos.set('extractor', ['---', 'name: extractor', 'tools: Read', '---', '', 'Eres el EXTRACTOR.'].join('\n'))
+    archivos.set('extractor', ['---', 'name: extractor', 'model: qwen2.5-coder:3b', 'tools: Read', '---', '', 'Eres el EXTRACTOR.'].join('\n'))
 
     const findings = findModelFindings(archivos)
 
     expect(findings).toHaveLength(1)
     expect(findings[0]).toContain('.claude/agents/extractor.md')
-    expect(findings[0]).toContain('model: (ninguno)')
-    expect(findings[0]).toContain('exactamente `model: sonnet`')
+    expect(findings[0]).toContain('model: qwen2.5-coder:3b')
+    expect(findings[0]).toContain('hereda el modelo de la sesion')
   })
 
   it('rojo (regla 1): un agente que escribe codigo con otro alias', () => {
     const archivos = censoValido()
-    archivos.set('backend_dev', archivos.get('backend_dev')!.replace('model: sonnet', 'model: haiku'))
+    archivos.set('backend_dev', archivos.get('backend_dev')!.replace('tools:', 'model: haiku\ntools:'))
 
     const findings = findModelFindings(archivos)
 
     // `haiku` es alias valido, asi que solo falla la regla de grupo, no la del formato.
     expect(findings).toHaveLength(1)
     expect(findings[0]).toContain('.claude/agents/backend_dev.md')
-    expect(findings[0]).toContain('exactamente `model: sonnet`')
+    expect(findings[0]).toContain('no deberia declarar')
   })
 
   it('rojo (regla 2): un agente que debe heredar declara modelo', () => {
@@ -241,7 +260,7 @@ describe('guardia: casos sinteticos -- cada comprobacion, con su rojo y su verde
   it('rojo (regla 3): un id con fecha o version, en cualquiera de los siete', () => {
     for (const idMalo of ['opus-4.8', 'claude-sonnet-4-5-20250929', 'sonnet-4.5', 'claude-3-5-haiku-latest']) {
       const archivos = censoValido()
-      archivos.set('frontend_dev', archivos.get('frontend_dev')!.replace('model: sonnet', `model: ${idMalo}`))
+      archivos.set('frontend_dev', archivos.get('frontend_dev')!.replace('tools:', `model: ${idMalo}\ntools:`))
 
       const findings = findModelFindings(archivos)
       const texto = findings.join('\n')
@@ -292,5 +311,12 @@ describe('guardia: casos sinteticos -- cada comprobacion, con su rojo y su verde
     expect(ALIAS_VALIDOS.every(esAliasPelado)).toBe(true)
     expect(esAliasPelado('opus-4.8')).toBe(false)
     expect(esAliasPelado('claude-sonnet-4-5-20250929')).toBe(false)
+  })
+
+  it('esModeloAdmitido: acepta los tags de Ollama aprobados y nada mas', () => {
+    expect(TAGS_OLLAMA_VALIDOS.every(esModeloAdmitido)).toBe(true)
+    expect(esModeloAdmitido('sonnet')).toBe(true)
+    expect(esModeloAdmitido('qwen2.5-coder:7b')).toBe(false)
+    expect(esModeloAdmitido('glm-4.7:cloud')).toBe(false)
   })
 })

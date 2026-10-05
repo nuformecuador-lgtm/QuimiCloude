@@ -33,7 +33,7 @@ import { subtractDecimal } from './order-decimal';
  * lote, asi que no hay presentacion por ingrediente que mostrar.
  *
  * **La unidad es la del PRODUCTO, no de la linea** (`productUnitId`): la receta ya no guarda
- * unidad. No tiene columna propia: va pegada a la cifra en «stock» y «restante» («720 L»),
+ * unidad. No tiene columna propia: va pegada a la cifra en «stock», «cantidad requerida» y «restante» («720 L»),
  * tambien en su `aria-label`. Se traduce con el catalogo que la seccion baja por props: simbolo
  * si lo hay, nombre si no. Si el insumo no tiene unidad resoluble —sin lotes o dado de baja— o
  * el id no existe en el catalogo, se pinta solo la cifra.
@@ -199,10 +199,10 @@ export function OrderIngredientsTable({
                   <TableCell
                     className="text-right"
                     title={exactDecimalTitle(required)}
-                    aria-label={trimDecimal(required)}
+                    aria-label={withUnit(trimDecimal(required), unit)}
                     data-testid="order-ingredient-required"
                   >
-                    {formatDecimalDisplay(required)}
+                    {withUnit(formatDecimalDisplay(required), unit)}
                   </TableCell>
                   <TableCell
                     className="text-right"

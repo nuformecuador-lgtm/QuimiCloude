@@ -131,10 +131,10 @@ const NAME_CELL_TESTID = 'data-table-cell-name';
 const ORDER_GROUP_NAME_TESTID = 'finished-stock-name';
 const ORDER_GROUP_TOGGLE_TESTID = 'finished-stock-toggle';
 
-/** «Pedido <numero> · <receta>», el nombre de la fila de pedido en la pestana de terminado. */
+/** La receta sola: el numero de pedido va en su propia columna. */
 function exactOrderGroupText(recipeName: string): RegExp {
   const escaped = recipeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`^\\s*Pedido \\S+ · ${escaped}\\s*$`);
+  return new RegExp(`^\\s*${escaped}\\s*$`);
 }
 
 type Credentials = { readonly username: string; readonly password: string };

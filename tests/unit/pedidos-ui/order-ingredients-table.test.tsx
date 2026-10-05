@@ -61,14 +61,16 @@ describe('R25 — el porcentaje se pinta con coma y dos decimales', () => {
 });
 
 describe('R17 — la cantidad requerida y el restante escalan con la cantidad del pedido', () => {
-  it('pedido 200 y linea al 10 % en L con existencia 15: requerida 20, restante -5 L resaltado', () => {
+  it('pedido 200 y linea al 10 % en L con existencia 15: requerida 20 L, restante -5 L resaltado', () => {
     renderTabla({ quantity: '200' });
 
     const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-stock').textContent).toBe(
       `${formatDecimalDisplay(LINEA.productStock ?? '')} L`,
     );
-    expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('20');
+    const requerida = within(tabla).getByTestId('order-ingredient-required');
+    expect(requerida.textContent).toBe('20 L');
+    expect(requerida).toHaveAttribute('aria-label', '20 L');
 
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
     expect(restante).toHaveTextContent('-5 L');
@@ -101,7 +103,7 @@ describe('R24 — un insumo sin unidad resoluble se muestra sin unidad', () => {
 
     const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('10,00 %');
-    expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('20');
+    expect(within(tabla).getByTestId('order-ingredient-required').textContent).toBe('20');
     // Sin stock (insumo sin unidad tampoco tiene existencia resuelta), el restante es el marcador.
     expect(within(tabla).getByTestId('order-ingredient-remaining')).toHaveTextContent('—');
   });

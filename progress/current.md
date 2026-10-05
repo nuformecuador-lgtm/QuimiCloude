@@ -22,9 +22,11 @@
 | QC-195 | envases-del-pedido-como-productos | Pedidos | fullstack | done | feature/QC-195-envases-del-pedido-como-productos | **CERRADA el 2026-10-04** (PR #142, merge `f6f69dad`): resumen en `progress/history.md`. Tarjeta en *Finalizado* y comentada. Pendiente local: borrar la base `QuimiCloude_QC195`. |
 
 ## Evaluaciones
+**2026-10-04:** QC-199 acotada con `/afinar-feature`: 9 decisiones cerradas y 0 preguntas abiertas en `specs/QC-199-presentacion-por-unidad-en-alta-de-producto/requirements.md`. Board: decisiones añadidas a la descripción. Sembrada en el árbol principal (`dev`), sin commitear: viaja a su rama en F1.0.
 **2026-10-04:** QC-194 cerrada (PR #141, merge `1ea13ba9`; tarjeta a Finalizado; resumen en history). Baseline sin podar: los 8 rojos siguen rojos en el gate completo.
 **2026-10-04:** QC-195 cerrada (PR #142, merge `f6f69dad`; tarjeta a Finalizado; resumen en history). Deja tres E2E rojos heredados de dev para ficha propia (ver Deudas).
 **2026-10-03:** QC-194 acotada con `/afinar-feature`: 8 decisiones cerradas y 2 preguntas abiertas en `specs/QC-194-herramientas-de-la-receta/requirements.md`. Board sin cambios. QC-195 acotada y sembrada aparte, en el arbol principal.
+**2026-10-03:** QC-195 acotada con `/afinar-feature`: 7 decisiones cerradas y 3 preguntas abiertas en `specs/QC-195-envases-del-pedido-como-productos/requirements.md`. Board sin cambios. Sembrada en el arbol principal (`dev`), **sin commitear**: viaja a su rama en F1.0.
 
 **2026-10-02:** QC-174 cerrada (PR #139, merge `ca656d5c`; tarjeta a Finalizado; resumen en history). Deja abierta QC-180 (tres rojos de 897a4f91 en el baseline).
 
@@ -99,6 +101,7 @@ Bitacora del backend en `progress/impl_identity-work-group-members-en-listado.md
 
 **2026-09-26:** QC-155 cerrada (PR #127, merge `6a957fe8`; tarjeta a Finalizado; resumen en history). Cupo `frontend` libre de ella.
 
+**Prueba de agentes Ollama (2026-09-27):** Ollama está disponible y el modelo `qwen2.5-coder:3b` responde correctamente. Prueba rápida: `ollama run qwen2.5-coder:3b "Responde en una palabra: Hola"` → respondió `Hola!`.
 
 ### QC-138 - CERRADA (2026-10-02)
 

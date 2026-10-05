@@ -8,6 +8,7 @@ export { BatchHistory, movementKindLabel, movementReasonLabel } from './batch-hi
 export { DeleteProductDialog } from './delete-product-dialog';
 export {
   buildFinishedStockColumns,
+  finishedStockRowName,
   finishedStockRowTitle,
   packagedStockLabel,
   type FinishedStockColumnsDeps,
