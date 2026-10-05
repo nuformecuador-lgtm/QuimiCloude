@@ -2786,13 +2786,30 @@
       "epic_name": "Pedidos",
       "name": "empacador-no-ejecuta-pedidos",
       "description": "Ver tarjeta QC-201: permiso asignaciones.ejecutar (Administrador y Operador); el Empacador no entra, ni comienza, ni termina la ejecución de pedidos, solo ve pedidos desde POR_EMPACAR, no tiene la pestaña «Mis asignados» y en «Terminados» solo ve los que empacó él.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",
       "branch": "feature/QC-201-empacador-no-ejecuta-pedidos",
       "depends_on": [],
       "spec_path": "specs/QC-201-empacador-no-ejecuta-pedidos"
+    },
+    {
+      "key": "QC-202",
+      "id": 202,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "estado-terminado-tras-empaque",
+      "description": "Ver tarjeta QC-202: estado TERMINADO al terminar el empaque; ENTREGADO queda para la entrega al cliente (ficha aparte).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "fullstack",
+      "branch": "feature/QC-202-estado-terminado-tras-empaque",
+      "depends_on": [
+        "QC-201"
+      ],
+      "spec_path": "specs/QC-202-estado-terminado-tras-empaque"
     }
   ]
 }

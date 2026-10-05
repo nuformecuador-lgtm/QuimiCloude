@@ -5023,3 +5023,14 @@ podar.
 - **Decisiones humanas:** P1-P6, N1-N10 (N1 y N7 por la alternativa), Enmienda 1 (R42-R44) y Enmienda 2 (R45-R47, E5, P6-A, E6). Contrato front-back congelado primero (TC) para hacer la UI en paralelo.
 - **Review:** vuelta 1 RECHAZADO (B1: «Reparto y unidad» no recalculaba el importe); vuelta 2 OK, menores m5-m7 cerrados o a deudas.
 - **Gate:** completo verde (8/8 en baseline), 12 E2E en chromium; webkit no corrido. El E2E nuevo cazo un bug real (alta con dos envases). Tres E2E rojos heredados de dev (`527a9902`) quedan para ficha propia.
+
+## 2026-10-04 — QC-201 empacador-no-ejecuta-pedidos
+
+- Permiso nuevo `asignaciones.ejecutar` (Administrador y Operador). Sin él no hay «Entrar»,
+  `/asignacion/[id]` da 404 y el servidor rechaza leer, comenzar y terminar la ejecución. El
+  Empacador no ve «Mis asignados» y en «Terminados» solo los pedidos que empacó él (`packedBy`).
+- Requisitos cubiertos: R1–R22. PR #144, merge `76980fa0`. Migración de datos
+  `20261004150000_execution_permission`, reversible.
+- Decisiones humanas: se retira qc138 R37 (bloqueaba cualquier permiso nuevo); los E2E abren
+  el menú de 3 puntos antes de pulsar un item. Riesgo aceptado: los Operadores con sesión
+  abierta reciben el permiso al volver a entrar (hasta 8 h). Nace QC-202 (estado TERMINADO).
