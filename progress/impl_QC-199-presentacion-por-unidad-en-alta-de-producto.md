@@ -201,3 +201,8 @@ Commits: B1 `c02b74ea` (también quita un «(R5)» de la misma línea tocada), m
       Tests  8 failed | 6358 passed | 9 skipped (6375)
 ```
 Los 8 rojos son los mismos casos de `tests/baseline-rojos.json` que en la tanda anterior; ninguno nuevo.
+
+## Decisiones del humano (2026-10-05)
+
+1. R26 (`e2e/inventario.spec.ts:783`), opción (a): se adapta el E2E. Las filas se buscan por el nombre a secas, sin «· unidad»; tiene que haber exactamente dos, y se distinguen por la existencia de cada una (`product-stock` = «<stock> kg» / «<stock> <litro>»). `product-columns.tsx` no se toca.
+2. QC-22 R24 (crear la presentación en línea sin perder lo escrito) pasa al alta de ENVASE, recuperando el recorrido de `origin/dev:e2e/inventario.spec.ts:529-575`.
