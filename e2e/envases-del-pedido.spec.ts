@@ -603,9 +603,10 @@ test.describe('envases del pedido como productos', () => {
     await switchUser(page, operatorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await page.goto(assignedOrderRoute(first.id));
-    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(firstNumber, {
-      timeout: 60_000,
-    });
+    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(
+      `${firstNumber} - ${RECIPE_NAME}`,
+      { timeout: 60_000 },
+    );
 
     // R44: la ejecucion nombra los envases.
     const executionLabel = page

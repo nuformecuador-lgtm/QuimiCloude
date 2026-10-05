@@ -4,6 +4,8 @@ import { useActionState, useRef } from 'react';
 
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
 import {
@@ -31,7 +33,9 @@ export const ORDER_EXECUTION_FINISH_ERROR_TESTID = 'order-execution-finish-error
 export const ORDER_EXECUTION_FINISH_FORM_TESTID = 'order-execution-finish-form';
 export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
-export const ORDER_EXECUTION_RECIPE_NAME_TESTID = 'order-execution-recipe-name';
+export const ORDER_EXECUTION_RECIPE_MISSING_TESTID = 'order-execution-recipe-missing';
+export const ORDER_EXECUTION_MATERIALS_TESTID = 'order-execution-materials';
+export const ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID = 'order-execution-materials-divider';
 export const ORDER_EXECUTION_ORDER_QUANTITY_TESTID = 'order-execution-order-quantity';
 export const ORDER_EXECUTION_PRESENTATION_TESTID = 'order-execution-presentation';
 
@@ -46,6 +50,11 @@ const INITIAL_STATE: FinishFormState = { status: 'idle' };
  *  del tipo que espera sirve para adaptar el estado local, que ademas admite `'idle'`. */
 const IGNORED_PREV_STATE: FinishAssignedOrderResult = { status: 'success' };
 
+/** Con la receta dada de baja el titulo queda solo con el numero: el aviso va aparte. */
+export function formatOrderExecutionTitle(numberText: string, recipeName: string | null): string {
+  return recipeName === null ? numberText : `${numberText} - ${recipeName}`;
+}
+
 export type OrderExecutionScreenProps = {
   readonly execution: AssignedOrderExecutionView;
 };
@@ -58,11 +67,12 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   );
 
   const error = state.status === 'error' ? state : undefined;
+  const title = formatOrderExecutionTitle(execution.numberText, execution.recipeName);
 
   return (
     <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6">
       <h1 className="text-2xl font-semibold" data-testid={ORDER_EXECUTION_TITLE_TESTID}>
-        {execution.numberText}
+        {title}
       </h1>
 
       <p
@@ -74,25 +84,34 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
       </p>
 
-      <p
-        className="text-base text-muted-foreground"
-        data-testid={ORDER_EXECUTION_RECIPE_NAME_TESTID}
-      >
-        {execution.recipeName ?? RECIPE_MISSING_TEXT}
-      </p>
+      {execution.recipeName === null ? (
+        <p
+          className="text-base text-muted-foreground"
+          data-testid={ORDER_EXECUTION_RECIPE_MISSING_TESTID}
+        >
+          {RECIPE_MISSING_TEXT}
+        </p>
+      ) : null}
 
       <p className="text-base text-muted-foreground" data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
         Presentación: <OrderDistributionLabel lines={execution.presentationLines} />
       </p>
 
-      <OrderExecutionLines lines={execution.lines} />
-
-      <OrderExecutionTools tools={execution.tools} />
+      <Card data-testid={ORDER_EXECUTION_MATERIALS_TESTID}>
+        <CardContent className="flex flex-col gap-4">
+          <OrderExecutionLines lines={execution.lines} />
+          {/* OrderExecutionTools no pinta nada sin herramientas: el divisor quedaria colgando. */}
+          {execution.tools.length > 0 ? (
+            <Separator data-testid={ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID} />
+          ) : null}
+          <OrderExecutionTools tools={execution.tools} />
+        </CardContent>
+      </Card>
 
       <div data-testid={ORDER_EXECUTION_SCREEN_TESTID}>
         <StepReader
           steps={execution.steps}
-          title={execution.numberText}
+          title={title}
           onFinish={() => formRef.current?.requestSubmit()}
           minStepSeconds={MIN_STEP_SECONDS}
           mode="ejecucion"
