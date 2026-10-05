@@ -127,11 +127,11 @@
   `presentation_id` NULL, un solo producto vivo con ese nombre. Incluye ver la opción «u» en el
   selector (R2).
   *Hecho:* el spec pasa en Playwright con el comando E2E del repo (`docs/verification.md`).
-- [ ] **T12 — Adaptar los E2E existentes del alta de insumo.** `e2e/inventario.spec.ts` (los recorridos
+- [x] **T12 — Adaptar los E2E existentes del alta de insumo.** `e2e/inventario.spec.ts` (los recorridos
   que crean un PRODUCT con `crearPresentacionEnLinea`/`elegirPresentacionExistente`, :529-1000
   aprox.) pasan a elegir unidad; los recorridos de envase no cambian. Depende de T10.
   *Hecho:* `e2e/inventario.spec.ts` verde sin casos saltados.
-  *Nota (2026-10-05):* sin marcar solo por R26 (`e2e/inventario.spec.ts:783`, «el mismo nombre en dos unidades son dos filas»), rojo en Chromium y WebKit por la deuda de `a543c84d` (la columna de nombre ya no pinta «· unidad»); pendiente de decisión humana. El resto de `e2e/inventario.spec.ts` pasa en los dos navegadores.
+  *Nota (2026-10-05):* R26 adaptado por decisión humana (filas por nombre a secas, distinguidas por existencia y unidad); QC-22 R24 pasa al alta de envase. Verde en Chromium y WebKit.
 - [x] **T13 — Gate completo y trazabilidad.** `./init.sh` completo en verde; mapa `R1..R20 -> test`
   en `progress/impl_QC-199-presentacion-por-unidad-en-alta-de-producto.md`. Depende de todo lo anterior.
   *Hecho:* gate verde y cada `R<n>` con al menos un test nombrado.

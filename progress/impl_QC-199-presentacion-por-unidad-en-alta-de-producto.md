@@ -206,3 +206,14 @@ Los 8 rojos son los mismos casos de `tests/baseline-rojos.json` que en la tanda 
 
 1. R26 (`e2e/inventario.spec.ts:783`), opción (a): se adapta el E2E. Las filas se buscan por el nombre a secas, sin «· unidad»; tiene que haber exactamente dos, y se distinguen por la existencia de cada una (`product-stock` = «<stock> kg» / «<stock> <litro>»). `product-columns.tsx` no se toca.
 2. QC-22 R24 (crear la presentación en línea sin perder lo escrito) pasa al alta de ENVASE, recuperando el recorrido de `origin/dev:e2e/inventario.spec.ts:529-575`.
+
+### E2E tras las decisiones del humano (2026-10-05)
+
+Commits: R26 `a730c640` + `e0b1b0fa` (`Number(...)` sobre el `Decimal` de Prisma); QC-22 R24 en alta de envase `ee714715`.
+
+| Navegador | Pasados | Fallados |
+|---|---|---|
+| chromium | 10 | 0 |
+| webkit | 10 | 0 |
+
+T12 marcada.
