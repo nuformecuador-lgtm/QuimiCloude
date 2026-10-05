@@ -40,3 +40,96 @@ envase-en-inventario (1); integración product-batch-lot (2), review-blocked-ord
 Rojos que ya estaban en HEAD antes del contrato: configuracion-ui/unidades-viewport (2),
 configuracion-ui/usuarios-viewport (2), navegacion/pantallas-exigen-permiso (1),
 recetas-ui/recipe-page (1), recetas/module-contract (1).
+
+## Commits por tarea
+
+| Tarea | Commit |
+|---|---|
+| T0 | `55dcfc83` |
+| Contrato | `b24050e4` |
+| T1 migración | `8be24d8d` (db:migrate / db:rollback / re-migrate; `prisma migrate status` limpio) |
+| T2 | `09811975` |
+| T3 | `b9b0db04` |
+| T5 | `6de5016b` (separado a mano del árbol final; por sí solo no compila) |
+| T6 | `a39d27b4` |
+| T8 | `4e8ea3f3` |
+| T4 | `b5cf6a96` |
+| T9 | `3390ba23` |
+| T7 | `b064346b` |
+| T14 | `baab7e4f` |
+| avisos de lint en tests | `07a4cbb4` |
+| alta en guardias (`aislamiento.json`, `guard-identificador-de-request`) | `066fa7cd` |
+| T10 | `18024566` |
+| T10, mock en `pantallas-exigen-permiso` | `dd2a22c5` |
+
+## Archivos
+
+Creados:
+- `db/migrations/20261004170000_product_batches_require_product_unit/{migration.sql,down.sql}`
+- `lib/modules/inventario/domain/list-product-form-units.ts`
+- `tests/unit/inventario/schema/product-batches-require-product-unit-migration.test.ts`
+- `tests/integration/inventario/product-batch-require-unit.int.test.ts`
+- `tests/integration/inventario/product-unit-without-presentation.int.test.ts`
+- `tests/unit/inventario/list-product-form-units.test.ts`
+- `tests/integration/unidades/unit-catalog-visible.int.test.ts`
+- `tests/unit/inventario-ui/product-form-unidad.test.tsx`
+
+Modificados, código:
+- `lib/modules/inventario/{ports/product-repository.ts, domain/product-view.ts, domain/product-batch-view.ts, domain/create-product.ts, domain/product-input.ts, index.ts}`
+- `lib/modules/inventario/adapters/driven/persistence/{product-prisma.ts, product-catalog-prisma.ts}`
+- `lib/modules/inventario/adapters/driving/product-actions.ts`
+- `lib/modules/unidades/domain/unit-catalog.ts`, `lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts`
+- `lib/composition/index.ts`
+- `app/(private)/inventario/page.tsx`, `components/{product-form.tsx, product-sheet.tsx, product-name-picker.tsx, product-list-section.tsx}`
+  (`product-list-section.tsx`: el estado vacío monta su propio `ProductSheet` de alta y necesita `formUnits`)
+- `components/shared/presentation-unit-select.tsx` (prop opcional `helper`, para el texto de ayuda de §6)
+
+Modificados, tests: `tests/unit/inventario/{product-input, create-product, authorization,
+company-isolation-service, product-service, product-actions, product-catalog-costing, list-use-cases,
+product-page}`, `tests/unit/inventario-ui/envase-en-inventario`, `tests/unit/asignaciones/empacador-authorization`,
+`tests/unit/navegacion/pantallas-exigen-permiso`, `tests/integration/inventario/{product-batch-lot, order-batches,
+qc195-packaging-product}`, `tests/integration/pedidos/{review-blocked-orders, order-ingredients-cost, order-cost-quote}`,
+los 25 dobles de `UnitCatalog` del contrato, `tests/integration/aislamiento.json`, `tests/guards/guard-identificador-de-request.test.ts`.
+
+## Mapa R -> test
+
+| R | Test (archivo › caso) |
+|---|---|
+| R1 | `tests/unit/inventario-ui/product-form-unidad.test.tsx` › «R1 el alta de insumo muestra Unidad y no Presentacion»; T11 |
+| R2 | ídem › «R2 el selector ofrece todas las unidades recibidas incluida unidad (u) y no ofrece sin unidad»; T11 |
+| R3 | ídem › «R3 envase muestra Presentacion y no Unidad; instrumento ninguna de las dos» |
+| R4 | ídem › «R4 sin unidad muestra Elige una unidad., no llama a la accion y conserva lo escrito» |
+| R5 | ídem › «R5 elegir un insumo existente preselecciona su unidad y se puede cambiar» |
+| R6 | `tests/unit/inventario/product-input.test.ts` › «R6 el alta de insumo exige unitId», «R6 el alta de insumo con presentationId es invalid_input», «R6 unitId con forma invalida da Elige una unidad.»; `tests/unit/inventario/product-actions.test.ts` › «R6 el alta de insumo envia unitId y no presentationId» |
+| R7 | `tests/unit/inventario/create-product.test.ts` › «R7 una unidad inexistente o de otra empresa es invalid_input y no escribe» |
+| R8 | `create-product.test.ts` y `tests/unit/inventario/authorization.test.ts` › «R8 sin inventario.modificar se rechaza antes de zod y sin consultar unidades ni productos» |
+| R9 | `tests/integration/inventario/product-unit-without-presentation.int.test.ts` › «R9 createWithFirstBatch con unitId crea producto con esa unidad y lote sin presentacion con su asiento»; `create-product.test.ts` › «R9 sin homonimo crea el producto con la unidad y el lote sin presentacion»; T11 |
+| R10 | `product-unit-without-presentation.int.test.ts` › «R10 findAliveIdByNameInUnit encuentra el homonimo de la misma unidad y no el de otra»; `create-product.test.ts` › «R10 con homonimo de la misma unidad agrega el lote sin presentacion», «R10 con homonimo de otra unidad crea otro producto»; T11 |
+| R11 | `product-input.test.ts` › «R11 el alta de envase sigue exigiendo presentationId», «R11 el alta de instrumento no cambia»; `create-product.test.ts` › «R11 envase e instrumento siguen por su camino»; `product-actions.test.ts` › «R11 el alta de envase sigue enviando presentationId» |
+| R12 | `tests/unit/inventario/schema/product-batches-require-product-unit-migration.test.ts` › «R12 la rama sin presentacion rechaza el insumo sin unidad con 23514 y product_batches_product_without_unit»; `tests/integration/inventario/product-batch-require-unit.int.test.ts` › «R12 un lote sin presentacion de un insumo sin unidad se rechaza»; `product-unit-without-presentation.int.test.ts` › «R12 el rechazo product_batches_product_without_unit se traduce a ValidationError» |
+| R13 | test estático › «R13 la rama con presentacion conserva el cuerpo vigente»; `product-batch-require-unit.int.test.ts` › «R13 un lote sin presentacion de un instrumento sin unidad entra», «R13 un lote sin presentacion de un envase entra», «R13 un lote con presentacion de otra unidad sigue rechazandose», «R13 un lote con presentacion cuyo producto no tiene unidad sigue rechazandose» |
+| R14 | test estático › «R14 down.sql restituye la funcion anterior identica»; `product-batch-require-unit.int.test.ts` › «R14 tras aplicar down.sql, el lote sin presentacion de un insumo sin unidad vuelve a entrar»; rollback manual de T1 |
+| R15 | test estático › «R15 la migracion no escribe datos ni toca presentations» |
+| R16 | `product-unit-without-presentation.int.test.ts` › «R16 un lote de insumo sin presentacion muestra la unidad del producto», «R16 un lote antiguo con presentacion muestra la unidad del producto», «R16 apartado y disponible del lote salen junto a la unidad del producto»; T11 |
+| R17 | `tests/unit/inventario/product-catalog-costing.test.ts` › «R17 toCostingBatch toma la unidad del producto»; `tests/integration/pedidos/order-cost-quote.int.test.ts` › «R17 un insumo con lotes solo sin presentacion tiene coste en la cotizacion»; `tests/integration/pedidos/order-ingredients-cost.int.test.ts` › «R17 el importe guardado del pedido cuenta el lote sin presentacion», «R17 el coste del lote de producto terminado no cuenta ese ingrediente como cero» |
+| R18 | `tests/integration/inventario/order-batches.int.test.ts` › «R18 lote de envase y de producto terminado conservan su unidad»; `order-ingredients-cost.int.test.ts` › «R18 los lotes sin costo y los de instrumento siguen fuera», «R18 los lotes de envase siguen fuera de findCostingBatches y los de terminado dentro» |
+| R19 | `e2e/insumo-por-unidad.spec.ts` (T11, pendiente) |
+| R20 | `tests/unit/inventario/list-product-form-units.test.ts` › «R20 con inventario.modificar y sin unidades.consultar devuelve las unidades visibles», «R20 sin inventario.modificar rechaza con error de permiso y no consulta unidades»; `tests/integration/unidades/unit-catalog-visible.int.test.ts` › «R20 listVisibleRefs devuelve las unidades de la empresa y las de sistema, incluida unidad, y ninguna de otra empresa»; `tests/unit/inventario/product-page.test.tsx` › «R20 la pagina pasa al formulario las unidades de la accion de inventario y no las de listUnitsAction» |
+
+## Salida de tests
+
+Subagentes (cada uno, sus archivos):
+- typecheck: 0 errores. lint: 0 errores (8 avisos previos, ninguno de esta ficha).
+- Integración (15 archivos, backend): Test Files 15 passed (15); Tests 167 passed (167).
+- `product-form-unidad.test.tsx`: 5 passed (5). `envase-en-inventario.test.tsx`: 13 passed (13).
+- `pantallas-exigen-permiso.test.tsx`: 1 failed | 41 passed (42). El rojo es `'/pedidos'`, de baseline.
+
+`./init.sh --rapido` tras T1-T10 y T14 (implementer, 2026-10-05):
+```
+Test Files  6 failed | 412 passed (418)
+     Tests  8 failed | 6269 passed | 7 skipped (6284)
+```
+Los 8 rojos están todos en archivos de `tests/baseline-rojos.json` (deuda ajena de dev; `--rapido` no consulta esa lista):
+unidades-viewport (2), usuarios-viewport (2), pantallas-exigen-permiso › '/pedidos' (1),
+product-page › «R18 — el nombre del producto se pinta junto a la unidad guardada» (1, roto desde a543c84d),
+recipe-page (1), recetas/module-contract (1). Ninguno es de esta ficha.
