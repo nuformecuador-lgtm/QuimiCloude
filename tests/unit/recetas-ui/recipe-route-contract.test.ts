@@ -1217,6 +1217,13 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'app/(private)/asignacion/[id]/components/order-execution-screen.tsx';
 
   /**
+   * TERCER montador (QC-211 design.md 5.2, R20): la pantalla de empaque monta el asistente en
+   * modo ejecucion para los pasos de envasado. Archivo EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_EMPAQUE =
+    'app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx';
+
+  /**
    * La edicion de una version pinta el documento con la vista sin estado del asistente, no con el
    * asistente: se acepta solo ese archivo y solo ese import exacto.
    */
@@ -1339,7 +1346,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     );
   });
 
-  it('el asistente solo se importa desde sus dos montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
+  it('el asistente solo se importa desde sus tres montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
     const importadores: string[] = [];
 
     const vista = fuenteSinComentarios(MONTADOR_DE_LA_VISTA);
@@ -1361,7 +1368,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
       }
     }
 
-    expect(importadores.sort()).toEqual([MONTADOR_DE_EJECUCION, UNICO_MONTADOR].sort());
+    expect(importadores.sort()).toEqual(
+      [MONTADOR_DE_EJECUCION, MONTADOR_DE_EMPAQUE, UNICO_MONTADOR].sort(),
+    );
   });
 
   it('el listado del catalogo no enlaza ni menciona el asistente', () => {
