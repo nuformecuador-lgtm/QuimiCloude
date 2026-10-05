@@ -36,6 +36,11 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, DELIVERED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc63_e2e_';
@@ -523,7 +528,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     const pendingRow = rowByNumber(page, orderPendingNumber);
     await expect(pendingRow).toHaveCount(1, { timeout: 60_000 });
 
-    await pendingRow.getByTestId(ENTER_TESTID).click();
+    await clickAndConfirm(page, pendingRow.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderPendingId!), {
       timeout: 60_000,
     });
@@ -539,7 +544,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     // Paso 2 de 2, el ultimo: Finalizar envia el formulario que llama a
     // `finishAssignedOrderAction`, que termina en el servidor con un `redirect` a la lista que
     // lleva `DELIVERED_ORDER_PARAM` con el numero del pedido.
-    await page.getByTestId(STEP_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },

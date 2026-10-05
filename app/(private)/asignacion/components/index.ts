@@ -14,6 +14,12 @@ export {
   assignedOrderEnterNoticeText,
 } from './assigned-order-enter-trigger';
 export {
+  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  ASSIGNED_ORDER_START_DIALOG_TESTID,
+  AssignedOrderStartTrigger,
+  assignedOrderStartConfirmTexts,
+} from './assigned-order-start-trigger';
+export {
   ASSIGNED_ORDER_ENTER_COLUMN_ID,
   ASSIGNED_ORDER_NUMBER_COLUMN_ID,
   ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 
+import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import type { OrderDistributionLineView, PackingOrderRow } from '@/lib/modules/asignaciones';
@@ -49,6 +50,25 @@ export const PACKING_ORDER_START_ERROR_TESTID = 'packing-order-start-error';
 export const PACKING_ORDER_FINISH_ERROR_TESTID = 'packing-order-finish-error';
 export const PACKING_ORDER_BACK_LINK_TESTID = 'packing-order-back-link';
 export const PACKING_ORDER_ID_FIELD = 'orderId';
+export const PACKING_ORDER_START_DIALOG_TESTID = 'packing-order-start-dialog';
+export const PACKING_ORDER_START_CONFIRM_TESTID = 'packing-order-start-confirm';
+export const PACKING_ORDER_FINISH_DIALOG_TESTID = 'packing-order-finish-dialog';
+export const PACKING_ORDER_FINISH_CONFIRM_TESTID = 'packing-order-finish-confirm';
+
+export const PACKING_ORDER_START_CONFIRM_TEXTS = {
+  title: '¿Comenzar el empaque?',
+  description:
+    'Una vez comenzado, el empaque no se puede devolver: tendrás que continuarlo hasta terminarlo.',
+  cancel: 'Cancelar',
+  confirm: 'Comenzar',
+} as const;
+
+export const PACKING_ORDER_FINISH_CONFIRM_TEXTS = {
+  title: '¿Terminar el empaque?',
+  description: 'Terminar el empaque no se puede deshacer.',
+  cancel: 'Cancelar',
+  confirm: 'Terminar',
+} as const;
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
@@ -92,6 +112,11 @@ export type PackingOrderScreenProps = {
 };
 
 export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) {
+  const startFormRef = useRef<HTMLFormElement>(null);
+  const finishFormRef = useRef<HTMLFormElement>(null);
+  const [startConfirmOpen, setStartConfirmOpen] = useState(false);
+  const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
+
   const [startState, startFormAction, startPending] = useActionState<
     StartPackingResult,
     FormData
@@ -177,39 +202,59 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
 
       {canStart ? (
         <form
+          ref={startFormRef}
           action={startFormAction}
           data-testid={PACKING_ORDER_START_FORM_TESTID}
           className="flex flex-col gap-2"
         >
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
           <Button
-            type="submit"
+            type="button"
             className={TOUCH_TARGET}
+            onClick={() => setStartConfirmOpen(true)}
             disabled={startPending}
             aria-busy={startPending}
             data-testid={PACKING_ORDER_START_BUTTON_TESTID}
           >
             {startPending ? START_PENDING_LABEL : START_LABEL}
           </Button>
+          <ConfirmActionDialog
+            open={startConfirmOpen}
+            onOpenChange={setStartConfirmOpen}
+            onConfirm={() => startFormRef.current?.requestSubmit()}
+            texts={PACKING_ORDER_START_CONFIRM_TEXTS}
+            testId={PACKING_ORDER_START_DIALOG_TESTID}
+            confirmTestId={PACKING_ORDER_START_CONFIRM_TESTID}
+          />
         </form>
       ) : null}
 
       {canFinish ? (
         <form
+          ref={finishFormRef}
           action={finishFormAction}
           data-testid={PACKING_ORDER_FINISH_FORM_TESTID}
           className="flex flex-col gap-2"
         >
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
           <Button
-            type="submit"
+            type="button"
             className={TOUCH_TARGET}
+            onClick={() => setFinishConfirmOpen(true)}
             disabled={finishPending}
             aria-busy={finishPending}
             data-testid={PACKING_ORDER_FINISH_BUTTON_TESTID}
           >
             {finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
           </Button>
+          <ConfirmActionDialog
+            open={finishConfirmOpen}
+            onOpenChange={setFinishConfirmOpen}
+            onConfirm={() => finishFormRef.current?.requestSubmit()}
+            texts={PACKING_ORDER_FINISH_CONFIRM_TEXTS}
+            testId={PACKING_ORDER_FINISH_DIALOG_TESTID}
+            confirmTestId={PACKING_ORDER_FINISH_CONFIRM_TESTID}
+          />
         </form>
       ) : null}
 

@@ -1,19 +1,33 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  PACKING_ORDER_FINISH_BUTTON_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TEXTS,
+  PACKING_ORDER_FINISH_DIALOG_TESTID,
+  PACKING_ORDER_ID_FIELD,
   PACKING_ORDER_MISSING_DISTRIBUTION_TESTID,
   PACKING_ORDER_PRESENTATION_LINE_TESTID,
   PACKING_ORDER_PRESENTATION_TESTID,
   PACKING_ORDER_QUANTITY_TESTID,
   PACKING_ORDER_SCREEN_TESTID,
+  PACKING_ORDER_START_BUTTON_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
+  PACKING_ORDER_START_CONFIRM_TEXTS,
+  PACKING_ORDER_START_DIALOG_TESTID,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
 import type { PackingOrderRow } from '@/lib/modules/asignaciones';
 
+const { startPackingActionMock, finishPackingActionMock } = vi.hoisted(() => ({
+  startPackingActionMock: vi.fn(),
+  finishPackingActionMock: vi.fn(),
+}));
+
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () => ({
-  startPackingAction: vi.fn(),
-  finishPackingAction: vi.fn(),
+  startPackingAction: startPackingActionMock,
+  finishPackingAction: finishPackingActionMock,
 }));
 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
@@ -164,4 +178,72 @@ describe('pantalla del Empacador — el nombre del envase de cada linea', () => 
       '2 × Garrafa 5 l',
     ]);
   });
+});
+
+describe('pantalla del Empacador — Comenzar y Terminar piden confirmacion', () => {
+  const CASOS = [
+    {
+      nombre: 'Comenzar',
+      order: () => fila(),
+      button: PACKING_ORDER_START_BUTTON_TESTID,
+      dialog: PACKING_ORDER_START_DIALOG_TESTID,
+      confirm: PACKING_ORDER_START_CONFIRM_TESTID,
+      texts: PACKING_ORDER_START_CONFIRM_TEXTS,
+      action: startPackingActionMock,
+      other: finishPackingActionMock,
+    },
+    {
+      nombre: 'Terminar',
+      order: () => fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }),
+      button: PACKING_ORDER_FINISH_BUTTON_TESTID,
+      dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
+      confirm: PACKING_ORDER_FINISH_CONFIRM_TESTID,
+      texts: PACKING_ORDER_FINISH_CONFIRM_TEXTS,
+      action: finishPackingActionMock,
+      other: startPackingActionMock,
+    },
+  ] as const;
+
+  for (const caso of CASOS) {
+    it(`${caso.nombre}: el boton no envia el formulario, abre la confirmacion`, () => {
+      pintar(caso.order());
+
+      const boton = screen.getByTestId(caso.button);
+      expect(boton).toHaveAttribute('type', 'button');
+      expect(screen.queryByTestId(caso.dialog)).toBeNull();
+
+      fireEvent.click(boton);
+
+      const dialog = screen.getByTestId(caso.dialog);
+      expect(dialog).toHaveTextContent(caso.texts.title);
+      expect(dialog).toHaveTextContent(caso.texts.description);
+      expect(screen.getByTestId(caso.confirm)).toHaveTextContent(caso.texts.confirm);
+      expect(caso.action).not.toHaveBeenCalled();
+    });
+
+    it(`${caso.nombre}: cancelar no invoca la accion`, async () => {
+      pintar(caso.order());
+
+      fireEvent.click(screen.getByTestId(caso.button));
+      fireEvent.click(screen.getByRole('button', { name: caso.texts.cancel }));
+      await act(async () => {});
+
+      expect(caso.action).not.toHaveBeenCalled();
+    });
+
+    it(`${caso.nombre}: confirmar envia el formulario con el id del pedido`, async () => {
+      caso.action.mockResolvedValue({ status: 'success' });
+      pintar(caso.order());
+
+      fireEvent.click(screen.getByTestId(caso.button));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(caso.confirm));
+      });
+
+      expect(caso.action).toHaveBeenCalledTimes(1);
+      expect(caso.other).not.toHaveBeenCalled();
+      const [, formData] = caso.action.mock.calls[0] as [unknown, FormData];
+      expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+    });
+  }
 });
