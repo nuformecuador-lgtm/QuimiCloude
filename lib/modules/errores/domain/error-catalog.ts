@@ -72,6 +72,7 @@ export const ERROR_MESSAGE_KEY = {
   order_distribution_exceeds_quantity: 'errors.order_distribution_exceeds_quantity',
   order_without_unit: 'errors.order_without_unit',
   recipe_version_under_review: 'errors.recipe_version_under_review',
+  order_unit_not_convertible: 'errors.order_unit_not_convertible',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -181,4 +182,6 @@ export const ERROR_MESSAGES_ES = {
     'El pedido no tiene unidad: asignale una desde la edicion del pedido antes de repartirlo.',
   'errors.recipe_version_under_review':
     'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
+  'errors.order_unit_not_convertible':
+    'La unidad del pedido no se puede convertir a la de algun insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
 } as const satisfies Record<ErrorMessageKey, string>;

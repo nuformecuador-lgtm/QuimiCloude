@@ -37,7 +37,8 @@ import {
   fakeOrderUnitOfWork,
   fakeRecipeExecutionReader,
 } from '../../helpers/order-unit-of-work-double';
-import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
+import type { OrderTransactionScope } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
@@ -188,6 +189,8 @@ function montar(deps: {
   readonly reservations?: MaterialReservations;
   readonly recipeLines?: readonly RecipeExecutionLine[];
   readonly costo?: ReturnType<typeof catalogosDeCosto>;
+  readonly scopeProducts?: OrderTransactionScope['products'];
+  readonly scopeUnits?: OrderTransactionScope['units'];
 }) {
   const reservations = deps.reservations ?? fakeMaterialReservations();
   const recipes = fakeRecipeExecutionReader({
@@ -213,8 +216,8 @@ function montar(deps: {
       reservations,
       recipes,
       finishedGoods: fakeFinishedGoodsIntake(),
-      products: fakeScopeProducts(),
-      units: fakeScopeUnits(),
+      products: deps.scopeProducts ?? fakeScopeProducts(),
+      units: deps.scopeUnits ?? fakeScopeUnits(),
     }),
     now: () => AHORA,
   };
@@ -741,5 +744,72 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
 
     await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
     expect(setIngredientsCost).toHaveBeenCalledWith(PEDIDO, null, ACTOR_ID, AHORA, ESCOPO);
+  });
+});
+
+describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con la unidad nueva', () => {
+  const ESCOPO = { companyId: EMPRESA };
+  const GRAMO: UnitRef = { id: 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null };
+  const KILO: UnitRef = { id: 'a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2', name: 'Kilogramo', symbol: 'kg', baseUnitId: GRAMO.id, factor: '1000' };
+  const PIEZA: UnitRef = { id: 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3', name: 'Pieza', symbol: 'pz', baseUnitId: null, factor: null };
+  const MATERIA = 'materia';
+  const RECETA: readonly RecipeExecutionLine[] = [{ productId: MATERIA, productName: null, percentage: '10.00' }];
+
+  /** El pedido esta guardado en kg (1000 kg); el reparto lo pasa a gramos, sin lineas. */
+  function montarConUnidad(insumoUnitId: string) {
+    const doble = ordersDoble(filaBloqueada({ status: 'PENDIENTE', quantity: '1000.0000', unitId: KILO.id }));
+    const lote: CostingBatch = {
+      productId: MATERIA,
+      unitId: insumoUnitId,
+      lot: '1',
+      stock: '1000',
+      available: '1000',
+      unitCost: '2.0000',
+      purchaseDate: '2026-01-01',
+    };
+    const costo = catalogosDeCosto(RECETA, [lote]);
+    costo.products.findRefs = vi.fn(async (ids: readonly string[]) =>
+      ids.map((id) => ({ id, name: id, unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' as const })),
+    );
+    const syncForOrder = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
+    const update = montar({
+      orders: doble.orders,
+      reservations: fakeMaterialReservations({ syncForOrder }),
+      units: catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILO.id, KILO], [PIEZA.id, PIEZA]])).units,
+      recipeLines: RECETA,
+      costo,
+      scopeProducts: fakeScopeProducts([{ id: MATERIA, name: MATERIA, unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' }]),
+      scopeUnits: fakeScopeUnits([GRAMO, KILO, PIEZA]),
+    });
+    return { ...doble, update, syncForOrder };
+  }
+
+  const EN_GRAMOS = { unitId: GRAMO.id, lines: [] };
+
+  it('R5 cambiar la unidad desde el reparto recalcula con la unidad nueva', async () => {
+    const m = montarConUnidad(KILO.id);
+
+    await expect(m.update(PEDIDO, ACTOR, EN_GRAMOS)).resolves.toBe('ok');
+
+    // 1000 g al 10 % son 0.1 kg a 2.0000: 0.2000. Con la unidad guardada (kg) serian 200.0000.
+    expect(m.setIngredientsCost).toHaveBeenCalledWith(
+      PEDIDO,
+      { total: '0.2000', packaging: '0.0000' },
+      ACTOR_ID,
+      AHORA,
+      ESCOPO,
+    );
+    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
+    expect(Number(entrada.requirement[0]?.quantity)).toBe(0.1);
+  });
+
+  it('R12 la edicion y el reparto con una linea no convertible se rechazan con order_unit_not_convertible', async () => {
+    const m = montarConUnidad(PIEZA.id);
+
+    await expect(m.update(PEDIDO, ACTOR, EN_GRAMOS)).resolves.toBe('unit_not_convertible');
+    expect(m.updatePresentationLinesAlive).not.toHaveBeenCalled();
+    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.setIngredientsCost).not.toHaveBeenCalled();
+    expect(m.setReservedAt).not.toHaveBeenCalled();
   });
 });

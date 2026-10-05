@@ -73,6 +73,7 @@ export {
   ValidationError,
   InsufficientMaterialError,
   RecipeWithoutLinesError,
+  OrderUnitNotConvertibleError,
   OrderWouldBlockError,
   PresentationWithoutContentError,
   UnitNotFoundError,

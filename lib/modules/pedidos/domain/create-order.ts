@@ -5,6 +5,7 @@ import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildOrderRequirement } from './order-requirement';
+import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
 import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
 import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
@@ -139,6 +140,27 @@ export function createCreateOrder(
     // R9: el estado de alta es siempre `PENDIENTE` y lo pone este caso de uso, no la
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
     const created = await deps.unitOfWork.run(async (transaction) => {
+      // La necesidad se arma antes del INSERT: una linea no convertible rechaza el alta sin
+      // escribir nada. Receta, productos y unidades se leen con el cliente de ESTA transaccion:
+      // pedir una segunda conexion mientras esta retiene la suya desperdiciaria una del pool.
+      const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
+      const recipeLines = content?.lines ?? [];
+      const units = await loadRequirementUnits(
+        transaction,
+        recipeLines.map((line) => line.productId),
+        data.unitId,
+        actor.companyId,
+      );
+      const requirement = requireConvertibleRequirement(
+        buildOrderRequirement({
+          recipeLines,
+          quantity: data.quantity,
+          packagingLines: distribution.packagingLines,
+          phase: 'before_consumption',
+          units,
+        }),
+      );
+
       const order = await transaction.orders.create(
         {
           recipeId: effectiveId,
@@ -155,24 +177,10 @@ export function createCreateOrder(
         scope,
       );
 
-      // Una receta sin lineas da una necesidad vacia, y `syncForOrder` la sincroniza sin
-      // apartar nada ni fallar. Se lee con `scope.recipes`, sobre el cliente de ESTA
-      // transaccion: pedir una segunda conexion mientras esta retiene la suya desperdiciaria
-      // una conexion del pool.
-      const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
-      const requirement = buildOrderRequirement({
-        recipeLines: content?.lines ?? [],
-        quantity: data.quantity,
-        packagingLines: distribution.packagingLines,
-        phase: 'before_consumption',
-        units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
-      });
-      if (requirement.kind !== 'ok') throw new Error('createOrder: necesidad no convertible sin tratar');
-
       const outcome = await transaction.reservations.syncForOrder({
         orderId: order.id,
         companyId: actor.companyId,
-        requirement: requirement.lines,
+        requirement,
         actorId: actor.id,
         now: instant,
       });

@@ -14,6 +14,7 @@ import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 
 import { OrderNotFoundError } from './errors';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
+import { loadRequirementUnits } from './order-requirement-units';
 import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
 import type { OrderScope } from './order-scope';
@@ -117,20 +118,29 @@ async function reviewOne(
       locked.status !== 'BLOQUEADO' ||
       locked.recipeId !== row.recipeId ||
       locked.quantity !== row.quantity ||
+      locked.unitId !== row.unitId ||
       !samePackaging(locked.presentationLines, row.presentationLines)
     ) {
       return false;
     }
 
     const content = await transaction.recipes.findExecutionContentById(locked.recipeId, scope.companyId);
+    const recipeLines = content?.lines ?? [];
+    const units = await loadRequirementUnits(
+      transaction,
+      recipeLines.map((line) => line.productId),
+      locked.unitId,
+      scope.companyId,
+    );
     const requirement = buildOrderRequirement({
-      recipeLines: content?.lines ?? [],
+      recipeLines,
       quantity: locked.quantity,
       packagingLines: packagingLinesOf(locked.presentationLines),
       phase: 'before_consumption',
-      units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
+      units,
     });
-    if (requirement.kind !== 'ok') throw new Error('reviewBlockedOrders: necesidad no convertible sin tratar');
+    // Entrar material no lo arregla: solo editar la unidad. Se queda bloqueado y sin tocar.
+    if (requirement.kind === 'not_convertible') return false;
 
     const outcome = await transaction.reservations.syncForOrder({
       orderId: id,

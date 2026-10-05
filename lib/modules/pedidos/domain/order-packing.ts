@@ -191,7 +191,9 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
             phase: 'materials_consumed',
             units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
           });
-          if (requirement.kind !== 'ok') throw new Error('finishPacking: necesidad no convertible sin tratar');
+          if (requirement.kind !== 'ok') {
+            throw new Error('finishPacking: los envases no se convierten y aun asi la necesidad no salio ok');
+          }
           const packagingRequirement = requirement.lines;
           // Un envase que es tambien ingrediente ya se consumio con la receta al pasar a
           // POR_EMPACAR: aqui solo cuenta lo que siga apartado de el, nunca su disponible.

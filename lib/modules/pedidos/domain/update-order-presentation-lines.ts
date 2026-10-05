@@ -15,11 +15,17 @@
 // incluye los envases.
 
 import type { Actor } from './actor';
-import { InsufficientMaterialError, OrderNotFoundError, OrderWouldBlockError } from './errors';
+import {
+  InsufficientMaterialError,
+  OrderNotFoundError,
+  OrderUnitNotConvertibleError,
+  OrderWouldBlockError,
+} from './errors';
 import { ingredientsPartOf, storedOrderCost, type PackagingCostLine, type StoredOrderCost } from './order-cost';
 import { validateDistribution } from './order-distribution';
 import type { OrderStatus } from './order-classification';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
+import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
 import type { OrderScope } from './order-scope';
 import { resolvePackagingCost, resolveStoredOrderCost, type OrderCostCatalogs } from './resolve-ingredients-cost';
 import {
@@ -56,7 +62,8 @@ export type UpdateOrderPresentationLinesInput = {
  * unidad ni las lineas ni lo apartado. `invalid_lines`: dos lineas con la misma presentacion, o
  * una linea antigua que el pedido no tenia tal cual. `would_block`: falta disponible en un
  * pedido que se puede bloquear y no llego la confirmacion; `insufficient_material`: falta en uno
- * que no se puede bloquear.
+ * que no se puede bloquear. `unit_not_convertible`: con la unidad nueva, la cantidad no se puede
+ * llevar a la unidad de algun insumo de la receta.
  */
 export type UpdateOrderPresentationLinesResult =
   | 'ok'
@@ -71,7 +78,8 @@ export type UpdateOrderPresentationLinesResult =
   | 'incompatible_units'
   | 'exceeds_quantity'
   | 'would_block'
-  | 'insufficient_material';
+  | 'insufficient_material'
+  | 'unit_not_convertible';
 
 export type UpdateOrderPresentationLinesDeps = DistributionCatalogs &
   Pick<OrderCostCatalogs, 'recipes' | 'products'> & {
@@ -134,6 +142,31 @@ export function createUpdateOrderPresentationLines(
         }
 
         const writeLines = resolution.lines.map((line) => line.write);
+
+        // En POR_EMPACAR la receta ya se consumio: solo quedan por apartar los envases. La
+        // necesidad se arma antes de escribir, con la unidad NUEVA: una linea no convertible
+        // rechaza el cambio sin tocar nada.
+        const materialsConsumed = locked.status === 'POR_EMPACAR';
+        const recipeLines = materialsConsumed
+          ? []
+          : ((await transaction.recipes.findExecutionContentById(locked.recipeId, companyId))?.lines ?? []);
+        const packagingLines = packagingLinesOf(writeLines);
+        const units = await loadRequirementUnits(
+          transaction,
+          recipeLines.map((line) => line.productId),
+          input.unitId,
+          companyId,
+        );
+        const requirement = requireConvertibleRequirement(
+          buildOrderRequirement({
+            recipeLines,
+            quantity: locked.quantity,
+            packagingLines,
+            phase: materialsConsumed ? 'materials_consumed' : 'before_consumption',
+            units,
+          }),
+        );
+
         const outcome = await transaction.orders.updatePresentationLinesAlive(
           orderId,
           input.unitId,
@@ -145,25 +178,10 @@ export function createUpdateOrderPresentationLines(
         // La fila esta bloqueada desde `lockAliveById` en esta misma transaccion.
         if (outcome !== 'ok') return 'not_found';
 
-        // En POR_EMPACAR la receta ya se consumio: solo quedan por apartar los envases.
-        const materialsConsumed = locked.status === 'POR_EMPACAR';
-        const content = materialsConsumed
-          ? null
-          : await transaction.recipes.findExecutionContentById(locked.recipeId, companyId);
-        const packagingLines = packagingLinesOf(writeLines);
-        const requirement = buildOrderRequirement({
-          recipeLines: content?.lines ?? [],
-          quantity: locked.quantity,
-          packagingLines,
-          phase: materialsConsumed ? 'materials_consumed' : 'before_consumption',
-          units: { orderUnitId: null, orderUnit: null, bridge: null, productUnits: new Map() },
-        });
-        if (requirement.kind !== 'ok') throw new Error('updateOrderPresentationLines: necesidad no convertible sin tratar');
-
         const reservation = await transaction.reservations.syncForOrder({
           orderId,
           companyId,
-          requirement: requirement.lines,
+          requirement,
           actorId,
           now: instant,
         });
@@ -206,6 +224,7 @@ export function createUpdateOrderPresentationLines(
       if (error instanceof OrderWouldBlockError) return 'would_block';
       if (error instanceof InsufficientMaterialError) return 'insufficient_material';
       if (error instanceof OrderNotFoundError) return 'not_found';
+      if (error instanceof OrderUnitNotConvertibleError) return 'unit_not_convertible';
       throw error;
     }
   };

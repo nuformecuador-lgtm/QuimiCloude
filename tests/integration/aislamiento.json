@@ -328,6 +328,11 @@
       "desde": "2026-10-03"
     },
     {
+      "archivo": "pedidos/order-unit-conversion.int.test.ts",
+      "motivo": "QC-204 T9: el alta ('createCreateOrder') y la lectura ('createGetOrder') cableadas a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', igual que 'order-reservation.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria. Usa las unidades de sistema gramo y kilogramo que siembran las migraciones, sin tocarlas. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, producto con lote, receta y pedido) y la limpia en un 'finally' por 'company_id'.",
+      "desde": "2026-10-05"
+    },
+    {
       "archivo": "pedidos/order-reservation.int.test.ts",
       "motivo": "QC-141 T9: crear/editar/cancelar/borrar ('createCreateOrder'/'createUpdateOrder'/'createCancelOrder'/'createDeleteOrder') cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', igual que 'order-ingredients-cost.int.test.ts' y 'order-unit-of-work.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. Los casos de R30/R15 y R50 comprueban con el cliente global que un rechazo -'insufficient_material', 'recipe_without_lines'- no dejo escrito ni el pedido ni la reserva.",
       "desde": "2026-09-23"

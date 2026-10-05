@@ -599,4 +599,39 @@ describe('createFinishPacking (T14, R17-R21)', () => {
       expect(call[0]).toMatchObject({ recipeId: VERSION, recipeName: 'Crema base · Sin perfume' });
     }
   });
+
+  it('R7 terminar el empaque costea el lote con la necesidad convertida', async () => {
+    const base = catalogosGlobales();
+    const catalogos = {
+      ...base,
+      recipes: {
+        ...base.recipes,
+        findExecutionContentById: async () => ({
+          id: RECETA,
+          name: 'Desengrasante',
+          isDeleted: false,
+          steps: [],
+          lines: [{ productId: 'materia', productName: null, percentage: '100.00' }],
+          tools: [],
+        }),
+      } as unknown as RecipeCatalog,
+      products: {
+        findRefs: async () => [{ id: 'materia', name: 'materia', unitId: LITRO, stockByUnit: [], type: 'PRODUCT' }],
+        findCostingBatches: async () => [
+          { productId: 'materia', lot: '1', stock: '100', available: '100', unitCost: '2.0000', unitId: LITRO, purchaseDate: '2026-01-01' },
+        ],
+      } as unknown as ProductCatalog,
+    };
+    const { finishPackingAliveById, receiveFromOrder } = montar({
+      lines: [lineaDe({ packages: 10, presentationContent: '1.0000' })],
+      finishPackingAlive: { kind: 'ok', recipeId: RECETA, quantity: '1000.0000', ingredientsCost: null, unitId: MILILITRO },
+      catalogos,
+    });
+
+    await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
+
+    // 1000 ml son 1 L a 2.0000: el lote cuesta 2.0000 y sus 10 L salen a 0.2000. Sin convertir,
+    // 1000 L costarian 200.0000 por litro.
+    expect(receiveFromOrder).toHaveBeenCalledWith(expect.objectContaining({ unitCost: '0.2000' }));
+  });
 });

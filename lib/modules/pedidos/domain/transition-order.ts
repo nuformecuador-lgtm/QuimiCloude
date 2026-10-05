@@ -13,6 +13,7 @@
 
 import { InsufficientMaterialError, InvalidTransitionError, RecipeWithoutLinesError } from './errors';
 import { buildRequirement } from './order-requirement';
+import { loadRequirementUnits } from './order-requirement-units';
 import { assertTransition } from './order-transitions';
 
 import type { OrderStatus } from './order-classification';
@@ -70,13 +71,17 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           // una segunda conexion mientras esta retiene la suya es espera o error bajo carga.
           const content = await scope.recipes.findExecutionContentById(locked.recipeId, companyId);
           const recipeLines = content?.lines ?? [];
-          const requirement = buildRequirement(recipeLines, locked.quantity, {
-            orderUnitId: null,
-            orderUnit: null,
-            bridge: null,
-            productUnits: new Map(),
-          });
-          if (requirement.kind !== 'ok') throw new Error('transitionOrder: necesidad no convertible sin tratar');
+          const units = await loadRequirementUnits(
+            scope,
+            recipeLines.map((line) => line.productId),
+            locked.unitId,
+            companyId,
+          );
+          const requirement = buildRequirement(recipeLines, locked.quantity, units);
+          // Sin necesidad en la unidad del insumo no hay con que comprobar lo que se consume.
+          if (requirement.kind === 'not_convertible') {
+            throw new InsufficientMaterialError(`productIds=${requirement.productIds.join(',')}`);
+          }
 
           // Solo la receta: los envases del reparto siguen apartados hasta Terminar el empaque.
           const outcome = await scope.reservations.consumeForOrder({

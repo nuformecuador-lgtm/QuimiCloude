@@ -1,8 +1,10 @@
+import type { ReservationRequirementLine } from '@/lib/modules/inventario';
 import type { UnitConversion } from '@/lib/modules/unidades';
 
 import type { OrderTransactionScope } from '../ports/order-unit-of-work';
 
-import type { RequirementUnits } from './order-requirement';
+import { OrderUnitNotConvertibleError } from './errors';
+import type { RecipeRequirement, RequirementUnits } from './order-requirement';
 
 /**
  * Las unidades con las que se convierte la necesidad de reserva, leidas con el cliente de la
@@ -39,4 +41,15 @@ export async function loadRequirementUnits(
     bridge,
     productUnits,
   };
+}
+
+/** Las lineas de una necesidad que se va a guardar: una linea no convertible rechaza el guardado,
+ *  nombrando sus productos en el diagnostico. */
+export function requireConvertibleRequirement(
+  requirement: RecipeRequirement,
+): readonly ReservationRequirementLine[] {
+  if (requirement.kind === 'not_convertible') {
+    throw new OrderUnitNotConvertibleError(`productIds=${requirement.productIds.join(',')}`);
+  }
+  return requirement.lines;
 }

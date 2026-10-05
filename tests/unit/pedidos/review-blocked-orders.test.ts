@@ -5,7 +5,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createReviewBlockedOrders } from '@/lib/modules/pedidos/domain/review-blocked-orders';
-import { fakeOrderRow, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import {
+  fakeOrderRow,
+  fakeScopeProducts,
+  fakeScopeUnits,
+  fakeUnitOfWork,
+} from '@/tests/helpers/order-unit-of-work-double';
 import { fakePackagingCatalog } from '@/tests/helpers/packaging-catalog-double';
 
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
@@ -15,7 +20,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { CostingBatch, ProductCatalog, ReservationOutcome } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
-import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
 const AHORA = new Date('2026-09-26T10:00:00.000Z');
@@ -56,6 +61,9 @@ type Escenario = {
   readonly resultado?: (orderId: string) => ReservationOutcome;
   readonly lineas?: readonly RecipeExecutionLine[];
   readonly lotes?: readonly CostingBatch[];
+  /** La unidad del insumo y el catalogo de unidades; por defecto el insumo en `LITRO`. */
+  readonly insumoUnitId?: string;
+  readonly unidades?: readonly UnitRef[];
 };
 
 function montar(escenario: Escenario = {}) {
@@ -104,10 +112,15 @@ function montar(escenario: Escenario = {}) {
     tools: [],
   }));
 
+  const insumoUnitId = escenario.insumoUnitId ?? LITRO.id;
+  const unidades: readonly UnitConversion[] = escenario.unidades ?? [LITRO];
+  const insumo = { id: PRODUCTO_X, name: 'x', unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' as const };
   const uow = fakeUnitOfWork({
     orders: { lockAliveById, setStatus, setIngredientsCost, setReservedAt },
     reservations: { syncForOrder },
     recipes: { findExecutionContentById },
+    products: fakeScopeProducts(escenario.insumoUnitId === undefined ? [] : [insumo]),
+    units: fakeScopeUnits(escenario.unidades ?? []),
   });
 
   const recipes = {
@@ -115,12 +128,13 @@ function montar(escenario: Escenario = {}) {
     findExecutionContentById,
   } as unknown as RecipeCatalog;
   const products = {
-    findRefs: vi.fn(async () => [{ id: PRODUCTO_X, name: 'x', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }]),
+    findRefs: vi.fn(async () => [insumo]),
     findCostingBatches: vi.fn(async () => escenario.lotes ?? [lote()]),
   } as unknown as ProductCatalog;
   const units = {
-    findRefs: vi.fn(async () => [LITRO]),
+    findRefs: vi.fn(async (ids: readonly string[]) => unidades.filter((unidad) => ids.includes(unidad.id))),
     findRefsSharingBaseInCompany: vi.fn(async () => []),
+    findMassVolumeBridge: vi.fn(async () => null),
   } as unknown as UnitCatalog;
 
   const review = createReviewBlockedOrders({ orders, recipes, products, units, packaging: fakePackagingCatalog(), unitOfWork: uow.unitOfWork });
@@ -371,6 +385,47 @@ describe('QC-195 reviewBlockedOrders — los envases del reparto', () => {
     const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
 
     expect(resultado).toEqual({ unblocked: 0, failed: [] });
+    expect(m.setStatus).not.toHaveBeenCalled();
+    expect(m.setIngredientsCost).not.toHaveBeenCalled();
+    expect(m.setReservedAt).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-204 reviewBlockedOrders — la necesidad en la unidad del pedido', () => {
+  const GRAMO: UnitRef = { id: 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null };
+  const KILO: UnitRef = { id: 'a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2', name: 'Kilogramo', symbol: 'kg', baseUnitId: GRAMO.id, factor: '1000' };
+  const PIEZA: UnitRef = { id: 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3', name: 'Pieza', symbol: 'pz', baseUnitId: null, factor: null };
+  const UNIDADES = [GRAMO, KILO, PIEZA];
+
+  /** 1000 g al 100 % sobre un insumo en `insumoUnitId`. */
+  function montarEnGramos(insumoUnitId: string) {
+    return montar({
+      filas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { quantity: '1000.0000', unitId: GRAMO.id })]]),
+      lotes: [lote({ unitId: insumoUnitId, stock: '100', available: '100', unitCost: '2.0000' })],
+      insumoUnitId,
+      unidades: UNIDADES,
+    });
+  }
+
+  it('R5 el desbloqueo recalcula con la unidad del pedido', async () => {
+    const m = montarEnGramos(KILO.id);
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({ unblocked: 1, failed: [] });
+    // 1000 g son 1 kg a 2.0000. Sin convertir serian 1000 kg: 2000.0000.
+    expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, { total: '2.0000', packaging: '0.0000' }, null, AHORA, SCOPE);
+    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
+    expect(Number(entrada.requirement[0]?.quantity)).toBe(1);
+  });
+
+  it('R12 el desbloqueo deja BLOQUEADO un pedido con una linea no convertible', async () => {
+    const m = montarEnGramos(PIEZA.id);
+
+    const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
+
+    expect(resultado).toEqual({ unblocked: 0, failed: [] });
+    expect(m.syncForOrder).not.toHaveBeenCalled();
     expect(m.setStatus).not.toHaveBeenCalled();
     expect(m.setIngredientsCost).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();

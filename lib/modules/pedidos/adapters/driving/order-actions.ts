@@ -16,6 +16,7 @@ import {
   OrderNotFoundError,
   OrderPresentationLineNotEditableError,
   OrderWithoutUnitError,
+  OrderUnitNotConvertibleError,
   OrderWouldBlockError,
   PedidosError,
   PresentationNotFoundError,
@@ -476,6 +477,8 @@ export async function updateOrderDistributionAction(
         throw new OrderWouldBlockError();
       case 'insufficient_material':
         throw new InsufficientMaterialError();
+      case 'unit_not_convertible':
+        throw new OrderUnitNotConvertibleError();
     }
   } catch (error) {
     return toErrorState(error);
