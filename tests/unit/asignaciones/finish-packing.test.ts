@@ -205,3 +205,31 @@ describe('finishPacking — entrada', () => {
     expect(findAliveById).not.toHaveBeenCalled();
   });
 });
+
+describe('QC-211 — finishPacking no comprueba el recorrido de los pasos de envasado', () => {
+  it('R24: termina un `EN_EMPAQUE` del actor con `{ orderId }` solo, sin ninguna prueba de recorrido', async () => {
+    const { deps, finishPackingAliveById } = montar();
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).resolves.toEqual({ numberText: expect.any(String) });
+    expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, expect.any(Date));
+  });
+
+  it.each([
+    ['packingStepsDone', 3],
+    ['packingSteps', []],
+    ['walkthrough', { completed: true }],
+  ])('R24: la entrada sigue siendo exactamente `{ orderId }`: `%s` de mas rechaza sin tocar ningun puerto', async (clave, valor) => {
+    const { deps, findAliveById, finishPackingAliveById } = montar();
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO, [clave]: valor })).rejects.toThrow(ValidationError);
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(finishPackingAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R24: las dependencias no incluyen ningun lector de pasos', () => {
+    const { deps } = montar();
+    expect(Object.keys(deps).filter((key) => /step/i.test(key))).toEqual([]);
+  });
+});

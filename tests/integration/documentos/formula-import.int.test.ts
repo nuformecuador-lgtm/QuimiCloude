@@ -686,3 +686,82 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
     });
   });
 });
+
+describe('QC-211 — confirmar guarda los pasos de envasado revisados', () => {
+  it('R18: crear guarda los pasos de envasado en orden y separados de los del operador', async () => {
+    const empresa = await crearEmpresa();
+    const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+    const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+
+    const resumen = await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+      documentFileId,
+      name: `Formula envasado ${token()}`,
+      description: null,
+      lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+      steps: [paso('Mezclar')],
+      packingSteps: [paso('Envasar en garrafas'), paso('Etiquetar')],
+      replaceRecipeId: null,
+    });
+
+    expect(resumen.outcome).toBe('created');
+    const receta = await prisma.recipe.findUniqueOrThrow({ where: { id: resumen.recipeId } });
+    expect(receta.steps).toEqual([paso('Mezclar')]);
+    expect(receta.packingSteps).toEqual([paso('Envasar en garrafas'), paso('Etiquetar')]);
+  });
+
+  it('R18: reemplazar sustituye los pasos de envasado anteriores por los revisados', async () => {
+    const empresa = await crearEmpresa();
+    const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+    const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+    const name = `Formula ${token()}`;
+    const sembrada = await createRecipe(
+      {
+        name,
+        description: null,
+        steps: [paso('Paso original')],
+        packingSteps: [paso('Envasado viejo 1'), paso('Envasado viejo 2')],
+        lines: [{ productId: ingrediente, percentage: '100.00' }],
+        imagePath: null,
+        tools: [],
+      } satisfies NewRecipe,
+      empresa.userId,
+      new Date(),
+      { companyId: empresa.companyId } satisfies RecipeScope,
+    );
+    if (sembrada === 'duplicate') throw new Error('la receta sembrada de prueba choco con un nombre duplicado');
+
+    await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+      documentFileId,
+      name,
+      description: null,
+      lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+      steps: [paso('Paso revisado')],
+      packingSteps: [paso('Envasado revisado')],
+      replaceRecipeId: sembrada.id,
+    });
+
+    const receta = await prisma.recipe.findUniqueOrThrow({ where: { id: sembrada.id } });
+    expect(receta.steps).toEqual([paso('Paso revisado')]);
+    expect(receta.packingSteps).toEqual([paso('Envasado revisado')]);
+  });
+
+  it('R17: un paso de envasado invalido rechaza entera la confirmacion y no crea la receta', async () => {
+    const empresa = await crearEmpresa();
+    const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+    const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+
+    await expect(
+      createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+        documentFileId,
+        name: `Formula ${token()}`,
+        description: null,
+        lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+        steps: [],
+        packingSteps: [{ blocks: [{ kind: 'paragraph', spans: [] }] }],
+        replaceRecipeId: null,
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_input' });
+
+    expect(await prisma.recipe.count({ where: { companyId: empresa.companyId } })).toBe(0);
+  });
+});

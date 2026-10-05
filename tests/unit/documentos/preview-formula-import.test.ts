@@ -331,3 +331,39 @@ describe('createPreviewFormulaImport', () => {
     });
   });
 });
+
+describe('QC-211 — la vista previa trae los pasos de envasado', () => {
+  it('R14: los pasos de envasado leidos viajan en `packingSteps`, en orden y separados de `steps`', async () => {
+    const bitacora: Bitacora = [];
+    const archivo: FileForReview = {
+      status: 'done',
+      strategy: 'formula',
+      extractedText: JSON.stringify({
+        name: 'Detergente X',
+        ingredients: [],
+        steps: ['Mezclar'],
+        packingSteps: ['Envasar', 'Etiquetar'],
+      }),
+    };
+    const deps = crearDeps(bitacora, { repository: dobleDeRepositorio(bitacora, archivo) });
+    const preview = createPreviewFormulaImport(deps);
+
+    const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+    expect(resultado.steps).toEqual([{ blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] }]);
+    expect(resultado.packingSteps).toEqual([
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Envasar' }] }] },
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Etiquetar' }] }] },
+    ]);
+  });
+
+  it('R15: un texto sin `packingSteps` da `packingSteps: []`', async () => {
+    const bitacora: Bitacora = [];
+    const preview = createPreviewFormulaImport(crearDeps(bitacora));
+
+    const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+    expect(resultado.packingSteps).toEqual([]);
+    expect(resultado.steps).toHaveLength(1);
+  });
+});
