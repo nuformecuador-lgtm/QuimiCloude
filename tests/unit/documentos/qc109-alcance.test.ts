@@ -252,7 +252,13 @@ export function infraccionesDeLimites(archivos: readonly ArchivoLeido[]): string
 }
 
 /** El proveedor de IA y los adaptadores, que el dominio y los puertos no pueden nombrar (R14). */
-export const NOMBRES_PROHIBIDOS_EN_DOMINIO = ['gemini', 'genai', '@google/genai', 'adapters/'] as const;
+export const NOMBRES_PROHIBIDOS_EN_DOMINIO = [
+  'gemini',
+  'genai',
+  '@google/genai',
+  'anthropic',
+  'adapters/',
+] as const;
 
 export function infraccionesDeProveedor(archivos: readonly ArchivoLeido[]): string[] {
   const hallazgos: string[] = [];
