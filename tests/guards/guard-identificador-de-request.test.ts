@@ -258,6 +258,10 @@ export const E2E_ESPERADOS = [
   // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
   // identificador de peticion.
   'envases-del-pedido.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
+  // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'insumo-por-unidad.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
