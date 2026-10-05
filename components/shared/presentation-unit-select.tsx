@@ -1,6 +1,7 @@
 'use client';
 
-import { useId } from 'react';
+import { CircleAlertIcon } from 'lucide-react';
+import { useId, type ReactNode } from 'react';
 
 import {
   Select,
@@ -9,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 /** Campo del formulario de la presentacion que alimenta este selector, via el `input` oculto. */
@@ -17,6 +19,10 @@ export const PRESENTATION_UNIT_FIELD = 'unitId';
 export const PRESENTATION_UNIT_SELECT_TESTID = 'presentation-unit-select';
 export const PRESENTATION_UNIT_OPTION_TESTID = 'presentation-unit-option';
 export const PRESENTATION_UNIT_ERROR_TESTID = 'presentation-error-unit';
+export const PRESENTATION_UNIT_HELPER_TESTID = 'presentation-unit-helper';
+export const PRESENTATION_UNIT_HELPER_TEXT_TESTID = 'presentation-unit-helper-text';
+
+const PRESENTATION_UNIT_HELPER_LABEL = 'Qué es';
 
 /** Objetivo tactil minimo (44x44 px) de R20. */
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -61,6 +67,8 @@ type PresentationUnitSelectProps = {
    * hay nada elegido, que es lo que el esquema rechaza (R17).
    */
   readonly onValueChange?: (unitId: string) => void;
+  /** Ayuda opcional junto a la etiqueta; sin ella no se pinta nada. */
+  readonly helper?: ReactNode;
 };
 
 /**
@@ -110,6 +118,7 @@ export function PresentationUnitSelect({
   name = PRESENTATION_UNIT_FIELD,
   value,
   onValueChange,
+  helper,
 }: PresentationUnitSelectProps) {
   const labelId = useId();
   const errorId = useId();
@@ -124,9 +133,31 @@ export function PresentationUnitSelect({
 
   return (
     <div className="flex flex-col gap-2">
-      <span id={labelId} className="text-sm font-medium">
-        {PRESENTATION_UNIT_LABEL}
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span id={labelId} className="text-sm font-medium">
+          {PRESENTATION_UNIT_LABEL}
+        </span>
+        {helper === undefined ? null : (
+          // `type="button"`: este selector vive dentro de formularios y un boton sin tipo los envia.
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={`${PRESENTATION_UNIT_HELPER_LABEL} ${PRESENTATION_UNIT_LABEL}`}
+                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  data-testid={PRESENTATION_UNIT_HELPER_TESTID}
+                />
+              }
+            >
+              <CircleAlertIcon className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent data-testid={PRESENTATION_UNIT_HELPER_TEXT_TESTID}>
+              {helper}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       {/*
         `null` cuando no hay unidad previa -venga por `defaultValue` o por `value`-: es lo que
         deja el disparador en estado de marcador. No es una opcion elegible: no hay ningun

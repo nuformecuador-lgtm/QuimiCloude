@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
-import type { ProductView } from '@/lib/modules/inventario';
+import type { ProductFormUnits, ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { ProductForm } from './product-form';
@@ -52,6 +52,7 @@ function createSuccessMessage(lot: string): string {
 export function ProductSheet({
   product,
   units,
+  formUnits,
 }: {
   readonly product?: ProductView;
   /**
@@ -61,6 +62,8 @@ export function ProductSheet({
    * que lo pide una sola vez (QC-44 R46).
    */
   readonly units?: readonly UnitRef[];
+  /** Unidades del selector «Unidad» del alta de insumo. La edicion no las usa. */
+  readonly formUnits?: ProductFormUnits;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -103,7 +106,14 @@ export function ProductSheet({
         conservaria el ultimo tipo elegido entre aperturas mientras `SharedSelect` -dentro del
         portal, que si se desmonta- volviera a pintar el default PRODUCT.
       */}
-      {open ? <ProductForm product={product} units={units} onSaved={handleSaved} /> : null}
+      {open ? (
+        <ProductForm
+          product={product}
+          units={units}
+          formUnits={formUnits}
+          onSaved={handleSaved}
+        />
+      ) : null}
     </Sheet>
   );
 }

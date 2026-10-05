@@ -116,7 +116,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
 function montarAlta() {
   render(
     <Sheet open>
-      <ProductForm units={UNIDADES} onSaved={vi.fn()} />
+      <ProductForm units={UNIDADES} formUnits={UNIDADES} onSaved={vi.fn()} />
     </Sheet>,
   );
 }
@@ -245,7 +245,8 @@ describe('alta de un envase', () => {
     montarAlta();
 
     await user.type(screen.getByTestId('product-field-name'), 'Sosa');
-    await elegirPresentacion(user);
+    await user.click(screen.getByTestId('presentation-unit-select'));
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name: 'ml' })));
     await user.type(screen.getByTestId('product-field-stock'), '10.5');
     await user.type(screen.getByTestId('product-field-qtyAlert'), '1');
     await user.type(screen.getByLabelText('Costo unitario'), '2');
