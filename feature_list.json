@@ -2825,6 +2825,21 @@
       "branch": "feature/QC-199-presentacion-por-unidad-en-alta-de-producto",
       "depends_on": [],
       "spec_path": "specs/QC-199-presentacion-por-unidad-en-alta-de-producto"
+    },
+    {
+      "key": "QC-204",
+      "id": 204,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "conversion-unidad-pedido-a-insumo",
+      "description": "Ver tarjeta QC-204: la necesidad de cada insumo (cantidad × %) se expresa en la unidad del pedido y se convierte a la del insumo para costear, apartar y mostrar. Misma familia: exacto (QC-76). Masa ↔ volumen: 1 l ≈ 1 kg, marcado «aprox.». Otras combinaciones: sin costo y con aviso. Pedidos ya creados no se migran.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-204-conversion-unidad-pedido-a-insumo",
+      "depends_on": [],
+      "spec_path": "specs/QC-204-conversion-unidad-pedido-a-insumo"
     }
   ]
 }
