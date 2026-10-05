@@ -119,6 +119,7 @@ const presentations: PresentationCatalog = {
 };
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
@@ -595,7 +596,7 @@ describe('la fachada de inventario dispara la revision', () => {
       await sumarLoteSinAvisar(b, prodB.productId, '50');
 
       const alta = await inventario.createProduct(
-        { name: prodA.name, stock: '20', presentationId: a.presentationId, unitCost: '2.5000', qtyAlert: '1' },
+        { name: prodA.name, stock: '20', unitId: a.unitId, unitCost: '2.5000', qtyAlert: '1' },
         almacenistaDe(a),
       );
 
@@ -620,7 +621,7 @@ describe('la fachada de inventario dispara la revision', () => {
       await prisma.recipeLine.deleteMany({ where: { recipeId } });
 
       await inventario.createProduct(
-        { name: `Otro ${token()}`, stock: '1', presentationId: fixture.presentationId, unitCost: '1.0000', qtyAlert: '1' },
+        { name: `Otro ${token()}`, stock: '1', unitId: fixture.unitId, unitCost: '1.0000', qtyAlert: '1' },
         almacenistaDe(fixture),
       );
 
@@ -704,7 +705,7 @@ describe('la fachada de inventario dispara la revision', () => {
       const lotesAntes = await prisma.productBatch.count({ where: { productId } });
 
       const alta = await inventario.createProduct(
-        { name, stock: '20', presentationId: fixture.presentationId, unitCost: '2.5000', qtyAlert: '1' },
+        { name, stock: '20', unitId: fixture.unitId, unitCost: '2.5000', qtyAlert: '1' },
         almacenistaDe(fixture),
       );
 

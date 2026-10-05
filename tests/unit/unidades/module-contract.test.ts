@@ -622,19 +622,25 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     expect(catalogo, 'ProductRef conserva un campo `unit` de texto').not.toMatch(CAMPO_UNIT_TEXTO)
 
     // `ProductView` lleva la unidad guardada, tipada con `UnitId`; `NewProduct` -lo que se
-    // escribe- no lleva ninguna: la unidad no se envia, se lee.
+    // escribe- solo la admite como referencia opcional al catalogo (alta de insumo, QC-199).
     const vista = read(join(inventarioDir, 'domain', 'product-view.ts'))
     expect(vista).toMatch(/readonly unitId: UnitId \| null/) // ProductView, columna guardada
     const nuevoProducto = vista.slice(vista.indexOf('export type NewProduct'), vista.indexOf('export type ProductView'))
-    expect(nuevoProducto, 'NewProduct volvio a declarar unidad').not.toMatch(/readonly unitId/)
+    expect(
+      nuevoProducto.match(/readonly unitId\b[^;\n]*/g) ?? [],
+      'NewProduct declara la unidad de otra forma que una referencia opcional',
+    ).toEqual(['readonly unitId?: string'])
     expect(vista, 'ProductView/NewProduct conservan un campo `unit`').not.toMatch(CAMPO_UNIT_TEXTO)
     expect(vista).toMatch(/from '@\/lib\/modules\/unidades'/)
 
-    // El esquema de entrada no acepta unidad de NINGUNA forma: ni referencia ni texto.
+    // El esquema de entrada acepta la unidad solo como referencia uuid y en una sola rama (alta de
+    // insumo, QC-199); como texto, nunca.
     const entrada = read(join(inventarioDir, 'domain', 'product-input.ts'))
-    expect(entrada, 'el esquema zod volvio a aceptar una unidad').not.toMatch(
-      /unitId:\s*unitIdSchema/,
-    )
+    expect(entrada).toMatch(/const unitIdSchema = z\.string\([^)]*\)\.uuid\(/)
+    expect(
+      entrada.match(/\bunitId:\s*\w+/g) ?? [],
+      'el esquema zod acepta la unidad en mas de una rama o sin el esquema uuid',
+    ).toEqual(['unitId: unitIdSchema'])
     expect(entrada, 'el esquema zod conserva un campo `unit` de texto').not.toMatch(
       CAMPO_UNIT_TEXTO,
     )
@@ -642,11 +648,12 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
       /unit:\s*z\.string\(\)/,
     )
 
-    // Y el borde tampoco la lee del `FormData`, ni con el nombre viejo ni con el nuevo.
+    // El borde lee la referencia del `FormData` en un solo sitio, y nunca la clave de texto.
     const acciones = read(join(inventarioDir, 'adapters', 'driving', 'product-actions.ts'))
-    expect(acciones, "la action sigue leyendo la clave 'unitId'").not.toMatch(
-      /formData,\s*'unitId'/,
-    )
+    expect(
+      acciones.match(/formData,\s*'unitId'/g) ?? [],
+      "la action lee la clave 'unitId' en mas de un sitio",
+    ).toHaveLength(1)
     expect(acciones, "el formulario sigue leyendo la clave 'unit'").not.toMatch(/'unit'/)
   })
 

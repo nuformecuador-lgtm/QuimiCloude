@@ -33,13 +33,13 @@ function batchRow(overrides: Partial<Record<string, unknown>> = {}) {
     stock: new Prisma.Decimal(10),
     unitCost: new Prisma.Decimal('1'),
     purchaseDate: new Date('2026-01-01T00:00:00.000Z'),
-    presentation: { unitId: 'l' },
+    product: { unitId: 'l' },
     ...overrides,
   };
 }
 
 describe('toCostingBatch', () => {
-  it('mapea productId, lot, stock, unitCost como cadena, unitId desde la presentacion, purchaseDate en YYYY-MM-DD y el disponible que le llega calculado', () => {
+  it('R17 toCostingBatch toma la unidad del producto', () => {
     const batch = toCostingBatch(
       {
         id: 'b-1',
@@ -48,7 +48,7 @@ describe('toCostingBatch', () => {
         stock: new Prisma.Decimal(12),
         unitCost: new Prisma.Decimal('3.5'),
         purchaseDate: new Date('2026-03-04T00:00:00.000Z'),
-        presentation: { unitId: 'kg' },
+        product: { unitId: 'kg' },
       },
       '9.0000',
     );
@@ -77,7 +77,7 @@ describe('findCostingBatches', () => {
     expect(batchFindMany).not.toHaveBeenCalled();
   });
 
-  it('una sola consulta de lotes para todos los productId, con stock > 0, presentacion y costo, producto vivo y ambito de empresa (R3)', async () => {
+  it('R18 una sola consulta de lotes para todos los productId, con stock > 0 y costo, producto vivo con unidad, con presentacion o de insumo, y ambito de empresa', async () => {
     batchFindMany.mockResolvedValueOnce([]);
 
     await findCostingBatches(['p-1', 'p-2'], 'empresa-1');
@@ -90,9 +90,9 @@ describe('findCostingBatches', () => {
         {
           productId: { in: ['p-1', 'p-2'] },
           stock: { gt: 0 },
-          presentationId: { not: null },
           unitCost: { not: null },
-          product: { deletedAt: null },
+          product: { deletedAt: null, unitId: { not: null } },
+          OR: [{ presentationId: { not: null } }, { product: { type: 'PRODUCT' } }],
         },
       ],
     });
@@ -170,5 +170,21 @@ describe('findCostingBatches', () => {
       /create|update|delete|adjust|write|insert|remove/i.test(nombre),
     );
     expect(nombresDeEscritura).toEqual([]);
+  });
+});
+
+describe('toCostingBatch — lote sin unidad o sin costo', () => {
+  it('R17 lanza si el producto del lote no tiene unidad o el lote no tiene costo', () => {
+    const base = {
+      id: 'b-1',
+      productId: 'p-1',
+      lot: 'L-1',
+      stock: new Prisma.Decimal(1),
+      unitCost: new Prisma.Decimal('1'),
+      purchaseDate: new Date('2026-03-04T00:00:00.000Z'),
+      product: { unitId: 'kg' },
+    };
+    expect(() => toCostingBatch({ ...base, product: { unitId: null } }, '1.0000')).toThrow(/sin unidad o sin costo/);
+    expect(() => toCostingBatch({ ...base, unitCost: null }, '1.0000')).toThrow(/sin unidad o sin costo/);
   });
 });

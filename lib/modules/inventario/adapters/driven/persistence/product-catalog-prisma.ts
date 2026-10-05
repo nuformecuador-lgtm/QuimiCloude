@@ -7,7 +7,7 @@ import type { ProductId, ProductRef } from '../../../domain/product-catalog';
 import type { CostingBatch } from '../../../domain/costing-batch';
 import type { ProductNameMatch } from '../../../domain/product-name-lookup';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
-import type { ProductType } from '../../../domain/product-type';
+import { PRODUCT_TYPES, type ProductType } from '../../../domain/product-type';
 
 import { batchCompanyScope, productCompanyScope } from './company-scope';
 import { findReservedAndAvailableByBatch } from './reservation-prisma';
@@ -101,7 +101,7 @@ const COSTING_BATCH_SELECT = {
   stock: true,
   unitCost: true,
   purchaseDate: true,
-  presentation: { select: { unitId: true } },
+  product: { select: { unitId: true } },
 } satisfies Prisma.ProductBatchSelect;
 
 type CostingBatchRow = Prisma.ProductBatchGetPayload<{ select: typeof COSTING_BATCH_SELECT }>;
@@ -112,19 +112,19 @@ function toCivilDate(date: Date): string {
 }
 
 /** Fila de Prisma -> `CostingBatch` del contrato publico. Funcion pura, testeable sin base.
- *  Un lote de MACHINE sin presentacion o sin costo no costea: se filtra antes de llegar aqui.
+ *  Un lote sin costo o de un producto sin unidad no costea: se filtra antes de llegar aqui.
  *  `available` llega ya calculado -mismo agregado del libro de reservas que usan el listado de
  *  lotes y la cobertura- porque esta funcion no tiene acceso a `reservation_movements`. */
 export function toCostingBatch(row: CostingBatchRow, available: string): CostingBatch {
-  if (row.presentation === null || row.unitCost === null) {
-    throw new Error(`toCostingBatch: lote ${row.lot} sin presentacion o sin costo`);
+  if (row.product.unitId === null || row.unitCost === null) {
+    throw new Error(`toCostingBatch: lote ${row.lot} sin unidad o sin costo`);
   }
   return {
     productId: row.productId,
     lot: row.lot,
     stock: row.stock.toFixed(4),
     unitCost: row.unitCost.toFixed(4),
-    unitId: row.presentation.unitId,
+    unitId: row.product.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),
     available,
   };
@@ -146,10 +146,11 @@ async function findAliveBatchesWithStock(
         {
           productId: { in: [...ids] },
           stock: { gt: 0 },
-          // MACHINE sin presentacion o sin costo no entra en el costeo de recetas.
-          presentationId: { not: null },
           unitCost: { not: null },
-          product: { deletedAt: null },
+          product: { deletedAt: null, unitId: { not: null } },
+          // Los lotes de insumo cuentan aunque no lleven presentacion; los de envase, que no la
+          // llevan, siguen fuera.
+          OR: [{ presentationId: { not: null } }, { product: { type: PRODUCT_TYPES.PRODUCT } }],
         },
       ],
     },

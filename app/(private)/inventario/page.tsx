@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import type { ProductFormUnits } from '@/lib/modules/inventario';
+import { listProductFormUnitsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
@@ -67,11 +69,17 @@ export default async function InventarioPage({
     eligiendo una presentacion ya existente. Por eso este fallo no pinta un estado de error de
     pagina, a diferencia de la de presentaciones, donde la unidad es el objeto mismo del panel.
   */
-  const [params, unitsResult] = await Promise.all([
+  // El alta pide sus unidades con el permiso de inventario: quien da de alta no tiene por que
+  // poder consultar el catalogo de unidades. Si falla, el selector sale vacio y el envio lo
+  // rechaza el esquema.
+  const [params, unitsResult, formUnitsResult] = await Promise.all([
     searchParams.then(parseProductListParams),
     listUnitsAction(),
+    listProductFormUnitsAction(),
   ]);
   const units = unitsResult.status === 'success' ? unitsResult.data : undefined;
+  const formUnits: ProductFormUnits =
+    formUnitsResult.status === 'success' ? formUnitsResult.data : [];
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -79,7 +87,7 @@ export default async function InventarioPage({
         <h1 data-testid="inventario-title" className="text-2xl font-semibold">
           Inventario
         </h1>
-        <ProductSheet units={units} />
+        <ProductSheet units={units} formUnits={formUnits} />
       </div>
       {/*
         SIN `key`: este limite NO se vuelve a montar en cada cambio de consulta. La llevaba (la
@@ -91,7 +99,7 @@ export default async function InventarioPage({
         primera carga.
       */}
       <Suspense fallback={<ProductTableSkeleton rows={params.pageSize} />}>
-        <ProductListSection params={params} units={units} />
+        <ProductListSection params={params} units={units} formUnits={formUnits} />
       </Suspense>
     </div>
   );

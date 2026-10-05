@@ -71,6 +71,7 @@ function dobleDePresentaciones(
 function dobleDeUnidades(visibles: readonly { id: string; name: string; symbol: string | null; baseUnitId: string | null; factor: string | null }[] = []) {
   return {
     findRefs: vi.fn(async (ids: readonly string[]) => visibles.filter((unidad) => ids.includes(unidad.id))),
+    listVisibleRefs: () => Promise.reject(new Error('no se usa')),
     findRefsSharingBaseInCompany: vi.fn(),
   };
 }

@@ -2818,7 +2818,7 @@
       "epic_name": "Inventario",
       "name": "presentacion-por-unidad-en-alta-de-producto",
       "description": "Ver tarjeta QC-199. Acotada el 2026-10-04: solo PRODUCT elige unidad en vez de presentación; PACKAGING, MACHINE y FINISHED_PRODUCT sin cambios; lotes existentes sin migración; la base rechaza lote sin presentación cuyo producto no tiene unidad.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",

@@ -25,6 +25,7 @@ import {
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
+  findAliveIdByNameInUnit,
   findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
@@ -32,6 +33,7 @@ import {
   softDeleteAliveProduct,
   updateAliveProduct,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -101,6 +103,7 @@ type Fixture = {
   readonly actorId: string;
   readonly companyId: string;
   readonly presentationId: string;
+  readonly unitId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
 };
@@ -158,6 +161,7 @@ async function createFixture(): Promise<Fixture> {
     actorId: user.id,
     companyId: company.id,
     presentationId: presentation.id,
+    unitId: unit.id,
     roleId: role.id,
     documentTypeCode: documentType.code,
   };
@@ -683,6 +687,7 @@ const repositorioReal: ProductRepository = {
   softDeleteAlive: softDeleteAliveProduct,
   listAlive: listAliveProducts,
   findAliveIdByNameInPresentationUnit,
+  findAliveIdByNameInUnit,
   findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
@@ -725,7 +730,7 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
       // 03:30 UTC del 1 de marzo es todavia 28 de febrero en cualquier zona de America: si el dia
       // se sacara de la zona local en vez de UTC, la columna diria '2026-02-28'.
       const instante = new Date('2026-03-01T03:30:00.000Z');
-      const altaDeProducto = createCreateProduct({ products: repositorioReal, now: () => instante });
+      const altaDeProducto = createCreateProduct({ products: repositorioReal, units: { findRefs: findUnitRefs }, now: () => instante });
       const actor = {
         id: fixture.actorId,
         companyId: fixture.companyId,
@@ -737,7 +742,7 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
           name: `Producto ${token()}`,
           stock: '2',
           qtyAlert: '1',
-          presentationId: fixture.presentationId,
+          unitId: fixture.unitId,
           unitCost: '1.5000',
         },
         actor,
@@ -749,7 +754,7 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
           name: `Producto ${token()}`,
           stock: '2',
           qtyAlert: '1',
-          presentationId: fixture.presentationId,
+          unitId: fixture.unitId,
           unitCost: '1.5000',
           purchaseDate: '2026-02-14',
         },
@@ -774,12 +779,12 @@ async function lotOfProduct(productId: string): Promise<string> {
 
 describe('R34, R35, R36: el lote tecleado de solo digitos no llega a 60 y el generado cabe siempre', () => {
   it('R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, los dos siguientes generados tienen 60 caracteres sin reintento y 60 digitos tecleados dan ValidationError sin filas nuevas', async () => {
-    // Por el caso de uso: el esquema de entrada solo se aplica ahi. `findAliveIdByNameInPresentationUnit`
+    // Por el caso de uso: el esquema de entrada solo se aplica ahi. `findAliveIdByNameInUnit`
     // no abre transaccion, asi que una sola por alta es la escritura sin reintento.
     const fixture = await createFixture();
     const spy = vi.spyOn(prisma, '$transaction');
     try {
-      const altaDeProducto = createCreateProduct({ products: repositorioReal, now: () => new Date() });
+      const altaDeProducto = createCreateProduct({ products: repositorioReal, units: { findRefs: findUnitRefs }, now: () => new Date() });
       const actor = {
         id: fixture.actorId,
         companyId: fixture.companyId,
@@ -791,7 +796,7 @@ describe('R34, R35, R36: el lote tecleado de solo digitos no llega a 60 y el gen
             name: `Producto ${token()}`,
             stock: '2',
             qtyAlert: '1',
-            presentationId: fixture.presentationId,
+            unitId: fixture.unitId,
             unitCost: '1.5000',
             ...(lot === undefined ? {} : { lot }),
           },

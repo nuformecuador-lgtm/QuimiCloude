@@ -276,6 +276,7 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
         presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
         units: {
           findRefs: findUnitRefs,
+          listVisibleRefs: () => Promise.reject(new Error('no se usa')),
           findRefsSharingBaseInCompany: async () => {
             throw new Error('el listado solo resuelve la etiqueta de la unidad del pedido');
           },

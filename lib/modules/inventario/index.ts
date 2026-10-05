@@ -83,6 +83,12 @@ export { createUpdatePresentation, type UpdatePresentationDeps } from './domain/
 export { createDeletePresentation, type DeletePresentationDeps } from './domain/delete-presentation';
 export { createListPresentations, type ListPresentationsDeps } from './domain/list-presentations';
 export {
+  createListProductFormUnits,
+  type ListProductFormUnits,
+  type ListProductFormUnitsDeps,
+  type ProductFormUnits,
+} from './domain/list-product-form-units';
+export {
   createAdjustBatchStock,
   type AdjustBatchStockDeps,
   type AdjustBatchStockInput,

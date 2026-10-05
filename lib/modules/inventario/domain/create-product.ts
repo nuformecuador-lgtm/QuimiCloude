@@ -1,4 +1,4 @@
-import type { PackageUnitSource } from '@/lib/modules/unidades';
+import type { PackageUnitSource, UnitCatalog } from '@/lib/modules/unidades';
 
 import { requirePermission, type Actor } from './actor';
 import { ActionNotAllowedError, ProductNotFoundError, ValidationError } from './errors';
@@ -6,7 +6,7 @@ import {
   createProductSchema,
   type CreateProductInput,
 } from './product-input';
-import { PRODUCT_TYPES } from './product-type';
+import { PRODUCT_TYPES, type ProductType } from './product-type';
 import { deriveUnitCost } from './unit-cost';
 
 import type { NewProductBatch } from './product-batch';
@@ -20,6 +20,8 @@ export type CreateProductDeps = {
   readonly stockIncreases?: StockIncreaseListener;
   /** De donde sale la unidad en que se cuentan los envases. Sin ella, el alta de un envase falla. */
   readonly packageUnit?: PackageUnitSource;
+  /** Comprueba la unidad del alta de insumo. Sin el, el alta de un insumo falla. */
+  readonly units?: Pick<UnitCatalog, 'findRefs'>;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };
@@ -108,6 +110,10 @@ export function createCreateProduct(
       return createPackaging(deps, entrada, actor, instante, purchaseDate, scope);
     }
 
+    if (entrada.type === PRODUCT_TYPES.PRODUCT) {
+      return createSupply(deps, entrada, actor, instante, purchaseDate, scope);
+    }
+
     const batch: NewProductBatch = {
       presentationId: entrada.presentationId ?? null,
       stock: entrada.stock,
@@ -119,42 +125,96 @@ export function createCreateProduct(
     };
 
     // Normalizar el nombre, filtrar los borrados y resolver la unidad de la presentacion es
-    // del adaptador: busca por nombre Y unidad, no por nombre solo. Sin presentacion (MACHINE),
-    // busca solo por nombre entre los vivos.
+    // del adaptador. Sin presentacion, busca solo por nombre entre los vivos.
     const existente = await deps.products.findAliveIdByNameInPresentationUnit(
       entrada.name,
       entrada.presentationId ?? null,
       scope,
     );
 
-    if (existente !== null) {
-      // El homonimo vivo es un producto terminado. Se rechaza aqui, antes de tocar el
-      // puerto, y `addBatchToAlive` lo vuelve a comprobar bajo la fila bloqueada para cerrar la
-      // carrera con un alta que naciera terminada entre esta lectura y esa escritura.
-      if (existente.type === PRODUCT_TYPES.FINISHED_PRODUCT) throw new ActionNotAllowedError();
-
-      // Solo viaja el lote: el nombre, la existencia y la alerta del panel se ignoran en este camino.
-      const agregado = await deps.products.addBatchToAlive(existente.id, batch, instante, scope);
-
-      if (agregado === 'finished_product') throw new ActionNotAllowedError();
-      if (agregado === null) throw new ProductNotFoundError(existente.id);
-
-      await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
-      return { id: existente.id, lot: agregado.lot };
-    }
-
-    // Una sola operacion del puerto para producto y lote, para que el dominio no pueda dejar
-    // escrita solo la mitad. El producto no lleva unidad: la declara la presentacion del lote.
-    // MACHINE no declara qtyAlert en el borde: la clave no viaja y el producto se queda en null.
-    const producto: NewProduct =
-      entrada.type === PRODUCT_TYPES.MACHINE
-        ? { name: entrada.name, type: PRODUCT_TYPES.MACHINE }
-        : { name: entrada.name, qtyAlert: entrada.qtyAlert, type: entrada.type };
-
-    const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);
-    await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
-    return { id: creado.id, lot: creado.lot };
+    // El instrumento no declara qtyAlert: el producto se queda en null.
+    return addOrCreate(deps, existente, { name: entrada.name, type: PRODUCT_TYPES.MACHINE }, batch, instante, scope);
   };
+}
+
+type Scope = { readonly companyId: string };
+
+/** Homonimo vivo: se le agrega el lote. Sin el: producto y lote nacen juntos. */
+async function addOrCreate(
+  deps: CreateProductDeps,
+  existente: { id: string; type: ProductType } | null,
+  producto: NewProduct,
+  batch: NewProductBatch,
+  instante: Date,
+  scope: Scope,
+): Promise<{ id: string; lot?: string }> {
+  if (existente !== null) {
+    // El homonimo vivo es un producto terminado. Se rechaza aqui, antes de tocar el
+    // puerto, y `addBatchToAlive` lo vuelve a comprobar bajo la fila bloqueada para cerrar la
+    // carrera con un alta que naciera terminada entre esta lectura y esa escritura.
+    if (existente.type === PRODUCT_TYPES.FINISHED_PRODUCT) throw new ActionNotAllowedError();
+
+    // Solo viaja el lote: el nombre, la existencia y la alerta del panel se ignoran en este camino.
+    const agregado = await deps.products.addBatchToAlive(existente.id, batch, instante, scope);
+
+    if (agregado === 'finished_product') throw new ActionNotAllowedError();
+    if (agregado === null) throw new ProductNotFoundError(existente.id);
+
+    await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
+    return { id: existente.id, lot: agregado.lot };
+  }
+
+  // Una sola operacion del puerto para producto y lote, para que el dominio no pueda dejar
+  // escrita solo la mitad.
+  const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);
+  await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
+  return { id: creado.id, lot: creado.lot };
+}
+
+type EntradaInsumo = Extract<CreateProductInput, { type: typeof PRODUCT_TYPES.PRODUCT }>;
+
+/**
+ * El insumo se cuenta en la unidad que se elige al darlo de alta y sus lotes no llevan
+ * presentacion. La unidad se comprueba antes de buscar el homonimo: una de otra empresa no
+ * puede servir ni para encontrarlo.
+ */
+async function createSupply(
+  deps: CreateProductDeps,
+  entrada: EntradaInsumo,
+  actor: Actor,
+  instante: Date,
+  purchaseDate: string,
+  scope: Scope,
+): Promise<{ id: string; lot?: string }> {
+  if (deps.units === undefined) {
+    throw new Error('alta de insumo sin el catalogo de unidades: falta el cableado');
+  }
+
+  const batch: NewProductBatch = {
+    presentationId: null,
+    stock: entrada.stock,
+    unitCost: resolverCostoUnitario(entrada),
+    lot: entrada.lot ?? null,
+    expiryDate: entrada.expiryDate ?? null,
+    purchaseDate,
+    createdBy: actor.id,
+  };
+
+  const visibles = await deps.units.findRefs([entrada.unitId], scope.companyId);
+  if (!visibles.some((unidad) => unidad.id === entrada.unitId)) {
+    throw new ValidationError('unitId: la unidad no existe o no es visible para la empresa');
+  }
+
+  const existente = await deps.products.findAliveIdByNameInUnit(entrada.name, entrada.unitId, scope);
+
+  return addOrCreate(
+    deps,
+    existente,
+    { name: entrada.name, qtyAlert: entrada.qtyAlert, type: PRODUCT_TYPES.PRODUCT, unitId: entrada.unitId },
+    batch,
+    instante,
+    scope,
+  );
 }
 type EntradaEnvase = Extract<CreateProductInput, { type: typeof PRODUCT_TYPES.PACKAGING }>;
 

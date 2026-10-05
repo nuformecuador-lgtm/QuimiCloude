@@ -37,6 +37,8 @@ const RUN_ID = randomUUID().replace(/-/g, '');
 const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
 const LIST_PAGE_SIZE = '25';
+/** El valor del selector de unidad sin el glifo de la flecha, que tambien vive en el disparador. */
+const SELECT_VALUE = '[data-slot="select-value"]';
 const ORDERS_SORT = 'createdAt:desc';
 const INVENTORY_SEARCH_PARAM = 'q';
 
@@ -79,6 +81,7 @@ let productId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
 let unitId: string | null = null;
+let unitLabel: string | null = null;
 let adminUserId: string | null = null;
 let operatorUserId: string | null = null;
 
@@ -143,7 +146,7 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await page.getByTestId('order-form-submit').click();
 }
 
-/** Da de alta por Inventario un lote nuevo del producto y la presentacion del fixture. */
+/** Da de alta por Inventario un lote nuevo del insumo del fixture, con su unidad preseleccionada. */
 async function addBatchThroughInventory(page: Page): Promise<void> {
   const query = new URLSearchParams({
     pageSize: LIST_PAGE_SIZE,
@@ -169,15 +172,10 @@ async function addBatchThroughInventory(page: Page): Promise<void> {
     timeout: 60_000,
   });
 
-  const presentationField = page.getByTestId('presentation-select');
-  await presentationField.click();
-  await presentationField.fill(PRESENTATION_NAME);
-  const presentationOption = page
-    .getByTestId('presentation-option')
-    .filter({ hasText: PRESENTATION_NAME });
-  await expect(presentationOption.first()).toBeVisible({ timeout: 60_000 });
-  await presentationOption.first().click();
-  await expect(presentationField).toHaveValue(PRESENTATION_NAME, { timeout: 60_000 });
+  const unitSelect = page.getByTestId('product-sheet').getByTestId('presentation-unit-select');
+  await expect(unitSelect.locator(SELECT_VALUE)).toHaveText(unitLabel ?? '', {
+    timeout: 60_000,
+  });
 
   await page.getByTestId('product-field-stock').fill(NEW_BATCH_STOCK);
   await page.getByTestId('product-field-qtyAlert').fill(QTY_ALERT);
@@ -273,9 +271,10 @@ test.beforeAll(async () => {
 
   const unit = await prisma.unit.findFirstOrThrow({
     where: { nameNormalized: 'litro', companyId: null },
-    select: { id: true },
+    select: { id: true, symbol: true, name: true },
   });
   unitId = unit.id;
+  unitLabel = unit.symbol ?? unit.name;
 
   // `products.unit_id` se fija a mano: el disparador que valida el lote exige que el producto ya
   // tenga unidad antes de insertarlo.

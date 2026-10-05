@@ -396,7 +396,7 @@ export async function findAliveIdByNameInPresentationUnit(
   presentationId: string | null,
   scope: InventoryScope,
 ): Promise<{ id: string; type: ProductType } | null> {
-  let unitId: string | null | undefined;
+  let unitId: string | null;
 
   if (presentationId === null) {
     unitId = null;
@@ -409,6 +409,23 @@ export async function findAliveIdByNameInPresentationUnit(
     unitId = presentation.unitId;
   }
 
+  return findAliveIdByNameAndUnitId(name, unitId, scope);
+}
+
+/** La unidad llega ya validada por el caso de uso. Mismo desempate que la de arriba. */
+export async function findAliveIdByNameInUnit(
+  name: string,
+  unitId: string,
+  scope: InventoryScope,
+): Promise<{ id: string; type: ProductType } | null> {
+  return findAliveIdByNameAndUnitId(name, unitId, scope);
+}
+
+async function findAliveIdByNameAndUnitId(
+  name: string,
+  unitId: string | null,
+  scope: InventoryScope,
+): Promise<{ id: string; type: ProductType } | null> {
   const row = await prisma.product.findFirst({
     where: {
       AND: [
@@ -653,12 +670,22 @@ function isBatchUnitMismatchViolation(error: unknown): boolean {
   return violationMessageOf(error).includes(BATCH_UNIT_MISMATCH_TRIGGER);
 }
 
+const BATCH_PRODUCT_WITHOUT_UNIT_TRIGGER = 'product_batches_product_without_unit';
+
+/** Mismo disparador y mismo criterio. El caso de uso escribe la unidad antes que el lote: solo
+ *  llega por un fallo de programacion o una escritura que no pasa por el. */
+function isBatchProductWithoutUnitViolation(error: unknown): boolean {
+  if (sqlStateOf(error) !== '23514') return false;
+  return violationMessageOf(error).includes(BATCH_PRODUCT_WITHOUT_UNIT_TRIGGER);
+}
+
 /** Lo que no se sabe traducir se relanza: un CHECK violado o una caida de conexion no son entrada
  *  invalida. */
 function translateBatchWriteError(error: unknown): never {
   if (isBatchForeignKeyViolation(error)) throw new ValidationError();
   if (isBatchCompanyScopeViolation(error)) throw new ValidationError();
   if (isBatchUnitMismatchViolation(error)) throw new ValidationError();
+  if (isBatchProductWithoutUnitViolation(error)) throw new ValidationError();
   throw error;
 }
 
@@ -728,11 +755,10 @@ async function writeBatchWithLotRetry<T>(
 }
 
 /**
- * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. El
- * producto nace con la unidad de esta presentacion -sin fila viva de la empresa, se aborta con
- * `ValidationError` antes de escribir nada- y su existencia queda recalculada al final.
- * `batch.presentationId === null` (MACHINE): el producto nace sin unidad y el lote sin
- * presentacion.
+ * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. La
+ * unidad del producto sale, por este orden, del envase, de `product.unitId` o de la presentacion
+ * del lote -sin fila viva de la empresa, se aborta con `ValidationError` antes de escribir nada-;
+ * sin ninguna de las tres, nace sin unidad. Su existencia queda recalculada al final.
  */
 export async function createWithFirstBatch(
   product: NewProduct,
@@ -750,6 +776,8 @@ export async function createWithFirstBatch(
       });
       if (presentation === null) throw new ValidationError();
       unitId = packaging.unitId;
+    } else if (product.unitId !== undefined) {
+      unitId = product.unitId;
     } else if (batch.presentationId !== null) {
       const presentation = await tx.presentation.findFirst({
         where: { AND: [presentationCompanyScope(scope), { id: batch.presentationId }] },
@@ -876,7 +904,9 @@ const BATCH_VIEW_SELECT = {
   purchaseDate: true,
   expiryDate: true,
   packageContent: true,
-  presentation: { select: { unitId: true } },
+  // La del producto y no la de la presentacion: los lotes de insumo ya no llevan presentacion, y
+  // los que la llevan estan en la misma unidad que su producto.
+  product: { select: { unitId: true } },
 } satisfies Prisma.ProductBatchSelect;
 
 type BatchViewRow = Prisma.ProductBatchGetPayload<{ select: typeof BATCH_VIEW_SELECT }>;
@@ -891,7 +921,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
     id: row.id,
     lot: row.lot,
     stock: row.stock.toFixed(4),
-    unitId: row.presentation?.unitId ?? null,
+    unitId: row.product.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
     packageContent: row.packageContent === null ? null : row.packageContent.toFixed(4),
@@ -954,7 +984,7 @@ export async function findBatchesOfOrder(
       ],
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    select: { ...BATCH_VIEW_SELECT, presentation: { select: { unitId: true, name: true } } },
+    select: { ...BATCH_VIEW_SELECT, presentation: { select: { name: true } } },
   });
 
   const reservedByBatch = await findReservedAndAvailableByBatch(

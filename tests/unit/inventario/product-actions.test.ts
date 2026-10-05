@@ -94,6 +94,9 @@ const VALID_PRODUCT_FIELDS = {
   type: PRODUCT_TYPES.PRODUCT,
 };
 
+const UNIDAD_DEL_INSUMO = '11111111-1111-4111-8111-111111111111';
+const PRESENTACION = '33333333-3333-4333-8333-333333333333';
+
 /** Un `FormData` manipulado: nadie lo pinta, pero el borde no puede fiarse de eso. */
 const UNIDAD_COLADA = { unitId: '22222222-2222-4222-8222-222222222222' };
 
@@ -102,7 +105,7 @@ const UNIDAD_COLADA = { unitId: '22222222-2222-4222-8222-222222222222' };
  * usan solo el fixture del producto.
  */
 const VALID_BATCH_FIELDS = {
-  presentationId: '11111111-1111-4111-8111-111111111111',
+  unitId: UNIDAD_DEL_INSUMO,
   unitCost: '12.3456',
   totalCost: '123.4560',
   lot: 'L-2026-001',
@@ -366,7 +369,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
       stock: '10',
       qtyAlert: '2',
       type: PRODUCT_TYPES.PRODUCT,
-      presentationId: '11111111-1111-4111-8111-111111111111',
+      unitId: UNIDAD_DEL_INSUMO,
       unitCost: '12.3456',
       totalCost: '123.4560',
       lot: 'L-2026-001',
@@ -420,7 +423,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
     expect(candidato.totalCost).toBeUndefined();
     // Ausentes de verdad, no presentes con '': el ancla evita que `toBeUndefined` pase por
     // una clave que ni siquiera se estuviera leyendo.
-    expect(candidato.presentationId).toBe('11111111-1111-4111-8111-111111111111');
+    expect(candidato.unitId).toBe(UNIDAD_DEL_INSUMO);
   });
 
   it('no repite el permiso ni ninguna regla: traduce el rechazo del caso de uso y ya', async () => {
@@ -472,26 +475,67 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
     expect(Object.keys(candidato)).not.toContain('stock');
   });
 
-  it('ni el alta ni la edicion leen `unitId` del FormData, aunque venga (QC-80, R21)', async () => {
-    // Que el formulario no pinte el campo no basta: un `FormData` se construye a mano. Y el
-    // candidato tiene que salir SIN la clave: los dos esquemas son `strictObject`, asi que colarla
-    // mataria cada alta y cada edicion con `invalid_input`.
+  it('R6 el alta de insumo envia unitId y no presentationId', async () => {
+    // Un `FormData` se construye a mano: aunque traiga una presentacion, el alta de insumo no la
+    // lee. Los esquemas son `strictObject`, asi que colarla seria `invalid_input`.
     createProductMock.mockResolvedValue({ id: 'producto-1' });
-    updateProductMock.mockResolvedValue(undefined);
 
     await createProductAction(
       CREATE_INITIAL,
-      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, ...UNIDAD_COLADA }),
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, presentationId: PRESENTACION }),
     );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato.unitId).toBe(UNIDAD_DEL_INSUMO);
+    expect(Object.keys(candidato)).not.toContain('presentationId');
+  });
+
+  it('R6 sin unidad en el FormData, el alta de insumo envia unitId ausente para que el esquema la rechace', async () => {
+    createProductMock.mockResolvedValue({ id: 'producto-1' });
+    await createProductAction(CREATE_INITIAL, formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, unitId: '' }));
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato.unitId).toBeUndefined();
+    expect(Object.keys(candidato)).not.toContain('presentationId');
+  });
+
+  it('R11 el alta de envase sigue enviando presentationId', async () => {
+    createProductMock.mockResolvedValue({ id: 'producto-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({
+        name: 'Botella PET',
+        type: PRODUCT_TYPES.PACKAGING,
+        stock: '100',
+        qtyAlert: '0',
+        unitCost: '0.5000',
+        presentationId: PRESENTACION,
+        ...UNIDAD_COLADA,
+      }),
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato).toEqual({
+      name: 'Botella PET',
+      type: PRODUCT_TYPES.PACKAGING,
+      stock: '100',
+      qtyAlert: '0',
+      unitCost: '0.5000',
+      presentationId: PRESENTACION,
+    });
+  });
+
+  it('la edicion no lee `unitId` del FormData, aunque venga', async () => {
+    updateProductMock.mockResolvedValue(undefined);
+
     await updateProductAction(
       'product-1',
       MUTATION_INITIAL,
       formDataOf({ ...VALID_PRODUCT_FIELDS, ...UNIDAD_COLADA }),
     );
 
-    const [candidatoAlta] = createProductMock.mock.calls[0] as [Record<string, unknown>];
     const [, candidatoEdicion] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
-    expect(Object.keys(candidatoAlta)).not.toContain('unitId');
     expect(Object.keys(candidatoEdicion)).not.toContain('unitId');
   });
 
@@ -552,7 +596,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
       stock: '10',
       qtyAlert: '2',
       type: PRODUCT_TYPES.PRODUCT,
-      presentationId: '11111111-1111-4111-8111-111111111111',
+      unitId: UNIDAD_DEL_INSUMO,
       unitCost: '12.3456',
       totalCost: '123.4560',
       lot: 'L-2026-001',
@@ -582,7 +626,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     for (const [candidato] of createProductMock.mock.calls as Array<[Record<string, unknown>]>) {
       expect(candidato.purchaseDate).toBeUndefined();
       // Ancla: el candidato es el del alta y trae su lote; sin esto `toBeUndefined` pasaria por vacio.
-      expect(candidato.presentationId).toBe('11111111-1111-4111-8111-111111111111');
+      expect(candidato.unitId).toBe(UNIDAD_DEL_INSUMO);
     }
   });
 
@@ -613,7 +657,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
         stock: '9',
         // El formulario no pinta presentacion ni costos para Instrumento (2026-09-23):
         // aunque lleguen en el FormData, la action no los manda.
-        presentationId: VALID_BATCH_FIELDS.presentationId,
+        presentationId: PRESENTACION,
         unitCost: VALID_BATCH_FIELDS.unitCost,
         purchaseDate: '2026-09-01',
         qtyAlert: '',
@@ -641,7 +685,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
         name: 'Instrumento de laboratorio',
         type: PRODUCT_TYPES.MACHINE,
         stock: '1',
-        presentationId: VALID_BATCH_FIELDS.presentationId,
+        presentationId: PRESENTACION,
         unitCost: VALID_BATCH_FIELDS.unitCost,
         purchaseDate: '',
       }),

@@ -60,6 +60,16 @@ export async function findUnitRefs(
   return rows.map(toUnitRef);
 }
 
+export async function listVisibleUnitRefs(companyId: string): Promise<readonly UnitRef[]> {
+  const rows = await prisma.unit.findMany({
+    where: companyScopeWhere({ companyId }),
+    select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+
+  return rows.map(toUnitRef);
+}
+
 export async function findPackageUnitId(): Promise<UnitId | null> {
   const row = await prisma.unit.findFirst({
     where: { companyId: null, nameNormalized: PACKAGE_UNIT_NAME, baseUnitId: null },

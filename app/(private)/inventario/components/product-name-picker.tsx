@@ -57,6 +57,8 @@ export type ProductNameOption = {
    */
   readonly presentationId?: string;
   readonly presentationName?: string;
+  /** Unidad del insumo elegido: el alta la deja preseleccionada. */
+  readonly unitId?: string | null;
 };
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -120,6 +122,7 @@ export function ProductNamePicker({
         name: item.name,
         qtyAlert: item.qtyAlert,
         type: item.type,
+        unitId: item.unitId,
       })),
       page: result.data.page,
       totalPages: result.data.totalPages,

@@ -13,6 +13,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
   adjustBatchStock,
+  createWithFirstBatch,
+  findBatchesOfAliveProduct,
   findBatchesOfOrder,
   receiveFinishedGoods,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
@@ -281,6 +283,50 @@ describe('findBatchesOfOrder: los lotes de producto terminado de un pedido', () 
       await prisma.product.update({ where: { id: productId }, data: { deletedAt: new Date() } });
 
       expect(await findBatchesOfOrder(pedido, fixture.scope)).toEqual([]);
+    } finally {
+      await limpiar(fixture);
+    }
+  });
+});
+
+describe('QC-199 — la unidad del lote es la de su producto', () => {
+  it('R18 lote de envase y de producto terminado conservan su unidad', async () => {
+    const fixture = await sembrarFixture();
+    try {
+      const botella = await sembrarPresentacion(fixture, 'Botella 500 ml', '0.5');
+      const pedido = await sembrarPedido(fixture);
+      const terminado = await recibir(fixture, pedido, botella, 4);
+
+      const delPedido = await findBatchesOfOrder(pedido, fixture.scope);
+      expect(delPedido.map((lote) => [lote.id, lote.unitId, lote.presentationName])).toEqual([
+        [terminado.batchId, fixture.unitId, 'Botella 500 ml'],
+      ]);
+      expect((await findBatchesOfAliveProduct(terminado.productId, fixture.scope)).map((lote) => lote.unitId)).toEqual([
+        fixture.unitId,
+      ]);
+
+      const unidadDeEnvases = await prisma.unit.findFirstOrThrow({
+        where: { companyId: null, nameNormalized: 'unidad' },
+        select: { id: true },
+      });
+      const envase = await createWithFirstBatch(
+        { name: `Botella vacia ${token()}`, qtyAlert: '0', type: 'PACKAGING' },
+        {
+          presentationId: null,
+          stock: '10',
+          unitCost: '0.5000',
+          lot: null,
+          purchaseDate: '2026-09-01',
+          expiryDate: null,
+          createdBy: fixture.empresa.userId,
+        },
+        new Date(),
+        fixture.scope,
+        { presentationId: botella, unitId: unidadDeEnvases.id },
+      );
+      expect((await findBatchesOfAliveProduct(envase.id, fixture.scope)).map((lote) => lote.unitId)).toEqual([
+        unidadDeEnvases.id,
+      ]);
     } finally {
       await limpiar(fixture);
     }

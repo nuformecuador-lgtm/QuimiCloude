@@ -258,6 +258,10 @@ export const E2E_ESPERADOS = [
   // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
   // identificador de peticion.
   'envases-del-pedido.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
+  // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'insumo-por-unidad.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -426,6 +430,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261004120000_orders_packaging_cost',
   // El permiso asignaciones.ejecutar y sus asignaciones; no toca el identificador.
   '20261004150000_execution_permission',
+  // La regla de unidad del lote de insumo sin presentacion; no toca el identificador.
+  '20261004170000_product_batches_require_product_unit',
 ] as const
 
 export function hallazgosDeMigraciones(

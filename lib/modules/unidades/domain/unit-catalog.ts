@@ -47,4 +47,8 @@ export interface UnitCatalog {
     companyId: string,
     unitIds: readonly UnitId[],
   ): Promise<readonly UnitRef[]>;
+
+  /** Todas las unidades visibles para esa empresa -propias o de sistema-, por nombre. No
+   *  comprueba permisos: lo hace el caso de uso del modulo que la llama. */
+  listVisibleRefs(companyId: string): Promise<readonly UnitRef[]>;
 }

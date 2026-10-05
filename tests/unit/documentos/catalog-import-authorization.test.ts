@@ -90,6 +90,7 @@ function dobleDeUnidades(
       bitacora.push('units.findRefs');
       return visibles.filter((unidad) => ids.includes(unidad.id));
     }),
+    listVisibleRefs: () => Promise.reject(new Error('no se usa')),
     findRefsSharingBaseInCompany: vi.fn(),
   };
 }

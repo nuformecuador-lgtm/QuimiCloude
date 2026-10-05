@@ -37,6 +37,7 @@ import type {
   CreateProductFormState,
   FinishedStockListResult,
   ProductListResult,
+  ProductFormUnitsResult,
   ProductMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type {
@@ -115,6 +116,7 @@ const {
   listPresentationsActionMock,
   createPresentationActionMock,
   listUnitsActionMock,
+  listProductFormUnitsActionMock,
   listProductBatchesActionMock,
   listOrderBatchesActionMock,
   listBatchMovementsActionMock,
@@ -155,6 +157,7 @@ const {
   // QC-80: la pagina pide el catalogo de unidades UNA vez, para el alta rapida de presentacion
   // que el selector lleva dentro (R11). Sin este doble la pagina intentaria abrir base de datos.
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
+  listProductFormUnitsActionMock: vi.fn<() => Promise<ProductFormUnitsResult>>(),
   // La fila abre un panel con los lotes del producto: sin este doble, montar la tabla
   // carga el modulo real y este intenta resolver la sesion.
   listProductBatchesActionMock: vi.fn(),
@@ -186,6 +189,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
   createProductAction: createProductActionMock,
   updateProductAction: updateProductActionMock,
   deleteProductAction: deleteProductActionMock,
+  listProductFormUnitsAction: listProductFormUnitsActionMock,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
@@ -449,6 +453,14 @@ async function elegirPresentacion(user: ReturnType<typeof setupUser>, nombre = P
   await waitFor(() => expect(screen.queryByTestId('presentation-popup')).toBeNull());
 }
 
+/** Elige la unidad del insumo en el selector «Unidad» del alta. */
+async function elegirUnidad(user: ReturnType<typeof setupUser>, etiqueta = UNIDAD.symbol) {
+  const selector = screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID);
+  await user.click(selector);
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: etiqueta })));
+  await waitFor(() => expect(selector).not.toHaveAttribute('aria-expanded', 'true'));
+}
+
 /**
  * Elige un tipo en el selector compartido del formulario. El `data-testid` vive en el root de
  * Base UI Select, no en el nodo `role=combobox`, asi que el trigger se localiza por su Label.
@@ -459,8 +471,8 @@ async function elegirTipo(user: ReturnType<typeof setupUser>, nombre: string) {
 }
 
 /**
- * Rellena el formulario abierto. En el ALTA cubre ademas lo minimo del primer lote -presentacion
- * y costo-, que desde el 2026-09-10 son obligatorios; en la EDICION esos campos no existen y el
+ * Rellena el formulario abierto. En el ALTA cubre ademas lo minimo: la unidad del insumo (o la
+ * presentacion del envase) y el costo del primer lote; en la EDICION esos campos no existen y el
  * helper no los toca.
  */
 async function rellenarFormulario(
@@ -474,9 +486,13 @@ async function rellenarFormulario(
     if (valor !== '') await user.type(control, valor);
   }
 
-  if (screen.queryByTestId('presentation-select') === null) return;
-
-  await elegirPresentacion(user);
+  if (screen.queryByTestId(PRESENTATION_UNIT_SELECT_TESTID) !== null) {
+    await elegirUnidad(user);
+  } else if (screen.queryByTestId('presentation-select') !== null) {
+    await elegirPresentacion(user);
+  } else {
+    return;
+  }
   for (const campo of Object.keys(LOTE_VALIDO)) {
     const valor = valores[campo] ?? LOTE_VALIDO[campo] ?? '';
     const control = screen.getByTestId(`product-field-${campo}`);
@@ -502,6 +518,7 @@ beforeEach(() => {
   deleteProductActionMock.mockResolvedValue({ status: 'success' });
   createPresentationActionMock.mockResolvedValue({ status: 'success', id: PRESENTACION_NUEVA.id });
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
+  listProductFormUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
   toastExito = vi.spyOn(toast, 'success');
   clearSidebarStateCookie();
   setViewportWidth(WIDE_VIEWPORT);
@@ -1440,10 +1457,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect((screen.getByTestId('product-field-stock') as HTMLInputElement).value).toBe('');
   });
 
-  it('el alta pide el primer lote: presentacion obligatoria y uno de los dos costos', async () => {
-    // Decision humana del 2026-09-10 — el alta captura ademas el PRIMER LOTE: presentacion
-    // obligatoria, costo unitario O total (basta con uno), y lote y caducidad opcionales.
-    // Todavia SIN back: nada de esto viaja a ninguna operacion, pero la pantalla ya lo exige.
+  it('el alta pide el primer lote: unidad obligatoria y uno de los dos costos', async () => {
+    // El alta de insumo exige la unidad y el costo unitario O total (basta con uno); lote y
+    // caducidad son opcionales.
     const user = setupUser();
 
     await renderPantalla();
@@ -1454,15 +1470,15 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       await user.type(screen.getByTestId(`product-field-${campo}`), valor);
     }
 
-    // Sin presentacion no se guarda: el campo espejo del selector es `required`, asi que el
-    // envio ni siquiera empieza -misma barrera nativa que tenia antes el desplegable-.
+    // Sin unidad no se guarda: el rechazo se pinta en el campo «Unidad».
     await user.click(screen.getByTestId(testId.enviar));
+    expect(await screen.findByTestId(PRESENTATION_UNIT_ERROR_TESTID)).toBeInTheDocument();
     expect(createProductActionMock).not.toHaveBeenCalled();
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
 
-    // Con presentacion pero sin ningun costo: se rechaza sin llamar a la operacion, y la falta
-    // se dice en LOS DOS campos, porque cualquiera de ellos la resuelve.
-    await elegirPresentacion(user);
+    // Con unidad pero sin ningun costo: se rechaza sin llamar a la operacion, y la falta se dice
+    // en LOS DOS campos, porque cualquiera de ellos la resuelve.
+    await elegirUnidad(user);
     await user.click(screen.getByTestId(testId.enviar));
 
     expect(await screen.findByTestId('product-error-unitCost')).toHaveTextContent('basta con uno');
@@ -1676,10 +1692,11 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
 
     const enviado = createProductActionMock.mock.calls[0][1];
-    for (const campo of ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate']) {
+    for (const campo of ['unitId', 'unitCost', 'totalCost', 'lot', 'expiryDate']) {
       expect(enviado.has(campo), `${campo} debe viajar en el alta`).toBe(true);
     }
-    expect(enviado.get('presentationId')).toBe(PRESENTACION_A.id);
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
+    expect(enviado.get('presentationId')).toBeNull();
     expect(enviado.get('unitCost')).toBe(LOTE_VALIDO.unitCost);
     expect(enviado.get('lot')).toBe('LT-4471');
     expect(enviado.get('expiryDate')).toBe('2027-03-15');
@@ -1741,7 +1758,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await screen.findByTestId(testId.errorFormulario);
 
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
-    expect(screen.getByTestId('presentation-value')).toHaveValue(PRESENTACION_A.id);
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toHaveTextContent(UNIDAD.symbol);
     expect(screen.getByTestId('product-field-unitCost')).toHaveValue(LOTE_VALIDO.unitCost);
     expect(screen.getByTestId('product-field-totalCost')).toHaveValue('150');
     expect(screen.getByTestId('product-field-lot')).toHaveValue('LT-4471');
@@ -1866,9 +1883,10 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
-    // PRODUCT: alerta, presentacion, costos, lote y expiracion a la vista.
+    // PRODUCT: alerta, unidad, costos, lote y expiracion a la vista; presentacion no.
     expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
-    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
     expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
 
     await elegirTipo(user, 'Instrumento');
@@ -1881,11 +1899,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await elegirTipo(user, 'Envase');
     expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
     expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.queryByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toBeNull();
     expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
 
     await elegirTipo(user, 'Producto');
     expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
-    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
     expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
     expect(screen.getByLabelText('Tipo')).toHaveTextContent('Producto');
     expect(screen.getByTestId(testId.formulario)).toBeInTheDocument();
@@ -1918,7 +1938,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
     expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
     expect(screen.getByTestId('product-field-lot')).toBeInTheDocument();
-    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toBeInTheDocument();
   });
 
   it('R3 — el select de tipo del alta no ofrece «Producto terminado»', async () => {
@@ -2058,23 +2078,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(campo).toHaveValue('');
   });
 
-  it('el formulario no captura la unidad, y el alta viaja sin ella (QC-80, R21)', async () => {
-    // **R23 de QC-14 quedo sin objeto** el 2026-09-03, y este test es su relevo, no su borrado.
-    //
-    // Aquel R23 pedia la unidad como TEXTO LIBRE porque eso era lo que la columna guardaba. El
-    // merge de QC-32 (`modelo-unidades`) tumbo esa premisa con la feature en vuelo -la unidad
-    // paso a ser una clave foranea al catalogo- y el campo salio de la pantalla por decision
-    // humana, a la espera de un selector.
-    //
-    // **QC-80 (R21) cierra la espera: ese selector no llegara nunca.** `products.unit_id` ya no
-    // existe -columna, indice y FK eliminados-, asi que no hay campo que pedir: la unidad la
-    // declara la PRESENTACION y la del producto se DERIVA de la de su lote mas reciente (R22).
-    // Lo que aqui era «todavia no» pasa a ser «nunca», y el caso se queda por el mismo motivo de
-    // siempre elevado: que el alta no envie `unitId` ya no es una carencia temporal, es el
-    // contrato -si lo enviara, el `strictObject` del esquema lo rechazaria con `invalid_input`-.
-    //
-    // Lo que se vigila aqui es que la ausencia siga siendo intencionada: ni un campo de texto que
-    // reviva la premisa caida, ni un hueco donde alguien teclee un UUID a mano.
+  it('el alta de insumo pide la unidad del catalogo, sin texto libre, y viaja con ella en vez de la presentacion', async () => {
     const user = setupUser();
 
     await renderPantalla();
@@ -2084,32 +2088,77 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const formulario = screen.getByTestId(testId.formulario);
     expect(screen.queryByTestId('product-field-unit')).toBeNull();
     expect(screen.queryByTestId('product-field-unitId')).toBeNull();
-    expect(formulario.textContent).not.toContain('Unidad');
 
-    // Los comboboxes del formulario son tres: el nombre -autocomplete de texto libre que busca
-    // productos existentes-, la presentacion -que volvio al alta el 2026-09-10 como campo del
-    // primer LOTE, no del producto- y el TIPO de producto, que esta ficha anadio. Ninguno de los
-    // tres es una unidad: el tercero se identifica por su propia etiqueta ("Tipo"), no por
-    // descarte de un conteo que cualquiera podria leer como magico.
+    // Tres comboboxes: el nombre, el tipo y la unidad. Ninguno es la presentacion.
     const combos = within(formulario).getAllByRole('combobox');
     expect(combos).toHaveLength(3);
     expect(combos).toContain(screen.getByTestId('product-field-name'));
-    // El trigger del tipo se localiza por su Label (htmlFor), no por data-testid: el atributo
-    // vive en el root de Base UI Select, que no es el nodo role=combobox.
     expect(combos).toContain(screen.getByLabelText('Tipo'));
-    expect(combos).toContain(screen.getByTestId('presentation-select'));
-    const selectorDeTipo = screen.getByLabelText('Tipo');
-    expect(combos).toContain(selectorDeTipo);
+    expect(combos).toContain(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
 
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));
 
     await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
 
-    // Y el alta llega a la Server Action SIN unidad, ni con el nombre viejo ni con el nuevo.
     const enviado = createProductActionMock.mock.calls[0][1];
     expect(enviado.get('unit')).toBeNull();
-    expect(enviado.get('unitId')).toBeNull();
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
+    expect(enviado.get('presentationId')).toBeNull();
+  });
+
+  it('R20 la pagina pasa al formulario las unidades de la accion de inventario y no las de listUnitsAction', async () => {
+    const DEL_CATALOGO = { ...UNIDAD, id: crypto.randomUUID(), name: 'Galón', symbol: 'gal' };
+    const DEL_ALTA = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [DEL_CATALOGO] });
+    listProductFormUnitsActionMock.mockResolvedValue({ status: 'success', data: [DEL_ALTA] });
+    const user = setupUser();
+
+    await renderPantalla();
+    expect(listProductFormUnitsActionMock).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+    const opciones = await screen.findAllByTestId(PRESENTATION_UNIT_OPTION_TESTID);
+    expect(opciones.map((opcion) => opcion.getAttribute('data-value'))).toEqual([DEL_ALTA.id]);
+  });
+
+  it('R20 si la lectura de unidades del alta falla, el selector sale vacio y la pantalla sigue en pie', async () => {
+    listProductFormUnitsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+    expect(screen.queryAllByTestId(PRESENTATION_UNIT_OPTION_TESTID)).toHaveLength(0);
+    expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
+  });
+
+  it('R20 el alta del estado vacio ofrece las unidades del formulario y no las de listUnitsAction', async () => {
+    // El estado vacio monta su propio panel de alta, aparte del de la cabecera.
+    const DEL_CATALOGO = { ...UNIDAD, id: crypto.randomUUID(), name: 'Galón', symbol: 'gal' };
+    const DEL_ALTA = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [DEL_CATALOGO] });
+    listProductFormUnitsActionMock.mockResolvedValue({ status: 'success', data: [DEL_ALTA] });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([], { total: 0 }));
+    const user = setupUser();
+
+    await renderPantalla();
+    const vacio = screen.getByTestId(testId.vacio);
+    await user.click(within(vacio).getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID));
+    const opciones = await screen.findAllByTestId(PRESENTATION_UNIT_OPTION_TESTID);
+    expect(opciones.map((opcion) => opcion.getAttribute('data-value'))).toEqual([DEL_ALTA.id]);
   });
 
   // QC-70 R32 — AQUI vivia el caso «un nombre de presentacion repetido pinta el mensaje DEL BACK,
@@ -2175,6 +2224,7 @@ describe('pantalla de productos — alta rapida de presentacion (QC-80 R11, R17,
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
+    await elegirTipo(user, 'Envase');
 
     await user.click(screen.getByTestId(testId.abrirAltaPresentacion));
     await user.type(screen.getByTestId(testId.nombrePresentacion), PRESENTACION_NUEVA.name);
@@ -2215,6 +2265,7 @@ describe('pantalla de productos — alta rapida de presentacion (QC-80 R11, R17,
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
+    await elegirTipo(user, 'Envase');
 
     expect(screen.getByTestId(testId.selectorPresentacion)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.abrirAltaPresentacion)).toBeNull();

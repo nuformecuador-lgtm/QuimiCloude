@@ -591,11 +591,16 @@ describe('QC-121 R2 — NewProduct no lleva unidad ni existencia', () => {
     expect(/\bstock\b/.test(cuerpo as string)).toBe(true);
   });
 
-  it('verde: el NewProduct real no declara unitId ni stock', () => {
+  // QC-199 anade `unitId` opcional para el alta de insumo: se admite solo como id opcional; la
+  // unidad como texto y la existencia siguen fuera.
+  it('verde: el NewProduct real no declara stock ni unidad como texto, y unitId solo como id opcional', () => {
     const cuerpo = cuerpoDeTipo(leer(PRODUCT_VIEW), 'NewProduct');
     expect(cuerpo, 'NewProduct no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(/\bunitId\b/.test(cuerpo as string)).toBe(false);
-    expect(/\bstock\b/.test(cuerpo as string)).toBe(false);
+    const codigo = stripComments(cuerpo as string);
+    expect(/\bstock\b/.test(codigo)).toBe(false);
+    expect(/\bunit(?:Name|Symbol|Label|Code)?\s*\??\s*:/.test(codigo)).toBe(false);
+    const declaraciones = codigo.match(/\bunitId\b[^;\n]*/g) ?? [];
+    expect(declaraciones).toEqual(['unitId?: string']);
   });
 });
 

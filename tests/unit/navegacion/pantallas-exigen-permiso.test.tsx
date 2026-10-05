@@ -61,6 +61,7 @@ const { getSessionUserMock, notFoundMock, redirectMock, actions } = vi.hoisted((
     getRecipeAction: vi.fn(),
     listUnitsAction: vi.fn(),
     listProductsAction: vi.fn(),
+    listProductFormUnitsAction: vi.fn(),
   },
 }));
 
@@ -104,6 +105,7 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
   listProductsAction: actions.listProductsAction,
+  listProductFormUnitsAction: actions.listProductFormUnitsAction,
   createProductAction: vi.fn(),
   updateProductAction: vi.fn(),
   deleteProductAction: vi.fn(),
