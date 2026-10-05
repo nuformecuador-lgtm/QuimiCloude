@@ -7,8 +7,9 @@ import type { CostingBatch, PackagingCostingBatch, ProductId } from '@/lib/modul
 import { consumedQuantity } from '@/lib/modules/recetas'
 import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades'
 
-/** Linea de receta, vista con lo minimo que este calculo necesita. `unitId` es la del insumo
- *  (`ProductRef.unitId`) y llega `null` cuando el producto todavia no tiene ningun lote. */
+/** Linea de receta, vista con lo minimo que este calculo necesita. `unitId` es la unidad guardada
+ *  del insumo (`ProductRef.unitId`) y es `null` cuando el producto no tiene unidad guardada; en
+ *  ese caso la linea no tiene coste. */
 export type RecipeCostLine = {
   readonly productId: ProductId
   readonly percentage: string
