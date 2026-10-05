@@ -508,8 +508,18 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     onSaved(state.lot);
   }, [state, onSaved]);
 
+  /**
+   * Cambiar de tipo tras elegir un producto existente vacia el formulario: lo autocompletado era
+   * de un producto de otro tipo. `resetCount` remonta los campos no controlados, y
+   * `valoresDescartados` impide que lo escrito en un intento fallido anterior los vuelva a llenar
+   * (el siguiente envio trae un estado nuevo, y con el sus valores vuelven a contar).
+   */
+  const [resetCount, setResetCount] = useState(0);
+  const [valoresDescartados, setValoresDescartados] = useState<FieldValues | undefined>(undefined);
+
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
-  const values = state.status === 'error' ? state.values : undefined;
+  const values =
+    state.status === 'error' && state.values !== valoresDescartados ? state.values : undefined;
 
   /** Valor inicial de un campo: lo escrito en el intento fallido; si no, el del producto que se edita. */
   const initialValue = (field: ProductFieldName, fromProduct: string): string =>
@@ -540,6 +550,17 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
   const isEdit = product !== undefined;
   const isPackaging = productType === PRODUCT_TYPES.PACKAGING;
+
+  function handleTypeChange(next: ProductType) {
+    setProductType(next);
+    // Con solo texto libre escrito no hay nada autocompletado que deshacer: se conserva.
+    if (template === null) return;
+    setTemplate(null);
+    setStockValue('');
+    setQtyAlertValue('');
+    setValoresDescartados(state.status === 'error' ? state.values : undefined);
+    setResetCount((count) => count + 1);
+  }
   const packagingPresentationName = product?.presentationName ?? null;
 
   return (
@@ -612,9 +633,11 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         />
       ) : (
         <ProductNamePicker
+          key={`name-${resetCount}`}
           defaultValue={initialValue('name', '')}
           error={fieldErrors.name}
           onSelect={applyTemplate}
+          productType={productType}
         />
       )}
 
@@ -649,10 +672,10 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           name="type"
           label={FIELD_LABELS.type}
           required
-          defaultValue={initialValue('type', template?.type ?? product?.type ?? PRODUCT_TYPES.PRODUCT)}
+          defaultValue={initialValue('type', productType)}
           error={fieldErrors.type}
           options={TYPE_OPTIONS}
-          onChange={(value) => setProductType(value as ProductType)}
+          onChange={(value) => handleTypeChange(value as ProductType)}
         />
       )}
 
@@ -675,7 +698,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
       {isEdit ? null : shouldShowField('presentationId', productType) && (
         <PresentationSelect
-          key={`${initialValue('presentationId', '')}-${template?.presentationId ?? ''}`}
+          key={`${resetCount}-${initialValue('presentationId', '')}-${template?.presentationId ?? ''}`}
           defaultValue={initialValue('presentationId', template?.presentationId ?? '')}
           defaultLabel={template?.presentationName ?? ''}
           error={fieldErrors.presentationId}
@@ -753,6 +776,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         <>
           {shouldShowField('unitCost', productType) && (
             <ProductCostFields
+              key={`costos-${resetCount}`}
               unitCostLabel={FIELD_LABELS.unitCost}
               totalCostLabel={FIELD_LABELS.totalCost}
               initialUnitCost={initialValue('unitCost', '')}
@@ -764,6 +788,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
           {shouldShowField('lot', productType) && (
             <ProductField
+              key={`lot-${resetCount}`}
               name="lot"
               label={FIELD_LABELS.lot}
               type="text"
@@ -775,6 +800,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
           {shouldShowField('expiryDate', productType) && (
             <ProductField
+              key={`expiryDate-${resetCount}`}
               name="expiryDate"
               label={FIELD_LABELS.expiryDate}
               type="date"
@@ -791,6 +817,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           */}
           {shouldShowField('purchaseDate', productType) && (
             <ProductBatchDateField
+              key={`purchaseDate-${resetCount}`}
               initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
               error={fieldErrors.purchaseDate}
             />
