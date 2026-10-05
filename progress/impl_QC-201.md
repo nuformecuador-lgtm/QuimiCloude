@@ -86,3 +86,19 @@ Se repitió el ciclo DOWN/UP con el mismo resultado y después se borró la base
 1. **`tests/unit/pedidos/qc138-transversales.test.ts` R37** («todo código del catálogo ya estaba en el padre de la rama»). Por construcción falla en cualquier rama que añada un permiso, y R1 lo exige. Cambiarlo es relajar un aserto ajeno, así que lo tiene que decidir el humano: retirarlo, acotarlo a la rama de QC-138 o meterlo en el baseline con su motivo. T12 sigue `[ ]` por esto.
 2. El caso D de `e2e/pedidos-terminados.spec.ts` está roto en `dev` por el menú de 3 puntos (ver arriba). Hay que decidir si se arregla aquí o en otra ficha.
 3. No está hecho: el merge de `dev` (F2.3; `origin/dev` ya va por `57a01471`), ni el PR. Pendiente para el PR: el riesgo D11 y el orden migración/código (design §9).
+
+## Cierre de los bloqueos (decisión del humano, 2026-10-04)
+
+1. **qc138 R37 retirado** (`0888fa28`). Se borró de `tests/unit/pedidos/qc138-transversales.test.ts` el caso «todo código del catálogo ya estaba en el padre de la rama». En su lugar queda un comentario: era una regla de QC-138 mientras la ficha estaba abierta, y ya cerró. Junto con el caso se borraron `codigosDePermiso` y su caso del extractor, que nadie más usaba. Se conservaron `git`, `padreDeLaRama`, `enElPadre` y `stripComments` porque los usan R39 y R21; ni R39 ni R21 se tocaron. El otro caso R37 (los permisos de pedidos e inventario) sigue, y su describe se renombró.
+2. **E2E del menú de 3 puntos** (`f42cad7b`). Helper nuevo `e2e/helpers/row-actions-menu.ts` (`openRowActionsMenuItem`): abre el disparador de la fila y busca el item en el portal (`page.getByRole('menu')`). Corregidos `pedidos-terminados` (caso D), `pedidos-busqueda`, `pedidos-responsables` (a través de `openOrderRowMenu`) y `cierre-de-sesiones` (`user-action-edit`).
+3. **`cierre-de-sesiones`** (`c98bcdc7`): esperaba que la víctima (Operador) aterrizara en inventario. Desde QC-86 el Operador tiene `asignaciones.consultar` y aterriza en `/asignacion`, así que el aterrizaje se deriva ahora con `loginAndLand`. El rojo ya estaba en `dev`; salió al corregir el menú.
+4. **Merge de `origin/dev` (57a01471)**: sin conflictos y sin migraciones nuevas.
+
+## Gate final (HEAD `c98bcdc7`)
+
+- `./init.sh` completo: **`== init OK ==`**. `Tests 10 failed | 12304 passed | 128 skipped (12442)`, `Test Files 8 failed | 862 passed (870)`: «sin rojos nuevos (8 rojos, todos en el baseline de 8)». Corrieron los tres proyectos (ui, node e integration).
+- E2E en la base efímera `qct_qc201_e2e`, en chromium y webkit (después se borró la base):
+  - `aislamiento-pedidos`, `cierre-de-sesiones`, `empaque`, `pedido-en-varias-presentaciones`, `pedidos`, `pedidos-busqueda`, `pedidos-cotizacion`, `pedidos-responsables`, `pedidos-terminados`, `reserva-de-material`, `pedidos-asignados` y `ejecucion-receta`: 52 passed y 2 failed. Los 2 eran `cierre-de-sesiones`.
+  - Tras `c98bcdc7`, `cierre-de-sesiones` da 2 passed.
+
+T12 marcada. Pendiente para el PR (no abierto): el riesgo D11 y el orden migración/código.

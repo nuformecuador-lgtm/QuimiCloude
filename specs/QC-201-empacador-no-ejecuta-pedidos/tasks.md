@@ -103,7 +103,7 @@ completo.
   `ejecucion-receta.spec.ts`, `pedidos-asignados.spec.ts` y `pedidos-terminados.spec.ts` siguen
   verdes (este último puede asumir que el Empacador ve todos los terminados: ajustarlo a R20).
   Casos `R8`, `R10`, `R18`, `R19a`, `R20`.
-- [ ] **T12. Gate completo y trazabilidad** — dep: todo lo anterior.
+- [x] **T12. Gate completo y trazabilidad** — dep: todo lo anterior.
   `./init.sh` completo en verde; mapa `R<n> -> test` en `progress/impl_QC-201-empacador-no-ejecuta-pedidos.md`.
   Riesgo aceptado D11 (sesiones vivas hasta 8 h) escrito en la descripción del PR. R21 se
   verifica con el test existente de que el login carga los permisos del rol desde BD
