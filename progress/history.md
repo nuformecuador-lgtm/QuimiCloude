@@ -5034,3 +5034,23 @@ podar.
 - Decisiones humanas: se retira qc138 R37 (bloqueaba cualquier permiso nuevo); los E2E abren
   el menú de 3 puntos antes de pulsar un item. Riesgo aceptado: los Operadores con sesión
   abierta reciben el permiso al volver a entrar (hasta 8 h). Nace QC-202 (estado TERMINADO).
+
+## 2026-10-05 — QC-199 presentacion-por-unidad-en-alta-de-producto
+
+- El alta de insumo (`PRODUCT`) pide la **unidad** en vez de la presentación; el lote nace sin
+  presentación, con la cantidad en la unidad del producto. Envase, instrumento y producto
+  terminado sin cambios; lotes existentes sin migración de datos (T0: 0 lotes con unidad de
+  presentación distinta de la del producto).
+- Migración `20261004170000_product_batches_require_product_unit`, reversible: la base rechaza un
+  lote sin presentación de un insumo sin unidad. Vista de lotes y costeo leen la unidad del
+  producto. Unidades del formulario con `inventario.modificar` (`listProductFormUnitsAction`).
+- Requisitos cubiertos: R1–R20. PR #145, merge `8cfbacc5`. Contrato de servicios commiteado antes
+  de paralelizar backend y frontend; ninguna firma cambió después.
+- Review: vuelta 1 rechazada (B1, cita de ficha en un comentario); vuelta 2 OK. m1 (tooltip en
+  táctil) y m3 (duplicado con `presentation-select.tsx`) aceptados sin cambio.
+- Decisiones humanas: E2E R26 localiza las filas por nombre y las distingue por la existencia
+  (la columna de nombre ya no pinta la unidad, deuda QC-177); QC-22 R24 se mueve al alta de envase.
+- Gate completo: 8 rojos, todos en el baseline (no hay entradas que podar). E2E 10/10 en Chromium y WebKit.
+- Nacen del review: QC-203 (agrupar homónimos por familia de unidad), QC-204 (convertir la unidad
+  del pedido a la del insumo), QC-205 (unicidad nombre + unidad), QC-206 (unidad en uso no cambia
+  factor), QC-207 (liberar material revisa los bloqueados).

@@ -22,7 +22,6 @@
 | QC-195 | envases-del-pedido-como-productos | Pedidos | fullstack | done | feature/QC-195-envases-del-pedido-como-productos | **CERRADA el 2026-10-04** (PR #142, merge `f6f69dad`): resumen en `progress/history.md`. Tarjeta en *Finalizado* y comentada. Pendiente local: borrar la base `QuimiCloude_QC195`. |
 
 ## Evaluaciones
-**2026-10-04:** QC-199 acotada con `/afinar-feature`: 9 decisiones cerradas y 0 preguntas abiertas en `specs/QC-199-presentacion-por-unidad-en-alta-de-producto/requirements.md`. Board: decisiones añadidas a la descripción. Sembrada en el árbol principal (`dev`), sin commitear: viaja a su rama en F1.0.
 **2026-10-04:** QC-194 cerrada (PR #141, merge `1ea13ba9`; tarjeta a Finalizado; resumen en history). Baseline sin podar: los 8 rojos siguen rojos en el gate completo.
 **2026-10-04:** QC-195 cerrada (PR #142, merge `f6f69dad`; tarjeta a Finalizado; resumen en history). Deja tres E2E rojos heredados de dev para ficha propia (ver Deudas).
 **2026-10-03:** QC-194 acotada con `/afinar-feature`: 8 decisiones cerradas y 2 preguntas abiertas en `specs/QC-194-herramientas-de-la-receta/requirements.md`. Board sin cambios. QC-195 acotada y sembrada aparte, en el arbol principal.
