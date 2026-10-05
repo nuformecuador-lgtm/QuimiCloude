@@ -891,6 +891,14 @@ test.describe('catalogo de productos', () => {
     await elegirUnidad(page, liter);
     await page.getByTestId('product-field-unitCost').fill(sameNameLiterUnitCost);
     await guardarAlta(page);
+    // El panel se cierra antes de `router.refresh()` y WebKit aborta un `goto` con ese refresco en
+    // vuelo: la segunda fila «X», sin navegar, dice que ya llego. La empresa del worker tiene menos
+    // productos que una pagina, asi que las dos caben en la actual.
+    const filasHomonimas = page
+      .getByTestId('data-table-cell-name')
+      .filter({ hasText: textoExacto(sameNameProductName) })
+      .locator('xpath=ancestor::tr[1]');
+    await expect(filasHomonimas).toHaveCount(2, { timeout: 60_000 });
 
     // --- 3. El listado muestra DOS filas «X», y es la existencia, con su unidad, lo que las
     // distingue: la celda de nombre ya no lleva la unidad.
@@ -939,6 +947,11 @@ test.describe('catalogo de productos', () => {
     await guardarAlta(page);
 
     const kgStockAfter = Number(sameNameKgFirstStock) + Number(sameNameKgSecondStock);
+    // La suma en la fila kg, sin navegar, es la senal de que el refresco del alta llego antes del
+    // `goto`: el numero de filas no cambia con un lote agregado.
+    await expect(
+      filasHomonimas.getByTestId('product-stock').filter({ hasText: kg.label }),
+    ).toHaveText(`${kgStockAfter} ${kg.label}`, { timeout: 60_000 });
     expect(
       (await existenciasDeHomonimos(page, sameNameProductName)).sort(),
       'sube solo la fila en kg; la de L queda igual y no aparece una tercera',
