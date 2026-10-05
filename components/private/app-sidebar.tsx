@@ -42,7 +42,7 @@ import {
   type NavItem,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/modules/identity';
 
 /**
@@ -115,7 +115,7 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                render={<Link href={DASHBOARD_ROUTE} />}
+                render={<Link href={ASSIGNED_ORDERS_ROUTE} />}
                 aria-label={BRAND_LABEL}
                 onClick={closeMobilePanel}
                 data-testid="private-brand-link"
