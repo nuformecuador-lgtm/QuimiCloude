@@ -85,6 +85,17 @@ const CHECKLIST_STEP: RecipeStepView = {
   ],
 };
 
+const PACKING_STEP: RecipeStepView = {
+  blocks: [
+    { kind: 'paragraph', spans: [{ text: 'Etiquetar el envase', bold: true }] },
+    { kind: 'checklist', items: [{ spans: [{ text: 'Lote impreso' }] }] },
+  ],
+};
+
+const PACKING_PLAIN_STEP: RecipeStepView = {
+  blocks: [{ kind: 'paragraph', spans: [{ text: 'Sellar la tapa' }] }],
+};
+
 function versionDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
   return {
     id: VERSION_ID,
@@ -433,6 +444,51 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
       'La receta original no tiene pasos.',
     );
     expect(screen.queryByTestId('recipe-version-inherited-steps')).toBeNull();
+  });
+
+  it('R12 — los pasos de envasado heredados se leen dentro de un contenedor inert, sin editor ni marcado', async () => {
+    const user = setupUser();
+    renderEdit(versionDetail({ packingSteps: [PACKING_STEP, PACKING_PLAIN_STEP] }));
+
+    const packing = screen.getByTestId('recipe-version-inherited-packing-steps');
+    expect(packing).toHaveAttribute('inert');
+    expect(packing).toHaveAttribute('aria-readonly', 'true');
+    expect(within(packing).getByText('Etiquetar el envase')).toBeInTheDocument();
+    expect(within(packing).getByText('Sellar la tapa')).toBeInTheDocument();
+    expect(within(packing).getByText('Lote impreso')).toBeInTheDocument();
+    // La negrilla del documento se conserva tal cual al leerla.
+    expect(within(packing).getByText('Etiquetar el envase').closest('strong')).not.toBeNull();
+
+    expect(packing.querySelector('[contenteditable], input:not([type="checkbox"]), textarea, select')).toBeNull();
+    expect(within(packing).queryByRole('button')).toBeNull();
+    expect(within(packing).queryByRole('toolbar')).toBeNull();
+    expect(screen.queryByTestId('recipe-packing-steps-field')).toBeNull();
+    expect(screen.queryByTestId('recipe-packing-step-add')).toBeNull();
+    expect(screen.queryByTestId('recipe-version-packing-steps-empty')).toBeNull();
+
+    const checkbox = within(packing).getByRole('checkbox');
+    expect(checkbox).toHaveAttribute('aria-checked', 'false');
+    await user.click(checkbox);
+    expect(checkbox).toHaveAttribute('aria-checked', 'false');
+    expect(updateVersionMock).not.toHaveBeenCalled();
+  });
+
+  it('R12 — sin pasos de envasado en la original se muestra el aviso y ningún bloque', () => {
+    renderEdit(versionDetail({ packingSteps: [] }));
+
+    expect(screen.getByTestId('recipe-version-packing-steps-empty')).toHaveTextContent(
+      'La receta original no tiene pasos de envasado.',
+    );
+    expect(screen.queryByTestId('recipe-version-inherited-packing-steps')).toBeNull();
+    expect(screen.queryByTestId('recipe-packing-steps-field')).toBeNull();
+  });
+
+  it('R12 — el alta de versión no ofrece pasos de envasado ni para leer ni para editar', () => {
+    renderCreate();
+
+    expect(screen.queryByTestId('recipe-version-inherited-packing-steps')).toBeNull();
+    expect(screen.queryByTestId('recipe-version-packing-steps-empty')).toBeNull();
+    expect(screen.queryByTestId('recipe-packing-steps-field')).toBeNull();
   });
 
   it('R23 — la versión por revisar lleva la marca «Por revisar»', () => {

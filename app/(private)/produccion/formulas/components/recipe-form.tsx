@@ -99,6 +99,10 @@ import {
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
+const PACKING_STEPS_TITLE = 'Pasos de envasado';
+const PACKING_STEPS_ADD_LABEL = 'Añadir paso de envasado';
+const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
+
 const PREVIEW_OPEN_LABEL = 'Vista previa';
 const PREVIEW_TITLE = 'Vista previa';
 const PREVIEW_DESCRIPTION =
@@ -143,6 +147,7 @@ type FieldErrors = {
   readonly tools?: RecipeToolErrors;
   readonly toolsGeneral?: string;
   readonly steps?: RecipeStepErrors;
+  readonly packingSteps?: RecipeStepErrors;
 };
 
 /**
@@ -170,6 +175,7 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
       lines: [],
       tools: [],
       steps: [],
+      packingSteps: [],
       image: { kind: 'untouched' },
     };
   }
@@ -185,6 +191,10 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
     // marcas y sus listas de verificacion intactas. `key` es una clave local de React.
     steps: recipe.steps.map(
       (step): RecipeStepFormValue => ({ key: createLocalKey('step'), document: step }),
+    ),
+    // Un detalle sin la clave (lecturas anteriores a la columna) abre con la sección vacía.
+    packingSteps: (recipe.packingSteps ?? []).map(
+      (step): RecipeStepFormValue => ({ key: createLocalKey('packing-step'), document: step }),
     ),
     image: { kind: 'untouched' },
   };
@@ -241,6 +251,7 @@ export function RecipeForm(props: RecipeFormProps) {
         tools: extractToolErrors(issues, RECIPE_TOOL_ERROR_MESSAGES),
         toolsGeneral: extractGeneralToolsError(issues),
         steps: extractStepErrors(issues),
+        packingSteps: extractStepErrors(issues, 'packingSteps'),
       });
       // R23: la validación previa rechazada tampoco invoca la operación, pero SÍ es un rechazo
       // que el usuario tiene que ver -no un silencio-, así que también alimenta la región de error
@@ -439,6 +450,15 @@ export function RecipeForm(props: RecipeFormProps) {
         steps={state.steps}
         onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
         errors={fieldErrors.steps}
+      />
+
+      <RecipeStepsField
+        steps={state.packingSteps}
+        onChange={(packingSteps) => setState((previous) => ({ ...previous, packingSteps }))}
+        errors={fieldErrors.packingSteps}
+        title={PACKING_STEPS_TITLE}
+        addLabel={PACKING_STEPS_ADD_LABEL}
+        testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
       />
 
       <div className="flex justify-end gap-2">

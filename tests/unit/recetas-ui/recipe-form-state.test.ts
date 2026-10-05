@@ -33,6 +33,7 @@ function state(tools: readonly RecipeToolFormValue[]): RecipeFormState {
     lines: [{ key: 'l', productId: PRODUCT, productName: 'Agua', percentage: '100', productUnitId: null }],
     tools,
     steps: [],
+    packingSteps: [],
     image: { kind: 'untouched' },
   };
 }

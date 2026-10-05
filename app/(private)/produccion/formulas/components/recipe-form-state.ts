@@ -100,6 +100,7 @@ export type RecipeFormState = {
   readonly lines: readonly RecipeLineFormValue[];
   readonly tools: readonly RecipeToolFormValue[];
   readonly steps: readonly RecipeStepFormValue[];
+  readonly packingSteps: readonly RecipeStepFormValue[];
   readonly image: ImageFieldState;
 };
 
@@ -132,6 +133,7 @@ export type RecipePayload = {
   readonly name: string;
   readonly description: string | null;
   readonly steps: readonly RecipeStepPayload[];
+  readonly packingSteps: readonly RecipeStepPayload[];
   readonly lines: readonly RecipeLinePayload[];
   readonly tools: readonly RecipeToolPayload[];
   readonly image?: { readonly bytes: Uint8Array } | null;
@@ -181,6 +183,7 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
     steps: state.steps.map((step): RecipeStepPayload => step.document),
+    packingSteps: state.packingSteps.map((step): RecipeStepPayload => step.document),
     lines: toLinePayloads(state.lines),
     tools: toToolPayloads(state.tools),
   };
@@ -301,12 +304,18 @@ export function extractLineErrors(issues: readonly ZodIssue[]): RecipeLineErrors
   return result;
 }
 
-/** Extrae de `error.issues` los mensajes que identifican un paso concreto (R32, R38 del esquema). */
-export function extractStepErrors(issues: readonly ZodIssue[]): RecipeStepErrors {
+/**
+ * Extrae de `error.issues` los mensajes que identifican un paso concreto (R32, R38 del esquema).
+ * `root` separa los pasos del operador de los de envasado: comparten índices.
+ */
+export function extractStepErrors(
+  issues: readonly ZodIssue[],
+  root: 'steps' | 'packingSteps' = 'steps',
+): RecipeStepErrors {
   const result: Record<number, string> = {};
   for (const issue of issues) {
-    const [root, index] = issue.path;
-    if (root !== 'steps' || typeof index !== 'number') continue;
+    const [issueRoot, index] = issue.path;
+    if (issueRoot !== root || typeof index !== 'number') continue;
     result[index] = issue.message;
   }
   return result;

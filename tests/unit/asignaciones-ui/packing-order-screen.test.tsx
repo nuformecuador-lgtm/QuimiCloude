@@ -6,6 +6,8 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TEXTS,
   PACKING_ORDER_FINISH_DIALOG_TESTID,
+  PACKING_ORDER_FINISH_ERROR_TESTID,
+  PACKING_ORDER_FINISH_FORM_TESTID,
   PACKING_ORDER_ID_FIELD,
   PACKING_ORDER_MISSING_DISTRIBUTION_TESTID,
   PACKING_ORDER_PRESENTATION_LINE_TESTID,
@@ -16,9 +18,10 @@ import {
   PACKING_ORDER_START_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TEXTS,
   PACKING_ORDER_START_DIALOG_TESTID,
+  PACKING_ORDER_STEPS_TESTID,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
-import type { PackingOrderRow } from '@/lib/modules/asignaciones';
+import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
 
 const { startPackingActionMock, finishPackingActionMock } = vi.hoisted(() => ({
   startPackingActionMock: vi.fn(),
@@ -33,7 +36,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
 const MISSING_DISTRIBUTION_TEXT = 'Falta el reparto: lo define quien edita pedidos';
 
-function fila(overrides: Partial<PackingOrderRow> = {}): PackingOrderRow {
+function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
     numberText: '2026-0000030',
@@ -50,11 +53,12 @@ function fila(overrides: Partial<PackingOrderRow> = {}): PackingOrderRow {
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
+    packingSteps: [],
     ...overrides,
   };
 }
 
-function pintar(order: PackingOrderRow) {
+function pintar(order: PackingOrderDetail) {
   render(<PackingOrderScreen order={order} actorId={ACTOR_ID} />);
 }
 
@@ -246,4 +250,201 @@ describe('pantalla del Empacador — Comenzar y Terminar piden confirmacion', ()
       expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
     });
   }
+});
+
+describe('pantalla del Empacador — los pasos de envasado', () => {
+  const LLENAR = 'Llenar las garrafas hasta la marca';
+  const TAPADAS = 'Garrafas tapadas';
+  const ETIQUETAR = 'Etiquetar el lote';
+  const PASO_DEL_OPERADOR = 'Mezclar el hipoclorito despacio';
+
+  const PASOS_DE_ENVASADO: PackingOrderDetail['packingSteps'] = [
+    {
+      blocks: [
+        { kind: 'paragraph', spans: [{ text: LLENAR }] },
+        { kind: 'checklist', items: [{ spans: [{ text: TAPADAS }] }] },
+      ],
+    },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: ETIQUETAR }] }] },
+  ];
+
+  const enEmpaquePropio = (packingSteps: PackingOrderDetail['packingSteps'] = PASOS_DE_ENVASADO) =>
+    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', packingSteps });
+
+  function marcarTodo(): void {
+    for (const casilla of screen.queryAllByRole('checkbox')) {
+      if (casilla.getAttribute('aria-checked') !== 'true') fireEvent.click(casilla);
+    }
+  }
+
+  async function esperar(ms: number): Promise<void> {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  }
+
+  async function recorrerHastaElUltimo(): Promise<void> {
+    vi.useFakeTimers();
+    try {
+      pintar(enEmpaquePropio());
+      marcarTodo();
+      await esperar(5000);
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+      await esperar(5000);
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it('R19: `POR_EMPACAR` con pasos en la prop no pinta ninguno', () => {
+    pintar(fila({ packingSteps: PASOS_DE_ENVASADO }));
+
+    expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
+    expect(screen.queryByTestId('step-reader')).toBeNull();
+    expect(screen.queryByText(LLENAR)).toBeNull();
+    expect(screen.queryByText(ETIQUETAR)).toBeNull();
+    expect(screen.getByTestId(PACKING_ORDER_START_BUTTON_TESTID)).toBeInTheDocument();
+  });
+
+  it('R19: `EN_EMPAQUE` de otro con pasos en la prop no pinta ninguno', () => {
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra', packingSteps: PASOS_DE_ENVASADO }));
+
+    expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
+    expect(screen.queryByText(LLENAR)).toBeNull();
+  });
+
+  it('R20: `EN_EMPAQUE` propio pinta el paso a paso, un paso por pantalla y sin el boton Terminar suelto', () => {
+    pintar(enEmpaquePropio());
+
+    const pasos = screen.getByTestId(PACKING_ORDER_STEPS_TESTID);
+    expect(within(pasos).getByTestId('step-reader-title')).toHaveTextContent('Pasos de envasado');
+    expect(within(pasos).getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
+    expect(within(pasos).getByText(LLENAR)).toBeInTheDocument();
+    expect(screen.queryByText(ETIQUETAR)).toBeNull();
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
+  });
+
+  it('R21: el ultimo boton dice «Terminar» y pasa por la misma confirmacion que el boton de hoy', async () => {
+    finishPackingActionMock.mockResolvedValue({ status: 'success' });
+    await recorrerHastaElUltimo();
+
+    expect(screen.getByText(ETIQUETAR)).toBeInTheDocument();
+    const terminar = screen.getByTestId('step-reader-finish');
+    expect(terminar).toHaveTextContent('Terminar');
+
+    fireEvent.click(terminar);
+    expect(screen.getByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toHaveTextContent(
+      PACKING_ORDER_FINISH_CONFIRM_TEXTS.title,
+    );
+    expect(finishPackingActionMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+    });
+
+    expect(finishPackingActionMock).toHaveBeenCalledTimes(1);
+    expect(startPackingActionMock).not.toHaveBeenCalled();
+    const [, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
+    expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+  });
+
+  it('R21: los errores de terminar se pintan en la region de siempre', async () => {
+    finishPackingActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'order_not_in_packing',
+      message: 'El pedido ya no esta en empaque.',
+    });
+    await recorrerHastaElUltimo();
+
+    fireEvent.click(screen.getByTestId('step-reader-finish'));
+    fireEvent.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+
+    expect(await screen.findByTestId(PACKING_ORDER_FINISH_ERROR_TESTID)).toHaveTextContent(
+      'El pedido ya no esta en empaque.',
+    );
+  });
+
+  it('R23: con un check sin marcar no se avanza aunque pase la espera, y el motivo es visible', async () => {
+    vi.useFakeTimers();
+    try {
+      pintar(enEmpaquePropio());
+      await esperar(5000);
+
+      expect(screen.getByTestId('step-reader-next')).toBeDisabled();
+      expect(screen.getByTestId('step-reader-blocked-reason')).toBeVisible();
+      expect(screen.getByTestId('step-reader-blocked-reason')).toHaveTextContent(/pendientes/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('R23: antes de 5 s no se avanza ni se termina, y la espera se explica en texto', async () => {
+    vi.useFakeTimers();
+    try {
+      pintar(enEmpaquePropio(PASOS_DE_ENVASADO.slice(1)));
+
+      await esperar(4999);
+      expect(screen.getByTestId('step-reader-finish')).toBeDisabled();
+      expect(screen.getByTestId('step-reader-wait-reason')).toHaveTextContent('para continuar.');
+      fireEvent.click(screen.getByTestId('step-reader-finish'));
+      expect(screen.queryByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toBeNull();
+
+      await esperar(1);
+      expect(screen.getByTestId('step-reader-finish')).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(finishPackingActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R25: sin pasos de envasado, `EN_EMPAQUE` propio pinta el boton Terminar de hoy', () => {
+    pintar(enEmpaquePropio([]));
+
+    expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
+    expect(screen.queryByTestId('step-reader')).toBeNull();
+    expect(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toHaveTextContent('Terminar');
+    expect(screen.getByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).not.toHaveClass('hidden');
+  });
+
+  it('R25: sin pasos de envasado, `POR_EMPACAR` y `EN_EMPAQUE` de otro siguen como hoy', () => {
+    pintar(fila());
+    expect(screen.getByTestId(PACKING_ORDER_START_BUTTON_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
+    cleanup();
+
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra' }));
+    expect(screen.getByText('Lo esta empacando Otra.')).toBeInTheDocument();
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PACKING_ORDER_STEPS_TESTID)).toBeNull();
+  });
+
+  it('R27: ningun texto de los pasos del operador aparece aunque viaje junto al pedido', () => {
+    const conPasosDelOperador = {
+      ...enEmpaquePropio(),
+      steps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: PASO_DEL_OPERADOR }] }] }],
+    };
+    pintar(conPasosDelOperador);
+
+    expect(screen.getByText(LLENAR)).toBeInTheDocument();
+    expect(screen.queryByText(PASO_DEL_OPERADOR)).toBeNull();
+  });
+
+  it('R31: desmontar y volver a montar empieza en el paso 1 sin marcas', async () => {
+    vi.useFakeTimers();
+    try {
+      pintar(enEmpaquePropio());
+      marcarTodo();
+      await esperar(5000);
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 2');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    cleanup();
+    pintar(enEmpaquePropio());
+
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-checked', 'false');
+  });
 });
