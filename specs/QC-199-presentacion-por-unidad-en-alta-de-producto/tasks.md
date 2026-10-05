@@ -104,7 +104,7 @@
 
 ## Bloque C — interfaz (depende de T4 y T14)
 
-- [ ] **T10 — Formulario y selector de nombre.** `product-form.tsx` y `product-name-picker.tsx`
+- [x] **T10 — Formulario y selector de nombre.** `product-form.tsx` y `product-name-picker.tsx`
   según `design.md > 6`. Incluye `page.tsx` y `product-sheet.tsx` con la prop `formUnits`
   (`design.md > 6.1`). Limpiar los comentarios de las líneas tocadas.
   Además, en `tests/unit/inventario/product-page.test.tsx`:
