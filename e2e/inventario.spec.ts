@@ -56,6 +56,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // `companies.name_normalized` se calcula con esta y con ninguna otra.
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
@@ -211,6 +212,13 @@ const sameNameKgUnitCost = '1.50';
 const sameNameLiterUnitCost = '2.25';
 const sameNameKgSecondUnitCost = '1.75';
 
+/**
+ * Alta de envase con su presentacion creada en linea. El nombre de presentacion admite 60
+ * caracteres y este gasta 54: un sufijo mas largo haria rechazar el alta en linea.
+ */
+const packagingProductName = `${productName}_envase`;
+const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
+
 async function createUserWithRole(user: Credentials, roleName: string): Promise<void> {
   if (!companyId) {
     throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -346,6 +354,31 @@ async function elegirUnidad(page: Page, unit: SystemUnitFixture): Promise<void> 
   await selector.click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unit.id}"]`).click();
   await expect(selector.locator(SELECT_VALUE)).toHaveText(unit.label, { timeout: 60_000 });
+}
+
+/** El tipo no lleva `data-testid` en su disparador: se localiza por su etiqueta. */
+async function elegirTipoEnvase(page: Page): Promise<void> {
+  await page.getByTestId('product-sheet').getByLabel('Tipo', { exact: true }).click();
+  await page.getByRole('option', { name: 'Envase', exact: true }).click();
+  await expect(page.getByTestId('presentation-select')).toBeVisible({ timeout: 60_000 });
+}
+
+/** Crea una presentacion desde el propio selector, sin salir del panel, y la deja elegida. */
+async function crearPresentacionEnLinea(
+  page: Page,
+  nombre: string,
+  unit: SystemUnitFixture,
+): Promise<void> {
+  await page.getByTestId('presentation-create-open').click();
+  await page.getByTestId('presentation-create-name').fill(nombre);
+  // Sin unidad el alta en linea se rechaza.
+  await page.getByTestId('presentation-unit-select').click();
+  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unit.id}"]`).click();
+  await page.getByTestId('presentation-create-submit').click();
+
+  await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+  // El selector es un autocompletado: lo elegido se lee en su valor, no en su texto.
+  await expect(page.getByTestId('presentation-select')).toHaveValue(nombre, { timeout: 60_000 });
 }
 
 /**
@@ -501,6 +534,8 @@ test.afterAll(async () => {
         where: { product: { name: { startsWith: productName } } },
       }),
     () => prisma.product.deleteMany({ where: { name: { startsWith: productName } } }),
+    // Despues de sus productos: `products.presentation_id` es `Restrict`.
+    () => prisma.presentation.deleteMany({ where: { name: presentationName } }),
     () =>
       prisma.user.deleteMany({
         where: { username: { in: [adminUser.username, noInventoryUser.username] } },
@@ -930,6 +965,56 @@ test.describe('catalogo de productos', () => {
       literProductAfter?.stock,
       'el producto en L no cambia con un lote agregado al de kg',
     ).toBe(Number(sameNameLiterStock));
+  });
+
+  test('el alta de envase crea su presentacion en linea, la deja elegida y no pierde lo escrito (QC-22 R24)', async ({
+    page,
+  }) => {
+    const kg = unidadDelFixture(kilogramUnit);
+    await loginAndLand(page, adminUser);
+
+    await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+
+    await abrirPanelDeAlta(page);
+    await elegirTipoEnvase(page);
+
+    // Lo escrito ANTES de crear la presentacion es lo que despues no puede haberse perdido.
+    await page.getByTestId('product-field-name').fill(packagingProductName);
+    await page.getByTestId('product-field-stock').fill(stockValue);
+    await page.getByTestId('product-field-qtyAlert').fill(qtyAlertValue);
+
+    await crearPresentacionEnLinea(page, presentationName, kg);
+    for (const [testId, valor] of [
+      ['product-field-name', packagingProductName],
+      ['product-field-stock', stockValue],
+      ['product-field-qtyAlert', qtyAlertValue],
+    ] as const) {
+      await expect(
+        page.getByTestId(testId),
+        'crear la presentacion no puede perder lo ya escrito',
+      ).toHaveValue(valor);
+    }
+
+    // El alta exige un costo; este recorrido no afirma sobre el importe.
+    await page.getByTestId('product-field-unitCost').fill(unitCostValue);
+    await guardarAlta(page);
+
+    const cell = await findProductCell(page, packagingProductName, { exact: true });
+    await expect(cell.first()).toBeVisible({ timeout: 60_000 });
+
+    const presentacion = await prisma.presentation.findFirst({
+      where: { name: presentationName },
+      select: { id: true },
+    });
+    expect(presentacion, 'la presentacion creada en linea debe existir en la base').not.toBeNull();
+    expect(
+      await prisma.product.findMany({
+        where: { name: packagingProductName, deletedAt: null },
+        select: { type: true, presentationId: true },
+      }),
+      'un unico envase, con la presentacion recien creada',
+    ).toEqual([{ type: PRODUCT_TYPES.PACKAGING, presentationId: presentacion?.id }]);
   });
 
   test('un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)', async ({
