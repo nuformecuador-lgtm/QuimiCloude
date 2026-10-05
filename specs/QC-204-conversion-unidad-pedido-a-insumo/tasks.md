@@ -10,7 +10,7 @@
 
 ## Bloque A — `unidades` (base de todo lo demás)
 
-- [ ] **T1 [P] — `convertWithApproximation`.** `lib/modules/unidades/domain/convert-with-approximation.ts`
+- [x] **T1 [P] — `convertWithApproximation`.** `lib/modules/unidades/domain/convert-with-approximation.ts`
   y export por el barrel, según `design.md > 3.1`.
   Tests en `tests/unit/unidades/convert-with-approximation.test.ts`:
   `R2 1000 g a kg da 1 exacto`; `R2 500 ml a l da 0.5 exacto`;
@@ -20,7 +20,7 @@
   `R4 sin puente masa-volumen, l a kg lanza IncompatibleUnitsError`;
   `N1 una base propia llamada gramo no cruza con el mililitro de sistema`.
   *Hecho:* verde; `convertQuantity` y sus tests sin cambios.
-- [ ] **T2 [P] — `findMassVolumeBridge`.** Método en `UnitCatalog` (`domain/unit-catalog.ts`),
+- [x] **T2 [P] — `findMassVolumeBridge`.** Método en `UnitCatalog` (`domain/unit-catalog.ts`),
   adaptador en `unit-catalog-prisma.ts` según `design.md > 3.2`, cableado en
   `lib/composition/index.ts` (`unitCatalog`). Factoría o parámetro de cliente para
   `findUnitRefs` y para `findMassVolumeBridge` (lo usará T7).
@@ -29,7 +29,7 @@
   `N1 ignora un gramo propio de la empresa`.
   *Hecho:* verde contra la base de tests; `findUnitRefs` con el cliente global se comporta igual
   (sus tests existentes, verdes).
-- [ ] **T3 [P] — `getMassVolumeBridgeAction`.** Acción de solo lectura en
+- [x] **T3 [P] — `getMassVolumeBridgeAction`.** Acción de solo lectura en
   `unidades/adapters/driving/unit-actions.ts` (`design.md > 5.2`), con el mismo control de sesión
   que `listUnitsAction`.
   Test unitario: `R13 la accion devuelve el puente del catalogo`; `R13 sin sesion se rechaza`.
