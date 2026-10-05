@@ -904,7 +904,9 @@ const BATCH_VIEW_SELECT = {
   purchaseDate: true,
   expiryDate: true,
   packageContent: true,
-  presentation: { select: { unitId: true } },
+  // La del producto y no la de la presentacion: los lotes de insumo ya no llevan presentacion, y
+  // los que la llevan estan en la misma unidad que su producto.
+  product: { select: { unitId: true } },
 } satisfies Prisma.ProductBatchSelect;
 
 type BatchViewRow = Prisma.ProductBatchGetPayload<{ select: typeof BATCH_VIEW_SELECT }>;
@@ -919,7 +921,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
     id: row.id,
     lot: row.lot,
     stock: row.stock.toFixed(4),
-    unitId: row.presentation?.unitId ?? null,
+    unitId: row.product.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
     packageContent: row.packageContent === null ? null : row.packageContent.toFixed(4),
@@ -982,7 +984,7 @@ export async function findBatchesOfOrder(
       ],
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    select: { ...BATCH_VIEW_SELECT, presentation: { select: { unitId: true, name: true } } },
+    select: { ...BATCH_VIEW_SELECT, presentation: { select: { name: true } } },
   });
 
   const reservedByBatch = await findReservedAndAvailableByBatch(

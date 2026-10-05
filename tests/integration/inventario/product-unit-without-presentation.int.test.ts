@@ -1,7 +1,7 @@
 /**
  * El insumo que se cuenta en una unidad elegida, sin presentacion en sus lotes, contra Postgres
- * real: la escritura (`createWithFirstBatch` con `unitId`), la busqueda del homonimo por unidad
- * y la traduccion del rechazo del disparador.
+ * real: la escritura (`createWithFirstBatch` con `unitId`), la busqueda del homonimo por unidad,
+ * la traduccion del rechazo del disparador y la vista de lotes por la unidad del producto.
  *
  * AISLAMIENTO: el adaptador usa el cliente Prisma GLOBAL, asi que lo sembrado queda confirmado.
  * Cada caso crea su empresa efimera y la borra en un `finally`.
@@ -17,6 +17,7 @@ import {
   addBatchToAlive,
   createWithFirstBatch,
   findAliveIdByNameInUnit,
+  findBatchesOfAliveProduct,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -218,3 +219,80 @@ describe('QC-199 — escritura y busqueda del insumo por unidad', () => {
   });
 });
 
+describe('QC-199 — la vista de lotes cuenta en la unidad del producto', () => {
+  it('R16 un lote de insumo sin presentacion muestra la unidad del producto', async () => {
+    await withFixture(async (fixture) => {
+      const created = await createWithFirstBatch(
+        { name: `Sosa ${token()}`, qtyAlert: '1', type: PRODUCT_TYPES.PRODUCT, unitId: fixture.kgId },
+        batchOf(fixture),
+        new Date(),
+        scopeOf(fixture),
+      );
+
+      const batches = await findBatchesOfAliveProduct(created.id, scopeOf(fixture));
+
+      expect(batches).toHaveLength(1);
+      expect(batches[0]).toMatchObject({ id: created.batchId, unitId: fixture.kgId, stock: '3.0000' });
+    });
+  });
+
+  it('R16 un lote antiguo con presentacion muestra la unidad del producto', async () => {
+    await withFixture(async (fixture) => {
+      // Alta anterior: la unidad del producto salio de la presentacion del lote.
+      const created = await createWithFirstBatch(
+        { name: `Alcohol ${token()}`, qtyAlert: '1', type: PRODUCT_TYPES.PRODUCT },
+        batchOf(fixture, { presentationId: fixture.mlPresentationId }),
+        new Date(),
+        scopeOf(fixture),
+      );
+      // Y un lote nuevo del mismo producto, ya sin presentacion.
+      await addBatchToAlive(created.id, batchOf(fixture, { stock: '1' }), new Date(), scopeOf(fixture));
+
+      const batches = await findBatchesOfAliveProduct(created.id, scopeOf(fixture));
+
+      expect(batches).toHaveLength(2);
+      expect(batches.map((batch) => batch.unitId)).toEqual([fixture.mlId, fixture.mlId]);
+    });
+  });
+
+  it('R16 apartado y disponible del lote salen junto a la unidad del producto', async () => {
+    await withFixture(async (fixture) => {
+      const created = await createWithFirstBatch(
+        { name: `Sosa ${token()}`, qtyAlert: '1', type: PRODUCT_TYPES.PRODUCT, unitId: fixture.kgId },
+        batchOf(fixture, { stock: '3' }),
+        new Date(),
+        scopeOf(fixture),
+      );
+      const order = await prisma.order.create({
+        data: {
+          companyId: fixture.companyId,
+          orderYear: new Date().getUTCFullYear(),
+          orderSequence: 1,
+          recipeId: fixture.recipeId,
+          quantity: new Prisma.Decimal('10'),
+        },
+        select: { id: true },
+      });
+      await prisma.reservationMovement.create({
+        data: {
+          companyId: fixture.companyId,
+          orderId: order.id,
+          batchId: created.batchId,
+          kind: 'reserve',
+          quantity: new Prisma.Decimal('1.25'),
+          createdBy: fixture.actorId,
+        },
+      });
+
+      const [batch] = await findBatchesOfAliveProduct(created.id, scopeOf(fixture));
+
+      expect(batch).toMatchObject({
+        unitId: fixture.kgId,
+        stock: '3.0000',
+        reserved: '1.2500',
+        available: '1.7500',
+        overReserved: false,
+      });
+    });
+  });
+});
