@@ -103,13 +103,21 @@ export interface ProductRepository {
     scope: InventoryScope,
   ): Promise<{ id: string; type: ProductType } | null>;
 
+  /** Como `findAliveIdByNameInPresentationUnit`, con la unidad ya dada: mismo ambito, mismo filtro
+   *  de vivos y mismo desempate. */
+  findAliveIdByNameInUnit(
+    name: string,
+    unitId: string,
+    scope: InventoryScope,
+  ): Promise<{ id: string; type: ProductType } | null>;
+
   /**
    * Alta de un producto NUEVO junto con su primer lote, en UNA sola transaccion. Devuelve los
    * dos identificadores porque las dos filas se escriben aqui: si cualquiera de las dos falla,
    * no queda ninguna, que es lo que hace imposible un producto sin ningun lote.
    *
-   * El producto nace con la unidad de la presentacion de este lote -la resuelve el adaptador,
-   * no quien llama- y con la existencia recalculada a partir de sus lotes en la MISMA
+   * El producto nace con `product.unitId` si viene; si no, con la unidad de la presentacion de
+   * este lote, que resuelve el adaptador. Y con la existencia recalculada a partir de sus lotes en la MISMA
    * transaccion: `stock` no lo escribe quien llama, es el adaptador el que suma tras crear el
    * lote.
    *

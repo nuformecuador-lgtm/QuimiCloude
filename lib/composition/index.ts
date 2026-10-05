@@ -93,6 +93,7 @@ import {
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
+  findAliveIdByNameInUnit,
   findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
@@ -794,6 +795,7 @@ const productRepository: ProductRepository = {
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
   findAliveIdByNameInPresentationUnit,
+  findAliveIdByNameInUnit,
   findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
