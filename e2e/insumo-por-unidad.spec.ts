@@ -238,6 +238,10 @@ test.describe('alta de insumo por unidad', () => {
 
     await page.getByTestId('product-field-unitCost').fill(firstUnitCost);
     await guardarAlta(page);
+    // El panel se cierra antes de `router.refresh()` y WebKit aborta un `goto` con ese refresco en
+    // vuelo: la fila nueva, sin navegar, dice que ya llego. La empresa del fixture solo tiene este
+    // producto, asi que sin filtro cabe en la primera pagina.
+    await expect(filaDelProducto(page)).toHaveCount(1, { timeout: 60_000 });
 
     // --- 2. Listado y panel de lotes, en kg.
     await abrirInventarioFiltrado(page);
@@ -276,7 +280,8 @@ test.describe('alta de insumo por unidad', () => {
     await page.getByTestId('product-field-unitCost').fill(secondUnitCost);
     await guardarAlta(page);
 
-    // --- 4. La existencia del MISMO producto sube, y los dos lotes se ven en kg.
+    // --- 4. La existencia del MISMO producto sube, y los dos lotes se ven en kg. La suma en la
+    // fila, sin navegar, es tambien la senal de que el refresco del alta llego antes del `goto`.
     const summedStock = Number(firstStock) + Number(secondStock);
     await expect(filaDelProducto(page).getByTestId('product-stock')).toHaveText(
       `${summedStock} ${kg.label}`,
