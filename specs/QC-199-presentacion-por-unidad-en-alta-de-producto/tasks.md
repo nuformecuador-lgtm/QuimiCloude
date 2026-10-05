@@ -7,7 +7,7 @@
 
 ## Bloque 0 — comprobación previa (bloqueante)
 
-- [ ] **T0 — Medir los lotes cuya unidad de presentación no coincide con la del producto.** Antes de
+- [x] **T0 — Medir los lotes cuya unidad de presentación no coincide con la del producto.** Antes de
   T6 y T7, ejecutar en la base de destino la consulta de `design.md > 9`. No cambia código ni
   datos.
   *Hecho:* el resultado (número y, si hay alguno, las filas) queda en
