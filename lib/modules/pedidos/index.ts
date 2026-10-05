@@ -225,3 +225,8 @@ export type {
   OrderPresentationAvailabilityNext,
 } from './domain/order-presentation-availability';
 export type { DistributionLineInput, PresentationLineInput } from './domain/resolve-distribution';
+
+/** La necesidad de una linea de receta convertida a la unidad del insumo: la comparten el costo,
+ *  la reserva, la ejecucion y la tabla de ingredientes del formulario. */
+export { resolveLineNeed } from './domain/order-line-need';
+export type { LineNeedUnits, OrderLineNeed } from './domain/order-line-need';
