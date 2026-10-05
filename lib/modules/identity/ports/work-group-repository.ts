@@ -78,6 +78,8 @@ export type AddMemberOutcome =
   | { readonly kind: 'group_not_found' }
   /** La persona no existe, esta dada de baja o es de otra empresa (R29): los tres, el mismo caso. */
   | { readonly kind: 'user_not_found' }
+  /** La persona existe y no pertenece, pero `admits` la rechazo: no se escribio ninguna fila. */
+  | { readonly kind: 'not_admitted' }
   | {
       readonly kind: 'already_member';
       /**
@@ -167,9 +169,12 @@ export interface WorkGroupRepository {
   listMembersAliveInCompany(companyId: string, id: string): Promise<MemberCandidate[] | 'not_found'>;
 
   /**
-   * Meter a **una** persona (R28–R32), en UNA transaccion de tres pasos (`design.md > 5.1`): grupo
-   * vivo de la empresa, persona viva de la empresa, `INSERT` de la pertenencia. La fila se crea
-   * **sea cual sea** el estado de cuenta de esa persona (R28): la pertenencia no depende del estado.
+   * Meter a **una** persona, en UNA transaccion: grupo vivo de la empresa, persona viva
+   * de la empresa, `admits` sobre su estado crudo y, solo si la admite, `INSERT` de la pertenencia.
+   *
+   * `admits` es la regla del dominio y el adaptador solo la invoca: asi decide antes de escribir sin
+   * tener una segunda copia de «cuenta activa». Si la rechaza y la persona ya pertenecia, el
+   * resultado sigue siendo `already_member`, para explicar por que no se ve; si no pertenecia, `not_admitted`.
    *
    * `now` entra por parametro —el dominio no tiene reloj propio— y lo usa el adaptador para la marca
    * de la fila nueva.
@@ -179,6 +184,7 @@ export interface WorkGroupRepository {
     id: string,
     userId: string,
     now: Date,
+    admits: (account: MemberCandidate) => boolean,
   ): Promise<AddMemberOutcome>;
 
   /**

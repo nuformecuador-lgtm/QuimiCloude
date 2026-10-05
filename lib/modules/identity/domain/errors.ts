@@ -373,3 +373,24 @@ export class WorkGroupMemberNotFoundError extends IdentityError {
     super('work_group_member_not_found', diagnostic);
   }
 }
+
+/**
+ * Meter en un grupo a una persona cuyo estado EFECTIVO no es activo. Un solo `code` para pendiente,
+ * inactiva y bloqueada: los tres llevan a la misma accion —activar la cuenta primero—.
+ */
+export class WorkGroupMemberNotActiveError extends IdentityError {
+  readonly code = 'work_group_member_not_active';
+
+  constructor(diagnostic?: string) {
+    super('work_group_member_not_active', diagnostic);
+  }
+}
+
+/** Meterse a si mismo en un grupo: nadie puede, sea cual sea su permiso. */
+export class WorkGroupMemberSelfError extends IdentityError {
+  readonly code = 'work_group_member_self';
+
+  constructor(diagnostic?: string) {
+    super('work_group_member_self', diagnostic);
+  }
+}

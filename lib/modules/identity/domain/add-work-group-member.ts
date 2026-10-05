@@ -5,7 +5,7 @@ import { requirePermission, type Actor } from './actor';
 // R19) decide aqui POR QUE una persona que ya pertenece no se ve (R31). Es la unica traduccion de
 // «lo que la columna dice» a «lo que significa ahora» (QC-78 R7): con dos, el mensaje del error y
 // el contenido de la lista podrian divergir y nadie se enteraria.
-import { effectiveAccountStatus } from './effective-account-status';
+import { effectiveAccountStatus, type AccountStatusView } from './effective-account-status';
 import {
   type IdentityError,
   UserNotFoundError,
@@ -14,11 +14,17 @@ import {
   WorkGroupMemberExistsError,
   WorkGroupMemberExistsInactiveError,
   WorkGroupMemberExistsPendingError,
+  WorkGroupMemberNotActiveError,
+  WorkGroupMemberSelfError,
   WorkGroupNotFoundError,
 } from './errors';
 import { workGroupMemberSchema } from './work-group-input';
 
-import type { MemberBlockReason, WorkGroupRepository } from '../ports/work-group-repository';
+import type {
+  MemberBlockReason,
+  MemberCandidate,
+  WorkGroupRepository,
+} from '../ports/work-group-repository';
 
 export type AddWorkGroupMemberDeps = {
   readonly workGroups: WorkGroupRepository;
@@ -70,6 +76,14 @@ export function blockReasonOf(status: UserAccountStatus): MemberBlockReason | nu
 }
 
 /**
+ * Quien puede ENTRAR en un grupo: la misma expresion que decide quien se ve en la lista.
+ * La usan el alta de miembro y el buscador de candidatos para que no puedan divergir.
+ */
+export function canJoinWorkGroup(account: AccountStatusView, now: Date): boolean {
+  return blockReasonOf(effectiveAccountStatus(account, now)) === null;
+}
+
+/**
  * Un motivo, un `code` (R31). **Tres y no uno** (`design.md > 7.2`): el `diagnostic` de QC-70 va al
  * registro del servidor y SOLO ahi, y el catalogo no interpola, asi que el motivo no puede viajar
  * como dato ni como texto de un codigo compartido. Ninguno de los tres es el de R30.
@@ -91,10 +105,12 @@ const HIDDEN_MEMBER_ERROR = {
  * asi que el «mandar el conjunto entero» —donde dos encargados a la vez se pisan en silencio y el
  * error no puede decir a QUIEN se refiere— es **inexpresable**, no solo desaconsejado.
  *
- * **La fila se crea sea cual sea el estado de cuenta de la persona** (R28): `pending`, `active`,
- * `inactive` o `blocked`. La pertenencia no depende del estado; el estado solo decide si la persona
- * se VE en la lista (R19). Este caso de uso no mira el estado para dejar entrar a nadie —solo para
- * elegir el mensaje cuando la fila YA existia—.
+ * **Solo entra quien tiene estado EFECTIVO activo** en el instante de la llamada: la misma
+ * `blockReasonOf(effectiveAccountStatus(...))` que decide quien se ve en la lista. El resto
+ * recibe `WorkGroupMemberNotActiveError` y no se escribe ninguna fila. Si ya pertenecia, el error
+ * sigue siendo el de «ya pertenece», con su motivo si no se ve.
+ *
+ * **Nadie puede meterse a si mismo**: se rechaza despues de zod y antes de tocar el puerto.
  *
  * **La garantia de no duplicar es la clave primaria** `(work_group_id, user_id)` (R32), dentro de la
  * transaccion del adaptador: la lectura de la persona sirve SOLO para elegir el mensaje. Si dos
@@ -122,6 +138,7 @@ export function createAddWorkGroupMember(
     if (!parsed.success) throw new ValidationError();
 
     const { workGroupId, userId } = parsed.data;
+    if (userId === actor.id) throw new WorkGroupMemberSelfError();
     // UN solo instante para la escritura y para el filtro: con dos relojes, un bloqueo que vence
     // entre medias daria un mensaje que no corresponde a lo que la lista muestra.
     const instant = now();
@@ -131,9 +148,11 @@ export function createAddWorkGroupMember(
       workGroupId,
       userId,
       instant,
+      (account: MemberCandidate) => canJoinWorkGroup(account, instant),
     );
 
     if (outcome.kind === 'created') return;
+    if (outcome.kind === 'not_admitted') throw new WorkGroupMemberNotActiveError();
     // R8, R9: no existe, esta dado de baja o es de otra empresa son el MISMO caso.
     if (outcome.kind === 'group_not_found') throw new WorkGroupNotFoundError();
     // R29: la persona inexistente, borrada o de otra empresa reutiliza el error que QC-66 ya creo

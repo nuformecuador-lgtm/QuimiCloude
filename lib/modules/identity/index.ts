@@ -274,6 +274,7 @@ export {
 export {
   WORK_GROUP_QUERYABLE,
   WORK_GROUP_MEMBER_QUERYABLE,
+  WORK_GROUP_CANDIDATE_QUERYABLE,
 } from './domain/work-group-queryable';
 
 // Los SIETE errores nuevos (R43). Se exportan las CLASES, no sus textos: quien decide por el
@@ -288,6 +289,8 @@ export {
   WorkGroupMemberExistsInactiveError,
   WorkGroupMemberExistsBlockedError,
   WorkGroupMemberNotFoundError,
+  WorkGroupMemberNotActiveError,
+  WorkGroupMemberSelfError,
 } from './domain/errors';
 
 // Las SIETE factories de caso de uso. Los tipos `*Deps` viajan con ellas: quien las cablea es
@@ -311,6 +314,11 @@ export {
   type ListWorkGroupMembersDeps,
   type PaginationPolicy,
 } from './domain/list-work-group-members';
+export {
+  createListWorkGroupCandidates,
+  type ListWorkGroupCandidatesDeps,
+  type WorkGroupCandidateRow,
+} from './domain/list-work-group-candidates';
 
 // ---------------------------------------------------------------------------------------
 // QC-87 T3 — Los DOS contratos con los que otro modulo pregunta por personas y por grupos de

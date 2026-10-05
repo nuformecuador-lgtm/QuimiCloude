@@ -18,11 +18,11 @@ import {
   WORK_GROUP_SHEET_TESTID,
   WorkGroupCreateAction,
 } from '@/app/(private)/configuracion/usuarios/components';
-import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
+import type { WorkGroupCandidateListResult } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { setupUser } from '../../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../../helpers/viewport';
 
-const { routerMock, listUsersActionMock } = vi.hoisted(() => ({
+const { routerMock, listWorkGroupCandidatesActionMock } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -31,7 +31,7 @@ const { routerMock, listUsersActionMock } = vi.hoisted(() => ({
     forward: vi.fn<() => void>(),
     prefetch: vi.fn<(href: string) => void>(),
   },
-  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
+  listWorkGroupCandidatesActionMock: vi.fn<(query: unknown) => Promise<WorkGroupCandidateListResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -55,6 +55,8 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     // El alta NO tiene miembros que listar: un grupo que todavia no existe no tiene a nadie. Por
     // eso este doble tambien falla, a diferencia del de la tabla, donde la edicion si la pide.
     listWorkGroupMembersAction: vi.fn(noDebeInvocarse('listWorkGroupMembersAction')),
+    // El picker de miembros iniciales, que el panel de alta monta siempre, la consulta al montarse.
+    listWorkGroupCandidatesAction: listWorkGroupCandidatesActionMock,
   };
 });
 
@@ -63,9 +65,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse desde el disparador del alta`);
   };
   return {
-    // El picker de miembros iniciales, que el panel de alta monta siempre, consulta esta action
-    // al montarse; las otras cinco siguen sin tener nada que hacer aqui.
-    listUsersAction: listUsersActionMock,
+    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
@@ -77,7 +77,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
 beforeEach(() => {
   vi.clearAllMocks();
   setViewportWidth(WIDE_VIEWPORT);
-  listUsersActionMock.mockResolvedValue({
+  listWorkGroupCandidatesActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
   });

@@ -44,10 +44,10 @@ import {
 import { Sheet } from '@/components/ui/sheet';
 import { errorMessage } from '@/lib/modules/errores';
 import { WORK_GROUP_NAME_MAX_LENGTH, normalizeWorkGroupName } from '@/lib/modules/identity';
-import type { UserRow } from '@/lib/modules/identity';
-import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
+import type { WorkGroupCandidateRow } from '@/lib/modules/identity';
 import type {
   CreateWorkGroupFormState,
+  WorkGroupCandidateListResult,
   WorkGroupMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { setupUser } from '../../../helpers/user-event';
@@ -56,7 +56,8 @@ const {
   createWorkGroupActionMock,
   renameWorkGroupActionMock,
   addWorkGroupMemberActionMock,
-  listUsersActionMock,
+  listWorkGroupCandidatesActionMock,
+  toastErrorMock,
 } = vi.hoisted(() => ({
   createWorkGroupActionMock:
     vi.fn<(prev: CreateWorkGroupFormState, data: FormData) => Promise<CreateWorkGroupFormState>>(),
@@ -68,7 +69,14 @@ const {
     vi.fn<
       (prev: WorkGroupMutationFormState, data: FormData) => Promise<WorkGroupMutationFormState>
     >(),
-  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
+  listWorkGroupCandidatesActionMock:
+    vi.fn<(query: unknown) => Promise<WorkGroupCandidateListResult>>(),
+  toastErrorMock: vi.fn<(message: string, options?: { description?: string }) => void>(),
+}));
+
+vi.mock('sonner', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('sonner')>()),
+  toast: { error: toastErrorMock },
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -95,6 +103,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     removeWorkGroupMemberAction: vi.fn(noDebeInvocarse('removeWorkGroupMemberAction')),
     listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
     listWorkGroupMembersAction: vi.fn(noDebeInvocarse('listWorkGroupMembersAction')),
+    listWorkGroupCandidatesAction: listWorkGroupCandidatesActionMock,
   };
 });
 
@@ -103,7 +112,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse desde el formulario del nombre`);
   };
   return {
-    listUsersAction: listUsersActionMock,
+    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
@@ -116,13 +125,10 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
 const GRUPO = { id: '11111111-1111-4111-8111-111111111111', name: 'Laboratorio' };
 
 /** Un candidato del picker de miembros, que el alta monta siempre (R22, ampliacion de alta). */
-const CANDIDATO: UserRow = {
+const CANDIDATO: WorkGroupCandidateRow = {
   id: 'u9',
   displayName: 'Nieto Salas, Dario',
-  username: 'dario.nieto',
-  email: 'dario.nieto@example.com',
   roleName: 'Operario',
-  accountStatus: 'pending',
 };
 
 function montar(group: typeof GRUPO | null, onSaved = vi.fn<() => void>()) {
@@ -180,7 +186,7 @@ beforeEach(() => {
   createWorkGroupActionMock.mockResolvedValue({ status: 'success', id: 'nuevo' });
   renameWorkGroupActionMock.mockResolvedValue({ status: 'success' });
   addWorkGroupMemberActionMock.mockResolvedValue({ status: 'success' });
-  listUsersActionMock.mockResolvedValue({
+  listWorkGroupCandidatesActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [CANDIDATO], total: 1, page: 1, pageSize: 10, totalPages: 1 },
   });
@@ -459,6 +465,60 @@ describe('el alta puede elegir miembros iniciales, en estado local hasta crear e
     // `data-table` es el envoltorio que pinta `<DataTable>`: ausente, el picker no se monto.
     expect(screen.queryByTestId('data-table')).toBeNull();
     // Y por tanto no consulto la lista de personas: ese bloque, en la edicion, no existe.
-    expect(listUsersActionMock).not.toHaveBeenCalled();
+    expect(listWorkGroupCandidatesActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('el picker solo ofrece personas activas', () => {
+  it('consulta la accion de candidatos de grupo, no el listado de usuarios, y pinta lo que devuelve', async () => {
+    const otro: WorkGroupCandidateRow = {
+      id: 'u10',
+      displayName: 'Ortega Vidal, Lucia',
+      roleName: 'Supervisora',
+    };
+    listWorkGroupCandidatesActionMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [CANDIDATO, otro], total: 2, page: 1, pageSize: 10, totalPages: 1 },
+    });
+    montar(null);
+
+    const fila = await screen.findByTestId(`data-table-row-${otro.id}`);
+    expect(fila).toHaveTextContent(otro.displayName);
+    expect(fila).toHaveTextContent(otro.roleName);
+    expect(screen.getByTestId(`data-table-row-${CANDIDATO.id}`)).toHaveTextContent(
+      CANDIDATO.displayName,
+    );
+
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(1);
+    expect(listWorkGroupCandidatesActionMock.mock.calls[0]![0]).toEqual({
+      page: 1,
+      pageSize: expect.any(Number),
+      sort: null,
+      filters: {},
+      search: '',
+    });
+  });
+
+  it('si al crear el grupo una pendiente ya no esta activa, el aviso trae el motivo del catalogo', async () => {
+    const motivo = errorMessage('work_group_member_not_active');
+    addWorkGroupMemberActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'work_group_member_not_active',
+      message: motivo,
+    });
+    const user = setupUser();
+    const onSaved = montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+    await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID);
+
+    await user.type(campo(), 'Turno Noche');
+    await user.click(screen.getByTestId(WORK_GROUP_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledTimes(1));
+    expect(toastErrorMock.mock.calls[0]![1]).toEqual({ description: motivo });
+    // El grupo ya existe: el alta sigue terminando con exito.
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 });
