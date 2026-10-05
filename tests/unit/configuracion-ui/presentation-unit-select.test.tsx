@@ -9,6 +9,10 @@ import {
   PRESENTATION_UNIT_SELECT_TESTID,
   PresentationUnitSelect,
 } from '@/app/(private)/configuracion/presentaciones/components';
+import {
+  PRESENTATION_UNIT_HELPER_TESTID,
+  PRESENTATION_UNIT_HELPER_TEXT_TESTID,
+} from '@/components/shared/presentation-unit-select';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 /**
@@ -183,5 +187,48 @@ describe('selector de unidad de la presentacion (R16, R17, R20)', () => {
     expect(disparador.className).toContain('min-w-11');
     expect(disparador.className).toContain('text-base');
     expect(disparador.className).toContain('md:text-base');
+  });
+});
+
+// La ayuda solo la pasa el alta de producto; la pantalla de presentaciones no la usa.
+describe('selector de unidad · ayuda de la etiqueta', () => {
+  const AYUDA = 'La unidad en la que se mide este insumo.';
+
+  it('sin `helper` no pinta ni el disparador ni el texto de ayuda', () => {
+    renderSelector();
+
+    expect(screen.queryByTestId(PRESENTATION_UNIT_HELPER_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PRESENTATION_UNIT_HELPER_TEXT_TESTID)).toBeNull();
+  });
+
+  it('con `helper` pinta el disparador y, al pedirla, su texto', async () => {
+    const user = setupUser();
+    renderSelector({ helper: AYUDA });
+
+    const disparador = screen.getByTestId(PRESENTATION_UNIT_HELPER_TESTID);
+    expect(disparador).toHaveAccessibleName('Qué es Unidad');
+
+    await user.hover(disparador);
+
+    const texto = await screen.findByTestId(
+      PRESENTATION_UNIT_HELPER_TEXT_TESTID,
+      {},
+      { timeout: 3_000 },
+    );
+    expect(texto).toHaveTextContent(AYUDA);
+  });
+
+  it('pulsar el disparador dentro de un formulario no lo envia', async () => {
+    const user = setupUser();
+    const alEnviar = vi.fn((evento: SubmitEvent) => evento.preventDefault());
+    renderSelector({ helper: AYUDA });
+    const formulario = screen.getByTestId(FORMULARIO_TESTID) as HTMLFormElement;
+    formulario.addEventListener('submit', alEnviar);
+
+    const disparador = screen.getByTestId(PRESENTATION_UNIT_HELPER_TESTID);
+    expect(disparador).toHaveAttribute('type', 'button');
+    await user.click(disparador);
+
+    expect(alEnviar).not.toHaveBeenCalled();
   });
 });
