@@ -186,3 +186,18 @@ Segunda corrida de `./init.sh` (2026-10-05):
 ✓ todas las migraciones tienen down.sql
 == init OK ==
 ```
+
+## Review, vuelta 1 (progress/review_QC-199-presentacion-por-unidad-en-alta-de-producto.md)
+
+- B1, m2, m4: se arreglan (hashes abajo).
+- m1 (la ayuda de «Unidad» solo se ve por hover o foco, sin soporte táctil verificado): **aceptado sin cambio** por el leader. Es el mismo patrón que `product-field.tsx` y `presentation-select.tsx`; si la ayuda tiene que llegar en táctil, es una ficha para todos los helpers.
+- m3 (bloque etiqueta + botón + tooltip duplicado entre `presentation-unit-select.tsx`, `presentation-select.tsx` y `product-field.tsx`): **aceptado sin cambio** por el leader. Extraerlo queda fuera del alcance de esta ficha.
+
+Commits: B1 `c02b74ea` (también quita un «(R5)» de la misma línea tocada), m2 `e4fafbb2` (`tests/unit/configuracion-ui/presentation-unit-select.test.tsx`, 3 casos), m4 `99fe9be7` (`product-page.test.tsx` › «R20 el alta del estado vacio ofrece las unidades del formulario y no las de listUnitsAction»; comprobado que falla si se quita `formUnits`).
+
+`./init.sh --rapido` tras la vuelta 1:
+```
+ Test Files  6 failed | 416 passed (422)
+      Tests  8 failed | 6358 passed | 9 skipped (6375)
+```
+Los 8 rojos son los mismos casos de `tests/baseline-rojos.json` que en la tanda anterior; ninguno nuevo.
