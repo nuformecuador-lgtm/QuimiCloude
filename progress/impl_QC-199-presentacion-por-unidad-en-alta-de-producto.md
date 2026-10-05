@@ -113,7 +113,7 @@ los 25 dobles de `UnitCatalog` del contrato, `tests/integration/aislamiento.json
 | R16 | `product-unit-without-presentation.int.test.ts` › «R16 un lote de insumo sin presentacion muestra la unidad del producto», «R16 un lote antiguo con presentacion muestra la unidad del producto», «R16 apartado y disponible del lote salen junto a la unidad del producto»; T11 |
 | R17 | `tests/unit/inventario/product-catalog-costing.test.ts` › «R17 toCostingBatch toma la unidad del producto»; `tests/integration/pedidos/order-cost-quote.int.test.ts` › «R17 un insumo con lotes solo sin presentacion tiene coste en la cotizacion»; `tests/integration/pedidos/order-ingredients-cost.int.test.ts` › «R17 el importe guardado del pedido cuenta el lote sin presentacion», «R17 el coste del lote de producto terminado no cuenta ese ingrediente como cero» |
 | R18 | `tests/integration/inventario/order-batches.int.test.ts` › «R18 lote de envase y de producto terminado conservan su unidad»; `order-ingredients-cost.int.test.ts` › «R18 los lotes sin costo y los de instrumento siguen fuera», «R18 los lotes de envase siguen fuera de findCostingBatches y los de terminado dentro» |
-| R19 | `e2e/insumo-por-unidad.spec.ts` (T11, pendiente) |
+| R19 | `e2e/insumo-por-unidad.spec.ts` › «R19 el Administrador da de alta un insumo eligiendo kg, lo ve en el listado y en el panel de lotes en kg, y un segundo alta del mismo nombre en kg suma a ese producto» (escrito; sin ejecutar) |
 | R20 | `tests/unit/inventario/list-product-form-units.test.ts` › «R20 con inventario.modificar y sin unidades.consultar devuelve las unidades visibles», «R20 sin inventario.modificar rechaza con error de permiso y no consulta unidades»; `tests/integration/unidades/unit-catalog-visible.int.test.ts` › «R20 listVisibleRefs devuelve las unidades de la empresa y las de sistema, incluida unidad, y ninguna de otra empresa»; `tests/unit/inventario/product-page.test.tsx` › «R20 la pagina pasa al formulario las unidades de la accion de inventario y no las de listUnitsAction» |
 
 ## Salida de tests
@@ -133,3 +133,35 @@ Los 8 rojos están todos en archivos de `tests/baseline-rojos.json` (deuda ajena
 unidades-viewport (2), usuarios-viewport (2), pantallas-exigen-permiso › '/pedidos' (1),
 product-page › «R18 — el nombre del producto se pinta junto a la unidad guardada» (1, roto desde a543c84d),
 recipe-page (1), recetas/module-contract (1). Ninguno es de esta ficha.
+
+## T11, T12 — E2E (escritos, sin ejecutar)
+
+- `650cf95f` T11: `e2e/insumo-por-unidad.spec.ts` (empresa propia `qc199_e2e_`, comprobación en Postgres con `prisma.$queryRaw`).
+- `754e992c` T12: `e2e/inventario.spec.ts`, 6 recorridos de alta de insumo pasan a elegir unidad (helper `elegirUnidad`);
+  se quitan `crearPresentacionEnLinea` / `elegirPresentacionExistente`. Dos casos cambian de nombre: el que cubría
+  QC-22 R24 (crear presentación en línea sin perder lo escrito) ahora comprueba que elegir unidad no pierde lo escrito,
+  porque el insumo ya no tiene presentación; el de «alta con presentacion y solo costo total» pasa a «alta con solo costo total».
+- `17d01ea2`: `e2e/pedido-bloqueado.spec.ts` › `addBatchThroughInventory` ya no elige presentación; comprueba que la unidad del
+  insumo viene preseleccionada. Barrido del resto de `e2e/`: ningún otro recorrido da de alta un insumo por el formulario.
+- Validado: typecheck, lint y `playwright test --list` (16 tests en los dos specs; 2 en pedido-bloqueado).
+- **No ejecutados.** T11 y T12 quedan sin marcar hasta que pasen en Playwright:
+  `pnpm run e2e e2e/insumo-por-unidad.spec.ts e2e/inventario.spec.ts e2e/pedido-bloqueado.spec.ts`
+  (base migrada y sembrada).
+
+## T13 — gate completo
+
+Primera corrida: 5 archivos rojos fuera del baseline, todos guardias de alcance que congelaban piezas que el spec cambia
+(lista cerrada de E2E en `guard-identificador-de-request` y `data-table-alcance`, factorías del barrel en
+`inventario-schema`, `NewProduct` sin `unitId` en `qc121-alcance` y `unidades/module-contract`). Ajustadas en `2a819eb2`
+sin aflojarlas: siguen siendo listas cerradas, y la unidad sigue comprobándose como id (`unitId?: string`, uuid en el
+esquema, una sola lectura de `'unitId'` en la acción) y nunca como texto.
+
+Segunda corrida de `./init.sh` (2026-10-05):
+```
+ Test Files  8 failed | 874 passed (882)
+      Tests  10 failed | 12436 passed | 128 skipped (12574)
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (8 rojos, todos en el baseline de 8)
+✓ todas las migraciones tienen down.sql
+== init OK ==
+```

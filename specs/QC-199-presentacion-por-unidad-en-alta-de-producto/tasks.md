@@ -131,7 +131,7 @@
   que crean un PRODUCT con `crearPresentacionEnLinea`/`elegirPresentacionExistente`, :529-1000
   aprox.) pasan a elegir unidad; los recorridos de envase no cambian. Depende de T10.
   *Hecho:* `e2e/inventario.spec.ts` verde sin casos saltados.
-- [ ] **T13 — Gate completo y trazabilidad.** `./init.sh` completo en verde; mapa `R1..R20 -> test`
+- [x] **T13 — Gate completo y trazabilidad.** `./init.sh` completo en verde; mapa `R1..R20 -> test`
   en `progress/impl_QC-199-presentacion-por-unidad-en-alta-de-producto.md`. Depende de todo lo anterior.
   *Hecho:* gate verde y cada `R<n>` con al menos un test nombrado.
 
