@@ -202,7 +202,7 @@ describe('createProductSchema', () => {
   });
 
   it('R6 el alta de insumo exige unitId', () => {
-    const { unitId: _omitida, ...sinUnidad } = ALTA_PRODUCTO;
+    const sinUnidad = Object.fromEntries(Object.entries(ALTA_PRODUCTO).filter(([key]) => key !== 'unitId'));
     for (const entrada of [sinUnidad, { ...sinUnidad, unitId: null }, { ...sinUnidad, unitId: '' }]) {
       const veredicto = createProductSchema.safeParse(entrada);
       expect(veredicto.success, JSON.stringify(entrada)).toBe(false);

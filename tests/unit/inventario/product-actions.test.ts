@@ -492,9 +492,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
 
   it('R6 sin unidad en el FormData, el alta de insumo envia unitId ausente para que el esquema la rechace', async () => {
     createProductMock.mockResolvedValue({ id: 'producto-1' });
-    const { unitId: _sinUnidad, ...sinUnidad } = VALID_BATCH_FIELDS;
-
-    await createProductAction(CREATE_INITIAL, formDataOf({ ...VALID_PRODUCT_FIELDS, ...sinUnidad, unitId: '' }));
+    await createProductAction(CREATE_INITIAL, formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, unitId: '' }));
 
     const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
     expect(candidato.unitId).toBeUndefined();
