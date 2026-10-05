@@ -37,7 +37,7 @@
 
 ## Bloque B — dominio de `pedidos` (depende de T1)
 
-- [ ] **T4 — `resolveLineNeed`.** `pedidos/domain/order-line-need.ts` + export por el barrel
+- [x] **T4 — `resolveLineNeed`.** `pedidos/domain/order-line-need.ts` + export por el barrel
   (`design.md > 4.1`).
   Tests `tests/unit/pedidos/order-line-need.test.ts`:
   `R1 la necesidad se calcula en la unidad del pedido y se convierte`;
@@ -48,7 +48,7 @@
   `R21 insumo sin unidad da la cifra sin convertir`;
   `R9 unidad de pedido no resuelta da no convertible`.
   *Hecho:* verde.
-- [ ] **T5 [P] — Costo.** `order-cost.ts` y `resolve-ingredients-cost.ts` según `design.md > 4.2`
+- [x] **T5 [P] — Costo.** `order-cost.ts` y `resolve-ingredients-cost.ts` según `design.md > 4.2`
   (`CostInput.orderUnitId`, `bridge`, parámetro `orderUnitId` en las cinco funciones `resolve*`).
   Depende de T4 y T2. Tests en `tests/unit/pedidos/order-cost.test.ts` (ampliar):
   `R5 un pedido de 1000 kg cuesta 1000 veces uno de 1000 g`;
@@ -57,7 +57,7 @@
   `R7 en el costo del lote una linea no convertible cuenta cero`;
   `R20 un pedido sin unidad cuesta igual que antes del cambio` (mismo valor que el caso existente).
   *Hecho:* verde; los casos existentes siguen verdes pasando `orderUnitId: null`.
-- [ ] **T6 [P] — Necesidad de reserva.** `order-requirement.ts` según `design.md > 4.3`
+- [x] **T6 [P] — Necesidad de reserva.** `order-requirement.ts` según `design.md > 4.3`
   (`RequirementUnits`, `RecipeRequirement`). Depende de T4.
   Tests `tests/unit/pedidos/order-requirement.test.ts` (ampliar):
   `R10 1000 g al 10 % sobre insumo en kg pide 0.1`;
