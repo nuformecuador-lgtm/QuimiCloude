@@ -217,3 +217,22 @@ Commits: R26 `a730c640` + `e0b1b0fa` (`Number(...)` sobre el `Decimal` de Prisma
 | webkit | 10 | 0 |
 
 T12 marcada.
+
+## F2.3 / F2.4 (2026-10-05)
+
+- F2.3: `git merge origin/dev` → `e259b8f9`. 6 commits de dev. Un único conflicto, trivial, en `feature_list.json`: se conserva la entrada nueva QC-202 de dev y QC-199 sigue en `in_progress`. El merge no trae migraciones.
+- F2.4, `./init.sh` completo tras el merge:
+```
+ Test Files  8 failed | 875 passed (883)
+      Tests  10 failed | 12445 passed | 128 skipped (12583)
+✓ tests: sin rojos nuevos (8 rojos, todos en el baseline de 8)
+== init OK ==
+```
+- E2E tras el merge: WebKit abortaba un `goto` de R26 por el `router.refresh()` del alta. Se arregló solo en el test en `83c60410`: antes de navegar espera sin navegar a ver las dos filas homónimas, y después a ver la suma. El cambio solo toca `e2e/`, así que el `./init.sh` anterior sigue valiendo.
+
+| Navegador | Pasados | Fallados |
+|---|---|---|
+| chromium | 10 | 0 |
+| webkit | 10 | 0 |
+
+Sin push ni PR (pendiente del leader).
