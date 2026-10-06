@@ -5103,3 +5103,21 @@ podar.
   podar). E2E 2/2 en Chromium y WebKit. Confirmación de 2.000 filas: 42,5 s en Postgres local.
 - Deudas: re-medir las 2.000 filas contra el pooler de Supabase; carpeta del worktree (no se pudo desmontar,
   archivo en uso en Windows) y base `QuimiCloude_QC209` sin borrar.
+
+## 2026-10-06 — QC-213 ajuste-por-total-contado
+
+- PR #152 hacia dev, merge `a4ab7ce1`. Spec R1–R30, D1–D11 y 9 decisiones nuevas aprobadas en F1.4; 11 tasks
+  (T0 contrato, B1–B5 y F1–F2 en paralelo, TI, TZ). Contrato de servicios primero, por pedido del humano.
+- El ajuste de un lote pide el total contado. El servidor recibe total y existencia vista, calcula la
+  diferencia con el lote bloqueado y rechaza con `batch_stock_changed` (estado `stock_changed` con la
+  existencia actual) si cambió. Motivos por sentido con un helper puro compartido
+  (`adjustment_reason_not_allowed`). El asiento guarda `stock_before` y el total contado (migración
+  `20261006140000_inventory_movements_adjustment_count`, 3 CHECK); el historial los muestra y los ajustes
+  viejos se ven como antes.
+- Enmiendas: sin prevalidación en la action (guardia R23); columna `stock_before` y no `previous_stock`
+  (test de identidad); CHECK con `::text`; migración renombrada para no chocar con QC-209; motivos de
+  aumento en `movement-reason.ts`.
+- Review: vuelta 1 rechazada (B1 motivos enumerados a mano, m1–m3), vuelta 2 OK. Gate completo: 8 rojos,
+  todos en el baseline (nada que podar). E2E 10/10 en Chromium y WebKit. Dos merges de dev resueltos a mano
+  (`feature_list.json`, `MIGRACIONES_ESPERADAS`); tras el segundo no se corrió ningún test, por decisión del
+  humano.
