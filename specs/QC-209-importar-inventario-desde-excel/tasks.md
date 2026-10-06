@@ -16,7 +16,7 @@
 > **B1 y todo lo que depende del lector .xlsx esperan a la aprobación de la dependencia**
 > (`design.md > DS-3`, regla 7). El resto de B no.
 
-## T0 — Publicar el contrato en código (secuencial, bloquea todo lo demás)
+## [x] T0 — Publicar el contrato en código (secuencial, bloquea todo lo demás)
 
 **Pista:** contrato · **Agente:** `backend_dev` · **R:** R32
 
