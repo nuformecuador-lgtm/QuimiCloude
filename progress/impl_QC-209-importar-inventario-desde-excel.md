@@ -414,10 +414,10 @@ existe, es de TI): se escribió celda a celda.
 
 ### Abierto
 
-- **R8 con .xlsx**: la comparación con la fila de ejemplo es literal (recortada), como dice design 1.5.
-  Si la plantilla .csv se abre en Excel y se guarda como .xlsx, «3,50» pasa a número 3.5 → texto `3.5`
-  y la fila deja de reconocerse como ejemplo. Falta decidir si las columnas numéricas y de fecha se
-  comparan en forma canónica.
+- ~~**R8 con .xlsx**~~ cerrado (decisión humana 2026-10-06, DS-8 enmendado): `isExampleRow` compara
+  normalizado: números con `parseImportDecimal` (con el origen de la celda) y sin ceros sobrantes,
+  fechas con `parseImportDate`, texto recortado y con espacios internos colapsados. Tests R8 nuevos en
+  `import-sheet-limits.test.ts` (3.5 y fechas de .xlsx, día/mes/año, espacios, 3.51 no se ignora).
 
 ### Rojos de guardia
 

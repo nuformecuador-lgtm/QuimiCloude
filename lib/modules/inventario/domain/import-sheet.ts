@@ -1,6 +1,11 @@
 import type { SpreadsheetCell, SpreadsheetReadResult } from '../ports/spreadsheet-reader';
 
-import { normalizeHeader, type ImportCellOrigin } from './import-cell-parsing';
+import {
+  normalizeHeader,
+  parseImportDate,
+  parseImportDecimal,
+  type ImportCellOrigin,
+} from './import-cell-parsing';
 import {
   INVENTORY_IMPORT_COLUMNS,
   INVENTORY_IMPORT_MAX_ROWS,
@@ -112,9 +117,47 @@ function toParsedRow(row: readonly SpreadsheetCell[], rowNumber: number, columns
   return { rowNumber, cells, origins };
 }
 
-function isExampleRow(cells: ImportCells): boolean {
+const DECIMAL_COLUMNS = new Set<ImportColumnKey>(['stock', 'unitCost', 'totalCost', 'qtyAlert']);
+const DATE_COLUMNS = new Set<ImportColumnKey>(['purchaseDate', 'expiryDate']);
+const PLAIN_DECIMAL = /^(\d*)(?:\.(\d*))?$/;
+
+function collapseSpaces(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+/** `3,50`, `3.5` y `03.500` son el mismo numero: se quitan ceros a la izquierda y a la derecha. */
+function canonicalDecimal(value: string): string {
+  const match = PLAIN_DECIMAL.exec(value);
+  if (match === null) return value;
+  const whole = (match[1] ?? '').replace(/^0+(?=\d)/, '') || '0';
+  const fraction = (match[2] ?? '').replace(/0+$/, '');
+  return fraction === '' ? whole : `${whole}.${fraction}`;
+}
+
+/** Si la celda no se puede leer como numero o fecha, se compara como texto y no casa con el ejemplo. */
+function canonicalCell(key: ImportColumnKey, text: string, origin: ImportCellOrigin): string {
+  if (DECIMAL_COLUMNS.has(key)) {
+    const parsed = parseImportDecimal(text, origin);
+    if (parsed.kind === 'value') return canonicalDecimal(parsed.value);
+  } else if (DATE_COLUMNS.has(key)) {
+    const parsed = parseImportDate(text);
+    if (parsed.kind === 'value') return parsed.value;
+  }
+  return collapseSpaces(text);
+}
+
+const CANONICAL_EXAMPLE = new Map<ImportColumnKey, string>(
+  INVENTORY_IMPORT_COLUMNS.map((column) => [
+    column.key,
+    canonicalCell(column.key, IMPORT_EXAMPLE_ROW[column.key], 'text'),
+  ]),
+);
+
+function isExampleRow(row: ParsedImportRow): boolean {
   return INVENTORY_IMPORT_COLUMNS.every(
-    (column) => cells[column.key].trim() === IMPORT_EXAMPLE_ROW[column.key].trim(),
+    (column) =>
+      canonicalCell(column.key, row.cells[column.key], row.origins[column.key]) ===
+      CANONICAL_EXAMPLE.get(column.key),
   );
 }
 
@@ -131,7 +174,7 @@ export function parseImportSheet(read: SpreadsheetReadResult): ImportSheetOutcom
   read.rows.forEach((row, index) => {
     if (index === 0 || isBlankRow(row)) return;
     const parsed = toParsedRow(row, index + 1, columns);
-    if (isExampleRow(parsed.cells)) exampleRowIgnored = true;
+    if (isExampleRow(parsed)) exampleRowIgnored = true;
     else rows.push(parsed);
   });
 

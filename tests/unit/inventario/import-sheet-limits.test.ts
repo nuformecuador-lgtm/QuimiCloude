@@ -112,6 +112,45 @@ describe('fila de ejemplo de la plantilla', () => {
     expect(outcome.ok && outcome.sheet.rows).toHaveLength(1);
   });
 
+  it('R8 la fila de ejemplo con 3.5 y fecha de .xlsx se ignora', () => {
+    const fromXlsx = INVENTORY_IMPORT_COLUMNS.map((column): SpreadsheetCell => {
+      if (column.key === 'unitCost') return { text: '3.5', origin: 'number' };
+      if (column.key === 'stock') return { text: '25', origin: 'number' };
+      if (column.key === 'qtyAlert') return { text: '5', origin: 'number' };
+      if (column.key === 'purchaseDate' || column.key === 'expiryDate') {
+        return { text: IMPORT_EXAMPLE_ROW[column.key], origin: 'date' };
+      }
+      return text(IMPORT_EXAMPLE_ROW[column.key]);
+    });
+    const outcome = parseImportSheet(sheet([HEADER, fromXlsx, item('Sal')]));
+    expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(true);
+    expect(outcome.ok && outcome.sheet.rows.map((row) => row.cells.name)).toEqual(['Sal']);
+  });
+
+  it('R8 la fila de ejemplo con fechas dia/mes/año se ignora', () => {
+    const dayFirst = EXAMPLE.map((value, index) =>
+      HEADER[index] === 'Fecha de compra' ? '15/01/2026' : HEADER[index] === 'Fecha de vencimiento' ? '15/01/2027' : value,
+    );
+    const outcome = parseImportSheet(sheet([HEADER, dayFirst, item('Sal')]));
+    expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(true);
+  });
+
+  it('R8 la comparacion colapsa los espacios internos y de los bordes del texto', () => {
+    const spaced = EXAMPLE.map((value, index) => (HEADER[index] === 'Nombre' ? '  Ejemplo   ácido 	 cítrico ' : value));
+    const outcome = parseImportSheet(sheet([HEADER, spaced, item('Sal')]));
+    expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(true);
+    expect(outcome.ok && outcome.sheet.rows).toHaveLength(1);
+  });
+
+  it('R8 una fila de ejemplo con un costo unitario distinto (3.51) no se ignora', () => {
+    const changed = INVENTORY_IMPORT_COLUMNS.map((column): SpreadsheetCell =>
+      column.key === 'unitCost' ? { text: '3.51', origin: 'number' } : text(IMPORT_EXAMPLE_ROW[column.key]),
+    );
+    const outcome = parseImportSheet(sheet([HEADER, changed]));
+    expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(false);
+    expect(outcome.ok && outcome.sheet.rows).toHaveLength(1);
+  });
+
   it('R8 sin la fila de ejemplo no se senala nada', () => {
     const outcome = parseImportSheet(sheet([HEADER, item('Sal')]));
     expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(false);
