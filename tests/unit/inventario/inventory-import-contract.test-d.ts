@@ -15,6 +15,7 @@ import type {
   ImportCells,
   ImportColumnKey,
   ImportFileRejected,
+  ImportNothingImported,
   ImportPreviewRow,
   ImportPreviewStatus,
   ImportResultRow,
@@ -53,12 +54,17 @@ import type {
 // --- Uniones discriminadas por `kind` -------------------------------------------------------
 expectTypeOf<InventoryImportPreviewOutcome['kind']>().toEqualTypeOf<'preview' | 'file_rejected'>()
 expectTypeOf<InventoryImportConfirmOutcome['kind']>().toEqualTypeOf<
-  'imported' | 'already_imported' | 'file_rejected'
+  'imported' | 'nothing_imported' | 'already_imported' | 'file_rejected'
 >()
 expectTypeOf<Extract<InventoryImportPreviewOutcome, { kind: 'preview' }>>().toEqualTypeOf<InventoryImportPreview>()
 expectTypeOf<Extract<InventoryImportPreviewOutcome, { kind: 'file_rejected' }>>().toEqualTypeOf<ImportFileRejected>()
 expectTypeOf<Extract<InventoryImportConfirmOutcome, { kind: 'imported' }>>().toEqualTypeOf<InventoryImportResult>()
 expectTypeOf<Extract<InventoryImportConfirmOutcome, { kind: 'already_imported' }>>().toEqualTypeOf<ImportAlreadyDone>()
+expectTypeOf<Extract<InventoryImportConfirmOutcome, { kind: 'nothing_imported' }>>().toEqualTypeOf<ImportNothingImported>()
+// Sin registro de importacion no hay `importId` que devolver.
+expectTypeOf<ImportNothingImported>().not.toHaveProperty('importId')
+expectTypeOf<ImportNothingImported['rows']>().toEqualTypeOf<readonly ImportResultRow[]>()
+expectTypeOf<ImportNothingImported['totals']>().toEqualTypeOf<InventoryImportResult['totals']>()
 
 // --- Uniones discriminadas por `status` -----------------------------------------------------
 expectTypeOf<ImportPreviewStatus>().toEqualTypeOf<'create' | 'add_batch' | 'duplicate' | 'error'>()

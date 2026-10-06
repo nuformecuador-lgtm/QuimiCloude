@@ -188,6 +188,7 @@ export {
   type ImportResultTotals,
   type InventoryImportResult,
   type ImportAlreadyDone,
+  type ImportNothingImported,
   type InventoryImportConfirmOutcome,
   type InventoryImportFile,
   type PreviewInventoryImport,

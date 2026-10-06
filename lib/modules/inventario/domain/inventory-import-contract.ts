@@ -179,7 +179,22 @@ export type ImportAlreadyDone = {
   readonly importedAt: string;
 };
 
-export type InventoryImportConfirmOutcome = InventoryImportResult | ImportAlreadyDone | ImportFileRejected;
+/** Al confirmar no quedó ninguna fila que crear ni a la que sumar lote. No se escribe nada, ni
+ *  siquiera el registro de la importación: no hay `importId` y la misma `importKey` se puede volver
+ *  a usar. Trae las filas con su motivo para mostrarlas y generar el archivo de errores. */
+export type ImportNothingImported = {
+  readonly kind: 'nothing_imported';
+  readonly fileName: string;
+  readonly exampleRowIgnored: boolean;
+  readonly totals: ImportResultTotals;
+  readonly rows: readonly ImportResultRow[];
+};
+
+export type InventoryImportConfirmOutcome =
+  | InventoryImportResult
+  | ImportNothingImported
+  | ImportAlreadyDone
+  | ImportFileRejected;
 
 export type InventoryImportFile = { readonly fileName: string; readonly bytes: Uint8Array };
 
