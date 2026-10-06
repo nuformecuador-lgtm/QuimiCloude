@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import Papa from 'papaparse';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -9,25 +10,31 @@ import {
   InventoryImportScreen,
   MISSING_CREATE_TESTID,
   MISSING_UNIT_TESTID,
+  NOTHING_IMPORTED_MESSAGE_TESTID,
+  NOTHING_IMPORTED_TESTID,
   PREVIEW_TABLE_TESTID,
   REJECTION_COLUMN_TESTID,
   REJECTION_TESTID,
   RESTART_TESTID,
   RESULT_TESTID,
+  RESULT_TITLE,
   REVIEWING_TESTID,
   REVIEW_BUTTON_TESTID,
+  ROW_ISSUE_TESTID,
   ROW_STATUS_TESTID,
   SCREEN_ERROR_TESTID,
   UNIT_DIALOG_TESTID,
   UPLOAD_INPUT_TESTID,
   UPLOAD_TOO_LARGE_TESTID,
   alreadyImportedMessage,
+  nothingImportedMessage,
 } from '@/app/(private)/inventario/importar/components';
 import { UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID } from '@/components/shared/unexpected-error-notice';
 import {
   INVENTORY_IMPORT_MAX_FILE_BYTES,
   buildInventoryImportErrorFile,
   type ImportDownload,
+  type ImportNothingImported,
 } from '@/lib/modules/inventario';
 import type {
   ConfirmInventoryImportResult,
@@ -70,6 +77,23 @@ function enviado(mock: { mock: { calls: unknown[][] } }, llamada: number): FormD
   const formData = mock.mock.calls[llamada]?.[0];
   if (!(formData instanceof FormData)) throw new Error('la acción no recibió FormData');
   return formData;
+}
+
+const FILAS_SIN_VALIDAS = FILAS_RESULTADO.filter((fila) => fila.status === 'duplicate' || fila.status === 'error');
+
+function nadaImportado(): ImportNothingImported {
+  return {
+    kind: 'nothing_imported',
+    fileName: 'inventario.csv',
+    exampleRowIgnored: false,
+    totals: { rows: 3, created: 0, batchAdded: 0, duplicate: 1, error: 2 },
+    rows: FILAS_SIN_VALIDAS,
+  };
+}
+
+function numerosDeFila(contenido: string): string[] {
+  const { data } = Papa.parse<string[]>(contenido.replace(/^﻿/, ''), { delimiter: ';', skipEmptyLines: true });
+  return data.slice(1).map((linea) => linea[0] ?? '');
 }
 
 async function subirYRevisar(archivo: File = ARCHIVO) {
@@ -277,6 +301,58 @@ describe('confirmación', () => {
     await user.click(within(await screen.findByTestId(RESULT_TESTID)).getByTestId(ERROR_FILE_BUTTON_TESTID));
 
     expect(downloadFileMock).toHaveBeenCalledWith(buildInventoryImportErrorFile(FILAS_RESULTADO, 'inventario.csv'));
+  });
+
+  it('R24 nothing_imported muestra las filas con su motivo y ofrece el archivo de errores sin decir que se importo', async () => {
+    confirmMock.mockResolvedValue({ status: 'success', data: nadaImportado() });
+    const user = await subirYRevisar();
+
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    const nada = await screen.findByTestId(NOTHING_IMPORTED_TESTID);
+    expect(within(nada).getByTestId(NOTHING_IMPORTED_MESSAGE_TESTID)).toHaveTextContent(
+      nothingImportedMessage('inventario.csv'),
+    );
+    expect(screen.queryByTestId(RESULT_TESTID)).toBeNull();
+    expect(screen.queryByText(RESULT_TITLE)).toBeNull();
+    expect(screen.queryByTestId(CONFIRM_BUTTON_TESTID)).toBeNull();
+    const estados = within(nada)
+      .getAllByTestId(ROW_STATUS_TESTID)
+      .map((estado) => estado.getAttribute('data-status'));
+    expect(estados).toEqual(['duplicate', 'error', 'error']);
+    const motivos = within(nada)
+      .getAllByTestId(ROW_ISSUE_TESTID)
+      .map((motivo) => motivo.textContent);
+    expect(motivos).toEqual(
+      FILAS_SIN_VALIDAS.flatMap((fila) => (fila.status === 'error' ? fila.issues.map((issue) => issue.message) : [])),
+    );
+
+    await user.click(within(nada).getByTestId(ERROR_FILE_BUTTON_TESTID));
+
+    expect(downloadFileMock).toHaveBeenCalledWith(buildInventoryImportErrorFile(FILAS_SIN_VALIDAS, 'inventario.csv'));
+  });
+
+  it('R28 el archivo de errores de nothing_imported trae solo las filas en error', async () => {
+    confirmMock.mockResolvedValue({ status: 'success', data: nadaImportado() });
+    const user = await subirYRevisar();
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await user.click(within(await screen.findByTestId(NOTHING_IMPORTED_TESTID)).getByTestId(ERROR_FILE_BUTTON_TESTID));
+
+    const descarga = downloadFileMock.mock.calls[0]?.[0];
+    expect(descarga).toBeDefined();
+    expect(numerosDeFila(descarga?.content ?? '')).toEqual(['7', '8']);
+  });
+
+  it('R24 tras nothing_imported se puede volver a subir otro archivo', async () => {
+    confirmMock.mockResolvedValue({ status: 'success', data: nadaImportado() });
+    const user = await subirYRevisar();
+    await user.click(await screen.findByTestId(CONFIRM_BUTTON_TESTID));
+
+    await user.click(within(await screen.findByTestId(NOTHING_IMPORTED_TESTID)).getByTestId(RESTART_TESTID));
+
+    expect(screen.queryByTestId(NOTHING_IMPORTED_TESTID)).toBeNull();
+    expect(screen.getByTestId(UPLOAD_INPUT_TESTID)).toBeInTheDocument();
   });
 
   it('mientras confirma, el botón queda ocupado y no se puede volver a pulsar', async () => {

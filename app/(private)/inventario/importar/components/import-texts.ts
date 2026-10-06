@@ -262,6 +262,12 @@ export function resultDescription(fileName: string, importedAt: string): string 
   return `«${fileName}» se importó el ${formatImportedAt(importedAt)}. Las filas duplicadas o con error no se importaron.`;
 }
 
+export const NOTHING_IMPORTED_TITLE = 'No se importó nada';
+
+export function nothingImportedMessage(fileName: string): string {
+  return `Al confirmar, «${fileName}» no tenía ninguna fila válida, así que no se ha importado nada. Revisa el motivo de cada fila, corrígelas y vuelve a subir el archivo.`;
+}
+
 export function alreadyImportedMessage(importedAt: string): string {
   return `Esta importación ya se había confirmado el ${formatImportedAt(importedAt)}. No se ha vuelto a escribir nada.`;
 }
@@ -271,4 +277,6 @@ export const REVIEWING_TESTID = 'inventory-import-reviewing';
 export const SCREEN_ERROR_TESTID = 'inventory-import-error';
 export const RESULT_TESTID = 'inventory-import-result';
 export const ALREADY_IMPORTED_TESTID = 'inventory-import-already-imported';
+export const NOTHING_IMPORTED_TESTID = 'inventory-import-nothing-imported';
+export const NOTHING_IMPORTED_MESSAGE_TESTID = 'inventory-import-nothing-imported-message';
 export const RESTART_TESTID = 'inventory-import-restart';

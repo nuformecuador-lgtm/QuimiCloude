@@ -12,7 +12,9 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import type {
   ImportAlreadyDone,
+  ImportNothingImported,
   ImportResultRow,
+  ImportResultTotals,
   InventoryImportResult,
 } from '@/lib/modules/inventario';
 
@@ -25,6 +27,9 @@ import {
 } from './import-preview-table';
 import {
   ALREADY_IMPORTED_TESTID,
+  NOTHING_IMPORTED_MESSAGE_TESTID,
+  NOTHING_IMPORTED_TESTID,
+  NOTHING_IMPORTED_TITLE,
   RESTART_LABEL,
   RESTART_TESTID,
   RESULT_STATUS_LABELS,
@@ -36,6 +41,7 @@ import {
   alreadyImportedMessage,
   createdLotDetail,
   duplicateLotDetail,
+  nothingImportedMessage,
   resultDescription,
 } from './import-texts';
 
@@ -83,6 +89,45 @@ function RestartButton({ onRestart }: { readonly onRestart: () => void }) {
   );
 }
 
+function ResultRows({
+  totals,
+  rows,
+  exampleRowIgnored,
+  onDownloadErrors,
+  onRestart,
+}: {
+  readonly totals: ImportResultTotals;
+  readonly rows: readonly ImportResultRow[];
+  readonly exampleRowIgnored: boolean;
+  readonly onDownloadErrors: () => void;
+  readonly onRestart: () => void;
+}) {
+  const statuses = RESULT_STATUS_ORDER.map((value) => ({
+    value,
+    count: rows.reduce((total, row) => (row.status === value ? total + 1 : total), 0),
+  }));
+
+  return (
+    <>
+      <ImportTotals totals={totals} labels={RESULT_TOTAL_LABELS} />
+      {exampleRowIgnored ? <ExampleRowIgnoredNotice /> : null}
+      <div className="flex flex-wrap gap-2">
+        {totals.error > 0 ? <ErrorFileButton onDownload={onDownloadErrors} /> : null}
+        <RestartButton onRestart={onRestart} />
+      </div>
+      <ImportRowsTable
+        tableId={RESULT_TABLE_ID}
+        testId={RESULT_TABLE_TESTID}
+        rows={rows}
+        statuses={statuses}
+        statusLabels={RESULT_STATUS_LABELS}
+        renderStatus={resultStatus}
+        renderDetail={resultDetail}
+      />
+    </>
+  );
+}
+
 export type ImportResultSummaryProps = {
   readonly result: InventoryImportResult;
   readonly onDownloadErrors: () => void;
@@ -90,31 +135,53 @@ export type ImportResultSummaryProps = {
 };
 
 export function ImportResultSummary({ result, onDownloadErrors, onRestart }: ImportResultSummaryProps) {
-  const statuses = RESULT_STATUS_ORDER.map((value) => ({
-    value,
-    count: result.rows.reduce((total, row) => (row.status === value ? total + 1 : total), 0),
-  }));
-
   return (
     <section className="flex min-w-0 flex-col gap-4" data-testid={RESULT_TESTID}>
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold">{RESULT_TITLE}</h2>
         <p className="text-sm text-muted-foreground">{resultDescription(result.fileName, result.importedAt)}</p>
       </div>
-      <ImportTotals totals={result.totals} labels={RESULT_TOTAL_LABELS} />
-      {result.exampleRowIgnored ? <ExampleRowIgnoredNotice /> : null}
-      <div className="flex flex-wrap gap-2">
-        {result.totals.error > 0 ? <ErrorFileButton onDownload={onDownloadErrors} /> : null}
-        <RestartButton onRestart={onRestart} />
-      </div>
-      <ImportRowsTable
-        tableId={RESULT_TABLE_ID}
-        testId={RESULT_TABLE_TESTID}
+      <ResultRows
+        totals={result.totals}
         rows={result.rows}
-        statuses={statuses}
-        statusLabels={RESULT_STATUS_LABELS}
-        renderStatus={resultStatus}
-        renderDetail={resultDetail}
+        exampleRowIgnored={result.exampleRowIgnored}
+        onDownloadErrors={onDownloadErrors}
+        onRestart={onRestart}
+      />
+    </section>
+  );
+}
+
+export type ImportNothingImportedSummaryProps = {
+  readonly nothing: ImportNothingImported;
+  readonly onDownloadErrors: () => void;
+  readonly onRestart: () => void;
+};
+
+export function ImportNothingImportedSummary({
+  nothing,
+  onDownloadErrors,
+  onRestart,
+}: ImportNothingImportedSummaryProps) {
+  return (
+    <section className="flex min-w-0 flex-col gap-4" data-testid={NOTHING_IMPORTED_TESTID}>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">{NOTHING_IMPORTED_TITLE}</h2>
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-lg border border-destructive/40 p-3 text-sm"
+          data-testid={NOTHING_IMPORTED_MESSAGE_TESTID}
+        >
+          <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+          {nothingImportedMessage(nothing.fileName)}
+        </p>
+      </div>
+      <ResultRows
+        totals={nothing.totals}
+        rows={nothing.rows}
+        exampleRowIgnored={nothing.exampleRowIgnored}
+        onDownloadErrors={onDownloadErrors}
+        onRestart={onRestart}
       />
     </section>
   );

@@ -10,6 +10,8 @@ import {
   buildInventoryImportErrorFile,
   type ImportAlreadyDone,
   type ImportFileRejection as Rejection,
+  type ImportNothingImported,
+  type InventoryImportConfirmOutcome,
   type InventoryImportPreview,
   type InventoryImportResult,
 } from '@/lib/modules/inventario';
@@ -24,7 +26,11 @@ import { ImportFileRejection } from './import-file-rejection';
 import { ImportMissingCatalog } from './import-missing-catalog';
 import { ImportPreviewSummary } from './import-preview-summary';
 import { ImportPreviewTable } from './import-preview-table';
-import { ImportAlreadyDoneNotice, ImportResultSummary } from './import-result-summary';
+import {
+  ImportAlreadyDoneNotice,
+  ImportNothingImportedSummary,
+  ImportResultSummary,
+} from './import-result-summary';
 import { ImportTemplateButton } from './import-template-button';
 import {
   IMPORT_SCREEN_TESTID,
@@ -42,7 +48,34 @@ type Outcome =
   | { readonly kind: 'rejected'; readonly rejection: Rejection }
   | { readonly kind: 'preview'; readonly preview: InventoryImportPreview; readonly importKey: string }
   | { readonly kind: 'imported'; readonly result: InventoryImportResult }
+  | { readonly kind: 'nothing_imported'; readonly nothing: ImportNothingImported }
   | { readonly kind: 'already_imported'; readonly done: ImportAlreadyDone };
+
+function confirmOutcome(data: InventoryImportConfirmOutcome): Outcome {
+  switch (data.kind) {
+    case 'imported':
+      return { kind: 'imported', result: data };
+    case 'nothing_imported':
+      return { kind: 'nothing_imported', nothing: data };
+    case 'already_imported':
+      return { kind: 'already_imported', done: data };
+    case 'file_rejected':
+      return { kind: 'rejected', rejection: data.rejection };
+  }
+}
+
+function isFinished(outcome: Outcome | null): boolean {
+  if (outcome === null) return false;
+  switch (outcome.kind) {
+    case 'imported':
+    case 'nothing_imported':
+    case 'already_imported':
+      return true;
+    case 'rejected':
+    case 'preview':
+      return false;
+  }
+}
 
 type Busy = 'preview' | 'confirm' | null;
 
@@ -125,16 +158,13 @@ export function InventoryImportScreen({ units }: InventoryImportScreenProps) {
         setError(response);
         return;
       }
-      const data = response.data;
-      if (data.kind === 'imported') setOutcome({ kind: 'imported', result: data });
-      else if (data.kind === 'already_imported') setOutcome({ kind: 'already_imported', done: data });
-      else setOutcome({ kind: 'rejected', rejection: data.rejection });
+      setOutcome(confirmOutcome(response.data));
     } finally {
       setBusy(null);
     }
   }
 
-  const finished = outcome?.kind === 'imported' || outcome?.kind === 'already_imported';
+  const finished = isFinished(outcome);
   const canReview =
     file !== null && !exceedsImportMaxBytes(file) && busy === null && outcome?.kind !== 'preview';
 
@@ -208,6 +238,16 @@ export function InventoryImportScreen({ units }: InventoryImportScreenProps) {
           result={outcome.result}
           onDownloadErrors={() =>
             downloadFile(buildInventoryImportErrorFile(outcome.result.rows, outcome.result.fileName))
+          }
+          onRestart={restart}
+        />
+      ) : null}
+
+      {outcome?.kind === 'nothing_imported' ? (
+        <ImportNothingImportedSummary
+          nothing={outcome.nothing}
+          onDownloadErrors={() =>
+            downloadFile(buildInventoryImportErrorFile(outcome.nothing.rows, outcome.nothing.fileName))
           }
           onRestart={restart}
         />

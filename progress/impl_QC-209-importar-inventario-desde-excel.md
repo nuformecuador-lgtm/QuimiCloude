@@ -313,6 +313,8 @@ Siguen rojos 4 casos que no se arreglan desde `importar/**` sin quitar algo que 
    su comentario de la linea 40 contiene `'use client'` y el test lo clasifica como cliente; F1
    le anadio `@/lib/composition`.
 
+- **nothing_imported (enmienda F2.1, R24)**: la pantalla lo pinta con `ImportNothingImportedSummary` (mensaje de que no se importó nada, totales, filas con estado y motivo, archivo de errores con `buildInventoryImportErrorFile` y «Importar otro archivo»); switches exhaustivos sin `default`. Tests en `inventory-import-screen.test.tsx`: «R24 nothing_imported muestra las filas con su motivo y ofrece el archivo de errores sin decir que se importo», «R28 el archivo de errores de nothing_imported trae solo las filas en error», «R24 tras nothing_imported se puede volver a subir otro archivo». Salida: `vitest run tests/unit/inventario/importar/` 6 files / 83 passed; typecheck exit 0; lint 0 errors.
+
 ## Pista B lectura (backend_dev, 2026-10-06)
 
 ### Commits
