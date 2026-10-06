@@ -18,7 +18,7 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
 import type { PresentationCatalog, PresentationRef, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
-import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -89,6 +89,7 @@ type Dobles = {
   readonly findExecutionContentById: ReturnType<typeof vi.fn>;
   readonly findRefs: ReturnType<typeof vi.fn>;
   readonly findRefsSharingBaseInCompany: ReturnType<typeof vi.fn>;
+  readonly findMassVolumeBridge: ReturnType<typeof vi.fn>;
   readonly productFindRefs: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
@@ -103,6 +104,7 @@ function montar(options?: {
   readonly ownUnits?: readonly UnitRef[];
   readonly sisterUnits?: readonly UnitRef[];
   readonly presentations?: readonly PresentationRef[];
+  readonly bridge?: MassVolumeBridge | null;
 }): Dobles {
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const listByOrderInCompany = vi.fn(async () => {
@@ -139,6 +141,7 @@ function montar(options?: {
 
   const findRefs = vi.fn(async () => options?.ownUnits ?? [unidad()]);
   const findRefsSharingBaseInCompany = vi.fn(async () => options?.sisterUnits ?? []);
+  const findMassVolumeBridge = vi.fn(async () => options?.bridge ?? null);
 
   const productFindRefs = vi.fn(async () => options?.products ?? [producto()]);
 
@@ -155,7 +158,7 @@ function montar(options?: {
     } as OrderAssignmentRepository,
     orders: { findAliveById, listAliveSummariesByIds, transitionAliveById } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
-    units: { findRefs, findRefsSharingBaseInCompany, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => Promise.reject(new Error('no se usa')) } as UnitCatalog,
+    units: { findRefs, findRefsSharingBaseInCompany, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge } as UnitCatalog,
     products: {
       findRefs: productFindRefs,
       findCostingBatches: vi.fn(async () => {
@@ -174,6 +177,7 @@ function montar(options?: {
     findExecutionContentById,
     findRefs,
     findRefsSharingBaseInCompany,
+    findMassVolumeBridge,
     productFindRefs,
     findRefsPresentations,
     todos: [
@@ -190,6 +194,7 @@ function montar(options?: {
       findExecutionContentById,
       findRefs,
       findRefsSharingBaseInCompany,
+      findMassVolumeBridge,
       productFindRefs,
       findRefsPresentations,
     ],
@@ -343,7 +348,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
     );
     for (const line of view.lines) {
       expect(Object.keys(line).sort()).toEqual(
-        ['productName', 'percentage', 'quantity', 'unit', 'alternativeUnits'].sort(),
+        ['productName', 'percentage', 'quantity', 'need', 'unit', 'alternativeUnits'].sort(),
       );
     }
   });
@@ -453,6 +458,82 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(findRefs).not.toHaveBeenCalled();
+    expect(view.unitId).toBeNull();
+    expect(view.unitLabel).toBeNull();
+  });
+});
+
+describe('getAssignedOrderExecution — la necesidad de la linea en la unidad del insumo', () => {
+  const GRAMO = uuid('6');
+  const GARRAFA = uuid('8');
+  const kilogramo = unidad({ id: KILOGRAMO, name: 'Kilogramo', symbol: 'kg' });
+  const gramo = unidad({ id: GRAMO, name: 'Gramo', symbol: 'g', baseUnitId: KILOGRAMO, factor: '0.001' });
+  const litro = unidad();
+  const puente: MassVolumeBridge = { volumeBaseId: LITRO, massBaseId: KILOGRAMO };
+
+  it('R16 la cantidad de la linea sale convertida a la unidad del insumo', async () => {
+    const { deps, findRefs } = montar({
+      summary: resumen({ quantity: '2000', unitId: GRAMO }),
+      products: [producto({ unitId: KILOGRAMO })],
+      ownUnits: [kilogramo, gramo],
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefs).toHaveBeenCalledTimes(1);
+    expect([...(findRefs.mock.calls[0]?.[0] as readonly string[])].sort()).toEqual([KILOGRAMO, GRAMO].sort());
+    const [line] = view.lines;
+    expect(line?.need).toBe('exact');
+    expect(Number(line?.quantity)).toBe(0.2);
+    expect(line?.unit?.id).toBe(KILOGRAMO);
+    expect(view.unitLabel).toBe('g');
+  });
+
+  it('R17 una linea aproximada sale con need approximate', async () => {
+    const { deps, findMassVolumeBridge } = montar({
+      summary: resumen({ quantity: '200', unitId: LITRO }),
+      products: [producto({ unitId: KILOGRAMO })],
+      ownUnits: [kilogramo, litro],
+      bridge: puente,
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findMassVolumeBridge).toHaveBeenCalledTimes(1);
+    const [line] = view.lines;
+    expect(line?.need).toBe('approximate');
+    expect(Number(line?.quantity)).toBe(20);
+    expect(line?.unit?.id).toBe(KILOGRAMO);
+  });
+
+  it('R17 una linea no convertible sale sin cantidad', async () => {
+    const { deps } = montar({
+      summary: resumen({ quantity: '200', unitId: GARRAFA }),
+      products: [producto({ unitId: LITRO })],
+      ownUnits: [litro, unidad({ id: GARRAFA, name: 'Garrafa', symbol: null })],
+      bridge: puente,
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    const [line] = view.lines;
+    expect(line?.need).toBe('not_convertible');
+    expect(line?.quantity).toBeNull();
+    expect(line?.percentage).toBe('10.00');
+    expect(line?.productName).toBe('Hipoclorito');
+  });
+
+  it('R20 un pedido sin unidad sale como antes', async () => {
+    const { deps, findRefs, findMassVolumeBridge } = montar({ summary: resumen({ quantity: '200', unitId: null }) });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findMassVolumeBridge).not.toHaveBeenCalled();
+    expect(findRefs).toHaveBeenCalledWith([LITRO], EMPRESA);
+    const [line] = view.lines;
+    expect(line?.need).toBe('unconverted');
+    expect(line?.quantity).toBe('20');
+    expect(line?.unit?.id).toBe(LITRO);
     expect(view.unitId).toBeNull();
     expect(view.unitLabel).toBeNull();
   });

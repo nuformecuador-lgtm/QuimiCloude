@@ -52,7 +52,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
   const availableUnits = line.unit === null ? [] : [line.unit, ...line.alternativeUnits];
   const selectedUnit = availableUnits.find((unit) => unit.id === selectedUnitId) ?? line.unit;
   const displayedQuantity =
-    line.unit === null || selectedUnit === null || selectedUnit.id === line.unit.id
+    line.quantity === null || line.unit === null || selectedUnit === null || selectedUnit.id === line.unit.id
       ? line.quantity
       : convertQuantity(line.quantity, line.unit, selectedUnit);
 
@@ -77,9 +77,9 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
       <span
         data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
         className="text-base font-medium"
-        title={exactDecimalTitle(displayedQuantity)}
+        title={displayedQuantity === null ? undefined : exactDecimalTitle(displayedQuantity)}
       >
-        {formatDecimalDisplay(displayedQuantity)}
+        {displayedQuantity === null ? null : formatDecimalDisplay(displayedQuantity)}
       </span>
       {line.unit === null ? null : line.alternativeUnits.length > 0 ? (
         <Select

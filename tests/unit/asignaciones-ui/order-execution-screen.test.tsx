@@ -62,6 +62,7 @@ const EXECUTION: AssignedOrderExecutionView = {
       productName: 'Resina acrílica',
       percentage: '10.00',
       quantity: '10',
+      need: 'unconverted',
       unit: LITRO,
       alternativeUnits: [MILILITRO],
     },
@@ -100,7 +101,7 @@ describe('pantalla de ejecucion — sin factor de escala, con la cantidad de la 
 
     expect(screen.getByText(new RegExp(EXECUTION.orderQuantity))).toBeVisible();
     expect(screen.getByTestId('order-execution-line-quantity-0')).toHaveTextContent(
-      EXECUTION.lines[0]!.quantity,
+      EXECUTION.lines[0]!.quantity ?? '',
     );
   });
 });

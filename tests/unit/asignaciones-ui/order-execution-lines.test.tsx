@@ -46,6 +46,7 @@ function linea(overrides: Partial<ExecutionLineView> = {}): ExecutionLineView {
     productName: 'Hipoclorito',
     percentage: '10.00',
     quantity: '20',
+    need: 'unconverted',
     unit: LITRO,
     alternativeUnits: [MILILITRO],
     ...overrides,
