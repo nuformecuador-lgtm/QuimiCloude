@@ -73,3 +73,26 @@ No hay LibreOffice ni openpyxl, pero **Excel 16 responde por COM** en esta máqu
 ## Setup del worktree
 
 `pnpm install --frozen-lockfile --prefer-offline`, `prisma generate`, `next typegen`. Lockfile sin cambios.
+
+## Gate de T0, segunda corrida (tras 9b9666fc, ficha en feature_list.json)
+
+`./init.sh --rapido` -> **exit 1, no verde.** En verde: Node, dependencias, Prisma, tipos de ruta,
+fichas, cupo (in_progress=2), specs, worktrees, base de desarrollo (71 migraciones), typecheck y lint
+(0 errores, 8 warnings preexistentes). Falla el check `pnpm run test:rapido` (vitest related de los
+12 archivos del diff contra origin/dev, más las guardias), y el gate se corta ahí:
+
+```
+ Test Files  7 failed | 433 passed (440)
+      Tests  9 failed | 6699 passed | 50 skipped (6758)
+✗ 'pnpm run test:rapido' fallo
+```
+
+Los 7 archivos rojos están todos en `tests/baseline-rojos.json`: configuracion-ui/unidades-viewport (2),
+configuracion-ui/usuarios-viewport (2), navegacion/pantallas-exigen-permiso (1), inventario/product-page (1),
+recetas-ui/recipe-page (1), recetas/module-contract (1), recetas/scope (1). Salen porque importan el
+barrel de inventario o `routes.ts`. No hay rojos fuera del baseline.
+
+Mientras la rama toque el barrel de inventario o `routes.ts`, `--rapido` va a salir así; el leader
+decide con qué criterio se sigue. Pistas B y F sin lanzar.
+
+TI: anotada en tasks.md la retirada de la exención de `scope.test.ts`.

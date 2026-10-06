@@ -258,6 +258,8 @@ Hecho cuando: revisado contra `docs/architecture.md > Regla: multiplataforma` (4
   `inventario.previewInventoryImport` / `confirmInventoryImport`, `revalidatePath(INVENTORY_ROUTE)`,
   traductor `createErrorStateTranslator(InventarioError, …)`)
 - `lib/modules/inventario/adapters/driving/inventory-import-fixtures.ts` (**se borra**)
+- `tests/unit/inventario/scope.test.ts` (modifica: quitar la exención de `'use server'` que T0 dio a
+  `inventory-import-fixtures.ts`, al borrar los fixtures)
 - `tests/unit/inventario/inventory-import-actions.test.ts` (modifica: de stub a acción real con la
   composición simulada; el test de forma de T0 no cambia)
 - el test del gate que cuenta lecturas de sesión por Server Action (QC-104, lee `adapters/driving/`
