@@ -149,7 +149,14 @@ envases.
   Tests 8 failed | 8969 passed | 30 skipped. Los 6 archivos están en el baseline: recetas/module-contract,
   unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso, recipe-page.
 - E2E (T14): `playwright test --list` da 4 tests en 1 archivo. No ejecutado.
-- ./init.sh completo: no corrido; lo corre el leader.
+- ./init.sh completo (lo corrió el leader): un rojo nuevo, tests/guards/guard-identificador-de-request.test.ts
+  («no hay ningun archivo nuevo en e2e/ y existe el test que lo sustituye (R21)»). Faltaba
+  pedido-conversion-de-unidad.spec.ts en la lista cerrada E2E_ESPERADOS. Se dio de alta con el comentario de siempre: el
+  recorrido que hace y que no lee ni afirma nada del identificador de petición. El resto de rojos del gate completo son
+  del baseline (según el leader).
+  Tras el arreglo: la guardia sola da 23/23. ./init.sh --rapido: typecheck OK, lint OK; Test Files 6 failed | 603 passed
+  (609); Tests 8 failed | 8969 passed | 30 skipped. Los mismos 6 archivos del baseline.
+- E2E (corrido por el leader): 4/4 en verde (R24 y R25 en chromium y webkit).
 
 ## Bloqueo T9 — conflicto con QC-195 R43 (resuelto: opción a)
 Los dos casos R43 de QC-195 siembran una receta antigua con el envase como ingrediente. El envase está en la unidad de

@@ -262,6 +262,10 @@ export const E2E_ESPERADOS = [
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
   'insumo-por-unidad.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el alta de un pedido en g y otro en l sobre un
+  // insumo en kg: cantidad requerida, marca de aproximacion, costo cotizado y guardado y cantidad
+  // apartada. No lee ni afirma nada sobre el identificador de peticion.
+  'pedido-conversion-de-unidad.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
