@@ -460,3 +460,38 @@ existe, es de TI): se escribió celda a celda.
 Verificacion: `pnpm exec vitest run guard tests/unit/inventario/qc121-alcance.test.ts` da
 `Test Files  52 passed (52)` y `Tests  719 passed | 11 skipped (730)`. `pnpm run typecheck` sale sin
 errores. `pnpm run lint` da 0 errores y 8 warnings, todos en archivos que esta tanda no toca.
+
+## Gate de la tanda B/F (B1-B7, B9, F1-F6 + guardias), 2026-10-06
+
+Criterio de la tanda (humano, solo QC-209): cierra si `--rapido` falla únicamente por archivos de
+`tests/baseline-rojos.json`.
+
+`./init.sh --rapido` -> exit 1 en `pnpm run test:rapido`: `Test Files 8 failed | 472 passed (480)`,
+`Tests 14 failed | 7272 passed | 50 skipped (7336)`. Typecheck y lint (0 errores) en verde. Comparación
+archivo a archivo:
+
+| Archivo rojo | Baseline |
+| --- | --- |
+| tests/unit/configuracion-ui/unidades-viewport.test.tsx | sí |
+| tests/unit/configuracion-ui/usuarios-viewport.test.tsx | sí |
+| tests/unit/inventario/product-page.test.tsx | sí |
+| tests/unit/navegacion/pantallas-exigen-permiso.test.tsx | sí |
+| tests/unit/recetas/module-contract.test.ts | sí |
+| tests/unit/recetas/scope.test.ts | sí |
+| tests/unit/recetas-ui/recipe-page.test.tsx | sí |
+| **tests/unit/inventario/product-route-contract.test.ts** | **NO** |
+
+**La tanda NO cierra.** `product-route-contract.test.ts` barre `app/(private)/inventario/` entero
+y supone que la ruta no tiene subrutas. Arreglado lo legítimo (59fd90d1, 5d44c59f: tamaño táctil,
+`filter(` que no son del usuario, comentario de `inventario/page.tsx` con el literal de directiva).
+Quedan 3 casos en conflicto con el spec:
+
+1. «el literal del permiso de escritura no vive en la ruta»: design 6 / F1 exigen
+   `requirePagePermission('inventario.modificar')` en `importar/page.tsx`, y
+   `guard-pantallas-exigen-permiso` lo exige también.
+2. «la pantalla no ofrece busqueda ni control de orden»: el filtro por estado de la vista previa es
+   requisito de F3 / design 6.
+3. «los componentes de ruta se exponen por el barrel…»: afirma que la única carpeta de la ruta es
+   `components/`; la subruta `importar/` de design 6 lo rompe por existir.
+
+Pistas B8, B10, TI y TZ en espera de decisión del leader.
