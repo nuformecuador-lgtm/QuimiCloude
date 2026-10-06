@@ -155,14 +155,14 @@ la forma exacta de su entrada y su salida está en `design.md > 1. Contrato de s
 ## Preguntas abiertas
 
 - ~~Producto terminado: qué presentación lleva, si la fórmula tiene varias, y qué coste toma su
-  lote.~~ **Propuesta en `design.md > DS-1`**, pendiente de aprobación humana junto con el spec.
-- ~~Decimales con coma o con punto en el .csv.~~ **Propuesta en `design.md > DS-2`**, pendiente de
-  aprobación humana junto con el spec.
-- **Salud de la librería .xlsx sin verificar.** Esta sesión no tenía red: los cuatro checks de
-  `read-excel-file` (`design.md > DS-3`) están escritos como se esperan, no como medidos. Hay que
-  correr `npm view read-excel-file deprecated time.modified license` y mirar las descargas
-  semanales antes de aprobar. Si alguno falla, la propuesta cae.
-- **De dónde sale el .xlsx de prueba** (`design.md > DS-13`). La librería propuesta solo lee; el
+  lote.~~ **Cerrada: `design.md > DS-1`, aprobada en F1.4 el 2026-10-06.**
+- ~~Decimales con coma o con punto en el .csv.~~ **Cerrada: `design.md > DS-2`, aprobada en F1.4
+  el 2026-10-06.**
+- ~~Salud de la librería .xlsx sin verificar.~~ **Cerrada el 2026-10-06**: checks medidos por el
+  leader (`design.md > 9.1`). En F1.4 el humano aprobó `read-excel-file` y pidió librería también
+  para .csv (`papaparse`), porque más adelante se descargará en .csv o .xlsx.
+- **De dónde sale el .xlsx de prueba** (`design.md > DS-13`, aprobada: lo produce el humano o el
+  implementer si tiene la herramienta). La librería propuesta solo lee; el
   fixture binario lo tiene que producir alguien (el humano con Excel/LibreOffice, o una herramienta
   que el implementer tenga a mano). Sin él, el lector .xlsx solo se prueba contra la librería
   simulada.

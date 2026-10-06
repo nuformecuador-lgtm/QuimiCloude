@@ -58,13 +58,16 @@ Hecho cuando: los dos tests pasan; `pnpm typecheck` y `pnpm lint` en verde;
 
 Ningún archivo de esta pista está en `app/`, `components/` ni `tests/unit/inventario/importar/`.
 
-### B1 — Instalar la dependencia aprobada · depende de: T0 + aprobación humana de DS-3
+### B1 — Instalar las dependencias aprobadas · depende de: T0 (DS-3 aprobada el 2026-10-06)
 
-- `package.json`, `pnpm-lock.yaml`, `docs/dependencias.md` (fila de `design.md > 9.1` con los
-  cuatro checks **medidos**).
+- `package.json`, `pnpm-lock.yaml`: `read-excel-file` y `papaparse` (dependencias) y
+  `@types/papaparse` (`devDependency`).
+- `docs/dependencias.md`: las dos filas de `design.md > 9.1` (checks ya medidos por el leader).
+- `tests/guards/guard-arquitectura-modulos.test.ts`: `PURE_PACKAGES` pasa a `['zod', 'papaparse']`.
+- `docs/architecture.md > Dominio`: «paquetes puros (hoy: `zod`)» pasa a «(hoy: `zod`, `papaparse`)».
 
-Hecho cuando: checks verificados con red y anotados; `guard-dependencias-aprobadas` en verde. Si un
-check falla: no se instala, se para y se vuelve al leader.
+Hecho cuando: `guard-dependencias-aprobadas` y `guard-arquitectura-modulos` en verde. Si al instalar
+la versión resuelta no es la medida (`9.3.x` / `5.7.x`), se para y se vuelve al leader.
 
 ### B2 [P] — Celdas a forma canónica · depende de: T0 · R12, R13
 
@@ -75,12 +78,13 @@ check falla: no se instala, se para y se vuelve al leader.
 
 Hecho cuando: casos `R12 …` y `R13 …` (incluidos `1.234,5`, `2026-02-30`, `31/12/2026`) en verde.
 
-### B3 [P] — Lector de hoja: puerto + .csv · depende de: T0 · R4
+### B3 [P] — Lector de hoja: puerto + .csv · depende de: B1 · R4
 
 - `lib/modules/inventario/ports/spreadsheet-reader.ts`
 - `lib/modules/inventario/domain/import-file-format.ts` — extensión + firma ZIP / UTF-8 →
   formato o `unsupported_format`.
-- `lib/modules/inventario/adapters/driven/spreadsheet/csv-reader.ts` — RFC 4180 acotado, `;`/`,`.
+- `lib/modules/inventario/adapters/driven/spreadsheet/csv-reader.ts` — `Papa.parse` con separador
+  `;`/`,` fijado por DS-2 (`design.md > 4.1`), sin lector propio.
 - `tests/unit/inventario/spreadsheet-format.test.ts`, `tests/unit/inventario/csv-reader.test.ts`
 
 Hecho cuando: comillas, comillas escapadas, salto de línea entre comillas, CRLF, BOM y detección
@@ -155,10 +159,11 @@ Hecho cuando: un caso nombrado `R<n> …` por cada R de la lista; el permiso va 
 fila que falla no deshace las demás; **medida** la confirmación de 2.000 filas contra la base de
 integración y anotada en `progress/impl_…md` (si > 120 s, parar y preguntar, `design.md > 7`).
 
-### B9 [P] — Archivo de errores real · depende de: T0 · R3, R28
+### B9 [P] — Archivo de errores real · depende de: B1 · R3, R28
 
 - `lib/modules/inventario/domain/inventory-import-downloads.ts` (completa
-  `buildInventoryImportErrorFile`: escapado RFC 4180, BOM, `;`)
+  `buildInventoryImportErrorFile` y pasa la plantilla de T0 a `Papa.unparse`, con `delimiter: ';'`
+  y BOM delante; mismo contrato de `design.md > 1.5`)
 - `tests/unit/inventario/inventory-import-downloads.test.ts`
 
 Hecho cuando: cabecera de plantilla exacta; archivo de errores con «Fila», valores originales y
@@ -283,7 +288,7 @@ Hecho cuando: cada R tiene al menos un test que existe y pasa; `./init.sh` compl
 | Pista | Archivos |
 | --- | --- |
 | T0 | `lib/modules/inventario/domain/inventory-import-contract.ts`, `.../domain/inventory-import-downloads.ts` (plantilla real, errores stub), `.../domain/preview-inventory-import.ts` y `.../domain/confirm-inventory-import.ts` (vacíos que lanzan, para que el barrel ya los reexporte), `lib/modules/inventario/index.ts`, `.../adapters/driving/inventory-import-actions.ts`, `.../adapters/driving/inventory-import-fixtures.ts`, `lib/shared/routes.ts`, `tests/unit/inventario/inventory-import-contract.test-d.ts`, `tests/unit/inventario/inventory-import-actions.test.ts` |
-| B | `package.json`, `pnpm-lock.yaml`, `docs/dependencias.md`, `lib/modules/inventario/domain/{import-cell-parsing,import-file-format,import-sheet,plan-inventory-import,import-finished-goods,preview-inventory-import,confirm-inventory-import,inventory-import-downloads}.ts` (los tres últimos los creó T0; B los completa), `lib/modules/inventario/ports/{spreadsheet-reader,inventory-import-repository,import-formula-lookup}.ts`, `lib/modules/inventario/adapters/driven/spreadsheet/{csv-reader,xlsx-reader}.ts`, `lib/modules/inventario/adapters/driven/persistence/{inventory-import-prisma,product-prisma}.ts`, `lib/composition/index.ts`, `db/schema.prisma`, `db/migrations/<ts>_inventory_imports/*`, `tests/unit/inventario/{import-cell-parsing,spreadsheet-format,csv-reader,import-header,import-sheet-limits,plan-inventory-import,preview-inventory-import,confirm-inventory-import,inventory-import-downloads}.test.ts`, `tests/integration/inventario/{xlsx-reader,inventory-import-repository,inventory-import-isolation,inventory-import-confirm,inventory-import-finished-goods,inventory-import-idempotency}.test.ts`, `tests/integration/aislamiento.json`, `tests/guards/guard-ambito-empresa-inventario.test.ts`, `tests/fixtures/inventario-importar/mixto.xlsx` |
+| B | `package.json`, `pnpm-lock.yaml`, `docs/dependencias.md`, `docs/architecture.md`, `tests/guards/guard-arquitectura-modulos.test.ts`, `lib/modules/inventario/domain/{import-cell-parsing,import-file-format,import-sheet,plan-inventory-import,import-finished-goods,preview-inventory-import,confirm-inventory-import,inventory-import-downloads}.ts` (los tres últimos los creó T0; B los completa), `lib/modules/inventario/ports/{spreadsheet-reader,inventory-import-repository,import-formula-lookup}.ts`, `lib/modules/inventario/adapters/driven/spreadsheet/{csv-reader,xlsx-reader}.ts`, `lib/modules/inventario/adapters/driven/persistence/{inventory-import-prisma,product-prisma}.ts`, `lib/composition/index.ts`, `db/schema.prisma`, `db/migrations/<ts>_inventory_imports/*`, `tests/unit/inventario/{import-cell-parsing,spreadsheet-format,csv-reader,import-header,import-sheet-limits,plan-inventory-import,preview-inventory-import,confirm-inventory-import,inventory-import-downloads}.test.ts`, `tests/integration/inventario/{xlsx-reader,inventory-import-repository,inventory-import-isolation,inventory-import-confirm,inventory-import-finished-goods,inventory-import-idempotency}.test.ts`, `tests/integration/aislamiento.json`, `tests/guards/guard-ambito-empresa-inventario.test.ts`, `tests/fixtures/inventario-importar/mixto.xlsx` |
 | F | `app/(private)/inventario/importar/page.tsx`, `app/(private)/inventario/importar/components/*`, `app/(private)/inventario/page.tsx`, `tests/unit/inventario/importar/*.test.tsx` |
 | TI | `lib/modules/inventario/adapters/driving/inventory-import-actions.ts`, `.../inventory-import-fixtures.ts` (borrado), `tests/unit/inventario/inventory-import-actions.test.ts`, test de conteo de sesión de QC-104, `e2e/inventario-importar.spec.ts`, `e2e/fixtures/inventario-importar-mixto.csv` |
 

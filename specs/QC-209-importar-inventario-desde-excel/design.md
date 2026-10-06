@@ -511,8 +511,11 @@ Adaptadores driven (`lib/modules/inventario/adapters/driven/spreadsheet/`):
   `number` de JS: se pasan a texto con `toFixed(4)` y se rechaza (`number_format_invalid`) si el
   número tiene más de 4 decimales significativos (`Math.abs(n * 1e4 - Math.round(n * 1e4)) > 1e-6`),
   para no redondear en silencio. Las fechas llegan como `Date` UTC: `toISOString().slice(0, 10)`.
-- `csv-reader.ts` — lector propio RFC 4180 acotado (DS-3): comillas dobles, comillas escapadas,
-  saltos de línea dentro de comillas, CRLF/LF, BOM. Separador `;` o `,` según DS-2.
+- `csv-reader.ts` — `Papa.parse` (DS-3) sobre el texto UTF-8 ya decodificado y sin BOM, con
+  `header: false`, `skipEmptyLines: 'greedy'` y `delimiter` fijado por la regla de DS-2 (se mira
+  la cabecera fuera de comillas; no se usa la autodetección de la librería, que podría elegir otro).
+  Comillas, comillas escapadas, saltos de línea entre comillas y CRLF/LF los resuelve la librería.
+  Un error de `Papa.parse` de tipo `Quotes` → `unreadable`.
 
 ### 4.2 Cabecera
 
@@ -660,8 +663,8 @@ declara excepción de escritorio.
 | --- | --- | --- |
 | **DS-1** | **Producto terminado.** (a) La fila **declara su presentación** en «Presentación», obligatoria: el terminado es uno por fórmula + presentación (índice parcial y `receiveFinishedGoods`), así que si la fórmula se envasa en varias presentaciones cada una es una fila; no se elige ninguna por defecto. (b) Solo **fórmulas originales vivas** (`findAliveByNormalizedName`); una versión no se importa. (c) «Nombre» va vacío: el nombre es el derivado `«Fórmula · Presentación»`, el mismo que pone el empaque. (d) «Existencia» = **número de envases**, entero > 0; la cantidad del lote es envases × contenido de la presentación (`planFinishedGoodsLine`), y `package_content` = ese contenido. Presentación sin contenido → `presentation_without_content`. (e) **Costo**: «Costo unitario» en la unidad de la presentación (lo que guarda `unit_cost` en los lotes de terminado, `order-packing.ts > unitCostByPresentationUnit`), o «Costo total» del lote, del que se deriva el unitario con `deriveUnitCost(total, cantidad)`. Uno de los dos obligatorio (CHECK `package_content_requires_unit_cost`). Vencimiento opcional. | Es la regla nueva de D4 y la pregunta abierta 1. (d) y (e) mantienen el lote importado indistinguible de uno de empaque. El coste por unidad pequeña redondea (riesgo QC-178): con «Costo total» el redondeo es a 4 decimales del unitario, el mismo que ya acepta QC-170. |
 | **DS-2** | **Números y fechas del .csv.** Separador de campo: `;` o `,`, el que aparezca en la cabecera fuera de comillas (si aparecen los dos, `;`). Decimal: **coma o punto**, uno solo, **sin separador de miles** (`1234,5` y `1234.5` valen; `1.234,5` y `1,234.5` → `number_format_invalid`). Con separador `,`, un decimal con coma va entre comillas (lo hace Excel solo). Fechas: `AAAA-MM-DD` o `DD/MM/AAAA` (día primero, nunca mes primero). En .xlsx, números y fechas nativos (sección 4.1); una fecha escrita como texto sigue las mismas formas. | Pregunta abierta 2. Excel en español exporta con `;` y coma decimal; otras configuraciones con `,` y punto. Rechazar los miles evita que `1.234` se lea como mil doscientos o como uno coma dos según quién lo escribió. |
-| **DS-3** | **Librería .xlsx: `read-excel-file`** (solo lectura, `read-excel-file/node` en el adaptador). El .csv se lee con un lector propio RFC 4180 acotado (~60 líneas, puro y testeado). Ver 9.1. | D3 pide **una** librería. El CSV propio choca con la regla de no reimplementar parsing: se acepta porque el formato de entrada es nuestro (plantilla fija) y RFC 4180 es corto. Si el humano prefiere librería también para CSV, la candidata es `papaparse` (MIT); sería una segunda aprobación. |
-| **DS-4** | **Plantilla y archivo de errores en .csv** (UTF-8 con BOM, separador `;`), generados en el cliente. | Con `read-excel-file` no se escribe .xlsx. Generar .xlsx exigiría `write-excel-file` (segunda dependencia). El .csv con BOM y `;` lo abre Excel en español en columnas. |
+| **DS-3** | **Librerías: `read-excel-file` para .xlsx y `papaparse` para .csv** (leer y escribir). `read-excel-file/node` solo en el adaptador `xlsx-reader.ts`. `papaparse` lee en `csv-reader.ts` (`Papa.parse` sobre el texto ya decodificado, sin `worker` ni descarga) y escribe en `inventory-import-downloads.ts` (`Papa.unparse`). Ver 9.1. **Enmienda F1.4 (2026-10-06, humano):** se descarta el lector CSV propio; «más adelante se agregará la opción de descargar también en csv o excel directamente», así que el CSV va por librería desde ya. | `papaparse` es JS puro, sin dependencias y sin APIs de Node ni de DOM en `parse`/`unparse` sobre `string`, así que entra en `PURE_PACKAGES` (`tests/guards/guard-arquitectura-modulos.test.ts`) y en la lista de `docs/architecture.md > Dominio` junto a `zod`: el dominio la usa para escribir la plantilla y el archivo de errores sin cambiar el contrato de 1.5. La futura descarga en .xlsx (`write-excel-file`, fuera de esta ficha) **no** es pura y no entra al dominio. |
+| **DS-4** | **Plantilla y archivo de errores en .csv** (UTF-8 con BOM, separador `;`), generados en el cliente con `Papa.unparse`. | La descarga en .xlsx queda para una ficha posterior (pedido del humano en F1.4) con `write-excel-file`; aquí no se instala. El .csv con BOM y `;` lo abre Excel en español en columnas. |
 | **DS-5** | **Tope de 1.000.000 bytes por archivo**, sin tocar `next.config.ts`. | 2.000 filas × 12 columnas caben con mucha holgura (~300 KB en .csv, menos en .xlsx), y así no se cambia el límite global de las Server Actions de toda la app. |
 | **DS-6** | **Idempotencia con `inventory_imports` + `importKey`** (R29, R30). | `docs/architecture.md > Dominio` n.º 3: toda operación que mueve existencias es idempotente y auditable. Sin esto, un doble clic o un reintento de red crea lotes repetidos (los de lote vacío reciben correlativos nuevos y no se ven como duplicado). Coste: una tabla y su migración. Límite aceptado: si la primera confirmación muere a mitad, la clave queda gastada y lo escrito se queda (D1); el usuario reintenta con un archivo nuevo y las filas con lote salen `duplicado`. |
 | **DS-7** | **Columnas desconocidas o repetidas rechazan el archivo** (R5). Columnas opcionales ausentes = vacías. Una columna que no aplica al tipo y trae valor → `error` de fila (R11), no se ignora. | Una errata en una cabecera opcional («Costo unitarios») se ignoraría en silencio y el usuario creería haber cargado costos. Mismo criterio que `strictObject` en todo el módulo. |
@@ -672,27 +675,34 @@ declara excepción de escritorio.
 | **DS-12** | **`maxDuration = 300`** en la página de importación. | Sección 7. |
 | **DS-13** | **Fixture .xlsx**: `tests/fixtures/inventario-importar/mixto.xlsx`, producido una vez a partir del .csv del E2E con Excel o LibreOffice (`soffice --headless --convert-to xlsx`), por el humano o por el implementer si tiene la herramienta. | La librería propuesta no escribe. Sin el fixture, `xlsx-reader.ts` solo se prueba con la librería simulada y el E2E usa .csv. |
 
-### 9.1 Dependencia propuesta (D3, regla 7) — **no instalada**
+### 9.1 Dependencias (D3, regla 7) — **aprobadas por el humano en F1.4 el 2026-10-06, sin instalar**
 
-| | |
-| --- | --- |
-| Paquete | `read-excel-file` (autor: catamphetamine) |
-| Qué hace | Lee la primera hoja (o una con nombre) de un .xlsx a filas de celdas tipadas (`string`, `number`, `boolean`, `Date`). Entrada en Node: `Buffer`/stream (`read-excel-file/node`). |
-| Qué código nos ahorra | Descomprimir el ZIP del .xlsx, leer `sharedStrings.xml`, `styles.xml` (para saber qué número es una fecha) y `sheet1.xml`, y convertir los números de serie de fecha de Excel. Es el trozo frágil del formato; a mano serían varios cientos de líneas más un lector ZIP. |
-| Dónde se usa | Solo en `lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader.ts` (servidor). No entra al bundle de cliente. |
-| Check 1 — no `deprecated` | **Sin verificar en esta sesión (sin red).** Esperado: no deprecado. |
-| Check 2 — release < 12 meses | **Sin verificar.** Esperado: publica con frecuencia (serie 5.x activa a la fecha de corte del conocimiento del agente). |
-| Check 3 — ≥ 10.000 descargas/semana | **Sin verificar.** Esperado: del orden de cientos de miles. |
-| Check 4 — licencia | **Sin verificar en npm.** Esperado: MIT. |
-| Cómo verificarlo | `npm view read-excel-file deprecated time.modified license` + descargas semanales en npmjs.com. Si algún check falla, la propuesta cae y se vuelve a este documento. |
-| Descartadas | `xlsx` (SheetJS): la versión de npm está parada en 0.18.5 (2022) y el proyecto publica fuera de npm → falla el check 2 en npm. `exceljs`: lee y escribe, pero su última release conocida es de 2023 → probable fallo del check 2 (sin verificar). |
+Checks medidos por el leader el 2026-10-06 contra `registry.npmjs.org` y `api.npmjs.org`.
 
-Fila propuesta para `docs/dependencias.md` (la añade quien instale, tras la aprobación; **este spec
-no edita el registro**):
+| | `read-excel-file` | `papaparse` |
+| --- | --- | --- |
+| Qué hace | Lee la primera hoja de un .xlsx a celdas tipadas (`string`, `number`, `boolean`, `Date`). En Node: `read-excel-file/node` sobre `Buffer`. | Lee y escribe CSV (`Papa.parse` / `Papa.unparse`): comillas, comillas escapadas, saltos de línea entre comillas, CRLF/LF, detección de separador. |
+| Qué código nos ahorra | Descomprimir el ZIP del .xlsx, `sharedStrings.xml`, `styles.xml` (qué número es fecha), `sheet1.xml` y los números de serie de fecha. Varios cientos de líneas más un lector ZIP. | El lector RFC 4180 propio (~60 líneas) y el escapado de la escritura; y la base de la futura descarga en .csv. |
+| Dónde se usa | Solo `lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader.ts` (servidor). | `.../adapters/driven/spreadsheet/csv-reader.ts` (servidor) y `lib/modules/inventario/domain/inventory-import-downloads.ts` (puro, llega al cliente por el barrel). Entra en `PURE_PACKAGES`. |
+| Check 1 — no `deprecated` | Sin `deprecated`. | Sin `deprecated`. |
+| Check 2 — release < 12 meses | `9.3.10`, 2026-08-10. | `5.7.0`, 2026-08-24. |
+| Check 3 — ≥ 10.000 descargas/semana | 3.246.357. | 19.874.585. |
+| Check 4 — licencia | MIT. | MIT. |
+| Descartadas | `xlsx` (SheetJS): npm parado en `0.18.5` (2022-03) → falla el check 2. `exceljs`: `4.4.0` de 2023-10 → falla el check 2. | Lector propio (DS-3 original), descartado por el humano en F1.4. |
+
+Para la futura descarga en .xlsx (fuera de esta ficha) la candidata medida el mismo día es
+`write-excel-file` `4.1.1` (2026-06-08, MIT, 1.425.721/semana, sin `deprecated`); necesita su propia
+aprobación cuando llegue esa ficha.
+
+Filas para `docs/dependencias.md` (las añade quien instale, en B1/B3):
 
 ```
-| `read-excel-file` | Leer la primera hoja de un .xlsx en la importación de inventario (QC-209), solo en el adaptador `inventario/adapters/driven/spreadsheet/xlsx-reader.ts` | aprobada | <fecha de aprobación> | Los cuatro checks verificados por <quién> el <fecha> contra npm: sin `deprecated`; última release `<versión>` del <fecha>; <N> descargas semanales; licencia MIT. Aprobada por el humano en la puerta F1.4 de QC-209. |
+| `read-excel-file` | Leer la primera hoja de un .xlsx en la importación de inventario (QC-209), solo en el adaptador `inventario/adapters/driven/spreadsheet/xlsx-reader.ts` | aprobada | 2026-10-06 | Los cuatro checks verificados por el leader el 2026-10-06 contra npm: sin `deprecated`; última release `9.3.10` del 2026-08-10; 3.246.357 descargas semanales; licencia MIT. Aprobada por el humano en la puerta F1.4 de QC-209. |
+| `papaparse` | Leer y escribir CSV en la importación de inventario (QC-209): `inventario/adapters/driven/spreadsheet/csv-reader.ts` y `inventario/domain/inventory-import-downloads.ts`; paquete puro admitido en el dominio | aprobada | 2026-10-06 | Los cuatro checks verificados por el leader el 2026-10-06 contra npm: sin `deprecated`; última release `5.7.0` del 2026-08-24; 19.874.585 descargas semanales; licencia MIT. Aprobada por el humano en la puerta F1.4 de QC-209. |
 ```
+
+`@types/papaparse` entra como `devDependency` junto a `papaparse` (tipos de la misma librería, no
+es código que se ejecute).
 
 ## 10. Alternativas descartadas
 
