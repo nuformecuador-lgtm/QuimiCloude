@@ -115,7 +115,7 @@ Archivos:
 **Hecho cuando:** los tres archivos en verde, cada caso con su `R<n>` en el nombre;
 `./init.sh --rapido` en verde.
 
-### B4 [P] — Tests de la action
+### [x] B4 [P] — Tests de la action
 Depende de: B2. En paralelo con B3 y B5.
 
 Archivos: `tests/unit/inventario/batch-actions.test.ts`.

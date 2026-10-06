@@ -6,7 +6,9 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import { errorMessage } from '@/lib/modules/errores';
 import {
+  AdjustmentReasonNotAllowedError,
   BatchNotFoundError,
+  BatchStockChangedError,
   BatchStockNegativeError,
   UnauthorizedError,
   ValidationError,
@@ -259,6 +261,76 @@ describe('adjustBatchStockAction', () => {
       message: errorMessage('batch_stock_negative'),
     });
     expect(JSON.stringify(result)).not.toContain(BATCH_ID);
+  });
+});
+
+describe('adjustBatchStockAction — ajuste por total contado', () => {
+  it('R8: pasa al caso de uso exactamente batchId, countedStock, seenStock y reason, sin diferencia', async () => {
+    adjustBatchStockMock.mockResolvedValue({ stock: '12.0000', reserved: '0.0000', overReserved: false });
+
+    await adjustBatchStockAction(
+      INITIAL,
+      formDataOf({ ...VALID_ADJUST_FIELDS, countedStock: '12.5', seenStock: '10', delta: '2.5' }),
+    );
+
+    const [candidato] = adjustBatchStockMock.mock.calls[0] as [Record<string, unknown>];
+    expect(Object.keys(candidato).sort()).toEqual(['batchId', 'countedStock', 'reason', 'seenStock']);
+    expect(candidato).toEqual({ batchId: BATCH_ID, countedStock: '12.5', seenStock: '10', reason: 'merma' });
+  });
+
+  it('R13: BatchStockChangedError llega como stock_changed con la existencia actual, sin pasar por el traductor', async () => {
+    adjustBatchStockMock.mockRejectedValue(new BatchStockChangedError('9.0000', `lote ${BATCH_ID}`));
+
+    const result = await adjustBatchStockAction(INITIAL, formDataOf(VALID_ADJUST_FIELDS));
+
+    expect(result).toEqual({
+      status: 'stock_changed',
+      code: 'batch_stock_changed',
+      message: errorMessage('batch_stock_changed'),
+      currentStock: '9.0000',
+    });
+    expect(JSON.stringify(result)).not.toContain(BATCH_ID);
+    expect(readRequestIdHeaderMock).not.toHaveBeenCalled();
+  });
+
+  it('R20: un ajuste que deja el lote sobre-reservado vuelve como success con overReserved', async () => {
+    adjustBatchStockMock.mockResolvedValue({ stock: '3.0000', reserved: '5.0000', overReserved: true });
+
+    const result = await adjustBatchStockAction(INITIAL, formDataOf(VALID_ADJUST_FIELDS));
+
+    expect(result).toEqual({ status: 'success', stock: '3.0000', reserved: '5.0000', overReserved: true });
+  });
+
+  it('R19: un total no numerico lo rechaza el caso de uso con invalid_input y el mensaje del catalogo', async () => {
+    const repoAdjust = vi.fn();
+    adjustBatchStockMock.mockImplementation(
+      createAdjustBatchStock({ products: { adjustBatchStock: repoAdjust } as unknown as ProductRepository }),
+    );
+
+    const result = await adjustBatchStockAction(
+      INITIAL,
+      formDataOf({ ...VALID_ADJUST_FIELDS, countedStock: 'doce' }),
+    );
+
+    const [candidato] = adjustBatchStockMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato.countedStock).toBe('doce');
+    expect(result).toEqual({ status: 'error', code: 'invalid_input', message: errorMessage('invalid_input') });
+    expect(repoAdjust).not.toHaveBeenCalled();
+  });
+
+  it('R15: adjustment_reason_not_allowed llega como ErrorState con el texto del catalogo', async () => {
+    adjustBatchStockMock.mockRejectedValue(new AdjustmentReasonNotAllowedError('aumento con merma'));
+
+    const result = await adjustBatchStockAction(
+      INITIAL,
+      formDataOf({ ...VALID_ADJUST_FIELDS, countedStock: '12', seenStock: '10' }),
+    );
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'adjustment_reason_not_allowed',
+      message: errorMessage('adjustment_reason_not_allowed'),
+    });
   });
 });
 
