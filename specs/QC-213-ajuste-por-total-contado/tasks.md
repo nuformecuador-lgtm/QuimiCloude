@@ -201,7 +201,7 @@ e2e/producto-terminado.spec.ts` en verde en Chromium y WebKit, con el resultado 
 
 ---
 
-## TZ — Cierre
+## [x] TZ — Cierre
 Depende de: TI.
 
 - `./init.sh` completo en verde.

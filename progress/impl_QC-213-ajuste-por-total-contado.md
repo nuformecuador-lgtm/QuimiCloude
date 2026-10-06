@@ -18,7 +18,7 @@
 | B3 tests del servidor | cerrada | `3958b4f7` |
 | B4 tests de la action | cerrada | `2c66f476` |
 | TI integración real y E2E | cerrada | `137ca814` |
-| TZ cierre | abierta: comprobaciones hechas, falta `./init.sh` completo (leader) | — |
+| TZ cierre | cerrada: `./init.sh` completo verde y E2E verde | este commit |
 
 ## Decisiones y enmiendas durante la implementación (2026-10-06)
 
@@ -196,8 +196,23 @@ Salida:
   `recetas/scope`); `movement-reason.test.ts` en verde.
 
 ## Pendientes para el leader
-1. Visto bueno a la línea añadida en `MIGRACIONES_ESPERADAS` de `guard-identificador-de-request`.
+1. ~~Visto bueno a la línea en `MIGRACIONES_ESPERADAS`~~: aprobada por el leader.
 2. ~~Timestamp compartido con QC-209~~: resuelto, migración renombrada a `20261006140000`.
 3. ~~`tasks.md > B1` nombraba el campo Prisma como `previousStock`~~: corregido a `stockBefore`.
-4. `./init.sh` completo antes del PR.
+4. ~~`./init.sh` completo antes del PR~~: verde (ver «Gate completo y E2E final»).
 5. Al cerrar la feature: borrar la base `QuimiCloude_QC213` y restaurar `.env` desde `.env.bak-QuimiCloude`.
+
+## Gate completo y E2E final (F2.3/F2.4, 2026-10-06, sobre `c4e9f38d`)
+- F2.3: `origin/dev` (`b20b6cc3`) ya contenido en la rama; nada que fusionar, sin migraciones nuevas
+  ni choque con `20261006140000`.
+- Primer `./init.sh` completo: lo mató el sistema por falta de memoria (en los unitarios); relanzado
+  con autorización del humano.
+- `./init.sh` completo: **«init OK», exit 0**. Vitest: 901 archivos (893 pasan, 8 fallan), 12947
+  casos (12809 pasan, 10 fallan, 128 omitidos), 567 s. «tests: sin rojos nuevos (8 rojos, todos en el
+  baseline de 8)»; los tres proyectos corrieron (ui, node, integration); todas las migraciones con
+  `down.sql`. Archivos rojos, todos del baseline: `unidades-viewport`, `usuarios-viewport`,
+  `product-page`, `pantallas-exigen-permiso`, `recipe-page`, `identity/account-status-scope`,
+  `recetas/module-contract`, `recetas/scope`. Ninguna entrada del baseline pasa ya.
+- E2E contra `QuimiCloude_QC213`: `pnpm exec playwright test e2e/ajuste-de-inventario.spec.ts
+  e2e/producto-terminado.spec.ts` → **10/10 en 1,9 min** (Chromium y WebKit: R29 aumento, R29
+  disminución, R29 existencia cambiada y reconfirmación, R21 Operador, producto terminado R37).
