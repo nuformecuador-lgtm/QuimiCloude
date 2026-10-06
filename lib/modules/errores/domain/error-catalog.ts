@@ -183,5 +183,5 @@ export const ERROR_MESSAGES_ES = {
   'errors.recipe_version_under_review':
     'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
   'errors.order_unit_not_convertible':
-    'La unidad del pedido no se puede convertir a la de algun insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
+    'La unidad del pedido no se puede convertir a la de algún insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
 } as const satisfies Record<ErrorMessageKey, string>;
