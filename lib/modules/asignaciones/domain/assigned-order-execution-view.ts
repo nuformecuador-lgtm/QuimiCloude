@@ -27,6 +27,11 @@ export type AssignedOrderExecutionView = {
   readonly unitLabel: string | null;
 };
 
+/** La vista al abrir, con el paso por el que retoma; `null` si la receta no tiene pasos. */
+export type StartedOrderExecution = AssignedOrderExecutionView & {
+  readonly resumeStepPosition: number | null;
+};
+
 export type ExecutionLineView = {
   readonly productName: string | null;
   /** "10.00" */
