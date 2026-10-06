@@ -915,4 +915,84 @@ describe('StepReader — espera minima por paso', () => {
 
     expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 3');
   });
+
+  it('en "ejecucion", retroceder varias veces sin esperar deja un solo anillo y un solo contador', () => {
+    vi.useFakeTimers();
+    render(
+      <StepReader
+        steps={[...TRES_PASOS_SIN_ITEMS, PASO_SIN_ITEMS_A]}
+        onFinish={vi.fn()}
+        title="Receta de prueba"
+        mode="ejecucion"
+        minStepSeconds={5}
+      />,
+    );
+
+    for (let paso = 0; paso < 3; paso += 1) {
+      avanzarReloj(5000);
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+    }
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 4 de 4');
+
+    for (let paso = 0; paso < 3; paso += 1) {
+      avanzarReloj(1000);
+      fireEvent.click(screen.getByTestId('step-reader-previous'));
+    }
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 4');
+
+    const motivo = screen.getByTestId('step-reader-wait-reason');
+    expect(screen.getAllByTestId('step-reader-wait-ring')).toHaveLength(1);
+    expect(within(motivo).getAllByTestId('countdown-timer')).toHaveLength(1);
+  });
+});
+
+describe('StepReader: texto y bloqueo del boton final (QC-211)', () => {
+  const UN_PASO: readonly RecipeStepDocument[] = [PASO_SIN_ITEMS];
+
+  it('R21: sin finishLabel el ultimo boton sigue diciendo Finalizar y sin aria-busy', () => {
+    render(<StepReader steps={UN_PASO} onFinish={vi.fn()} />);
+    const boton = screen.getByTestId('step-reader-finish');
+    expect(boton).toHaveTextContent('Finalizar');
+    expect(boton).toBeEnabled();
+    expect(boton).not.toHaveAttribute('aria-busy');
+  });
+
+  it('R21: con finishLabel el ultimo boton lleva ese texto y al pulsarlo llama a onFinish', () => {
+    const onFinish = vi.fn();
+    render(<StepReader steps={UN_PASO} onFinish={onFinish} finishLabel="Terminar" mode="ejecucion" />);
+    const boton = screen.getByTestId('step-reader-finish');
+    expect(boton).toHaveTextContent('Terminar');
+    expect(boton).not.toHaveTextContent('Finalizar');
+    fireEvent.click(boton);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('R21: con finishBusy el ultimo boton queda deshabilitado, con aria-busy, y onFinish no se llama', () => {
+    const onFinish = vi.fn();
+    render(
+      <StepReader steps={UN_PASO} onFinish={onFinish} finishLabel="Terminar" finishBusy mode="ejecucion" />,
+    );
+    const boton = screen.getByTestId('step-reader-finish');
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveAttribute('aria-busy', 'true');
+    fireEvent.click(boton);
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it('R21: al terminar finishBusy el boton vuelve a habilitarse y a llamar a onFinish', () => {
+    const onFinish = vi.fn();
+    const { rerender } = render(<StepReader steps={UN_PASO} onFinish={onFinish} finishBusy />);
+    expect(screen.getByTestId('step-reader-finish')).toBeDisabled();
+    rerender(<StepReader steps={UN_PASO} onFinish={onFinish} finishBusy={false} />);
+    const boton = screen.getByTestId('step-reader-finish');
+    expect(boton).toBeEnabled();
+    expect(boton).not.toHaveAttribute('aria-busy');
+    fireEvent.click(boton);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('R21: finishBusy no afecta a Siguiente en los pasos intermedios', () => {
+    render(<StepReader steps={[PASO_SIN_ITEMS, PASO_SIN_ITEMS]} onFinish={vi.fn()} finishBusy />);
+    expect(screen.getByTestId('step-reader-next')).toBeEnabled();
+  });
 });

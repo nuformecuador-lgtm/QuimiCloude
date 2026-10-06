@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
@@ -9,6 +10,7 @@ import { companyScopeColumns, presentationCompanyScope } from './company-scope';
 import {
   dateRangeCondition,
   normalizedSearchCondition,
+  selectCondition,
   textCondition,
 } from './list-query-sql';
 
@@ -179,8 +181,8 @@ function isUnitLockedViolation(error: unknown): boolean {
 
 /** QC-80 (R15): `unitId` entra en el `select` porque entra en el contrato de salida. Se
  *  exporta para que su test pueda afirmar la columna como dato y no como texto.
- *  `PRESENTATION_QUERYABLE` **no** gana `unitId`: no se ordena ni se filtra por un uuid que
- *  nadie pinta. */
+ *  `PRESENTATION_QUERYABLE` declara `unitId` solo como filtro (`select`), para el reparto en
+ *  presentaciones del pedido; no es ordenable. */
 export const presentationSelect = {
   id: true,
   name: true,
@@ -346,9 +348,13 @@ export function presentationOrderBy(
 
 /**
  * Un filtro del contrato -> la condicion de su columna. `null` cuando el campo no es filtrable
- * aqui o cuando el valor no acota nada. `PRESENTATION_QUERYABLE` solo declara `createdAt`
- * (`dateRange`); las otras formas se traducen igual -es trabajo del adaptador- y hoy no llegan
- * porque `sanitizeListQuery` las poda antes.
+ * aqui o cuando el valor no acota nada. `PRESENTATION_QUERYABLE` declara `createdAt`
+ * (`dateRange`) y `unitId` (`select`); las otras formas se traducen igual -es trabajo del
+ * adaptador- y hoy no llegan porque `sanitizeListQuery` las poda antes.
+ *
+ * `select` de `unitId`: una lista vacia no acota, igual que en el resto de listados. Los valores
+ * que no son uuid se descartan antes de la consulta, porque `unit_id` es `uuid` y Postgres
+ * rechazaria la consulta entera; si no queda ninguno, tampoco acota.
  *
  * `numberRange` no aparece: `presentations` no tiene ninguna columna numerica.
  */
@@ -370,10 +376,20 @@ function presentationFilterWhere(
       if (field === 'name') return { name: condition };
       return null;
     }
-    case 'select':
+    case 'select': {
+      if (field !== 'unitId') return null;
+      const condition = selectCondition(value.values.filter(isUuid));
+      return condition === null ? null : { unitId: condition };
+    }
     case 'numberRange':
       return null;
   }
+}
+
+const uuidSchema = z.string().uuid();
+
+function isUuid(value: string): boolean {
+  return uuidSchema.safeParse(value).success;
 }
 
 /**

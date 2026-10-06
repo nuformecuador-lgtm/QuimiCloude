@@ -63,6 +63,9 @@ export type StepReaderProps = {
   /** `'lectura'` (por defecto) es el contrato historico. `'ejecucion'` es la variante de planta:
    *  ver la enmienda del docblock de este archivo. */
   readonly mode?: 'lectura' | 'ejecucion';
+  readonly finishLabel?: string;
+  /** Mientras la accion de terminar esta en curso: evita enviarla dos veces. */
+  readonly finishBusy?: boolean;
 };
 
 /** Clave de un item marcado. El paso entra en la clave: marcar en el paso 2 no marca en el 1. */
@@ -158,7 +161,15 @@ function StepProgress({ total, current }: { readonly total: number; readonly cur
   );
 }
 
-export function StepReader({ steps, onFinish, title, minStepSeconds, mode = 'lectura' }: StepReaderProps) {
+export function StepReader({
+  steps,
+  onFinish,
+  title,
+  minStepSeconds,
+  mode = 'lectura',
+  finishLabel = TEXTS.finish,
+  finishBusy = false,
+}: StepReaderProps) {
   const isEjecucion = mode === 'ejecucion';
   const baseId = useId();
   const [index, setIndex] = useState(0);
@@ -254,7 +265,7 @@ export function StepReader({ steps, onFinish, title, minStepSeconds, mode = 'lec
   }
 
   function finish() {
-    if (blocked) return;
+    if (blocked || finishBusy) return;
     onFinish();
   }
 
@@ -272,9 +283,9 @@ export function StepReader({ steps, onFinish, title, minStepSeconds, mode = 'lec
 
   const waitReason = waiting && (
     <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
-      {isEjecucion && <WaitRing key={arrival} seconds={minStepSeconds ?? 0} />}
+      {isEjecucion && <WaitRing key={`ring-${arrival}`} seconds={minStepSeconds ?? 0} />}
       {TEXTS.waitPrefix}{' '}
-      <CountdownTimer key={arrival} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
+      <CountdownTimer key={`timer-${arrival}`} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
       {' '}
       {TEXTS.waitSuffix}
     </p>
@@ -298,11 +309,12 @@ export function StepReader({ steps, onFinish, title, minStepSeconds, mode = 'lec
       type="button"
       className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : TOUCH_TARGET}
       data-testid="step-reader-finish"
-      disabled={blocked}
+      disabled={blocked || finishBusy}
+      aria-busy={finishBusy || undefined}
       aria-describedby={describedBy}
       onClick={finish}
     >
-      {TEXTS.finish}
+      {finishLabel}
     </Button>
   ) : (
     <Button

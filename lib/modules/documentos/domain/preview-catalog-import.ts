@@ -21,7 +21,6 @@ import {
 import { pairCropsWithLines, type CropPairingRow } from './crop-pairing';
 import { isCropPathOf } from './document-path';
 import { ValidationError } from './errors';
-import { READ_LINK_TTL_SECONDS } from './limits';
 
 import type { CropCatalog } from '../ports/crop-catalog';
 import type { DocumentBatchRepository } from '../ports/document-batch-repository';
@@ -281,9 +280,10 @@ export function createPreviewCatalogImport(
     const classified = classifyCatalogImportRows(rows.map(toClassifyRow), presentationMatches, aliveLines);
 
     const cropPaths = await deps.crops.list(actor.companyId, documentFileId);
-    const crops: readonly CatalogImportPreviewCrop[] = await Promise.all(
-      cropPaths.map(async (path) => ({ path, url: await deps.crops.createSignedReadUrl(path, READ_LINK_TTL_SECONDS) })),
-    );
+    const crops: readonly CatalogImportPreviewCrop[] = cropPaths.map((path) => ({
+      path,
+      url: deps.crops.publicUrl(path),
+    }));
     const cropUrlByPath = new Map(crops.map((crop) => [crop.path, crop.url]));
 
     const imagePaths: readonly (string | null)[] =

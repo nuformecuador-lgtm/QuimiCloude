@@ -2,16 +2,21 @@
 // parte del aviso).
 //
 // **Las tres Server Actions implicadas estan mockeadas** —la consulta de miembros, la consulta de
-// personas y las dos mutaciones—: son el borde del modulo `identity`, que esta ficha solo consume
-// (R36), y son ademas el punto de observacion de casi todo lo de aqui —«se vuelve a consultar»,
-// «se manda de a una», «no se filtra en el cliente»—.
+// candidatos de grupo y las dos mutaciones—: son el borde del modulo `identity`, que esta ficha
+// solo consume (R36), y son ademas el punto de observacion de casi todo lo de aqui —«se vuelve a
+// consultar», «se manda de a una», «no se filtra en el cliente»—.
 //
 // **Ningun assert sobre literales de copy** (R41): filas, controles y regiones de error se
 // localizan por `data-testid` exportado, la posicion dentro del total se lee de los `data-*` del
 // indicador, y los textos de error se comparan contra `errorMessage(code)` —el catalogo—, nunca
 // contra una frase escrita aqui.
+//
+// **El picker de candidatos monta `<DataTable>` (`components/shared/data-table`)**: su fila, su
+// buscador y su paginacion se localizan por los `data-testid` REALES del componente compartido
+// (`data-table-row-<id>`, `data-table-search`, `data-table-previous`/`-next`/`-page-indicator`),
+// no por un `data-testid` propio de este dominio.
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { toast } from 'sonner';
@@ -19,7 +24,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   WORK_GROUP_ADD_ERROR_TESTID,
-  WORK_GROUP_CANDIDATE_TESTID,
   WORK_GROUP_ID_FIELD,
   WORK_GROUP_MEMBERS_ERROR_TESTID,
   WORK_GROUP_MEMBERS_LOADING_TESTID,
@@ -30,15 +34,14 @@ import {
   WORK_GROUP_MEMBER_NAME_TESTID,
   WORK_GROUP_MEMBER_REMOVE_TESTID,
   WORK_GROUP_MEMBER_ROW_TESTID,
-  WORK_GROUP_MEMBER_SEARCH_TESTID,
   WORK_GROUP_REMOVE_ERROR_TESTID,
   WorkGroupMembers,
 } from '@/app/(private)/configuracion/usuarios/components';
 import { SEARCH_DEBOUNCE_MS } from '@/components/shared/data-table';
 import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
-import type { Page, UserRow, WorkGroupMemberRow } from '@/lib/modules/identity';
-import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
+import type { Page, WorkGroupCandidateRow, WorkGroupMemberRow } from '@/lib/modules/identity';
 import type {
+  WorkGroupCandidateListResult,
   WorkGroupMemberListResult,
   WorkGroupMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
@@ -48,7 +51,7 @@ const {
   listWorkGroupMembersActionMock,
   addWorkGroupMemberActionMock,
   removeWorkGroupMemberActionMock,
-  listUsersActionMock,
+  listWorkGroupCandidatesActionMock,
 } = vi.hoisted(() => ({
   listWorkGroupMembersActionMock:
     vi.fn<(workGroupId: string, query: unknown) => Promise<WorkGroupMemberListResult>>(),
@@ -60,7 +63,8 @@ const {
     vi.fn<
       (prev: WorkGroupMutationFormState, data: FormData) => Promise<WorkGroupMutationFormState>
     >(),
-  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
+  listWorkGroupCandidatesActionMock:
+    vi.fn<(query: unknown) => Promise<WorkGroupCandidateListResult>>(),
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
@@ -75,6 +79,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     removeWorkGroupMemberAction: removeWorkGroupMemberActionMock,
     listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
     listWorkGroupMembersAction: listWorkGroupMembersActionMock,
+    listWorkGroupCandidatesAction: listWorkGroupCandidatesActionMock,
   };
 });
 
@@ -83,7 +88,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse desde la lista de miembros`);
   };
   return {
-    listUsersAction: listUsersActionMock,
+    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
@@ -103,17 +108,13 @@ const MIEMBROS: readonly WorkGroupMemberRow[] = [
 ];
 
 /**
- * Un candidato con TODO lo que `UserRow` trae. Existe asi a proposito: sirve para demostrar que de
- * la persona solo se pinta el nombre mostrable y que su correo, su documento y su estado de cuenta
- * no llegan al DOM (R31, pregunta abierta 2).
+ * Un candidato tal como lo devuelve la consulta de candidatos de grupo: solo personas activas, y
+ * de cada una solo su nombre mostrable y su rol (R31).
  */
-const CANDIDATO: UserRow = {
+const CANDIDATO: WorkGroupCandidateRow = {
   id: 'u9',
   displayName: 'Nieto Salas, Dario',
-  username: 'dario.nieto',
-  email: 'dario.nieto@example.com',
   roleName: 'Operario',
-  accountStatus: 'pending',
 };
 
 function paginaDeMiembros(
@@ -145,16 +146,23 @@ function nombresPintados(): string[] {
 }
 
 /**
- * Escribe en el buscador y espera al candidato. **Con temporizadores reales**: el rebote es de
- * `SEARCH_DEBOUNCE_MS` y `findBy*` espera hasta un segundo, asi que la espera es la de verdad. Los
- * casos que solo miran la LLAMADA —y no el DOM— si falsean el reloj, para demostrar que antes del
- * rebote no se consulta.
+ * Escribe en el buscador y espera a la FILA del candidato (la del `<DataTable>` compartido,
+ * localizada por su `data-testid` real `data-table-row-<id>`). **Con temporizadores reales**: el
+ * rebote es de `SEARCH_DEBOUNCE_MS` -el que `<DataTable>` aplica a su propio buscador antes de
+ * emitir `onParamsChange`- y `findBy*` espera hasta un segundo, asi que la espera es la de verdad.
+ * Los casos que solo miran la LLAMADA —y no el DOM— si falsean el reloj, para demostrar que antes
+ * del rebote no se consulta.
  */
 async function buscarCandidato(): Promise<HTMLElement> {
-  fireEvent.change(screen.getByTestId(WORK_GROUP_MEMBER_SEARCH_TESTID), {
+  fireEvent.change(screen.getByTestId('data-table-search'), {
     target: { value: 'nieto' },
   });
-  return screen.findByTestId(WORK_GROUP_CANDIDATE_TESTID);
+  return screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
+}
+
+/** El boton «Agregar» DENTRO de la fila del candidato: es lo unico que dispara el alta (R28). */
+function botonAgregar(fila: HTMLElement): HTMLElement {
+  return within(fila).getByRole('button');
 }
 
 /** Fuente de la lista de miembros sin comentarios. */
@@ -188,7 +196,7 @@ beforeEach(() => {
   });
   addWorkGroupMemberActionMock.mockResolvedValue({ status: 'success' });
   removeWorkGroupMemberActionMock.mockResolvedValue({ status: 'success' });
-  listUsersActionMock.mockResolvedValue({
+  listWorkGroupCandidatesActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [CANDIDATO], total: 1, page: 1, pageSize: 10, totalPages: 1 },
   });
@@ -241,6 +249,9 @@ describe('se pinta lo que la operacion devuelve, y nada mas (R25, R31)', () => {
   it('y su fuente no nombra ningun dato de credencial ni de estado de cuenta (R31)', () => {
     const fuente = fuenteDeLosMiembros();
 
+    // La tabla de candidatos (con `username` y `roleName`) vive en `work-group-form.tsx`
+    // (`WorkGroupMemberPicker`), no aqui: este archivo solo la MONTA, asi que su propia fuente no
+    // deberia nombrar ningun dato de persona mas alla de `displayName` y el identificador.
     for (const prohibido of [
       'accountStatus',
       'email',
@@ -353,17 +364,31 @@ describe('el buscador saca sus candidatos de la consulta de personas (R28)', () 
   it('busca en el servidor sobre el conjunto entero, con rebote', async () => {
     vi.useFakeTimers();
     montar();
-    await vi.advanceTimersByTimeAsync(0);
+    // El picker consulta SIEMPRE, tambien al montarse con el termino vacio (R28): esa es la
+    // llamada inicial, y no pasa por ningun rebote. Se deja resolver su promesa -sin avanzar
+    // ningun temporizador- para que `<DataTable>` sustituya el `Skeleton` por la tabla real.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(1);
 
-    fireEvent.change(screen.getByTestId(WORK_GROUP_MEMBER_SEARCH_TESTID), {
+    fireEvent.change(screen.getByTestId('data-table-search'), {
       target: { value: 'nieto' },
     });
-    expect(listUsersActionMock).not.toHaveBeenCalled();
+    // El rebote es el de `<DataTable>` sobre su PROPIO buscador: mientras no transcurra, la
+    // segunda consulta no sale.
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+    // La actualizacion que el rebote dispara (`setParams` -> nuevo efecto ->
+    // `listWorkGroupCandidatesAction`) no nace de un evento de testing-library, asi que se envuelve
+    // en `act` -mismo patron que `order-execution-screen.test.tsx`- para que React la aplique
+    // antes de la asercion.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+    });
 
-    expect(listUsersActionMock).toHaveBeenCalledTimes(1);
-    expect(listUsersActionMock.mock.calls[0]![0]).toEqual({
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(2);
+    expect(listWorkGroupCandidatesActionMock.mock.calls[1]![0]).toEqual({
       page: 1,
       pageSize: 10,
       sort: null,
@@ -376,19 +401,86 @@ describe('el buscador saca sus candidatos de la consulta de personas (R28)', () 
     montar();
     await esperarLista();
 
-    const candidato = await buscarCandidato();
-    // Del candidato tampoco se pinta el estado de cuenta (pregunta abierta 2).
-    expect(candidato).toHaveTextContent(CANDIDATO.displayName);
-    expect(candidato.textContent ?? '').not.toContain(CANDIDATO.email);
-    expect(candidato.textContent ?? '').not.toContain(CANDIDATO.accountStatus);
+    const fila = await buscarCandidato();
+    // De cada candidato se pinta nombre y rol.
+    expect(fila).toHaveTextContent(CANDIDATO.displayName);
+    expect(fila).toHaveTextContent(CANDIDATO.roleName);
 
-    fireEvent.click(candidato);
+    fireEvent.click(botonAgregar(fila));
 
     await waitFor(() => expect(addWorkGroupMemberActionMock).toHaveBeenCalledTimes(1));
     const datos = addWorkGroupMemberActionMock.mock.calls[0]![1];
     expect([...datos.keys()].sort()).toEqual([WORK_GROUP_MEMBER_ID_FIELD, WORK_GROUP_ID_FIELD].sort());
     expect(datos.get(WORK_GROUP_ID_FIELD)).toBe(GRUPO_ID);
     expect(datos.get(WORK_GROUP_MEMBER_ID_FIELD)).toBe(CANDIDATO.id);
+  });
+
+  it('la tabla de candidatos ya NO tiene columna «Usuario»: solo nombre, rol y acciones', async () => {
+    montar();
+    await esperarLista();
+
+    const fila = await screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
+    // Nombre, rol y la celda de acciones: tres celdas, ni una mas.
+    expect(within(fila).getAllByRole('cell')).toHaveLength(3);
+  });
+
+  it('aparece aunque no se escriba nada en el buscador: trae la primera pagina de candidatos', async () => {
+    montar();
+    await esperarLista();
+
+    // Sin ningun `fireEvent.change`: la tabla se pinta igual, con tiempo real de por medio.
+    const fila = await screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
+    expect(fila).toHaveTextContent(CANDIDATO.displayName);
+    expect(listWorkGroupCandidatesActionMock.mock.calls[0]![0]).toMatchObject({ search: '' });
+  });
+});
+
+describe('el buscador de candidatos esta paginado, con la paginacion REAL de <DataTable> (QC-85 ampliacion)', () => {
+  it('muestra la posicion dentro del total y los dos controles de la tabla compartida', async () => {
+    listWorkGroupCandidatesActionMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [CANDIDATO], total: 23, page: 2, pageSize: 10, totalPages: 3 },
+    });
+    montar();
+    await esperarLista();
+    await screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
+
+    // R41: ningun assert sobre el COPY del indicador -los numeros que pinta son la MISMA
+    // informacion que ya viaja en `data` (`page`/`totalPages`), asi que el comportamiento lo
+    // comprueba el caso siguiente sobre la llamada al servidor, no sobre este texto.
+    //
+    // El `params` que gobierna estos botones es el del PICKER (siempre nace en la pagina 1),
+    // no el `page` que el doble finge devolver dentro de `data`: por eso "anterior" nace
+    // deshabilitado y "siguiente" no, independientemente de lo que la respuesta diga.
+    const indicador = screen.getByTestId('data-table-page-indicator');
+    expect(indicador).toHaveAttribute('role', 'status');
+    expect(screen.getByTestId('data-table-previous')).toBeInTheDocument();
+    expect(screen.getByTestId('data-table-previous')).toBeDisabled();
+    expect(screen.getByTestId('data-table-next')).toBeInTheDocument();
+    expect(screen.getByTestId('data-table-next')).not.toBeDisabled();
+  });
+
+  it('avanzar pide la pagina siguiente al servidor', async () => {
+    const user = setupUser();
+    listWorkGroupCandidatesActionMock.mockImplementation(async (consulta) => ({
+      status: 'success',
+      data: {
+        items: [CANDIDATO],
+        total: 23,
+        page: (consulta as { page: number }).page,
+        pageSize: 10,
+        totalPages: 3,
+      },
+    }));
+    montar();
+    await esperarLista();
+    await screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
+
+    await user.click(screen.getByTestId('data-table-next'));
+
+    await waitFor(() => expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(2));
+    const ultimaLlamada = listWorkGroupCandidatesActionMock.mock.calls.at(-1)![0];
+    expect(ultimaLlamada).toMatchObject({ page: 2 });
   });
 });
 
@@ -414,7 +506,7 @@ describe('los cuatro «ya pertenece» son CUATRO casos, por su codigo (R29)', ()
 
       montar();
       await esperarLista();
-      fireEvent.click(await buscarCandidato());
+      fireEvent.click(botonAgregar(await buscarCandidato()));
 
       const region = await screen.findByTestId(WORK_GROUP_ADD_ERROR_TESTID);
       expect(region).toHaveAttribute('data-code', code);
@@ -434,7 +526,7 @@ describe('los cuatro «ya pertenece» son CUATRO casos, por su codigo (R29)', ()
     });
     montar();
     await esperarLista();
-    fireEvent.click(await buscarCandidato());
+    fireEvent.click(botonAgregar(await buscarCandidato()));
 
     expect(await screen.findByTestId(WORK_GROUP_ADD_ERROR_TESTID)).toBeInTheDocument();
     // Ni se volvio a consultar, ni se inserto ninguna fila.
@@ -449,7 +541,7 @@ describe('tras un exito se vuelve a consultar, y nada es optimista (R30)', () =>
     // entra en el grupo pero no se ve (`design.md > 10.2`). R30 prohibe compensarlo.
     montar();
     await esperarLista();
-    fireEvent.click(await buscarCandidato());
+    fireEvent.click(botonAgregar(await buscarCandidato()));
 
     await waitFor(() => expect(listWorkGroupMembersActionMock).toHaveBeenCalledTimes(2));
     await esperarLista();

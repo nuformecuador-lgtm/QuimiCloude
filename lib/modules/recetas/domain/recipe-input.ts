@@ -207,7 +207,7 @@ export const MAX_RECIPE_STEPS = 50;
 const recipeStepsSchema = z.array(recipeStepSchema).max(MAX_RECIPE_STEPS).default([]);
 
 /** Rechaza que la lista de lineas repita el mismo `productId` (R16). */
-function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {
+function sinProductoRepetido(lines: readonly { readonly productId: string }[]): boolean {
   const ids = lines.map((line) => line.productId);
   return new Set(ids).size === ids.length;
 }
@@ -218,7 +218,7 @@ function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {
  * `.default([])`: un payload sin la clave `lines` se trata como lista vacia y se rechaza
  * igual, en alta y en edicion.
  */
-const recipeLinesSchema = z
+export const recipeLinesSchema = z
   .array(recipeLineSchema)
   .default([])
   .refine(sinProductoRepetido, {
@@ -233,6 +233,23 @@ const recipeLinesSchema = z
       });
     }
   });
+
+// Tope de la columna `integer`: la cantidad de una herramienta es informativa, no de stock.
+export const MAX_TOOL_QUANTITY = 2147483647;
+
+export const recipeToolSchema = z
+  .object({
+    productId: z.string().uuid(),
+    quantity: z.number().int().min(1).max(MAX_TOOL_QUANTITY),
+  })
+  .strict();
+
+export type RecipeToolInput = z.infer<typeof recipeToolSchema>;
+
+// Sin `.default()`: cada esquema decide que significa omitirla, y fuera de la suma de porcentajes.
+export const recipeToolsSchema = z.array(recipeToolSchema).refine(sinProductoRepetido, {
+  message: 'No puede haber dos herramientas con el mismo producto.',
+});
 
 /**
  * Bytes de una imagen nueva, sin validar todavia formato ni tamano -eso es
@@ -251,7 +268,9 @@ export const createRecipeSchema = z.object({
   name: recipeNameSchema,
   description: recipeDescriptionSchema,
   steps: recipeStepsSchema,
+  packingSteps: recipeStepsSchema,
   lines: recipeLinesSchema,
+  tools: recipeToolsSchema.default([]),
   image: recipeImageUploadSchema.optional(),
 });
 
@@ -269,9 +288,36 @@ export const updateRecipeSchema = z.object({
   name: recipeNameSchema,
   description: recipeDescriptionSchema,
   steps: recipeStepsSchema,
+  packingSteps: recipeStepsSchema,
   lines: recipeLinesSchema,
   image: recipeImageUploadSchema.nullable().optional(),
+  // Omitidas = conservar las que tiene; `[]` = quitarlas todas. Con `.default([])` el reemplazo
+  // por PDF, que no las manda, las borraria.
+  tools: recipeToolsSchema.optional(),
+  propagateToVersionIds: z
+    .array(z.string().uuid())
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: 'No puede haber dos versiones repetidas.',
+    })
+    .default([]),
+});
+
+// Sin `lines`, la version nace con una copia de las de su original, que el caso de uso valida con
+// este mismo `recipeLinesSchema`.
+export const createRecipeVersionSchema = z.object({
+  name: recipeNameSchema,
+  lines: recipeLinesSchema.optional(),
+  // Sin `tools`, la version nace con las de su original.
+  tools: recipeToolsSchema.optional(),
+});
+
+export const updateRecipeVersionSchema = z.object({
+  name: recipeNameSchema,
+  lines: recipeLinesSchema,
+  tools: recipeToolsSchema.optional(),
 });
 
 export type CreateRecipeInput = z.infer<typeof createRecipeSchema>;
 export type UpdateRecipeInput = z.infer<typeof updateRecipeSchema>;
+export type CreateRecipeVersionInput = z.infer<typeof createRecipeVersionSchema>;
+export type UpdateRecipeVersionInput = z.infer<typeof updateRecipeVersionSchema>;

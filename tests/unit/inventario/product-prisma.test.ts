@@ -120,3 +120,28 @@ describe('R5 (QC-150) — el listado filtra por FINISHED_PRODUCT', () => {
     expect(segundo?.AND).toBeUndefined();
   });
 });
+
+describe('QC-195 R8, R9 — el filtro por unidad de la presentacion fija', () => {
+  const consulta: ListQuery = {
+    page: 1,
+    pageSize: 20,
+    sort: null,
+    search: '',
+    filters: { presentationUnitId: { kind: 'select', values: ['u-ml', 'u-l'] } },
+  };
+
+  function filtroDePresentacion(where: ReturnType<typeof buildProductWhere>): unknown {
+    const filtros = (where.AND as Array<{ AND?: Array<{ presentationId?: unknown }> }>)[1]?.AND ?? [];
+    return filtros.find((condicion) => condicion.presentationId !== undefined)?.presentationId;
+  }
+
+  it('R8 — se traduce a las presentaciones ya resueltas para esas unidades', () => {
+    expect(filtroDePresentacion(buildProductWhere(consulta, { companyId: 'empresa-1' }, ['p-500', 'p-1l']))).toEqual({
+      in: ['p-500', 'p-1l'],
+    });
+  });
+
+  it('R9 — sin presentaciones resueltas no deja pasar ningun producto, tampoco los que no tienen presentacion fija', () => {
+    expect(filtroDePresentacion(buildProductWhere(consulta, { companyId: 'empresa-1' }))).toEqual({ in: [] });
+  });
+});

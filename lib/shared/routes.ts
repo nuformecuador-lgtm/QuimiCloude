@@ -35,6 +35,9 @@ export const LOGIN_ROUTE_SESSION_ENDED = `${LOGIN_ROUTE}?${SESSION_ENDED_PARAM}=
  */
 export const INVENTORY_ROUTE = '/inventario';
 
+/** Cuelga de `INVENTORY_ROUTE`, así que su prefijo privado ya la cubre. */
+export const INVENTORY_IMPORT_ROUTE = '/inventario/importar';
+
 /**
  * Pantalla de recetas de produccion (QC-26, R3).
  *
@@ -51,6 +54,19 @@ export const NEW_RECIPE_ROUTE = `${FORMULAS_ROUTE}/nueva`;
 /** Ruta de edicion de una receta existente, derivada de `FORMULAS_ROUTE` (QC-26, R5, R6). */
 export function recipeEditRoute(id: string): string {
   return `${FORMULAS_ROUTE}/${id}`;
+}
+
+/**
+ * Alta de una version de la receta `id`, derivada de `recipeEditRoute`. `nueva` es un segmento
+ * estatico y un id de version es un UUID, asi que no choca con `[versionId]`.
+ */
+export function newRecipeVersionRoute(id: string): string {
+  return `${recipeEditRoute(id)}/versiones/nueva`;
+}
+
+/** Edicion de la version `versionId` de la receta `id`, derivada de `recipeEditRoute`. */
+export function recipeVersionRoute(id: string, versionId: string): string {
+  return `${recipeEditRoute(id)}/versiones/${versionId}`;
 }
 
 /**

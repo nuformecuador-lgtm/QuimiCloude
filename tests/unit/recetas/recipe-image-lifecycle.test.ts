@@ -39,12 +39,15 @@ function filaCon(imagePath: string | null): RecipeRow {
     name: RECETA_VALIDA.name,
     description: null,
     steps: [],
+    packingSteps: [],
     imagePath,
     createdBy: ADMIN.id,
     updatedBy: ADMIN.id,
     createdAt: AHORA,
     updatedAt: AHORA,
     lines: [{ id: 'linea-1', ...LINEA_100 }],
+    tools: [],
+    original: null,
   };
 }
 
@@ -55,6 +58,9 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
     listAlive: vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 })),
     replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(async () => 'ok'),
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
+    createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
+    listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     ...overrides,
   };
 }

@@ -210,21 +210,30 @@ describe('QC-90 R30 — el contrato de inventario no ofrece editar ni borrar lot
   });
 });
 
-describe('QC-90 R31 — el listado de productos no devuelve presentacion', () => {
-  // Mordida en TIEMPO DE COMPILACION, ademas de la de tiempo de test: si alguien anade
-  // `presentationId` o `presentationName` a `ProductView`, `pnpm run typecheck` se pone rojo
-  // aqui mismo. Es la mitad que un barrido de texto no puede dar.
-  type SinPresentacion<T> = 'presentationId' extends keyof T
-    ? never
-    : 'presentationName' extends keyof T
-      ? never
-      : true;
-  const productViewSigueSinPresentacion: SinPresentacion<ProductView> = true;
-  void productViewSigueSinPresentacion;
+// QC-90 R31 prohibia toda presentacion en `ProductView` porque la de entonces era la del LOTE.
+// QC-195 (R8-R10) devuelve al producto su presentacion FIJA -la del envase-, en cuatro campos
+// opcionales. Este bloque vigila ahora que sean esos cuatro y ninguno mas: la del lote sigue
+// fuera del listado.
+const CAMPOS_DE_PRESENTACION_FIJA = [
+  'presentationContent',
+  'presentationId',
+  'presentationName',
+  'presentationUnitId',
+] as const;
 
-  it('ProductView sigue sin declarar presentacion', () => {
-    // R31, alternativa B de `design.md > 10`: la presentacion se mudo al LOTE el 2026-09-09 y
-    // esta ficha NO la devuelve al producto.
+describe('QC-90 R31, QC-195 R8-R10 — el listado de productos solo devuelve la presentacion fija', () => {
+  // Mordida en TIEMPO DE COMPILACION, ademas de la de tiempo de test: si alguien anade otro
+  // campo `presentation*` a `ProductView`, `pnpm run typecheck` se pone rojo aqui mismo.
+  type CamposPresentacion<T> = Extract<keyof T, `presentation${string}`>;
+  type SoloLaFija<T> = [CamposPresentacion<T>] extends [(typeof CAMPOS_DE_PRESENTACION_FIJA)[number]]
+    ? [(typeof CAMPOS_DE_PRESENTACION_FIJA)[number]] extends [CamposPresentacion<T>]
+      ? true
+      : never
+    : never;
+  const productViewSoloPresentacionFija: SoloLaFija<ProductView> = true;
+  void productViewSoloPresentacionFija;
+
+  it('QC-195 R8-R10: ProductView declara solo los cuatro campos de la presentacion fija', () => {
     const fuente = stripComments(
       readFileSync(
         join(repoRoot, 'lib', 'modules', 'inventario', 'domain', 'product-view.ts'),
@@ -240,12 +249,12 @@ describe('QC-90 R31 — el listado de productos no devuelve presentacion', () =>
     expect(cuerpo, 'ancla anti-vacuidad: el cuerpo de ProductView debe traer sus campos').toContain(
       'qtyAlert',
     );
+    const declarados = [...new Set(cuerpo.match(/\bpresentation\w*/gi) ?? [])].sort();
     expect(
-      cuerpo,
-      'ProductView volvio a declarar presentacion: eso es la alternativa B de `design.md > 10`, ' +
-        'descartada y declarada fuera de alcance en R31. Si ahora hace falta, pasa por la ficha ' +
-        'que corresponda (QC-91 reabre esa misma consulta), no por aqui.',
-    ).not.toMatch(/presentation/i);
+      declarados,
+      'ProductView declara una presentacion distinta de la fija del producto: la del lote no ' +
+        'vuelve al listado (QC-90 R31).',
+    ).toEqual([...CAMPOS_DE_PRESENTACION_FIJA]);
   });
 
   it('la opcion del autocomplete de nombre llega sin presentationId poblado desde el listado', () => {

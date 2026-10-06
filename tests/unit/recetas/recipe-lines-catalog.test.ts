@@ -47,12 +47,15 @@ function filaConLineaVieja(): RecipeRow {
     name: 'Desengrasante 5%',
     description: null,
     steps: [],
+    packingSteps: [],
     imagePath: null,
     createdBy: ADMIN.id,
     updatedBy: ADMIN.id,
     createdAt: AHORA,
     updatedAt: AHORA,
     lines: [{ id: 'linea-1', productId: LINEA_VIEJA.productId, percentage: '100.00' }],
+    tools: [],
+    original: null,
   };
 }
 
@@ -63,6 +66,9 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
     listAlive: vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 })),
     replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(async () => 'ok'),
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
+    createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
+    listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     ...overrides,
   };
 }

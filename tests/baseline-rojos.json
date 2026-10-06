@@ -1,4 +1,45 @@
 {
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Todo lo que NO este aqui y salga rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
-  "archivos": {}
+  "archivos": {
+    "tests/unit/inventario/product-page.test.tsx": {
+      "motivo": "Deuda ajena de dev: el caso R18 (nombre del producto junto a la unidad guardada) falla igual en origin/dev desde a543c84d (feat(data-table), #131) y 3018853a (table adjustments), que reescribieron product-columns.tsx. Ajeno a QC-161, que no toca inventario ni la UI. Salida limpia: QC-177 borra esta entrada.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/recetas-ui/recipe-page.test.tsx": {
+      "motivo": "Deuda ajena de dev: el caso R21 (acciones en una columna que no se puede fijar, area tactil de 44x44) falla igual en origin/dev desde a543c84d (feat(data-table), #131) y 3018853a (table adjustments), que reescribieron recipe-columns.tsx. Ajeno a QC-161, que no toca recetas ni la UI. Salida limpia: QC-177 borra esta entrada.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/configuracion-ui/unidades-viewport.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 3018853a (table adjustments): la celda de equivalencia ya no lleva overflow-hidden fuera del desplazador que el test exige. Salida limpia: QC-177 borra esta entrada. Ajeno a fix/pino-logger, que no toca configuracion.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/configuracion-ui/usuarios-viewport.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 3018853a (table adjustments): la celda de correo ya no lleva overflow-hidden fuera del desplazador que el test exige. Salida limpia: QC-177 borra esta entrada. Ajeno a fix/pino-logger, que no toca configuracion.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/identity/account-status-scope.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 0dbcd68f (user filter): lib/modules/asignaciones/domain/list-responsible-candidates.ts empezo a nombrar el estado de cuenta y no esta en la lista cerrada SITIOS_PERMITIDOS. Salida limpia: QC-177 borra esta entrada. Ajeno a fix/pino-logger, que no toca identity ni asignaciones.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/inventario/product-page.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde a543c84d (data-table: flechas de scroll, width/hideText y defaultPinned por columna, PR #131): el caso del nombre del producto junto a la unidad guardada falla igual en origin/dev puro. Salida limpia: QC-177 borra esta entrada. Ajeno a QC-171, que no toca inventario.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/recetas-ui/recipe-page.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde a543c84d (data-table: flechas de scroll, width/hideText y defaultPinned por columna, PR #131): el caso de la columna de acciones que no se puede fijar falla igual en origin/dev puro. Salida limpia: QC-177 borra esta entrada. Ajeno a QC-171, que no toca recetas.",
+      "desde": "2026-10-01"
+    },
+    "tests/unit/recetas/scope.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios): alta de grupo con miembros, 2026-10-02): hizo que app/(private)/pedidos/page.tsx importe listRecipesAction (loadFormCatalogs) y las guardias de alcance de recetas lo marcan como segunda pantalla de recetas. page.tsx, scope.test.ts y module-contract.test.ts son identicos a origin/dev. Ajeno a QC-170. Salida limpia: QC-180 borra esta entrada.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/recetas/module-contract.test.ts": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios): alta de grupo con miembros, 2026-10-02): hizo que app/(private)/pedidos/page.tsx importe listRecipesAction (loadFormCatalogs) y las guardias de alcance de recetas lo marcan como segunda pantalla de recetas. page.tsx, scope.test.ts y module-contract.test.ts son identicos a origin/dev. Ajeno a QC-170. Salida limpia: QC-180 borra esta entrada.",
+      "desde": "2026-10-02"
+    },
+    "tests/unit/navegacion/pantallas-exigen-permiso.test.tsx": {
+      "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios): alta de grupo con miembros, 2026-10-02): el caso «'/pedidos' se sirve con el permiso» rechaza con TypeError: Cannot read properties of undefined (reading 'status') en loadFormCatalogs (app/(private)/pedidos/page.tsx:91) porque el test no mockea listRecipesAction. page.tsx y el test son identicos a origin/dev. Ajeno a QC-170. Salida limpia: QC-180 borra esta entrada.",
+      "desde": "2026-10-02"
+    }
+  }
 }

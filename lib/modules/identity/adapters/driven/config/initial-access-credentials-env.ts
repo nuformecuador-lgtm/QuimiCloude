@@ -1,6 +1,7 @@
 import type {
   InitialAdminCredentials,
   InitialAdminCredentialsProvider,
+  InitialMaestroCredentialsProvider,
 } from '../../../ports/initial-access-credentials';
 
 /**
@@ -15,6 +16,12 @@ import type {
  * `tests/guards/guard-password-never-plaintext.test.ts`.
  */
 const REQUIRED_ENV_VAR_NAMES = ['SEED_ADMIN_USERNAME', 'SEED_ADMIN_PASSWORD', 'SEED_ADMIN_EMAIL'] as const;
+
+const REQUIRED_MAESTRO_ENV_VAR_NAMES = [
+  'SEED_MAESTRO_USERNAME',
+  'SEED_MAESTRO_PASSWORD',
+  'SEED_MAESTRO_EMAIL',
+] as const;
 
 /**
  * Lee una variable de entorno por su nombre. Vacia o solo-espacios cuenta como ausente
@@ -34,23 +41,29 @@ function readRequiredEnv(name: string): string {
  * escribir ninguno de los tres nombres como identificador). Si falta una o varias, el
  * error las nombra todas juntas y nunca incluye ningun valor (R18).
  */
+function readCredentialTriple(names: readonly [string, string, string]): InitialAdminCredentials {
+  const missing: string[] = [];
+  const resolved: string[] = [];
+
+  for (const name of names) {
+    try {
+      resolved.push(readRequiredEnv(name));
+    } catch {
+      missing.push(name);
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`faltan las variables de entorno: ${missing.join(', ')}`);
+  }
+
+  const [username, credential, email] = resolved as [string, string, string];
+  return { username, credential, email };
+}
+
 export const readInitialAdminCredentialsFromEnv: InitialAdminCredentialsProvider =
-  (): InitialAdminCredentials => {
-    const missing: string[] = [];
-    const resolved: string[] = [];
+  (): InitialAdminCredentials => readCredentialTriple(REQUIRED_ENV_VAR_NAMES);
 
-    for (const name of REQUIRED_ENV_VAR_NAMES) {
-      try {
-        resolved.push(readRequiredEnv(name));
-      } catch {
-        missing.push(name);
-      }
-    }
-
-    if (missing.length > 0) {
-      throw new Error(`faltan las variables de entorno: ${missing.join(', ')}`);
-    }
-
-    const [username, credential, email] = resolved as [string, string, string];
-    return { username, credential, email };
-  };
+/** Mismo contrato, con las tres `SEED_MAESTRO_*`: se leen solo cuando se invoca. */
+export const readInitialMaestroCredentialsFromEnv: InitialMaestroCredentialsProvider =
+  (): InitialAdminCredentials => readCredentialTriple(REQUIRED_MAESTRO_ENV_VAR_NAMES);

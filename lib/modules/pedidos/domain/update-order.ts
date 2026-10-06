@@ -1,22 +1,27 @@
 import { requirePermission, type Actor } from './actor';
 import {
+  InsufficientMaterialError,
   OrderNotFoundError,
-  PresentationNotFoundError,
-  RecipeNotFoundError,
+  OrderWouldBlockError,
   ValidationError,
 } from './errors';
+import type { OrderStatus } from './order-classification';
 import { updateOrderSchema } from './order-input';
-import { buildRequirement } from './order-requirement';
+import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
+import { buildOrderRequirement } from './order-requirement';
+import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
+import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 import type { OrderRepository } from '../ports/order-repository';
+import type { OrderWriteRepository } from '../ports/order-write-repository';
 
 /** Recupera `products` y `units` porque cada escritura recalcula el coste de los ingredientes:
  *  hace falta leer los lotes disponibles y convertir entre la unidad de la receta y la del
@@ -27,8 +32,11 @@ export type UpdateOrderDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
-  /** Ver el comentario identico de `create-order.ts` sobre por que no se le pasa al coste. */
+  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto. No se le pasan al
+   *  coste, ver el comentario identico de `create-order.ts`. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
+  readonly packaging: PackagingCatalog;
   readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -73,7 +81,7 @@ export function createUpdateOrder(
 
     const parsed = updateOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const data = parsed.data;
+    const { confirmBlocked, ...data } = parsed.data;
 
     // R33: no existe y ya esta borrado son el mismo caso. La comprobacion de estado se hace
     // sobre la fila que se acaba de leer y NO en el `where` del `UPDATE` (`design.md > 7.4`):
@@ -88,37 +96,29 @@ export function createUpdateOrder(
     // modifica ninguna fila.
     assertTransition(row.status, row.status);
 
-    // R25 -la sutileza de esta ficha-. Si la receta NO cambia se acepta aunque este dada de
-    // baja: corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula.
-    // Si CAMBIA, se exige viva igual que en el alta (R15), asi que sigue siendo imposible
-    // PONER una receta inexistente o dada de baja.
-    if (data.recipeId !== row.recipeId) {
-      const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
-      if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
+    // Si la receta del pedido no cambia se acepta aunque este dada de baja o por revisar:
+    // corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula. Si
+    // cambia, se exige lo mismo que en el alta.
+    let effectiveId = data.recipeVersionId ?? data.recipeId;
+    if (effectiveId !== row.recipeId) {
+      const refs = await deps.recipes.findRefsIncludingDeleted(
+        orderRecipeIds(data.recipeId, data.recipeVersionId),
+        actor.companyId,
+      );
+      effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
     }
-
-    // La presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y evita una
-    // rama «si cambio» que habria que probar aparte. Con un pedido viejo sin presentacion,
-    // `row.presentationId` es `null` y la entrada trae una: la comprobacion es la misma.
-    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
-    if (presentation === undefined) throw new PresentationNotFoundError();
-
-    // La copia solo se sustituye si la presentacion CAMBIA. Si no cambia, se conserva la
-    // de la fila ya leida -editar cantidad, prioridad o receta no la toca-.
-    const presentationContent =
-      data.presentationId === row.presentationId ? row.presentationContent : presentation.content;
 
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
     // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
     // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
     // disponible para si mismo: editarlo sin cambiar nada no le hace perder de su propio
     // promedio el lote que el mismo aparto entero.
-    const ingredientsCost = await resolveIngredientsCost(
-      deps.recipes,
-      deps.products,
-      deps.units,
-      data.recipeId,
+    const cost = await resolveStoredOrderCost(
+      deps,
+      effectiveId,
       data.quantity,
+      data.unitId,
+      packagingLinesOfInput(data.presentationLines),
       actor.companyId,
       { orderId: id },
     );
@@ -133,20 +133,51 @@ export function createUpdateOrder(
       // arriba y este bloqueo.
       assertTransition(locked.status, locked.status);
 
-      // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado
-      // por otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las
-      // lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido-. Se lee con
-      // `scope.recipes`, sobre el cliente de ESTA transaccion, para que la lectura vea la
-      // misma instantanea que acaba de bloquear `lockAliveById`.
-      const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
-      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
+      // La unidad y el reparto se resuelven y se validan contra
+      // el total con la fila del pedido YA BLOQUEADA, para que dos ediciones simultaneas no
+      // dejen ninguna pasar del total. Una linea antigua solo se conserva si llega igual.
+      const distribution = await resolveDistribution(
+        deps,
+        actor.companyId,
+        data.quantity,
+        data.unitId,
+        data.presentationLines,
+        { savedLines: locked.presentationLines },
+      );
+
+      // La receta se lee con el cliente de ESTA transaccion, para ver la misma instantanea que
+      // acaba de bloquear `lockAliveById`. La edicion solo llega antes de consumir la receta.
+      // Una linea no convertible rechaza la edicion antes del `UPDATE`.
+      const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
+      const recipeLines = content?.lines ?? [];
+      const units = await loadRequirementUnits(
+        transaction,
+        recipeLines.map((line) => line.productId),
+        data.unitId,
+        actor.companyId,
+      );
+      const requirement = requireConvertibleRequirement(
+        buildOrderRequirement({
+          recipeLines,
+          quantity: data.quantity,
+          packagingLines: distribution.packagingLines,
+          phase: 'before_consumption',
+          units,
+        }),
+      );
 
       const result = await transaction.orders.updateAlive(
         id,
-        { ...data, presentationContent },
+        {
+          recipeId: effectiveId,
+          quantity: data.quantity,
+          priority: data.priority,
+          unitId: data.unitId,
+          presentationLines: distribution.lines,
+        },
         actor.id,
         instant,
-        ingredientsCost,
+        cost,
         scope,
       );
       if (result === 'not_found') throw new OrderNotFoundError();
@@ -159,6 +190,20 @@ export function createUpdateOrder(
         now: instant,
       });
 
+      if (outcome.kind === 'insufficient') {
+        // Un pedido en curso tiene que seguir teniendo con que producirse.
+        if (locked.status === 'EN_CURSO') throw new InsufficientMaterialError();
+        if (!confirmBlocked) throw new OrderWouldBlockError();
+        if (locked.status !== 'BLOQUEADO') {
+          await moveStatus(transaction.orders, id, locked.status, 'BLOQUEADO', actor.id, instant, scope);
+        }
+        if (cost !== null) {
+          await transaction.orders.setIngredientsCost(id, null, actor.id, instant, scope);
+        }
+      } else if (locked.status === 'BLOQUEADO') {
+        await moveStatus(transaction.orders, id, 'BLOQUEADO', 'PENDIENTE', actor.id, instant, scope);
+      }
+
       await transaction.orders.setReservedAt(
         id,
         outcome.kind === 'reserved' ? instant : null,
@@ -166,4 +211,19 @@ export function createUpdateOrder(
       );
     });
   };
+}
+
+/** La fila ya esta bloqueada por `lockAliveById`, asi que cualquier resultado distinto de `ok`
+ *  es que el pedido dejo de existir para esta empresa. */
+async function moveStatus(
+  orders: OrderWriteRepository,
+  id: string,
+  from: OrderStatus,
+  to: OrderStatus,
+  actorId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<void> {
+  const result = await orders.setStatus(id, from, to, actorId, now, scope);
+  if (result !== 'ok') throw new OrderNotFoundError();
 }

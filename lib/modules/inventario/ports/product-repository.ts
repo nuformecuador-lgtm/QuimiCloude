@@ -4,7 +4,7 @@ import type { MovementReason } from '../domain/movement-reason';
 import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
-import type { NewProduct, ProductType, ProductView } from '../domain/product-view';
+import type { NewProduct, PackagingIdentity, ProductType, ProductView } from '../domain/product-view';
 import type { BatchHistoryEntry } from '../domain/reservation';
 
 /**
@@ -103,15 +103,26 @@ export interface ProductRepository {
     scope: InventoryScope,
   ): Promise<{ id: string; type: ProductType } | null>;
 
+  /** Como `findAliveIdByNameInPresentationUnit`, con la unidad ya dada: mismo ambito, mismo filtro
+   *  de vivos y mismo desempate. */
+  findAliveIdByNameInUnit(
+    name: string,
+    unitId: string,
+    scope: InventoryScope,
+  ): Promise<{ id: string; type: ProductType } | null>;
+
   /**
    * Alta de un producto NUEVO junto con su primer lote, en UNA sola transaccion. Devuelve los
    * dos identificadores porque las dos filas se escriben aqui: si cualquiera de las dos falla,
    * no queda ninguna, que es lo que hace imposible un producto sin ningun lote.
    *
-   * El producto nace con la unidad de la presentacion de este lote -la resuelve el adaptador,
-   * no quien llama- y con la existencia recalculada a partir de sus lotes en la MISMA
+   * El producto nace con `product.unitId` si viene; si no, con la unidad de la presentacion de
+   * este lote, que resuelve el adaptador. Y con la existencia recalculada a partir de sus lotes en la MISMA
    * transaccion: `stock` no lo escribe quien llama, es el adaptador el que suma tras crear el
    * lote.
+   *
+   * Con `packaging` (envase), el producto nace con esa presentacion y esa unidad, y el lote va sin
+   * presentacion; una presentacion de otra empresa es `ValidationError`.
    *
    * El `lot` devuelto es el TEXTO que quedo escrito en la fila -el que tecleo la persona o el
    * que genero el correlativo-, no el `batchId`. El adaptador ya lo calcula para escribir la
@@ -122,7 +133,15 @@ export interface ProductRepository {
     batch: NewProductBatch,
     now: Date,
     scope: InventoryScope,
+    packaging?: PackagingIdentity,
   ): Promise<{ id: string; batchId: string; lot: string }>;
+
+  /** El envase vivo con presentacion fija y ese nombre (el mas antiguo si hay varios). Los
+   *  envases sin presentacion fija no cuentan. */
+  findAlivePackagingByName(
+    name: string,
+    scope: InventoryScope,
+  ): Promise<{ id: string; presentationId: string } | null>;
 
   /**
    * Agrega el lote a un producto que YA EXISTE.
@@ -146,12 +165,17 @@ export interface ProductRepository {
    * Devuelve `'finished_product'` cuando, bajo el mismo bloqueo con el que va a escribir,
    * el producto resulta ser `FINISHED_PRODUCT`: cierra la carrera contra un alta manual que
    * empezo a evaluarse antes de que el producto naciera terminado, sin escribir lote ni asiento.
+   *
+   * Lanza `ActionNotAllowedError`, bajo el mismo bloqueo, si el lote no cuadra con la presentacion
+   * fija del envase: con `packaging`, el producto tiene que ser un envase con esa presentacion; sin
+   * el, no puede serlo.
    */
   addBatchToAlive(
     productId: string,
     batch: NewProductBatch,
     now: Date,
     scope: InventoryScope,
+    packaging?: { readonly presentationId: string },
   ): Promise<{ batchId: string; lot: string } | null | 'finished_product'>;
 
   /**
@@ -177,6 +201,9 @@ export interface ProductRepository {
    * es positivo: se decide con el producto ya bloqueado, sin llegar a mover el lote ni a
    * escribir el asiento. Un `delta` negativo sobre un producto terminado sigue las mismas reglas
    * que cualquier otro lote, incluido el rechazo de una existencia final negativa.
+   *
+   * Lanza `ValidationError` si el lote es de un envase con presentacion fija y `delta` no es un
+   * numero entero de envases.
    */
   adjustBatchStock(
     batchId: string,

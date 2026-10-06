@@ -1,10 +1,14 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
-import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitView } from '@/lib/modules/unidades';
+import {
+  formatOrderNumber,
+  type OrderPresentationLineView,
+  type OrderSummary,
+} from '@/lib/modules/pedidos';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import {
@@ -91,13 +95,6 @@ export const COVERAGE_COLUMN_ID = 'coverage';
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
 export const ACTIONS_COLUMN_ID = 'actions';
 
-/**
- * Columnas que nacen fijadas al borde izquierdo (R19, `design.md > 6.3`). Es un **defecto**: en
- * cuanto el usuario tenga preferencia guardada para este `tableId` gana la suya, incluida la de
- * no tener nada fijado.
- */
-export const ORDER_DEFAULT_PINNED_COLUMNS: readonly string[] = [ORDER_NUMBER_COLUMN_ID];
-
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
 export const MISSING_VALUE_MARK = '—';
 
@@ -133,6 +130,7 @@ function formatRequestDate(value: Date): string {
 export type OrderColumnsDeps = {
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /**
    * QC-102 R16, R26 — los responsables **ya repartidos por fila** por el Server Component de la
    * seccion: un `Record` plano y serializable, `orderId` → responsables de ese pedido. Aqui no se
@@ -153,6 +151,8 @@ export type OrderColumnsDeps = {
    * —marcador de ausencia, igual que responsables— y la lista se sigue viendo entera.
    */
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
+  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
+  readonly canEditDistribution?: boolean;
 };
 
 /**
@@ -162,12 +162,19 @@ export type OrderColumnsDeps = {
  * sin cablear -los botones existian y no abrian nada-. Las columnas siguen siendo DATOS: lo que
  * cambia es que se construyen con sus dependencias.
  */
+/** Una linea con envase se nombra por el envase; una antigua, o sin nombre de envase, por su presentacion. */
+function distributionLabelLine(line: OrderPresentationLineView) {
+  return { presentationName: line.packagingName ?? line.presentationName, packages: line.packages };
+}
+
 export function buildOrderColumns({
   recipes,
   units,
+  bridge,
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
+  canEditDistribution = false,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -175,6 +182,9 @@ export function buildOrderColumns({
       label: 'Nº de pedido',
       align: 'start',
       sortable: true,
+      // Nace fijada al borde izquierdo (R19): es un defecto, con preferencia guardada gana
+      // la del usuario.
+      defaultPinned: 'left',
       // R10: el correlativo SIEMPRE sale de la funcion de formato del contrato. Ni aqui ni en
       // ningun otro archivo se compone `${year}-${sequence}` a mano.
       cell: (order) => formatOrderNumber(order.number),
@@ -182,7 +192,7 @@ export function buildOrderColumns({
     {
       id: STATUS_COLUMN_ID,
       label: 'Estado',
-      align: 'start',
+      align: 'center',
       sortable: true,
       filter: { kind: 'select', options: ORDER_STATUS_FILTER_OPTIONS },
       cell: (order) => <OrderStatusBadge status={order.status} />,
@@ -190,7 +200,7 @@ export function buildOrderColumns({
     {
       id: PRIORITY_COLUMN_ID,
       label: 'Prioridad',
-      align: 'start',
+      align: 'center',
       sortable: true,
       filter: { kind: 'select', options: ORDER_PRIORITY_FILTER_OPTIONS },
       cell: (order) => <OrderPriorityBadge priority={order.priority} />,
@@ -199,29 +209,32 @@ export function buildOrderColumns({
       id: RECIPE_NAME_COLUMN_ID,
       label: 'Receta',
       align: 'start',
-      // R9: el nombre viene RESUELTO en la propia fila (alternativa M, descartada). Si no viene,
-      // marcador — nunca `order.recipeId`.
+      width: 500,
+      hideText: false,
       cell: (order) =>
         order.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />,
     },
     {
       id: QUANTITY_COLUMN_ID,
       label: 'Cantidad',
-      align: 'end',
+      align: 'center',
       // Se pinta redondeada a dos decimales y el `title` lleva el valor exacto, para el caso
       // en que el redondeo esconda una diferencia real.
       cell: (order) => (
         <span title={exactDecimalTitle(order.quantity)}>
           {formatDecimalDisplay(order.quantity)}
+          {order.unitLabel === null ? null : ` ${order.unitLabel}`}
         </span>
       ),
     },
     {
       id: PRESENTATION_NAME_COLUMN_ID,
       label: 'Presentación',
-      align: 'start',
+      align: 'center',
       // Solo informa, como el importe: sin `sortable` y sin `filter`.
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => (
+        <OrderDistributionLabel lines={order.presentationLines.map(distributionLabelLine)} />
+      ),
     },
     {
       id: CREATED_AT_COLUMN_ID,
@@ -270,6 +283,7 @@ export function buildOrderColumns({
           order={order}
           recipes={recipes}
           units={units}
+          bridge={bridge}
           // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
@@ -290,12 +304,14 @@ export function buildOrderColumns({
           order={order}
           recipes={recipes}
           units={units}
+          bridge={bridge}
           // QC-102 R24, R26: la entrada «Responsables» abre el panel con lo que el lote YA trajo
           // para esta fila. Sin esto, el panel abriria vacio y tendria que consultar.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
           // La hoja pinta la cobertura de ESTA fila, ya traida por el lote.
           coverage={coverageByOrder[order.id]}
+          canEditDistribution={canEditDistribution}
         />
       ),
     },

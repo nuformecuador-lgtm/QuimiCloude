@@ -17,15 +17,16 @@ export type { ProductType } from './product-type';
  *
  * QC-52 (R1, R2): sin `cost`, `minPurchase` ni `deliveryTime` -son del catalogo del
  * proveedor-. 2026-09-09: sin `presentationId` -la presentacion se mudo al lote
- * (`ProductBatch`)-. QC-80 (R21): sin `unitId` -la unidad la declara la PRESENTACION, y la
- * del producto se DERIVA del lote mas reciente; no hay nada que escribir aqui-. La existencia
- * se quito: se escribe unicamente en el lote que crea el alta. Lo que queda es lo que la
- * cosa ES (`name`), su alerta (`qtyAlert`) y su tipo (`type`).
+ * (`ProductBatch`)-. La existencia se quito: se escribe unicamente en el lote que crea el
+ * alta. Lo que queda es lo que la cosa ES (`name`), su alerta (`qtyAlert`), su tipo (`type`)
+ * y, en el insumo, la unidad en que se cuenta (`unitId`).
  */
 export type NewProduct = {
   readonly name: string;
   readonly qtyAlert?: string | null;
   readonly type?: ProductType;
+  /** Sin ella, la unidad sale de la presentacion del lote o del envase. */
+  readonly unitId?: string;
 };
 
 /**
@@ -63,4 +64,16 @@ export type ProductView = {
   readonly reserved?: string;
   /** Suma de lo disponible en los lotes vivos del producto. Misma condicion que `reserved`. */
   readonly available?: string;
+  /** Presentacion fija del producto; `null` si no la tiene (un envase anterior a tenerla). */
+  readonly presentationId?: string | null;
+  readonly presentationName?: string | null;
+  /** Contenido de un envase, en `presentationUnitId`. */
+  readonly presentationContent?: string | null;
+  readonly presentationUnitId?: UnitId | null;
+};
+
+/** Lo que fija el alta de un envase: su presentacion y la unidad en que se cuenta su existencia. */
+export type PackagingIdentity = {
+  readonly presentationId: string;
+  readonly unitId: UnitId;
 };

@@ -34,6 +34,7 @@ import { createUpdateCatalogLine } from '@/lib/modules/proveedores/domain/update
 
 import type { Actor } from '@/lib/modules/proveedores/domain/actor'
 import type { CatalogLineView } from '@/lib/modules/proveedores/domain/catalog-line-view'
+import type { CatalogImageUrl } from '@/lib/modules/proveedores/ports/catalog-image-url'
 import type { ListQueryLog } from '@/lib/modules/proveedores/ports/list-query-log'
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -74,6 +75,8 @@ const units: UnitCatalog = {
   findRefs: vi.fn(async (ids: readonly string[]) =>
     ids.map((id) => ({ id, name: 'kg', symbol: 'kg', baseUnitId: null, factor: null })),
   ),
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+  findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: sinHermanasDeBase(),
 }
 
@@ -130,6 +133,11 @@ function logMudo(): ListQueryLog {
   return { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
 }
 
+/** Doble mudo: compone una URL reconocible sin tocar ningun almacenamiento de verdad. */
+function imagesMudo(): CatalogImageUrl {
+  return { publicUrl: vi.fn<CatalogImageUrl['publicUrl']>((path) => `https://cdn.test/${path}`) }
+}
+
 /** Fila del catalogo tal como la devuelve el puerto. */
 function linea(id: string, name: string, presentationId: string): CatalogLineView {
   return {
@@ -158,7 +166,11 @@ describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T3
     await createCreateCatalogLine({ catalog: repo, units, now })(ALTA_VALIDA, ADMIN)
     await createUpdateCatalogLine({ catalog: repo, units, now })('linea-1', CAMPOS_VALIDOS, ADMIN)
     await createDeleteCatalogLine({ catalog: repo, now })('linea-1', ADMIN)
-    await createListCatalogLines({ catalog: repo, log: logMudo() })(SUPPLIER_ID, { page: 1 }, ADMIN)
+    await createListCatalogLines({ catalog: repo, log: logMudo(), images: imagesMudo() })(
+      SUPPLIER_ID,
+      { page: 1 },
+      ADMIN,
+    )
 
     const AMBITO = { companyId: ADMIN.companyId }
     for (const [metodo, espia] of Object.entries(spies)) {
@@ -177,6 +189,8 @@ describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T3
     )
     const conUnidad: UnitCatalog = {
       findRefs,
+      listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+      findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: sinHermanasDeBase(),
     }
 
@@ -208,6 +222,8 @@ describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T3
     const { repo, spies } = makeCatalog()
     const ajena: UnitCatalog = {
       findRefs: vi.fn(async () => []),
+      listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+      findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: sinHermanasDeBase(),
     }
 
@@ -251,10 +267,11 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       'units',
     ])
     expect(clavesDelTipoDeps(read('domain', 'delete-catalog-line.ts'))).toEqual(['catalog', 'now'])
-    // QC-57 (R6) le anade el puerto del LOG de campos omitidos, y nada mas: sigue sin
-    // conocer `inventario`, que es lo que este caso vigila.
+    // El puerto del LOG de campos omitidos y el de la URL publica de la imagen: ninguno de
+    // los dos es `inventario`, que es lo que este caso vigila.
     expect(clavesDelTipoDeps(read('domain', 'list-catalog-lines.ts'))).toEqual([
       'catalog',
+      'images',
       'log',
     ])
 
@@ -484,7 +501,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       })),
     })
 
-    const pagina = await createListCatalogLines({ catalog: repo, log: logMudo() })(
+    const pagina = await createListCatalogLines({ catalog: repo, log: logMudo(), images: imagesMudo() })(
       SUPPLIER_ID,
       { page: 1 },
       ADMIN,
@@ -522,13 +539,17 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     })
 
     await expect(
-      createListCatalogLines({ catalog: repo, log: logMudo() })(SUPPLIER_ID, { page: 1 }, ADMIN),
+      createListCatalogLines({ catalog: repo, log: logMudo(), images: imagesMudo() })(
+        SUPPLIER_ID,
+        { page: 1 },
+        ADMIN,
+      ),
     ).rejects.toBeInstanceOf(SupplierNotFoundError)
 
     // Y una consulta de pagina invalida es entrada invalida, no una pagina vacia.
     const otro = makeCatalog()
     await expect(
-      createListCatalogLines({ catalog: otro.repo, log: logMudo() })(
+      createListCatalogLines({ catalog: otro.repo, log: logMudo(), images: imagesMudo() })(
         SUPPLIER_ID,
         { page: 0 },
         ADMIN,

@@ -84,10 +84,12 @@ enum UserAccountStatus {
 }
 
 /// Las unicidades de correo, nombre de usuario y documento no son `@unique`: son indices unicos
-/// funcionales (`lower(...)`), parciales (`WHERE deleted_at IS NULL`) y con `company_id` delante,
-/// escritos a mano en la migracion. Un `@unique` aqui distinguiria mayusculas y quemaria el valor
-/// de los usuarios dados de baja. `users_company_id_idx` no sobra: el RESTRICT al borrar una empresa
-/// tiene que ver tambien a los dados de baja, que esos indices parciales no cubren.
+/// funcionales (`lower(...)`) y parciales (`WHERE deleted_at IS NULL`), escritos a mano en la
+/// migracion. El nombre de usuario es unico en todo el sistema; correo y documento, por empresa
+/// (`company_id` delante), mas un indice aparte para las filas sin empresa. Un `@unique` aqui
+/// distinguiria mayusculas y quemaria el valor de los usuarios dados de baja.
+/// `users_company_id_idx` no sobra: el RESTRICT al borrar una empresa tiene que ver tambien a los
+/// dados de baja, que esos indices parciales no cubren.
 /// @module identity
 model User {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -102,7 +104,8 @@ model User {
   passwordHash     String    @map("password_hash")
   roleId           String    @map("role_id") @db.Uuid
   /// Con `@relation`, a diferencia de otras FK: `User` y `Company` son del mismo modulo.
-  companyId        String    @map("company_id") @db.Uuid
+  /// Vacia solo para el Maestro: lo exige el disparador "users_check_company_by_role".
+  companyId        String?   @map("company_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -128,7 +131,7 @@ model User {
 
   documentType          DocumentType           @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role                  Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  company               Company                @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  company               Company?               @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   credentialSetupTokens CredentialSetupToken[]
   revokedSessions       RevokedSession[]
 
@@ -286,12 +289,15 @@ model Product {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(6)
-  /// Solo en productos terminados: de que receta y en que presentacion se fabrica.
+  /// Solo en productos terminados: de que receta se fabrica.
   recipeId       String?     @map("recipe_id") @db.Uuid
+  /// Producto terminado: en que presentacion se fabrica. Envase: su presentacion fija; NULL en
+  /// los envases dados de alta cuando el envase no la llevaba.
   presentationId String?     @map("presentation_id") @db.Uuid
 
   batches ProductBatch[]
 
+  @@unique([companyId, id], map: "products_company_id_id_key")
   @@index([companyId], map: "products_company_id_idx")
   @@index([unitId], map: "products_unit_id_idx")
   @@index([recipeId], map: "products_recipe_id_idx")
@@ -371,12 +377,17 @@ model InventoryMovement {
   createdBy String?               @map("created_by") @db.Uuid
   createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  /// El asiento `production` de una linea del reparto (uno por linea). Sin
+  /// `@relation`: `OrderPresentationLine` es de `pedidos`; su FK esta escrita a mano y es drift.
+  orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
+
   batch ProductBatch @relation(fields: [batchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([batchId], map: "inventory_movements_batch_id_idx")
   @@index([companyId], map: "inventory_movements_company_id_idx")
   @@index([createdBy], map: "inventory_movements_created_by_idx")
   @@index([orderId], map: "inventory_movements_order_id_idx")
+  @@index([orderPresentationLineId], map: "inventory_movements_order_presentation_line_id_idx")
   @@map("inventory_movements")
 }
 
@@ -413,6 +424,30 @@ model ReservationMovement {
   @@map("reservation_movements")
 }
 
+/// Una confirmacion de importacion de inventario. `importKey` es la clave de idempotencia que manda
+/// la pantalla. `companyId` y `createdBy` no llevan `@relation`: `Company` y `User` son de otro
+/// modulo; sus FK estan escritas a mano y son drift. Sin `deletedAt` ni borrado: es auditoria.
+/// @module inventario
+model InventoryImport {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  importKey       String    @map("import_key") @db.Uuid
+  fileName        String    @map("file_name")
+  fileSha256      String    @map("file_sha256")
+  rowsTotal       Int?      @map("rows_total")
+  createdCount    Int?      @map("created_count")
+  batchAddedCount Int?      @map("batch_added_count")
+  duplicateCount  Int?      @map("duplicate_count")
+  errorCount      Int?      @map("error_count")
+  createdBy       String    @map("created_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  @@unique([companyId, importKey], map: "inventory_imports_company_key_unique")
+  @@index([companyId, createdAt], map: "inventory_imports_company_created_idx")
+  @@map("inventory_imports")
+}
+
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
 /// guardia de modulos lo vea. Sus FK estan escritas a mano. NULL = no la creo una persona.
 /// `companyId` tampoco lleva `@relation`, por el mismo motivo pero hacia `companies`: su FK
@@ -426,7 +461,7 @@ enum ProductType {
   FINISHED_PRODUCT
 }
 
-/// `recipes_company_name_unique` (empresa, nombre) es PARCIAL por `deleted_at IS NULL` y por
+/// `recipes_company_name_unique` (empresa, nombre) es PARCIAL (vivas y solo originales) y por
 /// eso no se declara `@@unique` aqui: Prisma no modela indices parciales. Ese mismo indice
 /// hace de indice de `companyId`, asi que tampoco hay un `@@index([companyId])` propio. Los
 /// indices de busqueda siguen siendo parciales o GIN y viven en las migraciones.
@@ -437,6 +472,7 @@ model Recipe {
   nameNormalized String    @map("name_normalized")
   description    String?
   steps          Json      @default("[]")
+  packingSteps   Json      @default("[]") @map("packing_steps")
   imagePath      String?   @map("image_path")
   companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
@@ -444,8 +480,14 @@ model Recipe {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// No nulo = version de otra receta. Su unicidad de nombre es por original
+  /// (`recipes_version_name_unique`, parcial, solo en la migracion).
+  parentRecipeId String?   @map("parent_recipe_id") @db.Uuid
 
-  lines RecipeLine[]
+  lines    RecipeLine[]
+  tools    RecipeTool[]
+  parent  Recipe?      @relation("RecipeVersions", fields: [parentRecipeId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  versions Recipe[]     @relation("RecipeVersions")
 
   @@index([createdBy], map: "recipes_created_by_idx")
   @@index([updatedBy], map: "recipes_updated_by_idx")
@@ -470,6 +512,25 @@ model RecipeLine {
   @@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")
   @@index([productId], map: "recipe_lines_product_id_idx")
   @@map("recipe_lines")
+}
+
+/// Sin `companyId`: hereda la empresa de su receta y cae con ella por el CASCADE.
+/// `productId` no lleva `@relation` porque apunta a otro modulo; su FK esta escrita a mano.
+/// El CHECK de cantidad positiva tambien vive solo en la migracion.
+/// @module recetas
+model RecipeTool {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipeId  String   @map("recipe_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([recipeId, productId], map: "recipe_tools_recipe_id_product_id_key")
+  @@index([productId], map: "recipe_tools_product_id_idx")
+  @@map("recipe_tools")
 }
 
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
@@ -578,8 +639,10 @@ enum OrderStatus {
   ENTREGADO
   CANCELADO
   POR_EMPACAR
-  /// Va el ultimo: reordenar obligaria a recrear el tipo en vez de anadir un valor.
   EN_EMPAQUE
+  /// Un pedido cuyo material no alcanza queda en BLOQUEADO. Va el ultimo, como los dos de
+  /// empaque: reordenar obligaria a recrear el tipo en vez de anadir un valor.
+  BLOQUEADO
 }
 
 /// El orden de declaracion es el de la prioridad, de menor a mayor: Postgres ordena un enum por
@@ -621,35 +684,70 @@ model Order {
   /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
   /// escribio. NULL = no se pudo calcular; nunca 0.
   ingredientsCost     Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
+  /// Parte de envases incluida en `ingredientsCost`, que sigue siendo el total. NULL si y solo si
+  /// `ingredientsCost` lo es: CHECK `orders_packaging_cost_matches_ingredients_cost`.
+  packagingCost       Decimal?      @map("packaging_cost") @db.Decimal(14, 4)
   /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
   /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
   /// entregar lo vacian.
   reservedAt          DateTime?     @map("reserved_at") @db.Timestamptz(6)
-  /// El envase en que se entrega lo fabricado, del catalogo de `inventario`. NULL en los
-  /// pedidos que existian antes de esta columna. Sin `@relation`: es drift, con FK COMPUESTA
-  /// `(company_id, presentation_id)` escrita a mano en la migracion.
-  presentationId      String?       @map("presentation_id") @db.Uuid
   /// Instante en que el pedido paso a ENTREGADO al finalizarlo en planta. NULL en los entregados
   /// antes de existir la columna. Solo puede tener valor si el estado es ENTREGADO, lo exige el
   /// CHECK `orders_finished_at_requires_delivered`.
   finishedAt          DateTime?     @map("finished_at") @db.Timestamptz(6)
-  /// Copia del contenido de la presentacion al crear el pedido o al cambiarle la presentacion.
-  /// NULL = la presentacion no tenia contenido entonces, o el pedido es anterior a esta columna.
-  presentationContent Decimal?      @map("presentation_content") @db.Decimal(14, 4)
   /// Quien tiene el pedido en empaque. Obligatorio en EN_EMPAQUE, NULL en PENDIENTE, EN_CURSO,
   /// POR_EMPACAR y CANCELADO, y opcional en ENTREGADO (los entregados antiguos no lo tienen, los
   /// nuevos lo conservan), lo exige el CHECK `orders_packed_by_matches_status`. Sin `@relation`:
   /// es drift, con FK COMPUESTA `(packed_by, company_id)` escrita a mano en la migracion.
   packedBy            String?       @map("packed_by") @db.Uuid
+  /// La unidad en que se expresa `quantity`. Sin
+  /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
+  /// presentacion; la aplicacion la exige en el alta y en la edicion.
+  unitId              String?       @map("unit_id") @db.Uuid
+
+  presentationLines OrderPresentationLine[]
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
   @@index([recipeId], map: "orders_recipe_id_idx")
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
-  @@index([presentationId], map: "orders_presentation_id_idx")
   @@index([packedBy], map: "orders_packed_by_idx")
+  @@index([unitId], map: "orders_unit_id_idx")
   @@map("orders")
+}
+
+/// El reparto de un pedido: en que presentaciones se entrega lo fabricado y cuantos envases de
+/// cada una. Sustituye a la presentacion unica por pedido. `companyId` es COPIA de la del pedido
+/// -no se deriva por JOIN- por el mismo motivo que en `product_batches`: la unicidad y el ambito
+/// de esta tabla no pueden depender de otra. `presentationId` no lleva `@relation`: `Presentation`
+/// es de `inventario`, es drift, con FK COMPUESTA `(company_id, presentation_id)` igual que
+/// `orders.presentation_id` la tenia.
+/// @module pedidos
+model OrderPresentationLine {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String   @map("order_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  presentationId String   @map("presentation_id") @db.Uuid
+  /// Numero de envases enteros de esta linea. Entero, no Decimal: no hay "0.5 envases".
+  packages       Int
+  /// Copia del contenido de la presentacion al anadir la linea o al cambiar su presentacion.
+  /// NULL = la presentacion no tenia contenido en ese instante.
+  presentationContent Decimal? @map("presentation_content") @db.Decimal(14, 4)
+  /// Envase (producto PACKAGING) de la linea. NULL = linea guardada antes de que el reparto
+  /// nombrara envases. Sin `@relation`: `Product` es de `inventario`; FK compuesta
+  /// `(company_id, packaging_product_id)` escrita a mano, drift.
+  packagingProductId String? @map("packaging_product_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([orderId, presentationId], map: "order_presentation_lines_order_id_presentation_id_key")
+  @@index([companyId], map: "order_presentation_lines_company_id_idx")
+  @@index([presentationId], map: "order_presentation_lines_presentation_id_idx")
+  @@index([packagingProductId], map: "order_presentation_lines_packaging_product_id_idx")
+  @@map("order_presentation_lines")
 }
 
 /// Las tres FK y el CHECK van escritos a mano y sin `@relation`, porque los padres son de otros

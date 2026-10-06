@@ -7,9 +7,11 @@ import PackingOrderPage from '@/app/(private)/asignacion/empaque/[id]/page';
 import {
   PACKING_ORDER_BACK_LINK_TESTID,
   PACKING_ORDER_FINISH_BUTTON_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_ERROR_TESTID,
   PACKING_ORDER_PACKER_TESTID,
   PACKING_ORDER_START_BUTTON_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
   PACKING_ORDER_START_ERROR_TESTID,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
 import { OrderNotFoundError } from '@/lib/modules/asignaciones';
@@ -77,11 +79,15 @@ function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
     id: 'order-1',
     numberText: '2026-0000030',
     recipeName: 'Jarabe simple',
-    presentationName: 'Caja x 12',
+    quantity: '10',
+    presentationLines: [{ presentationId: 'presentation-1', presentationName: 'Caja x 12', packages: 4 }],
+    unitId: 'unit-1',
+    unitLabel: 'kg',
     packages: '4',
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
+    packingSteps: [],
     ...overrides,
   };
 }
@@ -187,6 +193,7 @@ describe('pagina del pedido de empaque — errores de Comenzar y Terminar visibl
     render(arbol);
 
     await user.click(screen.getByTestId(PACKING_ORDER_START_BUTTON_TESTID));
+    await user.click(screen.getByTestId(PACKING_ORDER_START_CONFIRM_TESTID));
 
     expect(await screen.findByTestId(PACKING_ORDER_START_ERROR_TESTID)).toHaveTextContent(
       'Otro empacador está empacando este pedido.',
@@ -208,6 +215,7 @@ describe('pagina del pedido de empaque — errores de Comenzar y Terminar visibl
     render(arbol);
 
     await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
 
     expect(await screen.findByTestId(PACKING_ORDER_FINISH_ERROR_TESTID)).toHaveTextContent(
       'Otro empacador está empacando este pedido.',

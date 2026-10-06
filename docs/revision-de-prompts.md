@@ -1,7 +1,7 @@
 # Registro de revisión de prompts
 
 Este documento registra la **revisión humana** de los dos prompts definitivos (`catalogo` y
-`formula`) que el sistema envía a la IA para leer PDFs. Ningún test automatizado llama a Gemini:
+`formula`) que el sistema envía a la IA para leer PDFs. Ningún test automatizado llama al proveedor de IA (hoy Claude):
 el gate corre sin red y sin gastar, así que la única forma de comprobar que un prompt pide lo
 correcto y lo pide bien es que una persona lo pase contra un PDF real y firme el resultado, campo
 por campo.

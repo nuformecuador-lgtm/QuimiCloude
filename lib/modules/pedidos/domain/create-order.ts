@@ -1,13 +1,16 @@
 import { requirePermission, type Actor } from './actor';
-import { PresentationNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
+import { OrderWouldBlockError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
-import { buildRequirement } from './order-requirement';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
+import { buildOrderRequirement } from './order-requirement';
+import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
+import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
+import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -36,12 +39,15 @@ export type CreateOrderDeps = {
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: los lotes con existencia con los que se costea. */
   readonly products: ProductCatalog;
-  /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
+  /** Contrato PUBLICO de `unidades`: la unidad del pedido y las de cada presentacion del
+   *  reparto, para convertir y para el coste. */
   readonly units: UnitCatalog;
-  /** Contrato PUBLICO de `inventario`: la presentacion que se elige, solo para comprobar que
-   *  existe en la empresa de quien escribe. No se le pasa al coste: la presentacion no cambia
-   *  nada de lo que se calcula. */
+  /** Contrato PUBLICO de `inventario`: las presentaciones del reparto, para comprobar que
+   *  existen en la empresa de quien escribe y copiar su contenido. No se le pasan al
+   *  coste: el reparto no cambia nada de lo que ese calculo hace. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
+  readonly packaging: PackagingCatalog;
   /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
    *  `reserved_at`, las tres o ninguna. */
   readonly unitOfWork: OrderUnitOfWork;
@@ -98,29 +104,35 @@ export function createCreateOrder(
 
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const data = parsed.data;
+    const { confirmBlocked, ...data } = parsed.data;
 
-    // R15: la receta tiene que existir y estar VIVA, y se comprueba ANTES de llegar al
-    // repositorio, asi que un alta rechazada no crea ni modifica ninguna fila. Un id que no
-    // existe simplemente no vuelve del catalogo; uno dado de baja vuelve con
-    // `isDeleted: true`, y las dos cosas se rechazan igual en el alta (en la EDICION no: ver
-    // R25 en `update-order.ts`).
-    const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
-    if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
-
-    // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
-    // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
-    // `presentation.content` es lo que se copia en el pedido: `null` si aun no lo tiene.
-    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
-    if (presentation === undefined) throw new PresentationNotFoundError();
-
-    const ingredientsCost = await resolveIngredientsCost(
-      deps.recipes,
-      deps.products,
-      deps.units,
-      data.recipeId,
-      data.quantity,
+    // Se comprueba antes de abrir la transaccion: un alta rechazada no crea ninguna fila. La
+    // edicion es mas permisiva con una receta que no cambia (`update-order.ts`).
+    const refs = await deps.recipes.findRefsIncludingDeleted(
+      orderRecipeIds(data.recipeId, data.recipeVersionId),
       actor.companyId,
+    );
+    const effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
+
+    const cost = await resolveStoredOrderCost(
+      deps,
+      effectiveId,
+      data.quantity,
+      data.unitId,
+      packagingLinesOfInput(data.presentationLines),
+      actor.companyId,
+    );
+
+    // La unidad y el reparto se resuelven y se validan contra el
+    // total ANTES de escribir nada. Un reparto vacio (`[]`) es valido. Un pedido nuevo no tiene
+    // lineas antiguas que conservar.
+    const distribution = await resolveDistribution(
+      deps,
+      actor.companyId,
+      data.quantity,
+      data.unitId,
+      data.presentationLines,
+      { savedLines: [] },
     );
 
     const instant = now();
@@ -128,21 +140,42 @@ export function createCreateOrder(
     // R9: el estado de alta es siempre `PENDIENTE` y lo pone este caso de uso, no la
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
     const created = await deps.unitOfWork.run(async (transaction) => {
+      // La necesidad se arma antes del INSERT: una linea no convertible rechaza el alta sin
+      // escribir nada. Receta, productos y unidades se leen con el cliente de ESTA transaccion:
+      // pedir una segunda conexion mientras esta retiene la suya desperdiciaria una del pool.
+      const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
+      const recipeLines = content?.lines ?? [];
+      const units = await loadRequirementUnits(
+        transaction,
+        recipeLines.map((line) => line.productId),
+        data.unitId,
+        actor.companyId,
+      );
+      const requirement = requireConvertibleRequirement(
+        buildOrderRequirement({
+          recipeLines,
+          quantity: data.quantity,
+          packagingLines: distribution.packagingLines,
+          phase: 'before_consumption',
+          units,
+        }),
+      );
+
       const order = await transaction.orders.create(
-        { ...data, status: STATUS_DE_ALTA, presentationContent: presentation.content },
+        {
+          recipeId: effectiveId,
+          quantity: data.quantity,
+          priority: data.priority,
+          unitId: data.unitId,
+          status: STATUS_DE_ALTA,
+          presentationLines: distribution.lines,
+        },
         instant.getUTCFullYear(),
         actor.id,
         instant,
-        ingredientsCost,
+        cost,
         scope,
       );
-
-      // Una receta sin lineas da una necesidad vacia, y `syncForOrder` la sincroniza sin
-      // apartar nada ni fallar. Se lee con `scope.recipes`, sobre el cliente de ESTA
-      // transaccion: pedir una segunda conexion mientras esta retiene la suya desperdiciaria
-      // una conexion del pool.
-      const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
-      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 
       const outcome = await transaction.reservations.syncForOrder({
         orderId: order.id,
@@ -151,6 +184,16 @@ export function createCreateOrder(
         actorId: actor.id,
         now: instant,
       });
+
+      if (outcome.kind === 'insufficient') {
+        // Lanzar deshace el INSERT y lo apartado: sin confirmacion no queda nada escrito.
+        if (!confirmBlocked) throw new OrderWouldBlockError();
+        await transaction.orders.setStatus(order.id, STATUS_DE_ALTA, 'BLOQUEADO', actor.id, instant, scope);
+        // El importe se calculo fuera de la transaccion: otra alta pudo apartar entre medias.
+        if (cost !== null) {
+          await transaction.orders.setIngredientsCost(order.id, null, actor.id, instant, scope);
+        }
+      }
 
       await transaction.orders.setReservedAt(
         order.id,

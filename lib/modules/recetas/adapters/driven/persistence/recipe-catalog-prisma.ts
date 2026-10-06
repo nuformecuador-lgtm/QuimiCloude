@@ -2,6 +2,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
+import { isVersionUnderReview, recipeDisplayName } from '../../../domain/recipe-version';
 
 import type { RecipeCatalog, RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
@@ -34,15 +35,30 @@ import { normalizedSearchCondition } from './list-query-sql';
  * gana ningun filtro de vida: `isDeleted` sigue viajando en cada `Ref`.
  */
 
+type DecimalLike = { toFixed(digits: number): string };
+
 type RecipeCatalogRow = {
   readonly id: string;
   readonly name: string;
   readonly deletedAt: Date | null;
+  readonly parent: { readonly id: string; readonly name: string } | null;
+  readonly lines: ReadonlyArray<{ readonly percentage: DecimalLike }>;
 };
 
 /** Fila de Prisma -> `RecipeRef` del contrato publico. Funcion pura, testeable sin base. */
 export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
-  return { id: row.id, name: row.name, isDeleted: row.deletedAt !== null };
+  const original = row.parent === null ? null : { id: row.parent.id, name: row.parent.name };
+  return {
+    id: row.id,
+    name: recipeDisplayName(row.name, original?.name ?? null),
+    ownName: row.name,
+    isDeleted: row.deletedAt !== null,
+    isUnderReview: isVersionUnderReview(
+      original !== null,
+      row.lines.map((line) => line.percentage.toFixed(2)),
+    ),
+    original,
+  };
 }
 
 export async function findRecipeRefsIncludingDeleted(
@@ -54,7 +70,13 @@ export async function findRecipeRefsIncludingDeleted(
   const scope: RecipeScope = { companyId };
   const rows = await prisma.recipe.findMany({
     where: { AND: [recipeCompanyScope(scope), { id: { in: [...ids] } }] },
-    select: { id: true, name: true, deletedAt: true },
+    select: {
+      id: true,
+      name: true,
+      deletedAt: true,
+      parent: { select: { id: true, name: true } },
+      lines: { select: { percentage: true } },
+    },
   });
 
   return rows.map(toRecipeRef);
@@ -75,7 +97,13 @@ export async function findRecipeIdsMatchingName(
 
   const scope: RecipeScope = { companyId };
   const rows = await prisma.recipe.findMany({
-    where: { AND: [recipeCompanyScope(scope), { nameNormalized: condition }] },
+    // El OR va dentro del AND: al nivel del ambito ensancharia lo visible a otra empresa.
+    where: {
+      AND: [
+        recipeCompanyScope(scope),
+        { OR: [{ nameNormalized: condition }, { parent: { nameNormalized: condition } }] },
+      ],
+    },
     select: { id: true },
   });
 
@@ -97,7 +125,12 @@ export async function findAliveRecipeByNormalizedName(
 
   const scope: RecipeScope = { companyId };
   const row = await prisma.recipe.findFirst({
-    where: { AND: [recipeCompanyScope(scope), { nameNormalized: normalized, deletedAt: null }] },
+    where: {
+      AND: [
+        recipeCompanyScope(scope),
+        { nameNormalized: normalized, deletedAt: null, parentRecipeId: null },
+      ],
+    },
     select: { id: true, name: true },
   });
 
@@ -125,9 +158,14 @@ type RecipeExecutionContentRow = {
   readonly name: string;
   readonly deletedAt: Date | null;
   readonly steps: unknown;
+  readonly parent: { readonly name: string; readonly steps: unknown } | null;
   readonly lines: ReadonlyArray<{
     readonly productId: string;
-    readonly percentage: { toFixed(digits: number): string };
+    readonly percentage: DecimalLike;
+  }>;
+  readonly tools: ReadonlyArray<{
+    readonly productId: string;
+    readonly quantity: number;
   }>;
 };
 
@@ -135,13 +173,19 @@ type RecipeExecutionContentRow = {
 export function toRecipeExecutionContent(row: RecipeExecutionContentRow): RecipeExecutionContent {
   return {
     id: row.id,
-    name: row.name,
+    name: recipeDisplayName(row.name, row.parent?.name ?? null),
     isDeleted: row.deletedAt !== null,
-    steps: toExecutionSteps(row.steps),
+    // Una version no tiene pasos propios: se ejecuta con los de su original.
+    steps: toExecutionSteps(row.parent === null ? row.steps : row.parent.steps),
     lines: row.lines.map((line) => ({
       productId: line.productId,
       productName: null,
       percentage: line.percentage.toFixed(2),
+    })),
+    tools: row.tools.map((tool) => ({
+      productId: tool.productId,
+      productName: null,
+      quantity: tool.quantity,
     })),
   };
 }
@@ -165,7 +209,12 @@ async function findExecutionContentByIdOn(
       name: true,
       deletedAt: true,
       steps: true,
+      parent: { select: { name: true, steps: true } },
       lines: { select: { productId: true, percentage: true } },
+      tools: {
+        select: { productId: true, quantity: true },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      },
     },
   });
 
@@ -188,4 +237,32 @@ export function createRecipeExecutionReader(tx: PrismaLike = prisma): Pick<Recip
   return {
     findExecutionContentById: (id, companyId) => findExecutionContentByIdOn(tx, id, companyId),
   };
+}
+
+type RecipePackingStepsRow = {
+  readonly packingSteps: unknown;
+  readonly parent: { readonly packingSteps: unknown } | null;
+};
+
+/** Fila de Prisma -> pasos de envasado. Una version no tiene propios: se empaca con los de su
+ *  original. Funcion pura, testeable sin base. */
+export function toRecipePackingSteps(row: RecipePackingStepsRow): readonly RecipeStepView[] {
+  return toExecutionSteps(row.parent === null ? row.packingSteps : row.parent.packingSteps);
+}
+
+/**
+ * Implementa `RecipePackingStepsReader['findPackingStepsById']`. Sin `deleted_at IS NULL`, igual
+ * que `findExecutionContentByIdOn`: una receta dada de baja se sigue empacando.
+ */
+export async function findRecipePackingStepsById(
+  id: RecipeId,
+  companyId: string,
+): Promise<readonly RecipeStepView[] | null> {
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { id }] },
+    select: { packingSteps: true, parent: { select: { packingSteps: true } } },
+  });
+
+  return row === null ? null : toRecipePackingSteps(row);
 }

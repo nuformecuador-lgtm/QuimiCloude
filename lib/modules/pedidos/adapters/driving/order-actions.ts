@@ -7,9 +7,28 @@ import {
   type ErrorState,
 } from '@/lib/modules/errores';
 import {
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  IncompatibleUnitsError,
+  InsufficientMaterialError,
+  OrderDistributionExceedsQuantityError,
+  OrderNotFoundError,
+  OrderPresentationLineNotEditableError,
+  OrderWithoutUnitError,
+  OrderUnitNotConvertibleError,
+  OrderWouldBlockError,
   PedidosError,
+  PresentationNotFoundError,
+  PresentationWithoutContentError,
+  ProductNotFoundError,
+  UnitNotFoundError,
+  ValidationError,
+  requirePermission,
+  updateOrderDistributionSchema,
   type Actor,
   type OrderCostQuote,
+  type OrderPresentationAvailabilityNext,
   type OrderSummary,
   type OrderView,
   type Page,
@@ -148,25 +167,55 @@ function readFormString(formData: FormData, name: string): string {
 }
 
 /**
- * Un campo AUSENTE del formulario es ausencia (`undefined`), no cadena vacia. Lo usa solo la
- * prioridad, que es el unico campo opcional del alta (R9): si el formulario no la envia, el
- * esquema aplica `BAJA` por defecto. Si la envia vacia, el esquema la rechaza como valor
- * fuera del conjunto cerrado (R19) — y eso es correcto: convertir el blanco en ausencia aqui
- * seria una regla de negocio en el borde, y el borde no decide (R5).
+ * Un campo AUSENTE del formulario es ausencia (`undefined`), no cadena vacia, para que el
+ * esquema aplique su defecto. Que hacer con un blanco lo decide el esquema, no el borde.
  */
 function readOptionalFormString(formData: FormData, name: string): string | undefined {
   const value = formData.get(name);
   return typeof value === 'string' ? value : undefined;
 }
 
-/** El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
- *  correlativo, ni autores: lo que el esquema no declara no puede llegar (R6, R9). */
+function readFormStrings(formData: FormData, name: string): string[] {
+  return formData.getAll(name).map((value) => (typeof value === 'string' ? value : ''));
+}
+
+/** La cadena vacia es la marca del identificador que no lleva esa posicion. */
+function emptyAsAbsent(value: string | undefined): string | undefined {
+  return value === '' ? undefined : value;
+}
+
+/**
+ * Las lineas llegan como tres listas de campos repetidos, unidas por posicion: en cada una va el
+ * envase o la presentacion de una linea antigua, y el otro vacio. Si las longitudes difieren, la
+ * posicion sin pareja queda `undefined` y la rechaza `presentationLinesSchema`: el borde no
+ * rellena ni descarta.
+ */
+function readPresentationLines(formData: FormData): unknown[] {
+  const packagingProductIds = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGING_FIELD);
+  const presentationIds = readFormStrings(formData, ORDER_DISTRIBUTION_PRESENTATION_FIELD);
+  const packages = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGES_FIELD);
+  const length = Math.max(packagingProductIds.length, presentationIds.length, packages.length);
+  return Array.from({ length }, (_, index) => ({
+    packagingProductId: emptyAsAbsent(packagingProductIds[index]),
+    presentationId: emptyAsAbsent(presentationIds[index]),
+    packages: packages[index],
+  }));
+}
+
+/**
+ * El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
+ * correlativo, ni autores: lo que el esquema no declara no puede llegar.
+ */
 function buildCreateCandidate(formData: FormData): unknown {
   return {
     recipeId: readFormString(formData, 'recipeId'),
     quantity: readFormString(formData, 'quantity'),
     priority: readOptionalFormString(formData, 'priority'),
-    presentationId: readFormString(formData, 'presentationId'),
+    unitId: readFormString(formData, 'unitId'),
+    presentationLines: readPresentationLines(formData),
+    // Solo la cadena exacta confirma: cualquier otro valor, o la ausencia, es no confirmar.
+    confirmBlocked: formData.get('confirmBlocked') === 'true',
+    recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
   };
 }
 
@@ -340,6 +389,97 @@ export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuo
   try {
     const data = await pedidos.quoteOrderCost(input, actor);
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// «Cuanto queda disponible», de solo lectura.
+// ---------------------------------------------------------------------------------------------
+
+export type OrderPresentationAvailabilityResult =
+  | { status: 'success'; data: OrderPresentationAvailabilityNext }
+  | ErrorState;
+
+/**
+ * El disponible en vivo del formulario de reparto, en la unidad del pedido -mismo patron que
+ * `quoteOrderCostAction` para el coste-. Argumento tipado, no `FormData`: no hay `<form>` que
+ * enviar, se recalcula con cada tecla. Nunca rechaza por el reparto: `data.kind` puede ser
+ * `'exceeds_quantity'` con `available` negativo (el aviso), y sigue siendo un `'success'`
+ * -el rechazo lo hace el guardado, no esta consulta.
+ */
+export async function quoteOrderPresentationAvailabilityAction(
+  input: unknown,
+): Promise<OrderPresentationAvailabilityResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.quoteOrderPresentationAvailability(input, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// La edicion ACOTADA «Reparto y unidad» en `POR_EMPACAR`.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * `updateOrderPresentationLines` NO comprueba el permiso: su unico llamador es esta
+ * action, y por eso -a diferencia de las diez de arriba, que no repiten `requirePermission`
+ * porque su caso de uso ya es la primera linea que lo hace- esta SI lo llama, aqui, antes de
+ * `zod` y antes de tocar la fachada.
+ */
+export async function updateOrderDistributionAction(
+  id: string,
+  input: unknown,
+): Promise<OrderMutationFormState> {
+  const actor = await currentActor();
+
+  try {
+    requirePermission(actor, 'pedidos.modificar');
+
+    const parsed = updateOrderDistributionSchema.safeParse(input);
+    if (!parsed.success) throw new ValidationError();
+
+    const result = await pedidos.updateOrderPresentationLines(id, actor, {
+      unitId: parsed.data.unitId,
+      lines: parsed.data.presentationLines,
+      confirmBlocked: parsed.data.confirmBlocked,
+    });
+
+    switch (result) {
+      case 'ok':
+        return { status: 'success' };
+      case 'not_found':
+        throw new OrderNotFoundError();
+      case 'not_editable':
+        throw new OrderPresentationLineNotEditableError();
+      case 'unit_not_found':
+        throw new UnitNotFoundError();
+      case 'without_unit':
+        throw new OrderWithoutUnitError();
+      case 'presentation_not_found':
+        throw new PresentationNotFoundError();
+      case 'packaging_not_found':
+        throw new ProductNotFoundError();
+      case 'invalid_lines':
+        throw new ValidationError();
+      case 'presentation_without_content':
+        throw new PresentationWithoutContentError();
+      case 'incompatible_units':
+        throw new IncompatibleUnitsError();
+      case 'exceeds_quantity':
+        throw new OrderDistributionExceedsQuantityError();
+      case 'would_block':
+        throw new OrderWouldBlockError();
+      case 'insufficient_material':
+        throw new InsufficientMaterialError();
+      case 'unit_not_convertible':
+        throw new OrderUnitNotConvertibleError();
+    }
   } catch (error) {
     return toErrorState(error);
   }

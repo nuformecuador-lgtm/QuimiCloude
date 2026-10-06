@@ -1,0 +1,340 @@
+# QC-195 — envases-del-pedido-como-productos · requirements.md
+
+> **Zona:** fullstack · **Complejidad:** high · **depends_on:** — · **Rama:** `feature/QC-195-envases-del-pedido-como-productos`
+>
+> **Alcance:** el reparto del pedido deja de elegir presentaciones y pasa a elegir productos
+> PACKAGING (envases). Cada envase tiene una sola presentación fija, de la que sale el contenido
+> para el cálculo actual. El selector solo lista los envases cuya presentación tiene la misma
+> unidad base que la cantidad del pedido (l → l, ml). Los envases elegidos se apartan con el
+> mismo flujo que las materias primas, con el aviso y el bloqueo de QC-138, y su costo se suma a
+> la cotización.
+>
+> **Lo que NO entra:** migrar los repartos de pedidos ya existentes.
+>
+> Sembrado por `/afinar-feature` el 2026-10-03. El bloque de Alcance y la tabla de «Decisiones
+> cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
+> reescribe: su trabajo aquí es `## Requisitos (EARS)`.
+
+## Requisitos (EARS)
+
+> Escritos por `spec_author` en F1.2 (2026-10-03). Cada requisito cita entre corchetes la fila de
+> «Decisiones cerradas» que lo origina: **[D1]** envase y presentación, **[D2]** stock en envases,
+> **[D3]** qué lista el selector, **[D4]** reserva y aviso, **[D5]** cálculo del reparto, **[D6]**
+> pedidos existentes, **[D7]** costo (en el orden de la tabla). Las marcas **[P1]**, **[P3]** y
+> **[N<n>]** remiten a las decisiones que el humano tomó en F1.4 el **2026-10-03**
+> (`design.md > 1`): P1 = A (unidad `unidad`, símbolo `u`), P2 = A, P3 = b, y N1 a N10 con la
+> recomendación salvo **N1** y **N7**, donde eligió la alternativa. Los requisitos ya están
+> escritos con lo decidido (R8 y R38 por N1; R39-R41 por N7). **[P4]** decidida 2026-10-03: A (se conservan).
+>
+> Vocabulario. *Envase*: producto de inventario de tipo PACKAGING. *Presentación del envase*: la
+> única presentación fija de ese producto. *Disponible*: el de QC-141 (existencia menos apartado,
+> nunca por debajo de cero). *Línea antigua*: línea de reparto guardada antes de esta feature, que
+> nombra una presentación y ningún envase.
+
+### A. El envase como producto de inventario
+
+**R1.** El sistema DEBE guardar en cada producto PACKAGING dado de alta a partir de esta feature
+exactamente una presentación, la que se elige en su alta, y DEBE rechazar sin escribir nada el alta
+de un producto PACKAGING que no la indique `[D1]`.
+
+**R2.** SI se intenta cambiar la presentación de un producto PACKAGING que ya tiene una, ENTONCES
+el sistema DEBE rechazar el cambio sin modificar el producto ni sus lotes `[D1]`.
+
+**R3.** CUANDO se añada un lote a un producto PACKAGING, el sistema DEBE registrarlo en la
+presentación fija del producto, y SI la entrada indica otra presentación, ENTONCES DEBE rechazar
+el lote sin escribir nada `[D1]`.
+
+**R4.** El sistema DEBE tratar como productos distintos dos envases con presentaciones distintas
+—«Botella PET 500 ml» con la presentación de 500 ml y «Botella PET 1 L» con la de 1 l—, cada uno
+con su propia existencia, sus lotes y su costo `[D1]`.
+
+**R5.** El sistema NO DEBE permitir, ni desde la aplicación ni desde la base de datos, que un
+producto de tipo PRODUCT o MACHINE tenga presentación propia, ni que un producto que no sea
+FINISHED_PRODUCT tenga receta, ni que un FINISHED_PRODUCT carezca de receta o de presentación
+`[D1]`.
+
+**R6.** El sistema DEBE expresar en número de envases la existencia, la existencia de cada lote,
+los ajustes, lo apartado y el disponible de un producto PACKAGING dado de alta a partir de esta
+feature, en la unidad de sistema `unidad` (símbolo `u`): un lote de 100 botellas tiene existencia
+`100 u` `[D2]` `[P1]`.
+
+**R7.** SI la existencia declarada en el alta o en el ajuste de un lote de un producto PACKAGING no
+es un número entero de envases, ENTONCES el sistema DEBE rechazarla sin escribir nada `[D2]`
+`[N3]`.
+
+### B. El selector del reparto
+
+**R8.** CUANDO quien tiene `pedidos.modificar` e `inventario.consultar` busque envases para el
+reparto de un pedido con unidad, el sistema DEBE ofrecer, a través del listado de productos de
+inventario, solo productos PACKAGING vivos de su empresa, con presentación fija
+y con contenido, cuya presentación tenga la misma unidad base efectiva (`baseUnitId ?? id`) que la
+unidad del pedido: con el pedido en `l` aparecen los envases en `l` y en `ml`, y no aparecen los
+envases en `kg` ni en `g` `[D3]` `[N1]`.
+
+**R9.** El selector del reparto NO DEBE ofrecer un producto PACKAGING sin presentación fija —los
+dados de alta antes de esta feature mientras no se resuelva P2— ni un producto de otro tipo
+`[D1]` `[D3]` `[D6]`.
+
+**R10.** El selector del reparto DEBE mostrar por cada envase su nombre, el nombre de su
+presentación y su disponible en envases, y DEBE ofrecer también los envases con disponible cero
+`[D4]` `[N2]`.
+
+**R11.** SI una línea del reparto que llega al servidor nombra un producto que no existe, es de otra
+empresa, está dado de baja, no es PACKAGING, no tiene presentación fija o cuya presentación no
+comparte unidad base con la unidad del pedido, ENTONCES el sistema DEBE rechazar el guardado entero
+sin escribir el pedido, la unidad, las líneas ni ningún apartado `[D3]`.
+
+**R12.** SI el reparto que llega al servidor nombra dos veces el mismo envase, o dos envases con la
+misma presentación, ENTONCES el sistema DEBE rechazarlo sin escribir nada `[D1]` `[N6]`.
+
+### C. El cálculo del reparto
+
+**R13.** El sistema DEBE calcular lo que cubre cada línea con envase como su número de envases por
+el contenido de la presentación del envase, convertido a la unidad del pedido, y DEBE aplicar al
+reparto las mismas reglas que hoy: el disponible del pedido es la cantidad menos la suma de las
+líneas, igual o menor se acepta, pasar de la cantidad se rechaza al guardar y una presentación sin
+contenido se rechaza `[D5]`.
+
+**R14.** CUANDO se guarde una línea con envase, el sistema DEBE copiar en ella la presentación y el
+contenido que tiene en ese instante la presentación del envase, y CUANDO se termine el empaque DEBE
+dar de alta el producto terminado de esa línea en esa presentación, igual que hoy `[D1]` `[D5]`.
+
+### D. Reserva de los envases
+
+**R15.** CUANDO se cree un pedido, se edite o se edite su reparto, el sistema DEBE apartar de cada
+envase del reparto tantos envases como indique su línea, en la misma operación que aparta las
+materias primas de la receta y con su misma regla: del lote más antiguo al más nuevo y todo o nada
+para el pedido entero. Un reparto de 40 botellas aparta 40 envases `[D2]` `[D4]`.
+
+**R16.** SI el disponible de algún envase del reparto, o de alguna materia prima de la receta, no
+cubre lo que el pedido necesita, ENTONCES el sistema NO DEBE dejar nada apartado para ese pedido
+`[D4]`.
+
+**R17.** SI al crear un pedido, o al editar un pedido `PENDIENTE` o `BLOQUEADO` —con la edición
+completa o con la de «Reparto y unidad»—, falta disponible de algún envase, ENTONCES el sistema
+DEBE responder con el mismo aviso que hoy da la falta de materia prima (`order_would_block`) sin
+escribir nada, y con la confirmación de quien guarda DEBE guardar el pedido en `BLOQUEADO`, sin
+nada apartado y sin importe `[D4]`.
+
+**R18.** SI al editar un pedido `EN_CURSO` o `POR_EMPACAR` falta disponible de algún envase,
+ENTONCES el sistema DEBE rechazar el guardado con `insufficient_material` sin modificar el pedido,
+su reparto ni lo apartado `[D4]` `[N9]`.
+
+**R19.** CUANDO se guarde el reparto de un pedido `BLOQUEADO` y el disponible ya cubra sus materias
+primas y sus envases, el sistema DEBE dejar el pedido en `PENDIENTE` con todo apartado, igual que
+hoy hace la edición completa `[D4]`.
+
+**R20.** CUANDO se edite el reparto de un pedido quitando un envase o bajando sus envases, el
+sistema DEBE liberar lo apartado que sobre de ese envase, en la misma operación `[D4]`.
+
+**R21.** CUANDO la revisión de pedidos bloqueados evalúe un pedido, el sistema DEBE exigir que el
+disponible cubra también los envases de su reparto, y NO DEBE desbloquearlo si falta alguno `[D4]`.
+
+**R22.** CUANDO un pedido se cancele, se borre o caduque su reserva, el sistema DEBE liberar
+también lo apartado de sus envases `[D4]`.
+
+**R23.** El sistema NO DEBE cambiar lo que otro pedido tiene apartado al apartar, liberar o
+consumir los envases de un pedido `[D4]`.
+
+**R24.** MIENTRAS un pedido esté en `POR_EMPACAR`, CUANDO se edite su reparto, el sistema DEBE
+sincronizar solo lo apartado de sus envases y NO DEBE volver a apartar ninguna materia prima ya
+consumida `[D4]` `[P3]`.
+
+**R25.** CUANDO se termine el empaque de un pedido, el sistema DEBE consumir del inventario, en la
+misma transacción que da de alta el producto terminado, los envases que el pedido tiene apartados;
+SI el disponible no alcanza para consumirlos todos, ENTONCES DEBE rechazar Terminar con
+`insufficient_material` sin mover el estado ni dar de alta producto terminado `[D2]` `[D4]` `[P3]`.
+*(Acotado por la Enmienda 1: no se aplica a lo que R43 deja sin consumir.)*
+
+**R26.** CUANDO un pedido pase a `POR_EMPACAR`, el sistema DEBE consumir sus materias primas como
+hoy y NO DEBE consumir sus envases `[P3]`. *(Enmienda 1: un envase que fuera también ingrediente
+se consumiría aquí como ingrediente; ver R43.)*
+
+### E. Costo
+
+**R27.** CUANDO el sistema calcule el importe de un pedido —la cotización del formulario de alta y
+de edición, y el importe que guarda al crear y al editar—, DEBE sumar al costo de ingredientes el
+costo de cada envase del reparto, calculado como sus envases por el **promedio simple** del costo
+unitario por envase de todos los lotes de ese envase con disponible mayor que cero: con 40 botellas
+y lotes A (100 envases a `0.50`) y B (50 envases a `0.70`), el envase cuesta 40 × (0.50 + 0.70) / 2
+= `24.0000`, que se suma al de los ingredientes `[D7]` `[N4]`.
+
+**R28.** SI la suma de los disponibles de los lotes de un envase es menor que sus envases en el
+reparto, ENTONCES el pedido DEBE quedar sin importe, con la misma salida que los demás casos sin
+importe, en la cotización y en lo guardado `[D7]`.
+
+**R29.** El sistema DEBE obtener la cotización del formulario y el importe guardado con el mismo
+cálculo, de modo que con el mismo reparto, receta, cantidad, lotes y apartados devuelvan el mismo
+valor o los dos queden sin importe, y la cotización del formulario DEBE recalcularse cuando cambie
+el reparto `[D7]`.
+
+**R30.** CUANDO se calcule el costo de los envases de un pedido que ya existe, el sistema DEBE
+contar como disponible de cada lote lo que ese mismo pedido tiene apartado en él, y NO DEBE incluir
+en el promedio un lote sin costo unitario `[D7]`.
+
+**R31.** CUANDO se termine el empaque de un pedido sin importe guardado, el sistema DEBE costear el
+lote de producto terminado incluyendo el costo de sus envases con la misma regla de R27 `[D7]`
+`[N8]`.
+
+### F. Pedidos existentes
+
+**R32.** El sistema NO DEBE modificar, migrar ni apartar nada a partir de las líneas antiguas: los
+pedidos guardados antes de esta feature conservan su reparto en presentaciones, sin envase y sin
+envases apartados `[D6]`.
+
+**R33.** El sistema DEBE seguir mostrando las líneas antiguas con el nombre de su presentación en
+la ficha, el listado, la pantalla de empaque y la de ejecución, y DEBE seguir dando de alta su
+producto terminado al terminar el empaque como hoy `[D6]`.
+
+**R34.** SI al guardar el reparto de un pedido llega una línea nueva, o una línea antigua con sus
+envases cambiados, que no nombra un producto PACKAGING, ENTONCES el sistema DEBE rechazar el
+guardado entero sin escribir nada `[D6]`.
+
+**R35.** CUANDO se guarde un pedido cuyo reparto conserva una línea antigua sin cambios —misma
+presentación y mismos envases—, el sistema DEBE conservarla como línea antigua, sin pedir envase y
+sin apartar nada por ella `[D6]` `[N5]`.
+
+### G. Formulario
+
+**R36.** El formulario de alta y de edición del pedido y el diálogo «Reparto y unidad» DEBEN
+mostrar el reparto en envases: cada línea con el nombre del envase y el de su presentación, sus
+envases y lo que cubre en la unidad del pedido, y el selector de R8 para añadir líneas `[D3]`
+`[D5]`.
+
+**R37.** CUANDO el diálogo «Reparto y unidad» reciba el aviso de R17, el sistema DEBE mostrar la
+misma confirmación que muestra hoy el formulario del pedido, y solo con ella reenviar el guardado
+`[D4]`.
+
+**R38.** SI quien abre el formulario del pedido o el diálogo «Reparto y unidad» tiene
+`pedidos.modificar` pero no `inventario.consultar`, ENTONCES el selector de envases NO DEBE listar
+ningún envase y DEBE indicar que falta ese permiso; las líneas que el reparto ya tenga se siguen
+mostrando y el servidor sigue validando cualquier guardado con R11 `[D3]` `[N1]`.
+
+> Consecuencia de N1, registrada para quien administra roles: para **repartir** un pedido en envases
+> hace falta `inventario.consultar` además de `pedidos.modificar`. Sin él se puede crear o editar el
+> pedido con su reparto vacío o con las líneas que ya tenga, pero no añadir envases. Hoy el único
+> rol sembrado con `pedidos.modificar` es Administrador, que ya tiene los dos
+> (`lib/modules/identity/domain/permissions.ts:221-244`); el aviso afecta a roles personalizados.
+
+### H. El envase no es ingrediente
+
+**R39.** CUANDO se cree una receta o una versión de receta, SI alguna línea indicada en la entrada
+nombra un producto PACKAGING, ENTONCES el sistema DEBE rechazar la operación con
+`action_not_allowed` sin escribir nada, igual que hoy con un producto terminado `[N7]`.
+
+**R40.** CUANDO se edite una receta o una versión de receta, SI una línea que la receta no tenía
+nombra un producto PACKAGING, ENTONCES el sistema DEBE rechazar la edición con
+`action_not_allowed` sin modificar la receta `[N7]`.
+
+**R41.** CUANDO se previsualice o se confirme la importación de una fórmula desde un documento, el
+sistema NO DEBE proponer un producto PACKAGING como ingrediente emparejado, y SI la confirmación
+nombra uno, ENTONCES DEBE rechazarla con `action_not_allowed` sin crear la receta `[N7]`.
+
+> Qué pasa con las recetas que **ya** tienen un ingrediente PACKAGING —al editarlas, al crear una
+> versión copiando sus líneas, y al pedir con ellas— queda abierto como **P4** (abajo): R40 solo
+> fija las líneas que la receta no tenía.
+
+### Enmienda 1 (F2.1, 2026-10-03)
+
+> Decidida por el humano el 2026-10-03 sobre cuatro preguntas que salieron al implementar. No toca
+> el Alcance ni D1-D7, P1-P4 o N1-N10. Detalle en `design.md > 1.6`.
+
+**R42.** CUANDO se cree una versión de receta, SI una línea copiada de la original nombra un producto
+PACKAGING que la original ya tenía, ENTONCES el sistema DEBE aceptarla; y SI una línea nombra un
+producto PACKAGING que la original no tenía, ENTONCES DEBE rechazar la versión con
+`action_not_allowed` sin escribir nada. Es la misma exención que la edición `[N7]` `[P4]`.
+
+**R43.** CUANDO se termine el empaque de un pedido cuya receta —conservada por P4— tiene como
+ingrediente el mismo envase que una línea de su reparto, el sistema DEBE consumir de ese envase solo
+lo que el pedido siga teniendo apartado de él; SI no le queda nada apartado —porque se consumió con
+las materias primas al pasar a `POR_EMPACAR`—, ENTONCES NO DEBE consumir nada del disponible de ese
+envase y NO DEBE rechazar Terminar por él `[D4]` `[P3]` `[P4]`.
+
+> Nota de `spec_author`: con las reglas ya escritas este caso **no se puede producir** a través de
+> la aplicación. Un envase que puede estar en un reparto tiene presentación fija (R9, R11) y nació
+> con esta feature, así que no puede ser ingrediente (R39-R42). Un envase legado puede ser
+> ingrediente (P4) pero no tiene presentación fija, y el alta con homónimo nunca se la pone (solo
+> busca envases que ya la tienen). R43 queda como salvaguarda y su test siembra el caso directamente
+> en la base.
+
+**R44.** La pantalla de empaque y la de ejecución DEBEN mostrar en cada línea con envase el nombre
+del envase, y en cada línea antigua el nombre de su presentación `[D5]` `[D6]`.
+
+> **Mensaje.** `insufficient_material` al Terminar el empaque usa el texto del catálogo tal cual, sin
+> un mensaje propio (`design.md > 1.6`).
+
+### Enmienda 2 (F2.2, 2026-10-04)
+
+> Viene del rechazo del review de la vuelta 1 (`progress/review_QC-195-envases-del-pedido-como-productos.md`,
+> B1) y de la decisión del humano **E5** (2026-10-04). No toca el Alcance, D1-D7, P1-P4, N1-N10 ni la
+> Enmienda 1. Detalle en `design.md > 1.7`. **P6** (cómo separar la parte de ingredientes) queda
+> decidida 2026-10-04 (A, columna `orders.packaging_cost`); solo afecta al *cómo* de R47, no a su comportamiento.
+
+**R45.** CUANDO se guarde el reparto de un pedido `PENDIENTE` o `EN_CURSO` por «Reparto y unidad» y
+el pedido no quede `BLOQUEADO`, el sistema DEBE guardar como importe el mismo valor que daría la
+cotización con su receta, su cantidad, el reparto nuevo y su propio apartado (R27, R29, R30),
+incluido «sin importe» `[D7]` `[N4]`.
+
+**R46.** CUANDO «Reparto y unidad» lleve un pedido de `BLOQUEADO` a `PENDIENTE` (R19), el sistema DEBE
+guardar el importe calculado como en R45, igual que la edición completa, y NO DEBE dejarlo sin
+importe salvo que ese cálculo dé «sin importe» `[D4]` `[D7]`.
+
+**R47.** CUANDO se guarde el reparto de un pedido `POR_EMPACAR`, el sistema DEBE guardar como importe
+la **parte de ingredientes del importe ya guardado, sin recalcularla**, más el costo de los envases
+del reparto nuevo calculado con R27 y R30; SI el importe guardado es «sin importe» o el costo de los
+envases lo es, ENTONCES el pedido DEBE quedar sin importe `[D7]` `[E5]`. *(Cómo se obtiene la parte
+de ingredientes: P6.)*
+
+> En `POR_EMPACAR` la receta ya se consumió, así que la cotización del formulario recalcularía los
+> ingredientes con los lotes de hoy y daría otra cifra. R47 es por eso una **excepción a la paridad
+> de R29** en ese estado. No se ve en pantalla: el diálogo «Reparto y unidad» no muestra la cotización
+> y la edición completa no admite `POR_EMPACAR`.
+
+## Preguntas abiertas
+
+- **Unidad «envase».** No existe una unidad de sistema para contar piezas. Hay que decidir si
+  se crea (por ejemplo `unidad`) y cómo convive con el trigger `product_batches_check_unit`,
+  que hoy exige que el lote use la unidad de su presentación. Toca unidades de medida
+  (`docs/architecture.md > Preguntas abiertas del dominio`).
+- **Envases ya cargados.** Qué pasa con los productos PACKAGING que ya tienen stock en litros o
+  kilos: si se convierten o si se exige darlos de alta de nuevo.
+- **Cuándo se consume el envase.** Si es con las materias primas, al pasar a `POR_EMPACAR`, o
+  al Terminar el empaque (`createFinishPacking`).
+
+> *(F1.2, `spec_author`, 2026-10-03.)* Las tres pasaron a `design.md > 1` como **P1**, **P2** y
+> **P3**, y salieron además **N1 a N10**.
+>
+> **Resueltas por el humano en F1.4, el 2026-10-03** (detalle en `design.md > 1`):
+> - **Unidad «envase» (P1) = A.** Unidad de sistema base `unidad`, símbolo `u`; el envase guarda su
+>   presentación en el producto y sus lotes no llevan presentación, así que
+>   `product_batches_check_unit` no cambia (R6).
+> - **Envases ya cargados (P2) = A.** Se quedan como están, como legado: sin presentación fija, el
+>   selector no los lista (R9); para repartir con ellos se dan de alta de nuevo.
+> - **Cuándo se consume el envase (P3) = b.** Al Terminar el empaque (R24-R26).
+> - N2, N3, N4, N5, N6, N8, N9 y N10 = la recomendación. **N1 y N7 = la alternativa** (R8, R38;
+>   R39-R41).
+
+- **P4 — Recetas que ya tienen un ingrediente PACKAGING.** *(Nueva, F1.4, 2026-10-03; DECIDIDA 2026-10-03: A, se conservan.)*
+  El código actual no lo resuelve solo: la edición valida solo las líneas que la receta no tenía
+  (`update-recipe.ts:91-106`, `update-recipe-version.ts:42-55`), pero crear una versión valida
+  **todas** las líneas copiadas (`create-recipe-version.ts:42-56`), así que con R39 una original con
+  un envase dejaría de poder versionarse. Opciones y recomendación en `design.md > 1.5`.
+
+- **P6 — Cómo separar la parte de ingredientes del importe guardado (R47).** *(Nueva, Enmienda 2,
+  2026-10-04; DECIDIDA 2026-10-04: A, columna `orders.packaging_cost`.)* Hoy `orders.ingredients_cost` guarda un solo número,
+  ingredientes más envases (N4), y nada guarda el desglose. Restar el costo viejo de los envases
+  recalculándolo no es exacto, porque los lotes y sus costos pueden haber cambiado desde que se
+  guardó. La opción recomendada añade una columna con la parte de envases y deja N4 como está (el
+  total sigue en `ingredients_cost`). Opciones en `design.md > 1.7`.
+
+## Decisiones cerradas (no reabrir)
+
+| Fecha | Pregunta | Decisión |
+|---|---|---|
+| 2026-10-03 | Envase y presentación | Un producto PACKAGING tiene una sola presentación fija; «Botella PET 500 ml» y «Botella PET 1 L» son productos distintos. Requiere ajustar `products_finished_identity_matches_type`. |
+| 2026-10-03 | ¿En qué se cuenta su stock? | En envases. Un reparto de 40 botellas aparta 40 envases. |
+| 2026-10-03 | ¿Qué envases lista el selector? | Solo los que tienen la misma unidad base que la cantidad del pedido (QC-76: `baseUnitId ?? id`). |
+| 2026-10-03 | Reserva y aviso | Mismo flujo que las materias primas (QC-141): todo o nada, del lote más antiguo al más nuevo. Si falta stock, aviso y `BLOQUEADO` como en QC-138. |
+| 2026-10-03 | Cálculo del reparto | Se mantiene `order-distribution.ts`: envases × contenido de la presentación, convertido a la unidad del pedido. |
+| 2026-10-03 | Pedidos existentes | Quedan como están, sin apartar envases. Si se edita su reparto, hay que elegir productos PACKAGING. |
+| 2026-10-03 | Costo | El costo del envase se suma a la cotización, con el costo promedio de QC-141 D22. |

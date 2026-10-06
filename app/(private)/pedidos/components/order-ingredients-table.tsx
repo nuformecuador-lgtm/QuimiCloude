@@ -3,6 +3,11 @@
 import { Loader2Icon } from 'lucide-react';
 
 import {
+  APPROXIMATE_LABEL,
+  ApproximateMark,
+  NotConvertibleNotice,
+} from '@/components/shared/unit-conversion-marks';
+import {
   Table,
   TableBody,
   TableCell,
@@ -10,16 +15,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { createOrderSchema } from '@/lib/modules/pedidos';
-import { consumedQuantity, formatPercentage, type RecipeLineView } from '@/lib/modules/recetas';
-import type { UnitView } from '@/lib/modules/unidades';
+import { createOrderSchema, resolveLineNeed, type OrderLineNeed } from '@/lib/modules/pedidos';
+import { formatPercentage, type RecipeLineView } from '@/lib/modules/recetas';
+import type { MassVolumeBridge, UnitConversion, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { subtractDecimal } from './order-decimal';
 
 /**
- * Los ingredientes de la receta elegida, con los datos de sus productos (nombre, porcentaje,
- * unidad y stock), dentro del formulario de pedido.
+ * Los ingredientes de la receta elegida, con los datos de sus productos (nombre, porcentaje
+ * y stock con su unidad), dentro del formulario de pedido.
  *
  * **Pieza puramente PRESENTACIONAL**: las lineas, las unidades y el estado de la consulta
  * llegan por props. Quien decide CUANDO pedir el detalle de la receta -y que hacer con el
@@ -33,9 +38,10 @@ import { subtractDecimal } from './order-decimal';
  * lote, asi que no hay presentacion por ingrediente que mostrar.
  *
  * **La unidad es la del PRODUCTO, no de la linea** (`productUnitId`): la receta ya no guarda
- * unidad. Se traduce aqui con el catalogo que la seccion baja por props: simbolo si lo
- * hay, nombre si no, y el marcador cuando el insumo no tiene unidad resoluble —sin lotes o
- * dado de baja— o cuando el id no existe en el catalogo.
+ * unidad. No tiene columna propia: va pegada a la cifra en «stock», «cantidad requerida» y «restante» («720 L»),
+ * tambien en su `aria-label`. Se traduce con el catalogo que la seccion baja por props: simbolo
+ * si lo hay, nombre si no. Si el insumo no tiene unidad resoluble —sin lotes o dado de baja— o
+ * el id no existe en el catalogo, se pinta solo la cifra.
  *
  * **Una linea cuyo producto esta de baja llega con `productName: null`**: la linea
  * se conserva y aqui se dice que el producto no esta disponible, en vez de dejar la celda
@@ -44,13 +50,9 @@ import { subtractDecimal } from './order-decimal';
  * **La columna «porcentaje» pinta `line.percentage` con `formatPercentage`**: «10,00 %», la
  * parte del insumo dentro de la receta.
  *
- * **La columna «cantidad requerida» es `consumedQuantity(pedido, porcentaje)`**: la cantidad
- * del pedido por el porcentaje, dividido 100, en decimal exacto. Sin una cantidad DECIMAL MAYOR
- * QUE CERO -vacia, cero, negativa o no numerica- vale `0` y no se calcula: la misma regla
- * `quantitySchema` del esquema del contrato (`createOrderSchema.shape.quantity`), no una copia,
- * decide que cuenta como cantidad valida aqui. En cuanto cambia el campo a un valor valido, se
- * recalcula. Es una columna DE CONSULTA: no viaja en el envio, que sigue llevando la cantidad tal
- * cual se escribio.
+ * **La «cantidad requerida» sale de `resolveLineNeed`**, la misma regla que el costo y la reserva,
+ * asi que va en la unidad del insumo. Sin unidad del pedido elegida no hay en que unidad leer la
+ * cifra y se pinta el marcador. Una cantidad que el contrato no acepta cuenta como `0`.
  *
  * **La columna «restante» resta lo requerido al stock**: `stock - requerida`, con
  * `subtractDecimal` —misma aritmetica exacta—. Si el pedido pide mas de lo que hay, el valor
@@ -83,14 +85,37 @@ const MISSING_PRODUCT_LABEL = 'Producto no disponible';
 /** Marcador de ausencia. Constante para que ningun test dependa del caracter. */
 const MISSING_VALUE_MARK = '—';
 
-/**
- * Etiqueta visible de la unidad del insumo: simbolo, nombre, o el marcador cuando el insumo no
- * tiene unidad resoluble (`productUnitId === null`) o el id no existe en el catalogo.
- */
-function unitLabel(productUnitId: string | null, units: readonly UnitView[]): string {
-  if (productUnitId === null) return MISSING_VALUE_MARK;
+/** Simbolo o nombre de la unidad del insumo; `null` si no hay unidad resoluble. */
+function unitLabel(productUnitId: string | null, units: readonly UnitView[]): string | null {
+  if (productUnitId === null) return null;
   const unit = units.find((candidate) => candidate.id === productUnitId);
-  return unit?.symbol ?? unit?.name ?? MISSING_VALUE_MARK;
+  return unit?.symbol ?? unit?.name ?? null;
+}
+
+function withUnit(value: string, unit: string | null): string {
+  return unit === null ? value : `${value} ${unit}`;
+}
+
+function unitConversionOf(unitId: string | null, units: readonly UnitView[]): UnitConversion | null {
+  if (unitId === null) return null;
+  return units.find((candidate) => candidate.id === unitId) ?? null;
+}
+
+/** `null` sin unidad del pedido elegida (`orderUnitId === ''`): no hay cifra que mostrar. */
+export function ingredientNeedOf(
+  line: RecipeLineView,
+  quantity: string,
+  orderUnitId: string,
+  units: readonly UnitView[],
+  bridge: MassVolumeBridge | null,
+): OrderLineNeed | null {
+  if (orderUnitId === '') return null;
+  const validQuantity = createOrderSchema.shape.quantity.safeParse(quantity).success ? quantity : '0';
+  return resolveLineNeed(validQuantity, line.percentage, unitConversionOf(line.productUnitId, units), {
+    orderUnitId,
+    orderUnit: unitConversionOf(orderUnitId, units),
+    bridge,
+  });
 }
 
 export type OrderIngredientsTableProps = {
@@ -100,6 +125,9 @@ export type OrderIngredientsTableProps = {
   readonly units: readonly UnitView[];
   /** La cantidad escrita en el formulario: escalo con ella la «cantidad requerida». */
   readonly quantity: string;
+  /** Unidad elegida en el formulario; `''` = sin elegir. */
+  readonly orderUnitId: string;
+  readonly bridge: MassVolumeBridge | null;
   /** Hay una consulta en vuelo: la tabla aun no tiene lineas definitivas. */
   readonly loading: boolean;
   /** Fallo de la consulta del detalle. `null` = no fallo. */
@@ -110,22 +138,18 @@ export function OrderIngredientsTable({
   lines,
   units,
   quantity,
+  orderUnitId,
+  bridge,
   loading,
   error,
 }: OrderIngredientsTableProps) {
-  /**
-   * La cantidad escrita solo cuenta si es la que el contrato acepta -decimal mayor que cero-:
-   * reutiliza `quantitySchema` en vez de repetir el patron o el `> 0` a mano.
-   */
-  const hasValidQuantity = createOrderSchema.shape.quantity.safeParse(quantity).success;
+  const requiredOf = (need: OrderLineNeed | null): string | null =>
+    need === null || need.kind === 'not_convertible' ? null : need.quantity;
 
-  /** Cantidad requerida de una linea: cantidad del pedido x porcentaje / 100, en decimal exacto. */
-  const requiredOf = (line: RecipeLineView): string =>
-    hasValidQuantity ? consumedQuantity(quantity, line.percentage) : '0';
-
-  /** Restante de una linea: el stock MENOS lo requerido. `null` = el producto no tiene stock. */
-  const remainingOf = (line: RecipeLineView): string | null =>
-    line.productStock === null ? null : subtractDecimal(line.productStock, requiredOf(line));
+  const remainingOf = (line: RecipeLineView, required: string | null): string | null =>
+    line.productStock === null || required === null
+      ? null
+      : subtractDecimal(line.productStock, required);
 
   /** Faltante: el restante es negativo, el pedido pide mas de lo que hay. Se resalta en rojo. */
   const isShort = (remaining: string): boolean => remaining.startsWith('-');
@@ -159,7 +183,6 @@ export function OrderIngredientsTable({
             <TableRow>
               <TableHead>Producto</TableHead>
               <TableHead className="text-right">Porcentaje</TableHead>
-              <TableHead>Unidad</TableHead>
               <TableHead className="text-right">Stock</TableHead>
               <TableHead className="text-right">Cantidad requerida</TableHead>
               <TableHead className="text-right">Restante</TableHead>
@@ -167,8 +190,11 @@ export function OrderIngredientsTable({
           </TableHeader>
           <TableBody>
             {lines.map((line, index) => {
-              const required = requiredOf(line);
-              const remaining = remainingOf(line);
+              const need = ingredientNeedOf(line, quantity, orderUnitId, units, bridge);
+              const required = requiredOf(need);
+              const remaining = remainingOf(line, required);
+              const unit = unitLabel(line.productUnitId, units);
+              const approximate = need?.kind === 'approximate';
               return (
                 <TableRow key={line.id} data-testid={`order-ingredient-${index}`}>
                   <TableCell data-testid="order-ingredient-product">
@@ -180,31 +206,56 @@ export function OrderIngredientsTable({
                   >
                     {formatPercentage(line.percentage)} %
                   </TableCell>
-                  <TableCell data-testid="order-ingredient-unit">
-                    {unitLabel(line.productUnitId, units)}
-                  </TableCell>
                   <TableCell
                     className="text-right"
                     title={line.productStock === null ? undefined : exactDecimalTitle(line.productStock)}
-                    aria-label={line.productStock === null ? undefined : trimDecimal(line.productStock)}
+                    aria-label={
+                      line.productStock === null
+                        ? undefined
+                        : withUnit(trimDecimal(line.productStock), unit)
+                    }
                     data-testid="order-ingredient-stock"
                   >
                     {line.productStock === null
                       ? MISSING_VALUE_MARK
-                      : formatDecimalDisplay(line.productStock)}
+                      : withUnit(formatDecimalDisplay(line.productStock), unit)}
                   </TableCell>
                   <TableCell
                     className="text-right"
-                    title={exactDecimalTitle(required)}
-                    aria-label={trimDecimal(required)}
+                    title={required === null ? undefined : exactDecimalTitle(required)}
+                    aria-label={
+                      required === null
+                        ? undefined
+                        : withUnit(trimDecimal(required), unit) +
+                          (approximate ? ` ${APPROXIMATE_LABEL}` : '')
+                    }
                     data-testid="order-ingredient-required"
                   >
-                    {formatDecimalDisplay(required)}
+                    {need?.kind === 'not_convertible' ? (
+                      <NotConvertibleNotice
+                        testId="order-ingredient-not-convertible"
+                        className="whitespace-normal"
+                      />
+                    ) : required === null ? (
+                      MISSING_VALUE_MARK
+                    ) : (
+                      <>
+                        {withUnit(formatDecimalDisplay(required), unit)}
+                        {approximate ? (
+                          <>
+                            {' '}
+                            <ApproximateMark testId="order-ingredient-approximate" />
+                          </>
+                        ) : null}
+                      </>
+                    )}
                   </TableCell>
                   <TableCell
                     className="text-right"
                     title={remaining === null ? undefined : exactDecimalTitle(remaining)}
-                    aria-label={remaining === null ? undefined : trimDecimal(remaining)}
+                    aria-label={
+                      remaining === null ? undefined : withUnit(trimDecimal(remaining), unit)
+                    }
                     data-testid="order-ingredient-remaining"
                   >
                     {remaining === null ? (
@@ -217,7 +268,7 @@ export function OrderIngredientsTable({
                             : undefined
                         }
                       >
-                        {formatDecimalDisplay(remaining)}
+                        {withUnit(formatDecimalDisplay(remaining), unit)}
                       </span>
                     )}
                   </TableCell>

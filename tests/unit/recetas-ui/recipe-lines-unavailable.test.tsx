@@ -89,6 +89,8 @@ function Harness({
       }}
       units={[]}
       initialProductPage={INITIAL_PRODUCT_PAGE}
+      tools={[]}
+      onToolsChange={() => {}}
       initialMachinePage={INITIAL_PRODUCT_PAGE}
     />
   );
@@ -170,7 +172,9 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
       name: 'Receta de prueba',
       description: '',
       lines,
+      tools: [],
       steps: [],
+      packingSteps: [],
       image: { kind: 'untouched' },
     });
 

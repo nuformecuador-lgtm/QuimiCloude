@@ -35,11 +35,23 @@ vi.mock('@/lib/shared/db/prisma', () => ({
 
 const {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
-  toAssignedOrderSummary,
+  listAliveOrderSummariesByIds: listAliveRecordsByIds,
+  listAliveOrderSummariesInCompany,
+  toOrderSummaryRecord,
   toOrderAssignmentTarget,
 } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma')
+const { createListAliveSummariesByIds, createListAliveSummariesInCompany } = await import('@/lib/modules/pedidos')
+
+/** Doble del catalogo de envases de `inventario`: solo devuelve los ids que conoce. */
+const findPackagingRefs = vi.fn(async (ids: readonly string[]) =>
+  ids.filter((id) => id === 'env-1').map((id) => ({ id, name: 'Envase PET 1L' })),
+)
+const summaryDeps = {
+  summaries: { listAliveByIds: listAliveRecordsByIds, listAliveInCompany: listAliveOrderSummariesInCompany },
+  packaging: { findRefs: findPackagingRefs, findCostingBatches: async () => [] },
+} as unknown as Parameters<typeof createListAliveSummariesByIds>[0]
+const listAliveOrderSummariesByIds = createListAliveSummariesByIds(summaryDeps)
+const listAliveSummariesInCompany = createListAliveSummariesInCompany(summaryDeps)
 
 // `transitionAliveOrder` se retiro -sin llamantes
 // desde que `createTransitionOrder` cablea el Finalizar sobre la unidad de trabajo-, y con ella
@@ -171,6 +183,19 @@ describe('contrato OrderCatalog', () => {
     expect(catalogoFuente).not.toMatch(/order-repository|OrderRepository/)
     expect(adaptadorFuente).not.toMatch(/order-repository|OrderRepository/)
   })
+
+  it("[D2'] OrderCatalog NO gana ningun metodo que escriba el reparto o la unidad", () => {
+    // F1.2 proponia `updatePresentationLinesAliveById` para la puerta del Empacador; `[D2']` la
+    // retira: quien tiene `pedidos.modificar` edita por `updateOrderPresentationLines` (T9), no
+    // por este contrato. Se afirma por NEGACION del nombre, no de la lista completa de metodos,
+    // para que un metodo de lectura nuevo manana no rompa este test sin motivo.
+    expect(catalogoFuente).not.toMatch(/updatePresentationLines|updateDistribution|writeDistribution/)
+    for (const metodo of catalogoFuente.matchAll(/^\s{2}(\w+)\(/gm)) {
+      expect(metodo[1], 'ningun metodo de OrderCatalog escribe el reparto').not.toMatch(
+        /presentationLine|[Dd]istribution/,
+      )
+    }
+  })
 })
 
 describe('toOrderAssignmentTarget', () => {
@@ -186,9 +211,9 @@ describe('toOrderAssignmentTarget', () => {
   })
 })
 
-describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion y la fecha de terminado', () => {
-  it('R27: copia presentationId tal cual, con y sin presentacion', () => {
-    const conPresentacion = toAssignedOrderSummary({
+describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la unidad y la fecha de terminado', () => {
+  it('T10: copia presentationLines EN EL ORDEN de la fila (createdAt, desempate id), con y sin reparto', () => {
+    const conReparto = toOrderSummaryRecord({
       id: 'o-1',
       orderYear: 2026,
       orderSequence: 7,
@@ -196,13 +221,20 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'PENDIENTE',
-      presentationId: 'p-1',
+      unitId: 'u-1',
+      presentationLines: [
+        { presentationId: 'p-1', packages: 5, packagingProductId: null },
+        { presentationId: 'p-2', packages: 1, packagingProductId: null },
+      ],
       finishedAt: null,
       packedBy: null,
     })
-    expect(conPresentacion.presentationId).toBe('p-1')
+    expect(conReparto.presentationLines).toEqual([
+      { presentationId: 'p-1', packages: 5, packagingProductId: null },
+      { presentationId: 'p-2', packages: 1, packagingProductId: null },
+    ])
 
-    const sinPresentacion = toAssignedOrderSummary({
+    const sinReparto = toOrderSummaryRecord({
       id: 'o-2',
       orderYear: 2026,
       orderSequence: 8,
@@ -210,16 +242,35 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'PENDIENTE',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: null,
     })
-    expect(sinPresentacion.presentationId).toBeNull()
+    expect(sinReparto.presentationLines).toEqual([])
+  })
+
+  it('T10: copia unitId tal cual, con y sin unidad (R43)', () => {
+    const filaBase = {
+      id: 'o-1b',
+      orderYear: 2026,
+      orderSequence: 7,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'PENDIENTE',
+      presentationLines: [],
+      finishedAt: null,
+      packedBy: null,
+    } as const
+
+    expect(toOrderSummaryRecord({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
+    expect(toOrderSummaryRecord({ ...filaBase, id: 'o-1c', unitId: null }).unitId).toBeNull()
   })
 
   it('R20: copia finishedAt tal cual, con y sin fecha', () => {
     const fecha = new Date('2026-09-23T10:00:00.000Z')
-    const conFecha = toAssignedOrderSummary({
+    const conFecha = toOrderSummaryRecord({
       id: 'o-3',
       orderYear: 2026,
       orderSequence: 9,
@@ -227,13 +278,14 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'ENTREGADO',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: fecha,
       packedBy: null,
     })
     expect(conFecha.finishedAt).toBe(fecha)
 
-    const sinFecha = toAssignedOrderSummary({
+    const sinFecha = toOrderSummaryRecord({
       id: 'o-4',
       orderYear: 2026,
       orderSequence: 10,
@@ -241,7 +293,8 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'ENTREGADO',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: null,
     })
@@ -249,7 +302,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
   })
 
   it('R14, R17: copia packedBy tal cual, con y sin empacador', () => {
-    const conEmpacador = toAssignedOrderSummary({
+    const conEmpacador = toOrderSummaryRecord({
       id: 'o-5',
       orderYear: 2026,
       orderSequence: 11,
@@ -257,13 +310,14 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'EN_EMPAQUE',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: 'u-1',
     })
     expect(conEmpacador.packedBy).toBe('u-1')
 
-    const sinEmpacador = toAssignedOrderSummary({
+    const sinEmpacador = toOrderSummaryRecord({
       id: 'o-6',
       orderYear: 2026,
       orderSequence: 12,
@@ -271,7 +325,8 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion 
       quantity: { toFixed: () => '10.0000' },
       priority: 'MEDIA',
       status: 'POR_EMPACAR',
-      presentationId: null,
+      unitId: null,
+      presentationLines: [],
       finishedAt: null,
       packedBy: null,
     })
@@ -431,6 +486,42 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     expect(JSON.stringify(llamada.where)).not.toContain('"id"')
   })
 
+  it('R20: con `packedBy`, el WHERE de la pagina y el del total llevan empresa, estado y ese empacador', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 2, 10, { packedBy: 'emp-1' })
+
+    const esperado = {
+      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null, packedBy: 'emp-1' }],
+    }
+    const llamada = findMany.mock.calls[0]?.[0]
+    expect(llamada.where).toEqual(esperado)
+    expect(llamada.skip).toBe(10)
+    expect(llamada.take).toBe(10)
+    expect(count.mock.calls[0]?.[0]?.where).toEqual(esperado)
+  })
+
+  it('R20: con `packedBy`, el total y las paginas salen del recuento ya filtrado', async () => {
+    count.mockResolvedValue(3)
+
+    const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1, 2, {
+      packedBy: 'emp-1',
+    })
+
+    expect(pagina.total).toBe(3)
+    expect(pagina.totalPages).toBe(2)
+  })
+
+  it('R20: sin filtro, o con un filtro vacio, el WHERE no cambia y no acota por empacador', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1, undefined, {})
+
+    const sinFiltro = {
+      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null }],
+    }
+    expect(findMany.mock.calls[0]?.[0]?.where).toEqual(sinFiltro)
+    expect(findMany.mock.calls[1]?.[0]?.where).toEqual(sinFiltro)
+    expect(JSON.stringify(findMany.mock.calls[1]?.[0]?.where)).not.toContain('packedBy')
+  })
+
   it('con `work_queue`, el ORDER BY es IDENTICO al de listAliveSummariesByIds', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE', 'EN_CURSO'], 'work_queue', 1)
     const deTodaLaEmpresa = findMany.mock.calls[0]?.[0]?.orderBy
@@ -471,7 +562,8 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
         quantity: { toFixed: () => '10.0000' },
         priority: 'MEDIA',
         status: 'ENTREGADO',
-        presentationId: null,
+        unitId: null,
+        presentationLines: [],
         finishedAt: new Date('2026-09-23T10:00:00.000Z'),
         packedBy: null,
       },
@@ -481,5 +573,66 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
 
     expect(pagina.items[0]?.finishedAt).toEqual(new Date('2026-09-23T10:00:00.000Z'))
+  })
+
+  it('T10: el select pide unitId y las lineas del reparto en el orden de alta (createdAt, desempate id)', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE'], 'work_queue', 1)
+
+    const seleccion = findMany.mock.calls[0]?.[0]?.select
+    expect(seleccion.unitId).toBe(true)
+    expect(seleccion.presentationLines).toEqual({
+      select: { presentationId: true, packages: true, packagingProductId: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    })
+    // Y ya no pide la columna que retiro T10: el reparto vive en `order_presentation_lines`.
+    expect(seleccion).not.toHaveProperty('presentationId')
+  })
+})
+
+describe('listAliveSummariesByIds — el nombre del envase de cada linea', () => {
+  beforeEach(() => {
+    findPackagingRefs.mockClear()
+    count.mockResolvedValue(1)
+  })
+
+  it('R44, R33: la linea con envase lleva su nombre, la antigua y la de un envase que no vuelve llevan null, en una sola llamada', async () => {
+    findMany.mockResolvedValue([
+      {
+        id: 'o-1',
+        orderYear: 2026,
+        orderSequence: 1,
+        recipeId: 'r-1',
+        quantity: { toFixed: () => '10.0000' },
+        priority: 'MEDIA',
+        status: 'POR_EMPACAR',
+        unitId: null,
+        presentationLines: [
+          { presentationId: 'p-1', packages: 4, packagingProductId: 'env-1' },
+          { presentationId: 'p-2', packages: 2, packagingProductId: null },
+          { presentationId: 'p-3', packages: 1, packagingProductId: 'env-de-baja' },
+        ],
+        finishedAt: null,
+        packedBy: null,
+      },
+    ])
+
+    const pagina = await listAliveOrderSummariesByIds(EMPRESA, ['o-1'], ['POR_EMPACAR'], 1)
+
+    expect(findPackagingRefs).toHaveBeenCalledTimes(1)
+    expect(findPackagingRefs).toHaveBeenCalledWith(['env-1', 'env-de-baja'], EMPRESA)
+    expect(pagina.items[0]?.presentationLines).toEqual([
+      { presentationId: 'p-1', packages: 4, packagingName: 'Envase PET 1L' },
+      { presentationId: 'p-2', packages: 2, packagingName: null },
+      { presentationId: 'p-3', packages: 1, packagingName: null },
+    ])
+  })
+
+  it('R33: una pagina sin envases no consulta el catalogo de envases', async () => {
+    findMany.mockResolvedValue([])
+    count.mockResolvedValue(0)
+
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    expect(findPackagingRefs).not.toHaveBeenCalled()
   })
 })

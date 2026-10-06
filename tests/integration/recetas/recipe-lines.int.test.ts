@@ -169,8 +169,10 @@ function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {
     name: `Receta ${token()}`,
     description: null,
     steps: [],
+    packingSteps: [],
     lines: [],
     imagePath: null,
+    tools: [],
     ...overrides,
   };
 }
@@ -258,6 +260,27 @@ describe('R6: el CHECK de rango de porcentaje', () => {
     } finally {
       await deleteTestProduct(prisma, productId);
       if (recipeId !== null) await prisma.recipe.delete({ where: { id: recipeId } });
+    }
+  });
+});
+
+describe('FK rota de producto de linea', () => {
+  it('el adaptador traduce la FK rota de una linea a ValidationError sin dejar receta', async () => {
+    const productId = await createTestProduct(prisma);
+    // Borrado fisico: el producto deja de existir y la FK de la linea queda rota.
+    await deleteTestProduct(prisma, productId);
+    const input = baseRecipeInput({ lines: [{ productId, percentage: '50.00' }] });
+    const scope: RecipeScope = { companyId: await andamiajeCompanyId(prisma) };
+
+    try {
+      await expect(
+        createRecipe(input, null as unknown as string, new Date(), scope),
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      const orphan = await prisma.recipe.findFirst({ where: { name: input.name } });
+      expect(orphan).toBeNull();
+    } finally {
+      await prisma.recipe.deleteMany({ where: { name: input.name } });
     }
   });
 });

@@ -4,13 +4,22 @@
 //
 // El paso dejo de ser `{ body, type }` y es un DOCUMENTO. La forma del documento en si la
 // cubre `recipe-step-document.test.ts`.
+//
+// Las herramientas viajan aparte de las lineas: entero positivo, sin repetir producto, y en la
+// edicion omitirlas (conservar) no es lo mismo que mandar `[]` (quitarlas).
 
 import {
   MAX_STEP_ELEMENTS,
+  MAX_TOOL_QUANTITY,
   createRecipeSchema,
+  createRecipeVersionSchema,
   recipeLineSchema,
+  recipeToolSchema,
+  recipeToolsSchema,
   updateRecipeSchema,
+  updateRecipeVersionSchema,
 } from '@/lib/modules/recetas/domain/recipe-input';
+import * as contrato from '@/lib/modules/recetas';
 import { pageQuerySchema } from '@/lib/modules/recetas/domain/page';
 
 const LINEA_VALIDA = {
@@ -368,5 +377,206 @@ describe('updateRecipeSchema — los tres estados del campo image (R47)', () => 
       createRecipeSchema.safeParse({ ...RECETA_VALIDA, image: { bytes: new Uint8Array([1]) } })
         .success,
     ).toBe(true);
+  });
+});
+
+const MAQUINA_A = '33333333-3333-4333-8333-333333333333';
+const MAQUINA_B = '44444444-4444-4444-8444-444444444444';
+const HERRAMIENTA_VALIDA = { productId: MAQUINA_A, quantity: 2 };
+
+describe('recipeToolSchema / recipeToolsSchema — forma de una herramienta', () => {
+  it('R1: acepta producto y cantidad entera positiva, hasta el tope de la columna', () => {
+    expect(recipeToolSchema.safeParse(HERRAMIENTA_VALIDA).success).toBe(true);
+    expect(recipeToolSchema.safeParse({ productId: MAQUINA_A, quantity: 1 }).success).toBe(true);
+    expect(recipeToolSchema.safeParse({ productId: MAQUINA_A, quantity: MAX_TOOL_QUANTITY }).success).toBe(true);
+    expect(recipeToolSchema.safeParse({ productId: MAQUINA_A, quantity: MAX_TOOL_QUANTITY + 1 }).success).toBe(false);
+    expect(MAX_TOOL_QUANTITY).toBe(2147483647);
+  });
+
+  it.each([
+    ['0', 0],
+    ['-1', -1],
+    ['1.5', 1.5],
+    ["'2'", '2'],
+  ])('R6: rechaza la cantidad %s', (_etiqueta, quantity) => {
+    expect(recipeToolSchema.safeParse({ productId: MAQUINA_A, quantity }).success).toBe(false);
+  });
+
+  it('R6: rechaza la cantidad ausente y el producto ausente o que no es uuid', () => {
+    expect(recipeToolSchema.safeParse({ productId: MAQUINA_A }).success).toBe(false);
+    expect(recipeToolSchema.safeParse({ quantity: 1 }).success).toBe(false);
+    expect(recipeToolSchema.safeParse({ productId: 'no-uuid', quantity: 1 }).success).toBe(false);
+  });
+
+  it('rechaza una clave extra', () => {
+    expect(recipeToolSchema.safeParse({ ...HERRAMIENTA_VALIDA, percentage: '10' }).success).toBe(false);
+  });
+
+  it('R4: rechaza dos herramientas con el mismo producto', () => {
+    const result = recipeToolsSchema.safeParse([
+      { productId: MAQUINA_A, quantity: 1 },
+      { productId: MAQUINA_A, quantity: 3 },
+    ]);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.message)).toContain(
+        'No puede haber dos herramientas con el mismo producto.',
+      );
+    }
+    expect(
+      recipeToolsSchema.safeParse([
+        { productId: MAQUINA_A, quantity: 1 },
+        { productId: MAQUINA_B, quantity: 1 },
+      ]).success,
+    ).toBe(true);
+  });
+
+  it('R25: el issue de una fila invalida apunta a [tools, i, campo] dentro de la receta', () => {
+    const result = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      tools: [HERRAMIENTA_VALIDA, { productId: MAQUINA_B, quantity: 0 }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path)).toEqual([['tools', 1, 'quantity']]);
+    }
+  });
+
+  it('el contrato publico del modulo exporta los esquemas y el tope', () => {
+    expect(contrato.recipeToolSchema).toBe(recipeToolSchema);
+    expect(contrato.recipeToolsSchema).toBe(recipeToolsSchema);
+    expect(contrato.MAX_TOOL_QUANTITY).toBe(MAX_TOOL_QUANTITY);
+  });
+});
+
+describe('tools en los cuatro esquemas — omitir no es lo mismo que []', () => {
+  const EDICION = { ...RECETA_VALIDA };
+
+  it('R2, R18: el alta sin tools las deja vacias', () => {
+    const result = createRecipeSchema.parse(RECETA_VALIDA);
+    expect(result.tools).toEqual([]);
+  });
+
+  it('R1: el alta conserva las herramientas enviadas', () => {
+    const result = createRecipeSchema.parse({ ...RECETA_VALIDA, tools: [HERRAMIENTA_VALIDA] });
+    expect(result.tools).toEqual([HERRAMIENTA_VALIDA]);
+  });
+
+  it('R17, R18: la edicion sin tools da undefined y con [] da [], distinguibles', () => {
+    const omitidas = updateRecipeSchema.parse(EDICION);
+    const vacias = updateRecipeSchema.parse({ ...EDICION, tools: [] });
+    expect('tools' in omitidas ? omitidas.tools : undefined).toBeUndefined();
+    expect(vacias.tools).toEqual([]);
+    expect(omitidas.tools).not.toEqual(vacias.tools);
+  });
+
+  it('R11: el alta de version sin tools da undefined (copia de la original)', () => {
+    const result = createRecipeVersionSchema.parse({ name: 'Version A' });
+    expect(result.tools).toBeUndefined();
+    expect(createRecipeVersionSchema.parse({ name: 'Version A', tools: [] }).tools).toEqual([]);
+  });
+
+  it('R17: la edicion de version sin tools da undefined y con [] da []', () => {
+    const base = { name: 'Version A', lines: [LINEA_VALIDA] };
+    expect(updateRecipeVersionSchema.parse(base).tools).toBeUndefined();
+    expect(updateRecipeVersionSchema.parse({ ...base, tools: [] }).tools).toEqual([]);
+  });
+
+  it('R4, R6: los cuatro esquemas aplican la misma validacion de herramientas', () => {
+    const repetidas = [HERRAMIENTA_VALIDA, HERRAMIENTA_VALIDA];
+    const cantidadCero = [{ productId: MAQUINA_A, quantity: 0 }];
+    for (const tools of [repetidas, cantidadCero]) {
+      expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, tools }).success).toBe(false);
+      expect(updateRecipeSchema.safeParse({ ...EDICION, tools }).success).toBe(false);
+      expect(createRecipeVersionSchema.safeParse({ name: 'V', tools }).success).toBe(false);
+      expect(updateRecipeVersionSchema.safeParse({ name: 'V', lines: [LINEA_VALIDA], tools }).success).toBe(false);
+    }
+  });
+
+  it('R7: lineas al 100 % mas herramientas pasa; las herramientas no cuentan en la suma', () => {
+    expect(
+      createRecipeSchema.safeParse({
+        ...RECETA_VALIDA,
+        tools: [{ productId: MAQUINA_A, quantity: 50 }],
+      }).success,
+    ).toBe(true);
+    const incompletas = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      lines: [{ ...LINEA_VALIDA, percentage: '60' }],
+      tools: [{ productId: MAQUINA_A, quantity: 40 }],
+    });
+    expect(incompletas.success).toBe(false);
+  });
+});
+
+describe('packingSteps en los esquemas de receta — pasos de envasado (QC-211)', () => {
+  const pasos = (n: number, prefijo: string) => Array.from({ length: n }, (_, i) => paso(`${prefijo} ${i}`));
+
+  it('R1: el alta y la edicion sin packingSteps los dejan en lista vacia', () => {
+    expect(createRecipeSchema.parse(RECETA_VALIDA).packingSteps).toEqual([]);
+    expect(updateRecipeSchema.parse(RECETA_VALIDA).packingSteps).toEqual([]);
+  });
+
+  it('R1: el alta y la edicion aceptan packingSteps: []', () => {
+    expect(createRecipeSchema.parse({ ...RECETA_VALIDA, packingSteps: [] }).packingSteps).toEqual([]);
+    expect(updateRecipeSchema.parse({ ...RECETA_VALIDA, packingSteps: [] }).packingSteps).toEqual([]);
+  });
+
+  it('R4: los pasos de envasado salen en su orden y separados de steps', () => {
+    const envasado = [paso('Envasar'), paso('Etiquetar')];
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const parsed = schema.parse({ ...RECETA_VALIDA, packingSteps: envasado });
+      expect(parsed.packingSteps).toEqual(envasado);
+      expect(parsed.steps).toEqual(RECETA_VALIDA.steps);
+    }
+  });
+
+  it('R3: 50 pasos del operador y 50 de envasado se aceptan; 51 de envasado se rechazan', () => {
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      expect(
+        schema.safeParse({ ...RECETA_VALIDA, steps: pasos(50, 'Mezclar'), packingSteps: pasos(50, 'Envasar') }).success,
+      ).toBe(true);
+      const result = schema.safeParse({ ...RECETA_VALIDA, packingSteps: pasos(51, 'Envasar') });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map((issue) => issue.path[0])).toEqual(['packingSteps']);
+      }
+    }
+  });
+
+  it('R2: rechaza el paso de envasado vacio, con mas de 30 elementos o con una clave desconocida en un bloque', () => {
+    const parrafos = (n: number) => ({
+      blocks: Array.from({ length: n }, (_, i) => ({ kind: 'paragraph', spans: [{ text: `Linea ${i}` }] })),
+    });
+    const invalidos: readonly unknown[] = [
+      paso(''),
+      paso('   '),
+      { blocks: [] },
+      parrafos(MAX_STEP_ELEMENTS + 1),
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Sellar' }], color: 'rojo' }] },
+      'Envasar',
+    ];
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      expect(schema.safeParse({ ...RECETA_VALIDA, packingSteps: [parrafos(MAX_STEP_ELEMENTS)] }).success).toBe(true);
+      for (const invalido of invalidos) {
+        const result = schema.safeParse({ ...RECETA_VALIDA, packingSteps: [paso('Envasar'), invalido] });
+        expect(result.success, JSON.stringify(invalido)).toBe(false);
+        if (!result.success) {
+          for (const issue of result.error.issues) expect(issue.path.slice(0, 2)).toEqual(['packingSteps', 1]);
+        }
+      }
+      expect(schema.safeParse({ ...RECETA_VALIDA, packingSteps: 'no es una lista' }).success).toBe(false);
+    }
+  });
+
+  it('R10: los esquemas de version descartan packingSteps sin rechazar la entrada', () => {
+    const alta = createRecipeVersionSchema.parse({ name: 'Version A', packingSteps: [paso('Envasar')] });
+    const edicion = updateRecipeVersionSchema.parse({
+      name: 'Version A',
+      lines: [LINEA_VALIDA],
+      packingSteps: [paso('Envasar')],
+    });
+    expect(alta).not.toHaveProperty('packingSteps');
+    expect(edicion).not.toHaveProperty('packingSteps');
   });
 });

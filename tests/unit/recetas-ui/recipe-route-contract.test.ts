@@ -5,7 +5,13 @@ import { join, relative, sep } from 'node:path';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { RECIPE_QUERYABLE } from '@/lib/modules/recetas';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
-import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
+import {
+  FORMULAS_ROUTE,
+  NEW_RECIPE_ROUTE,
+  newRecipeVersionRoute,
+  recipeEditRoute,
+  recipeVersionRoute,
+} from '@/lib/shared/routes';
 
 /**
  * Guardias de codigo, sin DOM: lo que la ruta promete no hacer (incrustar la ruta, repetir la
@@ -29,10 +35,21 @@ const CARPETA_NUEVA = join(CARPETA_RUTA, NUEVA_SUFIJO);
 const PAGE_NUEVA_PATH = join(CARPETA_NUEVA, 'page.tsx');
 const CARPETA_EDICION = join(CARPETA_RUTA, '[id]');
 const PAGE_EDICION_PATH = join(CARPETA_EDICION, 'page.tsx');
+/** Los segmentos dinamicos se pasan como sondas para que la carpeta salga de `routes.ts`. */
+const SUFIJO_NUEVA_VERSION = newRecipeVersionRoute('[id]').slice(FORMULAS_ROUTE.length + 1);
+const SUFIJO_VERSION = recipeVersionRoute('[id]', '[versionId]').slice(FORMULAS_ROUTE.length + 1);
+const CARPETA_NUEVA_VERSION = join(CARPETA_RUTA, SUFIJO_NUEVA_VERSION);
+const CARPETA_VERSION = join(CARPETA_RUTA, SUFIJO_VERSION);
+const CARPETA_VERSIONES = join(CARPETA_VERSION, '..');
+const PAGE_NUEVA_VERSION_PATH = join(CARPETA_NUEVA_VERSION, 'page.tsx');
+const PAGE_VERSION_PATH = join(CARPETA_VERSION, 'page.tsx');
 
 const LAYOUT_PRIVADO_PATH = join('app', '(private)', 'layout.tsx');
 
 const LITERALES_DE_RUTA = [`'${FORMULAS_ROUTE}'`, `"${FORMULAS_ROUTE}"`, `\`${FORMULAS_ROUTE}`];
+
+/** El segmento de versiones solo lo componen `newRecipeVersionRoute` y `recipeVersionRoute`. */
+const SEGMENTO_DE_VERSIONES = '/versiones';
 
 function leer(rutaRelativa: string): string {
   return readFileSync(join(RAIZ, rutaRelativa), 'utf8');
@@ -450,12 +467,63 @@ const MIGRACION_QC147 = [
   'db/migrations/20260922160000_recipe_lines_percentage/down.sql',
 ];
 
+// QC-194 (2026-10-03): la receta y sus versiones ganan herramientas. Exactamente los archivos
+// que el diff de esta rama toca bajo `lib/modules/recetas/`, ninguno mas.
+const HERRAMIENTAS_DE_LA_RECETA_QC194 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/create-recipe-version.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/recipe-catalog.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-tools.ts',
+  'lib/modules/recetas/domain/recipe-version.ts',
+  'lib/modules/recetas/domain/recipe-view.ts',
+  'lib/modules/recetas/domain/update-recipe-version.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// La migracion que crea `recipe_tools` y `db/schema.prisma` con el modelo nuevo.
+const MIGRACION_QC194 = [
+  'db/schema.prisma',
+  'db/migrations/20261003120000_recipe_tools/migration.sql',
+  'db/migrations/20261003120000_recipe_tools/down.sql',
+];
+
+// QC-211 (2026-10-05): pasos de envasado. Exactamente los archivos que el diff de esta rama toca
+// bajo `lib/modules/recetas/`, ninguno mas.
+const PASOS_DE_ENVASADO_QC211 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-packing-steps-reader.ts',
+  'lib/modules/recetas/domain/recipe-view.ts',
+  'lib/modules/recetas/domain/update-recipe-version.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// La columna `packing_steps` de `recipes` y `db/schema.prisma` con el campo nuevo.
+const MIGRACION_QC211 = [
+  'db/schema.prisma',
+  'db/migrations/20261005120000_recipe_packing_steps/migration.sql',
+  'db/migrations/20261005120000_recipe_packing_steps/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
   ...RENOMBRADO_DE_COMENTARIOS_QC70,
   ...AISLAMIENTO_POR_EMPRESA_QC50,
   ...CANTIDADES_EN_PORCENTAJE_QC147,
+  ...HERRAMIENTAS_DE_LA_RECETA_QC194,
+  ...PASOS_DE_ENVASADO_QC211,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -474,6 +542,8 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC68,
   ...MIGRACION_QC121,
   ...MIGRACION_QC147,
+  ...MIGRACION_QC194,
+  ...MIGRACION_QC211,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -510,6 +580,22 @@ describe('contrato de la ruta de recetas', () => {
     expect(FUENTES_DE_LA_RUTA.length).toBeGreaterThan(1);
   });
 
+  it('las rutas de version cuelgan de recipeEditRoute con su forma exacta', () => {
+    expect(newRecipeVersionRoute('sonda-de-prueba')).toBe(
+      '/produccion/formulas/sonda-de-prueba/versiones/nueva',
+    );
+    expect(recipeVersionRoute('sonda-de-prueba', 'sonda-de-version')).toBe(
+      '/produccion/formulas/sonda-de-prueba/versiones/sonda-de-version',
+    );
+    expect(newRecipeVersionRoute('sonda-de-prueba')).toBe(
+      `${recipeEditRoute('sonda-de-prueba')}/versiones/nueva`,
+    );
+
+    for (const pagina of [PAGE_NUEVA_VERSION_PATH, PAGE_VERSION_PATH]) {
+      expect(existsSync(join(RAIZ, pagina)), `deberia existir ${pagina}`).toBe(true);
+    }
+  });
+
   it('ningun archivo de produccion incrusta el literal de la ruta y private-nav reexporta, no redeclara', () => {
     const conElLiteral: string[] = [];
 
@@ -519,12 +605,17 @@ describe('contrato de la ruta de recetas', () => {
         if (ruta === 'lib/shared/routes.ts') continue;
         const codigo = fuenteSinComentarios(ruta);
         if (LITERALES_DE_RUTA.some((literal) => codigo.includes(literal))) conElLiteral.push(ruta);
+        else if (codigo.includes(SEGMENTO_DE_VERSIONES)) conElLiteral.push(ruta);
       }
     }
 
     expect(conElLiteral, 'el literal de la ruta solo puede vivir en lib/shared/routes.ts').toEqual(
       [],
     );
+    // Ancla anti-vacuidad: las dos paginas de version entran en el barrido de `app`.
+    for (const pagina of [PAGE_NUEVA_VERSION_PATH, PAGE_VERSION_PATH]) {
+      expect(FUENTES_DE_LA_RUTA).toContain(enRutaDePosix(pagina));
+    }
 
     expect(leer('lib/shared/routes.ts')).toContain('export const FORMULAS_ROUTE');
 
@@ -588,13 +679,19 @@ describe('contrato de la ruta de recetas', () => {
 
   // El permiso que exigen las pantallas y el de su item de menu tienen que ser el mismo codigo: se
   // deriva del catalogo en vez de escribirse a mano.
-  it('las tres pantallas exigen recetas.consultar y el item de menu declara ese mismo permiso (QC-75 R5, R6)', () => {
+  it('las cinco pantallas exigen recetas.consultar y el item de menu declara ese mismo permiso (QC-75 R5, R6)', () => {
     const permiso = PERMISSIONS.find(
       (entrada) => entrada.module === 'recetas' && entrada.action === 'consultar',
     );
     expect(permiso, 'el catalogo de identity deberia tener recetas.consultar').toBeDefined();
 
-    for (const pagina of [PAGE_PATH, PAGE_NUEVA_PATH, PAGE_EDICION_PATH]) {
+    for (const pagina of [
+      PAGE_PATH,
+      PAGE_NUEVA_PATH,
+      PAGE_EDICION_PATH,
+      PAGE_NUEVA_VERSION_PATH,
+      PAGE_VERSION_PATH,
+    ]) {
       expect(fuenteSinComentarios(pagina), `${pagina} deberia exigir su permiso`).toContain(
         `requirePagePermission('${permiso?.code}')`,
       );
@@ -729,6 +826,10 @@ describe('contrato de la ruta de recetas', () => {
       'listRecipesAction',
       'listProductsAction',
       'listUnitsAction',
+      // Operaciones de versiones de QC-172 que usa QC-174 (design §3). La lista sigue CERRADA.
+      'listRecipeVersionsAction',
+      'createRecipeVersionAction',
+      'updateRecipeVersionAction',
     ]);
 
     for (const ruta of FUENTES_DE_LA_RUTA_SIN_IMPORTAR) {
@@ -738,7 +839,7 @@ describe('contrato de la ruta de recetas', () => {
       while ((encaje = patron.exec(codigo)) !== null) {
         expect(
           permitidas.has(encaje[1]),
-          `${ruta}: «${encaje[1]}» no es una de las siete operaciones publicadas`,
+          `${ruta}: «${encaje[1]}» no es una de las diez operaciones publicadas`,
         ).toBe(true);
       }
     }
@@ -877,7 +978,7 @@ describe('contrato de la ruta de recetas', () => {
     expect(conDndKit).toEqual([join(COMPONENTES_PATH, 'recipe-steps-field.tsx').split('\\').join('/')]);
   });
 
-  it('los componentes de ruta se exponen por el barrel, las tres paginas importan solo del barrel y no queda ningun componente suelto', () => {
+  it('los componentes de ruta se exponen por el barrel, las cinco paginas importan solo del barrel y no queda ningun componente suelto', () => {
     // Regla de `docs/architecture.md > Componentes`.
     const barrel = fuenteSinComentarios(BARREL_PATH.split('\\').join('/'));
 
@@ -915,6 +1016,14 @@ describe('contrato de la ruta de recetas', () => {
     expect(paginaEdicion).toContain("from '../components'");
     expect(paginaEdicion).not.toContain("from '../components/");
 
+    for (const pagina of [PAGE_NUEVA_VERSION_PATH, PAGE_VERSION_PATH]) {
+      const fuente = fuenteSinComentarios(enRutaDePosix(pagina));
+      expect(fuente, `${pagina} debe importar del barrel`).toContain("from '../../../components'");
+      expect(fuente, `${pagina} no puede importar por ruta profunda`).not.toContain(
+        "from '../../../components/",
+      );
+    }
+
     // La frontera cliente/servidor se declara en cada componente, no en el barrel.
     expect(barrel).not.toContain('use client');
 
@@ -932,10 +1041,23 @@ describe('contrato de la ruta de recetas', () => {
       );
     }
 
-    for (const carpeta of [CARPETA_NUEVA, CARPETA_EDICION]) {
+    // Lista CERRADA de subcarpetas: `[id]` solo cuelga `versiones`, y esta solo el alta y la
+    // pagina de una version.
+    const SUBCARPETAS_LEGITIMAS = new Map<string, readonly string[]>([
+      [CARPETA_NUEVA, []],
+      [CARPETA_EDICION, ['versiones']],
+      [CARPETA_VERSIONES, ['[versionId]', 'nueva']],
+      [CARPETA_NUEVA_VERSION, []],
+      [CARPETA_VERSION, []],
+    ]);
+    for (const [carpeta, subcarpetas] of SUBCARPETAS_LEGITIMAS) {
       const entradas = readdirSync(join(RAIZ, carpeta), { withFileTypes: true });
+      expect(
+        entradas.filter((entrada) => entrada.isDirectory()).map((entrada) => entrada.name).sort(),
+        `${carpeta} tiene subcarpetas fuera de la lista`,
+      ).toEqual([...subcarpetas].sort());
       for (const entrada of entradas) {
-        expect(entrada.isDirectory(), `${carpeta} no deberia tener subcarpetas`).toBe(false);
+        if (entrada.isDirectory()) continue;
         expect(
           archivosDeAppRouter,
           `${carpeta}/${entrada.name} no es un archivo del App Router`,
@@ -1095,6 +1217,20 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'app/(private)/asignacion/[id]/components/order-execution-screen.tsx';
 
   /**
+   * TERCER montador (QC-211 design.md 5.2, R20): la pantalla de empaque monta el asistente en
+   * modo ejecucion para los pasos de envasado. Archivo EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_EMPAQUE =
+    'app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx';
+
+  /**
+   * La edicion de una version pinta el documento con la vista sin estado del asistente, no con el
+   * asistente: se acepta solo ese archivo y solo ese import exacto.
+   */
+  const MONTADOR_DE_LA_VISTA = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-version-form.tsx'));
+  const IMPORT_DE_LA_VISTA = "from '@/components/shared/step-reader/step-document-view';";
+
+  /**
    * Por nombre y no por carpeta: un test nuevo que lo montase en otro sitio tiene que salir en la
    * lista. Este mismo archivo esta porque escribe el nombre para poder prohibirlo.
    */
@@ -1169,6 +1305,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
+        // La pantalla de importar inventario: cuelga de /inventario, no del asistente de lectura.
+        'INVENTORY_IMPORT_ROUTE',
         'INVENTORY_ROUTE',
         'LOGIN_ROUTE',
         // No es una pantalla: el destino del login tras un corte de sesion, derivado de LOGIN_ROUTE.
@@ -1202,25 +1340,39 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue
         // CERRADA.
         'formulaImportRoute',
+        // Alta y edicion de una version de receta, derivadas de `recipeEditRoute`. No son del
+        // asistente de lectura.
+        'newRecipeVersionRoute',
+        'recipeVersionRoute',
       ].sort(),
     );
   });
 
-  it('el asistente solo se importa desde recipe-form.tsx', () => {
+  it('el asistente solo se importa desde sus tres montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
     const importadores: string[] = [];
+
+    const vista = fuenteSinComentarios(MONTADOR_DE_LA_VISTA);
+    expect(vista).toContain(IMPORT_DE_LA_VISTA);
+    expect(vista, 'recipe-version-form.tsx no puede montar el asistente').not.toContain('StepReader');
 
     for (const carpeta of ['app', 'components', 'lib', 'hooks', 'tests', 'e2e']) {
       if (!existsSync(join(RAIZ, carpeta))) continue;
       for (const ruta of fuentesBajo(carpeta)) {
         if ((TESTS_QUE_LO_NOMBRAN as readonly string[]).includes(ruta)) continue;
-        const codigo = fuenteSinComentarios(ruta);
+        const fuente = fuenteSinComentarios(ruta);
+        // Al montador de la vista se le descuenta solo su import exacto; cualquier otro del
+        // step-reader sigue contando.
+        const codigo =
+          ruta === MONTADOR_DE_LA_VISTA ? fuente.replace(IMPORT_DE_LA_VISTA, '') : fuente;
         if (IMPORTS_DEL_ASISTENTE.some((importado) => codigo.includes(importado))) {
           importadores.push(ruta);
         }
       }
     }
 
-    expect(importadores.sort()).toEqual([MONTADOR_DE_EJECUCION, UNICO_MONTADOR].sort());
+    expect(importadores.sort()).toEqual(
+      [MONTADOR_DE_EJECUCION, MONTADOR_DE_EMPAQUE, UNICO_MONTADOR].sort(),
+    );
   });
 
   it('el listado del catalogo no enlaza ni menciona el asistente', () => {

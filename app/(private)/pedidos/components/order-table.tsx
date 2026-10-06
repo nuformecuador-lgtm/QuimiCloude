@@ -8,12 +8,12 @@ import { DataTable, type DataTableParams, type DataTableTexts } from '@/componen
 import { buttonVariants } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
-import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
+import { buildOrderColumns } from './order-columns';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
 import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
@@ -107,6 +107,7 @@ export type OrderTableProps = {
    */
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /**
    * QC-102 R16 — los responsables de la pagina, **ya repartidos por fila en el SERVIDOR**: un
    * `Record` plano y serializable. La tabla solo lo atraviesa hasta la celda; aqui no se agrupa,
@@ -120,6 +121,8 @@ export type OrderTableProps = {
    * `responsiblesByOrder`. La tabla solo lo atraviesa hasta la celda.
    */
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
+  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
+  readonly canEditDistribution?: boolean;
   /**
    * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
    * DENTRO de la tabla, con la caja montada, en vez del vacio de `order-list-empty.tsx`.
@@ -133,9 +136,11 @@ export function OrderTable({
   totalPages,
   recipes,
   units,
+  bridge,
   responsiblesByOrder,
   responsiblesCatalog,
   coverageByOrder,
+  canEditDistribution,
   noMatches,
 }: OrderTableProps) {
   const router = useRouter();
@@ -172,8 +177,16 @@ export function OrderTable({
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
     () =>
-      buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder }),
-    [recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder],
+      buildOrderColumns({
+        recipes,
+        units,
+        bridge,
+        responsiblesByOrder,
+        responsiblesCatalog,
+        coverageByOrder,
+        canEditDistribution,
+      }),
+    [recipes, units, bridge, responsiblesByOrder, responsiblesCatalog, coverageByOrder, canEditDistribution],
   );
 
   /*
@@ -261,7 +274,6 @@ export function OrderTable({
             </div>
           )
         }
-        defaultPinnedColumns={ORDER_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

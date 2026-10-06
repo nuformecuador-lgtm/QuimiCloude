@@ -1,51 +1,65 @@
 'use client';
 
-import { PencilIcon, TrashIcon, UsersIcon, XCircleIcon } from 'lucide-react';
+import { PackageIcon, PencilIcon, TrashIcon, UsersIcon, XCircleIcon } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
 import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
 
 /**
- * Las tres acciones de fila de un pedido: editar, cancelar y borrar (R23, R24,
- * `design.md > 8`).
+ * Las acciones de fila de un pedido: editar, cancelar, borrar, responsables y, cuando aplica,
+ * reparto y unidad (R23, R24, `design.md > 8`).
  *
- * **Siempre visibles.** Nada se descubre con `:hover`, que en tactil no existe (R45): los tres
- * controles estan en el DOM y a la vista desde el primer render, y cada uno mide al menos
- * 44x44 px (`TOUCH_TARGET`).
+ * **Decision humana puntual (pedida por chat, solo para esta pantalla):** las acciones ya no son
+ * botones en linea, sino items de un menu "de los 3 puntos" (`RowActionsMenu`,
+ * `components/shared/row-actions-menu.tsx`), mismo criterio que adopto `UserRowActions`. R45
+ * sigue exigiendo que nada se descubra con `:hover` y que cada control mida 44x44 px, y eso se
+ * sigue cumpliendo: el DISPARADOR del menu esta siempre visible y siempre en el DOM, con su
+ * propio objetivo tactil. Lo que cambia es que las acciones individuales viven dentro del menu
+ * que ese disparador abre con un clic, no como controles sueltos. No es una derogacion general de
+ * R45 para el resto del repo: las demas pantallas con botones en linea siguen con ellos.
+ *
+ * **Decision humana puntual (2026-10-04):** los items del menu dicen solo el verbo, sin el numero
+ * del pedido. El contexto de la fila lo conserva el nombre accesible del disparador.
  *
  * **La fila llega por props** (R43). Este componente no importa `lib/composition`, ni el cliente
  * de base de datos, ni pide nada por su cuenta: lo que muestra ya lo trajo la consulta de la
  * lista, hecha una sola vez por el Server Component de la seccion.
  *
- * **QC-102 T13 — la CUARTA accion, «Responsables», NO se deshabilita en estado final** (QC-102
- * R24, `design.md > 3.2`). Las otras tres cambian el pedido y por eso mueren con el; esta solo
- * ABRE el panel en su seccion para VER quien lo preparo, y eso QC-87 R13 lo permite en los cuatro
+ * **QC-102 T13 — la accion «Responsables», NO se deshabilita en estado final** (QC-102 R24,
+ * `design.md > 3.2`). Las otras cambian el pedido y por eso mueren con el; esta solo ABRE el
+ * panel en su seccion para VER quien lo preparo, y eso QC-87 R13 lo permite en los cuatro
  * estados. Lo que desaparece dentro del panel son los controles de escritura (QC-102 R29), no la
- * puerta al dato. Por eso `FINAL_ORDER_REASON` sigue diciendo exactamente lo que sigue siendo
- * cierto: no se puede editar, cancelar ni eliminar —de responsables no dice nada—.
+ * puerta al dato: de responsables no dice nada.
  *
  * **Un solo predicado para el estado final** (`isFinalOrderStatus`): con el pedido en
- * `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` o `EN_EMPAQUE` los tres controles van `disabled` **con
- * el motivo VISIBLE** —no solo en `title`, que en tactil no aparece nunca— y **no se monta ningun
+ * `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` o `EN_EMPAQUE` los items de editar/cancelar/borrar van
+ * `disabled` dentro del menu, sin ningun texto aparte que lo explique, y **no se monta ningun
  * dialogo**. La pantalla anticipa la regla; el backend la impide igual (`invalid_transition`,
  * `not_cancellable`, `not_deletable`), asi que anticipar no es confiar.
  *
- * **Puntos de enganche de T10, T11 y T12.** Los tres disparadores emiten por callback opcional
- * (`onEdit`, `onCancel`, `onDelete`) con el pedido entero. Cuando existan `OrderSheet`,
- * `CancelOrderDialog` y `DeleteOrderDialog`, quien componga la fila decide si abre el panel/
- * dialogo desde esos callbacks o si sustituye cada boton por su disparador propio. Mientras
- * tanto **no se invoca ninguna operacion**: sin callback, pulsar no hace nada, y con el pedido
- * en estado final el callback no se llega a llamar.
+ * **`BLOQUEADO` NO es final** (QC-138): un pedido sin material se edita y se cancela como uno
+ * `PENDIENTE`, y bajar su cantidad puede bastar para desbloquearlo. Lo que no admite es el
+ * trabajo, y eso lo rechazan el backend y la lista del Operador, no este menu.
+ *
+ * **Reparto y unidad (QC-170)**: item QUINTO, condicional. Solo aparece si `canEditDistribution`
+ * -lo decide el servidor con el permiso de modificar pedidos- Y el estado admite esa edicion
+ * acotada (`acceptsDistributionEdit`). Antes de `POR_EMPACAR` la edicion general ya cubre reparto
+ * y unidad; desde `EN_EMPAQUE` el reparto queda fijado; en `BLOQUEADO` la edicion general sigue
+ * abierta y ya los cubre.
+ *
+ * **Puntos de enganche de T10, T11 y T12.** Los tres primeros items emiten por callback opcional
+ * (`onEdit`, `onCancel`, `onDelete`) con el pedido entero. Quien compone la fila decide si abre el
+ * panel/dialogo desde esos callbacks. Con el pedido en estado final, el item va `disabled` y el
+ * primitivo del menu no llega a invocar su `onSelect`.
  */
-
-/** Objetivo tactil minimo (44x44 px) de R45. Los primitivos miden 32 px de alto por defecto. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * Que estados del contrato ya no admiten editar, cancelar ni borrar. Mapa exhaustivo y tipado
  * —no una comparacion suelta contra los literales— para que un estado nuevo rompa el
  * `typecheck` en vez de colarse como «editable» por defecto. `POR_EMPACAR` y `EN_EMPAQUE` ya
  * consumieron material y dieron de alta un lote: se cierran igual que `ENTREGADO`.
+ *
+ * `BLOQUEADO` NO es final: ver el comentario de cabecera.
  */
 const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   PENDIENTE: false,
@@ -54,6 +68,7 @@ const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   EN_EMPAQUE: true,
   ENTREGADO: true,
   CANCELADO: true,
+  BLOQUEADO: false,
 };
 
 /**
@@ -65,9 +80,27 @@ export function isFinalOrderStatus(status: OrderStatus): boolean {
   return ORDER_STATUS_IS_FINAL[status];
 }
 
-/** Motivo, visible, de por que las acciones no estan disponibles. Constante: ningun test lo copia. */
-export const FINAL_ORDER_REASON =
-  'Este pedido ya está cerrado: no se puede editar, cancelar ni eliminar.';
+/**
+ * Estados en que solo cabe la edicion acotada de reparto y unidad (QC-170). Antes de
+ * `POR_EMPACAR` la edicion general ya cubre los dos campos; desde `EN_EMPAQUE` el reparto queda
+ * fijado.
+ */
+const ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: false,
+  EN_CURSO: false,
+  POR_EMPACAR: true,
+  EN_EMPAQUE: false,
+  ENTREGADO: false,
+  CANCELADO: false,
+  // La edicion general sigue abierta en BLOQUEADO y ya cubre reparto y unidad.
+  BLOQUEADO: false,
+};
+
+export function acceptsDistributionEdit(status: OrderStatus): boolean {
+  return ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT[status];
+}
+
+export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
 
 export type OrderRowActionsProps = {
   readonly order: OrderSummary;
@@ -79,9 +112,12 @@ export type OrderRowActionsProps = {
   readonly onDelete?: (order: OrderSummary) => void;
   /**
    * QC-102 R24 — abre el panel que YA existe en su seccion de responsables. Es la unica de las
-   * cuatro que sigue viva con el pedido cerrado.
+   * acciones que sigue viva con el pedido cerrado.
    */
   readonly onResponsibles?: (order: OrderSummary) => void;
+  /** Lo decide el servidor con el permiso de modificar pedidos; sin el, la accion no se pinta. */
+  readonly canEditDistribution?: boolean;
+  readonly onDistribution?: (order: OrderSummary) => void;
 };
 
 export function OrderRowActions({
@@ -90,86 +126,66 @@ export function OrderRowActions({
   onCancel,
   onDelete,
   onResponsibles,
+  canEditDistribution = false,
+  onDistribution,
 }: OrderRowActionsProps) {
   const isFinal = isFinalOrderStatus(order.status);
+  const showDistribution = canEditDistribution && acceptsDistributionEdit(order.status);
+
+  const items: RowActionMenuItem[] = [
+    {
+      key: 'edit',
+      label: 'Editar',
+      icon: PencilIcon,
+      onSelect: () => onEdit?.(order),
+      disabled: isFinal,
+      testId: 'order-action-edit',
+    },
+    {
+      key: 'cancel',
+      label: 'Cancelar',
+      icon: XCircleIcon,
+      onSelect: () => onCancel?.(order),
+      disabled: isFinal,
+      testId: 'order-action-cancel',
+    },
+    {
+      key: 'delete',
+      label: 'Eliminar',
+      icon: TrashIcon,
+      onSelect: () => onDelete?.(order),
+      disabled: isFinal,
+      destructive: true,
+      testId: 'order-action-delete',
+    },
+    // QC-102 R24: sin `disabled`. Ver quien prepara un pedido no es modificarlo, asi que un
+    // pedido ENTREGADO o CANCELADO se sigue pudiendo consultar. No exige pasar por el formulario
+    // de edicion: abre el MISMO panel en su seccion.
+    {
+      key: 'responsibles',
+      label: 'Responsables',
+      icon: UsersIcon,
+      onSelect: () => onResponsibles?.(order),
+      testId: 'order-action-responsibles',
+    },
+  ];
+
+  if (showDistribution) {
+    items.push({
+      key: 'distribution',
+      label: 'Reparto y unidad',
+      icon: PackageIcon,
+      onSelect: () => onDistribution?.(order),
+      testId: ORDER_ACTION_DISTRIBUTION_TESTID,
+    });
+  }
 
   return (
-    <div
-      className="flex flex-col items-end gap-1"
-      data-testid="order-row-actions"
-      data-order-id={order.id}
-      data-final={isFinal ? 'true' : 'false'}
-    >
-      <div className="flex items-center justify-end gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={TOUCH_TARGET}
-          disabled={isFinal}
-          aria-label={`Editar el pedido ${order.numberText}`}
-          data-testid="order-action-edit"
-          onClick={() => onEdit?.(order)}
-        >
-          <PencilIcon aria-hidden="true" />
-        </Button>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={TOUCH_TARGET}
-          disabled={isFinal}
-          aria-label={`Cancelar el pedido ${order.numberText}`}
-          data-testid="order-action-cancel"
-          onClick={() => onCancel?.(order)}
-        >
-          <XCircleIcon aria-hidden="true" />
-        </Button>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={TOUCH_TARGET}
-          disabled={isFinal}
-          aria-label={`Eliminar el pedido ${order.numberText}`}
-          data-testid="order-action-delete"
-          onClick={() => onDelete?.(order)}
-        >
-          <TrashIcon aria-hidden="true" />
-        </Button>
-
-        {/*
-          QC-102 R24: la cuarta entrada, y **sin `disabled`**. Ver quien prepara un pedido no es
-          modificarlo, asi que un pedido ENTREGADO o CANCELADO se sigue pudiendo consultar. No
-          exige pasar por el formulario de edicion: abre el MISMO panel en su seccion.
-        */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className={TOUCH_TARGET}
-          aria-label={`Responsables del pedido ${order.numberText}`}
-          data-testid="order-action-responsibles"
-          onClick={() => onResponsibles?.(order)}
-        >
-          <UsersIcon aria-hidden="true" />
-        </Button>
-      </div>
-
-      {/*
-        El motivo se PINTA (R24): `title` no existe en tactil y `aria-disabled` no lo explica.
-        Va debajo de los tres controles, no en un tooltip, para que se lea sin interaccion.
-      */}
-      {isFinal ? (
-        <p
-          className="max-w-56 text-right text-xs text-muted-foreground"
-          data-testid="order-row-actions-reason"
-        >
-          {FINAL_ORDER_REASON}
-        </p>
-      ) : null}
-    </div>
+    <RowActionsMenu
+      items={items}
+      triggerLabel={`Acciones del pedido ${order.numberText}`}
+      triggerTestId="order-row-actions"
+      triggerDataAttributes={{ 'data-order-id': order.id }}
+    />
   );
 }

@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { recipeStepSchema, type RecipeStepDocument } from '@/lib/modules/recetas';
+import {
+  recipeStepSchema,
+  updateRecipeVersionSchema,
+  type RecipeLineView,
+  type RecipeStepDocument,
+} from '@/lib/modules/recetas';
 
 import {
   buildRecipePayload,
+  buildRecipeVersionPayload,
+  toLineFormValues,
   type RecipeFormState,
   type RecipeLineFormValue,
   type RecipeStepFormValue,
@@ -69,7 +76,9 @@ function baseState(overrides: Partial<RecipeFormState> = {}): RecipeFormState {
     name: 'Receta de prueba',
     description: '',
     lines: [],
+    tools: [],
     steps: [],
+    packingSteps: [],
     image: { kind: 'untouched' },
     ...overrides,
   };
@@ -258,5 +267,98 @@ describe('buildRecipePayload — las líneas van completas y quitar una la saca 
     expect(afterRemoval.lines).toHaveLength(1);
     expect(afterRemoval.lines[0]?.productId).toBe('p1');
     expect(afterRemoval.lines.some((l) => l.productId === 'p2')).toBe(false);
+  });
+});
+
+describe('buildRecipeVersionPayload — la versión solo envía su nombre y sus líneas', () => {
+  it('R22 — el payload es exactamente { name, lines, tools }, sin pasos, descripción ni imagen', () => {
+    const payload = buildRecipeVersionPayload({
+      name: 'Sin sal',
+      lines: [line({ key: 'l1', productId: 'p1', percentage: '60,5' }), line({ key: 'l2', productId: 'p2', percentage: '39.5' })],
+      tools: [],
+    });
+
+    expect(payload).toStrictEqual({
+      name: 'Sin sal',
+      lines: [
+        { productId: 'p1', percentage: '60.5' },
+        { productId: 'p2', percentage: '39.5' },
+      ],
+      tools: [],
+    });
+    expect(Object.keys(payload).sort()).toEqual(['lines', 'name', 'tools']);
+  });
+
+  it('R22 — sanea las líneas igual que buildRecipePayload', () => {
+    const lines = [
+      line({ key: 'l1', productId: 'p1', productName: null, percentage: '12,25' }),
+      line({ key: 'l2', productId: 'p2', percentage: '87.75' }),
+    ];
+
+    const version = buildRecipeVersionPayload({ name: 'V', lines, tools: [] });
+    const recipe = buildRecipePayload('edit', baseState({ lines }));
+
+    expect(version.lines).toStrictEqual(recipe.lines);
+  });
+
+  it('R22 — el payload pasa el esquema de edición de versión del contrato', () => {
+    const payload = buildRecipeVersionPayload({
+      name: 'Versión',
+      lines: [line({ productId: '11111111-1111-4111-8111-111111111111', percentage: '100,00' })],
+      tools: [],
+    });
+
+    expect(updateRecipeVersionSchema.safeParse(payload).success).toBe(true);
+  });
+});
+
+describe('toLineFormValues — proyección de las líneas del detalle al formulario', () => {
+  function view(overrides: Partial<RecipeLineView> = {}): RecipeLineView {
+    return {
+      id: 'line-1',
+      productId: 'p1',
+      productName: 'Agua',
+      percentage: '12.50',
+      productUnitId: 'u1',
+      productStock: '3.0000',
+      ...overrides,
+    };
+  }
+
+  it('R8, R9 — formatea el % con coma y conserva producto, nombre y unidad, sin el id de dominio', () => {
+    const [value] = toLineFormValues([view()]);
+
+    expect(value).toMatchObject({
+      productId: 'p1',
+      productName: 'Agua',
+      percentage: '12,50',
+      productUnitId: 'u1',
+    });
+    expect(Object.keys(value!).sort()).toEqual([
+      'key',
+      'percentage',
+      'productId',
+      'productName',
+      'productUnitId',
+    ]);
+    expect(value!.key).not.toBe('line-1');
+  });
+
+  it('R9 — conserva la línea de un producto dado de baja y el orden recibido', () => {
+    const values = toLineFormValues([
+      view({ id: 'a', productId: 'pa', productName: null, percentage: '30.00' }),
+      view({ id: 'b', productId: 'pb', percentage: '70.00' }),
+    ]);
+
+    expect(values.map((v) => [v.productId, v.productName, v.percentage])).toEqual([
+      ['pa', null, '30,00'],
+      ['pb', 'Agua', '70,00'],
+    ]);
+  });
+
+  it('cada línea recibe una clave local distinta', () => {
+    const values = toLineFormValues([view({ id: 'a' }), view({ id: 'b', productId: 'p2' })]);
+
+    expect(new Set(values.map((v) => v.key)).size).toBe(2);
   });
 });

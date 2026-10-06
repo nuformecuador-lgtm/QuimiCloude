@@ -6,7 +6,7 @@
  */
 import { z } from 'zod';
 
-import { requirePermission, type Actor } from './actor';
+import { canExecuteAssignedOrders, requirePermission, type Actor } from './actor';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
 import { ValidationError } from './errors';
 
@@ -17,13 +17,17 @@ import { formatOrderNumber, type OrderCatalog, type Page } from '@/lib/modules/p
 /**
  * Duplicados de `lib/shared/pagination.ts` a proposito: el dominio no puede importar
  * `lib/shared/**` (`docs/architecture.md > La regla de dependencias`). Un test ata los numeros.
- * Solo se usan cuando no hay ni un id y la pagina vacia se construye aqui, sin tocar el puerto.
+ * Solo se usan cuando la pagina vacia se construye aqui, sin tocar el puerto.
  */
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 25;
 
 function effectivePageSize(pageSize: number | undefined): number {
   return Math.min(pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+}
+
+function emptyPage(page: number, pageSize: number | undefined): Page<AssignedOrderView> {
+  return { items: [], total: 0, page, pageSize: effectivePageSize(pageSize), totalPages: 1 };
 }
 
 const listAssignedOrdersSchema = z.strictObject({
@@ -35,12 +39,13 @@ export type ListAssignedOrdersDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
 };
 
-const ESTADOS_DE_TRABAJO = ['PENDIENTE', 'EN_CURSO'] as const;
+// `BLOQUEADO` entra para que el Operador vea el pedido aunque todavia no lo pueda iniciar.
+const ESTADOS_DE_TRABAJO = ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const;
 
 /** El estrechamiento es seguro porque la consulta se llama SIEMPRE filtrando por
  *  `ESTADOS_DE_TRABAJO`: ninguna fila puede volver con otro estado. */
-function toWorkingStatus(status: string): 'PENDIENTE' | 'EN_CURSO' {
-  return status as 'PENDIENTE' | 'EN_CURSO';
+function toWorkingStatus(status: string): AssignedOrderView['status'] {
+  return status as AssignedOrderView['status'];
 }
 
 export function createListAssignedOrders(
@@ -57,19 +62,14 @@ export function createListAssignedOrders(
     if (!parsed.success) throw new ValidationError();
     const { page, pageSize } = parsed.data;
 
+    // Todos los estados de esta lista son previos al empaque: quien no ejecuta no ve ninguno.
+    if (!canExecuteAssignedOrders(actor)) return emptyPage(page, pageSize);
+
     // La empresa y la persona salen del actor, nunca de la entrada.
     const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
 
     // Sin ni un id no se consulta nada mas: la pagina vacia se construye aqui.
-    if (ids.length === 0) {
-      return {
-        items: [],
-        total: 0,
-        page,
-        pageSize: effectivePageSize(pageSize),
-        totalPages: 1,
-      };
-    }
+    if (ids.length === 0) return emptyPage(page, pageSize);
 
     // El filtro de estado y la paginacion van en SQL, sobre el conjunto completo: si no, `total`
     // describiria algo distinto de lo que se muestra.
@@ -97,7 +97,9 @@ export function createListAssignedOrders(
         otherResponsibles: (rowComposed?.responsibles ?? []).filter(
           (responsible) => responsible.userId !== actor.id,
         ),
-        presentationName: rowComposed?.presentationName ?? null,
+        presentationLines: rowComposed?.presentationLines ?? [],
+        unitId: row.unitId,
+        unitLabel: rowComposed?.unitLabel ?? null,
       };
     });
 

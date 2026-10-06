@@ -1,6 +1,10 @@
+import type { Prisma, PrismaClient } from '@prisma/client';
+
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { UnitId, UnitRef } from '../../../domain/unit-catalog';
+import type { MassVolumeBridge } from '../../../domain/convert-with-approximation';
+import { PACKAGE_UNIT_NAME } from '../../../domain/package-unit';
+import type { UnitCatalog, UnitId, UnitRef } from '../../../domain/unit-catalog';
 
 import { companyScopeWhere } from './unit-prisma';
 
@@ -19,6 +23,8 @@ import { companyScopeWhere } from './unit-prisma';
  * una de la empresa propia se resuelve, y una de otra empresa no vuelve, igual que si no
  * existiera.
  */
+
+type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 type UnitCatalogRow = {
   readonly id: string;
@@ -46,10 +52,11 @@ export function toUnitRef(row: UnitCatalogRow): UnitRef {
 export async function findUnitRefs(
   ids: readonly UnitId[],
   companyId: string,
+  db: PrismaLike = prisma,
 ): Promise<readonly UnitRef[]> {
   if (ids.length === 0) return [];
 
-  const rows = await prisma.unit.findMany({
+  const rows = await db.unit.findMany({
     where: {
       AND: [companyScopeWhere({ companyId }), { id: { in: [...ids] } }],
     },
@@ -57,4 +64,51 @@ export async function findUnitRefs(
   });
 
   return rows.map(toUnitRef);
+}
+
+export async function listVisibleUnitRefs(companyId: string): Promise<readonly UnitRef[]> {
+  const rows = await prisma.unit.findMany({
+    where: companyScopeWhere({ companyId }),
+    select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+
+  return rows.map(toUnitRef);
+}
+
+export async function findPackageUnitId(): Promise<UnitId | null> {
+  const row = await prisma.unit.findFirst({
+    where: { companyId: null, nameNormalized: PACKAGE_UNIT_NAME, baseUnitId: null },
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
+const VOLUME_BASE_NAME = 'mililitro';
+const MASS_BASE_NAME = 'gramo';
+
+/** Solo las bases de sistema: una unidad propia con el mismo nombre no cuenta. */
+export async function findMassVolumeBridge(db: PrismaLike = prisma): Promise<MassVolumeBridge | null> {
+  const rows = await db.unit.findMany({
+    where: {
+      companyId: null,
+      baseUnitId: null,
+      nameNormalized: { in: [VOLUME_BASE_NAME, MASS_BASE_NAME] },
+    },
+    select: { id: true, nameNormalized: true },
+  });
+  const volume = rows.find((row) => row.nameNormalized === VOLUME_BASE_NAME);
+  const mass = rows.find((row) => row.nameNormalized === MASS_BASE_NAME);
+  if (volume === undefined || mass === undefined) return null;
+  return { volumeBaseId: volume.id, massBaseId: mass.id };
+}
+
+/** Las lecturas que necesita quien trabaja dentro de una transaccion, atadas a su cliente. */
+export function createUnitCatalogReader(
+  db: PrismaLike = prisma,
+): Pick<UnitCatalog, 'findRefs' | 'findMassVolumeBridge'> {
+  return {
+    findRefs: (ids, companyId) => findUnitRefs(ids, companyId, db),
+    findMassVolumeBridge: () => findMassVolumeBridge(db),
+  };
 }

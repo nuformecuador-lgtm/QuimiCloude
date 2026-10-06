@@ -6,10 +6,7 @@ import { useMemo, useTransition } from 'react';
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
 import type { AssignedOrderView, AssignmentViewKind } from '@/lib/modules/asignaciones';
 
-import {
-  ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS,
-  buildAssignedOrdersColumns,
-} from './assigned-orders-columns';
+import { buildAssignedOrdersColumns } from './assigned-orders-columns';
 import { assignedOrdersListHref } from './assigned-orders-list-params';
 
 export const ASSIGNED_ORDERS_TABLE_ID = 'asignacion';
@@ -43,12 +40,19 @@ export type AssignedOrdersTableProps = {
   readonly totalPages: number;
   /** La vista vigente: viaja a cada `href` de paginacion para que no se pierda al navegar. */
   readonly vista: AssignmentViewKind;
+  readonly canExecute: boolean;
 };
 
-export function AssignedOrdersTable({ rows, params, totalPages, vista }: AssignedOrdersTableProps) {
+export function AssignedOrdersTable({
+  rows,
+  params,
+  totalPages,
+  vista,
+  canExecute,
+}: AssignedOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => buildAssignedOrdersColumns(), []);
+  const columns = useMemo(() => buildAssignedOrdersColumns({ canExecute }), [canExecute]);
 
   // El «en vuelo» sale del `isPending` de la transicion y no de una `key` en el `<Suspense>`:
   // remontar ese limite borraria el foco.
@@ -78,7 +82,6 @@ export function AssignedOrdersTable({ rows, params, totalPages, vista }: Assigne
         status="idle"
         texts={ASSIGNED_ORDERS_TABLE_TEXTS}
         searchable={false}
-        defaultPinnedColumns={ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS}
       />
     </div>
   );

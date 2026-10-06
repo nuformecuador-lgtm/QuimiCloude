@@ -34,8 +34,9 @@ export {
   PRODUCT_QUERYABLE,
   PRODUCT_TYPE_VALUES,
   MANUAL_PRODUCT_TYPE_VALUES,
+  PRODUCT_PRESENTATION_UNIT_FILTER,
 } from './domain/product-queryable';
-export { PRODUCT_TYPES, type ProductType } from './domain/product-type';
+export { isIngredientType, PRODUCT_TYPES, type ProductType } from './domain/product-type';
 export { normalizePresentationName } from './domain/presentation-name';
 export { normalizeProductName } from './domain/product-name';
 export {
@@ -68,6 +69,7 @@ export { type InventoryMovementView, type NewInventoryMovement } from './domain/
 export { MOVEMENT_REASONS, type MovementReason } from './domain/movement-reason';
 
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
+export type { StockIncreaseListener } from './domain/stock-increase-listener';
 export {
   createCreateRawMaterial,
   type CreateRawMaterialDeps,
@@ -81,6 +83,12 @@ export { createUpdatePresentation, type UpdatePresentationDeps } from './domain/
 export { createDeletePresentation, type DeletePresentationDeps } from './domain/delete-presentation';
 export { createListPresentations, type ListPresentationsDeps } from './domain/list-presentations';
 export {
+  createListProductFormUnits,
+  type ListProductFormUnits,
+  type ListProductFormUnitsDeps,
+  type ProductFormUnits,
+} from './domain/list-product-form-units';
+export {
   createAdjustBatchStock,
   type AdjustBatchStockDeps,
   type AdjustBatchStockInput,
@@ -89,6 +97,19 @@ export {
   createListProductBatches,
   type ListProductBatchesDeps,
 } from './domain/list-product-batches';
+export { createListOrderBatches, type ListOrderBatchesDeps } from './domain/list-order-batches';
+export { createListFinishedStock, type ListFinishedStockDeps } from './domain/list-finished-stock';
+export { FINISHED_STOCK_QUERYABLE } from './domain/finished-stock-queryable';
+export type {
+  FinishedOrderNumber,
+  FinishedOrderStockRow,
+  FinishedStockBatch,
+  FinishedStockGroup,
+  FinishedStockProductLine,
+  FinishedStockRow,
+  FinishedWithoutOrderStockRow,
+} from './domain/finished-stock';
+export type { PackagedStockEntry } from './domain/packaged-stock';
 export {
   createListBatchMovements,
   type ListBatchMovementsDeps,
@@ -103,15 +124,19 @@ export {
 } from './domain/decimal-quantity';
 export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
 export {
-  planFinishedGoods,
-  type FinishedGoodsPlan,
+  planFinishedGoodsLine,
+  type FinishedGoodsLinePlan,
   type FinishedGoodsOutcome,
   type FinishedGoodsIntake,
 } from './domain/finished-goods';
+// `pedidos` deriva el coste unitario unico del pedido con la MISMA division que ya usa
+// este modulo para un lote sin costo de compra -mismo criterio de redondeo, misma escala-.
+export { deriveUnitCost } from './domain/unit-cost';
 
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
+export type { PackagingCatalog, PackagingCostingBatch, PackagingRef } from './domain/packaging-catalog';
 // Resolver ingredientes POR NOMBRE: interfaz nueva, no un metodo mas de ProductCatalog, para no
 // pisarse con otro cambio en paralelo sobre este ultimo.
 export type { ProductNameLookup, ProductNameMatch } from './domain/product-name-lookup';
@@ -136,6 +161,53 @@ export type {
   BatchHistoryEntry,
 } from './domain/reservation';
 export { planReservation } from './domain/plan-reservation';
+export {
+  INVENTORY_IMPORT_MAX_ROWS,
+  INVENTORY_IMPORT_MAX_FILE_BYTES,
+  INVENTORY_IMPORT_ACCEPT,
+  IMPORT_TYPE_LABELS,
+  INVENTORY_IMPORT_COLUMNS,
+  IMPORT_ROW_ISSUE_CODES,
+  type InventoryImportFormat,
+  type ImportRowType,
+  type ImportColumnRule,
+  type ImportColumnKey,
+  type ImportCells,
+  type ImportRowIssueCode,
+  type ImportRowIssue,
+  type ImportBatchTarget,
+  type ImportPreviewRow,
+  type ImportPreviewStatus,
+  type ImportMissingEntry,
+  type ImportPreviewTotals,
+  type InventoryImportPreview,
+  type ImportFileRejection,
+  type ImportFileRejected,
+  type InventoryImportPreviewOutcome,
+  type ImportResultRow,
+  type ImportResultTotals,
+  type InventoryImportResult,
+  type ImportAlreadyDone,
+  type ImportNothingImported,
+  type InventoryImportConfirmOutcome,
+  type InventoryImportFile,
+  type PreviewInventoryImport,
+  type ConfirmInventoryImport,
+} from './domain/inventory-import-contract';
+export {
+  IMPORT_EXAMPLE_ROW,
+  buildInventoryImportTemplate,
+  buildInventoryImportErrorFile,
+  type ImportDownload,
+} from './domain/inventory-import-downloads';
+export {
+  createPreviewInventoryImport,
+  type PreviewInventoryImportDeps,
+} from './domain/preview-inventory-import';
+export {
+  createConfirmInventoryImport,
+  type ConfirmInventoryImportDeps,
+} from './domain/confirm-inventory-import';
 export type {
   ReservationCandidateBatch,
   PlanReservationInput,

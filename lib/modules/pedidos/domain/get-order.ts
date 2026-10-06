@@ -4,23 +4,61 @@ import { formatOrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
 import type { OrderRow, OrderView } from './order-view';
 
-import type { PresentationCatalog } from '@/lib/modules/inventario';
-import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { PackagingCatalog, PresentationCatalog } from '@/lib/modules/inventario';
+import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
 /**
- * QC-35bis (2026-09-07): `units` YA NO ES UNA DEPENDENCIA de este caso de uso. Al salir la
- * unidad del pedido no queda ningun id que resolver contra el catalogo de `unidades`, asi que
- * pedirlo aqui seria cablear una dependencia falsa -exactamente lo que `design.md > 9` evita en
- * `cancelOrder` y `deleteOrder`-. Es tambien una consulta menos por ficha y por pagina.
+ * La unidad vuelve al pedido: `units` VUELVE a ser una dependencia de este caso de uso,
+ * porque `quantity` se interpreta siempre en `unitId` y la ficha muestra su etiqueta. Sigue sin
+ * haber ningun `unitPrice` que costear aqui.
  */
 export type GetOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
-  /** Contrato PUBLICO de `inventario`: resuelve el nombre de la presentacion. */
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de las presentaciones del reparto. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de los envases del reparto. */
+  readonly packaging: PackagingCatalog;
+  /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de `unitId`. */
+  readonly units: UnitCatalog;
 };
+
+/** El simbolo de la unidad, o su nombre si no lo tiene. Se exporta porque
+ *  `list-orders.ts` la reutiliza para no divergir en el criterio. */
+export function unitLabelOf(unit: { readonly name: string; readonly symbol: string | null }): string {
+  return unit.symbol ?? unit.name;
+}
+
+/** Los ids unicos de las presentaciones de todo el reparto de las filas, para resolverlos
+ *  en una sola llamada al catalogo. */
+export function orderPresentationIds(rows: readonly Pick<OrderRow, 'presentationLines'>[]): string[] {
+  return [...new Set(rows.flatMap((row) => row.presentationLines.map((line) => line.presentationId)))];
+}
+
+/** Los ids unicos de los envases del reparto de las filas; las lineas antiguas no tienen. */
+export function orderPackagingIds(rows: readonly Pick<OrderRow, 'presentationLines'>[]): string[] {
+  return [
+    ...new Set(
+      rows.flatMap((row) =>
+        row.presentationLines.flatMap((line) => (line.packagingProductId === null ? [] : [line.packagingProductId])),
+      ),
+    ),
+  ];
+}
+
+/** Los nombres de los envases; uno dado de baja o sin presentacion fija no vuelve. */
+export async function findPackagingNames(
+  packaging: PackagingCatalog,
+  ids: readonly string[],
+  companyId: string,
+): Promise<ReadonlyMap<string, string>> {
+  if (ids.length === 0) return new Map();
+  const refs = await packaging.findRefs(ids, companyId);
+  return new Map(refs.map((ref) => [ref.id, ref.name]));
+}
 
 /**
  * Compone la salida de una fila con los nombres ya resueltos (R42, R43, R44, R46).
@@ -40,15 +78,22 @@ export type GetOrderDeps = {
  */
 export function toOrderView(
   row: OrderRow,
-  recipeNames: ReadonlyMap<string, string>,
+  recipes: ReadonlyMap<string, RecipeRef>,
   presentationNames: ReadonlyMap<string, string> = new Map(),
+  unitLabels: ReadonlyMap<string, string> = new Map(),
+  packagingNames: ReadonlyMap<string, string> = new Map(),
 ): OrderView {
+  const recipe = recipes.get(row.recipeId);
   return {
     id: row.id,
     number: row.number,
     numberText: formatOrderNumber(row.number),
     recipeId: row.recipeId,
-    recipeName: recipeNames.get(row.recipeId) ?? null,
+    recipeName: recipe?.name ?? null,
+    recipeVersion:
+      recipe?.original == null
+        ? null
+        : { originalId: recipe.original.id, originalName: recipe.original.name, versionName: recipe.ownName },
     quantity: row.quantity,
     priority: row.priority,
     status: row.status,
@@ -60,18 +105,24 @@ export function toOrderView(
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
-    presentationId: row.presentationId,
-    // `null` si el pedido esta sin presentacion; la FK compuesta con RESTRICT hace imposible
-    // el caso «tiene id pero no vuelve del catalogo».
-    presentationName: row.presentationId === null ? null : presentationNames.get(row.presentationId) ?? null,
+    presentationLines: row.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      presentationName: presentationNames.get(line.presentationId) ?? null,
+      packages: line.packages,
+      packagingProductId: line.packagingProductId,
+      packagingName: line.packagingProductId === null ? null : packagingNames.get(line.packagingProductId) ?? null,
+    })),
+    unitId: row.unitId,
+    // `null` si el pedido esta sin unidad; la FK con RESTRICT hace imposible el caso
+    // «tiene id pero no vuelve del catalogo».
+    unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,
   };
 }
 
 /**
  * Ficha de un pedido (R42). Consultar exige `pedidos.consultar` (QC-74 R16): quien no lo tiene
- * ni siquiera lee, y el `requirePermission` va antes de tocar el repositorio y el catalogo de
- * recetas (QC-74 R12). Era UN paso por DOS catalogos hasta QC-35bis: el de `unidades` se fue
- * con la unidad del pedido.
+ * ni siquiera lee, y el `requirePermission` va antes de tocar el repositorio y los catalogos
+ * de recetas, presentaciones y unidades.
  */
 export function createGetOrder(
   deps: GetOrderDeps,
@@ -92,15 +143,19 @@ export function createGetOrder(
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId], actor.companyId);
 
+    const presentationIds = orderPresentationIds([row]);
     const presentations =
-      row.presentationId === null
-        ? []
-        : await deps.presentations.findRefs([row.presentationId], actor.companyId);
+      presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
+
+    const units = row.unitId === null ? [] : await deps.units.findRefs([row.unitId], actor.companyId);
+    const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds([row]), actor.companyId);
 
     return toOrderView(
       row,
-      new Map(recipes.map((recipe) => [recipe.id, recipe.name])),
+      new Map(recipes.map((recipe) => [recipe.id, recipe])),
       new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
+      new Map(units.map((unit) => [unit.id, unitLabelOf(unit)])),
+      packagingNames,
     );
   };
 }

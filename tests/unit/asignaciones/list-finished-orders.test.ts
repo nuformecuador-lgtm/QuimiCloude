@@ -28,7 +28,11 @@ const ANA = uuid('1');
 const BEA = uuid('2');
 const RECETA = uuid('a');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['terminados.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['terminados.consultar', 'asignaciones.ejecutar'],
+};
 
 function pedidoId(i: number): string {
   const sufijo = i.toString(16).padStart(2, '0');
@@ -43,7 +47,8 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'ENTREGADO',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: new Date('2026-09-20T10:00:00.000Z'),
     packedBy: null,
     ...overrides,
@@ -51,7 +56,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
 }
 
 function receta(overrides?: Partial<RecipeRef>): RecipeRef {
-  return { id: RECETA, name: 'Jabon liquido', isDeleted: false, ...overrides };
+  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, ...overrides };
 }
 
 function persona(id: string): PersonRef {
@@ -192,6 +197,7 @@ describe('QC-145 — listFinishedOrders: R17 pedidos ENTREGADO de toda la empres
       'finished_recent_first',
       1,
       undefined,
+      undefined,
     );
   });
 });
@@ -237,14 +243,14 @@ describe('QC-145 — listFinishedOrders: R21 la fila y sus responsables', () => 
   });
 
   it('sin presentacion ni receta resueltas, salen `null` y no el identificador', async () => {
-    const items = [resumen(pedidoId(1), { presentationId: null })];
+    const items = [resumen(pedidoId(1), { presentationLines: [] })];
     const { deps } = montar({ page: { items, total: 1 }, refs: [] });
     const listFinishedOrders = createListFinishedOrders(deps);
 
     const pagina = await listFinishedOrders(ACTOR, { page: 1 });
 
     expect(pagina.items[0]?.recipeName).toBeNull();
-    expect(pagina.items[0]?.presentationName).toBeNull();
+    expect(pagina.items[0]?.presentationLines).toEqual([]);
   });
 
   it('la fila expone exactamente las claves del contrato, sin importe ni otros datos', async () => {
@@ -255,7 +261,17 @@ describe('QC-145 — listFinishedOrders: R21 la fila y sus responsables', () => 
     const pagina = await listFinishedOrders(ACTOR, { page: 1 });
 
     expect(Object.keys(pagina.items[0] ?? {}).sort()).toEqual(
-      ['id', 'numberText', 'recipeName', 'quantity', 'presentationName', 'finishedAt', 'responsibles'].sort(),
+      [
+        'id',
+        'numberText',
+        'recipeName',
+        'quantity',
+        'presentationLines',
+        'unitId',
+        'unitLabel',
+        'finishedAt',
+        'responsibles',
+      ].sort(),
     );
   });
 });
@@ -267,8 +283,75 @@ describe('QC-145 — listFinishedOrders: R27 paginacion delegada al catalogo', (
 
     const pagina = await listFinishedOrders(ACTOR, { page: 2, pageSize: 25 });
 
-    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 2, 25);
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
+      EMPRESA,
+      ['ENTREGADO'],
+      'finished_recent_first',
+      2,
+      25,
+      undefined,
+    );
     expect(pagina.page).toBe(2);
     expect(pagina.pageSize).toBe(25);
+  });
+});
+
+describe('listFinishedOrders — quien no ejecuta solo ve lo que empaco', () => {
+  const EMPACADOR: Actor = {
+    id: ANA,
+    companyId: EMPRESA,
+    permissions: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
+  };
+
+  it('R20: sin `asignaciones.ejecutar` filtra en la consulta por `packedBy` = el actor', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+
+    await createListFinishedOrders(deps)(EMPACADOR, { page: 3, pageSize: 5 });
+
+    expect(listAliveSummariesInCompany).toHaveBeenCalledTimes(1);
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
+      EMPRESA,
+      ['ENTREGADO'],
+      'finished_recent_first',
+      3,
+      5,
+      { packedBy: ANA },
+    );
+  });
+
+  it('R20: el empacador del filtro sale de la sesion, nunca de la entrada', async () => {
+    const { deps } = montar();
+
+    await expect(
+      createListFinishedOrders(deps)(EMPACADOR, { page: 1, packedBy: BEA } as unknown),
+    ).rejects.toThrow(ValidationError);
+  });
+
+  it('R20: `total` y `totalPages` son los que devuelve la consulta filtrada', async () => {
+    const items = [resumen(pedidoId(1))];
+    const { deps } = montar({ page: { items, total: 11 }, refs: [receta()] });
+
+    const pagina = await createListFinishedOrders(deps)(EMPACADOR, { page: 1, pageSize: 5 });
+
+    expect(pagina.total).toBe(11);
+    expect(pagina.totalPages).toBe(3);
+  });
+
+  it('R20a: con `asignaciones.ejecutar` consulta sin filtro, como siempre', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+
+    await createListFinishedOrders(deps)(
+      { ...EMPACADOR, permissions: [...EMPACADOR.permissions, 'asignaciones.ejecutar'] },
+      { page: 1 },
+    );
+
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
+      EMPRESA,
+      ['ENTREGADO'],
+      'finished_recent_first',
+      1,
+      undefined,
+      undefined,
+    );
   });
 });

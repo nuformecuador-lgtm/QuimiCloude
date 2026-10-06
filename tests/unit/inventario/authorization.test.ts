@@ -33,6 +33,8 @@ import {
 } from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListBatchMovements } from '@/lib/modules/inventario/domain/list-batch-movements';
+import { createListFinishedStock } from '@/lib/modules/inventario/domain/list-finished-stock';
+import { createListOrderBatches } from '@/lib/modules/inventario/domain/list-order-batches';
 import { createListProductBatches } from '@/lib/modules/inventario/domain/list-product-batches';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
@@ -41,9 +43,12 @@ import { createProductSchema, updateProductSchema } from '@/lib/modules/inventar
 import type { OrderNumberDirectory } from '@/lib/modules/inventario/domain/reservation';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
+import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
+import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** Los dos codigos de este modulo (R16). `satisfies` los ata a la union del catalogo: un
  *  codigo mal escrito aqui no compila, no falla en tiempo de ejecucion. */
@@ -79,11 +84,11 @@ const PRODUCTO_VALIDO = {
 };
 
 /** QC-90 (R1): el ALTA ya no acepta un producto pelado -siempre crea su primer lote-, asi
- *  que el fixture del alta lleva ademas la existencia del lote, presentacion y costo. */
+ *  que el fixture del alta lleva ademas la existencia del lote, la unidad y el costo. */
 const PRODUCTO_VALIDO_CON_LOTE = {
   ...PRODUCTO_VALIDO,
   stock: '0',
-  presentationId: '11111111-1111-4111-8111-111111111111',
+  unitId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
 };
 
@@ -130,6 +135,8 @@ function repositorioProductoQueFalla(): ProductRepository {
     findAliveIdByNameInPresentationUnit: vi.fn<
       ProductRepository['findAliveIdByNameInPresentationUnit']
     >(explota),
+    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(explota),
+    findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(explota),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(explota),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(explota),
     // QC-92: los tres del libro de inventario tambien EXPLOTAN, por la misma razon.
@@ -189,6 +196,9 @@ type Repos = {
   readonly log: ListQueryLog;
   readonly people: PeopleDirectory;
   readonly orders: OrderNumberDirectory;
+  readonly finishedOrders: FinishedOrderRepository;
+  readonly orderNumbers: OrderNumberFormatter;
+  readonly units: Pick<UnitCatalog, 'findRefs'>;
 };
 
 /** El hueco que `inventario` declara para el numero visible de un pedido: sin permiso el
@@ -208,6 +218,24 @@ function montarReposQueFallan(): Repos {
     log: logQueFalla(),
     people: directorioQueFalla(),
     orders: directorioDePedidosQueFalla(),
+    finishedOrders: {
+      findBatchesOfOrder: vi.fn<FinishedOrderRepository['findBatchesOfOrder']>(() => {
+        throw new Error('el repositorio de pedidos terminados no debe ser llamado');
+      }),
+      listStockGroups: vi.fn<FinishedOrderRepository['listStockGroups']>(() => {
+        throw new Error('el repositorio de pedidos terminados no debe ser llamado');
+      }),
+    },
+    orderNumbers: {
+      format: vi.fn<OrderNumberFormatter['format']>(() => {
+        throw new Error('el formato del numero de pedido no debe ser llamado');
+      }),
+    },
+    units: {
+      findRefs: vi.fn<UnitCatalog['findRefs']>(() => {
+        throw new Error('el catalogo de unidades no debe ser llamado');
+      }),
+    },
   };
 }
 
@@ -242,6 +270,8 @@ function montarReposPermisivos(): Repos {
       findAliveIdByNameInPresentationUnit: vi.fn<
         ProductRepository['findAliveIdByNameInPresentationUnit']
       >(async () => null),
+      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
+      findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
       createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
         id: 'producto-1',
         batchId: 'lote-1',
@@ -277,6 +307,16 @@ function montarReposPermisivos(): Repos {
     orders: {
       findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(async () => new Map()),
     },
+    finishedOrders: {
+      findBatchesOfOrder: vi.fn<FinishedOrderRepository['findBatchesOfOrder']>(async () => []),
+      listStockGroups: vi.fn<FinishedOrderRepository['listStockGroups']>(async () => PAGINA_VACIA),
+    },
+    orderNumbers: { format: vi.fn<OrderNumberFormatter['format']>(() => '2026-0000001') },
+    units: {
+      findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
+        ids.map((id) => ({ id, name: 'kilogramo', symbol: 'kg', baseUnitId: null, factor: null })),
+      ),
+    },
   };
 }
 
@@ -290,6 +330,8 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     // QC-90 (R23): «sin una sola llamada al repositorio» incluye los tres metodos del alta
     // con primer lote. Un metodo nuevo en el puerto que no se anada aqui es un hueco.
     () => expect(repos.products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled(),
+    () => expect(repos.products.findAliveIdByNameInUnit).not.toHaveBeenCalled(),
+    () => expect(repos.units.findRefs).not.toHaveBeenCalled(),
     () => expect(repos.products.createWithFirstBatch).not.toHaveBeenCalled(),
     () => expect(repos.products.addBatchToAlive).not.toHaveBeenCalled(),
     // QC-92 (T8): los tres del libro de inventario. Faltaban, y eran justo el hueco por el que un
@@ -308,6 +350,9 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.people.findRefsIncludingDeletedInCompany).not.toHaveBeenCalled(),
     // Sin permiso tampoco se pregunta el numero visible de ningun pedido.
     () => expect(repos.orders.findNumberTexts).not.toHaveBeenCalled(),
+    () => expect(repos.finishedOrders.findBatchesOfOrder).not.toHaveBeenCalled(),
+    () => expect(repos.finishedOrders.listStockGroups).not.toHaveBeenCalled(),
+    () => expect(repos.orderNumbers.format).not.toHaveBeenCalled(),
   ];
 }
 
@@ -335,9 +380,9 @@ const CASOS_DE_USO: ReadonlyArray<{
     nombre: 'create-product',
     permiso: MODIFICAR,
     invocar: (repos, actor) =>
-      createCreateProduct({ products: repos.products })(PRODUCTO_VALIDO_CON_LOTE, actor),
+      createCreateProduct({ products: repos.products, units: repos.units })(PRODUCTO_VALIDO_CON_LOTE, actor),
     invocarConEntradaInvalida: (repos, actor) =>
-      createCreateProduct({ products: repos.products })(ENTRADA_INVALIDA, actor),
+      createCreateProduct({ products: repos.products, units: repos.units })(ENTRADA_INVALIDA, actor),
   },
   {
     nombre: 'update-product',
@@ -436,6 +481,33 @@ const CASOS_DE_USO: ReadonlyArray<{
       })('lote-1', actor),
     invocarConEntradaInvalida: null,
   },
+  {
+    nombre: 'list-order-batches',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) =>
+      createListOrderBatches({ finishedOrders: repos.finishedOrders })(
+        '7d3f0c1e-2b4a-4c5d-8e9f-0a1b2c3d4e5f',
+        actor,
+      ),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createListOrderBatches({ finishedOrders: repos.finishedOrders })('no-es-un-uuid', actor),
+  },
+  {
+    nombre: 'list-finished-stock',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) =>
+      createListFinishedStock({
+        finishedOrders: repos.finishedOrders,
+        orderNumbers: repos.orderNumbers,
+        log: repos.log,
+      })({}, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createListFinishedStock({
+        finishedOrders: repos.finishedOrders,
+        orderNumbers: repos.orderNumbers,
+        log: repos.log,
+      })(ENTRADA_INVALIDA, actor),
+  },
 ];
 
 const CASOS_DE_LECTURA = CASOS_DE_USO.filter((caso) => caso.permiso === CONSULTAR);
@@ -482,8 +554,8 @@ async function esperarConcesion(
  * ser entrada valida-, todo lo de abajo seguiria en verde midiendo otra cosa.
  */
 describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => {
-  it('cubre los doce casos de uso: siete de modificacion y cinco de consulta', () => {
-    expect(CASOS_DE_USO).toHaveLength(12);
+  it('cubre los catorce casos de uso: siete de modificacion y siete de consulta', () => {
+    expect(CASOS_DE_USO).toHaveLength(14);
     expect(CASOS_DE_ESCRITURA.map((caso) => caso.nombre)).toEqual([
       'create-product',
       'update-product',
@@ -499,6 +571,8 @@ describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => 
       'list-presentations',
       'list-product-batches',
       'list-batch-movements',
+      'list-order-batches',
+      'list-finished-stock',
     ]);
   });
 
@@ -518,11 +592,12 @@ describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => 
     expect(createProductSchema.safeParse(PRODUCTO_VALIDO_CON_LOTE).success).toBe(true);
     expect(createProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
     expect(updateProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
-    // QC-90: el fixture del ALTA se ancla contra SU esquema, que es otro. Si dejara de ser
-    // entrada valida, la mitad de la concesion se pondria verde por el motivo equivocado.
-    expect(createProductWithFirstBatchSchema.safeParse(PRODUCTO_VALIDO_CON_LOTE).success).toBe(
-      true,
-    );
+    // El esquema publicado del alta con lote sigue pidiendo presentacion: el insumo por unidad
+    // no pasa por el.
+    const { unitId, ...sinUnidad } = PRODUCTO_VALIDO_CON_LOTE;
+    expect(
+      createProductWithFirstBatchSchema.safeParse({ ...sinUnidad, presentationId: unitId }).success,
+    ).toBe(true);
     expect(createProductWithFirstBatchSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
   });
 });
@@ -569,7 +644,7 @@ describe('QC-74 R12/R15 — rechazo sin el permiso exigido, sin efectos y con el
     // aqui saldria `ValidationError` -y un actor sin permiso habria averiguado algo del
     // sistema que no tenia derecho a preguntar-.
     const conEntrada = CASOS_DE_USO.filter((caso) => caso.invocarConEntradaInvalida !== null);
-    expect(conEntrada).toHaveLength(7);
+    expect(conEntrada).toHaveLength(9);
 
     for (const caso of conEntrada) {
       const invocar = caso.invocarConEntradaInvalida;
@@ -597,8 +672,8 @@ describe('QC-74 R13 — pertenencia exacta, sin jerarquia ni implicacion entre p
     }
   });
 
-  it('un actor con solo inventario.modificar es rechazado en los cinco casos de lectura', async () => {
-    expect(CASOS_DE_LECTURA).toHaveLength(5);
+  it('un actor con solo inventario.modificar es rechazado en los siete casos de lectura', async () => {
+    expect(CASOS_DE_LECTURA).toHaveLength(7);
 
     for (const caso of CASOS_DE_LECTURA) {
       await esperarRechazoSinEfectos(
@@ -671,7 +746,7 @@ describe('R1 / QC-74 R18 — el actor entra por parametro y no trae nombre de ro
     // llega al repositorio" (eso ya lo cierran los bloques de arriba), sino que el mismo
     // caso de uso con el mismo doble da resultados distintos cambiando solo `actor`.
     const repos = montarReposPermisivos();
-    const createProduct = createCreateProduct({ products: repos.products });
+    const createProduct = createCreateProduct({ products: repos.products, units: repos.units });
 
     await expect(createProduct(PRODUCTO_VALIDO_CON_LOTE, actorCon(MODIFICAR))).resolves.toEqual({
       id: 'producto-1',
@@ -813,5 +888,19 @@ describe('R21 — canAdjustBatchStock, el predicado de presentacion', () => {
   it('R21: no hay implicacion entre permisos', () => {
     expect(canAdjustBatchStock(actorCon(CONSULTAR))).toBe(false);
     expect(canAdjustBatchStock(actorCon(MODIFICAR))).toBe(true);
+  });
+});
+
+describe('QC-199 — alta de insumo por unidad', () => {
+  it('R8 sin inventario.modificar se rechaza antes de zod y sin consultar unidades ni productos', async () => {
+    for (const actor of [actorCon(), actorCon(CONSULTAR), null, undefined]) {
+      for (const entrada of [PRODUCTO_VALIDO_CON_LOTE, ENTRADA_INVALIDA]) {
+        const repos = montarReposQueFallan();
+        const createProduct = createCreateProduct({ products: repos.products, units: repos.units });
+
+        await expect(createProduct(entrada, actor)).rejects.toBeInstanceOf(UnauthorizedError);
+        afirmarQueNingunMetodoFueLlamado(repos);
+      }
+    }
   });
 });

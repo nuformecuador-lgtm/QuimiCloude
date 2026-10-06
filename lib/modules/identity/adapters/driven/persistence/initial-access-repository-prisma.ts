@@ -164,6 +164,45 @@ export function createInitialAccessRepository(
         throw error;
       }
     },
+
+    async createInitialMaestro(input) {
+      // Sin `catch` de P2002: el dominio ya comprobo los choques antes de escribir, asi que
+      // aqui un duplicado es una carrera o un choque real y la transaccion entera se deshace.
+      const created = await db.user.create({
+        data: {
+          roleId: input.roleId,
+          accountStatus: input.accountStatus,
+          username: input.username,
+          email: input.email,
+          passwordHash: input.passwordHash,
+          firstNames: input.firstNames,
+          lastNames: input.lastNames,
+          birthDate: input.birthDate,
+          phone: input.phone,
+          documentTypeCode: input.documentTypeCode,
+          documentNumber: input.documentNumber,
+          // Igual que el Administrador inicial: su contrasena viene de una variable de despliegue.
+          mustChangeCredential: true,
+        },
+      });
+      return { id: created.id };
+    },
+
+    // `$queryRaw` con `lower(...)` y no `mode: 'insensitive'`: este genera `ILIKE`, que no
+    // usa los indices funcionales sobre `lower(...)`.
+    async countLiveUsersWithUsername(username) {
+      const rows = await db.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(*)::int AS "count" FROM "users"
+        WHERE lower("username") = lower(${username}) AND "deleted_at" IS NULL`;
+      return rows[0]?.count ?? 0;
+    },
+
+    async countLiveUsersWithoutCompanyWithEmail(email) {
+      const rows = await db.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(*)::int AS "count" FROM "users"
+        WHERE lower("email") = lower(${email}) AND "company_id" IS NULL AND "deleted_at" IS NULL`;
+      return rows[0]?.count ?? 0;
+    },
   };
 }
 

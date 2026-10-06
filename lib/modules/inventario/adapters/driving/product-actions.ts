@@ -2,7 +2,15 @@
 
 import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import { InventarioError, PRODUCT_TYPES, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
+import {
+  InventarioError,
+  PRODUCT_TYPES,
+  type Actor,
+  type FinishedStockRow,
+  type Page,
+  type ProductFormUnits,
+  type ProductView,
+} from '@/lib/modules/inventario';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Aqui no se repite `requirePermission`: es la primera linea de cada caso de uso.
@@ -23,6 +31,14 @@ export type ProductQueryResult =
 
 export type ProductListResult =
   | { status: 'success'; data: Page<ProductView> }
+  | ErrorState;
+
+export type FinishedStockListResult =
+  | { status: 'success'; data: Page<FinishedStockRow> }
+  | ErrorState;
+
+export type ProductFormUnitsResult =
+  | { status: 'success'; data: ProductFormUnits }
   | ErrorState;
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
@@ -99,7 +115,8 @@ function buildProductFields(formData: FormData): Record<string, unknown> | typeo
  * Construye el candidato segun el tipo de producto.
  * El esquema es una union discriminada, asi que solo se pasan los campos relevantes.
  * Los tres tipos crean lote; MACHINE omite `qtyAlert` y solo lleva stock + purchaseDate
- * (el formulario no pinta presentacion ni costos para Instrumento).
+ * (el formulario no pinta presentacion ni costos para Instrumento). El insumo lleva su
+ * unidad y el envase su presentacion fija.
  */
 function buildCreateProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
   const type = readOptionalFormString(formData, 'type') || PRODUCT_TYPES.PRODUCT;
@@ -122,12 +139,17 @@ function buildCreateProductCandidate(formData: FormData): unknown | typeof INVAL
     name,
     type,
     stock,
-    presentationId: readOptionalFormString(formData, 'presentationId'),
     unitCost: readOptionalFormString(formData, 'unitCost'),
     totalCost: readOptionalFormString(formData, 'totalCost'),
     lot: readOptionalFormString(formData, 'lot'),
     purchaseDate: readOptionalFormString(formData, 'purchaseDate'),
   } as Record<string, unknown>;
+
+  if (type === PRODUCT_TYPES.PRODUCT) {
+    candidate.unitId = readOptionalFormString(formData, 'unitId');
+  } else {
+    candidate.presentationId = readOptionalFormString(formData, 'presentationId');
+  }
 
   // PACKAGING no tiene expiryDate
   if (type !== PRODUCT_TYPES.PACKAGING) {
@@ -235,6 +257,29 @@ export async function listProductsAction(query: unknown): Promise<ProductListRes
 
   try {
     const data = await inventario.listProducts(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** La pestana de producto terminado, una fila por pedido. `query` llega `unknown`, como arriba. */
+export async function listFinishedStockAction(query: unknown): Promise<FinishedStockListResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await inventario.listFinishedStock(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function listProductFormUnitsAction(): Promise<ProductFormUnitsResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await inventario.listProductFormUnits(actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

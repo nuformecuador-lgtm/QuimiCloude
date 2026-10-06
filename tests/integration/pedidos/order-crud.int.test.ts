@@ -46,7 +46,25 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma'
+import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
+import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
+import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
+
+import type { Actor } from '@/lib/modules/pedidos'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
+import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
+import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
+import { findMassVolumeBridge } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento
@@ -341,7 +359,10 @@ async function createOrder(
       createdAt: seed.createdAt,
       createdBy: f.userId,
       updatedBy: f.userId,
-      presentationId: seed.presentationId,
+      presentationLines:
+        seed.presentationId === undefined || seed.presentationId === null
+          ? undefined
+          : { create: [{ companyId: f.companyId, presentationId: seed.presentationId, packages: 1 }] },
     },
     select: { id: true },
   })
@@ -850,8 +871,8 @@ describe('que devuelven las lecturas (R40)', () => {
   })
 })
 
-describe('QC-146 — la presentacion del pedido, contra la base', () => {
-  it('R5: la baja logica conserva la presentacion', async () => {
+describe('QC-146 — la presentacion del pedido, contra la base (hoy, su linea de reparto)', () => {
+  it('R5: la baja logica conserva el reparto', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const id = await createOrder(tx, f, { presentationId: f.presentationId })
@@ -860,14 +881,14 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
 
       const stored = await tx.order.findUniqueOrThrow({
         where: { id },
-        select: { presentationId: true, deletedAt: true },
+        select: { presentationLines: { select: { presentationId: true } }, deletedAt: true },
       })
       expect(stored.deletedAt).not.toBeNull()
-      expect(stored.presentationId).toBe(f.presentationId)
+      expect(stored.presentationLines).toEqual([{ presentationId: f.presentationId }])
     })
   })
 
-  it('R9: editar sustituye la presentacion por otra de la misma empresa', async () => {
+  it('R9: editar sustituye la presentacion de la linea por otra de la misma empresa', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const otraPresentacion = (
@@ -883,9 +904,15 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
       ).id
       const id = await createOrder(tx, f, { presentationId: f.presentationId })
 
-      await tx.order.update({ where: { id }, data: { presentationId: otraPresentacion } })
+      await tx.orderPresentationLine.updateMany({
+        where: { orderId: id },
+        data: { presentationId: otraPresentacion },
+      })
 
-      const stored = await tx.order.findUniqueOrThrow({ where: { id }, select: { presentationId: true } })
+      const stored = await tx.orderPresentationLine.findFirstOrThrow({
+        where: { orderId: id },
+        select: { presentationId: true },
+      })
       expect(stored.presentationId).toBe(otraPresentacion)
       expect(stored.presentationId).not.toBe(f.presentationId)
     })
@@ -917,7 +944,8 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
       })
 
       const id = await createOrder(tx, f, { presentationId: f.presentationId })
-      await tx.order.update({ where: { id }, data: { presentationId: f.presentationId, priority: 'ALTA' } })
+      await tx.order.update({ where: { id }, data: { priority: 'ALTA' } })
+      await tx.orderPresentationLine.updateMany({ where: { orderId: id }, data: { packages: 2 } })
 
       const stockDespues = await tx.productBatch.findUniqueOrThrow({
         where: { id: batch.id },
@@ -926,6 +954,294 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
       expect(stockDespues.stock.toFixed(4)).toBe(batch.stock.toFixed(4))
       const movimientos = await tx.inventoryMovement.count({ where: { batchId: batch.id } })
       expect(movimientos).toBe(0)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// QC-138 — alta y edicion que bloquean, contra la base y dentro de la transaccion del caso
+// ---------------------------------------------------------------------------
+
+/**
+ * Los casos de uso REALES de alta y edicion sobre la transaccion del caso. La unidad de trabajo
+ * abre un SAVEPOINT y lo deshace si el trabajo lanza: es lo que hace la transaccion propia de
+ * `withOrderTransaction`, y asi «no queda nada escrito» se mide de verdad sin committear. Los
+ * adaptadores de dentro (pedido, reservas, receta) son los reales; los catalogos de fuera leen
+ * por la misma transaccion porque los reales usan el cliente global y no verian el fixture.
+ * El importe no se mide aqui: sin lotes costeables sale siempre nulo.
+ */
+function casosDeUsoSobre(tx: Prisma.TransactionClient) {
+  const unitOfWork: OrderUnitOfWork = {
+    async run(work) {
+      savepointSeq += 1
+      const savepoint = `uow_${String(savepointSeq)}`
+      await tx.$executeRawUnsafe(`SAVEPOINT ${savepoint}`)
+      try {
+        const result = await work({
+          orders: createOrderWriteRepository(tx),
+          reservations: createMaterialReservations(tx),
+          recipes: createRecipeExecutionReader(tx),
+          ...orderScopeReaders(tx),
+          finishedGoods: createFinishedGoodsIntake(tx),
+        })
+        await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${savepoint}`)
+        return result
+      } catch (error) {
+        await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${savepoint}`)
+        throw error
+      }
+    },
+  }
+  const orders = {
+    findAliveById: (id: string, scope: { companyId: string }) =>
+      createOrderWriteRepository(tx).lockAliveById(id, scope),
+  } as unknown as OrderRepository
+  const recipes = {
+    findRefsIncludingDeleted: async (ids: readonly string[], companyId: string) =>
+      (
+        await tx.recipe.findMany({
+          where: { id: { in: [...ids] }, companyId },
+          select: { id: true, name: true, deletedAt: true, parent: { select: { id: true, name: true } } },
+        })
+      ).map((r) => ({
+        id: r.id,
+        name: r.name,
+        ownName: r.name,
+        isDeleted: r.deletedAt !== null,
+        // Desde QC-172 el alta distingue original de version: estas recetas son originales.
+        isUnderReview: false,
+        original: r.parent,
+      })),
+    findExecutionContentById: createRecipeExecutionReader(tx).findExecutionContentById,
+  } as unknown as RecipeCatalog
+  const presentations = {
+    findRefs: async (ids: readonly string[], companyId: string) =>
+      (
+        await tx.presentation.findMany({
+          where: { id: { in: [...ids] }, companyId },
+          select: { id: true, name: true },
+        })
+      ).map((p) => ({ id: p.id, name: p.name, content: null })),
+  } as unknown as PresentationCatalog
+  const products = { findRefs: async () => [], findCostingBatches: async () => [] } as unknown as ProductCatalog
+  const units = {
+    findRefs: async (ids: readonly string[], companyId: string) =>
+      (
+        await tx.unit.findMany({
+          where: { id: { in: [...ids] }, OR: [{ companyId }, { companyId: null }] },
+          select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
+        })
+      ).map((u) => ({ ...u, factor: u.factor === null ? null : u.factor.toFixed(4) })),
+    findRefsSharingBaseInCompany: async () => [],
+    findMassVolumeBridge: () => findMassVolumeBridge(tx),
+  } as unknown as UnitCatalog
+  const now = () => new Date()
+  return {
+    createOrder: createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
+    updateOrder: createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
+  }
+}
+
+/** Un ingrediente con un solo lote de `stock` y una linea al 100 % en la receta del fixture. */
+async function seedIngredient(tx: Prisma.TransactionClient, f: Fixtures, stock: string): Promise<string> {
+  const marca = token()
+  const product = await tx.product.create({
+    data: {
+      name: `Ingrediente ${marca}`,
+      nameNormalized: `ingrediente${marca}`,
+      companyId: f.companyId,
+      unitId: f.unitId,
+    },
+    select: { id: true },
+  })
+  await tx.productBatch.create({
+    data: {
+      productId: product.id,
+      presentationId: f.presentationId,
+      stock: new Prisma.Decimal(stock),
+      unitCost: new Prisma.Decimal('5'),
+      lot: `L${marca.slice(0, 10)}`,
+      purchaseDate: new Date('2026-01-01'),
+      companyId: f.companyId,
+    },
+  })
+  await tx.recipeLine.create({
+    data: { recipeId: f.recipeId, productId: product.id, percentage: new Prisma.Decimal('100.00') },
+  })
+  return product.id
+}
+
+function actorDelFixture(f: Fixtures): Actor {
+  return { id: f.userId, companyId: f.companyId, permissions: ['pedidos.consultar', 'pedidos.modificar'] }
+}
+
+function entrada(f: Fixtures, quantity: string, confirmBlocked?: boolean) {
+  return {
+    recipeId: f.recipeId,
+    quantity,
+    unitId: f.unitId,
+    ...(confirmBlocked === undefined ? {} : { confirmBlocked }),
+  }
+}
+
+async function codigoDe(promesa: Promise<unknown>): Promise<string | null> {
+  return promesa.then(
+    () => null,
+    (error: unknown) => (error as { code?: string }).code ?? String(error),
+  )
+}
+
+async function estadoDe(tx: Prisma.TransactionClient, id: string) {
+  const row = await tx.order.findUniqueOrThrow({
+    where: { id },
+    select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true },
+  })
+  const movimientos = await tx.reservationMovement.findMany({
+    where: { orderId: id },
+    select: { kind: true, quantity: true, createdBy: true },
+    orderBy: { createdAt: 'asc' },
+  })
+  return {
+    status: row.status,
+    reservedAt: row.reservedAt,
+    ingredientsCost: row.ingredientsCost,
+    quantity: row.quantity.toFixed(4),
+    movimientos: movimientos.map((m) => ({
+      kind: m.kind,
+      quantity: m.quantity.toFixed(4),
+      createdBy: m.createdBy,
+    })),
+  }
+}
+
+describe('QC-138 — el alta y la edicion bloquean con confirmacion, contra la base', () => {
+  it('R1, R6: alta que no alcanza sin confirmacion -> order_would_block y ninguna fila, ni pedido ni movimiento', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      await seedIngredient(tx, f, '5')
+      const c = casosDeUsoSobre(tx)
+
+      expect(await codigoDe(c.createOrder(entrada(f, '10'), actorDelFixture(f)))).toBe('order_would_block')
+
+      expect(await tx.order.count({ where: { companyId: f.companyId } })).toBe(0)
+      expect(await tx.reservationMovement.count({ where: { companyId: f.companyId } })).toBe(0)
+    })
+  })
+
+  it('R5, R8: alta confirmada que no alcanza -> BLOQUEADO, sin apartado, reserved_at nulo y sin importe', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      await seedIngredient(tx, f, '5')
+      const c = casosDeUsoSobre(tx)
+
+      const creado = await c.createOrder(entrada(f, '10', true), actorDelFixture(f))
+
+      expect(await estadoDe(tx, creado.id)).toEqual({
+        status: 'BLOQUEADO',
+        reservedAt: null,
+        ingredientsCost: null,
+        quantity: '10.0000',
+        movimientos: [],
+      })
+    })
+  })
+
+  it('R8, R10: alta confirmada que si alcanza -> PENDIENTE con su material apartado', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      await seedIngredient(tx, f, '50')
+      const c = casosDeUsoSobre(tx)
+
+      const creado = await c.createOrder(entrada(f, '10', true), actorDelFixture(f))
+
+      const estado = await estadoDe(tx, creado.id)
+      expect(estado.status).toBe('PENDIENTE')
+      expect(estado.reservedAt).not.toBeNull()
+      expect(estado.movimientos).toEqual([{ kind: 'reserve', quantity: '10.0000', createdBy: f.userId }])
+    })
+  })
+
+  it('R2: receta sin lineas -> PENDIENTE sin pedir confirmacion', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const c = casosDeUsoSobre(tx)
+
+      const creado = await c.createOrder(entrada(f, '10'), actorDelFixture(f))
+
+      const estado = await estadoDe(tx, creado.id)
+      expect(estado.status).toBe('PENDIENTE')
+      expect(estado.reservedAt).toBeNull()
+      expect(estado.movimientos).toEqual([])
+    })
+  })
+
+  it('R10, R26: editar un BLOQUEADO hasta que alcanza lo desbloquea y aparta', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      await seedIngredient(tx, f, '5')
+      const c = casosDeUsoSobre(tx)
+      const creado = await c.createOrder(entrada(f, '10', true), actorDelFixture(f))
+
+      await c.updateOrder(creado.id, entrada(f, '4'), actorDelFixture(f))
+
+      const estado = await estadoDe(tx, creado.id)
+      expect(estado.status).toBe('PENDIENTE')
+      expect(estado.quantity).toBe('4.0000')
+      expect(estado.reservedAt).not.toBeNull()
+      expect(estado.movimientos).toEqual([{ kind: 'reserve', quantity: '4.0000', createdBy: f.userId }])
+    })
+  })
+
+  it('R6: editar un PENDIENTE hasta que no alcanza sin confirmacion -> order_would_block y nada cambia', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      await seedIngredient(tx, f, '20')
+      const c = casosDeUsoSobre(tx)
+      const creado = await c.createOrder(entrada(f, '10'), actorDelFixture(f))
+      const antes = await estadoDe(tx, creado.id)
+
+      expect(await codigoDe(c.updateOrder(creado.id, entrada(f, '30'), actorDelFixture(f)))).toBe(
+        'order_would_block',
+      )
+
+      expect(await estadoDe(tx, creado.id)).toEqual(antes)
+    })
+  })
+
+  it('R11: un PENDIENTE que pasa a BLOQUEADO libera todo lo apartado con quien edita como autor', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      await seedIngredient(tx, f, '20')
+      const c = casosDeUsoSobre(tx)
+      const creado = await c.createOrder(entrada(f, '10'), actorDelFixture(f))
+
+      await c.updateOrder(creado.id, entrada(f, '30', true), actorDelFixture(f))
+
+      const estado = await estadoDe(tx, creado.id)
+      expect(estado.status).toBe('BLOQUEADO')
+      expect(estado.reservedAt).toBeNull()
+      expect(estado.ingredientsCost).toBeNull()
+      expect(estado.movimientos).toEqual([
+        { kind: 'reserve', quantity: '10.0000', createdBy: f.userId },
+        { kind: 'release', quantity: '10.0000', createdBy: f.userId },
+      ])
+    })
+  })
+
+  it('R12: un EN_CURSO que deja de alcanzar -> insufficient_material sin escribir nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      await seedIngredient(tx, f, '20')
+      const c = casosDeUsoSobre(tx)
+      const creado = await c.createOrder(entrada(f, '10'), actorDelFixture(f))
+      await tx.order.update({ where: { id: creado.id }, data: { status: 'EN_CURSO' } })
+      const antes = await estadoDe(tx, creado.id)
+
+      expect(await codigoDe(c.updateOrder(creado.id, entrada(f, '30', true), actorDelFixture(f)))).toBe(
+        'insufficient_material',
+      )
+
+      expect(await estadoDe(tx, creado.id)).toEqual(antes)
     })
   })
 })

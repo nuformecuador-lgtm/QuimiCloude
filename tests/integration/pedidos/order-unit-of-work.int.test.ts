@@ -32,6 +32,7 @@ import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-s
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 import type { OrderTransactionScope } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { NewOrder } from '@/lib/modules/pedidos/domain/order-view';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
@@ -64,6 +65,7 @@ function runInOrderTransaction<T>(work: (scope: OrderTransactionScope) => Promis
       orders: createOrderWriteRepository(tx),
       reservations: createMaterialReservations(tx),
       recipes: createRecipeExecutionReader(tx),
+      ...orderScopeReaders(tx),
       finishedGoods: createFinishedGoodsIntake(tx),
     }),
   );
@@ -175,8 +177,8 @@ function newOrder(fixture: Fixture, quantity = '1.0000'): NewOrder {
     quantity,
     priority: 'BAJA',
     status: 'PENDIENTE',
-    presentationId: fixture.presentationId,
-    presentationContent: null,
+    unitId: fixture.unitId,
+    presentationLines: [],
   };
 }
 

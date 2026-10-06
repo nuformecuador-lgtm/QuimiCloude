@@ -18,7 +18,12 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { canModifyAssignments, requirePermission, type Actor } from '@/lib/modules/asignaciones/domain/actor';
+import {
+  canExecuteAssignedOrders,
+  canModifyAssignments,
+  requirePermission,
+  type Actor,
+} from '@/lib/modules/asignaciones/domain/actor';
 import { AsignacionesError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
 import {
   createListAssignedOrders,
@@ -303,11 +308,11 @@ describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
     for (const doble of todos) expect(doble).not.toHaveBeenCalled();
   });
 
-  it('con `asignaciones.consultar` SI llega al repositorio', async () => {
+  it('con `asignaciones.consultar` y `asignaciones.ejecutar` SI llega al repositorio', async () => {
     const { deps, todos } = montarDeps();
     const listAssignedOrders = createListAssignedOrders(deps);
 
-    await listAssignedOrders(conPermisos('asignaciones.consultar'), { page: 1 });
+    await listAssignedOrders(conPermisos('asignaciones.consultar', 'asignaciones.ejecutar'), { page: 1 });
 
     expect(todos[0]).toHaveBeenCalledTimes(1);
   });
@@ -625,7 +630,7 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
       pageSize: 1,
       totalPages: 1,
     }));
-    const finishPackingAliveById = vi.fn(async () => 'ok' as const);
+    const finishPackingAliveById = vi.fn(async () => ({ kind: 'ok' as const, finishedGoods: [] }));
     const deps = {
       orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById },
     } as unknown as FinishPackingDeps;
@@ -655,5 +660,57 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
     await finishPacking(conPermisos(PERMISO_EMPAQUE), { orderId: PEDIDO });
 
     expect(finishPackingAliveById).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('`canExecuteAssignedOrders`', () => {
+  const PERMISO_EJECUCION: PermissionCode = 'asignaciones.ejecutar';
+
+  it('R9: verdadero con `asignaciones.ejecutar`, solo o acompanado', () => {
+    expect(canExecuteAssignedOrders(conPermisos(PERMISO_EJECUCION))).toBe(true);
+    expect(canExecuteAssignedOrders(conPermisos('asignaciones.consultar', PERMISO_EJECUCION))).toBe(true);
+  });
+
+  it('R9: falso sin el permiso, aunque traiga `asignaciones.consultar` o `empaque.modificar`', () => {
+    expect(canExecuteAssignedOrders(conPermisos('asignaciones.consultar'))).toBe(false);
+    expect(canExecuteAssignedOrders(conPermisos('empaque.modificar'))).toBe(false);
+    expect(canExecuteAssignedOrders(conPermisos('asignaciones.consultar', 'empaque.modificar', 'terminados.consultar'))).toBe(
+      false,
+    );
+    expect(canExecuteAssignedOrders(conPermisos('asignaciones.modificar'))).toBe(false);
+  });
+
+  it('R9: falla cerrado y no lanza ante actor nulo, ausente, sin conjunto o con el conjunto vacio', () => {
+    for (const [nombre, actor] of ACTORES_DENEGADOS) {
+      expect(() => canExecuteAssignedOrders(actor), nombre).not.toThrow();
+      expect(canExecuteAssignedOrders(actor), nombre).toBe(false);
+    }
+  });
+
+  it('R9: responde lo mismo que `requirePermission(actor, asignaciones.ejecutar)` sobre la matriz', () => {
+    const casos: ReadonlyArray<Actor | null | undefined> = [
+      ...ACTORES_DENEGADOS.map(([, actor]) => actor),
+      conPermisos(PERMISO_EJECUCION),
+      conPermisos('asignaciones.consultar'),
+      conPermisos('empaque.modificar'),
+      conPermisos('asignaciones.ejecutarr'),
+      conPermisos('asignaciones.*'),
+      conPermisos('asignaciones.consultar', PERMISO_EJECUCION),
+    ];
+    for (const actor of casos) {
+      let autorizado = true;
+      try {
+        requirePermission(actor, PERMISO_EJECUCION);
+      } catch {
+        autorizado = false;
+      }
+      expect(canExecuteAssignedOrders(actor), JSON.stringify(actor)).toBe(autorizado);
+    }
+  });
+
+  it('R9: el modulo lo publica en su contrato', async () => {
+    const contrato = await import('@/lib/modules/asignaciones');
+    expect(contrato.canExecuteAssignedOrders(conPermisos(PERMISO_EJECUCION))).toBe(true);
+    expect(contrato.canExecuteAssignedOrders(conPermisos('asignaciones.consultar'))).toBe(false);
   });
 });

@@ -108,3 +108,17 @@ export function subtractDecimal(a: string, b: string): string {
 
   return formatDecimal({ unscaled: leftUnscaled - rightUnscaled, scale });
 }
+/**
+ * Cociente de dos decimales en texto, truncado a `scale` decimales. `null` si un operando no es
+ * un decimal valido o el divisor es cero.
+ */
+export function divideDecimal(a: string, b: string, scale: number): string | null {
+  const left = parseDecimal(a);
+  const right = parseDecimal(b);
+  if (left === null || right === null || right.unscaled === ZERO) return null;
+
+  const power = (digits: number): bigint => BigInt(10) ** BigInt(digits);
+  const unscaled =
+    (left.unscaled * power(right.scale + scale)) / (right.unscaled * power(left.scale));
+  return formatDecimal({ unscaled, scale });
+}

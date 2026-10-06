@@ -21,10 +21,12 @@ const REQUERIDOS = { qtyAlert: '0' } as const;
 /** Unidad de fixture para las presentaciones (QC-80 R10). */
 const UNIDAD_FIXTURE = '11111111-1111-4111-8111-111111111111';
 
+/** Unidad del insumo de fixture. */
+const KG_FIXTURE = '22222222-2222-4222-8222-222222222222';
+
 /** Lote minimo valido para PRODUCT/PACKAGING (el `type` lo pone el preprocess si falta). */
 const LOTE_MINIMO = {
   stock: '1',
-  presentationId: UNIDAD_FIXTURE,
   unitCost: '10.0000',
 } as const;
 
@@ -33,6 +35,16 @@ const ALTA_PRODUCTO = {
   name: 'Producto',
   ...REQUERIDOS,
   ...LOTE_MINIMO,
+  unitId: KG_FIXTURE,
+} as const;
+
+/** Envase valido para el ALTA: su presentacion fija viaja en el borde. */
+const ALTA_ENVASE = {
+  name: 'Bidon',
+  type: PRODUCT_TYPES.PACKAGING,
+  ...REQUERIDOS,
+  ...LOTE_MINIMO,
+  presentationId: UNIDAD_FIXTURE,
 } as const;
 
 /** Producto valido para la EDICION (base del producto, sin lote). */
@@ -158,6 +170,8 @@ describe('createProductSchema', () => {
       softDeleteAlive: vi.fn(),
       listAlive: vi.fn(),
       findAliveIdByNameInPresentationUnit: vi.fn(),
+      findAliveIdByNameInUnit: vi.fn(),
+      findAlivePackagingByName: vi.fn(),
       createWithFirstBatch: vi.fn(),
       addBatchToAlive: vi.fn(),
       adjustBatchStock: vi.fn(),
@@ -171,7 +185,7 @@ describe('createProductSchema', () => {
         name: 'Producto',
         stock: '0',
         qtyAlert: '0',
-        presentationId: UNIDAD_FIXTURE,
+        unitId: KG_FIXTURE,
         unitCost: '10.0000',
         cost: '10.0000',
       },
@@ -182,26 +196,76 @@ describe('createProductSchema', () => {
     expect((error as ValidationError).code).toBe('invalid_input');
     expect(products.create).not.toHaveBeenCalled();
     expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
+    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
   });
 
-  it('el alta NO acepta ninguna unidad: `unitId` es campo desconocido (QC-80, R21)', () => {
-    // R21
-    const conUnidad = { ...ALTA_PRODUCTO, unitId: '22222222-2222-4222-8222-222222222222' };
-    expect(createProductSchema.safeParse(conUnidad).success).toBe(false);
-    expect(updateProductSchema.safeParse({ ...EDICION_PRODUCTO, unitId: conUnidad.unitId }).success).toBe(false);
-    expect(createProductSchema.safeParse({ ...ALTA_PRODUCTO, unitId: null }).success).toBe(false);
+  it('R6 el alta de insumo exige unitId', () => {
+    const sinUnidad = Object.fromEntries(Object.entries(ALTA_PRODUCTO).filter(([key]) => key !== 'unitId'));
+    for (const entrada of [sinUnidad, { ...sinUnidad, unitId: null }, { ...sinUnidad, unitId: '' }]) {
+      const veredicto = createProductSchema.safeParse(entrada);
+      expect(veredicto.success, JSON.stringify(entrada)).toBe(false);
+      if (!veredicto.success) {
+        expect(veredicto.error.issues.some((issue) => issue.path[0] === 'unitId')).toBe(true);
+      }
+    }
+    expect(createProductSchema.parse(ALTA_PRODUCTO)).toMatchObject({
+      type: PRODUCT_TYPES.PRODUCT,
+      unitId: KG_FIXTURE,
+    });
+  });
 
-    const veredicto = createProductSchema.safeParse(conUnidad);
+  it('R6 el alta de insumo con presentationId es invalid_input', () => {
+    const veredicto = createProductSchema.safeParse({ ...ALTA_PRODUCTO, presentationId: UNIDAD_FIXTURE });
     expect(veredicto.success).toBe(false);
     if (!veredicto.success) {
       expect(
         veredicto.error.issues.some(
-          (issue) => issue.code === 'unrecognized_keys' && issue.keys.includes('unitId'),
+          (issue) => issue.code === 'unrecognized_keys' && issue.keys.includes('presentationId'),
         ),
       ).toBe(true);
     }
+    // Ni siquiera nula: la clave no existe en la rama del insumo.
+    expect(createProductSchema.safeParse({ ...ALTA_PRODUCTO, presentationId: null }).success).toBe(false);
+  });
+
+  it('R6 el caso de uso rechaza con invalid_input el alta de insumo con presentationId sin consultar ni escribir', async () => {
+    const products = {
+      findAliveIdByNameInUnit: vi.fn(),
+      findAliveIdByNameInPresentationUnit: vi.fn(),
+      createWithFirstBatch: vi.fn(),
+      addBatchToAlive: vi.fn(),
+    };
+    const units = { findRefs: vi.fn() };
+    const createProduct = createCreateProduct({ products: products as never, units });
+
+    const error = await createProduct(
+      { ...ALTA_PRODUCTO, presentationId: UNIDAD_FIXTURE },
+      { id: 'actor-1', companyId: 'company-a', permissions: ['inventario.modificar'] },
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).code).toBe('invalid_input');
+    expect(units.findRefs).not.toHaveBeenCalled();
+    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+  });
+
+  it('R6 unitId con forma invalida da Elige una unidad.', () => {
+    for (const unitId of ['kg', '123', 42, undefined]) {
+      const veredicto = createProductSchema.safeParse({ ...ALTA_PRODUCTO, unitId });
+      expect(veredicto.success, String(unitId)).toBe(false);
+      if (!veredicto.success) {
+        const issue = veredicto.error.issues.find((candidate) => candidate.path[0] === 'unitId');
+        expect(issue?.message).toBe('Elige una unidad.');
+      }
+    }
+  });
+
+  it('la edicion no acepta unitId', () => {
+    expect(updateProductSchema.safeParse({ ...EDICION_PRODUCTO, unitId: KG_FIXTURE }).success).toBe(false);
   });
 
   it('exige qtyAlert, y ahora lo acepta decimal de hasta cuatro decimales, cero o mas', () => {
@@ -211,6 +275,7 @@ describe('createProductSchema', () => {
     const soloObligatoriosDeAntes = {
       name: 'Producto',
       ...LOTE_MINIMO,
+      unitId: KG_FIXTURE,
       type: PRODUCT_TYPES.PRODUCT,
     };
 
@@ -243,15 +308,14 @@ describe('createProductSchema', () => {
     }
 
     // Los campos del primer lote viajan en el ALTA (QC-90), asi que ademas de nombre, alerta
-    // y tipo quedan existencia, presentacion y costos -este ultimo con su default `PRODUCT`
-    // puesto por el esquema, aunque la entrada no lo haya declarado-.
+    // y tipo quedan existencia, unidad y costos.
     expect(Object.keys(parsed).sort()).toEqual([
       'name',
-      'presentationId',
       'qtyAlert',
       'stock',
       'type',
       'unitCost',
+      'unitId',
     ]);
   });
 
@@ -271,7 +335,7 @@ describe('createProductSchema', () => {
 });
 
 describe('union discriminada por tipo de producto', () => {
-  it('MACHINE crea producto + lote: sin qtyAlert, solo stock y purchaseDate en el borde', () => {
+  it('R11 el alta de instrumento no cambia', () => {
     // El formulario de Instrumento pinta unicamente existencia y fecha de compra (2026-09-23):
     // presentationId y unitCost son anulables SOLO para MACHINE.
     const machine = {
@@ -288,7 +352,7 @@ describe('union discriminada por tipo de producto', () => {
       name: 'Instrumento',
       stock: '1',
     });
-    expect(parsed.presentationId ?? null).toBeNull();
+    expect((parsed as { presentationId?: string | null }).presentationId ?? null).toBeNull();
     expect(parsed.unitCost ?? null).toBeNull();
 
     // purchaseDate viaja en el lote; presentationId y unitCost pueden venir si el llamante
@@ -315,7 +379,7 @@ describe('union discriminada por tipo de producto', () => {
       createProductSchema.safeParse({ name: 'Instrumento', type: PRODUCT_TYPES.MACHINE }).success,
     ).toBe(false);
 
-    // PRODUCT sigue exigiendo presentacion: la anulabilidad es UNICAMENTE de MACHINE.
+    // El insumo sin unidad se rechaza: lo opcional es UNICAMENTE de MACHINE.
     expect(
       createProductSchema.safeParse({
         name: 'Producto',
@@ -327,26 +391,49 @@ describe('union discriminada por tipo de producto', () => {
     ).toBe(false);
   });
 
-  it('PACKAGING acepta lote pero rechaza expiryDate', () => {
-    const packaging = {
-      name: 'Bidon',
-      type: PRODUCT_TYPES.PACKAGING,
-      ...REQUERIDOS,
-      ...LOTE_MINIMO,
-    };
+  it('R11 el alta de envase sigue exigiendo presentationId', () => {
+    const packaging = ALTA_ENVASE;
     expect(createProductSchema.safeParse(packaging).success).toBe(true);
+    // El envase no declara unidad: la recibe del sistema.
+    expect(createProductSchema.safeParse({ ...packaging, unitId: KG_FIXTURE }).success).toBe(false);
+
+    const sinPresentacion = Object.fromEntries(Object.entries(packaging).filter(([key]) => key !== 'presentationId'));
+    expect(createProductSchema.safeParse(sinPresentacion).success).toBe(false);
+    expect(createProductSchema.safeParse({ ...packaging, presentationId: null }).success).toBe(false);
 
     expect(
       createProductSchema.safeParse({ ...packaging, expiryDate: '2027-01-31' }).success,
     ).toBe(false);
   });
 
+  it('R7 — la existencia del alta de un PACKAGING es un numero entero de envases', () => {
+    const packaging = { ...ALTA_ENVASE, name: 'Botella' };
+    for (const stock of ['0', '100', '100.0000', '7.0']) {
+      expect(createProductSchema.safeParse({ ...packaging, stock }).success, stock).toBe(true);
+    }
+    for (const stock of ['2.5', '0.0001', '10.25']) {
+      expect(createProductSchema.safeParse({ ...packaging, stock }).success, stock).toBe(false);
+    }
+    // El decimal sigue valiendo para una materia prima.
+    expect(createProductSchema.safeParse({ ...ALTA_PRODUCTO, stock: '2.5' }).success).toBe(true);
+  });
+
+  it('R2 — la edicion de un PACKAGING no acepta presentacion: no se puede cambiar', () => {
+    expect(
+      updateProductSchema.safeParse({
+        name: 'Botella',
+        type: PRODUCT_TYPES.PACKAGING,
+        qtyAlert: '0',
+        presentationId: UNIDAD_FIXTURE,
+      }).success,
+    ).toBe(false);
+  });
+
   it('PRODUCT acepta expiryDate opcional', () => {
     const product = {
+      ...ALTA_PRODUCTO,
       name: 'Cloro',
       type: PRODUCT_TYPES.PRODUCT,
-      ...REQUERIDOS,
-      ...LOTE_MINIMO,
     };
     expect(createProductSchema.safeParse(product).success).toBe(true);
     expect(

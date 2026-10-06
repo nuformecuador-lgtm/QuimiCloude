@@ -3,11 +3,12 @@ import { ActionNotAllowedError, RecipeDuplicateNameError, ValidationError } from
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
 
-import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
+import { isIngredientType, type ProductCatalog } from '@/lib/modules/inventario';
 
 export type CreateRecipeDeps = {
   readonly recipes: RecipeRepository;
@@ -55,9 +56,10 @@ export function createCreateRecipe(
       const missing = productIds.some((id) => !foundIds.has(id));
       if (missing) throw new ValidationError();
 
-      const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
-      if (finished) throw new ActionNotAllowedError();
+      if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
+
+    await assertToolsValid(data.tools, [], deps.products, actor.companyId);
 
     // R21: sin imagen no se toca el almacenamiento en absoluto.
     let imagePath: string | null = null;
@@ -75,8 +77,10 @@ export function createCreateRecipe(
       name: data.name,
       description: data.description ?? null,
       steps: data.steps,
+      packingSteps: data.packingSteps,
       lines: data.lines,
       imagePath,
+      tools: data.tools,
     };
 
     // R8: el puerto traduce el `23505` del indice unico parcial a `'duplicate'`.

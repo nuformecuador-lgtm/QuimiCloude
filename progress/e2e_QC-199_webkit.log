@@ -1,0 +1,346 @@
+
+> quimicloude@0.1.0 e2e C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-199-presentacion-por-unidad-en-alta-de-producto
+> playwright test "e2e/insumo-por-unidad.spec.ts" "e2e/inventario.spec.ts" "e2e/pedido-bloqueado.spec.ts" "--project=webkit" "--reporter=line"
+
+[WebServer] 
+[WebServer] > quimicloude@0.1.0 dev C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-199-presentacion-por-unidad-en-alta-de-producto
+[WebServer] > next dev "--port" "3117"
+[WebServer] 
+
+[WebServer] ▲ Next.js 16.3.0 (Turbopack)
+
+[WebServer] - Local:         http://localhost:3117
+
+[WebServer] - Network:       http://172.29.16.1:3117
+[WebServer] - Environments: .env
+[WebServer] ✓ Ready in 802ms
+
+[WebServer] ✓ Running next.config.ts took 55ms
+
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+[WebServer] 
+
+[WebServer]  GET / 200 in 835ms (next.js: 325ms, proxy.ts: 204ms, application-code: 307ms)
+
+
+Running 10 tests using 6 workers
+
+[1/10] [webkit] › e2e\insumo-por-unidad.spec.ts:202:7 › alta de insumo por unidad › R19 el Administrador da de alta un insumo eligiendo kg, lo ve en el listado y en el panel de lotes en kg, y un segundo alta del mismo nombre en kg suma a ese producto
+[2/10] [webkit] › e2e\inventario.spec.ts:571:7 › catalogo de productos › el Administrador entra, da de alta un insumo eligiendo su unidad y lo ve en la lista (R4, R17, R18, R21)
+[3/10] [webkit] › e2e\inventario.spec.ts:815:7 › catalogo de productos › el alta de producto muestra el lote asignado en el aviso de éxito (R14, R17)
+[4/10] [webkit] › e2e\inventario.spec.ts:693:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18)
+[5/10] [webkit] › e2e\inventario.spec.ts:983:7 › catalogo de productos › el alta de envase crea su presentacion en linea, la deja elegida y no pierde lo escrito (QC-22 R24)
+[6/10] [webkit] › e2e\pedido-bloqueado.spec.ts:405:7 › pedido bloqueado por inventario insuficiente › R40, R7, R13, R14, R31 - un pedido sin material se guarda bloqueado, el Operador no puede entrar y un alta de lote lo deja pendiente con material apartado
+[WebServer]  GET /login 200 in 1596ms (next.js: 583ms, proxy.ts: 19ms, application-code: 994ms)
+
+[WebServer]  GET /login 200 in 905ms (next.js: 299ms, proxy.ts: 70ms, application-code: 536ms)
+
+[WebServer]  GET /login 200 in 897ms (next.js: 301ms, proxy.ts: 71ms, application-code: 525ms)
+
+[WebServer]  GET /login 200 in 902ms (next.js: 316ms, proxy.ts: 70ms, application-code: 517ms)
+
+[WebServer]  GET /login 200 in 894ms (next.js: 313ms, proxy.ts: 70ms, application-code: 511ms)
+
+[WebServer]  GET /login 200 in 844ms (next.js: 352ms, proxy.ts: 138ms, application-code: 354ms)
+
+[WebServer]  GET /dashboard 200 in 1510ms (next.js: 219ms, proxy.ts: 80ms, application-code: 1210ms)
+
+[WebServer]  GET /dashboard 200 in 1516ms (next.js: 378ms, proxy.ts: 75ms, application-code: 1063ms)
+
+[WebServer]  GET /dashboard 200 in 1526ms (next.js: 637ms, proxy.ts: 74ms, application-code: 815ms)
+
+[WebServer]  GET /dashboard 200 in 1526ms (next.js: 459ms, proxy.ts: 74ms, application-code: 993ms)
+
+[WebServer]  GET /dashboard 200 in 1539ms (next.js: 721ms, proxy.ts: 74ms, application-code: 744ms)
+
+[WebServer]  GET /dashboard 200 in 1521ms (next.js: 507ms, proxy.ts: 91ms, application-code: 924ms)
+
+[WebServer]  POST /login 200 in 3.9s (next.js: 234ms, proxy.ts: 40ms, application-code: 3.6s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1582ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /login 200 in 3.9s (next.js: 213ms, proxy.ts: 38ms, application-code: 3.7s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1572ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /login 200 in 3.9s (next.js: 198ms, proxy.ts: 35ms, application-code: 3.7s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1543ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /login 200 in 5.0s (next.js: 60ms, proxy.ts: 16ms, application-code: 4.9s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1567ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /login 200 in 5.0s (next.js: 1070ms, proxy.ts: 29ms, application-code: 3.9s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1591ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /login 200 in 5.0s (next.js: 1057ms, proxy.ts: 22ms, application-code: 3.9s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1567ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  GET /inventario?pageSize=25 200 in 3.9s (next.js: 192ms, proxy.ts: 34ms, application-code: 3.7s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 4.0s (next.js: 222ms, proxy.ts: 135ms, application-code: 3.6s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 4.0s (next.js: 229ms, proxy.ts: 122ms, application-code: 3.6s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 4.0s (next.js: 461ms, proxy.ts: 184ms, application-code: 3.4s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 3.9s (next.js: 877ms, proxy.ts: 39ms, application-code: 3.0s)
+
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 4.1s (next.js: 547ms, proxy.ts: 188ms, application-code: 3.3s)
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 199ms (next.js: 39ms, proxy.ts: 14ms, application-code: 146ms)
+[WebServer]   └─ ƒ listRecipesAction({"page":1,"pageSize":25,"search":"qc138_e2e_26cfb5df62114e6e99afc3f4e243ba20_receta"}) in 109ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 631ms (next.js: 22ms, proxy.ts: 17ms, application-code: 591ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 481ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 605ms (next.js: 40ms, proxy.ts: 57ms, application-code: 508ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 350ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 347ms (next.js: 50ms, proxy.ts: 49ms, application-code: 249ms)
+
+[WebServer]   └─ ƒ getRecipeAction("08907522-91f8-4188-94ec-5ffd309dcf07") in 136ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 546ms (next.js: 43ms, proxy.ts: 20ms, application-code: 483ms)
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 439ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 437ms (next.js: 92ms, proxy.ts: 31ms, application-code: 315ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 238ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 176ms (next.js: 47ms, proxy.ts: 22ms, application-code: 107ms)
+[WebServer]   └─ ƒ listRecipeVersionsAction("08907522-91f8-4188-94ec-5ffd309dcf07") in 65ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 568ms (next.js: 13ms, proxy.ts: 16ms, application-code: 538ms)
+[WebServer]   └─ ƒ listRecipeVersionsAction("08907522-91f8-4188-94ec-5ffd309dcf07") in 66ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+
+[7/10] [webkit] › e2e\inventario.spec.ts:862:7 › catalogo de productos › el mismo nombre en dos unidades son dos filas, cada una con su propia existencia (R26)
+[WebServer]  GET /inventario?pageSize=25 200 in 612ms (proxy.ts: 256ms)
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.1s (next.js: 429ms, proxy.ts: 129ms, application-code: 1523ms)
+
+[WebServer]   └─ ƒ quoteOrderCostAction({"quantity":"1500","recipeId":"08907522-91f8-4188-94ec-5ffd309dcf07"}) in 1130ms lib/modules/pedidos/adapters/driving/order-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 946ms (next.js: 187ms, proxy.ts: 385ms, application-code: 375ms)
+
+[WebServer]   └─ ƒ createPresentationAction({"status":"idle"}, {}) in 274ms lib/modules/inventario/adapters/driving/presentation-actions.ts
+
+[WebServer]  GET /login 200 in 680ms (next.js: 204ms, proxy.ts: 94ms, application-code: 382ms)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 3.7s (next.js: 51ms, proxy.ts: 29ms, application-code: 3.6s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 3.4s (next.js: 424ms, proxy.ts: 113ms, application-code: 2.9s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 3.3s (next.js: 460ms, proxy.ts: 255ms, application-code: 2.6s)
+
+[WebServer]  POST /inventario?pageSize=25 200 in 835ms (next.js: 104ms, proxy.ts: 15ms, application-code: 716ms)
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 536ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 313ms (next.js: 19ms, proxy.ts: 15ms, application-code: 279ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25}) in 192ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 264ms (next.js: 103ms, proxy.ts: 29ms, application-code: 132ms)
+
+[WebServer]   └─ ƒ quoteOrderPresentationAvailabilityAction({"presentationLines":[],"quantity":"1500","unitId":"51ee7e4e-3c2c-4f6c-b524-75808a47fba5"}) in 99ms lib/modules/pedidos/adapters/driving/order-actions.ts
+
+[8/10] [webkit] › e2e\inventario.spec.ts:632:7 › catalogo de productos › el alta con solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7)
+[WebServer]  POST /inventario?pageSize=25 200 in 1097ms (next.js: 120ms, proxy.ts: 105ms, application-code: 872ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 508ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 2.6s (next.js: 66ms, proxy.ts: 73ms, application-code: 2.5s)
+
+[WebServer]  GET /login 200 in 2.2s (next.js: 1261ms, proxy.ts: 37ms, application-code: 933ms)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 4.5s (next.js: 66ms, proxy.ts: 19ms, application-code: 4.4s)
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.1s (next.js: 553ms, proxy.ts: 265ms, application-code: 1322ms)
+
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 1190ms lib/modules/pedidos/adapters/driving/order-actions.ts
+
+[WebServer]  GET /dashboard 200 in 974ms (next.js: 133ms, proxy.ts: 58ms, application-code: 783ms)
+
+[WebServer]  POST /login 200 in 2.4s (next.js: 250ms, proxy.ts: 206ms, application-code: 1928ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 597ms lib/modules/identity/adapters/driving/login-action.ts
+
+[9/10] [webkit] › e2e\inventario.spec.ts:1033:7 › catalogo de productos › un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)
+[WebServer]  POST /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 159ms (next.js: 18ms, proxy.ts: 15ms, application-code: 126ms)
+[WebServer]   └─ ƒ listProductBatchesAction("2af4acf3-71ee-4a2a-a392-5aea7817adce") in 87ms lib/modules/inventario/adapters/driving/batch-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 360ms (next.js: 39ms, proxy.ts: 30ms, application-code: 291ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 253ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[10/10] [webkit] › e2e\inventario.spec.ts:754:7 › catalogo de productos › agregar un segundo lote a un producto existente suma su existencia en el listado, sin escribir el lote a mano (R22, R20)
+[WebServer]  GET /inventario?pageSize=25 200 in 3.0s (next.js: 41ms, proxy.ts: 16ms, application-code: 3.0s)
+
+[WebServer]  GET /login 200 in 1982ms (next.js: 262ms, proxy.ts: 265ms, application-code: 1455ms)
+
+[WebServer]  GET /login 200 in 1979ms (next.js: 269ms, proxy.ts: 265ms, application-code: 1445ms)
+
+[WebServer]  POST /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 3.7s (next.js: 30ms, proxy.ts: 14ms, application-code: 3.7s)
+
+[WebServer]   └─ ƒ createOrderAction({"status":"idle"}, {}) in 3205ms lib/modules/pedidos/adapters/driving/order-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 2.1s (next.js: 529ms, proxy.ts: 58ms, application-code: 1469ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25}) in 859ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /dashboard 200 in 3.5s (next.js: 383ms, proxy.ts: 184ms, application-code: 2.9s)
+
+[WebServer]  POST /login 200 in 6.0s (next.js: 258ms, proxy.ts: 252ms, application-code: 5.5s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 1042ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 2.3s (next.js: 511ms, proxy.ts: 539ms, application-code: 1276ms)
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 1174ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 4.5s (next.js: 803ms, proxy.ts: 49ms, application-code: 3.7s)
+
+[WebServer] ⨯ Error: aborted
+[WebServer]     at ignore-listed frames
+
+[WebServer]  POST /inventario?pageSize=25 200 in 2.6s (next.js: 198ms, proxy.ts: 29ms, application-code: 2.4s)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 1439ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25 200 in 5.1s (next.js: 28ms, proxy.ts: 38ms, application-code: 5.0s)
+
+[WebServer]  GET /login 200 in 4.1s (next.js: 522ms, proxy.ts: 317ms, application-code: 3.2s)
+
+[WebServer]  GET /dashboard 200 in 5.7s (next.js: 351ms, proxy.ts: 38ms, application-code: 5.3s)
+
+[WebServer]  POST /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 6.1s (next.js: 1591ms, proxy.ts: 237ms, application-code: 4.3s)
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 3448ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /login 200 in 6.8s (next.js: 20ms, proxy.ts: 10ms, application-code: 6.8s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 448ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  GET /dashboard 200 in 2.6s (next.js: 495ms, proxy.ts: 168ms, application-code: 1942ms)
+
+[WebServer]  POST /login 200 in 9.1s (next.js: 1332ms, proxy.ts: 333ms, application-code: 7.4s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 885ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 4.7s (next.js: 1324ms, proxy.ts: 319ms, application-code: 3.1s)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 2865ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 5.9s (next.js: 692ms, proxy.ts: 192ms, application-code: 5.0s)
+
+[WebServer]  GET /inventario 404 in 6.5s (next.js: 398ms, proxy.ts: 41ms, application-code: 6.0s)
+
+[WebServer]  POST /inventario?pageSize=25 200 in 5.0s (next.js: 352ms, proxy.ts: 1268ms, application-code: 3.4s)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 2196ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 8.0s (next.js: 439ms, proxy.ts: 100ms, application-code: 7.4s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 6.6s (next.js: 1351ms, proxy.ts: 945ms, application-code: 4.3s)
+
+[WebServer]  POST /inventario?pageSize=25 200 in 3.0s (next.js: 540ms, proxy.ts: 1422ms, application-code: 1009ms)
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 762ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+
+[WebServer]  GET /asignacion 200 in 9.1s (next.js: 1460ms, proxy.ts: 21ms, application-code: 7.6s)
+
+[WebServer]  POST /login 200 in 11.0s (next.js: 179ms, proxy.ts: 15ms, application-code: 10.8s)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 974ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  GET /inventario?pageSize=25 200 in 8.1s (next.js: 534ms, proxy.ts: 1266ms, application-code: 6.3s)
+
+[WebServer]  POST /inventario?pageSize=25 200 in 1544ms (next.js: 124ms, proxy.ts: 249ms, application-code: 1171ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 1108ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25&q=qc199_e2e_insumo_b63a0c972a24472c8715d064ba0293ea 200 in 351ms (next.js: 78ms, proxy.ts: 113ms, application-code: 159ms)
+[WebServer]   └─ ƒ listProductBatchesAction("2af4acf3-71ee-4a2a-a392-5aea7817adce") in 77ms lib/modules/inventario/adapters/driving/batch-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 475ms (next.js: 50ms, proxy.ts: 147ms, application-code: 278ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 255ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25 200 in 1319ms (next.js: 24ms, proxy.ts: 14ms, application-code: 1280ms)
+
+[WebServer]  GET /login 200 in 518ms (next.js: 35ms, proxy.ts: 8ms, application-code: 475ms)
+
+[WebServer]  POST /inventario?pageSize=25 200 in 494ms (next.js: 102ms, proxy.ts: 129ms, application-code: 262ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 189ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25 200 in 1416ms (next.js: 31ms, proxy.ts: 19ms, application-code: 1367ms)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 1918ms (next.js: 25ms, proxy.ts: 27ms, application-code: 1867ms)
+
+[WebServer]  GET /dashboard 200 in 1673ms (next.js: 313ms, proxy.ts: 995ms, application-code: 364ms)
+
+[WebServer]  POST /login 200 in 2.2s (next.js: 11ms, proxy.ts: 14ms, application-code: 2.2s)
+
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 368ms lib/modules/identity/adapters/driving/login-action.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 179ms (next.js: 40ms, proxy.ts: 21ms, application-code: 117ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 94ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25&q=qc138_e2e_26cfb5df62114e6e99afc3f4e243ba20_producto 200 in 2.1s (next.js: 20ms, proxy.ts: 9ms, application-code: 2.1s)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 3.1s (next.js: 1279ms, proxy.ts: 57ms, application-code: 1748ms)
+
+[WebServer]  POST /inventario?pageSize=25 200 in 87ms (next.js: 10ms, proxy.ts: 14ms, application-code: 63ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25}) in 45ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 90ms (next.js: 14ms, proxy.ts: 8ms, application-code: 67ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 49ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 76ms (next.js: 9ms, proxy.ts: 11ms, application-code: 55ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25}) in 38ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25&q=qc138_e2e_26cfb5df62114e6e99afc3f4e243ba20_producto 200 in 80ms (next.js: 8ms, proxy.ts: 9ms, application-code: 63ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25}) in 46ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 193ms (next.js: 32ms, proxy.ts: 12ms, application-code: 149ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 34ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25&q=qc138_e2e_26cfb5df62114e6e99afc3f4e243ba20_producto 200 in 305ms (next.js: 75ms, proxy.ts: 38ms, application-code: 191ms)
+
+[WebServer]   └─ ƒ listProductsAction({"filters":{"type":"[Object]"},"page":1,"pageSize":25,"...":"1 item not stringified"}) in 160ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 176ms (next.js: 32ms, proxy.ts: 9ms, application-code: 134ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 113ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25 200 in 136ms (next.js: 13ms, proxy.ts: 11ms, application-code: 112ms)
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 87ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  POST /inventario?pageSize=25&q=qc138_e2e_26cfb5df62114e6e99afc3f4e243ba20_producto 200 in 1168ms (next.js: 15ms, proxy.ts: 10ms, application-code: 1142ms)
+
+[WebServer]   └─ ƒ createProductAction({"status":"idle"}, {}) in 1085ms lib/modules/inventario/adapters/driving/product-actions.ts
+
+[WebServer]  GET /inventario?pageSize=25 200 in 1138ms (next.js: 89ms, proxy.ts: 13ms, application-code: 1037ms)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 890ms (next.js: 32ms, proxy.ts: 163ms, application-code: 695ms)
+
+[WebServer]  GET /inventario?pageSize=25 200 in 1860ms (next.js: 124ms, proxy.ts: 53ms, application-code: 1683ms)
+
+[WebServer]  GET /inventario?pageSize=25&q=qc138_e2e_26cfb5df62114e6e99afc3f4e243ba20_producto 200 in 2.3s (next.js: 13ms, proxy.ts: 9ms, application-code: 2.2s)
+
+[WebServer]  GET /pedidos?pageSize=25&sort=createdAt%3Adesc 200 in 2.4s (next.js: 28ms, proxy.ts: 16ms, application-code: 2.4s)
+
+  10 passed (1.9m)

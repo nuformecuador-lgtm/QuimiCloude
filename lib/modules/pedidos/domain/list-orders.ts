@@ -10,18 +10,26 @@ import type { ListFilterValue, ListQuery } from './list-query';
 import type { OrderSummary } from './order-view';
 import type { Page } from './page';
 
-import type { PresentationCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
+
+import { findPackagingNames, orderPackagingIds, orderPresentationIds, unitLabelOf } from './get-order';
 
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { OrderRepository } from '../ports/order-repository';
 
-/** QC-35bis (2026-09-07): sin unidad en el pedido, `units` deja de ser dependencia del listado. */
+/** La unidad vuelve al pedido: `units` VUELVE a ser dependencia del listado, UNA sola
+ *  llamada por pagina con los ids UNICOS. */
 export type ListOrdersDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina. */
   readonly presentations: PresentationCatalog;
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de los envases de la pagina. */
+  readonly packaging: PackagingCatalog;
+  /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de unidad de la pagina. */
+  readonly units: UnitCatalog;
   readonly log: ListQueryLog;
 };
 
@@ -100,11 +108,13 @@ function pruneClosedSelects(query: ListQuery): {
  *   4. el log de lo podado (R6).
  *   5. UNA llamada al repositorio, con la consulta YA SANEADA (R13).
  *   6. Ids DEDUPLICADOS con `Set` y UNA llamada al catalogo de recetas, con todos los ids de la
- *      pagina a la vez (R45).
+ *      pagina a la vez; lo mismo con las presentaciones y con las
+ *      unidades: una llamada por catalogo y por pagina, nunca por fila.
  *
- * DOS invocaciones de puerto por pagina sin busqueda (repositorio + catalogo de nombres) y TRES
- * con busqueda (mas el catalogo de ids), tenga la pagina 1 fila o 25. El test lo demuestra
- * CONTANDO invocaciones: comprobar solo el resultado pasaria verde con un bucle de diez consultas.
+ * El repositorio, el catalogo de recetas, el de presentaciones y el de unidades se llaman UNA
+ * vez cada uno por pagina, tenga 1 fila o 25 -mas el catalogo de ids si hay busqueda-. El test
+ * lo demuestra CONTANDO invocaciones: comprobar solo el resultado pasaria verde con un bucle de
+ * diez consultas.
  *
  * QC-57 R25: **`status` y `priority` dejan de ser parametros propios** y entran como filtros
  * `select` del contrato, opcionales y combinables como siempre. Se conserva que un pedido
@@ -159,21 +169,26 @@ export function createListOrders(
     // pidio. La vigencia se exige al ESCRIBIR (R15, R25), no al leer.
     const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
 
-    const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
+    const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
 
-    const presentationIds = [
-      ...new Set(
-        page.items
-          .map((row) => row.presentationId)
-          .filter((id): id is string => id !== null),
-      ),
-    ];
+    // Las presentaciones de TODAS las lineas de la pagina, deduplicadas: una sola llamada.
+    const presentationIds = orderPresentationIds(page.items);
     const presentations =
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
     const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
+    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS.
+    const unitIds = [
+      ...new Set(page.items.map((row) => row.unitId).filter((id): id is string => id !== null)),
+    ];
+    const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, actor.companyId);
+    const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
+
+    // Los envases de la pagina, deduplicados: una sola llamada.
+    const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds(page.items), actor.companyId);
+
     return {
-      items: page.items.map((row) => toOrderView(row, recipeNames, presentationNames)),
+      items: page.items.map((row) => toOrderView(row, recipesById, presentationNames, unitLabels, packagingNames)),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

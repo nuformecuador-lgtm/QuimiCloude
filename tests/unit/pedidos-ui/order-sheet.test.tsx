@@ -10,7 +10,7 @@
 //
 // **Ningun assert sobre copy** (R44).
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -186,15 +186,20 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   quoteOrderCostAction: vi.fn(() =>
     Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
   ),
+  quoteOrderPresentationAvailabilityAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { kind: 'ok', available: '0' } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
 }));
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
+  getMassVolumeBridgeAction: vi.fn(async () => ({ status: 'success', data: null })),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
@@ -204,17 +209,38 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   }),
 }));
 
+// El selector de envases del reparto lista productos: sin este doble, su modulo arrastraria
+// `@/lib/composition` real.
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  listProductsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
+}));
+
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
-const UNIDADES: readonly UnitView[] = [
-  { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
-];
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Litro',
+  symbol: 'L',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
+
+const UNIDADES: readonly UnitView[] = [UNIDAD];
 
 const CANTIDAD = '12.5000';
 
 /** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del panel. */
-const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
+const PRESENTACION = {
+  id: crypto.randomUUID(),
+  name: 'Bidón 20L',
+  unitId: UNIDAD.id,
+  content: '20.0000',
+};
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -223,6 +249,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: CANTIDAD,
     priority: 'MEDIA',
     status: 'PENDIENTE',
@@ -232,8 +259,19 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: PRESENTACION.id,
-    presentationName: PRESENTACION.name,
+    presentationLines: [
+
+      {
+        presentationId: PRESENTACION.id,
+        presentationName: PRESENTACION.name,
+        packages: 1,
+        packagingProductId: null,
+        packagingName: null,
+      },
+
+    ],
+    unitId: UNIDAD.id,
+    unitLabel: UNIDAD.symbol,
     ...overrides,
   };
 }
@@ -315,10 +353,8 @@ beforeEach(() => {
       totalPages: 1,
     },
   });
-  // La pantalla de pedidos pide unidades de nuevo desde el 2026-09-09: el panel muestra los
-  // ingredientes de la receta y resuelve con ellas la unidad de cada linea. El doble devuelve
-  // una lista vacia: ningun caso de este archivo afirma sobre la unidad de un ingrediente.
-  listUnitsActionMock.mockResolvedValue({ status: 'success', data: [] });
+  // El catalogo de unidades alimenta el selector de unidad del pedido, obligatorio en el alta.
+  listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
   getRecipeActionMock.mockResolvedValue({
     status: 'success',
     data: {
@@ -332,7 +368,12 @@ beforeEach(() => {
       createdBy: null,
       updatedBy: null,
       steps: [],
+      packingSteps: [],
       lines: [],
+      tools: [],
+      original: null,
+      isUnderReview: false,
+      displayName: RECETA.name,
     },
   });
   createOrderActionMock.mockResolvedValue({
@@ -361,8 +402,8 @@ afterEach(() => {
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
   await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
-  await user.click(screen.getByTestId('presentation-select'));
-  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
+  await user.click(screen.getByTestId('presentation-unit-select'));
+  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 
@@ -496,11 +537,12 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // estado final `OrderRowActions` no llega a emitir nada (R24) y el panel no se abre.
     const user = setupUser();
     const elPedido = pedido();
-    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={UNIDADES} />);
+    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={UNIDADES} bridge={null} />);
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId('order-action-edit'));
 
     await screen.findByTestId(ORDER_FORM_TESTID);
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
@@ -519,10 +561,15 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
     // R24 — la pantalla anticipa la regla en vez de dejar intentarlo contra el servidor.
     const user = setupUser();
     render(
-      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} />,
+      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} bridge={null} />,
     );
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    const item = await screen.findByTestId('order-action-edit');
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    // El item deshabilitado sigue en el arbol: el evento nativo se dispara a mano, sin pasar por
+    // la comprobacion de `pointer-events` de `user-event`.
+    fireEvent.click(item);
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
     expect(updateOrderActionMock).not.toHaveBeenCalled();
@@ -571,7 +618,8 @@ describe('el termino de busqueda sobrevive al panel lateral (R4, R9)', () => {
 
     expect(screen.getByTestId('data-table-search')).toHaveValue(termino);
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId('order-action-edit'));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
     expect(routerMock.push).not.toHaveBeenCalled();

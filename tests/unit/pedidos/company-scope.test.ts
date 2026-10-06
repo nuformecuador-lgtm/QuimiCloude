@@ -39,12 +39,15 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
 const PEDIDO = '11111111-1111-4111-8111-111111111111'
 const RECETA = '22222222-2222-4222-8222-222222222222'
 const PRESENTACION = '66666666-6666-4666-8666-666666666666'
+/** QC-170 [Q4]: la unidad del pedido, obligatoria en el alta. */
+const UNIDAD = '77777777-7777-4777-8777-777777777777'
 
 const ACTOR: Actor = {
   id: 'u-1',
@@ -79,8 +82,8 @@ function filaConEmpresa(): OrderRow {
     createdBy: 'u-1',
     updatedBy: 'u-1',
     companyId: EMPRESA,
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
+    unitId: null,
   }
   return row as OrderRow
 }
@@ -152,8 +155,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       createdBy: 'u-1',
       updatedBy: 'u-1',
       companyId: EMPRESA,
-      presentationId: null,
-      presentationContent: null,
+      presentationLines: [],
     }
     const row = toOrderRow(prismaRow as unknown as Parameters<typeof toOrderRow>[0])
     expect(row).not.toHaveProperty('companyId')
@@ -163,7 +165,15 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
   })
 
   it('la vista del pedido (`toOrderView`) no la lleva', () => {
-    const vista = toOrderView(filaConEmpresa(), new Map([[RECETA, 'Acido citrico 50%']]))
+    const vista = toOrderView(
+      filaConEmpresa(),
+      new Map([
+        [
+          RECETA,
+          { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
+        ],
+      ]),
+    )
     expect(vista).not.toHaveProperty('companyId')
     expect(exponeEmpresa(vista)).toBe(false)
   })
@@ -184,7 +194,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
     })
     const recipes = {
       findRefsIncludingDeleted: vi.fn(async () => [
-        { id: RECETA, name: 'Acido citrico 50%', isDeleted: false },
+        { id: RECETA, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false },
       ]),
       findExecutionContentById: vi.fn(async () => ({
         id: RECETA,
@@ -199,22 +209,26 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       findCostingBatches: vi.fn(async () => []),
     } as unknown as ProductCatalog
     const units = {
-      findRefs: vi.fn(async () => []),
+      findRefs: vi.fn(async (ids: readonly string[]) =>
+        ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'Unidad', symbol: null, baseUnitId: null, factor: null }] : [],
+      ),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
+      findMassVolumeBridge: vi.fn(async () => null),
     } as unknown as UnitCatalog
     const presentations = {
       findRefs: vi.fn(async () => [{ id: PRESENTACION, name: 'Bidon 20L' }]),
     } as unknown as PresentationCatalog
 
-    const ficha = await createGetOrder({ orders, recipes, presentations })(PEDIDO, ACTOR)
+    const ficha = await createGetOrder({ orders, recipes, presentations, packaging: fakePackagingCatalog(), units })(PEDIDO, ACTOR)
     const lista = await createListOrders({
       orders,
       recipes,
-      presentations,
+      presentations, packaging: fakePackagingCatalog(),
+      units,
       log: { ignoredFields: vi.fn() },
     })({ page: 1 }, ACTOR)
-    const alta = await createCreateOrder({ recipes, products, units, presentations, unitOfWork })(
-      { recipeId: RECETA, quantity: '10.0000', presentationId: PRESENTACION },
+    const alta = await createCreateOrder({ recipes, products, units, presentations, packaging: fakePackagingCatalog(), unitOfWork })(
+      { recipeId: RECETA, quantity: '10.0000', unitId: UNIDAD },
       ACTOR,
     )
 

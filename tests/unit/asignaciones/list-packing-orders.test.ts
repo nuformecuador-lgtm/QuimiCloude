@@ -25,7 +25,8 @@ const RESUMEN_1 = {
   quantity: '10.0000',
   priority: 'ALTA',
   status: 'POR_EMPACAR',
-  presentationId: 'presentacion-1',
+  presentationLines: [{ presentationId: 'presentacion-1', packages: 1, packagingName: null }],
+  unitId: 'unidad-1',
   finishedAt: null,
   packedBy: null,
 };
@@ -37,7 +38,8 @@ const RESUMEN_2 = {
   quantity: '20.0000',
   priority: 'MEDIA',
   status: 'EN_EMPAQUE',
-  presentationId: 'presentacion-1',
+  presentationLines: [{ presentationId: 'presentacion-1', packages: 1, packagingName: null }],
+  unitId: null,
   finishedAt: null,
   packedBy: BETO,
 };
@@ -47,6 +49,7 @@ type Dobles = {
   readonly listAliveSummariesInCompany: ReturnType<typeof vi.fn>;
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
+  readonly findRefsUnits: ReturnType<typeof vi.fn>;
   readonly findFinishedGoodsReceipts: ReturnType<typeof vi.fn>;
   readonly findRefsIncludingDeletedInCompany: ReturnType<typeof vi.fn>;
   readonly listByOrdersInCompany: ReturnType<typeof vi.fn>;
@@ -60,8 +63,12 @@ function montar(): Dobles {
     pageSize: 10,
     totalPages: 1,
   }));
-  const findRefsIncludingDeleted = vi.fn(async () => [{ id: 'receta-1', name: 'Desengrasante' }, { id: 'receta-2', name: 'Limpiador' }]);
+  const findRefsIncludingDeleted = vi.fn(async () => [
+    { id: 'receta-1', name: 'Desengrasante', ownName: 'Desengrasante', isUnderReview: false, original: null, isDeleted: false },
+    { id: 'receta-2', name: 'Limpiador', ownName: 'Limpiador', isUnderReview: false, original: null, isDeleted: false },
+  ]);
   const findRefsPresentations = vi.fn(async () => [{ id: 'presentacion-1', name: 'Botella 1L' }]);
+  const findRefsUnits = vi.fn(async () => [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]);
   const findFinishedGoodsReceipts = vi.fn(async () => [
     { orderId: PEDIDO_1, packages: '5' },
     { orderId: PEDIDO_2, packages: '3' },
@@ -75,6 +82,7 @@ function montar(): Dobles {
     recipes: { findRefsIncludingDeleted },
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations },
+    units: { findRefs: findRefsUnits },
     products: { findFinishedGoodsReceipts },
     now: () => new Date('2026-09-25T12:00:00.000Z'),
   } as unknown as ListPackingOrdersDeps;
@@ -84,6 +92,7 @@ function montar(): Dobles {
     listAliveSummariesInCompany,
     findRefsIncludingDeleted,
     findRefsPresentations,
+    findRefsUnits,
     findFinishedGoodsReceipts,
     findRefsIncludingDeletedInCompany,
     listByOrdersInCompany,
@@ -156,7 +165,10 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         id: PEDIDO_1,
         numberText: expect.any(String),
         recipeName: 'Desengrasante',
-        presentationName: 'Botella 1L',
+        quantity: '10.0000',
+        presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null }],
+        unitId: 'unidad-1',
+        unitLabel: 'L',
         packages: '5',
         status: 'POR_EMPACAR',
         packedByName: null,
@@ -166,7 +178,10 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         id: PEDIDO_2,
         numberText: expect.any(String),
         recipeName: 'Limpiador',
-        presentationName: 'Botella 1L',
+        quantity: '20.0000',
+        presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null }],
+        unitId: null,
+        unitLabel: null,
         packages: '3',
         status: 'EN_EMPAQUE',
         packedByName: 'Beto',

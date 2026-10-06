@@ -102,6 +102,13 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
       status: 'success',
       data: { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
     })),
+    // El picker de miembros que el panel de edicion monta SI la pide, siempre, al abrirse (R28):
+    // responde una pagina vacia. Lo que ese picker pinta se prueba en `work-group-form.test.tsx`
+    // y en `work-group-members.test.tsx`; aqui solo interesa el desbordamiento del viewport.
+    listWorkGroupCandidatesAction: vi.fn(async () => ({
+      status: 'success',
+      data: { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
+    })),
   };
 });
 
@@ -125,10 +132,14 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
   }),
 }));
 
-/** Un nombre LARGO de verdad: con una sola columna de datos, es lo unico que puede desbordar. */
+/** Un nombre LARGO de verdad: es lo que mas facilmente puede desbordar la columna de datos. */
 const GRUPOS: readonly WorkGroupRow[] = [
-  { id: 'g1', name: 'Laboratorio de control de calidad de materias primas y producto terminado' },
-  { id: 'g2', name: 'Produccion' },
+  {
+    id: 'g1',
+    name: 'Laboratorio de control de calidad de materias primas y producto terminado',
+    members: [],
+  },
+  { id: 'g2', name: 'Produccion', members: [] },
 ];
 
 function sesionCon(permissions: readonly string[]) {

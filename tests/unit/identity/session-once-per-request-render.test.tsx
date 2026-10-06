@@ -293,26 +293,39 @@ async function pintarLayout(): Promise<void> {
 async function pintarUsuarios(): Promise<void> {
   await pintarLayout();
   await UsuariosPage({ searchParams: Promise.resolve({}) });
-  await UserListSection({ params: PARAMS, canModify: true, currentUserId: SUB });
+  // El catalogo de roles ya no lo pide esta seccion -lo pide `page.tsx`, una sola vez-: aqui basta
+  // con reproducir la forma del prop, vacio, porque este archivo cuenta lecturas de sesion, no
+  // datos.
+  await UserListSection({
+    params: PARAMS,
+    canModify: true,
+    currentUserId: SUB,
+    roles: [],
+    rolesError: null,
+  });
 }
 
 /** `/configuracion/unidades`: layout + pagina (que corta DOS veces) + la seccion de lista. */
 async function pintarUnidades(): Promise<void> {
   await pintarLayout();
   await UnidadesPage({ searchParams: Promise.resolve({}) });
-  await UnitListSection({ params: PARAMS });
+  // El catalogo ya no lo pide esta seccion -lo pide `page.tsx`, una sola vez-: aqui basta con
+  // reproducir la forma del prop, vacio, porque este archivo cuenta lecturas de sesion, no datos.
+  await UnitListSection({ params: PARAMS, catalog: [] });
 }
 
 /**
  * `/pedidos`: layout + pagina + la seccion de lista, MAS las tres acciones que la seccion invoca
- * cuando la lista trae filas (`order-list-section.tsx:147, 179-180`). Con la base doblada la lista
- * sale vacia y la seccion sale antes de llegar a ellas; se invocan aqui, en el MISMO ambito, para
- * que el conteo cubra tambien ese camino.
+ * cuando la lista trae filas (`order-list-section.tsx:249-251`). Con la base doblada la lista sale
+ * vacia y la seccion sale antes de llegar a ellas; se invocan aqui, en el MISMO ambito, para que
+ * el conteo cubra tambien ese camino.
  */
 async function pintarPedidos(): Promise<void> {
   await pintarLayout();
   await PedidosPage({ searchParams: Promise.resolve({}) });
-  await OrderListSection({ params: PARAMS });
+  // Los catalogos de recetas y unidades ya no los pide esta seccion -los pide `page.tsx`, una
+  // sola vez-: aqui basta con reproducir la forma de los props, vacios.
+  await OrderListSection({ params: PARAMS, recipes: { items: [], totalPages: 1 }, units: [], bridge: null });
   await listResponsiblesForOrdersAction(['0a3f2b1c-9e0d-4a4c-8b9e-772a5f6c1d8b']);
   await listUsersAction({ page: 1, pageSize: 25 });
   await listWorkGroupsAction({ page: 1, pageSize: 25 });

@@ -26,16 +26,18 @@ import {
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 
 import { NOW, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 const PERMISOS_DEL_ADMINISTRADOR = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR];
 if (PERMISOS_DEL_ADMINISTRADOR === undefined) {
@@ -47,8 +49,8 @@ if (PERMISOS_DEL_ADMINISTRADOR === undefined) {
 function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentRepository>[0]) {
   const orders: OrderCatalog = {
     findAliveById: findAliveOrderTargetById,
-    listAliveSummariesByIds: listAliveOrderSummariesByIds,
-    listAliveSummariesInCompany,
+    listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
+    listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
     // Este archivo prueba `listCompanyOrders`, que nunca transiciona un pedido.
     transitionAliveById: async () => {
       throw new Error('listCompanyOrders no ejecuta ninguna transicion');
@@ -79,6 +81,14 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     },
     people: assignmentDirectoryPrisma,
     presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+    units: {
+      findRefs: findUnitRefs,
+      listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+      findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
+      findRefsSharingBaseInCompany: async () => {
+        throw new Error('el listado solo resuelve la etiqueta de la unidad del pedido');
+      },
+    },
     now: () => NOW,
   });
 }

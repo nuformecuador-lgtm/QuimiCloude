@@ -18,6 +18,11 @@
  * **Decimotercera enmienda, 2026-09-24**: `customer_not_found`.
  * **Decimocuarta enmienda, 2026-09-25**: `order_packing_taken`, `order_not_packable`,
  * `order_produced_frozen`.
+ * **2026-09-27**: `order_without_distribution`,
+ * `order_presentation_line_not_editable`, `order_distribution_exceeds_quantity`,
+ * `order_without_unit`.
+ * **Decimoquinta enmienda, 2026-10-01**: `order_would_block`, `order_blocked`.
+ * **2026-10-05**: `order_unit_not_convertible`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -61,6 +66,10 @@ export const ERROR_CODES = [
   'work_group_member_exists_inactive',
   'work_group_member_exists_blocked',
   'work_group_member_not_found',
+  // Distinto de los `work_group_member_exists_*`: la persona no pertenece y no puede entrar.
+  'work_group_member_not_active',
+  // Distinto de `self_operation`: el texto nombra el grupo, y esa regla es de grupos.
+  'work_group_member_self',
   'order_delivered_frozen',
   'order_cancelled_not_assignable',
   'order_assignment_not_found',
@@ -109,6 +118,29 @@ export const ERROR_CODES = [
   'order_not_packable',
   // Distinto de `order_delivered_frozen`: el pedido esta por empacar o en empaque, no entregado.
   'order_produced_frozen',
+  // Distinto de `insufficient_material`: no rechaza la operacion, pide confirmar que el pedido se
+  // guarde bloqueado porque el material disponible no lo cubre.
+  'order_would_block',
+  // Distinto de `invalid_transition`: el pedido esta bloqueado por falta de material y no se puede
+  // abrir ni iniciar hasta que se desbloquee.
+  'order_blocked',
+  // Distinto de `presentation_without_content`: el pedido no tiene ni una linea de reparto, no le
+  // falta el contenido a una que ya existe.
+  'order_without_distribution',
+  // Distinto de `invalid_transition`: no es el ESTADO del pedido el que no admite el cambio, es
+  // que el reparto de ESTE pedido ya no se puede tocar.
+  'order_presentation_line_not_editable',
+  // Distinto de `invalid_input`: la entrada tiene forma valida, lo que falla es que la suma del
+  // reparto pasa de la cantidad del pedido.
+  'order_distribution_exceeds_quantity',
+  // Distinto de `unit_not_found`: la unidad no falta porque no exista, falta porque el pedido
+  // nunca la tuvo asignada.
+  'order_without_unit',
+  // Distinto de `recipe_not_found`: la version existe y esta viva, pero sus lineas no suman 100 %.
+  'recipe_version_under_review',
+  // Distinto de `incompatible_units` e `insufficient_material`: el material puede estar, lo que
+  // falla es llevar la cantidad del pedido a la unidad de algun insumo de su receta.
+  'order_unit_not_convertible',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

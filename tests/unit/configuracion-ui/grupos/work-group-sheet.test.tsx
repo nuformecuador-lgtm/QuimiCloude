@@ -25,11 +25,17 @@ import {
 import type { WorkGroupRow } from '@/lib/modules/identity';
 import type {
   CreateWorkGroupFormState,
+  WorkGroupCandidateListResult,
   WorkGroupMemberListResult,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { setupUser } from '../../../helpers/user-event';
 
-const { routerMock, createWorkGroupActionMock, listWorkGroupMembersActionMock } = vi.hoisted(() => ({
+const {
+  routerMock,
+  createWorkGroupActionMock,
+  listWorkGroupMembersActionMock,
+  listWorkGroupCandidatesActionMock,
+} = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
     replace: vi.fn<(href: string) => void>(),
@@ -42,6 +48,8 @@ const { routerMock, createWorkGroupActionMock, listWorkGroupMembersActionMock } 
     vi.fn<(prev: CreateWorkGroupFormState, data: FormData) => Promise<CreateWorkGroupFormState>>(),
   listWorkGroupMembersActionMock:
     vi.fn<(workGroupId: string, query: unknown) => Promise<WorkGroupMemberListResult>>(),
+  listWorkGroupCandidatesActionMock:
+    vi.fn<(query: unknown) => Promise<WorkGroupCandidateListResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -61,6 +69,9 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     removeWorkGroupMemberAction: vi.fn(noDebeInvocarse('removeWorkGroupMemberAction')),
     listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
     listWorkGroupMembersAction: listWorkGroupMembersActionMock,
+    // El ALTA monta el picker de miembros iniciales (`WorkGroupMemberPicker`), que SI consulta
+    // esta action siempre (QC-85 ampliacion).
+    listWorkGroupCandidatesAction: listWorkGroupCandidatesActionMock,
   };
 });
 
@@ -78,7 +89,11 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
   };
 });
 
-const GRUPO: WorkGroupRow = { id: '11111111-1111-4111-8111-111111111111', name: 'Laboratorio' };
+const GRUPO: WorkGroupRow = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Laboratorio',
+  members: [],
+};
 
 /** Los cuatro archivos de las escrituras: ninguno monta una segunda region de avisos (R35). */
 const ARCHIVOS_DE_LAS_ESCRITURAS = [
@@ -134,6 +149,10 @@ beforeEach(() => {
   toastExito = vi.spyOn(toast, 'success').mockImplementation(() => 'id');
   createWorkGroupActionMock.mockResolvedValue({ status: 'success', id: 'nuevo' });
   listWorkGroupMembersActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
+  });
+  listWorkGroupCandidatesActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
   });

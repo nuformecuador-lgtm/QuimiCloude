@@ -3,15 +3,11 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { SEARCH_DEBOUNCE_MS } from '@/components/shared/data-table';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
-import type { Page, UserRow, WorkGroupMemberRow } from '@/lib/modules/identity';
-import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
+import type { Page, WorkGroupMemberRow } from '@/lib/modules/identity';
 import {
   addWorkGroupMemberAction,
   removeWorkGroupMemberAction,
@@ -20,7 +16,13 @@ import {
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { WORK_GROUP_ID_FIELD } from './work-group-form';
+import {
+  WORK_GROUP_CANDIDATES_ERROR_TESTID,
+  WORK_GROUP_CANDIDATES_LOADING_TESTID,
+  WORK_GROUP_ID_FIELD,
+  WORK_GROUP_MEMBER_ID_FIELD,
+  WorkGroupMemberPicker,
+} from './work-group-form';
 
 /**
  * Los miembros del grupo abierto: lista paginada, buscador para anadir y accion para sacar
@@ -45,14 +47,12 @@ import { WORK_GROUP_ID_FIELD } from './work-group-form';
  * otro grupo ni de otra pagina. Mientras no coincida, lo que se ve es «cargando» (R27); con error
  * se dice, y **no** se pinta una lista vacia como si el grupo no tuviera miembros.
  *
- * **Los candidatos salen de la CONSULTA DE PERSONAS ya publicada** (R28) —`listUsersAction`, la
- * misma que usa la pestana de al lado—, con rebote de `SEARCH_DEBOUNCE_MS`. No se construye
- * ninguna consulta propia, no se escribe ningun candidato a mano y no se crea ninguna consulta de
- * «candidatos»: seria backend (R36). Elegir a una persona manda `addWorkGroupMemberAction` con
- * `workGroupId` + `userId`, **de a una**; el esquema del borde no admite listas.
- *
- * **De los candidatos tampoco se pinta el estado de cuenta** (pregunta abierta 2, respuesta por
- * defecto de `design.md > 10`): se deja como esta y se revisa si molesta en uso.
+ * **El buscador y la tabla de candidatos son `WorkGroupMemberPicker`**, el selector reutilizable
+ * que vive en `work-group-form.tsx` (R28) —la misma pieza que monta el ALTA para elegir los
+ * miembros iniciales de un grupo que todavia no existe—: aqui, en la EDICION, elegir a alguien
+ * manda de inmediato `addWorkGroupMemberAction` con `workGroupId` + `userId`, **de a una**; el
+ * esquema del borde no admite listas. Ninguna consulta de «candidatos» se escribe en este archivo:
+ * seria backend (R36).
  *
  * **Tras CUALQUIER exito se vuelve a pedir la lista al servidor y se pinta lo que devuelva**
  * (R30). Nada optimista: ni insertar ni retirar filas en el cliente. Es lo que hace que una
@@ -82,32 +82,28 @@ export const WORK_GROUP_MEMBER_REMOVE_TESTID = 'work-group-member-remove';
 export const WORK_GROUP_MEMBERS_PREVIOUS_TESTID = 'work-group-members-previous';
 export const WORK_GROUP_MEMBERS_NEXT_TESTID = 'work-group-members-next';
 export const WORK_GROUP_MEMBERS_POSITION_TESTID = 'work-group-members-position';
-export const WORK_GROUP_MEMBER_SEARCH_TESTID = 'work-group-member-search';
-export const WORK_GROUP_CANDIDATE_TESTID = 'work-group-candidate';
-export const WORK_GROUP_CANDIDATES_LOADING_TESTID = 'work-group-candidates-loading';
-export const WORK_GROUP_CANDIDATES_EMPTY_TESTID = 'work-group-candidates-empty';
-export const WORK_GROUP_CANDIDATES_ERROR_TESTID = 'work-group-candidates-error';
 /** Region del BUSCADOR: aqui se pinta el rechazo de meter a alguien (R29). */
 export const WORK_GROUP_ADD_ERROR_TESTID = 'work-group-add-error';
 /** Region de la LISTA: aqui se pinta el rechazo de sacar a alguien, sin retirar la fila (R32). */
 export const WORK_GROUP_REMOVE_ERROR_TESTID = 'work-group-remove-error';
 
-/** El segundo nombre de `FormData` de las dos operaciones de miembro. El primero lo declara el
- *  formulario (`WORK_GROUP_ID_FIELD`): cada nombre publico sale de UN solo archivo. */
-export const WORK_GROUP_MEMBER_ID_FIELD = 'userId';
+// Re-exportados tal cual: `WorkGroupMemberPicker` y sus constantes se DECLARAN en
+// `work-group-form.tsx` (evita un ciclo de imports entre los dos archivos), pero el barrel de la
+// ruta sigue republicandolos `from './work-group-members'` sin que haya que tocarlo.
+export {
+  WORK_GROUP_CANDIDATES_ERROR_TESTID,
+  WORK_GROUP_CANDIDATES_LOADING_TESTID,
+  WORK_GROUP_MEMBER_ID_FIELD,
+};
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
-const FIELD_TEXT = 'text-base md:text-base';
 
 const MEMBERS_TITLE = 'Miembros del grupo';
-const SEARCH_LABEL = 'Buscar personas para añadir';
 const REMOVE_LABEL = 'Quitar del grupo';
 const PREVIOUS_LABEL = 'Miembros anteriores';
 const NEXT_LABEL = 'Miembros siguientes';
 const EMPTY_MESSAGE = 'Este grupo todavía no tiene miembros que mostrar.';
-const NO_CANDIDATES_MESSAGE = 'No hay personas que coincidan con la búsqueda.';
 const LOADING_MESSAGE = 'Cargando los miembros del grupo…';
-const SEARCHING_MESSAGE = 'Buscando personas…';
 const ADD_SUCCESS = 'Persona añadida al grupo.';
 const REMOVE_SUCCESS = 'Persona retirada del grupo.';
 
@@ -127,20 +123,6 @@ type MembersState =
   | { status: 'error'; key: string; error: ErrorState }
   | { status: 'ready'; key: string; data: Page<WorkGroupMemberRow> };
 
-/**
- * Los cuatro estados del buscador. `idle` es «no se ha escrito nada»: no se consulta en vacio.
- *
- * Lo que se GUARDA es solo lo resuelto —y con el termino al que pertenece—; «cargando» y «sin
- * termino» se DERIVAN al pintar, comparando con el termino vigente. Asi una respuesta que llega
- * tarde no puede pintar los candidatos de otra busqueda.
- */
-type ResolvedCandidates =
-  | { status: 'idle' }
-  | { status: 'error'; term: string; error: ErrorState }
-  | { status: 'ready'; term: string; items: readonly UserRow[] };
-
-type CandidatesState = ResolvedCandidates | { status: 'loading' };
-
 export type WorkGroupMembersProps = {
   /** El grupo abierto. Sin identificador no hay a quien anadir: el alta no monta este bloque. */
   readonly workGroupId: string;
@@ -151,10 +133,6 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
   /** Sube tras cada exito y obliga a volver a pedir la lista al servidor (R30). */
   const [reloads, setReloads] = useState(0);
   const [members, setMembers] = useState<MembersState>({ status: 'loading' });
-
-  const [search, setSearch] = useState('');
-  const [candidates, setCandidates] = useState<ResolvedCandidates>({ status: 'idle' });
-  const term = search.trim();
 
   const [addError, setAddError] = useState<ErrorState | null>(null);
   const [removeError, setRemoveError] = useState<ErrorState | null>(null);
@@ -183,37 +161,6 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
       cancelled = true;
     };
   }, [workGroupId, page, key]);
-
-  useEffect(() => {
-    // Sin termino no se consulta, y **no se toca el estado**: «no se ha escrito nada» se DERIVA
-    // del termino al pintar, en vez de escribirse desde el efecto (un `setState` sincrono ahi son
-    // renders en cascada). Mismo criterio que el estado de la lista.
-    if (term === '') return;
-
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      // La consulta de personas de QC-66, tal cual la publica el modulo (R28).
-      void listUsersAction({
-        page: 1,
-        pageSize: DEFAULT_PAGE_SIZE,
-        sort: null,
-        filters: {},
-        search: term,
-      }).then((result) => {
-        if (cancelled) return;
-        setCandidates(
-          result.status === 'error'
-            ? { status: 'error', term, error: result }
-            : { status: 'ready', term, items: result.data.items },
-        );
-      });
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [term]);
 
   /** El `FormData` de las dos operaciones de miembro: los mismos dos campos, de a una (R28, R32). */
   function memberFormData(userId: string): FormData {
@@ -262,15 +209,6 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
   const shown: MembersState =
     members.status !== 'loading' && members.key === key ? members : { status: 'loading' };
 
-  // Y lo mismo con los candidatos: sin termino no hay buscador que pintar, y mientras la respuesta
-  // no sea la del termino vigente lo que se ve es «buscando».
-  const shownCandidates: CandidatesState =
-    term === ''
-      ? { status: 'idle' }
-      : candidates.status !== 'idle' && candidates.term === term
-        ? candidates
-        : { status: 'loading' };
-
   return (
     <section className="flex flex-col gap-4" data-testid={WORK_GROUP_MEMBERS_TESTID}>
       <h3 className="text-sm font-medium">{MEMBERS_TITLE}</h3>
@@ -305,22 +243,15 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
       )}
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`${workGroupId}-member-search`}>{SEARCH_LABEL}</Label>
-        <Input
-          id={`${workGroupId}-member-search`}
-          type="search"
-          autoComplete="off"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className={`min-h-11 ${FIELD_TEXT}`}
-          data-testid={WORK_GROUP_MEMBER_SEARCH_TESTID}
-        />
-
         {addError === null ? null : (
           <ErrorRegion state={addError} testId={WORK_GROUP_ADD_ERROR_TESTID} />
         )}
 
-        <Candidates state={shownCandidates} busy={busy} onAdd={(userId) => void addMember(userId)} />
+        <WorkGroupMemberPicker
+          busy={busy}
+          selectedIds={shown.status === 'ready' ? shown.data.items.map((member) => member.id) : []}
+          onAdd={(candidate) => void addMember(candidate.id)}
+        />
       </div>
     </section>
   );
@@ -416,65 +347,6 @@ function MembersList({
         </Button>
       </div>
     </div>
-  );
-}
-
-/** Los candidatos del buscador (R28). Uno por persona, y elegir a una la mete **de a una**. */
-function Candidates({
-  state,
-  busy,
-  onAdd,
-}: {
-  readonly state: CandidatesState;
-  readonly busy: boolean;
-  readonly onAdd: (userId: string) => void;
-}) {
-  if (state.status === 'idle') return null;
-
-  if (state.status === 'loading') {
-    return (
-      <div
-        role="status"
-        aria-busy="true"
-        aria-label={SEARCHING_MESSAGE}
-        data-testid={WORK_GROUP_CANDIDATES_LOADING_TESTID}
-      >
-        <Skeleton className="h-11 w-full" />
-      </div>
-    );
-  }
-
-  if (state.status === 'error') {
-    return <ErrorRegion state={state.error} testId={WORK_GROUP_CANDIDATES_ERROR_TESTID} />;
-  }
-
-  if (state.items.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground" data-testid={WORK_GROUP_CANDIDATES_EMPTY_TESTID}>
-        {NO_CANDIDATES_MESSAGE}
-      </p>
-    );
-  }
-
-  return (
-    <ul className="flex flex-col gap-2">
-      {state.items.map((candidate) => (
-        <li key={candidate.id}>
-          <Button
-            type="button"
-            variant="outline"
-            className={`w-full justify-start ${TOUCH_TARGET}`}
-            disabled={busy}
-            data-testid={WORK_GROUP_CANDIDATE_TESTID}
-            data-user-id={candidate.id}
-            onClick={() => onAdd(candidate.id)}
-          >
-            {/* Solo el nombre mostrable: ni correo, ni documento, ni estado de cuenta. */}
-            {candidate.displayName}
-          </Button>
-        </li>
-      ))}
-    </ul>
   );
 }
 

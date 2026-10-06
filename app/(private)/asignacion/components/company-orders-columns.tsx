@@ -1,7 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
@@ -11,7 +11,7 @@ import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
 
 /**
  * Las columnas de «Todos»: número, receta, cantidad,
- * presentación, prioridad, estado (con filtro `select` de los cuatro estados) y responsables.
+ * presentación, prioridad, estado (con filtro `select` de todos los estados) y responsables.
  * **Sin columna «Entrar» ni acciones**, tampoco para los pedidos asignados al propio actor.
  *
  * La columna de **fecha de terminado** solo aparece cuando el filtro vigente es EXACTAMENTE
@@ -39,10 +39,6 @@ export const COMPANY_ORDER_STATUS_COLUMN_ID = 'status';
 export const COMPANY_ORDER_DATE_COLUMN_ID = 'finishedAt';
 export const COMPANY_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
 
-export const COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS: readonly string[] = [
-  COMPANY_ORDER_NUMBER_COLUMN_ID,
-];
-
 export const COMPANY_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   PENDIENTE: 'Pendiente',
   EN_CURSO: 'En curso',
@@ -50,6 +46,7 @@ export const COMPANY_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> 
   EN_EMPAQUE: 'En empaque',
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
+  BLOQUEADO: 'Bloqueado',
 };
 
 export const COMPANY_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
@@ -95,6 +92,8 @@ export function buildCompanyOrdersColumns({
       id: COMPANY_ORDER_NUMBER_COLUMN_ID,
       label: 'Nº de pedido',
       align: 'start',
+      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       cell: (order) => order.numberText,
     },
     {
@@ -108,13 +107,16 @@ export function buildCompanyOrdersColumns({
       id: COMPANY_ORDER_QUANTITY_COLUMN_ID,
       label: 'Cantidad',
       align: 'end',
-      cell: (order) => formatDecimalDisplay(order.quantity),
+      cell: (order) =>
+        order.unitLabel === null
+          ? formatDecimalDisplay(order.quantity)
+          : `${formatDecimalDisplay(order.quantity)} ${order.unitLabel}`,
     },
     {
       id: COMPANY_ORDER_PRESENTATION_COLUMN_ID,
       label: 'Presentación',
       align: 'start',
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: COMPANY_ORDER_PRIORITY_COLUMN_ID,

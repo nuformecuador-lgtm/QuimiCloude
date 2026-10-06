@@ -19,16 +19,19 @@ import {
   updateProductSchema,
   MANUAL_PRODUCT_TYPE_VALUES,
   PRODUCT_TYPES,
+  type ProductFormUnits,
   type ProductView,
   type ProductType,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import {
   createProductAction,
   updateProductAction,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
 import { PresentationSelect } from '@/components/shared/presentation-select';
+import { PresentationUnitSelect } from '@/components/shared/presentation-unit-select';
 import { SharedSelect } from '@/components/shared/shared-select';
 
 import { sanitizeQuantityInput } from './product-cost-amount';
@@ -36,25 +39,24 @@ import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-
 import { ProductCostFields } from './product-cost-fields';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
+import { EMPTY_CELL, productUnitLabel } from './product-columns';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * Campos de texto del producto.
  *
- * **La unidad tampoco esta**, y no por descuido: ver el comentario del formulario mas abajo.
- *
- * **El costo tampoco**: QC-52 lo saco del producto entero -junto con la compra minima y el
- * tiempo de entrega- porque son terminos comerciales del catalogo de cada proveedor. Ya no hay
- * campo, ni oculto, ni valor precargado que enviar (R5).
+ * **El costo no esta** -ni la compra minima ni el tiempo de entrega- porque son terminos
+ * comerciales del catalogo de cada proveedor. Ya no hay campo, ni oculto, ni valor precargado
+ * que enviar.
  */
 const TEXT_FIELDS = ['name'] as const;
 
 /** Campo decimal del producto: cadena de hasta 4 decimales, como la columna. */
 const PRODUCT_DECIMAL_FIELDS = ['qtyAlert'] as const;
 
-/** Campo select del producto. */
-const PRODUCT_SELECT_FIELDS = ['type'] as const;
+/** Campos select del producto. La unidad solo se pide en el alta de un insumo. */
+const PRODUCT_SELECT_FIELDS = ['type', 'unitId'] as const;
 
 /**
  * Campos del LOTE que el alta pide junto al producto (`product_batches`), incluida su existencia.
@@ -105,6 +107,7 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   stock: 'Debe ser un número decimal de 0 o más, con hasta 4 decimales.',
   qtyAlert: 'Debe ser un número decimal de 0 o más, con hasta 4 decimales.',
   presentationId: 'Elige una presentación.',
+  unitId: 'Elige una unidad.',
   // «Mayor que 0» porque la columna lleva `CHECK (unit_cost > 0)`. Y dos decimales, no los cuatro
   // del esquema: el campo ya no deja teclear mas, asi que prometer cuatro mandaria a escribir algo
   // que el propio campo rechaza.
@@ -114,6 +117,21 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   expiryDate: 'Escribe una fecha válida.',
   purchaseDate: 'Elige la fecha de compra.',
 };
+
+/** Un envase se cuenta en piezas: no hay medio envase. */
+const WHOLE_PACKAGES_PATTERN = /^\d{1,10}$/;
+const WHOLE_PACKAGES_MESSAGE = 'Escribe un número entero de envases, 0 o más.';
+
+const PACKAGING_STOCK_LABEL = 'Existencia (envases)';
+const PACKAGING_STOCK_HELPER = 'El número de envases con el que entra este lote al inventario.';
+const PACKAGING_PRESENTATION_HELPER =
+  'La presentación de este envase (botella de 500 ml, bidón de 20 L…). Se elige al darlo de alta y no se puede cambiar después.';
+const UNIT_HELPER =
+  'La unidad en que se cuenta este insumo. Todos sus lotes se registran en ella.';
+const PACKAGING_PRESENTATION_NOTE = 'Es la presentación fija del envase: no se puede cambiar después.';
+const PACKAGING_LEGACY_LABEL = 'Envase sin presentación fija';
+const PACKAGING_LEGACY_NOTE =
+  'Se dio de alta antes de los envases con presentación: no se ofrece en el reparto de pedidos.';
 
 /** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
 const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario o el costo total; basta con uno.';
@@ -138,6 +156,7 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
   stock: 'Existencia',
   qtyAlert: 'Alerta de cantidad',
   presentationId: 'Presentación',
+  unitId: 'Unidad',
   unitCost: 'Costo unitario',
   totalCost: 'Costo total',
   lot: 'Lote',
@@ -147,12 +166,12 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
 
 /** Determina si un campo debe mostrarse segun el tipo de producto seleccionado. */
 function shouldShowField(field: ProductFieldName, productType: ProductType | undefined): boolean {
-  // Instrumento (MACHINE): solo existencia y fecha de compra entre los campos del lote;
-  // sin presentacion, costos, lote, caducidad ni alerta (2026-09-23).
+  // El insumo se cuenta en su unidad; el envase, por su presentacion fija.
+  if (field === 'presentationId') return productType === PRODUCT_TYPES.PACKAGING;
+  if (field === 'unitId') return (productType ?? PRODUCT_TYPES.PRODUCT) === PRODUCT_TYPES.PRODUCT;
   if (productType === PRODUCT_TYPES.MACHINE) {
     const hiddenForMachine: ProductFieldName[] = [
       'qtyAlert',
-      'presentationId',
       'unitCost',
       'totalCost',
       'lot',
@@ -283,11 +302,13 @@ type ProductFormProps = {
   /** Producto que se edita. Ausente en el alta (R19). */
   readonly product?: ProductView;
   /**
-   * Catalogo de unidades para el alta rapida de presentacion del selector (QC-80 R11). Baja por
-   * props desde la pagina, que lo pide una sola vez (QC-44 R46); este formulario no consulta
-   * nada. Sin el, el alta rapida no se ofrece y la presentacion se elige entre las existentes.
+   * Catalogo de unidades. En el alta, para el alta rapida de presentacion del selector: sin el,
+   * la presentacion se elige entre las existentes. En la edicion, para nombrar la unidad de la
+   * alerta de cantidad. Baja por props desde la pagina; este formulario no consulta nada.
    */
   readonly units?: readonly UnitRef[];
+  /** Unidades que ofrece el campo «Unidad» del alta de insumo. Sin ellas, el selector sale vacio. */
+  readonly formUnits?: ProductFormUnits;
   /**
    * Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar.
    *
@@ -326,7 +347,7 @@ type ProductFormProps = {
  * `login-form.tsx`, incluida la `key` de montaje que evita el aviso de Base UI cuando el
  * `defaultValue` de un campo no controlado cambia despues de montarse).
  */
-export function ProductForm({ product, units, onSaved }: ProductFormProps) {
+export function ProductForm({ product, units, formUnits = [], onSaved }: ProductFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
@@ -334,31 +355,26 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
   const [productType, setProductType] = useState<ProductType>(product?.type ?? PRODUCT_TYPES.PRODUCT);
 
   /**
-   * Autocompletado al elegir un producto existente (decision humana del 2026-09-09, ampliada el
-   * 2026-09-10 con la presentacion): alerta de cantidad y presentacion. La existencia y los
-   * costos los escribe el usuario -son los del lote que esta dando de alta, no los del producto
-   * elegido-.
-   *
-   * **La presentacion llega vacia mientras el alta siga sin back**: `listProductsAction` devuelve
-   * `ProductView`, que desde el 2026-09-09 ya no la lleva -se mudo al lote-. El hilo esta puesto
-   * de punta a punta y el selector se rellena solo en cuanto la consulta traiga la presentacion
-   * del ultimo lote; hasta entonces el campo queda en blanco y se elige a mano.
+   * Lo que se copia al elegir un producto existente: alerta, tipo, unidad y presentacion. La
+   * existencia y los costos no, porque son del lote que se esta dando de alta.
    */
   const [template, setTemplate] = useState<{
     readonly qtyAlert: string;
     readonly presentationId: string;
     readonly presentationName: string;
+    readonly unitId: string;
     readonly type: ProductType;
   } | null>(null);
 
   function applyTemplate(option: ProductNameOption) {
     setTemplate({
-      qtyAlert: option.qtyAlert ?? '',
+      qtyAlert: trimDecimal(option.qtyAlert ?? ''),
       presentationId: option.presentationId ?? '',
       presentationName: option.presentationName ?? '',
+      unitId: option.unitId ?? '',
       type: option.type ?? PRODUCT_TYPES.PRODUCT,
     });
-    setQtyAlertValue(option.qtyAlert ?? '');
+    setQtyAlertValue(trimDecimal(option.qtyAlert ?? ''));
   }
 
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
@@ -381,6 +397,16 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     const type = (values.type || PRODUCT_TYPES.PRODUCT) as ProductType;
     const isMachine = type === PRODUCT_TYPES.MACHINE;
     const isPackaging = type === PRODUCT_TYPES.PACKAGING;
+
+    if (
+      isCreate &&
+      isPackaging &&
+      fieldErrors.stock === undefined &&
+      decimals.stock !== undefined &&
+      !WHOLE_PACKAGES_PATTERN.test(decimals.stock)
+    ) {
+      fieldErrors.stock = WHOLE_PACKAGES_MESSAGE;
+    }
 
     /*
       EXACTAMENTE las claves del esquema, ni una mas (R24): los dos esquemas son `strictObject`,
@@ -408,7 +434,9 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
                 type,
                 qtyAlert: decimals.qtyAlert,
                 stock: decimals.stock,
-                presentationId: values.presentationId,
+                ...(isPackaging
+                  ? { presentationId: values.presentationId }
+                  : { unitId: values.unitId }),
                 unitCost,
                 totalCost,
                 lot: readOptionalText(values.lot),
@@ -485,8 +513,18 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     onSaved(state.lot);
   }, [state, onSaved]);
 
+  /**
+   * Cambiar de tipo tras elegir un producto existente vacia el formulario: lo autocompletado era
+   * de un producto de otro tipo. `resetCount` remonta los campos no controlados, y
+   * `valoresDescartados` impide que lo escrito en un intento fallido anterior los vuelva a llenar
+   * (el siguiente envio trae un estado nuevo, y con el sus valores vuelven a contar).
+   */
+  const [resetCount, setResetCount] = useState(0);
+  const [valoresDescartados, setValoresDescartados] = useState<FieldValues | undefined>(undefined);
+
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
-  const values = state.status === 'error' ? state.values : undefined;
+  const values =
+    state.status === 'error' && state.values !== valoresDescartados ? state.values : undefined;
 
   /** Valor inicial de un campo: lo escrito en el intento fallido; si no, el del producto que se edita. */
   const initialValue = (field: ProductFieldName, fromProduct: string): string =>
@@ -501,8 +539,14 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
    */
   const [stockValue, setStockValue] = useState(() => initialValue('stock', ''));
   const [qtyAlertValue, setQtyAlertValue] = useState(() =>
-    initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert ?? ''),
+    initialValue('qtyAlert', trimDecimal(template?.qtyAlert ?? product?.qtyAlert ?? '')),
   );
+  // Solo en la edicion: en el alta la unidad del selector puede cambiar y la etiqueta mentiria.
+  const editUnitLabel = product === undefined ? null : productUnitLabel(product, units);
+  const qtyAlertLabel =
+    editUnitLabel === null || editUnitLabel === EMPTY_CELL
+      ? FIELD_LABELS.qtyAlert
+      : `${FIELD_LABELS.qtyAlert} (${editUnitLabel})`;
 
   // Todo error de campo tiene ya SU campo en pantalla: desde QC-52 el formulario no tiene
   // ningun campo oculto, asi que no hay rechazo que se quede sin sitio donde pintarse. La region
@@ -516,6 +560,19 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       : undefined;
 
   const isEdit = product !== undefined;
+  const isPackaging = productType === PRODUCT_TYPES.PACKAGING;
+
+  function handleTypeChange(next: ProductType) {
+    setProductType(next);
+    // Con solo texto libre escrito no hay nada autocompletado que deshacer: se conserva.
+    if (template === null) return;
+    setTemplate(null);
+    setStockValue('');
+    setQtyAlertValue('');
+    setValoresDescartados(state.status === 'error' ? state.values : undefined);
+    setResetCount((count) => count + 1);
+  }
+  const packagingPresentationName = product?.presentationName ?? null;
 
   return (
     /*
@@ -573,7 +630,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
       {/*
         En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
-        autocompletan presentacion y alerta (decision humana del 2026-09-09). En la EDICION el
+        autocompletan unidad y alerta. En la EDICION el
         nombre sigue siendo un campo de texto plano: no hay otro producto del que copiar nada.
       */}
       {isEdit ? (
@@ -587,9 +644,11 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         />
       ) : (
         <ProductNamePicker
+          key={`name-${resetCount}`}
           defaultValue={initialValue('name', '')}
           error={fieldErrors.name}
           onSelect={applyTemplate}
+          productType={productType}
         />
       )}
 
@@ -624,63 +683,79 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           name="type"
           label={FIELD_LABELS.type}
           required
-          defaultValue={initialValue('type', template?.type ?? product?.type ?? PRODUCT_TYPES.PRODUCT)}
+          defaultValue={initialValue('type', productType)}
           error={fieldErrors.type}
           options={TYPE_OPTIONS}
-          onChange={(value) => setProductType(value as ProductType)}
+          onChange={(value) => handleTypeChange(value as ProductType)}
         />
       )}
 
       {/*
-        Presentacion (obligatoria en el alta, 2026-09-10). La presentacion es del LOTE, no del
-        producto (2026-09-09), asi que solo se pide al dar de alta: en la EDICION el producto no
-        tiene ninguna que cambiar. Se reusa el selector compartido -mismo control que proveedores,
-        con su alta en linea-.
-
-        `key`: el selector fija su valor inicial al montarse, asi que elegir un producto existente
-        -o recuperar lo escrito tras un rechazo- lo remonta con el valor nuevo. El campo sigue sin
-        estar controlado, igual que `ProductField`.
+        Unidad del insumo y presentacion del envase: solo en el alta. La `key` remonta el selector
+        al elegir un producto existente o al recuperar lo escrito tras un rechazo, porque fija su
+        valor inicial al montarse.
       */}
+      {isEdit ? null : shouldShowField('unitId', productType) && (
+        <PresentationUnitSelect
+          key={`${initialValue('unitId', '')}-${template?.unitId ?? ''}`}
+          name="unitId"
+          units={formUnits}
+          defaultValue={initialValue('unitId', template?.unitId ?? '') || undefined}
+          error={fieldErrors.unitId}
+          helper={UNIT_HELPER}
+        />
+      )}
+
+      {isEdit && isPackaging ? (
+        <PackagingPresentationSummary
+          presentationName={packagingPresentationName}
+          labelId={`${fieldId}-packaging-presentation`}
+        />
+      ) : null}
+
       {isEdit ? null : shouldShowField('presentationId', productType) && (
         <PresentationSelect
-          key={`${initialValue('presentationId', '')}-${template?.presentationId ?? ''}`}
+          key={`${resetCount}-${initialValue('presentationId', '')}-${template?.presentationId ?? ''}`}
           defaultValue={initialValue('presentationId', template?.presentationId ?? '')}
           defaultLabel={template?.presentationName ?? ''}
           error={fieldErrors.presentationId}
-          // QC-80 (R10, R11): crear una presentacion desde aqui tambien exige unidad. El catalogo
-          // baja por props desde la pagina, que lo pide una sola vez; este formulario no consulta
-          // nada. Sin catalogo, el alta rapida no se ofrece y solo se puede elegir una existente.
+          // Sin catalogo, el alta rapida de presentacion no se ofrece.
           units={units}
-          helper="La presentación en la que llega este lote (bidón de 20 L, saco de 25 kg…). Si no está en la lista, créala aquí mismo sin salir del panel."
+          helper={PACKAGING_PRESENTATION_HELPER}
         />
       )}
+
+      {!isEdit && isPackaging ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="product-packaging-presentation-note"
+        >
+          {PACKAGING_PRESENTATION_NOTE}
+        </p>
+      ) : null}
 
       {isEdit ? null : shouldShowField('stock', productType) && (
         <ProductField
           name="stock"
-          label={FIELD_LABELS.stock}
+          label={isPackaging ? PACKAGING_STOCK_LABEL : FIELD_LABELS.stock}
           type="text"
-          inputMode="decimal"
+          inputMode={isPackaging ? 'numeric' : 'decimal'}
           required
-          helper="La existencia con la que entra este lote al inventario."
+          helper={
+            isPackaging
+              ? PACKAGING_STOCK_HELPER
+              : 'La existencia con la que entra este lote al inventario.'
+          }
           value={stockValue}
           onChange={(event) => setStockValue(sanitizeQuantityInput(event.currentTarget.value))}
           error={fieldErrors.stock}
         />
       )}
 
-      {/*
-        AQUI IBA LA UNIDAD, y su ausencia es deliberada: la declara la PRESENTACION
-        (`presentations.unit_id`, obligatoria), y `products.unit_id` -expuesto como
-        `ProductView.unitId`- es un dato que se lee, nunca uno que este formulario envie. El
-        alta, por tanto, no manda `unitId` -y si lo mandara, el esquema es `strictObject` y lo
-        rechazaria con `invalid_input`-.
-      */}
-
       {shouldShowField('qtyAlert', productType) && (
         <ProductField
           name="qtyAlert"
-          label={FIELD_LABELS.qtyAlert}
+          label={qtyAlertLabel}
           type="text"
           inputMode="decimal"
           required
@@ -704,6 +779,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         <>
           {shouldShowField('unitCost', productType) && (
             <ProductCostFields
+              key={`costos-${resetCount}`}
               unitCostLabel={FIELD_LABELS.unitCost}
               totalCostLabel={FIELD_LABELS.totalCost}
               initialUnitCost={initialValue('unitCost', '')}
@@ -715,6 +791,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
           {shouldShowField('lot', productType) && (
             <ProductField
+              key={`lot-${resetCount}`}
               name="lot"
               label={FIELD_LABELS.lot}
               type="text"
@@ -726,6 +803,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
           {shouldShowField('expiryDate', productType) && (
             <ProductField
+              key={`expiryDate-${resetCount}`}
               name="expiryDate"
               label={FIELD_LABELS.expiryDate}
               type="date"
@@ -742,6 +820,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           */}
           {shouldShowField('purchaseDate', productType) && (
             <ProductBatchDateField
+              key={`purchaseDate-${resetCount}`}
               initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
               error={fieldErrors.purchaseDate}
             />
@@ -751,6 +830,45 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
       </div>
     </SheetContent>
+  );
+}
+
+/**
+ * La presentacion de un envase en la edicion: solo se muestra, porque no se puede cambiar. Sin
+ * ella es un envase legado, que se marca para no confundirlo con los que se reparten.
+ */
+function PackagingPresentationSummary({
+  presentationName,
+  labelId,
+}: {
+  readonly presentationName: string | null;
+  readonly labelId: string;
+}) {
+  if (presentationName === null) {
+    return (
+      <div
+        role="note"
+        className="flex flex-col gap-1 rounded-lg border p-3 text-sm"
+        data-testid="product-packaging-legacy"
+      >
+        <span className="font-medium">{PACKAGING_LEGACY_LABEL}</span>
+        <span className="text-muted-foreground">{PACKAGING_LEGACY_NOTE}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <span id={labelId} className="text-sm font-medium">
+        {FIELD_LABELS.presentationId}
+      </span>
+      <p
+        aria-labelledby={labelId}
+        className="flex min-h-11 items-center rounded-md border px-3 text-base text-muted-foreground"
+        data-testid="product-packaging-presentation"
+      >
+        {presentationName}
+      </p>
+    </div>
   );
 }
 

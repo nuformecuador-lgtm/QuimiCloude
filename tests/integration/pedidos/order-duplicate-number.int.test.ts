@@ -126,15 +126,15 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
-function pedidoNuevo(presentationId: string): NewOrder {
-  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId, presentationContent: null };
+function pedidoNuevo(unitId: string): NewOrder {
+  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', unitId, presentationLines: [] };
 }
 
 function altaDe(fixture: Fixture): Promise<OrderRow> {
   const now = new Date();
   return withOrderTransaction((tx) =>
     createOrderWriteRepository(tx).create(
-      pedidoNuevo(fixture.presentationId),
+      pedidoNuevo(fixture.unitId),
       now.getUTCFullYear(),
       fixture.actorId,
       now,

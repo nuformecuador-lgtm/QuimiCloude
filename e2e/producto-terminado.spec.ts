@@ -1,17 +1,18 @@
 /**
- * E2E del producto terminado: dar contenido a una presentacion, crear y finalizar un pedido con
- * ella, y ver el lote nacer en Inventario, con su cambio de contenido posterior.
+ * E2E del producto terminado: dar contenido a una presentacion, crear un pedido repartido en ella,
+ * producirlo y empacarlo, y ver el lote nacer en Inventario, con su cambio de contenido posterior.
  *
  * EL RECORRIDO, en un solo `test()` -cada paso es la precondicion del siguiente, partirlo
  * obligaria a resembrar el estado de los anteriores-:
  *   1. el Administrador entra a Presentaciones y le pone contenido `1` a la presentacion del
  *      fixture, por la pantalla;
- *   2. crea un pedido de `50.5` con esa presentacion, DESPUES de ponerle el contenido, por la
- *      pantalla de Pedidos;
+ *   2. crea un pedido de `50.5` litros repartido en 50 envases de esa presentacion, DESPUES de
+ *      ponerle el contenido, por la pantalla de Pedidos;
  *   3. se asigna al Operador por Prisma -la asignacion no es lo que este recorrido demuestra, mismo
  *      criterio que `e2e/reserva-de-material.spec.ts`- y el Operador lo entra y lo finaliza por el
  *      Finalizar de la planta en `/asignacion/[id]`;
- *   4. la confirmacion dice los envases enteros y el nombre del producto terminado;
+ *   4. Finalizar deja el pedido por empacar sin dar de alta ningun lote; el Empacador lo comienza
+ *      y lo termina, y es Terminar el que da de alta el producto terminado;
  *   5. el Administrador entra a Inventario, pestana «Producto terminado», y ve el producto con su
  *      lote de 50 y «50 envases»;
  *   6. cambia el contenido de la presentacion a `2` y el lote sigue diciendo «50 envases»: los
@@ -44,7 +45,12 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
-import { normalizeCompanyName, ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
+import {
+  normalizeCompanyName,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_OPERADOR,
+} from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
@@ -55,11 +61,22 @@ import {
   DELIVERED_ORDER_PARAM,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
+  PACKED_ORDER_PARAM,
   PRESENTATIONS_ROUTE,
   assignedOrderRoute,
+  packingOrderRoute,
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
+import { addPackagingLine } from './helpers/order-distribution';
+import { batchStock, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -81,15 +98,21 @@ const PRODUCT_NAME = `${SHARED_TOKEN}_ingrediente`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_Botella 1L`;
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 const BATCH_LOT = `${SHARED_TOKEN}_lote`;
+/** El envase del reparto, con la presentacion del fixture como presentacion fija. */
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_lote_envase`;
+const PACKAGING_STOCK = '100';
+const PACKAGING_UNIT_COST = '0.5000';
 
 /** Muy por encima de `ORDER_QUANTITY`: la entrega debe alcanzar sin agotar el lote del ingrediente. */
 const BATCH_STOCK = '200.0000';
 const UNIT_COST = '10.0000';
 
-/** `50.5 / 1` da 50 envases enteros y 50 de cantidad: el 0.5 sobrante no entra. */
+/** 50 envases de `1` dan 50 de cantidad: el 0.5 sobrante no entra. */
 const ORDER_QUANTITY = '50.5';
+const ORDER_PACKAGES = '50';
 const PRESENTATION_CONTENT_INITIAL = '1';
-/** El contenido cambia DESPUES del Finalizar: el lote ya guarda el suyo propio. */
+/** El contenido cambia DESPUES de Terminar: el lote ya guarda el suyo propio. */
 const PRESENTATION_CONTENT_CHANGED = '2';
 const EXPECTED_PACKAGES_LABEL = '50 envases';
 
@@ -112,6 +135,14 @@ const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
 const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const NAME_CELL_TESTID = 'data-table-cell-name';
+const ORDER_GROUP_NAME_TESTID = 'finished-stock-name';
+const ORDER_GROUP_TOGGLE_TESTID = 'finished-stock-toggle';
+
+/** La receta sola: el numero de pedido va en su propia columna. */
+function exactOrderGroupText(recipeName: string): RegExp {
+  const escaped = recipeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^\\s*${escaped}\\s*$`);
+}
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -130,12 +161,22 @@ const operatorUser: Credentials = {
   password: `Qc150-Operador-${RUN_ID.slice(0, 12)}`,
 };
 
+/** Comienza y termina el empaque: Terminar es lo que da de alta el lote. */
+const empacadorUser: Credentials = {
+  username: `${SHARED_TOKEN}_empacador`,
+  password: `Qc150-Empacador-${RUN_ID.slice(0, 12)}`,
+};
+
 let companyId: string | null = null;
+let unitId: string | null = null;
 let productId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
+let packagingId: string | null = null;
+let packagingBatchId: string | null = null;
 let adminUserId: string | null = null;
 let operatorUserId: string | null = null;
+let empacadorUserId: string | null = null;
 
 /** Igualdad EXACTA de texto: un correlativo o un nombre no puede casar con el prefijo de otro. */
 function exactText(value: string): RegExp {
@@ -200,9 +241,16 @@ async function createUser(user: Credentials, roleId: string): Promise<string> {
   return created.id;
 }
 
+/** En WebKit el refresco que deja un guardado anterior puede interrumpir la navegacion. */
+async function gotoSettled(page: Page, url: string): Promise<void> {
+  await expect(async () => {
+    await page.goto(url);
+  }).toPass({ timeout: 60_000 });
+}
+
 /** Le pone -o le cambia- el contenido a la presentacion del fixture, por la pantalla. */
 async function setPresentationContent(page: Page, content: string): Promise<void> {
-  await page.goto(presentationsUrl(PRESENTATION_NAME));
+  await gotoSettled(page, presentationsUrl(PRESENTATION_NAME));
   await expect(page.getByTestId('presentaciones-title')).toBeVisible({ timeout: 60_000 });
 
   const rowActions = page.locator(`[data-presentation-id="${presentationId}"]`);
@@ -215,9 +263,10 @@ async function setPresentationContent(page: Page, content: string): Promise<void
   await expect(page.getByTestId('presentation-sheet')).toHaveCount(0, { timeout: 60_000 });
 }
 
-/** Crea un pedido de `quantity` para la receta y la presentacion del fixture, por la pantalla. */
-async function createOrder(page: Page, quantity: string): Promise<void> {
-  await page.goto(ordersUrl());
+/** Crea un pedido de `quantity` para la receta del fixture, repartido en `packages` envases del
+ *  envase del fixture, por la pantalla. */
+async function createOrder(page: Page, quantity: string, packages: string): Promise<void> {
+  await gotoSettled(page, ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
   await page.getByTestId('order-create-open').first().click();
@@ -231,17 +280,23 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
   await recipeOption.click();
   await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-  const presentationPicker = page.getByTestId('presentation-select');
-  await presentationPicker.click();
-  await presentationPicker.fill(PRESENTATION_NAME);
-  const presentationOption = page
-    .getByTestId('presentation-option')
-    .filter({ hasText: PRESENTATION_NAME });
-  await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-  await presentationOption.click();
-  await expect(page.getByTestId('presentation-value')).toHaveValue(presentationId ?? '');
-
   await page.getByTestId('order-field-quantity').fill(quantity);
+  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+
+  // El selector solo ofrece el envase cuando su presentacion ya tiene contenido.
+  const distribution = page.getByTestId('order-distribution-field');
+  await addPackagingLine(
+    page,
+    page.getByTestId('order-form'),
+    { productId: packagingId ?? '', name: PACKAGING_NAME },
+    packages,
+  );
+  await expect(distribution.getByTestId('order-distribution-available')).toHaveAttribute(
+    'data-state',
+    'ready',
+    { timeout: 60_000 },
+  );
 
   await page.getByTestId('order-form-submit').click();
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
@@ -249,7 +304,7 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
 
 /** Abre el panel de lotes del producto terminado del fixture, ya en la pestana correcta. */
 async function openFinishedGoodsBatchesPanel(page: Page, productName: string): Promise<Locator> {
-  await page.goto(inventoryUrl(SHARED_TOKEN));
+  await gotoSettled(page, inventoryUrl(SHARED_TOKEN));
   await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
   await page.getByRole('tab', { name: 'Producto terminado' }).click();
@@ -258,6 +313,18 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
     undefined,
     { timeout: 60_000 },
   );
+
+  // La pestana lista pedidos: el producto aparece al desplegar el pedido de la receta.
+  const orderName = page
+    .getByTestId(ORDER_GROUP_NAME_TESTID)
+    .filter({ hasText: exactOrderGroupText(RECIPE_NAME) });
+  await expect(orderName).toHaveCount(1, { timeout: 60_000 });
+  const orderRow = page
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
+    .filter({ has: orderName });
+  const toggle = orderRow.getByTestId(ORDER_GROUP_TOGGLE_TESTID);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
   const nameCell = page
     .getByTestId(NAME_CELL_TESTID)
@@ -303,12 +370,16 @@ test.beforeAll(async () => {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
+    await prisma.orderPresentationLine.deleteMany({
+      where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
@@ -359,6 +430,17 @@ test.beforeAll(async () => {
     );
   }
 
+  const empacadorRole = await prisma.role.findUnique({
+    where: { name: ROLE_EMPACADOR },
+    select: { id: true },
+  });
+  if (!empacadorRole) {
+    throw new Error(
+      `falta el rol "${ROLE_EMPACADOR}": siembra la base con \`pnpm run db:seed\` antes de ` +
+        'correr `pnpm run e2e`.',
+    );
+  }
+
   companyId = (
     await prisma.company.create({
       data: { name: COMPANY_NAME, nameNormalized: normalizeCompanyName(COMPANY_NAME) },
@@ -368,12 +450,14 @@ test.beforeAll(async () => {
 
   adminUserId = await createUser(adminUser, adminRole.id);
   operatorUserId = await createUser(operatorUser, operatorRole.id);
+  empacadorUserId = await createUser(empacadorUser, empacadorRole.id);
 
   // Una de las unidades del catalogo arrancador, nunca creada ni borrada por este archivo.
   const unit = await prisma.unit.findFirstOrThrow({
     where: { nameNormalized: 'litro', companyId: null },
     select: { id: true },
   });
+  unitId = unit.id;
 
   // `products.unit_id` se fija a mano: el disparador que valida el lote de mas abajo exige que el
   // producto ya tenga unidad.
@@ -429,6 +513,18 @@ test.beforeAll(async () => {
     },
   });
 
+  const packaging = await seedPackaging({
+    companyId,
+    name: PACKAGING_NAME,
+    presentationId: presentation.id,
+    stock: PACKAGING_STOCK,
+    unitCost: PACKAGING_UNIT_COST,
+    lot: PACKAGING_LOT,
+    createdBy: adminUserId,
+  });
+  packagingId = packaging.productId;
+  packagingBatchId = packaging.batchId;
+
   recipeId = (
     await prisma.recipe.create({
       data: {
@@ -461,6 +557,10 @@ test.afterAll(async () => {
         ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
+      scopedCompanyId
+        ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
       scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     // Todos los lotes primero, del producto de la receta y del terminado que Finalizar da de
     // alta: `product_batches.product_id` -> `products` RESTRINGE, y a esta altura ya no queda
@@ -485,7 +585,9 @@ test.afterAll(async () => {
         : Promise.resolve(),
     () =>
       prisma.user.deleteMany({
-        where: { username: { in: [adminUser.username, operatorUser.username] } },
+        where: {
+          username: { in: [adminUser.username, operatorUser.username, empacadorUser.username] },
+        },
       }),
     () => prisma.company.deleteMany({ where: { name: COMPANY_NAME } }),
   ];
@@ -508,7 +610,7 @@ test.afterAll(async () => {
 test.setTimeout(240_000);
 
 test.describe('producto terminado', () => {
-  test('R37 - dar contenido a la presentacion, finalizar un pedido con ella y ver el lote entrar en Inventario, sin que un cambio de contenido posterior lo altere', async ({
+  test('R37 - dar contenido a la presentacion, producir y empacar un pedido repartido en ella y ver el lote entrar en Inventario, sin que un cambio de contenido posterior lo altere', async ({
     page,
   }) => {
     expect(recipeId, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
@@ -522,11 +624,16 @@ test.describe('producto terminado', () => {
 
     // --- 2. El pedido, DESPUES de darle contenido a la presentacion: el pedido copia ese
     // contenido al crearlo.
-    await createOrder(page, ORDER_QUANTITY);
+    await createOrder(page, ORDER_QUANTITY, ORDER_PACKAGES);
     const order = await prisma.order.findFirstOrThrow({
       where: { recipeId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, orderYear: true, orderSequence: true, presentationContent: true },
+      select: {
+        id: true,
+        orderYear: true,
+        orderSequence: true,
+        presentationLines: { select: { presentationContent: true } },
+      },
     });
     const orderNumber = formatOrderNumber({
       year: order.orderYear,
@@ -535,8 +642,8 @@ test.describe('producto terminado', () => {
     // Igualdad NUMERICA, no de texto: el valor vuelve de un `DECIMAL(14,4)` y como se serialicen
     // sus ceros de relleno es cosa de la libreria, no del dato.
     expect(
-      order.presentationContent?.equals(PRESENTATION_CONTENT_INITIAL) ?? false,
-      'el pedido deberia copiar el contenido de la presentacion al crearse (R38)',
+      order.presentationLines[0]?.presentationContent?.equals(PRESENTATION_CONTENT_INITIAL) ?? false,
+      'la linea del reparto deberia copiar el contenido de la presentacion al crearse (R38)',
     ).toBe(true);
 
     // --- 3. Se asigna al Operador por Prisma: la asignacion no es lo que este recorrido demuestra
@@ -554,7 +661,7 @@ test.describe('producto terminado', () => {
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
-    await assignedRow.getByTestId('assigned-order-enter').click();
+    await clickAndConfirm(page, assignedRow.getByTestId('assigned-order-enter'), ASSIGNED_ORDER_START_CONFIRM_TESTID);
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), {
       timeout: 60_000,
     });
@@ -562,30 +669,53 @@ test.describe('producto terminado', () => {
 
     // --- 4. Finalizar por el Finalizar de la planta.
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
-    await page.getByTestId(STEP_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
-    // Finalizar deja el pedido «por empacar»: el consumo y el alta del lote ya ocurrieron en esa
-    // misma operacion, sin que haga falta que un Empacador lo entregue.
-    const deliveredOrder = await prisma.order.findUniqueOrThrow({
+    // Finalizar deja el pedido «por empacar» y todavia no da de alta ningun lote.
+    const producedOrder = await prisma.order.findUniqueOrThrow({
       where: { id: order.id },
       select: { status: true },
     });
-    expect(deliveredOrder.status).toBe('POR_EMPACAR');
+    expect(producedOrder.status).toBe('POR_EMPACAR');
 
-    const finishedProductName = `${RECIPE_NAME} · ${PRESENTATION_NAME}`;
-
-    // La confirmacion dice que queda por empacar, los envases enteros y el nombre del producto
-    // terminado.
     const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderNumber);
     await expect(aviso).toContainText('por empacar');
-    await expect(aviso).toContainText(EXPECTED_PACKAGES_LABEL);
-    await expect(aviso).toContainText(finishedProductName);
+
+    expect(
+      await prisma.product.count({
+        where: { companyId: companyId!, type: 'FINISHED_PRODUCT', recipeId, presentationId },
+      }),
+      'Finalizar ya no da de alta producto terminado',
+    ).toBe(0);
+
+    // --- 4b. El Empacador lo comienza y lo termina: Terminar da de alta el lote.
+    await page.goto('about:blank');
+    await page.context().clearCookies();
+    await loginAndLand(page, empacadorUser);
+    await page.goto(packingOrderRoute(order.id));
+    await expect(page.getByTestId('packing-order-screen')).toBeVisible({ timeout: 60_000 });
+    await clickAndConfirm(page, page.getByTestId('packing-order-start-button'), PACKING_ORDER_START_CONFIRM_TESTID);
+    await expect(page.getByTestId('packing-order-finish-button')).toBeVisible({ timeout: 60_000 });
+    await clickAndConfirm(page, page.getByTestId('packing-order-finish-button'), PACKING_ORDER_FINISH_CONFIRM_TESTID);
+    await page.waitForURL(
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(PACKED_ORDER_PARAM),
+      { timeout: 60_000 },
+    );
+
+    const deliveredOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: { status: true, packedBy: true },
+    });
+    expect(deliveredOrder.status).toBe('ENTREGADO');
+    expect(deliveredOrder.packedBy).toBe(empacadorUserId);
+
+    const finishedProductName = `${RECIPE_NAME} · ${PRESENTATION_NAME}`;
 
     // El producto terminado nacio de verdad, no solo lo dice la pantalla.
     const finishedProduct = await prisma.product.findFirstOrThrow({
@@ -593,6 +723,11 @@ test.describe('producto terminado', () => {
       select: { id: true, name: true },
     });
     expect(finishedProduct.name).toBe(finishedProductName);
+
+    // Terminar consumio los envases del reparto.
+    expect(await batchStock(packagingBatchId!)).toBe(
+      Number(PACKAGING_STOCK) - Number(ORDER_PACKAGES),
+    );
 
     // --- 5. Inventario, pestana «Producto terminado»: el producto con su lote de 50 y «50
     // envases».

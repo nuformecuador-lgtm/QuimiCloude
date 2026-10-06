@@ -25,10 +25,16 @@ import {
   NotCancellableError,
   NotDeletableError,
   OrderNotFoundError,
+  OrderWouldBlockError,
   PresentationNotFoundError,
   RecipeNotFoundError,
   UnauthorizedError,
   ValidationError,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  createOrderSchema,
+  updateOrderSchema,
 } from '@/lib/modules/pedidos'
 import {
   cancelOrderAction,
@@ -53,7 +59,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
@@ -66,6 +72,8 @@ const {
   deleteOrderMock,
   findCoverageMock,
   quoteOrderCostMock,
+  quoteOrderPresentationAvailabilityMock,
+  updateOrderPresentationLinesMock,
   getSessionUserMock,
   getSessionContextMock,
 } = vi.hoisted(() => ({
@@ -78,6 +86,9 @@ const {
   // La cobertura de la pagina.
   findCoverageMock: vi.fn(),
   quoteOrderCostMock: vi.fn(),
+  // T11, T25: el disponible de solo lectura y la edicion acotada del reparto y la unidad.
+  quoteOrderPresentationAvailabilityMock: vi.fn(),
+  updateOrderPresentationLinesMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
   getSessionContextMock: vi.fn(),
@@ -103,6 +114,8 @@ vi.mock('@/lib/composition', () => ({
     deleteOrder: deleteOrderMock,
     findCoverage: findCoverageMock,
     quoteOrderCost: quoteOrderCostMock,
+    quoteOrderPresentationAvailability: quoteOrderPresentationAvailabilityMock,
+    updateOrderPresentationLines: updateOrderPresentationLinesMock,
   },
 }))
 
@@ -122,6 +135,7 @@ const SESSION_CONTEXT = { companyId: '33333333-3333-4333-8333-333333333333' }
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
+const UNIT_ID = '77777777-7777-4777-8777-777777777777'
 
 function formDataOf(fields: Record<string, string>): FormData {
   const formData = new FormData()
@@ -136,7 +150,7 @@ const VALID_CREATE_FIELDS = {
   recipeId: RECIPE_ID,
   quantity: '12.5000',
   priority: 'ALTA',
-  presentationId: PRESENTATION_ID,
+  unitId: UNIT_ID,
 }
 
 const VALID_UPDATE_FIELDS = { ...VALID_CREATE_FIELDS, status: 'EN_CURSO' }
@@ -233,10 +247,26 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // valida con los esquemas del dominio, no conoce los estados ni las transiciones, no mide
     // el motivo, no reimplementa la paginacion y no habla con el ORM.
     const source = readActionsSource()
-    expect(source, 'repite la comprobacion de permiso').not.toMatch(/requirePermission/)
+    // T25 (R12): `updateOrderDistributionAction` es la UNICA excepcion, y a proposito -su caso
+    // de uso (`updateOrderPresentationLines`) no comprueba el permiso porque solo tiene ESTE
+    // llamador (`design.md > 4.2`)-. Las diez restantes siguen sin repetirlo: se cuenta, no se
+    // prohibe en bloque.
+    const llamadasARequirePermission = source.match(/requirePermission\(/g) ?? []
+    expect(llamadasARequirePermission.length, 'solo updateOrderDistributionAction la llama').toBe(1)
+    expect(
+      source.slice(0, source.indexOf('requirePermission(')),
+      'requirePermission solo aparece dentro de updateOrderDistributionAction',
+    ).toContain('export async function updateOrderDistributionAction(')
     expect(source, 'incrusta el nombre del rol').not.toMatch(/Administrador/)
     expect(source, 'incrusta ROLE_ADMINISTRADOR').not.toMatch(/ROLE_ADMINISTRADOR/)
-    expect(source, 'valida con el esquema del dominio').not.toMatch(/Schema\b/)
+    // T25 (R46): `updateOrderDistributionAction` es la OTRA excepcion deliberada -su caso de uso
+    // (`updateOrderPresentationLines`) no valida, porque recibe `{ unitId, lines }` YA TIPADO
+    // (`design.md > 4.2`): la unica manera de que la cantidad, la receta o los responsables no
+    // lleguen ni como candidato es que ESTA action los rechace con `.strict()` antes de llamarlo.
+    // Se retira SOLO ese nombre del texto antes de comprobar que ninguna de las otras nueve
+    // repite un esquema del dominio.
+    const sinEsquemaDeT25 = source.replaceAll('updateOrderDistributionSchema', '')
+    expect(sinEsquemaDeT25, 'valida con el esquema del dominio').not.toMatch(/Schema\b/)
     expect(source, 'decide sobre el estado o la transicion').not.toMatch(
       /PENDIENTE|EN_CURSO|ENTREGADO|CANCELADO|assertTransition|isAllowedTransition/,
     )
@@ -271,15 +301,16 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     cancelOrderMock.mockResolvedValue(undefined)
     deleteOrderMock.mockResolvedValue(undefined)
 
-    // 1. El alta traslada los TRES campos del formulario SIN tocarlos: la cantidad sigue siendo
-    //    cadena y el recorte/los rangos son de `zod`, no del borde. (Eran cinco hasta el
-    //    2026-09-07: la unidad y el precio unitario salieron del pedido.)
+    // 1. El alta traslada los campos del formulario SIN tocarlos: la cantidad sigue siendo
+    //    cadena y el recorte/los rangos son de `zod`, no del borde.
     await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
     expect(createOrderMock.mock.calls[0]?.[0]).toEqual({
       recipeId: RECIPE_ID,
       quantity: '12.5000',
       priority: 'ALTA',
-      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      presentationLines: [],
+      confirmBlocked: false,
     })
     // Y lo que el esquema no declara NO se envia: ni estado, ni motivo, ni correlativo, ni
     // autores (R6, R9). La action no puede colar por el formulario lo que el alta no acepta.
@@ -315,7 +346,9 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       recipeId: RECIPE_ID,
       quantity: '12.5000',
       priority: 'ALTA',
-      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      presentationLines: [],
+      confirmBlocked: false,
     })
     expect(updateOrderMock.mock.calls[0]?.[1]).not.toHaveProperty('status')
     // Y NUNCA lleva motivo: cancelar es `cancelOrder` y solo el (R24, R26).
@@ -551,18 +584,74 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       'quoteOrderCostAction',
     )
 
-    // Y no hay ni un `catch` que se quede callado: los OCHO `catch` del archivo -uno por
-    // Server Action, incluidas `listOrderCoverageAction` y `quoteOrderCostAction`- devuelven
-    // `toErrorState`, que o traduce el error de dominio o registra el ajeno y devuelve el
-    // codigo generico. Ninguno se lo traga sin dejar rastro.
+    // Y no hay ni un `catch` que se quede callado: los DIEZ `catch` del archivo -uno por
+    // Server Action, incluidas `listOrderCoverageAction`, `quoteOrderCostAction`,
+    // `quoteOrderPresentationAvailabilityAction` (T11) y `updateOrderDistributionAction`
+    // (T25)- devuelven `toErrorState`, que o traduce el error de dominio o registra el ajeno y
+    // devuelve el codigo generico. Ninguno se lo traga sin dejar rastro.
     const source = readActionsSource()
     const catches = source.match(/catch\s*\(/g) ?? []
     const traducciones = source.match(/return toErrorState\(error\)/g) ?? []
     expect(catches.length).toBeGreaterThan(0)
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
-    expect(catches.length).toBe(8)
+    expect(catches.length).toBe(10)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
+  })
+})
+
+describe('QC-138 — la confirmacion de guardar bloqueado viaja por el formulario', () => {
+  beforeEach(() => {
+    createOrderMock.mockResolvedValue({
+      id: ORDER_ID,
+      number: { year: 2026, sequence: 1 },
+      numberText: '2026-0000001',
+    })
+    updateOrderMock.mockResolvedValue(undefined)
+  })
+
+  it('R8: confirmBlocked=true llega al alta y a la edicion como booleano verdadero', async () => {
+    await createOrderAction(CREATE_INITIAL, formDataOf({ ...VALID_CREATE_FIELDS, confirmBlocked: 'true' }))
+    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ confirmBlocked: true })
+
+    await updateOrderAction(
+      ORDER_ID,
+      MUTATION_INITIAL,
+      formDataOf({ ...VALID_CREATE_FIELDS, confirmBlocked: 'true' }),
+    )
+    expect(updateOrderMock.mock.calls[0]?.[1]).toMatchObject({ confirmBlocked: true })
+  })
+
+  it('R6: sin el campo, o con cualquier otro valor, no se confirma', async () => {
+    for (const valor of [undefined, 'false', 'TRUE', '1', 'on', '']) {
+      createOrderMock.mockClear()
+      const campos =
+        valor === undefined ? VALID_CREATE_FIELDS : { ...VALID_CREATE_FIELDS, confirmBlocked: valor }
+      await createOrderAction(CREATE_INITIAL, formDataOf(campos))
+      expect(createOrderMock.mock.calls[0]?.[0], `confirmBlocked=${String(valor)}`).toMatchObject({
+        confirmBlocked: false,
+      })
+    }
+  })
+
+  it('R6: order_would_block vuelve con su codigo estable en el alta y en la edicion', async () => {
+    createOrderMock.mockRejectedValueOnce(new OrderWouldBlockError())
+    expect(await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))).toEqual({
+      status: 'error',
+      code: 'order_would_block',
+      message: errorMessage('order_would_block'),
+    })
+
+    updateOrderMock.mockRejectedValueOnce(new OrderWouldBlockError())
+    expect(
+      await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_CREATE_FIELDS)),
+    ).toMatchObject({ status: 'error', code: 'order_would_block' })
+  })
+
+  it('R6: la action no envia ningun estado: lo decide el caso de uso', async () => {
+    await createOrderAction(CREATE_INITIAL, formDataOf({ ...VALID_CREATE_FIELDS, status: 'BLOQUEADO' }))
+    expect(createOrderMock.mock.calls[0]?.[0]).not.toHaveProperty('status')
+    expect(readActionsSource(), 'la action decide el estado bloqueado').not.toMatch(/BLOQUEADO/)
   })
 })
 
@@ -731,6 +820,10 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       products: products as unknown as ProductCatalog,
       units: units as unknown as UnitCatalog,
       presentations: presentations as unknown as PresentationCatalog,
+      packaging: {
+        findRefs: explota('packaging.findRefs'),
+        findCostingBatches: explota('packaging.findCostingBatches'),
+      } as unknown as PackagingCatalog,
       log,
     }
 
@@ -789,8 +882,8 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
   })
 })
 
-describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14 y QC-151 T7', () => {
-  it('el modulo exporta exactamente las ocho actions, con su aridad de siempre', () => {
+describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14, QC-151 T7 y QC-170 T11/T25', () => {
+  it('el modulo exporta exactamente las diez actions, con su aridad de siempre', () => {
     const exportadas = Object.entries(orderActions)
       .filter(([, valor]) => typeof valor === 'function')
       .map(([nombre, valor]) => [nombre, (valor as (...args: never[]) => unknown).length] as const)
@@ -805,7 +898,11 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
       ['quoteOrderCostAction', 1],
+      // T11: el disponible de solo lectura, argumento ya tipado.
+      ['quoteOrderPresentationAvailabilityAction', 1],
+      // T25: la edicion acotada, `id` + argumento ya tipado, ningun `FormData`.
       ['updateOrderAction', 3],
+      ['updateOrderDistributionAction', 2],
     ])
   })
 
@@ -820,6 +917,8 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       listOrdersAction: 'query: unknown',
       listOrderCoverageAction: 'orderIds: readonly string[]',
       quoteOrderCostAction: 'input: unknown',
+      quoteOrderPresentationAvailabilityAction: 'input: unknown',
+      updateOrderDistributionAction: 'id: string, input: unknown',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {
       const desde = source.indexOf(`export async function ${nombre}(`)
@@ -833,5 +932,152 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       expect(firma, nombre).toBe(parametros)
       expect(firma, `${nombre} recibe la empresa`).not.toMatch(/company|actor|session/i)
     }
+  })
+})
+
+describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData', () => {
+  const OTRA_PRESENTATION_ID = '88888888-8888-4888-8888-888888888888'
+
+  function formDataWithLines(
+    fields: Record<string, string>,
+    presentationIds: readonly string[],
+    packages: readonly string[],
+  ): FormData {
+    const formData = formDataOf(fields)
+    for (const id of presentationIds) formData.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, id)
+    for (const count of packages) formData.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, count)
+    return formData
+  }
+
+  // El doble valida con el esquema REAL y lanza lo que lanza el caso de uso: asi la entrada
+  // invalida se mide hasta el `code` que ve el formulario.
+  function validatingWith(schema: { safeParse(input: unknown): { success: boolean } }) {
+    return (...args: unknown[]) => {
+      if (!schema.safeParse(args.at(-2)).success) throw new ValidationError()
+      return { id: ORDER_ID, number: { year: 2026, sequence: 1 }, numberText: '2026-0000001' }
+    }
+  }
+
+  beforeEach(() => {
+    createOrderMock.mockImplementation((input: unknown, actor: unknown) =>
+      validatingWith(createOrderSchema)(input, actor),
+    )
+    updateOrderMock.mockImplementation((id: unknown, input: unknown, actor: unknown) => {
+      validatingWith(updateOrderSchema)(id, input, actor)
+    })
+  })
+
+  const LINEAS_ESPERADAS = [
+    { presentationId: PRESENTATION_ID, packages: '3' },
+    { presentationId: OTRA_PRESENTATION_ID, packages: '5' },
+  ]
+
+  it('R1 R41: el alta con unidad y dos lineas construye el candidato en orden y el esquema lo acepta', async () => {
+    const result = await createOrderAction(
+      CREATE_INITIAL,
+      formDataWithLines(VALID_CREATE_FIELDS, [PRESENTATION_ID, OTRA_PRESENTATION_ID], ['3', '5']),
+    )
+
+    expect(createOrderMock.mock.calls[0]?.[0]).toEqual({
+      recipeId: RECIPE_ID,
+      quantity: '12.5000',
+      priority: 'ALTA',
+      unitId: UNIT_ID,
+      presentationLines: LINEAS_ESPERADAS,
+      confirmBlocked: false,
+    })
+    expect(result.status).toBe('success')
+    expect(createOrderSchema.parse(createOrderMock.mock.calls[0]?.[0]).presentationLines).toEqual([
+      { presentationId: PRESENTATION_ID, packages: 3 },
+      { presentationId: OTRA_PRESENTATION_ID, packages: 5 },
+    ])
+  })
+
+  it('R1 R41: la edicion con unidad y dos lineas construye el mismo candidato, sin estado', async () => {
+    const result = await updateOrderAction(
+      ORDER_ID,
+      MUTATION_INITIAL,
+      formDataWithLines(VALID_UPDATE_FIELDS, [PRESENTATION_ID, OTRA_PRESENTATION_ID], ['3', '5']),
+    )
+
+    expect(updateOrderMock.mock.calls[0]?.[0]).toBe(ORDER_ID)
+    expect(updateOrderMock.mock.calls[0]?.[1]).toEqual({
+      recipeId: RECIPE_ID,
+      quantity: '12.5000',
+      priority: 'ALTA',
+      unitId: UNIT_ID,
+      presentationLines: LINEAS_ESPERADAS,
+      confirmBlocked: false,
+    })
+    expect(result).toEqual({ status: 'success' })
+  })
+
+  it('R9: sin lineas el reparto llega vacio y el alta es valida', async () => {
+    const result = await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
+
+    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ presentationLines: [] })
+    expect(result.status).toBe('success')
+  })
+
+  it('R1: longitudes desiguales del reparto terminan en invalid_input, en alta y en edicion', async () => {
+    const masIds = await createOrderAction(
+      CREATE_INITIAL,
+      formDataWithLines(VALID_CREATE_FIELDS, [PRESENTATION_ID, OTRA_PRESENTATION_ID], ['3']),
+    )
+    expect(masIds).toMatchObject({ status: 'error', code: 'invalid_input' })
+
+    const masEnvases = await updateOrderAction(
+      ORDER_ID,
+      MUTATION_INITIAL,
+      formDataWithLines(VALID_UPDATE_FIELDS, [PRESENTATION_ID], ['3', '5']),
+    )
+    expect(masEnvases).toMatchObject({ status: 'error', code: 'invalid_input' })
+  })
+
+  it('R41: un presentationId suelto ya no se lee, y sin unidad el alta es invalid_input', async () => {
+    const result = await createOrderAction(
+      CREATE_INITIAL,
+      formDataOf({ recipeId: RECIPE_ID, quantity: '12.5000', presentationId: PRESENTATION_ID }),
+    )
+
+    const candidato = createOrderMock.mock.calls[0]?.[0]
+    expect(candidato).not.toHaveProperty('presentationId')
+    expect(candidato).toMatchObject({ unitId: '', presentationLines: [] })
+    expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
+    expect(readActionsSource()).not.toMatch(/['"]presentationId['"]/)
+  })
+
+  it('QC-195 R11, R35: las tres listas se unen por posicion y la cadena vacia es ausencia', async () => {
+    const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+    const formData = formDataOf(VALID_CREATE_FIELDS)
+    formData.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, ENVASE_ID)
+    formData.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, '')
+    formData.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '40')
+    formData.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, '')
+    formData.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, PRESENTATION_ID)
+    formData.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '2')
+
+    const result = await createOrderAction(CREATE_INITIAL, formData)
+
+    expect(result.status).toBe('success')
+    expect(createOrderSchema.parse(createOrderMock.mock.calls[0]?.[0]).presentationLines).toEqual([
+      { packagingProductId: ENVASE_ID, packages: 40 },
+      { presentationId: PRESENTATION_ID, packages: 2 },
+    ])
+  })
+
+  it('QC-195 R11: una posicion con envase y presentacion a la vez, o con ninguno, es invalid_input', async () => {
+    const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+    const ambos = formDataOf(VALID_CREATE_FIELDS)
+    ambos.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, ENVASE_ID)
+    ambos.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, PRESENTATION_ID)
+    ambos.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '1')
+    expect(await createOrderAction(CREATE_INITIAL, ambos)).toMatchObject({ status: 'error', code: 'invalid_input' })
+
+    const ninguno = formDataOf(VALID_CREATE_FIELDS)
+    ninguno.append(ORDER_DISTRIBUTION_PACKAGING_FIELD, '')
+    ninguno.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, '')
+    ninguno.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '1')
+    expect(await createOrderAction(CREATE_INITIAL, ninguno)).toMatchObject({ status: 'error', code: 'invalid_input' })
   })
 })

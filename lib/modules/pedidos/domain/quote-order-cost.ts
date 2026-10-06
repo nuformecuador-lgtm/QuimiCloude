@@ -1,14 +1,15 @@
 import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { quoteOrderCostSchema } from './order-input';
-import { resolveIngredientsCost } from './resolve-ingredients-cost';
+import { packagingLinesOfInput } from './resolve-distribution';
+import { resolveOrderCost } from './resolve-ingredients-cost';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /**
- * Solo los tres catalogos de LECTURA que `resolveIngredientsCost` necesita: sin `orders` ni
+ * Solo los catalogos de LECTURA que `resolveOrderCost` necesita: sin `orders` ni
  * `presentations`, asi que este caso de uso no puede escribir ninguna fila porque no recibe
  * nada que escriba.
  */
@@ -16,15 +17,15 @@ export type QuoteOrderCostDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
+  readonly packaging: PackagingCatalog;
 };
 
 export type OrderCostQuote = { readonly ingredientsCost: string | null };
 
 /**
- * Cotizacion de solo lectura del coste de ingredientes de un pedido: la misma regla que el
- * alta y la edicion aplican al guardar (`resolveIngredientsCost`), con la misma receta y la
- * misma cantidad, y con el `companyId` que llega SIEMPRE del actor de la sesion, nunca de la
- * entrada.
+ * Cotizacion de solo lectura del importe de un pedido -ingredientes y envases del reparto-: la
+ * misma regla que el alta y la edicion aplican al guardar (`resolveOrderCost`), con el
+ * `companyId` que llega SIEMPRE del actor de la sesion, nunca de la entrada.
  *
  * `data.orderId` solo lo envia el formulario de EDICION: hace que lo que ese pedido ya tiene
  * apartado cuente como disponible para el mismo, igual que hace `updateOrder` al guardar. No
@@ -47,12 +48,13 @@ export function createQuoteOrderCost(
     if (!parsed.success) throw new ValidationError();
     const data = parsed.data;
 
-    const ingredientsCost = await resolveIngredientsCost(
-      deps.recipes,
-      deps.products,
-      deps.units,
+    // Las lineas antiguas, sin envase, no cuestan.
+    const ingredientsCost = await resolveOrderCost(
+      { recipes: deps.recipes, products: deps.products, units: deps.units, packaging: deps.packaging },
       data.recipeId,
       data.quantity,
+      data.unitId,
+      packagingLinesOfInput(data.presentationLines ?? []),
       actor.companyId,
       { orderId: data.orderId },
     );

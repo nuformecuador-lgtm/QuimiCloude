@@ -290,6 +290,7 @@ const CLAVES_PERMITIDAS = [
   'quantity',
   'unit',
   'steps',
+  'packingSteps',
   'documentFileId',
   'lines',
   'kind',

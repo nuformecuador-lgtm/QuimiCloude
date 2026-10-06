@@ -5,7 +5,12 @@ import {
   createGetAssignedOrderExecution,
   type GetAssignedOrderExecutionDeps,
 } from '@/lib/modules/asignaciones/domain/get-assigned-order-execution';
-import { AsignacionesError, OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
+import {
+  AsignacionesError,
+  OrderBlockedError,
+  OrderNotFoundError,
+  UnauthorizedError,
+} from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/domain/assigned-order-execution-view';
@@ -13,7 +18,7 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
 import type { PresentationCatalog, PresentationRef, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
-import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -28,7 +33,11 @@ const LITRO = uuid('d');
 const MILILITRO = uuid('e');
 const KILOGRAMO = uuid('f');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+};
 
 function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
@@ -38,7 +47,8 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '200',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: null,
     packedBy: null,
     ...overrides,
@@ -52,6 +62,7 @@ function contenido(overrides?: Partial<RecipeExecutionContent>): RecipeExecution
     isDeleted: false,
     steps: [],
     lines: [{ productId: PRODUCTO, productName: null, percentage: '10.00' }],
+    tools: [],
     ...overrides,
   };
 }
@@ -67,7 +78,7 @@ function unidad(overrides?: Partial<UnitRef>): UnitRef {
 const PRESENTACION = uuid('b');
 
 function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
-  return { id: PRESENTACION, name: 'Bidon 20L', content: null, ...overrides };
+  return { id: PRESENTACION, name: 'Bidon 20L', content: null, unitId: LITRO, ...overrides };
 }
 
 type Dobles = {
@@ -78,6 +89,7 @@ type Dobles = {
   readonly findExecutionContentById: ReturnType<typeof vi.fn>;
   readonly findRefs: ReturnType<typeof vi.fn>;
   readonly findRefsSharingBaseInCompany: ReturnType<typeof vi.fn>;
+  readonly findMassVolumeBridge: ReturnType<typeof vi.fn>;
   readonly productFindRefs: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
@@ -85,13 +97,14 @@ type Dobles = {
 
 function montar(options?: {
   readonly ids?: readonly string[];
-  readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' } | null;
+  readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' } | null;
   readonly summary?: AssignedOrderSummary;
   readonly content?: RecipeExecutionContent | null;
   readonly products?: readonly ProductRef[];
   readonly ownUnits?: readonly UnitRef[];
   readonly sisterUnits?: readonly UnitRef[];
   readonly presentations?: readonly PresentationRef[];
+  readonly bridge?: MassVolumeBridge | null;
 }): Dobles {
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const listByOrderInCompany = vi.fn(async () => {
@@ -128,6 +141,7 @@ function montar(options?: {
 
   const findRefs = vi.fn(async () => options?.ownUnits ?? [unidad()]);
   const findRefsSharingBaseInCompany = vi.fn(async () => options?.sisterUnits ?? []);
+  const findMassVolumeBridge = vi.fn(async () => options?.bridge ?? null);
 
   const productFindRefs = vi.fn(async () => options?.products ?? [producto()]);
 
@@ -144,7 +158,7 @@ function montar(options?: {
     } as OrderAssignmentRepository,
     orders: { findAliveById, listAliveSummariesByIds, transitionAliveById } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
-    units: { findRefs, findRefsSharingBaseInCompany } as UnitCatalog,
+    units: { findRefs, findRefsSharingBaseInCompany, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge } as UnitCatalog,
     products: {
       findRefs: productFindRefs,
       findCostingBatches: vi.fn(async () => {
@@ -163,6 +177,7 @@ function montar(options?: {
     findExecutionContentById,
     findRefs,
     findRefsSharingBaseInCompany,
+    findMassVolumeBridge,
     productFindRefs,
     findRefsPresentations,
     todos: [
@@ -179,6 +194,7 @@ function montar(options?: {
       findExecutionContentById,
       findRefs,
       findRefsSharingBaseInCompany,
+      findMassVolumeBridge,
       productFindRefs,
       findRefsPresentations,
     ],
@@ -186,7 +202,7 @@ function montar(options?: {
 }
 
 describe('getAssignedOrderExecution — autorizacion', () => {
-  it('R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto', async () => {
+  it('R5: exige `asignaciones.ejecutar` ANTES de tocar ningun puerto', async () => {
     const { deps, todos } = montar();
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
 
@@ -236,6 +252,22 @@ describe('getAssignedOrderExecution — R7: la empresa', () => {
     await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
+  });
+});
+
+describe('QC-138 — getAssignedOrderExecution: un BLOQUEADO no se abre', () => {
+  it('R32 — abrir la ejecucion de un BLOQUEADO, tambien por la URL directa, rechaza con `order_blocked`', async () => {
+    const { deps, listAliveSummariesByIds, findExecutionContentById } = montar({
+      order: { id: PEDIDO, status: 'BLOQUEADO' },
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const error = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(OrderBlockedError);
+    expect((error as OrderBlockedError).code).toBe('order_blocked');
+    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(findExecutionContentById).not.toHaveBeenCalled();
   });
 });
 
@@ -308,12 +340,15 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
         'orderQuantity',
         'steps',
         'lines',
-        'presentationName',
+        'tools',
+        'presentationLines',
+        'unitId',
+        'unitLabel',
       ].sort(),
     );
     for (const line of view.lines) {
       expect(Object.keys(line).sort()).toEqual(
-        ['productName', 'percentage', 'quantity', 'unit', 'alternativeUnits'].sort(),
+        ['productName', 'percentage', 'quantity', 'need', 'unit', 'alternativeUnits'].sort(),
       );
     }
   });
@@ -322,7 +357,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
 describe('getAssignedOrderExecution — la presentacion del pedido asignado', () => {
   it('R25: la vista lleva el nombre de la presentacion cuando el pedido tiene una', async () => {
     const { deps, findRefsPresentations } = montar({
-      summary: resumen({ presentationId: PRESENTACION }),
+      summary: resumen({ presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] }),
       presentations: [presentacion()],
     });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
@@ -330,17 +365,177 @@ describe('getAssignedOrderExecution — la presentacion del pedido asignado', ()
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(findRefsPresentations).toHaveBeenCalledWith([PRESENTACION], EMPRESA);
-    expect(view.presentationName).toBe('Bidon 20L');
+    expect(view.presentationLines[0]?.presentationName).toBe('Bidon 20L');
   });
 
   it('R25: un pedido sin presentacion devuelve `presentationName: null`, sin consultar el catalogo', async () => {
-    const { deps, findRefsPresentations } = montar({ summary: resumen({ presentationId: null }) });
+    const { deps, findRefsPresentations } = montar({ summary: resumen({ presentationLines: [] }) });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
 
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(findRefsPresentations).not.toHaveBeenCalled();
-    expect(view.presentationName).toBeNull();
+    expect(view.presentationLines).toEqual([]);
+  });
+});
+
+describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad del pedido', () => {
+  const SEGUNDA_PRESENTACION = uuid('9');
+
+  it('R26: la vista lleva TODAS las lineas del reparto en orden de alta, con nombre y envases, en una sola llamada', async () => {
+    const { deps, findRefsPresentations } = montar({
+      summary: resumen({
+        presentationLines: [
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: null },
+          { presentationId: PRESENTACION, packages: 1, packagingName: null },
+        ],
+      }),
+      presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefsPresentations).toHaveBeenCalledTimes(1);
+    expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
+    expect(view.presentationLines).toEqual([
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+    ]);
+  });
+
+  it('R44: la pantalla de ejecucion recibe el nombre del envase en la linea con envase y `null` en la antigua (R33)', async () => {
+    const { deps } = montar({
+      summary: resumen({
+        presentationLines: [
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: 'Envase PET 200 ml' },
+          { presentationId: PRESENTACION, packages: 1, packagingName: null },
+        ],
+      }),
+      presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view.presentationLines).toEqual([
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: 'Envase PET 200 ml' },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+    ]);
+  });
+
+  it('R27: sin reparto, `presentationLines` es `[]` y la vista sale igual, sin error', async () => {
+    const { deps } = montar({ summary: resumen({ presentationLines: [] }) });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view.presentationLines).toEqual([]);
+    expect(view.orderId).toBe(PEDIDO);
+  });
+
+  it('R26: la cantidad del pedido viaja con la etiqueta de su unidad (simbolo, o nombre si no lo tiene)', async () => {
+    const GARRAFA = uuid('8');
+    const conSimbolo = montar({ summary: resumen({ unitId: LITRO }), ownUnits: [unidad()] });
+    const vistaConSimbolo = await createGetAssignedOrderExecution(conSimbolo.deps)(ACTOR, { orderId: PEDIDO });
+    expect(conSimbolo.findRefs).toHaveBeenCalledWith([LITRO], EMPRESA);
+    expect(vistaConSimbolo.unitId).toBe(LITRO);
+    expect(vistaConSimbolo.unitLabel).toBe('L');
+
+    const sinSimbolo = montar({
+      summary: resumen({ unitId: GARRAFA }),
+      ownUnits: [unidad(), unidad({ id: GARRAFA, name: 'Garrafa', symbol: null })],
+    });
+    const vistaSinSimbolo = await createGetAssignedOrderExecution(sinSimbolo.deps)(ACTOR, { orderId: PEDIDO });
+    expect(vistaSinSimbolo.unitId).toBe(GARRAFA);
+    expect(vistaSinSimbolo.unitLabel).toBe('Garrafa');
+  });
+
+  it('R42: un pedido sin unidad sale con `unitId` y `unitLabel` a null', async () => {
+    const { deps, findRefs } = montar({ summary: resumen({ unitId: null }), products: [] });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefs).not.toHaveBeenCalled();
+    expect(view.unitId).toBeNull();
+    expect(view.unitLabel).toBeNull();
+  });
+});
+
+describe('getAssignedOrderExecution — la necesidad de la linea en la unidad del insumo', () => {
+  const GRAMO = uuid('6');
+  const GARRAFA = uuid('8');
+  const kilogramo = unidad({ id: KILOGRAMO, name: 'Kilogramo', symbol: 'kg' });
+  const gramo = unidad({ id: GRAMO, name: 'Gramo', symbol: 'g', baseUnitId: KILOGRAMO, factor: '0.001' });
+  const litro = unidad();
+  const puente: MassVolumeBridge = { volumeBaseId: LITRO, massBaseId: KILOGRAMO };
+
+  it('R16 la cantidad de la linea sale convertida a la unidad del insumo', async () => {
+    const { deps, findRefs } = montar({
+      summary: resumen({ quantity: '2000', unitId: GRAMO }),
+      products: [producto({ unitId: KILOGRAMO })],
+      ownUnits: [kilogramo, gramo],
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefs).toHaveBeenCalledTimes(1);
+    expect([...(findRefs.mock.calls[0]?.[0] as readonly string[])].sort()).toEqual([KILOGRAMO, GRAMO].sort());
+    const [line] = view.lines;
+    expect(line?.need).toBe('exact');
+    expect(Number(line?.quantity)).toBe(0.2);
+    expect(line?.unit?.id).toBe(KILOGRAMO);
+    expect(view.unitLabel).toBe('g');
+  });
+
+  it('R17 una linea aproximada sale con need approximate', async () => {
+    const { deps, findMassVolumeBridge } = montar({
+      summary: resumen({ quantity: '200', unitId: LITRO }),
+      products: [producto({ unitId: KILOGRAMO })],
+      ownUnits: [kilogramo, litro],
+      bridge: puente,
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findMassVolumeBridge).toHaveBeenCalledTimes(1);
+    const [line] = view.lines;
+    expect(line?.need).toBe('approximate');
+    expect(Number(line?.quantity)).toBe(20);
+    expect(line?.unit?.id).toBe(KILOGRAMO);
+  });
+
+  it('R17 una linea no convertible sale sin cantidad', async () => {
+    const { deps } = montar({
+      summary: resumen({ quantity: '200', unitId: GARRAFA }),
+      products: [producto({ unitId: LITRO })],
+      ownUnits: [litro, unidad({ id: GARRAFA, name: 'Garrafa', symbol: null })],
+      bridge: puente,
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    const [line] = view.lines;
+    expect(line?.need).toBe('not_convertible');
+    expect(line?.quantity).toBeNull();
+    expect(line?.percentage).toBe('10.00');
+    expect(line?.productName).toBe('Hipoclorito');
+  });
+
+  it('R20 un pedido sin unidad sale como antes', async () => {
+    const { deps, findRefs, findMassVolumeBridge } = montar({ summary: resumen({ quantity: '200', unitId: null }) });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findMassVolumeBridge).not.toHaveBeenCalled();
+    expect(findRefs).toHaveBeenCalledWith([LITRO], EMPRESA);
+    const [line] = view.lines;
+    expect(line?.need).toBe('unconverted');
+    expect(line?.quantity).toBe('20');
+    expect(line?.unit?.id).toBe(LITRO);
+    expect(view.unitId).toBeNull();
+    expect(view.unitLabel).toBeNull();
   });
 });
 
@@ -443,5 +638,204 @@ describe('la pantalla de ejecucion no lleva importe (R15)', () => {
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(Object.keys(view)).not.toContain('ingredientsCost');
+  });
+});
+
+describe('getAssignedOrderExecution — pedido con version de receta', () => {
+  it('R8, R11: la ejecucion de un pedido con version muestra el nombre compuesto, los pasos de la original y las lineas de la version', async () => {
+    const VERSION = uuid('9');
+    const pasosDeLaOriginal = [{ blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Mezclar en frio' }] }] }];
+    const { deps, findExecutionContentById } = montar({
+      summary: resumen({ recipeId: VERSION }),
+      content: contenido({
+        id: VERSION,
+        name: 'Jabon liquido · Sin perfume',
+        steps: pasosDeLaOriginal,
+        lines: [{ productId: PRODUCTO, productName: null, percentage: '25.00' }],
+      }),
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findExecutionContentById).toHaveBeenCalledWith(VERSION, EMPRESA);
+    expect(view.recipeName).toBe('Jabon liquido · Sin perfume');
+    expect(view.steps).toEqual(pasosDeLaOriginal);
+    expect(view.lines.map((line) => line.percentage)).toEqual(['25.00']);
+  });
+});
+
+describe('getAssignedOrderExecution — herramientas de la receta', () => {
+  const BATIDORA = uuid('4');
+  const BALANZA = uuid('5');
+
+  function conHerramientas(): RecipeExecutionContent {
+    return contenido({
+      tools: [
+        { productId: BATIDORA, productName: null, quantity: 2 },
+        { productId: BALANZA, productName: null, quantity: 1 },
+      ],
+    });
+  }
+
+  const vivos = [
+    producto(),
+    producto({ id: BATIDORA, name: 'Batidora', unitId: null, type: 'MACHINE' }),
+    producto({ id: BALANZA, name: 'Balanza', unitId: KILOGRAMO, type: 'MACHINE' }),
+  ];
+
+  it('R28: trae nombre y cantidad de cada herramienta de la receta del pedido, en su orden', async () => {
+    const { deps, findExecutionContentById } = montar({ content: conHerramientas(), products: vivos });
+
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findExecutionContentById).toHaveBeenCalledWith(RECETA, EMPRESA);
+    expect(vista.tools).toEqual([
+      { productName: 'Batidora', quantity: 2 },
+      { productName: 'Balanza', quantity: 1 },
+    ]);
+  });
+
+  it('R28: si el pedido es de una version, son las herramientas de esa receta (la que lee el catalogo por recipeId)', async () => {
+    const VERSION = uuid('9');
+    const { deps, findExecutionContentById } = montar({
+      summary: resumen({ recipeId: VERSION }),
+      content: contenido({ id: VERSION, tools: [{ productId: BALANZA, productName: null, quantity: 4 }] }),
+      products: vivos,
+    });
+
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(findExecutionContentById).toHaveBeenCalledWith(VERSION, EMPRESA);
+    expect(vista.tools).toEqual([{ productName: 'Balanza', quantity: 4 }]);
+  });
+
+  it('R29: la cantidad no cambia con la cantidad del pedido', async () => {
+    const vistas = await Promise.all(
+      ['1', '200', '99999.5'].map((quantity) =>
+        createGetAssignedOrderExecution(
+          montar({ summary: resumen({ quantity }), content: conHerramientas(), products: vivos }).deps,
+        )(ACTOR, { orderId: PEDIDO }),
+      ),
+    );
+
+    for (const vista of vistas) expect(vista.tools.map((t) => t.quantity)).toEqual([2, 1]);
+  });
+
+  it('R30: una herramienta de baja sale con productName null y su cantidad', async () => {
+    const { deps } = montar({ content: conHerramientas(), products: [producto(), vivos[1] as ProductRef] });
+
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(vista.tools).toEqual([
+      { productName: 'Batidora', quantity: 2 },
+      { productName: null, quantity: 1 },
+    ]);
+  });
+
+  it('R31: sin herramientas, tools es []', async () => {
+    const { deps } = montar();
+    const vista = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+    expect(vista.tools).toEqual([]);
+  });
+
+  it('R28: un solo findRefs de productos para lineas y herramientas, y las unidades solo de las lineas', async () => {
+    const { deps, productFindRefs, findRefs } = montar({ content: conHerramientas(), products: vivos });
+
+    await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(productFindRefs).toHaveBeenCalledTimes(1);
+    expect([...(productFindRefs.mock.calls[0]?.[0] as readonly string[])].sort()).toEqual(
+      [PRODUCTO, BATIDORA, BALANZA].sort(),
+    );
+    const unidadesPedidas = findRefs.mock.calls.flatMap((call) => [...(call[0] as readonly string[])]);
+    expect(unidadesPedidas).not.toContain(KILOGRAMO);
+  });
+
+  it('R32: sin asignaciones.ejecutar no toca ningun puerto, aunque la receta tenga herramientas', async () => {
+    const { deps, todos } = montar({ content: conHerramientas(), products: vivos });
+
+    await expect(
+      createGetAssignedOrderExecution(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['recetas.consultar', 'recetas.modificar'] },
+        { orderId: PEDIDO },
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+});
+
+function doblesDe(deps: object): unknown[] {
+  return Object.values(deps as Record<string, unknown>).flatMap((value) =>
+    vi.isMockFunction(value) ? [value] : value !== null && typeof value === 'object' ? doblesDe(value) : [],
+  );
+}
+
+const SIN_EJECUTAR: readonly (readonly [string, readonly string[]])[] = [
+  ['solo asignaciones.consultar', ['asignaciones.consultar']],
+  ['solo empaque.modificar', ['empaque.modificar']],
+  ['asignaciones.consultar + empaque.modificar', ['asignaciones.consultar', 'empaque.modificar']],
+  ['el conjunto vacio', []],
+];
+
+describe('getAssignedOrderExecution — exige `asignaciones.ejecutar`', () => {
+  it.each(SIN_EJECUTAR)('R5, R7a: con %s rechaza con `unauthorized` sin invocar ningun puerto', async (_caso, permissions) => {
+    const { deps } = montar();
+
+    await expect(
+      createGetAssignedOrderExecution(deps)({ id: ANA, companyId: EMPRESA, permissions }, { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('R5: sin el permiso rechaza antes de validar la entrada', async () => {
+    const { deps } = montar();
+
+    await expect(
+      createGetAssignedOrderExecution(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] },
+        { orderId: 'no-es-un-uuid' },
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it('R7b: con solo `asignaciones.ejecutar` leer la ejecucion resuelve igual que con el conjunto del Operador', async () => {
+    const soloEjecutar: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
+    const conEjecutar = montar();
+    const deReferencia = montar();
+
+    const resultado = await createGetAssignedOrderExecution(conEjecutar.deps)(soloEjecutar, { orderId: PEDIDO });
+    const referencia = await createGetAssignedOrderExecution(deReferencia.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(resultado).toEqual(referencia);
+  });
+});
+
+describe('QC-211 — la ejecucion del operador no lleva pasos de envasado', () => {
+  const MEZCLAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Mezclar en frio' }] }] };
+  const ENVASAR = 'Envasar en garrafas de 5 L';
+
+  it('R26: la vista construida desde un contenido de receta no tiene `packingSteps` y solo trae los pasos del operador', async () => {
+    const { deps } = montar({ content: contenido({ steps: [MEZCLAR] }) });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view).not.toHaveProperty('packingSteps');
+    expect(view.steps).toEqual([MEZCLAR]);
+  });
+
+  it('R26: aunque el contenido trajera pasos de envasado, la vista no los copia', async () => {
+    const conEnvasado = {
+      ...contenido({ steps: [MEZCLAR] }),
+      packingSteps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: ENVASAR }] }] }],
+    } as RecipeExecutionContent;
+    const { deps } = montar({ content: conEnvasado });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view).not.toHaveProperty('packingSteps');
+    expect(JSON.stringify(view)).not.toContain(ENVASAR);
   });
 });

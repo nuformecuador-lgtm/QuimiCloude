@@ -103,7 +103,7 @@ function productView(overrides: Partial<ProductView> = {}): ProductView {
 }
 
 function vistaPreviaVacia(): FormulaImportPreview {
-  return { name: null, description: null, ingredients: [], steps: [], nameClash: null };
+  return { name: null, description: null, ingredients: [], steps: [], packingSteps: [], nameClash: null };
 }
 
 /** Resuelve los Server Components `async` del arbol antes de entregarselo al renderer de cliente. */

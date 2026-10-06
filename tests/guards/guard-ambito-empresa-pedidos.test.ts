@@ -487,9 +487,10 @@ const PUERTOS = [
 const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
   [
     'transitionAliveById',
-    // Gana `recipes`, `products` y `units` -las lecturas globales del coste del lote y del
-    // nombre de la receta-, ademas de `unitOfWork`.
-    /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,?\s*\}\s*\)$/,
+    // R15, R16: Finalizar ya no da de alta ningun lote, asi que ya no necesita
+    // `recipes`/`products`/`units` -las lecturas globales del coste del lote y del nombre de
+    // la receta se trasladan a Terminar-. Solo `unitOfWork`.
+    /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,?\s*\}\s*\)$/,
   ],
   // Comenzar y Terminar (empaque): cada uno cablea un caso de uso de `pedidos/domain` sobre
   // `OrderPackingRepository`, implementado en `order-prisma.ts` con `scope: OrderScope` -las dos
@@ -499,8 +500,26 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     /^createStartPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,?\s*\}\s*\)$/,
   ],
   [
+    // T14 (R17-R21): Terminar da de alta un lote por linea, asi que `createFinishPacking`
+    // abre `orderUnitOfWork` directamente -ya no cablea `OrderPackingRepository.finishPackingAlive`,
+    // que T13 retiro del puerto- y necesita los mismos catalogos globales que `transitionAliveById`
+    // usaba antes de R15/R16, mas `presentationCatalog` para la defensa en profundidad de R19.
+    // QC-195 (R31): y `packagingCatalog`, para costear los envases del lote; filtra por empresa en
+    // `inventario` (lo vigila `guard-ambito-empresa-inventario`).
     'finishPackingAliveById',
-    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,?\s*\}\s*\)$/,
+    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
+  ],
+  // QC-195 (R44): los dos listados de resumen resuelven el nombre del envase en
+  // `pedidos/domain`, sobre `OrderSummaryReader`. Quien toca la base son
+  // `listAliveOrderSummariesByIds` y `listAliveOrderSummariesInCompany` (`order-catalog-prisma.ts`),
+  // que el barrido sin lista de excepciones de mas abajo sigue exigiendo con `companyId`.
+  [
+    'listAliveSummariesByIds',
+    /^createListAliveSummariesByIds\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
+  ],
+  [
+    'listAliveSummariesInCompany',
+    /^createListAliveSummariesInCompany\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
   ],
 ])
 

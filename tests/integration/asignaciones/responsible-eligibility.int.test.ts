@@ -33,12 +33,12 @@ vi.mock('@/lib/shared/db/prisma', async () => {
 
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
+import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { createGetAssignedOrderExecution } from '@/lib/modules/asignaciones/domain/get-assigned-order-execution';
 import { createStartAssignedOrder } from '@/lib/modules/asignaciones/domain/start-assigned-order';
 import { findRecipeExecutionContentById } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
@@ -62,6 +62,9 @@ import {
   withSavepoint,
   type Fixture,
 } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 /** El error que ningun caso de este archivo tiene que disparar: si algo llama a estos catalogos,
  *  algo cambio en el contenido de la receta o de la orden que este archivo asume vacio. */
@@ -107,21 +110,16 @@ async function transitionAliveByIdReal(
   now: Date,
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
-  const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
-  // Yendo a `POR_EMPACAR`, el exito real lleva `finishedGoods` -aqui no hay producto
-  // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
-  // reconoce el exito por esta forma, no por el literal `'ok'`.
-  if (resultado === 'ok' && to === 'POR_EMPACAR') {
-    return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
-  }
-  return resultado;
+  // R15, R16: yendo a `POR_EMPACAR` el exito real vuelve a ser el literal `'ok'` -ya
+  // no da de alta ningun lote-, asi que este doble no necesita distinguir el destino.
+  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
 }
 
 /** El `OrderCatalog` REAL: los tres metodos de escritura y lectura que la ejecucion necesita. */
 function ordersReales(): OrderCatalog {
   return {
     findAliveById: findAliveOrderTargetById,
-    listAliveSummariesByIds: listAliveOrderSummariesByIds,
+    listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
@@ -146,7 +144,13 @@ function wireExecutionUseCases(fixture: Fixture) {
   return {
     get: createGetAssignedOrderExecution(deps),
     start: createStartAssignedOrder({ ...deps, now: () => NOW }),
-    finish: createFinishAssignedOrder({ assignments, orders, now: () => NOW }),
+    finish: createFinishAssignedOrder({
+      assignments,
+      orders,
+      people: assignmentDirectoryPrisma,
+      groups: assignmentDirectoryPrisma,
+      now: () => NOW,
+    }),
   };
 }
 
@@ -230,7 +234,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       const actor: Actor = {
         id: administradorId,
         companyId: fixture.companyA,
-        permissions: ['asignaciones.consultar', 'pedidos.consultar'],
+        permissions: ['asignaciones.consultar', 'asignaciones.ejecutar', 'pedidos.consultar'],
       };
       const ejecucion = wireExecutionUseCases(fixture);
 
@@ -283,7 +287,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       const actor: Actor = {
         id: administradorId,
         companyId: fixture.companyA,
-        permissions: ['asignaciones.consultar', 'pedidos.consultar'],
+        permissions: ['asignaciones.consultar', 'asignaciones.ejecutar', 'pedidos.consultar'],
       };
       const ejecucion = wireExecutionUseCases(fixture);
 

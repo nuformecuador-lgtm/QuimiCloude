@@ -26,6 +26,7 @@ import {
   DELETE_WORK_GROUP_DISMISS_TESTID,
   DELETE_WORK_GROUP_ID_TESTID,
   WORK_GROUP_FORM_CANCEL_TESTID,
+  WORK_GROUP_MEMBERS_COLUMN_ID,
   WORK_GROUP_NAME_COLUMN_ID,
   WORK_GROUP_ROW_ACTIONS_TESTID,
   WORK_GROUP_SHEET_TESTID,
@@ -79,6 +80,14 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
       status: 'success',
       data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
     })),
+    // El picker de miembros que el panel de edicion monta SI la pide, siempre, al abrirse (R28):
+    // responde una pagina vacia para que abrir el panel no sea un fallo. Lo que ese picker pinta
+    // se prueba en `work-group-form.test.tsx` y en `work-group-members.test.tsx`; aqui solo
+    // interesa QUE panel se abre y sobre quien.
+    listWorkGroupCandidatesAction: vi.fn(async () => ({
+      status: 'success',
+      data: { items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
+    })),
   };
 });
 
@@ -104,9 +113,9 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
 
 /** Llegan a proposito DESORDENADOS: R14 y R15 se comprueban con ellos. */
 const GRUPOS: readonly WorkGroupRow[] = [
-  { id: 'g3', name: 'Zona de empaque' },
-  { id: 'g1', name: 'Laboratorio' },
-  { id: 'g2', name: 'Produccion' },
+  { id: 'g3', name: 'Zona de empaque', members: [] },
+  { id: 'g1', name: 'Laboratorio', members: [] },
+  { id: 'g2', name: 'Produccion', members: [] },
 ];
 
 function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
@@ -193,19 +202,22 @@ describe('la lista usa la tabla COMPARTIDA y no declara una propia (R12)', () =>
     expect(screen.getByTestId('data-table-page-size')).toBeInTheDocument();
   });
 
-  it('hay UNA columna de datos y ninguna celda pinta un numero de miembros (R12)', () => {
+  it('hay DOS columnas de datos y ninguna celda pinta un numero de miembros (R12)', () => {
     montar();
 
     expect(screen.getByTestId(`data-table-head-${WORK_GROUP_NAME_COLUMN_ID}`)).toBeInTheDocument();
     expect(
+      screen.getByTestId(`data-table-head-${WORK_GROUP_MEMBERS_COLUMN_ID}`),
+    ).toBeInTheDocument();
+    expect(
       screen.getByTestId(`data-table-head-${WORK_GROUP_ACTIONS_COLUMN_ID}`),
     ).toBeInTheDocument();
 
-    // Cabecera + tres filas, con dos celdas por fila y ninguna mas.
+    // Cabecera + tres filas, con tres celdas por fila y ninguna mas.
     for (const grupo of GRUPOS) {
       const fila = screen.getByTestId(`data-table-row-${grupo.id}`);
-      expect(fila.querySelectorAll('td')).toHaveLength(2);
-      // El nombre, tal cual, y ni un digito al lado: el conteo de miembros es QC-100.
+      expect(fila.querySelectorAll('td')).toHaveLength(3);
+      // El nombre, tal cual, y ni un digito al lado: el conteo de miembros sigue siendo QC-100.
       expect(fila.textContent ?? '').toContain(grupo.name);
       expect(fila.textContent ?? '').not.toMatch(/\d/);
     }

@@ -31,9 +31,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   createRecipe,
+  createRecipeVersion,
   findAliveRecipeById,
   listAliveRecipes,
+  listAliveRecipeVersions,
   replaceAliveRecipe,
+  replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
@@ -182,6 +185,7 @@ async function deleteTestUser(db: Db, userId: string): Promise<void> {
   await db.documentType.delete({ where: { code: user.documentTypeCode } });
   // La empresa efimera va DESPUES del usuario: `users_company_id_fkey` es `ON DELETE RESTRICT`
   // (QC-47 R11), asi que borrarla antes la rechazaria la base con 23503.
+  if (user.companyId === null) throw new Error('el usuario de prueba se creo con empresa');
   await db.company.delete({ where: { id: user.companyId } });
 }
 
@@ -239,8 +243,10 @@ function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {
     name: `Receta ${token()}`,
     description: null,
     steps: [],
+    packingSteps: [],
     lines: [],
     imagePath: null,
+    tools: [],
     ...overrides,
   };
 }
@@ -632,6 +638,9 @@ const realRecipeRepository: RecipeRepository = {
   listAlive: listAliveRecipes,
   replaceAlive: replaceAliveRecipe,
   softDeleteAlive: softDeleteAliveRecipe,
+  createVersion: createRecipeVersion,
+  listAliveVersions: listAliveRecipeVersions,
+  replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
 const realProductCatalog: ProductCatalog = {

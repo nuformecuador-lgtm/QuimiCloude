@@ -17,11 +17,14 @@ consecuencias de arquitectura que no son opinables:
    NO se parte**: roles y tipos de documento son del sistema y se comparten —
    «Administrador» significa lo mismo en todas. Lo que une las dos mitades es que **cada
    usuario pertenece a UNA empresa y tiene UN rol**: la empresa es una columna de su ficha
-   (`users.company_id`, obligatoria), no una tabla de pertenencias. Un usuario no puede
-   estar en dos empresas a la vez, y eso es deliberado (QC-47, decisiones 4 y 5). Lo que
-   SI se parte por empresa dentro de la identidad es la **unicidad**: el correo, el nombre
-   de usuario y el documento se miden dentro de la empresa, asi que dos empresas pueden
-   tener cada una su `admin`.
+   (`users.company_id`, obligatoria **salvo para el Maestro**), no una tabla de
+   pertenencias. Un usuario no puede estar en dos empresas a la vez, y eso es deliberado
+   (QC-47, decisiones 4 y 5). El Maestro, dueno de la plataforma, no pertenece a ninguna
+   (QC-161): la columna admite `NULL` y el disparador `users_check_company_by_role` es la
+   garantia —sin empresa solo el Maestro, y el Maestro nunca con empresa—. Lo que SI se
+   parte por empresa dentro de la identidad es la **unicidad** del correo y del documento:
+   se miden dentro de la empresa (y aparte entre los usuarios sin empresa). El **nombre de
+   usuario es unico en todo el sistema**, empresas y Maestro incluidos (QC-161).
    - **La frontera se valida en el service.** `## Acceso a datos y autorizacion` sigue
      mandando entero: la RLS no filtra ninguna query de esta aplicacion, asi que un
      aislamiento implementado solo como policy **no cuenta como implementado**, igual que
@@ -29,11 +32,11 @@ consecuencias de arquitectura que no son opinables:
      autoriza por si solo**.
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
      columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
-     y cerrada de ocho tablas: los catalogos compartidos por todas las empresas
+     y cerrada de nueve tablas: los catalogos compartidos por todas las empresas
      (`document_types`, `roles`, `permissions`, `role_permissions`), la propia empresa
      (`companies`), las que cuelgan de un usuario que ya tiene empresa
-     (`credential_setup_tokens`, `revoked_sessions`) y la que hereda la empresa de su
-     receta (`recipe_lines`). La tabla de usuarios no es exenta: lleva su empresa. La
+     (`credential_setup_tokens`, `revoked_sessions`) y las que heredan la empresa de su
+     receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La
      lista la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`, que la guarda
      con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
@@ -274,7 +277,7 @@ lib/modules/<modulo>/
 
 - **Dominio** (`domain/`): casos de uso y tipos. Solo puede importar de su propio
   `domain/`/`ports/`, el contrato (`index.ts`) de otro modulo, y paquetes puros (hoy:
-  `zod`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
+  `zod`, `papaparse`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
   `app/`, `components/` ni las tripas de otro modulo.
 - **Puertos** (`ports/`): la superficie hacia adentro. Los implementa el adaptador
   driven correspondiente y los cablea el punto de composicion. Nadie mas los importa.
@@ -321,7 +324,7 @@ un adaptador driven: recibe datos por props y llama a la Server Action por su ru
 
 | Origen | PUEDE importar | NO PUEDE importar |
 | --- | --- | --- |
-| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
+| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`, `papaparse`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
 | `lib/modules/M/adapters/driven/**` | `../../domain`, `../../ports`, `lib/shared/**`, `@prisma/client`, SDKs externos, `@/lib/modules/N` (barrel), **otro driven del MISMO modulo** (ver nota) | `lib/composition`, `../driving/**`, `app/**`, `components/**`, `lib/modules/N/**` (profundo), **un driven de OTRO modulo** |
 | `lib/modules/M/adapters/driving/**` | `lib/composition`, `@/lib/modules/M` (barrel), su propia carpeta, `next/*`, `react*`, `lib/shared/**` | `@prisma/client`, el cliente Prisma compartido, `../driven/**`, `../../domain`/`../../ports` por ruta profunda |
 | `lib/composition/**` | `@/lib/modules/*` (barrel), `*/ports/**`, `*/adapters/driven/**`, `lib/shared/**` | `*/adapters/driving/**`, `app/**`, `components/**` |

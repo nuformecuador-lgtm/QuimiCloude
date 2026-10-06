@@ -875,3 +875,10 @@ Ninguna bloquea la implementación. Dos más, propias y menores:
    medición, elegir entre `(priority, created_at)` y otros sería adivinar; es aditivo y barato el día
    que la lista crezca. Es la misma pregunta que QC-33 dejó anotada en su § 11.2 y sigue sin
    consumidor real delante.
+
+## Enmienda 2026-10-01 — versiones de receta (QC-172)
+
+`RecipeRef` gana `ownName` (el nombre de la fila), `isUnderReview` (siempre `false` en originales) y
+`original: { id, name } | null`. `name` pasa a ser el nombre **mostrado**: compuesto con el de la
+original cuando la receta es una versión. Detalle en
+[`specs/QC-172-versiones-de-receta/`](../QC-172-versiones-de-receta/).

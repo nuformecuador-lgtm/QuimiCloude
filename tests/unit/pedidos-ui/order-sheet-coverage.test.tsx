@@ -17,7 +17,7 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { routerMock } = vi.hoisted(() => ({
@@ -65,6 +65,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', 
 });
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: vi.fn(() => {
     throw new Error('listRecipesAction no debe invocarse: la primera pagina llega por props');
   }),
@@ -119,6 +120,7 @@ function pedido(): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
@@ -128,8 +130,9 @@ function pedido(): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: null,
-    presentationName: null,
+    presentationLines: [],
+    unitId: null,
+    unitLabel: null,
   };
 }
 
@@ -141,6 +144,7 @@ function montarLista(coverageByOrder: Readonly<Record<string, 'full' | 'partial'
       totalPages={1}
       recipes={RECETAS}
       units={UNIDADES}
+      bridge={null}
       coverageByOrder={coverageByOrder}
     />,
   );
@@ -164,7 +168,8 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
       const user = setupUser();
       montarLista({ [PEDIDO_ID]: coverage });
 
-      await user.click(screen.getByTestId('order-action-edit'));
+      await user.click(screen.getByTestId('order-row-actions'));
+      await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
 
       const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
       const etiqueta = within(panel).getByTestId(ORDER_SHEET_COVERAGE_TESTID);
@@ -179,7 +184,8 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
     const user = setupUser();
     montarLista({});
 
-    await user.click(screen.getByTestId('order-action-edit'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(await esperarInteractiva(await screen.findByTestId('order-action-edit')));
 
     const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
     expect(within(panel).queryByTestId(ORDER_SHEET_COVERAGE_TESTID)).toBeNull();
@@ -189,7 +195,10 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
     const user = setupUser();
     montarLista({ [PEDIDO_ID]: 'full' });
 
-    await user.click(screen.getByTestId('order-action-responsibles'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+    );
 
     const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
     expect(within(panel).getByTestId('order-coverage')).toHaveAttribute('data-coverage', 'full');

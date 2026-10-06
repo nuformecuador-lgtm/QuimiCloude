@@ -72,9 +72,9 @@ function dobleDeRecortes(bitacora: Bitacora, paths: readonly string[] = []): Cro
       bitacora.push('crops.list');
       return paths;
     }),
-    createSignedReadUrl: vi.fn(async (path: string) => {
-      bitacora.push('crops.createSignedReadUrl');
-      return `https://firmada.invalid/${path}`;
+    publicUrl: vi.fn((path: string) => {
+      bitacora.push('crops.publicUrl');
+      return `https://publica.invalid/${path}`;
     }),
   };
 }
@@ -90,7 +90,7 @@ function dobleDePresentaciones(bitacora: Bitacora, encontradas: readonly { id: s
 }
 
 function dobleDeUnidades() {
-  return { findRefs: vi.fn(), findRefsSharingBaseInCompany: vi.fn() };
+  return { findRefs: vi.fn(), listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => Promise.reject(new Error('no se usa')), findRefsSharingBaseInCompany: vi.fn() };
 }
 
 /** Puerto de ESCRITURA que falla si alguien lo llama: la vista previa no debe escribir
@@ -248,6 +248,59 @@ describe('createPreviewCatalogImport', () => {
     expect(cambia.rows[0]?.newCost).toBe('150.0000');
   });
 
+  describe('QC-171 — recortes con URL publica', () => {
+    it('QC-171 R9 — crops[].url y rows[].imageUrl son publicUrl(ruta), sin ninguna firma', async () => {
+      const bitacora: Bitacora = [];
+      const ruta = `${EMPRESA}/${ARCHIVO}/1-1.png`;
+      const deps = crearDeps(bitacora, { crops: dobleDeRecortes(bitacora, [ruta]) });
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
+
+      expect(resultado.crops).toEqual([{ path: ruta, url: `https://publica.invalid/${ruta}` }]);
+      expect(resultado.rows[0]?.imageUrl).toBe(`https://publica.invalid/${ruta}`);
+      expect(deps.crops.publicUrl).toHaveBeenCalledWith(ruta);
+    });
+
+    it('QC-171 R10 — list se llama UNA sola vez, sea cual sea el numero de recortes, y ningun otro metodo asincrono del puerto', async () => {
+      const bitacora: Bitacora = [];
+      const rutas = [`${EMPRESA}/${ARCHIVO}/1-1.png`, `${EMPRESA}/${ARCHIVO}/1-2.png`, `${EMPRESA}/${ARCHIVO}/1-3.png`];
+      const deps = crearDeps(bitacora, { crops: dobleDeRecortes(bitacora, rutas) });
+      const preview = createPreviewCatalogImport(deps);
+
+      await preview(actorConPermiso(), { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
+
+      expect(deps.crops.list).toHaveBeenCalledTimes(1);
+      expect(bitacora.filter((entrada) => entrada === 'crops.list')).toHaveLength(1);
+    });
+
+    it('QC-171 R12 — el emparejamiento de filas con recortes no cambia: la ruta propuesta sigue siendo la de `pairCropsWithLines`', async () => {
+      const bitacora: Bitacora = [];
+      const ruta = `${EMPRESA}/${ARCHIVO}/1-1.png`;
+      const deps = crearDeps(bitacora, { crops: dobleDeRecortes(bitacora, [ruta]) });
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
+
+      // La fila extraida trae `page: 1` y hay un unico recorte de esa pagina: el mismo
+      // emparejamiento de siempre le propone esa ruta, solo cambia con que URL se pinta.
+      expect(resultado.rows[0]?.imagePath).toBe(ruta);
+    });
+
+    it('QC-171 R2 — imagePath sigue siendo la ruta, nunca empieza por http', async () => {
+      const bitacora: Bitacora = [];
+      const ruta = `${EMPRESA}/${ARCHIVO}/1-1.png`;
+      const deps = crearDeps(bitacora, { crops: dobleDeRecortes(bitacora, [ruta]) });
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
+
+      expect(resultado.rows[0]?.imagePath).toBe(ruta);
+      expect(resultado.rows[0]?.imagePath).not.toMatch(/^https?:\/\//);
+      expect(resultado.rows[0]?.imageUrl).toMatch(/^https?:\/\//);
+    });
+  });
+
   describe('R31 — el permiso se exige primero: ningun puerto se toca sin el', () => {
     const actoresDenegados: readonly (readonly [string, Actor | null | undefined])[] = [
       ['actor nulo', null],
@@ -270,6 +323,7 @@ describe('createPreviewCatalogImport', () => {
         expect(bitacora).toEqual([]);
         expect(deps.repository.readFileForReview).not.toHaveBeenCalled();
         expect(deps.crops.list).not.toHaveBeenCalled();
+        expect(deps.crops.publicUrl).not.toHaveBeenCalled();
         expect(deps.presentations.findByNormalizedNames).not.toHaveBeenCalled();
         expect(deps.catalog.findAliveByIdentity).not.toHaveBeenCalled();
         expect(deps.createPresentation).not.toHaveBeenCalled();

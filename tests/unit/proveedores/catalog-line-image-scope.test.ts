@@ -74,18 +74,25 @@ function fuentesDe(dir: string): readonly string[] {
 // acoplamiento que tiene que salir en rojo aqui en vez de pasar en silencio.
 const units: UnitCatalog = {
   findRefs: vi.fn(async () => []),
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+  findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: vi.fn(async () => {
     throw new Error('proveedores no pide unidades hermanas de base');
   }),
 };
 
 describe('R32 — `proveedores` sigue SIN puerto de almacenamiento, y esta ficha no le crea uno', () => {
-  it('el censo de `ports/` es exacto: cuatro puertos, ninguno de imagenes', () => {
+  it('el censo de `ports/` es exacto: cinco puertos, ninguno de almacenamiento', () => {
     // Lista CERRADA a proposito: un puerto nuevo de almacenamiento -aunque naciera «solo para
     // componer la URL»- entra por aqui y este caso lo dice. Se anade
     // `supplier-catalog-import-repository.ts` -la importacion por identidad, sin nada de
     // imagenes ni de almacenamiento- y el censo sube de tres a cuatro.
+    //
+    // El QUINTO, `catalog-image-url.ts`, es justo la excepcion que R32 permite: compone la URL
+    // publica a partir de la ruta y NADA MAS -no sube, no borra, no lista, no recibe la
+    // empresa-, asi que no es el puerto de almacenamiento que este caso prohibe.
     expect(readdirSync(join(moduloDir, 'ports')).sort()).toEqual([
+      'catalog-image-url.ts',
       'list-query-log.ts',
       'supplier-catalog-import-repository.ts',
       'supplier-catalog-repository.ts',
@@ -191,7 +198,10 @@ describe('R32 — se sigue sirviendo por enlace publico', () => {
     expect(codigo).not.toMatch(/companyId|company_id/i);
   });
 
-  it('la pantalla del catalogo le pasa la ruta de la linea, sin componer ninguna URL', () => {
+  it('la pantalla del catalogo le pasa la URL publica ya compuesta por el servidor, sin componerla ella misma', () => {
+    // La columna pinta `line.imageUrl`, que llega ya compuesta desde el servidor. `imagePath`
+    // sigue viajando en la fila -el formulario de edicion la reenvia-, pero ya no es lo que se
+    // pasa a `EntityImage`.
     const columnas = leer(
       'app',
       '(private)',
@@ -201,7 +211,7 @@ describe('R32 — se sigue sirviendo por enlace publico', () => {
       'catalog-columns.tsx',
     );
 
-    expect(columnas).toMatch(/<EntityImage path=\{line\.imagePath\}/);
+    expect(columnas).toMatch(/<EntityImage path=\{line\.imageUrl\}/);
     expect(columnas).not.toMatch(/createSignedUrl|signedUrl|SignedUrl|getPublicUrl/i);
     expect(columnas).not.toMatch(/companyId|company_id/i);
   });

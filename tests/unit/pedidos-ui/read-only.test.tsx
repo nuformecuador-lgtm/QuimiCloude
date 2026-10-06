@@ -41,7 +41,7 @@ import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 // LA SEGUNDA MITAD DE R28, invocada y no reescrita: los casos de QC-87 corren tal cual estan en
@@ -99,6 +99,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
 });
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: vi.fn(() => {
     throw new Error('listRecipesAction no debe invocarse: la primera pagina llega por props');
   }),
@@ -184,6 +185,7 @@ const PEDIDO: OrderSummary = {
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
   recipeId: RECETA.id,
   recipeName: RECETA.name,
+  recipeVersion: null,
   quantity: '12.5000',
   priority: 'MEDIA',
   status: 'PENDIENTE',
@@ -193,8 +195,9 @@ const PEDIDO: OrderSummary = {
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   createdBy: null,
   updatedBy: null,
-  presentationId: null,
-  presentationName: null,
+  presentationLines: [],
+  unitId: null,
+  unitLabel: null,
 };
 
 beforeEach(() => {
@@ -267,12 +270,16 @@ describe('QC-102 — sin `asignaciones.modificar` el panel es de SOLO LECTURA (R
         totalPages={1}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
         responsiblesByOrder={{ [PEDIDO_ID]: RESPONSABLES }}
         responsiblesCatalog={CATALOGO_SOLO_LECTURA}
       />,
     );
 
-    await user.click(screen.getByTestId('order-action-responsibles'));
+    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
+    );
     const seccion = await screen.findByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
 
     for (const testId of CONTROLES_DE_ESCRITURA) {

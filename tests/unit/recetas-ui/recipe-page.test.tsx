@@ -131,6 +131,7 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
   deleteRecipeAction: deleteRecipeActionMock,
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
 }));
 
 const testId = {

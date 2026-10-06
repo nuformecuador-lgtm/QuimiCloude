@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
+  ROLE_MAESTRO,
   ROLE_OPERADOR,
   SEED_ROLES,
 } from '@/lib/modules/identity';
@@ -155,11 +156,12 @@ describe('R1 — el rol Empacador nace en SEED_ROLES, los otros dos quedan intac
     expect(operador?.description).toBe('Operacion del dia a dia.');
   });
 
-  it('SEED_ROLES tiene exactamente tres filas: Administrador, Operador y Empacador', () => {
+  it('SEED_ROLES empieza exactamente por Administrador, Operador y Empacador; solo el Maestro va detras', () => {
     expect(SEED_ROLES.map((rol) => rol.name)).toEqual([
       ROLE_ADMINISTRADOR,
       ROLE_OPERADOR,
       ROLE_EMPACADOR,
+      ROLE_MAESTRO,
     ]);
   });
 });

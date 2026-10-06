@@ -32,14 +32,12 @@ import {
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   createOrderWriteRepository,
-  finishPackingAliveOrder,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
@@ -48,12 +46,18 @@ import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 
-import { NOW, actorOf, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
+import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransaction } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
 if (PERMISOS_DEL_EMPACADOR === undefined) {
   throw new Error('SEED_ROLE_PERMISSIONS no declara al Empacador: este archivo no puede construir su actor');
 }
+
+/** Los permisos del Empacador mas `asignaciones.ejecutar`: quien ejecuta ve todos los terminados. */
+const PERMISOS_CON_EJECUCION: readonly string[] = [...PERMISOS_DEL_EMPACADOR, 'asignaciones.ejecutar'];
 
 /**
  * `OrderCatalog['transitionAliveById']` real: `assertTransition` seguida del mismo `UPDATE`
@@ -70,14 +74,9 @@ async function transitionAliveByIdReal(
   now: Date,
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
-  const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
-  // Yendo a `POR_EMPACAR`, el exito real lleva `finishedGoods` -aqui no hay producto
-  // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
-  // reconoce el exito por esta forma, no por el literal `'ok'`.
-  if (resultado === 'ok' && to === 'POR_EMPACAR') {
-    return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
-  }
-  return resultado;
+  // R15, R16: yendo a `POR_EMPACAR` el exito real vuelve a ser el literal `'ok'` -ya
+  // no da de alta ningun lote-, asi que este doble no necesita distinguir el destino.
+  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
 }
 
 /** Cablea el caso de uso REAL sobre la `tx` del fixture, con los mismos adaptadores que
@@ -85,15 +84,20 @@ async function transitionAliveByIdReal(
 function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepository>[0]) {
   const orders: OrderCatalog = {
     findAliveById: findAliveOrderTargetById,
-    listAliveSummariesByIds: listAliveOrderSummariesByIds,
-    listAliveSummariesInCompany,
+    listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
+    listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
     transitionAliveById: transitionAliveByIdReal,
     // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.
     startPackingAliveById: (id, companyId, packerId, now) =>
       startPackingAliveOrder(id, packerId, now, { companyId }),
-    finishPackingAliveById: (id, companyId, packerId, now) =>
-      finishPackingAliveOrder(id, packerId, now, { companyId }),
+    // T14: `finishPackingAlive` ya vive en `OrderWriteRepository`, dentro de la unidad de
+    // trabajo. Este archivo no ejercita el alta de producto terminado (T14 la prueba entera en
+    // `finish-with-finished-goods.int.test.ts`), asi que el `'ok'` vuelve sin lineas.
+    finishPackingAliveById: async (id, companyId, packerId, now) => {
+      const outcome = await createOrderWriteRepository().finishPackingAlive(id, packerId, now, { companyId });
+      return outcome.kind === 'ok' ? { kind: 'ok', finishedGoods: [] } : outcome.kind;
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 
@@ -117,11 +121,21 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       },
       people: assignmentDirectoryPrisma,
       presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+      units: {
+        findRefs: findUnitRefs,
+        listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+        findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
+        findRefsSharingBaseInCompany: async () => {
+          throw new Error('el listado solo resuelve la etiqueta de la unidad del pedido');
+        },
+      },
       now: () => NOW,
     }),
     finishAssignedOrder: createFinishAssignedOrder({
       assignments,
       orders,
+      people: assignmentDirectoryPrisma,
+      groups: assignmentDirectoryPrisma,
       now: () => NOW,
     }),
     // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.
@@ -131,7 +145,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
 }
 
 describe('asignaciones · listFinishedOrders con los permisos del Empacador (integracion)', () => {
-  it('R17, R19: solo ENTREGADO de toda la empresa, sin filtro por asignado; otra empresa no vuelve', async () => {
+  it('R17, R19, R20a: con `asignaciones.ejecutar`, solo ENTREGADO de toda la empresa, sin filtro por asignado; otra empresa no vuelve', async () => {
     await inRolledBackTransaction(async (fixture) => {
       const { listFinishedOrders } = wireListFinishedOrders(fixture.tx);
 
@@ -157,7 +171,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: PERMISOS_CON_EJECUCION,
       };
 
       const pagina = await listFinishedOrders(actorEmpacador, { page: 1 });
@@ -195,7 +209,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: PERMISOS_CON_EJECUCION,
       };
 
       const primeraPagina = await listFinishedOrders(actorEmpacador, { page: 1, pageSize: 2 });
@@ -237,7 +251,8 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
 
       // El Finalizar de QC-168 deja el pedido POR_EMPACAR, no ENTREGADO: el lote de producto
       // terminado que entra viene en la respuesta, pero `finished_at` lo escribe Terminar.
-      await finishAssignedOrder(actorEmpacador, { orderId: pedido });
+      // Finalizar exige `asignaciones.ejecutar`, que el Empacador no tiene.
+      await finishAssignedOrder({ ...actorEmpacador, permissions: PERMISOS_CON_EJECUCION }, { orderId: pedido });
 
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
     });
@@ -262,7 +277,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorOperario: Actor = {
         id: operario,
         companyId: fixture.companyA,
-        permissions: ['asignaciones.consultar'],
+        permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
       };
       const actorEmpacador: Actor = {
         id: empacador,
@@ -273,6 +288,10 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       // Finalizar: EN_CURSO -> POR_EMPACAR. Todavia no aparece en «Terminados».
       await finishAssignedOrder(actorOperario, { orderId: pedido });
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
+
+      // R10: Comenzar exige al menos una linea de reparto real, o el pedido queda
+      // `'without_distribution'` y no puede avanzar.
+      await crearLinea(fixture.tx, fixture.companyA, pedido);
 
       // Comenzar: POR_EMPACAR -> EN_EMPAQUE, a nombre del Empacador. Sigue sin aparecer.
       await startPacking(actorEmpacador, { orderId: pedido });
@@ -298,7 +317,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: PERMISOS_CON_EJECUCION,
       };
 
       const pagina = await listFinishedOrders(actorEmpacador, { page: 1 });
@@ -320,6 +339,46 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
           { page: 1 },
         ),
       ).rejects.toMatchObject({ code: 'unauthorized' });
+    });
+  });
+
+  it('R20: dos empacadores sin `asignaciones.ejecutar` ven cada uno solo lo que empacaron, con total y paginas del conjunto filtrado', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const { listFinishedOrders } = wireListFinishedOrders(fixture.tx);
+
+      const empacadorA = await createPerson(fixture, fixture.companyA);
+      const empacadorB = await createPerson(fixture, fixture.companyA);
+
+      async function entregado(packedBy: string | null, finishedAt: Date): Promise<string> {
+        const id = await createOrder(fixture, { status: 'ENTREGADO' });
+        await fixture.tx.order.update({ where: { id }, data: { packedBy, finishedAt } });
+        return id;
+      }
+
+      const deA1 = await entregado(empacadorA, new Date('2026-03-01T00:00:00.000Z'));
+      const deA2 = await entregado(empacadorA, new Date('2026-03-02T00:00:00.000Z'));
+      const deA3 = await entregado(empacadorA, new Date('2026-03-03T00:00:00.000Z'));
+      const deB = await entregado(empacadorB, new Date('2026-03-04T00:00:00.000Z'));
+      const sinEmpacador = await entregado(null, new Date('2026-03-05T00:00:00.000Z'));
+
+      const actorA: Actor = { id: empacadorA, companyId: fixture.companyA, permissions: PERMISOS_DEL_EMPACADOR };
+      const actorB: Actor = { id: empacadorB, companyId: fixture.companyA, permissions: PERMISOS_DEL_EMPACADOR };
+
+      const primeraDeA = await listFinishedOrders(actorA, { page: 1, pageSize: 2 });
+      const segundaDeA = await listFinishedOrders(actorA, { page: 2, pageSize: 2 });
+      expect(primeraDeA.items.map((item) => item.id)).toEqual([deA3, deA2]);
+      expect(segundaDeA.items.map((item) => item.id)).toEqual([deA1]);
+      expect(primeraDeA.total).toBe(3);
+      expect(primeraDeA.totalPages).toBe(2);
+
+      const deEmpacadorB = await listFinishedOrders(actorB, { page: 1 });
+      expect(deEmpacadorB.items.map((item) => item.id)).toEqual([deB]);
+      expect(deEmpacadorB.total).toBe(1);
+
+      // R20a: con `asignaciones.ejecutar` vuelven todos, tambien el que no tiene empacador.
+      const todos = await listFinishedOrders({ ...actorA, permissions: PERMISOS_CON_EJECUCION }, { page: 1 });
+      expect(todos.items.map((item) => item.id)).toEqual([sinEmpacador, deB, deA3, deA2, deA1]);
+      expect(todos.total).toBe(5);
     });
   });
 });

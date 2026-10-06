@@ -1,7 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
@@ -29,10 +29,6 @@ export const FINISHED_ORDER_QUANTITY_COLUMN_ID = 'quantity';
 export const FINISHED_ORDER_PRESENTATION_COLUMN_ID = 'presentationName';
 export const FINISHED_ORDER_DATE_COLUMN_ID = 'finishedAt';
 export const FINISHED_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
-
-export const FINISHED_ORDERS_DEFAULT_PINNED_COLUMNS: readonly string[] = [
-  FINISHED_ORDER_NUMBER_COLUMN_ID,
-];
 
 /**
  * `YYYY-MM-DD` en UTC, nunca `toLocaleDateString`: el Server Component y el
@@ -63,6 +59,8 @@ export function buildFinishedOrdersColumns(): readonly DataTableColumn<FinishedO
       id: FINISHED_ORDER_NUMBER_COLUMN_ID,
       label: 'Nº de pedido',
       align: 'start',
+      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       cell: (order) => order.numberText,
     },
     {
@@ -76,13 +74,16 @@ export function buildFinishedOrdersColumns(): readonly DataTableColumn<FinishedO
       id: FINISHED_ORDER_QUANTITY_COLUMN_ID,
       label: 'Cantidad',
       align: 'end',
-      cell: (order) => formatDecimalDisplay(order.quantity),
+      cell: (order) =>
+        order.unitLabel === null
+          ? formatDecimalDisplay(order.quantity)
+          : `${formatDecimalDisplay(order.quantity)} ${order.unitLabel}`,
     },
     {
       id: FINISHED_ORDER_PRESENTATION_COLUMN_ID,
       label: 'Presentación',
       align: 'start',
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: FINISHED_ORDER_DATE_COLUMN_ID,

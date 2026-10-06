@@ -35,12 +35,12 @@ export {
   type UserListSearchParams,
 } from './user-list-params';
 export {
+  CHANGE_USER_STATUS_ACTION_LABEL,
+  DELETE_USER_ACTION_LABEL,
+  EDIT_USER_ACTION_LABEL,
   USERS_TITLE_TESTID,
   USER_ACCOUNT_STATUS_LABELS,
   USER_STATUS_FILTER_OPTIONS,
-  changeUserStatusLabel,
-  deleteUserLabel,
-  editUserLabel,
   endUserSessionsLabel,
   endUserSessionsMessage,
   endUserSessionsSuccess,
@@ -155,11 +155,14 @@ export {
   USER_ROLES_ERROR_TESTID,
   USER_SHEET_TESTID,
   USER_USERNAME_FIELD,
+  USER_USERNAME_SUGGESTION_APPLY_TESTID,
+  USER_USERNAME_SUGGESTION_TESTID,
   UserForm,
   type UserFieldName,
   type UserFormEndSessions,
   type UserFormProps,
 } from './user-form';
+export { nextUsernameCandidate, usernameFromNames } from './username-from-names';
 export {
   USER_SHEET_ERROR_CODE_TESTID,
   USER_SHEET_ERROR_TESTID,
@@ -203,6 +206,7 @@ export {
   USUARIOS_TABS_LABEL,
   USUARIOS_TAB_LABELS,
   WORK_GROUP_ACTIONS_COLUMN_LABEL,
+  WORK_GROUP_MEMBERS_COLUMN_LABEL,
   WORK_GROUP_NAME_COLUMN_LABEL,
   WORK_GROUP_SECTION_TESTID,
   deleteWorkGroupLabel,
@@ -214,6 +218,7 @@ export {
   WORK_GROUP_ACTION_EDIT_TESTID,
   WORK_GROUP_COLUMNS,
   WORK_GROUP_COLUMN_COUNT,
+  WORK_GROUP_MEMBERS_COLUMN_ID,
   WORK_GROUP_NAME_COLUMN_ID,
   WORK_GROUP_ROW_ACTIONS_TESTID,
   WorkGroupRowActions,
@@ -268,6 +273,8 @@ export {
   type DeleteWorkGroupDialogProps,
 } from './delete-work-group-dialog';
 export {
+  WORK_GROUP_CANDIDATES_ERROR_TESTID,
+  WORK_GROUP_CANDIDATES_LOADING_TESTID,
   WORK_GROUP_FORM_CANCEL_TESTID,
   WORK_GROUP_FORM_ERROR_CODE_TESTID,
   WORK_GROUP_FORM_ERROR_TESTID,
@@ -275,21 +282,23 @@ export {
   WORK_GROUP_FORM_SUBMIT_TESTID,
   WORK_GROUP_FORM_TESTID,
   WORK_GROUP_ID_FIELD,
+  WORK_GROUP_MEMBER_PICKER_TABLE_ID,
   WORK_GROUP_NAME_ERROR_TESTID,
   WORK_GROUP_NAME_FIELD,
   WORK_GROUP_NAME_FIELD_TESTID,
   WORK_GROUP_NAME_ISSUE_MESSAGES,
+  WORK_GROUP_PENDING_MEMBER_REMOVE_TESTID,
+  WORK_GROUP_PENDING_MEMBER_TESTID,
+  WORK_GROUP_SHEET_TESTID,
   WorkGroupForm,
+  WorkGroupMemberPicker,
   workGroupNameIssue,
   type WorkGroupFormProps,
+  type WorkGroupMemberPickerProps,
   type WorkGroupNameIssue,
 } from './work-group-form';
 export {
   WORK_GROUP_ADD_ERROR_TESTID,
-  WORK_GROUP_CANDIDATES_EMPTY_TESTID,
-  WORK_GROUP_CANDIDATES_ERROR_TESTID,
-  WORK_GROUP_CANDIDATES_LOADING_TESTID,
-  WORK_GROUP_CANDIDATE_TESTID,
   WORK_GROUP_MEMBERS_EMPTY_TESTID,
   WORK_GROUP_MEMBERS_ERROR_TESTID,
   WORK_GROUP_MEMBERS_LOADING_TESTID,
@@ -301,17 +310,12 @@ export {
   WORK_GROUP_MEMBER_NAME_TESTID,
   WORK_GROUP_MEMBER_REMOVE_TESTID,
   WORK_GROUP_MEMBER_ROW_TESTID,
-  WORK_GROUP_MEMBER_SEARCH_TESTID,
   WORK_GROUP_REMOVE_ERROR_TESTID,
   WorkGroupMembers,
   workGroupMembersPositionLabel,
   type WorkGroupMembersProps,
 } from './work-group-members';
-export {
-  WORK_GROUP_SHEET_TESTID,
-  WorkGroupSheet,
-  type WorkGroupSheetProps,
-} from './work-group-sheet';
+export { WorkGroupSheet, type WorkGroupSheetProps } from './work-group-sheet';
 export {
   WORK_GROUP_CREATE_OPEN_TESTID,
   WorkGroupCreateAction,

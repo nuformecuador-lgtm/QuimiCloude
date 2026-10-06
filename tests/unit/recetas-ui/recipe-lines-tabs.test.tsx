@@ -7,11 +7,12 @@ import { setupUser } from '../../helpers/user-event';
 import {
   RecipeLinesField,
   type RecipeLineFormValue,
+  type RecipeToolFormValue,
 } from '@/app/(private)/produccion/formulas/components';
 
 /**
- * Tabs de líneas de la receta: ingredientes (PRODUCT, con % y cantidad) y máquinas
- * (MACHINE, solo selección, UI-only: no entra a la suma ni al payload).
+ * Tabs de líneas de la receta: ingredientes (PRODUCT, con % y cantidad) y herramientas
+ * (MACHINE, con cantidad entera propia y sin %: no entra a la suma).
  *
  * Se monta `RecipeLinesField` directamente porque los tabs son SUYOS: el formulario solo le
  * pasa las dos primeras páginas ya filtradas por tipo. `listProductsAction` está mockeada
@@ -44,10 +45,13 @@ function lineValue(key: string, percentage: string): RecipeLineFormValue {
 
 function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
   const [lines, setLines] = useState(initialLines);
+  const [tools, setTools] = useState<readonly RecipeToolFormValue[]>([]);
   return (
     <RecipeLinesField
       lines={lines}
       onChange={setLines}
+      tools={tools}
+      onToolsChange={setTools}
       units={[]}
       initialProductPage={PRODUCT_PAGE}
       initialMachinePage={MACHINE_PAGE}
@@ -91,7 +95,7 @@ describe('tabs de líneas: ingredientes y máquinas', () => {
     expect(screen.getByTestId('recipe-line-add-0')).toBeEnabled();
   });
 
-  it('el tab de máquinas no lleva % ni cantidad: solo selección', async () => {
+  it('el tab de máquinas no lleva % ni cantidad de referencia', async () => {
     const user = setupUser();
     render(<Harness />);
 

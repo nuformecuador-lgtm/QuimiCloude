@@ -57,6 +57,8 @@ export type ProductNameOption = {
    */
   readonly presentationId?: string;
   readonly presentationName?: string;
+  /** Unidad del insumo elegido: el alta la deja preseleccionada. */
+  readonly unitId?: string | null;
 };
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -77,12 +79,15 @@ type ProductNamePickerProps = {
   readonly error?: string;
   /** Avisa del producto existente elegido, para que el formulario autocomplete presentacion y alerta. */
   readonly onSelect?: (option: ProductNameOption) => void;
+  /** Tipo elegido en el formulario: solo se ofrecen productos de ese tipo. */
+  readonly productType: ProductType;
 };
 
 export function ProductNamePicker({
   defaultValue = '',
   error,
   onSelect,
+  productType,
 }: ProductNamePickerProps) {
   const labelId = useId();
   const inputId = useId();
@@ -96,11 +101,15 @@ export function ProductNamePicker({
 
   /**
    * Pide una pagina del catalogo, con el termino vigente si lo hay. La busqueda la resuelve el
-   * servidor: con termino viaja `search`; sin el, es la pagina completa del catalogo.
+   * servidor: con termino viaja `search`; sin el, es la pagina completa del catalogo. El tipo
+   * tambien se filtra en el servidor, no recortando en memoria.
    */
   const pedirPagina = useCallback(async ({ query, page }: AsyncPageRequest) => {
     const search = query.trim();
-    const filtro = search === '' ? {} : { search };
+    const filtro = {
+      ...(search === '' ? {} : { search }),
+      filters: { type: { kind: 'select', values: [productType] } },
+    };
     const result = await listProductsAction({ page, pageSize: MAX_PAGE_SIZE, ...filtro });
 
     if (result.status === 'error') {
@@ -113,13 +122,14 @@ export function ProductNamePicker({
         name: item.name,
         qtyAlert: item.qtyAlert,
         type: item.type,
+        unitId: item.unitId,
       })),
       page: result.data.page,
       totalPages: result.data.totalPages,
     };
-  }, []);
+  }, [productType]);
 
-  const { items, isLoading, isLoadingMore, error: loadError, loadMore } =
+  const { items, isLoading, isLoadingMore, error: loadError, loadMore, reset } =
     useAsyncPaginatedOptions<ProductNameOption>({
       fetchPage: pedirPagina,
       query: draft ?? '',
@@ -127,6 +137,14 @@ export function ProductNamePicker({
       debounceMs: SEARCH_DEBOUNCE_MS,
       enabled: open,
     });
+
+  // El hook solo reconsulta al cambiar el texto o al abrir: sin este reinicio, al reabrir tras
+  // cambiar de tipo se veria un instante la lista del tipo anterior.
+  const [tipoConsultado, setTipoConsultado] = useState(productType);
+  if (tipoConsultado !== productType) {
+    setTipoConsultado(productType);
+    reset();
+  }
 
   /** Llegar al final de la lista pide la pagina siguiente; el hook ignora lo que sobra. */
   const handleScroll = useCallback(

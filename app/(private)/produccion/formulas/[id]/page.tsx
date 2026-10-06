@@ -1,16 +1,20 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
-import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import {
+  getRecipeAction,
+  listRecipeVersionsAction,
+} from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, recipeVersionRoute } from '@/lib/shared/routes';
 
-import { RecipeForm, RecipeListError } from '../components';
+import { RecipeForm, RecipeListError, RecipeVersionList } from '../components';
 
 export const metadata: Metadata = {
   title: `Editar fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
@@ -53,20 +57,24 @@ export default async function EditarRecetaPage({
 
   const { id } = await params;
 
-  const [recipeResult, unitsResult, productsResult, machinesResult] = await Promise.all([
-    getRecipeAction(id),
-    listUnitsAction(),
-    listProductsAction({
-      page: FIRST_PAGE,
-      pageSize: MAX_PAGE_SIZE,
-      filters: { type: { kind: 'select', values: [PRODUCT_TYPES.PRODUCT] } },
-    }),
-    listProductsAction({
-      page: FIRST_PAGE,
-      pageSize: MAX_PAGE_SIZE,
-      filters: { type: { kind: 'select', values: [PRODUCT_TYPES.MACHINE] } },
-    }),
-  ]);
+  // Las versiones se piden a la vez que el detalle aunque el id resulte ser de una version: en ese
+  // caso su respuesta se descarta, porque la redireccion se decide con el detalle.
+  const [recipeResult, versionsResult, unitsResult, productsResult, machinesResult] =
+    await Promise.all([
+      getRecipeAction(id),
+      listRecipeVersionsAction(id),
+      listUnitsAction(),
+      listProductsAction({
+        page: FIRST_PAGE,
+        pageSize: MAX_PAGE_SIZE,
+        filters: { type: { kind: 'select', values: [PRODUCT_TYPES.PRODUCT] } },
+      }),
+      listProductsAction({
+        page: FIRST_PAGE,
+        pageSize: MAX_PAGE_SIZE,
+        filters: { type: { kind: 'select', values: [PRODUCT_TYPES.MACHINE] } },
+      }),
+    ]);
 
   if (recipeResult.status === 'error') {
     if (recipeResult.code === 'recipe_not_found') {
@@ -98,6 +106,18 @@ export default async function EditarRecetaPage({
     );
   }
 
+  if (recipeResult.data.original !== null) {
+    redirect(recipeVersionRoute(recipeResult.data.original.id, id));
+  }
+
+  if (versionsResult.status === 'error') {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+        <RecipeListError error={versionsResult} />
+      </div>
+    );
+  }
+
   if (unitsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -124,12 +144,13 @@ export default async function EditarRecetaPage({
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <h1 data-testid="recipe-form-title" className="text-2xl font-semibold">
-        Editar fórmula
+      <h1 data-testid="recipe-form-title" className="text-2xl font-semibold break-words">
+        Editar fórmula · {recipeResult.data.name}
       </h1>
       <RecipeForm
         mode="edit"
         recipe={recipeResult.data}
+        versions={versionsResult.data}
         units={unitsResult.data}
         initialProductPage={{
           items: productsResult.data.items.map((item) => ({
@@ -148,6 +169,7 @@ export default async function EditarRecetaPage({
           totalPages: machinesResult.data.totalPages,
         }}
       />
+      <RecipeVersionList originalId={id} versions={versionsResult.data} />
     </div>
   );
 }

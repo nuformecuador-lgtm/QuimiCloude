@@ -5,7 +5,6 @@ export { FormulaPdfUpload } from './formula-pdf-upload';
 export {
   ACTIONS_COLUMN_ID,
   IMAGE_COLUMN_ID,
-  RECIPE_DEFAULT_PINNED_COLUMNS,
   buildRecipeColumns,
   type RecipeColumn,
   type RecipeColumnId,
@@ -43,11 +42,16 @@ export { RecipeTableSkeleton } from './recipe-table-skeleton';
 
 export {
   buildRecipePayload,
+  buildRecipeVersionPayload,
   createLocalKey,
   extractFieldError,
   extractGeneralLinesError,
+  extractGeneralToolsError,
   extractLineErrors,
   extractStepErrors,
+  extractToolErrors,
+  toLineFormValues,
+  toToolFormValues,
   type ImageFieldState,
   type RecipeFormMode,
   type RecipeFormState,
@@ -58,19 +62,42 @@ export {
   type RecipePayload,
   type RecipeStepErrors,
   type RecipeStepFormValue,
+  type RecipeToolErrorMessages,
+  type RecipeToolErrors,
+  type RecipeToolFieldName,
+  type RecipeToolFormValue,
+  type RecipeToolPayload,
+  type RecipeVersionFormState,
+  type RecipeVersionPayload,
 } from './recipe-form-state';
 export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
 export {
+  RECIPE_TOOL_ERROR_MESSAGES,
   RecipeLinesField,
   clampPercentageToRemaining,
   referenceAmountForPercentage,
   sanitizePercentageInput,
+  sanitizeToolQuantityInput,
   type RecipeLinesFieldProps,
-  type RecipeMachineFormValue,
 } from './recipe-lines-field';
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
+export {
+  PropagateVersionsDialog,
+  type PropagateVersionsDialogProps,
+} from './propagate-versions-dialog';
+export {
+  RecipeVersionForm,
+  type RecipeVersionFormOriginal,
+  type RecipeVersionFormProps,
+} from './recipe-version-form';
+export { RecipeVersionList, type RecipeVersionListProps } from './recipe-version-list';
+export {
+  compareWithOriginal,
+  type RemovedLine,
+  type VersionLineMark,
+} from './recipe-version-diff';
 
 // `recipe-step-schema.ts` no sale por aquí: su export tiene un tipo de la librería del editor, y el
 // barrel dejaría usarlo desde cualquier archivo sin importar la librería, que debe quedar aislada.

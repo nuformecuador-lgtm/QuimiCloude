@@ -30,23 +30,27 @@
 // columnas angostas (correlativo, estado, prioridad) y dos anchas (receta, motivo), y `tasks.md >
 // T14` obliga a **comprobarlo y anotar el resultado**, parando si resultara inservible.
 //
-// **Resultado: NO bloquea.** Los cuatro hechos que lo sostienen se afirman en el ultimo `describe`
+// **Resultado: CERRADA por decision humana.** La pantalla declara ancho fijo donde lo necesita
+// y contenido en el resto, y los hechos que lo sostienen se afirman en el ultimo `describe`
 // de este archivo, en los dos viewports:
 //
-//   1. Ninguna de las diez columnas declara ancho: `buildOrderColumns` no emite `size`, `width`,
-//      `minSize` ni `maxSize`. No hay nada que la libreria pueda imponer al DOM por esa via.
-//   2. Ninguna celda ni cabecera recibe un estilo de ancho en linea. `data-table.tsx` solo escribe
-//      estilo en linea para el fijado (`position`, `left`/`right`, `zIndex`), nunca `width`.
-//   3. La tabla usa **layout automatico**: `components/ui/table.tsx` no declara `table-fixed`, asi
-//      que el navegador dimensiona cada columna **por su contenido**, y las celdas llevan
-//      `whitespace-nowrap`, asi que el contenido no se parte en columnas angostas.
-//   4. Los 150 px por defecto de la libreria solo alimentan los **offsets sticky**
-//      (`column.getStart()`), y la unica columna fijada es la **primera**, cuyo offset es `0`. Un
-//      offset de 0 no depende del ancho supuesto de nada.
+//   1. Solo `recipeName` declara ancho: `width: 500` del contrato (fijo + minimo en linea, para
+//      que el salto de linea no la encoja) con `hideText: false` (el texto parte dentro de esos
+//      500 px). Es el texto largo de la fila y sin tope empuja al resto fuera de la vista.
+//   2. Ninguna columna declara las claves de dimensionado de la LIBRERIA (`size`, `minSize`,
+//      `maxSize`, ...): por esa via la libreria no impone nada al DOM, y sus 150 px por defecto
+//      solo alimentan los offsets sticky.
+//   3. El resto de celdas y cabeceras no lleva ningun estilo de ancho en linea: `data-table.tsx`
+//      solo escribe `width`/`minWidth` donde la columna lo declara, y `position`/`left`/`right`
+//      para el fijado.
+//   4. La tabla usa **layout automatico**: `components/ui/table.tsx` no declara `table-fixed`, asi
+//      que el navegador dimensiona por contenido lo no declarado, y las celdas sin `hideText`
+//      llevan `whitespace-nowrap`, asi que el contenido no se parte en columnas angostas.
+//   5. La unica columna fijada es la del correlativo (R19), y es la **primera**, cuyo offset
+//      sticky es `0`. Un offset de 0 no depende del ancho supuesto de nada.
 //
-// Es decir: el ancho por defecto de la libreria no llega al DOM en esta pantalla. Por eso **no se
-// propone una tercera prop de ancho en el componente compartido** —seria alcance inventado, y la
-// decision es del humano—, y P2 se **arrastra** tal como esta escrita, sin cambiar de estado.
+// Es decir: el ancho declarado llega al DOM solo donde la pantalla lo pide, y el ancho por
+// defecto de la libreria sigue sin llegar a ninguna parte en esta pantalla.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
@@ -64,6 +68,7 @@ import {
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_SELECT_TESTID,
   QUANTITY_COLUMN_ID,
+  RECIPE_NAME_COLUMN_ID,
   RECIPE_PICKER_TESTID,
   buildOrderColumns,
   type RecipePickerPage,
@@ -236,12 +241,14 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
 }));
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
+  getMassVolumeBridgeAction: vi.fn(async () => ({ status: 'success', data: null })),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
@@ -249,6 +256,15 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   createPresentationAction: vi.fn(() => {
     throw new Error('createPresentationAction no debe invocarse desde este archivo');
   }),
+}));
+
+// El selector de envases del reparto lista productos: sin este doble, su modulo arrastraria
+// `@/lib/composition` real.
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  listProductsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
 }));
 
 const RECETA = {
@@ -285,6 +301,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
@@ -294,8 +311,19 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: PRESENTACION.id,
-    presentationName: PRESENTACION.name,
+    presentationLines: [
+
+      {
+        presentationId: PRESENTACION.id,
+        presentationName: PRESENTACION.name,
+        packages: 1,
+        packagingProductId: null,
+        packagingName: null,
+      },
+
+    ],
+    unitId: null,
+    unitLabel: null,
     ...overrides,
   };
 }
@@ -407,7 +435,12 @@ beforeEach(() => {
       createdBy: null,
       updatedBy: null,
       steps: [],
+      packingSteps: [],
       lines: [],
+      tools: [],
+      original: null,
+      isUnderReview: false,
+      displayName: RECETA.name,
     },
   });
   clearSidebarStateCookie();
@@ -458,33 +491,34 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     expect(document.body.style.overflowX).toBe('');
   });
 
-  it('las acciones de fila siguen siendo alcanzables dentro de la tabla (R22)', async () => {
+  it('el disparador de las acciones de fila sigue siendo alcanzable dentro de la tabla (R22)', async () => {
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
     const celda = within(fila).getByTestId(`data-table-cell-${ACTIONS_COLUMN_ID}`);
 
-    // Las tres, en el DOM y visibles, sin ninguna interaccion previa.
-    for (const accion of ['order-action-edit', 'order-action-cancel', 'order-action-delete']) {
-      const control = within(celda).getByTestId(accion);
-      expect(control, `${accion} a ${ancho}px`).toBeVisible();
-      expect(control, `${accion} a ${ancho}px`).toBeEnabled();
-    }
+    // El disparador, en el DOM y visible, sin ninguna interaccion previa. Las cuatro acciones
+    // viven detras de el (decision humana puntual, ver el comentario de cabecera de
+    // `order-row-actions.tsx`) y se alcanzan abriendolo con un clic (siguiente caso).
+    const disparador = within(celda).getByTestId('order-row-actions');
+    expect(disparador, `disparador a ${ancho}px`).toBeVisible();
+    expect(disparador, `disparador a ${ancho}px`).toBeEnabled();
 
-    // Y viajan DENTRO del contenedor que se desplaza: el scroll de la tabla las alcanza sin que
+    // Y viaja DENTRO del contenedor que se desplaza: el scroll de la tabla lo alcanza sin que
     // el documento se mueva.
     expect(screen.getByRole('table').parentElement?.contains(celda)).toBe(true);
   });
 
-  it('ningun control se descubre ni se activa solo con :hover (R45)', async () => {
+  it('el disparador esta en el DOM y visible desde el primer render, sin :hover (R45)', async () => {
     await renderPantalla();
 
-    // 1) En el DOM: los tres controles de fila y el disparador del alta estan visibles ya, sin
-    //    pasar el puntero por encima. En tactil no hay puntero que pasar.
+    // 1) En el DOM: el disparador de la fila y el del alta estan visibles ya, sin pasar el
+    //    puntero por encima. En tactil no hay puntero que pasar. Las cuatro acciones viven detras
+    //    de este disparador y se comprueban en el caso siguiente, que lo abre con un clic.
     const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
-    for (const accion of ['order-action-edit', 'order-action-cancel', 'order-action-delete']) {
-      expect(within(fila).getByTestId(accion)).toBeVisible();
-    }
+    const disparador = within(fila).getByTestId('order-row-actions');
+    expect(disparador, `disparador a ${ancho}px`).toBeVisible();
+    expect(disparador, `disparador a ${ancho}px`).toBeEnabled();
     expect(screen.getByTestId(ORDER_CREATE_OPEN_TESTID)).toBeVisible();
 
     // 2) En las clases: ningun elemento de la pantalla usa el puntero para REVELAR nada. Un
@@ -506,14 +540,41 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     }
   });
 
-  it('los controles tactiles de la lista miden al menos 44x44 px (R45)', async () => {
+  it('abrir el disparador con un CLIC (nunca hover) revela las cuatro acciones (R45)', async () => {
+    const user = setupUser();
+    await renderPantalla();
+
+    const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
+    const disparador = within(fila).getByTestId('order-row-actions');
+
+    // Antes del clic, ninguna accion esta en el DOM: no hay nada que un `:hover` pudiera revelar.
+    for (const accion of [
+      'order-action-edit',
+      'order-action-cancel',
+      'order-action-delete',
+      'order-action-responsibles',
+    ]) {
+      expect(screen.queryByTestId(accion), `${accion} antes de abrir a ${ancho}px`).toBeNull();
+    }
+
+    await user.click(disparador);
+
+    for (const accion of [
+      'order-action-edit',
+      'order-action-cancel',
+      'order-action-delete',
+      'order-action-responsibles',
+    ]) {
+      expect(await screen.findByTestId(accion), `${accion} a ${ancho}px`).toBeVisible();
+    }
+  });
+
+  it('el disparador de acciones y el del alta miden al menos 44x44 px (R45)', async () => {
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${PEDIDO_ID}`);
     const controles = [
-      ...['order-action-edit', 'order-action-cancel', 'order-action-delete'].map((accion) =>
-        within(fila).getByTestId(accion),
-      ),
+      within(fila).getByTestId('order-row-actions'),
       screen.getByTestId(ORDER_CREATE_OPEN_TESTID),
     ];
 
@@ -537,12 +598,12 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
-    // Eran cinco campos hasta el 2026-09-07: el precio unitario y el selector de unidad salieron
-    // del formulario con la decision humana. Los que quedan se siguen midiendo uno a uno.
+    // El selector de presentacion del reparto solo aparece con unidad elegida; aqui se mide el de
+    // la unidad, que esta siempre.
     const campos = [
       screen.getByTestId(`order-field-${QUANTITY_COLUMN_ID}`),
       screen.getByTestId(RECIPE_PICKER_TESTID),
-      screen.getByTestId('presentation-select'),
+      screen.getByTestId('presentation-unit-select'),
       screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
     ];
 
@@ -589,14 +650,15 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
   // P2 de QC-55 (ancho de columna): comprobacion formal. Ver la cabecera de este archivo.
   // ------------------------------------------------------------------------------------------
 
-  it('P2 — ninguna columna declara ancho y ninguna celda recibe uno en linea', async () => {
-    // Primera mitad: la CONFIGURACION. Si una columna declarase `size`, la libreria si tendria un
-    // ancho que imponer, y los 150 px por defecto dejarian de ser inertes.
-    const columnas = buildOrderColumns({ recipes: RECETAS, units: [] });
+  it('P2 — solo receta declara ancho fijo y el resto no recibe ninguno en linea', async () => {
+    // Primera mitad: la CONFIGURACION. Solo `recipeName` declara el `width` del contrato
+    // (decision humana: es el texto largo de la fila); ninguna declara las claves de
+    // dimensionado de la libreria, asi que por esa via no impone nada.
+    const columnas = buildOrderColumns({ recipes: RECETAS, units: [], bridge: null });
     expect(columnas).toHaveLength(11);
 
     for (const columna of columnas) {
-      for (const clave of ['size', 'width', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {
+      for (const clave of ['size', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {
         expect(
           Object.prototype.hasOwnProperty.call(columna, clave),
           `la columna ${columna.id} declara ${clave}`,
@@ -604,7 +666,18 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
       }
     }
 
-    // Segunda mitad: el DOM. Ni cabeceras ni celdas llevan ancho en linea.
+    const receta = columnas.find((columna) => columna.id === RECIPE_NAME_COLUMN_ID);
+    expect(receta?.width).toBe(500);
+    expect(receta?.hideText).toBe(false);
+    for (const columna of columnas.filter((otra) => otra.id !== RECIPE_NAME_COLUMN_ID)) {
+      expect(
+        Object.prototype.hasOwnProperty.call(columna, 'width'),
+        `la columna ${columna.id} declara width`,
+      ).toBe(false);
+    }
+
+    // Segunda mitad: el DOM. Solo las celdas de receta llevan ancho en linea (fijo + minimo,
+    // para que el salto de linea no la encoja); el resto, ninguno.
     await renderPantalla();
 
     const celdas = [
@@ -614,9 +687,15 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     expect(celdas.length, 'la tabla deberia tener celdas').toBeGreaterThan(0);
 
     for (const celda of celdas) {
-      expect((celda as HTMLElement).style.width, `ancho en linea a ${ancho}px`).toBe('');
-      expect((celda as HTMLElement).style.minWidth, `ancho minimo en linea a ${ancho}px`).toBe('');
-      expect((celda as HTMLElement).style.maxWidth, `ancho maximo en linea a ${ancho}px`).toBe('');
+      const esReceta =
+        celda.getAttribute('data-testid') === `data-table-cell-${RECIPE_NAME_COLUMN_ID}` ||
+        celda.getAttribute('data-testid') === `data-table-head-${RECIPE_NAME_COLUMN_ID}`;
+      const estilo = celda as HTMLElement;
+      expect(estilo.style.width, `ancho en linea a ${ancho}px`).toBe(esReceta ? '500px' : '');
+      expect(estilo.style.minWidth, `ancho minimo en linea a ${ancho}px`).toBe(
+        esReceta ? '500px' : '',
+      );
+      expect(estilo.style.maxWidth, `ancho maximo en linea a ${ancho}px`).toBe('');
       expect(celda.getAttribute('width'), `atributo width a ${ancho}px`).toBeNull();
     }
   });

@@ -2,7 +2,7 @@
 // (R8, R9). Hermano exacto de `./roles`: dominio puro, sin Prisma, sin `next/*`, sin `lib/shared`.
 // Vive centralizado en `identity` a proposito (`design.md > 2`): repartirlo por modulo crearia un
 // ciclo entre barriles (`identity -> inventario -> identity`) con constantes en `undefined`.
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
+import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO } from './roles';
 
 /**
  * El catalogo cerrado: el codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en
@@ -48,6 +48,14 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
  * `empaque` suma `empaque.modificar`, sin `empaque.consultar`: es el primer modulo del catalogo
  * que solo escribe, porque quien lo tiene ya ve el pedido por otra via y no necesita una consulta
  * propia. Lo recibe unicamente el Empacador.
+ *
+ * **Octava enmienda al catalogo cerrado**: suma `empresas.consultar` y `empresas.modificar`,
+ * ver y mantener las empresas de la plataforma. Cambia el recuento; como `usuarios`, su modulo no
+ * es una carpeta de `lib/modules/`. Solo los recibe el Maestro: ningun rol de empresa los tiene.
+ *
+ * `asignaciones.ejecutar` es la unica accion que no es `consultar` ni `modificar`: separa ver los
+ * pedidos asignados de entrar a ejecutarlos, para que quien solo empaca los vea sin ejecutarlos.
+ * Lo reciben el Administrador y el Operador.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -144,6 +152,12 @@ export const PERMISSIONS = [
     description: 'Asignar y desasignar responsables de un pedido.',
   },
   {
+    code: 'asignaciones.ejecutar',
+    module: 'asignaciones',
+    action: 'ejecutar',
+    description: 'Entrar, comenzar y terminar la ejecución de los pedidos asignados.',
+  },
+  {
     code: 'terminados.consultar',
     module: 'terminados',
     action: 'consultar',
@@ -179,6 +193,18 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Comenzar y terminar el empaque de los pedidos de la empresa.',
   },
+  {
+    code: 'empresas.consultar',
+    module: 'empresas',
+    action: 'consultar',
+    description: 'Consultar las empresas de la plataforma.',
+  },
+  {
+    code: 'empresas.modificar',
+    module: 'empresas',
+    action: 'modificar',
+    description: 'Dar de alta, editar y dar de baja empresas de la plataforma.',
+  },
 ] as const;
 
 /**
@@ -191,13 +217,15 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
 /**
  * Los permisos que el seed asigna a cada rol, ESCRITOS UNO A UNO (decision 2026-09-07 nº2). Sin
  * comodin y sin derivarlos de `PERMISSIONS`: el Administrador pasa por la MISMA ruta de permiso
- * que cualquier otro rol (R8), y el Operador nace con exactamente los que se le escriben aqui
- * —QC-74 R9 decia «uno»; QC-86 R26 le suma `asignaciones.consultar` y pasan a ser DOS, y ni uno
- * mas: al Operador NO se le da `recetas.consultar` ni ningun otro (QC-86 R27)—. Las claves salen de
+ * que cualquier otro rol, y el Operador nace con exactamente los que se le escriben aqui: ni
+ * `recetas.consultar` ni ningun otro. Las claves salen de
  * `./roles`, nunca del literal. Sin empresa: el permiso cuelga del rol y de nada mas (R6).
  *
  * El Empacador nace con exactamente `asignaciones.consultar`, `terminados.consultar` y
  * `empaque.modificar`, sin `inventario.consultar` ni `asignaciones.modificar`.
+ *
+ * El Maestro nace con exactamente `empresas.consultar` y `empresas.modificar`, y ningun rol de
+ * empresa recibe ninguno de los dos.
  */
 export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionCode[]>> = {
   [ROLE_ADMINISTRADOR]: [
@@ -216,19 +244,26 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'usuarios.modificar',
     'asignaciones.consultar',
     'asignaciones.modificar',
+    'asignaciones.ejecutar',
     'terminados.consultar',
     'clientes.consultar',
     'clientes.modificar',
     'documentos.consultar',
     'documentos.modificar',
   ],
-  [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
+  [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
+  [ROLE_MAESTRO]: ['empresas.consultar', 'empresas.modificar'],
 };
 
 /**
  * Los codigos del catalogo que el Administrador NO recibe, aunque exista un modulo que los
- * declare. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
+ * declare: el empaque es tarea del Empacador y las empresas son cosa de la plataforma, no de una
+ * empresa. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
  * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
  */
-export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = ['empaque.modificar'];
+export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = [
+  'empaque.modificar',
+  'empresas.consultar',
+  'empresas.modificar',
+];

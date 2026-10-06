@@ -74,6 +74,9 @@ function repositorioQueFalla(): RecipeRepository {
     listAlive: vi.fn<RecipeRepository['listAlive']>(explota),
     replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(explota),
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(explota),
+    createVersion: vi.fn<RecipeRepository['createVersion']>(explota),
+    listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(explota),
+    replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(explota),
   };
 }
 
@@ -118,12 +121,15 @@ const FILA_RECETA: RecipeRow = {
   name: 'Desengrasante 5%',
   description: null,
   steps: [],
+  packingSteps: [],
   imagePath: null,
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
   createdAt: AHORA,
   updatedAt: AHORA,
   lines: [],
+  tools: [],
+  original: null,
 };
 
 /** Dobles PERMISIVOS, para la mitad de CONCESION: aqui el caso de uso debe llegar al puerto. */
@@ -135,6 +141,9 @@ function montarPuertosPermisivos(): Puertos {
       listAlive: vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 })),
       replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(async () => 'ok'),
       softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
+      createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
+      listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+      replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     },
     products: {
       // Resuelve el producto de `RECETA_VALIDA`: sin esto, `createRecipe`/`updateRecipe`

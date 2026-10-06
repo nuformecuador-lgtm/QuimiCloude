@@ -10,7 +10,10 @@ import {
   createVerifyCredentials,
   seedInitialAccess,
 } from '@/lib/modules/identity';
-import { readInitialAdminCredentialsFromEnv } from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
+import {
+  readInitialAdminCredentialsFromEnv,
+  readInitialMaestroCredentialsFromEnv,
+} from '@/lib/modules/identity/adapters/driven/config/initial-access-credentials-env';
 import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/driven/persistence/session-user-prisma';
 import { withInitialAccessTransaction } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
 import {
@@ -58,6 +61,7 @@ import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/s
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
   createAdjustBatchStock,
+  createConfirmInventoryImport,
   createCreatePresentation,
   createCreateProduct,
   createCreateRawMaterial,
@@ -65,9 +69,13 @@ import {
   createDeleteProduct,
   createGetProduct,
   createListBatchMovements,
+  createListFinishedStock,
+  createListOrderBatches,
   createListPresentations,
   createListProductBatches,
+  createListProductFormUnits,
   createListProducts,
+  createPreviewInventoryImport,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
@@ -78,13 +86,20 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
+  findPackagingCostingBatches,
+  findPackagingRefs,
+} from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import {
   addBatchToAlive,
   adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
+  findAliveIdByNameInUnit,
+  findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
+  findBatchesOfOrder,
   findFinishedGoodsReceipts,
   listAliveProducts,
   softDeleteAliveProduct,
@@ -105,18 +120,45 @@ import {
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
+import {
+  claimImport,
+  findAliveFinishedProducts,
+  findAliveProductsByNormalizedNames,
+  findBatchesByLots,
+  findImport,
+  finishImport,
+  receiveImportedFinishedGoods,
+} from '@/lib/modules/inventario/adapters/driven/persistence/inventory-import-prisma';
+import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
+import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
+import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
+import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
+import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
+import type { SpreadsheetReader } from '@/lib/modules/inventario/ports/spreadsheet-reader';
+import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
+import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type {
   OrderNumberDirectory,
+  PackagingCatalog,
   PresentationCatalog,
   ProductCatalog,
   ProductNameLookup,
   ReservationQueries,
+  StockIncreaseListener,
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { forModule } from '@/lib/shared/observability/logger';
+import {
+  createUnitCatalogReader,
+  findMassVolumeBridge,
+  findPackageUnitId,
+  findUnitRefs,
+  listVisibleUnitRefs,
+} from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findUnitRefsSharingBaseInCompany,
   listUnits,
@@ -135,22 +177,29 @@ import type { UnitWriteRepository } from '@/lib/modules/unidades/ports/unit-writ
 import {
   createCreateUnit,
   createDeleteUnit,
+  createGetMassVolumeBridge,
   createListUnits,
   createUpdateUnit,
   type UnitCatalog,
 } from '@/lib/modules/unidades';
 import {
   createCreateRecipe,
+  createCreateRecipeVersion,
   createDeleteRecipe,
   createGetRecipe,
+  createListRecipeVersions,
   createListRecipes,
   createUpdateRecipe,
+  createUpdateRecipeVersion,
 } from '@/lib/modules/recetas';
 import {
   createRecipe,
+  createRecipeVersion,
   findAliveRecipeById,
   listAliveRecipes,
+  listAliveRecipeVersions,
   replaceAliveRecipe,
+  replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
@@ -175,6 +224,7 @@ import {
   createListSupplierShowcase,
   createUpdateCatalogLine,
   createUpdateSupplier,
+  type CatalogImageUrl,
 } from '@/lib/modules/proveedores';
 // La importacion por identidad de un catalogo. El adaptador y el puerto son
 // de uso EXCLUSIVO de esta operacion -por eso no se cablean junto al resto de `proveedores`, mas
@@ -210,25 +260,34 @@ import {
   createFindCoverage,
   createFinishPacking,
   createGetOrder,
+  createListAliveSummariesByIds,
+  createListAliveSummariesInCompany,
   createListOrders,
   createQuoteOrderCost,
+  createQuoteOrderPresentationAvailability,
+  createReviewBlockedOrders,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
+  createUpdateOrderPresentationLines,
+  formatOrderNumber,
 } from '@/lib/modules/pedidos';
 import {
   createOrderWriteRepository,
-  finishPackingAliveOrder,
   findAliveOrderById,
+  findBlockedOrderIds,
   findExpirableOrders,
   listAliveOrders,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
-import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import {
+  withOrderTransaction,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
+import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
@@ -236,6 +295,7 @@ import {
   findAliveRecipeByNormalizedName,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
+  findRecipePackingStepsById,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -294,6 +354,7 @@ import {
   createAddWorkGroupMember,
   createCreateWorkGroup,
   createDeleteWorkGroup,
+  createListWorkGroupCandidates,
   createListWorkGroupMembers,
   createListWorkGroups,
   createRemoveWorkGroupMember,
@@ -308,6 +369,8 @@ import {
   renameAliveInCompany,
   softDeleteAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/work-group-prisma';
+import { listCandidatesAliveInCompany } from '@/lib/modules/identity/adapters/driven/persistence/work-group-candidates-prisma';
+import type { WorkGroupCandidateReader } from '@/lib/modules/identity/ports/work-group-candidate-reader';
 import type { PaginationPolicy } from '@/lib/modules/identity';
 import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-group-repository';
 // QC-87 T11 (`design.md > 2.3`) — asignar responsables a un pedido. Las CUATRO factories salen del
@@ -338,7 +401,7 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
+  listAliveOrderSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
@@ -365,8 +428,8 @@ import {
   type CatalogImportDeps,
   type FormulaImportDeps,
 } from '@/lib/modules/documentos';
+import { readWithAnthropic } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
-import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
 import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
@@ -392,7 +455,7 @@ import {
 import { uploadCrop } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
 import { cropStorageMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-memory';
 import {
-  createCropSignedReadUrl,
+  cropPublicUrl,
   listCrops,
 } from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase';
 import { cropCatalogMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-memory';
@@ -409,6 +472,7 @@ import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signat
 import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
+import type { DocumentJobLog } from '@/lib/modules/documentos/ports/document-job-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 // `clientes`. Imports al final del bloque, bloque de cableado al final del archivo: no
 // reordena ni reformatea nada de lo que hay arriba.
@@ -620,6 +684,8 @@ const workGroupRepository: WorkGroupRepository = {
  */
 const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage };
 
+const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAliveInCompany };
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -648,6 +714,7 @@ export const identity = {
         repository,
         passwordHasher,
         credentials: readInitialAdminCredentialsFromEnv,
+        maestroCredentials: readInitialMaestroCredentialsFromEnv,
         // R18: el seed evalua la politica antes de hashear; aqui se le entrega la misma
         // funcion que expone la fachada.
         checkCredentialPolicy,
@@ -719,6 +786,11 @@ export const identity = {
     pagination: workGroupMemberPagination,
     log: identityListQueryLog,
   }),
+  listWorkGroupCandidates: createListWorkGroupCandidates({
+    candidates: workGroupCandidateReader,
+    pagination: workGroupMemberPagination,
+    log: identityListQueryLog,
+  }),
   // QC-23 T17 (`design.md > 8`) — los DOS casos de uso de cierre en bloque, ya cableados. Claves
   // NUEVAS al FINAL del objeto: ninguna de las de arriba se toca.
   //
@@ -758,12 +830,19 @@ const productRepository: ProductRepository = {
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
   findAliveIdByNameInPresentationUnit,
+  findAliveIdByNameInUnit,
+  findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
   adjustBatchStock,
   findBatchesOfAliveProduct,
   findBatchMovements,
 };
+
+const finishedOrderRepository: FinishedOrderRepository = { findBatchesOfOrder, listStockGroups };
+
+/** El formato del numero de pedido es de `pedidos`; `inventario` solo declara el hueco. */
+const orderNumberFormatter: OrderNumberFormatter = { format: formatOrderNumber };
 
 const presentationRepository: PresentationRepository = {
   create: createPresentation,
@@ -779,6 +858,33 @@ const presentationRepository: PresentationRepository = {
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 /**
+ * El aviso de existencia que sube, atado a la revision de los pedidos bloqueados de `pedidos`.
+ * Va antes de la fachada de `inventario`, que lo necesita; `reviewBlockedOrders` se declara mas
+ * abajo y solo se lee cuando llega un aviso, con el modulo ya cargado. Nunca lanza: el lote o el
+ * ajuste ya estan escritos y un fallo aqui no puede devolverlos como error.
+ */
+const blockedOrdersLog = forModule('pedidos');
+
+const stockIncreaseListener: StockIncreaseListener = {
+  async onStockIncreased({ companyId, now }) {
+    try {
+      const result = await reviewBlockedOrders({ companyId, now });
+      if (result.failed.length > 0) {
+        // El logger solo admite primitivas; `failed` lleva unicamente ids y codigos.
+        blockedOrdersLog.error('blocked_orders_review_failed', {
+          companyId,
+          failedCount: result.failed.length,
+          failed: JSON.stringify(result.failed),
+        });
+      }
+    } catch {
+      // Sin el error: su mensaje puede traer datos de la consulta.
+      blockedOrdersLog.error('blocked_orders_review_failed', { companyId, stage: 'blocked_ids' });
+    }
+  },
+};
+
+/**
  * Fachada del modulo `inventario` ya cableada (T11, `design.md > 3`, `> 7`). Es lo que
  * consumen las Server Actions de T12.
  *
@@ -788,8 +894,42 @@ const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderN
  * `{ id, roleName }` con lo que devuelve `SessionUser`. `lib/composition` no conoce
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
+const createProductUseCase = createCreateProduct({
+  products: productRepository,
+  stockIncreases: stockIncreaseListener,
+  packageUnit: { findPackageUnitId },
+  units: { findRefs: findUnitRefs },
+});
+
+const inventoryImportRepository: InventoryImportRepository = {
+  findAliveProductsByNormalizedNames,
+  findAliveFinishedProducts,
+  findBatchesByLots,
+  findImport,
+  claimImport,
+  finishImport,
+  receiveImportedFinishedGoods,
+};
+
+const spreadsheetReader: SpreadsheetReader = {
+  read: async (bytes, format) => (format === 'csv' ? readCsv(bytes) : readXlsx(bytes)),
+};
+
+const importFormulaLookup: ImportFormulaLookup = {
+  findAliveOriginalByName: findAliveRecipeByNormalizedName,
+};
+
+// Los adaptadores y no `unitCatalog` ni `presentationCatalog`, que se declaran mas abajo.
+const inventoryImportReadDeps = {
+  reader: spreadsheetReader,
+  imports: inventoryImportRepository,
+  units: { listVisibleRefs: listVisibleUnitRefs },
+  presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+  formulas: importFormulaLookup,
+};
+
 export const inventario = {
-  createProduct: createCreateProduct({ products: productRepository }),
+  createProduct: createProductUseCase,
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
@@ -803,7 +943,10 @@ export const inventario = {
     log: inventarioListQueryLog,
   }),
   // Claves nuevas al final: ninguna de las de arriba se toca.
-  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  adjustBatchStock: createAdjustBatchStock({
+    products: productRepository,
+    stockIncreases: stockIncreaseListener,
+  }),
   listProductBatches: createListProductBatches({ products: productRepository }),
   // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
   // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
@@ -813,6 +956,21 @@ export const inventario = {
     products: productRepository,
     people: assignmentDirectoryPrisma,
     orders: orderNumberDirectory,
+  }),
+  listOrderBatches: createListOrderBatches({ finishedOrders: finishedOrderRepository }),
+  listFinishedStock: createListFinishedStock({
+    finishedOrders: finishedOrderRepository,
+    orderNumbers: orderNumberFormatter,
+    log: inventarioListQueryLog,
+  }),
+  // El adaptador y no `unitCatalog`, que se declara mas abajo.
+  listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
+  previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
+  confirmInventoryImport: createConfirmInventoryImport({
+    ...inventoryImportReadDeps,
+    createProduct: createProductUseCase,
+    stockIncreases: stockIncreaseListener,
+    digest: fileDigest,
   }),
 } as const;
 
@@ -826,6 +984,12 @@ export const inventario = {
 // nada de `identity` ni de `inventario` arriba -diff minimo, hay otra sesion (QC-22)
 // tocando este mismo archivo en paralelo-.
 // ---------------------------------------------------------------------------------------
+
+/** Solo para el servidor de `pedidos`: validar el envase de cada linea del reparto y costearlo. */
+const packagingCatalog: PackagingCatalog = {
+  findRefs: findPackagingRefs,
+  findCostingBatches: findPackagingCostingBatches,
+};
 
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
@@ -853,6 +1017,8 @@ const productNameLookup: ProductNameLookup = {
 const unitCatalog: UnitCatalog = {
   findRefs: findUnitRefs,
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
+  listVisibleRefs: listVisibleUnitRefs,
+  findMassVolumeBridge: () => findMassVolumeBridge(),
 };
 
 const recipeRepository: RecipeRepository = {
@@ -861,6 +1027,9 @@ const recipeRepository: RecipeRepository = {
   listAlive: listAliveRecipes,
   replaceAlive: replaceAliveRecipe,
   softDeleteAlive: softDeleteAliveRecipe,
+  createVersion: createRecipeVersion,
+  listAliveVersions: listAliveRecipeVersions,
+  replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
 /** `RecipeImageStorage` cableado con el adaptador de Supabase Storage (T11). Ninguna de
@@ -910,6 +1079,9 @@ export const recetas = {
     images: recipeImageStorage,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
+  createRecipeVersion: createCreateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
+  updateRecipeVersion: createUpdateRecipeVersion({ recipes: recipeRepository, products: productCatalog }),
+  listRecipeVersions: createListRecipeVersions({ recipes: recipeRepository }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -946,6 +1118,17 @@ const supplierCatalogRepository: SupplierCatalogRepository = {
 };
 
 /**
+ * La URL publica de un recorte sale del MISMO bucket que ya lee
+ * `cropCatalog`, mas abajo -mismo criterio de bifurcacion por `documentsE2EDoublesEnabled()`-.
+ * Declarada AQUI, antes de la fachada de `proveedores`, porque sus tres casos de uso capturan
+ * esta dependencia al construirse.
+ */
+const catalogImageUrl: CatalogImageUrl = {
+  publicUrl: (path) =>
+    documentsE2EDoublesEnabled() ? cropCatalogMemory.publicUrl(path) : cropPublicUrl(path),
+};
+
+/**
  * Fachada del modulo `proveedores` ya cableada (T13, `design.md > 10`). Es lo que consumen
  * las dos Server Actions de T14.
  *
@@ -979,10 +1162,17 @@ export const proveedores = {
   listCatalogLines: createListCatalogLines({
     catalog: supplierCatalogRepository,
     log: proveedoresListQueryLog,
+    images: catalogImageUrl,
   }),
   // La vista de catalogo visual. Claves nuevas al final: ninguna de las de arriba se toca.
-  listSupplierShowcase: createListSupplierShowcase({ suppliers: supplierRepository }),
-  listShowcaseLines: createListShowcaseLines({ catalog: supplierCatalogRepository }),
+  listSupplierShowcase: createListSupplierShowcase({
+    suppliers: supplierRepository,
+    images: catalogImageUrl,
+  }),
+  listShowcaseLines: createListShowcaseLines({
+    catalog: supplierCatalogRepository,
+    images: catalogImageUrl,
+  }),
 };
 
 // ---------------------------------------------------------------------------------------
@@ -1018,6 +1208,7 @@ export const unidades = {
   createUnit: createCreateUnit({ units: unitWriteRepository }),
   updateUnit: createUpdateUnit({ units: unitWriteRepository }),
   deleteUnit: createDeleteUnit({ units: unitWriteRepository }),
+  getMassVolumeBridge: createGetMassVolumeBridge({ units: unitCatalog }),
 } as const;
 
 
@@ -1057,15 +1248,14 @@ const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredList
 const orderRepository: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
+  findBlockedIds: findBlockedOrderIds,
 };
 
 /**
- * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
- * MISMO `tx`, el repositorio de escritura de `pedidos`, las reservas de `inventario` y el
- * lector de contenido de receta, para que las tres lecturas y escrituras vean la misma
- * instantanea sin abrir una segunda conexion mientras esta retiene la suya. Sin `unitCatalog`:
- * la necesidad ya llega en la unidad del producto, asi que `createMaterialReservations` no
- * convierte nada.
+ * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye cada
+ * pieza del scope con el MISMO `tx`, para que todas vean la misma instantanea sin abrir una
+ * segunda conexion mientras esta retiene la suya. `createMaterialReservations` no convierte
+ * nada: la necesidad le llega ya en la unidad del producto.
  */
 const orderUnitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -1075,6 +1265,8 @@ const orderUnitOfWork: OrderUnitOfWork = {
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
+        products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
+        units: createUnitCatalogReader(tx),
       };
       return work(scope);
     }),
@@ -1096,6 +1288,17 @@ const expireStaleOrders = createExpireStaleOrders({
   now: () => new Date(),
 });
 
+/** La revision de bloqueados que dispara `stockIncreaseListener`. No va en la fachada `pedidos`:
+ *  no lleva actor y ninguna Server Action la llama. */
+const reviewBlockedOrders = createReviewBlockedOrders({
+  orders: orderRepository,
+  recipes: recipeCatalog,
+  products: productCatalog,
+  units: unitCatalog,
+  packaging: packagingCatalog,
+  unitOfWork: orderUnitOfWork,
+});
+
 /**
  * Fachada del modulo `pedidos` ya cableada (T14, `design.md > 9`). Es lo que consumen las
  * Server Actions de T15.
@@ -1111,10 +1314,11 @@ const expireStaleOrders = createExpireStaleOrders({
  *
  * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
  * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
- * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben SOLO el
- * catalogo de recetas, por el mismo motivo: no calculan ningun importe ni apartan nada.
- * `createOrder` y `updateOrder` son los dos que si costean y aparta, asi que son los dos que
- * reciben tambien `products`, `units` y `unitOfWork`.
+ * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben `recipes`,
+ * `presentations` y `units` -para la etiqueta de `unitId`-, pero no
+ * `products` ni `unitOfWork`: no calculan ningun importe ni apartan nada. `createOrder` y
+ * `updateOrder` son los dos que si costean y aparta, asi que son los dos que reciben tambien
+ * `products` y `unitOfWork`.
  */
 export const pedidos = {
   createOrder: createCreateOrder({
@@ -1122,17 +1326,24 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
   }),
   getOrder: createGetOrder({
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
+    // La unidad vuelve al pedido: `getOrder` vuelve a necesitar `units`.
+    units: unitCatalog,
   }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
+    // Mismo motivo que `getOrder`, una llamada por pagina.
+    units: unitCatalog,
     log: pedidosListQueryLog,
   }),
   updateOrder: createUpdateOrder({
@@ -1141,6 +1352,7 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
@@ -1150,12 +1362,30 @@ export const pedidos = {
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
+    packaging: packagingCatalog,
   }),
   // El proceso diario y su puerta: sin usuario delante, asi que ninguno de los dos recibe actor.
   // El handler los llama en ese orden -primero la puerta- y `lib/composition` no impone el
   // orden por su cuenta.
   verifyCronSecret,
   expireStaleOrders,
+  // La edicion ACOTADA del reparto y la unidad: aparta los envases, asi que va en la unidad de
+  // trabajo compartida con `inventario`. `recipes` y `products` son para recalcular el importe.
+  updateOrderPresentationLines: createUpdateOrderPresentationLines({
+    recipes: recipeCatalog,
+    products: productCatalog,
+    packaging: packagingCatalog,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    unitOfWork: orderUnitOfWork,
+  }),
+  // «Cuanto queda disponible», de solo lectura. Los catalogos del reparto de
+  // `updateOrderPresentationLines`, sin transaccion: no escribe nada.
+  quoteOrderPresentationAvailability: createQuoteOrderPresentationAvailability({
+    packaging: packagingCatalog,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1200,26 +1430,42 @@ export const observabilidad = {
  *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
  *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
  *  consume el material en la misma transaccion. */
-/** `OrderPackingRepository` cableado con las dos escrituras crudas de `order-prisma.ts`: cada
- *  una un `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida
- *  con `inventario`. */
+/** `OrderPackingRepository` cableado con la escritura cruda de Comenzar (`order-prisma.ts`): un
+ *  `UPDATE` condicional fuera de `orderUnitOfWork`, sin abrir la transaccion compartida con
+ *  `inventario`. Terminar no vive aqui: abre `orderUnitOfWork` directamente. */
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
-  finishPackingAlive: finishPackingAliveOrder,
+};
+
+const orderSummaryReader: OrderSummaryReader = {
+  listAliveByIds: listAliveOrderSummariesByIds,
+  listAliveInCompany: listAliveOrderSummariesInCompany,
 };
 
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
-  listAliveSummariesByIds: listAliveOrderSummariesByIds,
-  listAliveSummariesInCompany,
-  transitionAliveById: createTransitionOrder({
+  listAliveSummariesByIds: createListAliveSummariesByIds({ summaries: orderSummaryReader, packaging: packagingCatalog }),
+  listAliveSummariesInCompany: createListAliveSummariesInCompany({
+    summaries: orderSummaryReader,
+    packaging: packagingCatalog,
+  }),
+  // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
+  // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
+  // cableados mas abajo para quien todavia los usa-.
+  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
+  startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
+  // Terminar SI necesita los tres catalogos globales -receta y coste del lote, mismo criterio
+  // que Finalizar usaba antes de dejar de dar de alta el lote- y `presentationCatalog`, para
+  // rechazar en profundidad una linea sin contenido copiado ni vigente.
+  finishPackingAliveById: createFinishPacking({
+    packing: orderPackingRepository,
     unitOfWork: orderUnitOfWork,
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
+    presentations: presentationCatalog,
+    packaging: packagingCatalog,
   }),
-  startPackingAliveById: createStartPacking({ packing: orderPackingRepository }),
-  finishPackingAliveById: createFinishPacking({ packing: orderPackingRepository }),
 };
 
 /**
@@ -1307,6 +1553,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
@@ -1332,6 +1579,8 @@ export const asignaciones = {
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
+    people: peopleDirectory,
+    groups: workGroupDirectory,
     now: () => new Date(),
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
@@ -1343,6 +1592,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   listCompanyOrders: createListCompanyOrders({
@@ -1351,6 +1601,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
   listResponsibleCandidates: createListResponsibleCandidates({
@@ -1368,6 +1619,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     products: productCatalog,
     now: () => new Date(),
   }),
@@ -1377,7 +1629,9 @@ export const asignaciones = {
     recipes: recipeCatalog,
     people: peopleDirectory,
     presentations: presentationCatalog,
+    units: unitCatalog,
     products: productCatalog,
+    packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
   }),
   startPacking: createStartPackingOrder({
@@ -1450,15 +1704,16 @@ const pdfConverter: PdfConverter = {
 };
 
 /**
- * `AiReader` cableado con el adaptador de Gemini. La clave del objeto es la del PUERTO
- * (`read`) y el valor, la funcion del adaptador (`readWithGenai`) —se llaman distinto a
+ * `AiReader` cableado con el adaptador de Claude; el de Gemini se conserva sin cablear como
+ * futuro respaldo. La clave del objeto es la del PUERTO
+ * (`read`) y el valor, la funcion del adaptador (`readWithAnthropic`) —se llaman distinto a
  * proposito, igual que `documentStorage` y `pdfConverter` arriba—. Aqui no se invoca nada,
  * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
  * toca la red: la suite entera arranca sin claves de IA.
  */
 const aiReader: AiReader = {
   read: (request) =>
-    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithGenai(request),
+    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithAnthropic(request),
 };
 
 /**
@@ -1521,10 +1776,8 @@ const cropCatalog: CropCatalog = {
     documentsE2EDoublesEnabled()
       ? cropCatalogMemory.list(companyId, documentFileId)
       : listCrops(companyId, documentFileId),
-  createSignedReadUrl: (path, expiresInSeconds) =>
-    documentsE2EDoublesEnabled()
-      ? cropCatalogMemory.createSignedReadUrl(path, expiresInSeconds)
-      : createCropSignedReadUrl(path, expiresInSeconds),
+  publicUrl: (path) =>
+    documentsE2EDoublesEnabled() ? cropCatalogMemory.publicUrl(path) : cropPublicUrl(path),
 };
 
 /** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
@@ -1544,11 +1797,14 @@ const cropCatalogImages = createCropCatalogImages({
  * que lo ejecuta en este mismo proceso en vez de publicar nada. Dos construcciones serian dos
  * cableados que pueden divergir.
  */
+const documentJobLog: DocumentJobLog = forModule('documentos');
+
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
   processPdfByStrategy,
   cropCatalogImages,
+  log: documentJobLog,
 });
 
 const processingQueue: ProcessingQueue = {

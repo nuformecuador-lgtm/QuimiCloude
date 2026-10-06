@@ -2,7 +2,11 @@
 
 import type { ReactNode } from 'react';
 
-import type { ProductBatchView } from '@/lib/modules/inventario';
+import {
+  PRODUCT_TYPES,
+  type ProductBatchView,
+  type ProductView,
+} from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
@@ -14,6 +18,8 @@ const PURCHASE_DATE_LABEL = 'Fecha de compra';
 const RESERVED_LABEL = 'Apartado';
 const AVAILABLE_LABEL = 'Disponible';
 const OVER_RESERVED_LABEL = 'Sobre-reservado';
+const PACKAGING_PRESENTATION_LABEL = 'Presentación del envase';
+const PACKAGING_LEGACY_LABEL = 'Envase sin presentación fija';
 
 /**
  * Panel de lotes de un producto: numero de lote, cantidad con su unidad y fecha de compra.
@@ -32,7 +38,23 @@ export type ProductBatchesPanelProps = {
   readonly renderBatchDetail?: (batch: ProductBatchView) => ReactNode;
   /** Ranura de las acciones del lote (el ajuste). */
   readonly renderBatchActions?: (batch: ProductBatchView) => ReactNode;
+  /**
+   * El producto de los lotes. Un lote de envase no lleva presentacion propia: su unidad y su
+   * presentacion son las del producto.
+   */
+  readonly product?: Pick<ProductView, 'type' | 'unitId' | 'presentationId' | 'presentationName'>;
 };
+
+type PackagingInfo =
+  | { readonly kind: 'fixed'; readonly presentationName: string }
+  | { readonly kind: 'legacy' }
+  | null;
+
+function packagingInfo(product: ProductBatchesPanelProps['product']): PackagingInfo {
+  if (product === undefined || product.type !== PRODUCT_TYPES.PACKAGING) return null;
+  if (product.presentationId == null) return { kind: 'legacy' };
+  return { kind: 'fixed', presentationName: product.presentationName ?? EMPTY_CELL };
+}
 
 /**
  * Etiqueta de una unidad a partir de su id: simbolo, nombre, o el marcador si el catalogo no la
@@ -50,13 +72,21 @@ function unitLabel(unitId: string | null, units: readonly UnitRef[] | undefined)
  * decimales para pintarla (`formatDecimalDisplay`). El valor guardado no cambia: esto es la
  * celda, no el dato.
  */
-function quantityLabel(batch: ProductBatchView, units: readonly UnitRef[] | undefined): string {
-  return formattedQuantity(batch.stock, batch.unitId, units);
+function quantityLabel(
+  batch: ProductBatchView,
+  unitId: string | null,
+  units: readonly UnitRef[] | undefined,
+): string {
+  return formattedQuantity(batch.stock, unitId, units);
 }
 
 /** Cifra exacta de la cantidad, para quien no puede quedarse con el redondeo del pixel. */
-function quantityAriaLabel(batch: ProductBatchView, units: readonly UnitRef[] | undefined): string {
-  return exactQuantity(batch.stock, batch.unitId, units);
+function quantityAriaLabel(
+  batch: ProductBatchView,
+  unitId: string | null,
+  units: readonly UnitRef[] | undefined,
+): string {
+  return exactQuantity(batch.stock, unitId, units);
 }
 
 /** La misma composicion «cantidad · unidad» que `quantityLabel`, para un valor cualquiera del
@@ -114,19 +144,46 @@ export function ProductBatchesPanel({
   units,
   renderBatchDetail,
   renderBatchActions,
+  product,
 }: ProductBatchesPanelProps) {
+  const packaging = packagingInfo(product);
+  const header =
+    packaging === null ? null : packaging.kind === 'legacy' ? (
+      <p
+        role="note"
+        className="rounded-lg border px-3 py-2 text-sm font-medium"
+        data-testid="product-batches-packaging-legacy"
+      >
+        {PACKAGING_LEGACY_LABEL}
+      </p>
+    ) : (
+      <p className="text-sm" data-testid="product-batches-packaging-presentation">
+        <span className="text-muted-foreground">{PACKAGING_PRESENTATION_LABEL}: </span>
+        {packaging.presentationName}
+      </p>
+    );
+  /** Un lote sin unidad propia (envase con presentacion fija) se cuenta en la del producto. */
+  const unitOf = (batch: ProductBatchView): string | null =>
+    batch.unitId ?? (packaging?.kind === 'fixed' ? (product?.unitId ?? null) : null);
+
   if (batches.length === 0) {
     return (
-      <div data-testid="product-batches-panel" className="p-4 text-sm text-muted-foreground">
-        Este producto todavía no tiene lotes registrados.
+      <div className="flex flex-col gap-3">
+        {header}
+        <div data-testid="product-batches-panel" className="p-4 text-sm text-muted-foreground">
+          Este producto todavía no tiene lotes registrados.
+        </div>
       </div>
     );
   }
 
   return (
+    <div className="flex flex-col gap-3">
+    {header}
     <ul data-testid="product-batches-panel" className="flex flex-col gap-3">
       {batches.map((batch) => {
         const packages = packageCountLabel(batch);
+        const unitId = unitOf(batch);
         return (
           <li
             key={batch.id}
@@ -144,9 +201,9 @@ export function ProductBatchesPanel({
                   <dd
                     data-testid="product-batch-quantity"
                     title={exactDecimalTitle(batch.stock)}
-                    aria-label={quantityAriaLabel(batch, units)}
+                    aria-label={quantityAriaLabel(batch, unitId, units)}
                   >
-                    {quantityLabel(batch, units)}
+                    {quantityLabel(batch, unitId, units)}
                   </dd>
                   {packages === null ? null : (
                     <span data-testid="product-batch-packages" className="text-xs text-muted-foreground">
@@ -164,9 +221,9 @@ export function ProductBatchesPanel({
                     <dd
                       data-testid="product-batch-reserved"
                       title={exactDecimalTitle(batch.reserved)}
-                      aria-label={exactQuantity(batch.reserved, batch.unitId, units)}
+                      aria-label={exactQuantity(batch.reserved, unitId, units)}
                     >
-                      {formattedQuantity(batch.reserved, batch.unitId, units)}
+                      {formattedQuantity(batch.reserved, unitId, units)}
                     </dd>
                   </div>
                 )}
@@ -176,9 +233,9 @@ export function ProductBatchesPanel({
                     <dd
                       data-testid="product-batch-available"
                       title={exactDecimalTitle(batch.available)}
-                      aria-label={exactQuantity(batch.available, batch.unitId, units)}
+                      aria-label={exactQuantity(batch.available, unitId, units)}
                     >
-                      {formattedQuantity(batch.available, batch.unitId, units)}
+                      {formattedQuantity(batch.available, unitId, units)}
                     </dd>
                   </div>
                 )}
@@ -198,5 +255,6 @@ export function ProductBatchesPanel({
         );
       })}
     </ul>
+    </div>
   );
 }

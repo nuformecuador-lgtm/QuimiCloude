@@ -28,8 +28,10 @@ function seedPermissionsOf(role: string): readonly string[] {
 }
 
 describe('QC-93 — landingRouteForPermissions deriva el destino con la regla del login', () => {
-  it('lleva al dashboard a quien tiene los permisos sembrados del Administrador (R2)', () => {
-    expect(landingRouteForPermissions(seedPermissionsOf(ROLE_ADMINISTRADOR))).toBe(DASHBOARD_ROUTE);
+  it('lleva a asignacion a quien tiene los permisos sembrados del Administrador (R2)', () => {
+    expect(landingRouteForPermissions(seedPermissionsOf(ROLE_ADMINISTRADOR))).toBe(
+      ASSIGNED_ORDERS_ROUTE,
+    );
   });
 
   it('lleva a asignacion a quien tiene los permisos sembrados del Operador (R2)', () => {

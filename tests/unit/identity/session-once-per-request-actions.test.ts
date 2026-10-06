@@ -302,6 +302,34 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       }),
   },
   {
+    // Entradas validas para el borde: una invalida volveria antes de leer la sesion.
+    archivo: 'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+    nombre: 'createRecipeVersionAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/recetas/adapters/driving/recipe-actions')
+      ).createRecipeVersionAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31', { name: 'Sin perfume' }),
+  },
+  {
+    archivo: 'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+    nombre: 'updateRecipeVersionAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/recetas/adapters/driving/recipe-actions')
+      ).updateRecipeVersionAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31', {
+        name: 'Sin perfume',
+        lines: [{ productId: '11111111-1111-4111-8111-111111111111', percentage: '100.00' }],
+      }),
+  },
+  {
+    archivo: 'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+    nombre: 'listRecipeVersionsAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/recetas/adapters/driving/recipe-actions')
+      ).listRecipeVersionsAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
+  {
     // Los dos archivos de `driving/` de proveedores resuelven las dos caras de la sesion desde
     // que el modulo acota sus consultas por empresa: el actor ya no basta con el usuario, hace
     // falta tambien su empresa. Se elige en cada uno una accion de LISTADO porque su entrada
@@ -370,6 +398,30 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).previewFormulaImportAction({
         documentFileId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
       }),
+  },
+  {
+    // Entrada valida para el borde: sin `file` la accion rechaza antes de `currentActor()`.
+    archivo: 'lib/modules/inventario/adapters/driving/inventory-import-actions.ts',
+    nombre: 'previewInventoryImportAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.append('file', new File(['Tipo;Nombre'], 'inventario.csv'));
+      return (
+        await import('@/lib/modules/inventario/adapters/driving/inventory-import-actions')
+      ).previewInventoryImportAction(formData);
+    },
+  },
+  {
+    archivo: 'lib/modules/inventario/adapters/driving/inventory-import-actions.ts',
+    nombre: 'confirmInventoryImportAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.append('file', new File(['Tipo;Nombre'], 'inventario.csv'));
+      formData.append('importKey', '9b2f7c1e-4a3d-4e5f-8a6b-1c2d3e4f5a6b');
+      return (
+        await import('@/lib/modules/inventario/adapters/driving/inventory-import-actions')
+      ).confirmInventoryImportAction(formData);
+    },
   },
 ];
 

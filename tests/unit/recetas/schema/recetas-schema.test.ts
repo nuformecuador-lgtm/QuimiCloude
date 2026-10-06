@@ -207,6 +207,7 @@ const RECIPE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['nameNormalized', 'name_normalized'],
   ['description', 'description'],
   ['steps', 'steps'],
+  ['packingSteps', 'packing_steps'],
   ['imagePath', 'image_path'],
   // 2026-09-16, QC-50 (aislamiento-por-empresa-en-recetas): Recipe gana `companyId` por el
   // mismo motivo que ya lo tienen `Product`/`Presentation`/`ProductBatch` desde QC-49 y
@@ -222,6 +223,7 @@ const RECIPE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
+  ['parentRecipeId', 'parent_recipe_id'],
 ]
 
 /** Cada campo escalar de `RecipeLine`, con su columna (R28).
@@ -263,7 +265,7 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     expect(field(recipe, 'imagePath').type).toBe('String')
 
     // La forma completa de la tabla: si alguien anade o quita una columna, este test lo dice.
-    expect(scalarNames(recipe, ['RecipeLine'])).toEqual(RECIPE_COLUMNS.map(([name]) => name).sort())
+    expect(scalarNames(recipe, ['RecipeLine', 'Recipe'])).toEqual(RECIPE_COLUMNS.map(([name]) => name).sort())
     expect(recipe.body).toContain('@@map("recipes")')
   })
 
@@ -292,11 +294,11 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     }
   })
 
-  it('steps es un unico campo Json y no existe ningun modelo de paso', () => {
+  it('R5: steps y packingSteps son los unicos campos Json y no existe ningun modelo de paso', () => {
     // R4 y decision cerrada 10: un solo documento JSON en una sola columna. Sin tabla de
     // pasos, sin columna de orden: el orden es el de la lista dentro del documento.
     const jsonFields = recipe.fields.filter((candidate) => candidate.type === 'Json')
-    expect(jsonFields.map((candidate) => candidate.name)).toEqual(['steps'])
+    expect(jsonFields.map((candidate) => candidate.name).sort()).toEqual(['packingSteps', 'steps'])
     expect(recipeLine.fields.some((candidate) => candidate.type === 'Json')).toBe(false)
 
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
@@ -322,6 +324,14 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     expect(steps.type).toBe('Json')
     expect(steps.isOptional).toBe(false)
     expect(steps.attributes).toMatch(/@default\("\[\]"\)/)
+  })
+
+  it('R5: packingSteps mapea a packing_steps, no es opcional y declara default lista vacia', () => {
+    const packingSteps = field(recipe, 'packingSteps')
+    expect(packingSteps.type).toBe('Json')
+    expect(packingSteps.isOptional).toBe(false)
+    expect(packingSteps.attributes).toMatch(/@default\("\[\]"\)/)
+    expect(packingSteps.attributes).toContain('@map("packing_steps")')
   })
 
   it('image_path es la unica columna de imagen y es opcional', () => {
@@ -443,7 +453,7 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
       .filter(([, moduleName]) => moduleName === 'recetas')
       .map(([modelName]) => modelName)
       .sort()
-    expect(recetasModels).toEqual(['Recipe', 'RecipeLine'])
+    expect(recetasModels).toEqual(['Recipe', 'RecipeLine', 'RecipeTool'])
     // Esta feature no adopta modelos ajenos: siguen siendo de su modulo.
     expect(owners.get('Product')).toBe('inventario')
     expect(owners.get('Presentation')).toBe('inventario')
@@ -474,11 +484,11 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
         expect(candidate.type, `${candidate.name} no puede apuntar a otro modulo`).not.toBe('User')
       }
     }
-    // El unico `@relation` de los dos modelos es el intra-modulo linea -> receta.
+    // Los unicos `@relation` son intra-modulo: version <-> original y linea -> receta.
     const relations = [...recipe.fields, ...recipeLine.fields].filter((candidate) =>
       /@relation/.test(candidate.attributes),
     )
-    expect(relations.map((candidate) => candidate.name)).toEqual(['recipe'])
+    expect(relations.map((candidate) => candidate.name)).toEqual(['parent', 'versions', 'recipe'])
     // Y `User` no gana ninguna coleccion de recetas del otro lado, ni `Product` de lineas.
     const user = parseModel('User')
     expect(user.fields.some((candidate) => candidate.type === 'Recipe')).toBe(false)

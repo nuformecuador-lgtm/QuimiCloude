@@ -22,7 +22,7 @@ import type { DocumentBatchRepository } from '../ports/document-batch-repository
 import type { createCreateRawMaterial } from '@/lib/modules/inventario';
 import {
   normalizeProductName,
-  PRODUCT_TYPES,
+  isIngredientType,
   type ProductCatalog,
   type ProductNameLookup,
   type ProductNameMatch,
@@ -68,6 +68,7 @@ export type FormulaImportPreview = {
   readonly description: string | null;
   readonly ingredients: readonly FormulaImportPreviewIngredient[];
   readonly steps: readonly RecipeStepDocument[];
+  readonly packingSteps: readonly RecipeStepDocument[];
   readonly nameClash: { readonly recipeId: string; readonly recipeName: string } | null;
 };
 
@@ -91,7 +92,7 @@ function matchIngredient(
 ): FormulaImportIngredientMatch {
   if (ingredient.name === null) return { kind: 'none' };
   const candidates = byNormalizedName.get(normalizeProductName(ingredient.name)) ?? [];
-  const eligible = candidates.filter((candidate) => candidate.type !== PRODUCT_TYPES.FINISHED_PRODUCT);
+  const eligible = candidates.filter((candidate) => isIngredientType(candidate.type));
   if (eligible.length === 0) return { kind: 'none' };
   if (eligible.length === 1) {
     const match = eligible[0] as ProductNameMatch;
@@ -150,6 +151,7 @@ export function createPreviewFormulaImport(
       description: extraction.description,
       ingredients,
       steps: extraction.steps,
+      packingSteps: extraction.packingSteps,
       nameClash,
     };
   };

@@ -31,8 +31,8 @@ type ProductFieldProps = {
   readonly defaultValue?: string;
   /** Mensaje de error del campo (R20). Se pinta en linea y marca el input como invalido. */
   readonly error?: string;
-  /** Solo para `text`: teclado decimal en movil sin usar `type="number"`. */
-  readonly inputMode?: 'decimal';
+  /** Solo para `text`: teclado decimal, o numerico para enteros, en movil sin `type="number"`. */
+  readonly inputMode?: 'decimal' | 'numeric';
   /** Pasa el campo a controlado. Lo usan los dos importes del lote y nadie mas. */
   readonly value?: string;
   /** Acompana a `value`: sin el, el campo controlado seria de solo lectura. */

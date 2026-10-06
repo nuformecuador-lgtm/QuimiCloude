@@ -77,7 +77,11 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
   };
 });
 
-const GRUPO: WorkGroupRow = { id: '11111111-1111-4111-8111-111111111111', name: 'Laboratorio' };
+const GRUPO: WorkGroupRow = {
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'Laboratorio',
+  members: [],
+};
 
 /** Si alguien pidio CERRAR: el primitivo pasa mas argumentos que el `open`, y el unico que este
  *  componente declara en su prop es el PRIMERO. */

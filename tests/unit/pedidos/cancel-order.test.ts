@@ -54,8 +54,8 @@ function fila(status: OrderStatus, cancellationReason: string | null = null): Or
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: null,
-    presentationContent: null,
+    presentationLines: [],
+    unitId: null,
   }
 }
 
@@ -76,7 +76,7 @@ function dobles(opciones: { fila?: OrderRow | null; cancelacion?: 'ok' | 'not_fo
   // `lockAliveById` bloquea la MISMA fila que `findAliveById` -en estos tests no hay carrera
   // que las separe-. Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- para poder
   // afirmar sobre `mock.calls[0]`: sin ellos, TypeScript infiere una tupla vacia.
-  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null, packagingCost: null }))
   const cancelAlive = vi.fn(
     async (id: string, reason: string, actorId: string | null, when: Date) => {
       // El doble no usa los argumentos; los DECLARA para que `mock.calls` tenga tipo.
@@ -127,6 +127,48 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
     await createCancelOrder(d)(ORDER_ID, { reason: 'Falta materia prima' }, ADMIN)
 
     expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+  })
+
+  it('R25: cancela un pedido BLOQUEADO con su motivo, igual que un PENDIENTE', async () => {
+    // Es la unica salida manual de un pedido sin material: no se fabrico nada, asi que cancelar
+    // no deja consumos sin explicacion, y esperar lotes no es cancelar.
+    const d = dobles({ fila: fila('BLOQUEADO') })
+
+    await createCancelOrder(d)(ORDER_ID, { reason: 'El cliente ya no lo quiere' }, ADMIN)
+
+    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+    expect(d.cancelAlive.mock.calls[0]).toEqual([
+      ORDER_ID,
+      'El cliente ya no lo quiere',
+      ADMIN.id,
+      AHORA,
+      { companyId: ADMIN.companyId },
+    ])
+  })
+
+  it('R25: cancelar un BLOQUEADO pide motivo y lo recorta igual que en los otros dos estados', async () => {
+    // Mismo borde de entrada, sin excepciones por estado: el motivo es obligatorio para los tres.
+    const sinMotivo = dobles({ fila: fila('BLOQUEADO') })
+    expect(
+      await codigoDelFallo(() => createCancelOrder(sinMotivo)(ORDER_ID, {}, ADMIN)),
+    ).toBe('invalid_input')
+    expect(sinMotivo.findAliveById).not.toHaveBeenCalled()
+
+    const conEspacios = dobles({ fila: fila('BLOQUEADO') })
+    await createCancelOrder(conEspacios)(ORDER_ID, { reason: '  ya no  ' }, ADMIN)
+    expect(conEspacios.cancelAlive.mock.calls[0]?.[1]).toBe('ya no')
+  })
+
+  it('R5, R25: cancelar un BLOQUEADO no encuentra material que liberar, y eso no lo rompe', async () => {
+    // Un bloqueado no aparta nada (R5), asi que la liberacion no tiene filas que tocar. El doble
+    // no falla cuando no encuentra nada, igual que el repositorio: lo que se afirma es que la
+    // operacion se completa y que el `reserved_at` se vacia igual.
+    const d = dobles({ fila: fila('BLOQUEADO') })
+
+    await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
+
+    expect(d.releaseForOrder).toHaveBeenCalledTimes(1)
+    expect(d.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, { companyId: ADMIN.companyId })
   })
 
   it('recorta el motivo antes de escribirlo (R27)', async () => {
@@ -238,7 +280,7 @@ describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
     const orden: string[] = []
     d.lockAliveById.mockImplementation(async () => {
       orden.push('orders.lockAliveById')
-      return { ...fila('PENDIENTE'), reservedAt: null }
+      return { ...fila('PENDIENTE'), reservedAt: null, packagingCost: null }
     })
     d.cancelAlive.mockImplementation(async () => {
       orden.push('orders.cancelAlive')

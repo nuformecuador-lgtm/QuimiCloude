@@ -5,8 +5,17 @@ import { redirect } from 'next/navigation';
 
 import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
-import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE, FORMULAS_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
+import {
+  PRIVATE_NAV_ITEMS,
+  filterNavItemsByPermissions,
+  firstVisibleNavHref,
+} from '@/lib/shared/navigation/private-nav';
+import {
+  ASSIGNED_ORDERS_ROUTE,
+  DASHBOARD_ROUTE,
+  FORMULAS_ROUTE,
+  INVENTORY_ROUTE,
+} from '@/lib/shared/routes';
 import {
   GENERIC_CREDENTIALS_ERROR,
   LOGIN_INITIAL_STATE,
@@ -58,8 +67,8 @@ beforeEach(() => {
   // Doble explicito: la action se testea contra un doble, nunca contra el dominio real.
   // Por defecto rechaza; los tests que necesitan otro resultado lo sobreescriben.
   verifyCredentialsMock.mockResolvedValue({ ok: false });
-  // Por defecto quien entra lo puede consultar todo, asi los casos heredados de QC-9 —cuyo
-  // respaldo esperado es el dashboard, primer item del menu— siguen expresando lo mismo.
+  // Por defecto quien entra lo puede consultar todo; con el dashboard oculto del menu, su
+  // respaldo es asignacion, el primer item visible.
   getSessionUserMock.mockResolvedValue(usuarioCon(TODOS_LOS_PERMISOS));
 });
 
@@ -147,13 +156,13 @@ describe('loginAction', () => {
     }
   });
 
-  it('redirige a /dashboard cuando las credenciales son aceptadas y no emite toast', async () => {
+  it('redirige al primer item del menu cuando las credenciales son aceptadas y no emite toast', async () => {
     verifyCredentialsMock.mockResolvedValue({ ok: true });
 
     const resultado = await submit({ username: 'ana.perez', password: 'clave' });
 
     expect(redirect).toHaveBeenCalledTimes(1);
-    expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
+    expect(redirect).toHaveBeenCalledWith(ASSIGNED_ORDERS_ROUTE);
     // Sin estado de error, no hay nada de lo que el cliente pueda derivar un toast (R17).
     expect(resultado).toBeUndefined();
   });
@@ -216,7 +225,7 @@ describe('loginAction', () => {
     expect(redirect).toHaveBeenCalledWith('/dashboard/reportes?desde=ayer');
   });
 
-  it('descarta un destino de vuelta externo y aterriza en el dashboard (R9)', async () => {
+  it('descarta un destino de vuelta externo y aterriza en el primer item del menu (R9)', async () => {
     verifyCredentialsMock.mockResolvedValue({ ok: true });
 
     for (const destinoFabricado of [
@@ -230,19 +239,19 @@ describe('loginAction', () => {
 
       await submit({ username: 'ana.perez', password: 'clave', next: destinoFabricado });
 
-      expect(redirect).toHaveBeenCalledWith(DASHBOARD_ROUTE);
+      expect(redirect).toHaveBeenCalledWith(ASSIGNED_ORDERS_ROUTE);
     }
   });
 
-  it('aterriza en el dashboard cuando el campo next viene vacio o no viene (R8)', async () => {
+  it('aterriza en el primer item del menu cuando el campo next viene vacio o no viene (R8)', async () => {
     verifyCredentialsMock.mockResolvedValue({ ok: true });
 
     await submit({ username: 'ana.perez', password: 'clave', next: '' });
     await submit({ username: 'ana.perez', password: 'clave' });
 
     expect(redirect).toHaveBeenCalledTimes(2);
-    expect(redirect).toHaveBeenNthCalledWith(1, DASHBOARD_ROUTE);
-    expect(redirect).toHaveBeenNthCalledWith(2, DASHBOARD_ROUTE);
+    expect(redirect).toHaveBeenNthCalledWith(1, ASSIGNED_ORDERS_ROUTE);
+    expect(redirect).toHaveBeenNthCalledWith(2, ASSIGNED_ORDERS_ROUTE);
   });
 
   // QC-75 T9 (R11, R12, R13) — el respaldo del login pasa a ser el primer enlace del menu YA
@@ -298,8 +307,8 @@ describe('loginAction', () => {
       }
 
       expect(redirect).toHaveBeenCalledWith(primerItem.href);
-      // Hoy ese primer item es el dashboard, derivado del menu y no del literal.
-      expect(primerItem.href).toBe(DASHBOARD_ROUTE);
+      // El dashboard esta oculto del menu, asi que ni con `dashboard.consultar` se aterriza alli.
+      expect(primerItem.href).not.toBe(DASHBOARD_ROUTE);
     });
 
     it('el destino de vuelta interno gana al respaldo por permisos (R13, no regresion de QC-9 R8)', async () => {
@@ -357,5 +366,44 @@ describe('loginAction', () => {
       expect(getSessionUserMock).not.toHaveBeenCalled();
       expect(redirect).not.toHaveBeenCalled();
     });
+  });
+});
+
+// El aterrizaje de quien solo tiene los permisos del Maestro. Mientras ningun enlace del
+// menu exija `empresas.*`, el menu filtrado queda vacio y el destino es el respaldo de siempre:
+// `/dashboard`, que le responde el 404 dentro de la zona privada.
+describe('aterrizaje del Maestro (QC-161)', () => {
+  const PERMISOS_DEL_MAESTRO = ['empresas.consultar', 'empresas.modificar'] as const;
+
+  it('QC-161 R33: con solo empresas.* y sin destino de vuelta aterriza en el respaldo calculado con el menu', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue({
+      ...usuarioCon(PERMISOS_DEL_MAESTRO),
+      roleName: 'Maestro',
+    });
+
+    await submit({ username: 'plataforma.inicial', password: 'clave', next: '' });
+
+    // El destino se calcula con las MISMAS funciones del menu que usa la action, no con un
+    // literal: el dia que un enlace del menu exija `empresas.consultar`, esto lo seguira.
+    const esperado =
+      firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_DEL_MAESTRO)) ??
+      DASHBOARD_ROUTE;
+
+    expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect).toHaveBeenCalledWith(esperado);
+    // Y hoy ese destino es el respaldo de siempre: ningun enlace del menu pide `empresas.*`.
+    expect(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_DEL_MAESTRO)).toEqual([]);
+    expect(esperado).toBe(DASHBOARD_ROUTE);
+  });
+
+  it('QC-161 R33: un destino de vuelta interno valido sigue mandando tambien para el Maestro', async () => {
+    verifyCredentialsMock.mockResolvedValue({ ok: true });
+    getSessionUserMock.mockResolvedValue(usuarioCon(PERMISOS_DEL_MAESTRO));
+
+    await submit({ username: 'plataforma.inicial', password: 'clave', next: '/inventario' });
+
+    expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect).toHaveBeenCalledWith('/inventario');
   });
 });

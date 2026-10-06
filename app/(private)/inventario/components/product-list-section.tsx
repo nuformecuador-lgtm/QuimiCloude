@@ -1,9 +1,10 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { identity } from '@/lib/composition';
-import { canAdjustBatchStock } from '@/lib/modules/inventario';
+import { canAdjustBatchStock, PRODUCT_TYPES, type ProductFormUnits } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
+import { FinishedStockListSection } from './finished-stock-list-section';
 import { FIRST_PAGE, productListHref, STOCK_COLUMN_ID, QTY_ALERT_COLUMN_ID, TYPE_COLUMN_ID } from './product-list-params';
 import { ProductListEmpty } from './product-list-empty';
 import { ProductListError } from './product-list-error';
@@ -24,6 +25,8 @@ type ProductListSectionProps = {
    * Aqui no se consulta nada: baja por props.
    */
   readonly units?: readonly UnitRef[];
+  /** Unidades que ofrece el selector «Unidad» del alta del estado vacio. */
+  readonly formUnits?: ProductFormUnits;
 };
 
 /**
@@ -44,7 +47,12 @@ type ProductListSectionProps = {
  * **Una lista vacia NO se pinta como tabla sin filas** (R14, R16): son tres situaciones distintas
  * -fallo, catalogo vacio y pagina que se quedo atras tras un borrado- y cada una dice lo suyo.
  */
-export async function ProductListSection({ params, units }: ProductListSectionProps) {
+export async function ProductListSection({ params, units, formUnits }: ProductListSectionProps) {
+  const typeFilter = params.filters[TYPE_COLUMN_ID];
+  if (typeFilter?.kind === 'select' && typeFilter.values[0] === PRODUCT_TYPES.FINISHED_PRODUCT) {
+    return <FinishedStockListSection params={params} units={units} />;
+  }
+
   const result = await listProductsAction(params);
 
   if (result.status === 'error') {
@@ -77,7 +85,7 @@ export async function ProductListSection({ params, units }: ProductListSectionPr
             : undefined
         }
       >
-        <ProductSheet units={units} />
+        <ProductSheet units={units} formUnits={formUnits} />
       </ProductListEmpty>
     );
   }

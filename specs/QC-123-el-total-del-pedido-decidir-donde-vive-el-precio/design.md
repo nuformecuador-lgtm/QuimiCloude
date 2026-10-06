@@ -333,6 +333,10 @@ por bueno al aprobar el spec (2026-09-18)**: es consecuencia directa de `[D6]`. 
 la unidad *del pedido*: `orders` no recupera ninguna columna de unidad y `NewOrder` sigue sin
 declararla.
 
+> **Nota del 2026-09-26 (QC-170, decisión humana [Q4]).** La frase «lo que NO vuelve es la unidad
+> *del pedido*» queda superada: QC-170 devuelve la unidad al pedido (`orders.unit_id`). El precio
+> unitario sigue fuera. Detalle en `specs/QC-170-pedido-en-varias-presentaciones/design.md > 0.6`.
+
 ---
 
 ## 6. Rutas, contratos de entrada y salida

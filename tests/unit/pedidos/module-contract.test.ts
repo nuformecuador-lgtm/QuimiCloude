@@ -523,10 +523,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // Y el barrel es un camino REAL, no una regla vacia: `order-contents.ts` lo usa hoy
     // (`design.md > 6.3`). Sin esta mitad, R32 pasaria por no existir el sujeto.
     //
-    // QC-35bis (2026-09-07): eran DOS barrels. Al salir la unidad del pedido, `pedidos` dejo de
-    // importar `@/lib/modules/unidades` en cualquiera de sus archivos -lo sigue vigilando el
-    // barrido de rutas profundas de arriba, que cubre los cuatro modulos-, asi que el unico
-    // contrato ajeno que este modulo consume es el de `recetas`.
+    // [Q4] deroga QC-35bis en la unidad: `pedidos` VUELVE a importar `@/lib/modules/unidades`
+    // -por su barrel, nunca por ruta profunda; eso lo sigue vigilando el barrido de arriba-
+    // desde `create-order.ts`, `update-order.ts`, `get-order.ts` y `list-orders.ts`. El unico
+    // archivo que SIGUE sin conocer ninguna unidad es `order-contents.ts`, que se comprueba
+    // aparte porque es el que le da sentido a esta mitad de R32.
     const contents = read(join(pedidosDir, 'domain', 'order-contents.ts'))
     const specsDeContents = importSpecifiers(contents)
     expect(specsDeContents).toContain('@/lib/modules/recetas')
@@ -557,6 +558,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       'CANCELADO',
       'POR_EMPACAR',
       'EN_EMPAQUE',
+      'BLOQUEADO',
     ])
     expect([...ORDER_STATUS_VALUES]).toEqual(enumValues('OrderStatus'))
 

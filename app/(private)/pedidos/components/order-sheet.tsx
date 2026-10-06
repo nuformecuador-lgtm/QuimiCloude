@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
+import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
 import { OrderForm, type OrderSheetSection } from './order-form';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
@@ -76,6 +77,7 @@ export type OrderSheetProps = {
   readonly recipes: RecipePickerPage;
   /** Catalogo de unidades, por props (R43): resuelve la unidad de los ingredientes. */
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
@@ -100,6 +102,7 @@ export function OrderSheet({
   order,
   recipes,
   units,
+  bridge,
   open,
   onOpenChange,
   responsibles = [],
@@ -156,6 +159,7 @@ export function OrderSheet({
         order={order}
         recipes={recipes}
         units={units}
+        bridge={bridge}
         onSaved={handleSaved}
         responsibles={responsibles}
         responsiblesCatalog={responsiblesCatalog}
@@ -170,12 +174,15 @@ export type OrderRowSheetActionsProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /** QC-102 R26 — los responsables de ESTA fila, ya traidos por el lote de la seccion. */
   readonly responsibles?: readonly OrderResponsible[];
   /** QC-102 R27, R28 — catalogos y `canWrite`, compuestos una vez en el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /** La cobertura de ESTA fila, ya traida por el lote de la seccion. */
   readonly coverage?: OrderCoverage;
+  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
+  readonly canEditDistribution?: boolean;
 };
 
 /**
@@ -199,13 +206,23 @@ export function OrderRowSheetActions({
   order,
   recipes,
   units,
+  bridge,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
+  canEditDistribution = false,
 }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [distributionOpen, setDistributionOpen] = useState(false);
+  // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
+  const [savedDistribution, setSavedDistribution] = useState<{
+    readonly order: OrderSummary;
+    readonly draft: OrderDistributionDraft;
+  } | null>(null);
+  const pendingDistribution =
+    savedDistribution?.order === order ? savedDistribution.draft : undefined;
   /**
    * QC-102 R23 — EN QUE SECCION abre el UNICO panel de esta fila. No hay un segundo `OrderSheet`
    * para responsables: editar y responsables abren **el mismo**, y esto es lo que los distingue.
@@ -225,11 +242,14 @@ export function OrderRowSheetActions({
         onCancel={() => setCancelOpen(true)}
         onDelete={() => setDeleteOpen(true)}
         onResponsibles={() => openSection('responsibles')}
+        canEditDistribution={canEditDistribution}
+        onDistribution={() => setDistributionOpen(true)}
       />
       <OrderSheet
         order={order}
         recipes={recipes}
         units={units}
+        bridge={bridge}
         open={editOpen}
         onOpenChange={setEditOpen}
         responsibles={responsibles}
@@ -243,6 +263,16 @@ export function OrderRowSheetActions({
       {deleteOpen ? (
         <DeleteOrderDialog order={order} open onOpenChange={setDeleteOpen} />
       ) : null}
+      {distributionOpen ? (
+        <OrderDistributionDialog
+          order={order}
+          units={units}
+          open
+          onOpenChange={setDistributionOpen}
+          saved={pendingDistribution}
+          onSaved={(draft) => setSavedDistribution({ order, draft })}
+        />
+      ) : null}
     </>
   );
 }
@@ -252,6 +282,7 @@ export type OrderRowResponsiblesProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /** Los responsables de ESTA fila, del lote que la seccion pidio una sola vez (R16, R26). */
   readonly responsibles: readonly OrderResponsible[];
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
@@ -280,6 +311,7 @@ export function OrderRowResponsibles({
   order,
   recipes,
   units,
+  bridge,
   responsibles,
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
@@ -294,6 +326,7 @@ export function OrderRowResponsibles({
           order={order}
           recipes={recipes}
           units={units}
+          bridge={bridge}
           open
           onOpenChange={setOpen}
           responsibles={responsibles}

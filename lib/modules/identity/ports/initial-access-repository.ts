@@ -101,4 +101,32 @@ export interface InitialAccessRepository {
     documentTypeCode: DocumentTypeCode;
     documentNumber: string;
   }): Promise<{ id: string }>;
+  /**
+   * Crea el primer Maestro, sin empresa. Es un metodo aparte y no un `companyId` opcional en
+   * `createInitialAdmin` para que el Administrador no pueda nacer sin empresa por descuido.
+   * Ante un choque de unicidad lanza: nunca devuelve un usuario que ya existia.
+   */
+  createInitialMaestro(input: {
+    roleId: string;
+    accountStatus: UserAccountStatus;
+    username: string;
+    email: string;
+    passwordHash: string;
+    firstNames: string;
+    lastNames: string;
+    birthDate: Date;
+    phone: string;
+    documentTypeCode: DocumentTypeCode;
+    documentNumber: string;
+  }): Promise<{ id: string }>;
+  /**
+   * Cuenta usuarios vivos, con o sin empresa, cuyo nombre de usuario coincide sin distinguir
+   * mayusculas. Es la misma condicion del indice unico global del nombre de usuario.
+   */
+  countLiveUsersWithUsername(username: string): Promise<number>;
+  /**
+   * Cuenta usuarios vivos sin empresa cuyo correo coincide sin distinguir mayusculas. Un
+   * usuario de empresa con ese correo no cuenta.
+   */
+  countLiveUsersWithoutCompanyWithEmail(email: string): Promise<number>;
 }

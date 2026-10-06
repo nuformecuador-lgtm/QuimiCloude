@@ -15,7 +15,8 @@ import { SHOWCASE_LINE_BATCH, SHOWCASE_LINE_SORT } from '@/lib/modules/proveedor
 import type { Actor } from '@/lib/modules/proveedores/domain/actor';
 import type { CatalogLineView } from '@/lib/modules/proveedores/domain/catalog-line-view';
 import type { Page } from '@/lib/modules/proveedores/domain/page';
-import type { ShowcasePage } from '@/lib/modules/proveedores/domain/supplier-showcase';
+import type { ShowcasePageRecord } from '@/lib/modules/proveedores/domain/supplier-showcase';
+import type { CatalogImageUrl } from '@/lib/modules/proveedores/ports/catalog-image-url';
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository';
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 
@@ -25,7 +26,12 @@ const OPERADOR: Actor = { id: 'operador-1', companyId: COMPANY_ID, permissions: 
 const SUPPLIER_ID = '22222222-2222-4222-8222-222222222222';
 const PRESENTATION_ID = '11111111-1111-4111-8111-111111111111';
 
-function paginaDeProveedoresVacia(): ShowcasePage {
+/** Doble mudo: compone una URL reconocible sin tocar ningun almacenamiento de verdad. */
+function imagesMudo(): CatalogImageUrl {
+  return { publicUrl: vi.fn<CatalogImageUrl['publicUrl']>((path) => `https://cdn.test/${path}`) };
+}
+
+function paginaDeProveedoresVacia(): ShowcasePageRecord {
   return { items: [], page: 1, hasMore: false };
 }
 
@@ -41,7 +47,12 @@ function montarShowcase() {
     listAlive: vi.fn<SupplierRepository['listAlive']>(),
     listShowcaseAlive,
   } satisfies SupplierRepository;
-  return { suppliers, listSupplierShowcase: createListSupplierShowcase({ suppliers }) };
+  const images = imagesMudo();
+  return {
+    suppliers,
+    images,
+    listSupplierShowcase: createListSupplierShowcase({ suppliers, images }),
+  };
 }
 
 function paginaDeLineas(
@@ -62,7 +73,8 @@ function montarLineas(resultado: Page<CatalogLineView> | 'supplier_not_found' = 
     softDeleteAlive: vi.fn<SupplierCatalogRepository['softDeleteAlive']>(),
     listBySupplierAlive,
   } satisfies SupplierCatalogRepository;
-  return { catalog, listShowcaseLines: createListShowcaseLines({ catalog }) };
+  const images = imagesMudo();
+  return { catalog, images, listShowcaseLines: createListShowcaseLines({ catalog, images }) };
 }
 
 function lineaDe(id: string, name: string): CatalogLineView {
@@ -197,12 +209,13 @@ describe('listShowcaseLines: la consulta que llega al puerto — pageSize 10, or
 });
 
 describe('R8 — la proyeccion de linea no lleva createdBy ni updatedBy', () => {
-  it('la salida solo trae id, name e imagePath', async () => {
+  it('la salida solo trae id, name e imageUrl', async () => {
     const { listShowcaseLines } = montarLineas(paginaDeLineas([lineaDe('l-1', 'Acido citrico')]));
 
     const pagina = await listShowcaseLines(SUPPLIER_ID, { page: 2 }, ADMIN);
 
-    expect(pagina.items).toEqual([{ id: 'l-1', name: 'Acido citrico', imagePath: null }]);
+    // R16 — sin ruta, `imageUrl` sale `null` y no se compone nada.
+    expect(pagina.items).toEqual([{ id: 'l-1', name: 'Acido citrico', imageUrl: null }]);
     const serializado = JSON.stringify(pagina.items);
     expect(serializado).not.toContain('createdBy');
     expect(serializado).not.toContain('updatedBy');

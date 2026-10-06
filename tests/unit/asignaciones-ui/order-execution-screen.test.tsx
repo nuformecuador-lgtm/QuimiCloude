@@ -3,15 +3,24 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  formatOrderExecutionTitle,
+  ORDER_EXECUTION_LINES_TESTID,
+  ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID,
+  ORDER_EXECUTION_MATERIALS_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TEXTS,
+  ORDER_EXECUTION_FINISH_DIALOG_TESTID,
   ORDER_EXECUTION_ORDER_ID_FIELD,
   ORDER_EXECUTION_ORDER_QUANTITY_TESTID,
   ORDER_EXECUTION_PRESENTATION_TESTID,
-  ORDER_EXECUTION_RECIPE_NAME_TESTID,
+  ORDER_EXECUTION_RECIPE_MISSING_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
+  ORDER_EXECUTION_TITLE_TESTID,
+  ORDER_EXECUTION_TOOLS_TESTID,
   OrderExecutionScreen,
 } from '@/app/(private)/asignacion/[id]/components';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
@@ -62,11 +71,15 @@ const EXECUTION: AssignedOrderExecutionView = {
       productName: 'Resina acrílica',
       percentage: '10.00',
       quantity: '10',
+      need: 'unconverted',
       unit: LITRO,
       alternativeUnits: [MILILITRO],
     },
   ],
-  presentationName: 'Caja x 12',
+  tools: [],
+  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  unitId: null,
+  unitLabel: null,
 };
 
 function marcarTodo(): void {
@@ -97,7 +110,7 @@ describe('pantalla de ejecucion — sin factor de escala, con la cantidad de la 
 
     expect(screen.getByText(new RegExp(EXECUTION.orderQuantity))).toBeVisible();
     expect(screen.getByTestId('order-execution-line-quantity-0')).toHaveTextContent(
-      EXECUTION.lines[0]!.quantity,
+      EXECUTION.lines[0]!.quantity ?? '',
     );
   });
 });
@@ -134,6 +147,23 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
     const cantidadPedido = screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID);
     expect(cantidadPedido.textContent).toBe('Pedido 0.13');
     expect(cantidadPedido).toHaveAttribute('title', '0.1255');
+  });
+
+  it('QC-170 R42: la cantidad del pedido lleva su unidad; sin unidad va la cifra sola', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{ ...EXECUTION, orderQuantity: '200.0000', unitId: 'unit-l', unitLabel: 'L' }}
+      />,
+    );
+    expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID).textContent).toBe(
+      'Pedido 200 L',
+    );
+    cleanup();
+
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+    expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID).textContent).toBe(
+      'Pedido 200',
+    );
   });
 
   it('QC-132 R4: sin title cuando el valor pintado coincide con el exacto', () => {
@@ -210,8 +240,58 @@ describe('pantalla de ejecucion — el error de la operacion se muestra sin bloq
     }
 
     fireEvent.click(screen.getByTestId('step-reader-finish'));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
 
     expect(await screen.findByTestId('order-execution-finish-error')).toBeVisible();
+  });
+});
+
+describe('pantalla de ejecucion — Finalizar pide confirmar antes de terminar el pedido', () => {
+  async function pulsarFinalizar(): Promise<void> {
+    vi.useFakeTimers();
+    try {
+      render(<OrderExecutionScreen execution={EXECUTION_SIN_ELEMENTOS} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    fireEvent.click(screen.getByTestId('step-reader-finish'));
+  }
+
+  it('pulsar Finalizar abre la confirmacion y todavia no invoca la operacion', async () => {
+    await pulsarFinalizar();
+
+    const dialog = screen.getByTestId(ORDER_EXECUTION_FINISH_DIALOG_TESTID);
+    expect(dialog).toHaveTextContent(ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.title);
+    expect(dialog).toHaveTextContent(ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.description);
+    expect(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID)).toHaveTextContent(
+      ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.confirm,
+    );
+    expect(finishAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('cancelar no invoca la operacion', async () => {
+    await pulsarFinalizar();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.cancel }),
+    );
+    await act(async () => {});
+
+    expect(finishAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('confirmar envia el formulario e invoca la operacion una vez', async () => {
+    finishAssignedOrderActionMock.mockResolvedValue({ status: 'success' });
+    await pulsarFinalizar();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
+    });
+
+    expect(finishAssignedOrderActionMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -252,6 +332,10 @@ describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar 
         fireEvent.click(screen.getByTestId('step-reader-finish'));
         await vi.advanceTimersByTimeAsync(0);
       });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
+        await vi.advanceTimersByTimeAsync(0);
+      });
 
       expect(finishAssignedOrderActionMock).toHaveBeenCalledTimes(1);
       const [, formData] = finishAssignedOrderActionMock.mock.calls[0] as [unknown, FormData];
@@ -285,6 +369,7 @@ describe('pantalla de ejecucion — QC-150 R18, R19: los errores nuevos del Fina
     }
 
     fireEvent.click(screen.getByTestId('step-reader-finish'));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
 
     return screen.findByTestId('order-execution-finish-error');
   }
@@ -313,16 +398,34 @@ describe('pantalla de ejecucion — QC-150 R18, R19: los errores nuevos del Fina
 });
 
 describe('pantalla de ejecucion — R25: muestra la presentación o Sin presentación', () => {
-  it('con presentationName pinta el nombre en su propia linea', () => {
+  it('QC-170 R26: pinta la primera linea del reparto en su propia linea', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
     const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
     expect(linea).toHaveTextContent('Presentación:');
-    expect(linea).toHaveTextContent('Caja x 12');
+    expect(linea).toHaveTextContent('5 × Caja x 12');
   });
 
-  it('con presentationName null pinta «Sin presentación»', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, presentationName: null }} />);
+  it('QC-170 R26: con varias lineas pinta la primera y «+N»', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{
+          ...EXECUTION,
+          presentationLines: [
+            { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
+            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
+      'Presentación: 5 × Botella 200 ml +1',
+    );
+  });
+
+  it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, presentationLines: [] }} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID)).toHaveTextContent(
       'Sin presentación',
@@ -344,9 +447,73 @@ describe('pantalla de ejecucion — R20: ningun control de edicion', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
-    expect(screen.getByTestId(ORDER_EXECUTION_RECIPE_NAME_TESTID)).toHaveTextContent(
+    expect(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID)).toHaveTextContent(
       EXECUTION.recipeName as string,
     );
+  });
+});
+
+describe('pantalla de ejecucion — el titulo es «# Pedido - nombre de la receta»', () => {
+  it('formatOrderExecutionTitle une numero y receta con un guion', () => {
+    expect(formatOrderExecutionTitle('PED-0007', 'Barniz acrílico')).toBe('PED-0007 - Barniz acrílico');
+  });
+
+  it('formatOrderExecutionTitle sin receta deja solo el numero', () => {
+    expect(formatOrderExecutionTitle('PED-0007', null)).toBe('PED-0007');
+  });
+
+  it('con receta pinta el titulo combinado y no repite el nombre ni el aviso de baja', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PED-0007 - Barniz acrílico');
+    expect(screen.queryByText('Barniz acrílico')).toBeNull();
+    expect(screen.queryByTestId(ORDER_EXECUTION_RECIPE_MISSING_TESTID)).toBeNull();
+  });
+
+  it('con la receta dada de baja el titulo queda solo con el numero y el aviso se conserva', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, recipeName: null }} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID).textContent).toBe('PED-0007');
+    expect(screen.getByTestId(ORDER_EXECUTION_RECIPE_MISSING_TESTID)).toHaveTextContent(
+      'Esta receta esta dada de baja.',
+    );
+  });
+});
+
+describe('pantalla de ejecucion — materiales y herramientas en su propio contenedor', () => {
+  it('las lineas y las herramientas viven dentro del contenedor, separadas del lector de pasos', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
+      />,
+    );
+
+    const contenedor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_TESTID);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_LINES_TESTID))).toBe(true);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID))).toBe(true);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID))).toBe(false);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID))).toBe(false);
+  });
+
+  it('con herramientas, un divisor separa los materiales de las herramientas', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
+      />,
+    );
+
+    const divisor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID);
+    const lineas = screen.getByTestId(ORDER_EXECUTION_LINES_TESTID);
+    const herramientas = screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID);
+    expect(lineas.compareDocumentPosition(divisor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(divisor.compareDocumentPosition(herramientas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('sin herramientas no pinta el divisor', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, tools: [] }} />);
+
+    expect(screen.queryByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID)).toBeNull();
   });
 });
 
@@ -445,5 +612,36 @@ describe('R18 — el asistente heredado solo puede cambiar step-reader.tsx (list
       fueraDeLaLista,
       `esta rama modifico un archivo del asistente fuera de la lista cerrada: ${fueraDeLaLista.join(', ')}`,
     ).toEqual([]);
+  });
+});
+
+describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
+  it('R44: una linea con envase pinta el nombre del envase, no el de la presentacion', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{
+          ...EXECUTION,
+          presentationLines: [
+            { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: 'Caja cartón 12 u', packages: 5 },
+            { presentationId: 'pres-2', presentationName: 'Bidón 20L', packagingName: null, packages: 1 },
+          ],
+        }}
+      />,
+    );
+
+    const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
+    expect(linea.textContent).toBe('Presentación: 5 × Caja cartón 12 u +1');
+    expect(within(linea).getByTestId('order-distribution')).toHaveAttribute(
+      'title',
+      '5 × Caja cartón 12 u, 1 × Bidón 20L',
+    );
+  });
+
+  it('R44: una linea antigua (`packagingName` null) pinta el nombre de su presentacion', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
+      'Presentación: 5 × Caja x 12',
+    );
   });
 });

@@ -59,6 +59,7 @@ export { type NewSupplier, type SupplierView } from './domain/supplier-view';
 // borro del modulo porque su caso no puede ocurrir (R32).
 export {
   type CatalogLineFields,
+  type CatalogLineListItem,
   type CatalogLineView,
   type NewCatalogLine,
 } from './domain/catalog-line-view';
@@ -104,4 +105,10 @@ export {
   type ShowcaseRow,
   type ShowcasePage,
   type ShowcaseLinesPage,
+  type ShowcaseLineRecord,
+  type ShowcaseRowRecord,
+  type ShowcasePageRecord,
 } from './domain/supplier-showcase';
+// `toImageUrl` es la UNICA regla de «ruta sin imagen» del modulo; `CatalogImageUrl` es el
+// puerto que la composicion ata a quien sabe componer la URL publica del recorte.
+export { toImageUrl, type CatalogImageUrl } from './domain/catalog-image-url';

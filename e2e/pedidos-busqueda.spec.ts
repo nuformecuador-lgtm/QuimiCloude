@@ -23,6 +23,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { DASHBOARD_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 
 const FIXTURE_PREFIX = 'qc122_e2e_';
 
@@ -328,7 +329,9 @@ test.describe('busqueda en la pantalla de pedidos', () => {
         });
 
     // --- El panel lateral: abrir y cerrar no navega ni pierde el termino ni la pagina.
-    await rowWithFirstNumber(secondPageNumbers).getByTestId(EDIT_ACTION).click();
+    await (
+      await openOrderRowMenu(page, rowMenuTrigger(rowWithFirstNumber(secondPageNumbers)), EDIT_ACTION)
+    ).click();
     await expect(page.getByTestId(ORDER_FORM)).toBeVisible({ timeout: 60_000 });
     expect(new URL(page.url()).searchParams.get('page')).toBe('2');
     expect(new URL(page.url()).searchParams.get('q')).toBe(SEARCH_TERM_C);

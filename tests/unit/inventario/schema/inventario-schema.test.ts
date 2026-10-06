@@ -235,7 +235,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
   // El censo paso de tres modelos a cuatro con `InventoryMovement` y de cuatro a cinco con
   // `ReservationMovement`, el libro de lo apartado por pedido.
-  it('el esquema declara exactamente cinco modelos del modulo inventario', () => {
+  // 2026-10-06 (QC-209): de cinco a seis con `InventoryImport`, el registro de cada importacion.
+  it('el esquema declara exactamente seis modelos del modulo inventario', () => {
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -248,13 +249,14 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .map(([, , modelName]) => modelName)
       .sort()
     expect(inventarioModels).toEqual([
+      'InventoryImport',
       'InventoryMovement',
       'Presentation',
       'Product',
       'ProductBatch',
       'ReservationMovement',
     ])
-    expect(inventarioModels).toHaveLength(5)
+    expect(inventarioModels).toHaveLength(6)
 
     for (const owned of ['DocumentType', 'Role', 'User']) {
       expect(modelNames, `el modelo ${owned} no debe desaparecer`).toContain(owned)
@@ -561,7 +563,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('products.name no tiene @unique ni @@unique', () => {
     // Dos productos pueden llamarse igual: se aparta a proposito del precedente de `users`.
     expect(field(product, 'name').attributes).not.toMatch(/@unique/)
-    expect(product.body).not.toMatch(/@@unique\(/)
+    // `@@unique([companyId, id])` es la clave candidata de la FK del envase del reparto: no toca el nombre.
+    expect(product.body).not.toMatch(/@@unique\(\[[^\]]*\bname/i)
     expect(product.body).not.toMatch(/@@index\([^)]*name/)
   })
 
@@ -650,7 +653,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
   // Un modelo sin `/// @module` es un hallazgo de la guardia de arquitectura, asi que cada uno
   // se cita por nombre.
-  it('los cinco modelos declaran /// @module inventario', () => {
+  it('los seis modelos declaran /// @module inventario', () => {
     // Texto crudo: `stripComments` se lleva justo lo que aqui hay que comprobar.
     const owners = new Map<string, string>()
     for (const match of rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)) {
@@ -663,12 +666,14 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(owners.get('ProductBatch')).toBe('inventario')
     expect(owners.get('InventoryMovement')).toBe('inventario')
     expect(owners.get('ReservationMovement')).toBe('inventario')
+    expect(owners.get('InventoryImport')).toBe('inventario')
 
     const inventarioModels = [...owners.entries()]
       .filter(([, moduleName]) => moduleName === 'inventario')
       .map(([modelName]) => modelName)
       .sort()
     expect(inventarioModels).toEqual([
+      'InventoryImport',
       'InventoryMovement',
       'Presentation',
       'Product',
@@ -728,11 +733,17 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // 2026-09-18 (QC-92): entran las tres que publica esta ficha -`createAdjustBatchStock` (R1),
     // `createListProductBatches` (R22) y `createListBatchMovements` (R23)-, y el barrel pasa de
     // nueve a doce. Sigue siendo igualdad exacta: una factoria de mas o de menos lo pone rojo.
+    // 2026-10-04 (producto terminado por pedido): entran `createListFinishedStock` y
+    // `createListOrderBatches`, y el barrel pasa de trece a quince.
+    // QC-199: entra `createListProductFormUnits` (unidades del alta de insumo) y pasa a dieciseis.
+    // 2026-10-06 (QC-209): entran `createPreviewInventoryImport` y `createConfirmInventoryImport`
+    // (importar inventario desde Excel), y el barrel pasa de dieciseis a dieciocho.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
     ).toEqual([
       'createAdjustBatchStock',
+      'createConfirmInventoryImport',
       'createCreatePresentation',
       'createCreateProduct',
       'createCreateRawMaterial',
@@ -740,9 +751,13 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createDeleteProduct',
       'createGetProduct',
       'createListBatchMovements',
+      'createListFinishedStock',
+      'createListOrderBatches',
       'createListPresentations',
       'createListProductBatches',
+      'createListProductFormUnits',
       'createListProducts',
+      'createPreviewInventoryImport',
       'createUpdatePresentation',
       'createUpdateProduct',
     ])

@@ -224,6 +224,35 @@ describe('createPreviewFormulaImport', () => {
       });
     });
 
+    it('QC-195 R41 — un envase como UNICO homonimo: match "none", nunca se propone', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        productNames: dobleDeNombresDeProducto(bitacora, [
+          { id: PRODUCTO_AGUA, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PACKAGING, unitId: null },
+        ]) as unknown as FormulaImportDeps['productNames'],
+      });
+      const preview = createPreviewFormulaImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+      expect(resultado.ingredients[0]?.match).toEqual({ kind: 'none' });
+    });
+
+    it('QC-195 R41 — un envase y una materia prima homonimos: se propone solo la materia prima', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        productNames: dobleDeNombresDeProducto(bitacora, [
+          { id: PRODUCTO_AGUA, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PRODUCT, unitId: null },
+          { id: PRODUCTO_AGUA_2, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PACKAGING, unitId: null },
+        ]) as unknown as FormulaImportDeps['productNames'],
+      });
+      const preview = createPreviewFormulaImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+      expect(resultado.ingredients[0]?.match).toEqual({ kind: 'one', productId: PRODUCTO_AGUA, productName: 'Agua', unitId: null });
+    });
+
     it('un terminado como UNICO homonimo: match "none", nunca "one"', async () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora, {
@@ -282,5 +311,59 @@ describe('createPreviewFormulaImport', () => {
 
       expect(resultado.nameClash).toBeNull();
     });
+  });
+
+  describe('R37 — el choque solo cuenta originales vivas', () => {
+    // El catalogo solo devuelve originales; que una version con ese nombre no vuelva lo prueba
+    // tests/integration/documentos/formula-import-versions.int.test.ts contra Postgres.
+    it('R37: un nombre que solo coincide con una version no vuelve del catalogo y no marca choque', async () => {
+      const bitacora: Bitacora = [];
+      const recipes = dobleDeRecetas(bitacora, null);
+      const deps = crearDeps(bitacora, { recipes: recipes as unknown as FormulaImportDeps['recipes'] });
+      const preview = createPreviewFormulaImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO, name: 'Sin perfume' });
+
+      expect(recipes.findAliveByNormalizedName).toHaveBeenCalledWith('Sin perfume', EMPRESA);
+      expect(recipes.findRefsIncludingDeleted).not.toHaveBeenCalled();
+      expect(recipes.findIdsMatchingName).not.toHaveBeenCalled();
+      expect(resultado.nameClash).toBeNull();
+    });
+  });
+});
+
+describe('QC-211 — la vista previa trae los pasos de envasado', () => {
+  it('R14: los pasos de envasado leidos viajan en `packingSteps`, en orden y separados de `steps`', async () => {
+    const bitacora: Bitacora = [];
+    const archivo: FileForReview = {
+      status: 'done',
+      strategy: 'formula',
+      extractedText: JSON.stringify({
+        name: 'Detergente X',
+        ingredients: [],
+        steps: ['Mezclar'],
+        packingSteps: ['Envasar', 'Etiquetar'],
+      }),
+    };
+    const deps = crearDeps(bitacora, { repository: dobleDeRepositorio(bitacora, archivo) });
+    const preview = createPreviewFormulaImport(deps);
+
+    const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+    expect(resultado.steps).toEqual([{ blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] }]);
+    expect(resultado.packingSteps).toEqual([
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Envasar' }] }] },
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Etiquetar' }] }] },
+    ]);
+  });
+
+  it('R15: un texto sin `packingSteps` da `packingSteps: []`', async () => {
+    const bitacora: Bitacora = [];
+    const preview = createPreviewFormulaImport(crearDeps(bitacora));
+
+    const resultado = await preview(actorConPermiso(), { documentFileId: ARCHIVO });
+
+    expect(resultado.packingSteps).toEqual([]);
+    expect(resultado.steps).toHaveLength(1);
   });
 });

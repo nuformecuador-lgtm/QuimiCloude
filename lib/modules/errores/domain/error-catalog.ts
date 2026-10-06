@@ -46,6 +46,8 @@ export const ERROR_MESSAGE_KEY = {
   work_group_member_exists_inactive: 'errors.work_group_member_exists_inactive',
   work_group_member_exists_blocked: 'errors.work_group_member_exists_blocked',
   work_group_member_not_found: 'errors.work_group_member_not_found',
+  work_group_member_not_active: 'errors.work_group_member_not_active',
+  work_group_member_self: 'errors.work_group_member_self',
   order_delivered_frozen: 'errors.order_delivered_frozen',
   order_cancelled_not_assignable: 'errors.order_cancelled_not_assignable',
   order_assignment_not_found: 'errors.order_assignment_not_found',
@@ -65,6 +67,14 @@ export const ERROR_MESSAGE_KEY = {
   order_packing_taken: 'errors.order_packing_taken',
   order_not_packable: 'errors.order_not_packable',
   order_produced_frozen: 'errors.order_produced_frozen',
+  order_would_block: 'errors.order_would_block',
+  order_blocked: 'errors.order_blocked',
+  order_without_distribution: 'errors.order_without_distribution',
+  order_presentation_line_not_editable: 'errors.order_presentation_line_not_editable',
+  order_distribution_exceeds_quantity: 'errors.order_distribution_exceeds_quantity',
+  order_without_unit: 'errors.order_without_unit',
+  recipe_version_under_review: 'errors.recipe_version_under_review',
+  order_unit_not_convertible: 'errors.order_unit_not_convertible',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -104,7 +114,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.incompatible_units': 'Las dos unidades no comparten unidad base: no son convertibles.',
   'errors.user_not_found': 'El usuario solicitado no existe.',
   'errors.duplicate_email': 'Ya existe un usuario con ese correo en la empresa.',
-  'errors.duplicate_username': 'Ya existe un usuario con ese nombre de usuario en la empresa.',
+  'errors.duplicate_username': 'Ya existe un usuario con ese nombre de usuario.',
   'errors.duplicate_document': 'Ya existe un usuario con ese documento en la empresa.',
   'errors.role_not_found': 'El rol indicado no existe.',
   'errors.self_operation': 'No puedes realizar esta operacion sobre tu propia cuenta.',
@@ -128,6 +138,10 @@ export const ERROR_MESSAGES_ES = {
   'errors.work_group_member_exists_blocked':
     'Esa persona ya pertenece al grupo; no aparece en la lista porque su cuenta esta bloqueada.',
   'errors.work_group_member_not_found': 'Esa persona no pertenece al grupo.',
+  // Uno solo para pendiente, inactiva y bloqueada: el catalogo no interpola y la accion es la misma.
+  'errors.work_group_member_not_active':
+    'Solo se puede meter en un grupo a una persona con la cuenta activa.',
+  'errors.work_group_member_self': 'No puedes meterte a ti mismo en un grupo de trabajo.',
   // No dicen «no tienes permiso» ni «no existe»: el pedido existe y hay permiso, lo que impide mover
   // responsables es su estado.
   'errors.order_delivered_frozen': 'Un pedido entregado conserva sus responsables tal como estaban.',
@@ -161,4 +175,19 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
   'errors.order_produced_frozen':
     'Un pedido ya producido conserva sus responsables tal como estaban.',
+  'errors.order_would_block':
+    'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
+  'errors.order_blocked': 'Falta material: el pedido esta bloqueado y no se puede iniciar.',
+  'errors.order_without_distribution':
+    'El pedido no tiene ningun reparto: anade al menos una presentacion antes de comenzar el empaque.',
+  'errors.order_presentation_line_not_editable':
+    'El reparto de este pedido ya no se puede cambiar: el empaque ya comenzo o el pedido esta cerrado.',
+  'errors.order_distribution_exceeds_quantity':
+    'El reparto pasa de la cantidad del pedido: quita envases o elige presentaciones mas pequenas.',
+  'errors.order_without_unit':
+    'El pedido no tiene unidad: asignale una desde la edicion del pedido antes de repartirlo.',
+  'errors.recipe_version_under_review':
+    'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
+  'errors.order_unit_not_convertible':
+    'La unidad del pedido no se puede convertir a la de algún insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
 } as const satisfies Record<ErrorMessageKey, string>;

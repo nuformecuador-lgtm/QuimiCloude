@@ -823,8 +823,14 @@ describe('QC-50 — lo que ya estaba escrito y esta migracion no toca', () => {
   it('el CHECK de recipe_lines y las FK previas de recipes/recipe_lines siguen escritos donde estaban', () => {
     // El recuento se CALCULA recorriendo todas las migraciones anteriores, no se escribe a
     // mano: una lista literal envejeceria en silencio cada vez que otra ficha tocara alguna.
+    // El recorrido incluye tambien las migraciones POSTERIORES: de ahi las dos de versiones.
     expect([...restriccionesPreviasDeRecipes.keys()].sort()).toEqual(
-      ['recipes_created_by_fkey', 'recipes_updated_by_fkey'].sort(),
+      [
+        'recipes_created_by_fkey',
+        'recipes_parent_not_self',
+        'recipes_parent_recipe_id_fkey',
+        'recipes_updated_by_fkey',
+      ].sort(),
     )
     const checksDeLineas = [...restriccionesPreviasDeRecipeLines.entries()]
       .filter(([, statement]) => /\bCHECK\s*\(/i.test(statement))

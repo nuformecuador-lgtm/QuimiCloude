@@ -861,6 +861,8 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
         // pasar: la integridad referencial la sigue dando Postgres, no el cliente.
         { conname: 'recipes_company_id_fkey', referencia: 'companies' },
         { conname: 'recipes_created_by_fkey', referencia: 'users' },
+        // Intra-modulo (version -> original): esta si lleva `@relation`.
+        { conname: 'recipes_parent_recipe_id_fkey', referencia: 'recipes' },
         { conname: 'recipes_updated_by_fkey', referencia: 'users' },
       ])
     })

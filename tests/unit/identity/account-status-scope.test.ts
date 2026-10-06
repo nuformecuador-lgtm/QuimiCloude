@@ -314,6 +314,10 @@ const SITIOS_PERMITIDOS = [
   //     para que el dominio pueda traducirlos. No los interpreta -no hay ni un `if` sobre el valor-
   //     y no los escribe nunca: el estado de cuenta lo mueve QC-66 y el bloqueo QC-78.
   'lib/modules/identity/adapters/driven/persistence/work-group-prisma.ts',
+  // Fix 2026-10-05 (grupos solo con miembros activos): el buscador de candidatos trae el estado
+  // CRUDO y el plazo, igual que `work-group-prisma.ts`, para que el dominio los traduzca con
+  // `effectiveAccountStatus`. No los interpreta ni los escribe.
+  'lib/modules/identity/adapters/driven/persistence/work-group-candidates-prisma.ts',
   'lib/modules/identity/domain/add-work-group-member.ts',
   'lib/modules/identity/domain/errors.ts',
   'lib/modules/identity/domain/list-work-group-members.ts',

@@ -85,12 +85,15 @@ function filaBase(id: string, overrides: Partial<RecipeRow> = {}): RecipeRow {
     name: 'Desengrasante 5%',
     description: null,
     steps: [],
+    packingSteps: [],
     imagePath: null,
     createdBy: 'actor-0',
     updatedBy: 'actor-0',
     createdAt: AHORA,
     updatedAt: AHORA,
     lines: [],
+    tools: [],
+    original: null,
     ...overrides,
   };
 }
@@ -124,12 +127,15 @@ function almacen() {
         name: data.name,
         description: data.description,
         steps: data.steps,
+        packingSteps: [],
         imagePath: data.imagePath,
         createdBy: actorId,
         updatedBy: actorId,
         createdAt: now,
         updatedAt: now,
         lines: data.lines.map((line, index) => ({ id: `linea-${contador}-${index}`, ...line })),
+        tools: [],
+        original: null,
       };
       filas.set(id, { row, companyId: scope.companyId, deleted: false });
       altas.push({ companyId: scope.companyId });

@@ -10,7 +10,7 @@ import {
   PRIVATE_NAV_ITEMS,
   type NavGroup,
 } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
 import {
@@ -215,7 +215,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     const control = screen.getByTestId(testId.toggle);
     expect(screen.getByTestId(testId.brandLong)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.brandShort)).toBeNull();
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', DASHBOARD_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
 
     await alternarBarra(user, 'collapsed');
 
@@ -223,7 +223,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     expect(control).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByTestId(testId.brandShort)).toHaveTextContent(BRAND_SHORT_LABEL);
     expect(screen.queryByTestId(testId.brandLong)).toBeNull();
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', DASHBOARD_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
 
     await alternarBarra(user, 'expanded');
 
@@ -231,7 +231,7 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     expect(control).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId(testId.brandLong)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.brandShort)).toBeNull();
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', DASHBOARD_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
   });
 
   it('en modo icono cada entrada conserva su nombre accesible', async () => {

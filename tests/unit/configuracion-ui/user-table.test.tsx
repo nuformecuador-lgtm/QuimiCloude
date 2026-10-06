@@ -447,7 +447,7 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
     expect(screen.queryByTestId(USER_SHEET_TESTID)).toBeNull();
     expect(screen.queryByTestId(DELETE_USER_DIALOG_TESTID)).toBeNull();
     expect(screen.queryByTestId(USER_STATUS_DIALOG_TESTID)).toBeNull();
-    // Y tres disparadores por fila, uno por accion (R6, mitad cliente).
+    // Y UN disparador por fila, que abre el menu con las tres acciones (R6, mitad cliente).
     expect(screen.getAllByTestId(USER_ROW_ACTIONS_TESTID)).toHaveLength(USUARIOS.length);
   });
 
@@ -461,12 +461,16 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
   });
 
   it('la accion de editar de una fila abre el panel SOBRE ESE usuario (R26)', async () => {
+    // El item vive en el menu "de los 3 puntos": se abre el disparador DE ESA fila y el item se
+    // busca en el documento -el popup se porta fuera del `<tr>` (`DropdownMenuContent` usa un
+    // `Portal`), por eso no se busca dentro de `fila`.
     const user = setupUser();
     montar();
     const objetivo = USUARIOS[1]!;
 
     const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
-    await user.click(within(fila).getByTestId(USER_ACTION_EDIT_TESTID));
+    await user.click(within(fila).getByTestId(USER_ROW_ACTIONS_TESTID));
+    await user.click(await esperarInteractiva(await screen.findByTestId(USER_ACTION_EDIT_TESTID)));
 
     expect(await screen.findByTestId(USER_SHEET_TESTID)).toBeInTheDocument();
     await waitFor(() => expect(getUserActionMock).toHaveBeenCalledWith(objetivo.id));
@@ -480,7 +484,10 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
     const objetivo = USUARIOS[1]!;
 
     const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
-    await user.click(within(fila).getByTestId(USER_ACTION_DELETE_TESTID));
+    await user.click(within(fila).getByTestId(USER_ROW_ACTIONS_TESTID));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId(USER_ACTION_DELETE_TESTID)),
+    );
 
     const dialogo = await screen.findByTestId(DELETE_USER_DIALOG_TESTID);
     expect(within(dialogo).getByTestId(DELETE_USER_ID_TESTID)).toHaveValue(objetivo.id);
@@ -494,7 +501,10 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
     const objetivo = USUARIOS[1]!;
 
     const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
-    await user.click(within(fila).getByTestId(USER_ACTION_STATUS_TESTID));
+    await user.click(within(fila).getByTestId(USER_ROW_ACTIONS_TESTID));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId(USER_ACTION_STATUS_TESTID)),
+    );
 
     const dialogo = await screen.findByTestId(USER_STATUS_DIALOG_TESTID);
     expect(within(dialogo).getByTestId(USER_STATUS_ID_TESTID)).toHaveValue(objetivo.id);

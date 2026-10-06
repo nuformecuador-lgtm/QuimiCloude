@@ -17,8 +17,10 @@ import type {
   FinishedGoodsIntake,
   FinishedGoodsOutcome,
   MaterialReservations,
+  ProductRef,
   ReservationOutcome,
 } from '@/lib/modules/inventario';
+import type { MassVolumeBridge, UnitRef } from '@/lib/modules/unidades';
 
 /** Un `OrderWriteRepository` que explota si se le llama un metodo que el test no espera: el
  *  patron de `explota()` que ya usan `create-order.test.ts` y compania, aplicado al puerto de
@@ -38,6 +40,9 @@ export function fakeOrderWriteRepository(
     softDeleteAlive: vi.fn(explota('softDeleteAlive')),
     setStatus: vi.fn(explota('setStatus')),
     setReservedAt: vi.fn(explota('setReservedAt')),
+    setIngredientsCost: vi.fn(explota('setIngredientsCost')),
+    finishPackingAlive: vi.fn(explota('finishPackingAlive')),
+    findPresentationLinesForFinish: vi.fn(explota('findPresentationLinesForFinish')),
     ...overrides,
   } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
 }
@@ -105,13 +110,35 @@ export function fakeRecipeExecutionReader(
   } as OrderTransactionScope['recipes'] & Record<'findExecutionContentById', ReturnType<typeof vi.fn>>;
 }
 
-/** Combina los tres puertos del `scope` y la unidad de trabajo que los expone, lista para
+/** Productos del `scope`: por defecto ninguno resuelve, asi que cada linea de receta se trata
+ *  como un insumo sin unidad y su necesidad no se convierte. */
+export function fakeScopeProducts(
+  refs: readonly ProductRef[] = [],
+): OrderTransactionScope['products'] & Record<'findRefs', ReturnType<typeof vi.fn>> {
+  const findRefs = vi.fn(async (ids: readonly string[]) => refs.filter((ref) => ids.includes(ref.id)));
+  return { findRefs } as OrderTransactionScope['products'] & Record<'findRefs', ReturnType<typeof vi.fn>>;
+}
+
+/** Unidades del `scope`: por defecto un catalogo vacio y sin puente masa-volumen. */
+export function fakeScopeUnits(
+  refs: readonly UnitRef[] = [],
+  bridge: MassVolumeBridge | null = null,
+): OrderTransactionScope['units'] & Record<'findRefs' | 'findMassVolumeBridge', ReturnType<typeof vi.fn>> {
+  const findRefs = vi.fn(async (ids: readonly string[]) => refs.filter((ref) => ids.includes(ref.id)));
+  const findMassVolumeBridge = vi.fn(async () => bridge);
+  return { findRefs, findMassVolumeBridge } as OrderTransactionScope['units'] &
+    Record<'findRefs' | 'findMassVolumeBridge', ReturnType<typeof vi.fn>>;
+}
+
+/** Combina los puertos del `scope` y la unidad de trabajo que los expone, lista para
  *  inyectar en `CreateOrderDeps.unitOfWork`, etc. */
 export function fakeUnitOfWork(overrides: {
   readonly orders?: Partial<OrderWriteRepository>;
   readonly reservations?: Partial<MaterialReservations>;
   readonly recipes?: Partial<OrderTransactionScope['recipes']>;
   readonly finishedGoods?: Partial<FinishedGoodsIntake>;
+  readonly products?: OrderTransactionScope['products'];
+  readonly units?: OrderTransactionScope['units'];
 } = {}): {
   readonly unitOfWork: OrderUnitOfWork;
   readonly orders: OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
@@ -119,17 +146,23 @@ export function fakeUnitOfWork(overrides: {
     Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
   readonly recipes: OrderTransactionScope['recipes'] & Record<'findExecutionContentById', ReturnType<typeof vi.fn>>;
   readonly finishedGoods: FinishedGoodsIntake & Record<keyof FinishedGoodsIntake, ReturnType<typeof vi.fn>>;
+  readonly products: OrderTransactionScope['products'];
+  readonly units: OrderTransactionScope['units'];
 } {
   const orders = fakeOrderWriteRepository(overrides.orders);
   const reservations = fakeMaterialReservations(overrides.reservations);
   const recipes = fakeRecipeExecutionReader(overrides.recipes);
   const finishedGoods = fakeFinishedGoodsIntake(overrides.finishedGoods);
+  const products = overrides.products ?? fakeScopeProducts();
+  const units = overrides.units ?? fakeScopeUnits();
   return {
-    unitOfWork: fakeOrderUnitOfWork({ orders, reservations, recipes, finishedGoods }),
+    unitOfWork: fakeOrderUnitOfWork({ orders, reservations, recipes, finishedGoods, products, units }),
     orders,
     reservations,
     recipes,
     finishedGoods,
+    products,
+    units,
   };
 }
 
@@ -151,9 +184,10 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: '66666666-6666-4666-8666-666666666666',
-    presentationContent: '1.0000',
+    presentationLines: [],
+    unitId: null,
     reservedAt: new Date('2026-01-02T03:04:05.000Z'),
+    packagingCost: null,
     ...overrides,
   };
 }

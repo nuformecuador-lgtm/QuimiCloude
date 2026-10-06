@@ -32,6 +32,7 @@ export async function writeMovement(
       quantity: movement.quantity,
       reason: movement.reason,
       orderId: movement.orderId,
+      orderPresentationLineId: movement.orderPresentationLineId,
       createdBy: movement.createdBy,
       ...companyScopeColumns(scope),
       createdAt: now,

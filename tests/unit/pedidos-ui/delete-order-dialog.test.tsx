@@ -74,6 +74,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: formatOrderNumber(NUMERO),
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: 'Esmalte azul',
+    recipeVersion: null,
     quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
@@ -83,8 +84,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: null,
-    presentationName: null,
+    presentationLines: [],
+    unitId: null,
+    unitLabel: null,
     ...overrides,
   };
 }

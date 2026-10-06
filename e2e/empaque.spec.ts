@@ -26,6 +26,7 @@ import type { Prisma } from '@prisma/client';
 import {
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
+  normalizeWorkGroupName,
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_OPERADOR,
@@ -45,6 +46,14 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
+import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { batchStock, seedPackaging } from './helpers/packaging';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc168_e2e_';
@@ -62,11 +71,20 @@ const COMPANY_NAME = `${SHARED_TOKEN}_empresa`;
 
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 
+/** El equipo vinculado al pedido: trae al Operario y al Empacador, pero al asignar solo se
+ *  escribe la fila del Operario —el Empacador «se une despues» y su fila la crea el Finalizar. */
+const WORK_GROUP_NAME = `${SHARED_TOKEN}_turno`;
+
 /** El único ingrediente de la receta del fixture: Finalizar lo consume al dejar el pedido por
  *  empacar. */
 const PRODUCT_NAME = `${SHARED_TOKEN}_producto`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
 const BATCH_LOT = `${SHARED_TOKEN}_lote`;
+/** El envase de la linea del reparto: Terminar lo consume. */
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_lote_envase`;
+const PACKAGING_STOCK = '10';
+const PACKAGING_UNIT_COST = '0.5000';
 
 /** Muy por encima de `ORDER_QUANTITY`: el consumo debe alcanzar sin agotar el lote. */
 const BATCH_STOCK = '100.0000';
@@ -156,7 +174,6 @@ const DATA_TABLE_TESTID = 'data-table';
 const DATA_TABLE_NEXT_TESTID = 'data-table-next';
 const ORDER_STATUS_TESTID = 'order-status';
 const ORDER_ACTION_CANCEL_TESTID = 'order-action-cancel';
-const ORDER_ROW_ACTIONS_REASON_TESTID = 'order-row-actions-reason';
 
 const LIST_PAGE_SIZE = '25';
 const LIST_SORT = 'createdAt:desc';
@@ -165,8 +182,10 @@ let companyId: string | null = null;
 let recipeId: string | null = null;
 let productId: string | null = null;
 let presentationId: string | null = null;
+let packagingBatchId: string | null = null;
 let operatorUserId: string | null = null;
 let empacadorUserId: string | null = null;
+let workGroupId: string | null = null;
 let orderId: string | null = null;
 let orderNumber: string | null = null;
 
@@ -296,10 +315,14 @@ test.beforeAll(async () => {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
+    await prisma.orderPresentationLine.deleteMany({
+      where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     const orphanFinishedProducts = await prisma.product.findMany({
       where: { recipeId: { in: orphanRecipeIds } },
@@ -316,8 +339,10 @@ test.beforeAll(async () => {
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
   if (orphanCompanyIds.length > 0) {
-    await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.workGroupMember.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+  await prisma.workGroup.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   await prisma.user.deleteMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -387,6 +412,17 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
+  const packaging = await seedPackaging({
+    companyId,
+    name: PACKAGING_NAME,
+    presentationId: presentation.id,
+    stock: PACKAGING_STOCK,
+    unitCost: PACKAGING_UNIT_COST,
+    lot: PACKAGING_LOT,
+    createdBy: operatorUserId,
+  });
+  packagingBatchId = packaging.batchId;
+
   recipeId = (
     await prisma.recipe.create({
       data: {
@@ -409,8 +445,18 @@ test.beforeAll(async () => {
       orderSequence: BASE_SEQUENCE,
       recipeId,
       quantity: ORDER_QUANTITY,
-      presentationId,
-      presentationContent: PRESENTATION_CONTENT,
+      unitId: unit.id,
+      presentationLines: {
+        create: [
+          {
+            companyId,
+            presentationId,
+            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+            presentationContent: PRESENTATION_CONTENT,
+            packagingProductId: packaging.productId,
+          },
+        ],
+      },
       status: 'EN_CURSO',
     },
     select: { id: true },
@@ -418,8 +464,28 @@ test.beforeAll(async () => {
   orderId = order.id;
   orderNumber = formatOrderNumber({ year, sequence: BASE_SEQUENCE });
 
+  // El equipo vinculado, con el Operario y el Empacador dentro. Al pedido solo se le escribe la
+  // fila del Operario con el origen del grupo: el grupo queda vinculado y el Empacador sin fila,
+  // que es la precondicion del auto-asignado del Finalizar.
+  workGroupId = (
+    await prisma.workGroup.create({
+      data: {
+        name: WORK_GROUP_NAME,
+        nameNormalized: normalizeWorkGroupName(WORK_GROUP_NAME),
+        companyId,
+      },
+      select: { id: true },
+    })
+  ).id;
+  await prisma.workGroupMember.createMany({
+    data: [
+      { workGroupId, userId: operatorUserId, companyId },
+      { workGroupId, userId: empacadorUserId, companyId },
+    ],
+  });
+
   await prisma.orderAssignment.create({
-    data: { orderId, userId: operatorUserId, companyId },
+    data: { orderId, userId: operatorUserId, companyId, workGroupId, workGroupName: WORK_GROUP_NAME },
   });
 });
 
@@ -443,6 +509,10 @@ test.afterAll(async () => {
         : Promise.resolve(),
     () =>
       scopedCompanyId
+        ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
         ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
@@ -461,6 +531,14 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.presentation.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.workGroupMember.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.workGroup.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       prisma.user.deleteMany({
@@ -505,6 +583,7 @@ test.describe('el recorrido de empaque (R48)', () => {
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
+    // EN_CURSO: Entrar es un enlace y no vuelve a pedir la confirmacion de comenzar.
     await assignedRow.getByTestId(ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId!), {
       timeout: 60_000,
@@ -512,13 +591,20 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
-    await page.getByTestId(STEP_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
     expect(await orderStatus(orderId)).toBe('POR_EMPACAR');
+
+    // El Finalizar asigno al Empacador del equipo vinculado, con el origen del grupo.
+    const empacadorAssignment = await prisma.orderAssignment.findUniqueOrThrow({
+      where: { orderId_userId: { orderId, userId: empacadorUserId } },
+    });
+    expect(empacadorAssignment.workGroupId).toBe(workGroupId);
+    expect(empacadorAssignment.workGroupName).toBe(WORK_GROUP_NAME);
 
     const deliveredNotice = page.getByTestId(DELIVERED_NOTICE_TESTID);
     await expect(deliveredNotice).toBeVisible({ timeout: 60_000 });
@@ -536,8 +622,8 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(page.getByTestId(PACKING_ORDERS_SECTION_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNED_ORDERS_EMPTY_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // --- 3. «Por empacar» no se puede cancelar desde Pedidos: la acción va deshabilitada con el
-    // motivo visible (R29, R42).
+    // --- 3. «Por empacar» no se puede cancelar desde Pedidos: la acción va deshabilitada en
+    // el menu de la fila (R29, R42).
     await page.context().clearCookies();
     await loginAndLand(page, adminUser);
     await page.goto(ordersUrl());
@@ -550,8 +636,9 @@ test.describe('el recorrido de empaque (R48)', () => {
       'data-status',
       'POR_EMPACAR',
     );
-    await expect(ordersRow.getByTestId(ORDER_ACTION_CANCEL_TESTID)).toBeDisabled();
-    await expect(ordersRow.getByTestId(ORDER_ROW_ACTIONS_REASON_TESTID)).toBeVisible();
+    await expect(
+      await openOrderRowMenu(page, rowMenuTrigger(ordersRow), ORDER_ACTION_CANCEL_TESTID),
+    ).toBeDisabled();
 
     // --- 4. Un Empacador lo comienza y lo termina (R18, R21).
     await page.context().clearCookies();
@@ -567,7 +654,7 @@ test.describe('el recorrido de empaque (R48)', () => {
     });
     await expect(page.getByTestId(PACKING_ORDER_SCREEN_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId(PACKING_ORDER_START_BUTTON_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_ORDER_START_BUTTON_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeVisible({
       timeout: 60_000,
     });
@@ -579,13 +666,17 @@ test.describe('el recorrido de empaque (R48)', () => {
     expect(startedOrder.status).toBe('EN_EMPAQUE');
     expect(startedOrder.packedBy).toBe(empacadorUserId);
 
-    await page.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID), PACKING_ORDER_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(PACKED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
     expect(await orderStatus(orderId)).toBe('ENTREGADO');
+    // Terminar consumio los envases de la linea.
+    expect(await batchStock(packagingBatchId!)).toBe(
+      Number(PACKAGING_STOCK) - Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+    );
 
     const packedNotice = page.getByTestId(PACKED_ORDER_NOTICE_TESTID);
     await expect(packedNotice).toBeVisible({ timeout: 60_000 });

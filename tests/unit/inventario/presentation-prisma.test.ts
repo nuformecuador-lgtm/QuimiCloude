@@ -10,7 +10,11 @@
 
 import { Prisma } from '@prisma/client';
 
+import { presentationCompanyScope } from '@/lib/modules/inventario/adapters/driven/persistence/company-scope';
+import { sanitizeListQuery, type ListQuery } from '@/lib/modules/inventario/domain/list-query';
+import { PRESENTATION_QUERYABLE } from '@/lib/modules/inventario/domain/presentation-queryable';
 import {
+  buildPresentationWhere,
   isPresentationInUseViolation,
   isUnitForeignKeyViolation,
   isUniqueNameViolation,
@@ -128,5 +132,81 @@ describe('toPresentationView — mapeo de fila a contrato (R15)', () => {
     expect(
       toPresentationView({ ...fila, content: new Prisma.Decimal('50.5') }).content,
     ).toBe('50.5000');
+  });
+});
+
+describe('buildPresentationWhere — filtro por unidad para el reparto del pedido', () => {
+  const SCOPE = { companyId: '11111111-1111-4111-8111-111111111111' };
+  const KG = '22222222-2222-4222-8222-222222222222';
+  const G = '33333333-3333-4333-8333-333333333333';
+
+  function consulta(overrides: Partial<ListQuery> = {}): ListQuery {
+    return { page: 1, sort: null, filters: {}, search: '', ...overrides };
+  }
+
+  it('PRESENTATION_QUERYABLE declara unitId como select y no lo hace ordenable', () => {
+    expect(PRESENTATION_QUERYABLE.filterable.unitId).toBe('select');
+    expect(PRESENTATION_QUERYABLE.sortable).not.toContain('unitId');
+  });
+
+  it('sanitizeListQuery deja pasar el select de unitId con sus uuids intactos', () => {
+    const filtro = { unitId: { kind: 'select' as const, values: [KG, G] } };
+    const saneada = sanitizeListQuery(consulta({ filters: filtro }), PRESENTATION_QUERYABLE);
+
+    expect(saneada.ignored).toEqual([]);
+    expect(saneada.query.filters).toEqual(filtro);
+  });
+
+  it('un select de unitId se traduce a unitId IN, dentro del ambito de la empresa', () => {
+    const where = buildPresentationWhere(
+      consulta({ filters: { unitId: { kind: 'select', values: [KG, G] } } }),
+      SCOPE,
+    );
+
+    expect(where).toEqual({
+      AND: [presentationCompanyScope(SCOPE), { AND: [{ unitId: { in: [KG, G] } }] }],
+    });
+  });
+
+  it('el ambito sigue siendo la capa de fuera cuando se combina con la busqueda', () => {
+    const where = buildPresentationWhere(
+      consulta({ search: 'Bolsa', filters: { unitId: { kind: 'select', values: [KG] } } }),
+      SCOPE,
+    );
+
+    expect(where.AND).toHaveLength(2);
+    const [ambito, interior] = where.AND as Prisma.PresentationWhereInput[];
+    expect(ambito).toEqual(presentationCompanyScope(SCOPE));
+    expect(interior).toMatchObject({ AND: [{ unitId: { in: [KG] } }] });
+    expect(interior?.nameNormalized).toBeDefined();
+  });
+
+  it('una lista de unidades vacia no acota, igual que en el resto de listados', () => {
+    const where = buildPresentationWhere(
+      consulta({ filters: { unitId: { kind: 'select', values: [] } } }),
+      SCOPE,
+    );
+
+    expect(where).toEqual({ AND: [presentationCompanyScope(SCOPE), {}] });
+  });
+
+  it('los valores que no son uuid se descartan antes de llegar a Postgres', () => {
+    const where = buildPresentationWhere(
+      consulta({ filters: { unitId: { kind: 'select', values: ['kg', KG] } } }),
+      SCOPE,
+    );
+
+    expect(where).toEqual({
+      AND: [presentationCompanyScope(SCOPE), { AND: [{ unitId: { in: [KG] } }] }],
+    });
+  });
+
+  it('un select sobre otro campo no se traduce', () => {
+    const where = buildPresentationWhere(
+      consulta({ filters: { name: { kind: 'select', values: [KG] } } }),
+      SCOPE,
+    );
+
+    expect(where).toEqual({ AND: [presentationCompanyScope(SCOPE), {}] });
   });
 });

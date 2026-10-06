@@ -1,0 +1,63 @@
+# fix/pino-logger: resultado
+
+## Gate completo (`./init.sh`): SIN RESULTADO. No terminó ninguna de las dos corridas
+
+- 1.ª corrida: se cortó al llegar al límite de 10 minutos que le puse. Fallo mío al elegir el
+  tiempo: aquí la suite tarda más de 20 minutos.
+- 2.ª corrida, con 90 minutos de límite: Claude Code la detuvo porque al sistema le quedaba muy
+  poca memoria. No es un fallo del gate.
+- **No está corriendo ahora** y no la he relanzado: con la memoria así, la indicación es no
+  reiniciarla sin que se pida.
+
+## Lo que sí corrió
+
+- typecheck: verde. Resuelve el TS2307 (`pino`) y el TS2353 (`log` en `RunDocumentJobDeps`).
+- lint: verde.
+- Un rojo en la suite antes del corte, y es el único que apareció:
+  - `tests/guards/guard-identificador-de-request.test.ts`, en el caso «package.json no gana
+    ninguna dependencia, ni una libreria de identificadores (R20)».
+  - **Causa:** el test exige exactamente `DEPENDENCIAS_ESPERADAS = 37` `dependencies`, y con
+    `pino` hay 38.
+- Las líneas `[error]` del log vienen de tests que provocan errores a propósito; no son fallos.
+- Después del arreglo, con `pnpm exec vitest run guard tests/unit/pedidos/qc146-alcance`:
+  52 archivos, 658 tests pasados y 11 omitidos, sin fallos.
+- Los tests del cambio (`run-document-job*`, `document-job-*`, `shared/logger`): 5 archivos,
+  32 tests pasados.
+
+## Qué cambia `3c415bf6`
+
+En `tests/guards/guard-identificador-de-request.test.ts`, `DEPENDENCIAS_ESPERADAS` pasa de
+37 a 38, y se añade una línea al comentario que lista cada dependencia que entró con
+aprobación. Es el mismo arreglo que cuando entraron `sharp` y `react-intersection-observer`
+(`c99d8e0d`). La guardia sigue cazando una librería de identificadores aunque el conteo cuadre.
+
+## Commits
+
+- `675361c1` fix(logger): runDocumentJob acepta y usa el puerto DocumentJobLog
+- `7211ebdf` fix(logger): instala pino, que logger.ts ya importaba
+- `3c415bf6` fix(logger): sube a 38 el conteo de dependencies de la guardia por pino
+
+## Por qué no hay push
+
+La regla es push solo con el gate completo en verde, y ninguna corrida terminó. Para cerrar:
+cuando haya memoria libre, relanzar `./init.sh` en este worktree y, si sale verde, hacer
+`git push -u origin fix/pino-logger`. No toqué `fix/logger-pino-en-dev`.
+
+## Actualizacion 2026-10-01: baseline y `./init.sh --rapido`
+
+- El leader corrio el gate completo: 10817 tests en verde y 5 en rojo, en 3 archivos heredados
+  de `dev` (`3018853a` y `0dbcd68f`). Ninguno toca archivos de esta rama.
+- `9aabdfc1` (de otra mano, ya en `origin`) anota los tres en `tests/baseline-rojos.json`.
+  `8af0b374` anade en cada motivo «Salida limpia: QC-177 borra esta entrada».
+- `./init.sh --rapido` sobre `8af0b374`: **ROJO**. typecheck y lint en verde; tests: 215
+  archivos en verde y 2 en rojo (4 tests de 3182).
+  - Los rojos son `unidades-viewport.test.tsx` (R27) y `usuarios-viewport.test.tsx` (R21),
+    los dos del baseline. No hay ningun rojo fuera del baseline.
+  - **Causa:** `--rapido` corre `pnpm run test:rapido` con `run_if` y **no consulta el
+    baseline**. La comparacion con `scripts/comparar-baseline-rojos.mjs` solo esta en el modo
+    completo (`init.sh`, rama `else`). Mientras esos archivos sigan rojos y el grafo los
+    seleccione, el rapido no puede salir verde.
+- **No hay push de `8af0b374`.** La condicion era que el rapido saliera verde. `origin` ya tiene
+  `9aabdfc1`, que pusheo otra mano.
+- Para cerrar hay dos salidas: que el leader acepte este rapido (rojo solo por archivos del
+  baseline) y se haga push, o correr el gate completo, que si aplica el baseline.

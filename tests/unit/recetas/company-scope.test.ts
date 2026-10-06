@@ -67,6 +67,8 @@ const FILA_CON_FUGA = {
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   lines: [],
+  tools: [],
+  original: null,
   companyId: 'empresa-1',
 } as unknown as RecipeRow;
 

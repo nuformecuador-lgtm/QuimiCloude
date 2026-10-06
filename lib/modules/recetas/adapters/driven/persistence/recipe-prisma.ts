@@ -4,6 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
+import { isVersionUnderReview, propagateLines, propagateTools } from '../../../domain/recipe-version';
 import { ValidationError } from '../../../domain/errors';
 import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
@@ -13,7 +14,16 @@ import { dateRangeCondition, normalizedSearchCondition } from './list-query-sql'
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 
-import type { NewRecipe, RecipeLineData, RecipeLineRow, RecipeRow } from '../../../ports/recipe-repository';
+import type {
+  NewRecipe,
+  NewRecipeVersion,
+  PropagatedVersion,
+  RecipeLineData,
+  RecipeLineRow,
+  RecipeRow,
+  RecipeToolData,
+  ReplaceWithPropagationResult,
+} from '../../../ports/recipe-repository';
 
 /**
  * Implementa `RecipeRepository` (`design.md > 7.3`, `> 8`) con Prisma. UNICO archivo del
@@ -30,7 +40,11 @@ import type { NewRecipe, RecipeLineData, RecipeLineRow, RecipeRow } from '../../
  * sitio del modulo que convierte en los dos sentidos.
  */
 
-const RECIPE_INCLUDE = { lines: true } satisfies Prisma.RecipeInclude;
+const RECIPE_INCLUDE = {
+  lines: true,
+  tools: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+  parent: { select: { id: true, name: true, description: true, imagePath: true, steps: true, packingSteps: true } },
+} satisfies Prisma.RecipeInclude;
 
 type RecipeWithLines = Prisma.RecipeGetPayload<{ include: typeof RECIPE_INCLUDE }>;
 
@@ -81,12 +95,25 @@ export function toRecipeRow(row: RecipeWithLines): RecipeRow {
     name: row.name,
     description: row.description,
     steps: toSteps(row.steps),
+    packingSteps: toSteps(row.packingSteps),
     imagePath: row.imagePath,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     lines: row.lines.map(toLineRow),
+    tools: row.tools.map((tool) => ({ id: tool.id, productId: tool.productId, quantity: tool.quantity })),
+    original:
+      row.parent === null
+        ? null
+        : {
+            id: row.parent.id,
+            name: row.parent.name,
+            description: row.parent.description,
+            imagePath: row.parent.imagePath,
+            steps: toSteps(row.parent.steps),
+            packingSteps: toSteps(row.parent.packingSteps),
+          },
   };
 }
 
@@ -163,14 +190,21 @@ function isUniqueNameViolation(error: unknown): boolean {
   return false;
 }
 
+function isForeignKeyViolation(error: unknown): boolean {
+  return sqlStateOf(error) === '23503' || sqlStateOf(error) === 'P2003';
+}
+
 /** `23514`: el `CHECK` de rango de `percentage`. Nunca `'duplicate'`. */
 function isPercentageCheckViolation(error: unknown): boolean {
   return sqlStateOf(error) === '23514';
 }
 
-/** Traduce el SQLSTATE al resultado discriminado del puerto, o relanza si no lo reconoce. */
+/** Prisma no expone que FK salto (`meta.constraint` llega null): cualquier FK rota (producto de
+ *  linea, de herramienta o autor) se reporta como entrada invalida. Solo ocurre con un borrado
+ *  fisico concurrente, porque la baja normal es logica. */
 function translateWriteError(error: unknown): never {
   if (isPercentageCheckViolation(error)) throw new ValidationError();
+  if (isForeignKeyViolation(error)) throw new ValidationError();
   throw error;
 }
 
@@ -190,6 +224,7 @@ export async function createRecipe(
         nameNormalized: normalizeRecipeName(data.name),
         description: data.description,
         steps: data.steps as unknown as Prisma.InputJsonValue,
+        packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
         imagePath: data.imagePath,
         createdAt: now,
         updatedAt: now,
@@ -199,6 +234,13 @@ export async function createRecipe(
           create: data.lines.map((line) => ({
             productId: line.productId,
             percentage: toDecimalInput(line.percentage),
+          })),
+        },
+        tools: {
+          create: (data.tools ?? []).map((tool, index) => ({
+            productId: tool.productId,
+            quantity: tool.quantity,
+            createdAt: toolCreatedAt(now, index),
           })),
         },
       },
@@ -321,6 +363,8 @@ export function buildRecipeWhere(query: ListQuery, scope: RecipeScope): Prisma.R
 
   return {
     deletedAt: null,
+    // Las versiones se listan aparte, bajo su original.
+    parentRecipeId: null,
     ...recipeCompanyScope(scope),
     ...(search === null ? {} : { nameNormalized: search }),
     ...(filters.length === 0 ? {} : { AND: filters }),
@@ -364,8 +408,14 @@ export async function listAliveRecipes(
 }
 
 /** Ids de linea final, para el paso 2 (`DELETE ... NOT IN`) de la conciliacion. */
-function productIdsOf(lines: readonly RecipeLineData[]): readonly string[] {
+function productIdsOf(lines: readonly { readonly productId: string }[]): readonly string[] {
   return lines.map((line) => line.productId);
+}
+
+/** `createdAt` creciente por posicion: las herramientas de una misma escritura compartirian el
+ *  `now()` de la transaccion y su orden de alta quedaria al azar del `id`. */
+function toolCreatedAt(now: Date, index: number): Date {
+  return new Date(now.getTime() + index);
 }
 
 /**
@@ -398,6 +448,7 @@ export async function replaceAliveRecipe(
           nameNormalized: normalizeRecipeName(data.name),
           description: data.description,
           steps: data.steps as unknown as Prisma.InputJsonValue,
+          packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
           imagePath: data.imagePath,
           updatedAt: now,
           updatedBy: actorId,
@@ -427,6 +478,28 @@ export async function replaceAliveRecipe(
         });
       }
 
+      if (data.tools !== null) {
+        const finalToolIds = productIdsOf(data.tools);
+        await tx.recipeTool.deleteMany({
+          where: {
+            recipeId: id,
+            ...(finalToolIds.length > 0 ? { productId: { notIn: [...finalToolIds] } } : {}),
+          },
+        });
+        for (const [index, tool] of data.tools.entries()) {
+          await tx.recipeTool.upsert({
+            where: { recipeId_productId: { recipeId: id, productId: tool.productId } },
+            create: {
+              recipeId: id,
+              productId: tool.productId,
+              quantity: tool.quantity,
+              createdAt: toolCreatedAt(now, index),
+            },
+            update: { quantity: tool.quantity },
+          });
+        }
+      }
+
       return 'ok';
     });
   } catch (error) {
@@ -435,18 +508,262 @@ export async function replaceAliveRecipe(
   }
 }
 
-/** `softDeleteAlive` de `RecipeRepository` (R6, R27, R35). Borrado LOGICO: solo marca
- *  `deleted_at`, nunca `prisma.recipe.delete`. `updateMany` para distinguir "no existe o ya
- *  borrada" (`count === 0`) de una excepcion, sin depender de `P2025`. */
+/**
+ * Borrado LOGICO: solo marca `deleted_at`, nunca `prisma.recipe.delete`. `updateMany` para
+ * distinguir "no existe o ya borrada" (`count === 0`) de una excepcion, sin depender de `P2025`.
+ * Las versiones vivas caen en la misma transaccion; si `id` es una version, no tiene ninguna.
+ */
 export async function softDeleteAliveRecipe(
   id: string,
   actorId: string,
   now: Date,
   scope: RecipeScope,
 ): Promise<'ok' | 'not_found'> {
-  const result = await prisma.recipe.updateMany({
-    where: { id, deletedAt: null, ...recipeCompanyScope(scope) },
-    data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
+  return prisma.$transaction(async (tx) => {
+    const deleted = { deletedAt: now, updatedAt: now, updatedBy: actorId };
+    const result = await tx.recipe.updateMany({
+      where: { id, deletedAt: null, ...recipeCompanyScope(scope) },
+      data: deleted,
+    });
+    if (result.count === 0) return 'not_found';
+
+    await tx.recipe.updateMany({
+      where: { parentRecipeId: id, deletedAt: null, ...recipeCompanyScope(scope) },
+      data: deleted,
+    });
+    return 'ok';
   });
-  return result.count === 0 ? 'not_found' : 'ok';
+}
+
+class VersionNotFound extends Error {
+  constructor() {
+    super('version_not_found');
+    this.name = 'VersionNotFound';
+  }
+}
+
+/**
+ * La original se lee `FOR SHARE` en la misma transaccion que crea la version: una baja
+ * concurrente de la original espera o hace que esta lectura no devuelva fila, y la version no
+ * nace colgando de una original muerta que la baja en cascada ya no alcanzaria.
+ */
+export async function createRecipeVersion(
+  originalId: string,
+  data: NewRecipeVersion,
+  actorId: string,
+  now: Date,
+  scope: RecipeScope,
+): Promise<{ id: string } | 'not_found' | 'duplicate'> {
+  const columns = companyScopeColumns(scope);
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const originals = await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
+        SELECT "id"
+          FROM "recipes"
+         WHERE "id" = ${originalId}::uuid
+           AND "company_id" = ${columns.companyId}::uuid
+           AND "deleted_at" IS NULL
+           AND "parent_recipe_id" IS NULL
+           FOR SHARE
+      `);
+      if (originals.length === 0) return 'not_found';
+
+      const created = await tx.recipe.create({
+        data: {
+          ...columns,
+          parentRecipeId: originalId,
+          name: data.name,
+          nameNormalized: normalizeRecipeName(data.name),
+          description: null,
+          steps: [],
+          packingSteps: [],
+          imagePath: null,
+          createdAt: now,
+          updatedAt: now,
+          createdBy: actorId,
+          updatedBy: actorId,
+          lines: {
+            create: data.lines.map((line) => ({
+              productId: line.productId,
+              percentage: toDecimalInput(line.percentage),
+            })),
+          },
+          tools: {
+            create: data.tools.map((tool, index) => ({
+              productId: tool.productId,
+              quantity: tool.quantity,
+              createdAt: toolCreatedAt(now, index),
+            })),
+          },
+        },
+        select: { id: true },
+      });
+      return { id: created.id };
+    });
+  } catch (error) {
+    if (isUniqueNameViolation(error)) return 'duplicate';
+    translateWriteError(error);
+  }
+}
+
+export async function listAliveRecipeVersions(
+  originalId: string,
+  scope: RecipeScope,
+): Promise<readonly RecipeRow[]> {
+  const rows = await prisma.recipe.findMany({
+    where: { parentRecipeId: originalId, deletedAt: null, ...recipeCompanyScope(scope) },
+    include: RECIPE_INCLUDE,
+    orderBy: [{ name: 'asc' }, TIE_BREAKER],
+  });
+  return rows.map(toRecipeRow);
+}
+
+function toLineData(line: { productId: string; percentage: Prisma.Decimal }): RecipeLineData {
+  return { productId: line.productId, percentage: fromDecimalPercentage(line.percentage) };
+}
+
+function toToolData(tool: { productId: string; quantity: number }): RecipeToolData {
+  return { productId: tool.productId, quantity: tool.quantity };
+}
+
+/**
+ * Las lineas de antes de la original y las de cada version se leen dentro de la transaccion
+ * que escribe: calcularlas fuera perderia en silencio un guardado concurrente de la version.
+ * Un id que no sea version viva de esta original revierte todo, incluida la original.
+ */
+export async function replaceAliveRecipeWithPropagation(
+  id: string,
+  data: NewRecipe,
+  versionIds: readonly string[],
+  actorId: string,
+  now: Date,
+  scope: RecipeScope,
+): Promise<ReplaceWithPropagationResult> {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.recipe.updateMany({
+        where: { id, deletedAt: null, parentRecipeId: null, ...recipeCompanyScope(scope) },
+        data: {
+          name: data.name,
+          nameNormalized: normalizeRecipeName(data.name),
+          description: data.description,
+          steps: data.steps as unknown as Prisma.InputJsonValue,
+          packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
+          imagePath: data.imagePath,
+          updatedAt: now,
+          updatedBy: actorId,
+        },
+      });
+      if (updated.count === 0) return 'not_found';
+
+      const before = (await tx.recipeLine.findMany({ where: { recipeId: id } })).map(toLineData);
+      const tools = data.tools;
+      const beforeTools =
+        tools === null ? [] : (await tx.recipeTool.findMany({ where: { recipeId: id } })).map(toToolData);
+
+      const finalProductIds = productIdsOf(data.lines);
+      await tx.recipeLine.deleteMany({
+        where: {
+          recipeId: id,
+          ...(finalProductIds.length > 0 ? { productId: { notIn: [...finalProductIds] } } : {}),
+        },
+      });
+      for (const line of data.lines) {
+        await tx.recipeLine.upsert({
+          where: { recipeId_productId: { recipeId: id, productId: line.productId } },
+          create: { recipeId: id, productId: line.productId, percentage: toDecimalInput(line.percentage) },
+          update: { percentage: toDecimalInput(line.percentage) },
+        });
+      }
+
+      if (tools !== null) {
+        const finalToolIds = productIdsOf(tools);
+        await tx.recipeTool.deleteMany({
+          where: {
+            recipeId: id,
+            ...(finalToolIds.length > 0 ? { productId: { notIn: [...finalToolIds] } } : {}),
+          },
+        });
+        for (const [index, tool] of tools.entries()) {
+          await tx.recipeTool.upsert({
+            where: { recipeId_productId: { recipeId: id, productId: tool.productId } },
+            create: {
+              recipeId: id,
+              productId: tool.productId,
+              quantity: tool.quantity,
+              createdAt: toolCreatedAt(now, index),
+            },
+            update: { quantity: tool.quantity },
+          });
+        }
+      }
+
+      const propagated: PropagatedVersion[] = [];
+      for (const versionId of versionIds) {
+        const touched = await tx.recipe.updateMany({
+          where: { id: versionId, parentRecipeId: id, deletedAt: null, ...recipeCompanyScope(scope) },
+          data: { updatedAt: now, updatedBy: actorId },
+        });
+        if (touched.count === 0) throw new VersionNotFound();
+
+        const current = (await tx.recipeLine.findMany({ where: { recipeId: versionId } })).map(toLineData);
+        const lines = propagateLines(before, data.lines, current);
+
+        const keptProductIds = productIdsOf(lines);
+        await tx.recipeLine.deleteMany({
+          where: {
+            recipeId: versionId,
+            ...(keptProductIds.length > 0 ? { productId: { notIn: [...keptProductIds] } } : {}),
+          },
+        });
+        for (const line of lines) {
+          await tx.recipeLine.upsert({
+            where: { recipeId_productId: { recipeId: versionId, productId: line.productId } },
+            create: { recipeId: versionId, productId: line.productId, percentage: toDecimalInput(line.percentage) },
+            update: { percentage: toDecimalInput(line.percentage) },
+          });
+        }
+
+        if (tools !== null) {
+          const currentTools = (
+            await tx.recipeTool.findMany({
+              where: { recipeId: versionId },
+              orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            })
+          ).map(toToolData);
+          const versionTools = propagateTools(beforeTools, tools, currentTools);
+          const keptToolIds = productIdsOf(versionTools);
+          await tx.recipeTool.deleteMany({
+            where: {
+              recipeId: versionId,
+              ...(keptToolIds.length > 0 ? { productId: { notIn: [...keptToolIds] } } : {}),
+            },
+          });
+          for (const [index, tool] of versionTools.entries()) {
+            await tx.recipeTool.upsert({
+              where: { recipeId_productId: { recipeId: versionId, productId: tool.productId } },
+              create: {
+                recipeId: versionId,
+                productId: tool.productId,
+                quantity: tool.quantity,
+                createdAt: toolCreatedAt(now, index),
+              },
+              update: { quantity: tool.quantity },
+            });
+          }
+        }
+
+        propagated.push({
+          versionId,
+          isUnderReview: isVersionUnderReview(true, lines.map((line) => line.percentage)),
+        });
+      }
+
+      return { kind: 'ok', propagated };
+    });
+  } catch (error) {
+    if (error instanceof VersionNotFound) return 'version_not_found';
+    if (isUniqueNameViolation(error)) return 'duplicate';
+    translateWriteError(error);
+  }
 }

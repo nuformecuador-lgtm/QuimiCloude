@@ -11,6 +11,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/start-assigned-order';
 import {
   AsignacionesError,
+  OrderBlockedError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
   OrderProducedFrozenError,
@@ -35,7 +36,11 @@ const RECETA = uuid('a');
 const PRODUCTO = uuid('c');
 const LITRO = uuid('d');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+};
 
 function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
@@ -45,7 +50,8 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '250.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: null,
     packedBy: null,
     ...overrides,
@@ -59,6 +65,7 @@ function contenido(): RecipeExecutionContent {
     isDeleted: false,
     steps: [],
     lines: [{ productId: PRODUCTO, productName: null, percentage: '90.00' }],
+    tools: [],
   };
 }
 
@@ -107,6 +114,8 @@ function montar(options?: {
     } as unknown as RecipeCatalog,
     units: {
       findRefs: vi.fn(async () => [unidad()]),
+      listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+      findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as UnitCatalog,
     products: {
@@ -126,7 +135,7 @@ function montar(options?: {
 }
 
 describe('startAssignedOrder — autorizacion', () => {
-  it('R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto', async () => {
+  it('R5: exige `asignaciones.ejecutar` ANTES de tocar ningun puerto', async () => {
     const { deps, listOrderIdsByUserInCompany, findAliveById, transitionAliveById } = montar();
     const startAssignedOrder = createStartAssignedOrder(deps);
 
@@ -245,6 +254,31 @@ describe('startAssignedOrder — R14: ENTREGADO y CANCELADO no admiten reapertur
   });
 });
 
+describe('QC-138 — startAssignedOrder: un BLOQUEADO no se arranca', () => {
+  it('R28, R32 — arrancar un BLOQUEADO rechaza con `order_blocked` sin escribir', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['BLOQUEADO'] });
+    const startAssignedOrder = createStartAssignedOrder(deps);
+
+    const error = await startAssignedOrder(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(OrderBlockedError);
+    expect((error as OrderBlockedError).code).toBe('order_blocked');
+    expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R32 — bloqueado por una edicion entre la lectura y la transicion: `stale`, relee y rechaza con `order_blocked`', async () => {
+    const { deps, findAliveById, transitionAliveById } = montar({
+      ordenDeEstados: ['PENDIENTE', 'BLOQUEADO'],
+      transitionResults: ['stale'],
+    });
+    const startAssignedOrder = createStartAssignedOrder(deps);
+
+    await expect(startAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderBlockedError);
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+    expect(findAliveById).toHaveBeenCalledTimes(2);
+  });
+});
+
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
   let dir = startDir;
@@ -271,5 +305,51 @@ describe('startAssignedOrder — R12: la legalidad la decide `pedidos`, no una s
     expect(fuente).not.toMatch(/PENDIENTE['"]?\s*:\s*\[/);
     expect(fuente).not.toMatch(/const\s+ALLOWED\b/);
     expect(fuente).not.toMatch(/isAllowedTransition|assertTransition/);
+  });
+});
+
+function doblesDe(deps: object): unknown[] {
+  return Object.values(deps as Record<string, unknown>).flatMap((value) =>
+    vi.isMockFunction(value) ? [value] : value !== null && typeof value === 'object' ? doblesDe(value) : [],
+  );
+}
+
+const SIN_EJECUTAR: readonly (readonly [string, readonly string[]])[] = [
+  ['solo asignaciones.consultar', ['asignaciones.consultar']],
+  ['solo empaque.modificar', ['empaque.modificar']],
+  ['asignaciones.consultar + empaque.modificar', ['asignaciones.consultar', 'empaque.modificar']],
+  ['el conjunto vacio', []],
+];
+
+describe('startAssignedOrder — exige `asignaciones.ejecutar`', () => {
+  it.each(SIN_EJECUTAR)('R6, R7a: con %s rechaza con `unauthorized` sin invocar ningun puerto', async (_caso, permissions) => {
+    const { deps } = montar({ ordenDeEstados: ['PENDIENTE', 'EN_CURSO'] });
+
+    await expect(
+      createStartAssignedOrder(deps)({ id: ANA, companyId: EMPRESA, permissions }, { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('R6: sin el permiso rechaza antes de validar la entrada', async () => {
+    const { deps } = montar({ ordenDeEstados: ['PENDIENTE', 'EN_CURSO'] });
+
+    await expect(
+      createStartAssignedOrder(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] },
+        { orderId: 'no-es-un-uuid' },
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it('R7b: con solo `asignaciones.ejecutar` comenzar resuelve igual que con el conjunto del Operador', async () => {
+    const soloEjecutar: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
+    const conEjecutar = montar({ ordenDeEstados: ['PENDIENTE', 'EN_CURSO'] });
+    const deReferencia = montar({ ordenDeEstados: ['PENDIENTE', 'EN_CURSO'] });
+
+    const resultado = await createStartAssignedOrder(conEjecutar.deps)(soloEjecutar, { orderId: PEDIDO });
+    const referencia = await createStartAssignedOrder(deReferencia.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(resultado).toEqual(referencia);
   });
 });

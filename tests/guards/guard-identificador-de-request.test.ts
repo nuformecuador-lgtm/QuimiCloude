@@ -167,6 +167,15 @@ export const E2E_ESPERADOS = [
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',
+  // Alta el 2026-10-02 (QC-138) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. Lo que ejercita: un alta de pedido sin material suficiente
+  // abre el modal, «Guardar bloqueado» lo deja Bloqueado en la lista; el Operador asignado lo ve
+  // sin poder entrar; y un alta de lote en Inventario lo deja PENDIENTE con su material apartado.
+  // NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'pedido-bloqueado.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja
@@ -211,6 +220,18 @@ export const E2E_ESPERADOS = [
   'unidades.spec.ts',
   'establecer-contrasena.spec.ts',
   'usuarios.spec.ts',
+  // Alta el 2026-10-02 (QC-172 R44) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: en el formulario de Pedidos se
+  // elige una receta original y una de sus versiones, se guarda el pedido, y en la base lo
+  // apartado sale de las lineas de la version (A y C) y no de las de la original (A y B). NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma
+  // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'versiones-de-receta.spec.ts',
+  // Alta (QC-174 R38): crea y edita versiones desde la ficha, propaga un cambio de la original y
+  // comprueba lineas en la base y el aviso «por revisar». No toca el identificador de peticion.
+  'versiones-en-la-receta.spec.ts',
   // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
   // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
   // se nombra, uno a uno-. Lo que ejercita: el recorrido de las vistas de /asignacion por
@@ -229,6 +250,31 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que el diferimiento sigue INTACTO.
   'producto-terminado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el pedido repartido en varias presentaciones
+  // de punta a punta; no lee ni afirma nada sobre el identificador de peticion.
+  'pedido-en-varias-presentaciones.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el reparto en envases: alta con envases
+  // apartados, falta de envase que bloquea, cotizacion con envases y Terminar que los consume; y
+  // que la receta no ofrece un envase como ingrediente. No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'envases-del-pedido.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
+  // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
+  // identificador de peticion.
+  'insumo-por-unidad.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el alta de un pedido en g y otro en ml sobre un
+  // insumo en kg: cantidad requerida, marca de aproximacion, costo cotizado y guardado y cantidad
+  // apartada. No lee ni afirma nada sobre el identificador de peticion.
+  'pedido-conversion-de-unidad.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el formulario de receta con pasos de
+  // envasado, la ejecucion del Operador y el empaque paso a paso del Empacador. No lee ni afirma
+  // nada sobre el identificador de peticion ni sobre `reference`, asi que el diferimiento de
+  // QC-71 R21 sigue INTACTO.
+  'pasos-de-envasado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la importacion de inventario desde un .csv:
+  // vista previa, alta de la unidad que falta, confirmacion, lotes y archivo de errores. No lee ni
+  // afirma nada sobre el identificador de peticion.
+  'inventario-importar.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -374,6 +420,35 @@ export const MIGRACIONES_ESPERADAS = [
   // al enum y la columna de quien empaca, la otra siembra el permiso `empaque.modificar`.
   '20260925120000_order_packing_states',
   '20260925120100_packing_permission',
+  // Tampoco estas dos: una crea la tabla del reparto por presentacion y la columna de unidad del
+  // pedido, la otra enlaza los movimientos de produccion con esa linea de reparto.
+  '20260927120000_order_presentation_lines',
+  '20260927120100_inventory_movements_production_per_line',
+  // Ni esta: pasa la presentacion unica de cada pedido a su reparto y retira esas columnas.
+  '20260927120200_order_presentation_lines_backfill_and_drop',
+  // Anade `parent_recipe_id` a `recipes`; no toca el identificador de peticion.
+  '20261001120000_recipe_versions',
+  // El rol Maestro: empresa opcional segun rol y nombre de usuario unico en todo el sistema; no
+  // toca el identificador de peticion.
+  '20261001160815_platform_maestro_role',
+  // El estado BLOQUEADO: una lo anade al enum, la otra crea el indice parcial de
+  // pedidos bloqueados. Ninguna toca el identificador de peticion.
+  '20261001170000_order_status_blocked',
+  '20261001170100_orders_blocked_index',
+  // Crea la tabla de herramientas de receta; no toca el identificador de peticion.
+  '20261003120000_recipe_tools',
+  // El envase de la linea del reparto y la unidad de envases; no toca el identificador.
+  '20261003130000_packaging_products_in_distribution',
+  // La parte de envases del importe del pedido; no toca el identificador.
+  '20261004120000_orders_packaging_cost',
+  // El permiso asignaciones.ejecutar y sus asignaciones; no toca el identificador.
+  '20261004150000_execution_permission',
+  // La regla de unidad del lote de insumo sin presentacion; no toca el identificador.
+  '20261004170000_product_batches_require_product_unit',
+  // Los pasos de envasado de la receta; no toca el identificador.
+  '20261005120000_recipe_packing_steps',
+  // El registro de importaciones de inventario; no toca el identificador.
+  '20261006120000_inventory_imports',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -428,14 +503,21 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-09-23 entro `react-intersection-observer` -el hook que detecta cuando el final de una
 // lista entra en pantalla-, tambien con los cuatro checks, con aprobacion humana en la puerta F1.4
 // y con su fila en `docs/dependencias.md`: de 36 a 37 con esa misma aprobacion.
+// El 2026-10-01 entro `pino` -el logger general del servidor-, con los cuatro checks, aprobacion
+// humana y su fila en `docs/dependencias.md`: de 37 a 38.
+// El 2026-10-05 entro `@anthropic-ai/sdk` -el cliente oficial para leer un PDF con Claude-, con
+// los cuatro checks, aprobacion humana y su fila en `docs/dependencias.md`: de 38 a 39.
+// El 2026-10-06 entraron `read-excel-file` y `papaparse` -leer la hoja y el CSV de la
+// importacion de inventario- y, como devDependency, `@types/papaparse`, con los cuatro checks,
+// aprobacion humana y su fila en `docs/dependencias.md`: de 39 a 41 y de 20 a 21.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 37
-export const DEV_DEPENDENCIAS_ESPERADAS = 20
+export const DEPENDENCIAS_ESPERADAS = 41
+export const DEV_DEPENDENCIAS_ESPERADAS = 21
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */
 export const FRAGMENTOS_PROHIBIDOS = ['uuid', 'nanoid', 'cuid', 'crypto'] as const

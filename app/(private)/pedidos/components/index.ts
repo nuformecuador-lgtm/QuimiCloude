@@ -7,6 +7,14 @@
 //
 // La pagina y los componentes de la ruta importan SIEMPRE desde aqui, nunca por ruta profunda.
 export {
+  BLOCKED_ORDER_CONFIRM_TESTID,
+  BLOCKED_ORDER_DIALOG_TESTID,
+  BLOCKED_ORDER_DISMISS_TESTID,
+  BLOCKED_ORDER_MESSAGE_TESTID,
+  BlockedOrderDialog,
+  type BlockedOrderDialogProps,
+} from './blocked-order-dialog';
+export {
   CANCEL_ORDER_CONFIRM_TESTID,
   CANCEL_ORDER_DIALOG_TESTID,
   CANCEL_ORDER_DISMISS_TESTID,
@@ -34,7 +42,6 @@ export {
   CANCELLATION_REASON_COLUMN_ID,
   COVERAGE_COLUMN_ID,
   MISSING_VALUE_MARK,
-  ORDER_DEFAULT_PINNED_COLUMNS,
   ORDER_NUMBER_COLUMN_ID,
   PRESENTATION_NAME_COLUMN_ID,
   QUANTITY_COLUMN_ID,
@@ -44,14 +51,22 @@ export {
   type OrderColumnsDeps,
 } from './order-columns';
 export { OrderField, type OrderFieldProps } from './order-field';
-export { multiplyDecimal, subtractDecimal } from './order-decimal';
+export { divideDecimal, multiplyDecimal, subtractDecimal } from './order-decimal';
+export {
+  lineCoverage,
+  type LineCoverage,
+  type LineCoverageInput,
+  type PresentationContent,
+} from './order-distribution-coverage';
 export { ORDER_AMOUNT_SYMBOL, formatOrderAmount, orderAmountTitle } from './order-amount';
 export {
+  ORDER_COST_QUOTE_APPROXIMATE_TESTID,
   ORDER_COST_QUOTE_ERROR_TESTID,
   ORDER_COST_QUOTE_QUOTING_TESTID,
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
   OrderCostQuote,
+  type OrderCostQuoteProps,
 } from './order-cost-quote';
 export {
   ORDER_COST_QUOTE_DEBOUNCE_MS,
@@ -60,6 +75,7 @@ export {
 } from './use-order-cost-quote';
 export {
   ORDER_BUSINESS_FIELDS,
+  ORDER_CONFIRM_BLOCKED_FIELD,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
@@ -76,6 +92,65 @@ export {
   type OrderFormProps,
   type OrderSheetSection,
 } from './order-form';
+export {
+  ORDER_DISTRIBUTION_ADD_PACKAGES_TESTID,
+  ORDER_DISTRIBUTION_ADD_TESTID,
+  ORDER_DISTRIBUTION_AVAILABLE_TESTID,
+  ORDER_DISTRIBUTION_ERROR_TESTID,
+  ORDER_DISTRIBUTION_LINE_COVERAGE_TESTID,
+  ORDER_DISTRIBUTION_LINE_LEGACY_TESTID,
+  ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
+  ORDER_DISTRIBUTION_LINE_PRESENTATION_TESTID,
+  ORDER_DISTRIBUTION_LINE_PROBLEM_TESTID,
+  ORDER_DISTRIBUTION_LINE_REMOVE_TESTID,
+  ORDER_DISTRIBUTION_LINE_TESTID,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  ORDER_DISTRIBUTION_TESTID,
+  ORDER_DISTRIBUTION_WARNING_TESTID,
+  ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID,
+  OrderDistributionField,
+  type OrderDistributionFieldProps,
+} from './order-distribution-field';
+export {
+  ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID,
+  ORDER_DISTRIBUTION_DIALOG_TESTID,
+  OrderDistributionDialog,
+  type OrderDistributionDialogProps,
+  type OrderDistributionDraft,
+} from './order-distribution-dialog';
+export {
+  ORDER_DISTRIBUTION_DEBOUNCE_MS,
+  availabilityBlocksSave,
+  distributionLinesValid,
+  fromOrderPresentationLines,
+  isLegacyLine,
+  lineKey,
+  toDistributionLinesInput,
+  toPresentationLinesInput,
+  useOrderDistributionAvailability,
+  type OrderDistributionAvailability,
+  type OrderDistributionAvailabilityInput,
+  type OrderDistributionLine,
+} from './use-order-distribution-availability';
+export {
+  PACKAGING_OPTION_AVAILABLE_TESTID,
+  PACKAGING_OPTION_PRESENTATION_TESTID,
+  PACKAGING_OPTION_TESTID,
+  PACKAGING_SELECT_EMPTY_TESTID,
+  PACKAGING_SELECT_FORBIDDEN_TESTID,
+  PACKAGING_SELECT_LOAD_ERROR_TESTID,
+  PACKAGING_SELECT_POPUP_TESTID,
+  PACKAGING_SELECT_TESTID,
+  PackagingSelect,
+  type PackagingOption,
+  type PackagingSelectProps,
+} from './packaging-select';
+export { compatibleUnitIds } from './compatible-unit-ids';
+export { useSavedPresentationContents } from './use-saved-line-contents';
 export { OrderListEmpty } from './order-list-empty';
 export {
   ORDER_INGREDIENTS_EMPTY_TESTID,
@@ -117,8 +192,9 @@ export {
 export { OrderListSection } from './order-list-section';
 export { ORDER_SKELETON_COLUMN_COUNT, OrderListSkeleton } from './order-list-skeleton';
 export {
-  FINAL_ORDER_REASON,
+  ORDER_ACTION_DISTRIBUTION_TESTID,
   OrderRowActions,
+  acceptsDistributionEdit,
   isFinalOrderStatus,
   type OrderRowActionsProps,
 } from './order-row-actions';
@@ -186,6 +262,15 @@ export {
   type RecipePickerPage,
   type RecipePickerProps,
 } from './recipe-picker';
+export {
+  ORIGINAL_VERSION_VALUE,
+  RECIPE_VERSION_FIELD,
+  RECIPE_VERSION_SELECT_TESTID,
+  RecipeVersionSelect,
+  type RecipeVersionChoice,
+  type RecipeVersionSelectProps,
+  type RecipeVersionSelectTexts,
+} from './recipe-version-select';
 export {
   ORDER_COVERAGE_LABELS,
   ORDER_PRIORITY_FILTER_OPTIONS,

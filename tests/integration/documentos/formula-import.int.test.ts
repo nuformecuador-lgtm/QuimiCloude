@@ -35,9 +35,12 @@ import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-s
 
 import {
   createRecipe,
+  createRecipeVersion,
   findAliveRecipeById,
   listAliveRecipes,
+  listAliveRecipeVersions,
   replaceAliveRecipe,
+  replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
@@ -61,7 +64,7 @@ import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { createCreateOrder } from '@/lib/modules/pedidos';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -69,6 +72,11 @@ import type { Actor as OrderActor } from '@/lib/modules/pedidos';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -90,6 +98,9 @@ const recipeRepository: RecipeRepository = {
   listAlive: listAliveRecipes,
   replaceAlive: replaceAliveRecipe,
   softDeleteAlive: softDeleteAliveRecipe,
+  createVersion: createRecipeVersion,
+  listAliveVersions: listAliveRecipeVersions,
+  replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
 /** Nadie del archivo sube ni borra imagen: reemplazar (R18) omite `image`, asi que el caso de
@@ -138,18 +149,20 @@ const orderUnitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        ...orderScopeReaders(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
       };
       return work(scope);
     }),
 };
 const orderPresentationCatalog = { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames };
-const orderUnitCatalog = { findRefs: findUnitRefs, findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
+const orderUnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => findMassVolumeBridge(), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
 const createOrderUseCase = createCreateOrder({
   recipes: recipeCatalog,
   products: productCatalog,
   units: orderUnitCatalog,
   presentations: orderPresentationCatalog,
+  packaging: packagingCatalog,
   unitOfWork: orderUnitOfWork,
 });
 
@@ -319,8 +332,10 @@ async function crearRecetaSembrada(
       name,
       description: 'Descripcion original',
       steps: [paso('Paso original 1')],
+      packingSteps: [],
       lines: overrides.lines ?? [],
       imagePath: overrides.imagePath ?? `recetas/${token()}.jpg`,
+      tools: [],
     } satisfies NewRecipe,
     empresa.userId,
     new Date(),
@@ -416,7 +431,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
       const sembrada = await crearRecetaSembrada(empresa, { lines: [{ productId: ingrediente, percentage: '100.00' }] });
 
       const pedido = await createOrderUseCase(
-        { recipeId: sembrada.id, quantity: '6.0000', priority: 'MEDIA', presentationId },
+        { recipeId: sembrada.id, quantity: '6.0000', priority: 'MEDIA', unitId: empresa.unitId },
         { id: empresa.userId, companyId: empresa.companyId, permissions: ['pedidos.modificar'] } satisfies OrderActor,
       );
       const antes = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } });
@@ -438,6 +453,67 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
 
       const despues = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } });
       expect(JSON.stringify(despues)).toBe(antesTextual);
+    });
+  });
+
+  describe('QC-194 R18 — el import de PDF y las herramientas de la receta', () => {
+    async function crearMaquina(companyId: string): Promise<string> {
+      const created = await createProduct(
+        { name: `Maquina ${token()}`, type: PRODUCT_TYPES.MACHINE, qtyAlert: null },
+        new Date(),
+        { companyId } satisfies InventoryScope,
+      );
+      return created.id;
+    }
+
+    it('R18: reemplazar por PDF una receta con dos herramientas las deja intactas', async () => {
+      const empresa = await crearEmpresa();
+      const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+      const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+      const sembrada = await crearRecetaSembrada(empresa, { lines: [{ productId: ingrediente, percentage: '100.00' }] });
+      const batidora = await crearMaquina(empresa.companyId);
+      const balanza = await crearMaquina(empresa.companyId);
+      await prisma.recipeTool.createMany({
+        data: [
+          { recipeId: sembrada.id, productId: batidora, quantity: 2 },
+          { recipeId: sembrada.id, productId: balanza, quantity: 1 },
+        ],
+      });
+      const herramientas = () =>
+        prisma.recipeTool.findMany({ where: { recipeId: sembrada.id }, orderBy: { productId: 'asc' } });
+      const antes = await herramientas();
+
+      const otroIngrediente = await crearProducto(empresa.companyId, `Otro ingrediente ${token()}`);
+      const resumen = await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+        documentFileId,
+        name: sembrada.name,
+        description: 'Formula reemplazada',
+        lines: [{ kind: 'existing', productId: otroIngrediente, percentage: '100.00' }],
+        steps: [],
+        replaceRecipeId: sembrada.id,
+      });
+
+      expect(resumen.outcome).toBe('replaced');
+      expect(antes).toHaveLength(2);
+      expect(await herramientas()).toEqual(antes);
+    });
+
+    it('R18: crear por PDF una receta nueva la deja sin herramientas', async () => {
+      const empresa = await crearEmpresa();
+      const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+      const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+
+      const resumen = await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+        documentFileId,
+        name: `Formula nueva ${token()}`,
+        description: null,
+        lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+        steps: [],
+        replaceRecipeId: null,
+      });
+
+      expect(resumen.outcome).toBe('created');
+      expect(await prisma.recipeTool.count({ where: { recipeId: resumen.recipeId } })).toBe(0);
     });
   });
 
@@ -610,5 +686,84 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
       const recetas = await prisma.recipe.count({ where: { companyId: empresa.companyId } });
       expect(recetas).toBe(0);
     });
+  });
+});
+
+describe('QC-211 — confirmar guarda los pasos de envasado revisados', () => {
+  it('R18: crear guarda los pasos de envasado en orden y separados de los del operador', async () => {
+    const empresa = await crearEmpresa();
+    const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+    const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+
+    const resumen = await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+      documentFileId,
+      name: `Formula envasado ${token()}`,
+      description: null,
+      lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+      steps: [paso('Mezclar')],
+      packingSteps: [paso('Envasar en garrafas'), paso('Etiquetar')],
+      replaceRecipeId: null,
+    });
+
+    expect(resumen.outcome).toBe('created');
+    const receta = await prisma.recipe.findUniqueOrThrow({ where: { id: resumen.recipeId } });
+    expect(receta.steps).toEqual([paso('Mezclar')]);
+    expect(receta.packingSteps).toEqual([paso('Envasar en garrafas'), paso('Etiquetar')]);
+  });
+
+  it('R18: reemplazar sustituye los pasos de envasado anteriores por los revisados', async () => {
+    const empresa = await crearEmpresa();
+    const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+    const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+    const name = `Formula ${token()}`;
+    const sembrada = await createRecipe(
+      {
+        name,
+        description: null,
+        steps: [paso('Paso original')],
+        packingSteps: [paso('Envasado viejo 1'), paso('Envasado viejo 2')],
+        lines: [{ productId: ingrediente, percentage: '100.00' }],
+        imagePath: null,
+        tools: [],
+      } satisfies NewRecipe,
+      empresa.userId,
+      new Date(),
+      { companyId: empresa.companyId } satisfies RecipeScope,
+    );
+    if (sembrada === 'duplicate') throw new Error('la receta sembrada de prueba choco con un nombre duplicado');
+
+    await createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+      documentFileId,
+      name,
+      description: null,
+      lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+      steps: [paso('Paso revisado')],
+      packingSteps: [paso('Envasado revisado')],
+      replaceRecipeId: sembrada.id,
+    });
+
+    const receta = await prisma.recipe.findUniqueOrThrow({ where: { id: sembrada.id } });
+    expect(receta.steps).toEqual([paso('Paso revisado')]);
+    expect(receta.packingSteps).toEqual([paso('Envasado revisado')]);
+  });
+
+  it('R17: un paso de envasado invalido rechaza entera la confirmacion y no crea la receta', async () => {
+    const empresa = await crearEmpresa();
+    const documentFileId = await crearArchivoListoFormula(empresa.companyId);
+    const ingrediente = await crearProducto(empresa.companyId, `Ingrediente ${token()}`);
+
+    await expect(
+      createConfirmFormulaImport(crearDeps())(actorDe(empresa), {
+        documentFileId,
+        name: `Formula ${token()}`,
+        description: null,
+        lines: [{ kind: 'existing', productId: ingrediente, percentage: '100.00' }],
+        steps: [],
+        packingSteps: [{ blocks: [{ kind: 'paragraph', spans: [] }] }],
+        replaceRecipeId: null,
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_input' });
+
+    expect(await prisma.recipe.count({ where: { companyId: empresa.companyId } })).toBe(0);
   });
 });

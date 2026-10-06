@@ -36,7 +36,9 @@ export type {
   RecipeCatalog,
   RecipeExecutionContent,
   RecipeExecutionLine,
+  RecipeExecutionTool,
 } from './domain/recipe-catalog';
+export type { RecipePackingStepsReader } from './domain/recipe-packing-steps-reader';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
   RECIPE_TOTAL_PERCENTAGE,
@@ -47,6 +49,13 @@ export {
   formatPercentage,
   type PercentageTotal,
 } from './domain/recipe-percentage';
+export {
+  VERSION_NAME_SEPARATOR,
+  recipeDisplayName,
+  isVersionUnderReview,
+  propagateLines,
+  propagateTools,
+} from './domain/recipe-version';
 export {
   MAX_IMAGE_BYTES,
   validateRecipeImage,
@@ -72,15 +81,25 @@ export {
   recipeLineSchema,
   createRecipeSchema,
   updateRecipeSchema,
+  createRecipeVersionSchema,
+  updateRecipeVersionSchema,
+  recipeToolSchema,
+  recipeToolsSchema,
+  MAX_TOOL_QUANTITY,
+  type RecipeToolInput,
   type RecipeLineInput,
   type CreateRecipeInput,
   type UpdateRecipeInput,
+  type CreateRecipeVersionInput,
+  type UpdateRecipeVersionInput,
 } from './domain/recipe-input';
 export {
   type RecipeSummary,
   type RecipeLineView,
+  type RecipeToolView,
   type RecipeStepView,
   type RecipeDetail,
+  type RecipeVersionSummary,
 } from './domain/recipe-view';
 
 // Las cinco factories de caso de uso (`design.md > 3`).
@@ -94,3 +113,15 @@ export {
   type StorageWarning,
 } from './domain/update-recipe';
 export { createDeleteRecipe, type DeleteRecipeDeps } from './domain/delete-recipe';
+export {
+  createCreateRecipeVersion,
+  type CreateRecipeVersionDeps,
+} from './domain/create-recipe-version';
+export {
+  createUpdateRecipeVersion,
+  type UpdateRecipeVersionDeps,
+} from './domain/update-recipe-version';
+export {
+  createListRecipeVersions,
+  type ListRecipeVersionsDeps,
+} from './domain/list-recipe-versions';

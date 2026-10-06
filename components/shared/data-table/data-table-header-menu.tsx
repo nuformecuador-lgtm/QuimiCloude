@@ -23,6 +23,8 @@ import { TableHead } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
 import type { DataTableColumn, DataTableSort, DataTableTexts } from './data-table-types';
+import { toColumnTextClass } from './data-table-column-style';
+import { DataTableColumnDivider } from './data-table-divider';
 
 /**
  * Menu por columna y celda de cabecera (`design.md > 2, 5, 8`, T7). Dos piezas de un mismo
@@ -86,7 +88,9 @@ export function DataTableHeaderMenu<TRow>({
   onOpenFilter,
 }: DataTableHeaderMenuProps<TRow>) {
   const isSortable = column.sortable === true;
-  const isPinnable = column.pinnable !== false;
+  // `defaultPinned` implica fijable (`data-table-types.ts`): nacer fijada y no ofrecer
+  // soltarla convertiria el defecto en imposicion.
+  const isPinnable = column.pinnable !== false || column.defaultPinned !== undefined;
   const isFilterable = column.filter !== undefined;
 
   if (!isSortable && !isPinnable && !isFilterable) {
@@ -172,6 +176,11 @@ export type DataTableHeaderCellProps<TRow> = {
   readonly pinned?: 'left' | 'right' | false;
   /** Estilo `position: sticky` con el desplazamiento calculado por quien compone (T11, R24, R28). */
   readonly style?: CSSProperties;
+  /**
+   * Pinta el divisor vertical en el borde derecho (todas salvo la ultima columna, lo decide
+   * quien compone). Ausente = sin divisor, el comportamiento de siempre.
+   */
+  readonly divider?: boolean;
 };
 
 /**
@@ -187,6 +196,7 @@ export function DataTableHeaderCell<TRow>({
   children,
   pinned = false,
   style,
+  divider = false,
 }: DataTableHeaderCellProps<TRow>) {
   const isSortable = column.sortable === true;
   const isActive = sort !== null && sort.columnId === column.id;
@@ -204,9 +214,14 @@ export function DataTableHeaderCell<TRow>({
       data-testid={`data-table-head-${column.id}`}
       data-pinned={pinned === false ? undefined : pinned}
       style={style}
-      className={cn(column.align === 'end' && 'text-right', pinned !== false && 'bg-background')}
+      className={cn(
+        column.align === 'end' && 'text-right',
+        pinned !== false && 'bg-background',
+        toColumnTextClass(column),
+        divider && 'relative',
+      )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         {isSortable ? (
           <button
             type="button"
@@ -224,6 +239,7 @@ export function DataTableHeaderCell<TRow>({
         )}
         {children}
       </div>
+      {divider ? <DataTableColumnDivider testId={`data-table-head-divider-${column.id}`} /> : null}
     </TableHead>
   );
 }

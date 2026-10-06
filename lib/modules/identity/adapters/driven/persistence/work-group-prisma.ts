@@ -30,19 +30,24 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
+import { buildDisplayName } from '../../../domain/display-name';
+
 import { insensitiveContainsCondition } from './list-query-sql';
 
 import type { ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
-import type { WorkGroupRow } from '../../../domain/work-group-view';
+import type { WorkGroupMemberRow, WorkGroupRow } from '../../../domain/work-group-view';
 import type { AddMemberOutcome, MemberCandidate } from '../../../ports/work-group-repository';
 
 // ---------------------------------------------------------------------------------------------
 // Proyecciones: columnas ENUMERADAS, nunca un `findMany` sin `select`
 // ---------------------------------------------------------------------------------------------
 
-/** R26: la fila del listado son DOS columnas. Ni `nameNormalized`, ni `companyId`, ni
- *  `deletedAt`, ni marcas de tiempo: lo que no se muestra no se lee. */
+/** R26: la propia tabla `work_groups` aporta DOS columnas a la fila del listado, `id` y `name`.
+ *  Los MIEMBROS de cada fila no salen de aqui —`WorkGroupMember` no es una relacion declarada en
+ *  el esquema (ver `listMembersAliveInCompany` mas abajo)— sino de las dos consultas aparte que
+ *  `listAliveInCompany` hace DESPUES de esta. Ni `nameNormalized`, ni `companyId`, ni `deletedAt`,
+ *  ni marcas de tiempo del grupo: lo que no se muestra no se lee. */
 const WORK_GROUP_ROW_SELECT = {
   id: true,
   name: true,
@@ -60,11 +65,33 @@ const MEMBER_CANDIDATE_SELECT = {
   lockedUntil: true,
 } satisfies Prisma.UserSelect;
 
+/** Lo que la columna de miembros del listado necesita para componer `displayName`, y nada mas: ni
+ *  `accountStatus` ni `lockedUntil`, porque esta columna es un vistazo informativo de «quien esta
+ *  en el grupo», no el flujo de alta/baja de `listMembersAliveInCompany` — ese filtro de estado
+ *  efectivo sigue viviendo SOLO en `list-work-group-members.ts` (QC-78 R7); replicarlo aqui seria
+ *  una segunda copia de la misma regla. */
+const WORK_GROUP_ROW_MEMBER_SELECT = {
+  id: true,
+  firstNames: true,
+  lastNames: true,
+  username: true,
+} satisfies Prisma.UserSelect;
+
 type WorkGroupRowPayload = Prisma.WorkGroupGetPayload<{ select: typeof WORK_GROUP_ROW_SELECT }>;
 type MemberCandidatePayload = Prisma.UserGetPayload<{ select: typeof MEMBER_CANDIDATE_SELECT }>;
+type WorkGroupRowMemberPayload = Prisma.UserGetPayload<{
+  select: typeof WORK_GROUP_ROW_MEMBER_SELECT;
+}>;
 
-function toWorkGroupRow(row: WorkGroupRowPayload): WorkGroupRow {
-  return { id: row.id, name: row.name };
+function toWorkGroupRowMember(row: WorkGroupRowMemberPayload): WorkGroupMemberRow {
+  return { id: row.id, displayName: buildDisplayName(row.firstNames, row.lastNames, row.username) };
+}
+
+function toWorkGroupRow(
+  row: WorkGroupRowPayload,
+  members: readonly WorkGroupMemberRow[],
+): WorkGroupRow {
+  return { id: row.id, name: row.name, members };
 }
 
 function toMemberCandidate(row: MemberCandidatePayload): MemberCandidate {
@@ -272,7 +299,14 @@ export function buildWorkGroupWhere(
 
 /** `listAliveInCompany` del puerto (R24-R26). El defecto de 10 y el tope de 25 salen de
  *  `lib/shared/pagination`, la MISMA implementacion que usa el resto de la aplicacion: pedir 100
- *  devuelve 25, no un error. */
+ *  devuelve 25, no un error.
+ *
+ *  Cada fila trae ademas sus MIEMBROS (humano, fuera de QC-84/R26 original). Son DOS consultas
+ *  mas, y SOLO sobre la pagina de grupos ya resuelta —nunca sobre toda la tabla—: primero las
+ *  pertenencias de esos grupos, despues las personas unicas que aparecen en ellas. Mismo patron de
+ *  dos pasos que `listMembersAliveInCompany`, por el mismo motivo: `WorkGroupMember` no declara
+ *  relacion en el esquema (sus FKs compuestas con `company_id` estan a mano en el `migration.sql`
+ *  de QC-83), asi que Prisma no puede resolverlo con un `include`. */
 export async function listAliveInCompany(
   companyId: string,
   query: ListQuery,
@@ -291,7 +325,73 @@ export async function listAliveInCompany(
     prisma.workGroup.count({ where }),
   ]);
 
-  return buildPage(rows.map(toWorkGroupRow), total, query.page, limit);
+  if (rows.length === 0) return buildPage([], total, query.page, limit);
+
+  const membersByGroup = await membersOfGroups(
+    companyId,
+    rows.map((row) => row.id),
+  );
+
+  return buildPage(
+    rows.map((row) => toWorkGroupRow(row, membersByGroup.get(row.id) ?? [])),
+    total,
+    query.page,
+    limit,
+  );
+}
+
+/**
+ * Las pertenencias de ESTA pagina de grupos, agrupadas por `workGroupId`, con el `displayName` ya
+ * compuesto. Dos consultas:
+ *
+ *   1. Las pertenencias de los grupos de la pagina (`workGroupId`, `userId`), acotadas a la
+ *      empresa (R8, R9).
+ *   2. Las personas unicas que aparecen en esas pertenencias, vivas de la empresa —SIN filtrar por
+ *      `effectiveAccountStatus` (QC-78 R7), y es deliberado: esta columna es un vistazo
+ *      informativo de «quien esta en el grupo», no el flujo de alta/baja que gestiona
+ *      `list-work-group-members.ts`. Ese filtro de estado efectivo sigue viviendo SOLO ahi.
+ *
+ * El orden de salida de la consulta de personas (`lastNames, firstNames, id`) es el mismo criterio
+ * que usa `listMembersAliveInCompany`, y se conserva al repartir cada persona en el grupo al que
+ * pertenece.
+ */
+async function membersOfGroups(
+  companyId: string,
+  workGroupIds: readonly string[],
+): Promise<Map<string, WorkGroupMemberRow[]>> {
+  const memberships = await prisma.workGroupMember.findMany({
+    where: { workGroupId: { in: [...workGroupIds] }, companyId },
+    select: { workGroupId: true, userId: true },
+  });
+
+  const result = new Map<string, WorkGroupMemberRow[]>();
+  if (memberships.length === 0) return result;
+
+  const userIds = [...new Set(memberships.map((membership) => membership.userId))];
+  const people = await prisma.user.findMany({
+    where: { id: { in: userIds }, companyId, deletedAt: null },
+    select: WORK_GROUP_ROW_MEMBER_SELECT,
+    orderBy: [{ lastNames: 'asc' }, { firstNames: 'asc' }, { id: 'asc' }],
+  });
+
+  // `workGroupIdsByUser`: a que grupos pertenece cada persona, para repartirla manteniendo el
+  // orden de `people` —no el de `memberships`, que no tiene ningun orden garantizado—.
+  const workGroupIdsByUser = new Map<string, string[]>();
+  for (const membership of memberships) {
+    const bucket = workGroupIdsByUser.get(membership.userId);
+    if (bucket === undefined) workGroupIdsByUser.set(membership.userId, [membership.workGroupId]);
+    else bucket.push(membership.workGroupId);
+  }
+
+  for (const person of people) {
+    const member = toWorkGroupRowMember(person);
+    for (const workGroupId of workGroupIdsByUser.get(person.id) ?? []) {
+      const bucket = result.get(workGroupId);
+      if (bucket === undefined) result.set(workGroupId, [member]);
+      else bucket.push(member);
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -373,15 +473,17 @@ export async function listMembersAliveInCompany(
  * mensaje de R31. Aqui no se cocina ningun motivo: eso seria la segunda copia de la regla que
  * QC-78 R7 puso en una sola funcion.
  *
- * La fila se crea SEA CUAL SEA el estado de cuenta de esa persona (R28): pertenecer no depende del
- * estado. El `INSERT` fallido aborta la transaccion, asi que devolver `'already_member'` no
- * confirma ninguna escritura.
+ * Antes del `INSERT` se pregunta `admits` con el estado crudo: la regla de quien puede entrar es del
+ * dominio y aqui solo se invoca. Si no la admite, se mira si ya pertenecia para que el mensaje siga
+ * siendo el de «ya pertenece» con su motivo y no el de «no admitida». El `INSERT` fallido aborta la transaccion, asi que
+ * devolver `'already_member'` no confirma ninguna escritura.
  */
 export async function addMemberAliveInCompany(
   companyId: string,
   id: string,
   userId: string,
   now: Date,
+  admits: (account: MemberCandidate) => boolean,
 ): Promise<AddMemberOutcome> {
   return prisma.$transaction(async (tx) => {
     const groupId = await findAliveGroupId(tx, companyId, id);
@@ -393,6 +495,15 @@ export async function addMemberAliveInCompany(
     });
     if (user === null) return { kind: 'user_not_found' };
 
+    const account = toMemberCandidate(user);
+    if (!admits(account)) {
+      const existing = await tx.workGroupMember.findFirst({
+        where: { workGroupId: groupId, userId: user.id, companyId },
+        select: { userId: true },
+      });
+      return existing === null ? { kind: 'not_admitted' } : { kind: 'already_member', account };
+    }
+
     try {
       await tx.workGroupMember.create({
         data: { workGroupId: groupId, userId: user.id, companyId, createdAt: now, updatedAt: now },
@@ -401,7 +512,7 @@ export async function addMemberAliveInCompany(
       return { kind: 'created' };
     } catch (error) {
       if (isDuplicateMemberViolation(error)) {
-        return { kind: 'already_member', account: toMemberCandidate(user) };
+        return { kind: 'already_member', account };
       }
       throw error;
     }

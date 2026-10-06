@@ -20,13 +20,13 @@ export type SessionTicket = {
    */
   readonly roleName: string;
   /**
-   * Empresa a la que pertenece esa persona EN EL INSTANTE de emitir (QC-48 R1, R6). Sale de su
-   * propia ficha (`users.company_id`, leida por la misma consulta que autentica) y jamas de la
-   * entrada del login: la empresa no se pregunta ni se elige. Viaja firmada dentro de la cookie
-   * desde `v3` como `cid`, igual que el rol desde `v2`, y es solo el IDENTIFICADOR: nada del
-   * nombre de la empresa ni de su estado de baja.
+   * Empresa a la que pertenece esa persona en el instante de emitir. Sale de su propia ficha
+   * (`users.company_id`, leida por la misma consulta que autentica) y jamas de la entrada del
+   * login: la empresa no se pregunta ni se elige. Viaja firmada como `cid` y es solo el
+   * identificador. `null` solo para el Maestro, que no pertenece a ninguna empresa: la base
+   * impide que cualquier otro rol quede sin ella.
    */
-  readonly companyId: string;
+  readonly companyId: string | null;
   /**
    * QC-23 T4 (R1, R2) — IDENTIFICADOR de ESTA sesion, con forma de UUID. Viaja firmado dentro de
    * la cookie desde `v4` como `sid`, igual que el rol desde `v2` y la empresa desde `v3`.
@@ -50,10 +50,10 @@ export type SessionTicket = {
  * `roleName` es obligatorio y va sin valor por defecto a proposito: un rol por defecto seria un
  * rol inventado, y QC-9 R26 exige que salga de la base o que no haya sesion.
  *
- * `companyId` es obligatorio y va sin valor por defecto por el mismo motivo (QC-48 R5): una
- * empresa por defecto seria una empresa inventada, y si el sistema no puede resolver una empresa
- * para quien se autentica, lo que corresponde es no emitir sesion. Va posicional y no en un
- * objeto para que `strict` marque uno a uno los sitios de llamada.
+ * `companyId` es obligatorio y va sin valor por defecto por el mismo motivo: una empresa por
+ * defecto seria una empresa inventada. `null` es un valor explicito —la ficha no tiene
+ * empresa—, nunca una omision. Va posicional y no en un objeto para que `strict` marque uno a
+ * uno los sitios de llamada.
  *
  * `sessionId` es obligatorio, posicional y **sin valor por defecto** (QC-23 R1, R2): un `sid`
  * inventado aqui dentro seria un `sid` no aleatorio —y, peor, derivable de lo que el resto del
@@ -64,7 +64,7 @@ export type SessionTicket = {
 export function createSessionTicket(
   userId: string,
   roleName: string,
-  companyId: string,
+  companyId: string | null,
   sessionId: string,
   now: Date = new Date(),
 ): SessionTicket {

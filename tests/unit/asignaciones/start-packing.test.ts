@@ -7,6 +7,7 @@ import {
   OrderNotFoundError,
   OrderNotPackableError,
   OrderPackingTakenError,
+  OrderWithoutDistributionError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/asignaciones/domain/errors';
@@ -23,7 +24,7 @@ const PEDIDO = uuid('7');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
 
-type Resultado = 'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found';
+type Resultado = 'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution';
 
 function montar(resultado: Resultado): {
   readonly deps: StartPackingDeps;
@@ -120,6 +121,17 @@ describe('startPacking — R23: estado que no admite Comenzar', () => {
     const startPacking = createStartPacking(deps);
 
     await expect(startPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotPackableError);
+  });
+});
+
+describe('startPacking — R10: POR_EMPACAR sin ninguna linea de reparto', () => {
+  it('`without_distribution` rechaza con `order_without_distribution`', async () => {
+    const { deps } = montar('without_distribution');
+    const startPacking = createStartPacking(deps);
+
+    await expect(startPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderWithoutDistributionError,
+    );
   });
 });
 

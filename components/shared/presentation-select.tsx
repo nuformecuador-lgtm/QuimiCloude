@@ -60,10 +60,18 @@ const EMPTY_LABEL = 'Ninguna presentación coincide con la búsqueda.';
 const LOADING_LABEL = 'Cargando presentaciones...';
 
 /** Solo lo que el selector necesita de una presentacion. R25: aqui no se lista, ni se edita, ni se borra. */
-type PresentationOption = {
+export type PresentationOption = {
   readonly id: string;
   readonly name: string;
+  /** `null` = sin contenido declarado. */
+  readonly content: string | null;
+  /** Unidad en que se expresa `content`. */
+  readonly unitId: string;
 };
+
+export const PRESENTATION_OPTION_WITHOUT_CONTENT_TESTID = 'presentation-option-without-content';
+
+const WITHOUT_CONTENT_LABEL = 'Sin contenido: complétalo en Presentaciones';
 
 type PresentationSelectProps = {
   /** Presentacion ya asignada al producto que se edita (R19). Ausente en el alta. */
@@ -97,6 +105,16 @@ type PresentationSelectProps = {
    * ofrecerlo. Elegir una presentacion YA EXISTENTE sigue funcionando igual.
    */
   readonly units?: readonly UnitRef[];
+  /** Nombre del campo espejo en el `FormData`. `null` = no aporta campo; el llamante usa `onSelect`. */
+  readonly name?: string | null;
+  readonly onSelect?: (option: PresentationOption) => void;
+  /** Marca las presentaciones sin contenido y no deja elegirlas. */
+  readonly requireContent?: boolean;
+  /**
+   * Solo ofrece presentaciones en estas unidades; ausente = todas. Cambiarla no reinicia una
+   * lista ya abierta: quien la cambie remonta el selector con `key`.
+   */
+  readonly unitIds?: readonly string[];
 };
 
 /**
@@ -176,6 +194,10 @@ export function PresentationSelect({
   error,
   helper,
   units,
+  name = PRESENTATION_FIELD,
+  onSelect,
+  requireContent = false,
+  unitIds,
 }: PresentationSelectProps) {
   const labelId = useId();
   const inputId = useId();
@@ -243,10 +265,13 @@ export function PresentationSelect({
     // Sin termino la clave se omite por claridad del sitio de llamada, no porque el esquema fuera
     // a rechazarla: con el contrato de QC-57 una busqueda vacia es AUSENCIA de busqueda.
     const filtro = search === '' ? {} : { search };
+    const porUnidad =
+      unitIds === undefined ? {} : { filters: { unitId: { kind: 'select', values: unitIds } } };
     const result = await listPresentationsAction({
       page,
       pageSize: MAX_PAGE_SIZE,
       ...filtro,
+      ...porUnidad,
     });
 
     if (result.status === 'error') {
@@ -256,11 +281,16 @@ export function PresentationSelect({
     }
 
     return {
-      items: result.data.items.map((item) => ({ id: item.id, name: item.name })),
+      items: result.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        content: item.content,
+        unitId: item.unitId,
+      })),
       page: result.data.page,
       totalPages: result.data.totalPages,
     };
-  }, []);
+  }, [unitIds]);
 
   const {
     items,
@@ -288,6 +318,8 @@ export function PresentationSelect({
   );
 
   function choose(option: PresentationOption) {
+    if (requireContent && option.content === null) return;
+    onSelect?.(option);
     setSelectedId(option.id);
     setSelectedName(option.name);
     setDraft(null);
@@ -352,7 +384,12 @@ export function PresentationSelect({
     // Exito: la presentacion nueva queda SELECCIONADA y el sub-formulario se cierra. No se toca
     // ningun otro campo del producto: lo escrito sigue donde estaba (R24). Se guarda ademas en
     // `created` para que siga ofreciendose aunque la consulta vigente no la traiga todavia.
-    const nueva = { id: result.id, name: parsed.data.name };
+    const nueva = {
+      id: result.id,
+      name: parsed.data.name,
+      content: parsed.data.content ?? null,
+      unitId: parsed.data.unitId,
+    };
     setCreated((previous) => [...previous, nueva]);
     setSelectedId(nueva.id);
     setSelectedName(nueva.name);
@@ -367,7 +404,12 @@ export function PresentationSelect({
   // `flatMap` y no con el metodo de recorte por texto: aqui no se filtra por lo escrito, que es
   // trabajo del servidor.
   const seleccionables = [
-    ...created.flatMap((nueva) => (items.some((item) => item.id === nueva.id) ? [] : [nueva])),
+    ...created.flatMap((nueva) =>
+      items.some((item) => item.id === nueva.id) ||
+      (unitIds !== undefined && !unitIds.includes(nueva.unitId))
+        ? []
+        : [nueva],
+    ),
     ...items,
   ];
 
@@ -425,18 +467,20 @@ export function PresentationSelect({
         aviso del navegador. Es el mismo patron que usa el propio primitivo de Base UI para su
         input de validacion, `aria-hidden` incluido: el nombre accesible lo lleva el combobox.
       */}
-      <input
-        type="text"
-        name={PRESENTATION_FIELD}
-        required
-        value={selectedId}
-        onChange={() => undefined}
-        onFocus={() => document.getElementById(inputId)?.focus()}
-        aria-hidden="true"
-        tabIndex={-1}
-        className="sr-only"
-        data-testid="presentation-value"
-      />
+      {name === null ? null : (
+        <input
+          type="text"
+          name={name}
+          required
+          value={selectedId}
+          onChange={() => undefined}
+          onFocus={() => document.getElementById(inputId)?.focus()}
+          aria-hidden="true"
+          tabIndex={-1}
+          className="sr-only"
+          data-testid="presentation-value"
+        />
+      )}
 
       <Autocomplete
         items={seleccionables}
@@ -474,19 +518,33 @@ export function PresentationSelect({
             {mensajeDeFallo === null ? (
               <>
                 <AutocompleteList>
-                  {(option: PresentationOption, index: number) => (
-                    <AutocompleteItem
-                      key={option.id}
-                      index={index}
-                      value={option}
-                      className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
-                      data-testid="presentation-option"
-                      data-presentation-id={option.id}
-                      onClick={() => choose(option)}
-                    >
-                      <span className="truncate">{option.name}</span>
-                    </AutocompleteItem>
-                  )}
+                  {(option: PresentationOption, index: number) => {
+                    const withoutContent = requireContent && option.content === null;
+                    return (
+                      <AutocompleteItem
+                        key={option.id}
+                        index={index}
+                        value={option}
+                        disabled={withoutContent}
+                        className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
+                        data-testid="presentation-option"
+                        data-presentation-id={option.id}
+                        data-without-content={withoutContent ? 'true' : undefined}
+                        onClick={() => choose(option)}
+                      >
+                        <span className="truncate">{option.name}</span>
+                        {withoutContent ? (
+                          <span
+                            className="ml-auto flex items-center gap-1 text-sm text-destructive"
+                            data-testid={PRESENTATION_OPTION_WITHOUT_CONTENT_TESTID}
+                          >
+                            <CircleAlertIcon className="size-4" aria-hidden />
+                            {WITHOUT_CONTENT_LABEL}
+                          </span>
+                        ) : null}
+                      </AutocompleteItem>
+                    );
+                  }}
                 </AutocompleteList>
 
                 {seleccionables.length === 0 && !cargando ? (

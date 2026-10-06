@@ -7,9 +7,10 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
+  createErrorStateTranslator,
   ERROR_CODES,
   ERROR_MESSAGE_KEY,
   ERROR_MESSAGES_ES,
@@ -17,6 +18,11 @@ import {
   UNEXPECTED_ERROR_CODE,
   type ErrorCode,
 } from '@/lib/modules/errores'
+import {
+  PedidosError,
+  RecipeNotFoundError,
+  RecipeVersionUnderReviewError,
+} from '@/lib/modules/pedidos/domain/errors'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -39,11 +45,16 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 60 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 70 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 60 y no 56: entran `customer_not_found` (QC-154), `order_packing_taken`,
-      // `order_not_packable` y `order_produced_frozen` (QC-168).
-      expect(ERROR_CODES).toHaveLength(60)
+      // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
+      // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
+      // `recipe_version_under_review` (QC-172). 67 y no 65: entran `order_would_block` y
+      // `order_blocked` (QC-138). 68 y no 67: entra `work_group_member_not_active` (fix de grupos,
+      // solo entran personas con estado efectivo activo). 69 y no 68: entra `work_group_member_self`
+      // (nadie puede meterse a si mismo en un grupo).
+      // 70 y no 69: entra `order_unit_not_convertible` (QC-204).
+      expect(ERROR_CODES).toHaveLength(70)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -372,6 +383,36 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     })
   })
 
+  describe('decimoquinta enmienda, 2026-10-01 — QC-138 R6 y R32: order_would_block, order_blocked', () => {
+    it('R6, R32 — los dos codigos estan en el catalogo con su clave y su texto exactos', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('order_would_block')
+      expect(codigos).toContain('order_blocked')
+      expect(ERROR_MESSAGE_KEY.order_would_block).toBe('errors.order_would_block')
+      expect(ERROR_MESSAGE_KEY.order_blocked).toBe('errors.order_blocked')
+      expect(errorMessage('order_would_block')).toBe(
+        'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
+      )
+      expect(errorMessage('order_blocked')).toBe(
+        'Falta material: el pedido esta bloqueado y no se puede iniciar.',
+      )
+    })
+
+    it('R6, R32 — se distinguen entre si y de insufficient_material e invalid_transition', () => {
+      const bloquearia = errorMessage('order_would_block')
+      const bloqueado = errorMessage('order_blocked')
+      expect(bloquearia).not.toBe(bloqueado)
+      expect(bloquearia).not.toBe(errorMessage('insufficient_material'))
+      expect(bloqueado).not.toBe(errorMessage('insufficient_material'))
+      expect(bloqueado).not.toBe(errorMessage('invalid_transition'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la decimoquinta enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Decimoquinta enmienda, 2026-10-01**')
+    })
+  })
+
   describe('R19 — los codigos inequivocos no se renombran', () => {
     it('los trece codigos congelados conservan su valor', () => {
       const codigos: readonly string[] = ERROR_CODES
@@ -466,10 +507,38 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
       expect(errorMessage('user_not_pending')).not.toBe(errorMessage('user_not_found'))
     })
 
+    it('QC-172 R33: recipe_version_under_review sale por el traductor con su texto, distinto de recipe_not_found', async () => {
+      const toErrorState = createErrorStateTranslator(PedidosError, async () => null, vi.fn())
+
+      expect(await toErrorState(new RecipeVersionUnderReviewError())).toEqual({
+        status: 'error',
+        code: 'recipe_version_under_review',
+        message: 'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
+      })
+      expect(await toErrorState(new RecipeNotFoundError())).not.toMatchObject({
+        code: 'recipe_version_under_review',
+      })
+      expect(errorMessage('recipe_version_under_review')).not.toBe(errorMessage('recipe_not_found'))
+    })
+
     it('el modulo errores no importa identity ni lo nombra', () => {
       for (const file of moduleFiles) {
         expect(readModuleFile(file)).not.toMatch(/lib\/modules\/identity/)
       }
     })
+  })
+})
+
+describe('QC-161 R41 — el nombre de usuario duplicado ya no se acota a la empresa', () => {
+  it('R41 — duplicate_username dice el choque sin nombrar la empresa', () => {
+    expect(errorMessage('duplicate_username')).toBe('Ya existe un usuario con ese nombre de usuario.')
+    expect(errorMessage('duplicate_username').toLowerCase()).not.toContain('empresa')
+  })
+
+  it('R41 — duplicate_email y duplicate_document siguen diciendo que el choque es en la empresa', () => {
+    expect(errorMessage('duplicate_email')).toBe('Ya existe un usuario con ese correo en la empresa.')
+    expect(errorMessage('duplicate_document')).toBe(
+      'Ya existe un usuario con ese documento en la empresa.',
+    )
   })
 })

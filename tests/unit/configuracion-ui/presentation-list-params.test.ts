@@ -161,12 +161,13 @@ describe('esta lista SI busca, y NUNCA filtra (R9, R10)', () => {
     ).toBe(false);
   });
 
-  it('los filtros son SIEMPRE {}: la unica columna filtrable del contrato es una que no se pinta', () => {
-    expect(Object.keys(PRESENTATION_QUERYABLE.filterable)).toEqual(['createdAt']);
+  it('los filtros son SIEMPRE {}: ninguna columna filtrable del contrato se pinta en esta pantalla', () => {
+    expect(Object.keys(PRESENTATION_QUERYABLE.filterable)).toEqual(['createdAt', 'unitId']);
 
     for (const entrada of [
       { createdFrom: '2026-01-01', createdTo: '2026-02-28' },
       { createdAt: '2026-01-01', name: 'algo' },
+      { unitId: '11111111-1111-4111-8111-111111111111' },
     ]) {
       expect(parsePresentationListParams(entrada).filters).toEqual({});
     }

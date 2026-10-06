@@ -115,24 +115,94 @@ describe('contrato RecipeCatalog', () => {
   })
 })
 
+/** Campos de fila de una original: sin `parent`; las lineas no cuentan para la revision. */
+const ORIGINAL = { parent: null, lines: [] } as const
+const REF_ORIGINAL = (name: string) => ({ ownName: name, isUnderReview: false, original: null })
+const pct = (value: string) => ({ toFixed: () => value })
+
 describe('toRecipeRef', () => {
   it('marca isDeleted true cuando deletedAt trae fecha, y conserva el nombre (R44)', () => {
-    const ref = toRecipeRef({ id: 'r-1', name: 'Detergente', deletedAt: new Date('2026-01-01') })
-    expect(ref).toEqual({ id: 'r-1', name: 'Detergente', isDeleted: true })
+    const ref = toRecipeRef({ id: 'r-1', name: 'Detergente', deletedAt: new Date('2026-01-01'), ...ORIGINAL })
+    expect(ref).toEqual({ id: 'r-1', name: 'Detergente', ...REF_ORIGINAL('Detergente'), isDeleted: true })
   })
 
   it('marca isDeleted false cuando deletedAt es null', () => {
-    expect(toRecipeRef({ id: 'r-2', name: 'Cloro', deletedAt: null })).toEqual({
+    expect(toRecipeRef({ id: 'r-2', name: 'Cloro', deletedAt: null, ...ORIGINAL })).toEqual({
       id: 'r-2',
       name: 'Cloro',
+      ...REF_ORIGINAL('Cloro'),
       isDeleted: false,
     })
   })
 
   // Mutacion: si el mapeo hiciera `Boolean(deletedAt)` mal o invirtiera el sentido, cae.
   it('no confunde viva con dada de baja', () => {
-    expect(toRecipeRef({ id: 'r-3', name: 'X', deletedAt: null }).isDeleted).not.toBe(true)
-    expect(toRecipeRef({ id: 'r-3', name: 'X', deletedAt: new Date() }).isDeleted).not.toBe(false)
+    expect(toRecipeRef({ id: 'r-3', name: 'X', deletedAt: null, ...ORIGINAL }).isDeleted).not.toBe(true)
+    expect(toRecipeRef({ id: 'r-3', name: 'X', deletedAt: new Date(), ...ORIGINAL }).isDeleted).not.toBe(false)
+  })
+})
+
+describe('toRecipeRef de una version', () => {
+  const PADRE = { id: 'r-original', name: 'Crema base' }
+
+  it('R11: el nombre mostrado es «Original · Version», con el propio y la original aparte', () => {
+    const ref = toRecipeRef({
+      id: 'r-version',
+      name: 'Sin perfume',
+      deletedAt: null,
+      parent: PADRE,
+      lines: [{ percentage: pct('60.00') }, { percentage: pct('40.00') }],
+    })
+
+    expect(ref).toEqual({
+      id: 'r-version',
+      name: 'Crema base · Sin perfume',
+      ownName: 'Sin perfume',
+      isDeleted: false,
+      isUnderReview: false,
+      original: { id: 'r-original', name: 'Crema base' },
+    })
+  })
+
+  it('R21: una version cuyas lineas no suman 100 esta por revisar', () => {
+    const ref = toRecipeRef({
+      id: 'r-version',
+      name: 'Sin perfume',
+      deletedAt: null,
+      parent: PADRE,
+      lines: [{ percentage: pct('60.00') }, { percentage: pct('39.99') }],
+    })
+
+    expect(ref.isUnderReview).toBe(true)
+  })
+
+  it('R21: una version sin lineas esta por revisar', () => {
+    const ref = toRecipeRef({ id: 'r-version', name: 'Vacia', deletedAt: null, parent: PADRE, lines: [] })
+
+    expect(ref.isUnderReview).toBe(true)
+  })
+
+  it('R21: una original sin lineas NO esta por revisar, ni una que no suma 100', () => {
+    expect(toRecipeRef({ id: 'r-1', name: 'Vieja', deletedAt: null, parent: null, lines: [] }).isUnderReview).toBe(
+      false,
+    )
+    expect(
+      toRecipeRef({ id: 'r-1', name: 'Vieja', deletedAt: null, parent: null, lines: [{ percentage: pct('50.00') }] })
+        .isUnderReview,
+    ).toBe(false)
+  })
+
+  it('R11: una version dada de baja conserva su nombre compuesto', () => {
+    const ref = toRecipeRef({
+      id: 'r-version',
+      name: 'Sin perfume',
+      deletedAt: new Date('2026-03-03'),
+      parent: PADRE,
+      lines: [{ percentage: pct('100.00') }],
+    })
+
+    expect(ref.name).toBe('Crema base · Sin perfume')
+    expect(ref.isDeleted).toBe(true)
   })
 })
 
@@ -141,15 +211,15 @@ const EMPRESA = 'empresa-1'
 describe('findRecipeRefsIncludingDeleted', () => {
   it('devuelve la receta dada de baja con su nombre e isDeleted true, y la viva con false (R44)', async () => {
     findMany.mockResolvedValue([
-      { id: 'r-viva', name: 'Cloro 5%', deletedAt: null },
-      { id: 'r-baja', name: 'Detergente viejo', deletedAt: new Date('2026-02-02') },
+      { id: 'r-viva', name: 'Cloro 5%', deletedAt: null, ...ORIGINAL },
+      { id: 'r-baja', name: 'Detergente viejo', deletedAt: new Date('2026-02-02'), ...ORIGINAL },
     ])
 
     const refs = await findRecipeRefsIncludingDeleted(['r-viva', 'r-baja'], EMPRESA)
 
     expect(refs).toEqual([
-      { id: 'r-viva', name: 'Cloro 5%', isDeleted: false },
-      { id: 'r-baja', name: 'Detergente viejo', isDeleted: true },
+      { id: 'r-viva', name: 'Cloro 5%', ...REF_ORIGINAL('Cloro 5%'), isDeleted: false },
+      { id: 'r-baja', name: 'Detergente viejo', ...REF_ORIGINAL('Detergente viejo'), isDeleted: true },
     ])
   })
 
@@ -165,12 +235,18 @@ describe('findRecipeRefsIncludingDeleted', () => {
       AND: [{ companyId: EMPRESA }, { id: { in: ['r-1', 'r-2'] } }],
     })
     expect(JSON.stringify(args.where)).not.toContain('deletedAt')
-    // Y `deletedAt` se PIDE en el select: es de donde sale `isDeleted`.
-    expect(args.select).toEqual({ id: true, name: true, deletedAt: true })
+    // `deletedAt` da `isDeleted`; `parent` y los porcentajes, el nombre mostrado y la revision.
+    expect(args.select).toEqual({
+      id: true,
+      name: true,
+      deletedAt: true,
+      parent: { select: { id: true, name: true } },
+      lines: { select: { percentage: true } },
+    })
   })
 
   it('un id que no existe simplemente no vuelve: no se inventa una fila', async () => {
-    findMany.mockResolvedValue([{ id: 'r-1', name: 'Cloro', deletedAt: null }])
+    findMany.mockResolvedValue([{ id: 'r-1', name: 'Cloro', deletedAt: null, ...ORIGINAL }])
 
     const refs = await findRecipeRefsIncludingDeleted(['r-1', 'r-fantasma'], EMPRESA)
 
@@ -204,7 +280,9 @@ describe('findRecipeExecutionContentById', () => {
       name: 'Cloro 5%',
       deletedAt: null,
       steps: [PASO_VALIDO],
+      parent: null,
       lines: [LINEA_CLORO],
+      tools: [],
     })
 
     const receta = await findRecipeExecutionContentById('r-viva', EMPRESA)
@@ -215,6 +293,7 @@ describe('findRecipeExecutionContentById', () => {
       isDeleted: false,
       steps: [PASO_VALIDO],
       lines: [{ productId: 'p-cloro', productName: null, percentage: '10.00' }],
+      tools: [],
     })
   })
 
@@ -224,7 +303,9 @@ describe('findRecipeExecutionContentById', () => {
       name: 'Detergente viejo',
       deletedAt: new Date('2026-02-02'),
       steps: [],
+      parent: null,
       lines: [],
+      tools: [],
     })
 
     const receta = await findRecipeExecutionContentById('r-baja', EMPRESA)
@@ -240,7 +321,7 @@ describe('findRecipeExecutionContentById', () => {
   })
 
   it('no filtra por deletedAt: una receta de baja sigue pudiendo ejecutarse', async () => {
-    findFirst.mockResolvedValue({ id: 'r-1', name: 'X', deletedAt: null, steps: [], lines: [] })
+    findFirst.mockResolvedValue({ id: 'r-1', name: 'X', deletedAt: null, steps: [], parent: null, lines: [], tools: [] })
 
     await findRecipeExecutionContentById('r-1', EMPRESA)
 
@@ -268,7 +349,9 @@ describe('findRecipeIdsMatchingName', () => {
 
     expect(ids).toEqual(['r-1'])
     const args = findMany.mock.calls[0]?.[0]
-    expect(args.where.AND[1]).toEqual({ nameNormalized: { contains: 'cloro' } })
+    expect(args.where.AND[1]).toEqual({
+      OR: [{ nameNormalized: { contains: 'cloro' } }, { parent: { nameNormalized: { contains: 'cloro' } } }],
+    })
   })
 
   it('ignora acentos y mayusculas al normalizar el termino (R2)', async () => {
@@ -277,7 +360,9 @@ describe('findRecipeIdsMatchingName', () => {
     await findRecipeIdsMatchingName('CLÓRO', EMPRESA)
 
     const args = findMany.mock.calls[0]?.[0]
-    expect(args.where.AND[1]).toEqual({ nameNormalized: { contains: 'cloro' } })
+    expect(args.where.AND[1]).toEqual({
+      OR: [{ nameNormalized: { contains: 'cloro' } }, { parent: { nameNormalized: { contains: 'cloro' } } }],
+    })
   })
 
   it('una receta dada de baja SI vuelve (R4)', async () => {
@@ -340,7 +425,7 @@ describe('findAliveRecipeByNormalizedName (QC-159 T1, R17, R20)', () => {
 
     const args = findFirst.mock.calls[0]?.[0]
     expect(args.where).toEqual({
-      AND: [{ companyId: EMPRESA }, { nameNormalized: 'desengrasante5', deletedAt: null }],
+      AND: [{ companyId: EMPRESA }, { nameNormalized: 'desengrasante5', deletedAt: null, parentRecipeId: null }],
     })
     expect(args.select).toEqual({ id: true, name: true })
   })
@@ -367,7 +452,9 @@ describe('toRecipeExecutionContent', () => {
       name: 'X',
       deletedAt: null,
       steps: [{ id: 'invalido' }, PASO_VALIDO],
+      parent: null,
       lines: [],
+      tools: [],
     })
 
     expect(contenido.steps).toEqual([PASO_VALIDO])
@@ -379,10 +466,142 @@ describe('toRecipeExecutionContent', () => {
       name: 'X',
       deletedAt: null,
       steps: [],
+      parent: null,
       lines: [LINEA_CLORO],
+      tools: [],
     })
 
     expect(contenido.lines[0]?.productName).toBeNull()
+  })
+
+  it('R8, R11: una version se ejecuta con el nombre compuesto, los pasos de su original y sus propias lineas', () => {
+    const contenido = toRecipeExecutionContent({
+      id: 'r-version',
+      name: 'Sin perfume',
+      deletedAt: null,
+      steps: [],
+      parent: { name: 'Crema base', steps: [{ id: 'invalido' }, PASO_VALIDO] },
+      lines: [LINEA_CLORO],
+      tools: [],
+    })
+
+    expect(contenido).toEqual({
+      id: 'r-version',
+      name: 'Crema base · Sin perfume',
+      isDeleted: false,
+      steps: [PASO_VALIDO],
+      lines: [{ productId: 'p-cloro', productName: null, percentage: '10.00' }],
+      tools: [],
+    })
+  })
+
+  it('R8: los pasos propios de una version no se usan aunque la fila traiga alguno', () => {
+    const contenido = toRecipeExecutionContent({
+      id: 'r-version',
+      name: 'Sin perfume',
+      deletedAt: null,
+      steps: [PASO_VALIDO],
+      parent: { name: 'Crema base', steps: [] },
+      lines: [],
+      tools: [],
+    })
+
+    expect(contenido.steps).toEqual([])
+  })
+})
+
+describe('herramientas en el contenido de ejecucion', () => {
+  it('R8: las herramientas van en `tools`, aparte, y `lines` queda identico al de una receta sin herramientas', () => {
+    const base = {
+      id: 'r-1',
+      name: 'X',
+      deletedAt: null,
+      steps: [],
+      parent: null,
+      lines: [LINEA_CLORO],
+    }
+    const sin = toRecipeExecutionContent({ ...base, tools: [] })
+    const con = toRecipeExecutionContent({
+      ...base,
+      tools: [
+        { productId: 'p-batidora', quantity: 2 },
+        { productId: 'p-balanza', quantity: 1 },
+      ],
+    })
+
+    expect(con.lines).toEqual(sin.lines)
+    expect(con.tools).toEqual([
+      { productId: 'p-batidora', productName: null, quantity: 2 },
+      { productId: 'p-balanza', productName: null, quantity: 1 },
+    ])
+  })
+
+  it('R28: la consulta pide las herramientas en orden de alta', async () => {
+    findFirst.mockResolvedValue({
+      id: 'r-1',
+      name: 'X',
+      deletedAt: null,
+      steps: [],
+      parent: null,
+      lines: [],
+      tools: [{ productId: 'p-batidora', quantity: 3 }],
+    })
+
+    const receta = await findRecipeExecutionContentById('r-1', EMPRESA)
+
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.select.tools).toEqual({
+      select: { productId: true, quantity: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    })
+    expect(receta?.tools).toEqual([{ productId: 'p-batidora', productName: null, quantity: 3 }])
+  })
+})
+
+describe('findRecipeExecutionContentById de una version', () => {
+  it('R8, R25: pide los pasos de la original sin filtro de vida en ella', async () => {
+    findFirst.mockResolvedValue({
+      id: 'r-version',
+      name: 'Sin perfume',
+      deletedAt: new Date('2026-04-04'),
+      steps: [],
+      parent: { name: 'Crema base', steps: [PASO_VALIDO] },
+      lines: [LINEA_CLORO],
+      tools: [],
+    })
+
+    const receta = await findRecipeExecutionContentById('r-version', EMPRESA)
+
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.select.parent).toEqual({ select: { name: true, steps: true } })
+    expect(JSON.stringify(args)).not.toContain('deletedAt":null')
+    expect(receta?.steps).toEqual([PASO_VALIDO])
+    expect(receta?.isDeleted).toBe(true)
+  })
+})
+
+describe('busquedas de nombre frente a versiones', () => {
+  it('R41, R40: el OR de nombre propio / de la original va DENTRO del AND con el ambito', async () => {
+    findMany.mockResolvedValue([])
+
+    await findRecipeIdsMatchingName('crema', EMPRESA)
+
+    const where = findMany.mock.calls[0]?.[0].where
+    expect(Object.keys(where)).toEqual(['AND'])
+    expect(where.AND[0]).toEqual({ companyId: EMPRESA })
+    expect(where.AND[1].OR).toEqual([
+      { nameNormalized: { contains: 'crema' } },
+      { parent: { nameNormalized: { contains: 'crema' } } },
+    ])
+  })
+
+  it('R37: findAliveRecipeByNormalizedName solo mira originales', async () => {
+    findFirst.mockResolvedValue(null)
+
+    await findAliveRecipeByNormalizedName('Sin perfume', EMPRESA)
+
+    const where = findFirst.mock.calls[0]?.[0].where
+    expect(where.AND[1]).toMatchObject({ parentRecipeId: null, deletedAt: null })
   })
 })
 

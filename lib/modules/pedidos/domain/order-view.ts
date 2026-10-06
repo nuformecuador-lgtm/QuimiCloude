@@ -10,16 +10,48 @@ import type { OrderNumber } from './order-number';
  * La cantidad viaja como CADENA decimal en las dos direcciones, nunca `number`
  * (`docs/architecture.md > Anti-patrones`): el adaptador driven la devuelve con `.toFixed(4)`.
  *
- * **QC-35bis (2026-09-07): el pedido ya no tiene unidad ni precio unitario.** Ninguno de los
- * tres tipos de este archivo los declara, asi que no hay forma de escribirlos ni de leerlos: la
- * columna se fue de `orders` y el tipo se fue de aqui a la vez. `unitName` tampoco existe -no
- * habia nada que resolver contra el catalogo de `unidades`-, y con el se cayo la unica razon
- * por la que `pedidos` hablaba con ese modulo.
+ * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio sigue fuera.
+ * Devuelve la UNIDAD (`unitId`), porque la cantidad se interpreta siempre en ella,
+ * con o sin reparto, y el reparto en si mismo -`presentationLines`- sustituye a la presentacion
+ * unica.
  *
  * `OrderRow` y `OrderView` SI llevan `ingredientsCost`: el pedido guarda el coste de sus propios
- * ingredientes, opcional, calculado al escribirlo. No es un precio de venta ni reabre lo que el
- * parrafo anterior cerro.
+ * ingredientes, opcional, calculado al escribirlo. No es un precio de venta.
  */
+
+/**
+ * Una linea del reparto ya resuelta y lista para el puerto de escritura: la presentacion, los
+ * envases enteros y el contenido que se le copia en este instante (`null` = la
+ * presentacion no lo tiene).
+ */
+export type OrderPresentationLineWrite = {
+  readonly presentationId: string;
+  readonly packages: number;
+  readonly content: string | null;
+  /** `null` = linea antigua que se conserva sin envase. */
+  readonly packagingProductId: string | null;
+};
+
+/** Una linea del reparto tal como la lee el puerto: sin el contenido copiado, que solo
+ *  necesita Terminar y lo lee por su propio camino. */
+export type OrderPresentationLineRow = {
+  readonly presentationId: string;
+  readonly packages: number;
+  /** `null` en una linea anterior a que el reparto nombrara su envase. */
+  readonly packagingProductId: string | null;
+};
+
+/** Una linea del reparto en la ficha y el listado. */
+export type OrderPresentationLineView = {
+  readonly presentationId: string;
+  /** `null` solo si la presentacion no vuelve del catalogo. */
+  readonly presentationName: string | null;
+  readonly packages: number;
+  /** `null` en una linea anterior a que el reparto nombrara su envase. */
+  readonly packagingProductId: string | null;
+  /** `null` en esa linea antigua, o si el envase no vuelve del catalogo. */
+  readonly packagingName: string | null;
+};
 
 /**
  * Datos de negocio de un pedido, ya validados por `order-input.ts` y listos para el puerto.
@@ -40,10 +72,9 @@ export type NewOrder = {
   readonly priority: OrderPriority;
   readonly status: EditableOrderStatus;
   /** Obligatoria: toda escritura de `NewOrder` la lleva. */
-  readonly presentationId: string;
-  /** Copia del contenido de `presentationId` en ese instante. `null` si la
-   *  presentacion no tiene contenido. */
-  readonly presentationContent: string | null;
+  readonly unitId: string;
+  /** El reparto, ya resuelto y validado contra el total (puede ser `[]`). */
+  readonly presentationLines: readonly OrderPresentationLineWrite[];
 };
 
 /**
@@ -78,12 +109,11 @@ export type OrderRow = {
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** `null` = pedido viejo, sin presentacion. */
-  readonly presentationId: string | null;
-  /** Copia del contenido de `presentationId` al crear el pedido o al cambiarle la
-   *  presentacion. `null` = sin copia: presentacion sin contenido entonces, o
-   *  pedido anterior a esta columna. */
-  readonly presentationContent: string | null;
+  /** El reparto en orden de alta (`created_at`, desempate `id`); `[]` = sin reparto. */
+  readonly presentationLines: readonly OrderPresentationLineRow[];
+  /** La unidad en que se expresa `quantity`.
+   *  `null` solo en los pedidos anteriores sin presentacion. */
+  readonly unitId: string | null;
 };
 
 /**
@@ -109,7 +139,14 @@ export type OrderView = {
   readonly number: OrderNumber;
   readonly numberText: string;
   readonly recipeId: string;
+  /** El nombre mostrado: «Original · Version» si `recipeId` es una version. */
   readonly recipeName: string | null;
+  /** `null` si la receta es una original o no vuelve del catalogo. */
+  readonly recipeVersion: {
+    readonly originalId: string;
+    readonly originalName: string;
+    readonly versionName: string;
+  } | null;
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
@@ -119,11 +156,16 @@ export type OrderView = {
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** `null` = sin presentacion; viaja para precargar el selector en la edicion. */
-  readonly presentationId: string | null;
-  /** `null` cuando el pedido esta sin presentacion, nunca cuando el id no vuelve del
-   *  catalogo: la FK compuesta con `RESTRICT` hace ese caso imposible por construccion. */
-  readonly presentationName: string | null;
+  /** El reparto en orden de alta; `[]` = sin reparto. Cada linea lleva lo que
+   *  `presentationLinesSchema` acepta, asi que la edicion lo precarga tal cual. */
+  readonly presentationLines: readonly OrderPresentationLineView[];
+  /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la
+   *  tienen todavia. */
+  readonly unitId: string | null;
+  /** El simbolo de la unidad, o su nombre si no tiene simbolo; `null` cuando `unitId`
+   *  es `null`, nunca cuando el id no vuelve del catalogo -la FK con `RESTRICT` hace ese caso
+   *  imposible por construccion-. */
+  readonly unitLabel: string | null;
 };
 
 /**

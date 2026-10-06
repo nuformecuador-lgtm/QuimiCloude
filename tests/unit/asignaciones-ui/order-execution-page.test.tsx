@@ -64,7 +64,10 @@ const EXECUCION_MINIMA = {
   orderQuantity: '250',
   steps: [],
   lines: [],
-  presentationName: null,
+  tools: [],
+  presentationLines: [],
+  unitId: null,
+  unitLabel: null,
 };
 
 function arbolDeLaPagina(id = 'order-1') {
@@ -72,7 +75,7 @@ function arbolDeLaPagina(id = 'order-1') {
 }
 
 beforeEach(() => {
-  getSessionUserMock.mockResolvedValue(sesionCon(['asignaciones.consultar']));
+  getSessionUserMock.mockResolvedValue(sesionCon(['asignaciones.consultar', 'asignaciones.ejecutar']));
   startAssignedOrderActionMock.mockResolvedValue({ status: 'success', data: EXECUCION_MINIMA });
 });
 
@@ -92,7 +95,7 @@ describe('pagina de ejecucion — el corte por permiso ocurre ANTES de leer nada
     expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('con sesion pero sin `asignaciones.consultar` responde 404, nunca 403', async () => {
+  it('R8: con sesion pero sin `asignaciones.ejecutar` responde 404, nunca 403', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(['inventario.consultar']));
 
     await expect(arbolDeLaPagina()).rejects.toThrow();
@@ -102,7 +105,29 @@ describe('pagina de ejecucion — el corte por permiso ocurre ANTES de leer nada
     expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('con el permiso, entra y abre el pedido', async () => {
+  it('R8: con los permisos del Empacador (consulta pero no ejecuta) responde 404 sin comenzar el pedido', async () => {
+    getSessionUserMock.mockResolvedValue(
+      sesionCon(['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar']),
+    );
+
+    await expect(arbolDeLaPagina()).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFoundMock).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(startAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R8: con `asignaciones.ejecutar` aunque no tenga `asignaciones.consultar`, entra y abre el pedido', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(['asignaciones.ejecutar']));
+
+    render(await arbolDeLaPagina());
+
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(startAssignedOrderActionMock).toHaveBeenCalledWith('order-1');
+    expect(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID)).toBeInTheDocument();
+  });
+
+  it('R8: con el permiso, entra y abre el pedido', async () => {
     const arbol = await arbolDeLaPagina();
     render(arbol);
 

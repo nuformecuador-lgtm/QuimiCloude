@@ -60,6 +60,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
 // El panel de edicion monta `OrderForm` en cada fila y su efecto pide el detalle de la receta
 // para los ingredientes: sin este doble, la llamada iria a la sesion real (R43).
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
   listRecipesAction: vi.fn(async () => ({
     status: 'success' as const,
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
@@ -99,6 +100,7 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     numberText: formatOrderNumber({ year: 2026, sequence }),
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: `Receta ${sequence}`,
+    recipeVersion: null,
     quantity: '1.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
@@ -108,8 +110,9 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: null,
-    presentationName: null,
+    presentationLines: [],
+    unitId: null,
+    unitLabel: null,
     ...overrides,
   };
 }
@@ -148,6 +151,7 @@ function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
       totalPages={totalPages}
       recipes={RECETAS}
       units={UNIDADES}
+      bridge={null}
     />,
   );
   return params;
@@ -187,6 +191,7 @@ function montarConNavegacionEnVuelo(
         totalPages={totalPages}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />
       <Suspense fallback={null}>
         <NavegacionEnVuelo promesa={promesa} />
@@ -217,6 +222,7 @@ function montarSinCoincidencias(overrides: Partial<DataTableParams> = {}) {
       totalPages={1}
       recipes={RECETAS}
       units={UNIDADES}
+      bridge={null}
       noMatches={{ clearHref: CLEAR_HREF }}
     />,
   );
@@ -371,6 +377,7 @@ describe('mientras la navegacion esta en vuelo, la caja conserva foco y texto, y
         totalPages={3}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />,
     );
 
@@ -476,6 +483,7 @@ describe('sin coincidencias: «Limpiar la busqueda» navega y vacia la caja (R15
         totalPages={1}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />,
     );
     expect(screen.getByTestId('data-table-search')).toHaveValue('');
@@ -495,7 +503,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
   it('un `params.search` externo, ajeno a la caja, se muestra tras el rerender', () => {
     const params = parametros({ search: 'acido' });
     const { rerender } = render(
-      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} />,
+      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} bridge={null} />,
     );
 
     expect(screen.getByTestId('data-table-search')).toHaveValue('acido');
@@ -507,6 +515,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
         totalPages={3}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />,
     );
 
@@ -517,7 +526,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
     vi.useFakeTimers();
     const params = parametros();
     const { rerender } = render(
-      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} />,
+      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} bridge={null} />,
     );
 
     const caja = screen.getByTestId('data-table-search');
@@ -533,6 +542,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
         totalPages={3}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />,
     );
 
@@ -556,6 +566,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
         totalPages={3}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />,
     );
     expect(screen.getByTestId('data-table-search')).toHaveValue('');
@@ -568,6 +579,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
         totalPages={3}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />,
     );
 
@@ -579,7 +591,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
     vi.useFakeTimers();
     const params = parametros();
     const { rerender } = render(
-      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} />,
+      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} bridge={null} />,
     );
 
     const caja = screen.getByTestId('data-table-search');
@@ -596,6 +608,7 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
         totalPages={3}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
       />,
     );
 

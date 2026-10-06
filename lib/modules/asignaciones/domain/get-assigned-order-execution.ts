@@ -2,14 +2,15 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, ValidationError } from './errors';
+import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
+import { toDistributionLines, unitLabelOf } from './order-distribution-view';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
-import { formatOrderNumber, type OrderCatalog } from '@/lib/modules/pedidos';
+import { formatOrderNumber, resolveLineNeed, type OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
-import { consumedQuantity, type RecipeCatalog } from '@/lib/modules/recetas';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 const getAssignedOrderExecutionSchema = z.strictObject({
@@ -38,7 +39,7 @@ export function createGetAssignedOrderExecution(
     input: unknown,
   ): Promise<AssignedOrderExecutionView> {
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
-    requirePermission(actor, 'asignaciones.consultar');
+    requirePermission(actor, 'asignaciones.ejecutar');
 
     const parsed = getAssignedOrderExecutionSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
@@ -50,6 +51,7 @@ export function createGetAssignedOrderExecution(
 
     const target = await deps.orders.findAliveById(orderId, actor.companyId);
     if (target === null) throw new OrderNotFoundError();
+    if (target.status === 'BLOQUEADO') throw new OrderBlockedError();
     if (target.status !== 'PENDIENTE' && target.status !== 'EN_CURSO') {
       throw new OrderNotFoundError();
     }
@@ -68,20 +70,28 @@ export function createGetAssignedOrderExecution(
     const recipeName = content !== null && !content.isDeleted ? content.name : null;
     const steps = content?.steps ?? [];
     const lines = content?.lines ?? [];
+    const tools = content?.tools ?? [];
 
-    const productIds = [...new Set(lines.map((line) => line.productId))];
+    const productIds = [
+      ...new Set([...lines.map((line) => line.productId), ...tools.map((tool) => tool.productId)]),
+    ];
     const productRefs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
     const productRefsById = new Map(productRefs.map((ref) => [ref.id, ref]));
 
+    // Solo las lineas llevan unidad: la cantidad de una herramienta es un conteo.
     const unitIds = [
       ...new Set(
-        productRefs
-          .map((ref) => ref.unitId)
+        lines
+          .map((line) => productRefsById.get(line.productId)?.unitId ?? null)
           .filter((unitId): unitId is string => unitId !== null),
       ),
     ];
-    const ownUnits = unitIds.length > 0 ? await deps.units.findRefs(unitIds, actor.companyId) : [];
+    const orderUnitId = summary.unitId;
+    const unitIdsToRead = orderUnitId === null ? unitIds : [...new Set([...unitIds, orderUnitId])];
+    const ownUnits = unitIdsToRead.length > 0 ? await deps.units.findRefs(unitIdsToRead, actor.companyId) : [];
     const ownUnitsById = new Map(ownUnits.map((unit) => [unit.id, unit]));
+    const orderUnit = orderUnitId === null ? null : ownUnitsById.get(orderUnitId) ?? null;
+    const bridge = orderUnitId === null ? null : await deps.units.findMassVolumeBridge();
 
     const sisterUnits =
       unitIds.length > 0
@@ -107,20 +117,24 @@ export function createGetAssignedOrderExecution(
               (sister) => sister.id !== unit.id,
             );
 
+      const need = resolveLineNeed(summary.quantity, line.percentage, unit, { orderUnitId, orderUnit, bridge });
+
       return {
         productName: productRef?.name ?? null,
         percentage: line.percentage,
-        quantity: consumedQuantity(summary.quantity, line.percentage),
+        quantity: need.kind === 'not_convertible' ? null : need.quantity,
+        need: need.kind,
         unit,
         alternativeUnits,
       };
     });
 
+    const presentationIds = [...new Set(summary.presentationLines.map((line) => line.presentationId))];
     const presentations =
-      summary.presentationId === null
+      presentationIds.length === 0
         ? []
-        : await deps.presentations.findRefs([summary.presentationId], actor.companyId);
-    const presentationName = presentations[0]?.name ?? null;
+        : await deps.presentations.findRefs(presentationIds, actor.companyId);
+    const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
     return {
       orderId: summary.id,
@@ -130,7 +144,13 @@ export function createGetAssignedOrderExecution(
       orderQuantity: summary.quantity,
       steps,
       lines: executionLines,
-      presentationName,
+      tools: tools.map((tool) => ({
+        productName: productRefsById.get(tool.productId)?.name ?? null,
+        quantity: tool.quantity,
+      })),
+      presentationLines: toDistributionLines(summary.presentationLines, presentationNames),
+      unitId: summary.unitId,
+      unitLabel: orderUnit === null ? null : unitLabelOf(orderUnit),
     };
   };
 }

@@ -55,7 +55,7 @@ function dobleDeRepositorio(archivo: FileForReview | null = ARCHIVO_LISTO): Docu
 function dobleDeRecortes(paths: readonly string[] = []): CropCatalog {
   return {
     list: vi.fn(async () => paths),
-    createSignedReadUrl: vi.fn(async (path: string) => `https://firmada.invalid/${path}`),
+    publicUrl: vi.fn((path: string) => `https://publica.invalid/${path}`),
   };
 }
 
@@ -71,6 +71,8 @@ function dobleDePresentaciones(
 function dobleDeUnidades(visibles: readonly { id: string; name: string; symbol: string | null; baseUnitId: string | null; factor: string | null }[] = []) {
   return {
     findRefs: vi.fn(async (ids: readonly string[]) => visibles.filter((unidad) => ids.includes(unidad.id))),
+    listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+    findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
     findRefsSharingBaseInCompany: vi.fn(),
   };
 }

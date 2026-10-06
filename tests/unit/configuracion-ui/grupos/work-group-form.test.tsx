@@ -9,11 +9,17 @@
 // `WORK_GROUP_NAME_ISSUE_MESSAGES` o contra el mensaje del catalogo de errores, nunca contra una
 // frase escrita aqui.
 //
-// **El panel se monta de verdad**: el formulario vive dentro de un `Sheet` porque su boton de
-// cancelar es un `SheetClose`. Lo que el panel decide —titulo, miembros, cierre— se prueba en
-// `work-group-sheet.test.tsx`.
+// **El panel se monta de verdad**: `WorkGroupForm` pinta su PROPIO `SheetContent` (cabecera, cuerpo
+// con scroll y pie fijo), asi que el unico envoltorio que este archivo necesita es el `<Sheet>` —el
+// primitivo que declara el contexto del panel—, sin un segundo `SheetContent` alrededor. Lo que el
+// panel decide ADEMAS —miembros de la edicion, cierre, aviso— se prueba en `work-group-sheet.test.tsx`.
+//
+// **Las filas del picker de candidatos se localizan por el `data-testid` REAL de la tabla
+// compartida** (`data-table-row-<id>`, de `components/shared/data-table`), no por un `data-testid`
+// propio de este dominio: desde que `WorkGroupMemberPicker` monta `<DataTable>`, esa es la unica
+// forma estable de llegar a una fila concreta.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,29 +31,52 @@ import {
   WORK_GROUP_FORM_SUBMIT_TESTID,
   WORK_GROUP_FORM_TESTID,
   WORK_GROUP_ID_FIELD,
+  WORK_GROUP_MEMBER_ID_FIELD,
   WORK_GROUP_NAME_ERROR_TESTID,
   WORK_GROUP_NAME_FIELD,
   WORK_GROUP_NAME_FIELD_TESTID,
   WORK_GROUP_NAME_ISSUE_MESSAGES,
+  WORK_GROUP_PENDING_MEMBER_REMOVE_TESTID,
+  WORK_GROUP_PENDING_MEMBER_TESTID,
   WorkGroupForm,
   workGroupNameIssue,
 } from '@/app/(private)/configuracion/usuarios/components';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet } from '@/components/ui/sheet';
 import { errorMessage } from '@/lib/modules/errores';
 import { WORK_GROUP_NAME_MAX_LENGTH, normalizeWorkGroupName } from '@/lib/modules/identity';
+import type { WorkGroupCandidateRow } from '@/lib/modules/identity';
 import type {
   CreateWorkGroupFormState,
+  WorkGroupCandidateListResult,
   WorkGroupMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { setupUser } from '../../../helpers/user-event';
 
-const { createWorkGroupActionMock, renameWorkGroupActionMock } = vi.hoisted(() => ({
+const {
+  createWorkGroupActionMock,
+  renameWorkGroupActionMock,
+  addWorkGroupMemberActionMock,
+  listWorkGroupCandidatesActionMock,
+  toastErrorMock,
+} = vi.hoisted(() => ({
   createWorkGroupActionMock:
     vi.fn<(prev: CreateWorkGroupFormState, data: FormData) => Promise<CreateWorkGroupFormState>>(),
   renameWorkGroupActionMock:
     vi.fn<
       (prev: WorkGroupMutationFormState, data: FormData) => Promise<WorkGroupMutationFormState>
     >(),
+  addWorkGroupMemberActionMock:
+    vi.fn<
+      (prev: WorkGroupMutationFormState, data: FormData) => Promise<WorkGroupMutationFormState>
+    >(),
+  listWorkGroupCandidatesActionMock:
+    vi.fn<(query: unknown) => Promise<WorkGroupCandidateListResult>>(),
+  toastErrorMock: vi.fn<(message: string, options?: { description?: string }) => void>(),
+}));
+
+vi.mock('sonner', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('sonner')>()),
+  toast: { error: toastErrorMock },
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -70,10 +99,11 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     createWorkGroupAction: createWorkGroupActionMock,
     renameWorkGroupAction: renameWorkGroupActionMock,
     deleteWorkGroupAction: vi.fn(noDebeInvocarse('deleteWorkGroupAction')),
-    addWorkGroupMemberAction: vi.fn(noDebeInvocarse('addWorkGroupMemberAction')),
+    addWorkGroupMemberAction: addWorkGroupMemberActionMock,
     removeWorkGroupMemberAction: vi.fn(noDebeInvocarse('removeWorkGroupMemberAction')),
     listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
     listWorkGroupMembersAction: vi.fn(noDebeInvocarse('listWorkGroupMembersAction')),
+    listWorkGroupCandidatesAction: listWorkGroupCandidatesActionMock,
   };
 });
 
@@ -94,12 +124,17 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
 /** Un grupo existente. El identificador es un UUID porque es lo que el esquema del borde espera. */
 const GRUPO = { id: '11111111-1111-4111-8111-111111111111', name: 'Laboratorio' };
 
+/** Un candidato del picker de miembros, que el alta monta siempre (R22, ampliacion de alta). */
+const CANDIDATO: WorkGroupCandidateRow = {
+  id: 'u9',
+  displayName: 'Nieto Salas, Dario',
+  roleName: 'Operario',
+};
+
 function montar(group: typeof GRUPO | null, onSaved = vi.fn<() => void>()) {
   render(
     <Sheet open onOpenChange={() => {}}>
-      <SheetContent>
-        <WorkGroupForm group={group} onSaved={onSaved} />
-      </SheetContent>
+      <WorkGroupForm group={group} onSaved={onSaved} />
     </Sheet>,
   );
   return onSaved;
@@ -137,10 +172,24 @@ function fuenteDelFormulario(): string {
     .replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
+/**
+ * Espera a que el picker de miembros, que el alta monta siempre, pinte su primera fila. La
+ * localiza por el `data-testid` REAL de `<DataTable>` (`data-table-row-<id>`): `getRowId` del
+ * picker es `candidate.id`, asi que es la MISMA fila para cualquier candidato de la pagina.
+ */
+async function esperarCandidato(): Promise<HTMLElement> {
+  return screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   createWorkGroupActionMock.mockResolvedValue({ status: 'success', id: 'nuevo' });
   renameWorkGroupActionMock.mockResolvedValue({ status: 'success' });
+  addWorkGroupMemberActionMock.mockResolvedValue({ status: 'success' });
+  listWorkGroupCandidatesActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [CANDIDATO], total: 1, page: 1, pageSize: 10, totalPages: 1 },
+  });
 });
 
 afterEach(() => {
@@ -345,5 +394,131 @@ describe('un rechazo se pinta por su CODIGO y no pierde lo escrito (R24)', () =>
     expect(region).toHaveAttribute('data-code', 'work_group_not_found');
     expect(campo()).toHaveValue(`${GRUPO.name} central`);
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe('el alta puede elegir miembros iniciales, en estado local hasta crear el grupo', () => {
+  it('elegir un candidato lo mete en «pendientes» SIN llamar a ninguna Server Action de miembro', async () => {
+    montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+
+    expect(await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID)).toHaveTextContent(
+      CANDIDATO.displayName,
+    );
+    expect(addWorkGroupMemberActionMock).not.toHaveBeenCalled();
+    // Y el candidato ya elegido se ve como «Agregado» en la propia tabla del picker.
+    expect(within(fila).getByRole('button')).toBeDisabled();
+  });
+
+  it('«Quitar» saca al candidato de pendientes', async () => {
+    montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+    await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID);
+
+    fireEvent.click(screen.getByTestId(WORK_GROUP_PENDING_MEMBER_REMOVE_TESTID));
+
+    expect(screen.queryByTestId(WORK_GROUP_PENDING_MEMBER_TESTID)).toBeNull();
+    // Y vuelve a poder elegirse: el boton vuelve a decir «Agregar».
+    expect(within(fila).getByRole('button')).not.toBeDisabled();
+  });
+
+  it('al enviar con pendientes: primero se crea el grupo y LUEGO se anade a cada uno, de a una', async () => {
+    const user = setupUser();
+    montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+    await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID);
+
+    await user.type(campo(), 'Turno Noche');
+    await user.click(screen.getByTestId(WORK_GROUP_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createWorkGroupActionMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(addWorkGroupMemberActionMock).toHaveBeenCalledTimes(1));
+
+    const datos = addWorkGroupMemberActionMock.mock.calls[0]![1];
+    expect([...datos.keys()].sort()).toEqual([WORK_GROUP_MEMBER_ID_FIELD, WORK_GROUP_ID_FIELD].sort());
+    expect(datos.get(WORK_GROUP_ID_FIELD)).toBe('nuevo');
+    expect(datos.get(WORK_GROUP_MEMBER_ID_FIELD)).toBe(CANDIDATO.id);
+  });
+
+  it('sin pendientes, crear el grupo no llama a ninguna operacion de miembro (R23)', async () => {
+    const user = setupUser();
+    montar(null);
+    await esperarCandidato();
+
+    await user.type(campo(), 'Turno Noche');
+    await user.click(screen.getByTestId(WORK_GROUP_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createWorkGroupActionMock).toHaveBeenCalledTimes(1));
+    expect(addWorkGroupMemberActionMock).not.toHaveBeenCalled();
+  });
+
+  it('la edicion NO monta el picker de miembros iniciales: ese bloque es solo del alta', () => {
+    montar(GRUPO);
+
+    expect(screen.queryByTestId(WORK_GROUP_PENDING_MEMBER_TESTID)).toBeNull();
+    // `data-table` es el envoltorio que pinta `<DataTable>`: ausente, el picker no se monto.
+    expect(screen.queryByTestId('data-table')).toBeNull();
+    // Y por tanto no consulto la lista de personas: ese bloque, en la edicion, no existe.
+    expect(listWorkGroupCandidatesActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('el picker solo ofrece personas activas', () => {
+  it('consulta la accion de candidatos de grupo, no el listado de usuarios, y pinta lo que devuelve', async () => {
+    const otro: WorkGroupCandidateRow = {
+      id: 'u10',
+      displayName: 'Ortega Vidal, Lucia',
+      roleName: 'Supervisora',
+    };
+    listWorkGroupCandidatesActionMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [CANDIDATO, otro], total: 2, page: 1, pageSize: 10, totalPages: 1 },
+    });
+    montar(null);
+
+    const fila = await screen.findByTestId(`data-table-row-${otro.id}`);
+    expect(fila).toHaveTextContent(otro.displayName);
+    expect(fila).toHaveTextContent(otro.roleName);
+    expect(screen.getByTestId(`data-table-row-${CANDIDATO.id}`)).toHaveTextContent(
+      CANDIDATO.displayName,
+    );
+
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(1);
+    expect(listWorkGroupCandidatesActionMock.mock.calls[0]![0]).toEqual({
+      page: 1,
+      pageSize: expect.any(Number),
+      sort: null,
+      filters: {},
+      search: '',
+    });
+  });
+
+  it('si al crear el grupo una pendiente ya no esta activa, el aviso trae el motivo del catalogo', async () => {
+    const motivo = errorMessage('work_group_member_not_active');
+    addWorkGroupMemberActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'work_group_member_not_active',
+      message: motivo,
+    });
+    const user = setupUser();
+    const onSaved = montar(null);
+
+    const fila = await esperarCandidato();
+    fireEvent.click(within(fila).getByRole('button'));
+    await screen.findByTestId(WORK_GROUP_PENDING_MEMBER_TESTID);
+
+    await user.type(campo(), 'Turno Noche');
+    await user.click(screen.getByTestId(WORK_GROUP_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(toastErrorMock).toHaveBeenCalledTimes(1));
+    expect(toastErrorMock.mock.calls[0]![1]).toEqual({ description: motivo });
+    // El grupo ya existe: el alta sigue terminando con exito.
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 });

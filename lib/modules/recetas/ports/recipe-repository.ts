@@ -13,7 +13,7 @@ import type { RecipeStepView } from '../domain/recipe-view';
  * vea (`design.md > 7.3`). **La unicidad de R10 la garantiza unicamente el indice unico
  * parcial**: no hay comprobacion previa por `nameNormalized`, que seria una carrera.
  *
- * Los cinco metodos exigen `scope: RecipeScope` al FINAL de la firma. Ponerlo en la firma
+ * Todos los metodos exigen `scope: RecipeScope` al FINAL de la firma. Ponerlo en la firma
  * -y no como un filtro que el adaptador decida aplicar o no- es lo que hace que una
  * LLAMADA que lo olvide no compile: quien escriba un sexto llamante dentro de un año no
  * puede enterarse en produccion de que le faltaba la empresa. Una implementacion que lo
@@ -37,6 +37,17 @@ export type RecipeLineRow = RecipeLineData & {
   readonly id: string;
 };
 
+/** Herramienta de la receta: un producto MACHINE y cuantas unidades hacen falta. No es
+ *  ingrediente, asi que no cuenta en la suma ni en la reserva de stock. */
+export type RecipeToolData = {
+  readonly productId: string;
+  readonly quantity: number;
+};
+
+export type RecipeToolRow = RecipeToolData & {
+  readonly id: string;
+};
+
 /**
  * Datos de negocio de una receta, ya validados por `recipe-input.ts`, listos para
  * `create`/`replaceAlive` (`design.md > 7.1`, `> 8`). `imagePath` es la ruta FINAL que el
@@ -47,8 +58,12 @@ export type NewRecipe = {
   readonly name: string;
   readonly description: string | null;
   readonly steps: readonly RecipeStepView[];
+  readonly packingSteps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineData[];
   readonly imagePath: string | null;
+  /** `null` = no tocar las que ya tiene. Releerlas y reenviarlas desde fuera de la
+   *  transaccion pisaria un guardado concurrente. */
+  readonly tools: readonly RecipeToolData[] | null;
 };
 
 /**
@@ -62,13 +77,46 @@ export type RecipeRow = {
   readonly name: string;
   readonly description: string | null;
   readonly steps: readonly RecipeStepView[];
+  readonly packingSteps: readonly RecipeStepView[];
   readonly imagePath: string | null;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lines: readonly RecipeLineRow[];
+  /** En orden de alta. */
+  readonly tools: readonly RecipeToolRow[];
+  /** `null` si la fila es una original; si es una version, la original de la que cuelga. */
+  readonly original: RecipeOriginalRow | null;
 };
+
+/** Lo que una version toma de su original: no guarda pasos, descripcion ni imagen propios. */
+export type RecipeOriginalRow = {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly imagePath: string | null;
+  readonly steps: readonly RecipeStepView[];
+  readonly packingSteps: readonly RecipeStepView[];
+};
+
+/** Datos de una version nueva: nombre y lineas; lo demas sale de la original. */
+export type NewRecipeVersion = {
+  readonly name: string;
+  readonly lines: readonly RecipeLineData[];
+  readonly tools: readonly RecipeToolData[];
+};
+
+export type PropagatedVersion = {
+  readonly versionId: string;
+  readonly isUnderReview: boolean;
+};
+
+export type ReplaceWithPropagationResult =
+  | { readonly kind: 'ok'; readonly propagated: readonly PropagatedVersion[] }
+  | 'not_found'
+  | 'version_not_found'
+  | 'duplicate';
 
 export interface RecipeRepository {
   create(
@@ -97,10 +145,32 @@ export interface RecipeRepository {
     now: Date,
     scope: RecipeScope,
   ): Promise<'ok' | 'not_found' | 'duplicate'>;
+  /** Dar de baja una original da de baja tambien sus versiones vivas, con la misma fecha y autor. */
   softDeleteAlive(
     id: string,
     actorId: string,
     now: Date,
     scope: RecipeScope,
   ): Promise<'ok' | 'not_found'>;
+  /** `'not_found'` si la original no existe, esta de baja, es de otra empresa o es una version. */
+  createVersion(
+    originalId: string,
+    data: NewRecipeVersion,
+    actorId: string,
+    now: Date,
+    scope: RecipeScope,
+  ): Promise<{ id: string } | 'not_found' | 'duplicate'>;
+  listAliveVersions(originalId: string, scope: RecipeScope): Promise<readonly RecipeRow[]>;
+  /**
+   * Guarda la original y propaga el cambio a las versiones indicadas, todo o nada.
+   * `'version_not_found'` si algun id no es una version viva de esa original.
+   */
+  replaceAliveWithPropagation(
+    id: string,
+    data: NewRecipe,
+    versionIds: readonly string[],
+    actorId: string,
+    now: Date,
+    scope: RecipeScope,
+  ): Promise<ReplaceWithPropagationResult>;
 }

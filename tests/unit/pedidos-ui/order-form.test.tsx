@@ -26,7 +26,24 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  BLOCKED_ORDER_CONFIRM_TESTID,
+  BLOCKED_ORDER_DIALOG_TESTID,
+  BLOCKED_ORDER_DISMISS_TESTID,
+  BLOCKED_ORDER_MESSAGE_TESTID,
   ORDER_BUSINESS_FIELDS,
+  ORDER_DISTRIBUTION_ADD_TESTID,
+  ORDER_DISTRIBUTION_AVAILABLE_TESTID,
+  ORDER_DISTRIBUTION_ERROR_TESTID,
+  ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
+  ORDER_DISTRIBUTION_LINE_TESTID,
+  ORDER_DISTRIBUTION_PACKAGES_FIELD,
+  ORDER_DISTRIBUTION_PACKAGING_FIELD,
+  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
+  PACKAGING_OPTION_TESTID,
+  PACKAGING_SELECT_TESTID,
+  ORDER_DISTRIBUTION_TESTID,
+  ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID,
+  ORDER_CONFIRM_BLOCKED_FIELD,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_TITLE_TESTID,
   ORDER_INGREDIENTS_EMPTY_TESTID,
@@ -41,8 +58,11 @@ import {
   ORDER_STATUS_FIELD,
   ORDER_STATUS_SELECT_TESTID,
   OrderForm,
+  ORIGINAL_VERSION_VALUE,
   RECIPE_FIELD,
   RECIPE_PICKER_TESTID,
+  RECIPE_VERSION_FIELD,
+  RECIPE_VERSION_SELECT_TESTID,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
@@ -64,8 +84,9 @@ import type {
 import type {
   RecipeListResult,
   RecipeQueryResult,
+  RecipeVersionListResult,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { RecipeDetail } from '@/lib/modules/recetas';
+import type { RecipeDetail, RecipeVersionSummary } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
@@ -75,7 +96,10 @@ const {
   prohibida,
   listRecipesActionMock,
   getRecipeActionMock,
+  listRecipeVersionsActionMock,
   listPresentationsActionMock,
+  listProductsActionMock,
+  quoteAvailabilityMock,
 } = vi.hoisted(() => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse desde el formulario`);
@@ -94,7 +118,10 @@ const {
     prohibida: noDebeInvocarse,
     listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
     getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+    listRecipeVersionsActionMock: vi.fn<(id: string) => Promise<RecipeVersionListResult>>(),
     listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
+    listProductsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
+    quoteAvailabilityMock: vi.fn<(input: unknown) => Promise<unknown>>(),
   };
 });
 
@@ -141,9 +168,11 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   quoteOrderCostAction: vi.fn(() =>
     Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
   ),
+  quoteOrderPresentationAvailabilityAction: quoteAvailabilityMock,
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
+  listRecipeVersionsAction: listRecipeVersionsActionMock,
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
 }));
@@ -151,6 +180,10 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
   listPresentationsAction: listPresentationsActionMock,
   createPresentationAction: vi.fn(prohibida('createPresentationAction')),
+}));
+
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  listProductsAction: listProductsActionMock,
 }));
 
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
@@ -162,16 +195,55 @@ const RECETA_CON_IMAGEN = {
 };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
-/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del panel. */
-const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
+/** Catalogo de unidades: resuelve la unidad de los ingredientes y es el de la unidad del pedido. */
+const UNIDAD = {
+  id: crypto.randomUUID(),
+  name: 'Litro',
+  symbol: 'L',
+  baseUnitId: null,
+  factor: null,
+  isSystem: true,
+};
+
+/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del reparto. */
+const PRESENTACION = {
+  id: crypto.randomUUID(),
+  name: 'Bidón 20L',
+  unitId: UNIDAD.id,
+  content: '20.0000',
+};
+
+/** Envase del catalogo, ofrecido por `listProductsAction` en el selector del reparto. */
+const ENVASE = {
+  id: crypto.randomUUID(),
+  name: 'Bidón PET 20 L',
+  imagePath: null,
+  stock: '10.0000',
+  unitId: crypto.randomUUID(),
+  qtyAlert: null,
+  type: 'PACKAGING',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  available: '10.0000',
+  presentationId: PRESENTACION.id,
+  presentationName: PRESENTACION.name,
+  presentationContent: PRESENTACION.content,
+  presentationUnitId: PRESENTACION.unitId,
+};
+
+/** Linea de reparto con envase, como la devuelve el pedido guardado. */
+const LINEA_ENVASE = {
+  presentationId: PRESENTACION.id,
+  presentationName: PRESENTACION.name,
+  packages: 1,
+  packagingProductId: ENVASE.id,
+  packagingName: ENVASE.name,
+};
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta. */
 const CANTIDAD = '0.1005';
 
-/** Catalogo de unidades que resuelve la unidad de los ingredientes. */
-const UNIDADES: readonly UnitView[] = [
-  { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
-];
+const UNIDADES: readonly UnitView[] = [UNIDAD];
 
 /** Linea del detalle de la receta elegida, con los datos del producto ya unidos. */
 const LINEA_INGREDIENTE = {
@@ -179,7 +251,7 @@ const LINEA_INGREDIENTE = {
   productId: crypto.randomUUID(),
   productName: 'Sosa cáustica',
   percentage: '10.00',
-  productUnitId: 'u-litro',
+  productUnitId: UNIDAD.id,
   productStock: '40.0000',
 };
 
@@ -196,7 +268,12 @@ function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     createdBy: null,
     updatedBy: null,
     steps: [],
+    packingSteps: [],
     lines: [LINEA_INGREDIENTE],
+    tools: [],
+    original: null,
+    isUnderReview: false,
+    displayName: RECETA.name,
     ...overrides,
   };
 }
@@ -208,6 +285,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: RECETA.id,
     recipeName: RECETA.name,
+    recipeVersion: null,
     quantity: CANTIDAD,
     priority: 'ALTA',
     status: 'EN_CURSO',
@@ -217,8 +295,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationId: PRESENTACION.id,
-    presentationName: PRESENTACION.name,
+    presentationLines: [LINEA_ENVASE],
+    unitId: UNIDAD.id,
+    unitLabel: UNIDAD.symbol,
     ...overrides,
   };
 }
@@ -228,7 +307,7 @@ const onSaved = vi.fn();
 function renderFormulario(order?: OrderSummary, recipes: RecipePickerPage = RECETAS) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={recipes} units={UNIDADES} onSaved={onSaved} />
+      <OrderForm order={order} recipes={recipes} units={UNIDADES} bridge={null} onSaved={onSaved} />
     </Sheet>,
   );
 }
@@ -239,10 +318,16 @@ async function elegirCatalogos(user: ReturnType<typeof setupUser>) {
   await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
 }
 
-/** Elige la presentacion del catalogo que trae `listPresentationsAction`. */
-async function elegirPresentacion(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId('presentation-select'));
-  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
+async function elegirUnidad(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId('presentation-unit-select'));
+  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
+}
+
+/** Anade al reparto el envase del catalogo que trae `listProductsAction`. */
+async function anadirLinea(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
+  await user.click(await esperarInteractiva(await screen.findByTestId(PACKAGING_OPTION_TESTID)));
+  await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
 }
 
 /** El control de cantidad, tipado: sus asserts miran la CADENA del DOM, no `valueAsNumber`. */
@@ -252,7 +337,7 @@ function cantidad(): HTMLInputElement {
 
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await elegirCatalogos(user);
-  await elegirPresentacion(user);
+  await elegirUnidad(user);
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 
@@ -265,9 +350,18 @@ beforeEach(() => {
   });
   updateOrderActionMock.mockResolvedValue({ status: 'success' });
   getRecipeActionMock.mockResolvedValue({ status: 'success', data: recetaDetalle() });
+  listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
   listPresentationsActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
+  });
+  listProductsActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [ENVASE], page: 1, pageSize: 25, total: 1, totalPages: 1 },
+  });
+  quoteAvailabilityMock.mockResolvedValue({
+    status: 'success',
+    data: { kind: 'ok', available: '0.1005' },
   });
 });
 
@@ -276,7 +370,7 @@ afterEach(() => {
 });
 
 describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
-  it('captura los TRES campos de negocio y los envia a la operacion de alta', async () => {
+  it('R41: captura los campos de negocio, unidad incluida, y los envia a la operacion de alta', async () => {
     // El `FormData` lleva exactamente los nombres que el adaptador driving lee. La lista se
     // deriva de `ORDER_BUSINESS_FIELDS`, no de literales sueltos.
     const user = setupUser();
@@ -292,9 +386,12 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
       expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
     }
     expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
-    // Y lo que ya no existe NO viaja: ni unidad ni precio, aunque el backend los ignorase.
-    expect(enviado.get('unitId')).toBeNull();
+    // La unidad vuelve al pedido; el precio unitario sigue fuera.
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
     expect(enviado.get('unitPrice')).toBeNull();
+    // Sin lineas el reparto viaja vacio, que es valido en el alta.
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([]);
     expect(updateOrderActionMock).not.toHaveBeenCalled();
   });
 
@@ -424,46 +521,197 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
   });
 });
 
-describe('la presentación del pedido (R16, R17, R18, R19)', () => {
-  it('R16: el alta ofrece el campo Presentación obligatorio', () => {
+describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
+  it('R41: el alta exige la unidad: sin ella no se llama a la operacion y el error va junto al selector', async () => {
+    const user = setupUser();
     renderFormulario();
 
-    const campo = screen.getByTestId('presentation-select');
-    expect(campo).toBeInTheDocument();
-    expect(screen.getByTestId('presentation-value')).toBeRequired();
+    await elegirCatalogos(user);
+    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    expect(await screen.findByTestId('presentation-error-unit')).toBeInTheDocument();
+    expect(createOrderActionMock).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('R17: el selector de presentación no ofrece crear', () => {
+  it('R42: sin unidad, el control de reparto dice que falta y no ofrece anadir lineas', () => {
     renderFormulario();
 
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(PACKAGING_SELECT_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_DISTRIBUTION_ADD_TESTID)).toBeNull();
+  });
+
+  it('R36: el selector del reparto es de envases, no ofrece crear presentaciones ni manda el campo de presentacion unica', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    await elegirUnidad(user);
+
+    expect(screen.getByTestId(PACKAGING_SELECT_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
     expect(screen.queryByTestId('presentation-create-open')).toBeNull();
+    const formulario = screen.getByTestId(ORDER_FORM_TESTID) as HTMLFormElement;
+    expect([...new FormData(formulario).keys()]).not.toContain('presentationId');
   });
 
-  it('R18: la edición precarga la presentación; sin presentación el campo arranca vacío y no guarda', async () => {
+  it('R36: las lineas anadidas viajan en el alta con el envase, la presentacion vacia y los envases', async () => {
+    const user = setupUser();
+    renderFormulario();
+
+    await rellenarAlta(user);
+    await anadirLinea(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual(['']);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['1']);
+  });
+
+  it('R35: una linea antigua se reenvia sin cambios por su presentacion y sin envase', async () => {
+    const user = setupUser();
+    renderFormulario(
+      pedido({
+        presentationLines: [
+          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null },
+        ],
+      }),
+    );
+
+    const linea = screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID);
+    expect(linea).toHaveAttribute('data-legacy', 'true');
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([PRESENTACION.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual(['']);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['2']);
+  });
+
+  it('R17: dos envases de presentaciones distintas se guardan: la presentacion vacia del envio no los hace repetidos', async () => {
+    const user = setupUser();
+    const otraPresentacion = { id: crypto.randomUUID(), name: 'Bidón 5L', content: '5.0000' };
+    const otroEnvase = {
+      ...ENVASE,
+      id: crypto.randomUUID(),
+      name: 'Bidón PET 5 L',
+      presentationId: otraPresentacion.id,
+      presentationName: otraPresentacion.name,
+      presentationContent: otraPresentacion.content,
+    };
+    listProductsActionMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [ENVASE, otroEnvase], page: 1, pageSize: 25, total: 2, totalPages: 1 },
+    });
+    renderFormulario();
+
+    await rellenarAlta(user);
+    for (const indice of [0, 1]) {
+      await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
+      const opciones = await screen.findAllByTestId(PACKAGING_OPTION_TESTID);
+      await user.click(await esperarInteractiva(opciones[indice]!));
+      await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
+    }
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id, otroEnvase.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual(['', '']);
+  });
+
+  it('R11: el rechazo product_not_found del envase se pinta junto al reparto', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'product_not_found',
+      message: 'El envase no existe.',
+    });
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() =>
+      expect(screen.getByTestId(ORDER_DISTRIBUTION_ERROR_TESTID)).toHaveTextContent(
+        'El envase no existe.',
+      ),
+    );
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+  });
+
+  it('R36: la edicion precarga unidad y reparto en envases, y permite cambiar los envases', async () => {
     const user = setupUser();
     const elPedido = pedido();
     renderFormulario(elPedido);
 
-    expect(screen.getByTestId('presentation-value')).toHaveValue(elPedido.presentationId);
+    const linea = screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID);
+    expect(linea).toHaveAttribute('data-packaging-product-id', ENVASE.id);
+    expect(linea).toHaveTextContent(ENVASE.name);
+    const envases = within(linea).getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
+    expect(envases).toHaveValue(1);
 
-    cleanup();
-    const sinPresentacion = pedido({ presentationId: null, presentationName: null });
-    renderFormulario(sinPresentacion);
-
-    const campo = screen.getByTestId('presentation-value') as HTMLInputElement;
-    expect(campo).toHaveValue('');
-    // El campo espejo conserva la validacion nativa de `required` (mismo primitivo que el
-    // selector de producto), aunque el formulario tiene `noValidate` y quien de verdad decide
-    // si el envio procede es el esquema del contrato en `save()`.
-    expect(campo.validity.valid).toBe(false);
-
+    await user.clear(envases);
+    await user.type(envases, '3');
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    expect(updateOrderActionMock).not.toHaveBeenCalled();
-    expect(onSaved).not.toHaveBeenCalled();
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
+    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['3']);
   });
 
-  it('R19: presentation_not_found se pinta junto al campo y conserva lo escrito', async () => {
+  it('R41: un pedido sin unidad exige elegirla al editar; con ella elegida se guarda', async () => {
+    const user = setupUser();
+    renderFormulario(pedido({ unitId: null, unitLabel: null, presentationLines: [] }));
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    expect(await screen.findByTestId('presentation-error-unit')).toBeInTheDocument();
+    expect(updateOrderActionMock).not.toHaveBeenCalled();
+
+    await elegirUnidad(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get('unitId')).toBe(UNIDAD.id);
+  });
+
+  it('R6: el disponible se pide con la cantidad, la unidad y el reparto vigentes', async () => {
+    renderFormulario(pedido());
+
+    await waitFor(() =>
+      expect(quoteAvailabilityMock).toHaveBeenCalledWith({
+        quantity: CANTIDAD,
+        unitId: UNIDAD.id,
+        presentationLines: [{ packagingProductId: ENVASE.id, packages: 1 }],
+      }),
+    );
+    expect(await screen.findByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveTextContent(
+      '0.1005 L',
+    );
+  });
+
+  it('R39: si el reparto pasa del total, Guardar queda deshabilitado', async () => {
+    quoteAvailabilityMock.mockResolvedValue({
+      status: 'success',
+      data: { kind: 'exceeds_quantity', available: '-19.8995' },
+    });
+    renderFormulario(pedido());
+
+    await waitFor(() => expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled());
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveAttribute(
+      'data-negative',
+      'true',
+    );
+  });
+
+  it('R36: el rechazo del servidor por el reparto se pinta junto al reparto y conserva lo escrito', async () => {
     const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -475,10 +723,11 @@ describe('la presentación del pedido (R16, R17, R18, R19)', () => {
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => {
-      expect(screen.getByTestId('presentation-select-error')).toBeInTheDocument();
+      expect(screen.getByTestId(ORDER_DISTRIBUTION_ERROR_TESTID)).toBeInTheDocument();
       expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
     });
     expect(cantidad().value).toBe(CANTIDAD);
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID)).toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
   });
 });
@@ -730,12 +979,12 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     );
     // La columna «porcentaje» pinta la parte del insumo con coma y dos decimales.
     expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('10,00 %');
-    // La unidad es la del PRODUCTO (`productUnitId`) y se resuelve con el catalogo bajado por
-    // props.
-    expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
-    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
-      formatDecimalDisplay(LINEA_INGREDIENTE.productStock ?? ''),
+    // La unidad es la del PRODUCTO (`productUnitId`), se resuelve con el catalogo bajado por
+    // props y va pegada a la cifra del stock.
+    expect(within(tabla).getByTestId('order-ingredient-stock').textContent).toBe(
+      `${formatDecimalDisplay(LINEA_INGREDIENTE.productStock ?? '')} L`,
     );
+    expect(within(tabla).queryByTestId('order-ingredient-unit')).toBeNull();
   });
 
   it('la edicion pide el detalle de la receta YA elegida al montar el panel', async () => {
@@ -767,6 +1016,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     const requerida = within(tabla).getByTestId('order-ingredient-required');
@@ -777,13 +1027,13 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
     // 0.1005 × 10,00 % = 0.01005 y 40 − 0.01005 = 39.98995. Se CALCULAN exactos y se PINTAN a dos
-    // decimales: «0.01» y «39.99». El valor exacto no se pierde, viaja en el `title`.
-    await waitFor(() => expect(requerida.textContent).toBe('0.01'));
+    // decimales: «0.01 L» y «39.99 L». El valor exacto no se pierde, viaja en el `title`.
+    await waitFor(() => expect(requerida.textContent).toBe('0.01 L'));
     expect(requerida).toHaveAttribute('title', '0.01005');
-    expect(requerida).toHaveAttribute('aria-label', '0.01005');
-    expect(restante.textContent).toBe('39.99');
+    expect(requerida).toHaveAttribute('aria-label', '0.01005 L');
+    expect(restante.textContent).toBe('39.99 L');
     expect(restante).toHaveAttribute('title', '39.98995');
-    expect(restante).toHaveAttribute('aria-label', '39.98995');
+    expect(restante).toHaveAttribute('aria-label', '39.98995 L');
     expect(restante.firstChild).not.toHaveClass('text-destructive');
   });
 
@@ -798,6 +1048,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
@@ -808,9 +1059,9 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
 
     // 0.005 − 0.01005 = −0.00505, resaltado. A dos decimales eso se pinta «-0.01», y el `title`
     // lleva la cifra exacta. El resalte (`isShort`) mira el exacto, no el pintado.
-    await waitFor(() => expect(restante.textContent).toBe('-0.01'));
+    await waitFor(() => expect(restante.textContent).toBe('-0.01 L'));
     expect(restante).toHaveAttribute('title', '-0.00505');
-    expect(restante).toHaveAttribute('aria-label', '-0.00505');
+    expect(restante).toHaveAttribute('aria-label', '-0.00505 L');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 
@@ -823,6 +1074,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('40');
@@ -853,6 +1105,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('0');
@@ -865,9 +1118,9 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     // El resalte de faltante (`isShort`) se decide con el restante EXACTO, nunca con el pintado.
     // En telefono o impreso no hay `title`, y alli el color es el unico aviso; se acepta a
     // sabiendas.
-    await waitFor(() => expect(restante.textContent).toBe('-0.01'));
+    await waitFor(() => expect(restante.textContent).toBe('-0.01 L'));
     expect(restante).toHaveAttribute('title', '-0.01005');
-    expect(restante).toHaveAttribute('aria-label', '-0.01005');
+    expect(restante).toHaveAttribute('aria-label', '-0.01005 L');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 
@@ -931,4 +1184,233 @@ describe('formulario de pedido — el identificador del error inesperado (QC-71 
     );
     esperarSinIdentificador();
   });
+});
+
+describe('pedido que no alcanza: el aviso de guardarlo bloqueado', () => {
+  const MENSAJE_BLOQUEO = 'No hay material suficiente para este pedido.';
+  const NO_ALCANZA = { status: 'error', code: 'order_would_block', message: MENSAJE_BLOQUEO } as const;
+
+  /** Lo que viajo en cada envio, sin el campo de confirmacion: para comparar los demas campos. */
+  function camposDeNegocio(formData: FormData): Record<string, string> {
+    const campos: Record<string, string> = {};
+    for (const [nombre, valor] of formData) {
+      if (nombre !== ORDER_CONFIRM_BLOCKED_FIELD) campos[nombre] = String(valor);
+    }
+    return campos;
+  }
+
+  it('R7: en el alta, ante order_would_block aparece el aviso y no la region de error', async () => {
+    const user = setupUser();
+    createOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario();
+
+    await rellenarAlta(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    const dialogo = await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID);
+    expect(within(dialogo).getAllByRole('button')).toHaveLength(2);
+    expect(screen.getByTestId(BLOCKED_ORDER_MESSAGE_TESTID)).toHaveTextContent(MENSAJE_BLOQUEO);
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('R7: en la edicion, ante order_would_block aparece el mismo aviso', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    expect(await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+  });
+
+  it('R7, R9: las acciones del aviso tienen objetivo tactil de al menos 44x44', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID);
+
+    for (const testId of [BLOCKED_ORDER_CONFIRM_TESTID, BLOCKED_ORDER_DISMISS_TESTID]) {
+      const boton = screen.getByTestId(testId);
+      expect(boton.className, testId).toContain('min-h-11');
+      expect(boton.className, testId).toContain('min-w-11');
+    }
+  });
+
+  it('R8: en el alta, «Guardar bloqueado» reenvia el mismo FormData con confirmBlocked=true', async () => {
+    const user = setupUser();
+    createOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    renderFormulario();
+
+    await rellenarAlta(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_CONFIRM_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(2));
+    const primero = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    const reenvio = createOrderActionMock.mock.calls[1]?.[1] as FormData;
+    expect(primero.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBeNull();
+    expect(reenvio.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBe('true');
+    expect(camposDeNegocio(reenvio)).toEqual(camposDeNegocio(primero));
+    expect(updateOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R8: en la edicion, «Guardar bloqueado» reenvia al mismo pedido y, guardado, no vuelve a avisar', async () => {
+    // El servidor decide si queda bloqueado o, si entre tanto alcanza, pendiente: el formulario
+    // solo ve el exito y cierra.
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    const elPedido = pedido();
+    renderFormulario(elPedido);
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_CONFIRM_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(2));
+    expect(updateOrderActionMock.mock.calls[1]?.[0]).toBe(elPedido.id);
+    const primero = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    const reenvio = updateOrderActionMock.mock.calls[1]?.[2] as FormData;
+    expect(reenvio.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBe('true');
+    expect(camposDeNegocio(reenvio)).toEqual(camposDeNegocio(primero));
+    expect(reenvio.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull();
+  });
+
+  it('R9: «Volver» cierra el aviso sin llamar a la action y los campos conservan su valor', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
+    const elPedido = pedido();
+    renderFormulario(elPedido);
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '7.7777');
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await user.click(await screen.findByTestId(BLOCKED_ORDER_DISMISS_TESTID));
+
+    await waitFor(() => expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull());
+    expect(updateOrderActionMock).toHaveBeenCalledTimes(1);
+    expect(createOrderActionMock).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    // Al pinchar Guardar el campo perdio el foco antes del envio: lo que conserva es lo colocado.
+    expect(cantidad().value).toBe('7.78');
+    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
+    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+  });
+});
+
+describe('el selector de version en el formulario', () => {
+  function versionDeLaReceta(name: string, isUnderReview = false): RecipeVersionSummary {
+    return {
+      id: crypto.randomUUID(),
+      name,
+      displayName: `${RECETA.name} · ${name}`,
+      isUnderReview,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+  }
+
+  function selectorDeVersion(): HTMLElement {
+    return screen.getByTestId(RECIPE_VERSION_SELECT_TESTID);
+  }
+
+  async function elegirVersion(user: ReturnType<typeof setupUser>, indice: number) {
+    await waitFor(() => expect(selectorDeVersion()).toBeEnabled());
+    await user.click(selectorDeVersion());
+    const opciones = await screen.findAllByTestId(`${RECIPE_VERSION_SELECT_TESTID}-option`);
+    await user.click(await esperarInteractiva(opciones[indice]!));
+  }
+
+  it('R27: en el alta sin receta el selector esta deshabilitado y su campo viaja vacio', () => {
+    renderFormulario();
+
+    expect(selectorDeVersion()).toBeDisabled();
+    expect(screen.getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-value`)).toHaveValue(
+      ORIGINAL_VERSION_VALUE,
+    );
+  });
+
+  it('R26, R27: elegir la receta pide sus versiones; sin ninguna ofrecible sigue deshabilitado', async () => {
+    const user = setupUser();
+    listRecipeVersionsActionMock.mockResolvedValue({
+      status: 'success',
+      data: [versionDeLaReceta('A medias', true)],
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    await waitFor(() => expect(listRecipeVersionsActionMock).toHaveBeenCalledWith(RECETA.id));
+    expect(selectorDeVersion()).toBeDisabled();
+  });
+
+  it('R28: elegir una version pide sus ingredientes y volver a «Original» los de la original', async () => {
+    const user = setupUser();
+    const viva = versionDeLaReceta('Sin colorante');
+    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [viva] });
+    renderFormulario();
+    await elegirCatalogos(user);
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA.id));
+
+    await elegirVersion(user, 1);
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(viva.id));
+
+    await elegirVersion(user, 0);
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA.id));
+  });
+
+  it('R28: el alta con version envia la original como receta y la version en su campo', async () => {
+    const user = setupUser();
+    const viva = versionDeLaReceta('Sin colorante');
+    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [viva] });
+    renderFormulario();
+    await rellenarAlta(user);
+    await elegirVersion(user, 1);
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
+    expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
+    expect(enviado.get(RECIPE_VERSION_FIELD)).toBe(viva.id);
+  });
+
+  it.each([
+    ['por revisar', true],
+    ['dada de baja', false],
+  ] as const)(
+    'R29: la edicion de un pedido con una version %s la muestra elegida y el FormData la conserva',
+    async (nota, sigueListada) => {
+      const user = setupUser();
+      const actual = versionDeLaReceta('A medias', true);
+      listRecipeVersionsActionMock.mockResolvedValue({
+        status: 'success',
+        data: sigueListada ? [actual] : [],
+      });
+      const elPedido = pedido({
+        recipeId: actual.id,
+        recipeName: actual.displayName,
+        recipeVersion: { originalId: RECETA.id, originalName: RECETA.name, versionName: actual.name },
+      });
+      renderFormulario(elPedido);
+
+      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(RECETA.id);
+      expect(screen.getByRole('combobox', { name: 'Receta' })).toHaveValue(RECETA.name);
+      await waitFor(() => expect(selectorDeVersion()).toHaveTextContent(nota));
+      expect(selectorDeVersion()).toHaveTextContent(actual.name);
+      expect(selectorDeVersion()).toBeEnabled();
+      expect(getRecipeActionMock).toHaveBeenCalledWith(actual.id);
+
+      await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+      await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+      const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+      expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
+      expect(enviado.get(RECIPE_VERSION_FIELD)).toBe(actual.id);
+    },
+  );
 });

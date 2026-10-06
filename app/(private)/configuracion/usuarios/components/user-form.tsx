@@ -1,7 +1,7 @@
 'use client';
 
 import { LogOutIcon } from 'lucide-react';
-import { useActionState, useEffect, useId } from 'react';
+import { useActionState, useEffect, useId, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
@@ -35,6 +35,7 @@ import {
 } from '@/lib/modules/identity/adapters/driving/user-actions';
 
 import { endUserSessionsLabel, toDateInputValue } from './user-labels';
+import { nextUsernameCandidate, usernameFromNames } from './username-from-names';
 
 /**
  * El formulario del alta y de la edicion de usuario (R23, R24, R25, R26, R27, R35, R36;
@@ -107,6 +108,10 @@ export const USER_FORM_CANCEL_TESTID = 'user-form-cancel';
  */
 export const USER_FORM_END_SESSIONS_TESTID = 'user-form-end-sessions';
 
+/** La recomendacion de nombre de usuario libre que acompana a `duplicate_username` en el alta. */
+export const USER_USERNAME_SUGGESTION_TESTID = 'user-username-suggestion';
+export const USER_USERNAME_SUGGESTION_APPLY_TESTID = 'user-username-suggestion-apply';
+
 /** Un `data-testid` por campo, para localizarlos sin depender de su etiqueta (R41). */
 export const USER_FIELD_TESTIDS: Readonly<Record<UserFieldName, string>> = {
   firstNames: 'user-field-first-names',
@@ -175,9 +180,18 @@ const EDIT_TITLE = 'Editar usuario';
 const CREATE_DESCRIPTION = 'Describe los datos de la persona que va a usar el sistema.';
 const EDIT_DESCRIPTION = 'Cambia los datos de la persona.';
 const ROLES_UNAVAILABLE = 'No se pudo cargar el catálogo de roles.';
+const USERNAME_SUGGESTION_HINT = 'Este nombre de usuario está libre:';
+const applySuggestionLabel = (username: string): string => `Usar ${username}`;
 
 type FieldValues = Partial<Record<UserFieldName, string>>;
 type FieldErrors = Partial<Record<UserFieldName, string>>;
+
+/** Los campos que el alta controla para derivar el nombre de usuario de nombres y apellidos. */
+type AutofillValues = {
+  readonly firstNames: string;
+  readonly lastNames: string;
+  readonly username: string;
+};
 
 /**
  * El estado del formulario. El error se guarda **entero** —no aplanado a `string`—: asi el render
@@ -191,6 +205,7 @@ type UserFormState =
       serverError: ErrorState;
       fieldErrors: FieldErrors;
       values: FieldValues;
+      suggestedUsername: string | null;
     };
 
 /** R36: lo construye ESTA pantalla, porque un archivo `'use server'` no exporta constantes. */
@@ -329,6 +344,27 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
   const formErrorId = `${fieldId}-form-error`;
   const isEdit = user !== undefined;
 
+  const [autofill, setAutofill] = useState<AutofillValues>({
+    firstNames: '',
+    lastNames: '',
+    username: '',
+  });
+  // Una vez tocado a mano, el nombre de usuario es de la persona: no se vuelve a pisar.
+  const [usernameEdited, setUsernameEdited] = useState(false);
+
+  function changeName(field: 'firstNames' | 'lastNames', value: string) {
+    setAutofill((previous) => {
+      const next = { ...previous, [field]: value };
+      if (usernameEdited) return next;
+      return { ...next, username: usernameFromNames(next.firstNames, next.lastNames) };
+    });
+  }
+
+  function changeUsername(value: string) {
+    setUsernameEdited(true);
+    setAutofill((previous) => ({ ...previous, username: value }));
+  }
+
   async function save(_previous: UserFormState, formData: FormData): Promise<UserFormState> {
     const values = readValues(formData);
     // Los campos viajan TAL CUAL: el esquema del modulo es quien normaliza y quien rechaza.
@@ -337,11 +373,16 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
     if (result.status === 'error') {
       // R27: DONDE se pinta lo decide el `code`, nunca el texto del mensaje.
       const field = CODE_TO_FIELD[result.code];
+      const suggestedUsername =
+        !isEdit && result.code === 'duplicate_username'
+          ? nextUsernameCandidate(values.username ?? '')
+          : null;
       return {
         status: 'error',
         serverError: result,
         fieldErrors: field === undefined ? {} : { [field]: result.message },
         values,
+        suggestedUsername,
       };
     }
 
@@ -365,9 +406,18 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
   const initial = initialValuesOf(user);
   const valueOf = (field: UserFieldName): string => written?.[field] ?? initial[field];
 
+  // Ya aplicada, la recomendacion sobra.
+  const suggestedUsername =
+    state.status === 'error' &&
+    state.suggestedUsername !== null &&
+    state.suggestedUsername !== autofill.username
+      ? state.suggestedUsername
+      : null;
+
   return (
     <SheetContent
       side="right"
+      minScreenWidth={70}
       className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
       data-testid={USER_SHEET_TESTID}
       isForm
@@ -402,65 +452,122 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
           </div>
         )}
 
-        <UserTextField
-          id={`${fieldId}-${USER_FIRST_NAMES_FIELD}`}
-          name={USER_FIRST_NAMES_FIELD}
-          value={valueOf(USER_FIRST_NAMES_FIELD)}
-          error={fieldErrors.firstNames}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_LAST_NAMES_FIELD}`}
-          name={USER_LAST_NAMES_FIELD}
-          value={valueOf(USER_LAST_NAMES_FIELD)}
-          error={fieldErrors.lastNames}
-        />
         {/*
-          `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera (R26).
+          Nombres y apellidos EN UNA FILA (decision humana): rejilla de 12 columnas que en angosto
+          se apila -movil primero (R45)- y en `sm` o mas ancho reparte 6+6.
         */}
-        <UserTextField
-          id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
-          name={USER_BIRTH_DATE_FIELD}
-          type="date"
-          value={valueOf(USER_BIRTH_DATE_FIELD)}
-          error={fieldErrors.birthDate}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_EMAIL_FIELD}`}
-          name={USER_EMAIL_FIELD}
-          type="email"
-          value={valueOf(USER_EMAIL_FIELD)}
-          error={fieldErrors.email}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_PHONE_FIELD}`}
-          name={USER_PHONE_FIELD}
-          type="tel"
-          value={valueOf(USER_PHONE_FIELD)}
-          error={fieldErrors.phone}
-        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-6">
+            <UserTextField
+              id={`${fieldId}-${USER_FIRST_NAMES_FIELD}`}
+              name={USER_FIRST_NAMES_FIELD}
+              value={isEdit ? valueOf(USER_FIRST_NAMES_FIELD) : autofill.firstNames}
+              onValueChange={
+                isEdit ? undefined : (value) => changeName(USER_FIRST_NAMES_FIELD, value)
+              }
+              error={fieldErrors.firstNames}
+            />
+          </div>
+          <div className="sm:col-span-6">
+            <UserTextField
+              id={`${fieldId}-${USER_LAST_NAMES_FIELD}`}
+              name={USER_LAST_NAMES_FIELD}
+              value={isEdit ? valueOf(USER_LAST_NAMES_FIELD) : autofill.lastNames}
+              onValueChange={
+                isEdit ? undefined : (value) => changeName(USER_LAST_NAMES_FIELD, value)
+              }
+              error={fieldErrors.lastNames}
+            />
+          </div>
+        </div>
 
-        {/* R25: las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
-        <UserSelectField
-          idPrefix={`${fieldId}-${USER_DOCUMENT_TYPE_FIELD}`}
-          name={USER_DOCUMENT_TYPE_FIELD}
-          value={valueOf(USER_DOCUMENT_TYPE_FIELD)}
-          error={fieldErrors.documentTypeCode}
-          optionTestId={USER_DOCUMENT_TYPE_OPTION_TESTID}
-          options={DOCUMENT_TYPE_CODES.map((code) => ({ value: code, label: code }))}
-        />
+        {/* Fecha de nacimiento, correo y telefono EN UNA FILA (decision humana): 4+4+4 desde `sm`. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-4">
+            {/*
+              `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera
+              (R26).
+            */}
+            <UserTextField
+              id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
+              name={USER_BIRTH_DATE_FIELD}
+              type="date"
+              value={valueOf(USER_BIRTH_DATE_FIELD)}
+              error={fieldErrors.birthDate}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_EMAIL_FIELD}`}
+              name={USER_EMAIL_FIELD}
+              type="email"
+              value={valueOf(USER_EMAIL_FIELD)}
+              error={fieldErrors.email}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_PHONE_FIELD}`}
+              name={USER_PHONE_FIELD}
+              type="tel"
+              value={valueOf(USER_PHONE_FIELD)}
+              error={fieldErrors.phone}
+            />
+          </div>
+        </div>
 
-        <UserTextField
-          id={`${fieldId}-${USER_DOCUMENT_NUMBER_FIELD}`}
-          name={USER_DOCUMENT_NUMBER_FIELD}
-          value={valueOf(USER_DOCUMENT_NUMBER_FIELD)}
-          error={fieldErrors.documentNumber}
-        />
-        <UserTextField
-          id={`${fieldId}-${USER_USERNAME_FIELD}`}
-          name={USER_USERNAME_FIELD}
-          value={valueOf(USER_USERNAME_FIELD)}
-          error={fieldErrors.username}
-        />
+        {/*
+          Tipo y numero de documento y nombre de usuario EN UNA FILA (decision humana): 4+4+4 desde
+          `sm`.
+        */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="sm:col-span-4">
+            {/* R25: las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
+            <UserSelectField
+              idPrefix={`${fieldId}-${USER_DOCUMENT_TYPE_FIELD}`}
+              name={USER_DOCUMENT_TYPE_FIELD}
+              value={valueOf(USER_DOCUMENT_TYPE_FIELD)}
+              error={fieldErrors.documentTypeCode}
+              optionTestId={USER_DOCUMENT_TYPE_OPTION_TESTID}
+              options={DOCUMENT_TYPE_CODES.map((code) => ({ value: code, label: code }))}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_DOCUMENT_NUMBER_FIELD}`}
+              name={USER_DOCUMENT_NUMBER_FIELD}
+              value={valueOf(USER_DOCUMENT_NUMBER_FIELD)}
+              error={fieldErrors.documentNumber}
+            />
+          </div>
+          <div className="sm:col-span-4">
+            <UserTextField
+              id={`${fieldId}-${USER_USERNAME_FIELD}`}
+              name={USER_USERNAME_FIELD}
+              value={isEdit ? valueOf(USER_USERNAME_FIELD) : autofill.username}
+              onValueChange={isEdit ? undefined : changeUsername}
+              error={fieldErrors.username}
+            >
+              {suggestedUsername === null ? null : (
+                <div
+                  className="flex flex-col gap-2 text-sm"
+                  data-testid={USER_USERNAME_SUGGESTION_TESTID}
+                >
+                  <p>{USERNAME_SUGGESTION_HINT}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={`w-full ${TOUCH_TARGET}`}
+                    data-testid={USER_USERNAME_SUGGESTION_APPLY_TESTID}
+                    onClick={() => changeUsername(suggestedUsername)}
+                  >
+                    <span className="truncate">{applySuggestionLabel(suggestedUsername)}</span>
+                  </Button>
+                </div>
+              )}
+            </UserTextField>
+          </div>
+        </div>
 
         {/*
           R24: las opciones vienen de la consulta de roles del modulo. SI esa consulta fallo, se
@@ -522,15 +629,21 @@ function UserTextField({
   name,
   type = 'text',
   value,
+  onValueChange,
   error,
+  children,
 }: {
   readonly id: string;
   readonly name: UserFieldName;
   readonly type?: 'text' | 'email' | 'tel' | 'date';
   readonly value: string;
+  /** Con ella el campo pasa a controlado; sin ella sigue como no controlado. */
+  readonly onValueChange?: (value: string) => void;
   readonly error?: string;
+  readonly children?: ReactNode;
 }) {
   const errorId = `${id}-error`;
+  const controlled = onValueChange !== undefined;
 
   return (
     <div className="flex flex-col gap-2">
@@ -538,16 +651,23 @@ function UserTextField({
       {/*
         `key={value}`: Base UI avisa cuando el `defaultValue` de un campo no controlado cambia
         despues de montarse, y la clave fuerza el remontaje justo en ese salto —el de volver de un
-        intento fallido con lo escrito—. El campo sigue sin estar controlado.
+        intento fallido con lo escrito—. Controlado, la clave es fija: remontar en cada tecla
+        quitaria el foco.
       */}
       <Input
-        key={value}
+        key={controlled ? name : value}
         id={id}
         name={name}
         type={type}
         autoComplete="off"
         required
-        defaultValue={value}
+        value={controlled ? value : undefined}
+        defaultValue={controlled ? undefined : value}
+        onChange={
+          onValueChange === undefined
+            ? undefined
+            : (event) => onValueChange(event.currentTarget.value)
+        }
         className={`min-h-11 ${FIELD_TEXT}`}
         aria-invalid={error === undefined ? undefined : true}
         aria-describedby={error === undefined ? undefined : errorId}
@@ -563,6 +683,7 @@ function UserTextField({
           {error}
         </p>
       )}
+      {children}
     </div>
   );
 }

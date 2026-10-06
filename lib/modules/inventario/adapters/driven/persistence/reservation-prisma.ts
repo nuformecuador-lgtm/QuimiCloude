@@ -169,8 +169,8 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         });
       }
 
-      const reserved = plan.kind === 'reserved' && plan.allocations.length > 0;
-      return { kind: reserved ? 'reserved' : 'not_reserved' };
+      if (plan.kind === 'insufficient') return { kind: 'insufficient', productIds: plan.productIds };
+      return { kind: plan.allocations.length > 0 ? 'reserved' : 'not_reserved' };
     },
 
     async releaseForOrder(input): Promise<void> {
@@ -191,16 +191,34 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
     },
 
     async consumeForOrder(input): Promise<ConsumptionOutcome> {
-      const { orderId, companyId, fallbackRequirement, actorId, now } = input;
+      const { orderId, companyId, actorId, now } = input;
       const scope: InventoryScope = { companyId };
+      const subset = input.productIds === undefined ? null : new Set<string>(input.productIds);
+      const fallbackRequirement =
+        subset === null
+          ? input.fallbackRequirement
+          : input.fallbackRequirement.filter((line) => subset.has(line.productId));
 
       const ownRows = await db.reservationMovement.findMany({
         where: { companyId, orderId },
         select: { batchId: true, kind: true, quantity: true },
       });
-      const ownByBatch = new Map(
+      let ownByBatch = new Map(
         [...netReservedByBatch(ownRows.map(toLedgerRow))].filter(([, quantity]) => isPositive(quantity)),
       );
+
+      let ownBatchRows =
+        ownByBatch.size === 0
+          ? []
+          : await db.productBatch.findMany({
+              where: { id: { in: [...ownByBatch.keys()] }, companyId },
+              select: { id: true, productId: true },
+            });
+      if (subset !== null) {
+        ownBatchRows = ownBatchRows.filter((row) => subset.has(row.productId));
+        const kept = new Set(ownBatchRows.map((row) => row.id));
+        ownByBatch = new Map([...ownByBatch].filter(([batchId]) => kept.has(batchId)));
+      }
 
       // El pedido no tiene nada apartado -no alcanzo al crearlo, o su reserva se libero por
       // una edicion que luego no volvio a apartar-. Se calcula y consume todo-o-nada de lo que
@@ -208,11 +226,6 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
       if (ownByBatch.size === 0) {
         return consumeWithoutReservation(db, scope, orderId, actorId, now, fallbackRequirement);
       }
-
-      const ownBatchRows = await db.productBatch.findMany({
-        where: { id: { in: [...ownByBatch.keys()] }, companyId },
-        select: { id: true, productId: true },
-      });
       const batchProduct = new Map(ownBatchRows.map((row) => [row.id, row.productId]));
 
       const productIds = [...new Set(ownBatchRows.map((row) => row.productId))];

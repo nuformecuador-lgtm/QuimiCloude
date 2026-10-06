@@ -9,19 +9,26 @@ import {
   AsignacionesError,
   InvalidTransitionError,
   MaterialShortageError,
-  NoWholePackageError,
   OrderCancelledNotAssignableError,
   OrderDeliveredFrozenError,
   OrderProducedFrozenError,
-  PresentationWithoutContentError,
-  RecipeNotFoundError,
   RecipeWithoutLinesError,
   UnauthorizedError,
 } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
-import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import type {
+  AssignmentRow,
+  OrderAssignmentRepository,
+} from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import type {
+  PeopleDirectory,
+  PermissionCode,
+  PersonRef,
+  WorkGroupDirectory,
+  WorkGroupSnapshot,
+} from '@/lib/modules/identity';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -30,28 +37,22 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
+const OPERARIO = uuid('2');
+const EMPACADOR = uuid('4');
+const OTRO_EMPACADOR = uuid('5');
+const GRUPO = uuid('6');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+};
 
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
 
-/** El exito por defecto de `transitionAliveById` yendo a `POR_EMPACAR`: un objeto
- *  con el lote de producto terminado que entro, no el literal `'ok'` -ese solo sale de una
- *  transicion que no es `POR_EMPACAR`, y `finishAssignedOrder` siempre pide esa-. */
-const OK_CON_PRODUCCION = {
-  kind: 'ok' as const,
-  finishedGoods: { productName: 'Desengrasante industrial · Botella 1L', packages: '5' },
-};
-
-type TransitionResult =
-  | typeof OK_CON_PRODUCCION
-  | 'not_found'
-  | 'stale'
-  | 'insufficient_material'
-  | 'recipe_without_lines'
-  | 'presentation_without_content'
-  | 'no_whole_package'
-  | 'recipe_not_found';
+// R15, R16: `transitionAliveById` yendo a `POR_EMPACAR` ya no da de alta ningun lote,
+// asi que el exito es el literal `'ok'`, sin `finishedGoods`.
+type TransitionResult = 'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines';
 
 type Dobles = {
   readonly deps: FinishAssignedOrderDeps;
@@ -59,15 +60,44 @@ type Dobles = {
   readonly findAliveById: ReturnType<typeof vi.fn>;
   readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
   readonly transitionAliveById: ReturnType<typeof vi.fn>;
+  readonly listByOrderInCompany: ReturnType<typeof vi.fn>;
+  readonly insertMissing: ReturnType<typeof vi.fn>;
+  readonly deleteOne: ReturnType<typeof vi.fn>;
+  readonly findAliveRefsInCompany: ReturnType<typeof vi.fn>;
+  readonly findSnapshotAliveInCompany: ReturnType<typeof vi.fn>;
 };
+
+function filaSuelta(userId: string): AssignmentRow {
+  return { userId, workGroupId: null, workGroupName: null };
+}
+
+function filaDeGrupo(userId: string, workGroupId: string, workGroupName: string): AssignmentRow {
+  return { userId, workGroupId, workGroupName };
+}
+
+function persona(
+  id: string,
+  permissions: readonly PermissionCode[],
+  isActive = true,
+): PersonRef {
+  return { id, displayName: `Persona ${id.slice(0, 8)}`, isActive, permissions };
+}
+
+function grupo(id: string, name: string, activeMemberIds: readonly string[]): WorkGroupSnapshot {
+  return { id, name, activeMemberIds };
+}
 
 function montar(options?: {
   readonly ordenDeEstados?: readonly OrderStatus[];
   readonly transitionResults?: readonly TransitionResult[];
   readonly ids?: readonly string[];
+  readonly filas?: readonly AssignmentRow[];
+  readonly snapshots?: readonly (WorkGroupSnapshot | null)[];
+  readonly personas?: readonly PersonRef[];
 }): Dobles {
   const estados = [...(options?.ordenDeEstados ?? ['EN_CURSO'])];
-  const resultados = [...(options?.transitionResults ?? [OK_CON_PRODUCCION])];
+  const resultados = [...(options?.transitionResults ?? ['ok' as const])];
+  const snapshots = [...(options?.snapshots ?? [])];
 
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: estados.shift() ?? 'ENTREGADO' }));
@@ -78,14 +108,19 @@ function montar(options?: {
     pageSize: 1,
     totalPages: 1,
   }));
-  const transitionAliveById = vi.fn(async () => resultados.shift() ?? OK_CON_PRODUCCION);
+  const transitionAliveById = vi.fn(async () => resultados.shift() ?? 'ok');
+  const listByOrderInCompany = vi.fn(async () => options?.filas ?? []);
+  const insertMissing = vi.fn(async () => 1);
+  const deleteOne = vi.fn(async () => 'ok' as const);
+  const findAliveRefsInCompany = vi.fn(async () => options?.personas ?? []);
+  const findSnapshotAliveInCompany = vi.fn(async () => snapshots.shift() ?? null);
 
   const deps: FinishAssignedOrderDeps = {
     assignments: {
-      insertMissing: vi.fn(),
-      listByOrderInCompany: vi.fn(),
+      insertMissing,
+      listByOrderInCompany,
       listByOrdersInCompany: vi.fn(),
-      deleteOne: vi.fn(),
+      deleteOne,
       deleteByWorkGroup: vi.fn(),
       listOrderIdsByUserInCompany,
     } as unknown as OrderAssignmentRepository,
@@ -94,14 +129,27 @@ function montar(options?: {
       listAliveSummariesByIds,
       transitionAliveById,
     } as unknown as OrderCatalog,
+    people: { findAliveRefsInCompany } as unknown as PeopleDirectory,
+    groups: { findSnapshotAliveInCompany } as unknown as WorkGroupDirectory,
     now: () => new Date('2026-09-17T12:00:00.000Z'),
   };
 
-  return { deps, listOrderIdsByUserInCompany, findAliveById, listAliveSummariesByIds, transitionAliveById };
+  return {
+    deps,
+    listOrderIdsByUserInCompany,
+    findAliveById,
+    listAliveSummariesByIds,
+    transitionAliveById,
+    listByOrderInCompany,
+    insertMissing,
+    deleteOne,
+    findAliveRefsInCompany,
+    findSnapshotAliveInCompany,
+  };
 }
 
 describe('finishAssignedOrder — autorizacion', () => {
-  it('R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto', async () => {
+  it('R5: exige `asignaciones.ejecutar` ANTES de tocar ningun puerto', async () => {
     const { deps, listOrderIdsByUserInCompany, findAliveById, transitionAliveById } = montar();
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
@@ -165,14 +213,12 @@ describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado re
   it('si `transitionAliveById` devuelve `stale`, relee y reintenta sin lanzar un error visible', async () => {
     const { deps, findAliveById, transitionAliveById } = montar({
       ordenDeEstados: ['EN_CURSO', 'EN_CURSO'],
-      transitionResults: ['stale', OK_CON_PRODUCCION],
+      transitionResults: ['stale', 'ok'],
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
     await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
       numberText: '2026-0000007',
-      productName: OK_CON_PRODUCCION.finishedGoods.productName,
-      packages: OK_CON_PRODUCCION.finishedGoods.packages,
     });
     expect(findAliveById).toHaveBeenCalledTimes(2);
     expect(transitionAliveById).toHaveBeenCalledTimes(2);
@@ -180,28 +226,12 @@ describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado re
 });
 
 describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES de transicionar', () => {
-  it('resuelve con el `numberText` formateado del pedido', async () => {
+  it('resuelve con el `numberText` formateado del pedido, sin envases ni producto (R16)', async () => {
     const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
     await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
       numberText: '2026-0000007',
-      productName: OK_CON_PRODUCCION.finishedGoods.productName,
-      packages: OK_CON_PRODUCCION.finishedGoods.packages,
-    });
-  });
-
-  it('R24: el exito lleva el producto y los envases del lote de producto terminado que entro', async () => {
-    const { deps } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: [{ kind: 'ok', finishedGoods: { productName: 'Acido citrico 50% · Bidon 20L', packages: '3' } }],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
-      numberText: '2026-0000007',
-      productName: 'Acido citrico 50% · Bidon 20L',
-      packages: '3',
     });
   });
 
@@ -298,44 +328,10 @@ describe('finishAssignedOrder — QC-141: el Finalizar traduce lo que devuelve e
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
   });
 
-  it('R18: `presentation_without_content` se traduce a PresentationWithoutContentError, sin reintentar', async () => {
-    const { deps, transitionAliveById } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: ['presentation_without_content'],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
-      PresentationWithoutContentError,
-    );
-    expect(transitionAliveById).toHaveBeenCalledTimes(1);
-  });
-
-  it('R19: `no_whole_package` se traduce a NoWholePackageError, sin reintentar', async () => {
-    const { deps, transitionAliveById } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: ['no_whole_package'],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
-      NoWholePackageError,
-    );
-    expect(transitionAliveById).toHaveBeenCalledTimes(1);
-  });
-
-  it('D24: `recipe_not_found` se traduce a RecipeNotFoundError, sin reintentar', async () => {
-    const { deps, transitionAliveById } = montar({
-      ordenDeEstados: ['EN_CURSO'],
-      transitionResults: ['recipe_not_found'],
-    });
-    const finishAssignedOrder = createFinishAssignedOrder(deps);
-
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
-      RecipeNotFoundError,
-    );
-    expect(transitionAliveById).toHaveBeenCalledTimes(1);
-  });
+  // R15, R16: `transitionAliveById` yendo a `POR_EMPACAR` ya no puede devolver
+  // `presentation_without_content`, `no_whole_package` ni `recipe_not_found` -esos tres
+  // resultados solo existian para el alta de producto terminado, que se traslado a Terminar el
+  // empaque-, asi que los tres casos que los traducian se retiran de este archivo.
 });
 
 describe('finishAssignedOrder — R16: no admite ningun dato de marcado', () => {
@@ -353,5 +349,281 @@ describe('finishAssignedOrder — R16: no admite ningun dato de marcado', () => 
     await expect(
       finishAssignedOrder(ACTOR, { orderId: PEDIDO, checkedItems: ['a', 'b'] } as unknown),
     ).rejects.toMatchObject({ code: 'invalid_input' });
+  });
+});
+
+const PERMISO_EMPAQUE: PermissionCode = 'empaque.modificar';
+const PERMISO_OPERARIO: PermissionCode = 'asignaciones.consultar';
+
+describe('finishAssignedOrder — auto-asignacion del empacador', () => {
+  it('R1: un empacador del equipo vinculado sin fila queda asignado con el origen del grupo', async () => {
+    const { deps, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_OPERARIO, PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    expect(insertMissing).toHaveBeenCalledWith(
+      [
+        {
+          orderId: PEDIDO,
+          userId: EMPACADOR,
+          companyId: EMPRESA,
+          workGroupId: GRUPO,
+          workGroupName: 'Turno noche',
+        },
+      ],
+      new Date('2026-09-17T12:00:00.000Z'),
+    );
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R1: a todos los encontrados, no solo al primero', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR, OTRO_EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(OTRO_EMPACADOR, [PERMISO_EMPAQUE]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    const filas = insertMissing.mock.calls[0]?.[0] as readonly { userId: string }[];
+    expect(filas.map((fila) => fila.userId).sort()).toEqual([EMPACADOR, OTRO_EMPACADOR].sort());
+  });
+
+  it('R1: una persona suelta con permiso de empaque ya asignada no se reinserta', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaSuelta(OPERARIO), filaSuelta(EMPACADOR)],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_OPERARIO, PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R2: sin empacadores vinculados no se escribe nada', async () => {
+    const { deps, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO])],
+      personas: [persona(OPERARIO, [PERMISO_OPERARIO])],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+    expect(transitionAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R2: sin responsables no se toca ni el directorio ni la escritura', async () => {
+    const { deps, insertMissing, findAliveRefsInCompany, findSnapshotAliveInCompany } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(findSnapshotAliveInCompany).not.toHaveBeenCalled();
+    expect(findAliveRefsInCompany).not.toHaveBeenCalled();
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R3: decide por el permiso, nunca por el nombre del rol', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      // OPERARIO trae todos los permisos menos el de empaque: aunque se llamara Empacador,
+      // sin el codigo no es candidato.
+      filas: [filaSuelta(OPERARIO)],
+      personas: [persona(OPERARIO, [PERMISO_OPERARIO, 'terminados.consultar'])],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R3: un empacador inactivo no se asigna', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_OPERARIO, PERMISO_EMPAQUE], false),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+
+  it('R4: el nombre congelado es el vivo del snapshot, no el de la fila vieja', async () => {
+    const { deps, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno viejo')],
+      snapshots: [grupo(GRUPO, 'Turno nuevo', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(insertMissing).toHaveBeenCalledWith(
+      [
+        {
+          orderId: PEDIDO,
+          userId: EMPACADOR,
+          companyId: EMPRESA,
+          workGroupId: GRUPO,
+          workGroupName: 'Turno nuevo',
+        },
+      ],
+      expect.any(Date),
+    );
+  });
+
+  it('R6: si la transicion falla, compensa lo creado y propaga el error original', async () => {
+    const { deps, insertMissing, deleteOne } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      transitionResults: ['insufficient_material'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      MaterialShortageError,
+    );
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    expect(deleteOne).toHaveBeenCalledTimes(1);
+    expect(deleteOne).toHaveBeenCalledWith(EMPRESA, PEDIDO, EMPACADOR);
+  });
+
+  it('R6: si la transicion falla sin nada creado, no hay compensacion', async () => {
+    const { deps, deleteOne } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      transitionResults: ['insufficient_material'],
+      filas: [filaSuelta(OPERARIO)],
+      personas: [persona(OPERARIO, [PERMISO_OPERARIO])],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      MaterialShortageError,
+    );
+    expect(deleteOne).not.toHaveBeenCalled();
+  });
+
+  it('R7: el reintento `stale` no repite el auto-asignado', async () => {
+    const { deps, listByOrderInCompany, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO', 'EN_CURSO'],
+      transitionResults: ['stale', 'ok'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(transitionAliveById).toHaveBeenCalledTimes(2);
+    expect(listByOrderInCompany).toHaveBeenCalledTimes(1);
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+  });
+
+  it('R8: un rechazo previo no lee ni escribe asignaciones nuevas', async () => {
+    const { deps, listByOrderInCompany, insertMissing, transitionAliveById } = montar({
+      ordenDeEstados: ['PENDIENTE'],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      InvalidTransitionError,
+    );
+    expect(listByOrderInCompany).not.toHaveBeenCalled();
+    expect(insertMissing).not.toHaveBeenCalled();
+    expect(transitionAliveById).not.toHaveBeenCalled();
+  });
+});
+
+function doblesDe(deps: object): unknown[] {
+  return Object.values(deps as Record<string, unknown>).flatMap((value) =>
+    vi.isMockFunction(value) ? [value] : value !== null && typeof value === 'object' ? doblesDe(value) : [],
+  );
+}
+
+const SIN_EJECUTAR: readonly (readonly [string, readonly string[]])[] = [
+  ['solo asignaciones.consultar', ['asignaciones.consultar']],
+  ['solo empaque.modificar', ['empaque.modificar']],
+  ['asignaciones.consultar + empaque.modificar', ['asignaciones.consultar', 'empaque.modificar']],
+  ['el conjunto vacio', []],
+];
+
+describe('finishAssignedOrder — exige `asignaciones.ejecutar`', () => {
+  it.each(SIN_EJECUTAR)('R7, R7a: con %s rechaza con `unauthorized` sin invocar ningun puerto', async (_caso, permissions) => {
+    const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await expect(
+      createFinishAssignedOrder(deps)({ id: ANA, companyId: EMPRESA, permissions }, { orderId: PEDIDO }),
+    ).rejects.toThrow(UnauthorizedError);
+    for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('R7: sin el permiso rechaza antes de validar la entrada', async () => {
+    const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await expect(
+      createFinishAssignedOrder(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] },
+        { orderId: 'no-es-un-uuid' },
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it('R7b: con solo `asignaciones.ejecutar` terminar resuelve igual que con el conjunto del Operador', async () => {
+    const soloEjecutar: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
+    const conEjecutar = montar({ ordenDeEstados: ['EN_CURSO'] });
+    const deReferencia = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    const resultado = await createFinishAssignedOrder(conEjecutar.deps)(soloEjecutar, { orderId: PEDIDO });
+    const referencia = await createFinishAssignedOrder(deReferencia.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(resultado).toEqual(referencia);
   });
 });

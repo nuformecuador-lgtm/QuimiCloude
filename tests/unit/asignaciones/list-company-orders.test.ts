@@ -43,7 +43,8 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: null,
     packedBy: null,
     ...overrides,
@@ -51,7 +52,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
 }
 
 function receta(overrides?: Partial<RecipeRef>): RecipeRef {
-  return { id: RECETA, name: 'Jabon liquido', isDeleted: false, ...overrides };
+  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, ...overrides };
 }
 
 function persona(id: string): PersonRef {
@@ -182,8 +183,8 @@ describe('QC-145 — listCompanyOrders: la entrada', () => {
   });
 });
 
-describe('QC-145 — listCompanyOrders: R22 sin filtro trae los seis estados', () => {
-  it('sin `statuses`, consulta con los seis estados en el orden del flujo (R41)', async () => {
+describe('QC-145 — listCompanyOrders: R22 sin filtro trae los siete estados', () => {
+  it('sin `statuses`, consulta con los siete estados en el orden del flujo (R41)', async () => {
     const { deps, listAliveSummariesInCompany } = montar();
     const listCompanyOrders = createListCompanyOrders(deps);
 
@@ -191,7 +192,7 @@ describe('QC-145 — listCompanyOrders: R22 sin filtro trae los seis estados', (
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO'],
+      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO', 'BLOQUEADO'],
       'work_queue',
       1,
       undefined,
@@ -269,7 +270,9 @@ describe('QC-145 — listCompanyOrders: R25 la fila y sus responsables', () => {
         'numberText',
         'recipeName',
         'quantity',
-        'presentationName',
+        'presentationLines',
+        'unitId',
+        'unitLabel',
         'priority',
         'status',
         'responsibles',
@@ -326,7 +329,7 @@ describe('QC-145 — listCompanyOrders: R27 paginacion delegada al catalogo', ()
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO'],
+      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO', 'BLOQUEADO'],
       'work_queue',
       2,
       25,

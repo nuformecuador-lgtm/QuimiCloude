@@ -4906,3 +4906,200 @@ podar.
   de la lista cerrada de acciones de las guardias; m5 los dos casos del E2E van encadenados en un solo `test`;
   m6 `isValidNewName` repite a mano el recorte y los límites 1..200.
 - **Pendiente local:** borrar la base `QuimiCloude_QC159`.
+
+## 2026-10-01 — QC-171-recortes-con-url-publica
+
+- **Qué:** los recortes de imagen de un catálogo en PDF se muestran con **URL pública** compuesta en el servidor, sin
+  solicitudes a Supabase, en la revisión de la importación, la vitrina de `/proveedores` y la tabla del catálogo.
+  Antes la vitrina y la tabla usaban la ruta como `src` y las imágenes importadas no se veían. Se sigue guardando la
+  ruta. Mismo bucket de recortes, que pasa a ser público: los recortes ya subidos siguen valiendo.
+- **PR #134**, merge `d17242a9`. Spec R1–R24, T0–T8. **R22 enmendado por el humano**: el E2E de QC-158 estaba
+  rojo en dev desde QC-160 y esta ficha arregló solo su paso 1 (abrir la ventana de subida). Sin migraciones ni
+  dependencias.
+- **Review:** vuelta 1 rechazada (B1: citas de ficha en comentarios de producción), vuelta 2 OK. Gate completo verde
+  sobre `8dbf0d9c`; el del HEAD final lo cortó la falta de memoria y el humano abrió el PR con `--rapido`.
+  E2E `catalogo-desde-pdf` verde en Chromium.
+- **Arrastre:** el arreglo de `pino` (PR #132) y dos rojos más de dev en el baseline (`product-page`,
+  `recipe-page`, desde `a543c84d`), que se suman a QC-177.
+- **Deuda (menores del review):** M2, aceptado por el humano: sin `SUPABASE_CROPS_BUCKET` la vitrina y la tabla dan
+  error en las líneas con imagen, en vez de mostrar el marcador.
+- **Pendiente humano (T8):** pasar a público el bucket de recortes en cada entorno ANTES de desplegar.
+- **Desbloquea:** QC-176.
+
+## 2026-10-01 — QC-161-rol-maestro
+
+- **PR #135**, merge `b4afc965`. Spec R1–R44, T0–T14. Nace el rol **Maestro** (sin empresa, solo
+  `empresas.consultar` / `empresas.modificar`, nunca asignable) y su primer usuario por seed (`SEED_MAESTRO_*`).
+  Migración `20261001160815_platform_maestro_role`: `company_id` obligatoria salvo para el Maestro y nombre de
+  usuario único en todo el sistema. Sin dependencias.
+- **Decisiones humanas en F2:** `empresas.*` entra en `ADMIN_EXCLUDED_PERMISSIONS` (desviación del design, que no
+  conocía la lista de QC-168); R39 sin cambios (base de desarrollo, sin repetidos).
+- **Review:** vuelta 1 rechazada (B1: citas de ficha en un JSDoc de producción; 3 menores), vuelta 2 OK. Gate
+  completo verde sobre `b2749955` (5 rojos, todos del baseline de QC-177); `--rapido` tras el merge de dev con un
+  timeout de máquina que aislado pasa 9/9.
+- **Arrastre:** bloqueada a mitad por dev rojo en typecheck (`pino`); arreglado en PR #132/#133.
+- **Condición de despliegue cumplida:** `SEED_MAESTRO_*` en Vercel (producción y preview), confirmado por el humano.
+- **Desbloquea:** QC-162 y QC-165.
+
+## 2026-10-02 — QC-172-versiones-de-receta
+
+- **PR #136**, merge `8303e0b8`. Spec R1–R45, T0–T14. Una receta tiene **versiones**: copia con vínculo a la
+  original (tabla `recipe_versions`, migración `20261001120000_recipe_versions`), 100 % por versión, propagación
+  asistida desde la original (la versión que deja de sumar 100 % queda **por revisar** y no se elige en un pedido),
+  pasos compartidos, un solo nivel. Selector de **versión** en el formulario de pedido; el pedido guarda la versión
+  como receta. Sin dependencias.
+- **Review:** OK a la primera, 0 bloqueantes, 7 menores (m2 y m4 corregidos en el spec). E2E 2 passed. Gate completo
+  verde sobre `8c33974e` (5 rojos, todos del baseline).
+- **Sync con dev antes del PR** (44 commits, QC-161): conflicto en la lista de migraciones del guard. Tras el sync,
+  **gate acotado por decisión del humano** (typecheck, lint, related, integración 52/52), no completo.
+- **Arrastre:** el seed de la base de pruebas pedía las `SEED_MAESTRO_*` de QC-161; añadidas al `.env` local con
+  valores provisionales que el humano cambiará.
+- **Desbloquea:** QC-174.
+
+## 2026-10-02 — QC-170-pedido-en-varias-presentaciones
+
+- **PR #137**, merge `c8649e9d`. Spec R1–R49 (R44 retirado), T0–T26. Un pedido se **reparte en lineas** de N envases x
+  presentacion y muestra lo que queda disponible; vuelve `orders.unit_id`. El producto terminado entra **al terminar el
+  empaque**, un lote por linea, con el coste por unidad expresado en la unidad de la presentacion de cada lote. La
+  presentacion unica de QC-146 desaparece y los pedidos vivos se convierten en su reparto. Enmienda QC-168, QC-150 y,
+  tras el merge de QC-172, el **R36 de QC-172** (el producto terminado de la version entra al terminar el empaque).
+- **Review:** vuelta 1 RECHAZADA (B1 citas en comentarios, B2 cuatro E2E rotos, B3 coste con unidades mezcladas, B4
+  aislamiento sin test); vuelta 2 **acotada a los arreglos** por orden del humano: OK.
+- **Dos sincronizaciones con dev antes del merge:** la primera (88 commits) destapo un doble de test de #130 con el
+  contrato viejo de `transitionAliveById` que colgaba el gate en un bucle sin fin; la segunda (36 commits, QC-172) dejo
+  16 conflictos resueltos como suma y un E2E de QC-172 adaptado al reparto. Sin renumerar migraciones.
+- **Gate:** sin rojos nuevos (8, todos en el baseline). E2E de 11 specs en Chromium y WebKit, verdes.
+- **Baseline:** tres rojos nuevos de dev, todos desde `897a4f91` (commit ad hoc que subio recetas y unidades a
+  `pedidos/page.tsx`): `recetas/scope`, `recetas/module-contract`, `navegacion/pantallas-exigen-permiso`. Necesitan ficha.
+- **Deuda:** precision de `unit_cost` (`decimal(14,4)`) aceptada por el humano, arreglo en **QC-178**.
+  `finish-assigned-order` reintenta con un `for (;;)` sin tope si el puerto responde `stale`; no se toco.
+- **Arrastre del arnes:** dias perdidos por modelos (cuota de OpenRouter, Ollama 3B, glm-5.3 que toco el spec aprobado);
+  ver `progress/current.md > Modelos`.
+
+## 2026-10-02 — QC-138-estado-bloqueado-por-inventario-insuficiente
+
+- **PR #138**, merge `3311586e`. Spec R1–R61, T0–T15. El pedido gana el estado `BLOQUEADO` (ultimo valor del enum, detras de
+  los de QC-168): al crear o editar, si la existencia no cubre la receta, un modal («Guardar bloqueado» / «Volver») avisa y
+  el pedido se guarda bloqueado. Solo la existencia insuficiente bloquea; receta sin lineas o unidades sin base comun no.
+  El alta de lote y el ajuste al alza desbloquean en automatico los pedidos cubiertos, recalculando su importe. El
+  Operador lo ve en su lista sin poder iniciarlo. Migraciones `20261001170000_order_status_blocked` y
+  `20261001170100_orders_blocked_index`.
+- **F2.0** esperando a QC-168 (#129): enum y migraciones rebasados segun `design.md > 10`.
+- **Review:** OK con 5 menores; 3 de spec corregidos (`0295adbf`).
+- **Sincronizaciones con dev:** QC-172 y `897a4f91` (3 rojos ajenos al baseline, `7e74709e`); tras QC-170 (#137) el PR
+  quedo en conflicto: 26 conflictos resueltos como suma (`e31e0835`), `BLOQUEADO` entra en la ventana del reparto.
+- **Gate:** completo verde (8/8 en baseline); rojo intermitente distinto por corrida (`user-table`,
+  `ciclo-de-vida-de-la-base`) declarado en el PR. E2E 8/8.
+- **Deuda local:** carpeta del worktree sin borrar (archivo en uso) y base `QuimiCloude_QC138`.
+
+## 2026-10-02 — QC-174-crear-versiones-en-la-receta
+
+- **PR #139**, merge `ca656d5c`. Spec R1–R39, T0–T12. Desde la ficha de una receta se crean, editan, ven y borran
+  sus **versiones**: página propia por versión (`/produccion/formulas/[id]/versiones/{nueva,[versionId]}`) con el
+  editor de líneas de la receta, diferencia con la original marcada por línea, pasos de la original en solo
+  lectura, y **propagación asistida** al guardar la original (casilla por versión, todas marcadas; aviso fijo si
+  alguna queda por revisar). Único toque de servidor: `updateRecipeAction` devuelve `propagated`. Sin dependencias.
+- **Decisiones humanas:** acotada con `/afinar-feature` (4 decisiones + 5 heredadas de QC-172); F1.4 con P1 (a) y
+  R7, R29 y R33/R34 añadidos por `spec_author` aprobados tal cual.
+- **Review:** OK a la primera, 0 bloqueantes; m1 corregido («Versión borrada.»), m2 y m3 aceptados. E2E 2 passed;
+  gate completo verde tras el primer sync con dev.
+- **Arrastre:** `897a4f91` (grupos y usuarios, fuera del flujo) rompe tres tests de dev (`pantallas-exigen-permiso`,
+  `recetas/module-contract`, `recetas/scope`); el humano decidió dejarlos en el baseline y nace **QC-180** para
+  arreglarlos. Segundo sync (85 commits: QC-138, QC-170) con conflictos solo de bitácora; tras él, `--rapido` y
+  E2E (4 passed), sin repetir el gate completo.
+
+## 2026-10-04 — QC-194-herramientas-de-la-receta
+
+- **PR #141**, merge `1ea13ba9`. Spec R1–R34, T0–T13. Una receta (original o version) declara sus **herramientas**: productos MACHINE con cantidad entera, en la tabla nueva `recipe_tools` (migracion `20261003120000_recipe_tools`, novena tabla exenta de `company_id`). Se editan en el tab «Herramientas» del formulario y el operador las ve en `/asignacion/<id>`. **No** apartan, consumen ni suman costo, y no cuentan en el 100 %: van en un campo `tools` aparte de `lines`, asi que `pedidos` e `inventario` no cambiaron.
+- **Acotada** con `/afinar-feature` (8 decisiones). **F1.4:** el humano pregunto por `recipe_lines` + `type`; se mantuvo la tabla aparte (design §11.1). Contrato de back congelado primero (`b95a1732`) para hacer la UI en paralelo.
+- **Review:** vuelta 1 OK con 7 menores; vuelta 2 OK (m2 con la opcion (a) del humano: 23503 -> `invalid_input`; m4 parcial por la guardia de ambito).
+- **Gate:** completo verde (8/8 en baseline). Escondia un rojo nuevo en `recetas/scope.test.ts` por ir el baseline por archivo; cerrado en `0503f35f`. Sin E2E (decision humana).
+- **Deuda local:** carpeta del worktree sin borrar.
+
+## 2026-10-04 — QC-195-envases-del-pedido-como-productos
+
+- **PR #142**, merge `f6f69dad`. Spec R1–R47, T0–T19 (+TC, T10.E1). El reparto del pedido deja de elegir presentaciones y elige **productos PACKAGING** (envases) con una presentacion fija en `products.presentation_id`; la linea gana `packaging_product_id` y sigue copiando la presentacion, asi que `order-distribution.ts` no cambio. Stock de envases en la unidad de sistema nueva **`unidad`/`u`** (entera), lotes sin presentacion. Los envases se apartan con la reserva de materias primas (todo o nada, aviso y `BLOQUEADO`), se consumen al **Terminar el empaque** y su costo (promedio D22) va en el importe; `orders.packaging_cost` guarda la parte de envases. PACKAGING ya no puede ser ingrediente de receta (las que ya lo tenian se conservan).
+- **Migraciones:** `20261003130000_packaging_products_in_distribution` (renumerada tras chocar con `recipe_tools` de QC-194) y `20261004120000_orders_packaging_cost`; rollback probado en bases efimeras.
+- **Decisiones humanas:** P1-P6, N1-N10 (N1 y N7 por la alternativa), Enmienda 1 (R42-R44) y Enmienda 2 (R45-R47, E5, P6-A, E6). Contrato front-back congelado primero (TC) para hacer la UI en paralelo.
+- **Review:** vuelta 1 RECHAZADO (B1: «Reparto y unidad» no recalculaba el importe); vuelta 2 OK, menores m5-m7 cerrados o a deudas.
+- **Gate:** completo verde (8/8 en baseline), 12 E2E en chromium; webkit no corrido. El E2E nuevo cazo un bug real (alta con dos envases). Tres E2E rojos heredados de dev (`527a9902`) quedan para ficha propia.
+
+## 2026-10-04 — QC-201 empacador-no-ejecuta-pedidos
+
+- Permiso nuevo `asignaciones.ejecutar` (Administrador y Operador). Sin él no hay «Entrar»,
+  `/asignacion/[id]` da 404 y el servidor rechaza leer, comenzar y terminar la ejecución. El
+  Empacador no ve «Mis asignados» y en «Terminados» solo los pedidos que empacó él (`packedBy`).
+- Requisitos cubiertos: R1–R22. PR #144, merge `76980fa0`. Migración de datos
+  `20261004150000_execution_permission`, reversible.
+- Decisiones humanas: se retira qc138 R37 (bloqueaba cualquier permiso nuevo); los E2E abren
+  el menú de 3 puntos antes de pulsar un item. Riesgo aceptado: los Operadores con sesión
+  abierta reciben el permiso al volver a entrar (hasta 8 h). Nace QC-202 (estado TERMINADO).
+
+## 2026-10-05 — QC-199 presentacion-por-unidad-en-alta-de-producto
+
+- El alta de insumo (`PRODUCT`) pide la **unidad** en vez de la presentación; el lote nace sin
+  presentación, con la cantidad en la unidad del producto. Envase, instrumento y producto
+  terminado sin cambios; lotes existentes sin migración de datos (T0: 0 lotes con unidad de
+  presentación distinta de la del producto).
+- Migración `20261004170000_product_batches_require_product_unit`, reversible: la base rechaza un
+  lote sin presentación de un insumo sin unidad. Vista de lotes y costeo leen la unidad del
+  producto. Unidades del formulario con `inventario.modificar` (`listProductFormUnitsAction`).
+- Requisitos cubiertos: R1–R20. PR #145, merge `8cfbacc5`. Contrato de servicios commiteado antes
+  de paralelizar backend y frontend; ninguna firma cambió después.
+- Review: vuelta 1 rechazada (B1, cita de ficha en un comentario); vuelta 2 OK. m1 (tooltip en
+  táctil) y m3 (duplicado con `presentation-select.tsx`) aceptados sin cambio.
+- Decisiones humanas: E2E R26 localiza las filas por nombre y las distingue por la existencia
+  (la columna de nombre ya no pinta la unidad, deuda QC-177); QC-22 R24 se mueve al alta de envase.
+- Gate completo: 8 rojos, todos en el baseline (no hay entradas que podar). E2E 10/10 en Chromium y WebKit.
+- Nacen del review: QC-203 (agrupar homónimos por familia de unidad), QC-204 (convertir la unidad
+  del pedido a la del insumo), QC-205 (unicidad nombre + unidad), QC-206 (unidad en uso no cambia
+  factor), QC-207 (liberar material revisa los bloqueados).
+
+## 2026-10-05 — QC-204 conversion-unidad-pedido-a-insumo
+
+- La necesidad de cada insumo (cantidad × %) se expresa en la **unidad del pedido** y se convierte
+  a la del insumo antes de costear, apartar, ejecutar y mostrar. Misma familia: exacta (QC-76).
+  Masa ↔ volumen: aproximación sin densidad (1 ml ≈ 1 g), marcada «aprox.» en la línea y con nota
+  bajo el costo. Otras combinaciones: no convertibles; el guardado se rechaza con
+  `order_unit_not_convertible`.
+- Sin migraciones ni dependencias. `unidades` publica `convertWithApproximation` y
+  `findMassVolumeBridge`; el scope transaccional de pedidos lee productos y unidades en la misma
+  conexión. La cotización exige `unitId`.
+- Requisitos cubiertos: R1–R26 (R26 por guardias y revisión). PR #150, merge `62bcf626`. E2E
+  `pedido-conversion-de-unidad.spec.ts` 4/4.
+- Review: vuelta 1 OK (0 B, 7 m). m2, m4, m6 y m7 cerrados antes del PR; m5 (T8+T9 en un commit)
+  aceptado.
+- Decisiones humanas durante F2: `LineNeedUnits.orderUnitId` (T4); un envase como ingrediente no
+  tiene excepción (T9); un pedido antiguo sin unidad mantiene el costo guardado al editar (m3).
+- Dos merges de `dev` con conflictos: `feature_list.json`/`current.md` (resueltos por el
+  leader) y el conteo del catálogo de errores (70 códigos tras QC-204 y el fix de grupos).
+
+## 2026-10-06 — QC-211 pasos-de-envasado
+
+- PR #148 hacia dev, merge `81c04edb`. Spec R1–R32, D1–D13, 16 tasks (T15 manual del humano, pendiente).
+- Columna `recipes.packing_steps` (JSONB, default `[]`, sin backfill). Sección propia en alta y edición;
+  las versiones heredan los de la original. Importación PDF con campo `packingSteps` tolerante a su ausencia.
+- Empaque: paso a paso con `StepReader` tras Comenzar; lectura con `empaque.modificar` solo en `EN_EMPAQUE` a
+  nombre del actor. El operador nunca recibe los pasos de envasado.
+- Arregla en la misma rama `e2e/empaque.spec.ts`, rojo en dev desde 6ef2b6e9 (decisión del humano).
+- Review: vuelta 1 rechazada (B1 cita en comentario, m1–m3), vuelta 2 OK. Gate completo: 8 rojos, todos en
+  el baseline (nada que podar). E2E 16/16 en Chromium y WebKit.
+- Deudas: tarjeta de Jira sin mover (MCP caído), carpeta del worktree y base `QuimiCloude_QC211` sin borrar.
+
+## 2026-10-06 — QC-209 importar-inventario-desde-excel
+
+- PR #151 hacia dev, merge `524572c7`. Spec R1–R33, D1–D11, DS-1–DS-13, 19 tasks (T0 contrato, B1–B10 y
+  F1–F6 en paralelo, TI, TZ). El contrato de servicios se publicó primero (T0, tipos + acciones con stub y
+  fixtures) para que frontend y backend avanzaran en paralelo e integraran al final.
+- Importa .xlsx (`read-excel-file`) y .csv (`papaparse`, entra en `PURE_PACKAGES`); hasta 2.000 filas y 1 MB.
+  Vista previa fila a fila (crear, sumar lote, duplicado, error) con alta de unidades y presentaciones faltantes;
+  confirmación parcial con archivo de errores. Tabla nueva `inventory_imports` (idempotencia por `importKey`,
+  migración `20261006120000_inventory_imports`). Pantalla `/inventario/importar`.
+- Enmiendas humanas: CSV por librería (F1.4); fila de ejemplo comparada normalizada (DS-8); R24 con 0 filas
+  válidas devuelve `nothing_imported` sin escribir nada; columna `completed_at` en vez de `finished_at` (guardia
+  `qc145-estado-solo-planta`); `product-route-contract.test.ts` excluye `importar/`; excepción solo para esta
+  ficha: `--rapido` cerró tandas con rojos únicamente del baseline.
+- Review vuelta 1 OK (0 B, 4 m, cerrados antes del PR). Gate completo: 8 rojos, todos en el baseline (nada que
+  podar). E2E 2/2 en Chromium y WebKit. Confirmación de 2.000 filas: 42,5 s en Postgres local.
+- Deudas: re-medir las 2.000 filas contra el pooler de Supabase; carpeta del worktree (no se pudo desmontar,
+  archivo en uso en Windows) y base `QuimiCloude_QC209` sin borrar.

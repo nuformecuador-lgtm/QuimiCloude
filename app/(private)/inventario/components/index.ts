@@ -6,6 +6,21 @@
 export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
 export { BatchHistory, movementKindLabel, movementReasonLabel } from './batch-history';
 export { DeleteProductDialog } from './delete-product-dialog';
+export {
+  buildFinishedStockColumns,
+  finishedStockRowName,
+  finishedStockRowTitle,
+  packagedStockLabel,
+  type FinishedStockColumnsDeps,
+  type FinishedStockTableRow,
+} from './finished-stock-columns';
+export { FinishedStockListSection } from './finished-stock-list-section';
+export {
+  FINISHED_STOCK_TABLE_ID,
+  FINISHED_STOCK_TABLE_TEXTS,
+  FinishedStockTable,
+  type FinishedStockTableProps,
+} from './finished-stock-table';
 // `PresentationSelect` ya no es propio de esta ruta: QC-44 lo promovio a
 // `components/shared/` porque la pantalla de proveedores lo necesita con la MISMA API
 // (`docs/architecture.md > Regla: sin sobre-ingenieria`). Se reexporta aqui para que la
@@ -17,7 +32,6 @@ export {
   EMPTY_CELL,
   IMAGE_COLUMN_ID,
   IMAGE_COLUMN_LABEL,
-  PRODUCT_DEFAULT_PINNED_COLUMNS,
   buildProductColumns,
   productUnitLabel,
   type ProductColumn,
@@ -42,6 +56,10 @@ export {
   ProductBatchesPanel,
   type ProductBatchesPanelProps,
 } from './product-batches-panel';
+export {
+  ProductBatchesSheet,
+  type ProductBatchesSheetProps,
+} from './product-batches-sheet';
 export {
   PRODUCT_NAME_FIELD,
   ProductNamePicker,

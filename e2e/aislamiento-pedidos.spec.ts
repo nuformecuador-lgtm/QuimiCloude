@@ -31,6 +31,8 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { addPackagingLine, openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc60_e2e_';
 
@@ -54,11 +56,20 @@ const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 /** Presentacion de la empresa A, para el alta por la UI: el alta la exige. */
 const UNIT_NAME = `${SHARED_TOKEN}_unidad`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
+/** El envase de A para el reparto del alta, con esa presentacion fija. */
+const PACKAGING_NAME = `${SHARED_TOKEN}_envase`;
+const PACKAGING_LOT = `${SHARED_TOKEN}_lote_envase`;
+const PACKAGING_STOCK = '10';
+const PACKAGING_UNIT_COST = '0.5000';
 
 const ADMIN_USERNAME = `${SHARED_TOKEN}_admin`;
 const ADMIN_PASSWORD = `Qc60-Admin-${RUN_ID.slice(0, 12)}`;
 
 const ORDER_QUANTITY = '7.25';
+
+/** Una linea de reparto que cabe en `ORDER_QUANTITY`: 1 envase de 1. */
+const PRESENTATION_CONTENT = '1';
+const ORDER_PACKAGES = '1';
 
 /** Posicion del pedido propio de A y del gemelo de B: la misma, a proposito (R11). */
 const SHARED_SEQUENCE = 1;
@@ -81,9 +92,10 @@ const ORDER_FORM = 'order-form';
 const RECIPE_PICKER = 'recipe-picker';
 const RECIPE_PICKER_OPTION = 'recipe-picker-option';
 const RECIPE_PICKER_VALUE = 'recipe-picker-value';
-const PRESENTATION_SELECT = 'presentation-select';
-const PRESENTATION_OPTION = 'presentation-option';
-const PRESENTATION_VALUE = 'presentation-value';
+const UNIT_SELECT = 'presentation-unit-select';
+const UNIT_OPTION = 'presentation-unit-option';
+const DISTRIBUTION_FIELD = 'order-distribution-field';
+const DISTRIBUTION_AVAILABLE = 'order-distribution-available';
 const QUANTITY_FIELD = 'order-field-quantity';
 const FORM_SUBMIT = 'order-form-submit';
 
@@ -94,6 +106,8 @@ let companyAId: string | null = null;
 let companyBId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
+let unitId: string | null = null;
+let packagingId: string | null = null;
 let orderAId: string | null = null;
 let orderBId: string | null = null;
 let orderBHighId: string | null = null;
@@ -214,13 +228,24 @@ test.beforeAll(async () => {
     })
   ).map((recipe) => recipe.id);
   if (orphanCompanyIds.length > 0) {
+    await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({
+      where: { companyId: { in: orphanCompanyIds } },
+    });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    // El envase, ANTES que su presentacion fija.
+    await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
     await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.unit.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
+    await prisma.orderPresentationLine.deleteMany({
+      where: { order: { recipeId: { in: orphanRecipeIds } } },
+    });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
@@ -274,17 +299,32 @@ test.beforeAll(async () => {
     data: { name: UNIT_NAME, nameNormalized: normalizeUnitName(UNIT_NAME), companyId: companyAId },
     select: { id: true },
   });
+  unitId = unit.id;
   presentationId = (
     await prisma.presentation.create({
       data: {
         name: PRESENTATION_NAME,
         nameNormalized: normalizePresentationName(PRESENTATION_NAME),
         unitId: unit.id,
+        // Sin contenido el selector del reparto no deja anadirla.
+        content: PRESENTATION_CONTENT,
         companyId: companyAId,
       },
       select: { id: true },
     })
   ).id;
+
+  packagingId = (
+    await seedPackaging({
+      companyId: companyAId,
+      name: PACKAGING_NAME,
+      presentationId,
+      stock: PACKAGING_STOCK,
+      unitCost: PACKAGING_UNIT_COST,
+      lot: PACKAGING_LOT,
+      createdBy: admin.id,
+    })
+  ).productId;
 
   orderAId = (await seedOrder(companyAId, SHARED_SEQUENCE, admin.id)).id;
   // B no tiene usuarios: sus pedidos nacen sin autor, que la columna admite.
@@ -297,9 +337,15 @@ test.afterAll(async () => {
   // corriendo. Cada paso corre aunque falle el anterior, y el primer fallo se relanza al final.
   const companyIds = [companyAId, companyBId].filter((id): id is string => id !== null);
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    () => prisma.reservationMovement.deleteMany({ where: { companyId: { in: companyIds } } }),
+    () => prisma.inventoryMovement.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.orderAssignment.deleteMany({ where: { companyId: { in: companyIds } } }),
+    () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
+    // El envase, ANTES que su presentacion fija.
+    () => prisma.productBatch.deleteMany({ where: { companyId: { in: companyIds } } }),
+    () => prisma.product.deleteMany({ where: { companyId: { in: companyIds } } }),
     // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
     () => prisma.presentation.deleteMany({ where: { name: PRESENTATION_NAME } }),
     () => prisma.unit.deleteMany({ where: { name: UNIT_NAME } }),
@@ -386,8 +432,7 @@ test.describe('aislamiento por empresa de pedidos', () => {
     // --- 3. Borrado cruzado conociendo el identificador (R20, R21). El id de B se mete por DOM en
     // el campo oculto del dialogo del pedido propio: es el gesto de quien abre las herramientas de
     // desarrollo, y ejercita la Server Action real sin fabricar ninguna peticion.
-    const ownRow = page.locator(`[data-testid="data-table-row-${orderAId}"]`);
-    await ownRow.getByTestId(DELETE_OPEN).click();
+    await (await openOrderRowMenu(page, orderMenuTrigger(page, orderAId), DELETE_OPEN)).click();
     await expect(page.getByTestId(DELETE_DIALOG)).toBeVisible({ timeout: 60_000 });
 
     const hiddenId = page.getByTestId(DELETE_ID_FIELD);
@@ -455,17 +500,23 @@ test.describe('aislamiento por empresa de pedidos', () => {
     await recipeOption.click();
     await expect(page.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(recipeId);
 
-    const presentationPicker = page.getByTestId(PRESENTATION_SELECT);
-    await presentationPicker.click();
-    await presentationPicker.fill(PRESENTATION_NAME);
-    const presentationOption = page
-      .getByTestId(PRESENTATION_OPTION)
-      .filter({ hasText: PRESENTATION_NAME });
-    await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
-    await presentationOption.click();
-    await expect(page.getByTestId(PRESENTATION_VALUE)).toHaveValue(presentationId ?? '');
-
     await page.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
+    await page.getByTestId(ORDER_FORM).getByTestId(UNIT_SELECT).click();
+    await page.locator(`[data-testid="${UNIT_OPTION}"][data-value="${unitId}"]`).click();
+
+    const distribution = page.getByTestId(DISTRIBUTION_FIELD);
+    await addPackagingLine(
+      page,
+      page.getByTestId(ORDER_FORM),
+      { productId: packagingId!, name: PACKAGING_NAME },
+      ORDER_PACKAGES,
+    );
+    await expect(distribution.getByTestId(DISTRIBUTION_AVAILABLE)).toHaveAttribute(
+      'data-state',
+      'ready',
+      { timeout: 60_000 },
+    );
+
     await page.getByTestId(FORM_SUBMIT).click();
     await expect(page.getByTestId(ORDER_FORM)).toHaveCount(0, { timeout: 60_000 });
 

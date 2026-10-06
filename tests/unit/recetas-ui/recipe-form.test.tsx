@@ -21,6 +21,7 @@ import {
 import type {
   CreateRecipeFormState,
   RecipeQueryResult,
+  RecipeVersionListResult,
   UpdateRecipeFormState,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { ProductListResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -28,7 +29,7 @@ import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/uni
 import type { UnitView } from '@/lib/modules/unidades';
 import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, recipeVersionRoute } from '@/lib/shared/routes';
 import { PERMISSIONS } from '@/lib/modules/identity';
 
 /**
@@ -76,6 +77,8 @@ const {
   createRecipeActionMock,
   updateRecipeActionMock,
   getRecipeActionMock,
+  listRecipeVersionsActionMock,
+  redirectMock,
   listProductsActionMock,
   listUnitsActionMock,
 } = vi.hoisted(() => ({
@@ -91,6 +94,11 @@ const {
   createRecipeActionMock: vi.fn<(input: unknown) => Promise<CreateRecipeFormState>>(),
   updateRecipeActionMock: vi.fn<(id: string, input: unknown) => Promise<UpdateRecipeFormState>>(),
   getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+  listRecipeVersionsActionMock: vi.fn<(originalId: string) => Promise<RecipeVersionListResult>>(),
+  // `redirect` de Next lanza para cortar el render; el doble lanza igual para que la pagina no siga.
+  redirectMock: vi.fn<(ruta: string) => never>((ruta) => {
+    throw new Error(`redirect:${ruta}`);
+  }),
   listProductsActionMock: vi.fn<(query: unknown) => Promise<ProductListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
 }));
@@ -110,12 +118,14 @@ vi.mock('@/lib/composition', () => ({
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => routerMock,
+  redirect: redirectMock,
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   createRecipeAction: createRecipeActionMock,
   updateRecipeAction: updateRecipeActionMock,
   getRecipeAction: getRecipeActionMock,
+  listRecipeVersionsAction: listRecipeVersionsActionMock,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
@@ -234,7 +244,12 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     createdBy: null,
     updatedBy: null,
     steps: [stepView('Mezclar')],
+    packingSteps: [],
     lines: [lineView()],
+    tools: [],
+    original: null,
+    isUnderReview: false,
+    displayName: 'Detergente industrial',
     ...overrides,
   };
 }
@@ -260,6 +275,7 @@ function renderEditForm(recipe: RecipeDetail) {
     <RecipeForm
       mode="edit"
       recipe={recipe}
+      versions={[]}
       units={UNITS}
       initialProductPage={PRODUCT_PAGE_1}
       initialMachinePage={MACHINE_PAGE}
@@ -510,12 +526,13 @@ beforeEach(() => {
     permissions: PERMISSIONS.map((permiso) => permiso.code),
   });
   createRecipeActionMock.mockResolvedValue({ status: 'success', id: RECIPE_ID });
-  updateRecipeActionMock.mockResolvedValue({ status: 'success' });
+  updateRecipeActionMock.mockResolvedValue({ status: 'success', propagated: [] });
   listProductsActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [productView()], total: 3, page: 2, pageSize: MAX_PAGE_SIZE, totalPages: 2 },
   });
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: UNITS });
+  listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
   toastSuccessSpy = vi.spyOn(toast, 'success');
   // jsdom no implementa `URL.createObjectURL`/`revokeObjectURL` (API de navegador real): se
   // resuelve aquí, explícitamente, en vez de en producción.
@@ -642,6 +659,83 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     );
     expect(screen.queryByTestId('recipe-form')).toBeNull();
     expect(getRecipeActionMock).toHaveBeenCalledWith(RECIPE_ID);
+  });
+});
+
+describe('QC-174 — la ficha de la original y el id de una version', () => {
+  const ORIGINAL_ID = '77777777-7777-4777-8777-777777777777';
+
+  it('R7: el id de una version redirige a su pagina bajo la original sin pintar el formulario', async () => {
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recipeDetail({ original: { id: ORIGINAL_ID, name: 'Original' } }),
+    });
+
+    await expect(
+      EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) }),
+    ).rejects.toThrow(`redirect:${recipeVersionRoute(ORIGINAL_ID, RECIPE_ID)}`);
+
+    expect(redirectMock).toHaveBeenCalledTimes(1);
+    expect(redirectMock).toHaveBeenCalledWith(recipeVersionRoute(ORIGINAL_ID, RECIPE_ID));
+    expect(screen.queryByTestId('recipe-form')).toBeNull();
+  });
+
+  it('R1, R5: la original pide sus versiones, el formulario las recibe y debajo sale la lista de versiones', async () => {
+    getRecipeActionMock.mockResolvedValue({ status: 'success', data: recipeDetail() });
+    listRecipeVersionsActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        {
+          id: 'version-1',
+          name: 'Copia',
+          displayName: 'Detergente industrial - Copia',
+          isUnderReview: false,
+          updatedAt: new Date('2026-01-03T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    const tree = await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) });
+    render(tree);
+
+    expect(listRecipeVersionsActionMock).toHaveBeenCalledWith(RECIPE_ID);
+    expect(redirectMock).not.toHaveBeenCalled();
+    const form = screen.getByTestId('recipe-form');
+    const versions = screen.getByTestId('recipe-versions');
+    expect(form.compareDocumentPosition(versions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(versions).getAllByTestId('recipe-version-row')).toHaveLength(1);
+    expect(within(versions).getByTestId('recipe-version-link')).toHaveAttribute(
+      'href',
+      recipeVersionRoute(RECIPE_ID, 'version-1'),
+    );
+  });
+
+  it('el titulo de la edicion nombra la formula que se esta editando', async () => {
+    getRecipeActionMock.mockResolvedValue({ status: 'success', data: recipeDetail() });
+    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
+
+    const tree = await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) });
+    render(tree);
+
+    expect(screen.getByTestId('recipe-form-title')).toHaveTextContent(
+      'Editar fórmula · Detergente industrial',
+    );
+  });
+
+  it('R5: si falla la lista de versiones presenta el error propio y ningun formulario', async () => {
+    getRecipeActionMock.mockResolvedValue({ status: 'success', data: recipeDetail() });
+    listRecipeVersionsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+
+    const tree = await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) });
+    render(tree);
+
+    expect(screen.getByTestId('recipe-list-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('recipe-form')).toBeNull();
+    expect(screen.queryByTestId('recipe-versions')).toBeNull();
   });
 });
 
@@ -1504,5 +1598,161 @@ describe('formulario de receta — el identificador del error inesperado (QC-71 
     expect(screen.queryByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeNull();
     expect(screen.queryByText(REFERENCIA_DEL_CASO)).toBeNull();
     expect(document.body.textContent ?? '').not.toContain(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+  });
+});
+
+describe('QC-194 — herramientas en el formulario de receta', () => {
+  const TOOL_A_ID = '88888888-8888-4888-8888-888888888888';
+  const TOOL_B_ID = '99999999-9999-4999-8999-999999999999';
+  const TOOL_PAGE = {
+    items: [
+      { id: TOOL_A_ID, name: 'Agitador', unitId: null },
+      { id: TOOL_B_ID, name: 'Balanza', unitId: null },
+    ],
+    totalPages: 1,
+  };
+
+  function renderWithTools(recipe?: RecipeDetail) {
+    return render(
+      recipe === undefined ? (
+        <RecipeForm mode="create" units={UNITS} initialProductPage={PRODUCT_PAGE_1} initialMachinePage={TOOL_PAGE} />
+      ) : (
+        <RecipeForm
+          mode="edit"
+          recipe={recipe}
+          versions={[]}
+          units={UNITS}
+          initialProductPage={PRODUCT_PAGE_1}
+          initialMachinePage={TOOL_PAGE}
+        />
+      ),
+    );
+  }
+
+  async function chooseTool(user: UserEvent, index: number, name: string) {
+    await user.click(screen.getByTestId(`recipe-machine-product-${index}`));
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name })));
+  }
+
+  it('R26 — el alta envía exactamente las herramientas del tab, con cantidad entera', async () => {
+    const user = setupUser();
+    renderWithTools();
+    await user.type(screen.getByTestId('recipe-field-name'), 'Con herramientas');
+    await addValidLine(user, 0);
+
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await chooseTool(user, 0, 'Agitador');
+    await user.click(screen.getByTestId('recipe-machine-add-0'));
+    await chooseTool(user, 1, 'Balanza');
+    await user.clear(screen.getByTestId('recipe-machine-quantity-1'));
+    await user.type(screen.getByTestId('recipe-machine-quantity-1'), '3');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [payload] = createRecipeActionMock.mock.calls[0] as [{ tools: unknown }];
+    expect(payload.tools).toStrictEqual([
+      { productId: TOOL_A_ID, quantity: 1 },
+      { productId: TOOL_B_ID, quantity: 3 },
+    ]);
+  });
+
+  it('R22, R26 — la edición precarga las guardadas y las reenvía, incluida la no disponible', async () => {
+    const user = setupUser();
+    renderWithTools(
+      recipeDetail({
+        tools: [
+          { id: 't1', productId: TOOL_A_ID, productName: 'Agitador', quantity: 2 },
+          { id: 't2', productId: TOOL_B_ID, productName: null, quantity: 4 },
+        ],
+      }),
+    );
+
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('2');
+    expect(screen.getByTestId('recipe-machine-unavailable-1')).toBeInTheDocument();
+    expect(screen.getByTestId('recipe-machine-quantity-1')).toHaveValue('4');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { tools: unknown }];
+    expect(payload.tools).toStrictEqual([
+      { productId: TOOL_A_ID, quantity: 2 },
+      { productId: TOOL_B_ID, quantity: 4 },
+    ]);
+  });
+
+  it('R26 — la edición sin herramientas manda tools vacío, no omite la clave', async () => {
+    const user = setupUser();
+    renderWithTools(recipeDetail());
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { tools: unknown }];
+    expect(payload.tools).toStrictEqual([]);
+  });
+
+  it.each(['', '0'])(
+    'R25 — cantidad %j: no invoca la acción, pinta el error en la fila y conserva lo escrito',
+    async (quantity) => {
+      const user = setupUser();
+      renderWithTools(
+        recipeDetail({ tools: [{ id: 't1', productId: TOOL_A_ID, productName: 'Agitador', quantity: 2 }] }),
+      );
+      await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+      await user.clear(screen.getByTestId('recipe-machine-quantity-0'));
+      if (quantity !== '') await user.type(screen.getByTestId('recipe-machine-quantity-0'), quantity);
+
+      await user.click(screen.getByTestId('recipe-form-submit'));
+
+      expect(await screen.findByTestId('recipe-machine-quantity-error-0')).toBeInTheDocument();
+      expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue(quantity);
+      expect(screen.getByTestId('recipe-form-error')).toBeInTheDocument();
+      expect(updateRecipeActionMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('R25 — una fila sin herramienta no invoca la acción y el error sale en su fila', async () => {
+    const user = setupUser();
+    renderWithTools(
+      recipeDetail({ tools: [{ id: 't1', productId: TOOL_A_ID, productName: 'Agitador', quantity: 2 }] }),
+    );
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await user.click(screen.getByTestId('recipe-machine-add-0'));
+    // Se vuelve a ingredientes: el formulario tiene que abrir el tab que tiene el error.
+    await user.click(screen.getByTestId('recipe-lines-tab-ingredients'));
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    expect(await screen.findByTestId('recipe-machine-product-1-field-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('recipe-machine-product-0-field-error')).toBeNull();
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('2');
+    expect(updateRecipeActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R27 — un rechazo del servidor por las herramientas sale en la región de error sin navegar', async () => {
+    const user = setupUser();
+    createRecipeActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'invalid_input',
+      message: 'La entrada recibida no es valida.',
+    });
+    renderWithTools();
+    await user.type(screen.getByTestId('recipe-field-name'), 'Con herramientas');
+    await addValidLine(user, 0);
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    await chooseTool(user, 0, 'Agitador');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    expect(await screen.findByTestId('recipe-form-error-message')).toHaveTextContent(
+      'La entrada recibida no es valida.',
+    );
+    expect(screen.getByTestId('recipe-form-error-code')).toHaveTextContent('invalid_input');
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(screen.getByTestId('recipe-machine-quantity-0')).toHaveValue('1');
+    expect(screen.getByTestId('recipe-field-name')).toHaveValue('Con herramientas');
   });
 });

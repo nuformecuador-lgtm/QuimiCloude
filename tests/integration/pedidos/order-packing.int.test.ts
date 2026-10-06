@@ -1,15 +1,17 @@
 /**
  * `startPackingAliveById` / `finishPackingAliveById` contra Postgres REAL, cableados exactamente
- * como `lib/composition`: `createStartPacking`/`createFinishPacking` sobre
- * `startPackingAliveOrder`/`finishPackingAliveOrder` (`order-prisma.ts`), que usan el cliente
- * Prisma GLOBAL con un `updateMany` condicional -sin `tx`-.
+ * como `lib/composition`: `createStartPacking` sobre `startPackingAliveOrder` (`order-prisma.ts`,
+ * cliente Prisma GLOBAL, `updateMany` condicional sin `tx`); `createFinishPacking` (T14, R17-R21)
+ * abre la unidad de trabajo compartida con `inventario` -`withOrderTransaction`, los mismos
+ * adaptadores reales que `lib/composition`-.
  *
  * AISLAMIENTO — mismo motivo que `order-reservation-concurrency.int.test.ts`: cada escritura es
- * SU PROPIA sentencia contra el cliente global, asi que envolver la corrida en una transaccion de
- * test con ROLLBACK impediria que dos llamadas reales compitan por el bloqueo de la misma fila
- * (R19). Cada caso fabrica su propia empresa efimera con randomUUID y la limpia en un `finally`.
+ * SU PROPIA sentencia (o su propia transaccion) contra el cliente global, asi que envolver la
+ * corrida en una transaccion de test con ROLLBACK impediria que dos llamadas reales compitan por
+ * el bloqueo de la misma fila (R19). Cada caso fabrica su propia empresa efimera con randomUUID y
+ * la limpia en un `finally`.
  *
- * Requisitos cubiertos: R18, R19, R20, R21, R22, R23, R24, R25, R27, R28.
+ * Requisitos cubiertos: R10, R18, R19, R20, R21, R22, R23, R24, R25, R27, R28.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -17,22 +19,81 @@ import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
+import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishPacking, createStartPacking } from '@/lib/modules/pedidos';
 import {
-  finishPackingAliveOrder,
+  createOrderWriteRepository,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import {
+  createRecipeExecutionReader,
+  findAliveRecipeByNormalizedName,
+  findRecipeExecutionContentById,
+  findRecipeIdsMatchingName,
+  findRecipeRefsIncludingDeleted,
+} from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
-  finishPackingAlive: finishPackingAliveOrder,
+};
+
+const unitOfWork: OrderUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) => {
+      const scope: OrderTransactionScope = {
+        orders: createOrderWriteRepository(tx),
+        reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
+        ...orderScopeReaders(tx),
+        finishedGoods: createFinishedGoodsIntake(tx),
+      };
+      return work(scope);
+    }),
+};
+
+const recipes: RecipeCatalog = {
+  findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
+  findExecutionContentById: findRecipeExecutionContentById,
+  findIdsMatchingName: findRecipeIdsMatchingName,
+  findAliveByNormalizedName: findAliveRecipeByNormalizedName,
+};
+const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts: async () => {
+  throw new Error('este archivo no ejercita "Por empacar"');
+} };
+const presentations: PresentationCatalog = {
+  findRefs: findPresentationRefs,
+  findByNormalizedNames: findPresentationsByNormalizedNames,
+};
+const units: UnitCatalog = {
+  findRefs: findUnitRefs,
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+  findMassVolumeBridge: () => findMassVolumeBridge(),
+  findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
 const startPackingAliveById = createStartPacking({ packing: orderPackingRepository });
-const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository });
+const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations, packaging: packagingCatalog });
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -54,6 +115,10 @@ type Fixture = {
   readonly packerId: string;
   readonly otherPackerId: string;
   readonly documentTypeCodes: readonly string[];
+  /** Una presentacion viva de la empresa, para poder darle al menos una linea de reparto a un
+   *  pedido `POR_EMPACAR` que tenga que Comenzar de verdad (R18, R19). */
+  readonly presentationId: string;
+  readonly unitId: string;
 };
 
 async function createCompany(label: string): Promise<string> {
@@ -104,18 +169,50 @@ async function crearFixture(): Promise<Fixture> {
   });
   const packer = await createUser(companyId);
   const otherPacker = await createUser(companyId);
+  const unit = await prisma.unit.create({
+    data: { name: `unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca}` },
+    select: { id: true },
+  });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: `Presentacion ${marca}`,
+      nameNormalized: `presentacion${marca}`,
+      unitId: unit.id,
+      companyId,
+      content: '1',
+    },
+    select: { id: true },
+  });
   return {
     companyId,
     recipeId: recipe.id,
     packerId: packer.id,
     otherPackerId: otherPacker.id,
     documentTypeCodes: [packer.documentTypeCode, otherPacker.documentTypeCode],
+    presentationId: presentation.id,
+    unitId: unit.id,
   };
 }
 
+/** Una linea de reparto para que un pedido `POR_EMPACAR` pueda Comenzar de verdad (R10). */
+async function crearLinea(fixture: Fixture, orderId: string, packages = 1): Promise<void> {
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId,
+      companyId: fixture.companyId,
+      presentationId: fixture.presentationId,
+      packages,
+      presentationContent: '1',
+    },
+  });
+}
+
 async function borrarFixture(fixture: Fixture, orderIds: readonly string[]): Promise<void> {
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [...orderIds] } } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } });
+  await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
+  await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
   await prisma.recipe.deleteMany({ where: { id: fixture.recipeId } });
   const userIds = [fixture.packerId, fixture.otherPackerId];
   const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { roleId: true } });
@@ -191,10 +288,27 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('startPackingAliveById — R18, R19, R20, R23, R24, R25', () => {
+describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
+  it('R10: Comenzar sobre POR_EMPACAR sin ninguna linea de reparto es without_distribution, sin escribir nada', async () => {
+    const fixture = await crearFixture();
+    const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
+    try {
+      const antes = await readOrder(pedido);
+      const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+      expect(resultado).toBe('without_distribution');
+
+      const despues = await readOrder(pedido);
+      expect(despues).toEqual(antes);
+    } finally {
+      await borrarFixture(fixture, [pedido]);
+    }
+  });
+
+
   it('R18: Comenzar sobre POR_EMPACAR deja EN_EMPAQUE con ese empacador, en una sola escritura', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
+    await crearLinea(fixture, pedido);
     try {
       const antes = await movementCountDe(fixture.companyId);
       const ahora = new Date();
@@ -213,6 +327,7 @@ describe('startPackingAliveById — R18, R19, R20, R23, R24, R25', () => {
   it('R19: dos Comenzar reales a la vez sobre el mismo pedido dejan a uno ok y al otro taken', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
+    await crearLinea(fixture, pedido);
     try {
       // Sin `await` entre las dos llamadas: compiten de verdad por el bloqueo de la fila.
       const [resultadoUno, resultadoDos] = await Promise.all([
@@ -314,7 +429,9 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       const antes = await movementCountDe(fixture.companyId);
       const ahora = new Date();
       const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora);
-      expect(resultado).toBe('ok');
+      // T14: sin ninguna linea de reparto -este pedido no la tiene-, el `'ok'` vuelve con
+      // `finishedGoods` vacio: no hay nada que dar de alta.
+      expect(resultado).toEqual({ kind: 'ok', finishedGoods: [] });
 
       const fila = await readOrder(pedido);
       expect(fila.status).toBe('ENTREGADO');

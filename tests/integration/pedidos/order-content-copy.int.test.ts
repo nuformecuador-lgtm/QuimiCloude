@@ -1,9 +1,13 @@
 /**
- * La copia del contenido de la presentacion en el pedido, con el flujo REAL de alta y
- * edicion (`createCreateOrder`/`createUpdateOrder`) cableado a mano con los
- * adaptadores driven REALES de `pedidos`, `recetas`, `inventario` y `unidades` -el mismo
- * conjunto que `lib/composition` ata, sin pasar por `lib/composition` para no arrastrar el
- * resto de la aplicacion a un test de dominio-.
+ * La copia del contenido de la presentacion en el reparto del pedido (R3), con el flujo REAL de
+ * alta y edicion (`createCreateOrder`/`createUpdateOrder`) cableado a mano con los adaptadores
+ * driven REALES de `pedidos`, `recetas`, `inventario` y `unidades` -el mismo conjunto que
+ * `lib/composition` ata, sin pasar por `lib/composition` para no arrastrar el resto de la
+ * aplicacion a un test de dominio-.
+ *
+ * QC-170: el reparto sustituye a la presentacion UNICA de QC-146. La copia ya no vive en
+ * `orders.presentation_content` -esa columna deja de escribirse (R4)- sino en
+ * `order_presentation_lines.presentation_content`, una por linea.
  *
  * AISLAMIENTO Y LIMPIEZA — mismo criterio que `order-ingredients-cost.int.test.ts`: los tests
  * de `tests/integration/` corren EN SERIE contra UNA base compartida
@@ -31,6 +35,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
+  findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma'
@@ -41,7 +46,7 @@ import {
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
+import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
@@ -54,6 +59,13 @@ import type { RecipeScope } from '@/lib/modules/recetas/domain/recipe-scope'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
+import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
+import type { PackagingCatalog } from '@/lib/modules/inventario';
+
+import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
+
+const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
@@ -75,6 +87,7 @@ function normalizeForTest(name: string): string {
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
+  findBlockedIds: findBlockedOrderIds,
 }
 
 const unitOfWork: OrderUnitOfWork = {
@@ -84,6 +97,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        ...orderScopeReaders(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
       }
       return work(scope)
@@ -106,6 +120,8 @@ const presentations: PresentationCatalog = {
 
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
+  listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+  findMassVolumeBridge: () => findMassVolumeBridge(),
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 }
 
@@ -210,8 +226,10 @@ async function crearReceta(empresa: Empresa): Promise<string> {
       name: `Receta ${token()}`,
       description: null,
       steps: [],
+      packingSteps: [],
       lines: [],
       imagePath: null,
+      tools: [],
     },
     empresa.actorId,
     new Date(),
@@ -229,138 +247,210 @@ function borrarPresentacion(presentationId: string): Promise<unknown> {
   return prisma.presentation.deleteMany({ where: { id: presentationId } })
 }
 
+/** Un envase con su presentacion fija, del contenido dado: lo que el reparto nombra. */
+async function crearEnvase(
+  empresa: Empresa,
+  content: string | null,
+): Promise<{ readonly presentationId: string; readonly packagingProductId: string }> {
+  const presentationId = await crearPresentacion(empresa, content)
+  const packagingProductId = await seedPackaging({
+    companyId: empresa.companyId,
+    presentationId,
+    createdBy: empresa.actorId,
+  })
+  return { presentationId, packagingProductId }
+}
+
+async function borrarEnvase(envase: { readonly presentationId: string; readonly packagingProductId: string }): Promise<void> {
+  await dropPackaging([envase.packagingProductId])
+  await borrarPresentacion(envase.presentationId)
+}
+
 async function borrarPedido(orderId: string): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { orderId } })
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId } })
   await prisma.order.deleteMany({ where: { id: orderId } })
 }
 
-async function presentationContentCrudo(orderId: string): Promise<string | null> {
+/** La copia vigente para UNA presentacion del reparto de un pedido: `null` si esa presentacion
+ *  no tiene ninguna linea en ese pedido (R2: a lo sumo una por presentacion). */
+async function lineContentCrudo(orderId: string, presentationId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ presentation_content: string | null }[]>`
-    SELECT "presentation_content"::text AS "presentation_content" FROM "orders" WHERE "id" = ${orderId}::uuid`
-  const row = rows[0]
-  if (row === undefined) throw new Error(`no existe el pedido ${orderId}`)
-  return row.presentation_content
+    SELECT "presentation_content"::text AS "presentation_content"
+      FROM "order_presentation_lines"
+     WHERE "order_id" = ${orderId}::uuid AND "presentation_id" = ${presentationId}::uuid`
+  return rows[0]?.presentation_content ?? null
 }
 
-describe('R38 — el alta copia el contenido de su presentacion', () => {
-  it('la presentacion tiene contenido: el pedido copia ese valor', async () => {
+describe('R3 — el alta copia el contenido de cada presentacion del reparto', () => {
+  it('la presentacion del envase tiene contenido: la linea copia ese valor (QC-195 R14)', async () => {
     const recipeId = await crearReceta(A)
-    const presentationId = await crearPresentacion(A, '5.0000')
-    const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork })
+    const envase = await crearEnvase(A, '5.0000')
+    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
-      { recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId },
+      {
+        recipeId,
+        quantity: '10.0000',
+        priority: 'MEDIA',
+        unitId: A.unitId,
+        presentationLines: [{ packagingProductId: envase.packagingProductId, packages: 1 }],
+      },
       actorDe(A),
     )
 
     try {
-      expect(await presentationContentCrudo(creado.id)).toBe('5.0000')
+      expect(await lineContentCrudo(creado.id, envase.presentationId)).toBe('5.0000')
     } finally {
       await borrarPedido(creado.id)
-      await borrarPresentacion(presentationId)
+      await borrarEnvase(envase)
       await borrarReceta(recipeId)
     }
   })
 
-  it('la presentacion NO tiene contenido: el pedido no lleva copia', async () => {
+  it('R35: la presentacion del envase NO tiene contenido, rechaza con presentation_without_content y no crea nada (QC-195 R13)', async () => {
     const recipeId = await crearReceta(A)
-    const presentationId = await crearPresentacion(A, null)
-    const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork })
-
-    const creado = await alta(
-      { recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId },
-      actorDe(A),
-    )
+    const envase = await crearEnvase(A, null)
+    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     try {
-      expect(await presentationContentCrudo(creado.id)).toBeNull()
+      await expect(
+        alta(
+          {
+            recipeId,
+            quantity: '10.0000',
+            priority: 'MEDIA',
+            unitId: A.unitId,
+            presentationLines: [{ packagingProductId: envase.packagingProductId, packages: 1 }],
+          },
+          actorDe(A),
+        ),
+      ).rejects.toMatchObject({ code: 'presentation_without_content' })
+      expect(await prisma.order.count({ where: { companyId: A.companyId, recipeId } })).toBe(0)
     } finally {
-      await borrarPedido(creado.id)
-      await borrarPresentacion(presentationId)
+      await borrarEnvase(envase)
       await borrarReceta(recipeId)
     }
   })
 })
 
-describe('R39 — la edicion sustituye la copia solo si cambia de presentacion', () => {
-  it('cambiar de presentacion sustituye la copia por el contenido nuevo', async () => {
+describe('R3 — la edicion reemplaza el reparto y copia el contenido vigente', () => {
+  it('cambiar de envase sustituye la linea por la de su presentacion, con el contenido nuevo (QC-195 R14)', async () => {
     const recipeId = await crearReceta(A)
-    const presentationVieja = await crearPresentacion(A, '3.0000')
-    const presentationNueva = await crearPresentacion(A, '9.0000')
-    const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork })
-    const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork })
+    const envaseViejo = await crearEnvase(A, '3.0000')
+    const envaseNuevo = await crearEnvase(A, '9.0000')
+    const presentationVieja = envaseViejo.presentationId
+    const presentationNueva = envaseNuevo.presentationId
+    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
-      { recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: presentationVieja },
+      {
+        recipeId,
+        quantity: '10.0000',
+        priority: 'MEDIA',
+        unitId: A.unitId,
+        presentationLines: [{ packagingProductId: envaseViejo.packagingProductId, packages: 1 }],
+      },
       actorDe(A),
     )
 
     try {
-      expect(await presentationContentCrudo(creado.id)).toBe('3.0000')
+      expect(await lineContentCrudo(creado.id, presentationVieja)).toBe('3.0000')
 
       await edicion(
         creado.id,
-        { recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: presentationNueva },
+        {
+          recipeId,
+          quantity: '10.0000',
+          priority: 'MEDIA',
+          unitId: A.unitId,
+          presentationLines: [{ packagingProductId: envaseNuevo.packagingProductId, packages: 1 }],
+        },
         actorDe(A),
       )
 
-      expect(await presentationContentCrudo(creado.id)).toBe('9.0000')
+      expect(await lineContentCrudo(creado.id, presentationVieja)).toBeNull()
+      expect(await lineContentCrudo(creado.id, presentationNueva)).toBe('9.0000')
     } finally {
       await borrarPedido(creado.id)
-      await borrarPresentacion(presentationVieja)
-      await borrarPresentacion(presentationNueva)
+      await borrarEnvase(envaseViejo)
+      await borrarEnvase(envaseNuevo)
       await borrarReceta(recipeId)
     }
   })
 
-  it('editar cantidad, prioridad o receta SIN cambiar de presentacion no toca la copia', async () => {
+  it('editar cantidad, prioridad o receta SIN cambiar el reparto recopia el contenido VIGENTE de la presentacion', async () => {
     const recipeId = await crearReceta(A)
     const otraReceta = await crearReceta(A)
-    const presentationId = await crearPresentacion(A, '4.0000')
-    // El contenido VIGENTE de la presentacion cambia entre el alta y la edicion: si la edicion
-    // recopiara sin que el id cambiara, el test lo detectaria.
-    const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork })
-    const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork })
+    const envase = await crearEnvase(A, '4.0000')
+    const presentationId = envase.presentationId
+    // El contenido VIGENTE de la presentacion cambia entre el alta y la edicion: la edicion
+    // reemplaza el CONJUNTO de lineas y vuelve a copiar el contenido de HOY (R3), a diferencia
+    // de la presentacion unica de QC-146, que solo recopiaba si el id cambiaba.
+    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
-      { recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId },
+      {
+        recipeId,
+        quantity: '10.0000',
+        priority: 'MEDIA',
+        unitId: A.unitId,
+        presentationLines: [{ packagingProductId: envase.packagingProductId, packages: 1 }],
+      },
       actorDe(A),
     )
 
     try {
-      expect(await presentationContentCrudo(creado.id)).toBe('4.0000')
+      expect(await lineContentCrudo(creado.id, presentationId)).toBe('4.0000')
 
-      await prisma.presentation.update({ where: { id: presentationId }, data: { content: '99.0000' } })
+      // El contenido nuevo tiene que seguir cabiendo en la cantidad EDITADA (R36): 1 envase de
+      // 20 no pasa de 25.
+      await prisma.presentation.update({ where: { id: presentationId }, data: { content: '20.0000' } })
 
       await edicion(
         creado.id,
-        { recipeId: otraReceta, quantity: '25.0000', priority: 'CRITICA', presentationId },
+        {
+          recipeId: otraReceta,
+          quantity: '25.0000',
+          priority: 'CRITICA',
+          unitId: A.unitId,
+          presentationLines: [{ packagingProductId: envase.packagingProductId, packages: 1 }],
+        },
         actorDe(A),
       )
 
-      expect(await presentationContentCrudo(creado.id)).toBe('4.0000')
+      expect(await lineContentCrudo(creado.id, presentationId)).toBe('20.0000')
     } finally {
       await borrarPedido(creado.id)
-      await borrarPresentacion(presentationId)
+      await borrarEnvase(envase)
       await borrarReceta(recipeId)
       await borrarReceta(otraReceta)
     }
   })
 })
 
-describe('R40 — cambiar el contenido de la presentacion no toca la copia de ningun pedido', () => {
-  it('el alta se hizo con un contenido, la presentacion cambia despues: la copia del pedido no se mueve', async () => {
+describe('R3 — cambiar el contenido de la presentacion no toca la copia de un pedido que no se edita', () => {
+  it('el alta se hizo con un contenido, la presentacion cambia despues: la copia de la linea no se mueve sin editar', async () => {
     const recipeId = await crearReceta(A)
-    const presentationId = await crearPresentacion(A, '1.0000')
-    const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork })
+    const envase = await crearEnvase(A, '1.0000')
+    const presentationId = envase.presentationId
+    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
-      { recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId },
+      {
+        recipeId,
+        quantity: '10.0000',
+        priority: 'MEDIA',
+        unitId: A.unitId,
+        presentationLines: [{ packagingProductId: envase.packagingProductId, packages: 1 }],
+      },
       actorDe(A),
     )
 
     try {
-      expect(await presentationContentCrudo(creado.id)).toBe('1.0000')
+      expect(await lineContentCrudo(creado.id, presentationId)).toBe('1.0000')
 
       await prisma.presentation.update({ where: { id: presentationId }, data: { content: '2.0000' } })
 
@@ -369,10 +459,10 @@ describe('R40 — cambiar el contenido de la presentacion no toca la copia de ni
         select: { content: true },
       })
       expect(presentacionDespues.content?.toFixed(4)).toBe('2.0000')
-      expect(await presentationContentCrudo(creado.id)).toBe('1.0000')
+      expect(await lineContentCrudo(creado.id, presentationId)).toBe('1.0000')
     } finally {
       await borrarPedido(creado.id)
-      await borrarPresentacion(presentationId)
+      await borrarEnvase(envase)
       await borrarReceta(recipeId)
     }
   })

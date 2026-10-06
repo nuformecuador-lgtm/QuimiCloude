@@ -10,8 +10,15 @@ export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
+  assignedOrderBlockedNoticeText,
   assignedOrderEnterNoticeText,
 } from './assigned-order-enter-trigger';
+export {
+  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  ASSIGNED_ORDER_START_DIALOG_TESTID,
+  AssignedOrderStartTrigger,
+  assignedOrderStartConfirmTexts,
+} from './assigned-order-start-trigger';
 export {
   ASSIGNED_ORDER_ENTER_COLUMN_ID,
   ASSIGNED_ORDER_NUMBER_COLUMN_ID,
@@ -23,9 +30,9 @@ export {
   ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_LABELS,
-  ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS,
   MISSING_VALUE_MARK,
   buildAssignedOrdersColumns,
+  type AssignedOrdersColumnsOptions,
 } from './assigned-orders-columns';
 export { AssignedOrdersEmpty } from './assigned-orders-empty';
 export { AssignedOrdersError } from './assigned-orders-error';
@@ -43,6 +50,7 @@ export { AssignedOrdersListSection } from './assigned-orders-list-section';
 export {
   ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT,
   AssignedOrdersSkeleton,
+  assignedOrdersSkeletonColumnCount,
 } from './assigned-orders-skeleton';
 export {
   ASSIGNED_ORDERS_TABLE_ID,
@@ -82,7 +90,6 @@ export {
   COMPANY_ORDER_STATUS_COLUMN_ID,
   COMPANY_ORDER_STATUS_FILTER_OPTIONS,
   COMPANY_ORDER_STATUS_LABELS,
-  COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS,
   buildCompanyOrdersColumns,
   type CompanyOrdersColumnsDeps,
 } from './company-orders-columns';
@@ -106,7 +113,6 @@ export {
   FINISHED_ORDER_QUANTITY_COLUMN_ID,
   FINISHED_ORDER_RECIPE_NAME_COLUMN_ID,
   FINISHED_ORDER_RESPONSIBLES_COLUMN_ID,
-  FINISHED_ORDERS_DEFAULT_PINNED_COLUMNS,
   buildFinishedOrdersColumns,
 } from './finished-orders-columns';
 export { FinishedOrdersEmpty, type FinishedOrdersEmptyProps } from './finished-orders-empty';

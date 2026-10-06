@@ -50,6 +50,9 @@ function montar() {
     listAlive,
     replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(),
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(),
+    createVersion: vi.fn<RecipeRepository['createVersion']>(),
+    listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(),
+    replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(),
   } satisfies RecipeRepository;
   const images: RecipeImageStorage = {
     upload: vi.fn(),

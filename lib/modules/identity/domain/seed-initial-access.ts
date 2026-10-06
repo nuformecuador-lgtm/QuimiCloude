@@ -1,13 +1,17 @@
-import { SEED_ADMIN_ACCOUNT_STATUS } from './account-status';
+import { SEED_ADMIN_ACCOUNT_STATUS, SEED_MAESTRO_ACCOUNT_STATUS } from './account-status';
 import { INITIAL_COMPANY_NAME } from './companies';
 import { normalizeCompanyName } from './company-name';
 import { DOCUMENT_TYPE_CC } from './document-type';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from './permissions';
-import { ROLE_ADMINISTRADOR, SEED_ROLES } from './roles';
+import { ROLE_ADMINISTRADOR, ROLE_MAESTRO, SEED_ROLES } from './roles';
 
 import type { CredentialPolicyResult } from './credential-policy';
 
-import type { InitialAdminCredentialsProvider } from '../ports/initial-access-credentials';
+import type {
+  InitialAdminCredentials,
+  InitialAdminCredentialsProvider,
+  InitialMaestroCredentialsProvider,
+} from '../ports/initial-access-credentials';
 import type { InitialAccessRepository } from '../ports/initial-access-repository';
 import type { PasswordHasher } from '../ports/password-hasher';
 
@@ -21,6 +25,7 @@ export interface SeedOutcome {
   /** Nombres de los roles creados en ESTA corrida. Vacio si ya estaban todos. */
   readonly createdRoles: readonly string[];
   readonly createdAdmin: boolean;
+  readonly createdMaestro: boolean;
   /**
    * QC-47 R20/R22: nombre de la empresa inicial creada en ESTA corrida, o `null` si ya
    * existia (o si no hizo falta ninguna porque el administrador ya estaba). Solo lo usa
@@ -43,6 +48,8 @@ export type SeedInitialAccessDeps = {
   readonly repository: InitialAccessRepository;
   readonly passwordHasher: PasswordHasher;
   readonly credentials: InitialAdminCredentialsProvider;
+  /** Solo se invoca si no hay ningun Maestro vivo. */
+  readonly maestroCredentials: InitialMaestroCredentialsProvider;
   /**
    * QC-19 R18: la politica de credenciales, ya cableada con su lista de filtradas. Es
    * OBLIGATORIA a proposito — un seed que pudiera construirse sin ella volveria a ser un
@@ -63,37 +70,49 @@ const INITIAL_ADMIN_BIRTH_DATE = new Date('1900-01-01T00:00:00.000Z');
 const INITIAL_ADMIN_PHONE = '+00 000 000 0000';
 const INITIAL_ADMIN_DOCUMENT_NUMBER = '00000000';
 
-export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<SeedOutcome> {
-  const { repository, passwordHasher, credentials, checkCredentialPolicy } = deps;
+/** El Maestro comparte los marcadores del Administrador salvo los nombres. */
+const INITIAL_MAESTRO_FIRST_NAMES = 'Plataforma';
+const INITIAL_MAESTRO_LAST_NAMES = 'Inicial';
 
-  // 1. Leer estado: roles existentes por nombre + numero de usuarios vivos con rol Administrador.
+const MAESTRO_USERNAME_IN_USE = 'el nombre de usuario del maestro inicial ya esta en uso';
+const MAESTRO_EMAIL_IN_USE = 'el correo del maestro inicial ya esta en uso';
+
+type HashedInitialUser = { username: string; email: string; passwordHash: string };
+
+export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<SeedOutcome> {
+  const { repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy } = deps;
+
+  // 1. Leer estado: roles existentes por nombre + usuarios vivos con rol Administrador y Maestro.
   const roleNames = SEED_ROLES.map((role) => role.name);
   const existingRoleIds = await repository.findRoleIdsByName(roleNames);
   const liveAdminCount = await repository.countLiveUsersWithRole(ROLE_ADMINISTRADOR);
+  const liveMaestroCount = await repository.countLiveUsersWithRole(ROLE_MAESTRO);
 
-  // 2. faltaAdmin = (numero == 0).
+  // 2. faltaAdmin / faltaMaestro.
   const needsAdmin = liveAdminCount === 0;
+  const needsMaestro = liveMaestroCount === 0;
 
-  // 3. Si faltaAdmin: resolver credenciales y hashear ANTES de escribir nada (R13): si
-  // cualquiera de los dos pasos falla, no queda nada creado a medias.
-  let hashedAdmin: { username: string; email: string; passwordHash: string } | null = null;
-  if (needsAdmin) {
-    const initialAdminCredentials = credentials();
-    // QC-19 R18: la politica se evalua ANTES de producir el hash. Si el resultado no es
-    // aceptable no se hashea y no se escribe nada; el error nombra las REGLAS
-    // incumplidas y nunca la credencial ni un fragmento suyo (R24).
-    const policyResult = await checkCredentialPolicy(initialAdminCredentials.credential);
-    if (!policyResult.ok) {
-      throw new Error(
-        `la credencial de instalacion no cumple la politica: ${policyResult.unmet.join(', ')}`,
-      );
+  // 3. Resolver credenciales y hashear ANTES de escribir nada: si cualquiera de los pasos
+  // falla, no queda nada creado a medias. Cada proveedor solo se invoca si hace falta.
+  const hashedAdmin = needsAdmin
+    ? await hashInitialUser(credentials(), passwordHasher, checkCredentialPolicy)
+    : null;
+  const hashedMaestro = needsMaestro
+    ? await hashInitialUser(maestroCredentials(), passwordHasher, checkCredentialPolicy)
+    : null;
+
+  // 3b. Choques del Maestro, tambien antes de escribir. Los mensajes no llevan el valor:
+  // acaban en el log del despliegue.
+  if (hashedMaestro !== null) {
+    const sameAsAdmin =
+      hashedAdmin !== null &&
+      hashedAdmin.username.toLowerCase() === hashedMaestro.username.toLowerCase();
+    if (sameAsAdmin || (await repository.countLiveUsersWithUsername(hashedMaestro.username)) > 0) {
+      throw new Error(MAESTRO_USERNAME_IN_USE);
     }
-    const passwordHash = await passwordHasher.hash(initialAdminCredentials.credential);
-    hashedAdmin = {
-      username: initialAdminCredentials.username,
-      email: initialAdminCredentials.email,
-      passwordHash,
-    };
+    if ((await repository.countLiveUsersWithoutCompanyWithEmail(hashedMaestro.email)) > 0) {
+      throw new Error(MAESTRO_EMAIL_IN_USE);
+    }
   }
 
   // 4. Crear solo los roles que falten.
@@ -128,7 +147,7 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
   // marcadores fijos de esta ficha.
   let createdAdmin = false;
   let createdCompany: string | null = null;
-  if (needsAdmin && hashedAdmin !== null) {
+  if (hashedAdmin !== null) {
     const administradorRoleId = roleIds.get(ROLE_ADMINISTRADOR);
     if (administradorRoleId === undefined) {
       throw new Error('no se pudo resolver el id del rol Administrador tras crearlo');
@@ -174,8 +193,57 @@ export async function seedInitialAccess(deps: SeedInitialAccessDeps): Promise<Se
     createdAdmin = true;
   }
 
-  // 7. Devolver el resultado.
-  return { createdRoles, createdAdmin, createdCompany, createdPermissions, createdRolePermissions };
+  // 7. Si faltaMaestro: crearlo sin empresa. No lee ni crea ninguna.
+  let createdMaestro = false;
+  if (hashedMaestro !== null) {
+    const maestroRoleId = roleIds.get(ROLE_MAESTRO);
+    if (maestroRoleId === undefined) {
+      throw new Error('no se pudo resolver el id del rol Maestro tras crearlo');
+    }
+    await repository.createInitialMaestro({
+      roleId: maestroRoleId,
+      accountStatus: SEED_MAESTRO_ACCOUNT_STATUS,
+      username: hashedMaestro.username,
+      email: hashedMaestro.email,
+      passwordHash: hashedMaestro.passwordHash,
+      firstNames: INITIAL_MAESTRO_FIRST_NAMES,
+      lastNames: INITIAL_MAESTRO_LAST_NAMES,
+      birthDate: INITIAL_ADMIN_BIRTH_DATE,
+      phone: INITIAL_ADMIN_PHONE,
+      documentTypeCode: DOCUMENT_TYPE_CC,
+      documentNumber: INITIAL_ADMIN_DOCUMENT_NUMBER,
+    });
+    createdMaestro = true;
+  }
+
+  // 8. Devolver el resultado.
+  return {
+    createdRoles,
+    createdAdmin,
+    createdMaestro,
+    createdCompany,
+    createdPermissions,
+    createdRolePermissions,
+  };
+}
+
+/**
+ * Evalua la politica ANTES de hashear. Si no se cumple, el error nombra las reglas
+ * incumplidas y nunca la credencial ni un fragmento suyo.
+ */
+async function hashInitialUser(
+  initial: InitialAdminCredentials,
+  passwordHasher: PasswordHasher,
+  checkCredentialPolicy: (candidate: string) => Promise<CredentialPolicyResult>,
+): Promise<HashedInitialUser> {
+  const policyResult = await checkCredentialPolicy(initial.credential);
+  if (!policyResult.ok) {
+    throw new Error(
+      `la credencial de instalacion no cumple la politica: ${policyResult.unmet.join(', ')}`,
+    );
+  }
+  const passwordHash = await passwordHasher.hash(initial.credential);
+  return { username: initial.username, email: initial.email, passwordHash };
 }
 
 /** Una fila del catalogo tal y como la escribe el puerto. */

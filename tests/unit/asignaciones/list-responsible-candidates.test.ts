@@ -15,7 +15,15 @@ import {
   MAX_CANDIDATES,
   type ListResponsibleCandidatesDeps,
 } from '@/lib/modules/asignaciones/domain/list-responsible-candidates';
-import type { PeopleDirectory, PermissionCode, PersonRef } from '@/lib/modules/identity';
+import {
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_OPERADOR,
+  SEED_ROLE_PERMISSIONS,
+  type PeopleDirectory,
+  type PermissionCode,
+  type PersonRef,
+} from '@/lib/modules/identity';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const ANA = '11111111-1111-4111-8111-111111111111';
@@ -87,12 +95,32 @@ describe('listResponsibleCandidates', () => {
     expect(Object.keys(candidato as object).sort()).toEqual(['displayName', 'id']);
   });
 
-  it('pide a `identity` la empresa del actor, el reloj inyectado y el tope de 25', async () => {
+  it('pide a `identity` la empresa del actor, el reloj inyectado, el tope de 25 y solo cuentas `active`', async () => {
     const m = montar([]);
 
     await m.listar(actorCon('asignaciones.modificar'), {});
 
-    expect(m.listAliveInCompany).toHaveBeenCalledWith(EMPRESA, AHORA, MAX_CANDIDATES);
+    expect(m.listAliveInCompany).toHaveBeenCalledWith(EMPRESA, AHORA, MAX_CANDIDATES, {
+      accountStatus: ['active'],
+    });
     expect(MAX_CANDIDATES).toBe(25);
+  });
+
+  it('R22: un usuario con exactamente los permisos sembrados del Empacador sigue siendo candidato a responsable', async () => {
+    const delEmpacador = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? [];
+    expect(delEmpacador.length).toBeGreaterThan(0);
+    expect(delEmpacador).not.toContain('asignaciones.ejecutar');
+    const m = montar([
+      persona(ANA, 'Ana', SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []),
+      persona(BRUNO, 'Bruno', delEmpacador),
+      persona(CARLOS, 'Carlos', SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] ?? []),
+    ]);
+
+    const candidatos = await m.listar(actorCon('asignaciones.modificar'), {});
+
+    expect(candidatos).toEqual([
+      { id: BRUNO, displayName: 'Bruno' },
+      { id: CARLOS, displayName: 'Carlos' },
+    ]);
   });
 });

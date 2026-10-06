@@ -8,11 +8,12 @@ import {
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
 import type { RecipeScope } from './recipe-scope';
+import { assertToolsValid } from './recipe-tools';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
-import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
+import type { NewRecipe, PropagatedVersion, RecipeRepository } from '../ports/recipe-repository';
 
-import { PRODUCT_TYPES, type ProductCatalog } from '@/lib/modules/inventario';
+import { isIngredientType, type ProductCatalog } from '@/lib/modules/inventario';
 
 /** Advertencia de un borrado de almacenamiento que fallo, con su contexto (R49). */
 export type StorageWarning = {
@@ -24,6 +25,8 @@ export type StorageWarning = {
 export type UpdateRecipeResult = {
   readonly id: string;
   readonly warnings: readonly StorageWarning[];
+  /** Una entrada por version a la que se propago el cambio; vacio si no se pidio propagar. */
+  readonly propagated: readonly PropagatedVersion[];
 };
 
 export type UpdateRecipeDeps = {
@@ -83,6 +86,8 @@ export function createUpdateRecipe(
 
     const existing = await deps.recipes.findAliveById(id, scope);
     if (existing === null) throw new RecipeNotFoundError();
+    // Una version tiene su propia operacion de edicion, que no admite pasos, descripcion ni imagen.
+    if (existing.original !== null) throw new ActionNotAllowedError();
 
     // R45, R46 (`design.md > 6`): diferencia de conjuntos. Solo se valida contra el
     // catalogo la linea NUEVA -la que no estaba ya en la receta-; la preexistente se
@@ -97,8 +102,11 @@ export function createUpdateRecipe(
       const missing = idsANuevoValidar.some((productId) => !foundIds.has(productId));
       if (missing) throw new ValidationError();
 
-      const finished = refs.some((ref) => ref.type === PRODUCT_TYPES.FINISHED_PRODUCT);
-      if (finished) throw new ActionNotAllowedError();
+      if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
+    }
+
+    if (data.tools !== undefined) {
+      await assertToolsValid(data.tools, existing.tools, deps.products, actor.companyId);
     }
 
     // R47 (`design.md > 7.1`, `> 9.3`): los TRES estados de `image`.
@@ -129,15 +137,21 @@ export function createUpdateRecipe(
       name: data.name,
       description: data.description ?? null,
       steps: data.steps,
+      packingSteps: data.packingSteps,
       lines: data.lines,
       imagePath,
+      tools: data.tools ?? null,
     };
 
-    // R11, R12, R13: la conciliacion de las lineas y la transaccion viven en el
-    // adaptador (`design.md > 8`), no aqui.
-    const result = await deps.recipes.replaceAlive(id, newRecipe, actor.id, now(), scope);
-    if (result === 'not_found') throw new RecipeNotFoundError();
-    if (result === 'duplicate') throw new RecipeDuplicateNameError();
+    const propagated = await persist(
+      deps.recipes,
+      id,
+      newRecipe,
+      data.propagateToVersionIds,
+      actor.id,
+      now(),
+      scope,
+    );
 
     // R26, R47, R48, R49: el borrado va DESPUES de que la base confirme, usa el MISMO
     // `remove` en los DOS caminos (reemplazar y quitar), y si falla NO revierte la
@@ -148,6 +162,29 @@ export function createUpdateRecipe(
       if (warning !== null) warnings.push(warning);
     }
 
-    return { id, warnings };
+    return { id, warnings, propagated };
   };
+}
+
+async function persist(
+  recipes: RecipeRepository,
+  id: string,
+  data: NewRecipe,
+  versionIds: readonly string[],
+  actorId: string,
+  now: Date,
+  scope: RecipeScope,
+): Promise<readonly PropagatedVersion[]> {
+  if (versionIds.length === 0) {
+    const result = await recipes.replaceAlive(id, data, actorId, now, scope);
+    if (result === 'not_found') throw new RecipeNotFoundError();
+    if (result === 'duplicate') throw new RecipeDuplicateNameError();
+    return [];
+  }
+
+  const result = await recipes.replaceAliveWithPropagation(id, data, versionIds, actorId, now, scope);
+  if (result === 'not_found') throw new RecipeNotFoundError();
+  if (result === 'duplicate') throw new RecipeDuplicateNameError();
+  if (result === 'version_not_found') throw new ValidationError();
+  return result.propagated;
 }

@@ -40,7 +40,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
@@ -102,6 +102,11 @@ function dobles() {
     findRefs: explota('presentations.findRefs'),
   } as unknown as PresentationCatalog
 
+  const packaging = {
+    findRefs: explota('packaging.findRefs'),
+    findCostingBatches: explota('packaging.findCostingBatches'),
+  } as unknown as PackagingCatalog
+
   // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion.
   // `requirePermission` va antes de zod y antes de sanear, asi que un actor rechazado no llega
   // ni a saber que su consulta traia campos no declarados.
@@ -114,11 +119,12 @@ function dobles() {
       ...Object.values(products as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(units as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(presentations as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      ...Object.values(packaging as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
       unitOfWork.run as unknown as ReturnType<typeof vi.fn>,
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, products, units, presentations, log, unitOfWork, llamadas }
+  return { orders, recipes, products, units, presentations, packaging, log, unitOfWork, llamadas }
 }
 
 /** Los dobles de la invocacion en curso. Se renuevan en CADA caso para que el contador de uno
@@ -132,6 +138,7 @@ function depsDeTurno() {
     products: enCurso.products,
     units: enCurso.units,
     presentations: enCurso.presentations,
+    packaging: enCurso.packaging,
     log: enCurso.log,
     unitOfWork: enCurso.unitOfWork,
   }
@@ -337,6 +344,21 @@ describe('R12: alta y edicion rechazan sin pedidos.modificar antes del catalogo 
       const { error, llamadas } = await ejecutar(invocacion, actorCon('otro.permiso'))
       esperaRechazo(error, llamadas, nombre)
       expect(enCurso.presentations.findRefs).not.toHaveBeenCalled()
+    })
+  }
+})
+
+describe('QC-138 R37: confirmar el bloqueo no abre el alta ni la edicion sin pedidos.modificar', () => {
+  const CON_CONFIRMACION = SIETE.filter(([nombre]) => ['createOrder', 'updateOrder'].includes(nombre))
+
+  for (const [nombre, , invocacion] of CON_CONFIRMACION) {
+    it(`R37: ${nombre} con confirmBlocked y solo inventario.modificar rechaza sin tocar ningun puerto`, async () => {
+      const { error, llamadas } = await ejecutar(
+        invocacion,
+        actorCon('inventario.modificar', CONSULTAR),
+        { ...ENTRADA_ALTA, confirmBlocked: true },
+      )
+      esperaRechazo(error, llamadas, nombre)
     })
   }
 })

@@ -213,16 +213,22 @@ async function ingredientsCostText(orderId: string): Promise<string | null> {
 test.beforeAll(async () => {
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
 
-  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: asignaciones -> pedidos ->
-  // recetas (sus lineas van en cascada) -> lotes -> productos -> presentaciones -> usuarios ->
-  // empresas.
+  // LIMPIEZA DEFENSIVA DE HUERFANOS. Orden que imponen las FK RESTRICT: apartados -> asignaciones ->
+  // reparto -> pedidos -> recetas (sus lineas van en cascada) -> lotes -> productos -> presentaciones ->
+  // usuarios -> empresas.
   const orphanCompanies = await prisma.company.findMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
     select: { id: true },
   });
   const orphanCompanyIds = orphanCompanies.map((company) => company.id);
   if (orphanCompanyIds.length > 0) {
+    // El pedido guardado aparta material: sus apartados restringen el borrado del pedido.
+    await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderPresentationLine.deleteMany({
+      where: { companyId: { in: orphanCompanyIds } },
+    });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -362,7 +368,11 @@ test.afterAll(async () => {
   // `FIXTURE_PREFIX`-: `fullyParallel` reparte los tests de este archivo en workers distintos,
   // cada uno con su propio `RUN_ID`. Casi todas las tablas de esta ficha llevan `company_id`.
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    // El pedido guardado aparta material: sus apartados restringen el borrado del pedido.
+    () => prisma.reservationMovement.deleteMany({ where: { companyId } }),
+    () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
     () => prisma.orderAssignment.deleteMany({ where: { companyId } }),
+    () => prisma.orderPresentationLine.deleteMany({ where: { companyId } }),
     () => prisma.order.deleteMany({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
@@ -521,12 +531,15 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeConLineaId);
 
     await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY_TEXT);
+    // El alta exige la unidad del pedido; el reparto es opcional y este escenario no lo usa.
+    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+    await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
     // La tabla de ingredientes pinta el porcentaje y la cantidad requerida ANTES de guardar:
     // 200 x 10 % = 20.
     await expect(page.getByTestId('order-ingredients-table')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('order-ingredient-percentage')).toHaveText('10,00 %');
-    await expect(page.getByTestId('order-ingredient-required')).toHaveText('20');
+    await expect(page.getByTestId('order-ingredient-required')).toHaveText(`20 ${unitSymbol}`);
 
     // Guardar: la Server Action REAL de `pedidos` contra Postgres.
     await page.getByTestId('order-form-submit').click();

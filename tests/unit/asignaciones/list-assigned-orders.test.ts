@@ -18,6 +18,7 @@ import type { PersonRef } from '@/lib/modules/identity';
 import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
+import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 /** Un uuid valido y legible a partir de un solo digito hexadecimal. */
 function uuid(seed: string): string {
@@ -29,7 +30,11 @@ const ANA = uuid('1');
 const BEA = uuid('2');
 const RECETA = uuid('a');
 
-const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
+const ACTOR: Actor = {
+  id: ANA,
+  companyId: EMPRESA,
+  permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'],
+};
 
 function pedidoId(i: number): string {
   const sufijo = i.toString(16).padStart(2, '0');
@@ -44,7 +49,8 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: null,
+    presentationLines: [],
+    unitId: null,
     finishedAt: null,
     packedBy: null,
     ...overrides,
@@ -52,7 +58,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
 }
 
 function receta(overrides?: Partial<RecipeRef>): RecipeRef {
-  return { id: RECETA, name: 'Jabon liquido', isDeleted: false, ...overrides };
+  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, ...overrides };
 }
 
 function persona(id: string): PersonRef {
@@ -60,9 +66,16 @@ function persona(id: string): PersonRef {
 }
 
 const PRESENTACION = uuid('7');
+const UNIDAD = uuid('8');
 
 function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
-  return { id: PRESENTACION, name: 'Bidon 20L', content: null, ...overrides };
+  return { id: PRESENTACION, name: 'Bidon 20L', content: null, unitId: UNIDAD, ...overrides };
+}
+
+const SEGUNDA_PRESENTACION = uuid('9');
+
+function unidad(overrides?: Partial<UnitRef>): UnitRef {
+  return { id: UNIDAD, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, ...overrides };
 }
 
 function filaSuelta(orderId: string, userId: string): OrderAssignmentRowWithOrder {
@@ -77,6 +90,7 @@ type Dobles = {
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>;
   readonly findRefsIncludingDeletedInCompany: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
+  readonly findRefsUnits: ReturnType<typeof vi.fn>;
   /** TODOS los metodos de puerto del montaje: lo que hace verificable «sin tocar ningun puerto» y
    *  «el mismo numero de llamadas con 1 fila que con 25». */
   readonly todos: readonly ReturnType<typeof vi.fn>[];
@@ -89,6 +103,7 @@ function montar(options?: {
   readonly rows?: readonly OrderAssignmentRowWithOrder[];
   readonly people?: readonly PersonRef[];
   readonly presentations?: readonly PresentationRef[];
+  readonly units?: readonly UnitRef[];
 }): Dobles {
   const idsDeLaPersona = options?.ids ?? [];
   const paginaDePedidos = options?.page ?? { items: [], total: 0 };
@@ -124,6 +139,7 @@ function montar(options?: {
   });
   const findRefsIncludingDeletedInCompany = vi.fn(async () => options?.people ?? []);
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
+  const findRefsUnits = vi.fn(async () => options?.units ?? []);
 
   const deps: ListAssignedOrdersDeps = {
     assignments: {
@@ -138,6 +154,7 @@ function montar(options?: {
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     people: { findAliveRefsInCompany, findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
+    units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
     now: () => new Date('2026-09-16T10:00:00.000Z'),
   } as unknown as ListAssignedOrdersDeps;
 
@@ -149,6 +166,7 @@ function montar(options?: {
     findRefsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
     findRefsPresentations,
+    findRefsUnits,
     todos: [
       listOrderIdsByUserInCompany,
       listByOrderInCompany,
@@ -162,6 +180,7 @@ function montar(options?: {
       findAliveRefsInCompany,
       findRefsIncludingDeletedInCompany,
       findRefsPresentations,
+      findRefsUnits,
     ],
   };
 }
@@ -239,7 +258,7 @@ describe('QC-88 — listAssignedOrders: R7 la empresa y la persona salen del ACT
     expect(listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, ANA);
   });
 
-  it('llama a `listAliveSummariesByIds` con la empresa del ACTOR, y SOLO los dos estados de trabajo (R12)', async () => {
+  it('llama a `listAliveSummariesByIds` con la empresa del ACTOR, y SOLO los estados de trabajo (R12; QC-138 R30 suma BLOQUEADO)', async () => {
     const { deps, listAliveSummariesByIds } = montar({ ids: [pedidoId(1)] });
     const listAssignedOrders = createListAssignedOrders(deps);
 
@@ -248,7 +267,7 @@ describe('QC-88 — listAssignedOrders: R7 la empresa y la persona salen del ACT
     expect(listAliveSummariesByIds).toHaveBeenCalledWith(
       EMPRESA,
       [pedidoId(1)],
-      ['PENDIENTE', 'EN_CURSO'],
+      ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'],
       1,
       undefined,
     );
@@ -382,6 +401,29 @@ describe('QC-88 — listAssignedOrders: la fila (R16, R17)', () => {
   });
 });
 
+describe('QC-138 — el Operador ve sus pedidos bloqueados', () => {
+  it('R30 — la lista incluye el BLOQUEADO asignado junto a PENDIENTE y EN_CURSO, con su estado', async () => {
+    const ids = [pedidoId(1), pedidoId(2), pedidoId(3)];
+    const items = [
+      resumen(pedidoId(1), { status: 'PENDIENTE' }),
+      resumen(pedidoId(2), { status: 'EN_CURSO' }),
+      resumen(pedidoId(3), { status: 'BLOQUEADO' }),
+    ];
+    const { deps, listAliveSummariesByIds } = montar({ ids, page: { items, total: 3 }, refs: [receta()] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(listAliveSummariesByIds.mock.calls[0]?.[2]).toContain('BLOQUEADO');
+    expect(pagina.items.map((item) => [item.id, item.status])).toEqual([
+      [pedidoId(1), 'PENDIENTE'],
+      [pedidoId(2), 'EN_CURSO'],
+      [pedidoId(3), 'BLOQUEADO'],
+    ]);
+    expect(pagina.total).toBe(3);
+  });
+});
+
 // QC-123 T8 — la via de `asignaciones` NO lleva el importe (R15). Se comprueba la FORMA del
 // contrato -la lista CERRADA de claves de la fila que el Operador recibe-, no solo un ejemplo:
 // si `AssignedOrderView` ganara `ingredientsCost`, el `toEqual` de abajo pasaria a comparar un
@@ -406,7 +448,9 @@ describe('QC-123 — el pedido asignado no lleva importe (R15)', () => {
         'priority',
         'status',
         'otherResponsibles',
-        'presentationName',
+        'presentationLines',
+        'unitId',
+        'unitLabel',
       ].sort(),
     );
     expect(Object.keys(fila ?? {})).not.toContain('ingredientsCost');
@@ -417,8 +461,8 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
   it('R24: cada fila lleva el nombre de la presentacion, o null, con una sola llamada al catalogo', async () => {
     const ids = [pedidoId(1), pedidoId(2)];
     const items = [
-      resumen(pedidoId(1), { presentationId: PRESENTACION }),
-      resumen(pedidoId(2), { presentationId: null }),
+      resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] }),
+      resumen(pedidoId(2), { presentationLines: [] }),
     ];
     const { deps, findRefsPresentations } = montar({
       ids,
@@ -432,13 +476,13 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([PRESENTACION], EMPRESA);
-    expect(pagina.items[0]?.presentationName).toBe('Bidon 20L');
-    expect(pagina.items[1]?.presentationName).toBeNull();
+    expect(pagina.items[0]?.presentationLines[0]?.presentationName).toBe('Bidon 20L');
+    expect(pagina.items[1]?.presentationLines).toEqual([]);
   });
 
   it('R24: ninguna llamada al catalogo si ningun pedido de la pagina tiene presentacion', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationId: null })];
+    const items = [resumen(pedidoId(1), { presentationLines: [] })];
     const { deps, findRefsPresentations } = montar({
       ids,
       page: { items, total: 1 },
@@ -449,12 +493,12 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(findRefsPresentations).not.toHaveBeenCalled();
-    expect(pagina.items[0]?.presentationName).toBeNull();
+    expect(pagina.items[0]?.presentationLines).toEqual([]);
   });
 
-  it('R26: un actor con solo asignaciones.consultar recibe la presentacion de sus pedidos asignados', async () => {
+  it('R26: un actor sin permisos de presentaciones recibe la presentacion de sus pedidos asignados', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationId: PRESENTACION })];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] })];
     const { deps } = montar({
       ids,
       page: { items, total: 1 },
@@ -465,7 +509,149 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
-    expect(ACTOR.permissions).toEqual(['asignaciones.consultar']);
-    expect(pagina.items[0]?.presentationName).toBe('Bidon 20L');
+    expect(ACTOR.permissions).toEqual(['asignaciones.consultar', 'asignaciones.ejecutar']);
+    expect(pagina.items[0]?.presentationLines[0]?.presentationName).toBe('Bidon 20L');
+  });
+});
+
+describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asignado', () => {
+  it('R26: cada fila lleva todas las lineas del reparto en orden de alta, con nombre y envases, con una sola llamada al catalogo', async () => {
+    const ids = [pedidoId(1), pedidoId(2)];
+    const items = [
+      resumen(pedidoId(1), {
+        presentationLines: [
+          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: null },
+          { presentationId: PRESENTACION, packages: 1, packagingName: null },
+        ],
+      }),
+      resumen(pedidoId(2), { presentationLines: [{ presentationId: PRESENTACION, packages: 2, packagingName: null }] }),
+    ];
+    const { deps, findRefsPresentations } = montar({
+      ids,
+      page: { items, total: 2 },
+      refs: [receta()],
+      presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
+    });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsPresentations).toHaveBeenCalledTimes(1);
+    expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
+    expect(pagina.items[0]?.presentationLines).toEqual([
+      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+    ]);
+    expect(pagina.items[1]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2, packagingName: null },
+    ]);
+  });
+
+  it('R27: un pedido sin reparto sale con `presentationLines: []` y sin llamada al catalogo', async () => {
+    const ids = [pedidoId(1)];
+    const items = [resumen(pedidoId(1), { presentationLines: [] })];
+    const { deps, findRefsPresentations } = montar({
+      ids,
+      page: { items, total: 1 },
+      refs: [receta()],
+    });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsPresentations).not.toHaveBeenCalled();
+    expect(pagina.items[0]?.presentationLines).toEqual([]);
+  });
+
+  it('R26: una presentacion que no vuelve del catalogo deja la linea con `presentationName: null`, no la descarta', async () => {
+    const ids = [pedidoId(1)];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 3, packagingName: null }] })];
+    const { deps } = montar({ ids, page: { items, total: 1 }, refs: [receta()] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(pagina.items[0]?.presentationLines).toEqual([
+      { presentationId: PRESENTACION, presentationName: null, packages: 3, packagingName: null },
+    ]);
+  });
+
+  it('R26: la cantidad viaja con la etiqueta de su unidad (simbolo, o nombre si no lo tiene), una sola llamada por pagina', async () => {
+    const OTRA_UNIDAD = uuid('b');
+    const ids = [pedidoId(1), pedidoId(2), pedidoId(3)];
+    const items = [
+      resumen(pedidoId(1), { unitId: UNIDAD }),
+      resumen(pedidoId(2), { unitId: OTRA_UNIDAD }),
+      resumen(pedidoId(3), { unitId: UNIDAD }),
+    ];
+    const { deps, findRefsUnits } = montar({
+      ids,
+      page: { items, total: 3 },
+      refs: [receta()],
+      units: [unidad(), unidad({ id: OTRA_UNIDAD, name: 'Garrafa', symbol: null })],
+    });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsUnits).toHaveBeenCalledTimes(1);
+    expect(findRefsUnits).toHaveBeenCalledWith([UNIDAD, OTRA_UNIDAD], EMPRESA);
+    expect(pagina.items.map((fila) => [fila.unitId, fila.unitLabel])).toEqual([
+      [UNIDAD, 'L'],
+      [OTRA_UNIDAD, 'Garrafa'],
+      [UNIDAD, 'L'],
+    ]);
+  });
+
+  it('R42: un pedido sin unidad sale con `unitId` y `unitLabel` a null, sin llamada al catalogo de unidades', async () => {
+    const ids = [pedidoId(1)];
+    const items = [resumen(pedidoId(1), { unitId: null })];
+    const { deps, findRefsUnits } = montar({ ids, page: { items, total: 1 }, refs: [receta()] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    expect(findRefsUnits).not.toHaveBeenCalled();
+    expect(pagina.items[0]?.unitId).toBeNull();
+    expect(pagina.items[0]?.unitLabel).toBeNull();
+  });
+});
+
+describe('listAssignedOrders — sin `asignaciones.ejecutar` no hay pedidos previos al empaque', () => {
+  it.each([
+    ['solo asignaciones.consultar', ['asignaciones.consultar']],
+    ['asignaciones.consultar + empaque.modificar + terminados.consultar', ['asignaciones.consultar', 'empaque.modificar', 'terminados.consultar']],
+  ] as const)('R16: con %s devuelve la pagina vacia sin consultar asignaciones ni pedidos', async (_caso, permissions) => {
+    const ids = [pedidoId(1)];
+    const { deps, todos } = montar({ ids, page: { items: [resumen(pedidoId(1))], total: 1 }, refs: [receta()] });
+
+    const pagina = await createListAssignedOrders(deps)({ id: ANA, companyId: EMPRESA, permissions }, { page: 2, pageSize: 5 });
+
+    expect(pagina).toEqual({ items: [], total: 0, page: 2, pageSize: 5, totalPages: 1 });
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('R16: sin el permiso la entrada se sigue validando', async () => {
+    const { deps } = montar();
+
+    await expect(
+      createListAssignedOrders(deps)({ id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] }, { page: 0 }),
+    ).rejects.toThrow(ValidationError);
+  });
+
+  it('R17: con `asignaciones.ejecutar` lista sus pedidos de trabajo como siempre', async () => {
+    const ids = [pedidoId(1)];
+    const { deps, listOrderIdsByUserInCompany, listAliveSummariesByIds } = montar({
+      ids,
+      page: { items: [resumen(pedidoId(1))], total: 1 },
+      refs: [receta()],
+    });
+
+    const pagina = await createListAssignedOrders(deps)(ACTOR, { page: 1 });
+
+    expect(listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, ANA);
+    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, ids, ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'], 1, undefined);
+    expect(pagina.total).toBe(1);
+    expect(pagina.items.map((item) => item.id)).toEqual(ids);
   });
 });

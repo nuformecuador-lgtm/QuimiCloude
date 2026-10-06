@@ -33,9 +33,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import {
+  createRecipeExecutionReader,
+  findAliveRecipeByNormalizedName,
+  findRecipeExecutionContentById,
+  findRecipeIdsMatchingName,
+  findRecipeRefsIncludingDeleted,
+} from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import {
   createRecipe,
+  createRecipeVersion,
   findAliveRecipeById,
   listAliveRecipes,
   replaceAliveRecipe,
@@ -151,8 +158,10 @@ function recetaNueva(overrides: Partial<NewRecipe> = {}): NewRecipe {
     name: `Receta ${token()}`,
     description: null,
     steps: [],
+    packingSteps: [],
     lines: [],
     imagePath: null,
+    tools: [],
     ...overrides,
   };
 }
@@ -204,7 +213,9 @@ beforeAll(async () => {
 afterAll(async () => {
   const empresas = [A, B, C].filter((empresa): empresa is Empresa => empresa !== undefined);
   for (const empresa of empresas) {
-    // `recipe_lines` cae con su receta por `ON DELETE CASCADE`.
+    // Versiones antes que originales: la FK a la original es RESTRICT. `recipe_lines` cae con
+    // su receta por `ON DELETE CASCADE`.
+    await prisma.recipe.deleteMany({ where: { companyId: empresa.companyId, parentRecipeId: { not: null } } });
     await prisma.recipe.deleteMany({ where: { companyId: empresa.companyId } });
   }
   for (const empresa of empresas) {
@@ -470,7 +481,16 @@ describe('R24 — findUnitRefs: de sistema, propia y ajena', () => {
 describe('R25 — findRecipeRefsIncludingDeleted acotado, con la baja logica viajando en la referencia', () => {
   it('una receta propia viva vuelve con isDeleted en false', async () => {
     const refs = await findRecipeRefsIncludingDeleted([A.recetas[0] ?? ''], A.companyId);
-    expect(refs).toEqual([{ id: A.recetas[0], name: expect.any(String), isDeleted: false }]);
+    expect(refs).toEqual([
+      {
+        id: A.recetas[0],
+        name: expect.any(String),
+        ownName: expect.any(String),
+        isDeleted: false,
+        isUnderReview: false,
+        original: null,
+      },
+    ]);
   });
 
   it('una receta propia con borrado logico vuelve, marcada, y no se confunde con la ausencia', async () => {
@@ -490,6 +510,133 @@ describe('R25 — findRecipeRefsIncludingDeleted acotado, con la baja logica via
 
     const ajenaBorrada = await findRecipeRefsIncludingDeleted([A.recetas[3] ?? ''], B.companyId);
     expect(ajenaBorrada).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Versiones frente al catalogo publico. Siembra propia (recetas y un producto por empresa) que
+// no entra en `empresa.recetas` ni en las lineas del producto sembrado: los casos de mas abajo
+// cuentan esas filas.
+// ---------------------------------------------------------------------------
+
+describe('versiones en el catalogo publico (R8, R25, R37, R40, R41)', () => {
+  const MARCA_VERSION = `versionunica${token()}`;
+  const MARCA_ORIGINAL = `originalunica${token()}`;
+  const PASOS_ORIGINAL: NewRecipe['steps'] = [
+    { blocks: [{ kind: 'paragraph', spans: [{ text: `Mezclar ${token()}` }] }] },
+  ];
+
+  const productos = new Map<string, string>();
+  const versiones: string[] = [];
+  const originales: string[] = [];
+
+  let originalA: string;
+  let versionA: string;
+  let versionBaja: string;
+  let versionB: string;
+
+  function lineaDe(empresa: Empresa): NewRecipe['lines'] {
+    return [{ productId: productos.get(empresa.companyId) ?? '', percentage: '100.00' }];
+  }
+
+  async function original(empresa: Empresa, overrides: Partial<NewRecipe>): Promise<string> {
+    const resultado = await createRecipe(recetaNueva(overrides), empresa.userId, AHORA, ambitoDe(empresa));
+    if (resultado === 'duplicate') throw new Error('el alta devolvio duplicate');
+    originales.push(resultado.id);
+    return resultado.id;
+  }
+
+  async function version(empresa: Empresa, originalId: string, name: string): Promise<string> {
+    const resultado = await createRecipeVersion(
+      originalId,
+      { name, lines: lineaDe(empresa), tools: [] },
+      empresa.userId,
+      AHORA,
+      ambitoDe(empresa),
+    );
+    if (typeof resultado === 'string') throw new Error(`el alta de la version devolvio ${resultado}`);
+    versiones.push(resultado.id);
+    return resultado.id;
+  }
+
+  beforeAll(async () => {
+    for (const empresa of [A, B]) {
+      const marca = token();
+      const producto = await prisma.product.create({
+        data: { name: `Producto version ${marca}`, nameNormalized: `productoversion${marca}`, companyId: empresa.companyId },
+        select: { id: true },
+      });
+      productos.set(empresa.companyId, producto.id);
+    }
+
+    originalA = await original(A, { name: `Crema ${MARCA_ORIGINAL}`, steps: PASOS_ORIGINAL, lines: lineaDe(A) });
+    versionA = await version(A, originalA, `Sin perfume ${MARCA_VERSION}`);
+
+    const originalBaja = await original(A, { name: `Retirada ${token()}`, steps: PASOS_ORIGINAL });
+    versionBaja = await version(A, originalBaja, `Ligera ${token()}`);
+    expect(await softDeleteAliveRecipe(originalBaja, A.userId, AHORA, ambitoDe(A))).toBe('ok');
+
+    // Mismos nombres en B: lo que se busque desde A no puede traerla.
+    const originalB = await original(B, { name: `Crema ${MARCA_ORIGINAL}`, lines: lineaDe(B) });
+    versionB = await version(B, originalB, `Sin perfume ${MARCA_VERSION}`);
+  });
+
+  afterAll(async () => {
+    await prisma.recipe.deleteMany({ where: { id: { in: versiones } } });
+    await prisma.recipe.deleteMany({ where: { id: { in: originales } } });
+    await prisma.product.deleteMany({ where: { id: { in: [...productos.values()] } } });
+  });
+
+  it('R8, R25: el contenido de una version dada de baja trae los pasos de su original, tambien de baja', async () => {
+    const contenido = await createRecipeExecutionReader().findExecutionContentById(versionBaja, A.companyId);
+
+    expect(contenido).not.toBeNull();
+    expect(contenido?.isDeleted).toBe(true);
+    expect(contenido?.steps).toEqual(PASOS_ORIGINAL);
+    expect(contenido?.lines).toEqual([{ productId: productos.get(A.companyId), productName: null, percentage: '100.00' }]);
+    expect(contenido?.name.startsWith('Retirada ')).toBe(true);
+  });
+
+  it('R8, R11: el contenido de una version viva lleva el nombre compuesto, los pasos de la original y sus lineas', async () => {
+    const contenido = await findRecipeExecutionContentById(versionA, A.companyId);
+
+    expect(contenido?.name).toBe(`Crema ${MARCA_ORIGINAL} · Sin perfume ${MARCA_VERSION}`);
+    expect(contenido?.steps).toEqual(PASOS_ORIGINAL);
+    expect(contenido?.lines).toEqual([{ productId: productos.get(A.companyId), productName: null, percentage: '100.00' }]);
+  });
+
+  it('R11, R21: la referencia de una version publica la original y el nombre compuesto', async () => {
+    const [ref] = await findRecipeRefsIncludingDeleted([versionA], A.companyId);
+
+    expect(ref).toEqual({
+      id: versionA,
+      name: `Crema ${MARCA_ORIGINAL} · Sin perfume ${MARCA_VERSION}`,
+      ownName: `Sin perfume ${MARCA_VERSION}`,
+      isDeleted: false,
+      isUnderReview: false,
+      original: { id: originalA, name: `Crema ${MARCA_ORIGINAL}` },
+    });
+  });
+
+  it('R37: findAliveByNormalizedName ignora una version viva con ese nombre, y encuentra la original', async () => {
+    await expect(findAliveRecipeByNormalizedName(`Sin perfume ${MARCA_VERSION}`, A.companyId)).resolves.toBeNull();
+    await expect(findAliveRecipeByNormalizedName(`Crema ${MARCA_ORIGINAL}`, A.companyId)).resolves.toEqual({
+      id: originalA,
+      name: `Crema ${MARCA_ORIGINAL}`,
+    });
+  });
+
+  it('R41, R40: una version se encuentra por su nombre y por el de su original, y nunca la de otra empresa', async () => {
+    const porSuNombre = await findRecipeIdsMatchingName(MARCA_VERSION, A.companyId);
+    expect(porSuNombre).toEqual([versionA]);
+
+    const porLaOriginal = await findRecipeIdsMatchingName(MARCA_ORIGINAL, A.companyId);
+    expect([...(porLaOriginal ?? [])].sort()).toEqual([originalA, versionA].sort());
+
+    // Control positivo desde B: la suya existe y casa por los dos caminos.
+    expect(await findRecipeIdsMatchingName(MARCA_VERSION, B.companyId)).toEqual([versionB]);
+    expect(porSuNombre).not.toContain(versionB);
+    expect(porLaOriginal).not.toContain(versionB);
   });
 });
 

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { multiplyDecimal, subtractDecimal } from '@/app/(private)/pedidos/components';
+import { divideDecimal, multiplyDecimal, subtractDecimal } from '@/app/(private)/pedidos/components';
 
 describe('multiplyDecimal — producto exacto de dos decimales en texto', () => {
   it('multiplica y devuelve el resultado sin ceros de relleno', () => {
@@ -80,5 +80,22 @@ describe('subtractDecimal — resta exacta de dos decimales en texto', () => {
 
   it('resta de cantidades grandes sin perder cifras', () => {
     expect(subtractDecimal('99999999.12345678', '0.00000001')).toBe('99999999.12345677');
+  });
+});
+describe('divideDecimal', () => {
+  it('divide sin deriva de coma flotante', () => {
+    expect(divideDecimal('0.3', '0.1', 4)).toBe('3');
+    expect(divideDecimal('1000', '20', 4)).toBe('50');
+  });
+
+  it('trunca a la escala pedida', () => {
+    expect(divideDecimal('100', '3', 4)).toBe('33.3333');
+    expect(divideDecimal('200', '3', 2)).toBe('66.66');
+  });
+
+  it('sin divisor valido o con divisor cero devuelve null', () => {
+    expect(divideDecimal('1', '0', 4)).toBeNull();
+    expect(divideDecimal('1', '', 4)).toBeNull();
+    expect(divideDecimal('abc', '2', 4)).toBeNull();
   });
 });

@@ -1,6 +1,11 @@
 import type { ZodIssue } from 'zod';
 
-import type { RecipeStepDocument } from '@/lib/modules/recetas';
+import {
+  formatPercentage,
+  type RecipeLineView,
+  type RecipeStepDocument,
+  type RecipeToolView,
+} from '@/lib/modules/recetas';
 
 /**
  * Tipos del estado del formulario de receta y el armado de su payload (T13, R22, R29, R32, R35,
@@ -76,12 +81,26 @@ export type RecipeStepFormValue = {
   readonly document: RecipeStepDocument;
 };
 
+/**
+ * Herramienta del tab, con la misma lectura de `productName` que `RecipeLineFormValue` (`''`
+ * sin elegir, `null` dada de baja). `quantity` es el texto tal cual lo escribe el usuario: se
+ * convierte a entero solo al armar el payload, para no perder lo tecleado si no es válido.
+ */
+export type RecipeToolFormValue = {
+  readonly key: string;
+  readonly productId: string;
+  readonly productName: string | null;
+  readonly quantity: string;
+};
+
 /** Estado completo y controlado del formulario. */
 export type RecipeFormState = {
   readonly name: string;
   readonly description: string;
   readonly lines: readonly RecipeLineFormValue[];
+  readonly tools: readonly RecipeToolFormValue[];
   readonly steps: readonly RecipeStepFormValue[];
+  readonly packingSteps: readonly RecipeStepFormValue[];
   readonly image: ImageFieldState;
 };
 
@@ -104,11 +123,19 @@ export type RecipeLinePayload = {
  */
 export type RecipeStepPayload = RecipeStepDocument;
 
+/** Herramienta tal como la espera el contrato: sin `key` ni `productName`, cantidad numérica. */
+export type RecipeToolPayload = {
+  readonly productId: string;
+  readonly quantity: number;
+};
+
 export type RecipePayload = {
   readonly name: string;
   readonly description: string | null;
   readonly steps: readonly RecipeStepPayload[];
+  readonly packingSteps: readonly RecipeStepPayload[];
   readonly lines: readonly RecipeLinePayload[];
+  readonly tools: readonly RecipeToolPayload[];
   readonly image?: { readonly bytes: Uint8Array } | null;
 };
 
@@ -156,12 +183,9 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
     steps: state.steps.map((step): RecipeStepPayload => step.document),
-    lines: state.lines.map(
-      (line): RecipeLinePayload => ({
-        productId: line.productId,
-        percentage: line.percentage.replace(',', '.'),
-      }),
-    ),
+    packingSteps: state.packingSteps.map((step): RecipeStepPayload => step.document),
+    lines: toLinePayloads(state.lines),
+    tools: toToolPayloads(state.tools),
   };
 
   switch (state.image.kind) {
@@ -173,6 +197,78 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     case 'cleared':
       return { ...base, image: null };
   }
+}
+
+function toLinePayloads(lines: readonly RecipeLineFormValue[]): RecipeLinePayload[] {
+  return lines.map(
+    (line): RecipeLinePayload => ({
+      productId: line.productId,
+      percentage: line.percentage.replace(',', '.'),
+    }),
+  );
+}
+
+/**
+ * Las de baja viajan igual que las demás: el servidor las conserva. Una cantidad vacía sale como
+ * `NaN` y la rechaza el esquema, que es quien señala la fila.
+ */
+function toToolPayloads(tools: readonly RecipeToolFormValue[]): RecipeToolPayload[] {
+  return tools.map(
+    (tool): RecipeToolPayload => ({
+      productId: tool.productId,
+      quantity: Number.parseInt(tool.quantity, 10),
+    }),
+  );
+}
+
+/** Estado del formulario de una versión: solo lo que la versión tiene propio. */
+export type RecipeVersionFormState = {
+  readonly name: string;
+  readonly lines: readonly RecipeLineFormValue[];
+  readonly tools: readonly RecipeToolFormValue[];
+};
+
+export type RecipeVersionPayload = {
+  readonly name: string;
+  readonly lines: readonly RecipeLinePayload[];
+  readonly tools: readonly RecipeToolPayload[];
+};
+
+/** Pasos, descripción e imagen son de la original: la versión nunca los envía. */
+export function buildRecipeVersionPayload(state: RecipeVersionFormState): RecipeVersionPayload {
+  return {
+    name: state.name,
+    lines: toLinePayloads(state.lines),
+    tools: toToolPayloads(state.tools),
+  };
+}
+
+/**
+ * Líneas del detalle proyectadas al estado del formulario. Se conservan las de un producto dado
+ * de baja (`productName: null`) y el % se precarga ya formateado («12.50» -> «12,50»).
+ */
+export function toLineFormValues(lines: readonly RecipeLineView[]): RecipeLineFormValue[] {
+  return lines.map(
+    (line): RecipeLineFormValue => ({
+      key: createLocalKey('line'),
+      productId: line.productId,
+      productName: line.productName,
+      percentage: formatPercentage(line.percentage),
+      productUnitId: line.productUnitId,
+    }),
+  );
+}
+
+/** Herramientas del detalle proyectadas al estado, conservando las de baja. */
+export function toToolFormValues(tools: readonly RecipeToolView[]): RecipeToolFormValue[] {
+  return tools.map(
+    (tool): RecipeToolFormValue => ({
+      key: createLocalKey('tool'),
+      productId: tool.productId,
+      productName: tool.productName,
+      quantity: String(tool.quantity),
+    }),
+  );
 }
 
 /** Genera una clave local única para una línea o un paso nuevo. Nunca es el id de dominio. */
@@ -208,12 +304,18 @@ export function extractLineErrors(issues: readonly ZodIssue[]): RecipeLineErrors
   return result;
 }
 
-/** Extrae de `error.issues` los mensajes que identifican un paso concreto (R32, R38 del esquema). */
-export function extractStepErrors(issues: readonly ZodIssue[]): RecipeStepErrors {
+/**
+ * Extrae de `error.issues` los mensajes que identifican un paso concreto.
+ * `root` separa los pasos del operador de los de envasado: comparten índices.
+ */
+export function extractStepErrors(
+  issues: readonly ZodIssue[],
+  root: 'steps' | 'packingSteps' = 'steps',
+): RecipeStepErrors {
   const result: Record<number, string> = {};
   for (const issue of issues) {
-    const [root, index] = issue.path;
-    if (root !== 'steps' || typeof index !== 'number') continue;
+    const [issueRoot, index] = issue.path;
+    if (issueRoot !== root || typeof index !== 'number') continue;
     result[index] = issue.message;
   }
   return result;
@@ -226,6 +328,36 @@ export function extractStepErrors(issues: readonly ZodIssue[]): RecipeStepErrors
  */
 export function extractGeneralLinesError(issues: readonly ZodIssue[]): string | undefined {
   const issue = issues.find((candidate) => candidate.path.length === 1 && candidate.path[0] === 'lines');
+  return issue?.message;
+}
+
+export type RecipeToolFieldName = 'productId' | 'quantity';
+
+export type RecipeToolErrors = Readonly<Record<number, Partial<Record<RecipeToolFieldName, string>>>>;
+
+export type RecipeToolErrorMessages = Readonly<Record<RecipeToolFieldName, string>>;
+
+/**
+ * Los mensajes de forma del esquema son los genéricos de zod, en inglés: por eso aquí se toma
+ * solo el `path` del issue y el texto lo pone quien llama.
+ */
+export function extractToolErrors(
+  issues: readonly ZodIssue[],
+  messages: RecipeToolErrorMessages,
+): RecipeToolErrors {
+  const result: Record<number, Partial<Record<RecipeToolFieldName, string>>> = {};
+  for (const issue of issues) {
+    const [root, index, field] = issue.path;
+    if (root !== 'tools' || typeof index !== 'number') continue;
+    if (field !== 'productId' && field !== 'quantity') continue;
+    result[index] = { ...result[index], [field]: messages[field] };
+  }
+  return result;
+}
+
+/** Error del array entero (producto repetido): no apunta a ninguna fila. */
+export function extractGeneralToolsError(issues: readonly ZodIssue[]): string | undefined {
+  const issue = issues.find((candidate) => candidate.path.length === 1 && candidate.path[0] === 'tools');
   return issue?.message;
 }
 

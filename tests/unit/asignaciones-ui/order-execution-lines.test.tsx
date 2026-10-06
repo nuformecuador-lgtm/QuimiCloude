@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 import {
+  ORDER_EXECUTION_LINE_APPROXIMATE_TESTID,
+  ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID,
   ORDER_EXECUTION_LINE_PERCENTAGE_TESTID,
   ORDER_EXECUTION_LINE_QUANTITY_TESTID,
   ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID,
@@ -46,6 +48,7 @@ function linea(overrides: Partial<ExecutionLineView> = {}): ExecutionLineView {
     productName: 'Hipoclorito',
     percentage: '10.00',
     quantity: '20',
+    need: 'unconverted',
     unit: LITRO,
     alternativeUnits: [MILILITRO],
     ...overrides,
@@ -287,5 +290,51 @@ describe('linea de ejecucion — unidad desconocida (R24)', () => {
     expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`)).toHaveTextContent(
       '20',
     );
+  });
+});
+
+describe('linea de ejecucion — conversion a la unidad del insumo', () => {
+  it('R17 en ejecucion una linea aproximada lleva la marca y una no convertible el aviso', () => {
+    render(
+      <OrderExecutionLines
+        lines={[
+          linea({ quantity: '1', need: 'approximate', unit: KILOGRAMO, alternativeUnits: [] }),
+          linea({ quantity: null, need: 'not_convertible', unit: KILOGRAMO, alternativeUnits: [] }),
+          linea({ need: 'exact' }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_APPROXIMATE_TESTID}-0`)).toHaveTextContent('aprox.');
+    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`)).toHaveTextContent('1');
+    expect(screen.queryByTestId(`${ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID}-0`)).toBeNull();
+
+    const noConvertible = screen.getByTestId('order-execution-line-1');
+    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID}-1`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-1`)).toBeNull();
+    expect(screen.queryByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-1`)).toBeNull();
+    expect(screen.queryByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-1`)).toBeNull();
+    expect(noConvertible.textContent?.replace('10,00 %', '')).not.toMatch(/\d/);
+
+    expect(screen.queryByTestId(`${ORDER_EXECUTION_LINE_APPROXIMATE_TESTID}-2`)).toBeNull();
+    expect(screen.queryByTestId(`${ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID}-2`)).toBeNull();
+  });
+
+  it('R16 el selector de unidad parte de la cantidad ya convertida y conserva la marca', async () => {
+    const user = setupUser();
+    render(
+      <OrderExecutionLines
+        lines={[linea({ quantity: '0.5', need: 'approximate', unit: LITRO, alternativeUnits: [MILILITRO] })]}
+      />,
+    );
+
+    await user.click(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-0`));
+    const opciones = await screen.findAllByTestId(ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID);
+    const ml = opciones.find((opcion) => opcion.textContent === 'ml');
+    if (ml === undefined) throw new Error('no se encontro la opcion ml');
+    await user.click(await esperarInteractiva(ml));
+
+    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`)).toHaveTextContent('500');
+    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_APPROXIMATE_TESTID}-0`)).toBeInTheDocument();
   });
 });

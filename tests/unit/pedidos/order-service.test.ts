@@ -28,9 +28,10 @@ import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
+import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
+import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -49,16 +50,18 @@ const OTRA_RECETA = '44444444-4444-4444-8444-444444444444'
  *  MISMO reloj (R10), y con un reloj real el test no podria afirmarlo. */
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
-const RECETA_VIVA: RecipeRef = { id: RECIPE_ID, name: 'Acido citrico 50%', isDeleted: false }
-const RECETA_DE_BAJA: RecipeRef = { id: RECIPE_ID, name: 'Formula retirada', isDeleted: true }
-const OTRA_VIVA: RecipeRef = { id: OTRA_RECETA, name: 'Detergente neutro', isDeleted: false }
-const OTRA_DE_BAJA: RecipeRef = { id: OTRA_RECETA, name: 'Formula vieja', isDeleted: true }
+const RECETA_VIVA: RecipeRef = { id: RECIPE_ID, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false }
+const RECETA_DE_BAJA: RecipeRef = { id: RECIPE_ID, name: 'Formula retirada', ownName: 'Formula retirada', isUnderReview: false, original: null, isDeleted: true }
+const OTRA_VIVA: RecipeRef = { id: OTRA_RECETA, name: 'Detergente neutro', ownName: 'Detergente neutro', isUnderReview: false, original: null, isDeleted: false }
+const OTRA_DE_BAJA: RecipeRef = { id: OTRA_RECETA, name: 'Formula vieja', ownName: 'Formula vieja', isUnderReview: false, original: null, isDeleted: true }
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
+/** QC-170 [Q4]: la unidad del pedido. `dobles()` la deja SIEMPRE resoluble. */
+const UNIT_ID = '77777777-7777-4777-8777-777777777777'
 
 const ENTRADA_ALTA = {
   recipeId: RECIPE_ID,
   quantity: '10.0000',
-  presentationId: PRESENTATION_ID,
+  unitId: UNIT_ID,
 }
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
@@ -75,8 +78,8 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
-    presentationId: PRESENTATION_ID,
-    presentationContent: null,
+    presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null }],
+    unitId: UNIT_ID,
     ...overrides,
   }
 }
@@ -87,6 +90,7 @@ type Dobles = {
   readonly products: ProductCatalog
   readonly units: UnitCatalog
   readonly presentations: PresentationCatalog
+  readonly packaging: PackagingCatalog
   readonly unitOfWork: ReturnType<typeof fakeUnitOfWork>['unitOfWork']
   readonly now: () => Date
 }
@@ -108,7 +112,7 @@ function dobles(opciones: {
   const create = vi.fn(async () => opciones.alta ?? fila())
   const filaVista = opciones.fila === undefined ? null : opciones.fila
   const findAliveById = vi.fn(async () => filaVista)
-  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null, packagingCost: null }))
   const updateAlive = vi.fn(async () => opciones.edicion ?? 'ok')
   const findRefsIncludingDeleted = vi.fn(async () => opciones.recetas ?? [RECETA_VIVA])
   const findPresentationRefs = vi.fn(
@@ -143,15 +147,23 @@ function dobles(opciones: {
     reservations: { syncForOrder },
   })
 
+  // La unidad del pedido SIEMPRE resuelve: `createOrder`/`updateOrder` la exigen (R41), y este
+  // archivo no ejercita el reparto -eso lo cubren `create-order.test.ts`/`update-order.test.ts`-.
+  const findUnitRefs = vi.fn(async (ids: readonly string[]) =>
+    ids.includes(UNIT_ID) ? [{ id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }] : [],
+  )
+
   return {
     orders,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
     products: { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) } as unknown as ProductCatalog,
     units: {
-      findRefs: vi.fn(async () => []),
+      findRefs: findUnitRefs,
       findRefsSharingBaseInCompany: vi.fn(async () => []),
+      findMassVolumeBridge: vi.fn(async () => null),
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
+    packaging: fakePackagingCatalog(),
     unitOfWork,
     now: () => AHORA,
     create,
@@ -196,7 +208,8 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',
-      presentationId: PRESENTATION_ID,
+      unitId: UNIT_ID,
+      presentationLines: [],
     })
   })
 
@@ -235,12 +248,12 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     const [data, , actorId] = d.create.mock.calls[0] as [Record<string, unknown>, number, string]
     expect(actorId).toBe(ADMIN.id)
     expect(Object.keys(data).sort()).toEqual([
-      'presentationContent',
-      'presentationId',
+      'presentationLines',
       'priority',
       'quantity',
       'recipeId',
       'status',
+      'unitId',
     ])
     expect(data.status).toBe('PENDIENTE')
   })
@@ -294,7 +307,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
 })
 
 describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
-  it('R23: la ficha devuelve id y nombre de la presentacion, con los nombres resueltos por los contratos (R42, R43)', async () => {
+  it('R26: la ficha devuelve el reparto con el nombre de cada presentacion, resuelto por los contratos (R42, R43)', async () => {
     const d = dobles({ fila: fila() })
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
@@ -305,6 +318,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       numberText: '2026-0000007',
       recipeId: RECIPE_ID,
       recipeName: 'Acido citrico 50%',
+      recipeVersion: null,
       quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',
@@ -315,20 +329,64 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       // R46: los dos autores salen como IDENTIFICADORES; resolver sus nombres es de QC-35.
       createdBy: 'admin-0',
       updatedBy: 'admin-0',
-      // R23: la ficha devuelve id y nombre de la presentacion, resueltos por el contrato.
-      presentationId: PRESENTATION_ID,
-      presentationName: 'Bidon 20L',
+      // R26: el reparto, con el nombre de cada presentacion resuelto por el contrato.
+      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null }],
+      // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
+      unitId: UNIT_ID,
+      unitLabel: 'L',
     })
   })
 
-  it('R23: un pedido sin presentacion devuelve su ausencia, sin consultar el catalogo', async () => {
-    const d = dobles({ fila: fila({ presentationId: null }) })
+  it('R27: un pedido sin reparto devuelve la lista vacia, sin consultar el catalogo', async () => {
+    const d = dobles({ fila: fila({ presentationLines: [] }) })
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.presentationId).toBeNull()
-    expect(vista.presentationName).toBeNull()
+    expect(vista.presentationLines).toEqual([])
     expect(d.findPresentationRefs).not.toHaveBeenCalled()
+  })
+
+  it('R26: varias lineas conservan el orden de alta y sus presentaciones se resuelven en una sola llamada', async () => {
+    const OTRA = '88888888-8888-4888-8888-888888888888'
+    const d = dobles({
+      fila: fila({
+        presentationLines: [
+          { presentationId: OTRA, packages: 2, packagingProductId: null },
+          { presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null },
+        ],
+      }),
+    })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(d.findPresentationRefs).toHaveBeenCalledTimes(1)
+    expect(d.findPresentationRefs.mock.calls[0]?.[0]).toEqual([OTRA, PRESENTATION_ID])
+    // `OTRA` no vuelve del doble del catalogo: la linea sigue saliendo, con el nombre a `null`.
+    expect(vista.presentationLines).toEqual([
+      { presentationId: OTRA, presentationName: null, packages: 2, packagingProductId: null, packagingName: null },
+      { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null },
+    ])
+  })
+
+  it('R42: un pedido sin unidad devuelve su ausencia, sin consultar el catalogo', async () => {
+    const d = dobles({ fila: fila({ unitId: null }) })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.unitId).toBeNull()
+    expect(vista.unitLabel).toBeNull()
+  })
+
+  it('[Q4]: sin simbolo, la etiqueta cae al nombre de la unidad', async () => {
+    const d = dobles({ fila: fila() })
+    const findUnitRefsSinSimbolo = vi.fn(async (ids: readonly string[]) =>
+      ids.includes(UNIT_ID) ? [{ id: UNIT_ID, name: 'Litro', symbol: null, baseUnitId: null, factor: null }] : [],
+    )
+    const conUnitsSinSimbolo = { ...d, units: { ...d.units, findRefs: findUnitRefsSinSimbolo } }
+
+    const vista = await createGetOrder(conUnitsSinSimbolo)(ORDER_ID, ADMIN)
+
+    expect(vista.unitLabel).toBe('Litro')
   })
 
   it('devuelve el motivo de un pedido cancelado (R29, R40)', async () => {
@@ -383,6 +441,8 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       orders,
       recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
       presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
+      packaging: fakePackagingCatalog(),
+      units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
       log,
     })({ page: 1 }, ADMIN)
 
@@ -416,8 +476,8 @@ describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', (
       recipeId: RECIPE_ID,
       quantity: '10.0000',
       priority: 'ALTA',
-      presentationId: PRESENTATION_ID,
-      presentationContent: null,
+      unitId: UNIT_ID,
+      presentationLines: [],
     })
     expect(actorId).toBe(ADMIN.id)
     expect(instante).toBe(AHORA)

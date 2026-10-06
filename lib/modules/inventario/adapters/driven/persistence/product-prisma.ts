@@ -4,8 +4,14 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { compareQuantities } from '../../../domain/decimal-quantity';
-import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
-import { planFinishedGoods } from '../../../domain/finished-goods';
+import {
+  ActionNotAllowedError,
+  BatchDuplicateLotError,
+  BatchStockNegativeError,
+  ValidationError,
+} from '../../../domain/errors';
+import { planFinishedGoodsLine } from '../../../domain/finished-goods';
+import { isWholeQuantity } from '../../../domain/product-input';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
 
@@ -34,9 +40,9 @@ import type { MovementReason } from '../../../domain/movement-reason';
 import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
-import type { NewProduct, ProductView, ProductType } from '../../../domain/product-view';
+import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
-import { PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
+import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
 // El ambito de empresa va como conjuncion aparte en un `AND` de primer nivel, para que ninguna otra
 // condicion del `where` pueda relajarlo. Una fila de otra empresa sale igual que una que no existe
@@ -215,11 +221,13 @@ function toDecimalRange(condition: NumberRangeCondition): { gte?: Prisma.Decimal
 function productFilterWhere(
   field: string,
   value: ListFilterValue,
+  presentationIdsByUnit: readonly string[],
 ): Prisma.ProductWhereInput | null {
   switch (value.kind) {
     case 'select': {
       const condition = selectCondition(value.values);
       if (condition === null) return null;
+      if (field === PRODUCT_PRESENTATION_UNIT_FILTER) return { presentationId: { in: [...presentationIdsByUnit] } };
       if (field === 'type') {
         const validValues = value.values.filter((v) => PRODUCT_TYPE_VALUES.includes(v as ProductType)) as ProductType[];
         if (validValues.length === 0) return null;
@@ -251,14 +259,16 @@ function productFilterWhere(
 }
 
 /** El termino se normaliza con la misma funcion que escribio `name_normalized`, para que la
- *  busqueda y la escritura no discrepen. */
+ *  busqueda y la escritura no discrepen. `presentationIdsByUnit` son las presentaciones que ya
+ *  resolvio el filtro por unidad de presentacion; sin ellas ese filtro no deja pasar nada. */
 export function buildProductWhere(
   query: ListQuery,
   scope: InventoryScope,
+  presentationIdsByUnit: readonly string[] = [],
 ): Prisma.ProductWhereInput {
   const search = normalizedSearchCondition(query.search, normalizeProductName);
   const filters = Object.entries(query.filters)
-    .map(([field, value]) => productFilterWhere(field, value))
+    .map(([field, value]) => productFilterWhere(field, value, presentationIdsByUnit))
     .filter((condition): condition is Prisma.ProductWhereInput => condition !== null);
 
   return {
@@ -278,17 +288,67 @@ export function buildProductWhere(
  * `totalPages` mentirian. El `count` usa el mismo `where` que el `findMany`, para que `total` no
  * cuente filas de otra empresa ni fuera del filtro.
  */
+/** Presentaciones de la empresa con contenido declarado cuya unidad esta entre `unitIds`. */
+async function findPresentationIdsWithContentInUnits(
+  unitIds: readonly string[],
+  scope: InventoryScope,
+): Promise<readonly string[]> {
+  if (unitIds.length === 0) return [];
+  const rows = await prisma.presentation.findMany({
+    where: { AND: [presentationCompanyScope(scope), { unitId: { in: [...unitIds] }, content: { not: null } }] },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
+}
+
+type FixedPresentationFields = Pick<
+  ProductView,
+  'presentationId' | 'presentationName' | 'presentationContent' | 'presentationUnitId'
+>;
+
+async function findFixedPresentations(
+  presentationIds: readonly string[],
+  scope: InventoryScope,
+): Promise<ReadonlyMap<string, FixedPresentationFields>> {
+  if (presentationIds.length === 0) return new Map();
+  const rows = await prisma.presentation.findMany({
+    where: { AND: [presentationCompanyScope(scope), { id: { in: [...presentationIds] } }] },
+    select: { id: true, name: true, content: true, unitId: true },
+  });
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        presentationId: row.id,
+        presentationName: row.name,
+        presentationContent: row.content === null ? null : row.content.toFixed(4),
+        presentationUnitId: row.unitId,
+      },
+    ]),
+  );
+}
+
+const NO_FIXED_PRESENTATION: FixedPresentationFields = {
+  presentationId: null,
+  presentationName: null,
+  presentationContent: null,
+  presentationUnitId: null,
+};
+
 export async function listAliveProducts(
   query: ListQuery,
   scope: InventoryScope,
 ): Promise<Page<ProductView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildProductWhere(query, scope);
+  const unitFilter = query.filters[PRODUCT_PRESENTATION_UNIT_FILTER];
+  const presentationIdsByUnit =
+    unitFilter?.kind === 'select' ? await findPresentationIdsWithContentInUnits(unitFilter.values, scope) : [];
+  const where = buildProductWhere(query, scope, presentationIdsByUnit);
 
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
       where,
-      select: PRODUCT_SELECT,
+      select: { ...PRODUCT_SELECT, presentationId: true },
       orderBy: productOrderBy(query.sort),
       skip: offset,
       take: limit,
@@ -303,9 +363,19 @@ export async function listAliveProducts(
     scope.companyId,
     rows.map((row) => row.id),
   );
+  const presentations = await findFixedPresentations(
+    [...new Set(rows.flatMap((row) => (row.presentationId === null ? [] : [row.presentationId])))],
+    scope,
+  );
   const items = rows.map((row) => {
     const aggregate = reservedByProduct.get(row.id);
-    return { ...toProductView(row), reserved: aggregate?.reserved ?? ZERO_QUANTITY, available: aggregate?.available ?? ZERO_QUANTITY };
+    const fixed = row.presentationId === null ? undefined : presentations.get(row.presentationId);
+    return {
+      ...toProductView(row),
+      reserved: aggregate?.reserved ?? ZERO_QUANTITY,
+      available: aggregate?.available ?? ZERO_QUANTITY,
+      ...(fixed ?? NO_FIXED_PRESENTATION),
+    };
   });
 
   return buildPage(items, total, query.page, limit);
@@ -326,7 +396,7 @@ export async function findAliveIdByNameInPresentationUnit(
   presentationId: string | null,
   scope: InventoryScope,
 ): Promise<{ id: string; type: ProductType } | null> {
-  let unitId: string | null | undefined;
+  let unitId: string | null;
 
   if (presentationId === null) {
     unitId = null;
@@ -339,6 +409,23 @@ export async function findAliveIdByNameInPresentationUnit(
     unitId = presentation.unitId;
   }
 
+  return findAliveIdByNameAndUnitId(name, unitId, scope);
+}
+
+/** La unidad llega ya validada por el caso de uso. Mismo desempate que la de arriba. */
+export async function findAliveIdByNameInUnit(
+  name: string,
+  unitId: string,
+  scope: InventoryScope,
+): Promise<{ id: string; type: ProductType } | null> {
+  return findAliveIdByNameAndUnitId(name, unitId, scope);
+}
+
+async function findAliveIdByNameAndUnitId(
+  name: string,
+  unitId: string | null,
+  scope: InventoryScope,
+): Promise<{ id: string; type: ProductType } | null> {
   const row = await prisma.product.findFirst({
     where: {
       AND: [
@@ -354,6 +441,29 @@ export async function findAliveIdByNameInPresentationUnit(
     select: { id: true, type: true },
   });
   return row === null ? null : { id: row.id, type: row.type as ProductType };
+}
+
+/** Mismo desempate que `findAliveIdByNameInPresentationUnit`. */
+export async function findAlivePackagingByName(
+  name: string,
+  scope: InventoryScope,
+): Promise<{ id: string; presentationId: string } | null> {
+  const row = await prisma.product.findFirst({
+    where: {
+      AND: [
+        productCompanyScope(scope),
+        {
+          nameNormalized: normalizeProductName(name),
+          type: PRODUCT_TYPES.PACKAGING,
+          presentationId: { not: null },
+          deletedAt: null,
+        },
+      ],
+    },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true, presentationId: true },
+  });
+  return row?.presentationId == null ? null : { id: row.id, presentationId: row.presentationId };
 }
 
 /**
@@ -431,7 +541,7 @@ type BatchLotTopRow = { readonly top: string | null };
  * toma su instantanea al empezar, y dentro de la misma sentencia leeria el maximo anterior al
  * commit de la otra sesion. El lock solo evita choques; la garantia es el indice unico.
  */
-async function resolveLot(
+export async function resolveLot(
   tx: Prisma.TransactionClient,
   batch: NewProductBatch,
   scope: InventoryScope,
@@ -465,7 +575,7 @@ async function resolveLot(
  * «que lo genere el backend» en una columna NOT NULL. `createdBy`/`updatedBy` van como escalares:
  * la FK a `users` solo existe en la migracion, para que el cliente no pueda atravesar a `identity`.
  */
-function toBatchCreateData(
+export function toBatchCreateData(
   productId: string,
   batch: NewProductBatch,
   lot: string,
@@ -560,12 +670,22 @@ function isBatchUnitMismatchViolation(error: unknown): boolean {
   return violationMessageOf(error).includes(BATCH_UNIT_MISMATCH_TRIGGER);
 }
 
+const BATCH_PRODUCT_WITHOUT_UNIT_TRIGGER = 'product_batches_product_without_unit';
+
+/** Mismo disparador y mismo criterio. El caso de uso escribe la unidad antes que el lote: solo
+ *  llega por un fallo de programacion o una escritura que no pasa por el. */
+function isBatchProductWithoutUnitViolation(error: unknown): boolean {
+  if (sqlStateOf(error) !== '23514') return false;
+  return violationMessageOf(error).includes(BATCH_PRODUCT_WITHOUT_UNIT_TRIGGER);
+}
+
 /** Lo que no se sabe traducir se relanza: un CHECK violado o una caida de conexion no son entrada
  *  invalida. */
 function translateBatchWriteError(error: unknown): never {
   if (isBatchForeignKeyViolation(error)) throw new ValidationError();
   if (isBatchCompanyScopeViolation(error)) throw new ValidationError();
   if (isBatchUnitMismatchViolation(error)) throw new ValidationError();
+  if (isBatchProductWithoutUnitViolation(error)) throw new ValidationError();
   throw error;
 }
 
@@ -635,21 +755,30 @@ async function writeBatchWithLotRetry<T>(
 }
 
 /**
- * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. El
- * producto nace con la unidad de esta presentacion -sin fila viva de la empresa, se aborta con
- * `ValidationError` antes de escribir nada- y su existencia queda recalculada al final.
- * `batch.presentationId === null` (MACHINE): el producto nace sin unidad y el lote sin
- * presentacion.
+ * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. La
+ * unidad del producto sale, por este orden, del envase, de `product.unitId` o de la presentacion
+ * del lote -sin fila viva de la empresa, se aborta con `ValidationError` antes de escribir nada-;
+ * sin ninguna de las tres, nace sin unidad. Su existencia queda recalculada al final.
  */
 export async function createWithFirstBatch(
   product: NewProduct,
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
+  packaging?: PackagingIdentity,
 ): Promise<{ id: string; batchId: string; lot: string }> {
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
     let unitId: string | null = null;
-    if (batch.presentationId !== null) {
+    if (packaging !== undefined) {
+      const presentation = await tx.presentation.findFirst({
+        where: { AND: [presentationCompanyScope(scope), { id: packaging.presentationId }] },
+        select: { id: true },
+      });
+      if (presentation === null) throw new ValidationError();
+      unitId = packaging.unitId;
+    } else if (product.unitId !== undefined) {
+      unitId = product.unitId;
+    } else if (batch.presentationId !== null) {
       const presentation = await tx.presentation.findFirst({
         where: { AND: [presentationCompanyScope(scope), { id: batch.presentationId }] },
         select: { unitId: true },
@@ -665,6 +794,7 @@ export async function createWithFirstBatch(
         unitId,
         qtyAlert: product.qtyAlert ?? null,
         type: product.type ?? PRODUCT_TYPES.PRODUCT,
+        presentationId: packaging?.presentationId ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,
         updatedAt: now,
@@ -687,6 +817,7 @@ export async function createWithFirstBatch(
         quantity: batch.stock,
         reason: null,
         orderId: null,
+        orderPresentationLineId: null,
         createdBy: batch.createdBy,
       },
       now,
@@ -699,7 +830,7 @@ export async function createWithFirstBatch(
   });
 }
 
-type AliveProductRow = { readonly id: string; readonly type: string };
+type AliveProductRow = { readonly id: string; readonly type: string; readonly presentationId: string | null };
 
 /** Con `productId` escalar y no como escritura anidada desde `product`, que dispararia el
  *  `@updatedAt` de `products`. */
@@ -708,6 +839,7 @@ export async function addBatchToAlive(
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
+  packaging?: { readonly presentationId: string },
 ): Promise<{ batchId: string; lot: string } | null | 'finished_product'> {
   const { companyId } = companyScopeColumns(scope);
 
@@ -715,7 +847,7 @@ export async function addBatchToAlive(
     // El borrado logico toma este mismo lock sobre la fila, asi que uno espera al otro. En READ
     // COMMITTED, el SELECT que espera vuelve a evaluar el WHERE y ya no ve la fila borrada.
     const rows = await tx.$queryRaw<ReadonlyArray<AliveProductRow>>(Prisma.sql`
-      SELECT "id", "type"
+      SELECT "id", "type", "presentation_id" AS "presentationId"
         FROM "products"
        WHERE "id" = ${productId}::uuid
          AND "company_id" = ${companyId}::uuid
@@ -724,6 +856,12 @@ export async function addBatchToAlive(
     `);
     const alive = rows[0];
     if (alive === undefined) return null;
+
+    // Un envase con presentacion fija solo admite lotes sin presentacion y por su misma presentacion.
+    const isFixedPackaging = alive.type === PRODUCT_TYPES.PACKAGING && alive.presentationId !== null;
+    if (packaging !== undefined ? !isFixedPackaging || alive.presentationId !== packaging.presentationId : isFixedPackaging) {
+      throw new ActionNotAllowedError();
+    }
 
     // Bajo la misma fila bloqueada, cierra la carrera con un alta manual que naciera
     // terminado despues de que `findAliveIdByNameInPresentationUnit` ya lo hubiera leido.
@@ -746,6 +884,7 @@ export async function addBatchToAlive(
         quantity: batch.stock,
         reason: null,
         orderId: null,
+        orderPresentationLineId: null,
         createdBy: batch.createdBy,
       },
       now,
@@ -765,7 +904,9 @@ const BATCH_VIEW_SELECT = {
   purchaseDate: true,
   expiryDate: true,
   packageContent: true,
-  presentation: { select: { unitId: true } },
+  // La del producto y no la de la presentacion: los lotes de insumo ya no llevan presentacion, y
+  // los que la llevan estan en la misma unidad que su producto.
+  product: { select: { unitId: true } },
 } satisfies Prisma.ProductBatchSelect;
 
 type BatchViewRow = Prisma.ProductBatchGetPayload<{ select: typeof BATCH_VIEW_SELECT }>;
@@ -780,7 +921,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
     id: row.id,
     lot: row.lot,
     stock: row.stock.toFixed(4),
-    unitId: row.presentation?.unitId ?? null,
+    unitId: row.product.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
     packageContent: row.packageContent === null ? null : row.packageContent.toFixed(4),
@@ -818,12 +959,57 @@ export async function findBatchesOfAliveProduct(
   });
 }
 
+/** Lotes que entraron por el asiento `production` del pedido. El ambito va en el lote y en el
+ *  asiento: un `orderId` de otra empresa no encuentra ninguno de los dos. Con `orderId` `null`,
+ *  los lotes sin asiento `production`, y entonces solo los de `productId`. */
+export async function findBatchesOfOrder(
+  orderId: string | null,
+  scope: InventoryScope,
+  productId: string | null = null,
+): Promise<readonly ProductBatchView[]> {
+  if (orderId === null && productId === null) return [];
+  const production = { AND: [movementCompanyScope(scope), { kind: 'production' as const }] };
+  const rows = await prisma.productBatch.findMany({
+    where: {
+      AND: [
+        batchCompanyScope(scope),
+        {
+          ...(productId === null ? {} : { productId }),
+          product: { deletedAt: null },
+          movements:
+            orderId === null
+              ? { none: production }
+              : { some: { AND: [movementCompanyScope(scope), { kind: 'production', orderId }] } },
+        },
+      ],
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    select: { ...BATCH_VIEW_SELECT, presentation: { select: { name: true } } },
+  });
+
+  const reservedByBatch = await findReservedAndAvailableByBatch(
+    prisma,
+    scope.companyId,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => {
+    const aggregate = reservedByBatch.get(row.id);
+    return {
+      ...toBatchView(row),
+      presentationName: row.presentation?.name ?? null,
+      reserved: aggregate?.reserved ?? ZERO_QUANTITY,
+      available: aggregate?.available ?? row.stock.toFixed(4),
+      overReserved: aggregate?.overReserved ?? false,
+    };
+  });
+}
+
 /** `P2025`: el `where` unico mas el filtro de empresa no encontraron fila que actualizar. */
 function isBatchNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
 
-type AdjustProductRow = { readonly id: string; readonly type: string };
+type AdjustProductRow = { readonly id: string; readonly type: string; readonly presentationId: string | null };
 
 /**
  * `stock: { increment: delta } }` es un `UPDATE ... SET stock = stock + $delta` relativo: dos
@@ -851,7 +1037,7 @@ export async function adjustBatchStock(
   try {
     return await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<ReadonlyArray<AdjustProductRow>>(Prisma.sql`
-        SELECT p."id", p."type"
+        SELECT p."id", p."type", p."presentation_id" AS "presentationId"
           FROM "products" p
           JOIN "product_batches" b ON b."product_id" = p."id"
          WHERE b."id" = ${batchId}::uuid
@@ -867,6 +1053,10 @@ export async function adjustBatchStock(
         return 'increase_not_allowed';
       }
 
+      if (product.type === PRODUCT_TYPES.PACKAGING && product.presentationId !== null && !isWholeQuantity(delta)) {
+        throw new ValidationError('delta: un envase se ajusta en envases enteros');
+      }
+
       const updated = await tx.productBatch.update({
         where: { id: batchId, companyId },
         data: { stock: { increment: new Prisma.Decimal(delta) }, updatedBy: actorId, updatedAt: now },
@@ -875,7 +1065,15 @@ export async function adjustBatchStock(
 
       await writeMovement(
         tx,
-        { batchId, kind: 'adjustment', quantity: delta, reason, orderId: null, createdBy: actorId },
+        {
+          batchId,
+          kind: 'adjustment',
+          quantity: delta,
+          reason,
+          orderId: null,
+          orderPresentationLineId: null,
+          createdBy: actorId,
+        },
         now,
         scope,
       );
@@ -945,6 +1143,7 @@ export async function consumeBatchStock(
       quantity: negateQuantity(input.quantity),
       reason: null,
       orderId: input.orderId,
+      orderPresentationLineId: null,
       createdBy: input.actorId,
     },
     now,
@@ -961,10 +1160,12 @@ export async function consumeBatchStock(
 type PresentationForShareRow = { readonly name: string; readonly unitId: string; readonly content: string | null };
 
 /**
- * La entrada de un lote de produccion al Finalizar un pedido: presentacion `FOR SHARE`,
- * producto terminado (nace si falta, `ON CONFLICT ... DO NOTHING` sobre el indice parcial de
- * la combinacion), lote, asiento `production` y recalculo, todo sobre la MISMA transaccion que
- * el resto del Finalizar -no abre la suya, a diferencia de `createWithFirstBatch`-.
+ * La entrada de un lote de produccion al Terminar el empaque, por UNA linea del reparto:
+ * presentacion `FOR SHARE`, producto terminado (nace si falta, `ON CONFLICT ...
+ * DO NOTHING` sobre el indice parcial de la combinacion), lote, asiento `production` -con
+ * `order_id` Y `order_presentation_line_id`- y recalculo, todo sobre la MISMA transaccion que
+ * el resto de Terminar -no abre la suya, a diferencia de `createWithFirstBatch`-. `unitCost` ya
+ * llega resuelto: el mismo para todas las lineas de un pedido, no se recalcula aqui.
  */
 export async function receiveFinishedGoods(
   tx: Prisma.TransactionClient,
@@ -973,9 +1174,10 @@ export async function receiveFinishedGoods(
     readonly recipeId: string;
     readonly recipeName: string;
     readonly presentationId: string;
-    readonly orderQuantity: string;
+    readonly orderPresentationLineId: string;
+    readonly packages: number;
     readonly orderContent: string | null;
-    readonly lotCost: string;
+    readonly unitCost: string;
     readonly actorId: string;
     readonly now: Date;
   },
@@ -996,9 +1198,8 @@ export async function receiveFinishedGoods(
   const content = input.orderContent ?? presentation.content;
   if (content === null) return { kind: 'presentation_without_content' };
 
-  const plan = planFinishedGoods({ orderQuantity: input.orderQuantity, content, lotCost: input.lotCost });
+  const plan = planFinishedGoodsLine({ packages: input.packages, content, unitCost: input.unitCost });
   if (plan.kind === 'no_content') return { kind: 'presentation_without_content' };
-  if (plan.kind === 'no_whole_package') return { kind: 'no_whole_package' };
 
   const name = `${input.recipeName} · ${presentation.name}`;
   // El arbitro de `ON CONFLICT ... WHERE` lo resuelve Postgres en el analisis de la sentencia,
@@ -1032,7 +1233,7 @@ export async function receiveFinishedGoods(
   const batch: NewProductBatch = {
     presentationId: input.presentationId,
     stock: plan.quantity,
-    unitCost: plan.unitCost,
+    unitCost: input.unitCost,
     lot: null,
     purchaseDate: toCivilDate(input.now),
     expiryDate: null,
@@ -1043,7 +1244,7 @@ export async function receiveFinishedGoods(
   const createdBatch = await tx.productBatch.create({
     data: {
       ...toBatchCreateData(product.id, batch, lot, input.now, scope),
-      packageContent: new Prisma.Decimal(plan.content),
+      packageContent: new Prisma.Decimal(content),
     },
     select: { id: true },
   });
@@ -1056,6 +1257,7 @@ export async function receiveFinishedGoods(
       quantity: plan.quantity,
       reason: null,
       orderId: input.orderId,
+      orderPresentationLineId: input.orderPresentationLineId,
       createdBy: input.actorId,
     },
     input.now,
@@ -1064,11 +1266,51 @@ export async function receiveFinishedGoods(
 
   await recalculateProductStock(tx, product.id, scope);
 
-  return { kind: 'received', productId: product.id, productName: product.name, packages: plan.packages };
+  return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
+}
+
+/** Lote de producto terminado que entra por importacion: asiento `opening`, no `production`,
+ *  porque no sale de ningun pedido. El producto ya debe existir y estar fijado en `tx`. */
+export async function addImportedFinishedGoodsBatch(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  batch: NewProductBatch,
+  packageContent: string,
+  now: Date,
+  scope: InventoryScope,
+): Promise<{ batchId: string; lot: string }> {
+  const lot = await resolveLot(tx, batch, scope);
+
+  const createdBatch = await tx.productBatch.create({
+    data: {
+      ...toBatchCreateData(productId, batch, lot, now, scope),
+      packageContent: new Prisma.Decimal(packageContent),
+    },
+    select: { id: true },
+  });
+
+  await writeMovement(
+    tx,
+    {
+      batchId: createdBatch.id,
+      kind: 'opening',
+      quantity: batch.stock,
+      reason: null,
+      orderId: null,
+      orderPresentationLineId: null,
+      createdBy: batch.createdBy,
+    },
+    now,
+    scope,
+  );
+
+  await recalculateProductStock(tx, productId, scope);
+
+  return { batchId: createdBatch.id, lot };
 }
 
 /** `quantity / packageContent`, como entero: `receiveFinishedGoods` siempre escribe la cantidad
- *  del asiento `production` como un multiplo exacto del contenido del lote (`planFinishedGoods`),
+ *  del asiento `production` como un multiplo exacto del contenido del lote (`planFinishedGoodsLine`),
  *  asi que la division nunca deja resto. */
 function packagesFromReceipt(quantity: Prisma.Decimal, packageContent: Prisma.Decimal): string {
   const scaledQuantity = BigInt(quantity.toFixed(4).replace('.', ''));

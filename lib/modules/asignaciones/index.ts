@@ -59,6 +59,8 @@ export {
   OrderPackingTakenError,
   OrderNotPackableError,
   OrderProducedFrozenError,
+  OrderBlockedError,
+  OrderWithoutDistributionError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -124,10 +126,15 @@ export {
 // primera linea de los tres casos de uso de escritura de QC-87.
 export { canModifyAssignments } from './domain/actor';
 
+// Si el usuario puede ejecutar sus pedidos asignados; decide la columna «Entrar» sin que `app/**`
+// escriba el codigo del permiso.
+export { canExecuteAssignedOrders } from './domain/actor';
+
 // La Server Action de esta operacion NO se reexporta aqui: un `'use server'` en el cierre de
 // imports volveria este contrato inimportable desde un componente de cliente.
 export { createListAssignedOrders, type ListAssignedOrdersDeps } from './domain/list-assigned-orders';
 export type { AssignedOrderView } from './domain/assigned-order-view';
+export type { OrderDistributionLineView } from './domain/order-distribution-view';
 
 // ---------------------------------------------------------------------------------------
 // La pantalla de ejecucion. Bloque NUEVO al final: no reordena ni reformatea nada
@@ -149,6 +156,7 @@ export {
 export type {
   AssignedOrderExecutionView,
   ExecutionLineView,
+  ExecutionToolView,
 } from './domain/assigned-order-execution-view';
 
 // Que vistas de `/asignacion` puede ver un usuario, solo por permiso. `app/**` compone la
@@ -159,7 +167,7 @@ export {
   type AssignmentViewKind,
 } from './domain/assignment-views';
 
-// La vista «Terminados»: los `ENTREGADO` de toda la empresa, sin filtro por usuario.
+// La vista «Terminados»: los `ENTREGADO` de la empresa; quien no ejecuta solo ve los que empaco.
 export {
   createListFinishedOrders,
   type ListFinishedOrdersDeps,
@@ -190,7 +198,7 @@ export {
 // El empaque: la fila comun y los cuatro casos de uso. Bloque NUEVO al final: no reordena ni
 // reformatea nada de lo de arriba.
 // ---------------------------------------------------------------------------------------
-export type { PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
+export type { PackingOrderDetail, PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
 export { createListPackingOrders, type ListPackingOrdersDeps } from './domain/list-packing-orders';
 export { createGetPackingOrder, type GetPackingOrderDeps } from './domain/get-packing-order';
 export { createStartPacking, type StartPackingDeps } from './domain/start-packing';

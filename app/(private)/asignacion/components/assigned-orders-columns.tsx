@@ -1,7 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
+import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority } from '@/lib/modules/pedidos';
@@ -22,10 +22,12 @@ function MissingValue({ field }: { readonly field: string }) {
   );
 }
 
-export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<'PENDIENTE' | 'EN_CURSO', string>> = {
-  PENDIENTE: 'Pendiente',
-  EN_CURSO: 'En curso',
-};
+export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<AssignedOrderView['status'], string>> =
+  {
+    PENDIENTE: 'Pendiente',
+    EN_CURSO: 'En curso',
+    BLOQUEADO: 'Bloqueado',
+  };
 
 export const ASSIGNED_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
   BAJA: 'Baja',
@@ -43,16 +45,21 @@ export const ASSIGNED_ORDER_STATUS_COLUMN_ID = 'status';
 export const ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
 export const ASSIGNED_ORDER_ENTER_COLUMN_ID = 'enter';
 
-export const ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS: readonly string[] = [
-  ASSIGNED_ORDER_NUMBER_COLUMN_ID,
-];
+export type AssignedOrdersColumnsOptions = {
+  /** Decidido en servidor; sin el, la columna «Entrar» no se emite. */
+  readonly canExecute: boolean;
+};
 
-export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedOrderView>[] {
-  return [
+export function buildAssignedOrdersColumns({
+  canExecute,
+}: AssignedOrdersColumnsOptions): readonly DataTableColumn<AssignedOrderView>[] {
+  const columns: DataTableColumn<AssignedOrderView>[] = [
     {
       id: ASSIGNED_ORDER_NUMBER_COLUMN_ID,
       label: 'Nº de pedido',
       align: 'start',
+      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       cell: (order) => order.numberText,
     },
     {
@@ -66,13 +73,14 @@ export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedO
       id: ASSIGNED_ORDER_QUANTITY_COLUMN_ID,
       label: 'Cantidad',
       align: 'end',
-      cell: (order) => order.quantity,
+      cell: (order) =>
+        order.unitLabel === null ? order.quantity : `${order.quantity} ${order.unitLabel}`,
     },
     {
       id: ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
       label: 'Presentación',
       align: 'start',
-      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
+      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
     },
     {
       id: ASSIGNED_ORDER_PRIORITY_COLUMN_ID,
@@ -101,12 +109,17 @@ export function buildAssignedOrdersColumns(): readonly DataTableColumn<AssignedO
       // Sin `onShowAll`: esta pantalla no tiene panel de edicion donde desplegar el resto.
       cell: (order) => <ResponsibleAvatars responsibles={order.otherResponsibles} />,
     },
-    {
+  ];
+
+  if (canExecute) {
+    columns.push({
       id: ASSIGNED_ORDER_ENTER_COLUMN_ID,
       label: 'Entrar',
       align: 'end',
       pinnable: false,
       cell: (order) => <AssignedOrderEnterTrigger order={order} />,
-    },
-  ];
+    });
+  }
+
+  return columns;
 }

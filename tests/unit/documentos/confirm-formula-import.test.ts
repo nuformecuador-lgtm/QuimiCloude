@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { FORMULA_IMPORT_PERMISSION, type Actor } from '@/lib/modules/documentos/domain/actor';
-import { ValidationError } from '@/lib/modules/documentos/domain/errors';
+import { UnauthorizedError, ValidationError } from '@/lib/modules/documentos/domain/errors';
 import { createConfirmFormulaImport } from '@/lib/modules/documentos/domain/confirm-formula-import';
 import type { FormulaImportDeps } from '@/lib/modules/documentos/domain/preview-formula-import';
 
@@ -76,7 +76,7 @@ function dobleDeRecetas(
   return {
     findRefsIncludingDeleted: vi.fn(async () => {
       bitacora.push('recipes.findRefsIncludingDeleted');
-      return refsIncludingDeleted;
+      return refsIncludingDeleted.map((ref) => ({ ...ref, ownName: ref.name, isUnderReview: false, original: null }));
     }),
     findExecutionContentById: vi.fn(),
     findIdsMatchingName: vi.fn(),
@@ -126,7 +126,7 @@ function dobleDeCreateRecipe(bitacora: Bitacora) {
 function dobleDeUpdateRecipe(bitacora: Bitacora) {
   return vi.fn(async (id: string) => {
     bitacora.push('updateRecipe');
-    return { id, warnings: [] };
+    return { id, warnings: [], propagated: [] };
   });
 }
 
@@ -283,6 +283,39 @@ describe('createConfirmFormulaImport', () => {
 
       expect(deps.createRawMaterial).not.toHaveBeenCalled();
       expect(deps.createRecipe).not.toHaveBeenCalled();
+    });
+
+    it('QC-195 R41 — el producto elegido es un ENVASE: action_not_allowed, cero escrituras', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        products: dobleDeProductos(bitacora, [
+          { id: PRODUCTO_AGUA, name: 'Botella', unitId: null, stockByUnit: [], type: PRODUCT_TYPES.PACKAGING },
+        ]) as unknown as FormulaImportDeps['products'],
+      });
+      const confirm = createConfirmFormulaImport(deps);
+
+      await expect(confirm(actorConPermiso(), entradaBase())).rejects.toBeInstanceOf(ActionNotAllowedError);
+
+      expect(deps.createRawMaterial).not.toHaveBeenCalled();
+      expect(deps.createRecipe).not.toHaveBeenCalled();
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+    });
+
+    it('QC-195 R41 — una materia prima nueva cuyo unico homonimo es un envase no lo reutiliza: crea la suya', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        productNames: dobleDeNombresDeProducto(bitacora, [
+          { id: PRODUCTO_SODA, name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PACKAGING, unitId: null },
+        ]) as unknown as FormulaImportDeps['productNames'],
+      });
+      const confirm = createConfirmFormulaImport(deps);
+
+      const resumen = await confirm(
+        actorConPermiso(),
+        entradaBase({ lines: [filaExistente(PRODUCTO_AGUA, '50.00'), filaNueva('Sosa', '50.00')] }),
+      );
+      expect(deps.createRawMaterial).toHaveBeenCalledWith({ name: 'Sosa' }, expect.anything());
+      expect(resumen.rawMaterialsReused).toBe(0);
     });
 
     it('R27 — el rechazo del producto ocurre ANTES de crear ninguna materia prima nueva', async () => {
@@ -585,5 +618,113 @@ describe('createConfirmFormulaImport', () => {
       expect(segunda.rawMaterialsReused).toBe(1);
       expect(deps.createRawMaterial).toHaveBeenCalledTimes(1);
     });
+  });
+
+  describe('R37 — el choque solo cuenta originales vivas', () => {
+    // El catalogo solo devuelve originales; que una version con ese nombre no vuelva lo prueba
+    // tests/integration/documentos/formula-import-versions.int.test.ts contra Postgres.
+    it('R37: un nombre que solo coincide con una version no choca y confirmar crea una receta original nueva', async () => {
+      const bitacora: Bitacora = [];
+      const recipes = dobleDeRecetas(bitacora, null);
+      const deps = crearDeps(bitacora, { recipes: recipes as unknown as FormulaImportDeps['recipes'] });
+      const confirm = createConfirmFormulaImport(deps);
+
+      const resumen = await confirm(actorConPermiso(), entradaBase({ name: 'Sin perfume' }));
+
+      expect(recipes.findAliveByNormalizedName).toHaveBeenCalledWith('Sin perfume', EMPRESA);
+      expect(deps.updateRecipe).not.toHaveBeenCalled();
+      expect(deps.createRecipe).toHaveBeenCalledTimes(1);
+      const entrada = (deps.createRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(entrada.name).toBe('Sin perfume');
+      // El alta de receta no tiene forma de colgarla de otra: nace original.
+      expect('parentRecipeId' in entrada).toBe(false);
+      expect(resumen.outcome).toBe('created');
+    });
+  });
+});
+
+describe('QC-211 — confirmar con pasos de envasado', () => {
+  const ENVASAR: RecipeStepDocument = { blocks: [{ kind: 'paragraph', spans: [{ text: 'Envasar' }] }] };
+  const ETIQUETAR: RecipeStepDocument = {
+    blocks: [{ kind: 'checklist', items: [{ spans: [{ text: 'Etiqueta puesta' }] }] }],
+  };
+
+  it('R18: crear pasa los pasos de envasado revisados, en orden y separados de `steps`', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora);
+    const confirm = createConfirmFormulaImport(deps);
+
+    await confirm(actorConPermiso(), entradaBase({ packingSteps: [ENVASAR, ETIQUETAR] }));
+
+    const entrada = (deps.createRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(entrada.steps).toEqual([PASO]);
+    expect(entrada.packingSteps).toEqual([ENVASAR, ETIQUETAR]);
+  });
+
+  it('R18: reemplazar sustituye los pasos de envasado por los revisados', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora, {
+      recipes: dobleDeRecetas(bitacora, { id: RECETA_VIVA, name: 'Detergente X' }) as unknown as FormulaImportDeps['recipes'],
+    });
+    const confirm = createConfirmFormulaImport(deps);
+
+    await confirm(actorConPermiso(), entradaBase({ replaceRecipeId: RECETA_VIVA, packingSteps: [ETIQUETAR] }));
+
+    expect(deps.updateRecipe).toHaveBeenCalledWith(
+      RECETA_VIVA,
+      expect.objectContaining({ steps: [PASO], packingSteps: [ETIQUETAR] }),
+      expect.anything(),
+    );
+  });
+
+  it('R18: sin la clave `packingSteps` en la entrada, crea con `packingSteps: []`', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora);
+    const confirm = createConfirmFormulaImport(deps);
+
+    await confirm(actorConPermiso(), entradaBase());
+
+    const entrada = (deps.createRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(entrada.packingSteps).toEqual([]);
+  });
+
+  it('R17: 51 pasos de envasado rechaza la confirmacion entera, sin leer ni escribir', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora);
+    const confirm = createConfirmFormulaImport(deps);
+
+    await expect(
+      confirm(actorConPermiso(), entradaBase({ packingSteps: Array.from({ length: 51 }, () => ENVASAR) })),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(bitacora).toEqual([]);
+  });
+
+  it('R17: un paso de envasado invalido rechaza la confirmacion entera, con su motivo en el diagnostico', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora);
+    const confirm = createConfirmFormulaImport(deps);
+    const pasoVacio = { blocks: [{ kind: 'paragraph', spans: [] }] };
+
+    const error = await confirm(actorConPermiso(), entradaBase({ packingSteps: [ENVASAR, pasoVacio] })).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).diagnostic).toContain('pasos de envasado: invalid');
+    expect(deps.createRawMaterial).not.toHaveBeenCalled();
+    expect(deps.createRecipe).not.toHaveBeenCalled();
+    expect(deps.updateRecipe).not.toHaveBeenCalled();
+  });
+
+  it('R6: sin `recetas.modificar` rechaza con `unauthorized` sin tocar ningun puerto', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora);
+    const confirm = createConfirmFormulaImport(deps);
+    const sinPermiso: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.modificar'] };
+
+    await expect(confirm(sinPermiso, entradaBase({ packingSteps: [ENVASAR] }))).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(bitacora).toEqual([]);
   });
 });

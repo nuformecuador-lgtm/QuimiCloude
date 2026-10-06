@@ -11,6 +11,8 @@
 // 2026-09-03 por decision del humano (R26).
 export { normalizeUnitName } from './domain/unit-name';
 export type { UnitCatalog, UnitId, UnitRef } from './domain/unit-catalog';
+export { PACKAGE_UNIT_NAME } from './domain/package-unit';
+export type { PackageUnitSource } from './domain/package-unit';
 
 // QC-26 (R40-R42): la unica operacion de lectura del catalogo completo, para el
 // selector de unidad del formulario de recetas. El contrato NUNCA reexporta la Server
@@ -55,6 +57,10 @@ export type { DeleteUnitDeps } from './domain/delete-unit';
 export { convertQuantity } from './domain/convert-quantity';
 export type { UnitConversion } from './domain/convert-quantity';
 export { IncompatibleUnitsError } from './domain/errors';
+export { convertWithApproximation } from './domain/convert-with-approximation';
+export type { ConvertedQuantity, MassVolumeBridge } from './domain/convert-with-approximation';
+export { createGetMassVolumeBridge } from './domain/get-mass-volume-bridge';
+export type { GetMassVolumeBridge, GetMassVolumeBridgeDeps } from './domain/get-mass-volume-bridge';
 
 // QC-57 (R27-R29): el listado acepta el contrato generico de consulta y su pagina es OPCIONAL.
 // `isUnitPage` es el discriminante en tiempo de ejecucion de `UnitListResult` -sin consulta se

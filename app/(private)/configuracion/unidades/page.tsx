@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
   UNITS_LABEL,
   UnitListSection,
   UnitListSkeleton,
+  UnitSheet,
   buildUnitListQuery,
   parseUnitListParams,
   type UnitListSearchParams,
@@ -50,6 +52,13 @@ export const metadata: Metadata = {
  *
  * **Aqui no se decide ningun permiso sobre los DATOS** (R14): esa autorizacion la aportan los casos
  * de uso de `unidades`, y esta pantalla no la repite.
+ *
+ * **El catalogo ENTERO de unidades se pide AQUI** (decision humana del 2026-10-02): antes lo pedia
+ * la seccion de lista, pero el disparador del alta ahora vive en esta cabecera -alineado con el
+ * titulo, igual que `inventario/page.tsx`- y necesita el mismo catalogo que el selector de
+ * «deriva de». **Un fallo aqui NO tumba la pantalla**: a diferencia de presentaciones, el catalogo
+ * solo alimenta una columna informativa y un selector, asi que se degrada con gracia -`baseUnits`
+ * queda vacio y el `<h1>` con su disparador se pintan igual-.
  */
 export default async function UnidadesPage({
   searchParams,
@@ -59,7 +68,15 @@ export default async function UnidadesPage({
   await requirePagePermission('unidades.consultar');
   await requirePagePermission('unidades.modificar');
 
-  const params = parseUnitListParams(await searchParams);
+  const [params, catalogResult] = await Promise.all([
+    parseUnitListParams(await searchParams),
+    listUnitsAction(),
+  ]);
+
+  // El degradado declarado: sin catalogo, ni indice ni selector de «deriva de», pero la pantalla
+  // entera -cabecera incluida- se pinta igual (mismo criterio que ya aplicaba la seccion de lista).
+  const catalog = catalogResult.status === 'success' ? catalogResult.data : [];
+  const baseUnits = catalog.filter((unit) => unit.baseUnitId === null);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -67,12 +84,13 @@ export default async function UnidadesPage({
         <h1 data-testid="unidades-title" className="text-2xl font-semibold">
           {UNITS_LABEL}
         </h1>
+        <UnitSheet baseUnits={baseUnits} />
       </div>
       <Suspense
         key={buildUnitListQuery(params)}
         fallback={<UnitListSkeleton rows={params.pageSize} />}
       >
-        <UnitListSection params={params} />
+        <UnitListSection params={params} catalog={catalog} />
       </Suspense>
     </div>
   );

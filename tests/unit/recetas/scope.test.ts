@@ -232,12 +232,25 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // porcentaje, y lo que ve el Operario en la linea de un pedido. VERIFICADO con `readdirSync`
     // antes de darlo de alta: `recetas-porcentaje.spec.ts` cae entre `recetas-pasos.spec.ts` y
     // `recetas.spec.ts`, asi que va en medio de esas dos.
+    //
+    // AMPLIADA de nuevo el 2026-10-02 (QC-172, versiones-de-receta): la lista pasa de CINCO a
+    // SEIS literales, y sigue siendo CERRADA -mismo criterio de siempre: un septimo spec de
+    // recetas sin ficha tiene que seguir poniendo esto en rojo, y por eso NO se convierte en
+    // `toContain` ni en un glob-. El spec que entra lo piden R44 y R30 de
+    // `specs/QC-172-versiones-de-receta/requirements.md`: un pedido hecho con una version de
+    // receta reserva el material de las lineas de la version (A y C) y no el de la original (A y
+    // B). VERIFICADO antes de darlo de alta, no supuesto: ese spec NO pinta ni ejercita la
+    // pantalla de recetas -no navega a `FORMULAS_ROUTE` ni a `recipeEditRoute`; su unica
+    // navegacion es a `ORDERS_ROUTE`- y siembra las recetas y su version por Prisma. El orden es
+    // el que devuelve `readdirSync`, asi que va ULTIMO, tras `recetas.spec.ts`.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
       'aislamiento-recetas.spec.ts', // QC-50 / R31: E2E de aislamiento por empresa
       'ejecucion-receta.spec.ts', // QC-63 / R29, R30: E2E de la ejecucion desde un pedido asignado
       'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
       'recetas-porcentaje.spec.ts', // QC-147 / R22: E2E del porcentaje en lineas de receta
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
+      'versiones-de-receta.spec.ts', // QC-172 / R44, R30: E2E del pedido con version de receta
+      'versiones-en-la-receta.spec.ts', // QC-174 / R38, R6: E2E de versiones en la ficha
     ])
   })
 
@@ -394,6 +407,7 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'nameNormalized',
       'description',
       'steps',
+      'packingSteps',
       'imagePath',
       // QC-50: aislamiento por empresa de esta ficha. `companyId` entra ENTRE `imagePath` y
       // `createdBy`, que es el lugar exacto donde `db/schema.prisma` lo coloco -no al final-,
@@ -404,7 +418,11 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'createdAt',
       'updatedAt',
       'deletedAt',
+      'parentRecipeId',
       'lines',
+      'tools',
+      'parent',
+      'versions',
       '@@index([createdBy], map: "recipes_created_by_idx")',
       '@@index([updatedBy], map: "recipes_updated_by_idx")',
       '@@map("recipes")',
@@ -427,6 +445,19 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       '@@map("recipe_lines")',
     ]
 
+    const EXPECTED_RECIPE_TOOL_FIELDS = [
+      'id',
+      'recipeId',
+      'productId',
+      'quantity',
+      'createdAt',
+      'updatedAt',
+      'recipe',
+      '@@unique([recipeId, productId], map: "recipe_tools_recipe_id_product_id_key")',
+      '@@index([productId], map: "recipe_tools_product_id_idx")',
+      '@@map("recipe_tools")',
+    ]
+
     expect(
       fieldNamesOf(normalizedLines(bodyOfModel('Recipe'))),
       'model Recipe gano, perdio o renombro un campo, indice o restriccion respecto al estado que dejo QC-24',
@@ -435,5 +466,9 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       fieldNamesOf(normalizedLines(bodyOfModel('RecipeLine'))),
       'model RecipeLine gano, perdio o renombro un campo, indice o restriccion respecto al estado que dejo QC-24',
     ).toEqual(EXPECTED_RECIPE_LINE_FIELDS)
+    expect(
+      fieldNamesOf(normalizedLines(bodyOfModel('RecipeTool'))),
+      'model RecipeTool gano, perdio o renombro un campo, indice o restriccion respecto a la migracion recipe_tools',
+    ).toEqual(EXPECTED_RECIPE_TOOL_FIELDS)
   })
 })

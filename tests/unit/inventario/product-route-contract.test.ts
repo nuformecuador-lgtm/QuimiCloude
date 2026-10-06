@@ -3,7 +3,11 @@ import { join, relative } from 'node:path';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
-import { INVENTORY_ROUTE, PRIVATE_ROUTE_PREFIXES } from '@/lib/shared/routes';
+import {
+  INVENTORY_IMPORT_ROUTE,
+  INVENTORY_ROUTE,
+  PRIVATE_ROUTE_PREFIXES,
+} from '@/lib/shared/routes';
 
 /**
  * Contrato de la ruta de inventario: R2, R5, R7, R8, R9, R13, R18, R22, R25, R27, R28, R29, R30,
@@ -93,8 +97,20 @@ function fuentesBajo(carpetaRelativa: string): string[] {
   return encontradas.sort();
 }
 
+// La subruta de importacion es otra pantalla, con su propio contrato en
+// `importar/importar-route-contract.test.ts`; aqui solo se vigila /inventario.
+const CARPETA_SUBRUTA_IMPORTAR = join(
+  'app',
+  '(private)',
+  INVENTORY_IMPORT_ROUTE.replace(/^\//, ''),
+);
+const NOMBRE_SUBRUTA_IMPORTAR = INVENTORY_IMPORT_ROUTE.split('/').pop() as string;
+const PREFIJO_SUBRUTA_IMPORTAR = `${CARPETA_SUBRUTA_IMPORTAR.split('\\').join('/')}/`;
+
 /** Los archivos de la ruta: `page.tsx` y todos los componentes propios. */
-const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
+const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA).filter(
+  (ruta) => !ruta.startsWith(PREFIJO_SUBRUTA_IMPORTAR),
+);
 
 /**
  * El selector de presentacion ya NO vive en la ruta: QC-44 lo promovio a `components/shared/`
@@ -785,6 +801,7 @@ describe('contrato de la ruta de inventario', () => {
     const archivosDeAppRouter = ['page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx'];
     for (const entrada of raizDeLaRuta) {
       if (entrada.isDirectory()) {
+        if (entrada.name === NOMBRE_SUBRUTA_IMPORTAR) continue;
         expect(entrada.name, 'la unica carpeta de la ruta es components/').toBe('components');
         continue;
       }

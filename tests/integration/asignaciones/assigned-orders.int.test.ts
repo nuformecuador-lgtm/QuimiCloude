@@ -29,9 +29,9 @@ import {
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
-  listAliveOrderSummariesByIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
@@ -44,6 +44,9 @@ import {
   inRolledBackTransaction,
   withSavepoint,
 } from './use-case-fixture';
+import { realOrderSummaries } from '../../helpers/order-summaries';
+
+const summaryReaders = realOrderSummaries();
 
 describe('asignaciones · los pedidos de una persona en su empresa (integracion)', () => {
   it('R8: la asignacion de OTRA empresa no vuelve, y no se distingue de una que no existe', async () => {
@@ -244,7 +247,7 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
         assignments: createOrderAssignmentRepository(fixture.tx),
         orders: {
           findAliveById: findAliveOrderTargetById,
-          listAliveSummariesByIds: listAliveOrderSummariesByIds,
+          listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
           listAliveSummariesInCompany: async () => {
             throw new Error('QC-144: listAssignedOrders no lista toda la empresa')
           },
@@ -271,6 +274,14 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           },
         },
         presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+        units: {
+          findRefs: findUnitRefs,
+          listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+          findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
+          findRefsSharingBaseInCompany: async () => {
+            throw new Error('el listado solo resuelve la etiqueta de la unidad del pedido');
+          },
+        },
         people: assignmentDirectoryPrisma,
         now: () => NOW,
       });
@@ -299,18 +310,23 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
         NOW,
       );
 
-      // El actor ES el Empacador: su id es el de la persona asignada, y sus permisos son
-      // EXACTAMENTE los que el seed le declara.
+      // El actor ES la persona asignada, con los permisos que el seed le declara al Empacador mas
+      // `asignaciones.ejecutar`: sin este ultimo la lista sale vacia (R16, abajo).
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,
-        permissions: PERMISOS_DEL_EMPACADOR,
+        permissions: [...PERMISOS_DEL_EMPACADOR, 'asignaciones.ejecutar'],
       };
 
       const pagina = await listAssignedOrders(actorEmpacador, { page: 1 });
 
       expect(pagina.items.map((item) => item.id)).toEqual([pedidoDelEmpacador]);
       expect(pagina.total).toBe(1);
+
+      // R16: con EXACTAMENTE los permisos del Empacador, su pedido PENDIENTE no aparece.
+      const vacia = await listAssignedOrders({ ...actorEmpacador, permissions: PERMISOS_DEL_EMPACADOR }, { page: 1 });
+      expect(vacia.items).toEqual([]);
+      expect(vacia.total).toBe(0);
     });
   });
 });

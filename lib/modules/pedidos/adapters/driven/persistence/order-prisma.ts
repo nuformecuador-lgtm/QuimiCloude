@@ -15,9 +15,15 @@ import { dateRangeCondition, numberRangeCondition, selectCondition } from './lis
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { StoredOrderCost } from '../../../domain/order-cost';
 import type { OrderScope } from '../../../domain/order-scope';
-import type { NewOrder, OrderEdit, OrderRow } from '../../../domain/order-view';
-import type { LockedOrderRow, OrderWriteRepository } from '../../../ports/order-write-repository';
+import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../../../domain/order-view';
+import type {
+  FinishPackingLine,
+  FinishPackingUpdateOutcome,
+  LockedOrderRow,
+  OrderWriteRepository,
+} from '../../../ports/order-write-repository';
 
 /** Cliente global o el transaccional que abra quien llama: los metodos de mas abajo no
  *  distinguen, mismo patron que `createOrderAssignmentRepository`. */
@@ -33,10 +39,9 @@ type PrismaLike = PrismaClient | Prisma.TransactionClient;
  * autores viajan como IDENTIFICADORES en crudo (R46). Por eso QC-33 dejo las FK como escalares
  * sin `@relation`: aqui no hay relacion que navegar ni por descuido.
  *
- * QC-35bis (2026-09-07): `unit_id` y `unit_price` salieron de `orders`
- * (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`), asi que este adaptador ya no
- * los selecciona, no los inserta, no los actualiza, no los ordena y no los filtra. La FK hacia
- * `units` cayo con la columna.
+ * `unit_price` sigue fuera de `orders` desde 2026-09-07: este adaptador no lo
+ * selecciona, no lo inserta, no lo actualiza, no lo ordena y no lo filtra. `unit_id` SI volvio
+ * y la cantidad se interpreta siempre en esa unidad, con o sin reparto.
  *
  * `deleted_at IS NULL` va en el `where` de TODA lectura y de TODA escritura `…Alive`, nunca
  * en un `if` posterior (R40): el filtro es del puerto, y por eso ningun caso de uso puede
@@ -68,8 +73,11 @@ const ORDER_SELECT = {
   updatedAt: true,
   createdBy: true,
   updatedBy: true,
-  presentationId: true,
-  presentationContent: true,
+  unitId: true,
+  presentationLines: {
+    select: { presentationId: true, packages: true, packagingProductId: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
 } satisfies Prisma.OrderSelect;
 
 type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
@@ -77,6 +85,16 @@ type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
 /** Cadena decimal(14,4) del puerto -> `Prisma.Decimal` para escribir. */
 export function toDecimalInput(value: string): Prisma.Decimal {
   return new Prisma.Decimal(value);
+}
+
+/** Las dos columnas del importe van siempre juntas: el CHECK
+ *  `orders_packaging_cost_matches_ingredients_cost` rechaza una sin la otra. */
+function costColumns(cost: StoredOrderCost | null): {
+  ingredientsCost: Prisma.Decimal | null;
+  packagingCost: Prisma.Decimal | null;
+} {
+  if (cost === null) return { ingredientsCost: null, packagingCost: null };
+  return { ingredientsCost: toDecimalInput(cost.total), packagingCost: toDecimalInput(cost.packaging) };
 }
 
 /** `Prisma.Decimal` de una lectura -> cadena con la escala EXACTA de la columna. */
@@ -103,8 +121,12 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
-    presentationId: row.presentationId,
-    presentationContent: row.presentationContent === null ? null : fromDecimal(row.presentationContent),
+    unitId: row.unitId,
+    presentationLines: row.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      packages: line.packages,
+      packagingProductId: line.packagingProductId,
+    })),
   };
 }
 
@@ -404,6 +426,48 @@ export async function listAliveOrders(
 }
 
 /**
+ * Reemplazo COMPLETO del reparto de un pedido: borra las lineas vigentes e
+ * inserta las nuevas, dentro de la MISMA transaccion que escribe el pedido. `[]` deja el pedido
+ * sin ninguna linea, y es un caso valido -no todo pedido tiene que repartirse ya-.
+ *
+ * El ambito viaja como `scope: OrderScope`, no como `companyId` suelto: la empresa que se
+ * escribe en cada linea nueva sale de `companyScopeColumns(scope)`, igual que el resto del
+ * archivo, nunca de un parametro que un llamante pudiera fabricar aparte.
+ */
+async function replacePresentationLines(
+  tx: PrismaLike,
+  orderId: string,
+  scope: OrderScope,
+  lines: readonly OrderPresentationLineWrite[],
+  now: Date,
+): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+  // El `company_id` en el `WHERE` es defensa en profundidad: quien llama ya releyo o
+  // escribio la fila de `orders` bajo el mismo ambito, pero ninguna sentencia cruda de este
+  // archivo filtra por id sin nombrar tambien la empresa.
+  await tx.$executeRaw(
+    Prisma.sql`DELETE FROM "order_presentation_lines" WHERE "order_id" = ${orderId}::uuid AND "company_id" = ${companyId}::uuid`,
+  );
+  for (const line of lines) {
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "order_presentation_lines" (
+        "order_id", "company_id", "presentation_id", "packages", "presentation_content",
+        "packaging_product_id", "created_at", "updated_at"
+      ) VALUES (
+        ${orderId}::uuid,
+        ${companyId}::uuid,
+        ${line.presentationId}::uuid,
+        ${line.packages}::integer,
+        ${line.content === null ? null : toDecimalInput(line.content)}::numeric,
+        ${line.packagingProductId}::uuid,
+        ${now}::timestamptz,
+        ${now}::timestamptz
+      )
+    `);
+  }
+}
+
+/**
  * `updateAlive` (R6, R20, R33, R40).
  *
  * El AMBITO viaja EN EL `where`, junto a `deletedAt: null`: un pedido de otra empresa no se
@@ -422,13 +486,18 @@ export async function listAliveOrders(
  *
  * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`: la edicion recalcula, y
  * el valor nuevo reemplaza al anterior aunque sea `null`.
+ *
+ * `presentationId`/`presentationContent` de la fila YA NO SE ESCRIBEN: el
+ * reparto vive en `order_presentation_lines` (`replacePresentationLines`, misma transaccion) y
+ * la columna se retira de `orders` en una migracion aparte -hasta entonces, sencillamente se
+ * deja de tocar-. `unit_id` ocupa su lugar como dato propio del pedido.
  */
 export async function updateAliveOrder(
   id: string,
   data: OrderEdit,
   actorId: string,
   now: Date,
-  ingredientsCost: string | null,
+  cost: StoredOrderCost | null,
   scope: OrderScope,
   tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
@@ -438,15 +507,42 @@ export async function updateAliveOrder(
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
-      ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
+      ...costColumns(cost),
       updatedAt: now,
       updatedBy: actorId,
-      presentationId: data.presentationId,
-      presentationContent:
-        data.presentationContent === null ? null : toDecimalInput(data.presentationContent),
+      unitId: data.unitId,
     },
   });
-  return count === 1 ? 'ok' : 'not_found';
+  if (count !== 1) return 'not_found';
+
+  await replacePresentationLines(tx, id, scope, data.presentationLines, now);
+  return 'ok';
+}
+
+/**
+ * `updatePresentationLinesAlive`: escribe SOLO `unit_id` y el reparto.
+ * A diferencia de `updateAliveOrder`, `data` no lleva `quantity`, `recipeId` ni `priority` -el
+ * TIPO de este metodo no puede ni expresarlos-, asi que esta sentencia no puede escribirlos ni
+ * por accidente. Sin filtro de `status` en el `where`: quien llama ya bloqueo la fila con
+ * `lockAliveById` en la MISMA transaccion y ya comprobo `REPARTO_EDITABLE_STATUSES` sobre ella.
+ */
+async function updatePresentationLinesAliveOrder(
+  id: string,
+  unitId: string,
+  lines: readonly OrderPresentationLineWrite[],
+  actorId: string,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<'ok' | 'not_found'> {
+  const { count } = await tx.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    data: { unitId, updatedAt: now, updatedBy: actorId },
+  });
+  if (count !== 1) return 'not_found';
+
+  await replacePresentationLines(tx, id, scope, lines, now);
+  return 'ok';
 }
 
 /**
@@ -514,7 +610,11 @@ export async function softDeleteAliveOrder(
 /** Fila minima del bloqueo: el identificador para saber que la fila existia, era viva y de esta
  *  empresa, y `reserved_at` para que quien recomprueba el plazo bajo el candado no pida una
  *  segunda lectura; el resto de columnas se relee con la API tipada. */
-type LockedOrderIdRow = { readonly id: string; readonly reserved_at: Date | null };
+type LockedOrderIdRow = {
+  readonly id: string;
+  readonly reserved_at: Date | null;
+  readonly packaging_cost: string | null;
+};
 
 /**
  * `lockAliveById` de `OrderWriteRepository`: `SELECT ... FOR UPDATE` de un pedido vivo, con el
@@ -528,7 +628,7 @@ async function lockAliveOrderById(
 ): Promise<LockedOrderRow | null> {
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<LockedOrderIdRow>>(Prisma.sql`
-    SELECT "id", "reserved_at"
+    SELECT "id", "reserved_at", "packaging_cost"::text AS "packaging_cost"
       FROM "orders"
      WHERE "id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -539,7 +639,12 @@ async function lockAliveOrderById(
   if (alive === undefined) return null;
 
   const row = await tx.order.findUnique({ where: { id: alive.id }, select: ORDER_SELECT });
-  return row === null ? null : { ...toOrderRow(row), reservedAt: alive.reserved_at };
+  if (row === null) return null;
+  return {
+    ...toOrderRow(row),
+    reservedAt: alive.reserved_at,
+    packagingCost: alive.packaging_cost === null ? null : fromDecimal(toDecimalInput(alive.packaging_cost)),
+  };
 }
 
 /**
@@ -555,7 +660,7 @@ async function insertAliveOrder(
   year: number,
   actorId: string,
   now: Date,
-  ingredientsCost: string | null,
+  cost: StoredOrderCost | null,
   scope: OrderScope,
 ): Promise<OrderRow> {
   const { companyId } = companyScopeColumns(scope);
@@ -568,8 +673,8 @@ async function insertAliveOrder(
   const filas = await tx.$queryRaw<readonly CreatedOrderRow[]>(Prisma.sql`
     INSERT INTO "orders" (
       "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
-      "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
-      "updated_at", "presentation_id", "presentation_content"
+      "priority", "status", "ingredients_cost", "packaging_cost", "created_by", "updated_by",
+      "created_at", "updated_at", "unit_id"
     ) VALUES (
       ${companyId}::uuid,
       ${year}::integer,
@@ -581,13 +686,13 @@ async function insertAliveOrder(
       ${data.quantity}::numeric,
       ${data.priority}::"OrderPriority",
       ${data.status}::"OrderStatus",
-      ${ingredientsCost}::numeric,
+      ${cost?.total ?? null}::numeric,
+      ${cost?.packaging ?? null}::numeric,
       ${actorId}::uuid,
       ${actorId}::uuid,
       ${now}::timestamptz,
       ${now}::timestamptz,
-      ${data.presentationId}::uuid,
-      ${data.presentationContent}::numeric
+      ${data.unitId}::uuid
     )
     RETURNING "id", "order_year", "order_sequence"
   `);
@@ -599,6 +704,10 @@ async function insertAliveOrder(
     throw new Error('El INSERT de pedido no devolvio ninguna fila.');
   }
 
+  // Las lineas del reparto nacen en la MISMA transaccion que el pedido: no hay
+  // conjunto previo que borrar -es un `INSERT` de alta, no un reemplazo-.
+  await replacePresentationLines(tx, row.id, scope, data.presentationLines, now);
+
   return {
     id: row.id,
     number: { year: Number(row.order_year), sequence: Number(row.order_sequence) },
@@ -607,14 +716,17 @@ async function insertAliveOrder(
     priority: data.priority,
     status: data.status,
     cancellationReason: null,
-    ingredientsCost: ingredientsCost === null ? null : fromDecimal(toDecimalInput(ingredientsCost)),
+    ingredientsCost: cost === null ? null : fromDecimal(toDecimalInput(cost.total)),
     createdAt: now,
     updatedAt: now,
     createdBy: actorId,
     updatedBy: actorId,
-    presentationId: data.presentationId,
-    presentationContent:
-      data.presentationContent === null ? null : fromDecimal(toDecimalInput(data.presentationContent)),
+    unitId: data.unitId,
+    presentationLines: data.presentationLines.map((line) => ({
+      presentationId: line.presentationId,
+      packages: line.packages,
+      packagingProductId: line.packagingProductId,
+    })),
   };
 }
 
@@ -631,7 +743,7 @@ async function setAliveOrderStatus(
   id: string,
   from: OrderStatus,
   to: OrderStatus,
-  actorId: string,
+  actorId: string | null,
   now: Date,
   scope: OrderScope,
   tx: PrismaLike,
@@ -654,6 +766,23 @@ async function setAliveOrderStatus(
   return stillAlive === null ? 'not_found' : 'stale';
 }
 
+/** `setIngredientsCost` de `OrderWriteRepository`: solo el importe, su parte de envases y el sello
+ *  de modificacion. */
+async function setAliveOrderIngredientsCost(
+  id: string,
+  cost: StoredOrderCost | null,
+  actorId: string | null,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<'ok' | 'not_found'> {
+  const { count } = await tx.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    data: { ...costColumns(cost), updatedAt: now, updatedBy: actorId },
+  });
+  return count === 1 ? 'ok' : 'not_found';
+}
+
 /**
  * `setReservedAt` de `OrderWriteRepository`. `$executeRaw` y no la API tipada: un `update` de
  * Prisma siempre mueve `updated_at` con `@updatedAt`, y apartar o liberar material no es una
@@ -673,6 +802,17 @@ async function setOrderReservedAt(
        AND "company_id" = ${companyId}::uuid
        AND "deleted_at" IS NULL
   `);
+}
+
+/** `findBlockedIds`: el filtro y el orden coinciden con el indice parcial
+ *  `orders_blocked_company_created_idx`. */
+export async function findBlockedOrderIds(scope: OrderScope): Promise<readonly string[]> {
+  const rows = await prisma.order.findMany({
+    where: { AND: [orderCompanyScope(scope), { status: 'BLOQUEADO', deletedAt: null }] },
+    select: { id: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+  return rows.map((row) => row.id);
 }
 
 /**
@@ -734,14 +874,17 @@ export async function findExpirableOrders(
 export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteRepository {
   return {
     lockAliveById: (id, scope) => lockAliveOrderById(id, scope, tx),
-    create: (data, year, actorId, now, ingredientsCost, scope) =>
-      insertAliveOrder(tx, data, year, actorId, now, ingredientsCost, scope),
-    updateAlive: (id, data, actorId, now, ingredientsCost, scope) =>
-      updateAliveOrder(id, data, actorId, now, ingredientsCost, scope, tx),
+    create: (data, year, actorId, now, cost, scope) => insertAliveOrder(tx, data, year, actorId, now, cost, scope),
+    updateAlive: (id, data, actorId, now, cost, scope) => updateAliveOrder(id, data, actorId, now, cost, scope, tx),
     cancelAlive: (id, reason, actorId, now, scope) => cancelAliveOrder(id, reason, actorId, now, scope, tx),
     softDeleteAlive: (id, actorId, now, scope) => softDeleteAliveOrder(id, actorId, now, scope, tx),
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
+    setIngredientsCost: (id, cost, actorId, now, scope) => setAliveOrderIngredientsCost(id, cost, actorId, now, scope, tx),
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
+    updatePresentationLinesAlive: (id, unitId, lines, actorId, now, scope) =>
+      updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),
+    finishPackingAlive: (id, packerId, now, scope) => finishPackingAliveOrder(id, packerId, now, scope, tx),
+    findPresentationLinesForFinish: (id, scope) => findPresentationLinesForFinishOrder(id, scope, tx),
   };
 }
 
@@ -752,59 +895,149 @@ type PackingStatusRow = { readonly status: OrderStatus; readonly packedBy: strin
 async function findAlivePackingStatus(
   id: string,
   scope: OrderScope,
+  tx: PrismaLike = prisma,
 ): Promise<PackingStatusRow | null> {
-  return prisma.order.findFirst({
+  return tx.order.findFirst({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     select: { status: true, packedBy: true },
   });
 }
 
+/** Fila minima del `SELECT ... FOR UPDATE` de Comenzar: lo que hace falta para clasificar el
+ *  resultado sin una segunda lectura, aparte del conteo de lineas. */
+type LockedPackingStatusRow = { readonly status: OrderStatus; readonly packed_by: string | null };
+
 /**
- * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar): un `UPDATE` condicional
- * `WHERE status = 'POR_EMPACAR'`. `count = 1` es el unico camino de exito; cualquier otro caso
- * relee la fila para distinguir «no existe» de «ya la tiene otro» de «ya es mia» de «no admite
- * Comenzar».
+ * Implementa `OrderPackingRepository['startPackingAlive']` (Comenzar): transaccion CORTA con
+ * `SELECT ... FOR UPDATE` de la fila, y solo con ella bloqueada se
+ * cuenta el reparto -en una sentencia NUEVA, para que la cuenta vea lo que confirmo un guardado
+ * del reparto que esperaba el MISMO bloqueo (`updateOrderPresentationLines` toma el mismo `FOR
+ * UPDATE`, asi que las dos escrituras se serializan)- y solo entonces se escribe. Se descarta un
+ * `EXISTS` dentro del `WHERE` del `UPDATE`: al reevaluar tras esperar el bloqueo, Postgres relee
+ * `orders` pero la subconsulta sobre `order_presentation_lines` puede seguir usando la foto del
+ * inicio de la sentencia, y un guardado que vacio el reparto dejaria Comenzar
+ * empacando un pedido con cero lineas.
  */
 export async function startPackingAliveOrder(
   id: string,
   packerId: string,
   now: Date,
   scope: OrderScope,
-): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
-    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_EMPACAR' }] },
-    data: { status: 'EN_EMPAQUE', packedBy: packerId, updatedAt: now, updatedBy: packerId },
-  });
-  if (count === 1) return 'ok';
+): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'> {
+  const { companyId } = companyScopeColumns(scope);
 
-  const row = await findAlivePackingStatus(id, scope);
-  if (row === null) return 'not_found';
-  if (row.status === 'EN_EMPAQUE') return row.packedBy === packerId ? 'already_mine' : 'taken';
-  return 'not_packable';
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<ReadonlyArray<LockedPackingStatusRow>>(Prisma.sql`
+      SELECT "status", "packed_by"
+        FROM "orders"
+       WHERE "id" = ${id}::uuid
+         AND "company_id" = ${companyId}::uuid
+         AND "deleted_at" IS NULL
+         FOR UPDATE
+    `);
+    const locked = rows[0];
+    if (locked === undefined) return 'not_found';
+
+    if (locked.status !== 'POR_EMPACAR') {
+      if (locked.status === 'EN_EMPAQUE') {
+        return locked.packed_by === packerId ? 'already_mine' : 'taken';
+      }
+      return 'not_packable';
+    }
+
+    // Sentencia NUEVA, tras el bloqueo: cuenta las lineas vigentes del reparto.
+    const [conteo] = await tx.$queryRaw<ReadonlyArray<{ total: bigint }>>(Prisma.sql`
+      SELECT count(*)::bigint AS total
+        FROM "order_presentation_lines"
+       WHERE "order_id" = ${id}::uuid
+         AND "company_id" = ${companyId}::uuid
+    `);
+    if (conteo === undefined || conteo.total === BigInt(0)) return 'without_distribution';
+
+    const { count } = await tx.order.updateMany({
+      where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_EMPACAR' }] },
+      data: { status: 'EN_EMPAQUE', packedBy: packerId, updatedAt: now, updatedBy: packerId },
+    });
+    // La fila sigue bloqueada desde el `SELECT ... FOR UPDATE` de arriba, en la MISMA
+    // transaccion: ninguna otra conexion pudo moverla entre la lectura y esta escritura.
+    return count === 1 ? 'ok' : 'not_packable';
+  });
 }
 
 /**
- * Implementa `OrderPackingRepository['finishPackingAlive']` (Terminar): el `UPDATE` condicional
- * exige ademas `packed_by = packerId`, y escribe `finished_at` en la MISMA sentencia que el
- * estado. Cualquier caso que no mueva la fila relee para distinguir «no existe» de «lo tiene
- * otro empacador» de «no admite Terminar».
+ * Implementa `OrderWriteRepository['finishPackingAlive']` (Terminar): el `UPDATE`
+ * condicional exige ademas `packed_by = packerId`, y escribe
+ * `finished_at` en la MISMA sentencia que el estado. Corre sobre `tx` -la transaccion
+ * compartida de `OrderUnitOfWork`, no el cliente global- para que el alta de los lotes que hace
+ * el dominio despues comparta la MISMA transaccion y un fallo posterior deshaga tambien este
+ * `UPDATE`. Si `count === 1`, relee la receta/cantidad/coste guardado que Terminar necesita, ya
+ * de esta transaccion -la fila sigue bloqueada desde el `UPDATE` de arriba, ninguna otra
+ * conexion pudo moverla-; si no, relee para clasificar «no existe» de «lo tiene otro empacador»
+ * de «no admite Terminar».
  */
-export async function finishPackingAliveOrder(
+async function finishPackingAliveOrder(
   id: string,
   packerId: string,
   now: Date,
   scope: OrderScope,
-): Promise<'ok' | 'not_packer' | 'not_packable' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
+  tx: PrismaLike,
+): Promise<FinishPackingUpdateOutcome> {
+  const { count } = await tx.order.updateMany({
     where: {
       AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'EN_EMPAQUE', packedBy: packerId }],
     },
     data: { status: 'ENTREGADO', finishedAt: now, updatedAt: now, updatedBy: packerId },
   });
-  if (count === 1) return 'ok';
+  if (count === 1) {
+    const row = await tx.order.findUniqueOrThrow({
+      where: { id },
+      select: { recipeId: true, quantity: true, ingredientsCost: true, unitId: true },
+    });
+    return {
+      kind: 'ok',
+      recipeId: row.recipeId,
+      quantity: fromDecimal(row.quantity),
+      ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
+      unitId: row.unitId,
+    };
+  }
 
-  const row = await findAlivePackingStatus(id, scope);
-  if (row === null) return 'not_found';
-  if (row.status === 'EN_EMPAQUE' && row.packedBy !== packerId) return 'not_packer';
-  return 'not_packable';
+  const row = await findAlivePackingStatus(id, scope, tx);
+  if (row === null) return { kind: 'not_found' };
+  if (row.status === 'EN_EMPAQUE' && row.packedBy !== packerId) return { kind: 'not_packer' };
+  return { kind: 'not_packable' };
+}
+
+/** Fila cruda de una linea del reparto para Terminar el empaque: `FOR SHARE`, en el
+ *  orden de alta, dentro de la MISMA transaccion que el `UPDATE` de `finishPackingAliveOrder`. */
+type FinishPackingLineRow = {
+  readonly id: string;
+  readonly presentation_id: string;
+  readonly packages: number;
+  readonly presentation_content: string | null;
+  readonly packaging_product_id: string | null;
+};
+
+async function findPresentationLinesForFinishOrder(
+  id: string,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<readonly FinishPackingLine[]> {
+  const { companyId } = companyScopeColumns(scope);
+  const rows = await tx.$queryRaw<ReadonlyArray<FinishPackingLineRow>>(Prisma.sql`
+    SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content",
+           "packaging_product_id"
+      FROM "order_presentation_lines"
+     WHERE "order_id" = ${id}::uuid
+       AND "company_id" = ${companyId}::uuid
+     ORDER BY "created_at" ASC, "id" ASC
+     FOR SHARE
+  `);
+  return rows.map((row) => ({
+    id: row.id,
+    presentationId: row.presentation_id,
+    packages: row.packages,
+    presentationContent: row.presentation_content,
+    packagingProductId: row.packaging_product_id,
+  }));
 }

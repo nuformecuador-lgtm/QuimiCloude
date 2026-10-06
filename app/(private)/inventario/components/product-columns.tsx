@@ -77,24 +77,10 @@ export const IMAGE_COLUMN_LABEL = 'Imagen';
 export const ACTIONS_COLUMN_LABEL = 'Acciones';
 
 /**
- * Columnas que nacen fijadas al borde izquierdo. Es un **defecto**: en cuanto el usuario tenga
- * preferencia guardada para este `tableId` gana la suya, incluida la de no tener nada fijado.
- *
- * Se fija la miniatura y no el nombre porque es la que identifica la fila de un vistazo y la que
- * menos ancho ocupa.
- */
-export const PRODUCT_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_ID];
-
-/** `null` no tiene cifra exacta que anunciar: el `aria-label` queda sin poner. */
-function decimalAriaLabel(value: string | null): string | undefined {
-  return value === null ? undefined : trimDecimal(value);
-}
-
-/**
  * Etiqueta de una unidad a partir de su id: simbolo, nombre, o el marcador si el catalogo no la
  * trae. Sin catalogo (`units` indefinido), devuelve `null` y quien llama pinta la cantidad sola.
  */
-function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined): string | null {
+export function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined): string | null {
   if (units === undefined) return null;
   const unit = units.find((candidate) => candidate.id === unitId);
   return unit?.symbol ?? unit?.name ?? EMPTY_CELL;
@@ -108,7 +94,7 @@ function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined)
  * COMO CAMPO DEL ESQUEMA -no puede existir una columna derivada de bajo de existencias-. Aqui es
  * una funcion de presentacion en un archivo de UI, que es justo lo que esa prohibicion deja vivo.
  */
-function isBelowAlert(product: ProductView): boolean {
+export function isBelowAlert(product: ProductView): boolean {
   return typeof product.qtyAlert === 'string' && compareQuantities(product.qtyAlert, product.stock) > 0;
 }
 
@@ -126,65 +112,59 @@ export function productUnitLabel(
 }
 
 /**
- * Existencia guardada junto a la unidad del producto, o solo el numero sin unidad ni catalogo.
+ * Una existencia junto a su unidad, tenida de rojo cuando esta en alarma.
  *
- * El numero se pinta a dos decimales (`formatDecimalDisplay`): la celda no es donde se vuelve a
- * guardar, y cuatro decimales de relleno no informan de nada.
+ * Se pinta a dos decimales: la celda no es donde se vuelve a guardar. El `aria-label` lleva la
+ * cifra exacta. `data-alert` acompana a la clase para que la alarma sea afirmable sin depender
+ * del nombre de una utilidad de Tailwind.
  */
-function existenceLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
-  const label = productUnitLabel(product, units);
-  const amount = formatDecimalDisplay(product.stock);
-  return label === null ? amount : `${amount} ${label}`;
-}
-
-/** Cifra exacta de la existencia para quien no puede quedarse con el redondeo del pixel. */
-function existenceAriaLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
-  const label = productUnitLabel(product, units);
-  const amount = trimDecimal(product.stock);
-  return label === null ? amount : `${amount} ${label}`;
-}
-
-/** «nombre · unidad», o solo el nombre sin unidad o sin catalogo. */
-function nameCell(product: ProductView, units: readonly UnitRef[] | undefined): string {
-  return productDisplayName(product.name, productUnitLabel(product, units));
-}
-
-/**
- * La existencia, tenida de rojo cuando esta en alarma.
- *
- * La alarma es de la CELDA, no de la fila: solo se tine el valor que la dispara. `data-alert`
- * acompana a la clase para que la condicion sea afirmable sin depender del nombre de una utilidad
- * de Tailwind.
- */
-function stockCell(product: ProductView, units: readonly UnitRef[] | undefined): ReactNode {
-  const alerted = isBelowAlert(product);
+export function stockAmountCell(stock: string, label: string | null, alerted: boolean): ReactNode {
+  const amount = formatDecimalDisplay(stock);
+  const exact = trimDecimal(stock);
 
   return (
     <span
       data-testid="product-stock"
       data-alert={alerted ? 'true' : undefined}
       className={alerted ? 'font-semibold text-destructive' : undefined}
-      title={exactDecimalTitle(product.stock)}
-      aria-label={existenceAriaLabel(product, units)}
+      title={exactDecimalTitle(stock)}
+      aria-label={label === null ? exact : `${exact} ${label}`}
     >
-      {existenceLabel(product, units)}
+      {label === null ? amount : `${amount} ${label}`}
+    </span>
+  );
+}
+
+function stockCell(product: ProductView, units: readonly UnitRef[] | undefined): ReactNode {
+  return stockAmountCell(product.stock, productUnitLabel(product, units), isBelowAlert(product));
+}
+
+/** Una cantidad en la unidad del producto; sin unidad conocida, la cifra sola. */
+function productQuantityCell(
+  value: string,
+  testId: string,
+  product: ProductView,
+  units: readonly UnitRef[] | undefined,
+): ReactNode {
+  const label = productUnitLabel(product, units);
+  const amount = formatDecimalDisplay(value);
+  const exact = trimDecimal(value);
+
+  return (
+    <span
+      data-testid={testId}
+      title={exactDecimalTitle(value)}
+      aria-label={label === null ? exact : `${exact} ${label}`}
+    >
+      {label === null ? amount : `${amount} ${label}`}
     </span>
   );
 }
 
 /** La alerta de cantidad, opcional: sin valor pinta el marcador de vacio, sin `title` ni `aria-label`. */
-function qtyAlertCell(product: ProductView): ReactNode {
+export function qtyAlertCell(product: ProductView, units: readonly UnitRef[] | undefined): ReactNode {
   if (product.qtyAlert === null) return EMPTY_CELL;
-
-  return (
-    <span
-      data-testid="product-qty-alert"
-      title={exactDecimalTitle(product.qtyAlert)}
-      aria-label={decimalAriaLabel(product.qtyAlert)}
-    >
-      {formatDecimalDisplay(product.qtyAlert)}
-    </span>
-  );
+  return productQuantityCell(product.qtyAlert, 'product-qty-alert', product, units);
 }
 
 /**
@@ -200,20 +180,7 @@ function aggregateQuantityCell(
   units: readonly UnitRef[] | undefined,
 ): ReactNode {
   if (value === undefined) return EMPTY_CELL;
-
-  const label = productUnitLabel(product, units);
-  const amount = formatDecimalDisplay(value);
-  const exact = trimDecimal(value);
-
-  return (
-    <span
-      data-testid={testId}
-      title={exactDecimalTitle(value)}
-      aria-label={label === null ? exact : `${exact} ${label}`}
-    >
-      {label === null ? amount : `${amount} ${label}`}
-    </span>
-  );
+  return productQuantityCell(value, testId, product, units);
 }
 
 export type ProductColumnsDeps = {
@@ -235,6 +202,9 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       id: IMAGE_COLUMN_ID,
       label: IMAGE_COLUMN_LABEL,
       align: 'start',
+      // Nace fijada: es la que identifica la fila de un vistazo y la que menos ancho ocupa.
+      // Es un defecto, con preferencia guardada gana la del usuario.
+      defaultPinned: 'left',
       // La miniatura sale de `products.image_path`. Hoy esa columna esta vacia en todas las
       // filas -nada la llena todavia-, asi que lo que se ve es el marcador; ese caso NO es un
       // hueco: es el estado normal por ahora.
@@ -247,12 +217,14 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       label: 'Nombre',
       align: 'start',
       sortable: true,
-      cell: (product) => nameCell(product, units),
+      width: 500,
+      hideText: false,
+      cell: (product) => product.name
     },
     {
       id: 'stock',
       label: 'Existencia',
-      align: 'end',
+      align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (product) => stockCell(product, units),
@@ -260,22 +232,22 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
-      align: 'end',
+      align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (product) => qtyAlertCell(product),
+      cell: (product) => qtyAlertCell(product, units),
     },
     {
       id: 'reserved',
       label: 'Reservado',
-      align: 'end',
+      align: 'center',
       // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
       cell: (product) => aggregateQuantityCell(product.reserved, 'product-reserved', product, units),
     },
     {
       id: 'available',
       label: 'Disponible',
-      align: 'end',
+      align: 'center',
       cell: (product) => aggregateQuantityCell(product.available, 'product-available', product, units),
     },
     {
@@ -283,7 +255,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       label: ACTIONS_COLUMN_LABEL,
       align: 'end',
       // No ordena, no filtra y no se fija: no es un dato de la fila.
-      pinnable: false,
+      defaultPinned: 'right',
       cell: (product) => <div className="flex justify-end gap-1">{rowActions(product)}</div>,
     },
   ];

@@ -261,6 +261,7 @@ const DISCRIMINANTES_DE_RESULTADO = [
   'duplicate_name',
   'group_not_found',
   'member_not_found',
+  'not_admitted',
   'not_found',
   'user_not_found',
 ] as const;

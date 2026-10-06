@@ -104,6 +104,7 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
   const TABLA: readonly (readonly [OrderStatus | 'no existe', string])[] = [
     ['PENDIENTE', 'sin error'],
     ['EN_CURSO', 'sin error'],
+    ['BLOQUEADO', 'sin error'],
     ['POR_EMPACAR', 'order_produced_frozen'],
     ['EN_EMPAQUE', 'order_produced_frozen'],
     ['ENTREGADO', 'order_delivered_frozen'],
@@ -119,14 +120,27 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     });
   }
 
-  it('los dos estados que admiten escritura SI llegan al puerto de escritura (R9)', async () => {
-    for (const status of ['PENDIENTE', 'EN_CURSO'] as const) {
+  it('los TRES estados que admiten escritura SI llegan al puerto de escritura (R9, R33)', async () => {
+    for (const status of ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const) {
       const { deps, assignments } = montar({ id: PEDIDO, status });
       await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).resolves.toEqual({
         added: 1,
       });
-      expect(assignments.insertMissing).toHaveBeenCalledTimes(1);
+      expect(assignments.insertMissing, status).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('R33: un BLOQUEADO admite la escritura de responsables, sin que eso lo vuelva arrancable', async () => {
+    // Se le puede poner responsable a un pedido que todavia no tiene material: quien lo asigne no
+    // lo va a poder iniciar hasta que entren lotes, y eso lo rechazan otros casos de uso, con otro
+    // error. Aqui lo que se afirma es que la escritura de responsables SI pasa y llega al puerto.
+    const { deps, assignments } = montar({ id: PEDIDO, status: 'BLOQUEADO' });
+
+    await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).resolves.toEqual({
+      added: 1,
+    });
+    expect(assignments.insertMissing).toHaveBeenCalledTimes(1);
+    expect(assignments.deleteOne).not.toHaveBeenCalled();
   });
 
   it('los estados que NO admiten escritura no tocan el puerto de escritura (R10, R11, R8, R33)', async () => {
@@ -200,10 +214,10 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     /**
      * El mapa de `order-state.ts` es TOTAL sobre `OrderStatus` (`satisfies Record<...>`), asi que
      * un estado nuevo en QC-34 rompe el TYPECHECK en vez de colarse como «admitida». Aqui se
-     * comprueba lo unico que un test en tiempo de ejecucion puede comprobar: que los SEIS
+     * comprueba lo unico que un test en tiempo de ejecucion puede comprobar: que los SIETE
      * estados que hoy existen estan clasificados, ninguno de ellos por defecto.
      */
-    it('los seis estados de hoy estan clasificados, ninguno por descuido (R33)', () => {
+    it('R35: los siete estados de hoy estan clasificados, ninguno por descuido (R33)', () => {
       const clasificado = (status: OrderStatus): 'admite' | string => {
         try {
           assertOrderAcceptsWrites({ id: PEDIDO, status });
@@ -216,6 +230,7 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
       expect({
         PENDIENTE: clasificado('PENDIENTE'),
         EN_CURSO: clasificado('EN_CURSO'),
+        BLOQUEADO: clasificado('BLOQUEADO'),
         POR_EMPACAR: clasificado('POR_EMPACAR'),
         EN_EMPAQUE: clasificado('EN_EMPAQUE'),
         ENTREGADO: clasificado('ENTREGADO'),
@@ -223,6 +238,7 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
       }).toEqual({
         PENDIENTE: 'admite',
         EN_CURSO: 'admite',
+        BLOQUEADO: 'admite',
         POR_EMPACAR: 'order_produced_frozen',
         EN_EMPAQUE: 'order_produced_frozen',
         ENTREGADO: 'order_delivered_frozen',

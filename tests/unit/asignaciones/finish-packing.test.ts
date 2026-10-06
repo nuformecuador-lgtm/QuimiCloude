@@ -4,9 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { createFinishPacking, type FinishPackingDeps } from '@/lib/modules/asignaciones/domain/finish-packing';
 import {
   AsignacionesError,
+  IncompatibleUnitsError,
+  MaterialShortageError,
   OrderNotFoundError,
   OrderNotPackableError,
   OrderPackingTakenError,
+  OrderWithoutUnitError,
+  PresentationWithoutContentError,
+  RecipeNotFoundError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/asignaciones/domain/errors';
@@ -23,7 +28,16 @@ const PEDIDO = uuid('7');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
 
-type Resultado = 'ok' | 'not_packer' | 'not_packable' | 'not_found';
+type Resultado =
+  | { readonly kind: 'ok'; readonly finishedGoods: readonly unknown[] }
+  | 'not_packer'
+  | 'not_packable'
+  | 'not_found'
+  | 'recipe_not_found'
+  | 'presentation_without_content'
+  | 'incompatible_units'
+  | 'order_without_unit'
+  | 'insufficient_material';
 
 function montar(options?: {
   readonly target?: { readonly id: string; readonly status: string } | null;
@@ -43,7 +57,7 @@ function montar(options?: {
     pageSize: 1,
     totalPages: 1,
   }));
-  const finishPackingAliveById = vi.fn(async () => options?.resultado ?? 'ok');
+  const finishPackingAliveById = vi.fn(async () => options?.resultado ?? { kind: 'ok' as const, finishedGoods: [] });
 
   const deps = {
     orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById },
@@ -118,6 +132,45 @@ describe('finishPacking — R23: estado que no admite Terminar', () => {
   });
 });
 
+describe('finishPacking — R17-R21: da de alta el lote por linea del reparto', () => {
+  it('`recipe_not_found` rechaza con `RecipeNotFoundError`', async () => {
+    const { deps } = montar({ resultado: 'recipe_not_found' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(RecipeNotFoundError);
+  });
+
+  it('`presentation_without_content` rechaza con `PresentationWithoutContentError`', async () => {
+    const { deps } = montar({ resultado: 'presentation_without_content' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(PresentationWithoutContentError);
+  });
+
+  it('R7, R18: `incompatible_units` rechaza con `IncompatibleUnitsError`', async () => {
+    const { deps } = montar({ resultado: 'incompatible_units' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(IncompatibleUnitsError);
+  });
+
+  it('R18: `order_without_unit` rechaza con `OrderWithoutUnitError`', async () => {
+    const { deps } = montar({ resultado: 'order_without_unit' });
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderWithoutUnitError);
+  });
+
+  it('QC-195 R25: `insufficient_material` (los envases no alcanzan) rechaza con `MaterialShortageError`, code insufficient_material', async () => {
+    const { deps } = montar({ resultado: 'insufficient_material' });
+    const finishPacking = createFinishPacking(deps);
+
+    const fallo = finishPacking(ACTOR, { orderId: PEDIDO });
+    await expect(fallo).rejects.toBeInstanceOf(MaterialShortageError);
+    await expect(fallo).rejects.toMatchObject({ code: 'insufficient_material' });
+  });
+});
+
 describe('finishPacking — R24: no existe, esta de baja o es de otra empresa', () => {
   it('sin pedido vivo rechaza con `order_not_found` sin leer el numero ni escribir', async () => {
     const { deps, listAliveSummariesByIds, finishPackingAliveById } = montar({ target: null });
@@ -150,5 +203,33 @@ describe('finishPacking — entrada', () => {
 
     await expect(finishPacking(ACTOR, { orderId: 'no-es-uuid' })).rejects.toThrow(ValidationError);
     expect(findAliveById).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-211 — finishPacking no comprueba el recorrido de los pasos de envasado', () => {
+  it('R24: termina un `EN_EMPAQUE` del actor con `{ orderId }` solo, sin ninguna prueba de recorrido', async () => {
+    const { deps, finishPackingAliveById } = montar();
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO })).resolves.toEqual({ numberText: expect.any(String) });
+    expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, expect.any(Date));
+  });
+
+  it.each([
+    ['packingStepsDone', 3],
+    ['packingSteps', []],
+    ['walkthrough', { completed: true }],
+  ])('R24: la entrada sigue siendo exactamente `{ orderId }`: `%s` de mas rechaza sin tocar ningun puerto', async (clave, valor) => {
+    const { deps, findAliveById, finishPackingAliveById } = montar();
+    const finishPacking = createFinishPacking(deps);
+
+    await expect(finishPacking(ACTOR, { orderId: PEDIDO, [clave]: valor })).rejects.toThrow(ValidationError);
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(finishPackingAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R24: las dependencias no incluyen ningun lector de pasos', () => {
+    const { deps } = montar();
+    expect(Object.keys(deps).filter((key) => /step/i.test(key))).toEqual([]);
   });
 });

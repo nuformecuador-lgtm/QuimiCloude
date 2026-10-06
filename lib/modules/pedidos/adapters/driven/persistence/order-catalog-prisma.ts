@@ -11,6 +11,7 @@ import type {
   OrderSummaryOrdering,
 } from '../../../domain/order-catalog';
 import type { Page } from '../../../domain/page';
+import type { OrderSummaryLineRecord, OrderSummaryRecord } from '../../../ports/order-summary-reader';
 
 /**
  * Implementa `OrderCatalog['findAliveById']` (`domain/order-catalog.ts`, QC-87
@@ -58,6 +59,14 @@ export async function findAliveOrderTargetById(
   return row === null ? null : toOrderAssignmentTarget(row);
 }
 
+/** Una fila de `order_presentation_lines`, ya en el orden de alta: la
+ *  consulta pide `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
+type AssignedOrderPresentationLineRow = {
+  readonly presentationId: string;
+  readonly packages: number;
+  readonly packagingProductId: string | null;
+};
+
 type AssignedOrderSummaryRow = {
   readonly id: string;
   readonly orderYear: number;
@@ -66,13 +75,19 @@ type AssignedOrderSummaryRow = {
   readonly quantity: { toFixed(digits: number): string };
   readonly priority: string;
   readonly status: string;
-  readonly presentationId: string | null;
+  readonly unitId: string | null;
+  readonly presentationLines: readonly AssignedOrderPresentationLineRow[];
   readonly finishedAt: Date | null;
   readonly packedBy: string | null;
 };
 
 /** `select` unico de los dos listados de resumen: si uno gana una columna y el otro no, el
- *  tipo `AssignedOrderSummaryRow` lo dice enseguida. */
+ *  tipo `AssignedOrderSummaryRow` lo dice enseguida.
+ *
+ * El `orderBy` de `presentationLines` lleva sus literales fijados uno a uno -y no con un
+ * `as const` de todo el objeto-, porque este archivo no importa `@prisma/client`
+ * (`tests/unit/pedidos/module-contract.test.ts`) y Prisma exige un ARRAY MUTABLE de
+ * `SortOrder`, no una tupla de solo lectura. */
 const SUMMARY_SELECT = {
   id: true,
   orderYear: true,
@@ -81,10 +96,14 @@ const SUMMARY_SELECT = {
   quantity: true,
   priority: true,
   status: true,
-  presentationId: true,
+  unitId: true,
+  presentationLines: {
+    select: { presentationId: true, packages: true, packagingProductId: true },
+    orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+  },
   finishedAt: true,
   packedBy: true,
-} as const;
+};
 
 /** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
  *  desempate para que sea total. Compartido por los dos listados de resumen para que no
@@ -108,7 +127,7 @@ const FINISHED_RECENT_FIRST_ORDER_BY = [
 
 /** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
  *  `@prisma/client`- y se fija a 4 decimales, la escala de la columna `Decimal(14,4)`. */
-export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOrderSummary {
+export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummaryRecord {
   return {
     id: row.id,
     number: { year: row.orderYear, sequence: row.orderSequence },
@@ -116,7 +135,14 @@ export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOr
     quantity: row.quantity.toFixed(4),
     priority: row.priority as AssignedOrderSummary['priority'],
     status: row.status as OrderStatus,
-    presentationId: row.presentationId,
+    unitId: row.unitId,
+    presentationLines: row.presentationLines.map(
+      (line): OrderSummaryLineRecord => ({
+        presentationId: line.presentationId,
+        packages: line.packages,
+        packagingProductId: line.packagingProductId,
+      }),
+    ),
     finishedAt: row.finishedAt,
     packedBy: row.packedBy,
   };
@@ -135,7 +161,7 @@ export async function listAliveOrderSummariesByIds(
   statuses: readonly OrderStatus[],
   page: number,
   pageSize?: number,
-): Promise<Page<AssignedOrderSummary>> {
+): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
     AND: [
@@ -155,24 +181,32 @@ export async function listAliveOrderSummariesByIds(
     prisma.order.count({ where }),
   ]);
 
-  return buildPage(rows.map(toAssignedOrderSummary), total, page, limit);
+  return buildPage(rows.map(toOrderSummaryRecord), total, page, limit);
 }
 
 /**
- * Implementa `OrderCatalog['listAliveSummariesInCompany']`: el mismo
- * resumen que `listAliveSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
+ * Implementa `OrderSummaryReader['listAliveInCompany']`: el mismo
+ * resumen que `listAliveOrderSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
  * «Terminados» y «Todos», que no acotan por quien esta asignado.
  */
-export async function listAliveSummariesInCompany(
+export async function listAliveOrderSummariesInCompany(
   companyId: string,
   statuses: readonly OrderStatus[],
   ordering: OrderSummaryOrdering,
   page: number,
   pageSize?: number,
-): Promise<Page<AssignedOrderSummary>> {
+  filter?: { readonly packedBy?: string },
+): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
-    AND: [orderCompanyScope({ companyId }), { status: { in: [...statuses] }, deletedAt: null }],
+    AND: [
+      orderCompanyScope({ companyId }),
+      {
+        status: { in: [...statuses] },
+        deletedAt: null,
+        ...(filter?.packedBy === undefined ? {} : { packedBy: filter.packedBy }),
+      },
+    ],
   };
   const orderBy =
     ordering === 'finished_recent_first'
@@ -190,6 +224,6 @@ export async function listAliveSummariesInCompany(
     prisma.order.count({ where }),
   ]);
 
-  return buildPage(rows.map(toAssignedOrderSummary), total, page, limit);
+  return buildPage(rows.map(toOrderSummaryRecord), total, page, limit);
 }
 

@@ -61,7 +61,10 @@ function dobleDeRecortes(bitacora: Bitacora): CropCatalog {
       bitacora.push('crops.list');
       return [];
     }),
-    createSignedReadUrl: vi.fn(),
+    publicUrl: vi.fn((path: string) => {
+      bitacora.push('crops.publicUrl');
+      return `https://publica.invalid/${path}`;
+    }),
   };
 }
 
@@ -87,6 +90,8 @@ function dobleDeUnidades(
       bitacora.push('units.findRefs');
       return visibles.filter((unidad) => ids.includes(unidad.id));
     }),
+    listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+    findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
     findRefsSharingBaseInCompany: vi.fn(),
   };
 }
@@ -133,7 +138,7 @@ describe('createConfirmCatalogImport — autorizacion', () => {
     ];
 
     for (const [nombre, actor] of actoresDenegados) {
-      it(`R31 — ${nombre}: unauthorized y ningun puerto tocado`, async () => {
+      it(`R31, R19 — ${nombre}: unauthorized, y ni list ni publicUrl se llegan a llamar`, async () => {
         const bitacora: Bitacora = [];
         const deps = crearDeps(bitacora);
         const confirm = createConfirmCatalogImport(deps);
@@ -141,6 +146,8 @@ describe('createConfirmCatalogImport — autorizacion', () => {
         await expect(confirm(actor, entradaBase([filaRevisada()]))).rejects.toBeInstanceOf(UnauthorizedError);
 
         expect(bitacora).toEqual([]);
+        expect(deps.crops.list).not.toHaveBeenCalled();
+        expect(deps.crops.publicUrl).not.toHaveBeenCalled();
       });
     }
 

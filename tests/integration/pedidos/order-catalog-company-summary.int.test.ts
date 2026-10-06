@@ -14,12 +14,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { cancelAliveOrder, createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
-import { listAliveSummariesInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
 import type { NewOrder, OrderScope } from '@/lib/modules/pedidos'
+import { realOrderSummaries } from '../../helpers/order-summaries'
+
+const { listAliveSummariesInCompany } = realOrderSummaries()
 
 const YEAR = 2889
 
@@ -123,8 +125,8 @@ function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
-    presentationId: e.presentationId,
-    presentationContent: null,
+    unitId: e.unitId,
+    presentationLines: [],
     ...overrides,
   }
 }
@@ -287,6 +289,105 @@ describe('R20 — el orden de terminados contra la base real', () => {
       await prisma.order.delete({ where: { id: reciente } })
       await prisma.order.delete({ where: { id: sinFechaMenor } })
       await prisma.order.delete({ where: { id: sinFechaMayor } })
+    }
+  })
+})
+
+async function crearEmpacador(e: Empresa): Promise<string> {
+  const marca = token()
+  const user = await prisma.user.create({
+    data: {
+      firstNames: 'Eva',
+      lastNames: 'Rojas Diaz',
+      birthDate: new Date('1992-03-09T00:00:00.000Z'),
+      email: `eva.${marca}@quimicloude.test`,
+      phone: '+57 300 444 5566',
+      documentTypeCode: e.documentTypeCode,
+      documentNumber: marca.slice(0, 12),
+      username: `eva.${marca}`,
+      passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
+      roleId: e.roleId,
+      companyId: e.companyId,
+    },
+    select: { id: true },
+  })
+  return user.id
+}
+
+async function seedEntregado(e: Empresa, packedBy: string | null): Promise<string> {
+  const id = await seedOrder(e, { status: 'ENTREGADO' })
+  if (packedBy !== null) await prisma.order.update({ where: { id }, data: { packedBy } })
+  return id
+}
+
+describe('R20 — `packedBy` filtra en la base, con total y paginacion del conjunto filtrado', () => {
+  it('R20: con `packedBy` solo vuelven los de ese empacador; el total y las paginas cuentan solo esos', async () => {
+    const empacador = await crearEmpacador(A)
+    const otro = await crearEmpacador(A)
+    const suyos = [
+      await seedEntregado(A, empacador),
+      await seedEntregado(A, empacador),
+      await seedEntregado(A, empacador),
+    ]
+    const delOtro = await seedEntregado(A, otro)
+    const sinEmpacador = await seedEntregado(A, null)
+    const todos = [...suyos, delOtro, sinEmpacador]
+    try {
+      const primera = await listAliveSummariesInCompany(A.companyId, ['ENTREGADO'], 'finished_recent_first', 1, 2, {
+        packedBy: empacador,
+      })
+      const segunda = await listAliveSummariesInCompany(A.companyId, ['ENTREGADO'], 'finished_recent_first', 2, 2, {
+        packedBy: empacador,
+      })
+
+      expect(primera.total).toBe(3)
+      expect(primera.totalPages).toBe(2)
+      expect(primera.items).toHaveLength(2)
+      expect(segunda.items).toHaveLength(1)
+      const vistos = [...primera.items, ...segunda.items]
+      expect(vistos.map((item) => item.id).sort()).toEqual([...suyos].sort())
+      expect(vistos.every((item) => item.packedBy === empacador)).toBe(true)
+    } finally {
+      await prisma.order.deleteMany({ where: { id: { in: todos } } })
+      await prisma.user.deleteMany({ where: { id: { in: [empacador, otro] } } })
+    }
+  })
+
+  it('R20: `packed_by NULL` no entra con filtro, y sin filtro el resultado incluye a todos como antes', async () => {
+    const empacador = await crearEmpacador(A)
+    const suyo = await seedEntregado(A, empacador)
+    const sinEmpacador = await seedEntregado(A, null)
+    try {
+      const filtrada = await listAliveSummariesInCompany(A.companyId, ['ENTREGADO'], 'finished_recent_first', 1, 25, {
+        packedBy: empacador,
+      })
+      const sinFiltro = await listAliveSummariesInCompany(A.companyId, ['ENTREGADO'], 'finished_recent_first', 1, 25)
+
+      expect(filtrada.items.map((item) => item.id)).toEqual([suyo])
+      expect(filtrada.total).toBe(1)
+      const ids = sinFiltro.items.map((item) => item.id)
+      expect(ids).toContain(suyo)
+      expect(ids).toContain(sinEmpacador)
+      expect(sinFiltro.total).toBeGreaterThanOrEqual(2)
+    } finally {
+      await prisma.order.deleteMany({ where: { id: { in: [suyo, sinEmpacador] } } })
+      await prisma.user.delete({ where: { id: empacador } })
+    }
+  })
+
+  it('R20: el filtro no cruza empresas, un empacador de otra empresa no devuelve nada en esta', async () => {
+    const empacadorB = await crearEmpacador(B)
+    const deB = await seedEntregado(B, empacadorB)
+    try {
+      const pagina = await listAliveSummariesInCompany(A.companyId, ['ENTREGADO'], 'finished_recent_first', 1, 25, {
+        packedBy: empacadorB,
+      })
+
+      expect(pagina.items).toEqual([])
+      expect(pagina.total).toBe(0)
+    } finally {
+      await prisma.order.delete({ where: { id: deB } })
+      await prisma.user.delete({ where: { id: empacadorB } })
     }
   })
 })
