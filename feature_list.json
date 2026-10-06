@@ -2872,6 +2872,21 @@
       "branch": "feature/QC-204-conversion-unidad-pedido-a-insumo",
       "depends_on": [],
       "spec_path": "specs/QC-204-conversion-unidad-pedido-a-insumo"
+    },
+    {
+      "key": "QC-209",
+      "id": 209,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "importar-inventario-desde-excel",
+      "description": "Un cliente nuevo llega con su inventario en una hoja de cálculo y hoy solo puede darlo de alta uno a uno. El Administrador sube un archivo y el sistema da de alta los productos con su primer lote, con las reglas del alta manual. Acotada con /afinar-feature el 2026-10-06: decisiones D1-D11 en specs/QC-209-importar-inventario-desde-excel/requirements.md (parcial, aviso y alta de unidades/presentaciones faltantes, .xlsx+.csv con librería a aprobar, cuatro tipos con terminado ligado a fórmula, plantilla fija, 2.000 filas en línea, duplicados marcados, contrato primero para paralelizar front y back, un E2E). Fuera: proveedores, mapeo de columnas, segundo plano, QC-205, QC-203.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-209-importar-inventario-desde-excel",
+      "depends_on": [],
+      "spec_path": "specs/QC-209-importar-inventario-desde-excel"
     }
   ]
 }
