@@ -200,7 +200,7 @@ export function buildFinishedStockColumns({
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
       align: 'center',
-      cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product) : null),
+      cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product, units) : null),
     },
     {
       id: ACTIONS_COLUMN_ID,

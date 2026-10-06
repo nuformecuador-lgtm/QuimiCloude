@@ -76,7 +76,7 @@ export function FinishedStockTable({
               canAdjust={canAdjust}
               loadBatches={loadLineBatches(parent, line)}
             />
-            <ProductSheet product={line.product} />
+            <ProductSheet product={line.product} units={units} />
             <DeleteProductDialog product={line.product} />
           </>
         ),
