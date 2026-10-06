@@ -275,6 +275,10 @@ export const E2E_ESPERADOS = [
   // vista previa, alta de la unidad que falta, confirmacion, lotes y archivo de errores. No lee ni
   // afirma nada sobre el identificador de peticion.
   'inventario-importar.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre retomar en el ultimo paso anotado tras recargar
+  // y cancelar con motivo desde la ejecucion. No lee ni afirma nada sobre el identificador de
+  // peticion.
+  'registro-ejecucion.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -449,6 +453,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261005120000_recipe_packing_steps',
   // El registro de importaciones de inventario; no toca el identificador.
   '20261006120000_inventory_imports',
+  // El registro de ejecucion de los pedidos; no toca el identificador.
+  '20261006180000_order_execution_entries',
 ] as const
 
 export function hallazgosDeMigraciones(
