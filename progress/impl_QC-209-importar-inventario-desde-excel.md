@@ -894,3 +894,8 @@ Verificacion tras el cambio: los 5 archivos -> `Test Files  5 passed (5)`, `Test
 `pnpm exec vitest run guard` -> `Test Files  51 passed (51)`, `Tests  692 passed | 11 skipped (703)`;
 integracion `inventory-import-{idempotency,isolation,repository}` -> `Test Files  3 passed (3)`,
 `Tests  25 passed (25)`.
+
+## Menores de la review
+
+- R1 (backend_dev): las dos acciones exigen `inventario.modificar` con `requirePermission` antes de `file.arrayBuffer()`; el caso de uso mantiene su comprobacion. Orden: zod -> actor (una lectura de sesion) -> permiso -> bytes -> caso de uso. Tests «R1 sin permiso la vista previa/la confirmacion no lee los bytes del archivo» en `tests/unit/inventario/inventory-import-actions.test.ts` (commit 0197ae84).
+- R31 (backend_dev): tres casos de vista previa con unidad, presentacion y formula homonimas en otra empresa (`missingUnits` + `unit_not_found`, `missingPresentations` + `presentation_not_found`, `formula_not_found`) en `tests/integration/inventario/inventory-import-isolation.int.test.ts` (commit 10d3b19e).
