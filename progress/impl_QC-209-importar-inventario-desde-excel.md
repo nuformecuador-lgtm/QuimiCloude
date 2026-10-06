@@ -508,3 +508,127 @@ Decisiones humanas aplicadas: test de ruta separado (aa2e713d, desvío para el r
 `Tests 9 failed | 7290 passed | 50 skipped (7349)`. Typecheck y lint en verde. Rojos: los 7 del baseline
 (unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso, recetas/module-contract,
 recetas/scope, recipe-page). Ningún rojo nuevo: la tanda cierra con la regla de rojos heredados.
+
+## B8
+
+backend_dev, 2026-10-06. Commits: 7f90d261 (planificación), eef05510 (vista previa y confirmación),
+c4edfa6e (integración) y el de esta bitácora.
+
+### Archivos
+
+- `lib/modules/inventario/domain/plan-inventory-import.ts` (nuevo): `planInventoryImport(sheet,
+  catalog, today)` pura; además `collectImportLookups`, `collectFinishedPairs` (qué leer de la base),
+  `importRowIssue` (motivo con la columna en el texto) e `importFormulaKey`. Devuelve también
+  `writes` (por fila válida, lo que escribe la confirmación).
+- `lib/modules/inventario/domain/import-finished-goods.ts` (nuevo): `importFinishedGoodsRowSchema`
+  (subesquemas de `createProductWithFirstBatchSchema.shape`), `resolveFinishedGoodsUnitCost`,
+  `createImportFinishedGoods(deps)`.
+- `lib/modules/inventario/domain/preview-inventory-import.ts` (relleno): deps reales
+  `InventoryImportReadDeps` (`reader`, `imports`, `units.listVisibleRefs`, `presentations`,
+  `formulas`, `now?`); `readInventoryImport` compartida con la confirmación.
+- `lib/modules/inventario/domain/confirm-inventory-import.ts` (relleno): deps = las de lectura +
+  `imports` completo, `createProduct`, `stockIncreases?`, **`digest`**.
+- `lib/modules/inventario/ports/file-digest.ts` y `adapters/driven/spreadsheet/file-digest.ts`
+  (nuevos): `FileDigest.sha256Hex` con `createHash` de `node:crypto`. **Desvío**: el hash se hacía
+  con `crypto.subtle` en el dominio y `guard-firma-sesion-unica` lo prohíbe fuera del codec de
+  sesión; no se tocó la guardia, el hash pasa a un puerto.
+- Tests: `tests/unit/inventario/{plan,preview,confirm}-inventory-import.test.ts`,
+  `tests/unit/inventario/inventory-import-kit.ts` (dobles compartidos, no es suite),
+  `tests/integration/inventario/inventory-import-{confirm,finished-goods,idempotency}.int.test.ts`,
+  `tests/integration/inventario/inventory-import-wiring.ts` (casos de uso atados a los adaptadores
+  reales, no es suite), `tests/integration/aislamiento.json` (los tres `.int.test.ts` en `commit`).
+- Barrel sin tocar.
+
+### Para B10 (cableado)
+
+`inventario.previewInventoryImport = createPreviewInventoryImport({ reader, imports, units:
+unitCatalog, presentations: presentationCatalog, formulas })` y `inventario.confirmInventoryImport =
+createConfirmInventoryImport({ ...lo mismo, createProduct: <el createProduct ya cableado>,
+stockIncreases: stockIncreaseListener, digest: fileDigest })`. `reader` elige `readCsv`/`readXlsx`
+por formato; `formulas.findAliveOriginalByName` = `findAliveRecipeByNormalizedName`. Plantilla en
+`tests/integration/inventario/inventory-import-wiring.ts`. Sigue pendiente la entrada de
+`InventoryImportRepository` en `guard-ambito-empresa-inventario` (ver «Pista B persistencia»).
+
+### Decisiones de implementación (dentro del diseño)
+
+1. Un motivo por columna (el primero que se detecta); `cost_required` una sola vez aunque el esquema
+   lo marque en «Costo unitario» y «Costo total». Los motivos salen ordenados por columna de la
+   plantilla. Texto: `<cabecera>: <regla>`.
+2. Código por `issue.path[0]` del esquema manual, decidido mirando el valor (zod 4 marca `custom`
+   tanto los `refine` como los `superRefine`): `stock` → `stock_invalid` / `stock_not_whole`;
+   `unitCost`/`totalCost` → `cost_required` / `cost_invalid` / `total_cost_too_low`; `qtyAlert` →
+   `value_required` / `qty_alert_invalid`; `lot` → `lot_invalid`; fechas → `*_date_invalid`.
+   Existencia 0 con solo costo total → `stock_invalid` con el texto «debe ser mayor que 0 para
+   derivar el costo unitario del costo total».
+3. Unidad (DS-10): primero por nombre normalizado; solo si ninguna casa, por símbolo exacto.
+4. Las referencias sin resolver se validan en el esquema con un uuid de relleno; a la confirmación
+   va el id real.
+5. Fecha de compra vacía → `purchaseDate: null` al alta manual (pone hoy con su reloj).
+6. Terminado: el costo total se reparte sobre envases × contenido de la presentación de la
+   planificación; si da 0 → `total_cost_too_low`. Un insumo con el nombre derivado de un terminado
+   que crea el mismo archivo, en la unidad de su presentación → `finished_product_homonym`.
+7. Confirmación: si la fila que debía crear el producto falló, la siguiente que le sumaba lote sale
+   `created` (es la que lo crea de verdad).
+8. **R24 frente a R30, para revisión**: sin ninguna fila válida, la confirmación no escribe lotes,
+   productos ni asientos, pero **sí** reserva y cierra el registro en `inventory_imports` (R30, y el
+   contrato exige `importId`). Si «no escribir nada» de R24 incluye el registro, hay que decidirlo.
+9. `BatchDuplicateLotError` al escribir → se mira de quién es el lote (`findBatchesByLots`): del
+   producto destino → `duplicate`; de otro → `lot_used_by_other_product`. `ActionNotAllowedError` →
+   `presentation_mismatch` (envase) o `finished_product_homonym`; cualquier otro → `write_failed`.
+
+### Mapa R -> test (B8)
+
+| R | Test |
+| --- | --- |
+| R1 | `preview-inventory-import.test.ts` «R1 sin sesion / sin actor / sin inventario.modificar rechaza con unauthorized sin leer el archivo ni consultar el inventario»; `confirm-inventory-import.test.ts` «R1 sin sesion / sin inventario.modificar rechaza con unauthorized sin leer, consultar ni escribir» |
+| R7 | `inventory-import-confirm.int.test.ts` «R7 R24 R26 al volver, las filas validas estan escritas…»; «R7 medida: confirmar 2.000 filas…» (solo con `QC209_MEDIR_2000=1`) |
+| R9 | `plan-inventory-import.test.ts` «R9 asigna a cada fila exactamente un estado…», «R9 «Tipo» vacio o desconocido…», «R9 el tipo se lee sin mayusculas…»; `preview-inventory-import.test.ts` «R9 devuelve cada fila con su estado y los totales, y no escribe nada», «R9 lee la base en lote…»; `inventory-import-confirm.int.test.ts` «R9 la vista previa no escribe nada en la base» |
+| R10 | `plan-inventory-import.test.ts` once casos «R10 …» (un motivo por regla con su columna, mensaje con la columna, costo una vez, instrumento, total que deja 0, envase entero, obligatorias vacías, R12 miles y nativo con > 4 decimales, R13 fechas) |
+| R11 | `plan-inventory-import.test.ts` «R11 un valor en una columna prohibida para el tipo…» |
+| R14 | `plan-inventory-import.test.ts` cinco casos «R14 …» (insumo nombre + unidad, el más antiguo, unidad por nombre o símbolo, envase con otra presentación, instrumento sin unidad) |
+| R15 | `plan-inventory-import.test.ts` «R15 la misma identidad nueva dos veces…», «R15 una fila en error no crea el producto…» |
+| R16 | `plan-inventory-import.test.ts` cuatro casos «R16 …»; `inventory-import-finished-goods.int.test.ts` «R16 crea el terminado ligado a la formula y despues le suma lotes…», «R16 formula inexistente o presentacion sin contenido…», «R16 una version de la formula no es una formula original» |
+| R17 | `plan-inventory-import.test.ts` «R17 insumo o instrumento cuyo homonimo vivo es un producto terminado…», «R17 un insumo con el nombre derivado de un terminado que crea el archivo…» |
+| R18 | `plan-inventory-import.test.ts` «R18 el lote ya existe en el mismo producto…»; `inventory-import-confirm.int.test.ts` «R25 R18 la confirmacion revalida…» |
+| R19 | `plan-inventory-import.test.ts` «R19 el lote es de otro producto…» |
+| R20 | `plan-inventory-import.test.ts` «R20 cada unidad o presentacion que falta se lista una vez…», «R20 una unidad que casa con varias es ambigua…»; `preview-inventory-import.test.ts` «R20 lista los faltantes aparte y ofrece crearlos segun los permisos del alta normal» |
+| R22 | `plan-inventory-import.test.ts` «R22 la planificacion nunca pide crear una unidad ni una presentacion»; `preview-inventory-import.test.ts` «R22 la vista previa no crea unidades ni presentaciones…» |
+| R24 | `confirm-inventory-import.test.ts` «R24 escribe solo las filas crear o sumar lote…», «R24 sin ninguna fila valida no escribe ningun lote…»; `inventory-import-confirm.int.test.ts` «R7 R24 R26 …» |
+| R25 | `confirm-inventory-import.test.ts` «R25 vuelve a validar contra la base del momento…»; `inventory-import-confirm.int.test.ts` «R25 R18 la confirmacion revalida…» |
+| R26 | `confirm-inventory-import.test.ts` «R26 insumo, envase e instrumento pasan por el alta manual…» (espía de `createProduct`), «R26 el terminado entra con quien importa como autor…»; `inventory-import-confirm.int.test.ts` «R7 R24 R26 …» (lote, asiento `opening` con autor, existencia, aviso por lote) |
+| R27 | `confirm-inventory-import.test.ts` «R27 una fila que falla al escribir queda en error y las demas se escriben», «R27 los rechazos del alta manual se traducen a su motivo», «R27 un lote que choca al escribir sobre el mismo producto es duplicado»; `inventory-import-confirm.int.test.ts` «R27 una fila que falla al escribir no deshace las ya escritas…» |
+| R29, R30 (además) | `confirm-inventory-import.test.ts` «R29 reserva la clave antes de la primera escritura…», «R29 una clave ya usada…»; `inventory-import-idempotency.int.test.ts` «R29 la misma clave dos veces…», «R29 con otra clave es otra importacion…», «R30 deja registrado quien, cuando, el archivo y las filas por resultado» |
+
+### Medida: confirmación de 2.000 filas (design 7)
+
+- **Cómo**: caso «R7 medida: confirmar 2.000 filas…» de `inventory-import-confirm.int.test.ts`,
+  activado con `QC209_MEDIR_2000=1` (sin la variable sale `skipped`). 2.000 insumos de un .csv: 500
+  identidades nuevas + 1.500 filas que suman lote (pares con lote escrito, impares con lote
+  generado). `createProduct` es el **de `@/lib/composition`** (`inventario.createProduct`), o sea con
+  el `stockIncreaseListener` real: una revisión de pedidos bloqueados por lote (empresa sin pedidos).
+  Lecturas, reserva y cierre con los adaptadores reales. Cronómetro `performance.now()` alrededor de
+  la única llamada a `confirm`.
+- **Base**: Postgres local (`localhost:5432`), base efímera de la corrida de integración
+  `qct_qc209_3c9e4900_muww21gy_bz0`, copia de la plantilla `qct_tpl_79d9c897501e`. No es el pooler
+  de Supabase.
+- **Resultado**: `medida de la importacion: 2000 filas confirmadas en 42.5 s
+  {"rows":2000,"created":500,"batchAdded":1500,"duplicate":0,"error":0}`. Una corrida anterior, en
+  frío, dio `tests 77.56s` para el caso entero (la línea de consola no se capturó). **Por debajo de
+  120 s en las dos**; no se para. Contra el pooler remoto la latencia por consulta será mayor:
+  conviene repetir la medida allí antes de producción.
+
+### Salida real
+
+- `pnpm run typecheck` -> `tsc --noEmit`, sin errores.
+- `pnpm run lint` -> `✖ 8 problems (0 errors, 8 warnings)` (los 8 preexistentes, ninguno en B8).
+- `pnpm exec vitest run` de los tres unitarios -> `Test Files  3 passed (3)` / `Tests  55 passed (55)`.
+- `pnpm exec vitest run --project integration` de los cinco `inventory-import-*.int.test.ts` (los
+  tres de B8 + los dos de B7) -> `Test Files  5 passed (5)` / `Tests  28 passed | 1 skipped (29)`
+  (el saltado es la medida).
+- `pnpm exec vitest run guard` -> `Test Files  51 passed (51)` / `Tests  684 passed | 11 skipped (695)`.
+- `pnpm exec vitest related --run` de los archivos de B8 (`--project node --project ui`) ->
+  `Test Files  6 failed | 328 passed (334)` / `Tests  8 failed | 5553 passed | 7 skipped (5568)`. Los
+  6 archivos rojos están en `tests/baseline-rojos.json` (recetas/module-contract, unidades-viewport,
+  usuarios-viewport, product-page, pantallas-exigen-permiso, recipe-page); salen por el barrel.
+
+Veredicto: B8 hecha; la medida cabe (42,5 s en local) y falta cablearla en B10.
