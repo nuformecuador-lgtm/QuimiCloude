@@ -1269,6 +1269,46 @@ export async function receiveFinishedGoods(
   return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
 }
 
+/** Lote de producto terminado que entra por importacion: asiento `opening`, no `production`,
+ *  porque no sale de ningun pedido. El producto ya debe existir y estar fijado en `tx`. */
+export async function addImportedFinishedGoodsBatch(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  batch: NewProductBatch,
+  packageContent: string,
+  now: Date,
+  scope: InventoryScope,
+): Promise<{ batchId: string; lot: string }> {
+  const lot = await resolveLot(tx, batch, scope);
+
+  const createdBatch = await tx.productBatch.create({
+    data: {
+      ...toBatchCreateData(productId, batch, lot, now, scope),
+      packageContent: new Prisma.Decimal(packageContent),
+    },
+    select: { id: true },
+  });
+
+  await writeMovement(
+    tx,
+    {
+      batchId: createdBatch.id,
+      kind: 'opening',
+      quantity: batch.stock,
+      reason: null,
+      orderId: null,
+      orderPresentationLineId: null,
+      createdBy: batch.createdBy,
+    },
+    now,
+    scope,
+  );
+
+  await recalculateProductStock(tx, productId, scope);
+
+  return { batchId: createdBatch.id, lot };
+}
+
 /** `quantity / packageContent`, como entero: `receiveFinishedGoods` siempre escribe la cantidad
  *  del asiento `production` como un multiplo exacto del contenido del lote (`planFinishedGoodsLine`),
  *  asi que la division nunca deja resto. */

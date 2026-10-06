@@ -6,9 +6,8 @@ import { planFinishedGoodsLine } from '../../../domain/finished-goods';
 import { normalizeProductName } from '../../../domain/product-name';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 
-import { writeMovement } from './batch-movement-prisma';
 import { batchCompanyScope, companyScopeColumns, productCompanyScope } from './company-scope';
-import { isDuplicateBatchLot, recalculateProductStock, resolveLot, toBatchCreateData } from './product-prisma';
+import { addImportedFinishedGoodsBatch, isDuplicateBatchLot } from './product-prisma';
 
 import type { ImportResultTotals } from '../../../domain/inventory-import-contract';
 import type { InventoryScope } from '../../../domain/inventory-scope';
@@ -232,32 +231,7 @@ async function writeImportedFinishedGoods(
     expiryDate: input.expiryDate,
     createdBy: input.createdBy,
   };
-  const lot = await resolveLot(tx, batch, scope);
-
-  const createdBatch = await tx.productBatch.create({
-    data: {
-      ...toBatchCreateData(product.id, batch, lot, now, scope),
-      packageContent: new Prisma.Decimal(presentation.content),
-    },
-    select: { id: true },
-  });
-
-  await writeMovement(
-    tx,
-    {
-      batchId: createdBatch.id,
-      kind: 'opening',
-      quantity: plan.quantity,
-      reason: null,
-      orderId: null,
-      orderPresentationLineId: null,
-      createdBy: input.createdBy,
-    },
-    now,
-    scope,
-  );
-
-  await recalculateProductStock(tx, product.id, scope);
+  const { lot } = await addImportedFinishedGoodsBatch(tx, product.id, batch, presentation.content, now, scope);
 
   return { productId: product.id, lot, created: inserted.length > 0 };
 }

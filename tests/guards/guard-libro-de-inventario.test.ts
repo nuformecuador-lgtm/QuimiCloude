@@ -21,6 +21,7 @@ const CAMINOS_ESPERADOS = [
   'adjustBatchStock',
   'consumeBatchStock',
   'receiveFinishedGoods',
+  'addImportedFinishedGoodsBatch',
 ] as const;
 const CARPETAS_IGNORADAS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage']);
 const SUFIJOS_FUENTE = ['.ts', '.tsx'];
@@ -247,7 +248,7 @@ describe('guardia: censo de caminos de escritura de product_batches bajo lib/ (R
     ).toBeGreaterThan(50);
   });
 
-  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods }', () => {
+  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods, addImportedFinishedGoodsBatch }', () => {
     const real = censoReal();
     expect(
       real,

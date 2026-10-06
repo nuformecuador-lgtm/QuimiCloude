@@ -271,6 +271,7 @@ const CAMINOS_ESPERADOS = [
   'consumeBatchStock',
   'createWithFirstBatch',
   'receiveFinishedGoods',
+  'addImportedFinishedGoodsBatch',
 ];
 const CENSO_ESPERADO = CAMINOS_ESPERADOS.map((nombre) => `${PRODUCT_PRISMA}::${nombre}`).sort();
 
@@ -285,7 +286,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
       .filter((linea) => linea !== '')
       .join('\n');
 
-  /** Los cinco caminos fabricados; `sinRecalculoEn` deja ese uno sin la llamada.
+  /** Los seis caminos fabricados; `sinRecalculoEn` deja ese uno sin la llamada.
    *  `consumeBatchStock` nace SIN recalculo -es la excepcion-, salvo que se pida a el
    *  explicitamente. */
   const fuenteCuatroCaminos = (sinRecalculoEn: string | null): string =>
@@ -295,9 +296,10 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
       construirCamino('adjustBatchStock', 'update', sinRecalculoEn !== 'adjustBatchStock'),
       construirCamino('consumeBatchStock', 'updateMany', sinRecalculoEn === 'consumeBatchStock'),
       construirCamino('receiveFinishedGoods', 'create', sinRecalculoEn !== 'receiveFinishedGoods'),
+      construirCamino('addImportedFinishedGoodsBatch', 'create', sinRecalculoEn !== 'addImportedFinishedGoodsBatch'),
     ].join('\n\n');
 
-  it('verde: los cinco caminos fabricados, cada uno con su recalculo (o su excepcion)', () => {
+  it('verde: los seis caminos fabricados, cada uno con su recalculo (o su excepcion)', () => {
     const fuente = fuenteCuatroCaminos(null);
     expect(funcionesQueEscribenLotes(fuente)).toEqual(CAMINOS_ESPERADOS.slice().sort());
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
@@ -315,7 +317,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
   });
 
-  it('rojo: un sexto camino fabricado sin recalculo tambien queda marcado', () => {
+  it('rojo: un septimo camino fabricado sin recalculo tambien queda marcado', () => {
     const fuente = `${fuenteCuatroCaminos(null)}\n\n${construirCamino('rogueWrite', 'create', false)}`;
     expect(funcionesSinRecalculo(fuente)).toEqual(['rogueWrite']);
   });
@@ -326,7 +328,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
   });
 
-  it('el censo real bajo lib/ es exactamente esos cinco caminos, ni uno mas', () => {
+  it('el censo real bajo lib/ es exactamente esos seis caminos, ni uno mas', () => {
     const archivos = archivosBajoCarpeta('lib');
     expect(archivos.length).toBeGreaterThan(50);
 
