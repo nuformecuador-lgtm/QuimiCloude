@@ -29,6 +29,7 @@ import {
   IdentityError,
   type Actor,
   type Page,
+  type WorkGroupCandidateRow,
   type WorkGroupMemberRow,
   type WorkGroupRow,
 } from '@/lib/modules/identity';
@@ -48,6 +49,10 @@ export type WorkGroupListResult = { status: 'success'; data: Page<WorkGroupRow> 
 
 export type WorkGroupMemberListResult =
   | { status: 'success'; data: Page<WorkGroupMemberRow> }
+  | ErrorState;
+
+export type WorkGroupCandidateListResult =
+  | { status: 'success'; data: Page<WorkGroupCandidateRow> }
   | ErrorState;
 
 // NO se exporta ninguna constante `INITIAL_STATE`: un archivo con `'use server'` solo puede
@@ -199,6 +204,23 @@ export async function listWorkGroupMembersAction(
 
   try {
     const data = await identity.listWorkGroupMembers(actor, workGroupId, query, new Date());
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/**
+ * Las personas que se pueden meter en un grupo: solo las de estado efectivo activo, con busqueda
+ * y paginacion. El `now` lo pone esta capa por el mismo motivo que en la lista de miembros.
+ */
+export async function listWorkGroupCandidatesAction(
+  query: unknown,
+): Promise<WorkGroupCandidateListResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await identity.listWorkGroupCandidates(actor, query, new Date());
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

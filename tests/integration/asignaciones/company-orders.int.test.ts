@@ -84,6 +84,7 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     units: {
       findRefs: findUnitRefs,
       listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+      findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
       findRefsSharingBaseInCompany: async () => {
         throw new Error('el listado solo resuelve la etiqueta de la unidad del pedido');
       },

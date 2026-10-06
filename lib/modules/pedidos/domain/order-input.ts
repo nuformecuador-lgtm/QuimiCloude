@@ -194,8 +194,9 @@ export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
 
 /**
- * Receta y cantidad, con la MISMA regla que el alta -`pick` hereda la
- * forma UUID y el patron decimal sin copiarlos-. Un `companyId` en la entrada no llega a
+ * Receta, cantidad y unidad, con la MISMA regla que el alta -`pick` hereda la
+ * forma UUID y el patron decimal sin copiarlos-. Sin unidad no hay cotizacion: la necesidad se
+ * expresa en la unidad del pedido. Un `companyId` en la entrada no llega a
  * ninguna parte: `z.object` descarta las claves de mas.
  *
  * `orderId` es OPCIONAL y solo lo envia el formulario de EDICION: el pedido que ya existe
@@ -204,7 +205,7 @@ export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
  * `findCostingBatches`, que lo usa para no restar lo que ese pedido aparto.
  */
 export const quoteOrderCostSchema = createOrderSchema
-  .pick({ recipeId: true, quantity: true })
+  .pick({ recipeId: true, quantity: true, unitId: true })
   .extend({ orderId: z.string().uuid().optional(), presentationLines: distributionLinesSchema.optional() });
 
 export type QuoteOrderCostInput = Omit<z.infer<typeof quoteOrderCostSchema>, 'presentationLines'> & {

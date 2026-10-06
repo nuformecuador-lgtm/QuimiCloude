@@ -2833,7 +2833,7 @@
       "epic_name": "Recetas",
       "name": "pasos-de-envasado",
       "description": "Al crear una fórmula hace falta un diferenciador para los pasos de envasado: la fórmula puede tener sus propios pasos de envasado, separados de los pasos del operador, y solo los ve el empacador. El empaque reutiliza el sistema de pasos del operador para hacer el paso a paso. NACE DEL CHAT el 2026-10-05. Acotada con /afinar-feature el 2026-10-05: decisiones en specs/QC-211-pasos-de-envasado/requirements.md.\n\nDECIDIDO POR EL HUMANO EL 2026-10-05\n\n1. LOS PASOS DE ENVASADO SON OPCIONALES. Una fórmula puede no tener ninguno. Las fórmulas existentes no se migran.\n2. MISMO FORMATO Y TOPES QUE LOS PASOS DEL OPERADOR (QC-62), guardados aparte.\n3. SE EDITAN EN ALTA Y EDICIÓN, en sección propia, con el mismo editor. Solo el Administrador.\n4. VERSIONES: heredan los pasos de envasado de la original (solo lectura), igual que los pasos del operador.\n5. IMPORTACIÓN DESDE PDF: la IA separa los pasos de envasado de los del operador; el Administrador los revisa.\n6. EL EMPACADOR VE EL PASO A PASO TRAS PULSAR COMENZAR EMPAQUE; el último paso termina con Terminar empaque.\n7. REGLA DE AVANCE IGUAL QUE EL OPERADOR (QC-64, QC-125): checks + espera de 5 s, solo en cliente.\n8. SIN PASOS DE ENVASADO, la pantalla de empaque se ve como hoy.\n9. VISIBILIDAD SEPARADA: el operador no ve los pasos de envasado; el empacador no ve los del operador. El empacador los lee con empaque.modificar.\n10. LECTURA EN VIVO, sin copia en el pedido; el avance no se guarda.\n11. UNA PRUEBA E2E del flujo Administrador crea → empacador recorre y termina → operador no los ve.\n12. INDEPENDIENTE DE QC-173.\n\nQUÉ ENTRA. Guardar los pasos de envasado con la fórmula; editarlos en alta y edición; heredarlos en versiones; separarlos en la importación desde PDF; mostrarlos en el paso a paso del empaque.\n\nLO QUE NO ENTRA. Fases en los pasos (QC-173). Estado del pedido al terminar el empaque (QC-202). Registro de ejecución (QC-82). Validación en servidor de checks o espera.",
-      "status": "spec_ready",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -2857,6 +2857,21 @@
         "QC-174"
       ],
       "spec_path": "specs/QC-210-versiones-desde-el-alta-de-formula"
+    },
+    {
+      "key": "QC-204",
+      "id": 204,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "conversion-unidad-pedido-a-insumo",
+      "description": "Ver tarjeta QC-204: la necesidad de cada insumo (cantidad × %) se expresa en la unidad del pedido y se convierte a la del insumo para costear, apartar y mostrar. Misma familia: exacto (QC-76). Masa ↔ volumen: 1 l ≈ 1 kg, marcado «aprox.». Otras combinaciones: sin costo y con aviso. Pedidos ya creados no se migran.",
+      "status": "done",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-204-conversion-unidad-pedido-a-insumo",
+      "depends_on": [],
+      "spec_path": "specs/QC-204-conversion-unidad-pedido-a-insumo"
     }
   ]
 }

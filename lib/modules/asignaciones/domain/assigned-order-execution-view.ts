@@ -31,8 +31,11 @@ export type ExecutionLineView = {
   readonly productName: string | null;
   /** "10.00" */
   readonly percentage: string;
-  /** `consumedQuantity(orderQuantity, percentage)`. */
-  readonly quantity: string;
+  /** En la unidad del insumo salvo `need: 'unconverted'`; `null` solo con `not_convertible`. */
+  readonly quantity: string | null;
+  /** `unconverted`: pedido o insumo sin unidad, la cifra va tal cual. `approximate`: cruzo de
+   *  masa a volumen o al reves a densidad 1. */
+  readonly need: 'unconverted' | 'exact' | 'approximate' | 'not_convertible';
   /** La del insumo; `null` = sin lotes o dado de baja. */
   readonly unit: UnitRef | null;
   /** Misma base efectiva que `unit`, sin ella misma; vacio si `unit` es `null`. */

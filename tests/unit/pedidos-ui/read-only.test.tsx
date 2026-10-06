@@ -270,6 +270,7 @@ describe('QC-102 — sin `asignaciones.modificar` el panel es de SOLO LECTURA (R
         totalPages={1}
         recipes={RECETAS}
         units={UNIDADES}
+        bridge={null}
         responsiblesByOrder={{ [PEDIDO_ID]: RESPONSABLES }}
         responsiblesCatalog={CATALOGO_SOLO_LECTURA}
       />,

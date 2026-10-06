@@ -57,6 +57,10 @@ export type { DeleteUnitDeps } from './domain/delete-unit';
 export { convertQuantity } from './domain/convert-quantity';
 export type { UnitConversion } from './domain/convert-quantity';
 export { IncompatibleUnitsError } from './domain/errors';
+export { convertWithApproximation } from './domain/convert-with-approximation';
+export type { ConvertedQuantity, MassVolumeBridge } from './domain/convert-with-approximation';
+export { createGetMassVolumeBridge } from './domain/get-mass-volume-bridge';
+export type { GetMassVolumeBridge, GetMassVolumeBridgeDeps } from './domain/get-mass-volume-bridge';
 
 // QC-57 (R27-R29): el listado acepta el contrato generico de consulta y su pagina es OPCIONAL.
 // `isUnitPage` es el discriminante en tiempo de ejecucion de `UnitListResult` -sin consulta se

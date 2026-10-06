@@ -2,9 +2,9 @@
 // parte del aviso).
 //
 // **Las tres Server Actions implicadas estan mockeadas** —la consulta de miembros, la consulta de
-// personas y las dos mutaciones—: son el borde del modulo `identity`, que esta ficha solo consume
-// (R36), y son ademas el punto de observacion de casi todo lo de aqui —«se vuelve a consultar»,
-// «se manda de a una», «no se filtra en el cliente»—.
+// candidatos de grupo y las dos mutaciones—: son el borde del modulo `identity`, que esta ficha
+// solo consume (R36), y son ademas el punto de observacion de casi todo lo de aqui —«se vuelve a
+// consultar», «se manda de a una», «no se filtra en el cliente»—.
 //
 // **Ningun assert sobre literales de copy** (R41): filas, controles y regiones de error se
 // localizan por `data-testid` exportado, la posicion dentro del total se lee de los `data-*` del
@@ -39,9 +39,9 @@ import {
 } from '@/app/(private)/configuracion/usuarios/components';
 import { SEARCH_DEBOUNCE_MS } from '@/components/shared/data-table';
 import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
-import type { Page, UserRow, WorkGroupMemberRow } from '@/lib/modules/identity';
-import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
+import type { Page, WorkGroupCandidateRow, WorkGroupMemberRow } from '@/lib/modules/identity';
 import type {
+  WorkGroupCandidateListResult,
   WorkGroupMemberListResult,
   WorkGroupMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
@@ -51,7 +51,7 @@ const {
   listWorkGroupMembersActionMock,
   addWorkGroupMemberActionMock,
   removeWorkGroupMemberActionMock,
-  listUsersActionMock,
+  listWorkGroupCandidatesActionMock,
 } = vi.hoisted(() => ({
   listWorkGroupMembersActionMock:
     vi.fn<(workGroupId: string, query: unknown) => Promise<WorkGroupMemberListResult>>(),
@@ -63,7 +63,8 @@ const {
     vi.fn<
       (prev: WorkGroupMutationFormState, data: FormData) => Promise<WorkGroupMutationFormState>
     >(),
-  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
+  listWorkGroupCandidatesActionMock:
+    vi.fn<(query: unknown) => Promise<WorkGroupCandidateListResult>>(),
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
@@ -78,6 +79,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     removeWorkGroupMemberAction: removeWorkGroupMemberActionMock,
     listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
     listWorkGroupMembersAction: listWorkGroupMembersActionMock,
+    listWorkGroupCandidatesAction: listWorkGroupCandidatesActionMock,
   };
 });
 
@@ -86,7 +88,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse desde la lista de miembros`);
   };
   return {
-    listUsersAction: listUsersActionMock,
+    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
@@ -106,17 +108,13 @@ const MIEMBROS: readonly WorkGroupMemberRow[] = [
 ];
 
 /**
- * Un candidato con TODO lo que `UserRow` trae. Existe asi a proposito: sirve para demostrar que de
- * la persona solo se pinta el nombre mostrable y que su correo, su documento y su estado de cuenta
- * no llegan al DOM (R31, pregunta abierta 2).
+ * Un candidato tal como lo devuelve la consulta de candidatos de grupo: solo personas activas, y
+ * de cada una solo su nombre mostrable y su rol (R31).
  */
-const CANDIDATO: UserRow = {
+const CANDIDATO: WorkGroupCandidateRow = {
   id: 'u9',
   displayName: 'Nieto Salas, Dario',
-  username: 'dario.nieto',
-  email: 'dario.nieto@example.com',
   roleName: 'Operario',
-  accountStatus: 'pending',
 };
 
 function paginaDeMiembros(
@@ -198,7 +196,7 @@ beforeEach(() => {
   });
   addWorkGroupMemberActionMock.mockResolvedValue({ status: 'success' });
   removeWorkGroupMemberActionMock.mockResolvedValue({ status: 'success' });
-  listUsersActionMock.mockResolvedValue({
+  listWorkGroupCandidatesActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [CANDIDATO], total: 1, page: 1, pageSize: 10, totalPages: 1 },
   });
@@ -372,24 +370,25 @@ describe('el buscador saca sus candidatos de la consulta de personas (R28)', () 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(listUsersActionMock).toHaveBeenCalledTimes(1);
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(1);
 
     fireEvent.change(screen.getByTestId('data-table-search'), {
       target: { value: 'nieto' },
     });
     // El rebote es el de `<DataTable>` sobre su PROPIO buscador: mientras no transcurra, la
     // segunda consulta no sale.
-    expect(listUsersActionMock).toHaveBeenCalledTimes(1);
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(1);
 
-    // La actualizacion que el rebote dispara (`setParams` -> nuevo efecto -> `listUsersAction`)
-    // no nace de un evento de testing-library, asi que se envuelve en `act` -mismo patron que
-    // `order-execution-screen.test.tsx`- para que React la aplique antes de la asercion.
+    // La actualizacion que el rebote dispara (`setParams` -> nuevo efecto ->
+    // `listWorkGroupCandidatesAction`) no nace de un evento de testing-library, asi que se envuelve
+    // en `act` -mismo patron que `order-execution-screen.test.tsx`- para que React la aplique
+    // antes de la asercion.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
     });
 
-    expect(listUsersActionMock).toHaveBeenCalledTimes(2);
-    expect(listUsersActionMock.mock.calls[1]![0]).toEqual({
+    expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(2);
+    expect(listWorkGroupCandidatesActionMock.mock.calls[1]![0]).toEqual({
       page: 1,
       pageSize: 10,
       sort: null,
@@ -403,12 +402,9 @@ describe('el buscador saca sus candidatos de la consulta de personas (R28)', () 
     await esperarLista();
 
     const fila = await buscarCandidato();
-    // De cada candidato se pinta nombre y rol; NI usuario, ni correo, ni estado de cuenta.
+    // De cada candidato se pinta nombre y rol.
     expect(fila).toHaveTextContent(CANDIDATO.displayName);
     expect(fila).toHaveTextContent(CANDIDATO.roleName);
-    expect(fila.textContent ?? '').not.toContain(CANDIDATO.username);
-    expect(fila.textContent ?? '').not.toContain(CANDIDATO.email);
-    expect(fila.textContent ?? '').not.toContain(CANDIDATO.accountStatus);
 
     fireEvent.click(botonAgregar(fila));
 
@@ -428,20 +424,20 @@ describe('el buscador saca sus candidatos de la consulta de personas (R28)', () 
     expect(within(fila).getAllByRole('cell')).toHaveLength(3);
   });
 
-  it('aparece aunque no se escriba nada en el buscador: trae la primera pagina de TODAS', async () => {
+  it('aparece aunque no se escriba nada en el buscador: trae la primera pagina de candidatos', async () => {
     montar();
     await esperarLista();
 
     // Sin ningun `fireEvent.change`: la tabla se pinta igual, con tiempo real de por medio.
     const fila = await screen.findByTestId(`data-table-row-${CANDIDATO.id}`);
     expect(fila).toHaveTextContent(CANDIDATO.displayName);
-    expect(listUsersActionMock.mock.calls[0]![0]).toMatchObject({ search: '' });
+    expect(listWorkGroupCandidatesActionMock.mock.calls[0]![0]).toMatchObject({ search: '' });
   });
 });
 
 describe('el buscador de candidatos esta paginado, con la paginacion REAL de <DataTable> (QC-85 ampliacion)', () => {
   it('muestra la posicion dentro del total y los dos controles de la tabla compartida', async () => {
-    listUsersActionMock.mockResolvedValue({
+    listWorkGroupCandidatesActionMock.mockResolvedValue({
       status: 'success',
       data: { items: [CANDIDATO], total: 23, page: 2, pageSize: 10, totalPages: 3 },
     });
@@ -466,7 +462,7 @@ describe('el buscador de candidatos esta paginado, con la paginacion REAL de <Da
 
   it('avanzar pide la pagina siguiente al servidor', async () => {
     const user = setupUser();
-    listUsersActionMock.mockImplementation(async (consulta) => ({
+    listWorkGroupCandidatesActionMock.mockImplementation(async (consulta) => ({
       status: 'success',
       data: {
         items: [CANDIDATO],
@@ -482,8 +478,8 @@ describe('el buscador de candidatos esta paginado, con la paginacion REAL de <Da
 
     await user.click(screen.getByTestId('data-table-next'));
 
-    await waitFor(() => expect(listUsersActionMock).toHaveBeenCalledTimes(2));
-    const ultimaLlamada = listUsersActionMock.mock.calls.at(-1)![0];
+    await waitFor(() => expect(listWorkGroupCandidatesActionMock).toHaveBeenCalledTimes(2));
+    const ultimaLlamada = listWorkGroupCandidatesActionMock.mock.calls.at(-1)![0];
     expect(ultimaLlamada).toMatchObject({ page: 2 });
   });
 });

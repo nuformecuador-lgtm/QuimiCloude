@@ -135,7 +135,13 @@ import type {
 } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { forModule } from '@/lib/shared/observability/logger';
-import { findPackageUnitId, findUnitRefs, listVisibleUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import {
+  createUnitCatalogReader,
+  findMassVolumeBridge,
+  findPackageUnitId,
+  findUnitRefs,
+  listVisibleUnitRefs,
+} from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findUnitRefsSharingBaseInCompany,
   listUnits,
@@ -154,6 +160,7 @@ import type { UnitWriteRepository } from '@/lib/modules/unidades/ports/unit-writ
 import {
   createCreateUnit,
   createDeleteUnit,
+  createGetMassVolumeBridge,
   createListUnits,
   createUpdateUnit,
   type UnitCatalog,
@@ -330,6 +337,7 @@ import {
   createAddWorkGroupMember,
   createCreateWorkGroup,
   createDeleteWorkGroup,
+  createListWorkGroupCandidates,
   createListWorkGroupMembers,
   createListWorkGroups,
   createRemoveWorkGroupMember,
@@ -344,6 +352,8 @@ import {
   renameAliveInCompany,
   softDeleteAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/work-group-prisma';
+import { listCandidatesAliveInCompany } from '@/lib/modules/identity/adapters/driven/persistence/work-group-candidates-prisma';
+import type { WorkGroupCandidateReader } from '@/lib/modules/identity/ports/work-group-candidate-reader';
 import type { PaginationPolicy } from '@/lib/modules/identity';
 import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-group-repository';
 // QC-87 T11 (`design.md > 2.3`) — asignar responsables a un pedido. Las CUATRO factories salen del
@@ -657,6 +667,8 @@ const workGroupRepository: WorkGroupRepository = {
  */
 const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage };
 
+const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAliveInCompany };
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -754,6 +766,11 @@ export const identity = {
   // no tiene reloj propio ni puede importar `lib/shared/**`.
   listWorkGroupMembers: createListWorkGroupMembers({
     workGroups: workGroupRepository,
+    pagination: workGroupMemberPagination,
+    log: identityListQueryLog,
+  }),
+  listWorkGroupCandidates: createListWorkGroupCandidates({
+    candidates: workGroupCandidateReader,
     pagination: workGroupMemberPagination,
     log: identityListQueryLog,
   }),
@@ -948,6 +965,7 @@ const unitCatalog: UnitCatalog = {
   findRefs: findUnitRefs,
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
   listVisibleRefs: listVisibleUnitRefs,
+  findMassVolumeBridge: () => findMassVolumeBridge(),
 };
 
 const recipeRepository: RecipeRepository = {
@@ -1137,6 +1155,7 @@ export const unidades = {
   createUnit: createCreateUnit({ units: unitWriteRepository }),
   updateUnit: createUpdateUnit({ units: unitWriteRepository }),
   deleteUnit: createDeleteUnit({ units: unitWriteRepository }),
+  getMassVolumeBridge: createGetMassVolumeBridge({ units: unitCatalog }),
 } as const;
 
 
@@ -1180,12 +1199,10 @@ const orderRepository: OrderRepository = {
 };
 
 /**
- * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
- * MISMO `tx`, el repositorio de escritura de `pedidos`, las reservas de `inventario` y el
- * lector de contenido de receta, para que las tres lecturas y escrituras vean la misma
- * instantanea sin abrir una segunda conexion mientras esta retiene la suya. Sin `unitCatalog`:
- * la necesidad ya llega en la unidad del producto, asi que `createMaterialReservations` no
- * convierte nada.
+ * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye cada
+ * pieza del scope con el MISMO `tx`, para que todas vean la misma instantanea sin abrir una
+ * segunda conexion mientras esta retiene la suya. `createMaterialReservations` no convierte
+ * nada: la necesidad le llega ya en la unidad del producto.
  */
 const orderUnitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -1195,6 +1212,8 @@ const orderUnitOfWork: OrderUnitOfWork = {
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
+        products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
+        units: createUnitCatalogReader(tx),
       };
       return work(scope);
     }),

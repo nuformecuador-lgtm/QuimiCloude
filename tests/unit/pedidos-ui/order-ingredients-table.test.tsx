@@ -12,7 +12,7 @@ import {
 } from '@/app/(private)/pedidos/components';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import type { RecipeLineView } from '@/lib/modules/recetas';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 
 const UNIDADES: readonly UnitView[] = [
   { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
@@ -37,6 +37,7 @@ afterEach(() => {
 function renderTabla(overrides: {
   lines?: readonly RecipeLineView[];
   quantity?: string;
+  orderUnitId?: string;
   loading?: boolean;
   error?: string | null;
 } = {}) {
@@ -45,6 +46,8 @@ function renderTabla(overrides: {
       lines={overrides.lines ?? [LINEA]}
       units={UNIDADES}
       quantity={overrides.quantity ?? '200'}
+      orderUnitId={overrides.orderUnitId ?? 'u-litro'}
+      bridge={null}
       loading={overrides.loading ?? false}
       error={overrides.error ?? null}
     />,
@@ -123,7 +126,11 @@ describe('la unidad del producto va pegada a la cifra de stock y restante', () =
     ['kg', 'u-kilo'],
     ['g', 'u-gramo'],
   ])('stock 720 en %s se lee «720 %s», tambien en el restante y en su aria-label', (simbolo, unitId) => {
-    renderTabla({ lines: [{ ...LINEA, productUnitId: unitId, productStock: '720.0000' }], quantity: '' });
+    renderTabla({
+      lines: [{ ...LINEA, productUnitId: unitId, productStock: '720.0000' }],
+      quantity: '',
+      orderUnitId: unitId,
+    });
 
     const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     const stock = within(tabla).getByTestId('order-ingredient-stock');
@@ -189,5 +196,104 @@ describe('otros estados de la tabla, sin cambios por esta ficha', () => {
       'No se pudo cargar la receta.',
     );
     expect(screen.queryByTestId(ORDER_INGREDIENTS_TABLE_TESTID)).toBeNull();
+  });
+});
+
+describe('la tabla convierte la necesidad a la unidad del insumo', () => {
+  const GRAMO: UnitView = { id: 'c-g', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null, isSystem: true };
+  const KILO: UnitView = { id: 'c-kg', name: 'Kilogramo', symbol: 'kg', baseUnitId: 'c-g', factor: '1000', isSystem: true };
+  const MILILITRO: UnitView = { id: 'c-ml', name: 'Mililitro', symbol: 'ml', baseUnitId: null, factor: null, isSystem: true };
+  const LITRO: UnitView = { id: 'c-l', name: 'Litro', symbol: 'l', baseUnitId: 'c-ml', factor: '1000', isSystem: true };
+  const PIEZA: UnitView = { id: 'c-pieza', name: 'Pieza', symbol: null, baseUnitId: null, factor: null, isSystem: false };
+  const CATALOGO: readonly UnitView[] = [GRAMO, KILO, MILILITRO, LITRO, PIEZA];
+  const PUENTE: MassVolumeBridge = { volumeBaseId: MILILITRO.id, massBaseId: GRAMO.id };
+
+  const EN_KG: RecipeLineView = { ...LINEA, productUnitId: KILO.id, productStock: '1.0000' };
+
+  function tabla(props: { lines?: readonly RecipeLineView[]; quantity: string; orderUnitId: string }) {
+    return (
+      <OrderIngredientsTable
+        lines={props.lines ?? [EN_KG]}
+        units={CATALOGO}
+        quantity={props.quantity}
+        orderUnitId={props.orderUnitId}
+        bridge={PUENTE}
+        loading={false}
+        error={null}
+      />
+    );
+  }
+
+  function celdas() {
+    const fila = screen.getByTestId('order-ingredient-0');
+    return {
+      fila,
+      requerida: within(fila).getByTestId('order-ingredient-required'),
+      restante: within(fila).getByTestId('order-ingredient-remaining'),
+    };
+  }
+
+  it('R13 la cantidad requerida y el restante salen convertidos y con la unidad del insumo', () => {
+    render(tabla({ quantity: '1000', orderUnitId: GRAMO.id }));
+
+    const { requerida, restante } = celdas();
+    expect(requerida).toHaveAttribute('aria-label', '0.1 kg');
+    expect(requerida).toHaveTextContent('0.1 kg');
+    expect(restante).toHaveAttribute('aria-label', '0.9 kg');
+    expect(screen.queryByTestId('order-ingredient-approximate')).toBeNull();
+  });
+
+  it('R13 cambiar la unidad del pedido recalcula la tabla', () => {
+    const { rerender } = render(tabla({ quantity: '1000', orderUnitId: GRAMO.id }));
+    expect(celdas().requerida).toHaveAttribute('aria-label', '0.1 kg');
+
+    rerender(tabla({ quantity: '1000', orderUnitId: KILO.id }));
+
+    const { requerida, restante } = celdas();
+    expect(requerida).toHaveAttribute('aria-label', '100 kg');
+    expect(restante).toHaveAttribute('aria-label', '-99 kg');
+    expect(restante.firstElementChild).toHaveClass('text-destructive');
+  });
+
+  it('R14 una linea no convertible muestra el aviso y no muestra cifras', () => {
+    render(tabla({ quantity: '1000', orderUnitId: PIEZA.id }));
+
+    const { requerida, restante } = celdas();
+    expect(within(requerida).getByTestId('order-ingredient-not-convertible')).toBeInTheDocument();
+    expect(requerida.textContent).not.toMatch(/\d/);
+    expect(restante.textContent).toBe('—');
+  });
+
+  it('R15 una linea aproximada lleva la marca aprox.', () => {
+    render(tabla({ quantity: '2', orderUnitId: LITRO.id, lines: [{ ...EN_KG, percentage: '50.00' }] }));
+
+    const { requerida, restante } = celdas();
+    expect(requerida).toHaveAttribute('aria-label', '1 kg aprox.');
+    expect(within(requerida).getByTestId('order-ingredient-approximate')).toHaveTextContent('aprox.');
+    expect(restante).toHaveAttribute('aria-label', '0 kg');
+  });
+
+  it('R19 sin unidad elegida la tabla no muestra cifras', () => {
+    render(tabla({ quantity: '1000', orderUnitId: '' }));
+
+    const { requerida, restante } = celdas();
+    expect(requerida.textContent).toBe('—');
+    expect(restante.textContent).toBe('—');
+    expect(screen.queryByTestId('order-ingredient-not-convertible')).toBeNull();
+  });
+
+  it('R21 un insumo sin unidad muestra la cifra sin convertir y sin aviso', () => {
+    render(
+      tabla({
+        quantity: '1000',
+        orderUnitId: GRAMO.id,
+        lines: [{ ...LINEA, productUnitId: null, productStock: null }],
+      }),
+    );
+
+    const { requerida } = celdas();
+    expect(requerida.textContent).toBe('100');
+    expect(screen.queryByTestId('order-ingredient-not-convertible')).toBeNull();
+    expect(screen.queryByTestId('order-ingredient-approximate')).toBeNull();
   });
 });

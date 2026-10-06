@@ -91,6 +91,7 @@ function dobleDeUnidades(
       return visibles.filter((unidad) => ids.includes(unidad.id));
     }),
     listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+    findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
     findRefsSharingBaseInCompany: vi.fn(),
   };
 }

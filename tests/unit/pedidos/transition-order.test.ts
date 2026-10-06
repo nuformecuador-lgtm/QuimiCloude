@@ -14,11 +14,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { InvalidTransitionError } from '@/lib/modules/pedidos/domain/errors';
 import { createTransitionOrder } from '@/lib/modules/pedidos/domain/transition-order';
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeExecutionLine } from '@/lib/modules/recetas';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 const EMPRESA = 'c-1';
 const AHORA = new Date('2026-09-23T12:00:00Z');
@@ -261,7 +262,7 @@ describe('createTransitionOrder', () => {
     const setStatus = vi.fn(async () => 'stale' as const);
     const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
     const setReservedAt = vi.fn();
-    const { orders, reservations, recipes: scopeRecipes, finishedGoods } = fakeUnitOfWork({
+    const { orders, reservations, recipes: scopeRecipes, finishedGoods, products, units } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
       reservations: { consumeForOrder },
       recipes,
@@ -270,7 +271,7 @@ describe('createTransitionOrder', () => {
     const unitOfWork: OrderUnitOfWork = {
       run: async <T>(work: (scope: OrderTransactionScope) => Promise<T>) => {
         try {
-          return await work({ orders, reservations, recipes: scopeRecipes, finishedGoods });
+          return await work({ orders, reservations, recipes: scopeRecipes, finishedGoods, products, units });
         } catch (err) {
           vioLaExcepcion = true;
           throw err;
@@ -338,5 +339,53 @@ describe('QC-195 — pasar a POR_EMPACAR consume solo la receta', () => {
     expect(consumeForOrder).toHaveBeenCalledWith(expect.objectContaining({ productIds: ['p-1', 'p-2'] }));
     const entrada = (consumeForOrder.mock.calls[0] as unknown as readonly [{ fallbackRequirement: readonly { productId: string }[] }])[0];
     expect(entrada.fallbackRequirement.map((line) => line.productId)).toEqual(['p-1', 'p-2']);
+  });
+});
+
+describe('QC-204 createTransitionOrder — la necesidad de respaldo al finalizar', () => {
+  const GRAMO: UnitRef = { id: 'u-g', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null };
+  const KILO: UnitRef = { id: 'u-kg', name: 'Kilogramo', symbol: 'kg', baseUnitId: GRAMO.id, factor: '1000' };
+  const PIEZA: UnitRef = { id: 'u-pz', name: 'Pieza', symbol: 'pz', baseUnitId: null, factor: null };
+
+  /** Pedido de 1000 g, una linea al 10 % sobre `p-1` con la unidad dada, sin nada apartado. */
+  function montar(insumoUnitId: string) {
+    const { recipes } = catalogoDeRecetas([{ productId: 'p-1', productName: null, percentage: '10.00' }]);
+    const lockAliveById = vi.fn(async () => filaBloqueada({ quantity: '1000.0000', unitId: GRAMO.id }));
+    const setStatus = vi.fn(async () => 'ok' as const);
+    const setReservedAt = vi.fn(async () => undefined);
+    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, setStatus, setReservedAt },
+      reservations: { consumeForOrder },
+      recipes,
+      products: fakeScopeProducts([{ id: 'p-1', name: 'p-1', unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' }]),
+      units: fakeScopeUnits([GRAMO, KILO, PIEZA]),
+    });
+    return { transitionAliveById: createTransitionOrder({ unitOfWork }), consumeForOrder, setStatus };
+  }
+
+  it('R11 finalizar sin nada apartado consume la necesidad convertida', async () => {
+    const m = montar(KILO.id);
+
+    await expect(
+      m.transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+    ).resolves.toBe('ok');
+
+    const entrada = (m.consumeForOrder.mock.calls[0] as unknown as readonly [{ fallbackRequirement: readonly { productId: string; quantity: string }[] }])[0];
+    expect(entrada.fallbackRequirement).toHaveLength(1);
+    expect(entrada.fallbackRequirement[0]?.productId).toBe('p-1');
+    // 1000 g al 10 % son 100 g = 0.1 kg; sin convertir serian 100.
+    expect(Number(entrada.fallbackRequirement[0]?.quantity)).toBe(0.1);
+  });
+
+  it('R11 finalizar con una linea no convertible devuelve insufficient_material sin consumir', async () => {
+    const m = montar(PIEZA.id);
+
+    await expect(
+      m.transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+    ).resolves.toBe('insufficient_material');
+
+    expect(m.consumeForOrder).not.toHaveBeenCalled();
+    expect(m.setStatus).not.toHaveBeenCalled();
   });
 });

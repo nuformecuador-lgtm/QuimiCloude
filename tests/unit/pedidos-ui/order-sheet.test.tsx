@@ -199,6 +199,7 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
+  getMassVolumeBridgeAction: vi.fn(async () => ({ status: 'success', data: null })),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
@@ -536,7 +537,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // estado final `OrderRowActions` no llega a emitir nada (R24) y el panel no se abre.
     const user = setupUser();
     const elPedido = pedido();
-    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={UNIDADES} />);
+    render(<OrderRowSheetActions order={elPedido} recipes={RECETAS} units={UNIDADES} bridge={null} />);
 
     expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull();
 
@@ -560,7 +561,7 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
     // R24 — la pantalla anticipa la regla en vez de dejar intentarlo contra el servidor.
     const user = setupUser();
     render(
-      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} />,
+      <OrderRowSheetActions order={pedido({ status: 'ENTREGADO' })} recipes={RECETAS} units={[]} bridge={null} />,
     );
 
     await user.click(screen.getByTestId('order-row-actions'));

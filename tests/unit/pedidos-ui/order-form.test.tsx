@@ -307,7 +307,7 @@ const onSaved = vi.fn();
 function renderFormulario(order?: OrderSummary, recipes: RecipePickerPage = RECETAS) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={recipes} units={UNIDADES} onSaved={onSaved} />
+      <OrderForm order={order} recipes={recipes} units={UNIDADES} bridge={null} onSaved={onSaved} />
     </Sheet>,
   );
 }
@@ -1016,6 +1016,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     const requerida = within(tabla).getByTestId('order-ingredient-required');
@@ -1047,6 +1048,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
@@ -1072,6 +1074,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('40');
@@ -1102,6 +1105,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     renderFormulario();
 
     await elegirCatalogos(user);
+    await elegirUnidad(user);
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('0');

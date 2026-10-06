@@ -5054,3 +5054,34 @@ podar.
 - Nacen del review: QC-203 (agrupar homónimos por familia de unidad), QC-204 (convertir la unidad
   del pedido a la del insumo), QC-205 (unicidad nombre + unidad), QC-206 (unidad en uso no cambia
   factor), QC-207 (liberar material revisa los bloqueados).
+
+## 2026-10-05 — QC-204 conversion-unidad-pedido-a-insumo
+
+- La necesidad de cada insumo (cantidad × %) se expresa en la **unidad del pedido** y se convierte
+  a la del insumo antes de costear, apartar, ejecutar y mostrar. Misma familia: exacta (QC-76).
+  Masa ↔ volumen: aproximación sin densidad (1 ml ≈ 1 g), marcada «aprox.» en la línea y con nota
+  bajo el costo. Otras combinaciones: no convertibles; el guardado se rechaza con
+  `order_unit_not_convertible`.
+- Sin migraciones ni dependencias. `unidades` publica `convertWithApproximation` y
+  `findMassVolumeBridge`; el scope transaccional de pedidos lee productos y unidades en la misma
+  conexión. La cotización exige `unitId`.
+- Requisitos cubiertos: R1–R26 (R26 por guardias y revisión). PR #150, merge `62bcf626`. E2E
+  `pedido-conversion-de-unidad.spec.ts` 4/4.
+- Review: vuelta 1 OK (0 B, 7 m). m2, m4, m6 y m7 cerrados antes del PR; m5 (T8+T9 en un commit)
+  aceptado.
+- Decisiones humanas durante F2: `LineNeedUnits.orderUnitId` (T4); un envase como ingrediente no
+  tiene excepción (T9); un pedido antiguo sin unidad mantiene el costo guardado al editar (m3).
+- Dos merges de `dev` con conflictos: `feature_list.json`/`current.md` (resueltos por el
+  leader) y el conteo del catálogo de errores (70 códigos tras QC-204 y el fix de grupos).
+
+## 2026-10-06 — QC-211 pasos-de-envasado
+
+- PR #148 hacia dev, merge `81c04edb`. Spec R1–R32, D1–D13, 16 tasks (T15 manual del humano, pendiente).
+- Columna `recipes.packing_steps` (JSONB, default `[]`, sin backfill). Sección propia en alta y edición;
+  las versiones heredan los de la original. Importación PDF con campo `packingSteps` tolerante a su ausencia.
+- Empaque: paso a paso con `StepReader` tras Comenzar; lectura con `empaque.modificar` solo en `EN_EMPAQUE` a
+  nombre del actor. El operador nunca recibe los pasos de envasado.
+- Arregla en la misma rama `e2e/empaque.spec.ts`, rojo en dev desde 6ef2b6e9 (decisión del humano).
+- Review: vuelta 1 rechazada (B1 cita en comentario, m1–m3), vuelta 2 OK. Gate completo: 8 rojos, todos en
+  el baseline (nada que podar). E2E 16/16 en Chromium y WebKit.
+- Deudas: tarjeta de Jira sin mover (MCP caído), carpeta del worktree y base `QuimiCloude_QC211` sin borrar.

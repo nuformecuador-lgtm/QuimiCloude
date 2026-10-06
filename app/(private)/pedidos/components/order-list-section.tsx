@@ -12,7 +12,7 @@ import {
   listOrderCoverageAction,
   listOrdersAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
@@ -43,6 +43,7 @@ type OrderListSectionProps = {
   readonly recipes: RecipePickerPage;
   /** El catalogo de unidades del panel de cada fila (R43), mismo origen que `recipes`. */
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
 };
 
 /**
@@ -213,7 +214,7 @@ async function loadResponsiblesCatalog(): Promise<OrderResponsiblesCatalog> {
   };
 }
 
-export async function OrderListSection({ params, recipes, units }: OrderListSectionProps) {
+export async function OrderListSection({ params, recipes, units, bridge }: OrderListSectionProps) {
   const result = await listOrdersAction(params);
 
   if (result.status === 'error') {
@@ -248,6 +249,7 @@ export async function OrderListSection({ params, recipes, units }: OrderListSect
           totalPages={totalPages}
           recipes={recipes}
           units={units}
+          bridge={bridge}
           noMatches={{ clearHref: orderListHref({ ...params, search: '', page: FIRST_PAGE }) }}
         />
       </div>
@@ -286,6 +288,7 @@ export async function OrderListSection({ params, recipes, units }: OrderListSect
         totalPages={totalPages}
         recipes={recipes}
         units={units}
+        bridge={bridge}
         responsiblesByOrder={responsiblesByOrder}
         responsiblesCatalog={responsiblesCatalog}
         coverageByOrder={coverageByOrder}

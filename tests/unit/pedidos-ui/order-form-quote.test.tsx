@@ -16,6 +16,7 @@ import {
   ORDER_DISTRIBUTION_ADD_TESTID,
   PACKAGING_OPTION_TESTID,
   PACKAGING_SELECT_TESTID,
+  ORDER_COST_QUOTE_APPROXIMATE_TESTID,
   ORDER_COST_QUOTE_ERROR_TESTID,
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
@@ -40,7 +41,7 @@ import type {
   RecipeVersionListResult,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeDetail, RecipeSummary, RecipeVersionSummary } from '@/lib/modules/recetas';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 
 const {
   createOrderActionMock,
@@ -269,7 +270,7 @@ function lineaConEnvase(packages: number) {
 function renderFormulario(order?: OrderSummary) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={RECETAS} units={UNIDADES} onSaved={onSaved} />
+      <OrderForm order={order} recipes={RECETAS} units={UNIDADES} bridge={null} onSaved={onSaved} />
     </Sheet>,
   );
 }
@@ -383,6 +384,7 @@ describe('R12 — en la edicion, cambiar receta o cantidad recotiza', () => {
         recipeId: elPedido.recipeId,
         quantity: '7',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -406,6 +408,7 @@ describe('R12 — en la edicion, cambiar receta o cantidad recotiza', () => {
         recipeId: RECETA2.id,
         quantity: elPedido.quantity,
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -423,11 +426,12 @@ describe('R13/R14 de punta a punta — elegir receta y teclear cantidad en el al
     });
     renderFormulario();
 
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user);
 
     await waitFor(() => expect(quoteOrderCostActionMock).toHaveBeenCalledTimes(1));
-    expect(quoteOrderCostActionMock).toHaveBeenCalledWith({ recipeId: RECETA.id, quantity: '5' });
+    expect(quoteOrderCostActionMock).toHaveBeenCalledWith({ recipeId: RECETA.id, quantity: '5', unitId: UNIDAD.id });
 
     quoteOrderCostActionMock.mockClear();
     await user.clear(cantidad());
@@ -439,6 +443,7 @@ describe('R13/R14 de punta a punta — elegir receta y teclear cantidad en el al
     expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
       recipeId: RECETA.id,
       quantity: '125',
+      unitId: UNIDAD.id,
     });
   });
 });
@@ -517,6 +522,7 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
         recipeId: RECETA2.id,
         quantity: elPedido.quantity,
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -541,12 +547,14 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
     });
     renderFormulario();
 
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user, RECETA);
     await waitFor(() =>
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
 
@@ -566,6 +574,7 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA2.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -575,7 +584,6 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
       MISSING_VALUE_MARK,
     );
 
-    await elegirUnidad(user);
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
@@ -602,11 +610,12 @@ describe('R65 — la edicion cuenta lo que el propio pedido tiene apartado', () 
         recipeId: elPedido.recipeId,
         quantity: '7',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
   });
 
-  it('el alta no envia orderId, solo receta y cantidad (R65)', async () => {
+  it('el alta no envia orderId, solo receta, cantidad y unidad (R65)', async () => {
     const user = setupUser();
     quoteOrderCostActionMock.mockResolvedValue({
       status: 'success',
@@ -620,6 +629,7 @@ describe('R65 — la edicion cuenta lo que el propio pedido tiene apartado', () 
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
     const enviado = quoteOrderCostActionMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
@@ -677,18 +687,19 @@ describe('la cotizacion sigue a la version elegida', () => {
       data: id === RECETA.id ? [VIVA] : [],
     }));
     renderFormulario();
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user);
 
     await elegirVersion(user, 1);
     await waitFor(() =>
-      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '5' }),
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '5', unitId: UNIDAD.id }),
     );
 
     await user.clear(cantidad());
     await user.type(cantidad(), '8');
     await waitFor(() =>
-      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '8' }),
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '8', unitId: UNIDAD.id }),
     );
 
     await elegirVersion(user, 0);
@@ -696,6 +707,7 @@ describe('la cotizacion sigue a la version elegida', () => {
       expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
         recipeId: RECETA.id,
         quantity: '8',
+        unitId: UNIDAD.id,
       }),
     );
   });
@@ -707,6 +719,7 @@ describe('la cotizacion sigue a la version elegida', () => {
       data: id === RECETA.id ? [VIVA] : [],
     }));
     renderFormulario();
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user);
     await elegirVersion(user, 1);
@@ -733,6 +746,7 @@ describe('la cotizacion sigue a la version elegida', () => {
       expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
         recipeId: RECETA2.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA2.id));
@@ -755,6 +769,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
         recipeId: RECETA.id,
         quantity: '5',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: 3 }],
       }),
     );
@@ -773,6 +788,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
       expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
         recipeId: RECETA.id,
         quantity: '5',
+        unitId: UNIDAD.id,
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: 1 }],
       }),
     );
@@ -791,6 +807,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
         recipeId: RECETA.id,
         quantity: '8',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: 2 }],
       }),
     );
@@ -809,6 +826,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
         recipeId: RECETA.id,
         quantity: '8',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
   });
@@ -830,5 +848,48 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
       ),
     );
     expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('el bloque de coste avisa de la aproximacion masa-volumen', () => {
+  const GRAMO: UnitView = { id: crypto.randomUUID(), name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null, isSystem: true };
+  const KILO: UnitView = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg', baseUnitId: GRAMO.id, factor: '1000', isSystem: true };
+  const MILILITRO: UnitView = { id: crypto.randomUUID(), name: 'Mililitro', symbol: 'ml', baseUnitId: null, factor: null, isSystem: true };
+  const LITRO: UnitView = { id: crypto.randomUUID(), name: 'Litro', symbol: 'l', baseUnitId: MILILITRO.id, factor: '1000', isSystem: true };
+  const PUENTE: MassVolumeBridge = { volumeBaseId: MILILITRO.id, massBaseId: GRAMO.id };
+
+  function renderEdicion(ingredientsCost: string | null) {
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, percentage: '50.00', productUnitId: KILO.id }] }),
+    });
+    return render(
+      <Sheet open>
+        <OrderForm
+          order={pedido({ quantity: '2', unitId: LITRO.id, unitLabel: LITRO.symbol, ingredientsCost })}
+          recipes={RECETAS}
+          units={[GRAMO, KILO, MILILITRO, LITRO]}
+          bridge={PUENTE}
+          onSaved={onSaved}
+        />
+      </Sheet>,
+    );
+  }
+
+  it('R18 el bloque de costo indica la aproximacion si hay importe y alguna linea aproximada', async () => {
+    renderEdicion('12.5000');
+
+    expect(await screen.findByTestId('order-ingredient-approximate')).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_COST_QUOTE_APPROXIMATE_TESTID)).toHaveTextContent(
+      'Incluye una aproximación masa↔volumen (1 l ≈ 1 kg).',
+    );
+  });
+
+  it('R18 sin importe no se indica la aproximacion', async () => {
+    renderEdicion(null);
+
+    expect(await screen.findByTestId('order-ingredient-approximate')).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe(MISSING_VALUE_MARK);
+    expect(screen.queryByTestId(ORDER_COST_QUOTE_APPROXIMATE_TESTID)).toBeNull();
   });
 });

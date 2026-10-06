@@ -201,6 +201,7 @@ describe('accion de fila «Reparto y unidad»', () => {
         order={pedido('POR_EMPACAR')}
         recipes={{ items: [], totalPages: 1 }}
         units={UNIDADES}
+        bridge={null}
         canEditDistribution
       />,
     );
@@ -354,6 +355,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
         order={order}
         recipes={{ items: [], totalPages: 1 }}
         units={UNIDADES}
+        bridge={null}
         canEditDistribution
       />
     );

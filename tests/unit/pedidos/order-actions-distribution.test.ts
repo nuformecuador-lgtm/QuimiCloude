@@ -172,6 +172,17 @@ describe('updateOrderDistributionAction — T25', () => {
     expect(result).toEqual({ status: 'error', code: codigo, message: expect.any(String) })
   })
 
+  it('R12 el reparto con una unidad no convertible se traduce a order_unit_not_convertible', async () => {
+    updateOrderPresentationLinesMock.mockResolvedValue('unit_not_convertible')
+
+    const result = await updateOrderDistributionAction(ORDER_ID, {
+      unitId: UNIT_ID,
+      presentationLines: [{ presentationId: PRESENTATION_ID, packages: 1 }],
+    })
+
+    expect(result).toEqual({ status: 'error', code: 'order_unit_not_convertible', message: expect.any(String) })
+  })
+
   it('QC-195 R11: una linea con envase llega a la fachada con el envase y los envases como numero', async () => {
     updateOrderPresentationLinesMock.mockResolvedValue('ok')
     const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'

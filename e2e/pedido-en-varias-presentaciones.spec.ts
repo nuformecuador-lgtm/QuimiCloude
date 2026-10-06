@@ -311,7 +311,9 @@ async function finishProduction(page: Page, orderId: string, numberText: string)
 
   await page.goto(assignedOrderRoute(orderId));
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(numberText);
+  await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(
+    `${numberText} - ${RECIPE_NAME}`,
+  );
 
   // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
   const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);

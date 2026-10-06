@@ -14,13 +14,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  OrderUnitNotConvertibleError,
   RecipeNotFoundError,
   RecipeVersionUnderReviewError,
   UnauthorizedError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors';
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
@@ -29,7 +30,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { CostingBatch, PackagingCatalog, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
-import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
@@ -126,7 +127,11 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
     }),
   );
   const findRefsSharingBaseInCompany = vi.fn(async () => []);
-  return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
+  const findMassVolumeBridge = vi.fn(async () => null);
+  return {
+    units: { findRefs, findRefsSharingBaseInCompany, findMassVolumeBridge } as unknown as UnitCatalog,
+    findRefs,
+  };
 }
 
 /** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A, con el
@@ -851,7 +856,8 @@ describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE
 // T5 — la edicion RECALCULA el importe de los ingredientes con la receta del DATO ENTRANTE.
 
 const PRODUCTO_X = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-const LITRO: UnitConversion = { id: 'l', baseUnitId: null, factor: null };
+/** Deriva de la unidad del pedido con factor 1: la necesidad pasa al insumo sin cambiar de cifra. */
+const LITRO: UnitConversion = { id: 'l', baseUnitId: UNIT_ID, factor: '1' };
 
 /** Una unica linea al 100 %: la cantidad necesaria queda igual a la del pedido. */
 function lineaDeReceta(overrides: Partial<RecipeExecutionLine> = {}): RecipeExecutionLine {
@@ -897,6 +903,7 @@ function catalogosQueExplotan() {
     units: {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+      findMassVolumeBridge: explota('units.findMassVolumeBridge'),
     } as unknown as UnitCatalog,
     presentations: {
       findRefs: explota('presentations.findRefs'),
@@ -1587,5 +1594,84 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
     await expect(
       updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, SIN_PERMISO),
     ).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+});
+
+describe('QC-204 — la edicion convierte la necesidad con la unidad editada', () => {
+  const GRAMO: UnitRef = { id: 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null };
+  const KILO: UnitRef = { id: 'a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2', name: 'Kilogramo', symbol: 'kg', baseUnitId: GRAMO.id, factor: '1000' };
+  const PIEZA: UnitRef = { id: 'a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3', name: 'Pieza', symbol: 'pz', baseUnitId: null, factor: null };
+
+  /** La fila guardada esta en kg; la edicion la pasa a gramos. */
+  function montar(insumoUnitId: string) {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta({ percentage: '10.00' })]]]));
+    const insumo: ProductRef = { id: PRODUCTO_X, name: 'insumo', unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' };
+    const prod = catalogoDeProductos(
+      [loteCosteable({ stock: '100', unitCost: '3.0000', unitId: insumoUnitId })],
+      [insumo],
+    );
+    const uni = catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILO.id, KILO], [PIEZA.id, PIEZA]]));
+    const filaVista = { ...filaExistente(), quantity: '1000.0000', unitId: KILO.id };
+    const findAliveById = vi.fn(async () => filaVista);
+    const orders = { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository;
+    const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const setReservedAt = vi.fn(async () => undefined);
+    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, updateAlive, setReservedAt },
+      reservations: { syncForOrder },
+      recipes: cat.recipes,
+      products: fakeScopeProducts([insumo]),
+      units: fakeScopeUnits([GRAMO, KILO, PIEZA]),
+    });
+    const updateOrder = createUpdateOrder({
+      orders,
+      unitOfWork,
+      recipes: cat.recipes,
+      products: prod.products,
+      units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
+      now: () => AHORA,
+    });
+    return { updateOrder, updateAlive, syncForOrder, setReservedAt };
+  }
+
+  const EDICION_EN_GRAMOS = { recipeId: RECETA_DE_A, quantity: '1000', unitId: GRAMO.id };
+
+  it('R5 la edicion recalcula con la unidad editada', async () => {
+    const m = montar(KILO.id);
+
+    await m.updateOrder(ORDER_ID, EDICION_EN_GRAMOS, ACTOR_A);
+
+    // 1000 g al 10 % son 0.1 kg a 3.0000: 0.3000. Con la unidad guardada (kg) serian 300.0000.
+    expect((m.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '0.3000', packaging: '0.0000' });
+  });
+
+  it('R10 la edicion vuelve a apartar con la unidad nueva', async () => {
+    const m = montar(KILO.id);
+
+    await m.updateOrder(ORDER_ID, EDICION_EN_GRAMOS, ACTOR_A);
+
+    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { productId: string; quantity: string }[] }])[0];
+    expect(entrada.requirement).toHaveLength(1);
+    expect(entrada.requirement[0]?.productId).toBe(PRODUCTO_X);
+    expect(Number(entrada.requirement[0]?.quantity)).toBe(0.1);
+  });
+
+  it('R12 la edicion y el reparto con una linea no convertible se rechazan con order_unit_not_convertible', async () => {
+    const m = montar(PIEZA.id);
+
+    const error = await m.updateOrder(ORDER_ID, EDICION_EN_GRAMOS, ACTOR_A).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(OrderUnitNotConvertibleError);
+    expect((error as PedidosError).code).toBe('order_unit_not_convertible');
+    expect(m.updateAlive).not.toHaveBeenCalled();
+    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.setReservedAt).not.toHaveBeenCalled();
   });
 });
