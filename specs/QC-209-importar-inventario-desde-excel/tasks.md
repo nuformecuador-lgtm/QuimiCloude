@@ -58,7 +58,7 @@ Hecho cuando: los dos tests pasan; `pnpm typecheck` y `pnpm lint` en verde;
 
 Ningún archivo de esta pista está en `app/`, `components/` ni `tests/unit/inventario/importar/`.
 
-### B1 — Instalar las dependencias aprobadas · depende de: T0 (DS-3 aprobada el 2026-10-06)
+### [x] B1 — Instalar las dependencias aprobadas · depende de: T0 (DS-3 aprobada el 2026-10-06)
 
 - `package.json`, `pnpm-lock.yaml`: `read-excel-file` y `papaparse` (dependencias) y
   `@types/papaparse` (`devDependency`).
@@ -69,7 +69,7 @@ Ningún archivo de esta pista está en `app/`, `components/` ni `tests/unit/inve
 Hecho cuando: `guard-dependencias-aprobadas` y `guard-arquitectura-modulos` en verde. Si al instalar
 la versión resuelta no es la medida (`9.3.x` / `5.7.x`), se para y se vuelve al leader.
 
-### B2 [P] — Celdas a forma canónica · depende de: T0 · R12, R13
+### [x] B2 [P] — Celdas a forma canónica · depende de: T0 · R12, R13
 
 - `lib/modules/inventario/domain/import-cell-parsing.ts` — decimal con coma o punto sin miles,
   fechas `AAAA-MM-DD` / `DD/MM/AAAA` con `esDiaDeCalendario`, etiqueta de tipo sin tildes ni
@@ -78,7 +78,7 @@ la versión resuelta no es la medida (`9.3.x` / `5.7.x`), se para y se vuelve al
 
 Hecho cuando: casos `R12 …` y `R13 …` (incluidos `1.234,5`, `2026-02-30`, `31/12/2026`) en verde.
 
-### B3 [P] — Lector de hoja: puerto + .csv · depende de: B1 · R4
+### [x] B3 [P] — Lector de hoja: puerto + .csv · depende de: B1 · R4
 
 - `lib/modules/inventario/ports/spreadsheet-reader.ts`
 - `lib/modules/inventario/domain/import-file-format.ts` — extensión + firma ZIP / UTF-8 →
@@ -90,7 +90,7 @@ Hecho cuando: casos `R12 …` y `R13 …` (incluidos `1.234,5`, `2026-02-30`, `3
 Hecho cuando: comillas, comillas escapadas, salto de línea entre comillas, CRLF, BOM y detección
 de separador cubiertos; un .xlsx renombrado a .csv y un .csv renombrado a .xlsx → `unsupported_format`.
 
-### B4 — Lector .xlsx · depende de: B1, B3 · R4
+### [x] B4 — Lector .xlsx · depende de: B1, B3 · R4
 
 - `lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader.ts`
 - `tests/fixtures/inventario-importar/mixto.xlsx` (DS-13; si no se puede producir, se anota en
@@ -100,7 +100,7 @@ de separador cubiertos; un .xlsx renombrado a .csv y un .csv renombrado a .xlsx 
 Hecho cuando: números nativos sin redondeo silencioso (> 4 decimales → `number_format_invalid`),
 fechas nativas a `AAAA-MM-DD`, solo la primera hoja, ZIP corrupto → `unreadable`.
 
-### B5 [P] — Hoja: cabecera, límites y fila de ejemplo · depende de: B2 · R5, R6, R8
+### [x] B5 [P] — Hoja: cabecera, límites y fila de ejemplo · depende de: B2 · R5, R6, R8
 
 - `lib/modules/inventario/domain/import-sheet.ts` — de `SpreadsheetReadResult` a
   `ParsedImportSheet | ImportFileRejection`.
@@ -109,7 +109,7 @@ fechas nativas a `AAAA-MM-DD`, solo la primera hoja, ZIP corrupto → `unreadabl
 Hecho cuando: falta / sobra / repetida con los nombres; «Fila» y «Motivo» aceptadas; 2.000 sí y
 2.001 no; filas en blanco no cuentan; ejemplo idéntico ignorado y señalado.
 
-### B6 [P] — Migración `inventory_imports` · depende de: T0 · R29, R30
+### [x] B6 [P] — Migración `inventory_imports` · depende de: T0 · R29, R30
 
 - `db/schema.prisma` (modifica: modelo `InventoryImport`, `/// @module inventario`)
 - `db/migrations/<timestamp>_inventory_imports/migration.sql` y `down.sql`
@@ -117,7 +117,7 @@ Hecho cuando: falta / sobra / repetida con los nombres; «Fila» y «Motivo» ac
 Hecho cuando: `pnpm run db:migrate` y `pnpm run db:rollback` limpios (y `_prisma_migrations`
 coherente); RLS + `FORCE`; `guard-empresa-en-esquema` y la guardia de RLS en verde.
 
-### B7 — Puerto y adaptador de persistencia · depende de: B6 · R16, R18, R19, R29, R30, R31
+### [x] B7 — Puerto y adaptador de persistencia · depende de: B6 · R16, R18, R19, R29, R30, R31
 
 - `lib/modules/inventario/ports/inventory-import-repository.ts`
 - `lib/modules/inventario/ports/import-formula-lookup.ts` (interfaz del hueco hacia `recetas`)
@@ -159,7 +159,7 @@ Hecho cuando: un caso nombrado `R<n> …` por cada R de la lista; el permiso va 
 fila que falla no deshace las demás; **medida** la confirmación de 2.000 filas contra la base de
 integración y anotada en `progress/impl_…md` (si > 120 s, parar y preguntar, `design.md > 7`).
 
-### B9 [P] — Archivo de errores real · depende de: B1 · R3, R28
+### [x] B9 [P] — Archivo de errores real · depende de: B1 · R3, R28
 
 - `lib/modules/inventario/domain/inventory-import-downloads.ts` (completa
   `buildInventoryImportErrorFile` y pasa la plantilla de T0 a `Papa.unparse`, con `delimiter: ';'`
@@ -189,7 +189,7 @@ Solo contra el contrato de T0. Las acciones se simulan en los tests (`vi.mock` d
 de cada acción); en el navegador local responden los stubs de T0. Ningún archivo de esta pista está
 en `lib/`, `db/`, `tests/integration/` ni `tests/unit/inventario/*.test.ts` de B.
 
-### F1 — Página y enlace · depende de: T0 · R2
+### [x] F1 — Página y enlace · depende de: T0 · R2
 
 - `app/(private)/inventario/importar/page.tsx` — `requirePagePermission('inventario.modificar')`,
   `export const maxDuration = 300`, `listUnitsAction()`, metadata.
@@ -200,7 +200,7 @@ en `lib/`, `db/`, `tests/integration/` ni `tests/unit/inventario/*.test.ts` de B
 
 Hecho cuando: 404 sin permiso; con permiso pinta la pantalla; el enlace no aparece sin permiso.
 
-### F2 [P] — Subida y plantilla · depende de: F1 · R3, R4, R6
+### [x] F2 [P] — Subida y plantilla · depende de: F1 · R3, R4, R6
 
 - `.../importar/components/import-upload-field.tsx`, `import-template-button.tsx`,
   `download-file.ts`, `import-file-rejection.tsx`
@@ -209,7 +209,7 @@ Hecho cuando: 404 sin permiso; con permiso pinta la pantalla; el enlace no apare
 Hecho cuando: `accept` del contrato; aviso local por tamaño; cada `ImportFileRejection.code` tiene
 su texto con columnas y cuentas; la plantilla se descarga desde `buildInventoryImportTemplate`.
 
-### F3 [P] — Vista previa · depende de: F1 · R9, R10, R18, R20, R24
+### [x] F3 [P] — Vista previa · depende de: F1 · R9, R10, R18, R20, R24
 
 - `.../importar/components/import-preview-summary.tsx`, `import-preview-table.tsx`
 - `tests/unit/inventario/importar/import-preview.test.tsx`
@@ -218,7 +218,7 @@ Hecho cuando: totales; los cuatro estados distinguibles sin color (texto/icono);
 columna; filtro por estado; `add_batch` dice si es sobre existente o sobre la fila N; aviso de fila
 de ejemplo ignorada; «Confirmar» deshabilitado con 0 válidas y disponible con errores o faltantes.
 
-### F4 [P] — Faltantes y sus altas · depende de: F1 · R20, R21, R22, R23
+### [x] F4 [P] — Faltantes y sus altas · depende de: F1 · R20, R21, R22, R23
 
 - `.../importar/components/import-missing-catalog.tsx`, `import-create-unit-dialog.tsx`,
   `import-create-presentation-dialog.tsx`
@@ -229,7 +229,7 @@ diálogos llaman a `createUnitAction` / `createPresentationAction` con los campo
 y el nombre prellenado; muestran sus `ErrorState` (`unit_duplicate_name`, `duplicate_symbol`,
 `invalid_derivation`, `presentation_duplicate_name`, `unauthorized`); al éxito avisan al padre.
 
-### F5 — Pantalla, confirmación y resultado · depende de: F2, F3, F4 · R23, R24, R25, R28, R29
+### [x] F5 — Pantalla, confirmación y resultado · depende de: F2, F3, F4 · R23, R24, R25, R28, R29
 
 - `.../importar/components/inventory-import-screen.tsx`, `import-result-summary.tsx`
 - `tests/unit/inventario/importar/inventory-import-screen.test.tsx`
@@ -239,7 +239,7 @@ Hecho cuando: tras crear un faltante se vuelve a pedir la vista previa con el **
 tiene su texto; el archivo de errores se descarga desde `buildInventoryImportErrorFile` en vista
 previa y en resultado; estados de carga y `unexpected` con su `reference`.
 
-### F6 [P] — Pasada multiplataforma · depende de: F5
+### [x] F6 [P] — Pasada multiplataforma · depende de: F5
 
 - Solo archivos de `app/(private)/inventario/importar/components/`.
 
