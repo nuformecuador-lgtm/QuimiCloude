@@ -174,3 +174,4 @@ Ninguna. Las dos se cerraron el 2026-10-05 al aprobar el spec (ver la tabla).
 | 2026-10-05 | Pregunta 2: ¿cómo se ve «aprox.» y el aviso en el costo? | **Opción a**: texto «aprox.» junto a la cifra y una línea bajo el importe (`design.md > 8`). Humano, al aprobar el spec. |
 | 2026-10-05 | N1–N5 de `design.md` | **Aprobadas** con el spec. |
 | 2026-10-05 | ¿Un ingrediente que es envase (unidad «envase») en un pedido en kg o l? | **No convertible, sin excepción** (R4, R12): el guardado se rechaza. Solo se ajusta el dato de prueba de los casos R43 de QC-195 (`finish-with-finished-goods.int.test.ts`) a una combinación convertible. Humano, en F2.1 (T9). |
+| 2026-10-05 | ¿Qué muestra el costo al editar un pedido antiguo sin unidad? | **El importe guardado** (R20, R22), no el guion de R19, aunque la tabla de ingredientes muestre guiones. Al elegir una unidad se recalcula con la fórmula nueva. Humano, tras la review (m3). |
