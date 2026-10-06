@@ -307,6 +307,15 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
     expect(m.syncForOrder).not.toHaveBeenCalled();
   });
 
+  it('R5: si una edicion cambio la unidad entre la lectura y el candado, se deja para la siguiente revision sin guardar el costo de la unidad vieja', async () => {
+    const m = montar({ bloqueadas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { unitId: 'ml' })]]) });
+
+    expect(await m.review({ companyId: EMPRESA_A, now: AHORA })).toEqual({ unblocked: 0, failed: [] });
+    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.setStatus).not.toHaveBeenCalled();
+    expect(m.setIngredientsCost).not.toHaveBeenCalled();
+  });
+
   it('R23: un fallo en un pedido no impide los demas y aparece en failed con su codigo', async () => {
     const m = montar({
       ids: [PEDIDO_1, PEDIDO_2, PEDIDO_3],
