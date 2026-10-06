@@ -127,3 +127,40 @@ Vuelve al implementer por B1: `movement-reason.test.ts` R9 en rojo por los liter
 puede acotarse al diff de la corrección, y debe volver a correr
 `tests/unit/inventario/movement-reason.test.ts` y `tests/unit/inventario/stock-adjustment.test.ts`
 (su caso R28 lee las mismas fuentes).
+
+## Vuelta 2 (acotada a afec8f42..ff67376c)
+
+Diff: `movement-reason.ts` (+6), `stock-adjustment.ts` (+2 -2), `design.md` (+30 -3) y la
+bitácora. No toca `tests/`, esquema, migraciones ni componentes compartidos.
+
+### Checklist
+- [x] B1 cerrado: `STOCK_INCREASE_REASONS` vive en `movement-reason.ts` (el `OWN_FILE` exento),
+      tipado `as const satisfies readonly MovementReason[]`; `stock-adjustment.ts` lo importa y ya
+      no repite literales. `REASONS_BY_DIRECTION`, `reasonsFor` e `isReasonAllowed` no cambian de
+      forma. La guardia de QC-92 no se tocó (sin diff en `tests/`). La constante no se publica en
+      el barrel (solo la usan esos dos archivos).
+- [x] `tests/unit/inventario/movement-reason.test.ts` y `stock-adjustment.test.ts` (su R28 lee
+      las mismas fuentes): 2 archivos, 40 tests, verdes.
+- [x] m1 cerrado: la fila de `countedStock` en `design.md > 1.3` dice «`readOptionalFormString`,
+      luego zod».
+- [x] m2 cerrado: enmienda de UI en `design.md > 4` (total parcial bloquea con
+      `adjust-batch-counted-error`, reset de Base UI ignorado, resultado anterior oculto al
+      reabrir) y fila de `guard-identificador-de-request.test.ts:447` en `design.md > 8`.
+- [x] m3 cerrado: enmienda en `design.md > 1.8` que describe el puente que se hizo.
+- [x] Typecheck (`tsc --noEmit`): limpio.
+- [x] Lint de los dos archivos tocados: limpio.
+- [x] Guardias (`vitest run tests/guards`): 44 archivos verdes.
+- [x] `vitest related` de los dos archivos de dominio: 398 archivos, 6 rojos, **todos en
+      `tests/baseline-rojos.json`** (`recetas/module-contract`, `configuracion-ui/unidades-viewport`,
+      `configuracion-ui/usuarios-viewport`, `inventario/product-page`,
+      `navegacion/pantallas-exigen-permiso`, `recetas-ui/recipe-page`). Ninguno nuevo.
+- [x] Comentarios: el único añadido en producción (JSDoc de `STOCK_INCREASE_REASONS`) explica el
+      porqué y no cita `QC-<n>`, `R<n>` ni `design.md`.
+- [x] Mapa R<n> -> test: sin cambios respecto a la vuelta 1.
+- No corridos (los corre el leader en F2.4): `.int`, E2E y `./init.sh` completo.
+
+### Hallazgos
+Ninguno abierto. Sin regresiones en el rango.
+
+### Veredicto
+**OK**.
