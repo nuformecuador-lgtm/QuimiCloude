@@ -161,9 +161,7 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
           data-testid="recipe-version-inherited-packing-steps"
           className="flex flex-col gap-2"
         >
-          <h3 className="text-sm font-semibold">
-            Pasos de envasado
-          </h3>
+          <h3 className="text-sm font-semibold">Pasos de envasado</h3>
           <ol className="flex flex-col gap-4">
             {version.packingSteps.map((step, index) => (
               <li key={index} className="flex flex-col gap-2">

@@ -348,6 +348,33 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
   });
 
+  it('R21: mientras termina, el ultimo boton dice «Terminando…» como el boton de hoy', async () => {
+    let resolver: (value: { status: 'success' }) => void = () => {};
+    finishPackingActionMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolver = resolve;
+      }),
+    );
+    await recorrerHastaElUltimo();
+
+    try {
+      fireEvent.click(screen.getByTestId('step-reader-finish'));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+      });
+
+      const terminar = screen.getByTestId('step-reader-finish');
+      expect(terminar).toHaveTextContent('Terminando…');
+      expect(terminar).toBeDisabled();
+      expect(terminar).toHaveAttribute('aria-busy', 'true');
+    } finally {
+      // Una acción sin resolver deja colgada la transición y bloquea las del caso siguiente.
+      await act(async () => {
+        resolver({ status: 'success' });
+      });
+    }
+  });
+
   it('R21: los errores de terminar se pintan en la region de siempre', async () => {
     finishPackingActionMock.mockResolvedValue({
       status: 'error',

@@ -305,7 +305,7 @@ export function extractLineErrors(issues: readonly ZodIssue[]): RecipeLineErrors
 }
 
 /**
- * Extrae de `error.issues` los mensajes que identifican un paso concreto (R32, R38 del esquema).
+ * Extrae de `error.issues` los mensajes que identifican un paso concreto.
  * `root` separa los pasos del operador de los de envasado: comparten índices.
  */
 export function extractStepErrors(

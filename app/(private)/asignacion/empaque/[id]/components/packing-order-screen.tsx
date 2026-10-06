@@ -246,7 +246,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
             onFinish={() => setFinishConfirmOpen(true)}
             minStepSeconds={PACKING_MIN_STEP_SECONDS}
             mode="ejecucion"
-            finishLabel={FINISH_LABEL}
+            finishLabel={finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
             finishBusy={finishPending}
           />
         </div>

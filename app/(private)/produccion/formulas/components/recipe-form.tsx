@@ -192,7 +192,7 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
     steps: recipe.steps.map(
       (step): RecipeStepFormValue => ({ key: createLocalKey('step'), document: step }),
     ),
-    // Un detalle sin la clave (lecturas anteriores a la columna) abre con la sección vacía.
+    // El tipo la exige, pero un detalle sin la clave debe abrir la sección vacía, no romper.
     packingSteps: (recipe.packingSteps ?? []).map(
       (step): RecipeStepFormValue => ({ key: createLocalKey('packing-step'), document: step }),
     ),
