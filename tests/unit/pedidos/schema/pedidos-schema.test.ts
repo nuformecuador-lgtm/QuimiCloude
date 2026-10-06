@@ -712,7 +712,14 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((modelName): modelName is string => modelName !== undefined)
       .sort()
     expect(pedidosModels).toEqual(['Order', 'OrderPresentationLine'])
-    expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
+    // `import` aqui es «importe». `InventoryImport` (QC-209, 2026-10-06) es el registro de una
+    // importacion de archivo, sin dinero: se exime solo ese nombre; el patron sigue entero.
+    const IMPORTACION_DE_ARCHIVO = new Set(['InventoryImport'])
+    expect(
+      modelNames.filter(
+        (name) => /cost|price|import/i.test(name) && !IMPORTACION_DE_ARCHIVO.has(name),
+      ),
+    ).toEqual([])
   })
 
   it('QC-195 R47: orders gana packagingCost, decimal(14,4) opcional y sin default, junto a ingredientsCost', () => {

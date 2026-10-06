@@ -100,11 +100,12 @@ const PRESENTACION_VALIDA = {
   unitId: '11111111-1111-4111-8111-111111111111',
 };
 
-/** QC-92 (R3, R8): entrada valida minima del AJUSTE. Delta entero distinto de cero y motivo del
- *  conjunto cerrado; el `batchId` es un uuid cualquiera porque aqui no hay base. */
+/** Entrada valida minima del AJUSTE: un total contado distinto de la existencia vista y un motivo
+ *  que vale para su sentido; el `batchId` es un uuid cualquiera porque aqui no hay base. */
 const AJUSTE_VALIDO = {
   batchId: '22222222-2222-4222-8222-222222222222',
-  delta: '2',
+  countedStock: '8',
+  seenStock: '10',
   reason: 'merma',
 };
 
@@ -282,7 +283,10 @@ function montarReposPermisivos(): Repos {
         lot: '1',
       })),
       adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({
-        stock: '1.0000',
+        kind: 'adjusted',
+        previousStock: '10.0000',
+        difference: '-2.0000',
+        stock: '8.0000',
         reserved: '0.0000',
         overReserved: false,
       })),

@@ -17,10 +17,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
   addBatchToAlive,
-  adjustBatchStock,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { BatchStockNegativeError } from '@/lib/modules/inventario/domain/errors';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -429,7 +429,7 @@ describe('R29, R32 — el ajuste de lote recalcula stock sin tocar el resto del 
 
       const antes = await prisma.product.findUniqueOrThrow({ where: { id: creado.id } });
 
-      const subida = await adjustBatchStock(
+      const subida = await adjustByDelta(
         creado.batchId,
         '6',
         'conteo_fisico',
@@ -437,10 +437,10 @@ describe('R29, R32 — el ajuste de lote recalcula stock sin tocar el resto del 
         new Date(Date.now() + 60_000),
         ambito(fixture),
       );
-      expect(subida).toEqual({ stock: '11.0000', reserved: '0.0000', overReserved: false });
+      expect(subida).toMatchObject({ kind: 'adjusted', stock: '11.0000', reserved: '0.0000', overReserved: false });
       expect(await stockOf(creado.id)).toBe('21.0000');
 
-      const bajada = await adjustBatchStock(
+      const bajada = await adjustByDelta(
         creado.batchId,
         '-9',
         'merma',
@@ -448,7 +448,7 @@ describe('R29, R32 — el ajuste de lote recalcula stock sin tocar el resto del 
         new Date(Date.now() + 120_000),
         ambito(fixture),
       );
-      expect(bajada).toEqual({ stock: '2.0000', reserved: '0.0000', overReserved: false });
+      expect(bajada).toMatchObject({ kind: 'adjusted', stock: '2.0000', reserved: '0.0000', overReserved: false });
       expect(await stockOf(creado.id)).toBe('12.0000');
 
       // R32: la unica columna del producto que cambio es `stock`.
@@ -478,7 +478,7 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
       productIds.push(creado.id);
 
       await expect(
-        adjustBatchStock(creado.batchId, '-6', 'merma', fixture.actorId, new Date(), ambito(fixture)),
+        adjustByDelta(creado.batchId, '-6', 'merma', fixture.actorId, new Date(), ambito(fixture)),
       ).rejects.toBeInstanceOf(BatchStockNegativeError);
 
       expect(await stockOf(creado.id)).toBe('5.0000');
@@ -511,7 +511,7 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
       productIdsB.push(productoDeB.id);
 
       // El lote es de A, pero el ambito con el que se ajusta es el de B.
-      const resultado = await adjustBatchStock(
+      const resultado = await adjustByDelta(
         productoDeA.batchId,
         '3',
         'conteo_fisico',
@@ -519,7 +519,7 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
         new Date(),
         ambito(fixtureB),
       );
-      expect(resultado).toBeNull();
+      expect(resultado).toEqual({ kind: 'batch_not_found' });
 
       expect(await stockOf(productoDeA.id)).toBe('5.0000');
       expect(await stockOf(productoDeB.id)).toBe('9.0000');
@@ -556,11 +556,11 @@ describe('R31 — dos escrituras concurrentes sobre el mismo producto suman las 
 
       // Sin `await` entre los dos: compiten de verdad por la fila del producto.
       const [primero, segundoAjuste] = await Promise.all([
-        adjustBatchStock(creado.batchId, '5', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
-        adjustBatchStock(segundo.batchId, '-3', 'merma', fixture.actorId, new Date(), ambito(fixture)),
+        adjustByDelta(creado.batchId, '5', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
+        adjustByDelta(segundo.batchId, '-3', 'merma', fixture.actorId, new Date(), ambito(fixture)),
       ]);
-      expect(primero).not.toBeNull();
-      expect(segundoAjuste).not.toBeNull();
+      expect(primero).toMatchObject({ kind: 'adjusted' });
+      expect(segundoAjuste).toMatchObject({ kind: 'adjusted' });
 
       // 10 + 5 + 20 - 3: si el recalculo de uno pisara al del otro, esto quedaria en 32 o en 27.
       expect(await stockOf(creado.id)).toBe('32.0000');
@@ -583,7 +583,7 @@ describe('R31 — dos escrituras concurrentes sobre el mismo producto suman las 
       productIds.push(creado.id);
 
       const [ajuste, agregado] = await Promise.all([
-        adjustBatchStock(creado.batchId, '4', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
+        adjustByDelta(creado.batchId, '4', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
         addBatchToAlive(
           creado.id,
           newBatch(fixture, fixture.kgPresentationId, { stock: '6' }),
@@ -591,7 +591,7 @@ describe('R31 — dos escrituras concurrentes sobre el mismo producto suman las 
           ambito(fixture),
         ),
       ]);
-      expect(ajuste).not.toBeNull();
+      expect(ajuste).toMatchObject({ kind: 'adjusted' });
       expect(agregado).not.toBeNull();
 
       // 10 + 4 + 6: ninguno de los dos cambios se pierde.

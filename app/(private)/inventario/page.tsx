@@ -1,11 +1,16 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { buttonVariants } from '@/components/ui/button';
+import { identity } from '@/lib/composition';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
-import type { ProductFormUnits } from '@/lib/modules/inventario';
+import { canAdjustBatchStock, type ProductFormUnits } from '@/lib/modules/inventario';
 import { listProductFormUnitsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
+import { INVENTORY_IMPORT_ROUTE } from '@/lib/shared/routes';
+import { cn } from '@/lib/utils';
 
 import {
   parseProductListParams,
@@ -31,8 +36,8 @@ export const metadata: Metadata = {
  * del layout privado ya lo es, y R5 de QC-11 exige que sea unico. (Escrito sin el signo de menor
  * que a proposito: una guardia de fuente que busque la etiqueta no debe encontrarla ni aqui.)
  *
- * **Los componentes se importan SOLO desde `./components`** (R27), nunca por ruta profunda. El
- * barrel no declara `'use client'`: la frontera la declara cada componente, asi que esta pagina
+ * **Los componentes se importan SOLO desde `./components`**, nunca por ruta profunda. El barrel
+ * no lleva la directiva de cliente: la frontera la declara cada componente, asi que esta pagina
  * sigue siendo un Server Component aunque importe de el.
  *
  * **El estado de lista vive en la cadena de consulta, no en React** (`design.md > 4.2`): asi
@@ -72,11 +77,13 @@ export default async function InventarioPage({
   // El alta pide sus unidades con el permiso de inventario: quien da de alta no tiene por que
   // poder consultar el catalogo de unidades. Si falla, el selector sale vacio y el envio lo
   // rechaza el esquema.
-  const [params, unitsResult, formUnitsResult] = await Promise.all([
+  const [params, unitsResult, formUnitsResult, sessionUser] = await Promise.all([
     searchParams.then(parseProductListParams),
     listUnitsAction(),
     listProductFormUnitsAction(),
+    identity.getSessionUser(),
   ]);
+  const canImport = canAdjustBatchStock(sessionUser);
   const units = unitsResult.status === 'success' ? unitsResult.data : undefined;
   const formUnits: ProductFormUnits =
     formUnitsResult.status === 'success' ? formUnitsResult.data : [];
@@ -87,7 +94,19 @@ export default async function InventarioPage({
         <h1 data-testid="inventario-title" className="text-2xl font-semibold">
           Inventario
         </h1>
-        <ProductSheet units={units} formUnits={formUnits} />
+        <div className="flex flex-wrap items-center gap-2">
+          {canImport ? (
+            <Link
+              href={INVENTORY_IMPORT_ROUTE}
+              data-slot="button"
+              data-testid="inventory-import-link"
+              className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+            >
+              Importar
+            </Link>
+          ) : null}
+          <ProductSheet units={units} formUnits={formUnits} />
+        </div>
       </div>
       {/*
         SIN `key`: este limite NO se vuelve a montar en cada cambio de consulta. La llevaba (la

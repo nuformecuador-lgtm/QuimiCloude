@@ -106,6 +106,25 @@ export class ActionNotAllowedError extends InventarioError {
   }
 }
 
+/** Lleva la existencia real del lote para que la pantalla recalcule la diferencia sin recargar. */
+export class BatchStockChangedError extends InventarioError {
+  readonly code = 'batch_stock_changed';
+  readonly currentStock: string;
+
+  constructor(currentStock: string, diagnostic?: string) {
+    super('batch_stock_changed', diagnostic);
+    this.currentStock = currentStock;
+  }
+}
+
+export class AdjustmentReasonNotAllowedError extends InventarioError {
+  readonly code = 'adjustment_reason_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('adjustment_reason_not_allowed', diagnostic);
+  }
+}
+
 export class ValidationError extends InventarioError {
   readonly code = 'invalid_input';
 

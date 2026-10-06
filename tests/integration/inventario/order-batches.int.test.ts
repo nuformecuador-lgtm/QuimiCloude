@@ -12,12 +12,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
-  adjustBatchStock,
   createWithFirstBatch,
   findBatchesOfAliveProduct,
   findBatchesOfOrder,
   receiveFinishedGoods,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
@@ -245,11 +245,11 @@ describe('findBatchesOfOrder: los lotes de producto terminado de un pedido', () 
       const pedido = await sembrarPedido(fixture);
       const { batchId } = await recibir(fixture, pedido, await sembrarPresentacion(fixture, 'Botella 500 ml', '0.5'), 2);
 
-      const parcial = await adjustBatchStock(batchId, '-0.2', 'merma', fixture.empresa.userId, new Date(), fixture.scope);
+      const parcial = await adjustByDelta(batchId, '-0.2', 'merma', fixture.empresa.userId, new Date(), fixture.scope);
       expect(parcial).toMatchObject({ stock: '0.8000' });
       expect((await findBatchesOfOrder(pedido, fixture.scope))[0]?.stock).toBe('0.8000');
 
-      await adjustBatchStock(batchId, '-0.8', 'merma', fixture.empresa.userId, new Date(), fixture.scope);
+      await adjustByDelta(batchId, '-0.8', 'merma', fixture.empresa.userId, new Date(), fixture.scope);
       expect((await findBatchesOfOrder(pedido, fixture.scope)).map((lote) => [lote.id, lote.stock])).toEqual([
         [batchId, '0.0000'],
       ]);

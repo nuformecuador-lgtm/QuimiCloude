@@ -1,0 +1,10 @@
+﻿Tipo;Nombre;Unidad;Presentación;Fórmula;Existencia;Costo unitario;Costo total;Lote;Fecha de compra;Fecha de vencimiento;Alerta de cantidad
+Insumo;qc209_e2e_{{RUN}}_insumo_nuevo;kilogramo;;;25;3,50;;qc209_{{RUN}}_L01;;;5
+Insumo;qc209_e2e_{{RUN}}_insumo_existente;kilogramo;;;5;2;;qc209_{{RUN}}_L02;;;1
+Envase;qc209_e2e_{{RUN}}_envase;;qc209_e2e_{{RUN}}_botella;;40;0,25;;qc209_{{RUN}}_L03;;;10
+Instrumento;qc209_e2e_{{RUN}}_instrumento;;;;2;150;;qc209_{{RUN}}_L04;;;
+Producto terminado;;;qc209_e2e_{{RUN}}_botella;qc209_e2e_{{RUN}}_formula;12;4;;qc209_{{RUN}}_L05;;;
+Insumo;qc209_e2e_{{RUN}}_insumo_existente;kilogramo;;;3;2;;qc209_{{RUN}}_L00;;;1
+Insumo;qc209_e2e_{{RUN}}_insumo_error;kilogramo;;;4;1;;qc209_{{RUN}}_L06;;;
+Insumo;qc209_e2e_{{RUN}}_insumo_tambor;qc209_e2e_{{RUN}}_tambor;;;6;1;;qc209_{{RUN}}_L07;;;2
+Insumo;qc209_e2e_{{RUN}}_insumo_tambor;qc209_e2e_{{RUN}}_tambor;;;4;1;;qc209_{{RUN}}_L08;;;2

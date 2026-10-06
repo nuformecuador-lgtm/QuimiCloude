@@ -141,6 +141,12 @@ export const ERROR_CODES = [
   // Distinto de `incompatible_units` e `insufficient_material`: el material puede estar, lo que
   // falla es llevar la cantidad del pedido a la unidad de algun insumo de su receta.
   'order_unit_not_convertible',
+  // Distinto de `batch_stock_negative`: el ajuste no deja la existencia bajo cero, es que se
+  // calculo contra una existencia que ya no es la del lote.
+  'batch_stock_changed',
+  // Distinto de `invalid_input`: el motivo es uno de los validos, pero no para el sentido del
+  // ajuste.
+  'adjustment_reason_not_allowed',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

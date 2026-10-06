@@ -19,7 +19,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
-import { adjustBatchStock, createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
@@ -334,7 +335,7 @@ describe('una merma simultanea a un apartado sobre el mismo producto no deja el 
       // producto deja a la merma leer el `stock` comprometido, gane quien gane la carrera.
       const [alta, merma] = await Promise.allSettled([
         createOrder(nuevoPedido(recipeId, fixture.unitId, '50.0000'), actorDe(fixture)),
-        adjustBatchStock(batchId, '-50', 'merma', fixture.actorId, new Date(), ambitoDe(fixture)),
+        adjustByDelta(batchId, '-50', 'merma', fixture.actorId, new Date(), ambitoDe(fixture)),
       ]);
 
       expect(merma.status).toBe('fulfilled');
