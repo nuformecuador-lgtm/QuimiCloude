@@ -54,7 +54,7 @@ import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma'
-import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
+import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
@@ -72,6 +72,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
+import { orderScopeReaders } from '../../helpers/order-scope-readers';
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -107,6 +108,7 @@ const unitOfWork: OrderUnitOfWork = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
         recipes: createRecipeExecutionReader(tx),
+        ...orderScopeReaders(tx),
         finishedGoods: createFinishedGoodsIntake(tx),
       }
       return work(scope)
@@ -130,6 +132,7 @@ const presentations: PresentationCatalog = {
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
   listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+  findMassVolumeBridge: () => findMassVolumeBridge(),
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 }
 
@@ -835,7 +838,7 @@ describe('QC-199 — los lotes de insumo sin presentacion cuentan en el costeo',
     const recipeId = await crearReceta(A, productId)
 
     try {
-      const coste = await resolveLotIngredientsCost(recipes, products, units, recipeId, '4.0000', A.companyId)
+      const coste = await resolveLotIngredientsCost(recipes, products, units, recipeId, '4.0000', null, A.companyId)
       expect(coste).toBe('20.0000')
     } finally {
       await borrarReceta(recipeId)

@@ -22,6 +22,7 @@
  * `order_presentation_line_not_editable`, `order_distribution_exceeds_quantity`,
  * `order_without_unit`.
  * **Decimoquinta enmienda, 2026-10-01**: `order_would_block`, `order_blocked`.
+ * **2026-10-05**: `order_unit_not_convertible`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -65,6 +66,10 @@ export const ERROR_CODES = [
   'work_group_member_exists_inactive',
   'work_group_member_exists_blocked',
   'work_group_member_not_found',
+  // Distinto de los `work_group_member_exists_*`: la persona no pertenece y no puede entrar.
+  'work_group_member_not_active',
+  // Distinto de `self_operation`: el texto nombra el grupo, y esa regla es de grupos.
+  'work_group_member_self',
   'order_delivered_frozen',
   'order_cancelled_not_assignable',
   'order_assignment_not_found',
@@ -133,6 +138,9 @@ export const ERROR_CODES = [
   'order_without_unit',
   // Distinto de `recipe_not_found`: la version existe y esta viva, pero sus lineas no suman 100 %.
   'recipe_version_under_review',
+  // Distinto de `incompatible_units` e `insufficient_material`: el material puede estar, lo que
+  // falla es llevar la cantidad del pedido a la unidad de algun insumo de su receta.
+  'order_unit_not_convertible',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

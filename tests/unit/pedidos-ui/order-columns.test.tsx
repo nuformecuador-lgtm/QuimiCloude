@@ -64,6 +64,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
 const ORDER_COLUMNS = buildOrderColumns({
   recipes: { items: [], totalPages: 1 },
   units: [],
+  bridge: null,
 });
 
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222';
@@ -535,6 +536,7 @@ describe('QC-102 — la columna propia de responsables (R16)', () => {
     const columnas = buildOrderColumns({
       recipes: { items: [], totalPages: 1 },
       units: [],
+      bridge: null,
       responsiblesByOrder: { [order.id]: [RESPONSABLE] },
     });
     const columna = columnas.find((candidate) => candidate.id === RESPONSIBLES_COLUMN_ID);
@@ -576,6 +578,7 @@ describe('QC-141 T14 — la columna propia de cobertura del material (R35)', () 
       const columnas = buildOrderColumns({
         recipes: { items: [], totalPages: 1 },
         units: [],
+        bridge: null,
         coverageByOrder: { [order.id]: coverage },
       });
       const columna = columnas.find((candidate) => candidate.id === COVERAGE_COLUMN_ID);

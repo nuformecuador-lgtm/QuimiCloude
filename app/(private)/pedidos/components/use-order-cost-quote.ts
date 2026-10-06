@@ -46,12 +46,15 @@ export type OrderCostQuoteState = {
 
 type OrderCostQuoteHandlers = {
   readonly state: OrderCostQuoteState;
-  readonly onRecipeChange: (recipeId: string | null, quantity: string) => void;
-  readonly onQuantityChange: (recipeId: string | null, quantity: string) => void;
+  readonly onRecipeChange: (recipeId: string | null, quantity: string, unitId: string) => void;
+  readonly onQuantityChange: (recipeId: string | null, quantity: string, unitId: string) => void;
+  /** La cantidad se convierte a la unidad de cada insumo: otra unidad, otro costo. */
+  readonly onUnitChange: (recipeId: string | null, quantity: string, unitId: string) => void;
   /** El costo de los envases depende del reparto: cambiarlo vuelve a cotizar. */
   readonly onDistributionChange: (
     recipeId: string | null,
     quantity: string,
+    unitId: string,
     lines: readonly OrderDistributionLine[],
   ) => void;
 };
@@ -59,6 +62,7 @@ type OrderCostQuoteHandlers = {
 function canQuote(
   recipeId: string | null,
   quantity: string,
+  unitId: string,
   lines: readonly OrderDistributionLine[],
 ): recipeId is string {
   return (
@@ -67,6 +71,7 @@ function canQuote(
     quoteOrderCostSchema.safeParse({
       recipeId,
       quantity,
+      unitId,
       presentationLines: toDistributionLinesInput(lines),
     }).success
   );
@@ -99,7 +104,7 @@ export function useOrderCostQuote(
 
   useEffect(() => clearPendingTimer, [clearPendingTimer]);
 
-  const request = useCallback((recipeId: string, quantity: string) => {
+  const request = useCallback((recipeId: string, quantity: string, unitId: string) => {
     const id = ++requestRef.current;
     setQuoting(true);
     setError(null);
@@ -110,6 +115,7 @@ export function useOrderCostQuote(
     void quoteOrderCostAction({
       recipeId,
       quantity,
+      unitId,
       ...(orderId === undefined ? {} : { orderId }),
       ...(presentationLines.length === 0 ? {} : { presentationLines }),
     })
@@ -142,47 +148,51 @@ export function useOrderCostQuote(
     setError(null);
   }, [clearPendingTimer]);
 
-  const onRecipeChange = useCallback(
-    (recipeId: string | null, quantity: string) => {
+  const quoteNow = useCallback(
+    (recipeId: string | null, quantity: string, unitId: string) => {
       clearPendingTimer();
-      if (!canQuote(recipeId, quantity, linesRef.current)) {
+      if (!canQuote(recipeId, quantity, unitId, linesRef.current)) {
         goToDash();
         return;
       }
-      request(recipeId, quantity);
+      request(recipeId, quantity, unitId);
     },
     [clearPendingTimer, goToDash, request],
   );
 
   const schedule = useCallback(
-    (recipeId: string | null, quantity: string) => {
+    (recipeId: string | null, quantity: string, unitId: string) => {
       clearPendingTimer();
-      if (!canQuote(recipeId, quantity, linesRef.current)) {
+      if (!canQuote(recipeId, quantity, unitId, linesRef.current)) {
         goToDash();
         return;
       }
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        request(recipeId, quantity);
+        request(recipeId, quantity, unitId);
       }, ORDER_COST_QUOTE_DEBOUNCE_MS);
     },
     [clearPendingTimer, goToDash, request],
   );
 
-  const onQuantityChange = schedule;
-
   const onDistributionChange = useCallback(
-    (recipeId: string | null, quantity: string, lines: readonly OrderDistributionLine[]) => {
+    (
+      recipeId: string | null,
+      quantity: string,
+      unitId: string,
+      lines: readonly OrderDistributionLine[],
+    ) => {
       linesRef.current = lines;
-      schedule(recipeId, quantity);
+      schedule(recipeId, quantity, unitId);
     },
     [schedule],
   );
 
   return {
     state: { amount, quoting, error },
-    onRecipeChange,
-    onQuantityChange,
+    onRecipeChange: quoteNow,
+    onQuantityChange: schedule,
+    onUnitChange: quoteNow,
     onDistributionChange,
   };
 }

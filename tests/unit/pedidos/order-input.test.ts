@@ -327,33 +327,41 @@ describe('pedidos — cancelOrderSchema (cancelacion)', () => {
 })
 
 // `quoteOrderCostSchema` es un `pick` de `createOrderSchema` y acepta/rechaza
-// exactamente lo mismo que el alta en `recipeId` y `quantity`, sin declarar nada mas.
+// exactamente lo mismo que el alta en `recipeId`, `quantity` y `unitId`, sin declarar nada mas.
 describe('pedidos — quoteOrderCostSchema (cotizacion)', () => {
-  it('acepta y rechaza exactamente lo mismo que createOrderSchema en recipeId y quantity', () => {
+  it('acepta y rechaza exactamente lo mismo que createOrderSchema en recipeId, quantity y unitId', () => {
     for (const quantity of [undefined, '0', '0.0000', '-1', '-0.0001', '', 'abc', '0.0001', '12.5000']) {
-      const entrada = { recipeId: RECIPE_ID, quantity }
+      const entrada = { recipeId: RECIPE_ID, quantity, unitId: UNIT_ID }
       expect(
         quoteOrderCostSchema.safeParse(entrada).success,
         `quantity=${String(quantity)}`,
       ).toBe(createOrderSchema.safeParse({ ...altaValida(), quantity }).success)
     }
     for (const recipeId of [undefined, '', 'no-es-uuid', RECIPE_ID]) {
-      const entrada = { recipeId, quantity: '12.5000' }
+      const entrada = { recipeId, quantity: '12.5000', unitId: UNIT_ID }
       expect(
         quoteOrderCostSchema.safeParse(entrada).success,
         `recipeId=${String(recipeId)}`,
       ).toBe(createOrderSchema.safeParse({ ...altaValida(), recipeId }).success)
     }
+    for (const unitId of [undefined, '', 'no-es-uuid', UNIT_ID]) {
+      const entrada = { recipeId: RECIPE_ID, quantity: '12.5000', unitId }
+      expect(
+        quoteOrderCostSchema.safeParse(entrada).success,
+        `unitId=${String(unitId)}`,
+      ).toBe(createOrderSchema.safeParse({ ...altaValida(), unitId }).success)
+    }
   })
 
-  it('descarta cualquier clave que no sea recipeId o quantity', () => {
+  it('descarta cualquier clave que no sea recipeId, quantity o unitId', () => {
     const parsed = quoteOrderCostSchema.parse({
       recipeId: RECIPE_ID,
       quantity: '12.5000',
+      unitId: UNIT_ID,
       presentationId: PRESENTATION_ID,
       companyId: '44444444-4444-4444-8444-444444444444',
     })
-    expect(Object.keys(parsed).sort()).toEqual(['quantity', 'recipeId'])
+    expect(Object.keys(parsed).sort()).toEqual(['quantity', 'recipeId', 'unitId'])
   })
 })
 

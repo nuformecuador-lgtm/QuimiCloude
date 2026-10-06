@@ -22,6 +22,9 @@
 | QC-195 | envases-del-pedido-como-productos | Pedidos | fullstack | done | feature/QC-195-envases-del-pedido-como-productos | **CERRADA el 2026-10-04** (PR #142, merge `f6f69dad`): resumen en `progress/history.md`. Tarjeta en *Finalizado* y comentada. Pendiente local: borrar la base `QuimiCloude_QC195`. |
 
 ## Evaluaciones
+**2026-10-05:** QC-204 cerrada (PR #150, merge `62bcf626`; tarjeta a Finalizado; resumen en history). Worktree desmontado.
+**2026-10-05:** QC-204 F1.0: elegida por el humano; `fullstack` / `high` (ya en el board); worktree montado; sin particion.
+**2026-10-05:** QC-204 acotada con `/afinar-feature`: 11 decisiones cerradas y 2 preguntas abiertas en `specs/QC-204-conversion-unidad-pedido-a-insumo/requirements.md`. Board actualizado (`zone:backend` -> `zone:fullstack`, bloque «ACOTADA» en la descripción); importada sola a `feature_list.json`. Sembrada en el arbol principal y movida a su rama en F1.0.
 **2026-10-05:** QC-173 corregida y acotada con `/afinar-feature`: las fases agrupan ingredientes, no pasos. 15 decisiones cerradas y 4 preguntas abiertas en `specs/QC-173-fases-en-los-ingredientes/requirements.md`. Board actualizado (título, descripción, slug `fases-en-los-pasos` a `fases-en-los-ingredientes`, `complexity:high`). Sigue `pending`.
 **2026-10-06:** QC-211 cerrada (PR #148, merge `81c04edb`; resumen en history). Tarjeta de Jira sin mover (MCP caido, ver Deudas). Baseline sin podar: 8 rojos siguen rojos.
 **2026-10-05:** QC-211 acotada con `/afinar-feature`: 13 decisiones cerradas y 1 pregunta abierta en `specs/QC-211-pasos-de-envasado/requirements.md`. Board actualizado (descripción y `complexity:medium` a `complexity:high` por la importación desde PDF). Importada a `feature_list.json` como `pending` (alta de F0 de esta sola ficha).

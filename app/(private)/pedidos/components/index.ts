@@ -60,11 +60,13 @@ export {
 } from './order-distribution-coverage';
 export { ORDER_AMOUNT_SYMBOL, formatOrderAmount, orderAmountTitle } from './order-amount';
 export {
+  ORDER_COST_QUOTE_APPROXIMATE_TESTID,
   ORDER_COST_QUOTE_ERROR_TESTID,
   ORDER_COST_QUOTE_QUOTING_TESTID,
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
   OrderCostQuote,
+  type OrderCostQuoteProps,
 } from './order-cost-quote';
 export {
   ORDER_COST_QUOTE_DEBOUNCE_MS,

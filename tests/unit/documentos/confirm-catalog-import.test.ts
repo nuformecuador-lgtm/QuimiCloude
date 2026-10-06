@@ -72,6 +72,7 @@ function dobleDeUnidades(visibles: readonly { id: string; name: string; symbol: 
   return {
     findRefs: vi.fn(async (ids: readonly string[]) => visibles.filter((unidad) => ids.includes(unidad.id))),
     listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+    findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
     findRefsSharingBaseInCompany: vi.fn(),
   };
 }

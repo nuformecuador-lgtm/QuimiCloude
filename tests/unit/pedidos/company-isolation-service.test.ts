@@ -54,7 +54,13 @@ import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/li
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
-import { fakeFinishedGoodsIntake, fakeOrderUnitOfWork, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import {
+  fakeFinishedGoodsIntake,
+  fakeOrderUnitOfWork,
+  fakeScopeProducts,
+  fakeScopeUnits,
+  fakeUnitOfWork,
+} from '@/tests/helpers/order-unit-of-work-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
@@ -207,6 +213,8 @@ function almacen() {
     recipes: recipes as unknown as OrderTransactionScope['recipes'],
     // Ningun caso de este archivo llega a ENTREGADO: ninguno espera que se llame.
     finishedGoods: fakeFinishedGoodsIntake(),
+    products: fakeScopeProducts(),
+    units: fakeScopeUnits(),
   })
   const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
   const units = {
@@ -214,6 +222,7 @@ function almacen() {
       ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'Unidad', symbol: null, baseUnitId: null, factor: null }] : [],
     ),
     findRefsSharingBaseInCompany: vi.fn(async () => []),
+    findMassVolumeBridge: vi.fn(async () => null),
   }
   const presentations = {
     findRefs: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'Bidon' }))),
@@ -530,6 +539,7 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
     const units = {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+      findMassVolumeBridge: explota('units.findMassVolumeBridge'),
     }
     const presentations = { findRefs: explota('presentations.findRefs') }
     const packaging = {

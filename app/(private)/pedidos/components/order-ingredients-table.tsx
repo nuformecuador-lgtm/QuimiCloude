@@ -3,6 +3,11 @@
 import { Loader2Icon } from 'lucide-react';
 
 import {
+  APPROXIMATE_LABEL,
+  ApproximateMark,
+  NotConvertibleNotice,
+} from '@/components/shared/unit-conversion-marks';
+import {
   Table,
   TableBody,
   TableCell,
@@ -10,9 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { createOrderSchema } from '@/lib/modules/pedidos';
-import { consumedQuantity, formatPercentage, type RecipeLineView } from '@/lib/modules/recetas';
-import type { UnitView } from '@/lib/modules/unidades';
+import { createOrderSchema, resolveLineNeed, type OrderLineNeed } from '@/lib/modules/pedidos';
+import { formatPercentage, type RecipeLineView } from '@/lib/modules/recetas';
+import type { MassVolumeBridge, UnitConversion, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { subtractDecimal } from './order-decimal';
@@ -45,13 +50,9 @@ import { subtractDecimal } from './order-decimal';
  * **La columna «porcentaje» pinta `line.percentage` con `formatPercentage`**: «10,00 %», la
  * parte del insumo dentro de la receta.
  *
- * **La columna «cantidad requerida» es `consumedQuantity(pedido, porcentaje)`**: la cantidad
- * del pedido por el porcentaje, dividido 100, en decimal exacto. Sin una cantidad DECIMAL MAYOR
- * QUE CERO -vacia, cero, negativa o no numerica- vale `0` y no se calcula: la misma regla
- * `quantitySchema` del esquema del contrato (`createOrderSchema.shape.quantity`), no una copia,
- * decide que cuenta como cantidad valida aqui. En cuanto cambia el campo a un valor valido, se
- * recalcula. Es una columna DE CONSULTA: no viaja en el envio, que sigue llevando la cantidad tal
- * cual se escribio.
+ * **La «cantidad requerida» sale de `resolveLineNeed`**, la misma regla que el costo y la reserva,
+ * asi que va en la unidad del insumo. Sin unidad del pedido elegida no hay en que unidad leer la
+ * cifra y se pinta el marcador. Una cantidad que el contrato no acepta cuenta como `0`.
  *
  * **La columna «restante» resta lo requerido al stock**: `stock - requerida`, con
  * `subtractDecimal` —misma aritmetica exacta—. Si el pedido pide mas de lo que hay, el valor
@@ -95,6 +96,28 @@ function withUnit(value: string, unit: string | null): string {
   return unit === null ? value : `${value} ${unit}`;
 }
 
+function unitConversionOf(unitId: string | null, units: readonly UnitView[]): UnitConversion | null {
+  if (unitId === null) return null;
+  return units.find((candidate) => candidate.id === unitId) ?? null;
+}
+
+/** `null` sin unidad del pedido elegida (`orderUnitId === ''`): no hay cifra que mostrar. */
+export function ingredientNeedOf(
+  line: RecipeLineView,
+  quantity: string,
+  orderUnitId: string,
+  units: readonly UnitView[],
+  bridge: MassVolumeBridge | null,
+): OrderLineNeed | null {
+  if (orderUnitId === '') return null;
+  const validQuantity = createOrderSchema.shape.quantity.safeParse(quantity).success ? quantity : '0';
+  return resolveLineNeed(validQuantity, line.percentage, unitConversionOf(line.productUnitId, units), {
+    orderUnitId,
+    orderUnit: unitConversionOf(orderUnitId, units),
+    bridge,
+  });
+}
+
 export type OrderIngredientsTableProps = {
   /** Lineas de la receta elegida, tal cual las entrega el detalle de `recetas`. */
   readonly lines: readonly RecipeLineView[];
@@ -102,6 +125,9 @@ export type OrderIngredientsTableProps = {
   readonly units: readonly UnitView[];
   /** La cantidad escrita en el formulario: escalo con ella la «cantidad requerida». */
   readonly quantity: string;
+  /** Unidad elegida en el formulario; `''` = sin elegir. */
+  readonly orderUnitId: string;
+  readonly bridge: MassVolumeBridge | null;
   /** Hay una consulta en vuelo: la tabla aun no tiene lineas definitivas. */
   readonly loading: boolean;
   /** Fallo de la consulta del detalle. `null` = no fallo. */
@@ -112,22 +138,18 @@ export function OrderIngredientsTable({
   lines,
   units,
   quantity,
+  orderUnitId,
+  bridge,
   loading,
   error,
 }: OrderIngredientsTableProps) {
-  /**
-   * La cantidad escrita solo cuenta si es la que el contrato acepta -decimal mayor que cero-:
-   * reutiliza `quantitySchema` en vez de repetir el patron o el `> 0` a mano.
-   */
-  const hasValidQuantity = createOrderSchema.shape.quantity.safeParse(quantity).success;
+  const requiredOf = (need: OrderLineNeed | null): string | null =>
+    need === null || need.kind === 'not_convertible' ? null : need.quantity;
 
-  /** Cantidad requerida de una linea: cantidad del pedido x porcentaje / 100, en decimal exacto. */
-  const requiredOf = (line: RecipeLineView): string =>
-    hasValidQuantity ? consumedQuantity(quantity, line.percentage) : '0';
-
-  /** Restante de una linea: el stock MENOS lo requerido. `null` = el producto no tiene stock. */
-  const remainingOf = (line: RecipeLineView): string | null =>
-    line.productStock === null ? null : subtractDecimal(line.productStock, requiredOf(line));
+  const remainingOf = (line: RecipeLineView, required: string | null): string | null =>
+    line.productStock === null || required === null
+      ? null
+      : subtractDecimal(line.productStock, required);
 
   /** Faltante: el restante es negativo, el pedido pide mas de lo que hay. Se resalta en rojo. */
   const isShort = (remaining: string): boolean => remaining.startsWith('-');
@@ -168,9 +190,11 @@ export function OrderIngredientsTable({
           </TableHeader>
           <TableBody>
             {lines.map((line, index) => {
-              const required = requiredOf(line);
-              const remaining = remainingOf(line);
+              const need = ingredientNeedOf(line, quantity, orderUnitId, units, bridge);
+              const required = requiredOf(need);
+              const remaining = remainingOf(line, required);
               const unit = unitLabel(line.productUnitId, units);
+              const approximate = need?.kind === 'approximate';
               return (
                 <TableRow key={line.id} data-testid={`order-ingredient-${index}`}>
                   <TableCell data-testid="order-ingredient-product">
@@ -198,11 +222,33 @@ export function OrderIngredientsTable({
                   </TableCell>
                   <TableCell
                     className="text-right"
-                    title={exactDecimalTitle(required)}
-                    aria-label={withUnit(trimDecimal(required), unit)}
+                    title={required === null ? undefined : exactDecimalTitle(required)}
+                    aria-label={
+                      required === null
+                        ? undefined
+                        : withUnit(trimDecimal(required), unit) +
+                          (approximate ? ` ${APPROXIMATE_LABEL}` : '')
+                    }
                     data-testid="order-ingredient-required"
                   >
-                    {withUnit(formatDecimalDisplay(required), unit)}
+                    {need?.kind === 'not_convertible' ? (
+                      <NotConvertibleNotice
+                        testId="order-ingredient-not-convertible"
+                        className="whitespace-normal"
+                      />
+                    ) : required === null ? (
+                      MISSING_VALUE_MARK
+                    ) : (
+                      <>
+                        {withUnit(formatDecimalDisplay(required), unit)}
+                        {approximate ? (
+                          <>
+                            {' '}
+                            <ApproximateMark testId="order-ingredient-approximate" />
+                          </>
+                        ) : null}
+                      </>
+                    )}
                   </TableCell>
                   <TableCell
                     className="text-right"

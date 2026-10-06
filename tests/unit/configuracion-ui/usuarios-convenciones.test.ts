@@ -123,7 +123,7 @@ const RUTA_DE_LAS_ACCIONES_DE_ROL = '@/lib/modules/identity/adapters/driving/rol
 const ACCIONES_DE_ROL = ['listRolesAction'] as const;
 
 /**
- * Las SIETE Server Actions de los GRUPOS DE TRABAJO (QC-84), en SU propio archivo y tambien por su
+ * Las Server Actions de los GRUPOS DE TRABAJO (QC-84), en SU propio archivo y tambien por su
  * ruta exacta (R36; QC-85 R36).
  *
  * **Alta de QC-85, y la lista sigue siendo CERRADA**: esta guardia no conocia mas actions que las
@@ -142,6 +142,7 @@ const ACCIONES_DE_GRUPO = [
   'removeWorkGroupMemberAction',
   'listWorkGroupsAction',
   'listWorkGroupMembersAction',
+  'listWorkGroupCandidatesAction',
 ] as const;
 
 /**

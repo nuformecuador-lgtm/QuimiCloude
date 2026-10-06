@@ -325,7 +325,7 @@ async function pintarPedidos(): Promise<void> {
   await PedidosPage({ searchParams: Promise.resolve({}) });
   // Los catalogos de recetas y unidades ya no los pide esta seccion -los pide `page.tsx`, una
   // sola vez-: aqui basta con reproducir la forma de los props, vacios.
-  await OrderListSection({ params: PARAMS, recipes: { items: [], totalPages: 1 }, units: [] });
+  await OrderListSection({ params: PARAMS, recipes: { items: [], totalPages: 1 }, units: [], bridge: null });
   await listResponsiblesForOrdersAction(['0a3f2b1c-9e0d-4a4c-8b9e-772a5f6c1d8b']);
   await listUsersAction({ page: 1, pageSize: 25 });
   await listWorkGroupsAction({ page: 1, pageSize: 25 });

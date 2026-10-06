@@ -142,6 +142,7 @@ function montarLista(status: OrderStatus = 'PENDIENTE') {
       totalPages={1}
       recipes={RECETAS}
       units={UNIDADES}
+      bridge={null}
     />,
   );
 }

@@ -1,4 +1,6 @@
 // lib/modules/unidades/domain/unit-catalog.ts
+import type { MassVolumeBridge } from './convert-with-approximation';
+
 /** Identificador de una unidad visto DESDE FUERA de `unidades`. Es lo unico que otro modulo
  *  guarda de una unidad (p. ej. `products.unit_id`, `recipe_lines.unit_id`). */
 export type UnitId = string;
@@ -51,4 +53,8 @@ export interface UnitCatalog {
   /** Todas las unidades visibles para esa empresa -propias o de sistema-, por nombre. No
    *  comprueba permisos: lo hace el caso de uso del modulo que la llama. */
   listVisibleRefs(companyId: string): Promise<readonly UnitRef[]>;
+
+  /** Ids del mililitro y el gramo de sistema, o `null` si falta alguno. Las de sistema son las
+   *  mismas para todas las empresas, por eso no recibe `companyId`. */
+  findMassVolumeBridge(): Promise<MassVolumeBridge | null>;
 }

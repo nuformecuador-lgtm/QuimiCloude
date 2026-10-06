@@ -473,15 +473,17 @@ export async function listMembersAliveInCompany(
  * mensaje de R31. Aqui no se cocina ningun motivo: eso seria la segunda copia de la regla que
  * QC-78 R7 puso en una sola funcion.
  *
- * La fila se crea SEA CUAL SEA el estado de cuenta de esa persona (R28): pertenecer no depende del
- * estado. El `INSERT` fallido aborta la transaccion, asi que devolver `'already_member'` no
- * confirma ninguna escritura.
+ * Antes del `INSERT` se pregunta `admits` con el estado crudo: la regla de quien puede entrar es del
+ * dominio y aqui solo se invoca. Si no la admite, se mira si ya pertenecia para que el mensaje siga
+ * siendo el de «ya pertenece» con su motivo y no el de «no admitida». El `INSERT` fallido aborta la transaccion, asi que
+ * devolver `'already_member'` no confirma ninguna escritura.
  */
 export async function addMemberAliveInCompany(
   companyId: string,
   id: string,
   userId: string,
   now: Date,
+  admits: (account: MemberCandidate) => boolean,
 ): Promise<AddMemberOutcome> {
   return prisma.$transaction(async (tx) => {
     const groupId = await findAliveGroupId(tx, companyId, id);
@@ -493,6 +495,15 @@ export async function addMemberAliveInCompany(
     });
     if (user === null) return { kind: 'user_not_found' };
 
+    const account = toMemberCandidate(user);
+    if (!admits(account)) {
+      const existing = await tx.workGroupMember.findFirst({
+        where: { workGroupId: groupId, userId: user.id, companyId },
+        select: { userId: true },
+      });
+      return existing === null ? { kind: 'not_admitted' } : { kind: 'already_member', account };
+    }
+
     try {
       await tx.workGroupMember.create({
         data: { workGroupId: groupId, userId: user.id, companyId, createdAt: now, updatedAt: now },
@@ -501,7 +512,7 @@ export async function addMemberAliveInCompany(
       return { kind: 'created' };
     } catch (error) {
       if (isDuplicateMemberViolation(error)) {
-        return { kind: 'already_member', account: toMemberCandidate(user) };
+        return { kind: 'already_member', account };
       }
       throw error;
     }

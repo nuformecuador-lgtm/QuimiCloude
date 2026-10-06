@@ -5,7 +5,8 @@
  * QUE SE EJERCITA: los casos de uso ya cableados —`identity.addWorkGroupMember`,
  * `removeWorkGroupMember`, `listWorkGroupMembers`— con un ACTOR de verdad, contra la base. Es el
  * unico sitio donde se pueden contestar las tres preguntas que un doble no contesta: que la fila
- * de pertenencia se CREA sea cual sea el estado de cuenta (R28), que la de mas NO PUEDE existir
+ * de pertenencia SOLO se crea para quien tiene estado efectivo activo (R28, enmienda 2026-10-05),
+ * que la de mas NO PUEDE existir
  * aunque dos intentos corran a la vez (R32), y que sacar BORRA la fila de verdad (R34).
  *
  * AISLAMIENTO: CONSTRUCCION PROPIA + LIMPIEZA PROPIA, igual que `work-group-crud.int.test.ts` y
@@ -194,6 +195,24 @@ async function rawUser(id: string): Promise<RawUserRow> {
   return row;
 }
 
+/**
+ * Mete a una persona SEA CUAL SEA su estado, para preparar escenarios de lectura. Desde la enmienda
+ * de R28 (2026-10-05) solo entra quien esta efectivamente activa, asi que se la activa un momento,
+ * se la mete por el caso de uso real y se le devuelve su estado y su plazo originales.
+ */
+async function meter(actor: Actor, workGroupId: string, userId: string): Promise<void> {
+  const original = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { accountStatus: true, lockedUntil: true },
+  });
+  await prisma.user.update({
+    where: { id: userId },
+    data: { accountStatus: 'active', lockedUntil: null },
+  });
+  await identity.addWorkGroupMember(actor, { workGroupId, userId });
+  await prisma.user.update({ where: { id: userId }, data: original });
+}
+
 // ---------------------------------------------------------------------------
 // Arranque
 // ---------------------------------------------------------------------------
@@ -228,25 +247,53 @@ afterAll(async () => {
 });
 
 // ---------------------------------------------------------------------------
-// R28 — la pertenencia NO depende del estado de cuenta
+// R28 (enmienda 2026-10-05) — solo entra quien tiene estado EFECTIVO activo
 // ---------------------------------------------------------------------------
 
-describe('R28 — se puede meter a cualquier persona VIVA de la empresa, sea cual sea su estado de cuenta', () => {
-  it('las cuatro cuentas —`pending`, `active`, `inactive` y `blocked`— dejan su fila de pertenencia', async () => {
+describe('R28 (enmienda 2026-10-05) — solo se puede meter a una persona con estado EFECTIVO activo', () => {
+  it('pendiente, inactiva, bloqueada sin plazo, bloqueada con plazo vigente y `active` con plazo vigente se rechazan con `work_group_member_not_active` y no dejan fila', async () => {
     await withCompany(async (companyId) => {
       const actor = actorOf(companyId);
       const { id: grupo } = await identity.createWorkGroup(actor, { name: 'Turno noche' });
-      const estados: readonly UserAccountStatus[] = ['pending', 'active', 'inactive', 'blocked'];
+      const vigente = new Date(Date.now() + 3_600_000);
 
-      const personas = await Promise.all(
-        estados.map((accountStatus) => seedUser(companyId, { accountStatus })),
-      );
-      for (const userId of personas) {
+      const rechazadas = [
+        await seedUser(companyId, { accountStatus: 'pending' }),
+        await seedUser(companyId, { accountStatus: 'inactive' }),
+        await seedUser(companyId, { accountStatus: 'blocked', lockedUntil: null }),
+        await seedUser(companyId, { accountStatus: 'blocked', lockedUntil: vigente }),
+        // Bloqueo por intentos: la columna dice `active` y lo que manda es el plazo (QC-78 R11).
+        await seedUser(companyId, { accountStatus: 'active', lockedUntil: vigente }),
+      ];
+
+      for (const userId of rechazadas) {
+        expect(
+          await codeOfRejection(
+            identity.addWorkGroupMember(actor, { workGroupId: grupo, userId }),
+          ),
+        ).toBe('work_group_member_not_active');
+      }
+
+      expect(await membershipsOf(grupo)).toEqual([]);
+    });
+  });
+
+  it('la `active` y la `blocked` con el plazo YA VENCIDO entran y dejan su fila', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorOf(companyId);
+      const { id: grupo } = await identity.createWorkGroup(actor, { name: 'Turno noche' });
+      const activa = await seedUser(companyId, { accountStatus: 'active' });
+      const vencida = await seedUser(companyId, {
+        accountStatus: 'blocked',
+        lockedUntil: new Date(Date.now() - 60_000),
+      });
+
+      for (const userId of [activa, vencida]) {
         await identity.addWorkGroupMember(actor, { workGroupId: grupo, userId });
       }
 
       expect((await membershipsOf(grupo)).map((fila) => fila.userId).sort()).toEqual(
-        [...personas].sort(),
+        [activa, vencida].sort(),
       );
     });
   });
@@ -266,7 +313,7 @@ describe('R19 + R20 — con las cuatro cuentas dentro, la lista devuelve SOLO la
       const inactiva = await seedUser(companyId, { accountStatus: 'inactive' });
       const bloqueada = await seedUser(companyId, { accountStatus: 'blocked' });
       for (const userId of [pendiente, activa, inactiva, bloqueada]) {
-        await identity.addWorkGroupMember(actor, { workGroupId: grupo, userId });
+        await meter(actor, grupo, userId);
       }
 
       const pagina = await identity.listWorkGroupMembers(
@@ -291,8 +338,8 @@ describe('R19 + R20 — con las cuatro cuentas dentro, la lista devuelve SOLO la
       const uno = await identity.createWorkGroup(actor, { name: 'Turno noche' });
       const dos = await identity.createWorkGroup(actor, { name: 'Turno tarde' });
       const userId = await seedUser(companyId, { accountStatus: 'pending' });
-      await identity.addWorkGroupMember(actor, { workGroupId: uno.id, userId });
-      await identity.addWorkGroupMember(actor, { workGroupId: dos.id, userId });
+      await meter(actor, uno.id, userId);
+      await meter(actor, dos.id, userId);
       const pertenenciasAntes = await prisma.workGroupMember.findMany({ where: { userId } });
 
       const ahora = new Date();
@@ -323,7 +370,7 @@ describe('R19 + R20 — con las cuatro cuentas dentro, la lista devuelve SOLO la
         accountStatus: 'blocked',
         lockedUntil: plazo,
       });
-      await identity.addWorkGroupMember(actor, { workGroupId: grupo, userId });
+      await meter(actor, grupo, userId);
       const personaAntes = await rawUser(userId);
       const pertenenciaAntes = await membershipsOf(grupo);
 
@@ -355,7 +402,7 @@ describe('R19 + R20 — con las cuatro cuentas dentro, la lista devuelve SOLO la
       const actor = actorOf(companyId);
       const { id: grupo } = await identity.createWorkGroup(actor, { name: 'Turno noche' });
       const userId = await seedUser(companyId, { accountStatus: 'blocked', lockedUntil: null });
-      await identity.addWorkGroupMember(actor, { workGroupId: grupo, userId });
+      await meter(actor, grupo, userId);
 
       const dentroDeUnAno = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
       const pagina = await identity.listWorkGroupMembers(actor, grupo, listInput(), dentroDeUnAno);
@@ -412,7 +459,7 @@ describe('R30 + R31 — meter a quien ya pertenece: un `code` por motivo, y ning
       const obtenidos: string[] = [];
       for (const caso of casos) {
         const userId = await seedUser(companyId, { accountStatus: caso.estado });
-        await identity.addWorkGroupMember(actor, { workGroupId: grupo, userId });
+        await meter(actor, grupo, userId);
         obtenidos.push(
           await codeOfRejection(
             identity.addWorkGroupMember(actor, { workGroupId: grupo, userId }),
@@ -572,7 +619,7 @@ describe('R51 + R52 + R53 — la lista de miembros se pagina sobre el conjunto Y
         await seedUser(companyId, { accountStatus: 'pending' }),
       ];
       for (const userId of [...visibles, ...ocultas]) {
-        await identity.addWorkGroupMember(actor, { workGroupId: grupo, userId });
+        await meter(actor, grupo, userId);
       }
 
       const paginas = [];
@@ -628,6 +675,115 @@ describe('R51 + R52 + R53 — la lista de miembros se pagina sobre el conjunto Y
       expect(tres.items).toHaveLength(3);
       expect(tres.pageSize).toBe(3);
       expect(tres.total).toBe(27);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Candidatos a grupo (R28 enmendado, 2026-10-05) — solo estado EFECTIVO activo, total correcto
+// ---------------------------------------------------------------------------
+
+describe('R28 (enmienda 2026-10-05) — los candidatos a grupo son solo las personas efectivamente activas', () => {
+  it('excluye pendiente, inactiva, bloqueadas vigentes, dadas de baja y de otra empresa; el total cuenta solo a las que salen', async () => {
+    await withTwoCompanies(async (companyA, companyB) => {
+      const actor = actorOf(companyA);
+      const ahora = new Date();
+      const vigente = new Date(ahora.getTime() + 3_600_000);
+
+      const activas: string[] = [];
+      for (let i = 0; i < 7; i += 1) {
+        activas.push(
+          await seedUser(companyA, {
+            accountStatus: 'active',
+            lastNames: `Candidata${String(i).padStart(2, '0')}`,
+          }),
+        );
+      }
+      const vencida = await seedUser(companyA, {
+        accountStatus: 'blocked',
+        lockedUntil: new Date(ahora.getTime() - 60_000),
+        lastNames: 'Candidata99',
+      });
+      const ocultas = [
+        await seedUser(companyA, { accountStatus: 'pending', lastNames: 'Candidata50' }),
+        await seedUser(companyA, { accountStatus: 'inactive', lastNames: 'Candidata51' }),
+        await seedUser(companyA, { accountStatus: 'blocked', lastNames: 'Candidata52' }),
+        await seedUser(companyA, {
+          accountStatus: 'blocked',
+          lockedUntil: vigente,
+          lastNames: 'Candidata53',
+        }),
+        await seedUser(companyA, {
+          accountStatus: 'active',
+          lockedUntil: vigente,
+          lastNames: 'Candidata54',
+        }),
+        await seedUser(companyA, { deletedAt: new Date(), lastNames: 'Candidata55' }),
+        await seedUser(companyB, { lastNames: 'Candidata56' }),
+      ];
+
+      const uno = await identity.listWorkGroupCandidates(
+        actor,
+        listInput({ pageSize: 5 }),
+        ahora,
+      );
+      const dos = await identity.listWorkGroupCandidates(
+        actor,
+        listInput({ page: 2, pageSize: 5 }),
+        ahora,
+      );
+
+      expect(uno.total).toBe(8);
+      expect(uno.totalPages).toBe(2);
+      expect(uno.items).toHaveLength(5);
+      expect(dos.items).toHaveLength(3);
+      const recorrido = [...uno.items, ...dos.items].map((fila) => fila.id);
+      expect(recorrido).toEqual([...activas, vencida]);
+      for (const userId of ocultas) expect(recorrido).not.toContain(userId);
+      expect(Object.keys(uno.items[0] ?? {}).sort()).toEqual(['displayName', 'id', 'roleName']);
+    });
+  });
+
+  it('la busqueda acota por nombre y el total sigue contando solo a las activas que casan', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorOf(companyId);
+      const ahora = new Date();
+      const buscada = await seedUser(companyId, { firstNames: 'Zoraida', accountStatus: 'active' });
+      await seedUser(companyId, { firstNames: 'Zoraida', accountStatus: 'pending' });
+      await seedUser(companyId, { firstNames: 'Beatriz', accountStatus: 'active' });
+
+      const pagina = await identity.listWorkGroupCandidates(
+        actor,
+        listInput({ search: 'zorai' }),
+        ahora,
+      );
+
+      expect(pagina.items.map((fila) => fila.id)).toEqual([buscada]);
+      expect(pagina.total).toBe(1);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Enmienda 2026-10-05 — nadie puede meterse a si mismo en un grupo
+// ---------------------------------------------------------------------------
+
+describe('enmienda 2026-10-05 — nadie puede meterse a si mismo en un grupo', () => {
+  it('el actor activo que se mete a si mismo recibe `work_group_member_self`, no deja fila y no sale como candidato', async () => {
+    await withCompany(async (companyId) => {
+      const yo = await seedUser(companyId, { accountStatus: 'active', firstNames: 'Yo' });
+      const otra = await seedUser(companyId, { accountStatus: 'active', firstNames: 'Otra' });
+      const actor: Actor = { ...actorOf(companyId), id: yo };
+      const { id: grupo } = await identity.createWorkGroup(actor, { name: 'Turno noche' });
+
+      expect(
+        await codeOfRejection(identity.addWorkGroupMember(actor, { workGroupId: grupo, userId: yo })),
+      ).toBe('work_group_member_self');
+      expect(await membershipsOf(grupo)).toEqual([]);
+
+      const candidatos = await identity.listWorkGroupCandidates(actor, listInput(), new Date());
+      expect(candidatos.items.map((fila) => fila.id)).toEqual([otra]);
+      expect(candidatos.total).toBe(1);
     });
   });
 });
