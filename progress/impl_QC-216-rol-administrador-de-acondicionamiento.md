@@ -77,3 +77,42 @@ Las líneas de `design.md > 5` coincidían con el código (sin relocalización).
 - `./init.sh --rapido`: corta en el paso de `feature_list.json` («falta QC-216»): la copia del
   worktree no tiene la ficha; es archivo del leader y no se toca. Typecheck, lint, `test:rapido` y
   guardias se corrieron a mano (arriba).
+
+## Tanda T7–T10 (comportamiento del rol, solo tests)
+
+En paralelo con la tanda T4–T6/T11–T14 de otro backend_dev en el mismo worktree; sin archivos en común.
+
+### Archivos
+
+| Task | Archivo | Cambio |
+|---|---|---|
+| T7 | `tests/unit/identity/roles/acondicionamiento-rol.test.ts` | nuevo (plantilla `maestro-rol.test.ts`): R1, R2 (barrido + sintéticos con tres comillas + simétricos), R3 (estático), R17 (barrido con anti-cegado; el mensaje dice cómo relajarlo) |
+| T8 | `tests/guards/guard-autorizacion-por-permiso.test.ts` | patrones del literal y de `ROLE_ACONDICIONAMIENTO`; ancla tensada (nombre del caso suma `QC-216 R11`); sintéticos que disparan y simétrico en comentario |
+| T9 | `tests/unit/navegacion/menu-acondicionamiento.test.ts` | nuevo: R12 (solo `nav-asignacion`, aterrizaje `/asignacion`; simétricos: el permiso nuevo solo no abre nada, el Operador ve inventario) |
+| T9 | `tests/unit/identity/require-page-permission.test.ts` | bloque R13: el código de cada `page.tsx` se lee de su fuente y se valida contra `PERMISSIONS` |
+| T10 | `tests/unit/asignaciones/acondicionamiento-authorization.test.ts` | nuevo: R14, R15 (13 casos de `asignaciones` + 2 de `inventario`, puertos falsos con Proxy que registran acceso y llamada), R16 |
+
+### Mapa parcial R → test
+
+- R1, R2, R3 (estático), R17 → `acondicionamiento-rol.test.ts`
+- R11 → `guard-autorizacion-por-permiso.test.ts` (casos `QC-216 R11`)
+- R12 → `menu-acondicionamiento.test.ts`
+- R13 → `require-page-permission.test.ts` (bloque del Administrador de acondicionamiento)
+- R14, R15, R16 → `acondicionamiento-authorization.test.ts`
+
+### Sensibilidad (mutar, ver rojo, revertir)
+
+- T7: regex del literal solo con comilla simple → rojos los dos sintéticos de tres comillas (R2, R17). Barrido sin `lib` → rojos R2 y el anti-cegado de R17.
+- T8: sin el patrón del literal → rojos el ancla y el sintético del literal; sin el patrón de la constante → rojos el ancla y el sintético de la constante.
+- T9: actor con `asignaciones.ejecutar` y `pedidos.consultar` de más → rojos `/asignacion/<id>` y `/pedidos`; menú con `inventario.consultar` de más → rojo R12.
+- T10: actor con `asignaciones.ejecutar`, `pedidos.consultar`, `empaque.modificar`, `inventario.consultar` de más → 12 rojos (R14, R15 de esos permisos, R16). Además un caso fijo comprueba que el puerto falso sí registra a quien lo toca.
+
+Todo revertido; los archivos commiteados son los verdes.
+
+### Verificación
+
+- `pnpm run typecheck`: verde.
+- `pnpm run lint`: 0 errores, 8 warnings preexistentes ajenos.
+- `pnpm exec vitest run` de los cinco archivos: `5 passed`, `70 passed`.
+- `pnpm exec vitest run guard`: `51 passed`, `695 passed | 11 skipped`.
+- `./init.sh` no se corrió (indicación del leader).
