@@ -1,0 +1,81 @@
+[WebServer] 
+[WebServer] > quimicloude@0.1.0 dev C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-211-pasos-de-envasado
+[WebServer] > next dev "--port" "3117"
+[WebServer] 
+[WebServer] ▲ Next.js 16.3.0 (Turbopack)
+[WebServer] - Local:         http://localhost:3117
+[WebServer] - Network:       http://192.168.101.8:3117
+[WebServer] - Environments: .env
+[WebServer] ✓ Ready in 478ms
+[WebServer] ✓ Running next.config.ts took 44ms
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[WebServer] 
+[WebServer]  GET / 200 in 570ms (next.js: 229ms, proxy.ts: 151ms, application-code: 190ms)
+
+Running 2 tests using 2 workers
+
+[WebServer]  GET /login 200 in 500ms (next.js: 189ms, proxy.ts: 9ms, application-code: 303ms)
+[WebServer]  GET /login 200 in 261ms (next.js: 144ms, proxy.ts: 13ms, application-code: 104ms)
+[WebServer]  GET /asignacion 200 in 360ms (next.js: 75ms, proxy.ts: 11ms, application-code: 273ms)
+[WebServer]  GET /asignacion 200 in 371ms (next.js: 86ms, proxy.ts: 124ms, application-code: 160ms)
+[WebServer]  POST /login 200 in 1142ms (next.js: 8ms, proxy.ts: 10ms, application-code: 1124ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 320ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  POST /login 200 in 625ms (next.js: 90ms, proxy.ts: 6ms, application-code: 528ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 106ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /produccion/formulas/nueva 200 in 634ms (next.js: 55ms, proxy.ts: 15ms, application-code: 564ms)
+[WebServer]  GET /produccion/formulas/nueva 200 in 277ms (next.js: 7ms, proxy.ts: 91ms, application-code: 178ms)
+[WebServer]  POST /produccion/formulas/nueva 200 in 66ms (next.js: 7ms, proxy.ts: 12ms, application-code: 48ms)
+[WebServer]   └─ ƒ createRecipeAction({"description":null,"lines":["[Object]"],"name":"qc211_e2e_dfc0aa8399124e24b4cdaacc1f9927b1_receta","...":"3 items not stringified"}) in 36ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /produccion/formulas 200 in 191ms (next.js: 34ms, proxy.ts: 4ms, application-code: 153ms)
+[WebServer]  GET /produccion/formulas 200 in 81ms (next.js: 8ms, proxy.ts: 5ms, application-code: 68ms)
+[WebServer]  GET /login 200 in 84ms (next.js: 6ms, proxy.ts: 5ms, application-code: 73ms)
+[WebServer]  GET /asignacion 200 in 262ms (next.js: 4ms, proxy.ts: 4ms, application-code: 253ms)
+[WebServer]  POST /login 200 in 412ms (next.js: 8ms, proxy.ts: 9ms, application-code: 396ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 113ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion/6995f3c6-f733-4920-82c0-eb025398b6c4 200 in 1486ms (next.js: 1285ms, proxy.ts: 8ms, application-code: 193ms)
+[WebServer]  POST /produccion/formulas/nueva 200 in 47ms (next.js: 10ms, proxy.ts: 5ms, application-code: 33ms)
+[WebServer]   └─ ƒ createRecipeAction({"description":null,"lines":["[Object]"],"name":"qc211_e2e_cce4149d0a8740aa8f66f3c1d68a31d6_receta","...":"3 items not stringified"}) in 26ms lib/modules/recetas/adapters/driving/recipe-actions.ts
+[WebServer]  GET /produccion/formulas 200 in 144ms (next.js: 4ms, proxy.ts: 4ms, application-code: 136ms)
+[WebServer]  GET /produccion/formulas 200 in 81ms (next.js: 6ms, proxy.ts: 7ms, application-code: 68ms)
+[WebServer]  GET /login 200 in 60ms (next.js: 3ms, proxy.ts: 3ms, application-code: 53ms)
+[WebServer]  GET /asignacion 200 in 113ms (next.js: 3ms, proxy.ts: 3ms, application-code: 107ms)
+[WebServer]  POST /login 200 in 239ms (next.js: 8ms, proxy.ts: 7ms, application-code: 224ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 94ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion/3c12f67f-b765-42d4-b5d5-1cf565ce7236 200 in 117ms (next.js: 15ms, proxy.ts: 4ms, application-code: 97ms)
+[WebServer]  GET /asignacion?entregado=2026-0976983 200 in 112ms (next.js: 5ms, proxy.ts: 5ms, application-code: 102ms)
+[WebServer]  POST /asignacion/6995f3c6-f733-4920-82c0-eb025398b6c4 200 in 249ms (next.js: 18ms, proxy.ts: 6ms, application-code: 226ms)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 98ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+[WebServer]  GET /login 200 in 96ms (next.js: 10ms, proxy.ts: 7ms, application-code: 79ms)
+[WebServer]  GET /asignacion 200 in 107ms (next.js: 6ms, proxy.ts: 5ms, application-code: 96ms)
+[WebServer]  POST /login 200 in 349ms (next.js: 28ms, proxy.ts: 9ms, application-code: 311ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 121ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion?vista=por_empacar 200 in 610ms (next.js: 14ms, proxy.ts: 8ms, application-code: 588ms)
+[WebServer]  GET /asignacion/empaque/6995f3c6-f733-4920-82c0-eb025398b6c4 200 in 1155ms (next.js: 1088ms, proxy.ts: 6ms, application-code: 61ms)
+[WebServer]  POST /asignacion/empaque/6995f3c6-f733-4920-82c0-eb025398b6c4 200 in 165ms (next.js: 25ms, proxy.ts: 7ms, application-code: 133ms)
+[WebServer]   └─ ƒ startPackingAction({"status":"success"}, {}) in 31ms lib/modules/asignaciones/adapters/driving/order-packing-actions.ts
+[WebServer]  GET /asignacion?entregado=2026-0976072 200 in 121ms (next.js: 5ms, proxy.ts: 12ms, application-code: 104ms)
+[WebServer]  POST /asignacion/3c12f67f-b765-42d4-b5d5-1cf565ce7236 200 in 231ms (next.js: 17ms, proxy.ts: 5ms, application-code: 209ms)
+[WebServer]   └─ ƒ finishAssignedOrderAction({"status":"success"}, {}) in 69ms lib/modules/asignaciones/adapters/driving/order-execution-actions.ts
+[WebServer]  GET /login 200 in 77ms (next.js: 5ms, proxy.ts: 3ms, application-code: 68ms)
+[WebServer]  GET /asignacion 200 in 77ms (next.js: 4ms, proxy.ts: 5ms, application-code: 68ms)
+[WebServer]  POST /login 200 in 210ms (next.js: 7ms, proxy.ts: 8ms, application-code: 195ms)
+[WebServer]   └─ ƒ loginAction({"status":"idle"}, {}) in 102ms lib/modules/identity/adapters/driving/login-action.ts
+[WebServer]  GET /asignacion?vista=por_empacar 200 in 273ms (next.js: 4ms, proxy.ts: 5ms, application-code: 264ms)
+[WebServer]  GET /asignacion/empaque/3c12f67f-b765-42d4-b5d5-1cf565ce7236 200 in 87ms (next.js: 15ms, proxy.ts: 4ms, application-code: 68ms)
+[WebServer]  POST /asignacion/empaque/3c12f67f-b765-42d4-b5d5-1cf565ce7236 200 in 117ms (next.js: 7ms, proxy.ts: 4ms, application-code: 106ms)
+[WebServer]   └─ ƒ startPackingAction({"status":"success"}, {}) in 14ms lib/modules/asignaciones/adapters/driving/order-packing-actions.ts
+[WebServer]  GET /asignacion?vista=por_empacar&empacado=2026-0976983 200 in 88ms (next.js: 3ms, proxy.ts: 4ms, application-code: 81ms)
+[WebServer]  POST /asignacion/empaque/6995f3c6-f733-4920-82c0-eb025398b6c4 200 in 326ms (next.js: 18ms, proxy.ts: 6ms, application-code: 302ms)
+[WebServer]   └─ ƒ finishPackingAction({"status":"success"}, {}) in 198ms lib/modules/asignaciones/adapters/driving/order-packing-actions.ts
+  ✓  2 [chromium] › e2e\pasos-de-envasado.spec.ts:429:7 › pasos de envasado de punta a punta (R32) › R32: el Administrador crea la formula con pasos de envasado, el operador no los ve, y el empacador los recorre tras Comenzar y termina sin ver los del operador (30.0s)
+[WebServer]  GET /asignacion?vista=por_empacar&empacado=2026-0976072 200 in 88ms (next.js: 4ms, proxy.ts: 4ms, application-code: 80ms)
+[WebServer]  POST /asignacion/empaque/3c12f67f-b765-42d4-b5d5-1cf565ce7236 200 in 216ms (next.js: 14ms, proxy.ts: 5ms, application-code: 197ms)
+[WebServer]   └─ ƒ finishPackingAction({"status":"success"}, {}) in 99ms lib/modules/asignaciones/adapters/driving/order-packing-actions.ts
+  ✓  1 [webkit] › e2e\pasos-de-envasado.spec.ts:429:7 › pasos de envasado de punta a punta (R32) › R32: el Administrador crea la formula con pasos de envasado, el operador no los ve, y el empacador los recorre tras Comenzar y termina sin ver los del operador (34.5s)
+
+  2 passed (39.0s)
