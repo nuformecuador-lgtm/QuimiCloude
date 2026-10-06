@@ -5,6 +5,7 @@ import {
   PERMISSIONS,
   ROLE_ACONDICIONAMIENTO,
   SEED_ROLE_PERMISSIONS,
+  type PermissionCode,
 } from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
@@ -159,13 +160,15 @@ describe('requirePagePermission con los permisos del Maestro (QC-161)', () => {
 describe('requirePagePermission con los permisos del Administrador de acondicionamiento (QC-216)', () => {
   const PERMISOS_DEL_ROL = SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [];
 
-  function codigoQueExige(pagina: string): string {
+  function codigoQueExige(pagina: string): PermissionCode {
     const fuente = readFileSync(resolve(process.cwd(), pagina), 'utf8');
     const codigos = [...fuente.matchAll(/requirePagePermission\(\s*['"`]([^'"`]+)['"`]\s*\)/g)].map(
       (match) => match[1],
     );
     expect(codigos, `${pagina} debe exigir exactamente un permiso`).toHaveLength(1);
-    return codigos[0] ?? '';
+    const codigo = PERMISSIONS.find((permiso) => permiso.code === codigos[0])?.code;
+    expect(codigo, `${pagina} exige un codigo que no esta en el catalogo`).toBeDefined();
+    return codigo as PermissionCode;
   }
 
   it('QC-216 R13: el rol tiene permisos sembrados con los que juzgar', () => {
