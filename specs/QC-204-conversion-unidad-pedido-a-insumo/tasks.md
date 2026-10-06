@@ -156,7 +156,7 @@
   `R24 pedido en g sobre insumo en kg: costo y cantidad apartada exactos`;
   `R25 pedido en l sobre insumo en kg: costo y cantidad apartada aproximados, con la marca en la linea y en el costo`.
   *Hecho:* verde en local con `pnpm e2e` (o el comando de `docs/verification.md`).
-- [ ] **T15 — Guardias y trazabilidad.** Comprobar que `package.json`/lockfile no cambian y que no
+- [x] **T15 — Guardias y trazabilidad.** Comprobar que `package.json`/lockfile no cambian y que no
   hay migración nueva (R26, R22); mapa `R1–R26 → test` en
   `progress/impl_QC-204-conversion-unidad-pedido-a-insumo.md`. Depende de todas.
   *Hecho:* `./init.sh` completo en verde; ningún `R<n>` sin test.
