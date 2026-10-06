@@ -97,7 +97,7 @@ de cada uno. Entrada `transaccion` en `aislamiento.json`; `guard-aislamiento-int
 
 ## Bloque B — `pedidos` cancela por encargo, por el camino único
 
-### T3 [ ] — Una sola definición y un solo cuerpo de cancelación
+### T3 [x] — Una sola definición y un solo cuerpo de cancelación
 **Toca:** `lib/modules/pedidos/domain/order-cancellation.ts` (nuevo),
 `lib/modules/pedidos/domain/cancel-order.ts`, `lib/modules/pedidos/index.ts`,
 `tests/unit/pedidos/order-cancellation.test.ts`
@@ -344,7 +344,7 @@ regla: copiar lo que haya el día de T13._
 
 ## Bloque E — Pantalla
 
-### T15 [ ] [P] — `StepReader`: dos props opcionales
+### T15 [x] [P] — `StepReader`: dos props opcionales
 **Toca:** `components/shared/step-reader/step-reader.tsx`, `tests/unit/recetas-ui/step-reader.test.tsx`
 **Hacer:** `initialStepPosition` (recortada a `[1, steps.length]`, fija el estado inicial) y
 `onStepChange` (`design.md > 6.1`), en los dos `mode`, sin tocar `finishLabel` ni `finishBusy`
@@ -385,7 +385,7 @@ pinta (R24); botón y controles con `min-h-11 min-w-11`, `Textarea` con `text-ba
 nada en `title` (R36). Retroceder sigue sin diálogo (R11).
 **Depende de:** T14, T16 (las dos tocan `order-execution-screen.tsx`: van en serie).
 
-### T18 [ ] [P] — Confirmación en la lista
+### T18 [x] [P] — Confirmación en la lista
 **Toca:** `lib/shared/routes.ts`, `app/(private)/asignacion/page.tsx`,
 `app/(private)/asignacion/components/assigned-order-cancelled-notice.tsx`,
 `app/(private)/asignacion/components/index.ts`,
@@ -454,7 +454,7 @@ espera `POR_EMPACAR` desde antes de esta ficha: es una **premisa cumplida** (R43
 nuestro. Lo único que hace QC-82 por ella es la limpieza de T23.
 **Depende de:** T16, T17, T18.
 
-### T21 [ ] [P] — Las enmiendas a QC-63, por escrito
+### T21 [x] [P] — Las enmiendas a QC-63, por escrito
 **Toca:** `specs/QC-63-ejecutar-receta-operador/requirements.md` (solo una nota al pie)
 **Hacer:** nota fechada: R10 queda enmendada por QC-82 R38 y R18 por QC-82 R37 (que se suma a la
 tensión de QC-125). **No** se reescriben R10 ni R18.
@@ -529,7 +529,7 @@ tests de **permisos** de QC-168 siguen verdes **sin tocarlos**.
 **Depende de:** T6, T7. En paralelo con T8–T11; y **T12** la necesita, porque son los consumidores de
 las deps.
 
-### T26 [ ] [P] — `pedidos`: Comenzar empaque sobre un cliente dado (nueva el 2026-10-06, ⚑ P5)
+### T26 [x] [P] — `pedidos`: Comenzar empaque sobre un cliente dado (nueva el 2026-10-06, ⚑ P5)
 **Toca:** `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`,
 `tests/integration/pedidos/order-packing.int.test.ts`
 **Hacer:** `design.md > 4` y `> 14.1 P5`. Extraer el cuerpo de `startPackingAliveOrder` (las tres
