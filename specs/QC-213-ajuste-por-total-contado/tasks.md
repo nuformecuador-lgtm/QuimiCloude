@@ -144,7 +144,7 @@ Archivos:
 
 Trabaja contra la action mockeada y `tests/fixtures/adjust-batch-stock.ts`. No toca `lib/`.
 
-### F1 [P] — Diálogo por total contado
+### [x] F1 [P] — Diálogo por total contado
 Depende de: T0. En paralelo con F2 y con todo el bloque B.
 
 Archivos:
