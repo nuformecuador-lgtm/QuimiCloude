@@ -293,7 +293,7 @@ los tipos, sin tocar un solo archivo en común.
 
 ## 2. Modelo de datos y migración — R24, R25
 
-Migración `db/migrations/20261006120000_inventory_movements_adjustment_count/` (verificar al crearla
+Migración `db/migrations/20261006140000_inventory_movements_adjustment_count/` (verificar al crearla
 que no choque con otra rama: QC-209 corre en paralelo y también puede migrar).
 
 `migration.sql`:

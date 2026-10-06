@@ -45,10 +45,10 @@
 6. **Guardia ajena con lista que se actualiza por ficha**: `tests/guards/guard-identificador-de-request.test.ts`
    gana una línea en `MIGRACIONES_ESPERADAS` (`ec0afd2c`), como pide su propio mensaje y como hizo
    QC-211. Sin cambio de lógica. Pendiente de visto bueno del leader.
-7. **Timestamp compartido con QC-209**: su rama local trae `20261006120000_inventory_imports` (aún no en
-   `origin`), mismo timestamp que `20261006120000_inventory_movements_adjustment_count`. Prisma aplica
-   las dos (orden alfabético), pero el orden queda ambiguo para `db:rollback`. Pendiente de decisión
-   del leader.
+7. **Timestamp compartido con QC-209 (resuelto)**: la migración de esta rama compartía timestamp con
+   `inventory_imports` de QC-209, lo que dejaba ambiguo el orden para `db:rollback`. Decisión del
+   leader: se renombra la nuestra a `20261006140000_inventory_movements_adjustment_count` (rollback
+   con el nombre viejo, `git mv`, `db:migrate`; status limpio). QC-209 no se toca.
 8. `frontend_dev` arregló un `filter(` en el diálogo que hacía saltar la guardia
    `product-route-contract`; lo cubre el siguiente `--rapido`.
 
@@ -164,8 +164,7 @@ F2: `app/(private)/inventario/components/batch-history.tsx`,
 
 ## Pendientes para el leader
 1. Visto bueno a la línea añadida en `MIGRACIONES_ESPERADAS` de `guard-identificador-de-request`.
-2. Decidir el timestamp compartido `20261006120000` con QC-209 (renombrar una de las dos).
-3. `tasks.md > B1` aún nombra el campo Prisma como `previousStock` (es `stockBefore`); no se tocó por
-   no salir de las enmiendas autorizadas.
+2. ~~Timestamp compartido con QC-209~~: resuelto, migración renombrada a `20261006140000`.
+3. ~~`tasks.md > B1` nombraba el campo Prisma como `previousStock`~~: corregido a `stockBefore`.
 4. `./init.sh` completo antes del PR.
 5. Al cerrar la feature: borrar la base `QuimiCloude_QC213` y restaurar `.env` desde `.env.bak-QuimiCloude`.

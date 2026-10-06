@@ -53,9 +53,9 @@ dentro del puente; commit `feat(QC-213): publica el contrato del ajuste por tota
 Depende de: T0.
 
 Archivos:
-- `db/migrations/20261006120000_inventory_movements_adjustment_count/migration.sql` y `down.sql`
+- `db/migrations/20261006140000_inventory_movements_adjustment_count/migration.sql` y `down.sql`
   (`design.md > 2`). Comprobar antes que el timestamp no choca con otra rama viva (QC-209).
-- `db/schema.prisma`: `previousStock` y `countedStock` en `InventoryMovement`.
+- `db/schema.prisma`: `stockBefore` y `countedStock` en `InventoryMovement`.
 - `lib/modules/inventario/domain/inventory-movement.ts`: los dos campos opcionales en
   `NewInventoryMovement`.
 - `lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma.ts`: **solo**
