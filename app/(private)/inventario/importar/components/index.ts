@@ -1,5 +1,16 @@
 export { downloadFile } from './download-file';
+export {
+  ImportCreatePresentationDialog,
+  buildCreatePresentationFormData,
+  type ImportCreatePresentationDialogProps,
+} from './import-create-presentation-dialog';
+export {
+  ImportCreateUnitDialog,
+  buildCreateUnitFormData,
+  type ImportCreateUnitDialogProps,
+} from './import-create-unit-dialog';
 export { ImportFileRejection, describeRejection } from './import-file-rejection';
+export { ImportMissingCatalog, type ImportMissingCatalogProps } from './import-missing-catalog';
 export {
   ErrorFileButton,
   ExampleRowIgnoredNotice,

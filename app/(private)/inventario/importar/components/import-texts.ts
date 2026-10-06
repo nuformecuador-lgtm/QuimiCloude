@@ -185,3 +185,61 @@ export const ROWS_TABLE_TEXTS = {
   scrollLeft: 'Desplazar la tabla a la izquierda',
   scrollRight: 'Desplazar la tabla a la derecha',
 } as const;
+
+export const MISSING_SECTION_TITLE = 'Faltan en el catálogo';
+export const MISSING_SECTION_DESCRIPTION =
+  'Estas unidades y presentaciones no existen en la empresa. Las filas que las nombran quedan en error hasta que las crees; al crearlas se vuelve a revisar el archivo.';
+export const MISSING_UNITS_TITLE = 'Unidades';
+export const MISSING_PRESENTATIONS_TITLE = 'Presentaciones';
+export const MISSING_CREATE_LABEL = 'Crear';
+
+export function missingRowsLabel(rowNumbers: readonly number[]): string {
+  const list = rowNumbers.map(formatCount).join(', ');
+  return rowNumbers.length === 1 ? `Fila ${list}` : `Filas ${list}`;
+}
+
+export function missingCreateAriaLabel(name: string): string {
+  return `Crear «${name}»`;
+}
+
+export const MISSING_SECTION_TESTID = 'inventory-import-missing';
+export const MISSING_UNIT_TESTID = 'inventory-import-missing-unit';
+export const MISSING_PRESENTATION_TESTID = 'inventory-import-missing-presentation';
+export const MISSING_NAME_TESTID = 'inventory-import-missing-name';
+export const MISSING_ROWS_TESTID = 'inventory-import-missing-rows';
+export const MISSING_CREATE_TESTID = 'inventory-import-missing-create';
+
+export const DIALOG_CANCEL_LABEL = 'Cancelar';
+export const DIALOG_SAVE_LABEL = 'Crear';
+export const DIALOG_SAVING_LABEL = 'Creando…';
+
+export const UNIT_DIALOG_TITLE = 'Nueva unidad';
+export const UNIT_DIALOG_DESCRIPTION = 'Se crea igual que desde la pantalla de unidades.';
+export const UNIT_FIELD_LABELS = {
+  name: 'Nombre',
+  symbol: 'Símbolo',
+  baseUnitId: 'Deriva de',
+  factor: 'Factor',
+} as const;
+export const NO_BASE_UNIT_LABEL = 'No deriva de ninguna';
+
+export const PRESENTATION_DIALOG_TITLE = 'Nueva presentación';
+export const PRESENTATION_DIALOG_DESCRIPTION = 'Se crea igual que desde la pantalla de presentaciones.';
+export const PRESENTATION_FIELD_LABELS = {
+  name: 'Nombre',
+  content: 'Contenido',
+} as const;
+
+export const UNIT_DIALOG_TESTID = 'inventory-import-unit-dialog';
+export const PRESENTATION_DIALOG_TESTID = 'inventory-import-presentation-dialog';
+export const DIALOG_FORM_ERROR_TESTID = 'inventory-import-dialog-error';
+export const DIALOG_SUBMIT_TESTID = 'inventory-import-dialog-submit';
+export const DIALOG_CANCEL_TESTID = 'inventory-import-dialog-cancel';
+
+export function dialogFieldTestId(field: string): string {
+  return `inventory-import-dialog-field-${field}`;
+}
+
+export function dialogFieldErrorTestId(field: string): string {
+  return `inventory-import-dialog-error-${field}`;
+}
