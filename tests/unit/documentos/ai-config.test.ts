@@ -11,7 +11,10 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readAiConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/ai-config-env';
+import {
+  readAiConfigFromEnv,
+  readAnthropicConfigFromEnv,
+} from '@/lib/modules/documentos/adapters/driven/config/ai-config-env';
 import type { AiConfig } from '@/lib/modules/documentos/adapters/driven/config/ai-config-env';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -143,6 +146,104 @@ describe('documentos — configuracion de la IA (clave y modelo)', () => {
     const schema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8');
     expect(schema).not.toMatch(/gemini/i);
     expect(schema).not.toMatch(/AiCredential/i);
+  });
+
+  describe('Anthropic, proveedor principal: mismas reglas que Gemini', () => {
+    const ANTHROPIC_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL'] as const;
+
+    afterEach(() => {
+      for (const name of ANTHROPIC_VARS) delete process.env[name];
+      Object.assign(process.env, originalEnv);
+    });
+
+    function mensajeDe(lectura: () => unknown): string {
+      try {
+        lectura();
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+      return '';
+    }
+
+    it('importar el archivo con las dos variables vacias no lanza', async () => {
+      for (const name of ANTHROPIC_VARS) process.env[name] = '';
+
+      const modulo = await import('@/lib/modules/documentos/adapters/driven/config/ai-config-env');
+
+      expect(typeof modulo.readAnthropicConfigFromEnv).toBe('function');
+    });
+
+    it('invocar sin configuracion lanza nombrando las dos variables', () => {
+      for (const name of ANTHROPIC_VARS) delete process.env[name];
+
+      const mensaje = mensajeDe(readAnthropicConfigFromEnv);
+
+      for (const name of ANTHROPIC_VARS) expect(mensaje).toContain(name);
+    });
+
+    it('falta solo ANTHROPIC_MODEL: lanza nombrandola y no cae a ningun modelo por defecto', () => {
+      for (const name of ANTHROPIC_VARS) delete process.env[name];
+      process.env.ANTHROPIC_API_KEY = 'una-clave-cualquiera';
+
+      const mensaje = mensajeDe(readAnthropicConfigFromEnv);
+
+      expect(mensaje).toContain('ANTHROPIC_MODEL');
+      expect(mensaje).not.toContain('ANTHROPIC_API_KEY');
+    });
+
+    it('el mensaje de error no contiene ningun valor configurado', () => {
+      for (const name of ANTHROPIC_VARS) delete process.env[name];
+      process.env.ANTHROPIC_API_KEY = 'CLAVE-SECRETA-RECONOCIBLE';
+      process.env.ANTHROPIC_MODEL = '   ';
+
+      const mensaje = mensajeDe(readAnthropicConfigFromEnv);
+
+      expect(mensaje).toContain('ANTHROPIC_MODEL');
+      expect(mensaje).not.toContain('CLAVE-SECRETA-RECONOCIBLE');
+    });
+
+    it('una variable vacia o solo-espacios cuenta como ausente', () => {
+      for (const name of ANTHROPIC_VARS) delete process.env[name];
+      process.env.ANTHROPIC_API_KEY = '   ';
+      process.env.ANTHROPIC_MODEL = 'un-modelo';
+
+      expect(() => readAnthropicConfigFromEnv()).toThrowError(/ANTHROPIC_API_KEY/);
+    });
+
+    it('con las dos presentes resuelve apiKey y model, sin recortar', () => {
+      for (const name of ANTHROPIC_VARS) delete process.env[name];
+      process.env.ANTHROPIC_API_KEY = 'una-clave';
+      process.env.ANTHROPIC_MODEL = 'un-modelo';
+
+      expect(readAnthropicConfigFromEnv()).toEqual({ apiKey: 'una-clave', model: 'un-modelo' });
+    });
+
+    it('las variables de un proveedor no satisfacen al otro', () => {
+      for (const name of [...ANTHROPIC_VARS, ...REQUIRED_VARS]) delete process.env[name];
+      process.env.GEMINI_API_KEY = 'una-clave';
+      process.env.GEMINI_MODEL = 'un-modelo';
+
+      expect(() => readAnthropicConfigFromEnv()).toThrowError(/ANTHROPIC_API_KEY, ANTHROPIC_MODEL/);
+    });
+
+    it('en todo el arbol del modulo no existe escrito ningun identificador de modelo de Claude', () => {
+      const patron = /['"`][^'"`\n]*claude-[a-z0-9.-]+[^'"`\n]*['"`]/i;
+      expect(patron.test("const model = 'claude-sonnet-5-5';")).toBe(true);
+      expect(patron.test('const model = readAnthropicConfigFromEnv().model;')).toBe(false);
+
+      const hallazgos = archivosDe(join(repoRoot, 'lib', 'modules', 'documentos'))
+        .filter((abs) => patron.test(readFileSync(abs, 'utf8')))
+        .map(toPosix);
+
+      expect(hallazgos).toEqual([]);
+    });
+
+    it('.env.example declara las dos variables VACIAS y documentadas', () => {
+      const envExample = readFileSync(join(repoRoot, '.env.example'), 'utf8');
+      expect(envExample).toMatch(/^ANTHROPIC_API_KEY=$/m);
+      expect(envExample).toMatch(/^ANTHROPIC_MODEL=$/m);
+      expect([...envExample.matchAll(/^(ANTHROPIC_API_KEY|ANTHROPIC_MODEL)=(.+)$/gm)]).toEqual([]);
+    });
   });
 
   describe('.env.example declara las dos variables, vacias y documentadas (R13, R15)', () => {

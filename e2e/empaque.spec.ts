@@ -46,6 +46,12 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 
@@ -577,6 +583,7 @@ test.describe('el recorrido de empaque (R48)', () => {
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
+    // EN_CURSO: Entrar es un enlace y no vuelve a pedir la confirmacion de comenzar.
     await assignedRow.getByTestId(ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId!), {
       timeout: 60_000,
@@ -584,7 +591,7 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
-    await page.getByTestId(STEP_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },
@@ -647,7 +654,7 @@ test.describe('el recorrido de empaque (R48)', () => {
     });
     await expect(page.getByTestId(PACKING_ORDER_SCREEN_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId(PACKING_ORDER_START_BUTTON_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_ORDER_START_BUTTON_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeVisible({
       timeout: 60_000,
     });
@@ -659,7 +666,7 @@ test.describe('el recorrido de empaque (R48)', () => {
     expect(startedOrder.status).toBe('EN_EMPAQUE');
     expect(startedOrder.packedBy).toBe(empacadorUserId);
 
-    await page.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID), PACKING_ORDER_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(PACKED_ORDER_PARAM),
       { timeout: 60_000 },

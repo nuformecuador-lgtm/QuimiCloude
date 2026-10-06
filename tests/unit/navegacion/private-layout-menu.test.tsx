@@ -228,7 +228,6 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     await renderLayout(TODOS_LOS_PERMISOS);
 
     for (const item of [
-      testId.dashboard,
       testId.asignacion,
       testId.inventario,
       testId.pedidos,
@@ -240,6 +239,15 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     ]) {
       expect(screen.getByTestId(item)).toBeInTheDocument();
     }
+  });
+
+  it('con `dashboard.consultar` el item del dashboard sigue sin pintarse: esta oculto del menu', async () => {
+    expect(TODOS_LOS_PERMISOS).toContain('dashboard.consultar');
+
+    await renderLayout(TODOS_LOS_PERMISOS);
+
+    expect(screen.getByTestId(testId.inventario)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.dashboard)).toBeNull();
   });
 
   it('el layout hace una sola lectura de sesion para pintar el menu', async () => {
@@ -298,7 +306,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
   });
 
-  it('ancla: el menu real tiene los diez items que este test vigila', async () => {
+  it('ancla: el menu real tiene los nueve items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): el ancla sube de seis a siete con
@@ -308,7 +316,6 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     const testIds = PRIVATE_NAV_ITEMS.map((item) => item.testId);
 
     expect(testIds).toEqual([
-      testId.dashboard,
       testId.asignacion,
       testId.inventario,
       testId.pedidos,

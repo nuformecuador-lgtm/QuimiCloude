@@ -28,6 +28,7 @@ import {
   buildSessionValue,
 } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { createSessionTicket } from '@/lib/modules/identity/domain/session';
+import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
 const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc9-ok';
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
@@ -165,11 +166,11 @@ describe('middleware de rutas privadas', () => {
     expect(destino(response)).toBe('/login?next=%2Fdashboard');
   });
 
-  it('redirige al dashboard quien pide el login con sesion valida (R10)', async () => {
+  it('redirige a asignacion quien pide el login con sesion valida y sin destino de vuelta (R10)', async () => {
     const response = await middleware(peticion('/login', await cookieFirmada()));
 
     expect(response.status).toBe(307);
-    expect(destino(response)).toBe('/dashboard');
+    expect(destino(response)).toBe(ASSIGNED_ORDERS_ROUTE);
   });
 
   it('sirve el login sin redireccion cuando no hay sesion (R11)', async () => {
@@ -385,7 +386,7 @@ describe('la sesion sin empresa y el portero de rutas (QC-161)', () => {
 
     expect(dejaPasar(privada)).toBe(true);
     expect(login.status).toBe(307);
-    expect(destino(login)).toBe('/dashboard');
+    expect(destino(login)).toBe(ASSIGNED_ORDERS_ROUTE);
   });
 
   it('QC-161 R32: con cid ausente sigue siendo anonima; solo el null explicito vale', async () => {
@@ -423,11 +424,11 @@ describe('la marca de sesion cortada, vista desde el portero (QC-78)', () => {
 
   // El contraste que impide que el caso de arriba pase «porque todo pasa»: sin la marca, la misma
   // peticion con la misma cookie sigue redirigiendo (R17).
-  it('sin la marca, /login con la misma cookie valida sigue redirigiendo al dashboard', async () => {
+  it('sin la marca, /login con la misma cookie valida sigue redirigiendo a asignacion', async () => {
     const response = await middleware(peticion('/login', await cookieFirmada()));
 
     expect(response.status).toBe(307);
-    expect(destino(response)).toBe('/dashboard');
+    expect(destino(response)).toBe(ASSIGNED_ORDERS_ROUTE);
   });
 
   // R30 (b) desde el borde: la marca no deja entrar a nadie. Escrita a mano en una ruta privada

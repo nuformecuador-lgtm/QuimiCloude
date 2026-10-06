@@ -223,6 +223,7 @@ async function crearReceta(empresa: Empresa): Promise<string> {
       name: `Receta ${token()}`,
       description: null,
       steps: [],
+      packingSteps: [],
       lines: [],
       imagePath: null,
       tools: [],

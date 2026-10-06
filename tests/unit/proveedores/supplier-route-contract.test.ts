@@ -220,7 +220,7 @@ const REAL = {
   search: '',
   session: ANONIMO,
   privatePrefixes: PRIVATE_ROUTE_PREFIXES,
-  routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
+  routes: { login: LOGIN_ROUTE, landing: DASHBOARD_ROUTE },
 } as const satisfies RouteAccessInput
 
 const RUTAS_DE_PROVEEDORES = [SUPPLIERS_ROUTE, supplierDetailRoute(ID_PROVEEDOR)] as const

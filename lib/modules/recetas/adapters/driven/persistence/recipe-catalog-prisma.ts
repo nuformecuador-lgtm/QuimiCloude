@@ -238,3 +238,31 @@ export function createRecipeExecutionReader(tx: PrismaLike = prisma): Pick<Recip
     findExecutionContentById: (id, companyId) => findExecutionContentByIdOn(tx, id, companyId),
   };
 }
+
+type RecipePackingStepsRow = {
+  readonly packingSteps: unknown;
+  readonly parent: { readonly packingSteps: unknown } | null;
+};
+
+/** Fila de Prisma -> pasos de envasado. Una version no tiene propios: se empaca con los de su
+ *  original. Funcion pura, testeable sin base. */
+export function toRecipePackingSteps(row: RecipePackingStepsRow): readonly RecipeStepView[] {
+  return toExecutionSteps(row.parent === null ? row.packingSteps : row.parent.packingSteps);
+}
+
+/**
+ * Implementa `RecipePackingStepsReader['findPackingStepsById']`. Sin `deleted_at IS NULL`, igual
+ * que `findExecutionContentByIdOn`: una receta dada de baja se sigue empacando.
+ */
+export async function findRecipePackingStepsById(
+  id: RecipeId,
+  companyId: string,
+): Promise<readonly RecipeStepView[] | null> {
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { id }] },
+    select: { packingSteps: true, parent: { select: { packingSteps: true } } },
+  });
+
+  return row === null ? null : toRecipePackingSteps(row);
+}

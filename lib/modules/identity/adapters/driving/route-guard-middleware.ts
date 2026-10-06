@@ -14,10 +14,10 @@
 // el repositorio (`docs/architecture.md > Acceso a datos y autorizacion`). Un permiso
 // implementado solo como corte de ruta no cuenta como implementado.
 //
-// **`/login` con sesion viva sigue redirigiendo a `DASHBOARD_ROUTE`** (`design.md > 3`, R17): el
-// borde no conoce los permisos y no va a conocerlos (R18). Para quien no tenga
-// `dashboard.consultar` eso acaba en el 404 del layout privado, con su menu a la izquierda para
-// seguir. Resolverlo aqui exigiria una consulta en el borde, que es lo prohibido.
+// **`/login` con sesion viva y sin destino de vuelta redirige a `ASSIGNED_ORDERS_ROUTE`**: el
+// dashboard esta oculto del menu, asi que se aterriza en asignacion. El borde no conoce los
+// permisos: quien no tenga el de esa pantalla recibe el 404 del layout privado, con su menu a la
+// izquierda para seguir. Resolverlo aqui exigiria una consulta en el borde, que es lo prohibido.
 //
 // Lo que este archivo NO puede hacer, y por que:
 // - **No toca la cookie (R5).** Solo `NextResponse.next()` y `NextResponse.redirect()`. Ni
@@ -61,7 +61,7 @@ import {
   type RouteAccessSession,
 } from '@/lib/modules/identity';
 import {
-  DASHBOARD_ROUTE,
+  ASSIGNED_ORDERS_ROUTE,
   LOGIN_ROUTE,
   PRIVATE_ROUTE_PREFIXES,
   SESSION_ENDED_PARAM,
@@ -120,7 +120,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     search: request.nextUrl.search,
     session,
     privatePrefixes: PRIVATE_ROUTE_PREFIXES,
-    routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
+    routes: { login: LOGIN_ROUTE, landing: ASSIGNED_ORDERS_ROUTE },
     // QC-78 R29 — el nombre de la marca entra como parametro, igual que los prefijos y las rutas:
     // el literal vive en `lib/shared/routes.ts` y el dominio no puede importarlo. Sin esta linea
     // el campo queda `undefined`, la regla 3 dispara siempre y el bucle vuelve; por eso hay un

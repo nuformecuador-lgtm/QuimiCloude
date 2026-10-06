@@ -448,6 +448,7 @@ model Recipe {
   nameNormalized String    @map("name_normalized")
   description    String?
   steps          Json      @default("[]")
+  packingSteps   Json      @default("[]") @map("packing_steps")
   imagePath      String?   @map("image_path")
   companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid

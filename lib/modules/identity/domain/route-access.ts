@@ -40,7 +40,8 @@ export type RouteAccessInput = {
   readonly session: RouteAccessSession;
   /** Prefijos de URL privados declarados (`design.md > 7`). Entran como parametro (R20). */
   readonly privatePrefixes: readonly string[];
-  readonly routes: { readonly login: string; readonly dashboard: string };
+  /** `landing`: donde aterriza quien abre el login con sesion y sin destino de vuelta. */
+  readonly routes: { readonly login: string; readonly landing: string };
   /**
    * Nombre del parametro que marca un login que viene de un corte de sesion (QC-78 R29). Entra
    * como parametro, igual que `privatePrefixes` y `routes`, porque el literal vive en
@@ -97,7 +98,7 @@ function returnPathFromSearch(search: string, fallback: string): string {
  *
  * 1. Ruta no privada y no login -> `allow` (R11 de QC-9).
  * 2. Ruta privada + anonimo -> al login con la ruta pedida como destino de vuelta (QC-75 R17).
- * 3. Login + sesion -> al destino de vuelta valido si lo hay, si no al dashboard (QC-75 R17).
+ * 3. Login + sesion -> al destino de vuelta valido si lo hay, si no a `routes.landing`.
  * 4. Resto -> `allow`: **una ruta privada con sesion valida pasa, sea cual sea el rol**
  *    (QC-75 R16). Quien no tenga el permiso de esa pantalla recibe su 404 en la pagina.
  */
@@ -120,9 +121,9 @@ export function decideRouteAccess(input: RouteAccessInput): RouteAccessDecision 
   }
 
   // 3 — El login con sesion valida no se sirve: se aterriza donde el usuario queria ir, y si no
-  // trae destino de vuelta, en el dashboard (R17). Ese respaldo no mira permisos porque el borde
-  // no puede: quien no tenga `dashboard.consultar` recibira alli el 404 del layout privado, con
-  // su menu a la izquierda para seguir (`design.md > 3`, R18).
+  // trae destino de vuelta, en `routes.landing`. Ese respaldo no mira permisos porque el borde no
+  // puede consultar la base: quien no tenga el permiso de esa pantalla recibira alli el 404 del
+  // layout privado, con su menu a la izquierda para seguir.
   //
   // SALVO que traiga la marca de sesion cortada (QC-78 R29). Entonces la cookie sigue firmada y
   // viva —el borde no puede saber otra cosa, tiene prohibido consultar la base— pero el servidor
@@ -138,7 +139,7 @@ export function decideRouteAccess(input: RouteAccessInput): RouteAccessDecision 
   if (esLogin && session.kind === 'authenticated' && !traeMarcaDeSesionCortada(search, sessionEndedParam)) {
     return {
       kind: 'redirect',
-      to: returnPathFromSearch(search, routes.dashboard),
+      to: returnPathFromSearch(search, routes.landing),
       reason: 'already-authenticated',
     };
   }

@@ -1,13 +1,8 @@
 // QC-138 T13 — lo que la ficha NO debe cambiar (R37, R39) ni ofrecer (R21).
 //
-// Las dependencias se comparan con el padre de la rama -el `merge-base` con `origin/dev`-, no con
-// una cifra: otra ficha puede sumar una dependencia aprobada en paralelo y eso no es trabajo de esta. Si no hay git o no hay `origin/dev`, el caso falla diciendolo: «no pude
-// mirar» no es un verde.
-//
 // El borrado fisico y los identificadores de base se miran sobre el fuente, sin historia: todo
 // `lib/**` y las dos migraciones de la ficha.
 
-import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,31 +27,6 @@ function findRepoRoot(startDir: string): string {
 }
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
-
-function git(comando: string): string {
-  return execSync(comando, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-}
-
-/** El padre de la rama. Lanza con un motivo legible si no se puede resolver. */
-function padreDeLaRama(): string {
-  try {
-    return git('git merge-base HEAD origin/dev');
-  } catch (error) {
-    throw new Error(
-      'No se pudo resolver `git merge-base HEAD origin/dev`, asi que este caso no se ha ' +
-        `comprobado. Hace falta git y la ref origin/dev. Causa: ${String(error)}`,
-    );
-  }
-}
-
-function enElPadre(ruta: string): string {
-  const padre = padreDeLaRama();
-  try {
-    return git(`git show ${padre}:${ruta}`);
-  } catch (error) {
-    throw new Error(`No se pudo leer ${ruta} en ${padre}. Causa: ${String(error)}`);
-  }
-}
 
 function stripComments(source: string): string {
   return source
@@ -86,26 +56,9 @@ describe('R37 — crear, editar y revisar siguen con sus permisos', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// R39 — package.json sin dependencias nuevas
-// ---------------------------------------------------------------------------------------------
-
-type PackageJson = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-
-function paquetesDe(pkg: PackageJson): string[] {
-  return [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})].sort();
-}
-
-describe('R39 — package.json no gana dependencias', () => {
-  it('R39: ningun paquete declarado falta en el package.json del padre de la rama', () => {
-    const delPadre = new Set(paquetesDe(JSON.parse(enElPadre('package.json')) as PackageJson));
-    const actuales = paquetesDe(JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as PackageJson);
-
-    const nuevos = actuales.filter((nombre) => !delPadre.has(nombre));
-
-    expect(nuevos, `Dependencias nuevas: ${nuevos.join(', ')}`).toEqual([]);
-  });
-});
+// «package.json no gana dependencias frente al padre de la rama» era regla de QC-138 mientras la
+// ficha estaba abierta; ya cerro y otras ramas pueden sumar dependencias aprobadas. Que toda
+// dependencia declarada este aprobada lo vigila guard-dependencias-aprobadas.test.ts.
 
 // ---------------------------------------------------------------------------------------------
 // R39 — ningun borrado fisico de pedidos ni de reservas

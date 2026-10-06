@@ -7,14 +7,14 @@ import {
   PACKING_ORDER_PRESENTATION_LINE_TESTID,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
-import type { PackingOrderRow } from '@/lib/modules/asignaciones';
+import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () => ({
   startPackingAction: vi.fn(),
   finishPackingAction: vi.fn(),
 }));
 
-function fila(overrides: Partial<PackingOrderRow> = {}): PackingOrderRow {
+function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
     numberText: '2026-0000030',
@@ -27,6 +27,7 @@ function fila(overrides: Partial<PackingOrderRow> = {}): PackingOrderRow {
     status: 'POR_EMPACAR',
     packedByName: null,
     packedById: null,
+    packingSteps: [],
     ...overrides,
   };
 }

@@ -11,6 +11,9 @@ import {
   ORDER_EXECUTION_LINES_TESTID,
   ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID,
   ORDER_EXECUTION_MATERIALS_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TEXTS,
+  ORDER_EXECUTION_FINISH_DIALOG_TESTID,
   ORDER_EXECUTION_ORDER_ID_FIELD,
   ORDER_EXECUTION_ORDER_QUANTITY_TESTID,
   ORDER_EXECUTION_PRESENTATION_TESTID,
@@ -236,8 +239,58 @@ describe('pantalla de ejecucion — el error de la operacion se muestra sin bloq
     }
 
     fireEvent.click(screen.getByTestId('step-reader-finish'));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
 
     expect(await screen.findByTestId('order-execution-finish-error')).toBeVisible();
+  });
+});
+
+describe('pantalla de ejecucion — Finalizar pide confirmar antes de terminar el pedido', () => {
+  async function pulsarFinalizar(): Promise<void> {
+    vi.useFakeTimers();
+    try {
+      render(<OrderExecutionScreen execution={EXECUTION_SIN_ELEMENTOS} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    fireEvent.click(screen.getByTestId('step-reader-finish'));
+  }
+
+  it('pulsar Finalizar abre la confirmacion y todavia no invoca la operacion', async () => {
+    await pulsarFinalizar();
+
+    const dialog = screen.getByTestId(ORDER_EXECUTION_FINISH_DIALOG_TESTID);
+    expect(dialog).toHaveTextContent(ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.title);
+    expect(dialog).toHaveTextContent(ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.description);
+    expect(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID)).toHaveTextContent(
+      ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.confirm,
+    );
+    expect(finishAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('cancelar no invoca la operacion', async () => {
+    await pulsarFinalizar();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.cancel }),
+    );
+    await act(async () => {});
+
+    expect(finishAssignedOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('confirmar envia el formulario e invoca la operacion una vez', async () => {
+    finishAssignedOrderActionMock.mockResolvedValue({ status: 'success' });
+    await pulsarFinalizar();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
+    });
+
+    expect(finishAssignedOrderActionMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -278,6 +331,10 @@ describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar 
         fireEvent.click(screen.getByTestId('step-reader-finish'));
         await vi.advanceTimersByTimeAsync(0);
       });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
+        await vi.advanceTimersByTimeAsync(0);
+      });
 
       expect(finishAssignedOrderActionMock).toHaveBeenCalledTimes(1);
       const [, formData] = finishAssignedOrderActionMock.mock.calls[0] as [unknown, FormData];
@@ -311,6 +368,7 @@ describe('pantalla de ejecucion — QC-150 R18, R19: los errores nuevos del Fina
     }
 
     fireEvent.click(screen.getByTestId('step-reader-finish'));
+    fireEvent.click(screen.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID));
 
     return screen.findByTestId('order-execution-finish-error');
   }

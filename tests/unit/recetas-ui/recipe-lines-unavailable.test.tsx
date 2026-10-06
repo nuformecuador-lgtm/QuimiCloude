@@ -174,6 +174,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
       lines,
       tools: [],
       steps: [],
+      packingSteps: [],
       image: { kind: 'untouched' },
     });
 

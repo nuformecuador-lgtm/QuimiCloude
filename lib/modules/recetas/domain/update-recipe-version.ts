@@ -62,6 +62,7 @@ export function createUpdateRecipeVersion(
         name: data.name,
         description: null,
         steps: [],
+        packingSteps: [],
         lines: data.lines,
         imagePath: null,
         tools: data.tools ?? null,

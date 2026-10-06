@@ -249,19 +249,22 @@ export type NavGroup = {
 
 export type NavItem = NavLink | NavGroup;
 
+/**
+ * Oculto del menu temporalmente por decision humana; la ruta, su pagina y su permiso siguen vivos.
+ * Para volver a mostrarlo, ponlo de nuevo como primer elemento de `PRIVATE_NAV_ITEMS`: el login
+ * aterriza en el primer enlace visible, asi que mientras falte nadie aterriza en `/dashboard`.
+ */
+export const HIDDEN_DASHBOARD_NAV_ITEM: NavLink = {
+  kind: 'link',
+  href: DASHBOARD_ROUTE,
+  label: 'Dashboard',
+  testId: 'nav-dashboard',
+  permission: 'dashboard.consultar',
+  icon: 'layout-dashboard',
+  section: NAV_SECTION_OPERATION,
+};
+
 export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
-  {
-    kind: 'link',
-    href: DASHBOARD_ROUTE,
-    label: 'Dashboard',
-    testId: 'nav-dashboard',
-    permission: 'dashboard.consultar',
-    icon: 'layout-dashboard',
-    section: NAV_SECTION_OPERATION,
-  },
-  // La posicion no es cosmetica: `firstVisibleNavHref` recorre el menu filtrado de arriba abajo,
-  // asi que quien no tiene `dashboard.consultar` aterriza en el primer item visible, que con este
-  // orden es este.
   {
     kind: 'link',
     href: ASSIGNED_ORDERS_ROUTE,

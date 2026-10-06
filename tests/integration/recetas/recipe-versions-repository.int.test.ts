@@ -129,6 +129,7 @@ async function original(empresa: Empresa, overrides: Partial<NewRecipe> = {}): P
     name: `Crema ${token()}`,
     description: 'Base para versiones',
     steps: PASOS,
+    packingSteps: [],
     lines: [linea(a, '70.00'), linea(b, '30.00')],
     imagePath: 'recetas/crema.jpg',
     tools: [],
@@ -289,6 +290,7 @@ describe('findAliveById y listAliveVersions', () => {
       description: 'Base para versiones',
       imagePath: 'recetas/crema.jpg',
       steps: PASOS,
+      packingSteps: [],
     });
 
     expect((await findAliveRecipeById(crema, A.scope))?.original).toBeNull();
@@ -368,6 +370,7 @@ describe('replaceAliveWithPropagation', () => {
       name: 'Crema renovada',
       description: 'Nueva',
       steps: PASOS,
+      packingSteps: [],
       lines: [linea(a, '60.00'), linea(b, '40.00')],
       imagePath: null,
       tools: [],
@@ -402,7 +405,7 @@ describe('replaceAliveWithPropagation', () => {
 
     const resultado = await replaceAliveRecipeWithPropagation(
       crema,
-      { name: `Crema ${token()}`, description: null, steps: [], lines: [linea(a, '50.00'), linea(b, '50.00')], imagePath: null, tools: [] },
+      { name: `Crema ${token()}`, description: null, packingSteps: [], steps: [], lines: [linea(a, '50.00'), linea(b, '50.00')], imagePath: null, tools: [] },
       [conC],
       A.userId,
       new Date(),
@@ -427,7 +430,7 @@ describe('replaceAliveWithPropagation', () => {
       const antes = [await retrato(crema), await retrato(propia)];
       const resultado = await replaceAliveRecipeWithPropagation(
         crema,
-        { name: `Cambiada ${token()}`, description: null, steps: [], lines: [linea(A.productos[2], '100.00')], imagePath: null, tools: [] },
+        { name: `Cambiada ${token()}`, description: null, packingSteps: [], steps: [], lines: [linea(A.productos[2], '100.00')], imagePath: null, tools: [] },
         [propia, intruso],
         A.userId,
         new Date(),
@@ -443,7 +446,7 @@ describe('replaceAliveWithPropagation', () => {
     const sinPerfume = await version(A, crema, []);
     const deBaja = await original(A);
     expect(await softDeleteAliveRecipe(deBaja, A.userId, new Date(), A.scope)).toBe('ok');
-    const datos: NewRecipe = { name: `X ${token()}`, description: null, steps: [], lines: [], imagePath: null, tools: [] };
+    const datos: NewRecipe = { name: `X ${token()}`, description: null, packingSteps: [], steps: [], lines: [], imagePath: null, tools: [] };
 
     expect(await replaceAliveRecipeWithPropagation(sinPerfume, datos, [], A.userId, new Date(), A.scope)).toBe('not_found');
     expect(await replaceAliveRecipeWithPropagation(crema, datos, [sinPerfume], B.userId, new Date(), B.scope)).toBe('not_found');
@@ -474,7 +477,7 @@ describe('replaceAliveWithPropagation', () => {
       await expect(
         replaceAliveRecipeWithPropagation(
           crema,
-          { name: `Cambiada ${token()}`, description: null, steps: [], lines: [linea(a, '60.00'), linea(b, '40.00')], imagePath: null, tools: [] },
+          { name: `Cambiada ${token()}`, description: null, packingSteps: [], steps: [], lines: [linea(a, '60.00'), linea(b, '40.00')], imagePath: null, tools: [] },
           [primera, segunda],
           A.userId,
           new Date(),

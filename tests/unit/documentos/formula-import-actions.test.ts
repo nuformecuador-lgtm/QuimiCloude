@@ -89,6 +89,7 @@ const PREVIEW_VACIA: FormulaImportPreview = {
   description: null,
   ingredients: [],
   steps: [],
+  packingSteps: [],
   nameClash: null,
 };
 
@@ -189,7 +190,7 @@ describe('documentos — la Server Action de la confirmacion de una importacion 
     const resultado = await confirmFormulaImportAction(CONFIRM_ENTRADA_VALIDA);
 
     expect(resultado).toEqual({ status: 'success', data: RESUMEN });
-    expect(confirmFormulaImportMock).toHaveBeenCalledWith(ACTOR_ESPERADO, CONFIRM_ENTRADA_VALIDA);
+    expect(confirmFormulaImportMock).toHaveBeenCalledWith(ACTOR_ESPERADO, { ...CONFIRM_ENTRADA_VALIDA, packingSteps: [] });
   });
 
   it('un exito revalida el listado de formulas y la ficha de la receta resultante, y solo esas dos', async () => {

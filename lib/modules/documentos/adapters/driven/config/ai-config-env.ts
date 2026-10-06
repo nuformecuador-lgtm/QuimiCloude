@@ -1,5 +1,5 @@
 /**
- * La clave y el modelo del proveedor de IA, leidos EN EL MOMENTO DE LA INVOCACION —dentro
+ * La clave y el modelo de cada proveedor de IA, leidos EN EL MOMENTO DE LA INVOCACION —dentro
  * de una funcion, nunca al importar el modulo—.
  *
  * Que se lean aqui y no en el top-level es lo que permite que `lib/composition` —que
@@ -16,11 +16,12 @@ export type AiConfig = {
 };
 
 /**
- * Los dos nombres viven UNICAMENTE como elementos de este arreglo, cadenas literales en
- * posicion de valor. Repetirlos como identificador aparte seria tener dos sitios que dicen
- * como se llama lo mismo.
+ * Los nombres viven UNICAMENTE como elementos de estos arreglos, cadenas literales en
+ * posicion de valor, en el orden clave y modelo. Repetirlos como identificador aparte seria
+ * tener dos sitios que dicen como se llama lo mismo.
  */
-const REQUIRED_ENV_VAR_NAMES = ['GEMINI_API_KEY', 'GEMINI_MODEL'] as const;
+const ANTHROPIC_ENV_VAR_NAMES = ['ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL'] as const;
+const GEMINI_ENV_VAR_NAMES = ['GEMINI_API_KEY', 'GEMINI_MODEL'] as const;
 
 /** Vacia o solo-espacios cuenta como ausente. Devuelve el valor SIN recortar. */
 function readRequiredEnv(name: string): string {
@@ -33,14 +34,14 @@ function readRequiredEnv(name: string): string {
 
 /**
  * Resuelve las dos por POSICION, no por nombre de propiedad, para no volver a escribir
- * ninguno de los dos nombres fuera del arreglo de arriba. Si faltan varias, el error las
+ * ninguno de los nombres fuera de los arreglos de arriba. Si faltan varias, el error las
  * nombra TODAS juntas y nunca incluye ningun valor.
  */
-export function readAiConfigFromEnv(): AiConfig {
+function readConfigFromEnv(names: readonly [string, string]): AiConfig {
   const missing: string[] = [];
   const resolved: string[] = [];
 
-  for (const name of REQUIRED_ENV_VAR_NAMES) {
+  for (const name of names) {
     try {
       resolved.push(readRequiredEnv(name));
     } catch {
@@ -54,4 +55,14 @@ export function readAiConfigFromEnv(): AiConfig {
 
   const [apiKey, model] = resolved as [string, string];
   return { apiKey, model };
+}
+
+/** Proveedor principal: Anthropic (Claude). */
+export function readAnthropicConfigFromEnv(): AiConfig {
+  return readConfigFromEnv(ANTHROPIC_ENV_VAR_NAMES);
+}
+
+/** Gemini: se conserva para usarlo como respaldo; hoy no esta cableado. */
+export function readAiConfigFromEnv(): AiConfig {
+  return readConfigFromEnv(GEMINI_ENV_VAR_NAMES);
 }

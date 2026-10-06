@@ -198,7 +198,7 @@ export {
 // El empaque: la fila comun y los cuatro casos de uso. Bloque NUEVO al final: no reordena ni
 // reformatea nada de lo de arriba.
 // ---------------------------------------------------------------------------------------
-export type { PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
+export type { PackingOrderDetail, PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
 export { createListPackingOrders, type ListPackingOrdersDeps } from './domain/list-packing-orders';
 export { createGetPackingOrder, type GetPackingOrderDeps } from './domain/get-packing-order';
 export { createStartPacking, type StartPackingDeps } from './domain/start-packing';

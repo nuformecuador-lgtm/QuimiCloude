@@ -39,6 +39,7 @@ function filaCon(imagePath: string | null): RecipeRow {
     name: RECETA_VALIDA.name,
     description: null,
     steps: [],
+    packingSteps: [],
     imagePath,
     createdBy: ADMIN.id,
     updatedBy: ADMIN.id,

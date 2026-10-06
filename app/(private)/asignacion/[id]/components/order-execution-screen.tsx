@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { useActionState, useRef, useState } from 'react';
 
+import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,6 +39,15 @@ export const ORDER_EXECUTION_MATERIALS_TESTID = 'order-execution-materials';
 export const ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID = 'order-execution-materials-divider';
 export const ORDER_EXECUTION_ORDER_QUANTITY_TESTID = 'order-execution-order-quantity';
 export const ORDER_EXECUTION_PRESENTATION_TESTID = 'order-execution-presentation';
+export const ORDER_EXECUTION_FINISH_DIALOG_TESTID = 'order-execution-finish-dialog';
+export const ORDER_EXECUTION_FINISH_CONFIRM_TESTID = 'order-execution-finish-confirm';
+
+export const ORDER_EXECUTION_FINISH_CONFIRM_TEXTS = {
+  title: '¿Terminar el pedido?',
+  description: 'Terminar el pedido no se puede deshacer.',
+  cancel: 'Cancelar',
+  confirm: 'Terminar',
+} as const;
 
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
 const ORDER_QUANTITY_LABEL = 'Pedido';
@@ -61,6 +71,7 @@ export type OrderExecutionScreenProps = {
 
 export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [state, formAction] = useActionState<FinishFormState, FormData>(
     (_previous, formData) => finishAssignedOrderAction(IGNORED_PREV_STATE, formData),
     INITIAL_STATE,
@@ -112,7 +123,7 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         <StepReader
           steps={execution.steps}
           title={title}
-          onFinish={() => formRef.current?.requestSubmit()}
+          onFinish={() => setConfirmOpen(true)}
           minStepSeconds={MIN_STEP_SECONDS}
           mode="ejecucion"
         />
@@ -125,6 +136,15 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
           defaultValue={execution.orderId}
         />
       </form>
+
+      <ConfirmActionDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={() => formRef.current?.requestSubmit()}
+        texts={ORDER_EXECUTION_FINISH_CONFIRM_TEXTS}
+        testId={ORDER_EXECUTION_FINISH_DIALOG_TESTID}
+        confirmTestId={ORDER_EXECUTION_FINISH_CONFIRM_TESTID}
+      />
 
       {error !== undefined ? (
         <div

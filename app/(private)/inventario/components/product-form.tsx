@@ -24,6 +24,7 @@ import {
   type ProductType,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import {
   createProductAction,
   updateProductAction,
@@ -38,6 +39,7 @@ import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-
 import { ProductCostFields } from './product-cost-fields';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
+import { EMPTY_CELL, productUnitLabel } from './product-columns';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -300,9 +302,9 @@ type ProductFormProps = {
   /** Producto que se edita. Ausente en el alta (R19). */
   readonly product?: ProductView;
   /**
-   * Catalogo de unidades para el alta rapida de presentacion del selector (QC-80 R11). Baja por
-   * props desde la pagina, que lo pide una sola vez (QC-44 R46); este formulario no consulta
-   * nada. Sin el, el alta rapida no se ofrece y la presentacion se elige entre las existentes.
+   * Catalogo de unidades. En el alta, para el alta rapida de presentacion del selector: sin el,
+   * la presentacion se elige entre las existentes. En la edicion, para nombrar la unidad de la
+   * alerta de cantidad. Baja por props desde la pagina; este formulario no consulta nada.
    */
   readonly units?: readonly UnitRef[];
   /** Unidades que ofrece el campo «Unidad» del alta de insumo. Sin ellas, el selector sale vacio. */
@@ -366,13 +368,13 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
 
   function applyTemplate(option: ProductNameOption) {
     setTemplate({
-      qtyAlert: option.qtyAlert ?? '',
+      qtyAlert: trimDecimal(option.qtyAlert ?? ''),
       presentationId: option.presentationId ?? '',
       presentationName: option.presentationName ?? '',
       unitId: option.unitId ?? '',
       type: option.type ?? PRODUCT_TYPES.PRODUCT,
     });
-    setQtyAlertValue(option.qtyAlert ?? '');
+    setQtyAlertValue(trimDecimal(option.qtyAlert ?? ''));
   }
 
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
@@ -537,8 +539,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
    */
   const [stockValue, setStockValue] = useState(() => initialValue('stock', ''));
   const [qtyAlertValue, setQtyAlertValue] = useState(() =>
-    initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert ?? ''),
+    initialValue('qtyAlert', trimDecimal(template?.qtyAlert ?? product?.qtyAlert ?? '')),
   );
+  // Solo en la edicion: en el alta la unidad del selector puede cambiar y la etiqueta mentiria.
+  const editUnitLabel = product === undefined ? null : productUnitLabel(product, units);
+  const qtyAlertLabel =
+    editUnitLabel === null || editUnitLabel === EMPTY_CELL
+      ? FIELD_LABELS.qtyAlert
+      : `${FIELD_LABELS.qtyAlert} (${editUnitLabel})`;
 
   // Todo error de campo tiene ya SU campo en pantalla: desde QC-52 el formulario no tiene
   // ningun campo oculto, asi que no hay rechazo que se quede sin sitio donde pintarse. La region
@@ -747,7 +755,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       {shouldShowField('qtyAlert', productType) && (
         <ProductField
           name="qtyAlert"
-          label={FIELD_LABELS.qtyAlert}
+          label={qtyAlertLabel}
           type="text"
           inputMode="decimal"
           required
