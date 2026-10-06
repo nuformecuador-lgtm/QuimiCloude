@@ -116,3 +116,77 @@ Todo revertido; los archivos commiteados son los verdes.
 - `pnpm exec vitest run` de los cinco archivos: `5 passed`, `70 passed`.
 - `pnpm exec vitest run guard`: `51 passed`, `695 passed | 11 skipped`.
 - `./init.sh` no se corrió (indicación del leader).
+
+## Tanda T4–T6, T11–T14 (migración e integración)
+
+En paralelo con la tanda T7–T10 de otro backend_dev en el mismo worktree; sin archivos en común.
+
+### Base usada
+
+- **`QuimiCloude_QC216`**, propia de la rama. Creada con `CREATE DATABASE ... TEMPLATE qct_tpl_f12f312b3e9e`
+  (la plantilla de integración de la rama antes de la migración nueva: 71 migraciones, sembrada).
+  Estado de partida comprobado: 4 roles, 24 permisos, 29 asignaciones, última migración
+  `20261006140000_inventory_movements_adjustment_count`. Es la «base sembrada antes de la feature».
+- `.env` del worktree apunta a ella (`DATABASE_URL` y `DIRECT_URL`); el original queda en
+  `.env.bak-QuimiCloude` (ignorado por git). La base compartida `QuimiCloude` no se tocó.
+- Un primer `db:seed` sobre la copia creó el rol antes de existir la migración; la base se borró y se
+  volvió a copiar de la plantilla para probar la migración sobre el estado previo de verdad.
+- Los tests de integración no usan esta base: `tests/integration/_global-setup.ts` construye su propia
+  plantilla desde las migraciones (`qct_tpl_98ed93a270b2`, ya con `conditioning_role`) y una copia
+  efímera por corrida.
+- Al cerrar la feature: borrar `QuimiCloude_QC216` y restaurar `.env` desde `.env.bak-QuimiCloude`.
+
+### Migración: timestamp
+
+`pnpm run db:migrate:create --name conditioning_role` generó `20261006234105_conditioning_role`.
+Es posterior a la última de `origin/dev` (`20261006140000`) y a las de otros worktrees
+(`20261006160000` QC-156, `20261006180000` QC-82), así que se conserva el que dio Prisma.
+
+Prisma generó además 67 sentencias de drift (`DROP CONSTRAINT` de FKs compuestas y `DROP INDEX` de
+índices trigram escritos a mano). Se borraron todas y la cabecera de `migration.sql` lo dice.
+
+### Archivos
+
+| Task | Archivo | Cambio |
+|---|---|---|
+| T4 | `db/migrations/20261006234105_conditioning_role/migration.sql` | nuevo: tres `INSERT ... ON CONFLICT DO NOTHING` de `design.md > 3.1`, cabecera (solo datos, sin otros roles, idempotencia, literales duplicados, drift borrado) |
+| T5 | `db/migrations/20261006234105_conditioning_role/down.sql` | nuevo: cuatro `DELETE` de `design.md > 3.2` en ese orden, cabecera |
+| T6 | `tests/unit/identity/schema/conditioning-role-migration.test.ts` | nuevo (plantilla `packer-role-migration.test.ts`): 12 casos, predicados puros + mutaciones en memoria |
+| T11 | `tests/integration/identity/conditioning-role-migration.int.test.ts` | nuevo (plantilla `packer-role-migration.int.test.ts`): 6 casos, SQL leído del archivo |
+| T12 | `tests/integration/identity/identity-seed.int.test.ts` | bucle sin `empresas.*` suma el rol; dos casos nuevos (R26/R3/R9 sobre base vacía; R23 sobre base sembrada salvo el rol) |
+| T13 | `tests/integration/identity/role-catalog.int.test.ts` | bloque R18: `createListRoles` + adaptador real con `usuarios.consultar` y con `usuarios.modificar`; simétrico sin permiso |
+| T13 | `tests/integration/identity/user-crud.int.test.ts` | bloque R19 (alta, edición, y los dos rechazos sin `usuarios.modificar`) y R3 (dos empresas, un solo rol) |
+| T14 | `tests/integration/identity/session-user.int.test.ts` | caso R20: la cadena real `createResolveSession` + `findActiveSessionUserById` da exactamente los dos permisos |
+| — | `tests/guards/guard-identificador-de-request.test.ts` | la lista de migraciones conocidas suma `20261006234105_conditioning_role` (la guardia lo exige a cada migración nueva) |
+| — | `tests/integration/aislamiento.json` | el censo suma `identity/conditioning-role-migration.int.test.ts` en `transaccion` |
+
+Los dos últimos no están en la lista de archivos de `tasks.md`; son altas obligatorias en censos que
+cada migración / test de integración nuevo tiene que actualizar (mismo patrón que QC-213).
+
+### Mapa parcial R → test
+
+- R7, R21, R22, R24, R25 (estático) → `tests/unit/identity/schema/conditioning-role-migration.test.ts`
+- R21, R22, R25 (base real) → `tests/integration/identity/conditioning-role-migration.int.test.ts`
+- R23, R26, R3 (una fila), R9 (base) → `tests/integration/identity/identity-seed.int.test.ts` (casos `QC-216 …` y el bucle `QC-161 R9, QC-216 R26`)
+- R18 → `tests/integration/identity/role-catalog.int.test.ts` (bloque `QC-216`)
+- R19, R3 (dos empresas) → `tests/integration/identity/user-crud.int.test.ts` (bloque `QC-216 R19`)
+- R20 → `tests/integration/identity/session-user.int.test.ts` (caso `QC-216 R20`)
+
+### Verificación
+
+- T4 en `QuimiCloude_QC216`: `pnpm run db:migrate` → «All migrations have been successfully applied»;
+  roles 5, permisos 25, asignaciones 31; el permiso nuevo solo en el rol nuevo.
+- T5: `pnpm run db:rollback` → vuelve a 4 / 24 / 29 y última migración `20261006140000`;
+  `pnpm run db:migrate` la reaplica; dos `pnpm run db:seed` seguidos → «nada que crear» las dos veces.
+  Las tres FKs (`users_role_id_fkey`, `role_permissions_role_id_fkey`,
+  `role_permissions_permission_code_fkey`) son RESTRICT, comprobado en `pg_constraint`.
+- T6: 12/12. Sensibilidad real además de la de memoria: quitar el `ON CONFLICT ("code")` del archivo
+  en disco pone rojo el caso R22; revertido con `git checkout`.
+- Integración (base efímera desde `qct_tpl_98ed93a270b2`): los cinco archivos de identity tocados
+  → `5 passed`, `113 passed`. **`identity-seed.int.test.ts` vuelve a verde**: los dos casos de doble
+  corrida (QC-142 R13 y QC-201 R3/R4) que la tanda 1 vio rojos por faltar la migración pasan.
+- `pnpm exec vitest related --run` de los archivos tocados: `7 passed`, `148 passed`.
+- `pnpm exec vitest run guard`: `51 passed`, `695 passed | 11 skipped` (antes de dar de alta los censos,
+  rojas `guard-identificador-de-request` y `guard-aislamiento-integracion`).
+- `pnpm run typecheck`: verde. `pnpm run lint`: 0 errores, 8 warnings preexistentes ajenos.
+- `./init.sh` / `pnpm test` no se corrieron (indicación del leader).
