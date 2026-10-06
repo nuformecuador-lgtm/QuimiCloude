@@ -36,8 +36,8 @@ export const metadata: Metadata = {
  * del layout privado ya lo es, y R5 de QC-11 exige que sea unico. (Escrito sin el signo de menor
  * que a proposito: una guardia de fuente que busque la etiqueta no debe encontrarla ni aqui.)
  *
- * **Los componentes se importan SOLO desde `./components`** (R27), nunca por ruta profunda. El
- * barrel no declara `'use client'`: la frontera la declara cada componente, asi que esta pagina
+ * **Los componentes se importan SOLO desde `./components`**, nunca por ruta profunda. El barrel
+ * no lleva la directiva de cliente: la frontera la declara cada componente, asi que esta pagina
  * sigue siendo un Server Component aunque importe de el.
  *
  * **El estado de lista vive en la cadena de consulta, no en React** (`design.md > 4.2`): asi
