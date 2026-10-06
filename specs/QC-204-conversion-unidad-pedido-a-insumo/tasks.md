@@ -87,7 +87,7 @@
   `R5 el desbloqueo recalcula con la unidad del pedido`;
   `R7 terminar el empaque costea el lote con la necesidad convertida`.
   *Hecho:* verde.
-- [ ] **T9 — Llamantes de reserva y consumo.** `create-order.ts`, `update-order.ts`,
+- [x] **T9 — Llamantes de reserva y consumo.** `create-order.ts`, `update-order.ts`,
   `update-order-presentation-lines.ts`, `review-blocked-orders.ts`, `transition-order.ts` usan
   `loadRequirementUnits` + `buildOrderRequirement`/`buildRequirement`. **Pregunta 1 cerrada:
   opción B** para el tratamiento de `not_convertible` en alta, edición y reparto
@@ -117,7 +117,7 @@
 
 ## Bloque D — presentación (D depende de B)
 
-- [ ] **T11 [P] — Ejecución.** `get-assigned-order-execution.ts` y `ExecutionLineView`
+- [x] **T11 [P] — Ejecución.** `get-assigned-order-execution.ts` y `ExecutionLineView`
   (`design.md > 5.1`). Depende de T4 y T2.
   Tests `tests/unit/asignaciones/get-assigned-order-execution.test.ts` (ampliar):
   `R16 la cantidad de la linea sale convertida a la unidad del insumo`;
@@ -125,7 +125,7 @@
   `R17 una linea no convertible sale sin cantidad`;
   `R20 un pedido sin unidad sale como antes`.
   *Hecho:* verde.
-- [ ] **T12 [P] — Cotización en el cliente.** `use-order-cost-quote.ts` (`unitId` en los
+- [x] **T12 [P] — Cotización en el cliente.** `use-order-cost-quote.ts` (`unitId` en los
   manejadores, `onUnitChange`) y `order-form.tsx` (conectar `PresentationUnitSelect`). Depende de T10.
   Tests `tests/unit/pedidos-ui/use-order-cost-quote.test.ts` (ampliar):
   `R8 la peticion lleva unitId`; `R8 cambiar la unidad pide una cotizacion nueva`;
