@@ -189,6 +189,11 @@
       "desde": "2026-09-24"
     },
     {
+      "archivo": "inventario/adjust-by-count.int.test.ts",
+      "motivo": "QC-213 B3 (R12-R14, R24-R26): llama a 'createWithFirstBatch' y 'adjustBatchStock' de 'product-prisma.ts' y a 'findBatchMovements', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' con el bloqueo de producto y lote dentro; una transaccion del test no las envolveria, y el caso R14 necesita que dos ajustes concurrentes confirmen para que uno vea el cambio del otro. Los INSERT crudos de R25 que la base rechaza no dejan nada. Cada caso fabrica su propia empresa efimera con randomUUID y la limpia en un 'finally' en el orden que exigen las FK (asientos -> lotes -> productos -> presentacion -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
+    },
+    {
       "archivo": "inventario/create-raw-material.int.test.ts",
       "motivo": "QC-159 T3: ejercita `createCreateRawMaterial` con el adaptador `createProduct` REAL de `product-prisma.ts`, que usa el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. Empresa efimera propia del archivo (randomUUID), sin usuario ni rol -el alta de materia prima no escribe autoria-; se limpia en `afterAll` por su id exacto (productos -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"

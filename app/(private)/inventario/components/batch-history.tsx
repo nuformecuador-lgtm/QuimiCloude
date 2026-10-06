@@ -13,6 +13,8 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const KIND_LABEL = 'Tipo';
 const QUANTITY_LABEL = 'Cantidad';
+const PREVIOUS_STOCK_LABEL = 'Existencia anterior';
+const COUNTED_STOCK_LABEL = 'Total contado';
 const REASON_LABEL = 'Motivo';
 const ORDER_LABEL = 'Pedido';
 const AUTHOR_LABEL = 'Autor';
@@ -57,6 +59,14 @@ export function movementKindLabel(kind: BatchHistoryEntry['kind']): string {
  */
 function formatMovementDate(createdAt: string): string {
   return `${createdAt.slice(0, 10)} ${createdAt.slice(11, 16)}`;
+}
+
+function DecimalValue({ value, testId }: { readonly value: string; readonly testId: string }) {
+  return (
+    <span data-testid={testId} title={exactDecimalTitle(value)} aria-label={trimDecimal(value)}>
+      {formatDecimalDisplay(value)}
+    </span>
+  );
 }
 
 type LoadState =
@@ -144,6 +154,20 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
                   >
                     {formatDecimalDisplay(movimiento.quantity)}
                   </span>
+                  {movimiento.previousStock === null || movimiento.countedStock === null ? null : (
+                    <>
+                      <span className="text-xs text-muted-foreground">{PREVIOUS_STOCK_LABEL}</span>
+                      <DecimalValue
+                        value={movimiento.previousStock}
+                        testId="batch-history-entry-previous-stock"
+                      />
+                      <span className="text-xs text-muted-foreground">{COUNTED_STOCK_LABEL}</span>
+                      <DecimalValue
+                        value={movimiento.countedStock}
+                        testId="batch-history-entry-counted-stock"
+                      />
+                    </>
+                  )}
                   {movimiento.reason === null ? null : (
                     <>
                       <span className="text-xs text-muted-foreground">{REASON_LABEL}</span>

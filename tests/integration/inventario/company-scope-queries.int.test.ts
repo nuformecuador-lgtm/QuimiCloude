@@ -16,7 +16,6 @@ import { normalizePresentationName, normalizeProductName } from '@/lib/modules/i
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
-  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
@@ -26,6 +25,7 @@ import {
   softDeleteAliveProduct,
   updateAliveProduct,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import {
   createPresentation,
   deletePresentationById,
@@ -690,9 +690,9 @@ describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMoveme
     const antes = await fotoLote(ajeno);
     const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: ajeno } });
 
-    const resultado = await adjustBatchStock(ajeno, '1', 'conteo_fisico', A.userId, new Date(), ambitoDe(A));
+    const resultado = await adjustByDelta(ajeno, '1', 'conteo_fisico', A.userId, new Date(), ambitoDe(A));
 
-    expect(resultado).toBeNull();
+    expect(resultado).toEqual({ kind: 'batch_not_found' });
     expect(await fotoLote(ajeno)).toBe(antes);
     expect(await prisma.inventoryMovement.count({ where: { batchId: ajeno } })).toBe(asientosAntes);
   });
@@ -705,9 +705,9 @@ describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMoveme
     const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: propio } });
     const delta = 1;
 
-    const resultado = await adjustBatchStock(propio, String(delta), 'conteo_fisico', B.userId, new Date(), ambitoDe(B));
+    const resultado = await adjustByDelta(propio, String(delta), 'conteo_fisico', B.userId, new Date(), ambitoDe(B));
 
-    expect(resultado).toEqual({ stock: (7 + delta).toFixed(4), reserved: '0.0000', overReserved: false });
+    expect(resultado).toMatchObject({ kind: 'adjusted', stock: (7 + delta).toFixed(4), reserved: '0.0000', overReserved: false });
     expect(await fotoLote(propio)).not.toBe(antes);
     const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: propio } });
     expect(fila.stock.toFixed(4)).toBe((7 + delta).toFixed(4));

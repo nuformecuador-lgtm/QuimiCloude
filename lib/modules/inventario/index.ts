@@ -94,6 +94,20 @@ export {
   type AdjustBatchStockInput,
 } from './domain/adjust-batch-stock';
 export {
+  STOCK_QUANTITY_PATTERN,
+  REASONS_BY_DIRECTION,
+  describeAdjustment,
+  reasonsFor,
+  isReasonAllowed,
+  type AdjustmentDirection,
+  type StockAdjustment,
+  type StockAdjustmentReading,
+  type AdjustBatchStockResult,
+  type BatchStockAdjustment,
+  type AdjustBatchStockOutcome,
+} from './domain/stock-adjustment';
+export { BatchStockChangedError, AdjustmentReasonNotAllowedError } from './domain/errors';
+export {
   createListProductBatches,
   type ListProductBatchesDeps,
 } from './domain/list-product-batches';

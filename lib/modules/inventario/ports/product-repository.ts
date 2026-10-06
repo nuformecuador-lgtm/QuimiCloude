@@ -1,11 +1,11 @@
 import type { InventoryScope } from '../domain/inventory-scope';
 import type { ListQuery } from '../domain/list-query';
-import type { MovementReason } from '../domain/movement-reason';
 import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
 import type { NewProduct, PackagingIdentity, ProductType, ProductView } from '../domain/product-view';
 import type { BatchHistoryEntry } from '../domain/reservation';
+import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../domain/stock-adjustment';
 
 /**
  * Puerto de acceso a datos de producto (`design.md > 7`). El sufijo `Alive` en los
@@ -179,40 +179,40 @@ export interface ProductRepository {
   ): Promise<{ batchId: string; lot: string } | null | 'finished_product'>;
 
   /**
-   * Mueve la existencia de un lote por `delta` (con signo) y deja su asiento en el libro,
-   * las dos cosas en la MISMA transaccion. El total nuevo no lo calcula quien llama: lo calcula la
-   * base con un `UPDATE` relativo, para que dos ajustes concurrentes no se pisen el uno al otro.
+   * Lleva un lote al total contado y deja su asiento en el libro, las dos cosas en la MISMA
+   * transaccion. Bloquea el producto y el lote, lee la existencia y solo escribe si es igual a
+   * `seenStock`: si no, devuelve `stock_changed` con la existencia actual y no toca nada. Asi un
+   * consumo entre que el usuario vio la existencia y confirmo no se pierde en silencio.
+   *
+   * La diferencia la calcula el adaptador (total menos existencia bloqueada) y la escribe con un
+   * `UPDATE` relativo; el asiento lleva la diferencia, la existencia de antes y el total.
    *
    * En esa misma transaccion, el ajuste tambien RECALCULA la existencia guardada del producto
    * -igual que hace el alta al escribir un lote-, sin tocar su nombre, su alerta, su unidad ni
    * su fecha de modificacion.
    *
-   * Devuelve `null` cuando el lote no existe o es de OTRA empresa -las dos por el mismo camino,
-   * igual que el resto del puerto-. Un `stock` que quedaria negativo se rechaza antes de
-   * escribir nada; el adaptador decide como lo comunica.
+   * Devuelve `batch_not_found` cuando el lote no existe o es de OTRA empresa -las dos por el mismo
+   * camino, igual que el resto del puerto-. La empresa no viaja en la entrada, igual que en
+   * `NewProduct` y `NewProductBatch`.
    *
-   * Tambien devuelve `reserved` -lo que los pedidos vivos tienen apartado en el lote tras el
-   * ajuste- y `overReserved` -si ese apartado supera la existencia nueva-: un ajuste a la
-   * baja se acepta igual, y esto es lo que permite avisar sin convertirlo en un error.
+   * Devuelve `increase_not_allowed` cuando el lote es de un producto terminado y el total supera
+   * la existencia: se decide con las filas ya bloqueadas, sin mover el lote ni escribir el asiento.
    *
-   * La empresa no viaja en ningun tipo de entrada, igual que en `NewProduct` y `NewProductBatch`.
+   * `adjusted` trae tambien `reserved` -lo que los pedidos vivos tienen apartado en el lote tras el
+   * ajuste- y `overReserved` -si ese apartado supera la existencia nueva-: un ajuste a la baja se
+   * acepta igual, y esto es lo que permite avisar sin convertirlo en un error. Todas las cantidades
+   * salen a cuatro decimales.
    *
-   * Devuelve `'increase_not_allowed'` cuando el lote es de un producto terminado y `delta`
-   * es positivo: se decide con el producto ya bloqueado, sin llegar a mover el lote ni a
-   * escribir el asiento. Un `delta` negativo sobre un producto terminado sigue las mismas reglas
-   * que cualquier otro lote, incluido el rechazo de una existencia final negativa.
-   *
-   * Lanza `ValidationError` si el lote es de un envase con presentacion fija y `delta` no es un
-   * numero entero de envases.
+   * Lanza `ValidationError` si el lote es de un envase con presentacion fija y el total no es un
+   * numero entero de envases, y `BatchStockNegativeError` si la base rechaza una existencia
+   * negativa.
    */
   adjustBatchStock(
-    batchId: string,
-    delta: string,
-    reason: MovementReason,
+    adjustment: BatchStockAdjustment,
     actorId: string,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ stock: string; reserved: string; overReserved: boolean } | null | 'increase_not_allowed'>;
+  ): Promise<AdjustBatchStockOutcome>;
 
   /**
    * Todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es
