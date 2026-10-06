@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ACONDICIONAMIENTO,
+  SEED_ROLE_PERMISSIONS,
+} from '@/lib/modules/identity';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 
@@ -146,6 +150,50 @@ describe('requirePagePermission con los permisos del Maestro (QC-161)', () => {
     await expect(requirePagePermission('empresas.consultar')).resolves.toBeUndefined();
 
     expect(notFoundMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+});
+
+// El codigo que exige cada pagina se lee de su fuente: si la pagina cambiara de permiso, este
+// bloque juzga el nuevo, no una copia.
+describe('requirePagePermission con los permisos del Administrador de acondicionamiento (QC-216)', () => {
+  const PERMISOS_DEL_ROL = SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [];
+
+  function codigoQueExige(pagina: string): string {
+    const fuente = readFileSync(resolve(process.cwd(), pagina), 'utf8');
+    const codigos = [...fuente.matchAll(/requirePagePermission\(\s*['"`]([^'"`]+)['"`]\s*\)/g)].map(
+      (match) => match[1],
+    );
+    expect(codigos, `${pagina} debe exigir exactamente un permiso`).toHaveLength(1);
+    return codigos[0] ?? '';
+  }
+
+  it('QC-216 R13: el rol tiene permisos sembrados con los que juzgar', () => {
+    expect(PERMISOS_DEL_ROL.length).toBeGreaterThan(0);
+  });
+
+  it('QC-216 R13: /asignacion deja pasar al rol, sin redirigir ni responder 404', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(PERMISOS_DEL_ROL));
+
+    await expect(
+      requirePagePermission(codigoQueExige('app/(private)/asignacion/page.tsx')),
+    ).resolves.toBeUndefined();
+
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['/asignacion/<id>', 'app/(private)/asignacion/[id]/page.tsx'],
+    ['/asignacion/empaque/<id>', 'app/(private)/asignacion/empaque/[id]/page.tsx'],
+    ['/pedidos', 'app/(private)/pedidos/page.tsx'],
+    ['/inventario', 'app/(private)/inventario/page.tsx'],
+  ])('QC-216 R13: %s responde «no encontrado» al rol', async (_ruta, pagina) => {
+    getSessionUserMock.mockResolvedValue(usuario(PERMISOS_DEL_ROL));
+
+    await expect(requirePagePermission(codigoQueExige(pagina))).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
     expect(redirectMock).not.toHaveBeenCalled();
   });
 });
