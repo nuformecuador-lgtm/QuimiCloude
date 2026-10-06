@@ -51,7 +51,7 @@ producción salvo que QC-215 toque `permissions.ts`; si lo hace, que mergee desp
 
 ## T1–T3 — El dominio
 
-- [ ] **T1.** `roles.ts`: `ROLE_ACONDICIONAMIENTO = 'Administrador de acondicionamiento'` y su fila
+- [x] **T1.** `roles.ts`: `ROLE_ACONDICIONAMIENTO = 'Administrador de acondicionamiento'` y su fila
       **al final** de `SEED_ROLES` con la descripción de `design.md > 2.1`; la cabecera pasa a «los
       cinco literales». Reexportar `ROLE_ACONDICIONAMIENTO` en `lib/modules/identity/index.ts`.
       **Hecho cuando:** `pnpm run typecheck` pasa y el literal `'Administrador de acondicionamiento'`
