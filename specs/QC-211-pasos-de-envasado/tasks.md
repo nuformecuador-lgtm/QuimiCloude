@@ -15,13 +15,13 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
 
 ## Bloque A — modelo y dominio `recetas`
 
-- [ ] **T1. Columna y migración.**
+- [x] **T1. Columna y migración.**
   Archivos: `db/schema.prisma`, `db/migrations/<ts>_recipe_packing_steps/migration.sql`,
   `db/migrations/<ts>_recipe_packing_steps/down.sql`.
   Según `design.md > 2.1`. `<ts>` posterior a la última migración de `dev`.
   Hecho: `pnpm run db:migrate` y `pnpm run db:rollback` aplican sin error en local; `prisma
   generate` ok.
-- [ ] **T2. Tests de esquema y migración** — dep: T1.
+- [x] **T2. Tests de esquema y migración** — dep: T1.
   Archivos: `tests/unit/recetas/schema/recetas-schema.test.ts`,
   `tests/integration/recetas/recipe-packing-steps-migration.int.test.ts` (nuevo).
   Enmendar el caso «steps es el único campo Json» a `['packingSteps', 'steps']` y añadir
@@ -29,13 +29,13 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
   con `steps` no vacíos → `packing_steps = '[]'` y `steps` idénticos; DOWN quita la columna y nada
   más.
   Hecho: verdes; casos `R5`.
-- [ ] **T3. Esquemas de entrada** [P con T4] — dep: ninguna.
+- [x] **T3. Esquemas de entrada** [P con T4] — dep: ninguna.
   Archivos: `lib/modules/recetas/domain/recipe-input.ts`, `tests/unit/recetas/recipe-input.test.ts`.
   `packingSteps: recipeStepsSchema` en alta y edición (`design.md > 3.1`).
   Hecho: casos que aceptan sin la clave (→ `[]`), con `[]`, con 50 + 50; rechazan 51 de envasado,
   paso vacío, 31 elementos, clave desconocida en un bloque; y que los esquemas de versión descartan
   `packingSteps`. Casos `R1`, `R2`, `R3`, `R10`.
-- [ ] **T4. Tipos, puerto y casos de uso de `recetas`** — dep: T1, T3.
+- [x] **T4. Tipos, puerto y casos de uso de `recetas`** — dep: T1, T3.
   Archivos: `lib/modules/recetas/ports/recipe-repository.ts`,
   `lib/modules/recetas/domain/recipe-view.ts`, `lib/modules/recetas/domain/create-recipe.ts`,
   `lib/modules/recetas/domain/update-recipe.ts`, `lib/modules/recetas/domain/update-recipe-version.ts`,
@@ -47,7 +47,7 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
   Hecho: con dobles del repositorio, alta y edición pasan `packingSteps` en orden; versión escribe
   `[]` aunque la entrada los traiga; `getRecipe` de una versión devuelve los de la original; sin
   `recetas.modificar` rechaza sin tocar el repositorio. Casos `R4`, `R6`, `R10`, `R11`.
-- [ ] **T5. Lector de pasos de envasado** — dep: T1.
+- [x] **T5. Lector de pasos de envasado** — dep: T1.
   Archivos: `lib/modules/recetas/domain/recipe-packing-steps-reader.ts` (nuevo),
   `lib/modules/recetas/index.ts`,
   `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`,
@@ -57,7 +57,7 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
   versión, descarta el elemento inválido conservando el orden; el `select` de
   `findExecutionContentByIdOn` no pide `packingSteps` y `toRecipeExecutionContent` no devuelve esa
   clave. Casos `R11`, `R26`.
-- [ ] **T6. Integración de `recetas`** — dep: T4, T5.
+- [x] **T6. Integración de `recetas`** — dep: T4, T5.
   Archivos: `tests/integration/recetas/packing-steps.int.test.ts` (nuevo).
   Contra Postgres: guardar y releer las dos listas intactas y separadas; versión sin pasos propios;
   editar la original y releer la versión (lo nuevo); el lector devuelve `null` para una receta de
@@ -66,7 +66,7 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
 
 ## Bloque B — empaque (`asignaciones`)
 
-- [ ] **T7. `getPackingOrder` con pasos de envasado** — dep: T5.
+- [x] **T7. `getPackingOrder` con pasos de envasado** — dep: T5.
   Archivos: `lib/modules/asignaciones/domain/packing-order-view.ts`,
   `lib/modules/asignaciones/domain/get-packing-order.ts`, `lib/modules/asignaciones/index.ts`
   (exportar `PackingOrderDetail`), `lib/composition/index.ts` (cablear `packingSteps`),
@@ -77,7 +77,7 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
   tiene ninguna clave con pasos del operador; actor con solo `empaque.modificar` los recibe; sin
   `empaque.modificar` rechaza sin validar y sin llamar a ningún puerto (lector incluido); el lector
   recibe la empresa del actor. Casos `R19`, `R20`, `R22`, `R27`, `R28`, `R29`.
-- [ ] **T8. Sin cambios en ejecución y en terminar** [P con T7] — dep: T5.
+- [x] **T8. Sin cambios en ejecución y en terminar** [P con T7] — dep: T5.
   Archivos: `tests/unit/asignaciones/get-assigned-order-execution.test.ts`,
   `tests/unit/asignaciones/finish-packing.test.ts`.
   Solo tests: la vista de ejecución construida desde un contenido de receta no tiene
@@ -88,20 +88,20 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
 
 ## Bloque C — UI
 
-- [ ] **T9. `StepReader`: `finishLabel` y `finishBusy`** [P con T10] — dep: ninguna.
+- [x] **T9. `StepReader`: `finishLabel` y `finishBusy`** [P con T10] — dep: ninguna.
   Archivos: `components/shared/step-reader/step-reader.tsx`,
   `tests/unit/recetas-ui/step-reader.test.tsx`.
   Según `design.md > 5.1`.
   Hecho: sin las props, el texto sigue siendo «Finalizar» y todos los casos existentes siguen
   verdes; con `finishLabel` el último botón lleva ese texto; con `finishBusy` está deshabilitado y
   con `aria-busy`, y `onFinish` no se llama. Casos `R21`.
-- [ ] **T10. `RecipeStepsField` reutilizable** [P con T9] — dep: ninguna.
+- [x] **T10. `RecipeStepsField` reutilizable** [P con T9] — dep: ninguna.
   Archivos: `app/(private)/produccion/formulas/components/recipe-steps-field.tsx`,
   `tests/unit/recetas-ui/recipe-steps-field.test.tsx` (nuevo, o el archivo que ya lo cubra).
   Según `design.md > 5.3`.
   Hecho: sin props, todos los `data-testid` de hoy idénticos; con `testIdPrefix`, título y texto de
   añadir propios; dos instancias en el mismo árbol no comparten pasos ni arrastre. Casos `R7`.
-- [ ] **T11. Formulario de fórmula** — dep: T3, T4, T10.
+- [x] **T11. Formulario de fórmula** — dep: T3, T4, T10.
   Archivos: `app/(private)/produccion/formulas/components/recipe-form.tsx`,
   `app/(private)/produccion/formulas/components/recipe-form-state.ts`,
   `tests/unit/recetas-ui/recipe-form-packing-steps.test.tsx` (nuevo).
@@ -111,13 +111,13 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
   pinta en ese paso de envasado y no en el paso del operador `i`, y al revés; editar carga los
   documentos con marcas y checklist intactos y guardar sin tocar los deja iguales. Casos `R7`,
   `R8`, `R9`.
-- [ ] **T12. Formulario de versión** [P con T11] — dep: T4.
+- [x] **T12. Formulario de versión** [P con T11] — dep: T4.
   Archivos: `app/(private)/produccion/formulas/components/recipe-version-form.tsx`,
   `tests/unit/recetas-ui/recipe-version-form.test.tsx`.
   Según `design.md > 5.5`.
   Hecho: los pasos de envasado heredados se ven, dentro de un contenedor `inert` y sin controles de
   edición; sin pasos en la original, el aviso. Casos `R12`.
-- [ ] **T13. Pantalla de empaque** — dep: T7, T9.
+- [x] **T13. Pantalla de empaque** — dep: T7, T9.
   Archivos: `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx`,
   `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`.
   Según `design.md > 5.2`. Si para entonces existe en `dev` la confirmación antes de Terminar,
@@ -133,7 +133,7 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
 
 ## Bloque D — importación desde PDF
 
-- [ ] **T14. Extracción, revisión y confirmación** — dep: T3, T4, T10.
+- [x] **T14. Extracción, revisión y confirmación** — dep: T3, T4, T10.
   Archivos: `lib/modules/documentos/domain/formula-extraction.ts`,
   `lib/modules/documentos/domain/preview-formula-import.ts`,
   `lib/modules/documentos/domain/review-formula-import.ts`,
@@ -165,7 +165,7 @@ task cierra con `./init.sh --rapido` en verde y su commit; T16 cierra con `./ini
 
 ## Bloque E — punta a punta y cierre
 
-- [ ] **T16. E2E y gate completo** — dep: T1–T14.
+- [x] **T16. E2E y gate completo** — dep: T1–T14.
   Archivos: `e2e/pasos-de-envasado.spec.ts` (nuevo),
   `progress/impl_QC-211-pasos-de-envasado.md`.
   E2E: el Administrador crea una fórmula con pasos del operador y dos pasos de envasado (uno con
