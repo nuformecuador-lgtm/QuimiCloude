@@ -14,6 +14,7 @@
     "asignaciones/list-order-responsibles.int.test.ts",
     "asignaciones/order-assignment-prisma.int.test.ts",
     "asignaciones/order-assignments-constraints.int.test.ts",
+    "asignaciones/order-execution-entries-constraints.int.test.ts",
     "asignaciones/reapply-work-group.int.test.ts",
     "asignaciones/remove-work-group.int.test.ts",
     "asignaciones/responsible-eligibility.int.test.ts",
