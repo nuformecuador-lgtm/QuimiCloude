@@ -1,8 +1,9 @@
-# QC-204 — impl (en curso)
+# QC-204 — impl (implementación completa; faltan el E2E y el gate completo, que corre el leader)
 
 ## Estado
-- Cerradas: T1–T12.
-- En curso: T13. Pendientes: T14, T15.
+- Cerradas: T1–T13.
+- T14: E2E escrito y commiteado (71688657). Se lista con 4 tests (R24 y R25 en chromium y webkit), pero **no se ha ejecutado**: lo corre el leader.
+- T15: guardias comprobadas (abajo) y mapa completo. Su «hecho» exige `./init.sh` completo en verde, que corre el leader.
 - Bloqueo T9: resuelto por el humano con la opción (a) (commit e81db6c7). Se cambió solo el dato de prueba de los casos R43.
 - Bloqueo T4: resuelto por el humano (opción 2; design 4.1 enmendado en 70e32f00).
 
@@ -26,6 +27,10 @@
 - 4e4fd8eb T12 la cotización viaja con unitId y se pide de nuevo al cambiar la unidad
 - e19f9932 T11 la ejecución da la cantidad convertida y el campo need
 - d7e00346 chore: marca T9, T11, T12
+- 4d51732a T13 tabla de ingredientes y bloque de costo (marcas «aprox.», aviso de no convertible, bridge desde page.tsx)
+- d1b8a25b T13 pantalla de ejecución (marca y aviso)
+- b58e618f chore: marca T13 y pone la bitácora al día
+- 71688657 T14 e2e/pedido-conversion-de-unidad.spec.ts
 
 ## Archivos
 Creados: lib/modules/unidades/domain/convert-with-approximation.ts, lib/modules/unidades/domain/get-mass-volume-bridge.ts,
@@ -55,6 +60,21 @@ Fixtures de tests/unit/asignaciones-ui/order-execution-{lines,screen}.test.tsx c
 T12: app/(private)/pedidos/components/use-order-cost-quote.ts y order-form.tsx. Tests: tests/unit/pedidos-ui/use-order-cost-quote.test.ts
 (nuevo, con docblock jsdom), order-cost-quote.test.tsx y order-form-quote.test.tsx (unitId en las expectativas; la unidad se
 elige antes que la receta).
+T13: components/shared/unit-conversion-marks.tsx (nuevo: ApproximateMark, NotConvertibleNotice);
+app/(private)/pedidos/components/{order-ingredients-table,order-cost-quote,order-form,order-list-section,order-table,
+order-columns,order-sheet}.tsx, el barrel de esa carpeta y app/(private)/pedidos/page.tsx (getMassVolumeBridgeAction en
+el Promise.all; si falla, null); app/(private)/asignacion/[id]/components/order-execution-lines.tsx e index.ts.
+Tests ajustados por el contrato nuevo (bridge, approximate, elegir unidad, mocks de unit-actions): unos 16 archivos de
+pedidos-ui, identity/session-once-per-request-render y navegacion/pantallas-exigen-permiso (solo el mock).
+Copy: marca «aprox.» (text-muted-foreground, title «Conversión aproximada: 1 ml ≈ 1 g»); bajo el importe «Incluye una
+aproximación masa↔volumen (1 l ≈ 1 kg).»; aviso de no convertible «La unidad del pedido no es convertible a la del
+insumo.» (text-destructive). El texto del aviso no venía fijado en el spec: lo eligió frontend_dev.
+order-columns, order-list-section, order-sheet y order-table ya estaban en CRLF en el índice y se dejaron así
+(git diff --check avisa de espacios al final en esas líneas).
+T14: e2e/pedido-conversion-de-unidad.spec.ts (nuevo). Siembra con Prisma con el prefijo qc204_e2e_: un insumo en kg con
+un lote de 1000 kg a 20/kg y una receta por caso con ese insumo al 10 %. Usa las unidades de sistema y el rol
+Administrador de db:seed. Lee lo apartado con netReservedInBatch (e2e/helpers/packaging.ts). Los pedidos se guardan sin
+envases.
 
 ## Mapa R<n> -> test (hasta ahora)
 - R2: convert-with-approximation.test.ts > `R2 1000 g a kg da 1 exacto`, `R2 500 ml a l da 0.5 exacto`
@@ -83,7 +103,22 @@ elige antes que la receta).
 - R17 (servidor): get-assigned-order-execution.test.ts > `R17 una linea aproximada sale con need approximate`, `R17 una linea no convertible sale sin cantidad`
 - R19 (cotización): use-order-cost-quote.test.ts > `R19 sin unidad no se cotiza y queda el guion`
 - R20 (ejecución): get-assigned-order-execution.test.ts > `R20 un pedido sin unidad sale como antes`
-- Pendientes: R13 (tabla), R14, R15, R17 (pantalla), R18, R19 (tabla), R21 (pantalla) en T13; R24–R25 en T14; R26 en T15.
+- R13 (tabla): tests/unit/pedidos-ui/order-ingredients-table.test.tsx > `R13 la cantidad requerida y el restante salen convertidos y con la unidad del insumo`, `R13 cambiar la unidad del pedido recalcula la tabla`
+- R14: order-ingredients-table.test.tsx > `R14 una linea no convertible muestra el aviso y no muestra cifras`
+- R15: order-ingredients-table.test.tsx > `R15 una linea aproximada lleva la marca aprox.`
+- R16 (pantalla): tests/unit/asignaciones-ui/order-execution-lines.test.tsx > `R16 el selector de unidad parte de la cantidad ya convertida y conserva la marca`
+- R17 (pantalla): order-execution-lines.test.tsx > `R17 en ejecucion una linea aproximada lleva la marca y una no convertible el aviso`
+- R18: tests/unit/pedidos-ui/order-form-quote.test.tsx > `R18 el bloque de costo indica la aproximacion si hay importe y alguna linea aproximada`, `R18 sin importe no se indica la aproximacion`
+- R19 (tabla): order-ingredients-table.test.tsx > `R19 sin unidad elegida la tabla no muestra cifras`
+- R21 (pantalla): order-ingredients-table.test.tsx > `R21 un insumo sin unidad muestra la cifra sin convertir y sin aviso`
+- R24: e2e/pedido-conversion-de-unidad.spec.ts > `R24 pedido en g sobre insumo en kg: costo y cantidad apartada exactos`. Cifras: 1000 g al 10 % = 0,1 kg; costo 2,0000; apartado 0,1 kg. **No ejecutado.**
+- R25: e2e/pedido-conversion-de-unidad.spec.ts > `R25 pedido en l sobre insumo en kg: costo y cantidad apartada aproximados, con la marca en la linea y en el costo`. Cifras: 2 l al 10 % ≈ 0,2 kg; costo 4,0000; apartado 0,2 kg; se ven las dos marcas. **No ejecutado.** Como 1 l ≈ 1 kg, la cifra coincide con la que saldría sin convertir; la aproximación solo la prueban las marcas.
+- R26: sin test propio. Dependencias: tests/guards/guard-dependencias-aprobadas.test.ts, y package.json/pnpm-lock.yaml sin diff contra el merge-base 7812803e. Borrado lógico: el diff no toca deletedAt en lib/ y los tests de borrado de pedidos que ya existían siguen en verde. Identificadores en inglés: lo comprueba la revisión, no hay guardia. **El reviewer decide si esto basta.**
+
+### Guardias de T15 (comprobadas a mano contra el merge-base 7812803e)
+- package.json y pnpm-lock.yaml: sin diff. Ninguna dependencia nueva.
+- prisma/, db/ y supabase/: sin diff. Ninguna migración nueva (R22, R26).
+- Diff de lib/ sin líneas de deletedAt/deleted_at.
 
 ## Salida de tests
 - T1 8/8, T2 2/2 (base efimera de scripts/test-db.ts), T3 3/3.
@@ -109,6 +144,12 @@ elige antes que la receta).
   recetas/module-contract). Desaparecen los rojos (a) y (b) de arriba.
   Subagentes: tests/integration/pedidos + inventario/company-scope 346/346; tests/integration/asignaciones 102/102;
   tests/unit/pedidos-ui 582 pasan y 3 se saltan; asignaciones + asignaciones-ui 288/288; guardias 681.
+
+- ./init.sh --rapido (tras T13): typecheck OK, lint OK; Test Files 6 failed | 603 passed (609);
+  Tests 8 failed | 8969 passed | 30 skipped. Los 6 archivos están en el baseline: recetas/module-contract,
+  unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso, recipe-page.
+- E2E (T14): `playwright test --list` da 4 tests en 1 archivo. No ejecutado.
+- ./init.sh completo: no corrido; lo corre el leader.
 
 ## Bloqueo T9 — conflicto con QC-195 R43 (resuelto: opción a)
 Los dos casos R43 de QC-195 siembran una receta antigua con el envase como ingrediente. El envase está en la unidad de
