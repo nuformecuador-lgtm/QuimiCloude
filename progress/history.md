@@ -5054,3 +5054,15 @@ podar.
 - Nacen del review: QC-203 (agrupar homónimos por familia de unidad), QC-204 (convertir la unidad
   del pedido a la del insumo), QC-205 (unicidad nombre + unidad), QC-206 (unidad en uso no cambia
   factor), QC-207 (liberar material revisa los bloqueados).
+
+## 2026-10-06 — QC-211 pasos-de-envasado
+
+- PR #148 hacia dev, merge `81c04edb`. Spec R1–R32, D1–D13, 16 tasks (T15 manual del humano, pendiente).
+- Columna `recipes.packing_steps` (JSONB, default `[]`, sin backfill). Sección propia en alta y edición;
+  las versiones heredan los de la original. Importación PDF con campo `packingSteps` tolerante a su ausencia.
+- Empaque: paso a paso con `StepReader` tras Comenzar; lectura con `empaque.modificar` solo en `EN_EMPAQUE` a
+  nombre del actor. El operador nunca recibe los pasos de envasado.
+- Arregla en la misma rama `e2e/empaque.spec.ts`, rojo en dev desde 6ef2b6e9 (decisión del humano).
+- Review: vuelta 1 rechazada (B1 cita en comentario, m1–m3), vuelta 2 OK. Gate completo: 8 rojos, todos en
+  el baseline (nada que podar). E2E 16/16 en Chromium y WebKit.
+- Deudas: tarjeta de Jira sin mover (MCP caído), carpeta del worktree y base `QuimiCloude_QC211` sin borrar.
