@@ -9,7 +9,7 @@
  *
  * Insumo en kilogramo con un unico lote de 1000 kg a 20,0000 por kg, y dos recetas de una sola
  * linea al 10 % (una por caso, para localizar cada pedido por su receta). Las unidades `gramo`,
- * `litro` y `kilogramo` son las del catalogo arrancador: se buscan, no se crean.
+ * `mililitro` y `kilogramo` son las del catalogo arrancador: se buscan, no se crean.
  *
  * Los pedidos se guardan sin reparto: `[]` es valido y deja el costo en solo ingredientes.
  */
@@ -48,7 +48,7 @@ const adminUser: Credentials = {
 const productName = `${SHARED_TOKEN}_ingrediente`;
 const presentationName = `${SHARED_TOKEN}_presentacion`;
 const gramRecipeName = `${SHARED_TOKEN}_receta_g`;
-const literRecipeName = `${SHARED_TOKEN}_receta_l`;
+const milliliterRecipeName = `${SHARED_TOKEN}_receta_ml`;
 
 const BATCH_STOCK = '1000';
 const UNIT_COST = '20.0000';
@@ -62,20 +62,21 @@ const GRAM_REQUIRED_TEXT = '0.1 kg';
 const GRAM_AMOUNT = '$ 2.00';
 const GRAM_SAVED_COST = '2.0000';
 
-// 2 l x 10 % = 0,2 l = 200 ml ≈ 200 g = 0,2 kg (aproximada); 0,2 kg x 20 = 4,0000.
-const LITER_QUANTITY = '2';
-const LITER_REQUIRED_KG = 0.2;
-const LITER_REQUIRED_TEXT = '0.2 kg';
-const LITER_AMOUNT = '$ 4.00';
-const LITER_SAVED_COST = '4.0000';
+// 2000 ml x 10 % = 200 ml ≈ 200 g = 0,2 kg (aproximada); 0,2 kg x 20 = 4,0000. Sin convertir
+// serian 200 kg y 4000,0000, asi que las cifras solo cuadran si se aplica la aproximacion.
+const MILLILITER_QUANTITY = '2000';
+const MILLILITER_REQUIRED_KG = 0.2;
+const MILLILITER_REQUIRED_TEXT = '0.2 kg';
+const MILLILITER_AMOUNT = '$ 4.00';
+const MILLILITER_SAVED_COST = '4.0000';
 
 let companyId: string;
 let adminUserId: string;
 let gramUnitId: string;
-let literUnitId: string;
+let milliliterUnitId: string;
 let batchId: string;
 let gramRecipeId: string;
-let literRecipeId: string;
+let milliliterRecipeId: string;
 
 async function systemUnitId(nameNormalized: string): Promise<string> {
   const unit = await prisma.unit.findFirstOrThrow({
@@ -197,7 +198,7 @@ test.beforeAll(async () => {
 
   const kilogramUnitId = await systemUnitId('kilogramo');
   gramUnitId = await systemUnitId('gramo');
-  literUnitId = await systemUnitId('litro');
+  milliliterUnitId = await systemUnitId('mililitro');
 
   const presentation = await prisma.presentation.create({
     data: {
@@ -268,7 +269,7 @@ test.beforeAll(async () => {
     ).id;
 
   gramRecipeId = await seedRecipe(gramRecipeName);
-  literRecipeId = await seedRecipe(literRecipeName);
+  milliliterRecipeId = await seedRecipe(milliliterRecipeName);
 });
 
 test.afterAll(async () => {
@@ -326,32 +327,33 @@ test.describe('conversion de la unidad del pedido a la del insumo (QC-204)', () 
     expect(await netReservedInBatch(order.id, batchId)).toBe(GRAM_REQUIRED_KG);
   });
 
-  test('R25 pedido en l sobre insumo en kg: costo y cantidad apartada aproximados, con la marca en la linea y en el costo', async ({
+  test('R25 pedido en ml sobre insumo en kg: costo y cantidad apartada aproximados, con la marca en la linea y en el costo', async ({
     page,
   }) => {
     await fillNewOrder(
       page,
-      { id: literRecipeId, name: literRecipeName },
-      LITER_QUANTITY,
-      literUnitId,
+      { id: milliliterRecipeId, name: milliliterRecipeName },
+      MILLILITER_QUANTITY,
+      milliliterUnitId,
     );
 
     const form = page.getByTestId('order-form');
     const line = form.getByTestId('order-ingredient-0');
-    await expect(line.getByTestId('order-ingredient-required')).toContainText(LITER_REQUIRED_TEXT, {
-      timeout: 60_000,
-    });
+    await expect(line.getByTestId('order-ingredient-required')).toContainText(
+      MILLILITER_REQUIRED_TEXT,
+      { timeout: 60_000 },
+    );
     await expect(line.getByTestId('order-ingredient-approximate')).toBeVisible();
 
-    await expect(form.getByTestId('order-cost-quote-value')).toHaveText(LITER_AMOUNT, {
+    await expect(form.getByTestId('order-cost-quote-value')).toHaveText(MILLILITER_AMOUNT, {
       timeout: 60_000,
     });
     await expect(form.getByTestId('order-cost-quote-approximate')).toBeVisible();
 
-    const order = await submitAndFindOrder(page, literRecipeId);
-    expect(order.unitId).toBe(literUnitId);
+    const order = await submitAndFindOrder(page, milliliterRecipeId);
+    expect(order.unitId).toBe(milliliterUnitId);
     expect(order.status).toBe('PENDIENTE');
-    expect(await ingredientsCostText(order.id)).toBe(LITER_SAVED_COST);
-    expect(await netReservedInBatch(order.id, batchId)).toBe(LITER_REQUIRED_KG);
+    expect(await ingredientsCostText(order.id)).toBe(MILLILITER_SAVED_COST);
+    expect(await netReservedInBatch(order.id, batchId)).toBe(MILLILITER_REQUIRED_KG);
   });
 });
