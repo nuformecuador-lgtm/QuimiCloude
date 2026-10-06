@@ -407,3 +407,35 @@ existe, es de TI): se escribió celda a celda.
   guardia («db/ no gana ni una migracion…») cae por `20261006120000_inventory_imports` (B6).
 - Ajenos a esta pista: `guard-libro-de-inventario` (camino de escritura nuevo en
   `inventory-import-prisma.ts`, B7) y `guard-pantallas-exigen-permiso` (`/inventario/importar`, pista F).
+
+## Guardias de la tanda B/F
+
+- `guard-identificador-de-request` (R19/R20 de QC-71): pide que toda migracion nueva este en la
+  lista cerrada `MIGRACIONES_ESPERADAS` y que el numero de dependencias cuadre. La migracion
+  `20261006120000_inventory_imports` no menciona el identificador de peticion (comprobado con grep
+  en `migration.sql`, `down.sql` y `db/schema.prisma`), asi que no le faltaba nada: se dio de alta
+  en la lista con el mismo patron. `DEPENDENCIAS_ESPERADAS` 39 -> 41 (`read-excel-file`,
+  `papaparse`) y `DEV_DEPENDENCIAS_ESPERADAS` 20 -> 21 (`@types/papaparse`), las tres con fila en
+  `docs/dependencias.md`. `FRAGMENTOS_PROHIBIDOS` intacto.
+- `guard-libro-de-inventario` (R28 de QC-121): censo cerrado de las escrituras de
+  `product_batches` bajo `lib/`; toda escritura debe vivir en `product-prisma.ts` como funcion
+  exportada con nombre, y cada una se comprueba con `writeMovement(` en su cuerpo. El adaptador
+  escribia el lote dentro de una funcion no exportada de `inventory-import-prisma.ts`. Asentaba,
+  pero fuera del censo. No hay lista de excepciones por archivo, y no se ha anadido ninguna.
+  **Arreglo en el adaptador**: el `create` del lote, su asiento `opening` y el recalculo pasan a
+  `addImportedFinishedGoodsBatch(tx, productId, batch, packageContent, now, scope)` en
+  `product-prisma.ts`, con el mismo cuerpo que antes. `writeImportedFinishedGoods` la llama dentro de la
+  misma transaccion. El puerto `InventoryImportRepository` no cambia. El camino nuevo entra en
+  `CAMINOS_ESPERADOS` de la guardia, que ahora exige su `writeMovement(`, y en el censo gemelo de
+  `tests/unit/inventario/qc121-alcance.test.ts` (R29, recalculo), que exige su
+  `recalculateProductStock(`. Desviacion de B7: `product-prisma.ts` gana una funcion, no solo
+  exports. Integracion despues del cambio (`--project integration`):
+  `inventory-import-repository` + `inventory-import-isolation` dan 18 passed, y con
+  `finished-goods.int` dan 28 passed.
+- `guard-pantallas-exigen-permiso` (R6/R20): `RUTAS_ESPERADAS_HOY` gana `/inventario/importar`
+  (llama a `requirePagePermission('inventario.modificar')` una vez) y el titulo pasa de
+  «diecinueve» a «veinte».
+
+Verificacion: `pnpm exec vitest run guard tests/unit/inventario/qc121-alcance.test.ts` da
+`Test Files  52 passed (52)` y `Tests  719 passed | 11 skipped (730)`. `pnpm run typecheck` sale sin
+errores. `pnpm run lint` da 0 errores y 8 warnings, todos en archivos que esta tanda no toca.
