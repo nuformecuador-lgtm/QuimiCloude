@@ -300,7 +300,9 @@ ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_st
   CHECK ("step_position" IS NULL OR "step_position" >= 1);
 
 ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_packing_has_no_step"
-  CHECK (("action"::text IN ('PACK_START','PACK_FINISH')) = ("step_position" IS NULL));  -- ⚑ R5bis
+  CHECK ("action"::text NOT IN ('PACK_START','PACK_FINISH') OR "step_position" IS NULL);  -- ⚑ R5bis
+-- Enmienda F2.1 (humano, 2026-10-06): implicación, no igualdad. La igualdad obligaba a las otras
+-- seis acciones a llevar posición y contradecía R5 (receta sin pasos anota con NULL).
 
 ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_order_id_company_id_fkey"
   FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id")
