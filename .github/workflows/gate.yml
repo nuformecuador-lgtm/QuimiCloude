@@ -96,16 +96,20 @@ jobs:
       - name: Credenciales efimeras (solo para la base de servicio de este job)
         shell: bash
         run: |
-          gen() { v=$(node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"); echo "::add-mask::$v" >&2; printf '%s' "$v"; }
+          # Cada valor se enmascara (por stdout, que es donde el runner lee los comandos) ANTES de
+          # escribirlo en $GITHUB_ENV: asi no aparece en el log del job.
+          gen() { node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"; }
+          S1=$(gen)$(gen); P1="Ci-9$(gen)z!"; P2="Cm-7$(gen)q!"
+          echo "::add-mask::$S1"; echo "::add-mask::$P1"; echo "::add-mask::$P2"
           # Mayuscula, minuscula, digito y simbolo garantizados (credential-policy.ts).
           {
-            echo "SESSION_SECRET=$(gen)$(gen)"
+            echo "SESSION_SECRET=$S1"
             echo "SEED_ADMIN_USERNAME=ciadmin"
             echo "SEED_ADMIN_EMAIL=ci-admin@example.com"
-            echo "SEED_ADMIN_PASSWORD=Ci-9$(gen)z!"
+            echo "SEED_ADMIN_PASSWORD=$P1"
             echo "SEED_MAESTRO_USERNAME=cimaestro"
             echo "SEED_MAESTRO_EMAIL=ci-maestro@example.com"
-            echo "SEED_MAESTRO_PASSWORD=Cm-7$(gen)q!"
+            echo "SEED_MAESTRO_PASSWORD=$P2"
           } >> "$GITHUB_ENV"
 
       - name: ./init.sh --completo
@@ -189,15 +193,19 @@ jobs:
       - name: Credenciales efimeras (solo para la base de servicio de este job)
         shell: bash
         run: |
-          gen() { v=$(node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"); echo "::add-mask::$v" >&2; printf '%s' "$v"; }
+          # Cada valor se enmascara (por stdout, que es donde el runner lee los comandos) ANTES de
+          # escribirlo en $GITHUB_ENV: asi no aparece en el log del job.
+          gen() { node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"; }
+          S1=$(gen)$(gen); P1="Ci-9$(gen)z!"; P2="Cm-7$(gen)q!"
+          echo "::add-mask::$S1"; echo "::add-mask::$P1"; echo "::add-mask::$P2"
           {
-            echo "SESSION_SECRET=$(gen)$(gen)"
+            echo "SESSION_SECRET=$S1"
             echo "SEED_ADMIN_USERNAME=ciadmin"
             echo "SEED_ADMIN_EMAIL=ci-admin@example.com"
-            echo "SEED_ADMIN_PASSWORD=Ci-9$(gen)z!"
+            echo "SEED_ADMIN_PASSWORD=$P1"
             echo "SEED_MAESTRO_USERNAME=cimaestro"
             echo "SEED_MAESTRO_EMAIL=ci-maestro@example.com"
-            echo "SEED_MAESTRO_PASSWORD=Cm-7$(gen)q!"
+            echo "SEED_MAESTRO_PASSWORD=$P2"
             echo "APP_BASE_URL=http://localhost:3117"
           } >> "$GITHUB_ENV"
 
