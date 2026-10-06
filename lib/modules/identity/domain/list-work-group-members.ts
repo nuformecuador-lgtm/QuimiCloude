@@ -3,9 +3,8 @@ import { requirePermission, type Actor } from './actor';
 // La MISMA expresion que elige el mensaje del duplicado oculto (R31) decide aqui quien SALE en la
 // lista (R19): «se ve» es «su estado efectivo no es motivo de ocultacion». Con dos definiciones, el
 // error podria decir «no se ve porque esta bloqueada» de alguien que la lista si muestra.
-import { blockReasonOf } from './add-work-group-member';
+import { canJoinWorkGroup } from './add-work-group-member';
 import { buildDisplayName } from './display-name';
-import { effectiveAccountStatus } from './effective-account-status';
 import { ValidationError, WorkGroupNotFoundError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { WORK_GROUP_MEMBER_QUERYABLE } from './work-group-queryable';
@@ -71,7 +70,7 @@ const listQuerySchema = createListQuerySchema();
  * (QC-78 R11).
  */
 function isVisible(candidate: MemberCandidate, now: Date): boolean {
-  return blockReasonOf(effectiveAccountStatus(candidate, now)) === null;
+  return canJoinWorkGroup(candidate, now);
 }
 
 /** Proyeccion a la fila de salida (R19): identificador y nombre mostrable, y **nada mas**. */

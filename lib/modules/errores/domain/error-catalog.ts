@@ -46,6 +46,8 @@ export const ERROR_MESSAGE_KEY = {
   work_group_member_exists_inactive: 'errors.work_group_member_exists_inactive',
   work_group_member_exists_blocked: 'errors.work_group_member_exists_blocked',
   work_group_member_not_found: 'errors.work_group_member_not_found',
+  work_group_member_not_active: 'errors.work_group_member_not_active',
+  work_group_member_self: 'errors.work_group_member_self',
   order_delivered_frozen: 'errors.order_delivered_frozen',
   order_cancelled_not_assignable: 'errors.order_cancelled_not_assignable',
   order_assignment_not_found: 'errors.order_assignment_not_found',
@@ -136,6 +138,10 @@ export const ERROR_MESSAGES_ES = {
   'errors.work_group_member_exists_blocked':
     'Esa persona ya pertenece al grupo; no aparece en la lista porque su cuenta esta bloqueada.',
   'errors.work_group_member_not_found': 'Esa persona no pertenece al grupo.',
+  // Uno solo para pendiente, inactiva y bloqueada: el catalogo no interpola y la accion es la misma.
+  'errors.work_group_member_not_active':
+    'Solo se puede meter en un grupo a una persona con la cuenta activa.',
+  'errors.work_group_member_self': 'No puedes meterte a ti mismo en un grupo de trabajo.',
   // No dicen «no tienes permiso» ni «no existe»: el pedido existe y hay permiso, lo que impide mover
   // responsables es su estado.
   'errors.order_delivered_frozen': 'Un pedido entregado conserva sus responsables tal como estaban.',

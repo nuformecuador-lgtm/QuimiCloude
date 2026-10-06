@@ -7,14 +7,20 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  formatOrderExecutionTitle,
+  ORDER_EXECUTION_LINES_TESTID,
+  ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID,
+  ORDER_EXECUTION_MATERIALS_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TEXTS,
   ORDER_EXECUTION_FINISH_DIALOG_TESTID,
   ORDER_EXECUTION_ORDER_ID_FIELD,
   ORDER_EXECUTION_ORDER_QUANTITY_TESTID,
   ORDER_EXECUTION_PRESENTATION_TESTID,
-  ORDER_EXECUTION_RECIPE_NAME_TESTID,
+  ORDER_EXECUTION_RECIPE_MISSING_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
+  ORDER_EXECUTION_TITLE_TESTID,
+  ORDER_EXECUTION_TOOLS_TESTID,
   OrderExecutionScreen,
 } from '@/app/(private)/asignacion/[id]/components';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
@@ -441,9 +447,73 @@ describe('pantalla de ejecucion — R20: ningun control de edicion', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
-    expect(screen.getByTestId(ORDER_EXECUTION_RECIPE_NAME_TESTID)).toHaveTextContent(
+    expect(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID)).toHaveTextContent(
       EXECUTION.recipeName as string,
     );
+  });
+});
+
+describe('pantalla de ejecucion — el titulo es «# Pedido - nombre de la receta»', () => {
+  it('formatOrderExecutionTitle une numero y receta con un guion', () => {
+    expect(formatOrderExecutionTitle('PED-0007', 'Barniz acrílico')).toBe('PED-0007 - Barniz acrílico');
+  });
+
+  it('formatOrderExecutionTitle sin receta deja solo el numero', () => {
+    expect(formatOrderExecutionTitle('PED-0007', null)).toBe('PED-0007');
+  });
+
+  it('con receta pinta el titulo combinado y no repite el nombre ni el aviso de baja', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PED-0007 - Barniz acrílico');
+    expect(screen.queryByText('Barniz acrílico')).toBeNull();
+    expect(screen.queryByTestId(ORDER_EXECUTION_RECIPE_MISSING_TESTID)).toBeNull();
+  });
+
+  it('con la receta dada de baja el titulo queda solo con el numero y el aviso se conserva', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, recipeName: null }} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID).textContent).toBe('PED-0007');
+    expect(screen.getByTestId(ORDER_EXECUTION_RECIPE_MISSING_TESTID)).toHaveTextContent(
+      'Esta receta esta dada de baja.',
+    );
+  });
+});
+
+describe('pantalla de ejecucion — materiales y herramientas en su propio contenedor', () => {
+  it('las lineas y las herramientas viven dentro del contenedor, separadas del lector de pasos', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
+      />,
+    );
+
+    const contenedor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_TESTID);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_LINES_TESTID))).toBe(true);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID))).toBe(true);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID))).toBe(false);
+    expect(contenedor.contains(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID))).toBe(false);
+  });
+
+  it('con herramientas, un divisor separa los materiales de las herramientas', () => {
+    render(
+      <OrderExecutionScreen
+        execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
+      />,
+    );
+
+    const divisor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID);
+    const lineas = screen.getByTestId(ORDER_EXECUTION_LINES_TESTID);
+    const herramientas = screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID);
+    expect(lineas.compareDocumentPosition(divisor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(divisor.compareDocumentPosition(herramientas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('sin herramientas no pinta el divisor', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, tools: [] }} />);
+
+    expect(screen.queryByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_EXECUTION_MATERIALS_DIVIDER_TESTID)).toBeNull();
   });
 });
 
