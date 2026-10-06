@@ -182,7 +182,7 @@ tabla a mano.
 
 Que incumple, textualmente:
 
-- `CHECKPOINTS.md > Datos y seguridad`: "`pnpm run db:rollback` revierte **y deja
+- `docs/checkpoints-proyecto.md > Datos y seguridad`: "`pnpm run db:rollback` revierte **y deja
   `_prisma_migrations` coherente**". Hoy no lo deja.
 - `tasks.md > T12`, cuyo "hecho cuando" es el ciclo apply, rollback y apply **limpio**. La
   task esta sin marcar, asi que tambien cae `CHECKPOINTS.md > Especificacion`: "todas las

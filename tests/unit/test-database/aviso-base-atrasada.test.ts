@@ -2,7 +2,7 @@
  * QC-77 — el aviso de base de desarrollo atrasada (R14, R15, R16).
  *
  * Por que existe: los tres desenlaces («al dia», «va N atras», «no se pudo consultar») estaban
- * medidos a mano una sola vez (`progress/qc77-mediciones/T12.md`). `docs/verification.md >
+ * medidos a mano una sola vez (`progress/qc77-mediciones/T12.md`). `docs/gate.md >
  * Cuando lo que verificas es el gate mismo` pide demostrar que cada validacion nueva **muerde**,
  * y probarlo una vez no es dejarlo probado: el dia que el formateo pierda el conteo, o que
  * alguien quite el `|| true` de `init.sh`, nada se pondria rojo.
@@ -159,7 +159,7 @@ describe('el bloque 6.c de init.sh avisa, no falla (R15)', () => {
   })
 
   it('su unico `fail` es el de scripts/test-db.ts ausente', () => {
-    // R15 — que falte el script SI es una rotura del arnes (`docs/verification.md > El
+    // R15 — que falte el script SI es una rotura del arnes (`docs/gate.md > El
     // anti-patron: la validacion opcional`). Cualquier OTRO `fail` que aparezca en este
     // bloque seria el estado de una base local decidiendo el codigo de salida del gate.
     const fails = bloque6c()

@@ -28,13 +28,16 @@ REPO="."
 BASE=""
 FORCE=0
 ASSUME_MERGED=0
+PUBLICAR=1
+RETOMAR=0
 WT_DIR=".worktrees"
 
 usage() {
   cat <<'AYUDA'
 wt.sh — ciclo de vida de los worktrees del arnes.
 
-  wt.sh new  <key> <slug>   crea worktree + rama desde la base           (paso F1.0)
+  wt.sh new  <key> <slug>   publica la rama (candado) + crea worktree    (paso F1.0)
+                            sale con 4 si la rama ya existe en origin: otro la tomo
   wt.sh done <key>-<slug>   desmonta tras el merge del PR                (paso F2.5)
   wt.sh list                inventario con veredicto SAFE / HOLD por worktree
   wt.sh clean [--force]     dry-run por defecto; con --force desmonta los SAFE
@@ -46,6 +49,8 @@ Opciones globales:
   --assume-merged    solo `done`: salta la guarda de merge, mantiene las otras tres.
                      Necesario con squash-merge de GitHub, que reescribe los commits y
                      deja la rama sin ser ancestro de dev aunque SI este mergeada.
+  --sin-publicar     solo `new`: no publica la rama en origin (sin candado de equipo).
+  --retomar          solo `new`: monta el worktree desde origin/<rama> (tu rama, otra maquina).
 
 Las cuatro guardas (cualquiera que salte deja el worktree en pie):
   1. es el worktree principal        3. tiene cambios sin commitear
@@ -62,6 +67,8 @@ while [ $# -gt 0 ]; do
     --base)          BASE="${2:?--base necesita una ref}"; shift 2 ;;
     --force)         FORCE=1; shift ;;
     --assume-merged) ASSUME_MERGED=1; shift ;;
+    --sin-publicar)  PUBLICAR=0; shift ;;
+    --retomar)       RETOMAR=1; shift ;;
     -h|--help)       usage 0 ;;
     -*)              fail "opcion desconocida: $1 (usa --help)" ;;
     *)               ARGS+=("$1"); shift ;;
@@ -99,11 +106,20 @@ enumerate() {
   fi
 }
 
+# Rama de integracion del perfil (`arnes.config.json > ramas.integracion`), `dev` si no hay.
+integracion() {
+  local cfg="$MAIN_WT/arnes.config.json"
+  [ -f "$REPO/arnes.config.json" ] && cfg="$REPO/arnes.config.json"
+  node -e "try{console.log(require(process.argv[1]).ramas?.integracion??'dev')}catch{console.log('dev')}" "$(cd "$(dirname "$cfg")" && pwd)/arnes.config.json" 2>/dev/null || echo dev
+}
+INTEGRACION=""
+
 # La ref contra la que se juzga si una rama ya esta integrada.
 resolve_base() {
   if [ -n "$BASE" ]; then echo "$BASE"; return 0; fi
   local r
-  for r in origin/dev origin/main origin/master dev main master; do
+  [ -n "$INTEGRACION" ] || INTEGRACION="$(integracion)"
+  for r in "origin/$INTEGRACION" "$INTEGRACION" origin/dev origin/main origin/master dev main master; do
     if git -C "$REPO" rev-parse --verify -q "$r" >/dev/null 2>&1; then echo "$r"; return 0; fi
   done
   return 1
@@ -208,14 +224,47 @@ cmd_new() {
     return 0
   fi
 
-  git -C "$REPO" fetch origin dev >/dev/null 2>&1 || warn "no se pudo hacer fetch de origin/dev"
+  [ -n "$INTEGRACION" ] || INTEGRACION="$(integracion)"
+  git -C "$REPO" fetch origin "$INTEGRACION" >/dev/null 2>&1 || warn "no se pudo hacer fetch de origin/$INTEGRACION"
   local base
   base="$(resolve_base)" || fail "no encuentro una ref base (origin/dev, dev, main...)"
 
   if git -C "$REPO" rev-parse --verify -q "$branch" >/dev/null 2>&1; then
-    git -C "$REPO" worktree add "$path" "$branch"          # la rama ya existia
+    git -C "$REPO" worktree add "$path" "$branch"          # la rama ya existia en local: es mia
+  elif [ "$RETOMAR" = 1 ]; then
+    # Mi propia rama, publicada desde otra maquina. Quien la tiene lo dice Jira (assignee):
+    # el leader lo comprueba ANTES de llamar con --retomar.
+    git -C "$REPO" fetch --quiet origin "refs/heads/$branch:refs/remotes/origin/$branch"       || fail "no existe origin/$branch: no hay nada que retomar"
+    git -C "$REPO" worktree add -b "$branch" "$path" "origin/$branch"
   else
-    git -C "$REPO" worktree add -b "$branch" "$path" "$base"
+    # CANDADO DE EQUIPO (docs/equipo.md). La rama se publica ANTES de crear el worktree y con
+    # lease vacio: `--force-with-lease=<ref>:` exige que la rama NO exista en el remoto, y el
+    # servidor lo comprueba de forma atomica. Si dos personas toman la misma feature a la vez,
+    # solo una gana. Ni siquiera el lease basta si los dos publican el MISMO commit de dev: git
+    # ve "Everything up-to-date", no actualiza nada, no evalua el lease y sale en verde para
+    # los dos (comprobado). Por eso la rama nace con un commit vacio PROPIO —sha unico, y de
+    # paso deja escrito quien la tomo y cuando—.
+    if [ "$PUBLICAR" = 1 ]; then
+      local sha quien
+      quien="$(git -C "$REPO" config user.name || echo desconocido)"
+      sha="$(git -C "$REPO" commit-tree "$base^{tree}" -p "$base" \
+        -m "chore($id): feature tomada por $quien" -m "Candado de equipo (scripts/wt.sh new). $(date -u +%Y-%m-%dT%H:%MZ)")"
+      local base_wt="$sha"
+      if ! git -C "$REPO" push --quiet --force-with-lease="refs/heads/$branch:" origin "$sha:refs/heads/$branch" 2>/dev/null; then
+        if git -C "$REPO" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+          echo "${RED}✗ TOMADA: la rama $branch ya existe en origin. Otra persona tomo esta feature.${NC}" >&2
+          echo "  Suelta el assignee en Jira si lo pusiste y elige otra feature." >&2
+          echo "  Si la tomaste TU desde otra maquina: ./scripts/wt.sh --retomar new $id $slug" >&2
+          exit 4
+        fi
+        fail "no se pudo publicar $branch en origin (¿sin red o sin permisos?). Reintenta, o usa --sin-publicar si trabajas solo."
+      fi
+      git -C "$REPO" fetch --quiet origin "refs/heads/$branch:refs/remotes/origin/$branch" || true
+    else
+      warn "--sin-publicar: la rama no se publica y NO hay candado de equipo"
+    fi
+    git -C "$REPO" worktree add --no-track -b "$branch" "$path" "${base_wt:-$base}"
+    [ "$PUBLICAR" = 1 ] && git -C "$REPO" branch --quiet --set-upstream-to="origin/$branch" "$branch" 2>/dev/null || true
   fi
   ok "worktree $path  (rama $branch desde $base)"
   echo
@@ -247,7 +296,7 @@ cmd_done() {
   if [ "$v" != "SAFE" ]; then
     print_row "$v" "$branch" "$path" "$reason"
     echo
-    warn "NO se desmonto nada. Anotalo en 'progress/current.md > Deudas y cosas abiertas'"
+    warn "NO se desmonto nada. Anotalo en 'progress/deudas.md'"
     warn "y sigue: un worktree retenido no bloquea el cierre de la feature."
     exit 3
   fi

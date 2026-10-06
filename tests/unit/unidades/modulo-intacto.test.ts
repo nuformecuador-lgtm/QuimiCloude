@@ -118,7 +118,7 @@ const SIN_RANGO =
  * Mismo remedio y mismo idioma que `unidades-convenciones.test.ts` (R32, R34) y que
  * `tests/unit/identity/account-status-scope.test.ts` (QC-65): fuera de su rama los casos quedan
  * MUDOS (`skipped`), nunca verdes —un verde diria «comprobado» sin haber mirado nada, el
- * anti-patron de la «validacion opcional» de `docs/verification.md`—, y el detector de rama se
+ * anti-patron de la «validacion opcional» de `docs/gate.md`—, y el detector de rama se
  * ejercita aparte en los dos sentidos para que el salto no vacie la guardia.
  *
  * DOS SENALES, no una: el tipo que QC-39 CREA —`unit-view.ts`, ninguna rama implementa esta ficha

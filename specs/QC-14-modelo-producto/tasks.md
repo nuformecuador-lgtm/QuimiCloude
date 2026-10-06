@@ -128,7 +128,7 @@ archivo que no está listado, se anota antes de seguir.
 - Archivos: ninguno (salvo lo que traiga el merge).
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` **sin flags**. El modo rápido
   no vale aquí: lo que esta feature acopla es SQL y nombres de archivo, no imports, y el grafo
-  no lo ve (`docs/verification.md > Lo que --rapido NO cubre`).
+  no lo ve (`docs/gate.md > Lo que --rapido NO cubre`).
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con las tres guardias en verde.
 
 ### [x] T9. Documentar el mapa `R<n> → test`

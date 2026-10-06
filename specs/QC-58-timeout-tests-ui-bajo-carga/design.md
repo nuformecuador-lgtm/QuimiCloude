@@ -107,7 +107,7 @@ lo mismo, lista de excepciones **por nombre** y nunca por patrón amplio).
 
 Vive en `tests/guards/` a propósito: `pnpm run test:guardias` selecciona por patrón `guard` y
 entra siempre en `./init.sh --rapido`. Nada de esto lo seleccionaría el grafo de imports, que es
-justo el agujero que `docs/verification.md > Las guardias van SIEMPRE` describe.
+justo el agujero que `docs/gate.md > Las guardias van SIEMPRE` describe.
 
 ### 3.1 El plazo
 
@@ -145,7 +145,7 @@ importar `setupUser` de `tests/helpers/user-event`.
 
 ### 3.3 Probar que muerde, no que pasa
 
-`docs/verification.md > Cuando lo que verificas es el gate mismo` es explícito y aquí aplica
+`docs/gate.md > Cuando lo que verificas es el gate mismo` es explícito y aquí aplica
 entero. Para cada una de las dos mitades, se rompe **el archivo real**, se corre la guardia, se
 confirma que sale con **1** y con el mensaje que nombra lo que falla, y se restaura **desde una
 copia (`cp`), nunca con `git checkout`** —el worktree tiene cambios sin commitear que no son de

@@ -30,7 +30,7 @@
 
 - [x] **T3 [P] — Test de la autorizacion en el service para ESTA ficha.** Ampliar
       `tests/unit/identity/end-all-sessions.test.ts` (o un archivo hermano) con el caso que
-      `CHECKPOINTS.md > Permisos` exige nombrado como R3: sobre **otra** persona sin
+      `docs/checkpoints-proyecto.md > Permisos` exige nombrado como R3: sobre **otra** persona sin
       `usuarios.modificar` se rechaza **y el puerto `stampAll` no se llama ni una vez**; y R4: los
       tres casos de no-encontrado dan el **mismo** codigo.
       **Hecho:** el doble del puerto registra cero llamadas en el caso denegado.

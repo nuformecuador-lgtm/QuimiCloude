@@ -115,7 +115,7 @@ para mostrar o activar nada (`docs/architecture.md > Componentes > Regla: multip
 | 2026-09-02 | ¿La página declara su propio `<main>`? | **NO.** `SidebarInset` **es** el `<main>` (verificado en `components/ui/sidebar.tsx:305`) y R5 de QC-11 exige landmark `main` único. La página aporta contenido, no armazón | R4 |
 | 2026-09-02 | Contenido de la pantalla | **Vacía de verdad**: título + contenedor vacío. Sin tarjetas, KPIs, tablas ni «empty state». Es literalmente lo que pide la ficha del board y lo que exige `> Regla: sin sobre-ingenieria` | R3 |
 | 2026-09-02 | ¿Server Component? | **Sí**, sin `'use client'`, sin datos y **sin props de sesión**. La sesión real la conecta QC-13. Precedente: la pantalla de login de QC-10 es Server Component puro | R6, R7 |
-| 2026-09-02 | Protección de la ruta | **No entra.** `/dashboard` queda alcanzable sin autenticación hasta QC-13. Hecho conocido y aceptado; `CHECKPOINTS.md > Permisos > «Paginas protegidas validan permisos…»` **NO APLICA** en esta feature | R8 |
+| 2026-09-02 | Protección de la ruta | **No entra.** `/dashboard` queda alcanzable sin autenticación hasta QC-13. Hecho conocido y aceptado; `docs/checkpoints-proyecto.md > Permisos > «Paginas protegidas validan permisos…»` **NO APLICA** en esta feature | R8 |
 | 2026-09-02 | Componentes de ruta | En `app/(private)/dashboard/components/` con barrel `index.ts`, **aunque sea uno solo**: la regla lo dice expresamente («la consistencia vale más que ahorrar una carpeta»). Alternativa descartada y su porqué en `design.md > 7.A` | R9 |
 | 2026-09-02 | Metadata de título | **Sí**, `export const metadata` con título propio que incluye la marca, siguiendo el precedente de `app/(public)/login/page.tsx`. El assert va sobre la constante `BRAND_LABEL`, **nunca** sobre el literal de copy | R5 |
 | 2026-09-02 | Copy del título visible | **«Dashboard»**, derivado de la etiqueta que ya usa el ítem de navegación en `lib/shared/navigation/private-nav.ts`. No es un invento: es la única forma de nombrarlo que ya existe en el repo. Los tests **no afirman sobre el literal** | R2 |
@@ -130,9 +130,9 @@ para mostrar o activar nada (`docs/architecture.md > Componentes > Regla: multip
   mismo que el test de componente, más lento y más frágil. **El E2E del camino
   login → dashboard lo aporta QC-13**, que es quien trae la sesión real. Queda como **T8** de
   `tasks.md` y como deuda anotada por el leader, no en silencio.
-- **`CHECKPOINTS.md > Datos y seguridad (Supabase)` NO APLICA**: cero tablas, cero migraciones,
+- **`docs/checkpoints-proyecto.md > Datos y seguridad (Supabase)` NO APLICA**: cero tablas, cero migraciones,
   cero RLS, cero secretos, cero webhooks (R6). Se declara, no se omite.
-- **`CHECKPOINTS.md > Modulos hexagonales` NO APLICA**: esta feature no crea ni toca ningún
+- **`docs/checkpoints-proyecto.md > Modulos hexagonales` NO APLICA**: esta feature no crea ni toca ningún
   módulo de `lib/modules/` (R6).
 - **Conflicto de archivos previsible con QC-13.** Ambas features viven en `app/(private)/`.
   QC-12 sólo **crea** archivos nuevos bajo `app/(private)/dashboard/`; no edita ninguno de

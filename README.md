@@ -1,73 +1,38 @@
-# harnessConfig — el arnés SDD, extraído
+# QuimiCloude
 
-Copia autocontenida de **toda la configuración del arnés** de este repo. Sirve para
-llevar el arnés a otro proyecto, o para leerlo entero sin el ruido de las specs y las
-bitácoras que se vayan acumulando.
+Aplicación Next.js (App Router) + TypeScript + Prisma + Postgres (Supabase), desplegada en
+Vercel. El stack y la arquitectura están en `docs/architecture.md`.
 
-**Nada de lo que hay aquí modifica el arnés vivo.** Los archivos del repo (`CLAUDE.md`,
-`AGENTS.md`, `.claude/`, `docs/`, `scripts/`, `init.sh`, `feature_list.json`,
-`progress/`, `specs/`) quedan intactos; esto es una copia paralela.
+El repo se trabaja con el **arnés SDD v2**, que viene de la plantilla
+[`singularis-co/harness_config`](https://github.com/singularis-co/harness_config). El arnés es un
+proceso para que agentes de Claude Code trabajen en equipo de forma verificable: spec antes que
+código, estado en disco, trazabilidad requisito→test y un gate ejecutable.
 
-## Qué hay
+## Empezar (cada persona, una vez)
 
-| Ruta | Origen | Estado |
-|---|---|---|
-| `CLAUDE.md` | raíz | copia literal |
-| `AGENTS.md` | raíz | copia literal |
-| `CHECKPOINTS.md` | raíz | copia literal |
-| `init.sh` | raíz | copia literal (el gate: `./init.sh` y `./init.sh --rapido`) |
-| `scripts/wt.sh` | `scripts/` | copia literal (ciclo de vida de los worktrees) |
-| `scripts/validate-features.mjs` | `scripts/` | copia literal (valida `feature_list.json` en el gate) |
-| `.mcp.json` | raíz | copia literal (servidores MCP) |
-| `docs/architecture.md` · `conventions.md` · `specs.md` · `verification.md` · `worktrees.md` · `jira.md` | `docs/` | copia literal — los que los subagentes leen |
-| `.claude/agents/*.md` | `.claude/agents/` | copia literal, los 6 subagentes |
-| `.claude/settings.json` | `.claude/` | copia literal (hooks del arnés) |
-| `.claude/settings.local.json` | `.claude/` | copia literal (permisos + MCP habilitado) |
-| `feature_list.json` | — | una única ficha de ejemplo |
-| `progress/current.md` | — | solo los encabezados que el leader espera |
-| `progress/history.md` | — | solo el encabezado y el formato de entrada |
-| `progress/impl_1-ejemplo-*.md` · `review_1-ejemplo-*.md` | — | ejemplo del formato de bitácora |
-| `specs/1-ejemplo-*/` | — | ejemplo de los 3 archivos SDD (requirements EARS / design / tasks) |
+1. Clona el repo, crea tu `.env` desde `.env.example` y corre `pnpm install`.
+2. Abre Claude Code en la raíz y corre `/jira-connect`. Fija tu identidad de Jira en
+   `.arnes.local.json`; ese archivo no se versiona.
+3. Pide «importa el board» (paso F0) y corre `./init.sh`. Debe salir en verde.
 
-## Qué se omite a propósito
+## El día a día
 
-- **Los historiales reales**: `progress/history.md`, `progress/current.md` y los
-  `impl_*.md` / `review_*.md` de features cerradas. Crecen sin techo y no son
-  configuración.
-- **Las specs reales**: queda una sola como ejemplo de formato.
-- **El `feature_list.json` real**, con su narrativa de decisiones por ficha.
-- **`.claude/skills/`**: son skills de terceros instaladas, no parte del arnés.
-- Todo lo que es la app en sí: `app/`, `lib/`, `tests/`, `db/`, `package.json`, configs
-  de build.
+- Abre Claude Code en la raíz: actúa como **leader** (`CLAUDE.md`). Te muestra tu sesión anterior
+  y tus features en vuelo.
+- Pídele la siguiente feature. Antes de tomarla, el leader:
+  - comprueba en Jira que nadie la tiene;
+  - te la asigna;
+  - publica su rama, que funciona como candado (`docs/equipo.md`).
+- Aprueba el spec moviendo la tarjeta de *Spec en revisión* a *En curso*.
+- Mergea el PR **solo con el check `gate-completo` en verde**.
 
-## Si lo trasplantas a otro proyecto, revisa esto
+## Mapa
 
-1. **`init.sh`** asume `pnpm` y los scripts `typecheck` / `lint` / `test` / `test:rapido`
-   en `package.json`, más `db/migrations/*/down.sql`. Sin esos scripts el gate **avisa y sigue**
-   (`warn`), no falla: verifica que existan o el gate no mide nada.
-2. **`.claude/settings.local.json`** trae permisos de esta máquina; revísalos allá.
-3. **`scripts/wt.sh` monta los worktrees en `.worktrees/` dentro del repo**, y esta copia
-   NO incluye `.gitignore`, `tsconfig.json` ni `eslint.config.mjs`. En el repo destino
-   hay que excluir esa carpeta en los tres, o `lint` y `typecheck` recorrerán una copia
-   completa del árbol por cada worktree abierto:
-   `/.worktrees/` en `.gitignore`, `".worktrees/**"` en `globalIgnores` de eslint, y
-   `.worktrees` en el `exclude` de `tsconfig.json`. Ver `docs/worktrees.md`.
-4. **`.mcp.json`** resuelve el proyecto de Supabase por `${SUPABASE_PROJECT_REF}` y la
-   clave de Context7 por `${CONTEXT7_API_KEY}`, y la autenticación de Jira por
-   `${ATLASSIAN_MCP_AUTH}` (que es `base64(email:api_token)`): las tres salen del entorno,
-   no del repo. Defínelas allá o los servidores MCP no levantan.
-   El arnés espera además un **board de Jira** con las cinco columnas del ciclo; sin él, el
-   paso F0 no tiene de dónde importar. Montaje completo en `docs/jira.md`.
-5. **`docs/architecture.md`** describe el dominio, el stack y los principios de este
-   proyecto (un ERP mono-tenant). Es el documento a reescribir en destino; los otros de
-   `docs/` son genéricos.
-6. **`CLAUDE.md` regla 1** y el paso 3 de `init.sh` fijan el máximo de 2 features
-   `in_progress` por zona: si lo cambias, cámbialo en los dos sitios (y en
-   `AGENTS.md > Paralelismo`).
-
-## Arranque en limpio
-
-```
-./init.sh                      # debe terminar en verde
-```
-Luego: `CLAUDE.md` → `AGENTS.md` → primera ficha `pending` de `feature_list.json`.
+| Para | Mira |
+| --- | --- |
+| El flujo completo y quién hace qué | `AGENTS.md` |
+| Trabajo en equipo, candado, cupo | `docs/equipo.md` |
+| El gate (local rápido, CI completo) | `docs/gate.md` |
+| Qué leer y cuánto | `docs/lectura.md` |
+| Perfil del proyecto | `docs/architecture.md`, `docs/conventions.md`, `docs/verification.md`, `docs/dependencias.md` |
+| Actualizar el arnés desde la plantilla | `./scripts/arnes-sync.sh` |

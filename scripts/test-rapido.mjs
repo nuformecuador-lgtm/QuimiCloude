@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `pnpm run test:rapido` — el gate de cerrar tanda (`docs/verification.md`).
+ * `pnpm run test:rapido` — el gate de cerrar tanda (`docs/gate.md`).
  *
  * Corre DOS cosas, y las dos importan:
  *   1. Los tests que el GRAFO DE IMPORTS relaciona con el diff contra `origin/dev`,
@@ -9,14 +9,14 @@
  *   2. TODAS las guardias (patron `guard`), siempre. Las guardias recorren el arbol de
  *      archivos en vez de importar lo que vigilan, asi que ningun grafo las selecciona.
  *
- * Sale en verde cuando la seleccion esta vacia (`--passWithNoTests`): hoy no hay guardias
- * y el diff puede no tocar ningun archivo con tests. "Sin tests seleccionados" no es un
+ * Sale en verde cuando la seleccion esta vacia (`--passWithNoTests`): el diff puede no tocar
+ * ningun archivo con tests, y un repo recien montado puede no tener guardias. "Sin tests seleccionados" no es un
  * fallo; un fallo es un test rojo.
  *
  * Node y no bash a proposito: este repo se trabaja tambien desde Windows.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
@@ -25,7 +25,15 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const VITEST_BIN = path.join(path.dirname(require.resolve('vitest/package.json')), 'vitest.mjs');
 
-const BASE_REF = process.env.TEST_RAPIDO_BASE ?? 'origin/dev';
+// La rama de integracion sale del perfil (`arnes.config.json > ramas.integracion`).
+function ramaDeIntegracion() {
+  try {
+    return JSON.parse(readFileSync('arnes.config.json', 'utf8')).ramas?.integracion ?? 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+const BASE_REF = process.env.TEST_RAPIDO_BASE ?? `origin/${ramaDeIntegracion()}`;
 
 /** Ficheros del diff vs `BASE_REF` (tres puntos) que siguen existiendo en disco. */
 function changedFiles() {

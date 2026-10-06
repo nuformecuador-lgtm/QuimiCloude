@@ -263,7 +263,7 @@ reporta al leader**; no la rellena con supuestos.
 | 2026-09-03 | Componentes de ruta | En `<ruta>/components/` con barrel `index.ts`, heredado de QC-12: «la consistencia vale más que ahorrar una carpeta» |
 | 2026-09-03 | Mutaciones | **Server Actions**, heredado de QC-11. Prohibido `fetch` a API routes propias |
 | 2026-09-03 | Librería de componentes | **shadcn/ui por CLI.** Ningún primitivo se escribe ni se edita a mano en `components/ui/` (QC-11). Los que faltan (`table`, `sheet`, `select`, `alert-dialog`, `form`) se añaden con `pnpm dlx shadcn@latest add`. Si hiciera falta una **librería** de verdad, el `frontend_dev` **para y la propone**; no la instala (regla 7 de `CLAUDE.md`) |
-| 2026-09-03 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (QC-11, `CHECKPOINTS.md > Permisos`) |
+| 2026-09-03 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (QC-11, `docs/checkpoints-proyecto.md > Permisos`) |
 | 2026-09-03 | Rutas y asserts | Rutas siempre en constantes exportadas, nunca literales (QC-11 R13). Los tests afirman sobre roles ARIA, `data-testid` y constantes exportadas; **nunca** sobre literales de copy |
 | 2026-09-03 | Multiplataforma | Se valida contra angosto y ancho con el helper `tests/helpers/viewport.ts` de QC-11. **No se declara ninguna excepción de escritorio** |
 | 2026-09-03 | Base de shadcn/ui, Vitest, layout y sidebar | **Precondición heredada y montada.** No se re-crean. El choque entre las features 4 y 10 ya ocurrió una vez en este repo; la T0 de `specs/11-*/tasks.md` existe para que no se repita |

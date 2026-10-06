@@ -165,7 +165,7 @@ import { cookies } from 'next/headers';
 
 - **Por que un adaptador driven y no la Server Action:** la cookie es un detalle de
   transporte. Si la escribiera `login-action.ts`, la decision "cuando hay sesion y hasta
-  cuando" quedaria fuera del dominio, que es justo lo que `CHECKPOINTS.md > Modulos
+  cuando" quedaria fuera del dominio, que es justo lo que `docs/checkpoints-proyecto.md > Modulos
   hexagonales` marca como mal hecho. El dominio decide *que* sesion se abre; el adaptador
   sabe *como* se transporta.
 - **`next/headers` en `driven/`:** la fila `adapters/driven/**` de la tabla de dependencias
@@ -441,7 +441,7 @@ contador es monotono y el bloqueo acaba disparandose igual.
 Es lo mas corto: `cookies().set(...)` justo antes del `redirect`, sin puerto `SessionWriter`
 ni adaptador nuevo. Se descarta porque deja la decision "hay sesion y dura hasta X" en un
 adaptador driving: el dominio devolveria `{ ok: true }` y la Server Action decidiria el
-resto. Eso es exactamente el anti-patron que `CHECKPOINTS.md > Modulos hexagonales` marca
+resto. Eso es exactamente el anti-patron que `docs/checkpoints-proyecto.md > Modulos hexagonales` marca
 ("la logica de negocio esta en `domain/`, no en la Server Action") y que la guardia **no**
 detecta. Ademas haria imposible testear la emision de sesion sin montar el runtime de Next.
 

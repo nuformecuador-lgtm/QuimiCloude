@@ -146,7 +146,7 @@ Queda dicho para el reviewer de la siguiente ficha que toque migraciones.
 
 ## La guardia muerde: rotura manual del archivo real
 
-`docs/verification.md > Probar que muerde, no que pasa` exige romper el archivo real, no solo
+`docs/gate.md > Probar que muerde, no que pasa` exige romper el archivo real, no solo
 pasar fuentes sinteticos. Copia de `lib/modules/identity/domain/seed-initial-access.ts` al
 scratchpad (**fuera del repo**), quitadas la dependencia, la evaluacion y el `throw`
 (`grep -c checkCredentialPolicy` da 0), y `pnpm exec vitest run tests/guards`:

@@ -496,7 +496,7 @@ $ pnpm exec vitest run guard
 
 **La carrera MUERDE: mutacion hecha por el implementer, no razonada**
 
-Hecho con copia en el scratchpad y restauracion con `cp`, como pide `docs/verification.md > Probar que
+Hecho con copia en el scratchpad y restauracion con `cp`, como pide `docs/gate.md > Probar que
 muerde`. En `product-prisma.ts:610` se sustituyo `SELECT pg_advisory_xact_lock(` por
 `SELECT num_nonnulls(`, que evalua los mismos argumentos **sin tomar el lock**, y se corrio solo el
 archivo nuevo:

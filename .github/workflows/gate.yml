@@ -1,0 +1,260 @@
+# Gate de CI del arnes (diseno v2, seccion 6).
+#
+#   PR hacia `dev`            -> gate-completo                (check informativo: ver abajo)
+#   PR hacia `main`           -> gate-completo + e2e          (los dos, informativos)
+#   workflow_dispatch         -> los dos, a mano, sobre la rama elegida
+#
+# Postgres es un contenedor de servicio, efimero: nace y muere con el job. La version es la
+# OBJETIVO del proyecto, 17 (docs/verification.md, decision humana del 2026-09-18), no la que
+# tenga cada maquina local.
+#
+# NINGUN secreto real vive aqui. Las credenciales del seed y el secreto de sesion se GENERAN
+# en cada corrida (paso "Credenciales efimeras"): solo sirven para la base de servicio, que
+# se tira al acabar el job. No hay `.env` en CI; `init.sh` (6.b) ve `DATABASE_URL` en el
+# entorno y no busca el archivo.
+name: gate
+
+# Plan GRATUITO de GitHub (2000 min/mes en repos privados; agotados, no corre nada): cada
+# minuto cuenta. Por eso: nada en borradores, nada si el PR solo toca prosa o estado del
+# arnes, cancelacion de corridas viejas y timeouts ajustados. Y sin branch protection en
+# este plan: el check es INFORMATIVO; la convencion es mergear solo con el check en verde.
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**/*.md'
+      - 'progress/**'
+      - 'specs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un push nuevo al mismo PR cancela la corrida anterior: su veredicto ya no describe la punta.
+concurrency:
+  group: gate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Base de "desarrollo" del job. Los tests de integracion NO escriben en ella: la usan para
+  # saber donde esta el servidor, y crean su base efimera desde una plantilla (QC-77).
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/quimicloude
+  DIRECT_URL: postgresql://postgres:postgres@localhost:5432/quimicloude
+  NO_COLOR: '1'
+
+jobs:
+  gate-completo:
+    name: gate-completo
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          # Superusuario a proposito: la integracion hace CREATE/DROP DATABASE y
+          # pg_advisory_lock contra la base `postgres` (tests/helpers/test-database.ts).
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quimicloude
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Checkout (historia completa)
+        uses: actions/checkout@v4
+        with:
+          # Historia entera y todas las ramas remotas: varias guardias calculan el merge-base
+          # con `dev`/`origin/dev` (tests/guards/guard-qc102-*, guard-pantalla-pedidos-*).
+          fetch-depth: 0
+
+      - name: Asegurar origin/dev
+        shell: bash
+        run: git fetch --no-tags origin +refs/heads/dev:refs/remotes/origin/dev
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        # Sin `version`: la toma de `packageManager` en package.json (pnpm@10.10.0).
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Dependencias
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Credenciales efimeras (solo para la base de servicio de este job)
+        shell: bash
+        run: |
+          gen() { node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"; }
+          # Mayuscula, minuscula, digito y simbolo garantizados (credential-policy.ts).
+          {
+            echo "SESSION_SECRET=$(gen)$(gen)"
+            echo "SEED_ADMIN_USERNAME=ciadmin"
+            echo "SEED_ADMIN_EMAIL=ci-admin@example.com"
+            echo "SEED_ADMIN_PASSWORD=Ci-9$(gen)z!"
+            echo "SEED_MAESTRO_USERNAME=cimaestro"
+            echo "SEED_MAESTRO_EMAIL=ci-maestro@example.com"
+            echo "SEED_MAESTRO_PASSWORD=Cm-7$(gen)q!"
+          } >> "$GITHUB_ENV"
+
+      - name: ./init.sh --completo
+        shell: bash
+        run: |
+          ./init.sh --completo 2>&1 | tee init-completo.log
+
+      - name: Resumen (poda del baseline de rojos)
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## gate-completo"
+            echo
+            echo '```'
+            grep -E "baseline|rojos|init OK|✗" init-completo.log || echo "(sin lineas de baseline en el log)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Informe de vitest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-completo-informe
+          path: |
+            init-completo.log
+            .vitest-rojos.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e:
+    name: e2e
+    # Solo en el PR de despliegue (base `main`), fuera de borrador, y a mano.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.base_ref == 'main' && github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quimicloude
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Dependencias
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Cliente de Prisma y tipos de ruta
+        shell: bash
+        run: |
+          pnpm exec prisma generate
+          pnpm exec next typegen
+
+      - name: Credenciales efimeras (solo para la base de servicio de este job)
+        shell: bash
+        run: |
+          gen() { node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"; }
+          {
+            echo "SESSION_SECRET=$(gen)$(gen)"
+            echo "SEED_ADMIN_USERNAME=ciadmin"
+            echo "SEED_ADMIN_EMAIL=ci-admin@example.com"
+            echo "SEED_ADMIN_PASSWORD=Ci-9$(gen)z!"
+            echo "SEED_MAESTRO_USERNAME=cimaestro"
+            echo "SEED_MAESTRO_EMAIL=ci-maestro@example.com"
+            echo "SEED_MAESTRO_PASSWORD=Cm-7$(gen)q!"
+            echo "APP_BASE_URL=http://localhost:3117"
+          } >> "$GITHUB_ENV"
+
+      # `prisma migrate deploy` NO termina sobre una base vacia (la migracion de QC-49 exige la
+      # empresa inicial). La receta de cuatro pasos ya vive en `db:test template`; aqui no se
+      # copia: se construye la plantilla y la base del E2E nace como copia suya.
+      - name: Base del E2E (plantilla migrada y sembrada -> copia)
+        shell: bash
+        run: |
+          pnpm run db:test template 2>&1 | tee plantilla.log
+          PLANTILLA=$(grep -oE 'qct_tpl_[A-Za-z0-9_]+' plantilla.log | tail -n 1)
+          [ -n "$PLANTILLA" ] || { echo "no se pudo leer el nombre de la plantilla"; exit 1; }
+          node -e "
+            const { Client } = require('pg');
+            const [plantilla] = process.argv.slice(1);
+            const c = new Client({ connectionString: 'postgresql://postgres:postgres@localhost:5432/postgres' });
+            (async () => {
+              await c.connect();
+              await c.query('DROP DATABASE IF EXISTS quimicloude_e2e WITH (FORCE)');
+              await c.query('CREATE DATABASE quimicloude_e2e TEMPLATE \"' + plantilla + '\"');
+              await c.end();
+            })().catch((e) => { console.error(e); process.exit(1); });
+          " "$PLANTILLA"
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/quimicloude_e2e" >> "$GITHUB_ENV"
+          echo "DIRECT_URL=postgresql://postgres:postgres@localhost:5432/quimicloude_e2e" >> "$GITHUB_ENV"
+
+      # Los DOS navegadores de playwright.config.ts, y no solo chromium: WebKit es el motor de
+      # iOS y docs/architecture.md exige ejercitarlo de verdad. Para ahorrar minutos se cachean
+      # los binarios por version de Playwright; las dependencias del sistema se instalan siempre.
+      - name: Version de Playwright
+        id: pw
+        shell: bash
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de navegadores
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-webkit
+
+      - name: Navegadores de Playwright
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Dependencias de sistema de los navegadores
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: pnpm exec playwright install-deps chromium webkit
+
+      - name: Playwright
+        shell: bash
+        run: pnpm run e2e
+
+      - name: Trazas de Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14

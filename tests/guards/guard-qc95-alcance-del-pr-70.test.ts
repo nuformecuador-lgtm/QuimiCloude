@@ -10,7 +10,7 @@
 // **Por que esta guardia NO mide la rama actual (decision humana, 2026-09-15).**
 // QC-95 ya esta mergeada en `dev` (PR #70). Una guardia de rama escrita despues del merge no ve
 // nunca el diff de la ficha: haria `skip` siempre y seria el anti-patron de la validacion opcional
-// (`docs/verification.md`). Por eso se ancla al RANGO INMUTABLE del propio PR, con SHAs completos:
+// (`docs/gate.md`). Por eso se ancla al RANGO INMUTABLE del propio PR, con SHAs completos:
 //
 //   git diff --name-only --no-renames 0ed8431e7e67c69532c0c0cb40e7d8e0dc04853c f777c56f941b0fdae1566663d24f82fd413fd1b5
 //
@@ -209,7 +209,7 @@ export function mensajeNoComprobado(detalle: string): string {
     'Esta guardia mide el rango inmutable del PR #70 y necesita sus commits en el clon. Si el ' +
     'clon es superficial, corre `git fetch --unshallow`; si falta el remoto o la rama, ' +
     '`git fetch origin dev`. Despues vuelve a correr la guardia. No se salta a proposito: un ' +
-    'salto aqui seria un verde que no ha mirado nada (docs/verification.md > El anti-patron: la ' +
+    'salto aqui seria un verde que no ha mirado nada (docs/gate.md > El anti-patron: la ' +
     'validacion opcional).'
   )
 }
