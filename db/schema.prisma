@@ -865,3 +865,36 @@ model Customer {
   @@index([updatedBy], map: "customers_updated_by_idx")
   @@map("customers")
 }
+
+enum OrderExecutionAction {
+  START
+  RESUME
+  ADVANCE
+  GO_BACK
+  CANCEL
+  FINISH
+  PACK_START
+  PACK_FINISH
+}
+
+/// Una fila por movimiento sobre la ejecucion de un pedido. Solo se inserta: no se edita ni se
+/// borra, y por eso no hay `created_at`, `updated_at` ni `deleted_at`. `occurredAt` no tiene
+/// default porque el caso de uso escribe el mismo instante que deja en el pedido. Sin
+/// `@relation`: las dos FK son compuestas con `company_id` y estan escritas a mano en la
+/// migracion, igual que sus tres CHECK; hay que borrar su `DROP CONSTRAINT` de toda migracion
+/// generada.
+/// @module asignaciones
+model OrderExecutionEntry {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String               @map("company_id") @db.Uuid
+  orderId      String               @map("order_id") @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  action       OrderExecutionAction
+  stepPosition Int?                 @map("step_position")
+  reason       String?
+  occurredAt   DateTime             @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([orderId, occurredAt(sort: Desc)], map: "order_execution_entries_order_id_occurred_at_idx")
+  @@index([userId], map: "order_execution_entries_user_id_idx")
+  @@map("order_execution_entries")
+}
