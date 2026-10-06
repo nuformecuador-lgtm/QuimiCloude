@@ -115,7 +115,7 @@ describe('alta de producto — autocomplete del nombre por tipo', () => {
 
     await elegirTipo(user, 'Envase');
     await elegirBotella(user);
-    expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue(BOTELLA.qtyAlert);
+    expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue('10');
     await user.type(screen.getByTestId('product-field-stock'), '5');
 
     await elegirTipo(user, 'Producto');

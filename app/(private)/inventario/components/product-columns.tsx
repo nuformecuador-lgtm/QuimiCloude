@@ -76,11 +76,6 @@ export const IMAGE_COLUMN_LABEL = 'Imagen';
 /** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
 export const ACTIONS_COLUMN_LABEL = 'Acciones';
 
-/** `null` no tiene cifra exacta que anunciar: el `aria-label` queda sin poner. */
-function decimalAriaLabel(value: string | null): string | undefined {
-  return value === null ? undefined : trimDecimal(value);
-}
-
 /**
  * Etiqueta de una unidad a partir de su id: simbolo, nombre, o el marcador si el catalogo no la
  * trae. Sin catalogo (`units` indefinido), devuelve `null` y quien llama pinta la cantidad sola.
@@ -144,19 +139,32 @@ function stockCell(product: ProductView, units: readonly UnitRef[] | undefined):
   return stockAmountCell(product.stock, productUnitLabel(product, units), isBelowAlert(product));
 }
 
-/** La alerta de cantidad, opcional: sin valor pinta el marcador de vacio, sin `title` ni `aria-label`. */
-export function qtyAlertCell(product: ProductView): ReactNode {
-  if (product.qtyAlert === null) return EMPTY_CELL;
+/** Una cantidad en la unidad del producto; sin unidad conocida, la cifra sola. */
+function productQuantityCell(
+  value: string,
+  testId: string,
+  product: ProductView,
+  units: readonly UnitRef[] | undefined,
+): ReactNode {
+  const label = productUnitLabel(product, units);
+  const amount = formatDecimalDisplay(value);
+  const exact = trimDecimal(value);
 
   return (
     <span
-      data-testid="product-qty-alert"
-      title={exactDecimalTitle(product.qtyAlert)}
-      aria-label={decimalAriaLabel(product.qtyAlert)}
+      data-testid={testId}
+      title={exactDecimalTitle(value)}
+      aria-label={label === null ? exact : `${exact} ${label}`}
     >
-      {formatDecimalDisplay(product.qtyAlert)}
+      {label === null ? amount : `${amount} ${label}`}
     </span>
   );
+}
+
+/** La alerta de cantidad, opcional: sin valor pinta el marcador de vacio, sin `title` ni `aria-label`. */
+export function qtyAlertCell(product: ProductView, units: readonly UnitRef[] | undefined): ReactNode {
+  if (product.qtyAlert === null) return EMPTY_CELL;
+  return productQuantityCell(product.qtyAlert, 'product-qty-alert', product, units);
 }
 
 /**
@@ -172,20 +180,7 @@ function aggregateQuantityCell(
   units: readonly UnitRef[] | undefined,
 ): ReactNode {
   if (value === undefined) return EMPTY_CELL;
-
-  const label = productUnitLabel(product, units);
-  const amount = formatDecimalDisplay(value);
-  const exact = trimDecimal(value);
-
-  return (
-    <span
-      data-testid={testId}
-      title={exactDecimalTitle(value)}
-      aria-label={label === null ? exact : `${exact} ${label}`}
-    >
-      {label === null ? amount : `${amount} ${label}`}
-    </span>
-  );
+  return productQuantityCell(value, testId, product, units);
 }
 
 export type ProductColumnsDeps = {
@@ -240,7 +235,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (product) => qtyAlertCell(product),
+      cell: (product) => qtyAlertCell(product, units),
     },
     {
       id: 'reserved',
