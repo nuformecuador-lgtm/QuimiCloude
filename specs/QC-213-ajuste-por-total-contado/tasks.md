@@ -177,7 +177,7 @@ Archivos:
 
 ---
 
-## TI — Integración real y E2E
+## [x] TI — Integración real y E2E
 Depende de: B2, B3, B4, B5, F1, F2.
 
 Archivos:

@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import {
   MOVEMENT_REASONS,
   REASONS_BY_DIRECTION,
@@ -102,4 +106,67 @@ describe('motivos por sentido', () => {
     expect(reasonsFor('increase')).toBe(REASONS_BY_DIRECTION.increase);
     expect(reasonsFor('decrease')).toBe(REASONS_BY_DIRECTION.decrease);
   });
+});
+
+describe('una sola fuente para el sentido y los motivos', () => {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+  /** Quita comentarios para que un ejemplo en prosa no cuente como codigo. */
+  function readCode(relativePath: string): string {
+    return readFileSync(join(repoRoot, relativePath), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+  }
+
+  function namedImportsFrom(code: string, specifier: string): string[] {
+    const names: string[] = [];
+    const pattern = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'([^']+)'/g;
+    for (const match of code.matchAll(pattern)) {
+      if (match[2] !== specifier) continue;
+      for (const raw of match[1]!.split(',')) {
+        const name = raw.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0]!.trim();
+        if (name !== '') names.push(name);
+      }
+    }
+    return names;
+  }
+
+  const consumers = [
+    {
+      name: 'el dialogo',
+      file: 'app/(private)/inventario/components/adjust-batch-dialog.tsx',
+      specifier: '@/lib/modules/inventario',
+      uses: ['describeAdjustment', 'reasonsFor', 'isReasonAllowed'],
+    },
+    {
+      name: 'el caso de uso',
+      file: 'lib/modules/inventario/domain/adjust-batch-stock.ts',
+      specifier: './stock-adjustment',
+      uses: ['describeAdjustment', 'isReasonAllowed'],
+    },
+  ] as const;
+
+  it.each(consumers)(
+    'R28 — $name decide sentido y motivos con las funciones de stock-adjustment, sin lista de motivos propia',
+    ({ file, specifier, uses }) => {
+      const code = readCode(file);
+
+      const imported = namedImportsFrom(code, specifier);
+      for (const name of uses) {
+        expect(imported, `${file} debe importar ${name} de ${specifier}`).toContain(name);
+        expect(code, `${file} no puede declarar su propio ${name}`).not.toMatch(
+          new RegExp(`(function|const|let|var)\s+${name}\b`),
+        );
+      }
+
+      expect(code, `${file} no puede declarar su propia tabla de motivos por sentido`).not.toMatch(
+        /REASONS_BY_DIRECTION/,
+      );
+      for (const reason of MOVEMENT_REASONS) {
+        expect(code, `${file} no puede nombrar el motivo ${reason} a mano`).not.toMatch(
+          new RegExp(`['"\`]${reason}['"\`]`),
+        );
+      }
+    },
+  );
 });
