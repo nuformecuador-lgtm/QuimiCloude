@@ -92,7 +92,7 @@ export type ImportResultSummaryProps = {
 export function ImportResultSummary({ result, onDownloadErrors, onRestart }: ImportResultSummaryProps) {
   const statuses = RESULT_STATUS_ORDER.map((value) => ({
     value,
-    count: result.rows.filter((row) => row.status === value).length,
+    count: result.rows.reduce((total, row) => (row.status === value ? total + 1 : total), 0),
   }));
 
   return (

@@ -289,6 +289,27 @@ genérico en vez del rechazo `file_too_large`. El servidor sigue mandando.
   el selector de Archivos de iOS; `crypto.randomUUID` exige contexto seguro (HTTPS o localhost) y
   Safari iOS ≥ 15.4.
 
+### Contrato de la ruta de inventario (`product-route-contract.test.ts`, 2026-10-06)
+
+El test recorre `app/(private)/inventario/` entero y ahora tambien ve `importar/`. Arreglado en
+`importar/**`:
+- R31: el `SelectTrigger` del alta de unidad lleva `min-h-11 min-w-11` literal (la guardia solo
+  resuelve constantes locales, no importadas).
+- `filter(` que no es control de usuario: recuentos por estado con `reduce` (vista previa y
+  resultado) y unidades base con `flatMap` en el alta de unidad.
+
+Siguen rojos 4 casos que no se arreglan desde `importar/**` sin quitar algo que exige el spec:
+1. «literal del permiso de escritura»: `importar/page.tsx:28` `requirePagePermission('inventario.modificar')`,
+   exigido por design 6 / tasks F1 y por `guard-pantallas-exigen-permiso`. El modulo solo publica
+   `canAdjustBatchStock` (sin redirect al login), y la pantalla tiene prohibido `redirect(`.
+2. «busqueda ni control de orden»: `import-preview-table.tsx:143` es el filtro por estado que exige
+   tasks F3 («filtro por estado»).
+3. «barrel»: el test mira el barrel de `inventario/components/` y exige que la unica carpeta de la
+   ruta sea `components/`; la subruta `importar/` (design 6) lo incumple por existir.
+4. «cliente sin composicion»: falla en `app/(private)/inventario/page.tsx` (fuera de `importar/`):
+   su comentario de la linea 40 contiene `'use client'` y el test lo clasifica como cliente; F1
+   le anadio `@/lib/composition`.
+
 ## Pista B lectura (backend_dev, 2026-10-06)
 
 ### Commits

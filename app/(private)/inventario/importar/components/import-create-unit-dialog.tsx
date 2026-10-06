@@ -26,7 +26,6 @@ import {
   DialogFormError,
   DialogTextField,
   FIELD_TEXT,
-  TOUCH_TARGET,
 } from './import-dialog-parts';
 import {
   NO_BASE_UNIT_LABEL,
@@ -90,7 +89,7 @@ export function ImportCreateUnitDialog({ initialName, units, onClose, onCreated 
 
   const errorField = error === null ? undefined : CODE_TO_FIELD[error.code];
   const fieldError = (field: UnitField) => (errorField === field ? error?.message : undefined);
-  const baseUnits = units.filter((unit) => unit.baseUnitId === null);
+  const baseUnits = units.flatMap((unit) => (unit.baseUnitId === null ? [unit] : []));
 
   function update(field: UnitField, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -152,7 +151,7 @@ export function ImportCreateUnitDialog({ initialName, units, onClose, onCreated 
                 aria-labelledby={baseLabelId}
                 aria-invalid={fieldError('baseUnitId') === undefined ? undefined : true}
                 aria-describedby={fieldError('baseUnitId') === undefined ? undefined : baseErrorId}
-                className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+                className={`w-full min-h-11 min-w-11 ${FIELD_TEXT}`}
                 data-testid={dialogFieldTestId('baseUnitId')}
               >
                 <SelectValue />

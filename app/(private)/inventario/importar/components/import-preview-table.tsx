@@ -251,7 +251,7 @@ export const PREVIEW_TABLE_ID = 'inventario-importar-vista-previa';
 export function ImportPreviewTable({ rows }: { readonly rows: readonly ImportPreviewRow[] }) {
   const statuses = PREVIEW_STATUS_ORDER.map((value) => ({
     value,
-    count: rows.filter((row) => row.status === value).length,
+    count: rows.reduce((total, row) => (row.status === value ? total + 1 : total), 0),
   }));
 
   return (
