@@ -137,3 +137,40 @@ All migrations have been successfully applied.
 
 El gate `--rapido` de esta tanda se corre junto con la tanda 3 (T8–T11, T25 rompen el tipado de los
 consumidores hasta T12/T13).
+
+## Tanda 3 (2026-10-06) — T8, T9, T10, T11, T25
+
+| Task | Commit | Archivos | Tests |
+| --- | --- | --- | --- |
+| T8 | `100fcccf` | `asignaciones/domain/record-step-move.ts`, `tests/unit/asignaciones/record-step-move.test.ts` | 20 |
+| T9 | `15bd40d0` | `asignaciones/domain/cancel-assigned-order.ts` (devuelve `CancelAssignedOrderResult = { numberText }`, tipo nuevo), `tests/unit/asignaciones/cancel-assigned-order.test.ts` | 27 |
+| T10 | `f997cfd6` | `start-assigned-order.ts`, `assigned-order-execution-view.ts` (`StartedOrderExecution`), `tests/unit/asignaciones/start-assigned-order.test.ts` | 37 |
+| T11 | `d2bd34d0` | `finish-assigned-order.ts`, `tests/unit/asignaciones/finish-assigned-order.test.ts` | 49 |
+| T25 | `52680e5d` | `start-packing.ts`, `finish-packing.ts`, `tests/unit/asignaciones/{start,finish}-packing.test.ts` | 28 + 40 |
+
+Permiso de la primera línea: `asignaciones.ejecutar` en T8–T11 (P3); `empaque.modificar` en T25.
+`order-state.test.ts` existe pero no se tocó: la fila que usa `recordStepMove` se prueba en su test.
+
+### Notas para el reviewer
+
+- **T10**: la vista se lee antes de `run`, así que hay una lectura más del pedido. El test de QC-138
+  R32 retocó **la fixture** (secuencia `['PENDIENTE','PENDIENTE','BLOQUEADO']`) y el recuento de lecturas
+  de 2 a 3, con nota fechada 2026-10-06. Tras `'stale'`, si relee `EN_CURSO`, reutiliza la vista ya leída
+  (el test de QC-63 que cuenta 3 lecturas sigue igual). `resume` con receta sin pasos ⇒ `null`. La
+  posición no se recorta en el servidor: lo hace `StepReader` (T15, R14).
+- **T11**: con `'stale'` también se compensa y se reintenta (conserva el comportamiento de hoy). El caso
+  QC-63 R16 tensado con nota fechada; las entradas de los tests existentes ganan `stepPosition`.
+- **T25**: la única lista existente que cambia es la de deps del test R25 (`['log','now','orders','transaction']`),
+  con nota fechada. `deps.log` se declara (§3.3) pero la escritura usa el `log` de `run`.
+- **Consumidores rotos hasta T12/T13** (esperado): `lib/composition/index.ts`,
+  `tests/unit/asignaciones/authorization.test.ts` (2 rojos por dobles sin `transaction`), integraciones
+  `batch-states`, `finished-orders`, `responsible-eligibility`; `asignaciones/module-contract` rojo hasta
+  que T12 meta los dos archivos nuevos en `CASOS_DE_USO_QC63`.
+
+### Mutaciones
+
+- T8/T9: 12, todas rojas; quitar la comprobación de `BLOQUEADO` en `recordStepMove` ⇒ 2 rojos.
+- T10: quitar el aborto ante no-éxito ⇒ 9 rojos. T11: destino `ENTREGADO` ⇒ 3 rojos; sin compensación al
+  fallar `append` ⇒ rojo el caso R24 de `deleteOne`.
+- T25: 10, todas rojas; comparar con `'ok'` en Terminar ⇒ 7 rojos; `already_mine` anota ⇒ 1 rojo;
+  `already_mine` aborta ⇒ 2; log/orders globales en vez de los de `run` ⇒ 4 y 4.

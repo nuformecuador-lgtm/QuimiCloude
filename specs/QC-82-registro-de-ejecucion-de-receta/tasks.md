@@ -186,7 +186,7 @@ del registro no contiene `update`, `upsert` ni `delete` sobre el modelo (R31); `
 `guard-arquitectura-modulos` verdes.
 **Depende de:** T1, T6.
 
-### T8 [ ] [P] — `recordStepMove`
+### T8 [x] [P] — `recordStepMove`
 **Toca:** `lib/modules/asignaciones/domain/record-step-move.ts`,
 `tests/unit/asignaciones/record-step-move.test.ts`,
 `tests/unit/asignaciones/order-state.test.ts` (solo si existe como archivo propio)
@@ -205,7 +205,7 @@ escriben; `POR_EMPACAR`/`EN_EMPAQUE` con **`order_produced_frozen`** y `BLOQUEAD
 R43, A2).
 **Depende de:** T6; la P3 respondida.
 
-### T9 [ ] [P] — `cancelAssignedOrder`
+### T9 [x] [P] — `cancelAssignedOrder`
 **Toca:** `lib/modules/asignaciones/domain/cancel-assigned-order.ts`,
 `tests/unit/asignaciones/cancel-assigned-order.test.ts`
 **Hacer:** `design.md > 3.3`. El motivo con `cancelOrderSchema.shape.reason` del barril de `pedidos`.
@@ -225,7 +225,7 @@ nota fechada); un `BLOQUEADO` cancela por `'ok'` (R29, B1); el actor no necesita
 ni `asignaciones.modificar` (R30).
 **Depende de:** T6; la P3 respondida.
 
-### T10 [ ] — `startAssignedOrder`: arrancar y retomar
+### T10 [x] — `startAssignedOrder`: arrancar y retomar
 **Toca:** `lib/modules/asignaciones/domain/start-assigned-order.ts`,
 `lib/modules/asignaciones/domain/assigned-order-execution-view.ts`,
 `tests/unit/asignaciones/start-assigned-order.test.ts`
@@ -245,7 +245,7 @@ sin anotaciones ⇒ 1 (R14); si `append(resume)` lanza, `startAssignedOrder` lan
 basta (R26); cualquier desenlace distinto de `'ok'` aborta sin `append` (R24).
 **Depende de:** T6.
 
-### T11 [ ] — `finishAssignedOrder`: finalizar
+### T11 [x] — `finishAssignedOrder`: finalizar
 **Toca:** `lib/modules/asignaciones/domain/finish-assigned-order.ts`,
 `tests/unit/asignaciones/finish-assigned-order.test.ts`
 **Hacer:** entrada `{ orderId, stepPosition }` (estricta); transición a **`POR_EMPACAR`** (**A1** — el
@@ -498,7 +498,7 @@ renombrar la de esta ficha con uno posterior, aplicar `db:rollback` + `db:migrat
 afirma en verde.
 **Depende de:** T1; se repite en cada sincronización con `dev`.
 
-### T25 [ ] [P] — `startPacking` y `finishPacking` anotan
+### T25 [x] [P] — `startPacking` y `finishPacking` anotan
 **Toca:** `lib/modules/asignaciones/domain/start-packing.ts`,
 `lib/modules/asignaciones/domain/finish-packing.ts`,
 `tests/unit/asignaciones/start-packing.test.ts`,
