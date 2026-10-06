@@ -443,6 +443,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261004170000_product_batches_require_product_unit',
   // Los pasos de envasado de la receta; no toca el identificador.
   '20261005120000_recipe_packing_steps',
+  // El registro de importaciones de inventario; no toca el identificador.
+  '20261006120000_inventory_imports',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -501,14 +503,17 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // humana y su fila en `docs/dependencias.md`: de 37 a 38.
 // El 2026-10-05 entro `@anthropic-ai/sdk` -el cliente oficial para leer un PDF con Claude-, con
 // los cuatro checks, aprobacion humana y su fila en `docs/dependencias.md`: de 38 a 39.
+// El 2026-10-06 entraron `read-excel-file` y `papaparse` -leer la hoja y el CSV de la
+// importacion de inventario- y, como devDependency, `@types/papaparse`, con los cuatro checks,
+// aprobacion humana y su fila en `docs/dependencias.md`: de 39 a 41 y de 20 a 21.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 39
-export const DEV_DEPENDENCIAS_ESPERADAS = 20
+export const DEPENDENCIAS_ESPERADAS = 41
+export const DEV_DEPENDENCIAS_ESPERADAS = 21
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */
 export const FRAGMENTOS_PROHIBIDOS = ['uuid', 'nanoid', 'cuid', 'crypto'] as const
