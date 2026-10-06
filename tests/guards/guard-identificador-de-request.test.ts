@@ -271,6 +271,10 @@ export const E2E_ESPERADOS = [
   // nada sobre el identificador de peticion ni sobre `reference`, asi que el diferimiento de
   // QC-71 R21 sigue INTACTO.
   'pasos-de-envasado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la importacion de inventario desde un .csv:
+  // vista previa, alta de la unidad que falta, confirmacion, lotes y archivo de errores. No lee ni
+  // afirma nada sobre el identificador de peticion.
+  'inventario-importar.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
