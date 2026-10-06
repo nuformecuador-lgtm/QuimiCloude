@@ -1145,10 +1145,18 @@ describe('R38 — el historial de un lote une los dos libros, del mas reciente a
 
       const reserva = (historial ?? []).find((entry) => entry.kind === 'reserve');
       expect(reserva).toEqual(
-        expect.objectContaining({ quantity: '4.0000', orderNumberText: orderId, authorName: fixture.actorId }),
+        expect.objectContaining({
+          quantity: '4.0000',
+          orderNumberText: orderId,
+          authorName: fixture.actorId,
+          previousStock: null,
+          countedStock: null,
+        }),
       );
       const alta = (historial ?? []).find((entry) => entry.kind === 'opening');
-      expect(alta).toEqual(expect.objectContaining({ orderNumberText: null, reason: null }));
+      expect(alta).toEqual(
+        expect.objectContaining({ orderNumberText: null, reason: null, previousStock: null, countedStock: null }),
+      );
     } finally {
       await dropFixture(fixture, [productId], [orderId]);
     }

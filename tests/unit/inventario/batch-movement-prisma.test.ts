@@ -165,6 +165,8 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         orderNumberText: null,
         authorName: ACTOR_ID,
         createdAt: '2026-09-17T14:00:00.000Z',
+        previousStock: null,
+        countedStock: null,
       },
       {
         id: 'movimiento-1',
@@ -174,6 +176,8 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         orderNumberText: null,
         authorName: ACTOR_ID,
         createdAt: AHORA.toISOString(),
+        previousStock: null,
+        countedStock: null,
       },
     ]);
 
@@ -222,6 +226,8 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         orderNumberText: 'pedido-1',
         authorName: ACTOR_ID,
         createdAt: '2026-09-17T12:00:00.000Z',
+        previousStock: null,
+        countedStock: null,
       },
       {
         id: 'movimiento-1',
@@ -231,6 +237,8 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         orderNumberText: null,
         authorName: ACTOR_ID,
         createdAt: '2026-09-17T10:00:00.000Z',
+        previousStock: null,
+        countedStock: null,
       },
     ]);
   });

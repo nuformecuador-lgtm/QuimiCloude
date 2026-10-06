@@ -114,9 +114,10 @@ existencia; la pantalla nunca la envía (R8).
 | `seenStock` | existencia vista, tal como la mostró la pantalla | `readOptionalFormString`, luego zod |
 | `reason` | uno de `MOVEMENT_REASONS` | `readOptionalFormString` |
 
-El campo `delta` desaparece. Un `countedStock` presente que no sea `^\d+(\.\d+)?$` devuelve, sin
-llamar al caso de uso, `{ status: 'error', code: 'invalid_input', message: 'El total contado no es
-un numero decimal valido.' }` (mismo mecanismo que hoy tiene `NUMERIC_FIELD_ERROR`).
+El campo `delta` desaparece. La action no prevalida el total: un `countedStock` no decimal lo
+rechaza el esquema del caso de uso con `invalid_input` (mensaje del catálogo), porque un estado
+`{ status: 'error' }` literal junto a la captura con `instanceof` dispara la guardia del traductor
+único del catálogo de errores (R23 de esa guardia).
 
 ```ts
 export type AdjustBatchStockFormState =

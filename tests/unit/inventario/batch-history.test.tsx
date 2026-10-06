@@ -30,6 +30,8 @@ function asiento(overrides: Partial<BatchHistoryEntry> = {}): BatchHistoryEntry 
     orderNumberText: null,
     authorName: 'Carla Duarte',
     createdAt: '2026-09-10T08:15:00.000Z',
+    previousStock: null,
+    countedStock: null,
     ...overrides,
   };
 }

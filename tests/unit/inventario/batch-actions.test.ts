@@ -11,6 +11,8 @@ import {
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/inventario';
+import { createAdjustBatchStock } from '@/lib/modules/inventario/domain/adjust-batch-stock';
+import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
 const {
   adjustBatchStockMock,
@@ -83,7 +85,8 @@ const INITIAL: AdjustBatchStockFormState = { status: 'idle' };
 
 const VALID_ADJUST_FIELDS = {
   batchId: BATCH_ID,
-  delta: '5',
+  countedStock: '5',
+  seenStock: '10',
   reason: 'merma',
 };
 
@@ -178,26 +181,42 @@ describe('adjustBatchStockAction', () => {
     });
   });
 
-  it('el delta que resta llega al caso de uso con su signo', async () => {
+  it('un total contado menor que la existencia vista llega al caso de uso como diferencia negativa', async () => {
     adjustBatchStockMock.mockResolvedValue({ stock: 3 });
 
-    await adjustBatchStockAction(INITIAL, formDataOf({ ...VALID_ADJUST_FIELDS, delta: '-7' }));
-
-    const [candidato] = adjustBatchStockMock.mock.calls[0] as [Record<string, unknown>];
-    expect(candidato).toEqual({ batchId: BATCH_ID, delta: '-7', reason: 'merma' });
-  });
-
-  it('rechaza un delta que no es un decimal valido, sin llamar al caso de uso', async () => {
-    const result = await adjustBatchStockAction(
+    await adjustBatchStockAction(
       INITIAL,
-      formDataOf({ ...VALID_ADJUST_FIELDS, delta: '1e3' }),
+      formDataOf({ ...VALID_ADJUST_FIELDS, countedStock: '3', seenStock: '10' }),
     );
 
-    expect(result.status).toBe('error');
-    if (result.status !== 'error') throw new Error('estado inesperado');
-    expect(result.code).toBe('invalid_input');
-    expect(adjustBatchStockMock).not.toHaveBeenCalled();
+    const [candidato] = adjustBatchStockMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato).toEqual({ batchId: BATCH_ID, delta: '-7.0000', reason: 'merma' });
   });
+
+  it.each(['1e3', 'doce', '-3', '12.'])(
+    'un total contado %j no decimal termina en invalid_input del caso de uso, sin escribir',
+    async (countedStock) => {
+      const repoAdjust = vi.fn();
+      const casoDeUsoReal = createAdjustBatchStock({
+        products: { adjustBatchStock: repoAdjust } as unknown as ProductRepository,
+      });
+      adjustBatchStockMock.mockImplementation(casoDeUsoReal);
+
+      const result = await adjustBatchStockAction(
+        INITIAL,
+        formDataOf({ ...VALID_ADJUST_FIELDS, countedStock }),
+      );
+
+      const [candidato] = adjustBatchStockMock.mock.calls[0] as [Record<string, unknown>];
+      expect(candidato.delta).toBeUndefined();
+      expect(result).toEqual({
+        status: 'error',
+        code: 'invalid_input',
+        message: errorMessage('invalid_input'),
+      });
+      expect(repoAdjust).not.toHaveBeenCalled();
+    },
+  );
 
   it('el motivo viaja tal cual: la forma la valida el caso de uso y devuelve invalid_input', async () => {
     adjustBatchStockMock.mockRejectedValue(new ValidationError());

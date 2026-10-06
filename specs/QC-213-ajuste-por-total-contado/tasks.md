@@ -10,7 +10,7 @@
 
 ---
 
-## T0 — Publicar el contrato (bloquea todo lo demás)
+## [x] T0 — Publicar el contrato (bloquea todo lo demás)
 
 Implementa `design.md > 1` tal cual, con el stub de `design.md > 1.8`.
 
@@ -122,7 +122,7 @@ Archivos: `tests/unit/inventario/batch-actions.test.ts`.
 Casos: `R8` la action pasa exactamente `{ batchId, countedStock, seenStock, reason }` al caso de uso;
 `R13` `BatchStockChangedError` → `{ status: 'stock_changed', code, message, currentStock }` sin
 pasar por el traductor; `R20` `success` con `overReserved`; total no numérico → `invalid_input`
-con el mensaje del campo y sin llamar al caso de uso; `adjustment_reason_not_allowed` llega como
+con el mensaje del catálogo (lo rechaza el caso de uso); `adjustment_reason_not_allowed` llega como
 `ErrorState`.
 
 **Hecho cuando:** archivo en verde; `./init.sh --rapido` en verde.

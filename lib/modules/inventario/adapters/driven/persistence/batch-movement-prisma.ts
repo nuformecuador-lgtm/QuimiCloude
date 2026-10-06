@@ -79,6 +79,8 @@ function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
     orderNumberText: row.orderId,
     authorName: row.createdBy,
     createdAt: row.createdAt.toISOString(),
+    previousStock: null,
+    countedStock: null,
   };
 }
 
@@ -92,6 +94,8 @@ function toReservationHistoryEntry(row: ReservationMovementRow): BatchHistoryEnt
     orderNumberText: row.orderId,
     authorName: row.createdBy,
     createdAt: row.createdAt.toISOString(),
+    previousStock: null,
+    countedStock: null,
   };
 }
 

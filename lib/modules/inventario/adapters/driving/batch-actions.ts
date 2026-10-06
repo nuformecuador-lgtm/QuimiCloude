@@ -1,9 +1,11 @@
 'use server';
 
 import { identity, inventario, observabilidad } from '@/lib/composition';
-import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import {
+  BatchStockChangedError,
   InventarioError,
+  describeAdjustment,
   type Actor,
   type BatchHistoryEntry,
   type ProductBatchView,
@@ -15,6 +17,12 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 export type AdjustBatchStockFormState =
   | { status: 'idle' }
   | { status: 'success'; stock: string; reserved: string; overReserved: boolean }
+  | {
+      status: 'stock_changed';
+      code: 'batch_stock_changed';
+      message: string;
+      currentStock: string;
+    }
   | ErrorState;
 
 export type ProductBatchesResult =
@@ -27,13 +35,6 @@ export type BatchMovementsResult =
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
 
-const NUMERIC_FIELD_ERROR = 'La cantidad del ajuste no es un numero decimal valido.';
-
-const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
-
-/** Distinto de `undefined`, que significa campo ausente y lo rechaza el esquema del caso de uso. */
-const INVALID_NUMBER = Symbol('invalid-number');
-
 function readOptionalFormString(formData: FormData, name: string): string | undefined {
   const value = formData.get(name);
   if (typeof value !== 'string' || value.trim() === '') return undefined;
@@ -41,18 +42,24 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
 }
 
 /**
- * El signo se conserva: el ajuste que resta llega negativo. El patron va antes de pasar el
- * valor al caso de uso, porque sin el `'1e3'` pasaria como decimal valido.
+ * Puente mientras el caso de uso siga pidiendo la diferencia en vez del total contado. Una lectura
+ * sin diferencia valida deja el campo ausente, y el caso de uso la rechaza despues del permiso.
  */
-function readOptionalFormDecimal(
-  formData: FormData,
-  name: string,
-): string | undefined | typeof INVALID_NUMBER {
-  const value = formData.get(name);
-  if (typeof value !== 'string' || value.trim() === '') return undefined;
-  const trimmed = value.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return INVALID_NUMBER;
-  return trimmed;
+function toDeltaCandidate(candidate: {
+  batchId: string | undefined;
+  countedStock: string | undefined;
+  seenStock: string | undefined;
+  reason: string | undefined;
+}): { batchId: string | undefined; delta: string | undefined; reason: string | undefined } {
+  const reading =
+    candidate.countedStock === undefined || candidate.seenStock === undefined
+      ? 'invalid'
+      : describeAdjustment(candidate.seenStock.trim(), candidate.countedStock.trim());
+  return {
+    batchId: candidate.batchId,
+    delta: typeof reading === 'string' ? undefined : reading.difference,
+    reason: candidate.reason,
+  };
 }
 
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
@@ -83,23 +90,31 @@ export async function adjustBatchStockAction(
 ): Promise<AdjustBatchStockFormState> {
   void prevState;
 
-  const delta = readOptionalFormDecimal(formData, 'delta');
-  if (delta === INVALID_NUMBER) {
-    return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
-  }
-
   const candidate = {
     batchId: readOptionalFormString(formData, 'batchId'),
-    delta,
+    countedStock: readOptionalFormString(formData, 'countedStock'),
+    seenStock: readOptionalFormString(formData, 'seenStock'),
     reason: readOptionalFormString(formData, 'reason'),
   };
 
   const actor = await currentActor();
 
   try {
-    const { stock, reserved, overReserved } = await inventario.adjustBatchStock(candidate, actor);
+    const { stock, reserved, overReserved } = await inventario.adjustBatchStock(
+      toDeltaCandidate(candidate),
+      actor,
+    );
     return { status: 'success', stock, reserved, overReserved };
   } catch (error) {
+    // `toErrorState` arma el estado campo a campo y perderia `currentStock`.
+    if (error instanceof BatchStockChangedError) {
+      return {
+        status: 'stock_changed',
+        code: error.code,
+        message: error.message,
+        currentStock: error.currentStock,
+      };
+    }
     return toErrorState(error);
   }
 }

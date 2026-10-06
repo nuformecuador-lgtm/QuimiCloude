@@ -339,6 +339,8 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       orderNumberText: null,
       authorName: 'usuario-conocido',
       createdAt: '2026-09-18T10:00:00.000Z',
+      previousStock: null,
+      countedStock: null,
     },
     {
       id: 'asiento-2',
@@ -348,6 +350,8 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       orderNumberText: null,
       authorName: 'usuario-desaparecido',
       createdAt: '2026-09-17T10:00:00.000Z',
+      previousStock: null,
+      countedStock: null,
     },
   ];
 
