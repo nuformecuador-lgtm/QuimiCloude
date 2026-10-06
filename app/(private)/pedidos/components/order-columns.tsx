@@ -8,7 +8,7 @@ import {
   type OrderPresentationLineView,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import {
@@ -130,6 +130,7 @@ function formatRequestDate(value: Date): string {
 export type OrderColumnsDeps = {
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /**
    * QC-102 R16, R26 — los responsables **ya repartidos por fila** por el Server Component de la
    * seccion: un `Record` plano y serializable, `orderId` → responsables de ese pedido. Aqui no se
@@ -169,6 +170,7 @@ function distributionLabelLine(line: OrderPresentationLineView) {
 export function buildOrderColumns({
   recipes,
   units,
+  bridge,
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
@@ -281,6 +283,7 @@ export function buildOrderColumns({
           order={order}
           recipes={recipes}
           units={units}
+          bridge={bridge}
           // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
@@ -301,6 +304,7 @@ export function buildOrderColumns({
           order={order}
           recipes={recipes}
           units={units}
+          bridge={bridge}
           // QC-102 R24, R26: la entrada «Responsables» abre el panel con lo que el lote YA trajo
           // para esta fila. Sin esto, el panel abriria vacio y tendria que consultar.
           responsibles={responsiblesByOrder[order.id] ?? []}

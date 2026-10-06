@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -28,6 +28,8 @@ import { normalizeProductName } from '../../../domain/product-name';
  * un `AND` aparte del filtro por identificadores: un producto de otra empresa se resuelve
  * exactamente igual que uno inexistente, simplemente no vuelve.
  */
+
+type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 type ProductCatalogRow = {
   readonly id: string;
@@ -65,8 +67,9 @@ type ProductStockRow = {
 async function findAliveProducts(
   ids: readonly ProductId[],
   scope: InventoryScope,
+  db: PrismaLike,
 ): Promise<readonly ProductStockRow[]> {
-  const rows = await prisma.product.findMany({
+  const rows = await db.product.findMany({
     where: {
       AND: [productCompanyScope(scope), { id: { in: [...ids] }, deletedAt: null }],
     },
@@ -78,10 +81,11 @@ async function findAliveProducts(
 export async function findProductRefs(
   ids: readonly ProductId[],
   companyId: string,
+  db: PrismaLike = prisma,
 ): Promise<readonly ProductRef[]> {
   if (ids.length === 0) return [];
 
-  const rows = await findAliveProducts(ids, { companyId });
+  const rows = await findAliveProducts(ids, { companyId }, db);
 
   return rows.map((row) =>
     toProductRef({

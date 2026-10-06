@@ -75,6 +75,7 @@ function fuentesDe(dir: string): readonly string[] {
 const units: UnitCatalog = {
   findRefs: vi.fn(async () => []),
   listVisibleRefs: () => Promise.reject(new Error('no se usa')),
+  findMassVolumeBridge: () => Promise.reject(new Error('no se usa')),
   findRefsSharingBaseInCompany: vi.fn(async () => {
     throw new Error('proveedores no pide unidades hermanas de base');
   }),

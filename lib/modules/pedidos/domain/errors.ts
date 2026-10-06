@@ -216,6 +216,16 @@ export class OrderWouldBlockError extends PedidosError {
   }
 }
 
+/** La cantidad del pedido no se puede llevar a la unidad de algun insumo de su receta. Se
+ *  lanza antes de escribir nada; el diagnostico lleva los productos afectados. */
+export class OrderUnitNotConvertibleError extends PedidosError {
+  readonly code = 'order_unit_not_convertible';
+
+  constructor(diagnostic?: string) {
+    super('order_unit_not_convertible', diagnostic);
+  }
+}
+
 /** El pedido no tiene ninguna linea de reparto: no se puede empezar el empaque sin saber en que
  *  presentaciones se entrega. */
 export class OrderWithoutDistributionError extends PedidosError {

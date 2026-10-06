@@ -1,11 +1,13 @@
 // lib/modules/pedidos/domain/order-requirement.ts
 //
-// Dominio puro: sin Prisma, sin framework, sin reloj. La cantidad necesaria de cada linea es
-// `consumedQuantity(orderQuantity, percentage)`, la misma formula que ya usan el coste y la
-// tabla de ingredientes: no hay una segunda multiplicacion propia de este modulo.
+// Dominio puro: sin Prisma, sin framework, sin reloj. La cantidad necesaria de cada linea sale de
+// `resolveLineNeed`, la misma que usan el coste y la tabla de ingredientes: no hay una segunda
+// multiplicacion ni una segunda conversion propias de este modulo.
 
-import { consumedQuantity } from '@/lib/modules/recetas';
 import type { ReservationRequirementLine } from '@/lib/modules/inventario';
+import type { UnitConversion } from '@/lib/modules/unidades';
+
+import { resolveLineNeed, type LineNeedUnits } from './order-line-need';
 
 /** Linea de receta con lo minimo que hace falta para calcular la necesidad. */
 export type RequirementSourceLine = {
@@ -26,16 +28,37 @@ export type PackagingRequirementLine = {
  */
 export type OrderRequirementPhase = 'before_consumption' | 'materials_consumed';
 
-/** La necesidad de cada linea de receta para `orderQuantity` unidades del pedido, en la unidad
- *  del producto. Una receta sin lineas da una necesidad vacia. */
+/** Las unidades con las que se convierte la necesidad. Un producto que no esta en
+ *  `productUnits` se trata como un insumo sin unidad. */
+export type RequirementUnits = LineNeedUnits & {
+  readonly productUnits: ReadonlyMap<string, UnitConversion | null>;
+};
+
+/** `not_convertible` lleva los productos cuya linea no se pudo llevar a su unidad, sin repetir. */
+export type RecipeRequirement =
+  | { readonly kind: 'ok'; readonly lines: readonly ReservationRequirementLine[] }
+  | { readonly kind: 'not_convertible'; readonly productIds: readonly string[] };
+
+/** La necesidad de cada linea de receta para `orderQuantity` del pedido, en la unidad del
+ *  producto. Una receta sin lineas da una necesidad vacia. */
 export function buildRequirement(
   lines: readonly RequirementSourceLine[],
   orderQuantity: string,
-): readonly ReservationRequirementLine[] {
-  return lines.map((line) => ({
-    productId: line.productId,
-    quantity: consumedQuantity(orderQuantity, line.percentage),
-  }));
+  units: RequirementUnits,
+): RecipeRequirement {
+  const converted: ReservationRequirementLine[] = [];
+  const notConvertible = new Set<string>();
+  for (const line of lines) {
+    const need = resolveLineNeed(orderQuantity, line.percentage, units.productUnits.get(line.productId) ?? null, units);
+    if (need.kind === 'not_convertible') {
+      notConvertible.add(line.productId);
+    } else {
+      converted.push({ productId: line.productId, quantity: need.quantity });
+    }
+  }
+  return notConvertible.size > 0
+    ? { kind: 'not_convertible', productIds: [...notConvertible] }
+    : { kind: 'ok', lines: converted };
 }
 
 /** Los envases de unas lineas del reparto; las antiguas, sin envase, no aportan ninguno. */
@@ -52,15 +75,21 @@ export type OrderRequirementInput = {
   readonly quantity: string;
   readonly packagingLines: readonly PackagingRequirementLine[];
   readonly phase: OrderRequirementPhase;
+  readonly units: RequirementUnits;
 };
 
 /**
  * La necesidad completa del pedido: la unica que se pasa a `syncForOrder`, que libera lo apartado
  * de cualquier producto que no venga aqui. Un mismo producto en dos lineas sale una vez, con la
- * suma.
+ * suma, que se hace ya en la unidad del producto.
  */
-export function buildOrderRequirement(input: OrderRequirementInput): readonly ReservationRequirementLine[] {
-  const recipe = input.phase === 'before_consumption' ? buildRequirement(input.recipeLines, input.quantity) : [];
+export function buildOrderRequirement(input: OrderRequirementInput): RecipeRequirement {
+  const recipeRequirement: RecipeRequirement =
+    input.phase === 'before_consumption'
+      ? buildRequirement(input.recipeLines, input.quantity, input.units)
+      : { kind: 'ok', lines: [] };
+  if (recipeRequirement.kind === 'not_convertible') return recipeRequirement;
+  const recipe = recipeRequirement.lines;
   const packaging = input.packagingLines.map((line) => ({
     productId: line.productId,
     quantity: String(line.packages),
@@ -71,7 +100,7 @@ export function buildOrderRequirement(input: OrderRequirementInput): readonly Re
     const previous = byProduct.get(line.productId);
     byProduct.set(line.productId, previous === undefined ? line.quantity : addExact(previous, line.quantity));
   }
-  return [...byProduct].map(([productId, quantity]) => ({ productId, quantity }));
+  return { kind: 'ok', lines: [...byProduct].map(([productId, quantity]) => ({ productId, quantity })) };
 }
 
 const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;

@@ -18,7 +18,7 @@ import {
 } from '@/app/(private)/pedidos/components';
 
 /** Los catalogos del panel no importan aqui: se pasan vacios porque la FACTORIA los exige. */
-const ORDER_COLUMNS = buildOrderColumns({ recipes: { items: [], totalPages: 1 }, units: [] });
+const ORDER_COLUMNS = buildOrderColumns({ recipes: { items: [], totalPages: 1 }, units: [], bridge: null });
 
 afterEach(() => {
   cleanup();

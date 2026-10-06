@@ -213,6 +213,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
         ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'Unidad', symbol: null, baseUnitId: null, factor: null }] : [],
       ),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
+      findMassVolumeBridge: vi.fn(async () => null),
     } as unknown as UnitCatalog
     const presentations = {
       findRefs: vi.fn(async () => [{ id: PRESENTACION, name: 'Bidon 20L' }]),

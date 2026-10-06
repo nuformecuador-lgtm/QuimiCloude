@@ -102,6 +102,7 @@ describe('resolveIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -119,6 +120,7 @@ describe('resolveIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -141,6 +143,7 @@ describe('resolveIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -159,6 +162,7 @@ describe('resolveIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -184,6 +188,7 @@ describe('resolveIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -210,7 +215,7 @@ describe('resolveIngredientsCost', () => {
     const prod = catalogoDeProductos(refs, batches);
     const uni = catalogoDeUnidades();
 
-    await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
+    await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', null, COMPANY_ID);
 
     expect(cat.findExecutionContentById).toHaveBeenCalledTimes(1);
     expect(prod.findRefs).toHaveBeenCalledTimes(1);
@@ -228,8 +233,8 @@ describe('resolveIngredientsCost', () => {
     );
     const uni = catalogoDeUnidades();
 
-    const con200 = await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
-    const con300 = await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '300.0000', COMPANY_ID);
+    const con200 = await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', null, COMPANY_ID);
+    const con300 = await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '300.0000', null, COMPANY_ID);
 
     // 200 * 10 % = 20 -> 20.0000; 300 * 10 % = 30 -> 30.0000; misma proporcion que las cantidades
     // de pedido (2:3), con los mismos porcentajes.
@@ -242,7 +247,7 @@ describe('resolveIngredientsCost', () => {
     const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }], [lote()]);
     const uni = catalogoDeUnidades();
 
-    await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
+    await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', null, COMPANY_ID);
     expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: undefined });
 
     await resolveIngredientsCost(
@@ -251,6 +256,7 @@ describe('resolveIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
       { orderId: 'pedido-1' },
     );
@@ -279,6 +285,7 @@ describe('resolveLotIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -301,6 +308,7 @@ describe('resolveLotIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -318,6 +326,7 @@ describe('resolveLotIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
     );
 
@@ -335,6 +344,7 @@ describe('resolveLotIngredientsCost', () => {
       uni.units,
       RECIPE_ID,
       '200.0000',
+      null,
       COMPANY_ID,
       { orderId: 'pedido-1' },
     );

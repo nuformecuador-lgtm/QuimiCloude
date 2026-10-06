@@ -8,9 +8,9 @@ import { toDistributionLines, unitLabelOf } from './order-distribution-view';
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
-import { formatOrderNumber, type OrderCatalog } from '@/lib/modules/pedidos';
+import { formatOrderNumber, resolveLineNeed, type OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
-import { consumedQuantity, type RecipeCatalog } from '@/lib/modules/recetas';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 const getAssignedOrderExecutionSchema = z.strictObject({
@@ -86,8 +86,12 @@ export function createGetAssignedOrderExecution(
           .filter((unitId): unitId is string => unitId !== null),
       ),
     ];
-    const ownUnits = unitIds.length > 0 ? await deps.units.findRefs(unitIds, actor.companyId) : [];
+    const orderUnitId = summary.unitId;
+    const unitIdsToRead = orderUnitId === null ? unitIds : [...new Set([...unitIds, orderUnitId])];
+    const ownUnits = unitIdsToRead.length > 0 ? await deps.units.findRefs(unitIdsToRead, actor.companyId) : [];
     const ownUnitsById = new Map(ownUnits.map((unit) => [unit.id, unit]));
+    const orderUnit = orderUnitId === null ? null : ownUnitsById.get(orderUnitId) ?? null;
+    const bridge = orderUnitId === null ? null : await deps.units.findMassVolumeBridge();
 
     const sisterUnits =
       unitIds.length > 0
@@ -113,10 +117,13 @@ export function createGetAssignedOrderExecution(
               (sister) => sister.id !== unit.id,
             );
 
+      const need = resolveLineNeed(summary.quantity, line.percentage, unit, { orderUnitId, orderUnit, bridge });
+
       return {
         productName: productRef?.name ?? null,
         percentage: line.percentage,
-        quantity: consumedQuantity(summary.quantity, line.percentage),
+        quantity: need.kind === 'not_convertible' ? null : need.quantity,
+        need: need.kind,
         unit,
         alternativeUnits,
       };
@@ -128,12 +135,6 @@ export function createGetAssignedOrderExecution(
         ? []
         : await deps.presentations.findRefs(presentationIds, actor.companyId);
     const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
-
-    const orderUnitId = summary.unitId;
-    const orderUnit =
-      orderUnitId === null
-        ? undefined
-        : (await deps.units.findRefs([orderUnitId], actor.companyId)).find((unit) => unit.id === orderUnitId);
 
     return {
       orderId: summary.id,
@@ -149,7 +150,7 @@ export function createGetAssignedOrderExecution(
       })),
       presentationLines: toDistributionLines(summary.presentationLines, presentationNames),
       unitId: summary.unitId,
-      unitLabel: orderUnit === undefined ? null : unitLabelOf(orderUnit),
+      unitLabel: orderUnit === null ? null : unitLabelOf(orderUnit),
     };
   };
 }

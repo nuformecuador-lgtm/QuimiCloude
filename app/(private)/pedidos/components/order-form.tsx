@@ -48,7 +48,7 @@ import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-a
 import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
@@ -62,7 +62,7 @@ import {
   OrderDistributionField,
 } from './order-distribution-field';
 import { OrderField } from './order-field';
-import { OrderIngredientsTable } from './order-ingredients-table';
+import { ingredientNeedOf, OrderIngredientsTable } from './order-ingredients-table';
 import { OrderRecipeImage } from './order-recipe-image';
 import {
   RECIPE_FIELD,
@@ -373,6 +373,8 @@ export type OrderFormProps = {
    * receta elegida. `recetas` no resuelve unidades (R50), asi que lo hace esta pantalla.
    */
   readonly units: readonly UnitView[];
+  /** Puente masa-volumen del catalogo; `null` si el catalogo no lo tiene. */
+  readonly bridge: MassVolumeBridge | null;
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R35). */
   readonly onSaved: () => void;
   /**
@@ -395,6 +397,7 @@ export function OrderForm({
   order,
   recipes,
   units,
+  bridge,
   onSaved,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
@@ -492,6 +495,12 @@ export function OrderForm({
   // en vuelo, asi que el estado arranca en `true` y el efecto no tiene que pintarlo a posteriori.
   const [ingredientsLoading, setIngredientsLoading] = useState(isEdit);
   const [ingredientsError, setIngredientsError] = useState<string | null>(null);
+  // Se calcula aqui y no viaja en la cotizacion: la edicion abre con el importe guardado sin cotizar.
+  const costApproximate =
+    quote.state.amount !== null &&
+    ingredients.some(
+      (line) => ingredientNeedOf(line, quantity, unitId, units, bridge)?.kind === 'approximate',
+    );
   const ingredientsRequestRef = useRef(0);
 
   /**
@@ -538,14 +547,14 @@ export function OrderForm({
       setRecipe(null);
       setIngredients([]);
       setIngredientsError(null);
-      quote.onRecipeChange(null, quantity);
+      quote.onRecipeChange(null, quantity, unitId);
       return;
     }
     setRecipe({ id: option.id, name: option.name, imageUrl: option.imageUrl });
     setIngredientsLoading(true);
     setIngredientsError(null);
     loadIngredients(option.id);
-    quote.onRecipeChange(option.id, quantity);
+    quote.onRecipeChange(option.id, quantity, unitId);
   }
 
   function chooseVersion(nextVersionId: string | null) {
@@ -555,7 +564,7 @@ export function OrderForm({
     setIngredientsLoading(true);
     setIngredientsError(null);
     loadIngredients(nextRecipeId);
-    quote.onRecipeChange(nextRecipeId, quantity);
+    quote.onRecipeChange(nextRecipeId, quantity, unitId);
   }
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
@@ -784,7 +793,7 @@ export function OrderForm({
                   defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
                   onValueChange={(value) => {
                     setQuantity(value);
-                    quote.onQuantityChange(effectiveRecipeId, value);
+                    quote.onQuantityChange(effectiveRecipeId, value, unitId);
                   }}
                   error={fieldErrors.quantity}
                 />
@@ -794,7 +803,10 @@ export function OrderForm({
                 <PresentationUnitSelect
                   units={units}
                   value={unitId}
-                  onValueChange={setUnitId}
+                  onValueChange={(next) => {
+                    setUnitId(next);
+                    quote.onUnitChange(effectiveRecipeId, quantity, next);
+                  }}
                   error={fieldErrors.unitId}
                 />
               </div>
@@ -820,7 +832,7 @@ export function OrderForm({
               lines={lines}
               onLinesChange={(next) => {
                 setLines(next);
-                quote.onDistributionChange(effectiveRecipeId, quantity, next);
+                quote.onDistributionChange(effectiveRecipeId, quantity, unitId, next);
               }}
               unitId={unitId}
               compatibleUnitIds={compatibleIds}
@@ -834,7 +846,7 @@ export function OrderForm({
 
             {/* El bloque de coste: DEBAJO de la fila, no entre los campos. Fuera de la condicion
                 de receta elegida, para verse con guion sin receta. */}
-            <OrderCostQuote {...quote.state} />
+            <OrderCostQuote {...quote.state} approximate={costApproximate} />
           </div>
         </div>
 
@@ -848,6 +860,8 @@ export function OrderForm({
             lines={ingredients}
             units={units}
             quantity={quantity}
+            orderUnitId={unitId}
+            bridge={bridge}
             loading={ingredientsLoading}
             error={ingredientsError}
           />

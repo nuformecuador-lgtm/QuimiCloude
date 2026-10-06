@@ -262,6 +262,10 @@ export const E2E_ESPERADOS = [
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
   'insumo-por-unidad.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el alta de un pedido en g y otro en ml sobre un
+  // insumo en kg: cantidad requerida, marca de aproximacion, costo cotizado y guardado y cantidad
+  // apartada. No lee ni afirma nada sobre el identificador de peticion.
+  'pedido-conversion-de-unidad.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el formulario de receta con pasos de
   // envasado, la ejecucion del Operador y el empaque paso a paso del Empacador. No lee ni afirma
   // nada sobre el identificador de peticion ni sobre `reference`, asi que el diferimiento de

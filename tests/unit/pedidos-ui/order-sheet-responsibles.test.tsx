@@ -190,6 +190,7 @@ function montarLista(
       totalPages={1}
       recipes={RECETAS}
       units={UNIDADES}
+      bridge={null}
       responsiblesByOrder={{ [PEDIDO_ID]: RESPONSABLES }}
       responsiblesCatalog={catalogo}
     />,

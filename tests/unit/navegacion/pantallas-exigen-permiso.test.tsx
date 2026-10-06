@@ -101,6 +101,7 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: actions.listUnitsAction,
+  getMassVolumeBridgeAction: vi.fn(),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({

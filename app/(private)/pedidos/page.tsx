@@ -3,8 +3,11 @@ import { Suspense } from 'react';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
-import type { UnitView } from '@/lib/modules/unidades';
+import {
+  getMassVolumeBridgeAction,
+  listUnitsAction,
+} from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { BRAND_LABEL, ORDERS_LABEL } from '@/lib/shared/navigation/private-nav';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
@@ -80,10 +83,12 @@ export const metadata: Metadata = {
 async function loadFormCatalogs(): Promise<{
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
 }> {
-  const [recipes, units] = await Promise.all([
+  const [recipes, units, bridge] = await Promise.all([
     listRecipesAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
     listUnitsAction(),
+    getMassVolumeBridgeAction(),
   ]);
 
   return {
@@ -100,6 +105,7 @@ async function loadFormCatalogs(): Promise<{
           }
         : { items: [], totalPages: FIRST_PAGE },
     units: units.status === 'success' ? units.data : [],
+    bridge: bridge.status === 'success' ? bridge.data : null,
   };
 }
 
@@ -110,7 +116,7 @@ export default async function PedidosPage({
 }) {
   await requirePagePermission('pedidos.consultar');
 
-  const [params, { recipes, units }] = await Promise.all([
+  const [params, { recipes, units, bridge }] = await Promise.all([
     searchParams.then(parseOrderListParams),
     loadFormCatalogs(),
   ]);
@@ -121,7 +127,7 @@ export default async function PedidosPage({
         <h1 data-testid="pedidos-title" className="text-2xl font-semibold">
           {ORDERS_LABEL}
         </h1>
-        <OrderSheet recipes={recipes} units={units} />
+        <OrderSheet recipes={recipes} units={units} bridge={bridge} />
       </div>
       {/*
         SIN `key`: remontar este limite en cada cambio de consulta destruia la barra de filtros y
@@ -130,7 +136,7 @@ export default async function PedidosPage({
         aqui cubre la primera carga.
       */}
       <Suspense fallback={<OrderListSkeleton rows={params.pageSize} />}>
-        <OrderListSection params={params} recipes={recipes} units={units} />
+        <OrderListSection params={params} recipes={recipes} units={units} bridge={bridge} />
       </Suspense>
     </div>
   );

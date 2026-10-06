@@ -9,6 +9,7 @@ import type { OrderStatus } from './order-classification';
 import { updateOrderSchema } from './order-input';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildOrderRequirement } from './order-requirement';
+import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
 import { packagingLinesOfInput, resolveDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
@@ -116,6 +117,7 @@ export function createUpdateOrder(
       deps,
       effectiveId,
       data.quantity,
+      data.unitId,
       packagingLinesOfInput(data.presentationLines),
       actor.companyId,
       { orderId: id },
@@ -145,13 +147,24 @@ export function createUpdateOrder(
 
       // La receta se lee con el cliente de ESTA transaccion, para ver la misma instantanea que
       // acaba de bloquear `lockAliveById`. La edicion solo llega antes de consumir la receta.
+      // Una linea no convertible rechaza la edicion antes del `UPDATE`.
       const content = await transaction.recipes.findExecutionContentById(effectiveId, actor.companyId);
-      const requirement = buildOrderRequirement({
-        recipeLines: content?.lines ?? [],
-        quantity: data.quantity,
-        packagingLines: distribution.packagingLines,
-        phase: 'before_consumption',
-      });
+      const recipeLines = content?.lines ?? [];
+      const units = await loadRequirementUnits(
+        transaction,
+        recipeLines.map((line) => line.productId),
+        data.unitId,
+        actor.companyId,
+      );
+      const requirement = requireConvertibleRequirement(
+        buildOrderRequirement({
+          recipeLines,
+          quantity: data.quantity,
+          packagingLines: distribution.packagingLines,
+          phase: 'before_consumption',
+          units,
+        }),
+      );
 
       const result = await transaction.orders.updateAlive(
         id,

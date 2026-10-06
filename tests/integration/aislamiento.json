@@ -59,6 +59,7 @@
     "recetas/recipe-lines.int.test.ts",
     "recetas/recipe-packing-steps-migration.int.test.ts",
     "recetas/recipe-versions-constraints.int.test.ts",
+    "unidades/mass-volume-bridge.int.test.ts",
     "unidades/unidades-constraints.int.test.ts"
   ],
   "commit": [
@@ -326,6 +327,11 @@
       "archivo": "pedidos/order-reservation-tools.int.test.ts",
       "motivo": "QC-194 T6 (R8-R10): crear, revisar bloqueados, pasar a curso y Finalizar con los casos de uso de `pedidos` cableados a mano con los adaptadores driven REALES de `pedidos`, `recetas`, `inventario` y `unidades`, igual que `order-reservation.int.test.ts`: `withOrderTransaction` y el alta de lotes abren SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, asi que una transaccion del test no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, productos con lotes, recetas con herramientas y pedidos) y la limpia en un `finally` en el orden de las FK (reservas -> asientos -> pedidos -> recetas, cuyas lineas y herramientas caen con ON DELETE CASCADE -> lotes -> productos -> presentacion -> unidad -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-03"
+    },
+    {
+      "archivo": "pedidos/order-unit-conversion.int.test.ts",
+      "motivo": "QC-204 T9: el alta ('createCreateOrder') y la lectura ('createGetOrder') cableadas a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', igual que 'order-reservation.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria. Usa las unidades de sistema gramo y kilogramo que siembran las migraciones, sin tocarlas. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, producto con lote, receta y pedido) y la limpia en un 'finally' por 'company_id'.",
+      "desde": "2026-10-05"
     },
     {
       "archivo": "pedidos/order-reservation.int.test.ts",

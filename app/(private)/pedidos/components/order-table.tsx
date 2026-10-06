@@ -8,7 +8,7 @@ import { DataTable, type DataTableParams, type DataTableTexts } from '@/componen
 import { buttonVariants } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
@@ -107,6 +107,7 @@ export type OrderTableProps = {
    */
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /**
    * QC-102 R16 — los responsables de la pagina, **ya repartidos por fila en el SERVIDOR**: un
    * `Record` plano y serializable. La tabla solo lo atraviesa hasta la celda; aqui no se agrupa,
@@ -135,6 +136,7 @@ export function OrderTable({
   totalPages,
   recipes,
   units,
+  bridge,
   responsiblesByOrder,
   responsiblesCatalog,
   coverageByOrder,
@@ -178,12 +180,13 @@ export function OrderTable({
       buildOrderColumns({
         recipes,
         units,
+        bridge,
         responsiblesByOrder,
         responsiblesCatalog,
         coverageByOrder,
         canEditDistribution,
       }),
-    [recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder, canEditDistribution],
+    [recipes, units, bridge, responsiblesByOrder, responsiblesCatalog, coverageByOrder, canEditDistribution],
   );
 
   /*

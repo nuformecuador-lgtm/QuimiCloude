@@ -5,6 +5,7 @@ import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/error
 import {
   UnidadesError,
   type Actor,
+  type MassVolumeBridge,
   type Page,
   type UnitView,
 } from '@/lib/modules/unidades';
@@ -114,6 +115,21 @@ export async function listUnitsAction(
 
   try {
     const data = await unidades.listUnits(query, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type MassVolumeBridgeResult =
+  | { status: 'success'; data: MassVolumeBridge | null }
+  | ErrorState;
+
+export async function getMassVolumeBridgeAction(): Promise<MassVolumeBridgeResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await unidades.getMassVolumeBridge(actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
