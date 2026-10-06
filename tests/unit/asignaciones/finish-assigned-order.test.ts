@@ -16,7 +16,17 @@ import {
   UnauthorizedError,
 } from '@/lib/modules/asignaciones/domain/errors';
 
+import {
+  ExecutionAbortedError,
+  type NewExecutionEntry,
+} from '@/lib/modules/asignaciones/domain/execution-entry';
+
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
+import type {
+  ExecutionTransaction,
+  ExecutionWriters,
+} from '@/lib/modules/asignaciones/ports/execution-transaction';
 import type {
   AssignmentRow,
   OrderAssignmentRepository,
@@ -50,6 +60,8 @@ const ACTOR: Actor = {
 
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
 
+const ENTRADA = { orderId: PEDIDO, stepPosition: 3 };
+
 // R15, R16: `transitionAliveById` yendo a `POR_EMPACAR` ya no da de alta ningun lote,
 // asi que el exito es el literal `'ok'`, sin `finishedGoods`.
 type TransitionResult = 'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines';
@@ -65,7 +77,12 @@ type Dobles = {
   readonly deleteOne: ReturnType<typeof vi.fn>;
   readonly findAliveRefsInCompany: ReturnType<typeof vi.fn>;
   readonly findSnapshotAliveInCompany: ReturnType<typeof vi.fn>;
+  readonly append: ReturnType<typeof vi.fn>;
+  readonly run: ReturnType<typeof vi.fn>;
+  readonly anotaciones: Anotacion[];
 };
+
+type Anotacion = { readonly entry: NewExecutionEntry; readonly dentroDeRun: boolean };
 
 function filaSuelta(userId: string): AssignmentRow {
   return { userId, workGroupId: null, workGroupName: null };
@@ -94,6 +111,7 @@ function montar(options?: {
   readonly filas?: readonly AssignmentRow[];
   readonly snapshots?: readonly (WorkGroupSnapshot | null)[];
   readonly personas?: readonly PersonRef[];
+  readonly appendFalla?: boolean;
 }): Dobles {
   const estados = [...(options?.ordenDeEstados ?? ['EN_CURSO'])];
   const resultados = [...(options?.transitionResults ?? ['ok' as const])];
@@ -114,6 +132,26 @@ function montar(options?: {
   const deleteOne = vi.fn(async () => 'ok' as const);
   const findAliveRefsInCompany = vi.fn(async () => options?.personas ?? []);
   const findSnapshotAliveInCompany = vi.fn(async () => snapshots.shift() ?? null);
+  const anotaciones: Anotacion[] = [];
+  let dentroDeRun = false;
+  const append = vi.fn(async (entry: NewExecutionEntry) => {
+    if (options?.appendFalla === true) throw new Error('la base no acepto la anotacion');
+    anotaciones.push({ entry, dentroDeRun });
+  });
+  const log: ExecutionLogRepository = { append, findLastStepPosition: vi.fn(async () => null) };
+  const writers = {
+    orders: { transitionAliveById, cancelAliveById: vi.fn() },
+    packing: { startPackingAliveById: vi.fn(), finishPackingAliveById: vi.fn() },
+    log,
+  } as unknown as ExecutionWriters;
+  const run = vi.fn(async (work: (w: ExecutionWriters) => Promise<unknown>) => {
+    dentroDeRun = true;
+    try {
+      return await work(writers);
+    } finally {
+      dentroDeRun = false;
+    }
+  });
 
   const deps: FinishAssignedOrderDeps = {
     assignments: {
@@ -131,6 +169,8 @@ function montar(options?: {
     } as unknown as OrderCatalog,
     people: { findAliveRefsInCompany } as unknown as PeopleDirectory,
     groups: { findSnapshotAliveInCompany } as unknown as WorkGroupDirectory,
+    log,
+    transaction: { run } as unknown as ExecutionTransaction,
     now: () => new Date('2026-09-17T12:00:00.000Z'),
   };
 
@@ -145,6 +185,9 @@ function montar(options?: {
     deleteOne,
     findAliveRefsInCompany,
     findSnapshotAliveInCompany,
+    append,
+    run,
+    anotaciones,
   };
 }
 
@@ -154,7 +197,7 @@ describe('finishAssignedOrder — autorizacion', () => {
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
     await expect(
-      finishAssignedOrder({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: PEDIDO }),
+      finishAssignedOrder({ id: ANA, companyId: EMPRESA, permissions: [] }, ENTRADA),
     ).rejects.toThrow(UnauthorizedError);
     expect(listOrderIdsByUserInCompany).not.toHaveBeenCalled();
     expect(findAliveById).not.toHaveBeenCalled();
@@ -165,7 +208,7 @@ describe('finishAssignedOrder — autorizacion', () => {
     const { deps, transitionAliveById } = montar();
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(null, { orderId: PEDIDO })).rejects.toBeInstanceOf(AsignacionesError);
+    await expect(finishAssignedOrder(null, ENTRADA)).rejects.toBeInstanceOf(AsignacionesError);
     expect(transitionAliveById).not.toHaveBeenCalled();
   });
 });
@@ -175,7 +218,7 @@ describe('finishAssignedOrder — R6: no es tuyo', () => {
     const { deps, findAliveById } = montar({ ids: [] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toMatchObject({
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toMatchObject({
       code: 'order_not_found',
     });
     expect(findAliveById).not.toHaveBeenCalled();
@@ -187,7 +230,7 @@ describe('finishAssignedOrder — R5: EN_CURSO transiciona a POR_EMPACAR', () =>
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['EN_CURSO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(transitionAliveById).toHaveBeenCalledWith(
       PEDIDO,
@@ -203,7 +246,7 @@ describe('finishAssignedOrder — R5: EN_CURSO transiciona a POR_EMPACAR', () =>
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['EN_CURSO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
   });
@@ -217,7 +260,7 @@ describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado re
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(findAliveById).toHaveBeenCalledTimes(2);
@@ -230,7 +273,7 @@ describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES 
     const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).resolves.toEqual({
       numberText: '2026-0000007',
     });
   });
@@ -241,7 +284,7 @@ describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES 
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     const [ordenLectura] = listAliveSummariesByIds.mock.invocationCallOrder;
     const [ordenTransicion] = transitionAliveById.mock.invocationCallOrder;
@@ -254,7 +297,7 @@ describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () =>
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['ENTREGADO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       OrderDeliveredFrozenError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
@@ -264,7 +307,7 @@ describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () =>
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['CANCELADO'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       OrderCancelledNotAssignableError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
@@ -274,7 +317,7 @@ describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () =>
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['POR_EMPACAR'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       OrderProducedFrozenError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
@@ -284,7 +327,7 @@ describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () =>
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['EN_EMPAQUE'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       OrderProducedFrozenError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
@@ -294,7 +337,7 @@ describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () =>
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['PENDIENTE'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       InvalidTransitionError,
     );
     expect(transitionAliveById).not.toHaveBeenCalled();
@@ -309,7 +352,7 @@ describe('finishAssignedOrder — QC-141: el Finalizar traduce lo que devuelve e
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       MaterialShortageError,
     );
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
@@ -322,7 +365,7 @@ describe('finishAssignedOrder — QC-141: el Finalizar traduce lo que devuelve e
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       RecipeWithoutLinesError,
     );
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
@@ -334,6 +377,8 @@ describe('finishAssignedOrder — QC-141: el Finalizar traduce lo que devuelve e
   // empaque-, asi que los tres casos que los traducian se retiran de este archivo.
 });
 
+// Nota 2026-10-06 (QC-82 R21): la entrada gana `stepPosition`, la posicion del paso en que se
+// finaliza; sigue rechazando cualquier dato de lo marcado.
 describe('finishAssignedOrder — R16: no admite ningun dato de marcado', () => {
   it('la firma solo acepta el actor y el identificador del pedido: sin un tercer parametro', () => {
     const { deps } = montar();
@@ -347,7 +392,7 @@ describe('finishAssignedOrder — R16: no admite ningun dato de marcado', () => 
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
     await expect(
-      finishAssignedOrder(ACTOR, { orderId: PEDIDO, checkedItems: ['a', 'b'] } as unknown),
+      finishAssignedOrder(ACTOR, { ...ENTRADA, checkedItems: ['a', 'b'] } as unknown),
     ).rejects.toMatchObject({ code: 'invalid_input' });
   });
 });
@@ -368,7 +413,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(insertMissing).toHaveBeenCalledTimes(1);
     expect(insertMissing).toHaveBeenCalledWith(
@@ -399,7 +444,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(insertMissing).toHaveBeenCalledTimes(1);
     const filas = insertMissing.mock.calls[0]?.[0] as readonly { userId: string }[];
@@ -417,7 +462,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(insertMissing).not.toHaveBeenCalled();
   });
@@ -431,7 +476,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(insertMissing).not.toHaveBeenCalled();
     expect(transitionAliveById).toHaveBeenCalledTimes(1);
@@ -444,7 +489,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(findSnapshotAliveInCompany).not.toHaveBeenCalled();
     expect(findAliveRefsInCompany).not.toHaveBeenCalled();
@@ -461,7 +506,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(insertMissing).not.toHaveBeenCalled();
   });
@@ -478,7 +523,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(insertMissing).not.toHaveBeenCalled();
   });
@@ -495,7 +540,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(insertMissing).toHaveBeenCalledWith(
       [
@@ -524,7 +569,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       MaterialShortageError,
     );
     expect(insertMissing).toHaveBeenCalledTimes(1);
@@ -541,7 +586,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       MaterialShortageError,
     );
     expect(deleteOne).not.toHaveBeenCalled();
@@ -560,7 +605,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+    await finishAssignedOrder(ACTOR, ENTRADA);
 
     expect(transitionAliveById).toHaveBeenCalledTimes(2);
     expect(listByOrderInCompany).toHaveBeenCalledTimes(1);
@@ -573,7 +618,7 @@ describe('finishAssignedOrder — auto-asignacion del empacador', () => {
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(finishAssignedOrder(ACTOR, ENTRADA)).rejects.toBeInstanceOf(
       InvalidTransitionError,
     );
     expect(listByOrderInCompany).not.toHaveBeenCalled();
@@ -600,7 +645,7 @@ describe('finishAssignedOrder — exige `asignaciones.ejecutar`', () => {
     const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
 
     await expect(
-      createFinishAssignedOrder(deps)({ id: ANA, companyId: EMPRESA, permissions }, { orderId: PEDIDO }),
+      createFinishAssignedOrder(deps)({ id: ANA, companyId: EMPRESA, permissions }, ENTRADA),
     ).rejects.toThrow(UnauthorizedError);
     for (const doble of doblesDe(deps)) expect(doble).not.toHaveBeenCalled();
   });
@@ -621,9 +666,159 @@ describe('finishAssignedOrder — exige `asignaciones.ejecutar`', () => {
     const conEjecutar = montar({ ordenDeEstados: ['EN_CURSO'] });
     const deReferencia = montar({ ordenDeEstados: ['EN_CURSO'] });
 
-    const resultado = await createFinishAssignedOrder(conEjecutar.deps)(soloEjecutar, { orderId: PEDIDO });
-    const referencia = await createFinishAssignedOrder(deReferencia.deps)(ACTOR, { orderId: PEDIDO });
+    const resultado = await createFinishAssignedOrder(conEjecutar.deps)(soloEjecutar, ENTRADA);
+    const referencia = await createFinishAssignedOrder(deReferencia.deps)(ACTOR, ENTRADA);
 
     expect(resultado).toEqual(referencia);
+  });
+});
+
+const AHORA = new Date('2026-09-17T12:00:00.000Z');
+
+describe('QC-82 — finishAssignedOrder: anota `finish` en la misma transaccion', () => {
+  it('R21: anota un `finish` con la posicion recibida y el mismo `now` que la transicion, DENTRO de `run`', async () => {
+    const { deps, run, transitionAliveById, anotaciones } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await createFinishAssignedOrder(deps)(ACTOR, { orderId: PEDIDO, stepPosition: 5 });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(transitionAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', ANA, AHORA);
+    expect(anotaciones).toEqual([
+      {
+        entry: {
+          action: 'finish',
+          companyId: EMPRESA,
+          orderId: PEDIDO,
+          userId: ANA,
+          stepPosition: 5,
+          occurredAt: AHORA,
+        },
+        dentroDeRun: true,
+      },
+    ]);
+  });
+
+  it('R21: el destino de la transicion es `POR_EMPACAR`, nunca `ENTREGADO`', async () => {
+    const { deps, transitionAliveById } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await createFinishAssignedOrder(deps)(ACTOR, ENTRADA);
+
+    const destinos = transitionAliveById.mock.calls.map((call: unknown[]) => call[3]);
+    expect(destinos).toEqual(['POR_EMPACAR']);
+    expect(destinos).not.toContain('ENTREGADO');
+  });
+
+  it('R5: una receta sin pasos finaliza con `stepPosition: null`', async () => {
+    const { deps, anotaciones } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await createFinishAssignedOrder(deps)(ACTOR, { orderId: PEDIDO, stepPosition: null });
+
+    expect(anotaciones.map(({ entry }) => entry.stepPosition)).toEqual([null]);
+  });
+
+  it.each([
+    ['sin `stepPosition`', { orderId: PEDIDO }],
+    ['`stepPosition` 0', { orderId: PEDIDO, stepPosition: 0 }],
+    ['`stepPosition` decimal', { orderId: PEDIDO, stepPosition: 1.5 }],
+    ['`stepPosition` en texto', { orderId: PEDIDO, stepPosition: '3' }],
+  ])('R21: la entrada estricta rechaza %s con `invalid_input` sin escribir', async (_caso, entrada) => {
+    const { deps, run, insertMissing } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await expect(createFinishAssignedOrder(deps)(ACTOR, entrada)).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+    expect(run).not.toHaveBeenCalled();
+    expect(insertMissing).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-82 — finishAssignedOrder: R24, nada a medias', () => {
+  it.each([
+    ['insufficient_material', MaterialShortageError],
+    ['recipe_without_lines', RecipeWithoutLinesError],
+  ] as const)('R24: `%s` se lanza DENTRO de `run`, con cero `append`, y sale como su error', async (resultado, Clase) => {
+    const { deps, run, append } = montar({ ordenDeEstados: ['EN_CURSO'], transitionResults: [resultado] });
+
+    await expect(createFinishAssignedOrder(deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(Clase);
+    await expect(run.mock.results[0]?.value).rejects.toBeInstanceOf(ExecutionAbortedError);
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R24: `not_found` aborta dentro de `run` y sale como `order_not_found`', async () => {
+    const { deps, run, append } = montar({ ordenDeEstados: ['EN_CURSO'], transitionResults: ['not_found'] });
+
+    await expect(createFinishAssignedOrder(deps)(ACTOR, ENTRADA)).rejects.toMatchObject({
+      code: 'order_not_found',
+    });
+    await expect(run.mock.results[0]?.value).rejects.toBeInstanceOf(ExecutionAbortedError);
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R24: `stale` aborta la vuelta sin anotar y la siguiente anota un solo `finish`', async () => {
+    const { deps, run, anotaciones } = montar({
+      ordenDeEstados: ['EN_CURSO', 'EN_CURSO'],
+      transitionResults: ['stale', 'ok'],
+    });
+
+    await createFinishAssignedOrder(deps)(ACTOR, ENTRADA);
+
+    expect(run).toHaveBeenCalledTimes(2);
+    await expect(run.mock.results[0]?.value).rejects.toBeInstanceOf(ExecutionAbortedError);
+    expect(anotaciones.map(({ entry }) => entry.action)).toEqual(['finish']);
+  });
+
+  it('R24: si `append` lanza, se propaga desde dentro de `run` y se borra cada fila de empacador creada', async () => {
+    const { deps, run, insertMissing, deleteOne } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR, OTRO_EMPACADOR])],
+      personas: [
+        persona(OPERARIO, [PERMISO_OPERARIO]),
+        persona(EMPACADOR, [PERMISO_EMPAQUE]),
+        persona(OTRO_EMPACADOR, [PERMISO_EMPAQUE]),
+      ],
+      appendFalla: true,
+    });
+
+    await expect(createFinishAssignedOrder(deps)(ACTOR, ENTRADA)).rejects.toThrow(
+      'la base no acepto la anotacion',
+    );
+    await expect(run.mock.results[0]?.value).rejects.toThrow('la base no acepto la anotacion');
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    expect(deleteOne).toHaveBeenCalledTimes(2);
+    expect(deleteOne).toHaveBeenCalledWith(EMPRESA, PEDIDO, EMPACADOR);
+    expect(deleteOne).toHaveBeenCalledWith(EMPRESA, PEDIDO, OTRO_EMPACADOR);
+  });
+
+  it('R24: el auto-asignado corre ANTES y FUERA de `run`, una sola vez', async () => {
+    const { deps, run, insertMissing } = montar({
+      ordenDeEstados: ['EN_CURSO', 'EN_CURSO'],
+      transitionResults: ['stale', 'ok'],
+      filas: [filaDeGrupo(OPERARIO, GRUPO, 'Turno noche')],
+      snapshots: [grupo(GRUPO, 'Turno noche', [OPERARIO, EMPACADOR])],
+      personas: [persona(OPERARIO, [PERMISO_OPERARIO]), persona(EMPACADOR, [PERMISO_EMPAQUE])],
+    });
+
+    await createFinishAssignedOrder(deps)(ACTOR, ENTRADA);
+
+    expect(insertMissing).toHaveBeenCalledTimes(1);
+    const [insercion] = insertMissing.mock.invocationCallOrder;
+    const [primeraTransaccion] = run.mock.invocationCallOrder;
+    expect(insercion).toBeLessThan(primeraTransaccion as number);
+  });
+});
+
+describe('QC-82 — finishAssignedOrder: el prologo no cambia', () => {
+  it('R26: con solo `asignaciones.consultar` rechaza sin abrir la transaccion ni anotar', async () => {
+    const { deps, run, append } = montar({ ordenDeEstados: ['EN_CURSO'] });
+
+    await expect(
+      createFinishAssignedOrder(deps)(
+        { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] },
+        ENTRADA,
+      ),
+    ).rejects.toThrow(UnauthorizedError);
+    expect(run).not.toHaveBeenCalled();
+    expect(append).not.toHaveBeenCalled();
   });
 });
