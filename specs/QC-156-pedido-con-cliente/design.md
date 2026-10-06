@@ -26,6 +26,10 @@
 Ningún código de error nuevo (`customer_not_found` ya existe, decimotercera enmienda de QC-154). No
 hay permisos nuevos ni dependencias nuevas.
 
+**Revisión tras F1.4 (2026-10-06).** El humano cerró P2, P4, P5 y P6. Cambian: § 1.2 (constantes del
+filtro «sin cliente»), § 4.1 y la § 4.1.1 nueva (P6), § 4.4 y § 5 (P2), § 8 (selector, parámetro y
+filtro), § 9, § 10 y § 11 (A7–A9). P4 y P5 confirman lo que ya estaba escrito.
+
 ---
 
 ## 1. Contrato publicado en T0 (lo que desbloquea las dos pistas)
@@ -34,7 +38,7 @@ Mismo esquema que QC-209 T0. T0 publica en código **real** los tipos, las firma
 la pista B (backend) y la pista F (frontend) trabajan en paralelo **sin compartir ningún archivo**.
 Todo lo que las dos tocarían lo toca T0 o TI.
 
-### 1.1 `clientes` (aditivo, posición P5)
+### 1.1 `clientes` (aditivo, P5 aprobada en F1.4)
 
 ```ts
 // lib/modules/clientes/domain/customer-catalog.ts
@@ -68,8 +72,7 @@ export interface CustomerCatalog {
   `tests/guards/guard-ambito-empresa-clientes.test.ts` lo exige a toda función de persistencia del
   módulo. Quien traduce `companyId` a `{ companyId }` es `lib/composition` (§ 6).
 - **Sin `city`, `phone`, `email` ni `address`** (R19, R37). La ciudad se **busca** (R27, mismo
-  criterio que el listado de clientes) pero no se **devuelve**. Si F1.4 elige la alternativa de P4,
-  se añade aquí.
+  criterio que el listado de clientes) pero no se **devuelve**: P4 se cerró sin ciudad.
 - **Ninguna comprobación de permiso**: `RecipeCatalog` tampoco la hace. Quien autoriza es el caso de
   uso de `pedidos` que lo llama (R6, R7, R8).
 - `index.ts` reexporta `CustomerCatalog`, `CustomerRef` y `CustomerRefSearch`, todos solo como
@@ -82,12 +85,23 @@ export interface CustomerCatalog {
 export type OrderCustomer = { readonly id: string; readonly name: string; readonly isDeleted: boolean };
 export type OrderCustomerSearchPurpose = 'assign' | 'filter';
 export const ORDER_CUSTOMER_FILTER_FIELD = 'customerId';
+/** Filtro «sin cliente» (P2): un `select` de valores CERRADOS, con un unico valor posible. */
+export const ORDER_CUSTOMER_PRESENCE_FILTER_FIELD = 'customerPresence';
+export const ORDER_CUSTOMER_PRESENCE_NONE = 'none';
+export const ORDER_CUSTOMER_PRESENCE_VALUES = [ORDER_CUSTOMER_PRESENCE_NONE] as const;
 /** UNICA definicion del nombre del cliente en pedidos (P4): «Nombres Apellidos». */
 export function formatOrderCustomerName(ref: Pick<CustomerRef, 'firstNames' | 'lastNames'>): string;
 export function toOrderCustomer(ref: CustomerRef): OrderCustomer;
 /** Forma de uuid; un id sin forma no llega al catalogo (R11, precedente QC-154 P5). */
 export function isCustomerIdShape(id: string): boolean;
+/** Sin forma de uuid -> CustomerNotFoundError SIN consultar; si no, findAliveRefById o
+ *  CustomerNotFoundError. Unico sitio que decide `customer_not_found` (alta, edicion, cambio). */
+export function requireAliveCustomer(
+  customers: Pick<CustomerCatalog, 'findAliveRefById'>, id: string, companyId: string,
+): Promise<CustomerRef>;
 ```
+
+Las seis funciones son **reales desde T0**: B3 y B4 las usan en paralelo.
 
 Cambios en `order-view.ts`:
 
@@ -96,6 +110,16 @@ Cambios en `order-view.ts`:
 - `OrderView` (y `OrderSummary`, que es su alias) gana `customer: OrderCustomer | null`.
 
 `OrderRow` no lleva el nombre, por el mismo motivo por el que no lleva el de la receta.
+
+Puerto de escritura, publicado **en T0** y no en B6: lo usan B3 (§ 4.1.1) y B4 (§ 4.2), que corren
+en paralelo antes de B6. T0 deja en `order-prisma.ts` un stub que lanza «sin implementar»; B6 lo
+rellena.
+
+```ts
+// lib/modules/pedidos/ports/order-write-repository.ts
+setCustomerAlive(id: string, customerId: string | null, actorId: string, now: Date, scope: OrderScope)
+  : Promise<'ok' | 'not_found'>;
+```
 
 ### 1.3 `pedidos`: firmas de los casos de uso nuevos
 
@@ -267,9 +291,74 @@ Los tests de `clientes` que cambian están en § 9.
   `NewOrder.customerId` viaja hasta `transaction.orders.create`.
 - `update-order.ts`: hace lo mismo **solo si** `data.customerId !== null && data.customerId !==
   row.customerId`. Es el criterio de la receta que no cambia (línea 99): se acepta aunque esté dada
-  de baja (R12). `OrderEdit.customerId` viaja a `updateAlive`. El resto de la edición (coste,
-  reservas, transición) **no cambia** (P6, R13).
+  de baja (R12). `OrderEdit.customerId` viaja a `updateAlive`. Cuando la edición cambia algo más
+  que el cliente, o no cambia nada, el resto (coste, reservas, transición) **no cambia**. Cuando
+  cambia **solo** el cliente, toma el atajo de § 4.1.1 (P6, R13).
 - `CreateOrderDeps` y `UpdateOrderDeps` ganan `customers: Pick<CustomerCatalog, 'findAliveRefById'>`.
+
+### 4.1.1 Edición que solo cambia el cliente (P6 (b), R13)
+
+**Dónde.** En `updateOrder`, justo después de `assertTransition(row.status, row.status)` (línea 97)
+y **antes** de la consulta de recetas (línea 103) y de `resolveStoredOrderCost` (línea 116):
+
+```ts
+const effectiveId = data.recipeVersionId ?? data.recipeId;
+if (data.customerId !== row.customerId && isCustomerOnlyEdit(row, { ...data, recipeId: effectiveId })) {
+  if (data.customerId !== null) await requireAliveCustomer(deps.customers, data.customerId, actor.companyId);
+  await deps.unitOfWork.run(async (tx) => {
+    const r = await tx.orders.setCustomerAlive(id, data.customerId, actor.id, now(), scope);
+    if (r === 'not_found') throw new OrderNotFoundError();
+  });
+  return;
+}
+// ...camino de siempre, sin tocar
+```
+
+`requireAliveCustomer` es la comprobación de § 4.1 (forma de uuid sin consultar, luego
+`findAliveRefById`) extraída a `order-customer.ts`, y la usan el alta, la edición y el cambio de
+cliente. Así hay un solo sitio que decide `customer_not_found`.
+
+**Qué cuenta como «igual»** (`domain/order-edit-change.ts`, nuevo, puro, sin dependencias):
+
+```ts
+export type ComparableEdit = Pick<OrderEdit, 'recipeId' | 'quantity' | 'priority' | 'unitId'> & {
+  readonly presentationLines: readonly DistributionLineInput[];
+};
+/** true si receta, cantidad, prioridad, unidad y reparto son iguales a los de `row`. No mira el cliente. */
+export function isCustomerOnlyEdit(row: OrderRow, edit: ComparableEdit): boolean;
+```
+
+| Dato | Comparación | Por qué |
+| --- | --- | --- |
+| Receta | `edit.recipeId === row.recipeId`, con `recipeId` ya resuelto a `recipeVersionId ?? recipeId` | Es exactamente el criterio que `update-order.ts:102-103` ya usa para no volver a pedir la receta. |
+| Cantidad | `sameDecimal(edit.quantity, row.quantity)`: igualdad **numérica** con enteros escalados (`bigint`), nunca con `Number` | El adaptador devuelve `toFixed(4)` (`order-prisma.ts:101`, `"10.0000"`) y el formulario puede enviar `"10"`. Comparar texto daría «distinto» y haría recalcular sin motivo; comparar con `parseFloat` perdería precisión en `DECIMAL(14,4)`. `sameDecimal` se **exporta** de `order-distribution.ts`, que ya tiene `parseDecimal` y `rescale` privados: no se escribe un tercer parser (ya hay dos, en `order-distribution.ts:37` y `order-cost.ts:62`). |
+| Prioridad | `===` | Enum cerrado. |
+| Unidad | `edit.unitId === row.unitId` | `row.unitId` es `null` solo en pedidos antiguos sin presentación; como el esquema exige unidad, nunca es igual y esos pedidos siguen el camino de siempre (que es el que les asigna unidad). |
+| Reparto | Misma longitud **y** cada línea entrante casa con una línea guardada distinta, sin importar el orden. Línea con envase: mismo `packagingProductId` y mismo `packages`. Línea antigua: `row.packagingProductId === null`, mismo `presentationId` y mismo `packages`. | El criterio de línea antigua es el de `legacyLineIsKept` (`resolve-distribution.ts:84`), ampliado a las líneas con envase. El orden no cuenta porque el puerto devuelve las líneas por `created_at` y el formulario no promete ese orden. Como el borde ya rechaza envases repetidos (`order-input.ts:91`) y la base no admite dos líneas con la misma presentación, la búsqueda por línea es una biyección. |
+| `confirmBlocked` | No se compara | No es un dato del pedido: es el permiso de dejarlo bloqueado si no alcanza, y en el atajo no se evalúa disponibilidad. |
+
+**Qué NO hace el atajo** (R13 con las garantías de R15): no llama a `recipes`, `products`, `units`,
+`presentations` ni `packaging`; no llama a `resolveStoredOrderCost`, `resolveDistribution`,
+`syncForOrder`, `setReservedAt`, `setStatus` ni `setIngredientsCost`. Solo `setCustomerAlive`. El
+test lo demuestra con dobles de esos cinco catálogos que **fallan si se les llama**.
+
+**Sin bloqueo de fila ni segunda comprobación de estado** dentro de la transacción, igual que el
+cambio de cliente dedicado (§ 4.2). El atajo solo escribe `customer_id`, `updated_by` y
+`updated_at`: si otra edición cambió la cantidad entre la lectura y la escritura, el atajo **no la
+revierte**, cosa que el reemplazo completo sí haría. Si el pedido pasó a un estado cerrado entre las
+dos, cambiar el cliente sigue siendo legal (decisión 5).
+
+**Casos límite escritos para el test:**
+
+- solo cambia el cliente → atajo;
+- cliente igual y nada más cambia → camino de siempre (recalcula), como antes de esta ficha;
+- cliente distinto y la cantidad `"10"` frente a la guardada `"10.0000"` → atajo;
+- cliente distinto y el reparto llega en otro orden → atajo;
+- cliente distinto y cambia una línea del reparto, la prioridad, la unidad, la cantidad o la receta
+  (incluido elegir una versión) → camino de siempre;
+- quitar el cliente sin cambiar nada más → atajo, con `customerId: null` y sin consultar el catálogo
+  de clientes;
+- estado cerrado → `assertTransition` rechaza **antes** del atajo, como hoy.
 
 ### 4.2 Cambio de cliente (R14–R18)
 
@@ -283,7 +372,7 @@ Los tests de `clientes` que cambian están en § 9.
 4. **Sin `assertTransition`** (R14). Este es el corazón de la decisión 5, y el test lo demuestra
    con los siete estados.
 5. Si `customerId === row.customerId` → `return` sin escribir (R12, R17).
-6. Si `customerId !== null`, aplica la comprobación de § 4.1 (R11).
+6. Si `customerId !== null`, aplica la comprobación de § 4.1 (`requireAliveCustomer`, R11).
 7. `deps.unitOfWork.run(tx => tx.orders.setCustomerAlive(id, customerId, actor.id, now(), scope))`.
    Si devuelve `'not_found'` → `OrderNotFoundError`.
 
@@ -324,9 +413,14 @@ Incluye los dados de baja por coherencia con R27.
 
 ### 4.4 Listado y ficha (R19–R26)
 
-- `order-queryable.ts`: `filterable` gana `customerId: 'select'`. `sortable` **no cambia** (R26). El
-  comentario explica por qué no es ordenable (P3).
+- `order-queryable.ts`: `filterable` gana `customerId: 'select'` y `customerPresence: 'select'`.
+  `sortable` **no cambia** (R26). El comentario explica por qué no es ordenable (P3) y que
+  `customerPresence` es el filtro «sin cliente» (P2).
 - `list-orders.ts`:
+  - **`customerPresence`** entra en `CLOSED_SELECT_VALUES` (línea 46) con
+    `ORDER_CUSTOMER_PRESENCE_VALUES` (`['none']`). La poda que ya existe para `status` y `priority`
+    (`pruneClosedSelect`, línea 62) quita cualquier otro valor y lo anota en `ignored`; con la
+    lista vacía el filtro desaparece (R24). **Cero código de poda nuevo** para «sin cliente».
   - Una segunda poda, junto a `pruneClosedSelects`: los valores del `select` `customerId` que no
     tengan forma de uuid se quitan y el campo se anota en `ignored` (R24). Con la lista vacía, el
     filtro desaparece.
@@ -342,6 +436,38 @@ Incluye los dados de baja por coherencia con R27.
   toca.
 - `ListOrdersDeps` y `GetOrderDeps` ganan
   `customers: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>`.
+
+### 4.4.1 Cómo se expresa «Sin cliente» (P2)
+
+**Opción elegida: un segundo campo filtrable, `customerPresence`, de forma `select` con un conjunto
+cerrado de un solo valor (`'none'`).**
+
+- **No toca el contrato de listados.** `list-query.ts` (duplicado a propósito en cinco módulos y
+  vigilado por `guard-contrato-listados`) sigue con sus cuatro formas. Un campo filtrable nuevo
+  solo cambia la lista blanca de `pedidos`, que es justo lo que el contrato prevé («añadir un campo
+  consultable NO cambia esta forma», `list-query.ts:51`).
+- **No rompe la validación de uuid.** `customerId` sigue admitiendo **solo** uuids y la poda de R24
+  no tiene ninguna excepción. «Sin cliente» vive en otro campo, con su propio conjunto cerrado,
+  podado por el mecanismo que ya usan `status` y `priority`.
+- **Semántica con los dos a la vez: unión.** Para el usuario es un solo filtro «Cliente» cuyo valor
+  es «este cliente o ninguno», y un `select` del contrato ya significa «cualquiera de estos». La
+  pantalla nunca envía los dos (R34, un solo valor), pero una dirección escrita a mano sí puede, y
+  la unión es la lectura que no sorprende. Con AND el resultado sería siempre vacío.
+
+En el adaptador (§ 5), los dos campos se traducen **juntos** a **un solo** término del `AND`:
+
+| Llega | Término |
+| --- | --- |
+| solo `customerId` | `{ customerId: { in: values } }` |
+| solo `customerPresence: ['none']` | `{ customerId: null }` |
+| los dos | `{ OR: [{ customerId: { in: values } }, { customerId: null }] }` |
+
+El `OR` vive **dentro** de su propio término del `AND`, después del ámbito y de `deletedAt: null`.
+Es lo que exige el comentario de `orderListWhere` (`order-prisma.ts:372`): un `OR` al mismo nivel
+que `companyId` ampliaría lo visible. El test de integración lo comprueba con un pedido sin cliente
+de **otra** empresa, que no debe aparecer.
+
+La opción descartada (un valor centinela dentro del `select` de `customerId`) está en § 11, A7.
 
 ### 4.5 Lo que NO cambia (R22)
 
@@ -359,15 +485,18 @@ Un test estático (§ 9) lo vigila sobre los tipos públicos de `OrderCatalog`.
 
 - `ports/order-write-repository.ts`: método nuevo
   `setCustomerAlive(id, customerId: string | null, actorId: string, now: Date, scope: OrderScope):
-  Promise<'ok' | 'not_found'>`. Lleva `scope` al final, como exige
-  `guard-ambito-empresa-pedidos.test.ts`. Su comentario dice qué escribe y qué no.
+  Promise<'ok' | 'not_found'>`, publicado en T0 (§ 1.2). Lleva `scope` al final, como exige
+  `guard-ambito-empresa-pedidos.test.ts`. Su comentario dice qué escribe y qué no. Lo usan el
+  cambio de cliente (§ 4.2) y el atajo de la edición (§ 4.1.1).
 - `ports/order-repository.ts`: **sin cambio de firma**. El filtro viaja dentro del `ListQuery` ya
   saneado.
 - `adapters/driven/persistence/order-prisma.ts`:
   - el `select` del pedido gana `customerId`, y `toOrderRow` lo copia;
   - `create` y `updateAlive` escriben `customerId`;
-  - `orderFilterWhere`, en el caso `'select'` con `field === 'customerId'`, devuelve
-    `{ customerId: { in: values } }`;
+  - `orderListWhere` saca `customerId` y `customerPresence` de `query.filters` **antes** del `map`
+    por `orderFilterWhere` y los traduce juntos con una función nueva, `orderCustomerFilterWhere`
+    (exportada para su test unitario, como `toOrderRow`), a un solo término (tabla de § 4.4.1). `orderFilterWhere` no gana ningún caso: si alguna vez
+    recibiera uno de los dos, devuelve `null` como con cualquier campo que no conoce;
   - `setCustomerAlive` hace `updateMany` con
     `where { id, deletedAt: null, ...companyScope(scope) }` y
     `data { customerId, updatedBy: actorId, updatedAt: now }`. Si `count === 0` devuelve
@@ -410,7 +539,8 @@ mismo archivo y conviene tocar el archivo una vez.
 - No hay `revalidatePath`: la pantalla llama a `router.refresh()`, como en todo `pedidos`
   (comentario de `order-sheet.tsx`).
 - `buildCreateCandidate` lee `customerId` con `readOptionalFormString`. `buildUpdateCandidate`
-  sigue siendo el mismo (P6).
+  no se toca: ya delega en `buildCreateCandidate` (`order-actions.ts:228`), así que la edición
+  también envía el cliente. La decisión de atajo (P6) es del dominio (§ 4.1.1), no de la action.
 - `tests/unit/pedidos/order-actions.test.ts:905` y `:921` (la lista de aridades y firmas de las
   actions exportadas) ganan las tres nuevas.
 
@@ -433,17 +563,17 @@ singular (R36).
 | Archivo | Cambio |
 | --- | --- |
 | `components/shared/async-autocomplete.tsx` | prop opcional `defaultInputValue?: string`: valor inicial del campo. Sin ella el comportamiento es idéntico al de hoy. Es lo único que falta para precargar la edición (R31) y el filtro (R29). **No** se toca el canal `error` (la Opción A de QC-71, descartada). |
-| `order-customer-label.ts` (nuevo) | `orderCustomerLabel(customer)`: el nombre, más « (eliminado)» si `isDeleted` (R20). La usan la columna, el selector, el filtro y el diálogo, y es la única definición. |
-| `order-customer-picker.tsx` (nuevo, `'use client'`) | Envoltura de `AsyncAutocomplete<OrderCustomer>`. Props: `purpose`, `value: OrderCustomer \| null`, `onChange`, `name?` (input oculto con el **id**, no la etiqueta), `disabled`, `aria-*`. `fetchPage` llama a `searchOrderCustomersAction({ search, page, pageSize }, purpose)` y, en error, lanza. Es el mismo canal que `recipe-picker` (QC-71 lo dejó así a propósito). |
-| `order-list-params.ts` | `CUSTOMER_PARAM = 'customer'` y `CUSTOMER_COLUMN_ID = ORDER_CUSTOMER_FILTER_FIELD`. Lee un uuid (regex de forma) o nada, y genera `?customer=<id>`. `parse(build(p))` sigue devolviendo `p`. |
+| `order-customer-label.ts` (nuevo) | `orderCustomerLabel(customer)`: el nombre, más « (eliminado)» si `isDeleted` (R20). La usan la columna, el selector, el filtro y el diálogo, y es la única definición. También `ORDER_CUSTOMER_NONE_LABEL = 'Sin cliente'` y `orderCustomerChoiceLabel(choice)`, que delega en la anterior o devuelve esa constante (R34). |
+| `order-customer-picker.tsx` (nuevo, `'use client'`) | Envoltura de `AsyncAutocomplete<OrderCustomerChoice>`, con `type OrderCustomerChoice = { kind: 'customer'; customer: OrderCustomer } \| { kind: 'none' }`. Props: `purpose`, `value: OrderCustomerChoice \| null`, `onChange`, `name?` (input oculto con el **id**, no la etiqueta; vacío con `none`), `disabled`, `aria-*`. `fetchPage` llama a `searchOrderCustomersAction({ search, page, pageSize }, purpose)` y, en error, lanza. Es el mismo canal que `recipe-picker` (QC-71 lo dejó así a propósito). **Solo con `purpose="filter"`**, `fetchPage` antepone `{ kind: 'none' }` en la página 1 cuando el término está vacío o cada palabra normalizada (sin acentos, minúsculas) aparece en «sin cliente» (R34). Con `purpose="assign"` nunca aparece: en el formulario y el diálogo, quitar el cliente es vaciar el campo o el botón «Quitar cliente». |
+| `order-list-params.ts` | `CUSTOMER_PARAM = 'customer'`, `CUSTOMER_COLUMN_ID = ORDER_CUSTOMER_FILTER_FIELD`, `CUSTOMER_PRESENCE_COLUMN_ID = ORDER_CUSTOMER_PRESENCE_FILTER_FIELD` y `CUSTOMER_NONE_PARAM_VALUE = 'none'`. **Un solo parámetro** para los dos campos del contrato: `?customer=<uuid>` se lee como `filters.customerId`, `?customer=none` como `filters.customerPresence = ['none']`, y cualquier otro valor se descarta. Al generar, `customerId` gana sobre `customerPresence` si llegaran los dos (la pantalla nunca los produce juntos). El parámetro único hace que la exclusión de R34 la garantice la dirección. `parse(build(p))` sigue devolviendo `p` para todo `p` con como mucho uno de los dos. |
 | `order-columns.tsx` | Columna `{ id: 'customer', label: 'Cliente', align: 'start' }`, sin `sortable` ni `filter` (R26, R30). La celda es `orderCustomerLabel` o `<MissingValue/>`. Va detrás de «Receta». |
 | `order-form.tsx` | Campo «Cliente» con `OrderCustomerPicker purpose="assign" name="customerId"`, precargado con `order?.customer` (R31). Va detrás del selector de receta. |
 | `order-customer-dialog.tsx` (nuevo, `'use client'`) | Diálogo controlado con el selector (`purpose="assign"`), un botón «Quitar cliente» y otro «Guardar». Llama a `setOrderCustomerAction(order.id, { customerId })`. Con éxito: cierra, `toast.success('Cliente actualizado.')` y `router.refresh()`. Con error: mensaje del catálogo y sigue abierto (R33). Se monta solo mientras está abierto, como los otros diálogos de la fila. |
 | `order-row-actions.tsx` | Item `{ key: 'customer', label: 'Cliente', icon: UserIcon, testId: 'order-action-customer' }`, **sin `disabled`** en ningún estado (R32). Solo aparece si `canEditCustomer`. Prop nueva: `onCustomer`. |
 | `order-sheet.tsx` (`OrderRowSheetActions`) | `customerOpen` y el diálogo montado condicionalmente. Pasa `canEditCustomer`. |
-| `order-customer-filter.tsx` (nuevo, `'use client'`) | `OrderCustomerPicker purpose="filter"` con el valor inicial que resolvió el servidor. Al elegir: `router.push(orderListHref(withFilter({ ...params, page: 1 }, CUSTOMER_COLUMN_ID, { kind: 'select', values: [id] })))`. Al limpiar quita la clave (R34). `withFilter` ya conserva los filtros que no son de columna (`data-table-params.ts:72`). |
-| `order-table.tsx` | `toolbarActions={<OrderCustomerFilter … />}`, la ranura que hoy usa solo `customer-table.tsx`. Props nuevas: `customerFilter: OrderCustomer \| null` y `canEditCustomer`. |
-| `order-list-section.tsx` | Si `params.filters.customerId` existe, llama a `getOrderCustomerFilterOptionAction(id)` **en paralelo** con `listOrdersAction`. Con `null`, quita el filtro de los parámetros **antes** de listar (R29). `canEditCustomer` sale del mismo `assertPermission(user, 'pedidos.modificar')` que ya calcula `canEditDistribution` (línea 111): no hay una segunda lectura de permisos. |
+| `order-customer-filter.tsx` (nuevo, `'use client'`) | `OrderCustomerPicker purpose="filter"` con el valor inicial que resolvió el servidor (o `{ kind: 'none' }`). Al elegir un cliente: quita `CUSTOMER_PRESENCE_COLUMN_ID` y pone `withFilter({ ...params, page: 1 }, CUSTOMER_COLUMN_ID, { kind: 'select', values: [id] })`. Al elegir «Sin cliente»: quita `CUSTOMER_COLUMN_ID` y pone `CUSTOMER_PRESENCE_COLUMN_ID` con `['none']`. Después, `router.push(orderListHref(...))`. Al limpiar quita las dos claves (R34). `withFilter` ya conserva los filtros que no son de columna (`data-table-params.ts:72`). La etiqueta de `none` es `ORDER_CUSTOMER_NONE_LABEL` de `order-customer-label.ts`. |
+| `order-table.tsx` | `toolbarActions={<OrderCustomerFilter … />}`, la ranura que hoy usa solo `customer-table.tsx`. Props nuevas: `customerFilter: OrderCustomerChoice \| null` y `canEditCustomer`. |
+| `order-list-section.tsx` | Si `params.filters.customerId` existe, llama a `getOrderCustomerFilterOptionAction(id)` **en paralelo** con `listOrdersAction`. Con `null`, quita el filtro de los parámetros **antes** de listar (R29). Con `customerPresence` **no** llama a esa action: el valor inicial del filtro es `{ kind: 'none' }` (R29). `canEditCustomer` sale del mismo `assertPermission(user, 'pedidos.modificar')` que ya calcula `canEditDistribution` (línea 111): no hay una segunda lectura de permisos. |
 | `components/index.ts` | Reexporta los cuatro componentes y el formateador nuevos. |
 
 El orden del menú es Editar, Cancelar, Eliminar, Responsables, **Cliente** y, cuando aplica,
@@ -463,7 +593,8 @@ filtro usan `Button` y `AsyncAutocomplete` con `min-h-11`, igual que `TOUCH_TARG
 | `tests/unit/clientes/scope.test.ts:553` (R40 de QC-154) | La mitad de `clientes` **sigue igual**. En la mitad de `pedidos`, `importaModulo(fuente, 'clientes')` pasa a `importaModuloEnProfundidad` (`@/lib/modules/clientes/` seguido de algo). El import por barrel queda permitido y el profundo prohibido. Se mantiene `nombraModeloOTabla(fuente, 'customer', 'customers')`. Cada cambio lleva su caso de sensibilidad: el barrel no dispara y la ruta profunda sí. | R36, decisión 7 |
 | `tests/unit/clientes/scope.test.ts:114` (`ARCHIVOS_ESPERADOS`) | `+ domain/customer-catalog.ts`, `+ adapters/driven/persistence/customer-catalog-prisma.ts` | R37 |
 | `tests/guards/guard-ambito-empresa-clientes.test.ts` | Si su lista de adaptadores es cerrada, `+ customer-catalog-prisma.ts`, con sus tres funciones que declaran `scope: CustomerScope` | R36 |
-| `tests/unit/pedidos/order-view.test.ts:119` | La lista exacta de `ORDER_QUERYABLE.filterable` gana `customerId` (`'select'`). `sortable` no cambia. | R23, R26 |
+| `tests/unit/pedidos/order-view.test.ts:119` | La lista exacta de `ORDER_QUERYABLE.filterable` gana `customerId` y `customerPresence` (los dos `'select'`). `sortable` no cambia. | R23, R24, R26 |
+| Dobles de `OrderWriteRepository` en `tests/unit/pedidos/**` | `setCustomerAlive` (mecánico; lo marca `typecheck` en T0) | § 1.2 |
 | `tests/unit/pedidos/order-actions.test.ts:905`, `:921` | Las tres actions nuevas | § 7 |
 | `tests/unit/identity/session-once-per-request-actions.test.ts` | Las tres actions nuevas | R9 |
 | `tests/integration/aislamiento.json` | Los archivos de integración nuevos (§ 10) | censo QC-77 |
@@ -483,18 +614,19 @@ prohibiendo.
 | R2, R3, R4 | `tests/unit/pedidos/schema/orders-customer-migration.test.ts` (forma del SQL UP/DOWN) + `tests/integration/pedidos/orders-customer-constraints.int.test.ts` (FK compuesta: otra empresa → `23503`; NULL válido; los existentes NULL tras migrar; DOWN deja el esquema previo) | unit + int |
 | R6, R7, R8 | `tests/unit/pedidos/order-customer-authorization.test.ts`: matriz operación × {sin permiso, solo `pedidos.consultar`, solo `pedidos.modificar`, ambos sin `clientes.*`}, con dobles que fallan si se les llama | unit |
 | R9 | `tests/unit/pedidos/order-actions-customer.test.ts` + `session-once-per-request-actions.test.ts` | unit |
-| R10–R13 | `tests/unit/pedidos/order-customer-write.test.ts` (alta y edición contra dobles; cuenta llamadas al catálogo) | unit |
+| R10–R12 | `tests/unit/pedidos/order-customer-write.test.ts` (alta y edición contra dobles; cuenta llamadas al catálogo) | unit |
+| R13 | `tests/unit/pedidos/order-edit-change.test.ts` (tabla de «igual» de § 4.1.1: decimal `10` = `10.0000`, reparto en otro orden, unidad `null`, receta frente a versión) + `order-customer-write.test.ts` (los casos límite de § 4.1.1: el atajo solo llama a `setCustomerAlive`, con dobles de recetas, productos, unidades, presentaciones y envases que **fallan si se les llama**; los demás casos recalculan como hoy) + `order-customer.int.test.ts` (edición real que solo cambia el cliente: `ingredients_cost`, `packaging_cost`, `reserved_at`, `status` y las reservas no cambian) | unit + int |
 | R14–R18 | `tests/unit/pedidos/set-order-customer.test.ts` (siete estados; dobles de recetas, inventario y reservas **ausentes**; el `unitOfWork` solo ve `setCustomerAlive`) + `tests/integration/pedidos/order-customer.int.test.ts` (antes y después de la fila completa: solo cambian `customer_id`, `updated_by` y `updated_at`; reservas e `inventory_movements` intactos) | unit + int |
 | R19, R20, R21 | `tests/unit/pedidos/list-orders-customer.test.ts` (cuenta una llamada por página, ids sin repetir, cero sin clientes) + `get-order.test.ts` | unit |
 | R22 | `tests/unit/pedidos/order-customer-boundaries.test.ts`: los tipos de `OrderCatalog` no tienen clave `customer*`, y el `select` de `order-catalog-prisma.ts` tampoco | unit estático |
-| R23, R24 | `list-orders-customer.test.ts` (poda y log) + `order-customer.int.test.ts` (filtro en base, total, combinación con estado y búsqueda, otra empresa → 0) | unit + int |
+| R23, R24 | `list-orders-customer.test.ts` (poda y log de `customerId` sin forma y de `customerPresence` distinto de `'none'`) + `tests/unit/pedidos/order-customer-filter-where.test.ts` (la tabla de § 4.4.1: los tres casos y el `OR` dentro de su propio término) + `order-customer.int.test.ts` (filtro por cliente, «sin cliente» y los dos a la vez como unión; total; combinación con estado y búsqueda; un pedido sin cliente de otra empresa no aparece) | unit + int |
 | R25 | `list-orders-customer.test.ts`: con un término que solo casa con el cliente, el catálogo de recetas recibe el término y el de clientes no | unit |
 | R26 | caso nuevo en `tests/unit/pedidos/list-orders-customer.test.ts`: `ORDER_QUERYABLE.sortable` no contiene `customer*`, y pedir `sort: customerId` se omite y se anota. Además, `order-view.test.ts:119` sigue fijando `sortable` y `filterable` exactos (§ 9). | unit |
-| R27, R28, R29 | `tests/unit/pedidos/search-order-customers.test.ts` + `tests/integration/clientes/customer-catalog.int.test.ts` (empresa, bajas, orden, búsqueda sin acentos, 10/25) + `tests/unit/pedidos-ui/order-customer-filter.test.tsx` | unit + int |
+| R27, R28, R29 | `tests/unit/pedidos/search-order-customers.test.ts` (la respuesta nunca trae «Sin cliente») + `tests/integration/clientes/customer-catalog.int.test.ts` (empresa, bajas, orden, búsqueda sin acentos, 10/25) + `tests/unit/pedidos-ui/order-customer-filter.test.tsx` + `order-list-section.test.tsx` (con `customer=none` no llama a la action de opción) | unit + int |
 | R30 | `tests/unit/pedidos-ui/order-columns.test.tsx` | unit (RTL) |
 | R31 | `tests/unit/pedidos-ui/order-form-customer.test.tsx` + `tests/unit/async-autocomplete.test.tsx` (prop nueva) | unit (RTL) |
 | R32, R33 | `tests/unit/pedidos-ui/order-customer-dialog.test.tsx` + `order-row-actions.test.tsx` (siete estados × `canEditCustomer`) | unit (RTL) |
-| R34 | `tests/unit/pedidos-ui/order-list-params.test.ts` (ida y vuelta) + `order-customer-filter.test.tsx` | unit |
+| R34 | `tests/unit/pedidos-ui/order-list-params.test.ts` (ida y vuelta con uuid y con `none`) + `order-customer-picker.test.tsx` («Sin cliente» primero en la página 1 con `filter`, según el término; nunca con `assign`) + `order-customer-filter.test.tsx` (elegir «Sin cliente» sustituye al cliente y al revés) | unit |
 | R35 | `order-customer-dialog.test.tsx` y `order-customer-filter.test.tsx` (clases de objetivo táctil) + `pedidos-viewport.test.tsx` | unit |
 | R36 | `tests/unit/clientes/scope.test.ts` (R40 y R38 reescritos) + `guard-arquitectura-modulos` | unit + guardia |
 | R37 | `tests/unit/clientes/customer-catalog.test.ts` (forma de `CustomerRef` con `expectTypeOf`; el `select` del adaptador) + los tests de `clientes` de QC-154 y QC-155 sin cambios y en verde | unit |
@@ -554,6 +686,40 @@ esto, y `withFilter` conserva los filtros que no son de columna.
 La decisión 6 dice que el selector del formulario **no** ofrece eliminados. Además, los permisos
 difieren: el selector pide `modificar` y el filtro `consultar`. Dos actions casi idénticas serían
 duplicación; un parámetro `purpose` cerrado expresa las dos diferencias en un solo sitio.
+
+### A7. «Sin cliente» como valor centinela dentro del `select` de `customerId` — descartada (P2)
+
+Por ejemplo `customerId: { kind: 'select', values: ['none'] }`, o el uuid nulo
+`00000000-0000-0000-0000-000000000000` para que pase la comprobación de forma. Se descarta por tres
+motivos:
+
+- **Rompe la regla de R24 o la esconde.** Con `'none'`, la poda de uuid necesita una excepción, y
+  un campo que admite «uuid o una palabra» deja de poder validarse con una sola regla. Con el uuid
+  nulo, la forma pasa pero el valor **miente**: es un identificador que parece de cliente y
+  significa «ninguno», y cualquiera que lea `customerId IN (...)` en el adaptador lo trataría como
+  un id más.
+- **Mezcla dos preguntas en una lista.** `select` significa «cualquiera de estos valores de la
+  columna». «La columna está vacía» no es un valor de la columna, sino otra pregunta, y el
+  contrato la expresa limpia como un segundo campo con su conjunto cerrado, igual que `status`.
+- **No ahorra nada.** El adaptador necesita igual una rama para `IS NULL`. El campo aparte reutiliza
+  `CLOSED_SELECT_VALUES` y no añade código de poda.
+
+Tampoco se añadió una **quinta forma** de filtro (`{ kind: 'isNull' }`) al contrato: `list-query.ts`
+está duplicado en cinco módulos y vigilado por `guard-contrato-listados`, y cambiarlo por una sola
+pantalla toca los cinco.
+
+### A8. P6 (a): quitar el campo «Cliente» del formulario de edición — descartada por el humano
+
+Habría dejado el diálogo «Cliente» como única vía en pedidos existentes. El humano eligió (b) en
+F1.4, y además (a) releía la decisión 2 («campo en el formulario»).
+
+### A9. P6: comparar contra la fila bloqueada dentro de la transacción — descartada
+
+Sería más estricto ante ediciones concurrentes, pero el coste se calcula **fuera** de la
+transacción (`update-order.ts:116`) y el atajo tiene que decidirse **antes** para no leer los
+catálogos (R13). Decidir dentro obligaría a calcular el coste siempre y a tirarlo después. La
+consecuencia de comparar con la lectura previa está escrita en § 4.1.1: el atajo solo escribe el
+cliente, así que no revierte lo que otra edición cambió entre medias.
 
 ---
 

@@ -19,10 +19,10 @@
 > pista, **para y vuelve al leader**: es un cambio de contrato (`design.md > 1`).
 >
 > **Antes de empezar:**
-> - El spec tiene que estar **aprobado** (F1.4), y la aprobación tiene que responder **P5**: si
->   `clientes` puede publicar el servicio de lectura aditivo. **T0 no se empieza sin esa
->   respuesta.** P2, P4 y P6 tienen posición por defecto escrita y no bloquean. Si F1.4 las cambia,
->   el cambio cae en B4/B5/F3 (P2), en T0/B2/F2 (P4) o en B3/F5 (P6).
+> - El spec tiene que estar **aprobado** (F1.4). Las preguntas P2, P4, P5 y P6 las cerró el humano
+>   el 2026-10-06 (`requirements.md > Decisiones cerradas`): P5 aprueba `CustomerCatalog`, así que
+>   T0 ya no está bloqueada. P2 («Sin cliente» en el filtro) cae en T0, B5, B6, F2, F3 y F7; P6 (la
+>   edición que solo cambia el cliente no recalcula) cae en T0 y B3; P4 no cambia nada.
 > - **Base de datos propia: `QuimiCloude_QC156`.** La integración corre con `DATABASE_URL` y
 >   `DIRECT_URL` sobrescritos en el entorno del comando, **nunca** contra la del `.env` (lección de
 >   QC-147).
@@ -38,7 +38,7 @@
 
 ## T0 — Publicar el contrato en código (secuencial; bloquea todo)
 
-**Agente:** `backend_dev` · **R:** R37 (forma), R9 (lista de sesión), R36 (frontera)
+**Agente:** `backend_dev` · **R:** R37 (forma), R9 (lista de sesión), R36 (frontera), R11 (`requireAliveCustomer`)
 
 Archivos:
 
@@ -49,8 +49,12 @@ Archivos:
   `scope: CustomerScope` y su cuerpo lanza «sin implementar».
 - `lib/modules/clientes/index.ts` (modifica): reexporta los tres tipos, solo como tipos.
 - `lib/modules/pedidos/domain/order-customer.ts` (nuevo): `OrderCustomer`,
-  `OrderCustomerSearchPurpose`, `ORDER_CUSTOMER_FILTER_FIELD`, y `formatOrderCustomerName`,
-  `toOrderCustomer` e `isCustomerIdShape`, **reales**.
+  `OrderCustomerSearchPurpose`, `ORDER_CUSTOMER_FILTER_FIELD`,
+  `ORDER_CUSTOMER_PRESENCE_FILTER_FIELD`, `ORDER_CUSTOMER_PRESENCE_NONE`,
+  `ORDER_CUSTOMER_PRESENCE_VALUES`, y `formatOrderCustomerName`, `toOrderCustomer`,
+  `isCustomerIdShape` y `requireAliveCustomer`, **reales** (`design.md > 1.2`).
+- `lib/modules/pedidos/ports/order-write-repository.ts` (modifica): `setCustomerAlive`
+  (`design.md > 1.2`). Lo usan B3 y B4 en paralelo, por eso entra aquí y no en B6.
 - `lib/modules/pedidos/domain/order-view.ts` (modifica): `customerId` en `OrderRow`, `NewOrder` y
   `OrderEdit`; `customer` en `OrderView`.
 - `lib/modules/pedidos/domain/errors.ts` (modifica): `CustomerNotFoundError` (`'customer_not_found'`).
@@ -67,7 +71,8 @@ Archivos:
 - Compilación mínima, con valores nulos temporales que B rellena:
   - `get-order.ts`: `toOrderView` devuelve `customer: null`.
   - `create-order.ts` y `update-order.ts`: pasan `customerId: null`.
-  - `order-prisma.ts`: `toOrderRow` devuelve `customerId: null`.
+  - `order-prisma.ts`: `toOrderRow` devuelve `customerId: null`, y `setCustomerAlive` es un stub
+    que lanza «sin implementar».
 - Tests:
   - `tests/unit/pedidos/order-customer-contract.test-d.ts` (nuevo): con `expectTypeOf` fija las
     formas de `OrderCustomer`, `OrderView.customer` y `CustomerRef` (sin `city`, `phone`, `email`
@@ -78,9 +83,11 @@ Archivos:
   - `tests/unit/clientes/scope.test.ts` (modifica): `ARCHIVOS_ESPERADOS` con los dos archivos
     nuevos de `clientes`, y el bloque R40 reescrito (`design.md > 9`) con sus dos casos de
     sensibilidad: el barrel no dispara y la ruta profunda sí.
+  - `tests/unit/pedidos/order-customer.test.ts` (nuevo): `formatOrderCustomerName`,
+    `isCustomerIdShape` y `requireAliveCustomer` (sin forma de uuid, cero llamadas al catálogo).
   - Fixtures existentes que construyen `OrderRow` u `OrderSummary` en `tests/unit/pedidos/**` y
-    `tests/unit/pedidos-ui/**`: `customerId: null` y `customer: null`. Mecánico; la lista la da
-    `pnpm typecheck`.
+    `tests/unit/pedidos-ui/**`: `customerId: null` y `customer: null`; dobles de
+    `OrderWriteRepository`: `setCustomerAlive`. Mecánico; la lista la da `pnpm typecheck`.
 
 **Hecho cuando:**
 - `pnpm typecheck` y `pnpm lint` están en verde;
@@ -142,22 +149,37 @@ revierte limpia, y los tres tests están en verde. Salida pegada en
   `tests/integration/clientes/**` de QC-153, QC-154 y QC-155 siguen en verde sin editarlos, aparte
   de los cambios ya hechos en T0 y de la lista de la guardia.
 
-### B3 [P] — Alta y edición con cliente · depende de: T0 · R10, R11, R12, R13
+### B3 [P] — Alta y edición con cliente · depende de: T0 · R10, R11, R12, R13, R15
 
 - `lib/modules/pedidos/domain/order-input.ts`: `customerId` en los dos esquemas, con el vacío como
   `null` y sin `.uuid()`.
-- `create-order.ts` y `update-order.ts`: la comprobación de `design.md > 4.1` y el paso de
-  `customerId` al puerto.
+- `create-order.ts` y `update-order.ts`: la comprobación de `design.md > 4.1` con
+  `requireAliveCustomer`, y el paso de `customerId` al puerto.
+- `update-order.ts`: el **atajo** de la edición que solo cambia el cliente (`design.md > 4.1.1`),
+  después de `assertTransition` y antes de leer recetas y calcular el coste.
+- `lib/modules/pedidos/domain/order-edit-change.ts` (nuevo): `isCustomerOnlyEdit` y
+  `ComparableEdit`, puros.
+- `lib/modules/pedidos/domain/order-distribution.ts` (modifica): **solo** exporta
+  `sameDecimal(a, b)` sobre `parseDecimal` y `rescale`, que ya existen. Ningún cambio de
+  comportamiento.
+- `tests/unit/pedidos/order-edit-change.test.ts` (nuevo): cada fila de la tabla de «igual» de
+  `design.md > 4.1.1`: `"10"` frente a `"10.0000"`, reparto en otro orden, línea con envase y línea
+  antigua, unidad guardada `null`, receta frente a versión, prioridad, y una línea de más o de menos.
 - `tests/unit/pedidos/order-customer-write.test.ts` (nuevo):
   - alta con un cliente vivo, sin cliente y con cliente vacío;
   - las cuatro causas de `customer_not_found`, y con el id sin forma **cero** llamadas al catálogo;
   - en la edición, el mismo cliente dado de baja se acepta y uno distinto dado de baja se rechaza;
   - en la edición, sin cliente queda `null`;
-  - en todos los rechazos, ninguna escritura.
+  - en todos los rechazos, ninguna escritura;
+  - **atajo (R13)**: los casos límite de `design.md > 4.1.1`. Cuando aplica, el `unitOfWork` solo ve
+    `setCustomerAlive(id, customerId, actor.id, now, scope)`, y los dobles de `recipes`, `products`,
+    `units`, `presentations` y `packaging` **fallan si se les llama**. Cuando no aplica (cambia otro
+    dato, o no cambia nada), se llama a `updateAlive` y `syncForOrder` como hoy. En estado cerrado,
+    `assertTransition` rechaza antes del atajo.
 - `tests/unit/pedidos/order-input.test.ts` (modifica, si fija las claves del esquema).
 
-**Hecho cuando:** los tests están en verde y `order-service.test.ts` y `update-order.test.ts`
-siguen en verde.
+**Hecho cuando:** los tests están en verde, y `order-service.test.ts`, `update-order.test.ts` y los
+tests de `order-distribution` siguen en verde sin editarlos.
 
 ### B4 [P] — Cambio de cliente y búsqueda de opciones · depende de: T0 · R6, R7, R8, R14–R18, R27, R28, R29
 
@@ -172,8 +194,8 @@ siguen en verde.
   - el `unitOfWork` solo recibe `setCustomerAlive`, con `(id, customerId, actor.id, now, scope)`;
   - las dependencias no incluyen catálogos de recetas, inventario ni unidades.
 - `tests/unit/pedidos/search-order-customers.test.ts` (nuevo): `includeDeleted` según `purpose`, un
-  `purpose` desconocido falla cerrado, y la opción de filtro con un id sin forma devuelve `null` sin
-  consultar.
+  `purpose` desconocido falla cerrado, la respuesta nunca trae una opción «Sin cliente» (R27), y la
+  opción de filtro con un id sin forma devuelve `null` sin consultar.
 - `tests/unit/pedidos/order-customer-authorization.test.ts` (nuevo): la matriz de
   `design.md > 10` (R6, R7, R8), con dobles que fallan si se les llama.
 
@@ -181,29 +203,36 @@ siguen en verde.
 
 ### B5 [P] — Listado, ficha y filtro · depende de: T0 · R19–R26
 
-- `order-queryable.ts`: `customerId: 'select'`.
-- `list-orders.ts`: la poda de uuid y la resolución con una llamada por página.
+- `order-queryable.ts`: `customerId: 'select'` y `customerPresence: 'select'`
+  (`design.md > 4.4`, `> 4.4.1`).
+- `list-orders.ts`: `customerPresence` en `CLOSED_SELECT_VALUES`, la poda de uuid de `customerId` y
+  la resolución con una llamada por página.
 - `get-order.ts`: `toOrderView` con clientes; `getOrder` hace una llamada.
 - `tests/unit/pedidos/list-orders-customer.test.ts` (nuevo):
   - una llamada por página con ids sin repetir, y cero llamadas sin clientes;
   - el cliente dado de baja llega con `isDeleted`;
-  - la poda y el log de valores sin forma;
+  - la poda y el log de valores sin forma en `customerId`, y de valores distintos de `'none'` en
+    `customerPresence` (con la lista vacía, el filtro desaparece);
+  - `customerId` y `customerPresence` llegan juntos al puerto sin tocarse;
   - la búsqueda no consulta clientes;
   - el orden por `customerId` se omite;
   - la salida no lleva datos personales.
 - `tests/unit/pedidos/get-order.test.ts` y `list-orders.test.ts` (modifican: dependencia nueva y
   conteo de llamadas).
-- `tests/unit/pedidos/order-view.test.ts:119` (modifica: `filterable` exacto con `customerId`).
+- `tests/unit/pedidos/order-view.test.ts:119` (modifica: `filterable` exacto con `customerId` y
+  `customerPresence`).
 - `tests/unit/pedidos/order-customer-boundaries.test.ts` (nuevo, R22): estático sobre
   `order-catalog.ts` y `order-catalog-prisma.ts`.
 
 **Hecho cuando:** los tests están en verde.
 
-### B6 — Adaptador, puerto y composición · depende de: B1, B2, B3, B4, B5 · R3, R15, R23
+### B6 — Adaptador y composición · depende de: B1, B2, B3, B4, B5 · R3, R13, R15, R23, R24
 
-- `ports/order-write-repository.ts`: `setCustomerAlive`.
 - `adapters/driven/persistence/order-prisma.ts`: el `select`, `toOrderRow`, `create`,
-  `updateAlive`, el filtro `customerId` y `setCustomerAlive` (`design.md > 5`).
+  `updateAlive`, `orderCustomerFilterWhere` (los dos campos del filtro juntos en un solo término,
+  `design.md > 4.4.1`) y `setCustomerAlive` real en lugar del stub de T0 (`design.md > 5`).
+- `tests/unit/pedidos/order-customer-filter-where.test.ts` (nuevo): los tres casos de la tabla de
+  `design.md > 4.4.1`, y que el `OR` queda dentro de su propio término, nunca al nivel del ámbito.
 - `lib/composition/index.ts`: el bloque de `customerCatalog` al final y las dependencias y la
   fachada en el bloque de `pedidos` (`design.md > 6`). **Una sola tanda.**
 - `tests/integration/pedidos/order-customer.int.test.ts` (nuevo):
@@ -213,7 +242,12 @@ siguen en verde.
     cambian;
   - las filas de reserva, `inventory_movements` y `order_assignments` del pedido no cambian;
   - el filtro por cliente en base: total, combinación con estado y con la búsqueda por receta, y
-    otra empresa da 0.
+    otra empresa da 0;
+  - el filtro «sin cliente» en base: solo pedidos sin cliente de la empresa (un pedido sin cliente
+    de **otra** empresa no aparece), y con los dos filtros, la unión;
+  - la edición general que solo cambia el cliente (R13): `ingredients_cost`, `packaging_cost`,
+    `reserved_at`, `status` y las filas de reserva no cambian; solo `customer_id`, `updated_by` y
+    `updated_at`.
 
   Su entrada en `aislamiento.json`.
 - `tests/unit/pedidos/company-scope.test.ts` o `guard-ambito-empresa-pedidos` (lo que mida el
@@ -239,23 +273,31 @@ los tests existentes de `pedidos-ui`.
 
 **Hecho cuando:** el test está en verde y nadie más que `pedidos` pasa la prop.
 
-### F2 — Etiqueta y selector · depende de: F1 · R20, R27, R28, R35
+### F2 — Etiqueta y selector · depende de: F1 · R20, R27, R28, R34, R35
 
-- `app/(private)/pedidos/components/order-customer-label.ts` y `order-customer-picker.tsx` (nuevos).
+- `app/(private)/pedidos/components/order-customer-label.ts` (nuevo, con
+  `ORDER_CUSTOMER_NONE_LABEL` y `orderCustomerChoiceLabel`) y `order-customer-picker.tsx` (nuevo,
+  sobre `OrderCustomerChoice`, `design.md > 8`).
 - `app/(private)/pedidos/components/index.ts`: reexporta los dos.
 - `tests/unit/pedidos-ui/order-customer-picker.test.tsx` (nuevo):
   - `fetchPage` llama a la action con el `purpose` que recibe;
-  - el oculto lleva el **id** y no la etiqueta;
+  - el oculto lleva el **id** y no la etiqueta (vacío con «Sin cliente»);
   - muestra el sufijo «(eliminado)»;
+  - con `purpose="filter"`, «Sin cliente» va primero en la página 1 sin término y con un término
+    que casa («sin», «CLIENTE», «sín»); no aparece con un término que no casa ni en la página 2;
+  - con `purpose="assign"`, «Sin cliente» no aparece nunca;
   - el objetivo táctil.
 
 **Hecho cuando:** el test está en verde.
 
 ### F3 [P] — Parámetro de la dirección · depende de: T0 · R24, R34
 
-- `order-list-params.ts`: `CUSTOMER_PARAM` y `CUSTOMER_COLUMN_ID`, con lectura y escritura.
-- `tests/unit/pedidos-ui/order-list-params.test.ts` (modifica): un uuid válido entra, uno inválido o
-  vacío no, el parámetro repetido toma el primero, y `parse(build(p))` devuelve `p` con el filtro.
+- `order-list-params.ts`: `CUSTOMER_PARAM`, `CUSTOMER_COLUMN_ID`, `CUSTOMER_PRESENCE_COLUMN_ID` y
+  `CUSTOMER_NONE_PARAM_VALUE`, con lectura y escritura (`design.md > 8`).
+- `tests/unit/pedidos-ui/order-list-params.test.ts` (modifica): un uuid válido entra como
+  `customerId`, `none` entra como `customerPresence`, otro valor o vacío no entra, el parámetro
+  repetido toma el primero, `parse(build(p))` devuelve `p` con cada uno de los dos filtros, y con
+  los dos a la vez la dirección lleva el uuid.
 
 **Hecho cuando:** el test está en verde.
 
@@ -288,11 +330,14 @@ los tests existentes de `pedidos-ui`.
 - `order-customer-filter.tsx` (nuevo), `order-table.tsx`, `order-list-section.tsx` e `index.ts`.
 - `tests/unit/pedidos-ui/order-customer-filter.test.tsx` (nuevo):
   - elegir navega a la primera página y conserva estado, prioridad, fecha, orden y `q`;
+  - elegir «Sin cliente» navega a `customer=none`; elegir después un cliente lo sustituye, y al
+    revés (un solo valor);
   - limpiar quita solo `customer`;
-  - viene precargado con la opción del servidor.
+  - viene precargado con la opción del servidor, o con «Sin cliente».
 - `tests/unit/pedidos-ui/order-list-section.test.tsx` (modifica):
-  - con `customer` en los parámetros, pide la opción **en paralelo** al listado;
+  - con `customer=<uuid>` en los parámetros, pide la opción **en paralelo** al listado;
   - con `null`, lista sin el filtro;
+  - con `customer=none`, **no** llama a la action de opción y lista con `customerPresence`;
   - `canEditCustomer` sale de la misma comprobación que `canEditDistribution`.
 - `tests/unit/pedidos-ui/order-table.test.tsx` (modifica): el filtro está en `toolbarActions`.
 - `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` (modifica si cubre la barra).
@@ -347,7 +392,7 @@ lo prohibido.
 - `lib/modules/clientes/domain/customer-catalog.ts`
 - `lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma.ts`
 - `lib/modules/pedidos/domain/order-customer.ts`, `set-order-customer.ts`,
-  `search-order-customers.ts`, `get-order-customer-filter-option.ts`
+  `search-order-customers.ts`, `get-order-customer-filter-option.ts`, `order-edit-change.ts`
 - `lib/modules/pedidos/adapters/driving/order-customer-fixtures.ts` (temporal, se borra en TI)
 - `app/(private)/pedidos/components/order-customer-label.ts`, `order-customer-picker.tsx`,
   `order-customer-dialog.tsx`, `order-customer-filter.tsx`
@@ -356,7 +401,8 @@ lo prohibido.
   - `tests/unit/pedidos/order-customer-contract.test-d.ts`, `order-customer-write.test.ts`,
     `set-order-customer.test.ts`, `search-order-customers.test.ts`,
     `order-customer-authorization.test.ts`, `list-orders-customer.test.ts`,
-    `order-customer-boundaries.test.ts`, `order-actions-customer.test.ts`
+    `order-customer-boundaries.test.ts`, `order-actions-customer.test.ts`,
+    `order-customer.test.ts`, `order-edit-change.test.ts`, `order-customer-filter-where.test.ts`
   - `tests/unit/pedidos/schema/orders-customer-migration.test.ts`
   - `tests/unit/clientes/customer-catalog.test.ts`
   - `tests/unit/pedidos-ui/order-customer-picker.test.tsx`, `order-form-customer.test.tsx`,
@@ -375,7 +421,8 @@ lo prohibido.
   (solo `export`)
 - `lib/modules/pedidos/index.ts`
 - `lib/modules/pedidos/domain/`: `order-view.ts`, `errors.ts`, `order-input.ts`, `create-order.ts`,
-  `update-order.ts`, `get-order.ts`, `list-orders.ts`, `order-queryable.ts`
+  `update-order.ts`, `get-order.ts`, `list-orders.ts`, `order-queryable.ts`, `order-distribution.ts`
+  (solo `export` de `sameDecimal`)
 - `lib/modules/pedidos/ports/order-write-repository.ts`
 - `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`
 - `lib/modules/pedidos/adapters/driving/order-actions.ts`
@@ -388,7 +435,8 @@ lo prohibido.
   - `tests/unit/clientes/scope.test.ts`
   - `tests/guards/guard-ambito-empresa-clientes.test.ts` (si su lista es cerrada)
   - `tests/unit/pedidos/`: `order-actions.test.ts`, `order-view.test.ts`, `order-input.test.ts`,
-    `list-orders.test.ts`, `get-order.test.ts`
+    `list-orders.test.ts`, `get-order.test.ts`, y los dobles de `OrderWriteRepository`
+    (`setCustomerAlive`, mecánico, T0)
   - `tests/unit/async-autocomplete.test.tsx`
   - `tests/unit/pedidos-ui/`: `order-list-params.test.ts`, `order-columns.test.tsx`,
     `order-row-actions.test.tsx`, `order-list-section.test.tsx`, `order-table.test.tsx`, y los que
