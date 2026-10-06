@@ -498,3 +498,13 @@ Quedan 3 casos en conflicto con el spec:
    `components/`; la subruta `importar/` de design 6 lo rompe por existir.
 
 Pistas B8, B10, TI y TZ en espera de decisión del leader.
+
+### Tanda B/F, segunda corrida (tras aa2e713d y 5827f90c) — CERRADA
+
+Decisiones humanas aplicadas: test de ruta separado (aa2e713d, desvío para el reviewer), R8 normalizada
+(5827f90c, DS-8 enmendada en 181833e3), `IMPORT_EXAMPLE_ROW` validada.
+
+`./init.sh --rapido` -> exit 1 en `pnpm run test:rapido`: `Test Files 7 failed | 474 passed (481)`,
+`Tests 9 failed | 7290 passed | 50 skipped (7349)`. Typecheck y lint en verde. Rojos: los 7 del baseline
+(unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso, recetas/module-contract,
+recetas/scope, recipe-page). Ningún rojo nuevo: la tanda cierra con la regla de rojos heredados.
