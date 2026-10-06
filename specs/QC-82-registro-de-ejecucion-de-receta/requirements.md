@@ -1,6 +1,6 @@
 # QC-82 — registro-de-ejecucion-de-receta · requirements.md
 
-> **Zona** `fullstack` · **Complejidad** `high` · **depends_on** `QC-63` ·
+> **Zona** `fullstack` · **Complejidad** `high` · **depends_on** `QC-63`, `QC-168` ·
 > **Rama** `feature/QC-82-registro-de-ejecucion-de-receta`
 >
 > ## Alcance
@@ -10,6 +10,13 @@
 > paso y, solo al cancelar, el motivo. La ficha **lo conecta a la pantalla de ejecución** de QC-63,
 > que gana un botón para **cancelar el pedido con motivo**, y que al **reentrar** en un pedido
 > `EN_CURSO` lo **devuelve al último paso anotado**.
+>
+> **Enmienda del 2026-09-26 (A1–A6):** al entrar **QC-168** (`estado-por-empacar`, `done`) el gesto
+> del operario ya no entrega: **deja el pedido `POR_EMPACAR`**, y quien lo recoge —el Empacador—
+> lo lleva a `ENTREGADO` con dos gestos más, **comenzar empaque** y **terminar empaque**, que
+> **también se anotan aquí** (QC-168 `D8`). Son **ocho** acciones, no seis. El resto de la ficha
+> —qué se guarda, cómo se acota, cómo se cancela— **no cambia**: lo que cambia es el estado de
+> salida del Finalizar, los dos estados nuevos, las dos acciones nuevas y quién puede cancelar.
 >
 > ## Lo que NO entra
 >
@@ -32,9 +39,14 @@
 > **Cómo se citan las decisiones.** `[D<n>]` es la fila **n-ésima** de `## Decisiones cerradas (no
 > reabrir)`, contando desde arriba y sin reordenar nada: `D1`–`D3` son las del 2026-09-08 y
 > `D4`–`D18` las del 2026-09-18 y `D19`–`D20` las del 2026-09-24. **Donde chocan, manda la del
-> 2026-09-18**: `D12` enmienda a `D1` (se añade **retomar**, y son **seis** acciones y ninguna más).
-> `D19` y `D20` no enmiendan ninguna: precisan `D6` y `D7` sobre hechos del código posteriores a
-> ellas.
+> 2026-09-18**: `D12` enmienda a `D1` (se añade **retomar**). **`[QC-168 D<n>]`** es una decisión de
+> **QC-168**, no de esta ficha: quien manda sobre el empaque es esa, y solo ella. **`[QC-168 R<n>]`**
+> es un requisito suyo, con la misma jerarquía. **Donde chocan, manda el de QC-168**: su `D8` (el
+> empaque también se registra) y su `D9` (QC-150 → QC-168 → QC-82, esta ficha ajusta su spec antes de
+> implementar) **ganan** a `D1`/`D12` de esta ficha, que quedan **cerradas y enmendadas**, no
+> reabiertas. Ninguna decisión de QC-168 se copia aquí como si fuera de esta ficha, y esta ficha no
+> inventa filas nuevas en la tabla de abajo: lo que QC-168 dejó sin contestar está en
+> `## Preguntas abiertas`.
 >
 > **Vocabulario.** «La pantalla» es la pantalla de ejecución de QC-63 (`assignedOrderRoute(<id>)`).
 > «Responsable asignado» es quien figura como responsable del pedido en su empresa. «Posición» es el
@@ -50,16 +62,42 @@
 > cancelación de `pedidos` ahora libera el material apartado y el de entrega lo consume, y los dos
 > abren su propia transacción. Las dos preguntas que abrió la revisión las cerró el humano el mismo
 > día (`D19`, `D20`).
+>
+> **Enmienda del 2026-09-26 (A1–A6), en una pasada y sin reescribir nada de lo anterior.** Las seis
+> filas que dejó QC-168 `design.md > 9`, apoyadas en su `R45` —que **prohíbe** a QC-168 tocar este
+> spec—; cada una comprobada contra el código de `dev` tras el merge `811416cd`, no contra el spec de
+> QC-168. Qué cambió y con qué evidencia, punto por punto, en `design.md > Revisión 2026-09-26`.
+>
+> | | Enmenda | Dónde cae | Requisitos |
+> |---|---|---|---|
+> | **A1** | El Finalizar deja **`POR_EMPACAR`**, no `ENTREGADO` | `design.md > 3.3` y `tasks.md > T11` | R21 |
+> | **A2** | `POR_EMPACAR` y `EN_EMPAQUE` **congelan** la asignación, con `order_produced_frozen` | `design.md > 0`, fila «Estados que congelan» | **R43** |
+> | **A3** | El enum pasa de **seis** a **ocho** acciones; las dos de empaque se anotan **dentro** de `transaction.run` | `design.md > 3.1`, `> 3.3` y `> 4` | R1, **R41**, **R42** |
+> | **A4** | Las dos escrituras de empaque exigen **`empaque.modificar`**, no `asignaciones.consultar` | `design.md > 3.3` | R26, **R42** |
+> | **A5** | Un pedido `POR_EMPACAR` o `EN_EMPAQUE` es **`not_cancellable`**, no `not_found` | `design.md > 5` | R29, **R43** |
+> | **A6** | La E2E ya espera `POR_EMPACAR` tras Finalizar | `tasks.md > T11` y `> T23` | **R43** (como premisa) |
+>
+> **Consecuencia de fondo, y es la que obliga a mover T1 y T2:** las seis acciones de
+> `order_execution_entries` pasan a **ocho**, y el enum `OrderExecutionAction` de la migración también.
+> El tipo `ExecutionAction` del dominio y su mapa al enum se amplían, y el `CHECK` de la posición
+> necesita **un tercero** para que las dos de empaque no lleven posición (R5bis). Nada de esto abre
+> alcance fuera de las seis enmiendas: sale de ellas.
+>
+> **Lo que la enmienda NO toca:** `D1`–`D20` siguen cerradas. No se reescribe ningún requisito que no
+> esté nombrado arriba, ni se reabre ninguna decisión. Lo único que se añade son **`R41`–`R43`**, tres
+> requisitos nuevos, y **dos preguntas abiertas** que quedan abajo.
 
 ### Qué se anota
 
-**R1.** El sistema DEBE anotar en el registro de ejecución **exactamente seis acciones** —arrancar,
-retomar, avanzar, retroceder, cancelar y finalizar— y la base DEBE rechazar cualquier anotación con
-una acción distinta de esas seis. `[D1] [D12]`
+**R1.** El sistema DEBE anotar en el registro de ejecución **exactamente ocho acciones** —arrancar,
+retomar, avanzar, retroceder, cancelar, finalizar, **comenzar empaque** y **terminar empaque**— y la
+base DEBE rechazar cualquier anotación con una acción distinta de esas ocho. `[D1] [D12] [QC-168 D8]
+[QC-168 D9]`
 
 **R2.** Cada anotación DEBE guardar la acción, el instante, el pedido, la persona que la hizo, su
-empresa y la posición del paso; y, solo si la acción es cancelar, el motivo. `[D1] [D9] [D10] [D14]
-[D15]`
+empresa y la posición del paso **—salvo en las dos anotaciones de empaque, que van siempre sin
+posición (R5bis)—**; y, solo si la acción es cancelar, el motivo. `[D1] [D9] [D10] [D14] [D15]
+[QC-168 D8]`
 
 **R3.** El sistema DEBE guardar del tiempo **un único instante** por anotación —el de la acción— y
 **NO DEBE** guardar duración, ni hora de fin, ni ninguna otra marca de tiempo en la anotación. `[D10]`
@@ -71,6 +109,11 @@ DEBE** corregir ni recalcular ninguna posición ya anotada. `[D9]`
 **R5.** ⚑ SI la receta del pedido no tiene ningún paso, ENTONCES las anotaciones de ese pedido DEBEN
 guardarse **sin posición**; en cualquier otro caso la posición DEBE existir y ser un entero mayor o
 igual que 1, y la base DEBE rechazar una posición menor que 1. `[D9]`
+**R5bis.** ⚑ Las dos anotaciones de empaque —**comenzar empaque** y **terminar empaque**— DEBEN
+guardarse **siempre sin posición**: la pantalla de empaque no recorre pasos y no tiene asistente
+que recorra, así que no hay posición que anotar. La base DEBE rechazar una posición distinta de
+`NULL` en esas dos acciones, y **NO DEBE** exigirla en ellas aunque la receta tenga pasos. `[D9]
+[QC-168 D8]`
 
 **R6.** El pedido DEBE ser **obligatorio**: la base DEBE rechazar una anotación sin pedido o con un
 pedido que no existe. `[D14]`
@@ -79,8 +122,9 @@ pedido que no existe. `[D14]`
 anotación cuya empresa no sea a la vez la del pedido y la de la persona que la hizo. `[D15]`
 
 **R8.** La base DEBE garantizar que el motivo existe **si y solo si** la acción es cancelar: DEBE
-rechazar una cancelación sin motivo y DEBE rechazar cualquier otra acción que traiga motivo. `[D2]
-[D4]`
+rechazar una cancelación sin motivo y DEBE rechazar cualquier otra acción que traiga motivo. Las dos
+acciones de empaque cuentan entre esas «cualquier otra acción»: no llevan motivo. `[D2]
+[D4] [QC-168 D8]`
 
 **R9.** SI se pide cancelar con el motivo ausente, vacío o de solo espacios, ENTONCES el sistema DEBE
 rechazarlo **sin escribir nada**: ni anotación ni cambio en el pedido. `[D3]`
@@ -125,10 +169,16 @@ cambiar igualmente, la pantalla **NO DEBE** bloquearse ni mostrar ningún error,
 DEBE** reintentarse: se pierde. `[D11]`
 
 **R20.** SI el pedido ya no está en `EN_CURSO` cuando llega una anotación de avanzar o de retroceder,
-ENTONCES el sistema **NO DEBE** escribirla. `[D11] [D13]`
+ENTONCES el sistema **NO DEBE** escribirla, y **NO DEBE** avisar de ello: la pantalla ya está
+instruida para no propagar el fallo (R19). SI el estado es `ENTREGADO` o `CANCELADO`, el sistema DEBE
+rechazar con su error de estado cerrado; SI es `POR_EMPACAR` o `EN_EMPAQUE`, con
+**`order_produced_frozen`**; SI es `PENDIENTE`, con `order_not_found`. `[D11] [D13] [QC-168 D8]`
 
 **R21.** CUANDO se activa **Finalizar** en el último paso, el sistema DEBE anotar **finalizar** con la
-posición de ese paso, en **la misma operación** que deja el pedido `ENTREGADO`. `[D5] [D11]`
+posición de ese paso, en **la misma operación** que deja el pedido **`POR_EMPACAR`**. La entrega la
+termina el Empacador, no el operario: desde QC-168 este requisito **no dice `ENTREGADO`**, y el
+`finished_at` tampoco se escribe aquí —lo escribe **terminar empaque**—. `[D5] [D11] [QC-168 D8]
+[QC-168 D9]`
 
 **R22.** La pantalla DEBE ofrecer un **botón para cancelar el pedido** que, antes de hacer nada,
 **pida el motivo** en un campo de texto visible. CUANDO se confirma con un motivo válido, el sistema
@@ -139,13 +189,15 @@ está mostrando, en **la misma operación**. `[D5] [D6] [D11]`
 **exactamente el mismo texto** que queda en la anotación, escrito una sola vez por quien cancela.
 `[D8]`
 
-**R24.** SI falla cualquiera de las dos escrituras de arrancar, finalizar o cancelar, ENTONCES **NO
-DEBE quedar ninguna**: ni la anotación sin el cambio del pedido ni el cambio del pedido sin la
-anotación, y la pantalla DEBE mostrar el error. «El cambio del pedido» incluye todo lo que `pedidos`
-escribe en esa misma operación: al finalizar, el consumo del material y la fecha de terminado; al
-cancelar, la liberación del material apartado. SI `pedidos` rechaza la entrega (material
-insuficiente o receta sin líneas), ENTONCES **NO DEBE** quedar la anotación de finalizar ni nada de
-esa operación. `[D11]`
+**R24.** SI falla cualquiera de las dos escrituras de arrancar, retomar, finalizar, cancelar, **comenzar
+empaque o terminar empaque**, ENTONCES **NO DEBE quedar ninguna**: ni la anotación sin el cambio del
+pedido ni el cambio del pedido sin la anotación, y la pantalla DEBE mostrar el error. «El cambio del
+pedido» incluye todo lo que `pedidos` escribe en esa misma operación: al finalizar, el consumo del
+material y el alta del lote de producto terminado; al cancelar, la liberación del material apartado;
+al comenzar o terminar el empaque, el estado y el `packed_by` o el `finished_at` que escribe esa misma
+sentencia. SI `pedidos` rechaza el Finalizar —material insuficiente, receta sin líneas, sin contenido
+de presentación, sin envase entero o receta dada de baja—, ENTONCES **NO DEBE** quedar la anotación de
+finalizar ni nada de esa operación. `[D11] [QC-168 D8] [QC-168 D9]`
 
 **R25.** ⚑ CUANDO el pedido queda `CANCELADO` desde la pantalla, el sistema DEBE devolver a quien la
 usa a la lista de pedidos asignados mostrando una **confirmación visible** de la cancelación. `[D6]`
@@ -156,7 +208,9 @@ usa a la lista de pedidos asignados mostrando una **confirmación visible** de l
 **primera línea** sea la exigencia de `asignaciones.consultar`, antes de validar la entrada y antes
 de tocar ninguna dependencia. SI el actor está ausente, no trae permisos, los trae vacíos o no trae
 ese código, ENTONCES el caso de uso DEBE rechazar con su error de autorización **sin haber llamado a
-ninguna dependencia**. `[D7]`
+ninguna dependencia**. **Las dos escrituras de las acciones de empaque son la única excepción, y la
+exigen en el otro sentido:** sus dos casos de uso piden **`empaque.modificar`** en esa primera línea y
+**NO** piden `asignaciones.consultar` (R42). `[D7] [QC-168 D8] [QC-168 D9]`
 
 **R27.** **Cualquier responsable asignado** al pedido DEBE poder cancelarlo desde la pantalla, no
 solo quien lo arrancó, sea cual sea su rol, **incluido el Empacador**. SI el pedido no está asignado a
@@ -174,11 +228,15 @@ del estado `CANCELADO` con su motivo. La cancelación desde la pantalla DEBE hac
 **exactamente lo mismo** que hace el caso de uso de cancelación de `pedidos`, **incluida la liberación
 de todo el material apartado** del pedido, con quien cancela como autor, y **NO DEBE** consumir ni dar
 de baja ningún material. SI `pedidos` declara el pedido no cancelable, ENTONCES el sistema DEBE
-responder `not_cancellable` sin escribir nada. `[D6] [D7] [D19]`
+responder `not_cancellable` sin escribir nada; y eso vale también, con el **mismo** código, para un
+pedido `POR_EMPACAR` o `EN_EMPAQUE` (R43). `[D6] [D7] [D19] [QC-168 D8]`
 
-**R30.** El conjunto de permisos que el seed asigna a cada rol DEBE quedar **sin cambios**: el
+**R30.** **Esta ficha** no DEBE cambiar el conjunto de permisos que el seed asigna a cada rol: el
 Operador DEBE poder cancelar desde la pantalla **sin** `pedidos.modificar` y **sin**
-`asignaciones.modificar`. `[D7]`
+`asignaciones.modificar`, y las dos acciones de empaque **NO DEBE** añadir ningún código nuevo al
+Operador. Esto no contradice a QC-168, que ya sembró `empaque.modificar` para el Empacador y con eso
+cerró su propio `R30`: aquí se afirma que **QC-82 no añade ni quita permisos**, no que el repo no los
+haya cambiado. `[D7] [QC-168 D9]`
 
 **R31.** El registro **NO DEBE** ofrecer ninguna operación que modifique o borre una anotación, y
 ninguna vía de la aplicación DEBE emitir una modificación ni un borrado sobre él: una anotación
@@ -224,23 +282,50 @@ afirman lo enmendado DEBEN **tensarse con nota fechada** y **ninguna guardia DEB
 **R40.** El sistema DEBE tener un E2E en el que el Operador cancela otro pedido asignado **con un
 motivo**, y el pedido queda **`CANCELADO` con ese motivo**. `[D17]`
 
+### Las dos acciones de empaque (A3, A4) y los dos estados que congelan (A2, A5, A6)
+
+**R41.** CUANDO el Empacador activa **Comenzar empaque** o **Terminar empaque** sobre un pedido
+`POR_EMPACAR`, el sistema DEBE anotar **esa** acción —**comenzar empaque** o **terminar empaque**— con
+el instante, el pedido, la persona y su empresa, **sin posición** (R5bis) y **sin motivo** (R8), y lo
+DEBE hacer **en la misma operación** que deja el pedido en `EN_EMPAQUE` o en `ENTREGADO`. SI cualquiera
+de las dos escrituras falla, ENTONCES **NO DEBE quedar ninguna**, y la pantalla DEBE mostrar el error
+(R24). SI el caso de uso de empaque responde que el pedido **ya está** en ese estado —
+`already_mine`—, ENTONCES **NO DEBE** anotar nada, porque no hubo cambio: es la regla de R24 aplicada al
+caso en que el estado ya era el que se pedía. `[D11] [D13] [QC-168 D8] [QC-168 D9]`
+
+**R42.** Las dos escrituras de R41 DEBEN hacerse con los **casos de uso de empaque** de
+`asignaciones` —los de **QC-168**— y **NO** con un caso de uso nuevo ni con uno de los otros cuatro
+caminos: esos dos archivos ya existen, ya exigen **`empaque.modificar`** en su primera línea y ya
+rechazan al actor sin ese permiso **antes de tocar nada**. Les corresponde además **compartir** la
+transacción de la ejecución, por el mismo mecanismo que las otras cuatro escrituras (R24), de modo que
+QC-82 **NO DEBE** duplicar la lógica de transición: la tiene que seguir llamando. `[D7] [D11]
+[QC-168 D8] [QC-168 D9]`
+
+**R43.** Un pedido `POR_EMPACAR` o `EN_EMPAQUE` DEBE quedar **fuera del alcance de las anotaciones de
+paso y de la cancelación**: (a) una anotación de avanzar o retroceder sobre él **NO DEBE** escribirse
+y su error es **`order_produced_frozen`** (R20); (b) pedir su cancelación **NO DEBE** responder
+`not_found` sino **`not_cancellable`** (R29); y (c) el E2E de empaque que espera `POR_EMPACAR` tras
+finalizar —el de **QC-168**— es una **premisa ya cumplida en `dev`**, no un entregable de esta ficha:
+lo que QC-82 le aporta es el **arreglo de limpieza** de esa E2E (R39) y las anotaciones que la
+habilitan. `[D11] [D13] [QC-168 D8] [QC-168 D9]`
+
 ### Cobertura de las decisiones
 
 | Decisión | Requisitos |
 |---|---|
-| D1 — seis acciones (enmendada por D12) | R1, R2 |
+| D1 — seis acciones (enmendada por D12; **y por A3, a ocho**) | R1, R2 |
 | D2 — el motivo puede quedar vacío | R8 |
 | D3 — no se cancela sin motivo | R9, R10 |
 | D4 — motivo solo en cancelar, garantizado en la base; retroceder sin preguntas | R8, R11, R18 |
 | D5 — la ficha conecta el registro a la pantalla | R12, R13, R17, R18, R21, R22, R36, R37, R38 |
-| D6 — cancelar cancela el pedido por el camino único, con botón y motivo | R22, R25, R29, R36 |
-| D7 — cualquier responsable, `asignaciones.consultar`, caso de uso nuevo, seed igual | R26, R27, R29, R30 |
+| D6 — cancelar cancela el pedido por el camino único, con botón y motivo | R22, R25, R29, R36, R43 |
+| D7 — cualquier responsable, `asignaciones.consultar`, caso de uso nuevo, seed igual | R26, R27, R29, R30, R42 |
 | D8 — el mismo texto de motivo en la anotación y en el pedido | R10, R23 |
-| D9 — se guarda la posición; riesgo aceptado | R2, R4, R5, R14, R17, R18 |
+| D9 — se guarda la posición; riesgo aceptado | R2, R4, R5, R14, R17, R18, R5bis, R41 |
 | D10 — un solo instante, sin duración | R2, R3 |
-| D11 — avanzar/retroceder no bloquean; los otros cuatro, en la misma operación | R12, R15, R16, R19, R20, R21, R22, R24 |
+| D11 — avanzar/retroceder no bloquean; los otros cuatro, en la misma operación | R12, R15, R16, R19, R20, R21, R22, R24, R41, R42 |
 | D12 — reentrar anota retomar y vuelve al último paso anotado | R1, R13, R14, R16, R37, R38 |
-| D13 — no se borra ni se edita nada | R20, R31 |
+| D13 — no se borra ni se edita nada | R20, R31, R41, R43 |
 | D14 — el pedido es obligatorio | R2, R6 |
 | D15 — columna propia de empresa | R2, R7, R27, R28 |
 | D16 — identificadores en inglés | R33 |
@@ -248,10 +333,34 @@ motivo**, y el pedido queda **`CANCELADO` con ese motivo**. `[D17]`
 | D18 — ninguna librería nueva | R35 |
 | D19 — cancelar desde la ejecución libera todo el material, por el camino único | R24, R29 |
 | D20 — el Empacador ejecuta, finaliza y (por D7) cancela lo que tenga asignado | R27 |
+| **QC-168 D8** — el empaque también se registra; `POR_EMPACAR` bloquea el avance | R1, R2, R5bis, R20, R21, R24, R26, R29, R41, R42, R43 |
+| **QC-168 D9** — el orden es QC-150 → QC-168 → QC-82, y esta ficha ajusta su spec | R1, R21, R24, R30, R41, R42, R43 |
+| **A1–A6** — la enmienda de QC-168 aplicada a los tres spec en una pasada | R20, R21, R24, R26, R29, R30, R39, **R41**, **R42**, **R43** |
+
+> **Nota fechada, 2026-09-26.** La fila de `D1` dice «seis» porque es lo que el humano cerró el
+> 2026-09-18, y no se reescribe. Ese «seis» queda **superado** por `QC-168 D8`: son **ocho** (R1). Lo
+> mismo con la etiqueta de la columna «caso de uso nuevo» de `D7`, que para las **dos** de empaque no
+> es nuevo sino **el de QC-168** (R42). Ninguna de las dos cosas es una reopening.
 
 ## Preguntas abiertas
 
-Ninguna.
+**Dos.** Las seis enmiendas A1–A6 no dejaron más huecos que estos dos, y ninguno es de alcance: los
+cuatro puntos que A1, A2, A4 y A6 obligaban a decidir sobre el código de `dev` se resolvieron
+comprobando el código, y por eso no están aquí. Lo que queda es lo que el código **no** puede
+contestar porque es una elección de producto, y las dos están en
+`design.md > Revisión 2026-09-26 > 14`.
+
+**P1 — Cuando `startPacking` o `finishPacking` responden `already_mine`, ¿se anota o no?**
+Es la parte de A3 que el código deja abierta: `already_mine` significa que el `UPDATE` no cambió
+nada, y de ahí se puede concluir que no hay hecho que registrar (y por tanto **cero** anotaciones) o
+que el registro es de **gestos** y repetir el clic es un gesto real (y por tanto **una** anotación).
+Lo primero mantiene R24 entero; lo segundo obliga a exceptuar `already_mine` de la regla de «o las
+dos escrituras o ninguna». **Recomendación: cero anotaciones**, por R24 y por D13.
+
+**P2 — ¿Cómo se llaman los dos valores nuevos del enum `OrderExecutionAction`?**
+`PACK_START` / `PACK_FINISH` frente a `START_PACKING` / `FINISH_PACKING`. Los dos respetan R33
+(inglés, mayúsculas) y los dos son indecibles por el código. **Recomendación: `PACK_START` y
+`PACK_FINISH`**, por simetría con `GO_BACK`, que también pone el verbo primero.
 
 ## Decisiones cerradas (no reabrir)
 
