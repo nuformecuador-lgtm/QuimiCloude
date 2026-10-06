@@ -407,6 +407,7 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'nameNormalized',
       'description',
       'steps',
+      'packingSteps',
       'imagePath',
       // QC-50: aislamiento por empresa de esta ficha. `companyId` entra ENTRE `imagePath` y
       // `createdBy`, que es el lugar exacto donde `db/schema.prisma` lo coloco -no al final-,

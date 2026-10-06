@@ -32,6 +32,7 @@ export type FormulaDraft = {
   readonly description: string | null;
   readonly lines: readonly DraftLine[];
   readonly steps: readonly RecipeStepDocument[];
+  readonly packingSteps: readonly RecipeStepDocument[];
 };
 
 export type RowProblem =
@@ -49,6 +50,7 @@ export type FormulaReviewIssues = {
   readonly name: 'ok' | 'empty' | 'too_long' | 'normalizes_empty';
   readonly description: 'ok' | 'too_long';
   readonly steps: 'ok' | 'too_many' | 'invalid';
+  readonly packingSteps: 'ok' | 'too_many' | 'invalid';
   readonly canConfirm: boolean;
 };
 
@@ -141,9 +143,26 @@ export function reviewFormulaImport(draft: FormulaDraft): FormulaReviewIssues {
   const name = nameStatus(draft.name);
   const description = descriptionStatus(draft.description);
   const steps = stepsStatus(draft.steps);
+  const packingSteps = stepsStatus(draft.packingSteps);
 
   const canConfirm =
-    !noLines && rows.length === 0 && total.isComplete && name === 'ok' && description === 'ok' && steps === 'ok';
+    !noLines &&
+    rows.length === 0 &&
+    total.isComplete &&
+    name === 'ok' &&
+    description === 'ok' &&
+    steps === 'ok' &&
+    packingSteps === 'ok';
 
-  return { total: total.total, isComplete: total.isComplete, noLines, rows, name, description, steps, canConfirm };
+  return {
+    total: total.total,
+    isComplete: total.isComplete,
+    noLines,
+    rows,
+    name,
+    description,
+    steps,
+    packingSteps,
+    canConfirm,
+  };
 }

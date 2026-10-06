@@ -36,9 +36,22 @@ type Dobles = {
   readonly deps: GetPackingOrderDeps;
   readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
   readonly findFinishedGoodsReceipts: ReturnType<typeof vi.fn>;
+  readonly findPackingStepsById: ReturnType<typeof vi.fn>;
+  readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
 
-function montar(options?: { readonly items?: readonly unknown[] }): Dobles {
+function paso(text: string) {
+  return { blocks: [{ kind: 'paragraph' as const, spans: [{ text }] }] };
+}
+
+const ENVASAR = paso('Envasar en garrafas de 5 L');
+const ETIQUETAR = paso('Etiquetar con el lote');
+const MEZCLAR_OPERADOR = 'Mezclar en frio 10 minutos';
+
+function montar(options?: {
+  readonly items?: readonly unknown[];
+  readonly packingSteps?: readonly unknown[] | null;
+}): Dobles {
   const listAliveSummariesByIds = vi.fn(async () => ({
     items: options?.items ?? [RESUMEN],
     total: (options?.items ?? [RESUMEN]).length,
@@ -47,26 +60,46 @@ function montar(options?: { readonly items?: readonly unknown[] }): Dobles {
     totalPages: 1,
   }));
   const findFinishedGoodsReceipts = vi.fn(async () => [{ orderId: PEDIDO, packages: '5' }]);
+  const findPackingStepsById = vi.fn(async () =>
+    options?.packingSteps === undefined ? [ENVASAR, ETIQUETAR] : options.packingSteps,
+  );
+  const listByOrdersInCompany = vi.fn(async () => []);
+  const findRefsIncludingDeleted = vi.fn(async () => [{ id: 'receta-1', name: 'Desengrasante', ownName: 'Desengrasante', isUnderReview: false, original: null, isDeleted: false }]);
+  const findRefsIncludingDeletedInCompany = vi.fn(async () => []);
+  const findPresentationRefs = vi.fn(async () => [
+    { id: 'presentacion-1', name: 'Botella 1L' },
+    { id: 'presentacion-2', name: 'Botella 200 ml' },
+  ]);
+  const findUnitRefs = vi.fn(async () => [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]);
 
   const deps = {
     orders: { listAliveSummariesByIds },
-    assignments: { listByOrdersInCompany: vi.fn(async () => []) },
-    recipes: { findRefsIncludingDeleted: vi.fn(async () => [{ id: 'receta-1', name: 'Desengrasante', ownName: 'Desengrasante', isUnderReview: false, original: null, isDeleted: false }]) },
-    people: { findRefsIncludingDeletedInCompany: vi.fn(async () => []) },
-    presentations: {
-      findRefs: vi.fn(async () => [
-        { id: 'presentacion-1', name: 'Botella 1L' },
-        { id: 'presentacion-2', name: 'Botella 200 ml' },
-      ]),
-    },
-    units: {
-      findRefs: vi.fn(async () => [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]),
-    },
+    assignments: { listByOrdersInCompany },
+    recipes: { findRefsIncludingDeleted },
+    people: { findRefsIncludingDeletedInCompany },
+    presentations: { findRefs: findPresentationRefs },
+    units: { findRefs: findUnitRefs },
     products: { findFinishedGoodsReceipts },
+    packingSteps: { findPackingStepsById },
     now: () => new Date('2026-09-25T12:00:00.000Z'),
   } as unknown as GetPackingOrderDeps;
 
-  return { deps, listAliveSummariesByIds, findFinishedGoodsReceipts };
+  return {
+    deps,
+    listAliveSummariesByIds,
+    findFinishedGoodsReceipts,
+    findPackingStepsById,
+    todos: [
+      listAliveSummariesByIds,
+      listByOrdersInCompany,
+      findRefsIncludingDeleted,
+      findRefsIncludingDeletedInCompany,
+      findPresentationRefs,
+      findUnitRefs,
+      findFinishedGoodsReceipts,
+      findPackingStepsById,
+    ],
+  };
 }
 
 describe('getPackingOrder — autorizacion (R13)', () => {
@@ -108,6 +141,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       status: 'POR_EMPACAR',
       packedByName: null,
       packedById: null,
+      packingSteps: [],
     });
   });
 
@@ -189,5 +223,90 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
 
     expect(row.unitId).toBeNull();
     expect(row.unitLabel).toBeNull();
+  });
+});
+
+describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
+  const RESUMEN_DEL_ACTOR = { ...RESUMEN, status: 'EN_EMPAQUE', packedBy: ANA };
+
+  it('R19: en `POR_EMPACAR` devuelve `packingSteps: []` sin llamar al lector', async () => {
+    const { deps, findPackingStepsById } = montar();
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.packingSteps).toEqual([]);
+    expect(findPackingStepsById).not.toHaveBeenCalled();
+  });
+
+  it('R22: en `EN_EMPAQUE` a nombre de otro devuelve `packingSteps: []` sin llamar al lector', async () => {
+    const { deps, findPackingStepsById } = montar({ items: [RESUMEN_EN_EMPAQUE] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.packingSteps).toEqual([]);
+    expect(findPackingStepsById).not.toHaveBeenCalled();
+  });
+
+  it('R20: en `EN_EMPAQUE` del actor devuelve los pasos del lector, en orden', async () => {
+    const { deps, findPackingStepsById } = montar({ items: [RESUMEN_DEL_ACTOR] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.packingSteps).toEqual([ENVASAR, ETIQUETAR]);
+    expect(findPackingStepsById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R20, R29: si el lector devuelve `null` (otra empresa o inexistente) la salida trae `[]`', async () => {
+    const { deps } = montar({ items: [RESUMEN_DEL_ACTOR], packingSteps: null });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(row.packingSteps).toEqual([]);
+  });
+
+  it('R29: el lector recibe la receta del pedido y la empresa del actor', async () => {
+    const { deps, findPackingStepsById } = montar({ items: [RESUMEN_DEL_ACTOR] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(findPackingStepsById).toHaveBeenCalledWith('receta-1', EMPRESA);
+  });
+
+  it('R27: la salida no tiene ninguna clave con los pasos del operador', async () => {
+    const { deps } = montar({ items: [RESUMEN_DEL_ACTOR] });
+    const getPackingOrder = createGetPackingOrder(deps);
+
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+
+    expect(Object.keys(row).filter((key) => /steps/i.test(key))).toEqual(['packingSteps']);
+    expect(JSON.stringify(row)).not.toContain(MEZCLAR_OPERADOR);
+  });
+
+  it('R28: un actor con solo `empaque.modificar` recibe los pasos', async () => {
+    const { deps } = montar({ items: [RESUMEN_DEL_ACTOR] });
+    const getPackingOrder = createGetPackingOrder(deps);
+    const soloEmpaque: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
+
+    const row = await getPackingOrder(soloEmpaque, { orderId: PEDIDO });
+
+    expect(row.packingSteps).toEqual([ENVASAR, ETIQUETAR]);
+  });
+
+  it('R28: sin `empaque.modificar` rechaza antes de validar y sin llamar a ningun puerto, lector incluido', async () => {
+    const { deps, todos } = montar({ items: [RESUMEN_DEL_ACTOR] });
+    const getPackingOrder = createGetPackingOrder(deps);
+    const sinPermiso: Actor = {
+      id: ANA,
+      companyId: EMPRESA,
+      permissions: ['recetas.consultar', 'asignaciones.ejecutar'],
+    };
+
+    await expect(getPackingOrder(sinPermiso, { orderId: 'no-es-uuid' })).rejects.toThrow(UnauthorizedError);
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
   });
 });

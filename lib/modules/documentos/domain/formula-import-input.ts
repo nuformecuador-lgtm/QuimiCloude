@@ -1,7 +1,7 @@
 /**
  * El esquema del borde de la vista previa y de la confirmacion de una importacion de formula.
  *
- * `steps` en la confirmacion viaja como `unknown[]`: cada paso se valida con `recipeStepSchema`
+ * `steps` y `packingSteps` en la confirmacion viajan como `unknown[]`: cada paso se valida con `recipeStepSchema`
  * dentro del caso de uso, no aqui, porque el esquema de receta vive en `recetas` y este borde
  * solo fija la FORMA del payload.
  */
@@ -29,6 +29,7 @@ export const confirmFormulaImportInputSchema = z
     description: z.string().nullable(),
     lines: z.array(draftLineInputSchema).max(200),
     steps: z.array(z.unknown()).max(MAX_RECIPE_STEPS),
+    packingSteps: z.array(z.unknown()).max(MAX_RECIPE_STEPS).default([]),
     // null = crear una receta nueva; un id = reemplazar esa receta
     replaceRecipeId: z.string().uuid().nullable(),
   })

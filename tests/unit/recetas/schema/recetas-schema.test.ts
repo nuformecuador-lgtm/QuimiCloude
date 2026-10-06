@@ -207,6 +207,7 @@ const RECIPE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['nameNormalized', 'name_normalized'],
   ['description', 'description'],
   ['steps', 'steps'],
+  ['packingSteps', 'packing_steps'],
   ['imagePath', 'image_path'],
   // 2026-09-16, QC-50 (aislamiento-por-empresa-en-recetas): Recipe gana `companyId` por el
   // mismo motivo que ya lo tienen `Product`/`Presentation`/`ProductBatch` desde QC-49 y
@@ -293,11 +294,11 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     }
   })
 
-  it('steps es un unico campo Json y no existe ningun modelo de paso', () => {
+  it('R5: steps y packingSteps son los unicos campos Json y no existe ningun modelo de paso', () => {
     // R4 y decision cerrada 10: un solo documento JSON en una sola columna. Sin tabla de
     // pasos, sin columna de orden: el orden es el de la lista dentro del documento.
     const jsonFields = recipe.fields.filter((candidate) => candidate.type === 'Json')
-    expect(jsonFields.map((candidate) => candidate.name)).toEqual(['steps'])
+    expect(jsonFields.map((candidate) => candidate.name).sort()).toEqual(['packingSteps', 'steps'])
     expect(recipeLine.fields.some((candidate) => candidate.type === 'Json')).toBe(false)
 
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
@@ -323,6 +324,14 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     expect(steps.type).toBe('Json')
     expect(steps.isOptional).toBe(false)
     expect(steps.attributes).toMatch(/@default\("\[\]"\)/)
+  })
+
+  it('R5: packingSteps mapea a packing_steps, no es opcional y declara default lista vacia', () => {
+    const packingSteps = field(recipe, 'packingSteps')
+    expect(packingSteps.type).toBe('Json')
+    expect(packingSteps.isOptional).toBe(false)
+    expect(packingSteps.attributes).toMatch(/@default\("\[\]"\)/)
+    expect(packingSteps.attributes).toContain('@map("packing_steps")')
   })
 
   it('image_path es la unica columna de imagen y es opcional', () => {

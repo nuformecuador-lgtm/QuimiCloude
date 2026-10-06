@@ -4,9 +4,14 @@ import Link from 'next/link';
 import { useActionState, useRef, useState } from 'react';
 
 import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { StepReader } from '@/components/shared/step-reader';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
-import type { OrderDistributionLineView, PackingOrderRow } from '@/lib/modules/asignaciones';
+import type {
+  OrderDistributionLineView,
+  PackingOrderDetail,
+  PackingOrderRow,
+} from '@/lib/modules/asignaciones';
 import {
   finishPackingAction,
   startPackingAction,
@@ -49,6 +54,7 @@ export const PACKING_ORDER_FINISH_BUTTON_TESTID = 'packing-order-finish-button';
 export const PACKING_ORDER_START_ERROR_TESTID = 'packing-order-start-error';
 export const PACKING_ORDER_FINISH_ERROR_TESTID = 'packing-order-finish-error';
 export const PACKING_ORDER_BACK_LINK_TESTID = 'packing-order-back-link';
+export const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
 export const PACKING_ORDER_ID_FIELD = 'orderId';
 export const PACKING_ORDER_START_DIALOG_TESTID = 'packing-order-start-dialog';
 export const PACKING_ORDER_START_CONFIRM_TESTID = 'packing-order-start-confirm';
@@ -81,6 +87,8 @@ const START_LABEL = 'Comenzar';
 const START_PENDING_LABEL = 'Comenzando…';
 const FINISH_LABEL = 'Terminar';
 const FINISH_PENDING_LABEL = 'Terminando…';
+const PACKING_STEPS_TITLE = 'Pasos de envasado';
+const PACKING_MIN_STEP_SECONDS = 5;
 const BACK_LABEL = 'Volver a «Por empacar»';
 /** `?vista=por_empacar` es el mismo nombre de parametro que `assignment-view-params.ts`. */
 const BACK_HREF = `${ASSIGNED_ORDERS_ROUTE}?vista=por_empacar`;
@@ -106,7 +114,7 @@ const START_INITIAL_STATE: StartPackingResult = { status: 'success' };
 const FINISH_INITIAL_STATE: FinishPackingResult = { status: 'success' };
 
 export type PackingOrderScreenProps = {
-  readonly order: PackingOrderRow;
+  readonly order: PackingOrderDetail;
   /** El id del actor de la sesion, nunca su nombre: se decide comparando `packedById`. */
   readonly actorId: string;
 };
@@ -134,6 +142,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
   const canFinish = order.status === 'EN_EMPAQUE' && order.packedById === actorId;
   const showsOtherPacker = order.status === 'EN_EMPAQUE' && order.packedById !== actorId;
   const lacksDistribution = order.status === 'POR_EMPACAR' && order.presentationLines.length === 0;
+  const showsPackingSteps = canFinish && order.packingSteps.length > 0;
 
   return (
     <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6" data-testid={PACKING_ORDER_SCREEN_TESTID}>
@@ -229,24 +238,40 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
         </form>
       ) : null}
 
+      {showsPackingSteps ? (
+        <div data-testid={PACKING_ORDER_STEPS_TESTID}>
+          <StepReader
+            steps={order.packingSteps}
+            title={PACKING_STEPS_TITLE}
+            onFinish={() => setFinishConfirmOpen(true)}
+            minStepSeconds={PACKING_MIN_STEP_SECONDS}
+            mode="ejecucion"
+            finishLabel={finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
+            finishBusy={finishPending}
+          />
+        </div>
+      ) : null}
+
       {canFinish ? (
         <form
           ref={finishFormRef}
           action={finishFormAction}
           data-testid={PACKING_ORDER_FINISH_FORM_TESTID}
-          className="flex flex-col gap-2"
+          className={showsPackingSteps ? 'hidden' : 'flex flex-col gap-2'}
         >
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
-          <Button
-            type="button"
-            className={TOUCH_TARGET}
-            onClick={() => setFinishConfirmOpen(true)}
-            disabled={finishPending}
-            aria-busy={finishPending}
-            data-testid={PACKING_ORDER_FINISH_BUTTON_TESTID}
-          >
-            {finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
-          </Button>
+          {showsPackingSteps ? null : (
+            <Button
+              type="button"
+              className={TOUCH_TARGET}
+              onClick={() => setFinishConfirmOpen(true)}
+              disabled={finishPending}
+              aria-busy={finishPending}
+              data-testid={PACKING_ORDER_FINISH_BUTTON_TESTID}
+            >
+              {finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
+            </Button>
+          )}
           <ConfirmActionDialog
             open={finishConfirmOpen}
             onOpenChange={setFinishConfirmOpen}

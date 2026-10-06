@@ -72,6 +72,11 @@ export type RecipeStepsFieldProps = {
   readonly steps: readonly RecipeStepFormValue[];
   readonly onChange: (steps: readonly RecipeStepFormValue[]) => void;
   readonly errors?: RecipeStepErrors;
+  readonly title?: string;
+  readonly addLabel?: string;
+  /** Raiz de los `data-testid` y de los `id` de error: dos instancias en la misma pagina no
+   *  deben colisionar. */
+  readonly testIdPrefix?: string;
 };
 
 /**
@@ -102,7 +107,14 @@ function buildAnnouncements(steps: readonly RecipeStepFormValue[]): Announcement
   };
 }
 
-export function RecipeStepsField({ steps, onChange, errors }: RecipeStepsFieldProps) {
+export function RecipeStepsField({
+  steps,
+  onChange,
+  errors,
+  title = 'Pasos',
+  addLabel = 'Añadir paso',
+  testIdPrefix = 'recipe-step',
+}: RecipeStepsFieldProps) {
   const headingId = useId();
 
   const sensors = useSensors(
@@ -139,15 +151,15 @@ export function RecipeStepsField({ steps, onChange, errors }: RecipeStepsFieldPr
   return (
     <section
       aria-labelledby={headingId}
-      data-testid="recipe-steps-field"
+      data-testid={`${testIdPrefix}s-field`}
       className="flex flex-col gap-3"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 id={headingId} className="text-lg font-medium">
-          Pasos
+          {title}
         </h2>
-        <Button type="button" className={TOUCH_TARGET} data-testid="recipe-step-add" onClick={addStep}>
-          Añadir paso
+        <Button type="button" className={TOUCH_TARGET} data-testid={`${testIdPrefix}-add`} onClick={addStep}>
+          {addLabel}
         </Button>
       </div>
 
@@ -158,13 +170,14 @@ export function RecipeStepsField({ steps, onChange, errors }: RecipeStepsFieldPr
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={steps.map((step) => step.key)} strategy={verticalListSortingStrategy}>
-          <ol className="flex flex-col gap-2" data-testid="recipe-steps-list">
+          <ol className="flex flex-col gap-2" data-testid={`${testIdPrefix}s-list`}>
             {steps.map((step, index) => (
               <RecipeStepRow
                 key={step.key}
                 step={step}
                 index={index}
                 total={steps.length}
+                testIdPrefix={testIdPrefix}
                 error={errors?.[index]}
                 onChangeDocument={(document) => updateStep(index, { document })}
                 onRemove={() => removeStep(index)}
@@ -181,6 +194,7 @@ type RecipeStepRowProps = {
   readonly step: RecipeStepFormValue;
   readonly index: number;
   readonly total: number;
+  readonly testIdPrefix: string;
   readonly error?: string;
   readonly onChangeDocument: (document: RecipeStepDocument) => void;
   readonly onRemove: () => void;
@@ -190,6 +204,7 @@ function RecipeStepRow({
   step,
   index,
   total,
+  testIdPrefix,
   error,
   onChangeDocument,
   onRemove,
@@ -198,13 +213,13 @@ function RecipeStepRow({
     id: step.key,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
-  const errorId = `recipe-step-error-${index}`;
+  const errorId = `${testIdPrefix}-error-${index}`;
 
   return (
     <li
       ref={setNodeRef}
       style={style}
-      data-testid="recipe-step-row"
+      data-testid={`${testIdPrefix}-row`}
       className={`flex items-start gap-2 rounded-lg border p-2 ${isDragging ? 'opacity-70' : ''}`}
     >
       {/* Asa de arrastre: SIEMPRE visible, >= 44x44 px, y con nombre accesible que INCLUYE la posición (R34, R50). */}
@@ -214,7 +229,7 @@ function RecipeStepRow({
         {...listeners}
         className={`${TOUCH_TARGET} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted`}
         aria-label={`Arrastrar el paso en la posición ${index + 1} de ${total}`}
-        data-testid={`recipe-step-handle-${index}`}
+        data-testid={`${testIdPrefix}-handle-${index}`}
       >
         <GripVerticalIcon aria-hidden="true" />
       </button>
@@ -233,12 +248,12 @@ function RecipeStepRow({
           document={step.document}
           onChange={onChangeDocument}
           label={`Paso ${index + 1}`}
-          editableTestId={`recipe-step-text-${index}`}
+          editableTestId={`${testIdPrefix}-text-${index}`}
           error={error}
           errorId={errorId}
         />
         {error === undefined ? null : (
-          <p id={errorId} className="text-sm text-destructive" data-testid={`recipe-step-field-error-${index}`}>
+          <p id={errorId} className="text-sm text-destructive" data-testid={`${testIdPrefix}-field-error-${index}`}>
             {error}
           </p>
         )}
@@ -249,7 +264,7 @@ function RecipeStepRow({
         variant="ghost"
         className={TOUCH_TARGET}
         aria-label={`Quitar paso ${index + 1}`}
-        data-testid={`recipe-step-remove-${index}`}
+        data-testid={`${testIdPrefix}-remove-${index}`}
         onClick={onRemove}
       >
         Quitar

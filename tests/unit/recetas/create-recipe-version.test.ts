@@ -30,6 +30,7 @@ const ORIGINAL: RecipeRow = {
   name: 'Crema base',
   description: 'Base',
   steps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] }],
+  packingSteps: [],
   imagePath: 'recetas/crema.jpg',
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -50,7 +51,7 @@ const VERSION: RecipeRow = {
   description: null,
   steps: [],
   imagePath: null,
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: 'Base', imagePath: null, steps: [] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: 'Base', imagePath: null, packingSteps: [], steps: [] },
 };
 
 function repositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepository {

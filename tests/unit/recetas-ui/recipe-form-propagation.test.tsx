@@ -81,6 +81,7 @@ function recipeDetail(): RecipeDetail {
     createdBy: null,
     updatedBy: null,
     steps: [],
+    packingSteps: [],
     lines: [lineView()],
     tools: [],
     original: null,

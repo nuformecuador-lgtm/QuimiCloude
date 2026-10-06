@@ -25,6 +25,7 @@ export {
   PACKING_ORDER_START_ERROR_TESTID,
   PACKING_ORDER_START_FORM_TESTID,
   PACKING_ORDER_STATUS_TESTID,
+  PACKING_ORDER_STEPS_TESTID,
   PackingOrderScreen,
   type PackingOrderScreenProps,
 } from './packing-order-screen';

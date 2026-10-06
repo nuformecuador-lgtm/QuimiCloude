@@ -262,6 +262,11 @@ export const E2E_ESPERADOS = [
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
   'insumo-por-unidad.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre el formulario de receta con pasos de
+  // envasado, la ejecucion del Operador y el empaque paso a paso del Empacador. No lee ni afirma
+  // nada sobre el identificador de peticion ni sobre `reference`, asi que el diferimiento de
+  // QC-71 R21 sigue INTACTO.
+  'pasos-de-envasado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -432,6 +437,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261004150000_execution_permission',
   // La regla de unidad del lote de insumo sin presentacion; no toca el identificador.
   '20261004170000_product_batches_require_product_unit',
+  // Los pasos de envasado de la receta; no toca el identificador.
+  '20261005120000_recipe_packing_steps',
 ] as const
 
 export function hallazgosDeMigraciones(

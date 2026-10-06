@@ -102,10 +102,15 @@ export const CANNED_FORMULA_UNASSIGNED_UNIT = 'g';
 /** Lo que falta para llegar a 100 %: el E2E lo teclea en el ingrediente sin porcentaje leido. */
 export const CANNED_FORMULA_MISSING_PERCENTAGE = '15';
 
+/** Los dos pasos de envasado del guion de formula, el segundo de dos lineas. */
+export const CANNED_FORMULA_PACKING_STEP_1 = `${CANNED_FORMULA_PREFIX}-envasado-1`;
+export const CANNED_FORMULA_PACKING_STEP_2_LINE_A = `${CANNED_FORMULA_PREFIX}-envasado-2-linea-a`;
+export const CANNED_FORMULA_PACKING_STEP_2_LINE_B = `${CANNED_FORMULA_PREFIX}-envasado-2-linea-b`;
+
 /**
  * El JSON de una formula: tres ingredientes -uno preseleccionable, uno de materia prima nueva y uno
- * sin porcentaje leido (solo cantidad y unidad de referencia)- y tres pasos, el segundo de dos
- * lineas.
+ * sin porcentaje leido (solo cantidad y unidad de referencia)-, tres pasos, el segundo de dos
+ * lineas, y dos pasos de envasado.
  */
 export const CANNED_FORMULA_TEXT = JSON.stringify({
   name: CANNED_FORMULA_RECIPE_NAME,
@@ -134,6 +139,10 @@ export const CANNED_FORMULA_TEXT = JSON.stringify({
     `${CANNED_FORMULA_PREFIX}-paso-1`,
     `${CANNED_FORMULA_PREFIX}-paso-2-linea-a\n${CANNED_FORMULA_PREFIX}-paso-2-linea-b`,
     `${CANNED_FORMULA_PREFIX}-paso-3`,
+  ],
+  packingSteps: [
+    CANNED_FORMULA_PACKING_STEP_1,
+    `${CANNED_FORMULA_PACKING_STEP_2_LINE_A}\n${CANNED_FORMULA_PACKING_STEP_2_LINE_B}`,
   ],
 });
 

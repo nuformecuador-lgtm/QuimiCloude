@@ -268,6 +268,7 @@ export const createRecipeSchema = z.object({
   name: recipeNameSchema,
   description: recipeDescriptionSchema,
   steps: recipeStepsSchema,
+  packingSteps: recipeStepsSchema,
   lines: recipeLinesSchema,
   tools: recipeToolsSchema.default([]),
   image: recipeImageUploadSchema.optional(),
@@ -287,6 +288,7 @@ export const updateRecipeSchema = z.object({
   name: recipeNameSchema,
   description: recipeDescriptionSchema,
   steps: recipeStepsSchema,
+  packingSteps: recipeStepsSchema,
   lines: recipeLinesSchema,
   image: recipeImageUploadSchema.nullable().optional(),
   // Omitidas = conservar las que tiene; `[]` = quitarlas todas. Con `.default([])` el reemplazo

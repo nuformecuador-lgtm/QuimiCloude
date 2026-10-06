@@ -524,7 +524,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // QC-199: entra `e2e/insumo-por-unidad.spec.ts`, y no afloja la lista. No estrena pantalla:
   // recorre el listado de inventario, ya en esta lista, y localiza `data-table-cell-name` para
   // encontrar el insumo recien dado de alta. El centinela pasa de VEINTICINCO a VEINTISEIS.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintiseis', () => {
+  //
+  // 2026-10-05: entra `e2e/pasos-de-envasado.spec.ts` (QC-211), y no afloja la lista. No estrena
+  // pantalla: recorre la de asignacion, ya en esta lista, y localiza la fila de «Mis asignados»
+  // por `data-table-row-<id>` y `data-table-cell-orderNumber`. El centinela pasa de VEINTISEIS a
+  // VEINTISIETE; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a
+  // ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintisiete', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -534,7 +540,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos veintiseis E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos veintisiete E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -565,6 +571,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La DECIMA la trae QC-93 el 2026-09-15 (R18): ver la nota de arriba. Es la sonda del usuario
       // sin permisos de modulo: afirma que `data-table` NO esta, no consume la tabla.
       'e2e/login.spec.ts',
+      // Ver la nota de arriba (2026-10-05, QC-211). Va antes que `pedido-bloqueado` porque la
+      // lista esta ORDENADA y 'a' precede a 'e'.
+      'e2e/pasos-de-envasado.spec.ts',
       // Ver la nota de arriba (2026-10-02, QC-138). Va antes que `pedidos-asignados` porque la
       // lista esta ORDENADA y '-' precede a 's'.
       'e2e/pedido-bloqueado.spec.ts',

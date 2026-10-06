@@ -12,6 +12,7 @@ import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-row
 import type { OrderDistributionLineView } from './order-distribution-view';
 
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
+import type { RecipeStepView } from '@/lib/modules/recetas';
 import { formatOrderNumber, type OrderStatus } from '@/lib/modules/pedidos';
 import type { ProductCatalog } from '@/lib/modules/inventario';
 
@@ -39,6 +40,12 @@ export type PackingOrderRow = {
   readonly status: OrderStatus;
   readonly packedByName: string | null;
   readonly packedById: string | null;
+};
+
+/** La fila de un unico pedido, con los pasos con que se empaca. */
+export type PackingOrderDetail = PackingOrderRow & {
+  /** Vacio salvo `EN_EMPAQUE` a nombre del actor. Nunca trae pasos del operador. */
+  readonly packingSteps: readonly RecipeStepView[];
 };
 
 export async function composePackingOrderRows(
