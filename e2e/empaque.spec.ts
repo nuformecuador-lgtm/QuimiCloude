@@ -48,7 +48,6 @@ import {
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
@@ -584,7 +583,8 @@ test.describe('el recorrido de empaque (R48)', () => {
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
-    await clickAndConfirm(page, assignedRow.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    // EN_CURSO: Entrar es un enlace y no vuelve a pedir la confirmacion de comenzar.
+    await assignedRow.getByTestId(ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId!), {
       timeout: 60_000,
     });
