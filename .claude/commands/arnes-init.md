@@ -79,7 +79,7 @@ En modo revisión, por cada doc del perfil:
     `> ABIERTO: <pregunta>`.
 - **`docs/dependencias.md`:** una fila por cada dependencia de `package.json`. Las que no tengan
   aprobación conocida van con estado `pendiente-de-aprobar`, y se avisa al humano.
-- **CI:** si el proyecto nuevo no tiene `.github/workflows/gate.yml` adaptado, propón los cambios
+- **CI:** si el proyecto no tiene `.github/workflows/gate.yml`, copia el ejemplo `plantillas/github/gate.yml` de la plantilla (o el de este repo) y propón cómo adaptarlo
   (servicios, variables, versión de Node). No escribas secretos.
 
 ## 4. Verifica y entrega
