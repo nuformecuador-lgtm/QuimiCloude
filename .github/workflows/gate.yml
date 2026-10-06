@@ -75,9 +75,13 @@ jobs:
           # con `dev`/`origin/dev` (tests/guards/guard-qc102-*, guard-pantalla-pedidos-*).
           fetch-depth: 0
 
-      - name: Asegurar origin/dev
+      - name: Asegurar dev y origin/dev
         shell: bash
-        run: git fetch --no-tags origin +refs/heads/dev:refs/remotes/origin/dev
+        # Algunas guardias de alcance comparan contra `dev` LOCAL (`git diff dev...HEAD`), no solo
+        # contra `origin/dev`: en CI no existe esa rama hasta que se crea aqui.
+        run: |
+          git fetch --no-tags origin +refs/heads/dev:refs/remotes/origin/dev
+          git branch --force dev origin/dev
 
       - name: pnpm
         uses: pnpm/action-setup@v4
