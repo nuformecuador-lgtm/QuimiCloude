@@ -149,7 +149,7 @@
 
 ## Bloque E — extremo a extremo y cierre
 
-- [ ] **T14 — E2E.** Ampliar `e2e/pedidos-cotizacion.spec.ts` o crear
+- [x] **T14 — E2E.** Ampliar `e2e/pedidos-cotizacion.spec.ts` o crear
   `e2e/pedido-conversion-de-unidad.spec.ts`, con datos propios sembrados por el helper que ya use
   la suite (insumo en kg con lotes de costo conocido). Depende de T9, T12, T13.
   Casos:
