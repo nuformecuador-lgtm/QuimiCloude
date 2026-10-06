@@ -96,7 +96,7 @@ jobs:
       - name: Credenciales efimeras (solo para la base de servicio de este job)
         shell: bash
         run: |
-          gen() { node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"; }
+          gen() { v=$(node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"); echo "::add-mask::$v" >&2; printf '%s' "$v"; }
           # Mayuscula, minuscula, digito y simbolo garantizados (credential-policy.ts).
           {
             echo "SESSION_SECRET=$(gen)$(gen)"
@@ -111,7 +111,10 @@ jobs:
       - name: ./init.sh --completo
         shell: bash
         run: |
-          ./init.sh --completo 2>&1 | tee init-completo.log
+          # `bash` explicito: no depende del bit de ejecucion (los clones de Windows lo pierden).
+          # `pipefail` para que el `tee` no se trague el codigo de salida del gate.
+          set -o pipefail
+          bash ./init.sh --completo 2>&1 | tee init-completo.log
 
       - name: Resumen (poda del baseline de rojos)
         if: always()
@@ -186,7 +189,7 @@ jobs:
       - name: Credenciales efimeras (solo para la base de servicio de este job)
         shell: bash
         run: |
-          gen() { node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"; }
+          gen() { v=$(node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))"); echo "::add-mask::$v" >&2; printf '%s' "$v"; }
           {
             echo "SESSION_SECRET=$(gen)$(gen)"
             echo "SEED_ADMIN_USERNAME=ciadmin"
