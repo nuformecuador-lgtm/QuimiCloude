@@ -1007,6 +1007,7 @@ las dos de empaque (A4, `empaque.modificar`), si los estados nuevos se pueden ca
 ## 14. Preguntas abiertas, mapa de trazabilidad y recuento
 
 ### 14.1 Lo que queda abierto para F1.4 — lista única (al día el 2026-10-06)
+> **F1.4 APROBADO por el humano el 2026-10-06** ("aprobado"): P1-P5 con la propuesta de cada una (P1 no anota `already_mine`; P2 `PACK_START`/`PACK_FINISH`; P3 `asignaciones.ejecutar`; P4 no se anota el recorrido de envasado; P5 `createOrderPackingRepository(db)`). Los ocho puntos de `## 12` quedan ratificados.
 
 **Cinco puntos, todos aquí y en ningún otro sitio.** Los ocho de `## 12` están **ratificados** desde
 el 2026-09-18 y no se repiten; `D19` y `D20` están **cerradas** (la segunda, enmendada por QC-201).
