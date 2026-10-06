@@ -96,23 +96,23 @@ producción salvo que QC-215 toque `permissions.ts`; si lo hace, que mergee desp
 
 ## T7–T10 — Comportamiento del rol
 
-- [ ] **T7. [P]** `tests/unit/identity/roles/acondicionamiento-rol.test.ts` (plantilla
+- [x] **T7. [P]** `tests/unit/identity/roles/acondicionamiento-rol.test.ts` (plantilla
       `maestro-rol.test.ts`): R1, R2 (barrido + sintéticos), R3 (estático), R17 (barrido del código
       con anti-cegado y mensaje que explica cómo relajarlo).
       **Hecho cuando:** verde, y el sintético con el literal dispara con las tres comillas. Depende
       de: T2.
 
-- [ ] **T8. [P]** `tests/guards/guard-autorizacion-por-permiso.test.ts`: patrones del literal y de
+- [x] **T8. [P]** `tests/guards/guard-autorizacion-por-permiso.test.ts`: patrones del literal y de
       `ROLE_ACONDICIONAMIENTO`; ancla tensada; sintéticos que disparan y simétrico que no
       (`design.md > 4`).
       **Hecho cuando:** verde, y quitar el patrón nuevo pone rojo el sintético. Cubre R11. Depende
       de: T1.
 
-- [ ] **T9. [P]** `tests/unit/navegacion/menu-acondicionamiento.test.ts` (R12) y ampliación de
+- [x] **T9. [P]** `tests/unit/navegacion/menu-acondicionamiento.test.ts` (R12) y ampliación de
       `tests/unit/identity/require-page-permission.test.ts` (R13, códigos leídos de cada `page.tsx`).
       **Hecho cuando:** verde. Cubre R12, R13. Depende de: T2.
 
-- [ ] **T10. [P]** `tests/unit/asignaciones/acondicionamiento-authorization.test.ts`: R14 (página
+- [x] **T10. [P]** `tests/unit/asignaciones/acondicionamiento-authorization.test.ts`: R14 (página
       vacía sin puertos), R15 (los casos de uso de `design.md > 6` rechazan sin puertos), R16
       (`resolveAssignmentViews` = `['asignados']`). Actor desde
       `SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]`.
