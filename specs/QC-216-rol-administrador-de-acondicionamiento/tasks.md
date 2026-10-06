@@ -57,7 +57,7 @@ producción salvo que QC-215 toque `permissions.ts`; si lo hace, que mergee desp
       **Hecho cuando:** `pnpm run typecheck` pasa y el literal `'Administrador de acondicionamiento'`
       aparece una sola vez en `lib/`. Depende de: —.
 
-- [ ] **T2.** `permissions.ts`: entrada `acondicionamiento.modificar` **al final** de `PERMISSIONS`
+- [x] **T2.** `permissions.ts`: entrada `acondicionamiento.modificar` **al final** de `PERMISSIONS`
       (`design.md > 2`); párrafo de enmienda del JSDoc con el texto de `design.md > 2` (≤ 5 líneas,
       sin citas); clave `[ROLE_ACONDICIONAMIENTO]: ['asignaciones.consultar', 'acondicionamiento.modificar']`
       al final de `SEED_ROLE_PERMISSIONS` con su frase en el JSDoc; `'acondicionamiento.modificar'`
