@@ -45,7 +45,7 @@ function Harness({
   useEffect(() => {
     handlersRef.current = { onRecipeChange, onQuantityChange };
   }, [handlersRef, onRecipeChange, onQuantityChange]);
-  return <OrderCostQuote {...state} />;
+  return <OrderCostQuote {...state} approximate={false} />;
 }
 
 function mount(initial: string | null = null) {
@@ -229,12 +229,12 @@ describe('OrderCostQuote — mientras cotiza (R16, R17)', () => {
 describe('OrderCostQuote — formato (R19)', () => {
   it('lleva title cuando el valor exacto difiere de lo pintado, y no lo lleva cuando coincide', () => {
     const conDiferencia: OrderCostQuoteState = { amount: '12752.5512', quoting: false, error: null };
-    const { unmount } = render(<OrderCostQuote {...conDiferencia} />);
+    const { unmount } = render(<OrderCostQuote {...conDiferencia} approximate={false} />);
     expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).toHaveAttribute('title', '12752.5512');
     unmount();
 
     const sinDiferencia: OrderCostQuoteState = { amount: '40.0000', quoting: false, error: null };
-    render(<OrderCostQuote {...sinDiferencia} />);
+    render(<OrderCostQuote {...sinDiferencia} approximate={false} />);
     expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).not.toHaveAttribute('title');
   });
 });

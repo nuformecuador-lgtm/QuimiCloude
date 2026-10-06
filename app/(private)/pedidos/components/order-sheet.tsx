@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
@@ -77,6 +77,7 @@ export type OrderSheetProps = {
   readonly recipes: RecipePickerPage;
   /** Catalogo de unidades, por props (R43): resuelve la unidad de los ingredientes. */
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
@@ -101,6 +102,7 @@ export function OrderSheet({
   order,
   recipes,
   units,
+  bridge,
   open,
   onOpenChange,
   responsibles = [],
@@ -157,6 +159,7 @@ export function OrderSheet({
         order={order}
         recipes={recipes}
         units={units}
+        bridge={bridge}
         onSaved={handleSaved}
         responsibles={responsibles}
         responsiblesCatalog={responsiblesCatalog}
@@ -171,6 +174,7 @@ export type OrderRowSheetActionsProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /** QC-102 R26 — los responsables de ESTA fila, ya traidos por el lote de la seccion. */
   readonly responsibles?: readonly OrderResponsible[];
   /** QC-102 R27, R28 — catalogos y `canWrite`, compuestos una vez en el servidor. */
@@ -202,6 +206,7 @@ export function OrderRowSheetActions({
   order,
   recipes,
   units,
+  bridge,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
@@ -244,6 +249,7 @@ export function OrderRowSheetActions({
         order={order}
         recipes={recipes}
         units={units}
+        bridge={bridge}
         open={editOpen}
         onOpenChange={setEditOpen}
         responsibles={responsibles}
@@ -276,6 +282,7 @@ export type OrderRowResponsiblesProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  readonly bridge: MassVolumeBridge | null;
   /** Los responsables de ESTA fila, del lote que la seccion pidio una sola vez (R16, R26). */
   readonly responsibles: readonly OrderResponsible[];
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
@@ -304,6 +311,7 @@ export function OrderRowResponsibles({
   order,
   recipes,
   units,
+  bridge,
   responsibles,
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
@@ -318,6 +326,7 @@ export function OrderRowResponsibles({
           order={order}
           recipes={recipes}
           units={units}
+          bridge={bridge}
           open
           onOpenChange={setOpen}
           responsibles={responsibles}

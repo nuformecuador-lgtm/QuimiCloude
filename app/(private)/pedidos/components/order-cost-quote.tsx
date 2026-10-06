@@ -11,20 +11,27 @@ export const ORDER_COST_QUOTE_TESTID = 'order-cost-quote';
 export const ORDER_COST_QUOTE_VALUE_TESTID = 'order-cost-quote-value';
 export const ORDER_COST_QUOTE_QUOTING_TESTID = 'order-cost-quote-quoting';
 export const ORDER_COST_QUOTE_ERROR_TESTID = 'order-cost-quote-error';
+export const ORDER_COST_QUOTE_APPROXIMATE_TESTID = 'order-cost-quote-approximate';
 
 /** Copy no afirmado por ningun test: van por `data-testid`. */
 const QUOTE_LABEL = 'Coste estimado de producción';
 const QUOTING_LABEL = 'cotizando…';
 const ERROR_PREFIX = 'No se pudo cotizar:';
+const APPROXIMATE_NOTICE = 'Incluye una aproximación masa↔volumen (1 l ≈ 1 kg).';
 
 function quoteDataState({ error, quoting }: OrderCostQuoteState): 'idle' | 'quoting' | 'error' {
   if (error !== null) return 'error';
   return quoting ? 'quoting' : 'idle';
 }
 
+export type OrderCostQuoteProps = OrderCostQuoteState & {
+  /** Alguna linea de la receta cruza masa y volumen. */
+  readonly approximate: boolean;
+};
+
 /** El bloque de coste del formulario de pedido: presentacional, todo llega por props. */
-export function OrderCostQuote(props: OrderCostQuoteState) {
-  const { amount, quoting, error } = props;
+export function OrderCostQuote(props: OrderCostQuoteProps) {
+  const { amount, quoting, error, approximate } = props;
 
   return (
     <div
@@ -53,6 +60,11 @@ export function OrderCostQuote(props: OrderCostQuoteState) {
             </span>
           ) : null}
         </div>
+        {approximate && amount !== null ? (
+          <span className="text-muted-foreground" data-testid={ORDER_COST_QUOTE_APPROXIMATE_TESTID}>
+            {APPROXIMATE_NOTICE}
+          </span>
+        ) : null}
         {error === null ? null : (
           <div className="text-destructive" data-testid={ORDER_COST_QUOTE_ERROR_TESTID}>
             {error.code === UNEXPECTED_ERROR_CODE ? (

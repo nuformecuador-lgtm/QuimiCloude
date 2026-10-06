@@ -144,6 +144,7 @@ function montarLista(coverageByOrder: Readonly<Record<string, 'full' | 'partial'
       totalPages={1}
       recipes={RECETAS}
       units={UNIDADES}
+      bridge={null}
       coverageByOrder={coverageByOrder}
     />,
   );

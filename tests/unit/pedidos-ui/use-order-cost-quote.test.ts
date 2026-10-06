@@ -117,7 +117,7 @@ describe('useOrderCostQuote — la unidad del pedido', () => {
 
     expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
     expect(result.current.state.amount).toBeNull();
-    render(createElement(OrderCostQuote, result.current.state));
+    render(createElement(OrderCostQuote, { ...result.current.state, approximate: false }));
     expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe(MISSING_VALUE_MARK);
   });
 });

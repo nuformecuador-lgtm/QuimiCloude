@@ -291,7 +291,7 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
   it('vacio: sin ningun pedido se pinta el estado propio de pedidos, NO una tabla sin filas', async () => {
     listOrdersActionMock.mockResolvedValue(pagina([]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.lista)).toBeNull();
@@ -305,7 +305,7 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
   it('lista: con pedidos se pinta la lista y ninguno de los otros dos estados', async () => {
     listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.vacio)).toBeNull();
@@ -319,7 +319,7 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
       message: 'La consulta no es valida.',
     });
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.error)).toHaveAttribute('role', 'alert');
     expect(screen.getByTestId(testId.errorMensaje)).toHaveTextContent('La consulta no es valida.');
@@ -342,6 +342,7 @@ describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, 
         params: parametros({ search: 'sin-coincidencias' }),
         recipes: RECIPES_VACIAS,
         units: UNITS_VACIAS,
+        bridge: null,
       }),
     );
 
@@ -359,6 +360,7 @@ describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, 
         params: parametros({ search: 'sin-coincidencias' }),
         recipes: RECIPES_VACIAS,
         units: UNITS_VACIAS,
+        bridge: null,
       }),
     );
 
@@ -383,6 +385,7 @@ describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, 
         }),
         recipes: RECIPES_VACIAS,
         units: UNITS_VACIAS,
+        bridge: null,
       }),
     );
 
@@ -403,7 +406,7 @@ describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, 
   it('sin termino y cero filas sigue siendo el vacio de siempre, sin "Limpiar la busqueda" (R16)', async () => {
     listOrdersActionMock.mockResolvedValue(pagina([]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
     expect(screen.queryByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID)).toBeNull();
@@ -419,6 +422,7 @@ describe('la pagina que se quedo atras vuelve a la primera (R21)', () => {
         params: parametros({ page: 4 }),
         recipes: RECIPES_VACIAS,
         units: UNITS_VACIAS,
+        bridge: null,
       }),
     );
 
@@ -436,7 +440,7 @@ describe('la pantalla no autoriza nada por su cuenta (R6)', () => {
       message: 'No tienes permiso para consultar pedidos.',
     });
 
-    const { container } = render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    const { container } = render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.error)).toBeInTheDocument();
     expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
@@ -455,7 +459,7 @@ describe('una sola llamada de lectura por pantalla (R7, R41)', () => {
     const params = parametros({ page: 2, pageSize: MAX_PAGE_SIZE });
     listOrdersActionMock.mockResolvedValue(pagina([pedido()], { page: 2, totalPages: 3 }));
 
-    render(await OrderListSection({ params, recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params, recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
     // Campo a campo la misma forma que `ListQuery`: sin claves de mas.
@@ -477,7 +481,7 @@ describe('lista de pedidos — el identificador del error inesperado (QC-71 R17,
   it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
     listOrdersActionMock.mockResolvedValue(errorInesperado());
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     const aviso = screen.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID);
     expect(within(aviso).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
@@ -493,7 +497,7 @@ describe('lista de pedidos — el identificador del error inesperado (QC-71 R17,
       message: 'No autorizado.',
     });
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
     esperarSinIdentificador();
@@ -523,7 +527,7 @@ describe('QC-102 — el listado trae los responsables de su pagina (R16)', () =>
       pagina([pedido(), pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' })]),
     );
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     // UNA, no una por fila: son dos pedidos y sigue siendo una sola invocacion.
     expect(listResponsiblesForOrdersActionMock).toHaveBeenCalledTimes(1);
@@ -546,7 +550,7 @@ describe('QC-102 — el listado trae los responsables de su pagina (R16)', () =>
       return { status: 'success' as const, data: [] };
     });
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(orden).toEqual(['pedidos', 'responsables']);
   });
@@ -563,7 +567,7 @@ describe('QC-102 — el listado trae los responsables de su pagina (R16)', () =>
       ],
     });
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     // La fila con responsable pinta su circulo con el nombre COMPLETO como nombre accesible; la
     // otra, el marcador de ausencia de esta pantalla (R19). Dos filas, dos celdas distintas.
@@ -574,7 +578,7 @@ describe('QC-102 — el listado trae los responsables de su pagina (R16)', () =>
   it('sin ningun pedido no se pregunta por responsables de nadie', async () => {
     listOrdersActionMock.mockResolvedValue(pagina([]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
     expect(listResponsiblesForOrdersActionMock).not.toHaveBeenCalled();
@@ -592,7 +596,7 @@ describe('QC-102 — si el lote falla, la lista NO se cae (R20)', () => {
         message: 'No se pudieron leer los responsables.',
       } as never);
 
-      render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+      render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
       // La lista entera sigue ahi, con su tabla y su fila.
       expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
@@ -621,7 +625,7 @@ describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
       pagina([pedido(), pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' })]),
     );
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     // UNA, no una por fila: son dos pedidos y sigue siendo una sola invocacion.
     expect(listOrderCoverageActionMock).toHaveBeenCalledTimes(1);
@@ -636,6 +640,7 @@ describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
         params: parametros({ page: 2 }),
         recipes: RECIPES_VACIAS,
         units: UNITS_VACIAS,
+        bridge: null,
       }),
     );
 
@@ -653,7 +658,7 @@ describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
       return { status: 'success' as const, data: [] };
     });
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(orden).toEqual(['pedidos', 'cobertura']);
   });
@@ -677,7 +682,7 @@ describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
       ],
     });
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     const etiquetas = screen.getAllByTestId('order-coverage').map((nodo) => nodo.getAttribute('data-coverage'));
     expect(etiquetas.sort()).toEqual(['full', 'none', 'partial']);
@@ -686,7 +691,7 @@ describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
   it('sin ningun pedido no se pregunta por cobertura de nadie', async () => {
     listOrdersActionMock.mockResolvedValue(pagina([]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
     expect(listOrderCoverageActionMock).not.toHaveBeenCalled();
@@ -704,7 +709,7 @@ describe('QC-141 — si el lote de cobertura falla, la lista NO se cae (R20, R35
         message: 'No se pudo leer la cobertura.',
       } as never);
 
-      render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+      render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
       expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
       expect(screen.getByRole('table')).toBeInTheDocument();
@@ -723,7 +728,7 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
   it('con `asignaciones.modificar` se piden los dos, una vez cada uno', async () => {
     listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(listResponsibleCandidatesActionMock).toHaveBeenCalledTimes(1);
     expect(listWorkGroupsActionMock).toHaveBeenCalledTimes(1);
@@ -736,7 +741,7 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
     });
     listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(listResponsibleCandidatesActionMock).not.toHaveBeenCalled();
     expect(listWorkGroupsActionMock).not.toHaveBeenCalled();
@@ -752,7 +757,7 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
     } as never);
     listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.error)).toBeNull();
@@ -783,7 +788,7 @@ describe('QC-145 — el catalogo de personas sale de listResponsibleCandidatesAc
       data: [{ id: '0000000c-0000-4000-8000-00000000000c', displayName: 'Rosa Vidal' }],
     });
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(listResponsibleCandidatesActionMock).toHaveBeenCalledTimes(1);
     expect(listResponsibleCandidatesActionMock).toHaveBeenCalledWith();
@@ -801,7 +806,7 @@ describe('QC-145 — el catalogo de personas sale de listResponsibleCandidatesAc
       message: 'No tienes permiso para asignar responsables.',
     } as never);
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.error)).toBeNull();
@@ -818,7 +823,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
     });
     listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     // Las acciones de fila viven dentro del menu "de los 3 puntos" (RowActionsMenu): hay que
     // abrir el disparador antes de que el item exista en el documento (via portal).
@@ -833,7 +838,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
     });
     listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
 
-    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS }));
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('order-row-actions'));

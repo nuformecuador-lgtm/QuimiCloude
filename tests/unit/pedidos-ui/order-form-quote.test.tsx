@@ -16,6 +16,7 @@ import {
   ORDER_DISTRIBUTION_ADD_TESTID,
   PACKAGING_OPTION_TESTID,
   PACKAGING_SELECT_TESTID,
+  ORDER_COST_QUOTE_APPROXIMATE_TESTID,
   ORDER_COST_QUOTE_ERROR_TESTID,
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
@@ -40,7 +41,7 @@ import type {
   RecipeVersionListResult,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeDetail, RecipeSummary, RecipeVersionSummary } from '@/lib/modules/recetas';
-import type { UnitView } from '@/lib/modules/unidades';
+import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 
 const {
   createOrderActionMock,
@@ -268,7 +269,7 @@ function lineaConEnvase(packages: number) {
 function renderFormulario(order?: OrderSummary) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={RECETAS} units={UNIDADES} onSaved={onSaved} />
+      <OrderForm order={order} recipes={RECETAS} units={UNIDADES} bridge={null} onSaved={onSaved} />
     </Sheet>,
   );
 }
@@ -846,5 +847,48 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
       ),
     );
     expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('el bloque de coste avisa de la aproximacion masa-volumen', () => {
+  const GRAMO: UnitView = { id: crypto.randomUUID(), name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null, isSystem: true };
+  const KILO: UnitView = { id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg', baseUnitId: GRAMO.id, factor: '1000', isSystem: true };
+  const MILILITRO: UnitView = { id: crypto.randomUUID(), name: 'Mililitro', symbol: 'ml', baseUnitId: null, factor: null, isSystem: true };
+  const LITRO: UnitView = { id: crypto.randomUUID(), name: 'Litro', symbol: 'l', baseUnitId: MILILITRO.id, factor: '1000', isSystem: true };
+  const PUENTE: MassVolumeBridge = { volumeBaseId: MILILITRO.id, massBaseId: GRAMO.id };
+
+  function renderEdicion(ingredientsCost: string | null) {
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, percentage: '50.00', productUnitId: KILO.id }] }),
+    });
+    return render(
+      <Sheet open>
+        <OrderForm
+          order={pedido({ quantity: '2', unitId: LITRO.id, unitLabel: LITRO.symbol, ingredientsCost })}
+          recipes={RECETAS}
+          units={[GRAMO, KILO, MILILITRO, LITRO]}
+          bridge={PUENTE}
+          onSaved={onSaved}
+        />
+      </Sheet>,
+    );
+  }
+
+  it('R18 el bloque de costo indica la aproximacion si hay importe y alguna linea aproximada', async () => {
+    renderEdicion('12.5000');
+
+    expect(await screen.findByTestId('order-ingredient-approximate')).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_COST_QUOTE_APPROXIMATE_TESTID)).toHaveTextContent(
+      'Incluye una aproximación masa↔volumen (1 l ≈ 1 kg).',
+    );
+  });
+
+  it('R18 sin importe no se indica la aproximacion', async () => {
+    renderEdicion(null);
+
+    expect(await screen.findByTestId('order-ingredient-approximate')).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe(MISSING_VALUE_MARK);
+    expect(screen.queryByTestId(ORDER_COST_QUOTE_APPROXIMATE_TESTID)).toBeNull();
   });
 });

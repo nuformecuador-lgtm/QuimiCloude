@@ -248,6 +248,7 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
+  getMassVolumeBridgeAction: vi.fn(async () => ({ status: 'success', data: null })),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
@@ -652,7 +653,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // Primera mitad: la CONFIGURACION. Solo `recipeName` declara el `width` del contrato
     // (decision humana: es el texto largo de la fila); ninguna declara las claves de
     // dimensionado de la libreria, asi que por esa via no impone nada.
-    const columnas = buildOrderColumns({ recipes: RECETAS, units: [] });
+    const columnas = buildOrderColumns({ recipes: RECETAS, units: [], bridge: null });
     expect(columnas).toHaveLength(11);
 
     for (const columna of columnas) {
