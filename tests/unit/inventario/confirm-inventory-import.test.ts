@@ -82,15 +82,54 @@ describe('confirmInventoryImport — que se escribe', () => {
     expect(outcome.totals).toEqual({ rows: 5, created: 1, batchAdded: 1, duplicate: 1, error: 2 });
   });
 
-  it('R24 sin ninguna fila valida no escribe ningun lote ni avisa de existencias', async () => {
-    const { confirm, createProduct, imports, stockIncreases } = build([{ ...ROW_INSUMO, stock: 'x' }, { ...ROW_TERMINADO, formula: 'Jabon' }]);
+  it('R24 con 0 filas validas devuelve nothing_imported sin reclamar la clave', async () => {
+    const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
+    const { confirm, createProduct, imports, stockIncreases, digest } = build(
+      [{ ...ROW_INSUMO, lot: 'L-1' }, { ...ROW_INSUMO, stock: 'x' }, { ...ROW_TERMINADO, formula: 'Jabon' }],
+      { products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal' }] },
+    );
 
     const outcome = await confirm(FILE, ADMIN);
 
-    expect(outcome).toMatchObject({ kind: 'imported', totals: { rows: 2, error: 2, created: 0, batchAdded: 0 } });
+    expect(outcome.kind).toBe('nothing_imported');
+    if (outcome.kind !== 'nothing_imported') return;
+    expect(outcome).not.toHaveProperty('importId');
+    expect(outcome.fileName).toBe(FILE.fileName);
+    expect(statuses(outcome.rows)).toEqual(['duplicate', 'error:stock_invalid', expect.stringMatching(/^error:/u)]);
+    expect(outcome.rows[0]).toMatchObject({ status: 'duplicate', lot: 'L-1' });
+    expect(outcome.totals).toEqual({ rows: 3, created: 0, batchAdded: 0, duplicate: 1, error: 2 });
+    expect(imports.findImport).toHaveBeenCalledWith(KEY, { companyId: ADMIN.companyId });
+    expect(imports.claimImport).not.toHaveBeenCalled();
+    expect(imports.finishImport).not.toHaveBeenCalled();
     expect(createProduct).not.toHaveBeenCalled();
     expect(imports.receiveImportedFinishedGoods).not.toHaveBeenCalled();
     expect(stockIncreases.onStockIncreased).not.toHaveBeenCalled();
+    expect(digest.sha256Hex).not.toHaveBeenCalled();
+  });
+
+  it('R24 R29 un reenvio de una clave ya confirmada cuyas filas salen todas duplicadas devuelve already_imported', async () => {
+    const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
+    const { confirm, createProduct, imports } = build([{ ...ROW_INSUMO, lot: 'L-1' }], {
+      products: [existing],
+      batches: [{ lot: 'L-1', productId: 'p-sal' }],
+    });
+    imports.findImport.mockResolvedValueOnce({ importId: 'import-1', importedAt: new Date('2026-10-05T10:00:00.000Z') });
+
+    const outcome = await confirm(FILE, ADMIN);
+
+    expect(outcome).toEqual({ kind: 'already_imported', importId: 'import-1', importedAt: '2026-10-05T10:00:00.000Z' });
+    expect(imports.claimImport).not.toHaveBeenCalled();
+    expect(createProduct).not.toHaveBeenCalled();
+  });
+
+  it('R24 con alguna fila valida no consulta la clave antes de reservarla', async () => {
+    const { confirm, imports } = build([ROW_INSUMO, { ...ROW_INSUMO, stock: 'x' }]);
+
+    const outcome = await confirm(FILE, ADMIN);
+
+    expect(outcome.kind).toBe('imported');
+    expect(imports.findImport).not.toHaveBeenCalled();
+    expect(imports.claimImport).toHaveBeenCalledTimes(1);
   });
 
   it('R25 vuelve a validar contra la base del momento: lo que cambio desde la vista previa se refleja', async () => {
@@ -104,7 +143,10 @@ describe('confirmInventoryImport — que se escribe', () => {
 
     const outcome = await confirm(FILE, ADMIN);
 
-    expect(outcome.kind === 'imported' && statuses(outcome.rows)).toEqual(['duplicate', 'error:lot_used_by_other_product']);
+    // Las dos dejaron de ser validas desde la vista previa: no queda nada que importar.
+    expect(outcome.kind).toBe('nothing_imported');
+    if (outcome.kind !== 'nothing_imported') return;
+    expect(statuses(outcome.rows)).toEqual(['duplicate', 'error:lot_used_by_other_product']);
     expect(createProduct).not.toHaveBeenCalled();
   });
 

@@ -8,6 +8,7 @@ import {
   buildInventoryImportTemplate,
   type ImportCells,
   type ImportAlreadyDone,
+  type ImportNothingImported,
   type InventoryImportPreview,
   type InventoryImportResult,
 } from '@/lib/modules/inventario';
@@ -226,6 +227,32 @@ describe('confirmInventoryImportAction', () => {
     await expect(confirmInventoryImportAction(form({ file: xlsx(), importKey: IMPORT_KEY }))).resolves.toEqual({
       status: 'success',
       data: ALREADY,
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('R24 sin filas validas es un exito con nothing_imported y no revalida nada', async () => {
+    const nothing: ImportNothingImported = {
+      kind: 'nothing_imported',
+      fileName: 'inventario.xlsx',
+      exampleRowIgnored: false,
+      totals: { rows: 1, created: 0, batchAdded: 0, duplicate: 1, error: 0 },
+      rows: [
+        {
+          rowNumber: 2,
+          type: 'PRODUCT',
+          productName: 'Sal',
+          cells: cells({ type: 'Insumo', name: 'Sal' }),
+          status: 'duplicate',
+          lot: 'L-1',
+        },
+      ],
+    };
+    confirmMock.mockResolvedValue(nothing);
+
+    await expect(confirmInventoryImportAction(form({ file: xlsx(), importKey: IMPORT_KEY }))).resolves.toEqual({
+      status: 'success',
+      data: nothing,
     });
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });

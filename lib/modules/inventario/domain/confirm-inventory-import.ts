@@ -85,6 +85,17 @@ function written(row: ImportPreviewRow, productId: string, lot: string, context:
   return { ...baseOf(row), status: createsIt ? 'created' : 'batch_added', productId, lot };
 }
 
+type UnwrittenRow = Extract<ImportPreviewRow, { status: 'error' | 'duplicate' }>;
+
+const isUnwritten = (row: ImportPreviewRow): row is UnwrittenRow =>
+  row.status === 'error' || row.status === 'duplicate';
+
+function unwrittenRow(row: UnwrittenRow): ImportResultRow {
+  return row.status === 'error'
+    ? { ...baseOf(row), status: 'error', issues: row.issues }
+    : { ...baseOf(row), status: 'duplicate', lot: row.lot };
+}
+
 async function writeRow(
   row: ImportPreviewRow,
   write: ImportRowWrite | undefined,
@@ -92,8 +103,7 @@ async function writeRow(
   context: RowContext,
   importFinishedGoods: ReturnType<typeof createImportFinishedGoods>,
 ): Promise<ImportResultRow> {
-  if (row.status === 'error') return { ...baseOf(row), status: 'error', issues: row.issues };
-  if (row.status === 'duplicate') return { ...baseOf(row), status: 'duplicate', lot: row.lot };
+  if (isUnwritten(row)) return unwrittenRow(row);
   if (write === undefined) return errorRow(row, importRowIssue('write_failed', null));
 
   const lot = lotOf(write);
@@ -124,6 +134,7 @@ async function writeRow(
 /**
  * Vuelve a planificar contra la base de ahora y escribe solo las filas validas, cada una en su
  * propia transaccion y en el orden del archivo. La clave se reserva antes de la primera escritura.
+ * Si no queda ninguna fila valida no se escribe nada, tampoco la reserva de la clave.
  */
 export function createConfirmInventoryImport(deps: ConfirmInventoryImportDeps): ConfirmInventoryImport {
   const now = deps.now ?? (() => new Date());
@@ -140,6 +151,24 @@ export function createConfirmInventoryImport(deps: ConfirmInventoryImportDeps): 
 
     const outcome = await readInventoryImport(deps, input, scope, civilDateUtc(instant));
     if (outcome.kind === 'file_rejected') return outcome;
+
+    const unwritten = outcome.plan.rows.filter(isUnwritten);
+    if (unwritten.length === outcome.plan.rows.length) {
+      // Un reenvio de una confirmacion ya hecha replanifica sus filas como duplicadas: sigue siendo
+      // la misma importacion y no una vacia.
+      const previous = await deps.imports.findImport(input.importKey, scope);
+      if (previous !== null) {
+        return { kind: 'already_imported', importId: previous.importId, importedAt: previous.importedAt.toISOString() };
+      }
+      const rows = unwritten.map(unwrittenRow);
+      return {
+        kind: 'nothing_imported',
+        fileName: input.fileName,
+        exampleRowIgnored: outcome.sheet.exampleRowIgnored,
+        totals: resultTotals(rows),
+        rows,
+      };
+    }
 
     const claim = await deps.imports.claimImport(
       {

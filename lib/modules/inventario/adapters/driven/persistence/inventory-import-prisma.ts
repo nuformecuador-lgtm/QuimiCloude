@@ -14,6 +14,7 @@ import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductType } from '../../../domain/product-type';
 import type {
+  ExistingImport,
   ImportClaim,
   ImportedFinishedGoods,
   ImportedFinishedGoodsOutcome,
@@ -129,14 +130,19 @@ export async function claimImport(
     if (!isDuplicateImportKey(error)) throw error;
   }
 
-  const existing = await prisma.inventoryImport.findFirst({
-    where: { AND: [companyScopeColumns(scope), { importKey: input.importKey }] },
-    select: { id: true, createdAt: true },
-  });
+  const existing = await findImport(input.importKey, scope);
   if (existing === null) {
     throw new Error('claimImport: la clave choco con el indice unico pero no aparece la importacion previa');
   }
-  return { kind: 'already', importId: existing.id, importedAt: existing.createdAt };
+  return { kind: 'already', ...existing };
+}
+
+export async function findImport(importKey: string, scope: InventoryScope): Promise<ExistingImport | null> {
+  const existing = await prisma.inventoryImport.findFirst({
+    where: { AND: [companyScopeColumns(scope), { importKey }] },
+    select: { id: true, createdAt: true },
+  });
+  return existing === null ? null : { importId: existing.id, importedAt: existing.createdAt };
 }
 
 export async function finishImport(

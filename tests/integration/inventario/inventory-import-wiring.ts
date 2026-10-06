@@ -11,6 +11,7 @@ import {
   findAliveFinishedProducts,
   findAliveProductsByNormalizedNames,
   findBatchesByLots,
+  findImport,
   finishImport,
   receiveImportedFinishedGoods,
 } from '@/lib/modules/inventario/adapters/driven/persistence/inventory-import-prisma';
@@ -71,6 +72,7 @@ export const importRepository: InventoryImportRepository = {
   findAliveProductsByNormalizedNames,
   findAliveFinishedProducts,
   findBatchesByLots,
+  findImport,
   claimImport,
   finishImport,
   receiveImportedFinishedGoods,

@@ -30,6 +30,8 @@ export type ImportedFinishedGoods = {
   readonly createdBy: string;
 };
 
+export type ExistingImport = { readonly importId: string; readonly importedAt: Date };
+
 export type ImportClaim =
   | { readonly kind: 'claimed'; readonly importId: string }
   | { readonly kind: 'already'; readonly importId: string; readonly importedAt: Date };
@@ -63,6 +65,9 @@ export interface InventoryImportRepository {
     lots: readonly string[],
     scope: InventoryScope,
   ): Promise<readonly { lot: string; productId: string }[]>;
+
+  /** La importacion ya confirmada con esa clave en la empresa, o `null`. Solo lee. */
+  findImport(importKey: string, scope: InventoryScope): Promise<ExistingImport | null>;
 
   /** Reserva la clave de importacion. Si la empresa ya la tenia, devuelve la importacion previa
    *  y no escribe nada. */

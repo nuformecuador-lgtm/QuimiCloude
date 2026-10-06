@@ -11,6 +11,7 @@ import type { ParsedImportRow, ParsedImportSheet } from '@/lib/modules/inventari
 import type { ImportCells, ImportColumnKey } from '@/lib/modules/inventario';
 import type { ImportCatalogSnapshot } from '@/lib/modules/inventario/domain/plan-inventory-import';
 import type {
+  ExistingImport,
   ImportClaim,
   ImportedFinishedGoodsOutcome,
   ImportProductRef,
@@ -135,6 +136,7 @@ export function fakeReadPorts(state: CatalogState = {}) {
     findBatchesByLots: vi.fn(async (lots: readonly string[]) =>
       (state.batches ?? []).filter((batch) => lots.includes(batch.lot)),
     ),
+    findImport: vi.fn(async (): Promise<ExistingImport | null> => null),
     claimImport: vi.fn(async (): Promise<ImportClaim> => ({ kind: 'claimed', importId: 'import-1' })),
     finishImport: vi.fn(async () => undefined),
     receiveImportedFinishedGoods: vi.fn(async (): Promise<ImportedFinishedGoodsOutcome> => ({

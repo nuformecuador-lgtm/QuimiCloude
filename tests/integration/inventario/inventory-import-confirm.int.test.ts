@@ -194,7 +194,8 @@ describe('importacion de inventario contra la base', () => {
     await confirm({ ...archivo, importKey: crypto.randomUUID() }, actor);
 
     const segunda = await confirm({ ...archivo, importKey: crypto.randomUUID() }, actor);
-    expect(segunda.kind === 'imported' && segunda.rows[0]?.status).toBe('duplicate');
+    // Su unica fila ya no es valida: no queda nada que importar.
+    expect(segunda.kind === 'nothing_imported' && segunda.rows[0]?.status).toBe('duplicate');
   });
 
   it.skipIf(process.env.QC209_MEDIR_2000 !== '1')(
