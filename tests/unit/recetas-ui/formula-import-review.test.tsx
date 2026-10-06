@@ -72,6 +72,7 @@ function preview(overrides: Partial<FormulaImportPreview> = {}): FormulaImportPr
     description: 'Fórmula de referencia',
     ingredients: [],
     steps: [],
+    packingSteps: [],
     nameClash: null,
     ...overrides,
   };
@@ -597,6 +598,7 @@ describe('la confirmacion escribe solo al confirmar y navega al resultado (R29)'
       description: 'Fórmula de referencia',
       lines: [{ kind: 'existing', productId: PRODUCT_EXISTING.id, percentage: '100.00' }],
       steps: [],
+      packingSteps: [],
       replaceRecipeId: null,
     });
 
@@ -616,6 +618,81 @@ describe('la confirmacion escribe solo al confirmar y navega al resultado (R29)'
       'href',
       recipeEditRoute('receta-nueva-id'),
     );
+  });
+});
+
+describe('los pasos de envasado tienen su propia seccion y sus propios motivos (R16, R17)', () => {
+  const MEZCLAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Mezclar despacio' }] }] };
+  const ENVASAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Envasar en garrafa' }] }] };
+  const ETIQUETAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Etiquetar el lote' }] }] };
+  const PASO_VACIO = { blocks: [{ kind: 'paragraph' as const, spans: [] }] };
+  const INGREDIENTE_COMPLETO = {
+    readName: 'Sosa',
+    percentage: '100.00',
+    percentageRead: '100',
+    quantityRead: null,
+    unitRead: null,
+    match: { kind: 'one' as const, productId: PRODUCT_EXISTING.id, productName: PRODUCT_EXISTING.name, unitId: null },
+  };
+
+  it('R16: pinta los pasos de envasado leidos en su seccion, separados de los del operador', () => {
+    renderReview({ steps: [MEZCLAR], packingSteps: [ENVASAR, ETIQUETAR] });
+
+    const seccion = screen.getByTestId('recipe-packing-steps-field');
+    expect(seccion).toHaveTextContent('Pasos de envasado');
+    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(2);
+    expect(screen.getByTestId('recipe-packing-step-text-0')).toHaveTextContent('Envasar en garrafa');
+    expect(screen.getByTestId('recipe-packing-step-text-1')).toHaveTextContent('Etiquetar el lote');
+
+    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(1);
+    expect(screen.getByTestId('recipe-steps-list')).not.toHaveTextContent('Envasar en garrafa');
+  });
+
+  it('R16: se añaden y borran sin tocar los pasos del operador', async () => {
+    const user = setupUser();
+    renderReview({ steps: [MEZCLAR], packingSteps: [] });
+
+    expect(screen.getByTestId('recipe-packing-step-add')).toHaveTextContent('Añadir paso de envasado');
+    await user.click(screen.getByTestId('recipe-packing-step-add'));
+    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(1);
+
+    await user.click(screen.getByTestId('recipe-packing-step-remove-0'));
+    expect(screen.getByTestId('recipe-packing-steps-list').children).toHaveLength(0);
+    expect(screen.getByTestId('recipe-steps-list').children).toHaveLength(1);
+  });
+
+  it('R16: confirmar envia los pasos de envasado en orden y aparte de los del operador', async () => {
+    const user = setupUser();
+    confirmFormulaImportActionMock.mockReturnValue(new Promise<ConfirmFormulaImportResult>(() => {}));
+    renderReview({ ingredients: [INGREDIENTE_COMPLETO], steps: [MEZCLAR], packingSteps: [ENVASAR, ETIQUETAR] });
+
+    await user.click(screen.getByTestId('formula-import-confirm'));
+
+    expect(confirmFormulaImportActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ steps: [MEZCLAR], packingSteps: [ENVASAR, ETIQUETAR] }),
+    );
+  });
+
+  it('R17: con 51 pasos de envasado el motivo es propio y no se puede confirmar', () => {
+    renderReview({
+      ingredients: [INGREDIENTE_COMPLETO],
+      packingSteps: Array.from({ length: 51 }, () => ENVASAR),
+    });
+
+    const razones = screen.getByTestId('formula-import-reasons');
+    expect(razones).toHaveTextContent('Hay más de 50 pasos de envasado.');
+    expect(razones).not.toHaveTextContent('Hay más de 50 pasos.');
+    expect(screen.getByTestId('formula-import-confirm')).toBeDisabled();
+    expect(confirmFormulaImportActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R17: con un paso de envasado invalido el motivo es propio y no se puede confirmar', () => {
+    renderReview({ ingredients: [INGREDIENTE_COMPLETO], packingSteps: [PASO_VACIO] });
+
+    const razones = screen.getByTestId('formula-import-reasons');
+    expect(razones).toHaveTextContent('Revisa los pasos de envasado: alguno no es válido.');
+    expect(razones).not.toHaveTextContent('Revisa los pasos: alguno no es válido.');
+    expect(screen.getByTestId('formula-import-confirm')).toBeDisabled();
   });
 });
 

@@ -158,6 +158,7 @@ function recetaNueva(overrides: Partial<NewRecipe> = {}): NewRecipe {
     name: `Receta ${token()}`,
     description: null,
     steps: [],
+    packingSteps: [],
     lines: [],
     imagePath: null,
     tools: [],

@@ -6,7 +6,7 @@
  * Cada campo de cada ingrediente se interpreta por separado (`catch(null)`): un tipo que no
  * encaja deja ESE campo en `null` y el ingrediente sobrevive. Solo dos motivos rechazan el
  * documento entero: que el texto no contenga ningun objeto JSON interpretable, o que
- * `ingredients`/`steps` no sean ni lista ni `null`. Un elemento de `ingredients` que no es un
+ * `ingredients`/`steps`/`packingSteps` no sean ni lista ni `null`. Un elemento de `ingredients` que no es un
  * objeto se descarta en silencio, igual que uno sin ningun campo con contenido.
  *
  * El porcentaje nunca se redondea: si el valor leido no cabe exacto en el patron aceptado, la
@@ -52,6 +52,8 @@ export type FormulaExtraction = {
   readonly description: string | null;
   readonly ingredients: readonly ExtractedIngredient[];
   readonly steps: readonly RecipeStepDocument[];
+  /** Separados de `steps`; ausente o `null` en el texto = `[]`. */
+  readonly packingSteps: readonly RecipeStepDocument[];
 };
 
 function trimOrNull(value: string | null): string | null {
@@ -158,6 +160,11 @@ export function extractFormulaFromText(text: string): FormulaExtraction {
     throw new ValidationError(diagnostico("'steps' no es ni lista ni null"));
   }
 
+  const rawPackingSteps = parsed.packingSteps;
+  if (rawPackingSteps !== null && rawPackingSteps !== undefined && !Array.isArray(rawPackingSteps)) {
+    throw new ValidationError(diagnostico("'packingSteps' no es ni lista ni null"));
+  }
+
   const name = trimOrNull(nullableString.parse(parsed.name ?? null));
   const description = trimOrNull(nullableString.parse(parsed.description ?? null));
 
@@ -167,6 +174,7 @@ export function extractFormulaFromText(text: string): FormulaExtraction {
     .filter((ingredient): ingredient is ExtractedIngredient => ingredient !== null);
 
   const steps = extractSteps(rawSteps ?? []);
+  const packingSteps = extractSteps(rawPackingSteps ?? []);
 
-  return { name, description, ingredients, steps };
+  return { name, description, ingredients, steps, packingSteps };
 }

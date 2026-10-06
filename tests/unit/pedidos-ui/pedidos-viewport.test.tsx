@@ -435,6 +435,7 @@ beforeEach(() => {
       createdBy: null,
       updatedBy: null,
       steps: [],
+      packingSteps: [],
       lines: [],
       tools: [],
       original: null,

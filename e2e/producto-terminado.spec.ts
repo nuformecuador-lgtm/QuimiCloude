@@ -68,6 +68,13 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
 import { addPackagingLine } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 
@@ -654,7 +661,7 @@ test.describe('producto terminado', () => {
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
-    await assignedRow.getByTestId('assigned-order-enter').click();
+    await clickAndConfirm(page, assignedRow.getByTestId('assigned-order-enter'), ASSIGNED_ORDER_START_CONFIRM_TESTID);
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), {
       timeout: 60_000,
     });
@@ -662,7 +669,7 @@ test.describe('producto terminado', () => {
 
     // --- 4. Finalizar por el Finalizar de la planta.
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
-    await page.getByTestId(STEP_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },
@@ -693,9 +700,9 @@ test.describe('producto terminado', () => {
     await loginAndLand(page, empacadorUser);
     await page.goto(packingOrderRoute(order.id));
     await expect(page.getByTestId('packing-order-screen')).toBeVisible({ timeout: 60_000 });
-    await page.getByTestId('packing-order-start-button').click();
+    await clickAndConfirm(page, page.getByTestId('packing-order-start-button'), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId('packing-order-finish-button')).toBeVisible({ timeout: 60_000 });
-    await page.getByTestId('packing-order-finish-button').click();
+    await clickAndConfirm(page, page.getByTestId('packing-order-finish-button'), PACKING_ORDER_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(PACKED_ORDER_PARAM),
       { timeout: 60_000 },

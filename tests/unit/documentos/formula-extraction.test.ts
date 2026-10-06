@@ -5,6 +5,12 @@ import { describe, expect, it } from 'vitest';
 
 import { extractFormulaFromText, readPercentage } from '@/lib/modules/documentos/domain/formula-extraction';
 import { ValidationError } from '@/lib/modules/documentos/domain/errors';
+import {
+  CANNED_FORMULA_PACKING_STEP_1,
+  CANNED_FORMULA_PACKING_STEP_2_LINE_A,
+  CANNED_FORMULA_PACKING_STEP_2_LINE_B,
+  CANNED_FORMULA_TEXT,
+} from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 
 describe('documentos — interpretacion tolerante del texto de formula', () => {
   describe('R4 — tolera la forma del texto y de cada campo, sin perder el ingrediente', () => {
@@ -209,5 +215,71 @@ describe('documentos — interpretacion tolerante del texto de formula', () => {
       expect(resultado.steps[0]?.blocks[0]).toEqual({ kind: 'paragraph', spans: [{ text: 'Primero' }] });
       expect(resultado.steps[1]?.blocks[0]).toEqual({ kind: 'paragraph', spans: [{ text: 'Segundo' }] });
     });
+  });
+});
+
+describe('QC-211 — pasos de envasado en el texto de formula', () => {
+  function parrafos(texto: string) {
+    return texto.split('\n').map((linea) => ({ kind: 'paragraph', spans: [{ text: linea }] }));
+  }
+
+  it('R14: `packingSteps` da documentos en orden, separados de `steps`', () => {
+    const texto = JSON.stringify({
+      steps: ['Mezclar en frio'],
+      packingSteps: ['Envasar en garrafas', 'Tapar\nEtiquetar con el lote'],
+    });
+    const resultado = extractFormulaFromText(texto);
+
+    expect(resultado.steps).toEqual([{ blocks: parrafos('Mezclar en frio') }]);
+    expect(resultado.packingSteps).toEqual([
+      { blocks: parrafos('Envasar en garrafas') },
+      { blocks: parrafos('Tapar\nEtiquetar con el lote') },
+    ]);
+  });
+
+  it('R14: un paso de envasado en blanco se descarta y el orden de los demas se conserva', () => {
+    const resultado = extractFormulaFromText('{"packingSteps":["Envasar"," ","Sellar"]}');
+
+    expect(resultado.packingSteps).toEqual([{ blocks: parrafos('Envasar') }, { blocks: parrafos('Sellar') }]);
+    expect(resultado.steps).toEqual([]);
+  });
+
+  it('R14: el texto de guion trae dos pasos de envasado, el segundo de dos lineas, y sus tres pasos del operador', () => {
+    const resultado = extractFormulaFromText(CANNED_FORMULA_TEXT);
+
+    expect(resultado.steps).toHaveLength(3);
+    expect(resultado.packingSteps).toEqual([
+      { blocks: parrafos(CANNED_FORMULA_PACKING_STEP_1) },
+      { blocks: parrafos(`${CANNED_FORMULA_PACKING_STEP_2_LINE_A}
+${CANNED_FORMULA_PACKING_STEP_2_LINE_B}`) },
+    ]);
+  });
+
+  it('R15: sin la clave `packingSteps` la lista es `[]` y lo demas se lee igual', () => {
+    const resultado = extractFormulaFromText('{"name":"Formula","steps":["Mezclar"]}');
+
+    expect(resultado.packingSteps).toEqual([]);
+    expect(resultado.steps).toHaveLength(1);
+    expect(resultado.name).toBe('Formula');
+  });
+
+  it('R15: `packingSteps: null` da `[]`', () => {
+    expect(extractFormulaFromText('{"packingSteps":null}').packingSteps).toEqual([]);
+  });
+
+  it.each([
+    ['un objeto', '{"packingSteps":{"a":"Envasar"}}'],
+    ['un numero', '{"packingSteps":3}'],
+    ['una cadena', '{"packingSteps":"Envasar"}'],
+  ])('R15: `packingSteps` como %s -> ValidationError invalid_input con su diagnostico', (_caso, texto) => {
+    let capturado: unknown;
+    try {
+      extractFormulaFromText(texto);
+    } catch (error) {
+      capturado = error;
+    }
+    expect(capturado).toBeInstanceOf(ValidationError);
+    expect((capturado as ValidationError).code).toBe('invalid_input');
+    expect((capturado as ValidationError).diagnostic).toContain("'packingSteps' no es ni lista ni null");
   });
 });

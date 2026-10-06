@@ -5,6 +5,7 @@ import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import {
   BRAND_LABEL,
+  HIDDEN_DASHBOARD_NAV_ITEM,
   PRIVATE_NAV_ITEMS,
   PRIVATE_NAV_LABEL,
   INVENTORY_ROUTE,
@@ -14,7 +15,7 @@ import {
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
 import * as privateNav from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, DASHBOARD_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 import type { SessionUser } from '@/lib/modules/identity';
 
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewport';
@@ -193,7 +194,7 @@ describe('barra lateral privada', () => {
     expect(screen.getAllByRole('navigation')).toHaveLength(1);
   });
 
-  it('la marca es un enlace a DASHBOARD_ROUTE con nombre accesible', () => {
+  it('la marca es un enlace a ASSIGNED_ORDERS_ROUTE con nombre accesible', () => {
     // R4
     renderSidebar();
 
@@ -201,7 +202,7 @@ describe('barra lateral privada', () => {
 
     expect(screen.getByTestId(testId.brand)).toContainElement(enlace);
     expect(enlace).toHaveRole('link');
-    expect(enlace).toHaveAttribute('href', DASHBOARD_ROUTE);
+    expect(enlace).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
     expect(enlace).toHaveAccessibleName(BRAND_LABEL);
     // En viewport ancho y modo expandido se muestra la version larga de la marca.
     expect(screen.getByTestId(testId.brandLong)).toBeInTheDocument();
@@ -225,7 +226,6 @@ describe('barra lateral privada', () => {
     // «Usuarios» es el ultimo item declarado en `PRIVATE_NAV_ITEMS` pero se dibuja junto a los
     // demas de «Operación».
     const esperado = [
-      'nav-dashboard',
       'nav-asignacion',
       'nav-inventario',
       'nav-pedidos',
@@ -238,6 +238,16 @@ describe('barra lateral privada', () => {
     ];
 
     expect(enDom).toEqual(esperado);
+  });
+
+  it('el item del dashboard no se pinta en el menu aunque su ruta siga existiendo', () => {
+    renderSidebar();
+
+    expect(screen.queryByTestId(HIDDEN_DASHBOARD_NAV_ITEM.testId)).toBeNull();
+    const enlacesDelMenu = Array.from(
+      screen.getByTestId(testId.nav).querySelectorAll('a[href]'),
+    ).map((enlace) => enlace.getAttribute('href'));
+    expect(enlacesDelMenu).not.toContain(DASHBOARD_ROUTE);
   });
 
   it('con una coleccion de navegacion vacia no renderiza entradas y el layout sigue en pie', () => {
@@ -386,7 +396,7 @@ describe('barra lateral privada', () => {
       }
     }
 
-    const esperados = new Set<string>([DASHBOARD_ROUTE]);
+    const esperados = new Set<string>([ASSIGNED_ORDERS_ROUTE]);
     for (const item of PRIVATE_NAV_ITEMS) {
       if (item.kind === 'link') {
         expect(screen.getByTestId(item.testId)).toHaveAttribute('href', item.href);
@@ -399,7 +409,7 @@ describe('barra lateral privada', () => {
       }
     }
 
-    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', DASHBOARD_ROUTE);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
 
     // Y ningun destino del arbol queda fuera del conjunto de constantes.
     const enDom = Array.from(document.querySelectorAll('a[href]')).map((enlace) =>
@@ -540,9 +550,9 @@ describe('el borrado de items de relleno (QC-13)', () => {
     //
     // TENSADO: la entrada nueva es la pantalla de clientes, ULTIMO del array y de la seccion
     // «Cadena», detras de proveedores. El ancla se TENSA, nunca se afloja: sube de nueve a DIEZ.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(10);
+    // El dashboard esta fuera temporalmente: vive en `HIDDEN_DASHBOARD_NAV_ITEM`.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(9);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
-      'nav-dashboard',
       'nav-asignacion',
       'nav-inventario',
       'nav-pedidos',

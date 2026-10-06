@@ -75,6 +75,11 @@ function enlacesDeEjecucion(): HTMLAnchorElement[] {
   );
 }
 
+// Un pedido sin comenzar entra por un boton que confirma antes de navegar, no por un enlace.
+function disparadoresDeEntrar(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('[data-testid="assigned-order-enter"]'));
+}
+
 beforeEach(() => {
   listAssignedOrdersActionMock.mockResolvedValue({
     status: 'success',
@@ -101,6 +106,7 @@ describe('sin `asignaciones.ejecutar` la tabla no emite «Entrar»', () => {
     const tabla = screen.getByTestId('assigned-orders-table');
     expect(within(tabla).queryByRole('columnheader', { name: /Entrar/ })).toBeNull();
     expect(enlacesDeEjecucion()).toHaveLength(0);
+    expect(disparadoresDeEntrar()).toHaveLength(0);
     expect(screen.getByText('2026-000123')).toBeInTheDocument();
   });
 
@@ -124,7 +130,7 @@ describe('con `asignaciones.ejecutar` la tabla queda como hoy', () => {
     expect(buildAssignedOrdersColumns({ canExecute: true }).at(-1)?.id).toBe(
       ASSIGNED_ORDER_ENTER_COLUMN_ID,
     );
-    expect(enlacesDeEjecucion().length).toBeGreaterThanOrEqual(ORDERS.length);
+    expect(disparadoresDeEntrar().length).toBeGreaterThanOrEqual(ORDERS.length);
   });
 
   it('R11: el esqueleto con `canExecute: true` pinta tantas columnas como la tabla', () => {
@@ -140,7 +146,7 @@ describe('con `asignaciones.ejecutar` la tabla queda como hoy', () => {
     const { rerender } = render(
       <AssignedOrdersTable rows={ORDERS} params={PARAMS} totalPages={1} vista="asignados" canExecute />,
     );
-    expect(enlacesDeEjecucion().length).toBeGreaterThanOrEqual(ORDERS.length);
+    expect(disparadoresDeEntrar().length).toBeGreaterThanOrEqual(ORDERS.length);
 
     rerender(
       <AssignedOrdersTable
@@ -152,6 +158,7 @@ describe('con `asignaciones.ejecutar` la tabla queda como hoy', () => {
       />,
     );
     expect(enlacesDeEjecucion()).toHaveLength(0);
+    expect(disparadoresDeEntrar()).toHaveLength(0);
   });
 });
 

@@ -47,6 +47,7 @@ function filaConLineaVieja(): RecipeRow {
     name: 'Desengrasante 5%',
     description: null,
     steps: [],
+    packingSteps: [],
     imagePath: null,
     createdBy: ADMIN.id,
     updatedBy: ADMIN.id,

@@ -67,6 +67,8 @@ export type RecipeStepView = RecipeStepDocument;
 
 export type RecipeDetail = RecipeSummary & {
   readonly steps: readonly RecipeStepView[];
+  /** Los del empacador; en una version, los de su original. */
+  readonly packingSteps: readonly RecipeStepView[];
   readonly lines: readonly RecipeLineView[];
   readonly tools: readonly RecipeToolView[];
   /** `null` en una original. */

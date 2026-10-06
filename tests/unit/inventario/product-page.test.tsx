@@ -832,6 +832,32 @@ describe('pantalla de productos — lista', () => {
     expect(celda).toHaveAttribute('aria-label', '12345.6789');
   });
 
+  it('la alerta de cantidad se pinta junto a la unidad del producto, como la existencia', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ unitId: UNIDAD_KG.id, qtyAlert: '10.0000' })]),
+    );
+
+    await renderPantalla();
+
+    const celda = screen.getByTestId('product-qty-alert');
+    expect(celda).toHaveTextContent('10 kg');
+    expect(celda).toHaveAttribute('aria-label', '10 kg');
+  });
+
+  it('sin unidad conocida, la alerta de cantidad pinta solo la cifra', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ unitId: null, qtyAlert: '10.0000' })]),
+    );
+
+    await renderPantalla();
+
+    const celda = screen.getByTestId('product-qty-alert');
+    expect(celda.textContent).toBe('10');
+    expect(celda).toHaveAttribute('aria-label', '10');
+  });
+
   it('R36 — muestra lo reservado y lo disponible del producto junto a su unidad, con la cifra exacta', async () => {
     const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
     listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
@@ -1429,6 +1455,57 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
     expect(toastExito).toHaveBeenCalledWith('Producto actualizado.');
     expect(String(toastExito.mock.calls[0][0])).not.toContain('Lote');
+  });
+
+  it('la edicion precarga la alerta de cantidad sin ceros de relleno y nombra la unidad en la etiqueta', async () => {
+    const user = setupUser();
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ unitId: UNIDAD_KG.id, qtyAlert: '10.0000' })]),
+    );
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    const formulario = await screen.findByTestId(testId.formulario);
+
+    const campo = screen.getByTestId('product-field-qtyAlert');
+    expect(campo).toHaveValue('10');
+    expect(within(formulario).getByLabelText('Alerta de cantidad (kg)')).toBe(campo);
+  });
+
+  it('la edicion no redondea la alerta de cantidad: solo quita los ceros de relleno', async () => {
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ unitId: null, qtyAlert: '0.1255' })]),
+    );
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    const formulario = await screen.findByTestId(testId.formulario);
+
+    expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue('0.1255');
+    // Sin unidad conocida, la etiqueta no cambia.
+    expect(within(formulario).getByLabelText('Alerta de cantidad')).toBe(
+      screen.getByTestId('product-field-qtyAlert'),
+    );
+  });
+
+  it('elegir un producto existente autocompleta la alerta de cantidad sin ceros de relleno', async () => {
+    const user = setupUser();
+    const existente = producto({ name: 'Sosa cáustica perlas', qtyAlert: '7.5000' });
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([existente]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId('product-field-name'));
+    await user.click(
+      await esperarInteractiva(await screen.findByRole('option', { name: existente.name })),
+    );
+
+    expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue('7.5');
   });
 
   it('elegir un producto existente autocompleta la alerta de cantidad, no la existencia', async () => {

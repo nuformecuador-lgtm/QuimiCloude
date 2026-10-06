@@ -59,6 +59,11 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
 
@@ -695,7 +700,7 @@ test.describe('reserva de material del pedido', () => {
 
     const assignedRowB = rowByNumber(page, orderBNumber);
     await expect(assignedRowB).toHaveCount(1, { timeout: 60_000 });
-    await assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID).click();
+    await clickAndConfirm(page, assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderB.id), {
       timeout: 60_000,
     });
@@ -710,7 +715,7 @@ test.describe('reserva de material del pedido', () => {
 
     // El unico paso de la receta del fixture: bloqueado hasta marcar su lista de verificacion.
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
-    await page.getByTestId(STEP_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },

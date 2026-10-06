@@ -68,6 +68,7 @@ export type FormulaImportPreview = {
   readonly description: string | null;
   readonly ingredients: readonly FormulaImportPreviewIngredient[];
   readonly steps: readonly RecipeStepDocument[];
+  readonly packingSteps: readonly RecipeStepDocument[];
   readonly nameClash: { readonly recipeId: string; readonly recipeName: string } | null;
 };
 
@@ -150,6 +151,7 @@ export function createPreviewFormulaImport(
       description: extraction.description,
       ingredients,
       steps: extraction.steps,
+      packingSteps: extraction.packingSteps,
       nameClash,
     };
   };

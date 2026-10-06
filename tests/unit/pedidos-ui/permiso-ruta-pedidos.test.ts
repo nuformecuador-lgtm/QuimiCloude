@@ -65,7 +65,7 @@ const REAL = {
   search: '',
   session: ANONIMO,
   privatePrefixes: PRIVATE_ROUTE_PREFIXES,
-  routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
+  routes: { login: LOGIN_ROUTE, landing: DASHBOARD_ROUTE },
 } as const satisfies RouteAccessInput;
 
 describe('el permiso de la pantalla de pedidos (QC-75 R5, R6)', () => {

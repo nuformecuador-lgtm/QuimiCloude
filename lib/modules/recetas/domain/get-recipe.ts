@@ -71,6 +71,7 @@ export function createGetRecipe(
       createdBy: row.createdBy,
       updatedBy: row.updatedBy,
       steps: shared.steps,
+      packingSteps: shared.packingSteps,
       original: row.original === null ? null : { id: row.original.id, name: row.original.name },
       isUnderReview: isVersionUnderReview(
         row.original !== null,

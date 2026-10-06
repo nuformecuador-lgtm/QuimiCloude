@@ -43,7 +43,7 @@ import type {
 const RECIPE_INCLUDE = {
   lines: true,
   tools: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
-  parent: { select: { id: true, name: true, description: true, imagePath: true, steps: true } },
+  parent: { select: { id: true, name: true, description: true, imagePath: true, steps: true, packingSteps: true } },
 } satisfies Prisma.RecipeInclude;
 
 type RecipeWithLines = Prisma.RecipeGetPayload<{ include: typeof RECIPE_INCLUDE }>;
@@ -95,6 +95,7 @@ export function toRecipeRow(row: RecipeWithLines): RecipeRow {
     name: row.name,
     description: row.description,
     steps: toSteps(row.steps),
+    packingSteps: toSteps(row.packingSteps),
     imagePath: row.imagePath,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
@@ -111,6 +112,7 @@ export function toRecipeRow(row: RecipeWithLines): RecipeRow {
             description: row.parent.description,
             imagePath: row.parent.imagePath,
             steps: toSteps(row.parent.steps),
+            packingSteps: toSteps(row.parent.packingSteps),
           },
   };
 }
@@ -222,6 +224,7 @@ export async function createRecipe(
         nameNormalized: normalizeRecipeName(data.name),
         description: data.description,
         steps: data.steps as unknown as Prisma.InputJsonValue,
+        packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
         imagePath: data.imagePath,
         createdAt: now,
         updatedAt: now,
@@ -445,6 +448,7 @@ export async function replaceAliveRecipe(
           nameNormalized: normalizeRecipeName(data.name),
           description: data.description,
           steps: data.steps as unknown as Prisma.InputJsonValue,
+          packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
           imagePath: data.imagePath,
           updatedAt: now,
           updatedBy: actorId,
@@ -572,6 +576,7 @@ export async function createRecipeVersion(
           nameNormalized: normalizeRecipeName(data.name),
           description: null,
           steps: [],
+          packingSteps: [],
           imagePath: null,
           createdAt: now,
           updatedAt: now,
@@ -643,6 +648,7 @@ export async function replaceAliveRecipeWithPropagation(
           nameNormalized: normalizeRecipeName(data.name),
           description: data.description,
           steps: data.steps as unknown as Prisma.InputJsonValue,
+          packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
           imagePath: data.imagePath,
           updatedAt: now,
           updatedBy: actorId,

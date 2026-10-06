@@ -19,6 +19,7 @@ import {
   type RouteAccessSession,
 } from '@/lib/modules/identity/domain/route-access';
 import {
+  ASSIGNED_ORDERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
@@ -31,7 +32,7 @@ import {
   recipeEditRoute,
 } from '@/lib/shared/routes';
 
-const ROUTES = { login: '/login', dashboard: '/dashboard' } as const;
+const ROUTES = { login: '/login', landing: '/asignacion' } as const;
 const PREFIJOS_PRIVADOS = ['/dashboard'] as const;
 
 const SUB = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
@@ -112,15 +113,15 @@ describe('decideRouteAccess — paso 2: ruta privada sin sesion (R17)', () => {
 });
 
 describe('decideRouteAccess — paso 3: login con sesion valida (R17)', () => {
-  it('sin destino de vuelta redirige al dashboard', () => {
+  it('sin destino de vuelta redirige a la ruta de aterrizaje', () => {
     expect(decidir({ pathname: '/login', session: CON_SESION })).toEqual({
       kind: 'redirect',
-      to: '/dashboard',
+      to: '/asignacion',
       reason: 'already-authenticated',
     });
   });
 
-  it('con destino de vuelta valido redirige ahi, no al dashboard', () => {
+  it('con destino de vuelta valido redirige ahi, no a la ruta de aterrizaje', () => {
     expect(
       decidir({ pathname: '/login', search: '?next=%2Fdashboard%2Freportes', session: CON_SESION }),
     ).toEqual({
@@ -133,7 +134,7 @@ describe('decideRouteAccess — paso 3: login con sesion valida (R17)', () => {
   // El destino de vuelta se valida como interno tambien aqui: nunca se emite una redireccion
   // fuera de este sitio.
   it.each([['https://evil.example'], ['//evil.example'], ['%2F%2Fevil.example']])(
-    'con un destino de vuelta externo (%s) redirige al dashboard',
+    'con un destino de vuelta externo (%s) redirige a la ruta de aterrizaje',
     (destino) => {
       const decision = decidir({
         pathname: '/login',
@@ -143,7 +144,7 @@ describe('decideRouteAccess — paso 3: login con sesion valida (R17)', () => {
 
       expect(decision).toEqual({
         kind: 'redirect',
-        to: '/dashboard',
+        to: '/asignacion',
         reason: 'already-authenticated',
       });
     },
@@ -223,7 +224,7 @@ describe('decideRouteAccess — la decision no es una autorizacion', () => {
 const REAL = {
   search: '',
   privatePrefixes: PRIVATE_ROUTE_PREFIXES,
-  routes: { login: LOGIN_ROUTE, dashboard: DASHBOARD_ROUTE },
+  routes: { login: LOGIN_ROUTE, landing: ASSIGNED_ORDERS_ROUTE },
 } as const;
 
 const ID_RECETA = '11111111-1111-4111-8111-111111111111';
@@ -279,7 +280,7 @@ describe('decideRouteAccess — R20: se ejercita sin Next, sin cookies y sin bas
       search: '',
       session: ANONIMO,
       privatePrefixes: ['/zona-privada'],
-      routes: { login: '/entrar', dashboard: '/inicio' },
+      routes: { login: '/entrar', landing: '/inicio' },
     });
 
     expect(decision).toEqual({
@@ -330,10 +331,10 @@ describe('decideRouteAccess — R29: el login con la marca se sirve en vez de re
 
   // Y la otra mitad, que es la que impide que el arreglo se coma la regla entera: SIN marca, el
   // login con sesion valida sigue redirigiendo exactamente como siempre.
-  it('sin la marca, el login con sesion valida sigue redirigiendo al dashboard', () => {
+  it('sin la marca, el login con sesion valida sigue redirigiendo a la ruta de aterrizaje', () => {
     expect(decidirConMarcaDeclarada({ pathname: '/login', session: CON_SESION })).toEqual({
       kind: 'redirect',
-      to: '/dashboard',
+      to: '/asignacion',
       reason: 'already-authenticated',
     });
   });
@@ -495,7 +496,7 @@ describe('decideRouteAccess — sin marca declarada, el comportamiento es el de 
   it('la regla 3 dispara aunque la query traiga el texto de la marca', () => {
     expect(decidir({ pathname: '/login', search: CON_MARCA, session: CON_SESION })).toEqual({
       kind: 'redirect',
-      to: '/dashboard',
+      to: '/asignacion',
       reason: 'already-authenticated',
     });
   });

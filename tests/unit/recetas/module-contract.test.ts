@@ -480,6 +480,22 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       'lib/modules/recetas/domain/recipe-catalog.ts',
       'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
     ]
+    // QC-211 (2026-10-05): pasos de envasado. Los archivos de `lib/modules/recetas/` que `tasks.md`
+    // asigna a T3-T5 y ninguno mas: contrato de entrada (T3), puerto, vista, casos de uso y
+    // adaptador de Prisma (T4), y el lector del empaque con su adaptador y el barrel (T5).
+    const PASOS_DE_ENVASADO_QC211 = [
+      'lib/modules/recetas/index.ts',
+      'lib/modules/recetas/domain/recipe-input.ts',
+      'lib/modules/recetas/domain/recipe-view.ts',
+      'lib/modules/recetas/ports/recipe-repository.ts',
+      'lib/modules/recetas/domain/create-recipe.ts',
+      'lib/modules/recetas/domain/update-recipe.ts',
+      'lib/modules/recetas/domain/update-recipe-version.ts',
+      'lib/modules/recetas/domain/get-recipe.ts',
+      'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+      'lib/modules/recetas/domain/recipe-packing-steps-reader.ts',
+      'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+    ]
     const AMPLIACIONES_APROBADAS = [
       ...AMPLIACION_QC34,
       ...CAMBIO_DE_FORMA_DEL_PASO_QC62,
@@ -488,6 +504,7 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       ...CANTIDADES_EN_PORCENTAJE_QC147,
       ...VERSIONES_DE_RECETA_QC172,
       ...HERRAMIENTAS_DE_RECETA_QC194,
+      ...PASOS_DE_ENVASADO_QC211,
     ]
     expect(
       diff

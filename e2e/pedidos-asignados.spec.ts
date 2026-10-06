@@ -36,6 +36,10 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
 
 // El primer `goto` hace que `next dev` compile la ruta bajo demanda, y bcrypt tarda a proposito.
 test.setTimeout(180_000);
@@ -736,9 +740,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
 
     const row = rowByNumber(page, executable.numberText);
     await expect(row).toHaveCount(1, { timeout: 60_000 });
-    const enter = row.getByTestId(ENTER_TESTID);
-    await expect(enter).toHaveAttribute('href', assignedOrderRoute(executable.id));
-    await enter.click();
+    await clickAndConfirm(page, row.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(executable!.id), {
       timeout: 60_000,
     });

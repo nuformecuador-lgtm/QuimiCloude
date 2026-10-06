@@ -53,6 +53,7 @@ function diagnosticoDeRevision(issues: FormulaReviewIssues): string {
   if (issues.name !== 'ok') motivos.push(`nombre: ${issues.name}`);
   if (issues.description !== 'ok') motivos.push(`descripcion: ${issues.description}`);
   if (issues.steps !== 'ok') motivos.push(`pasos: ${issues.steps}`);
+  if (issues.packingSteps !== 'ok') motivos.push(`pasos de envasado: ${issues.packingSteps}`);
   for (const row of issues.rows) motivos.push(`fila ${row.index + 1}: ${row.problems.join(', ')}`);
   return `formula-import: revision invalida (${motivos.join('; ')})`;
 }
@@ -81,7 +82,15 @@ export function createConfirmFormulaImport(
 
     const parsed = confirmFormulaImportInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { documentFileId, name, description, lines, steps: rawSteps, replaceRecipeId } = parsed.data;
+    const {
+      documentFileId,
+      name,
+      description,
+      lines,
+      steps: rawSteps,
+      packingSteps: rawPackingSteps,
+      replaceRecipeId,
+    } = parsed.data;
 
     const file = await deps.repository.readFileForReview(documentFileId, actor.companyId);
     if (file === null || file.status !== 'done' || file.strategy !== 'formula') {
@@ -93,6 +102,7 @@ export function createConfirmFormulaImport(
       description,
       lines: lines.map(toDraftLine),
       steps: rawSteps as readonly RecipeStepDocument[],
+      packingSteps: rawPackingSteps as readonly RecipeStepDocument[],
     });
     if (!issues.canConfirm) throw new ValidationError(diagnosticoDeRevision(issues));
 
@@ -178,18 +188,22 @@ export function createConfirmFormulaImport(
       percentage: line.percentage,
     }));
     const finalSteps = rawSteps.map((step) => recipeStepSchema.parse(step));
+    const finalPackingSteps = rawPackingSteps.map((step) => recipeStepSchema.parse(step));
 
     // SIN `image`: el import de formula no toca la imagen de la receta.
     if (clash !== null) {
       const result = await deps.updateRecipe(
         clash.id,
-        { name: clash.name, description, steps: finalSteps, lines: finalLines },
+        { name: clash.name, description, steps: finalSteps, packingSteps: finalPackingSteps, lines: finalLines },
         actor,
       );
       return { recipeId: result.id, outcome: 'replaced', rawMaterialsCreated, rawMaterialsReused };
     }
 
-    const result = await deps.createRecipe({ name, description, steps: finalSteps, lines: finalLines }, actor);
+    const result = await deps.createRecipe(
+      { name, description, steps: finalSteps, packingSteps: finalPackingSteps, lines: finalLines },
+      actor,
+    );
     return { recipeId: result.id, outcome: 'created', rawMaterialsCreated, rawMaterialsReused };
   };
 }

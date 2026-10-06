@@ -810,3 +810,32 @@ describe('getAssignedOrderExecution — exige `asignaciones.ejecutar`', () => {
     expect(resultado).toEqual(referencia);
   });
 });
+
+describe('QC-211 — la ejecucion del operador no lleva pasos de envasado', () => {
+  const MEZCLAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Mezclar en frio' }] }] };
+  const ENVASAR = 'Envasar en garrafas de 5 L';
+
+  it('R26: la vista construida desde un contenido de receta no tiene `packingSteps` y solo trae los pasos del operador', async () => {
+    const { deps } = montar({ content: contenido({ steps: [MEZCLAR] }) });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view).not.toHaveProperty('packingSteps');
+    expect(view.steps).toEqual([MEZCLAR]);
+  });
+
+  it('R26: aunque el contenido trajera pasos de envasado, la vista no los copia', async () => {
+    const conEnvasado = {
+      ...contenido({ steps: [MEZCLAR] }),
+      packingSteps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: ENVASAR }] }] }],
+    } as RecipeExecutionContent;
+    const { deps } = montar({ content: conEnvasado });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view).not.toHaveProperty('packingSteps');
+    expect(JSON.stringify(view)).not.toContain(ENVASAR);
+  });
+});

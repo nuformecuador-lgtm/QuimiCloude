@@ -2630,15 +2630,15 @@
       "id": 173,
       "epic": "QC-27",
       "epic_name": "Recetas",
-      "name": "fases-en-los-pasos",
-      "description": "Los pasos de una receta se pueden AGRUPAR POR FASES: pasos 1-3 = Fase 1 \"Mezcla\", pasos 4-6 = Fase 2 \"Envasado\". NACE DEL CHAT el 2026-09-25.\n\nDECIDIDO POR EL HUMANO EL 2026-09-25\n\n1. LISTA DE FASES + FASE EN CADA PASO. Junto a los pasos se guarda una lista de fases con nombre y orden, y cada paso dice a que fase pertenece. Renombrar una fase se hace en un solo sitio; arrastrar un paso a otra fase solo le cambia la fase. Descartadas: pasos anidados dentro de fases (obliga a migrar todo lo guardado y a cambiar la numeracion de la ejecucion en planta) y rangos de pasos (se desfasan al reordenar).\n2. LOS PASOS DE UNA FASE VAN SEGUIDOS: no puede haber Mezcla, Envasado y otra vez Mezcla.\n3. LA NUMERACION DE PASOS SIGUE SIENDO CORRIDA (1 a N), no reinicia por fase.\n4. LAS RECETAS EXISTENTES NO SE MIGRAN: sin fases se ven como hoy, sin agrupar.\n\nEJEMPLO\n\n* Fase 1 · Mezcla: 1. Calentar el agua a 70 C; 2. Agregar la glicerina; 3. Fundir la cera y mezclar 10 min\n* Fase 2 · Envasado: 4. Dejar enfriar a 35 C; 5. Llenar los envases; 6. Etiquetar\n\nQUE ENTRA. Guardar las fases con la receta, crearlas, renombrarlas, borrarlas y asignar pasos en el editor de pasos; y mostrar el agrupador donde se leen los pasos, incluida la ejecucion en planta.\n\nLO QUE NO ENTRA. Tiempos o registro por fase. Las versiones de receta: si se hacen, comparten los pasos y fases de la original (decidido en la ficha de versiones).\n\nABIERTO, se acota con /afinar-feature: si una receta con fases puede tener pasos sueltos sin fase, que pasa con los pasos al borrar una fase, tope de fases, si el registro de ejecucion (QC-82) necesita saber la fase.",
+      "name": "fases-en-los-ingredientes",
+      "description": "Los ingredientes de una fórmula se pueden AGRUPAR POR FASES con nombre libre y orden. Por ejemplo, «Acuosa»: agua 60 %, glicerina 5 %; «Oleosa»: cera 10 %. NACE DEL CHAT el 2026-09-25. CORREGIDA el 2026-10-05: las fases agrupan INGREDIENTES, no pasos; los pasos no cambian.\n\nACOTADA el 2026-10-05 con /afinar-feature. Decisiones:\n\n1. Puede haber ingredientes sueltos, sin fase, junto a las fases.\n2. La regla del 100 % aplica solo a la fórmula entera. Cada fase muestra su subtotal.\n3. Un producto puede repetirse una vez por fase. La reserva de material suma todas sus líneas.\n4. Al borrar una fase con ingredientes, se borran con ella tras un aviso. Antes se pueden arrastrar a otra fase o quitar uno a uno.\n5. El nombre de la fase es libre. El orden se cambia arrastrando.\n6. Las versiones heredan las fases de la original. Pueden mover sus ingredientes entre fases, pero no crear, renombrar ni borrar fases. Si la original borra una fase, en la versión sus ingredientes quedan sueltos.\n7. La propagación a versiones va por producto y fase.\n8. Las fases se ven en la ficha de fórmula y de versión, en la ejecución del operador y en la importación desde PDF (la IA las detecta).\n9. Las fórmulas existentes no se migran.\n10. Un E2E: fórmula con agua en dos fases → pedido → la reserva suma ambas líneas.\n\nLO QUE NO ENTRA. Agrupar pasos o procedimiento. Pasos de envasado (QC-211). Fases en el formulario de pedido. 100 % por fase.\n\nVer specs/QC-173-fases-en-los-ingredientes/requirements.md.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
-      "branch": "feature/QC-173-fases-en-los-pasos",
+      "branch": "feature/QC-173-fases-en-los-ingredientes",
       "depends_on": [],
-      "spec_path": "specs/QC-173-fases-en-los-pasos"
+      "spec_path": "specs/QC-173-fases-en-los-ingredientes"
     },
     {
       "key": "QC-174",
@@ -2825,6 +2825,38 @@
       "branch": "feature/QC-199-presentacion-por-unidad-en-alta-de-producto",
       "depends_on": [],
       "spec_path": "specs/QC-199-presentacion-por-unidad-en-alta-de-producto"
+    },
+    {
+      "key": "QC-211",
+      "id": 211,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "pasos-de-envasado",
+      "description": "Al crear una fórmula hace falta un diferenciador para los pasos de envasado: la fórmula puede tener sus propios pasos de envasado, separados de los pasos del operador, y solo los ve el empacador. El empaque reutiliza el sistema de pasos del operador para hacer el paso a paso. NACE DEL CHAT el 2026-10-05. Acotada con /afinar-feature el 2026-10-05: decisiones en specs/QC-211-pasos-de-envasado/requirements.md.\n\nDECIDIDO POR EL HUMANO EL 2026-10-05\n\n1. LOS PASOS DE ENVASADO SON OPCIONALES. Una fórmula puede no tener ninguno. Las fórmulas existentes no se migran.\n2. MISMO FORMATO Y TOPES QUE LOS PASOS DEL OPERADOR (QC-62), guardados aparte.\n3. SE EDITAN EN ALTA Y EDICIÓN, en sección propia, con el mismo editor. Solo el Administrador.\n4. VERSIONES: heredan los pasos de envasado de la original (solo lectura), igual que los pasos del operador.\n5. IMPORTACIÓN DESDE PDF: la IA separa los pasos de envasado de los del operador; el Administrador los revisa.\n6. EL EMPACADOR VE EL PASO A PASO TRAS PULSAR COMENZAR EMPAQUE; el último paso termina con Terminar empaque.\n7. REGLA DE AVANCE IGUAL QUE EL OPERADOR (QC-64, QC-125): checks + espera de 5 s, solo en cliente.\n8. SIN PASOS DE ENVASADO, la pantalla de empaque se ve como hoy.\n9. VISIBILIDAD SEPARADA: el operador no ve los pasos de envasado; el empacador no ve los del operador. El empacador los lee con empaque.modificar.\n10. LECTURA EN VIVO, sin copia en el pedido; el avance no se guarda.\n11. UNA PRUEBA E2E del flujo Administrador crea → empacador recorre y termina → operador no los ve.\n12. INDEPENDIENTE DE QC-173.\n\nQUÉ ENTRA. Guardar los pasos de envasado con la fórmula; editarlos en alta y edición; heredarlos en versiones; separarlos en la importación desde PDF; mostrarlos en el paso a paso del empaque.\n\nLO QUE NO ENTRA. Fases en los pasos (QC-173). Estado del pedido al terminar el empaque (QC-202). Registro de ejecución (QC-82). Validación en servidor de checks o espera.",
+      "status": "spec_ready",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-211-pasos-de-envasado",
+      "depends_on": [],
+      "spec_path": "specs/QC-211-pasos-de-envasado"
+    },
+    {
+      "key": "QC-210",
+      "id": 210,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "versiones-desde-el-alta-de-formula",
+      "description": "Hoy las versiones de una fórmula solo se crean desde la pantalla de edición (sección «Versiones» → «Nueva versión»). El alta (/produccion/formulas/nueva) no permite crearlas. BLOQUEADA POR QC-174.\n\nQUÉ ENTRA\n1. En el alta de fórmula se pueden añadir una o varias versiones antes de guardar. Cada versión nace como copia viva de las líneas de la original: las líneas que la versión no cambió siguen a la original hasta guardar.\n2. Los formularios de fórmula y de versión (alta y edición) tienen tres acciones:\n- Guardar: guarda y se queda. En el alta pasa a la edición (/produccion/formulas/[id]), para que un segundo «Guardar» no duplique.\n- Guardar y salir: guarda y vuelve (fórmula → lista; versión → ficha de la original).\n- Cancelar: vuelve sin guardar; pide confirmación si hay cambios sin guardar.\n\nLO QUE NO ENTRA. Versiones en línea dentro de la edición de la fórmula: allí sigue el enlace «Nueva versión» (QC-174). Ningún cambio de modelo, propagación ni «por revisar» (QC-172).\n\nACOTADA el 2026-10-05 con /afinar-feature. La original se guarda aunque falle una versión. Las versiones inválidas no se guardan y quedan en la edición con su error. «Guardar y salir» no sale mientras alguna falle. Sin E2E: tests de componente e integración. Permisos y reglas de versión heredados de QC-172/QC-174. Ver specs/QC-210-versiones-desde-el-alta-de-formula/requirements.md.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "frontend",
+      "branch": "feature/QC-210-versiones-desde-el-alta-de-formula",
+      "depends_on": [
+        "QC-174"
+      ],
+      "spec_path": "specs/QC-210-versiones-desde-el-alta-de-formula"
     },
     {
       "key": "QC-204",

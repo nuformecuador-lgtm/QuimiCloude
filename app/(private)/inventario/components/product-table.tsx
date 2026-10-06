@@ -120,7 +120,7 @@ export function ProductTable({
         rowActions: (product) => (
           <>
             <ProductBatchesSheet product={product} units={units} canAdjust={canAdjust} />
-            <ProductSheet product={product} />
+            <ProductSheet product={product} units={units} />
             <DeleteProductDialog product={product} />
           </>
         ),

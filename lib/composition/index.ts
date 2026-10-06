@@ -278,6 +278,7 @@ import {
   findAliveRecipeByNormalizedName,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
+  findRecipePackingStepsById,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -1567,6 +1568,7 @@ export const asignaciones = {
     presentations: presentationCatalog,
     units: unitCatalog,
     products: productCatalog,
+    packingSteps: { findPackingStepsById: findRecipePackingStepsById },
     now: () => new Date(),
   }),
   startPacking: createStartPackingOrder({

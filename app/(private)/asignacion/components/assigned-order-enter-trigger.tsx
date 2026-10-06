@@ -5,6 +5,8 @@ import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import { assignedOrderRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
+import { AssignedOrderStartTrigger } from './assigned-order-start-trigger';
+
 export const ASSIGNED_ORDER_ENTER_TESTID = 'assigned-order-enter';
 export const ASSIGNED_ORDER_ENTER_REASON_TESTID = 'assigned-order-enter-reason';
 
@@ -78,13 +80,11 @@ export function AssignedOrderEnterTrigger({
   }
 
   return (
-    <Link
+    <AssignedOrderStartTrigger
       href={assignedOrderRoute(order.id)}
-      data-slot="button"
-      data-testid={ASSIGNED_ORDER_ENTER_TESTID}
-      className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+      testId={ASSIGNED_ORDER_ENTER_TESTID}
     >
       Entrar
-    </Link>
+    </AssignedOrderStartTrigger>
   );
 }

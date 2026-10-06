@@ -563,7 +563,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
       return;
     }
 
-    // El Administrador tiene `dashboard.consultar`: aterriza en el panel, no en `/asignacion`.
+    // El aterrizaje lo deriva el menu; se navega explicito para no depender de su orden.
     await loginAndLand(page, adminUser);
     await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });

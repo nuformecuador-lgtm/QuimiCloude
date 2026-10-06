@@ -149,6 +149,34 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
           </ol>
         </div>
       )}
+
+      {version.packingSteps.length === 0 ? (
+        <p className="text-sm text-muted-foreground" data-testid="recipe-version-packing-steps-empty">
+          La receta original no tiene pasos de envasado.
+        </p>
+      ) : (
+        <div
+          inert
+          aria-readonly="true"
+          data-testid="recipe-version-inherited-packing-steps"
+          className="flex flex-col gap-2"
+        >
+          <h3 className="text-sm font-semibold">Pasos de envasado</h3>
+          <ol className="flex flex-col gap-4">
+            {version.packingSteps.map((step, index) => (
+              <li key={index} className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Paso {index + 1}</span>
+                <StepDocumentView
+                  document={step}
+                  isItemChecked={() => false}
+                  onToggleItem={noop}
+                  idPrefix={`recipe-version-packing-step-${index}`}
+                />
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </section>
   );
 }

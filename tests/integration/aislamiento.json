@@ -57,6 +57,7 @@
     "recetas/recipe-crud.int.test.ts",
     "recetas/recipe-lines-percentage.int.test.ts",
     "recetas/recipe-lines.int.test.ts",
+    "recetas/recipe-packing-steps-migration.int.test.ts",
     "recetas/recipe-versions-constraints.int.test.ts",
     "unidades/mass-volume-bridge.int.test.ts",
     "unidades/unidades-constraints.int.test.ts"
@@ -386,6 +387,11 @@
       "archivo": "recetas/recipe-catalog-by-name.int.test.ts",
       "motivo": "QC-159 T1: ejercita `findAliveRecipeByNormalizedName` de `recipe-catalog-prisma.ts`, que usa el cliente Prisma GLOBAL (mismo criterio que `findRecipeRefsIncludingDeleted` en `company-scope-queries.int.test.ts`), asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol y tipo de documento incluidos) y la limpia en el `afterAll`, en el orden que exigen las FK: recetas (sus lineas caen con ON DELETE CASCADE) -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"
+    },
+    {
+      "archivo": "recetas/packing-steps.int.test.ts",
+      "motivo": "QC-211 T6: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe`, `softDeleteAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipePackingStepsById` / `findRecipeExecutionContentById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-05"
     },
     {
       "archivo": "recetas/recipe-versions-repository.int.test.ts",

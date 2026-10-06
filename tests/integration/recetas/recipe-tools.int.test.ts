@@ -134,6 +134,7 @@ function datos(overrides: Partial<NewRecipe> = {}): NewRecipe {
     name: `Crema ${token()}`,
     description: null,
     steps: [],
+    packingSteps: [],
     lines: [
       { productId: a, percentage: '70.00' },
       { productId: b, percentage: '30.00' },

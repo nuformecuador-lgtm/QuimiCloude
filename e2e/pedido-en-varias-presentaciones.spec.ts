@@ -51,6 +51,12 @@ import {
 } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import {
+  clickAndConfirm,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 
@@ -315,7 +321,7 @@ async function finishProduction(page: Page, orderId: string, numberText: string)
   }).toPass({ timeout: 60_000 });
   const finish = page.getByTestId(STEP_FINISH_TESTID);
   await expect(finish).toBeEnabled({ timeout: 60_000 });
-  await finish.click();
+  await clickAndConfirm(page, finish, ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
   await page.waitForURL(
     (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
     { timeout: 60_000 },
@@ -685,9 +691,9 @@ test.describe('pedido en varias presentaciones', () => {
       `${PACKAGES_B} × ${PACKAGING_B_NAME}`,
     );
 
-    await page.getByTestId(PACKING_START_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId(PACKING_FINISH_TESTID)).toBeVisible({ timeout: 60_000 });
-    await page.getByTestId(PACKING_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_FINISH_TESTID), PACKING_ORDER_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(PACKED_ORDER_PARAM),
       { timeout: 60_000 },
@@ -810,7 +816,7 @@ test.describe('pedido en varias presentaciones', () => {
     await expect(page.getByTestId(DISTRIBUTION_FIELD_TESTID)).toHaveCount(0);
 
     // --- 3. R10: Comenzar se rechaza y el pedido sigue «Por empacar».
-    await page.getByTestId(PACKING_START_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId(PACKING_START_ERROR_TESTID)).toHaveText(
       errorMessage('order_without_distribution'),
       { timeout: 60_000 },
@@ -875,7 +881,7 @@ test.describe('pedido en varias presentaciones', () => {
       await expect(packingScreen.getByTestId(PACKING_MISSING_DISTRIBUTION_TESTID)).toHaveCount(0);
       await expect(packingScreen.locator(EDITING_CONTROLS)).toHaveCount(0);
 
-      await page.getByTestId(PACKING_START_TESTID).click();
+      await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
       await expect(page.getByTestId(PACKING_FINISH_TESTID)).toBeVisible({ timeout: 60_000 });
       const started = await prisma.order.findUniqueOrThrow({
         where: { id: orderId },

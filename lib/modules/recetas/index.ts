@@ -38,6 +38,7 @@ export type {
   RecipeExecutionLine,
   RecipeExecutionTool,
 } from './domain/recipe-catalog';
+export type { RecipePackingStepsReader } from './domain/recipe-packing-steps-reader';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
   RECIPE_TOTAL_PERCENTAGE,

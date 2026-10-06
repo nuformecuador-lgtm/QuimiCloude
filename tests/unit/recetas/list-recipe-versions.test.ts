@@ -16,6 +16,7 @@ const ORIGINAL: RecipeRow = {
   name: 'Crema base',
   description: null,
   steps: [],
+  packingSteps: [],
   imagePath: null,
   createdBy: null,
   updatedBy: null,
@@ -26,7 +27,7 @@ const ORIGINAL: RecipeRow = {
   original: null,
 };
 
-const COMO_VERSION = { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, steps: [] };
+const COMO_VERSION = { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, steps: [], packingSteps: [] };
 
 function version(id: string, name: string, percentages: readonly string[], updatedAt = AHORA): RecipeRow {
   return {

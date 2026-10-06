@@ -46,6 +46,12 @@ import {
 
 import { loginAndLand } from './helpers/landing';
 import {
+  clickAndConfirm,
+  ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_FINISH_CONFIRM_TESTID,
+  PACKING_ORDER_START_CONFIRM_TESTID,
+} from './helpers/confirm-dialog';
+import {
   DISTRIBUTION_ADD_PACKAGES_TESTID,
   DISTRIBUTION_ADD_TESTID,
   DISTRIBUTION_AVAILABLE_TESTID,
@@ -628,7 +634,7 @@ test.describe('envases del pedido como productos', () => {
     }).toPass({ timeout: 60_000 });
     const finishStep = page.getByTestId(STEP_FINISH_TESTID);
     await expect(finishStep).toBeEnabled({ timeout: 60_000 });
-    await finishStep.click();
+    await clickAndConfirm(page, finishStep, ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },
@@ -662,9 +668,9 @@ test.describe('envases del pedido como productos', () => {
     );
     await expect(packingLines.filter({ hasText: JUG_NAME })).toHaveText(`${JUGS} × ${JUG_NAME}`);
 
-    await page.getByTestId(PACKING_START_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId(PACKING_FINISH_TESTID)).toBeVisible({ timeout: 60_000 });
-    await page.getByTestId(PACKING_FINISH_TESTID).click();
+    await clickAndConfirm(page, page.getByTestId(PACKING_FINISH_TESTID), PACKING_ORDER_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(PACKED_ORDER_PARAM),
       { timeout: 60_000 },

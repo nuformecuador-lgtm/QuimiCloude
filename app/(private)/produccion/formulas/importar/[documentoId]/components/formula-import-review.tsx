@@ -40,6 +40,10 @@ import { FormulaNameClash } from './formula-name-clash';
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
+const PACKING_STEPS_TITLE = 'Pasos de envasado';
+const PACKING_STEPS_ADD_LABEL = 'Añadir paso de envasado';
+const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
+
 /** Modo de asignacion de producto de una fila, distinto del `kind` de `DraftLine`: una fila
  *  `preselected` sigue siendo `existing` para el borrador, pero se pinta sin selector. */
 export type IngredientRowMode = 'preselected' | 'choose' | 'create';
@@ -167,6 +171,9 @@ function buildConfirmReasons(
   if (issues.steps === 'too_many') reasons.push('Hay más de 50 pasos.');
   else if (issues.steps === 'invalid') reasons.push('Revisa los pasos: alguno no es válido.');
 
+  if (issues.packingSteps === 'too_many') reasons.push('Hay más de 50 pasos de envasado.');
+  else if (issues.packingSteps === 'invalid') reasons.push('Revisa los pasos de envasado: alguno no es válido.');
+
   if (nameClash !== null && replaceChoice === null) {
     reasons.push(`Elige reemplazar o cambiar el nombre de «${nameClash.recipeName}».`);
   }
@@ -198,6 +205,9 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   const [steps, setSteps] = useState<readonly RecipeStepFormValue[]>(() =>
     preview.steps.map((document) => ({ key: createLocalKey('formula-step'), document })),
   );
+  const [packingSteps, setPackingSteps] = useState<readonly RecipeStepFormValue[]>(() =>
+    preview.packingSteps.map((document) => ({ key: createLocalKey('formula-packing-step'), document })),
+  );
   const [nameClash, setNameClash] = useState(preview.nameClash);
   const [replaceChoice, setReplaceChoice] = useState<'replace' | null>(null);
   const [isCheckingName, startCheckingName] = useTransition();
@@ -217,8 +227,9 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
         description: description.trim() === '' ? null : description,
         lines: rows.map(toDraftLine),
         steps: steps.map((step) => step.document),
+        packingSteps: packingSteps.map((step) => step.document),
       }),
-    [name, description, rows, steps],
+    [name, description, rows, steps, packingSteps],
   );
 
   const reasons = useMemo(
@@ -294,6 +305,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
       description: description.trim() === '' ? null : description,
       lines: rows.map(toConfirmLine),
       steps: steps.map((step) => step.document),
+      packingSteps: packingSteps.map((step) => step.document),
       replaceRecipeId: nameClash !== null && replaceChoice === 'replace' ? nameClash.recipeId : null,
     });
 
@@ -391,6 +403,14 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
 
       {/* `RecipeStepsField` se importa TAL CUAL del barrel de formulas: no se toca. */}
       <RecipeStepsField steps={steps} onChange={setSteps} />
+
+      <RecipeStepsField
+        steps={packingSteps}
+        onChange={setPackingSteps}
+        title={PACKING_STEPS_TITLE}
+        addLabel={PACKING_STEPS_ADD_LABEL}
+        testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
+      />
 
       {confirmError === null ? null : (
         <div
