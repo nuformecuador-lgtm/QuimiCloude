@@ -910,3 +910,12 @@ integracion `inventory-import-{idempotency,isolation,repository}` -> `Test Files
 
 - R1 (backend_dev): las dos acciones exigen `inventario.modificar` con `requirePermission` antes de `file.arrayBuffer()`; el caso de uso mantiene su comprobacion. Orden: zod -> actor (una lectura de sesion) -> permiso -> bytes -> caso de uso. Tests «R1 sin permiso la vista previa/la confirmacion no lee los bytes del archivo» en `tests/unit/inventario/inventory-import-actions.test.ts` (commit 0197ae84).
 - R31 (backend_dev): tres casos de vista previa con unidad, presentacion y formula homonimas en otra empresa (`missingUnits` + `unit_not_found`, `missingPresentations` + `presentation_not_found`, `formula_not_found`) en `tests/integration/inventario/inventory-import-isolation.int.test.ts` (commit 10d3b19e).
+
+### Gate de cierre de los menores (tras 675e3e86)
+
+`./init.sh --rapido` -> exit 1 en `pnpm run test:rapido`: `Test Files 7 failed | 483 passed (490)`,
+`Tests 9 failed | 7478 passed | 51 skipped (7538)`; typecheck y lint en verde. Los 7 rojos están en el
+baseline (unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso,
+recetas/module-contract, recetas/scope, recipe-page); ninguno nuevo. Tanda cerrada con la regla de
+rojos heredados. Integración `inventory-import-*.int.test.ts`: `Test Files 5 passed (5)`,
+`Tests 35 passed | 1 skipped (36)`.
