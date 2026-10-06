@@ -914,3 +914,48 @@ describe('QC-60 R18, R22, R24 — el SQL crudo escribe y numera con la empresa d
     })
   }
 })
+
+// --- La unidad de trabajo propia y la unida a una transaccion ajena (QC-82) ----------------------
+
+const COMPOSITION_ROOT = join(repoRoot, 'lib', 'composition')
+const COMPOSICION = join(COMPOSITION_ROOT, 'index.ts')
+
+/** Lo que se lee para estas reglas: sin comentarios y sin contenido de cadenas. */
+const legible = (source: string): string => vaciarCadenas(sinComentarios(source))
+
+const sinEspacios = (texto: string): string => texto.replace(/\s+/g, '')
+
+/** Los miembros del ambito que construye `orderTransactionScopeOn`, ordenados. */
+function miembrosDelAmbito(source: string): readonly string[] {
+  const codigo = legible(source)
+  const funcion = funcionesDe(codigo, sinComentarios(source)).find((f) => f.nombre === 'orderTransactionScopeOn')
+  if (funcion === undefined) return []
+  const retorno = funcion.cuerpo.search(/\breturn\s*\{/)
+  if (retorno < 0) return []
+  const abre = funcion.cuerpo.indexOf('{', retorno)
+  return porComasDeNivelCero(funcion.cuerpo.slice(abre + 1, cierreEquilibrado(funcion.cuerpo, abre, '{', '}')))
+    .map((entrada) => /^(\w+)/.exec(entrada)?.[1] ?? entrada)
+    .sort()
+}
+
+/** Reemplaza la primera aparicion de `buscado` a partir de `desde`, y falla si no esta. */
+function mutar(real: string, buscado: string, nuevo: string, desde = 0): string {
+  const indice = real.indexOf(buscado, desde)
+  expect(indice, `la mutacion no encontro ${buscado}`).toBeGreaterThan(-1)
+  return `${real.slice(0, indice)}${nuevo}${real.slice(indice + buscado.length)}`
+}
+
+describe('QC-82 — el ambito de la unidad de trabajo se construye en un solo sitio', () => {
+  it('R24: el ambito de la unidad de trabajo tiene exactamente seis miembros y las dos unidades lo construyen igual', () => {
+    const real = readFileSync(COMPOSICION, 'utf8')
+    expect(miembrosDelAmbito(real)).toEqual(['finishedGoods', 'orders', 'products', 'recipes', 'reservations', 'units'])
+    const codigo = sinEspacios(legible(real))
+    expect(codigo).toContain('withOrderTransaction((tx)=>work(orderTransactionScopeOn(tx)))')
+    expect(codigo).toContain('{run:(work)=>work(orderTransactionScopeOn(tx))}')
+  })
+
+  it('R24 ANTI-PLACEBO: quitar `units` del ambito sale en rojo', () => {
+    const mutado = mutar(readFileSync(COMPOSICION, 'utf8'), '    units: createUnitCatalogReader(tx),\n', '')
+    expect(miembrosDelAmbito(mutado)).toEqual(['finishedGoods', 'orders', 'products', 'recipes', 'reservations'])
+  })
+})
