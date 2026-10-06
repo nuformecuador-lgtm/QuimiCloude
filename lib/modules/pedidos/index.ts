@@ -160,6 +160,10 @@ export { createUpdateOrder } from './domain/update-order';
 export type { UpdateOrderDeps } from './domain/update-order';
 export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';
+/** Cancelar por encargo de otro modulo, con la unidad de trabajo que le cablee la composicion:
+ *  mismas comprobaciones y la misma liberacion que `createCancelOrder`, sin permiso ni motivo. */
+export { createCancelAliveOrder } from './domain/order-cancellation';
+export type { CancelAliveOrderDeps, OrderCancellation } from './domain/order-cancellation';
 export { createDeleteOrder } from './domain/delete-order';
 export type { DeleteOrderDeps } from './domain/delete-order';
 
