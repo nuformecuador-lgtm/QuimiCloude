@@ -541,7 +541,7 @@ type BatchLotTopRow = { readonly top: string | null };
  * toma su instantanea al empezar, y dentro de la misma sentencia leeria el maximo anterior al
  * commit de la otra sesion. El lock solo evita choques; la garantia es el indice unico.
  */
-async function resolveLot(
+export async function resolveLot(
   tx: Prisma.TransactionClient,
   batch: NewProductBatch,
   scope: InventoryScope,
@@ -575,7 +575,7 @@ async function resolveLot(
  * «que lo genere el backend» en una columna NOT NULL. `createdBy`/`updatedBy` van como escalares:
  * la FK a `users` solo existe en la migracion, para que el cliente no pueda atravesar a `identity`.
  */
-function toBatchCreateData(
+export function toBatchCreateData(
   productId: string,
   batch: NewProductBatch,
   lot: string,
