@@ -538,14 +538,14 @@ export function OrderForm({
       setRecipe(null);
       setIngredients([]);
       setIngredientsError(null);
-      quote.onRecipeChange(null, quantity);
+      quote.onRecipeChange(null, quantity, unitId);
       return;
     }
     setRecipe({ id: option.id, name: option.name, imageUrl: option.imageUrl });
     setIngredientsLoading(true);
     setIngredientsError(null);
     loadIngredients(option.id);
-    quote.onRecipeChange(option.id, quantity);
+    quote.onRecipeChange(option.id, quantity, unitId);
   }
 
   function chooseVersion(nextVersionId: string | null) {
@@ -555,7 +555,7 @@ export function OrderForm({
     setIngredientsLoading(true);
     setIngredientsError(null);
     loadIngredients(nextRecipeId);
-    quote.onRecipeChange(nextRecipeId, quantity);
+    quote.onRecipeChange(nextRecipeId, quantity, unitId);
   }
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
@@ -784,7 +784,7 @@ export function OrderForm({
                   defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
                   onValueChange={(value) => {
                     setQuantity(value);
-                    quote.onQuantityChange(effectiveRecipeId, value);
+                    quote.onQuantityChange(effectiveRecipeId, value, unitId);
                   }}
                   error={fieldErrors.quantity}
                 />
@@ -794,7 +794,10 @@ export function OrderForm({
                 <PresentationUnitSelect
                   units={units}
                   value={unitId}
-                  onValueChange={setUnitId}
+                  onValueChange={(next) => {
+                    setUnitId(next);
+                    quote.onUnitChange(effectiveRecipeId, quantity, next);
+                  }}
                   error={fieldErrors.unitId}
                 />
               </div>
@@ -820,7 +823,7 @@ export function OrderForm({
               lines={lines}
               onLinesChange={(next) => {
                 setLines(next);
-                quote.onDistributionChange(effectiveRecipeId, quantity, next);
+                quote.onDistributionChange(effectiveRecipeId, quantity, unitId, next);
               }}
               unitId={unitId}
               compatibleUnitIds={compatibleIds}

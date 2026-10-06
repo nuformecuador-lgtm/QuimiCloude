@@ -382,6 +382,7 @@ describe('R12 — en la edicion, cambiar receta o cantidad recotiza', () => {
         recipeId: elPedido.recipeId,
         quantity: '7',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -405,6 +406,7 @@ describe('R12 — en la edicion, cambiar receta o cantidad recotiza', () => {
         recipeId: RECETA2.id,
         quantity: elPedido.quantity,
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -422,11 +424,12 @@ describe('R13/R14 de punta a punta — elegir receta y teclear cantidad en el al
     });
     renderFormulario();
 
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user);
 
     await waitFor(() => expect(quoteOrderCostActionMock).toHaveBeenCalledTimes(1));
-    expect(quoteOrderCostActionMock).toHaveBeenCalledWith({ recipeId: RECETA.id, quantity: '5' });
+    expect(quoteOrderCostActionMock).toHaveBeenCalledWith({ recipeId: RECETA.id, quantity: '5', unitId: UNIDAD.id });
 
     quoteOrderCostActionMock.mockClear();
     await user.clear(cantidad());
@@ -438,6 +441,7 @@ describe('R13/R14 de punta a punta — elegir receta y teclear cantidad en el al
     expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
       recipeId: RECETA.id,
       quantity: '125',
+      unitId: UNIDAD.id,
     });
   });
 });
@@ -516,6 +520,7 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
         recipeId: RECETA2.id,
         quantity: elPedido.quantity,
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -540,12 +545,14 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
     });
     renderFormulario();
 
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user, RECETA);
     await waitFor(() =>
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
 
@@ -565,6 +572,7 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA2.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() =>
@@ -574,7 +582,6 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
       MISSING_VALUE_MARK,
     );
 
-    await elegirUnidad(user);
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
@@ -601,11 +608,12 @@ describe('R65 — la edicion cuenta lo que el propio pedido tiene apartado', () 
         recipeId: elPedido.recipeId,
         quantity: '7',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
   });
 
-  it('el alta no envia orderId, solo receta y cantidad (R65)', async () => {
+  it('el alta no envia orderId, solo receta, cantidad y unidad (R65)', async () => {
     const user = setupUser();
     quoteOrderCostActionMock.mockResolvedValue({
       status: 'success',
@@ -619,6 +627,7 @@ describe('R65 — la edicion cuenta lo que el propio pedido tiene apartado', () 
       expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
         recipeId: RECETA.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
     const enviado = quoteOrderCostActionMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
@@ -676,18 +685,19 @@ describe('la cotizacion sigue a la version elegida', () => {
       data: id === RECETA.id ? [VIVA] : [],
     }));
     renderFormulario();
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user);
 
     await elegirVersion(user, 1);
     await waitFor(() =>
-      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '5' }),
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '5', unitId: UNIDAD.id }),
     );
 
     await user.clear(cantidad());
     await user.type(cantidad(), '8');
     await waitFor(() =>
-      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '8' }),
+      expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({ recipeId: VIVA.id, quantity: '8', unitId: UNIDAD.id }),
     );
 
     await elegirVersion(user, 0);
@@ -695,6 +705,7 @@ describe('la cotizacion sigue a la version elegida', () => {
       expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
         recipeId: RECETA.id,
         quantity: '8',
+        unitId: UNIDAD.id,
       }),
     );
   });
@@ -706,6 +717,7 @@ describe('la cotizacion sigue a la version elegida', () => {
       data: id === RECETA.id ? [VIVA] : [],
     }));
     renderFormulario();
+    await elegirUnidad(user);
     await user.type(cantidad(), '5');
     await elegirReceta(user);
     await elegirVersion(user, 1);
@@ -732,6 +744,7 @@ describe('la cotizacion sigue a la version elegida', () => {
       expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
         recipeId: RECETA2.id,
         quantity: '5',
+        unitId: UNIDAD.id,
       }),
     );
     await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA2.id));
@@ -754,6 +767,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
         recipeId: RECETA.id,
         quantity: '5',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: 3 }],
       }),
     );
@@ -772,6 +786,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
       expect(quoteOrderCostActionMock).toHaveBeenLastCalledWith({
         recipeId: RECETA.id,
         quantity: '5',
+        unitId: UNIDAD.id,
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: 1 }],
       }),
     );
@@ -790,6 +805,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
         recipeId: RECETA.id,
         quantity: '8',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: 2 }],
       }),
     );
@@ -808,6 +824,7 @@ describe('R29 — la cotizacion se recalcula al cambiar el reparto', () => {
         recipeId: RECETA.id,
         quantity: '8',
         orderId: elPedido.id,
+        unitId: UNIDAD.id,
       }),
     );
   });

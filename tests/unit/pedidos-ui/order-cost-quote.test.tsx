@@ -26,10 +26,11 @@ import {
 import { UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID } from '@/components/shared/unexpected-error-notice';
 
 const RECIPE_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+const UNIT_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
 type Handlers = {
-  onRecipeChange: (recipeId: string | null, quantity: string) => void;
-  onQuantityChange: (recipeId: string | null, quantity: string) => void;
+  onRecipeChange: (recipeId: string | null, quantity: string, unitId: string) => void;
+  onQuantityChange: (recipeId: string | null, quantity: string, unitId: string) => void;
 };
 
 /** Monta el hook y el bloque a la vez, con las manejadoras accesibles desde el test. */
@@ -77,11 +78,11 @@ describe('useOrderCostQuote — cuando pide y cuando no (R9, R13, R14)', () => {
   it('sin receta o cantidad no valida: guion y ninguna llamada, tambien tras 1s (R9)', async () => {
     const handlers = mount(null);
 
-    act(() => handlers.current!.onQuantityChange(null, '5'));
-    act(() => handlers.current!.onQuantityChange(RECIPE_ID, ''));
-    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '0'));
-    act(() => handlers.current!.onQuantityChange(RECIPE_ID, 'abc'));
-    act(() => handlers.current!.onRecipeChange(null, '5'));
+    act(() => handlers.current!.onQuantityChange(null, '5', UNIT_ID));
+    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '', UNIT_ID));
+    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '0', UNIT_ID));
+    act(() => handlers.current!.onQuantityChange(RECIPE_ID, 'abc', UNIT_ID));
+    act(() => handlers.current!.onRecipeChange(null, '5', UNIT_ID));
 
     await advance(1000);
 
@@ -93,18 +94,18 @@ describe('useOrderCostQuote — cuando pide y cuando no (R9, R13, R14)', () => {
     quoteOrderCostActionMock.mockResolvedValue(successResult('40.0000'));
     const handlers = mount(null);
 
-    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '1'));
+    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '1', UNIT_ID));
     await advance(100);
-    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '12'));
+    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '12', UNIT_ID));
     await advance(100);
-    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '125'));
+    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '125', UNIT_ID));
 
     await advance(499);
     expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
 
     await advance(1);
     expect(quoteOrderCostActionMock).toHaveBeenCalledTimes(1);
-    expect(quoteOrderCostActionMock).toHaveBeenCalledWith({ recipeId: RECIPE_ID, quantity: '125' });
+    expect(quoteOrderCostActionMock).toHaveBeenCalledWith({ recipeId: RECIPE_ID, quantity: '125', unitId: UNIT_ID });
   });
 
   it('elegir receta pide de inmediato, sin esperar la ventana (R14)', async () => {
@@ -112,7 +113,7 @@ describe('useOrderCostQuote — cuando pide y cuando no (R9, R13, R14)', () => {
     const handlers = mount(null);
 
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID);
       await Promise.resolve();
     });
 
@@ -126,7 +127,7 @@ describe('useOrderCostQuote — respuestas (R10, R11, R15)', () => {
     const handlers = mount(null);
 
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID);
       await Promise.resolve();
     });
 
@@ -153,8 +154,8 @@ describe('useOrderCostQuote — respuestas (R10, R11, R15)', () => {
     );
     const handlers = mount(null);
 
-    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5'));
-    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '6'));
+    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID));
+    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '6', UNIT_ID));
     expect(resolvers).toHaveLength(2);
 
     await act(async () => {
@@ -180,8 +181,8 @@ describe('useOrderCostQuote — respuestas (R10, R11, R15)', () => {
     );
     const handlers = mount(null);
 
-    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5'));
-    act(() => handlers.current!.onQuantityChange(RECIPE_ID, ''));
+    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID));
+    act(() => handlers.current!.onQuantityChange(RECIPE_ID, '', UNIT_ID));
 
     await act(async () => {
       responder?.(successResult('10.0000'));
@@ -200,7 +201,7 @@ describe('OrderCostQuote — mientras cotiza (R16, R17)', () => {
     );
     const handlers = mount('40.0000');
 
-    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5'));
+    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID));
 
     expect(screen.getByTestId(ORDER_COST_QUOTE_TESTID)).toHaveAttribute('data-state', 'quoting');
     expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 40.00');
@@ -216,7 +217,7 @@ describe('OrderCostQuote — mientras cotiza (R16, R17)', () => {
     quoteOrderCostActionMock.mockImplementation(() => new Promise<OrderCostQuoteResult>(() => {}));
     const handlers = mount(null);
 
-    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5'));
+    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID));
 
     expect(screen.queryByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).not.toBeInTheDocument();
     expect(screen.getByTestId(ORDER_COST_QUOTE_QUOTING_TESTID)).toBeInTheDocument();
@@ -248,7 +249,7 @@ describe('useOrderCostQuote — cuando la cotizacion falla (R21)', () => {
     const handlers = mount(null);
 
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID);
       await Promise.resolve();
     });
 
@@ -269,7 +270,7 @@ describe('useOrderCostQuote — cuando la cotizacion falla (R21)', () => {
     const handlers = mount(null);
 
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID);
       await Promise.resolve();
     });
 
@@ -285,14 +286,14 @@ describe('useOrderCostQuote — cuando la cotizacion falla (R21)', () => {
     const handlers = mount(null);
 
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID);
       await Promise.resolve();
     });
     expect(screen.getByTestId(ORDER_COST_QUOTE_ERROR_TESTID)).toBeInTheDocument();
 
     quoteOrderCostActionMock.mockResolvedValueOnce(successResult('40.0000'));
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '6');
+      handlers.current!.onRecipeChange(RECIPE_ID, '6', UNIT_ID);
       await Promise.resolve();
     });
 
@@ -305,7 +306,7 @@ describe('useOrderCostQuote — cuando la cotizacion falla (R21)', () => {
     const handlers = mount(null);
 
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID);
       await Promise.resolve();
     });
 
@@ -326,13 +327,13 @@ describe('useOrderCostQuote — cuando la cotizacion falla (R21)', () => {
     const handlers = mount(null);
 
     await act(async () => {
-      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      handlers.current!.onRecipeChange(RECIPE_ID, '5', UNIT_ID);
       await Promise.resolve();
     });
     expect(screen.getByTestId(ORDER_COST_QUOTE_ERROR_TESTID)).toBeInTheDocument();
 
     quoteOrderCostActionMock.mockImplementation(() => new Promise<OrderCostQuoteResult>(() => {}));
-    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '7'));
+    act(() => handlers.current!.onRecipeChange(RECIPE_ID, '7', UNIT_ID));
 
     expect(screen.queryByTestId(ORDER_COST_QUOTE_ERROR_TESTID)).not.toBeInTheDocument();
     expect(screen.queryByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).not.toBeInTheDocument();
