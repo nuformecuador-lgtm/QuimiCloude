@@ -2872,6 +2872,21 @@
       "branch": "feature/QC-204-conversion-unidad-pedido-a-insumo",
       "depends_on": [],
       "spec_path": "specs/QC-204-conversion-unidad-pedido-a-insumo"
+    },
+    {
+      "key": "QC-213",
+      "id": 213,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "ajuste-por-total-contado",
+      "description": "Ver tarjeta QC-213: el ajuste de existencia de un lote pasa a pedir el total contado; el sistema calcula y muestra la diferencia (aumento o disminución). Motivos filtrados por sentido: al aumentar solo conteo físico y error de carga. Producto terminado solo disminuye. Abiertos: cambio de existencia entre abrir y guardar, total por debajo de lo reservado, historial.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-213-ajuste-por-total-contado",
+      "depends_on": [],
+      "spec_path": "specs/QC-213-ajuste-por-total-contado"
     }
   ]
 }
