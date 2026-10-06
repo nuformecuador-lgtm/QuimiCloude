@@ -194,6 +194,9 @@ completar en B10.
 
 ## Pista F
 
+Desvío para el reviewer: product-route-contract.test.ts excluye importar/ (decisión humana
+2026-10-06); sus reglas aplicables viven en importar-route-contract.test.ts.
+
 Commits: F1 762e3eaa, F2 08a7ee91, F3 4458df01, F4 c8f4fafa, F5 d35c63f9, F6 (este, solo bitácora).
 Todo bajo `app/(private)/inventario/importar/` salvo el enlace en `app/(private)/inventario/page.tsx`.
 
