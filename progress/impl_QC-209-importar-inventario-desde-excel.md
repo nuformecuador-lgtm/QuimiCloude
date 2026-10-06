@@ -191,3 +191,100 @@ Base desechable borrada al terminar. **Pendiente para el humano/leader:** aplica
 
 Veredicto: B6 y B7 hechos; persistencia lista para B8, con la entrada de la guardia de puertos a
 completar en B10.
+
+## Pista F
+
+Commits: F1 762e3eaa, F2 08a7ee91, F3 4458df01, F4 c8f4fafa, F5 d35c63f9, F6 (este, solo bitácora).
+Todo bajo `app/(private)/inventario/importar/` salvo el enlace en `app/(private)/inventario/page.tsx`.
+
+### Archivos por task
+
+- **F1**: `importar/page.tsx` (`requirePagePermission('inventario.modificar')`, `maxDuration = 300`,
+  `listUnitsAction()`, metadata), `components/index.ts`, `components/import-texts.ts` (copy y
+  testids), `components/inventory-import-screen.tsx` (esqueleto), `inventario/page.tsx` (enlace
+  «Importar» si `canAdjustBatchStock(sessionUser)`, que es el chequeo de `inventario.modificar` ya
+  publicado por el barrel), `tests/unit/inventario/importar/importar-page.test.tsx`.
+- **F2**: `components/import-upload-field.tsx`, `import-template-button.tsx`, `download-file.ts`,
+  `import-file-rejection.tsx`; `tests/.../import-upload.test.tsx`.
+- **F3**: `components/import-preview-summary.tsx`, `import-preview-table.tsx` (tabla genérica
+  `ImportRowsTable` sobre `components/shared/data-table`, paginada y filtrada en cliente; la reutiliza
+  el resultado); `tests/.../import-preview.test.tsx`, `tests/.../import-preview-fixtures.ts` (datos
+  de prueba compartidos por los tests de la pista; no es un test).
+- **F4**: `components/import-missing-catalog.tsx`, `import-create-unit-dialog.tsx`,
+  `import-create-presentation-dialog.tsx`, `import-dialog-parts.tsx` (campo, alerta y pie comunes a
+  los dos diálogos); `tests/.../import-missing-catalog.test.tsx`.
+- **F5**: `components/inventory-import-screen.tsx` (completa), `import-result-summary.tsx`;
+  `tests/.../inventory-import-screen.test.tsx`.
+- **F6**: revisión, sin cambios de código (abajo).
+
+### Desvío respecto a design.md > 6
+
+`import-upload-field.tsx` **no reutiliza** `components/shared/file-field.tsx`: su `accept` es una
+unión de MIME (`UploadableFileType`) que no incluye el de .xlsx, filtra por `file.type` (Windows
+informa `application/vnd.ms-excel` para un .csv) y **bloquea** los archivos grandes que no son
+imagen en vez de avisar. Usarlo exigiría tocar `components/shared/`, fuera de la pista. Se usa un
+`<input type="file" accept={INVENTORY_IMPORT_ACCEPT}>` con botón visible, mismo patrón que
+`components/shared/document-upload/document-upload.tsx`. Además, un archivo de más de
+`INVENTORY_IMPORT_MAX_FILE_BYTES` se avisa y **no se envía** (botón «Revisar archivo»
+deshabilitado): Next corta el cuerpo de la Server Action en 1 MB y el usuario recibiría un error
+genérico en vez del rechazo `file_too_large`. El servidor sigue mandando.
+
+### R -> test (pista F)
+
+| R | Test |
+| --- | --- |
+| R1 | `inventory-import-screen.test.tsx` «R1 «unauthorized» se pinta con su mensaje» (el corte real es de B) |
+| R2 | `importar-page.test.tsx` «R2 sin inventario.modificar responde 404…», «R2 sin sesión redirige…», «R2 con inventario.modificar pinta la pantalla…», «R2 aparece con…», «R2 no aparece sin…» |
+| R3 | `import-upload.test.tsx` «R3 descarga lo que construye buildInventoryImportTemplate», «R3 R28 crea un Blob…» |
+| R4 | `import-upload.test.tsx` «R4 el input acepta solo las extensiones del contrato», «R4 entrega el archivo…», «R4 R6 «…» tiene su propio texto», «R4 «missing/unknown/duplicate_columns» nombra cada columna»; `inventory-import-screen.test.tsx` «R4 R5 un archivo rechazado entero…» |
+| R6 | `import-upload.test.tsx` «R6 avisa en local…», «R6 no avisa con un archivo en el tope exacto», «R6 «file_too_large»…», «R6 «too_many_rows»…»; `inventory-import-screen.test.tsx` «R6 un archivo que pasa del tope se avisa y no se envía» |
+| R8 | `import-preview.test.tsx` «R8 avisa de que la fila de ejemplo se ignoró solo cuando vino» |
+| R9 | `import-preview.test.tsx` «R9 pinta el total…», «R9 pinta cada fila…», «R9 los cuatro estados se distinguen sin color…», «R9 el filtro por estado…»; `inventory-import-screen.test.tsx` «R9 manda el archivo elegido…» |
+| R10 | `import-preview.test.tsx` «R10 una fila en error lista cada motivo con la columna…» |
+| R14, R15 | `import-preview.test.tsx` «R14 R15 «sumar lote» dice si es sobre un producto existente o sobre el de la fila N» |
+| R18 | `import-preview.test.tsx` «R18 la fila duplicada nombra el lote que ya existe» |
+| R20 | `import-preview.test.tsx` «R20 la fila que nombra una presentación inexistente…»; `import-missing-catalog.test.tsx` «R20 lista cada faltante una vez…», «R20 sin faltantes no pinta la sección» |
+| R21 | `import-missing-catalog.test.tsx` «R21 sin permiso de alta de unidades/presentaciones no ofrece el botón…», «R21 abre con el nombre prellenado y llama a createUnitAction/createPresentationAction…», «R21 con unidad base elegida…», «R21 sin contenido no envía la clave», «R21 «unit_duplicate_name»/«duplicate_symbol»/«invalid_derivation»/«presentation_duplicate_name» se pinta junto a su campo…», «R21 «unauthorized» se pinta en la alerta…» |
+| R22 | `import-missing-catalog.test.tsx` «R22 pintar la lista no crea nada» |
+| R23 | `inventory-import-screen.test.tsx` «R23 tras crear la unidad vuelve a pedir la vista previa con el MISMO archivo y pinta la nueva» |
+| R24 | `import-preview.test.tsx` «R24 «Confirmar» sigue disponible con filas en error y faltantes sin crear», «R24 «Confirmar» queda deshabilitado sin ninguna fila válida», «R24 mientras se confirma…»; `inventory-import-screen.test.tsx` «R24 confirma con el mismo archivo y una importKey uuid, y pinta el resultado fila a fila» |
+| R25 | `inventory-import-screen.test.tsx` «R25 si al confirmar el archivo se rechaza, se muestra el rechazo» (y el resultado fila a fila del caso R24) |
+| R28 | `import-preview.test.tsx` «R28 ofrece el archivo de errores solo si hay filas en error»; `inventory-import-screen.test.tsx` «R28 el archivo de errores de la vista previa / del resultado sale de buildInventoryImportErrorFile» |
+| R29 | `inventory-import-screen.test.tsx` «R29 un reintento tras un fallo reutiliza la misma importKey», «R29 una vista previa nueva estrena importKey», «R29 «already_imported» dice que esa importación ya se hizo» |
+
+### Salida real (2026-10-06)
+
+- `pnpm exec vitest run tests/unit/inventario/importar/`: `Test Files  5 passed (5)` / `Tests  71 passed (71)`.
+- `pnpm run typecheck`: exit 0, sin salida.
+- `pnpm run lint`: `✖ 8 problems (0 errors, 8 warnings)` — los 8 preexistentes; ninguno en archivos de F.
+- `product-page.test.tsx` + `navegacion/pantallas-exigen-permiso.test.tsx` (baseline rojos) tras el
+  enlace: `2 failed | 124 passed`; los dos rojos son de `/pedidos` y de «R18 nombre junto a la
+  unidad», ajenos a F; los casos de `/inventario` pasan.
+- **Rojo nuevo por la pista F, fuera de su alcance**: `tests/guards/guard-pantallas-exigen-permiso.test.ts`
+  «el barrido encuentra exactamente las diecinueve pantallas privadas de hoy» — la lista fija
+  `RUTAS_ESPERADAS_HOY` no tiene `/inventario/importar`. El otro caso de la guardia («cada pantalla
+  privada llama a requirePagePermission con un codigo del catalogo») pasa. Arreglo: añadir
+  `'/inventario/importar'` a la lista y tensar el título a «veinte». Es `tests/guards/`: lo hace el
+  leader/implementer.
+
+### F6 — revisión multiplataforma (`docs/architecture.md > Regla: multiplataforma`)
+
+- **44×44**: todos los `Button` de la pista llevan `min-h-11 min-w-11` (10/10), igual el enlace
+  «Importar» y el de vuelta; los `SelectTrigger` e `Input` de los diálogos, `min-h-11`. El cierre en
+  aspa de `DialogContent` (`icon-sm`, < 44 px) se desactiva (`showCloseButton={false}`): se cierra con
+  «Cancelar» (44 px) o Escape/fuera.
+- **Inputs ≥ 16 px**: campos de los diálogos con `text-base md:text-base` (el primitivo baja a 14 px
+  en `md`); el `<input type="file">` oculto, `text-base`; `PresentationUnitSelect` ya lo cumple.
+- **Sin `:hover` único**: ninguna clase `hover:` propia; el filtro por estado son botones con
+  `aria-pressed`, los motivos se ven siempre (no en tooltip).
+- **Sin `100vh`**: el diálogo usa `max-h-[calc(100dvh-2rem)]` con `overflow-y-auto`. Scroll anidado
+  dentro de un popup fijo: sin verificar en un iOS real.
+- **Tabla en 375 px**: `DataTable` envuelve en `overflow-x-auto` propio (`components/ui/table.tsx`) con
+  flechas de desplazamiento; cuatro columnas (fila, estado, producto, detalle) como pide el diseño; la
+  pantalla lleva `min-w-0` para que el flex no la ensanche; totales en 2 columnas en móvil; filtros,
+  faltantes y botones con `flex-wrap`.
+- **Sin elementos fijos propios**: no hace falta `env(safe-area-inset-*)`.
+- **Riesgos sin verificar desde el repo** (no son excepción de escritorio): descarga por `Blob` +
+  `<a download>` en WebView embebido (declarado en design 6); `accept=".xlsx,.csv"` por extensión en
+  el selector de Archivos de iOS; `crypto.randomUUID` exige contexto seguro (HTTPS o localhost) y
+  Safari iOS ≥ 15.4.
