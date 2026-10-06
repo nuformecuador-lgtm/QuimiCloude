@@ -267,6 +267,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: scope });
     await prisma.orderAssignment.deleteMany({ where: scope });
     await prisma.orderPresentationLine.deleteMany({ where: scope });
+    await prisma.orderExecutionEntry.deleteMany({ where: scope });
     await prisma.order.deleteMany({ where: scope });
     await prisma.productBatch.deleteMany({ where: scope });
     const orphanRecipes = await prisma.recipe.findMany({ where: scope, select: { id: true } });
@@ -383,6 +384,7 @@ test.afterAll(async () => {
     byCompany((id) => prisma.inventoryMovement.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderAssignment.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderPresentationLine.deleteMany({ where: { companyId: id } })),
+    byCompany((id) => prisma.orderExecutionEntry.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.order.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.productBatch.deleteMany({ where: { companyId: id } })),
     async () => {
