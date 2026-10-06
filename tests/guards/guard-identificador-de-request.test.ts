@@ -451,6 +451,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261006120000_inventory_imports',
   // La existencia de antes y el total contado del asiento de ajuste; no toca el identificador.
   '20261006140000_inventory_movements_adjustment_count',
+  // El rol Administrador de acondicionamiento y su permiso; no toca el identificador.
+  '20261006234105_conditioning_role',
 ] as const
 
 export function hallazgosDeMigraciones(
