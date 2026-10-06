@@ -1,6 +1,7 @@
 /**
  * Aislamiento por empresa de `inventory-import-prisma.ts` contra Postgres real: cada metodo,
- * llamado con el ambito de B, trata lo de A como inexistente y no lo toca.
+ * llamado con el ambito de B, trata lo de A como inexistente y no lo toca. La vista previa,
+ * con los catalogos reales, tampoco resuelve unidades, presentaciones ni formulas de A.
  *
  * AISLAMIENTO: el adaptador usa el cliente Prisma GLOBAL y abre sus propias transacciones, asi
  * que una transaccion del test no lo envolveria. Dos empresas efimeras (randomUUID) nacen en
@@ -31,8 +32,10 @@ import {
   sembrarUnidad,
   token,
 } from './inventory-import-fixture';
+import { actorOf, csvFile, wireImport } from './inventory-import-wiring';
 
 import type { Empresa } from './inventory-import-fixture';
+import type { InventoryImportPreviewOutcome } from '@/lib/modules/inventario';
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 
 let A: Empresa;
@@ -137,5 +140,72 @@ describe('R31: el adaptador de importacion no ve ni escribe en otra empresa', ()
     expect(await prisma.product.count({ where: { companyId: B.companyId } })).toBe(0);
     expect(await prisma.productBatch.count({ where: { companyId: B.companyId } })).toBe(0);
     expect(await prisma.inventoryMovement.count({ where: { companyId: B.companyId } })).toBe(0);
+  });
+});
+
+async function sembrarUnidadDeEmpresa(empresa: Empresa, name: string): Promise<void> {
+  const { id } = await prisma.unit.create({
+    data: { name, nameNormalized: name.toLowerCase().replace(/[^a-z0-9]/gu, ''), companyId: empresa.companyId },
+    select: { id: true },
+  });
+  empresa.unitIds.push(id);
+}
+
+function filaUnica(outcome: InventoryImportPreviewOutcome) {
+  if (outcome.kind !== 'preview') throw new Error(`se esperaba una vista previa y llego ${outcome.kind}`);
+  expect(outcome.rows).toHaveLength(1);
+  const fila = outcome.rows[0]!;
+  return { outcome, fila, codigos: fila.status === 'error' ? fila.issues.map((issue) => issue.code) : [] };
+}
+
+describe('R31: la vista previa trata los catalogos homonimos de otra empresa como inexistentes', () => {
+  it('R31 una unidad de otra empresa con el mismo nombre sale como faltante y unit_not_found', async () => {
+    const unidad = `Galon ${token().slice(0, 8)}`;
+    await sembrarUnidadDeEmpresa(A, unidad);
+    const { preview } = wireImport();
+
+    const { outcome, fila, codigos } = filaUnica(
+      await preview(csvFile([{ type: 'Insumo', name: 'Sal', unit: unidad, stock: '1', unitCost: '1', qtyAlert: '1' }]), actorOf(B)),
+    );
+
+    expect(fila.status).toBe('error');
+    expect(codigos).toContain('unit_not_found');
+    expect(outcome.missingUnits).toEqual([{ name: unidad, rowNumbers: [2] }]);
+  });
+
+  it('R31 una presentacion de otra empresa con el mismo nombre sale como faltante y presentation_not_found', async () => {
+    const presentacion = `Bidon ${token().slice(0, 8)}`;
+    await sembrarPresentacion(A, unitId, { name: presentacion });
+    const { preview } = wireImport();
+
+    const { outcome, fila, codigos } = filaUnica(
+      await preview(
+        csvFile([{ type: 'Envase', name: 'Bidon azul', presentation: presentacion, stock: '1', unitCost: '1', qtyAlert: '1' }]),
+        actorOf(B),
+      ),
+    );
+
+    expect(fila.status).toBe('error');
+    expect(codigos).toContain('presentation_not_found');
+    expect(outcome.missingPresentations).toEqual([{ name: presentacion, rowNumbers: [2] }]);
+  });
+
+  it('R31 una formula de otra empresa con el mismo nombre sale como formula_not_found', async () => {
+    const formula = `Formula ${token().slice(0, 8)}`;
+    await sembrarReceta(A, formula);
+    const presentacionB = `Frasco ${token().slice(0, 8)}`;
+    await sembrarPresentacion(B, await sembrarUnidad(B), { name: presentacionB });
+    const { preview } = wireImport();
+
+    const { outcome, fila, codigos } = filaUnica(
+      await preview(
+        csvFile([{ type: 'Producto terminado', formula, presentation: presentacionB, stock: '1', unitCost: '1' }]),
+        actorOf(B),
+      ),
+    );
+
+    expect(fila.status).toBe('error');
+    expect(codigos).toEqual(['formula_not_found']);
+    expect(outcome.missingPresentations).toEqual([]);
   });
 });
