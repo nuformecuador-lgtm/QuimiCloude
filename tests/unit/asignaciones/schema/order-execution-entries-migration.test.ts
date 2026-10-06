@@ -260,7 +260,7 @@ describe('migration.sql — columnas (R2, R3, R4)', () => {
 describe('migration.sql — los tres CHECK (R5, R5bis, R8)', () => {
   const REASON = `CHECK(("action"::text='CANCEL')=("reason"ISNOTNULL))`
   const POSITION = `CHECK("step_position"ISNULLOR"step_position">=1)`
-  const PACKING = `CHECK(("action"::textIN('PACK_START','PACK_FINISH'))=("step_position"ISNULL))`
+  const PACKING = `CHECK("action"::textNOTIN('PACK_START','PACK_FINISH')OR"step_position"ISNULL)`
 
   it('la migracion declara exactamente tres CHECK', () => {
     expect(up.filter((statement) => /CHECK\s*\(/i.test(statement))).toHaveLength(3)
@@ -280,16 +280,19 @@ describe('migration.sql — los tres CHECK (R5, R5bis, R8)', () => {
     expect(checkBody(desdeCero, 'order_execution_entries_step_position_positive')).not.toBe(POSITION)
   })
 
-  it('R5bis: PACK_START y PACK_FINISH van sin posicion, y solo ellas la exigen nula', () => {
+  it('R5bis: PACK_START y PACK_FINISH van sin posicion; las demas acciones pueden llevarla o no', () => {
     expect(checkBody(up, 'order_execution_entries_packing_has_no_step')).toBe(PACKING)
 
-    const soloImplicacion = mutate(
+    // La igualdad exigiria posicion a toda accion de receta, y una receta sin pasos no la tiene.
+    const igualdad = mutate(
       up,
-      `("action"::text IN ('PACK_START', 'PACK_FINISH')) = ("step_position" IS NULL)`,
-      `"action"::text NOT IN ('PACK_START', 'PACK_FINISH') OR "step_position" IS NULL`,
+      `"action"::text NOT IN ('PACK_START','PACK_FINISH') OR "step_position" IS NULL`,
+      `("action"::text IN ('PACK_START','PACK_FINISH')) = ("step_position" IS NULL)`,
     )
-    expect(checkBody(soloImplicacion, 'order_execution_entries_packing_has_no_step')).not.toBe(PACKING)
-    const sinFinish = mutate(up, `IN ('PACK_START', 'PACK_FINISH')`, `IN ('PACK_START')`)
+    expect(checkBody(igualdad, 'order_execution_entries_packing_has_no_step')).not.toBe(PACKING)
+    const sinNot = mutate(up, `NOT IN ('PACK_START','PACK_FINISH')`, `IN ('PACK_START','PACK_FINISH')`)
+    expect(checkBody(sinNot, 'order_execution_entries_packing_has_no_step')).not.toBe(PACKING)
+    const sinFinish = mutate(up, `IN ('PACK_START','PACK_FINISH')`, `IN ('PACK_START')`)
     expect(checkBody(sinFinish, 'order_execution_entries_packing_has_no_step')).not.toBe(PACKING)
   })
 })

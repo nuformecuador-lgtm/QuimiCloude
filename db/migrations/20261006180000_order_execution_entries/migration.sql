@@ -39,7 +39,7 @@ ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_st
 
 -- El empaque no recorre pasos de la receta: sus dos acciones van siempre sin posicion.
 ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_packing_has_no_step"
-  CHECK (("action"::text IN ('PACK_START', 'PACK_FINISH')) = ("step_position" IS NULL));
+  CHECK ("action"::text NOT IN ('PACK_START','PACK_FINISH') OR "step_position" IS NULL);
 
 -- Compuestas con `company_id`: el pedido y la persona son de la misma empresa que la fila. RESTRICT
 -- porque `orders` y `users` se borran de forma logica; un borrado fisico tiene que fallar.
