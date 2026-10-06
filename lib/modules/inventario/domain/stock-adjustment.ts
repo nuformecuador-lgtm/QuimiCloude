@@ -1,5 +1,5 @@
 import { compareQuantities, subtractQuantities } from './decimal-quantity';
-import { MOVEMENT_REASONS, type MovementReason } from './movement-reason';
+import { MOVEMENT_REASONS, STOCK_INCREASE_REASONS, type MovementReason } from './movement-reason';
 
 /** Decimal NO negativo, hasta diez enteros y cuatro decimales: la escala de `decimal(14,4)`. */
 export const STOCK_QUANTITY_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
@@ -7,7 +7,7 @@ export const STOCK_QUANTITY_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
 export type AdjustmentDirection = 'increase' | 'decrease';
 
 export const REASONS_BY_DIRECTION = {
-  increase: ['conteo_fisico', 'error_de_carga'],
+  increase: STOCK_INCREASE_REASONS,
   decrease: MOVEMENT_REASONS,
 } as const satisfies Record<AdjustmentDirection, readonly MovementReason[]>;
 

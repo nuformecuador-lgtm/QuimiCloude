@@ -18,8 +18,15 @@ Prisma: lo importa el diálogo (componente de cliente) y el caso de uso. Se publ
 como caso de uso.
 
 ```ts
+// movement-reason.ts (junto a MOVEMENT_REASONS)
+export const STOCK_INCREASE_REASONS = [
+  'conteo_fisico',
+  'error_de_carga',
+] as const satisfies readonly MovementReason[];
+
+// stock-adjustment.ts
 import { compareQuantities, subtractQuantities } from './decimal-quantity';
-import { MOVEMENT_REASONS, type MovementReason } from './movement-reason';
+import { MOVEMENT_REASONS, STOCK_INCREASE_REASONS, type MovementReason } from './movement-reason';
 
 /** Decimal NO negativo, hasta diez enteros y cuatro decimales: la escala de `decimal(14,4)`. */
 export const STOCK_QUANTITY_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
@@ -27,7 +34,7 @@ export const STOCK_QUANTITY_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
 export type AdjustmentDirection = 'increase' | 'decrease';
 
 export const REASONS_BY_DIRECTION = {
-  increase: ['conteo_fisico', 'error_de_carga'],
+  increase: STOCK_INCREASE_REASONS,
   decrease: MOVEMENT_REASONS,
 } as const satisfies Record<AdjustmentDirection, readonly MovementReason[]>;
 
@@ -52,6 +59,12 @@ export function isReasonAllowed(direction: AdjustmentDirection, reason: Movement
 
 La comparación es siempre decimal (`compareQuantities`), nunca de cadenas: `'12'` y `'12.0000'`
 son la misma existencia.
+
+**Enmienda (review vuelta 1):** la lista de motivos de aumento vive en `movement-reason.ts` como
+`STOCK_INCREASE_REASONS` y `stock-adjustment.ts` la importa, porque el test de motivos
+(`tests/unit/inventario/movement-reason.test.ts`, R9 de QC-92) prohíbe enumerar dos o más motivos
+fuera de ese archivo. `REASONS_BY_DIRECTION`, `reasonsFor` e `isReasonAllowed` no cambian de forma ni
+de tipo; la constante nueva no se publica en el barrel.
 
 ### 1.2 Entrada del caso de uso — R12, R15, R16, R19, R21
 
@@ -110,7 +123,7 @@ existencia; la pantalla nunca la envía (R8).
 | Campo de `FormData` | Contenido | Lo lee |
 |---|---|---|
 | `batchId` | uuid del lote | `readOptionalFormString` |
-| `countedStock` | total contado, decimal no negativo | prechequeo numérico, luego zod |
+| `countedStock` | total contado, decimal no negativo | `readOptionalFormString`, luego zod |
 | `seenStock` | existencia vista, tal como la mostró la pantalla | `readOptionalFormString`, luego zod |
 | `reason` | uno de `MOVEMENT_REASONS` | `readOptionalFormString` |
 
@@ -286,6 +299,10 @@ cambiar todavía el puerto ni el esquema del caso de uso**:
   mientras el caso de uso siga pidiendo `delta` lleva un **puente**: si `describeAdjustment` da un
   `StockAdjustment`, pasa `{ batchId, delta: difference, reason }`; si no, devuelve `invalid_input`.
   El puente no comprueba la existencia vista. B2 lo quita y pasa los cuatro campos tal cual.
+
+  **Enmienda (implementación):** el puente que se hizo no devolvía `invalid_input` él mismo: ante
+  una lectura no válida pasaba el candidato sin `delta`, para que el caso de uso comprobara primero
+  el permiso y respondiera `invalid_input` desde su esquema. B2 lo quitó; ya no existe.
 - El adaptador del historial devuelve `previousStock: null, countedStock: null` hasta B5.
 
 Con eso, `frontend_dev` trabaja contra la action mockeada y las fixtures, y `backend_dev` contra
@@ -399,6 +416,15 @@ así que no aparece un orden de bloqueo nuevo.
 - El aviso de producto terminado (`adjust-batch-finished-product-notice`) se conserva con su texto:
   lo comprueba `e2e/producto-terminado.spec.ts:758`.
 
+**Enmienda (implementación, aceptada por el leader como detalle de UI):**
+- Un total que `describeAdjustment` lee como `'invalid'` (vacío o parcial, como `5.`) bloquea el
+  envío con la alerta `adjust-batch-counted-error`.
+- El selector de motivo ignora el reset que hace Base UI (`onValueChange` con `null` y
+  `details.reason === 'none'`) cuando la opción elegida deja de estar en la lista; quien decide si
+  el motivo sigue valiendo es la regla de R6/R10.
+- Al reabrir el diálogo se oculta el resultado del envío anterior (el estado de la action de esa
+  vez se descarta), además de reiniciar los campos y los errores.
+
 ## 5. Historial — R26, R27
 
 `app/(private)/inventario/components/batch-history.tsx`: en cada entrada con
@@ -482,6 +508,7 @@ Tests y E2E:
 | `tests/unit/inventario/qc91-alcance.test.ts:481,487` | guardia del único `update` | sin cambio |
 | `tests/unit/inventario/qc121-alcance.test.ts:270,295` | guardia del recálculo | sin cambio |
 | `tests/guards/guard-libro-de-inventario.test.ts:21,250,309-347` | censo de escritores del libro | sin cambio |
+| `tests/guards/guard-identificador-de-request.test.ts:447` | `MIGRACIONES_ESPERADAS` | B1 (enmienda): una línea, `'20261006140000_inventory_movements_adjustment_count'`; la propia guardia lo pide a la ficha que añade migración. Sin cambio de lógica |
 | `tests/unit/inventario/schema/inventario-schema.test.ts:735-755` | censo de factorías | sin cambio (§1.1) |
 | `tests/unit/inventario/batch-movement-prisma.test.ts` (4 objetos con `orderNumberText`) | historial | T0 (campos `null`) + B5 |
 | `tests/unit/inventario/batch-history.test.tsx` (5 objetos) | historial | T0 (campos `null`) + F2 |

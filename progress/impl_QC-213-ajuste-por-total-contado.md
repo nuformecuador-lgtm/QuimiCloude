@@ -162,6 +162,39 @@ F2: `app/(private)/inventario/components/batch-history.tsx`,
   nombres de caso).
 - **`./init.sh` completo NO corrido aquí**: por la regla del gate lo corre el leader antes del PR.
 
+## Review vuelta 1 (2026-10-06)
+
+Arreglos de `progress/review_QC-213-ajuste-por-total-contado.md`:
+
+- **B1**: los motivos de aumento pasan a `lib/modules/inventario/domain/movement-reason.ts` como
+  `STOCK_INCREASE_REASONS` (`as const satisfies readonly MovementReason[]`) y `stock-adjustment.ts`
+  la importa en `REASONS_BY_DIRECTION.increase`. El tipo de `REASONS_BY_DIRECTION` es el mismo
+  (`readonly ['conteo_fisico', 'error_de_carga']` en `increase`); `reasonsFor` e `isReasonAllowed` sin
+  cambios. No se publica en el barrel. El test de motivos no se toca. `design.md > 1.1` refleja el
+  bloque de código y lleva la enmienda con el motivo.
+- **m1**: `design.md > 1.3`, celda de `countedStock`: «`readOptionalFormString`, luego zod»
+  (comprobado en `batch-actions.ts:73`). El párrafo de debajo ya decía que la action no prevalida.
+- **m2**: enmienda en `design.md > 4` con los tres añadidos de UI, comprobados en
+  `adjust-batch-dialog.tsx` (`handleSubmit`: `reading === 'invalid'` → `adjust-batch-counted-error`;
+  `onValueChange` ignora `null` con `details.reason === 'none'`; `onOpenChange(true)` →
+  `setDismissedState(state)`); y fila nueva en `design.md > 8` para la línea de
+  `MIGRACIONES_ESPERADAS` (`guard-identificador-de-request.test.ts:447`).
+- **m3**: enmienda en `design.md > 1.8`: el puente pasaba el candidato sin `delta` para que el caso
+  de uso comprobara primero el permiso y respondiera `invalid_input`; B2 lo quitó.
+
+Salida:
+- `pnpm run typecheck`: limpio. `pnpm run lint`: 0 errores, 8 avisos ajenos (`product-columns.tsx`,
+  `confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `vitest run movement-reason.test.ts stock-adjustment.test.ts`: 2 archivos, 40/40.
+- `./init.sh --rapido`: typecheck y lint verdes; `test:rapido` 617 archivos, 8 fallos en 6 archivos,
+  9223 pasan, 30 omitidos. Los 8 son el baseline (`unidades-viewport` x2, `usuarios-viewport` x2,
+  `product-page` R18, `recipe-page` R21, `pantallas-exigen-permiso` `/pedidos`, `recetas/module-contract`).
+- `vitest run tests/guards`: 44 archivos, 612 pasan, 5 omitidos.
+- Tests que leen el disco (`grep -rl readFileSync tests/unit`, 271 archivos, en 5 lotes porque la
+  línea de comandos de Windows no admite los 271 de una vez): 3 fallos, los tres en
+  `tests/baseline-rojos.json` (`identity/account-status-scope`, `recetas/module-contract`,
+  `recetas/scope`); `movement-reason.test.ts` en verde.
+
 ## Pendientes para el leader
 1. Visto bueno a la línea añadida en `MIGRACIONES_ESPERADAS` de `guard-identificador-de-request`.
 2. ~~Timestamp compartido con QC-209~~: resuelto, migración renombrada a `20261006140000`.
