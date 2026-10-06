@@ -71,6 +71,7 @@ import {
 import { PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
 import { clearedLockState } from '@/lib/modules/identity/domain/effective-account-status';
 import {
+  ROLE_ACONDICIONAMIENTO,
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_MAESTRO,
@@ -1357,6 +1358,96 @@ describe('QC-144 R3 — el rol Empacador se asigna a usuarios de empresas distin
       expect(detalleB?.roleId).toBe(empacadorRoleId);
       expect(detalleA?.roleName).toBe(ROLE_EMPACADOR);
       expect(detalleB?.roleName).toBe(ROLE_EMPACADOR);
+    });
+  });
+});
+
+describe('QC-216 R19 — alta y edicion con el rol de acondicionamiento, por un actor con `usuarios.modificar`', () => {
+  let acondicionamientoRoleId = '';
+
+  beforeAll(async () => {
+    const rol = await prisma.role.findUnique({ where: { name: ROLE_ACONDICIONAMIENTO }, select: { id: true } });
+    if (rol === null) {
+      throw new Error(
+        `falta el rol «${ROLE_ACONDICIONAMIENTO}» en la base: corre \`pnpm run db:migrate\` antes de este archivo.`,
+      );
+    }
+    acondicionamientoRoleId = rol.id;
+  });
+
+  it('R19 — el alta con el rol se acepta y persiste ese rol con la empresa del actor', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorWithPermissions(companyId, ['usuarios.modificar']);
+
+      const result = await identity.createUser(actor, createUserInputData(acondicionamientoRoleId));
+
+      const detail = await findAliveInCompany(companyId, result.id);
+      expect(detail?.roleId).toBe(acondicionamientoRoleId);
+      expect(detail?.roleName).toBe(ROLE_ACONDICIONAMIENTO);
+      const fila = await rawUser(result.id);
+      expect(fila.company_id).toBe(companyId);
+      expect(fila.role_id).toBe(acondicionamientoRoleId);
+    });
+  });
+
+  it('R19 — la edicion que pide el rol se acepta y persiste ese rol con la empresa del actor', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorWithPermissions(companyId, ['usuarios.modificar']);
+      const created = await identity.createUser(actor, createUserInputData(operadorRoleId));
+
+      await identity.updateUser(actor, created.id, updateUserInputData(acondicionamientoRoleId));
+
+      const detail = await findAliveInCompany(companyId, created.id);
+      expect(detail?.roleId).toBe(acondicionamientoRoleId);
+      expect(detail?.roleName).toBe(ROLE_ACONDICIONAMIENTO);
+      expect((await rawUser(created.id)).company_id).toBe(companyId);
+    });
+  });
+
+  it('R19 — sin `usuarios.modificar` el alta con el rol se rechaza y no crea ninguna fila', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorWithPermissions(companyId, ['usuarios.consultar']);
+
+      await expect(
+        identity.createUser(actor, createUserInputData(acondicionamientoRoleId)),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(await countRowsOf(companyId)).toBe(0);
+    });
+  });
+
+  it('R19 — sin `usuarios.modificar` la edicion hacia el rol se rechaza y no modifica la fila', async () => {
+    await withCompany(async (companyId) => {
+      const owner = actorWithPermissions(companyId, ['usuarios.modificar']);
+      const created = await identity.createUser(owner, createUserInputData(operadorRoleId));
+      const antes = await rawUser(created.id);
+
+      const actorSinPermiso = actorWithPermissions(companyId, ['usuarios.consultar']);
+      await expect(
+        identity.updateUser(actorSinPermiso, created.id, updateUserInputData(acondicionamientoRoleId)),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+
+      expect(await rawUser(created.id)).toEqual(antes);
+    });
+  });
+
+  it('R3 — dos usuarios de dos empresas distintas nacen con el MISMO rol, cada uno en su empresa', async () => {
+    await withTwoCompanies(async (companyA, companyB) => {
+      const enA = await identity.createUser(
+        actorWithPermissions(companyA, ['usuarios.modificar']),
+        createUserInputData(acondicionamientoRoleId),
+      );
+      const enB = await identity.createUser(
+        actorWithPermissions(companyB, ['usuarios.modificar']),
+        createUserInputData(acondicionamientoRoleId),
+      );
+
+      const filaA = await rawUser(enA.id);
+      const filaB = await rawUser(enB.id);
+      expect(filaA.role_id).toBe(acondicionamientoRoleId);
+      expect(filaB.role_id).toBe(acondicionamientoRoleId);
+      expect(filaA.company_id).toBe(companyA);
+      expect(filaB.company_id).toBe(companyB);
+      expect(await prisma.role.count({ where: { name: ROLE_ACONDICIONAMIENTO } })).toBe(1);
     });
   });
 });
