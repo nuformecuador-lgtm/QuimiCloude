@@ -842,3 +842,33 @@ del entorno: hay que volver a lanzarla cuando haya memoria. Hasta entonces TZ y 
   entrada del E2E en guard-identificador-de-request.
 - Al cerrar la ficha: borrar la base `QuimiCloude_QC209` y restaurar `.env.bak-QuimiCloude` (pasos en
   «B10 y TI backend»).
+
+## Rojos del gate completo (desvios para el reviewer)
+
+El `./init.sh` completo dio 5 archivos rojos fuera de `tests/baseline-rojos.json`. Ninguna guardia se
+afloja: cuatro son listas cerradas que crecen con la ficha, con su nota fechada al estilo de cada archivo.
+
+1. `tests/unit/inventario/schema/inventario-schema.test.ts`: los modelos de `inventario` pasan de cinco a
+   seis con `InventoryImport` (dos casos: censo y `/// @module`, mas `owners.get('InventoryImport')`). El
+   barrel pasa de dieciseis a dieciocho factorias: `createPreviewInventoryImport` y
+   `createConfirmInventoryImport`, las dos unicas nuevas frente a `origin/dev`. Igualdad exacta intacta.
+2. `tests/unit/pedidos/schema/pedidos-schema.test.ts` (R20 de QC-123): el patron
+   `/cost|price|import/i` busca tablas de «importe» (dinero) en el esquema; `InventoryImport` casaba por
+   la palabra en ingles. No es un problema del esquema (tiene `/// @module inventario` y no lleva dinero).
+   Se exime SOLO ese nombre exacto, con nota fechada, como la exencion de `Customer` en el mismo archivo;
+   el patron sigue entero.
+3. `tests/unit/inventario/scope.test.ts`: la lista cerrada de E2E del catalogo gana
+   `fixtures/inventario-importar-mixto.csv` e `inventario-importar.spec.ts` (casan por «inventario»;
+   ejercitan la pantalla de importacion, no una segunda pantalla del catalogo).
+4. `tests/unit/shared/data-table-alcance.test.ts`: de veintisiete a veintiocho E2E con
+   `e2e/inventario-importar.spec.ts` (la vista previa monta la tabla compartida; busca lo importado
+   por `data-table-cell-name`).
+5. `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`: SIGUE ROJO, sin tocar. El bloque marcado es
+   `finishImport` en `inventory-import-prisma.ts`, que escribe `finishedAt` del REGISTRO de importacion
+   (`inventory_imports.finished_at`, design 5.1), no de un lote ni de un pedido. No se puede mover sin
+   cambiar el modelo de datos: pendiente de decision (opciones en el informe al leader).
+
+Verificacion: los 5 archivos -> `Test Files  1 failed | 4 passed (5)`, `Tests  1 failed | 94 passed |
+2 skipped (97)` (el rojo es el 5). `pnpm run typecheck` verde; `pnpm run lint` 0 errores, 8 warnings en
+archivos no tocados; `pnpm exec vitest run guard` -> `Test Files  51 passed (51)`,
+`Tests  692 passed | 11 skipped (703)`.
