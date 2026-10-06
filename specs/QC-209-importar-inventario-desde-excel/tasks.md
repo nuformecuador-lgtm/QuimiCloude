@@ -170,7 +170,7 @@ Hecho cuando: cabecera de plantilla exacta; archivo de errores con «Fila», val
 «Motivo», solo filas `error`; el archivo generado pasa por `import-sheet.ts` sin rechazo de cabecera
 (si B5 aún no está, ese caso se añade en B5).
 
-### B10 — Cableado · depende de: B3, B4, B7, B8 · R1, R31
+### [x] B10 — Cableado · depende de: B3, B4, B7, B8 · R1, R31
 
 - `lib/composition/index.ts` (modifica) — `inventario.previewInventoryImport` /
   `inventario.confirmInventoryImport` con: lector por formato, `InventoryImportRepository`,
