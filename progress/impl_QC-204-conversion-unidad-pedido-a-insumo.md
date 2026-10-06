@@ -1,9 +1,12 @@
-# QC-204 — impl (implementación completa; faltan el E2E y el gate completo, que corre el leader)
+# QC-204 — impl (implementación completa y review OK; menores m2, m4, m6 y m7 cerrados antes del PR; merge con origin/dev)
 
 ## Estado
 - Cerradas: T1–T13.
-- T14: E2E escrito y commiteado (71688657). Se lista con 4 tests (R24 y R25 en chromium y webkit), pero **no se ha ejecutado**: lo corre el leader.
-- T15: guardias comprobadas (abajo) y mapa completo. Su «hecho» exige `./init.sh` completo en verde, que corre el leader.
+- T14: E2E escrito (71688657). El leader lo corrió con 4/4 en verde. Después se rehízo R25 para el menor m4 (pedido en
+  ml), y esa versión no se ha corrido.
+- T15: guardias comprobadas (abajo) y mapa completo. El gate completo y el cierre de T15 los lleva el leader.
+- Review: OK sin bloqueantes (progress/review_QC-204-conversion-unidad-pedido-a-insumo.md). Menores cerrados: m2, m4, m6
+  y m7. m3 no se toca por decisión humana (commit 7927d6c0). m1 y m5 los lleva el leader.
 - Bloqueo T9: resuelto por el humano con la opción (a) (commit e81db6c7). Se cambió solo el dato de prueba de los casos R43.
 - Bloqueo T4: resuelto por el humano (opción 2; design 4.1 enmendado en 70e32f00).
 
@@ -87,6 +90,7 @@ envases.
 - R3 (además): order-line-need.test.ts > `R3 2 l al 50 % sobre insumo en kg da 1 aproximado`
 - R4 (además): order-line-need.test.ts > `R4 kg sobre insumo en unidad da no convertible`; order-requirement.test.ts > `R4 una linea no convertible da not_convertible con su productId`
 - R5: order-cost.test.ts > `R5 un pedido de 1000 kg cuesta 1000 veces uno de 1000 g`, `R5 un pedido en l sobre insumo en kg cuesta como la aproximacion`; `R5 el alta guarda el costo con la necesidad convertida` (create-order), `R5 la edicion recalcula con la unidad editada` (update-order), `R5 cambiar la unidad desde el reparto recalcula con la unidad nueva` (update-order-presentation-lines), `R5 el desbloqueo recalcula con la unidad del pedido` (review-blocked-orders)
+- R5 (m6, comparación de unitId en review-blocked-orders): tests/unit/pedidos/review-blocked-orders.test.ts > `R5: si una edicion cambio la unidad entre la lectura y el candado, se deja para la siguiente revision sin guardar el costo de la unidad vieja`. Se comprobó que falla si se quita la comparación.
 - R6: order-cost.test.ts > `R6 una linea no convertible deja el costo en null`; quote-order-cost.test.ts > `R6 una linea no convertible da sin costo`
 - R7: order-cost.test.ts > `R7 en el costo del lote una linea no convertible cuenta cero`; order-packing > `R7 terminar el empaque costea el lote con la necesidad convertida`
 - R8 (servidor): quote-order-cost.test.ts > `R8 la cotizacion usa la unidad recibida`. Cliente: T12, pendiente.
@@ -111,9 +115,11 @@ envases.
 - R18: tests/unit/pedidos-ui/order-form-quote.test.tsx > `R18 el bloque de costo indica la aproximacion si hay importe y alguna linea aproximada`, `R18 sin importe no se indica la aproximacion`
 - R19 (tabla): order-ingredients-table.test.tsx > `R19 sin unidad elegida la tabla no muestra cifras`
 - R21 (pantalla): order-ingredients-table.test.tsx > `R21 un insumo sin unidad muestra la cifra sin convertir y sin aviso`
-- R24: e2e/pedido-conversion-de-unidad.spec.ts > `R24 pedido en g sobre insumo en kg: costo y cantidad apartada exactos`. Cifras: 1000 g al 10 % = 0,1 kg; costo 2,0000; apartado 0,1 kg. **No ejecutado.**
-- R25: e2e/pedido-conversion-de-unidad.spec.ts > `R25 pedido en l sobre insumo en kg: costo y cantidad apartada aproximados, con la marca en la linea y en el costo`. Cifras: 2 l al 10 % ≈ 0,2 kg; costo 4,0000; apartado 0,2 kg; se ven las dos marcas. **No ejecutado.** Como 1 l ≈ 1 kg, la cifra coincide con la que saldría sin convertir; la aproximación solo la prueban las marcas.
-- R26: sin test propio. Dependencias: tests/guards/guard-dependencias-aprobadas.test.ts, y package.json/pnpm-lock.yaml sin diff contra el merge-base 7812803e. Borrado lógico: el diff no toca deletedAt en lib/ y los tests de borrado de pedidos que ya existían siguen en verde. Identificadores en inglés: lo comprueba la revisión, no hay guardia. **El reviewer decide si esto basta.**
+- R24: e2e/pedido-conversion-de-unidad.spec.ts > `R24 pedido en g sobre insumo en kg: costo y cantidad apartada exactos`. Cifras: 1000 g al 10 % = 0,1 kg; costo 2,0000; apartado 0,1 kg. En verde en la corrida del leader (4/4).
+- R25: e2e/pedido-conversion-de-unidad.spec.ts > `R25 pedido en ml sobre insumo en kg: costo y cantidad apartada aproximados, con la marca en la linea y en el costo` (m4). Cifras: 2000 ml al 10 % = 200 ml ≈ 0,2 kg; costo 4,0000; apartado 0,2 kg; se ven las dos marcas. Con la fórmula vieja saldrían 4000,0000 y 200, así que costo y apartado solo cuadran si se aplica la aproximación. Esta versión no se ha corrido.
+- R26, sin dependencias de terceros: tests/guards/guard-dependencias-aprobadas.test.ts > `toda dependencia de package.json tiene su fila en el registro`, `el registro no lista paquetes que ya no estan instalados`. Además, package.json y pnpm-lock.yaml no tienen diff contra el merge-base 7812803e.
+- R26, el borrado lógico no cambia: tests/unit/pedidos/delete-order.test.ts > `borra un pedido PENDIENTE marcandolo, con el actor y el instante (R31, R6)`, `R27: borra logicamente un BLOQUEADO, igual que un PENDIENTE` y los demás casos del archivo, en verde. El diff no toca deletedAt en lib/.
+- R26, identificadores en inglés: revisados uno a uno por el reviewer (progress/review_QC-204-conversion-unidad-pedido-a-insumo.md, «Decisión sobre R26»).
 
 ### Guardias de T15 (comprobadas a mano contra el merge-base 7812803e)
 - package.json y pnpm-lock.yaml: sin diff. Ninguna dependencia nueva.
