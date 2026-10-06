@@ -231,8 +231,8 @@ export type ImportAlreadyDone = {
   readonly importedAt: string;
 };
 
-/** R24: al confirmar no quedó ninguna fila válida (en  o ). No se escribe nada,
- *  tampoco , así que no hay  y la misma  se puede reutilizar.
+/** R24: al confirmar no quedó ninguna fila válida (en `crear` o `sumar lote`). No se escribe nada,
+ *  tampoco `inventory_imports`, así que no hay `importId` y la misma `importKey` se puede reutilizar.
  *  Trae las filas con su motivo para que la pantalla las muestre y ofrezca el archivo de errores
  *  (R25, R28). Enmienda F2.1 del humano, 2026-10-06. */
 export type ImportNothingImported = {
