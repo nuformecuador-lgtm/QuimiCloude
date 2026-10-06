@@ -277,7 +277,7 @@ lib/modules/<modulo>/
 
 - **Dominio** (`domain/`): casos de uso y tipos. Solo puede importar de su propio
   `domain/`/`ports/`, el contrato (`index.ts`) de otro modulo, y paquetes puros (hoy:
-  `zod`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
+  `zod`, `papaparse`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
   `app/`, `components/` ni las tripas de otro modulo.
 - **Puertos** (`ports/`): la superficie hacia adentro. Los implementa el adaptador
   driven correspondiente y los cablea el punto de composicion. Nadie mas los importa.
@@ -324,7 +324,7 @@ un adaptador driven: recibe datos por props y llama a la Server Action por su ru
 
 | Origen | PUEDE importar | NO PUEDE importar |
 | --- | --- | --- |
-| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
+| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`, `papaparse`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
 | `lib/modules/M/adapters/driven/**` | `../../domain`, `../../ports`, `lib/shared/**`, `@prisma/client`, SDKs externos, `@/lib/modules/N` (barrel), **otro driven del MISMO modulo** (ver nota) | `lib/composition`, `../driving/**`, `app/**`, `components/**`, `lib/modules/N/**` (profundo), **un driven de OTRO modulo** |
 | `lib/modules/M/adapters/driving/**` | `lib/composition`, `@/lib/modules/M` (barrel), su propia carpeta, `next/*`, `react*`, `lib/shared/**` | `@prisma/client`, el cliente Prisma compartido, `../driven/**`, `../../domain`/`../../ports` por ruta profunda |
 | `lib/composition/**` | `@/lib/modules/*` (barrel), `*/ports/**`, `*/adapters/driven/**`, `lib/shared/**` | `*/adapters/driving/**`, `app/**`, `components/**` |
