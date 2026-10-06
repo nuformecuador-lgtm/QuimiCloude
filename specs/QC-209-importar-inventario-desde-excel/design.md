@@ -562,7 +562,7 @@ model InventoryImport {
   errorCount      Int?      @map("error_count")
   createdBy       String    @map("created_by") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  finishedAt      DateTime? @map("finished_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
 
   @@unique([companyId, importKey], map: "inventory_imports_company_key_unique")
   @@index([companyId, createdAt], map: "inventory_imports_company_created_idx")
@@ -574,9 +574,10 @@ Migración `db/migrations/<ts>_inventory_imports/`:
 
 - `migration.sql`: `CREATE TABLE` + FK a mano `company_id → companies(id) ON DELETE RESTRICT`,
   `created_by → users(id) ON DELETE RESTRICT`; `CHECK` de cuentas `>= 0` y de
-  `finished_at IS NULL OR rows_total IS NOT NULL`; `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` +
+  `completed_at IS NULL OR rows_total IS NOT NULL`; `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` +
   `FORCE ROW LEVEL SECURITY` + la policy por empresa con el mismo patrón que las demás tablas de
   `inventario` (defensa en profundidad; la frontera es el service).
+- Enmienda F2.1 (2026-10-06, humano): la columna de cierre se llama `completed_at`, no `finished_at`. La guardia `qc145-estado-solo-planta` reserva `finished_at` a los pedidos, y el nombre nuevo no afloja ningún control.
 - `down.sql`: `DROP TABLE "inventory_imports";` (nada más la referencia).
 
 Tiene `company_id`: no entra en la lista de exentas de `guard-empresa-en-esquema`. No se borra nunca
