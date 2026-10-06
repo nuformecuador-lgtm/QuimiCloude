@@ -117,7 +117,9 @@ la forma exacta de su entrada y su salida está en `design.md > 1. Contrato de s
 - **R24** (D1) CUANDO el Administrador confirma, el sistema DEBE importar solo las filas en estado
   `crear` o `sumar lote` y NO DEBE importar las filas en `duplicado` ni en `error`. MIENTRAS haya
   filas en `error` o faltantes sin crear, la confirmación DEBE seguir disponible para las filas
-  válidas. SI no hay ninguna fila válida, ENTONCES la confirmación NO DEBE escribir nada.
+  válidas. SI no hay ninguna fila válida, ENTONCES la confirmación NO DEBE escribir nada, tampoco
+  el registro de `inventory_imports`, y DEBE devolver `nothing_imported` con las filas y sus motivos
+  (enmienda F2.1, humano, 2026-10-06; `design.md > 1.4`).
 - **R25** (D1) CUANDO el Administrador confirma, el sistema DEBE volver a validar el archivo contra
   el estado de la base en ese momento, y el resultado DEBE decir, fila a fila, qué se creó, a qué
   producto se sumó lote, qué fue duplicado y qué falló y por qué, incluidas las filas que pasaron a

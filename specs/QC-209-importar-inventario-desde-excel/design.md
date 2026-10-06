@@ -231,7 +231,23 @@ export type ImportAlreadyDone = {
   readonly importedAt: string;
 };
 
-export type InventoryImportConfirmOutcome = InventoryImportResult | ImportAlreadyDone | ImportFileRejected;
+/** R24: al confirmar no quedó ninguna fila válida (en  o ). No se escribe nada,
+ *  tampoco , así que no hay  y la misma  se puede reutilizar.
+ *  Trae las filas con su motivo para que la pantalla las muestre y ofrezca el archivo de errores
+ *  (R25, R28). Enmienda F2.1 del humano, 2026-10-06. */
+export type ImportNothingImported = {
+  readonly kind: 'nothing_imported';
+  readonly fileName: string;
+  readonly exampleRowIgnored: boolean;
+  readonly totals: ImportResultTotals;
+  readonly rows: readonly ImportResultRow[];
+};
+
+export type InventoryImportConfirmOutcome =
+  | InventoryImportResult
+  | ImportNothingImported
+  | ImportAlreadyDone
+  | ImportFileRejected;
 ```
 
 ### 1.5 Descargas (funciones puras del barrel)
