@@ -136,7 +136,7 @@ el desempate de `findAliveProductsByNormalizedNames` coincide con
 `findAliveIdByNameInPresentationUnit` en el mismo caso; `claimImport` doble → `already`;
 `receiveImportedFinishedGoods` crea una vez y suma después, con `package_content` y asiento `opening`.
 
-### B8 — Planificación y casos de uso · depende de: B2, B5, B7 · R1, R7, R9-R11, R14-R20, R22, R24-R27
+### [x] B8 — Planificación y casos de uso · depende de: B2, B5, B7 · R1, R7, R9-R11, R14-R20, R22, R24-R27
 
 - `lib/modules/inventario/domain/plan-inventory-import.ts` (`design.md > 3.1`)
 - `lib/modules/inventario/domain/import-finished-goods.ts` (esquema de fila de terminado + caso de
