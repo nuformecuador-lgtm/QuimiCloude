@@ -784,3 +784,52 @@ Con el `.env` del worktree apuntando a `QuimiCloude_QC209` (migrada y sembrada):
 No usa el usuario `admin` del seed: crea su propio Administrador en su propia empresa.
 
 Veredicto: E2E de R33 escrito, compila y se lista en los dos proyectos; pendiente de correr.
+
+## TZ — cierre (2026-10-06)
+
+### Mapa R -> test (consolidado; detalle por pista en sus secciones)
+
+| R | Test principal |
+| --- | --- |
+| R1 | tests/unit/inventario/preview-inventory-import.test.ts, confirm-inventory-import.test.ts; tests/integration/inventario/inventory-import-idempotency.int.test.ts (composición real) |
+| R2 | tests/unit/inventario/importar/importar-page.test.tsx |
+| R3 | tests/unit/inventario/inventory-import-downloads.test.ts; importar/import-upload.test.tsx |
+| R4 | tests/unit/inventario/spreadsheet-format.test.ts, csv-reader.test.ts; tests/integration/inventario/xlsx-reader.test.ts (mixto.xlsx) |
+| R5 | tests/unit/inventario/import-header.test.ts |
+| R6, R8 | tests/unit/inventario/import-sheet-limits.test.ts |
+| R7 | tests/integration/inventario/inventory-import-confirm.int.test.ts |
+| R9-R11, R14-R20, R22 | tests/unit/inventario/plan-inventory-import.test.ts (+ preview-inventory-import.test.ts) |
+| R12, R13 | tests/unit/inventario/import-cell-parsing.test.ts |
+| R16 (escritura) | tests/integration/inventario/inventory-import-finished-goods.int.test.ts |
+| R21, R22 | tests/unit/inventario/importar/import-missing-catalog.test.tsx |
+| R23 | tests/unit/inventario/importar/inventory-import-screen.test.tsx |
+| R24-R27 | tests/unit/inventario/confirm-inventory-import.test.ts; tests/integration/inventario/inventory-import-confirm.int.test.ts |
+| R28 | tests/unit/inventario/inventory-import-downloads.test.ts; importar/import-preview.test.tsx |
+| R29, R30 | tests/integration/inventario/inventory-import-idempotency.int.test.ts, inventory-import-repository.int.test.ts |
+| R31 | tests/integration/inventario/inventory-import-isolation.int.test.ts |
+| R32 | tests/unit/inventario/inventory-import-contract.test-d.ts (typecheck), inventory-import-actions.test.ts |
+| R33 | e2e/inventario-importar.spec.ts (escrito y listado; sin correr, F2.4) |
+
+Comprobado: cada R1..R33 aparece como prefijo de al menos un caso en los tests del diff de la rama.
+
+Medida B8: 2.000 filas confirmadas en 42.5 s (Postgres local; re-medir contra el pooler).
+Fixture .xlsx: mixto.xlsx producido con Excel 16 por COM (sección Pista B lectura).
+
+### Gate completo
+
+`./init.sh` (completo) lanzado tras 5a6dc1a9: en verde hasta lint (base `QuimiCloude_QC209` al día,
+70 migraciones; typecheck y lint pasan). **Claude Code paró la corrida en `pnpm run test:json`
+porque el sistema se quedó sin memoria**; no hay veredicto de la suite. No se relanzó por instrucción
+del entorno: hay que volver a lanzarla cuando haya memoria. Hasta entonces TZ y TI no están cerradas.
+
+### Pendientes para el leader / reviewer
+
+- R24 frente a R30: con 0 filas válidas la confirmación no escribe productos, lotes ni movimientos,
+  pero sí el registro de `inventory_imports` (R30 y el `importId` del contrato lo piden). Decidir si
+  «no escribir nada» incluye la auditoría.
+- Desvíos: test de ruta separado (decisión humana); `FileDigest` puerto nuevo (guard-firma-sesion-unica);
+  `addImportedFinishedGoodsBatch` nueva en product-prisma.ts (guard-libro-de-inventario); F no reusa
+  file-field.tsx y no envía > 1 MB; CSV con `skipEmptyLines: false`; integración `.int.test.ts`;
+  entrada del E2E en guard-identificador-de-request.
+- Al cerrar la ficha: borrar la base `QuimiCloude_QC209` y restaurar `.env.bak-QuimiCloude` (pasos en
+  «B10 y TI backend»).
