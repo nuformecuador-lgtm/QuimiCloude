@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { ApproximateMark, NotConvertibleNotice } from '@/components/shared/unit-conversion-marks';
 import {
   Select,
   SelectContent,
@@ -32,6 +33,8 @@ export const ORDER_EXECUTION_LINE_QUANTITY_TESTID = 'order-execution-line-quanti
 export const ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID = 'order-execution-line-unit-select';
 export const ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID = 'order-execution-line-unit-option';
 export const ORDER_EXECUTION_LINE_UNIT_TESTID = 'order-execution-line-unit';
+export const ORDER_EXECUTION_LINE_APPROXIMATE_TESTID = 'order-execution-line-approximate';
+export const ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID = 'order-execution-line-not-convertible';
 export const PRODUCT_NAME_FALLBACK = 'Producto no disponible';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -74,14 +77,21 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
       <span aria-hidden="true" className="text-base text-muted-foreground">
         {' · '}
       </span>
-      <span
-        data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
-        className="text-base font-medium"
-        title={displayedQuantity === null ? undefined : exactDecimalTitle(displayedQuantity)}
-      >
-        {displayedQuantity === null ? null : formatDecimalDisplay(displayedQuantity)}
-      </span>
-      {line.unit === null ? null : line.alternativeUnits.length > 0 ? (
+      {line.need === 'not_convertible' ? (
+        <NotConvertibleNotice
+          testId={`${ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID}-${index}`}
+          className="text-base"
+        />
+      ) : (
+        <span
+          data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
+          className="text-base font-medium"
+          title={displayedQuantity === null ? undefined : exactDecimalTitle(displayedQuantity)}
+        >
+          {displayedQuantity === null ? null : formatDecimalDisplay(displayedQuantity)}
+        </span>
+      )}
+      {line.unit === null || line.need === 'not_convertible' ? null : line.alternativeUnits.length > 0 ? (
         <Select
           value={selectedUnitId ?? line.unit.id}
           onValueChange={(next) => {
@@ -117,6 +127,12 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
           {unitLabel(line.unit)}
         </span>
       )}
+      {line.need === 'approximate' ? (
+        <ApproximateMark
+          testId={`${ORDER_EXECUTION_LINE_APPROXIMATE_TESTID}-${index}`}
+          className="text-base"
+        />
+      ) : null}
     </li>
   );
 }
