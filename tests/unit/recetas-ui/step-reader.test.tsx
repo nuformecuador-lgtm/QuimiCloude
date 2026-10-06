@@ -996,3 +996,76 @@ describe('StepReader: texto y bloqueo del boton final (QC-211)', () => {
     expect(screen.getByTestId('step-reader-next')).toBeEnabled();
   });
 });
+
+describe.each(['lectura', 'ejecucion'] as const)(
+  'StepReader: paso de entrada y aviso de cambio de paso (QC-82), mode=%s',
+  (mode) => {
+    const SIN_BLOQUEO: readonly RecipeStepDocument[] = [PASO_SIN_ITEMS, PASO_SIN_ITEMS, PASO_SIN_ITEMS];
+
+    it('R13: con initialStepPosition=3 empieza en el paso 3', () => {
+      render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={3} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 3 de 3');
+      expect(screen.getByText(PASO_3_TEXTO)).toBeInTheDocument();
+    });
+
+    it('R14: una posicion fuera de rango se recorta (9 al ultimo, 0 al primero)', () => {
+      const { unmount } = render(
+        <StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={9} />,
+      );
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 3 de 3');
+      unmount();
+
+      render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={0} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+    });
+
+    it('R17, R18: Siguiente avisa {advance, 2} y Anterior avisa {go_back, 1}', () => {
+      const onStepChange = vi.fn();
+      render(
+        <StepReader steps={SIN_BLOQUEO} onFinish={vi.fn()} mode={mode} onStepChange={onStepChange} />,
+      );
+
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+      expect(onStepChange).toHaveBeenCalledTimes(1);
+      expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'advance', position: 2 });
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 3');
+
+      fireEvent.click(screen.getByTestId('step-reader-previous'));
+      expect(onStepChange).toHaveBeenCalledTimes(2);
+      expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'go_back', position: 1 });
+    });
+
+    it('R18: Anterior en el paso 1 no avisa', () => {
+      const onStepChange = vi.fn();
+      render(
+        <StepReader steps={SIN_BLOQUEO} onFinish={vi.fn()} mode={mode} onStepChange={onStepChange} />,
+      );
+
+      fireEvent.click(screen.getByTestId('step-reader-previous'));
+      expect(onStepChange).not.toHaveBeenCalled();
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+    });
+
+    it('R13: empezar en el paso 3 no mueve el foco', () => {
+      const antes = document.activeElement;
+      render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={3} />);
+      expect(document.activeElement).toBe(antes);
+      if (mode === 'ejecucion') {
+        expect(document.activeElement).not.toBe(screen.getByTestId('step-reader-heading'));
+      }
+    });
+
+    it('R37: empezando en el ultimo paso, finishLabel sigue en el boton final', () => {
+      render(
+        <StepReader
+          steps={SIN_BLOQUEO}
+          onFinish={vi.fn()}
+          mode={mode}
+          finishLabel="Terminar"
+          initialStepPosition={3}
+        />,
+      );
+      expect(screen.getByTestId('step-reader-finish')).toHaveTextContent('Terminar');
+    });
+  },
+);
