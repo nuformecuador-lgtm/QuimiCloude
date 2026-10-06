@@ -66,7 +66,7 @@ producción salvo que QC-215 toque `permissions.ts`; si lo hace, que mergee desp
       **Hecho cuando:** `pnpm run typecheck` pasa, `PermissionCode` incluye el código y el párrafo
       nuevo no casa con `/QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i`. Depende de: T1.
 
-- [ ] **T3.** Actualizar los tests unitarios y guardias rojos de `design.md > 5` (todas las filas
+- [x] **T3.** Actualizar los tests unitarios y guardias rojos de `design.md > 5` (todas las filas
       que no son de integración): `permissions.test.ts`, `qc75-convenciones.test.ts`,
       `order-assignments-migration.test.ts`, `maestro-rol.test.ts`, `empacador-rol.test.ts`. Las
       listas a mano **nombran** el código, el módulo o el rol; nada se relaja. En

@@ -41,3 +41,39 @@ catálogo (sí se comprueban una a una al editar).
 
 ## Tanda 1 (T1–T3)
 
+Preparación del worktree: no tenía `node_modules`. Se corrió `pnpm install --frozen-lockfile`
+(sin dependencias nuevas; `package.json` y el lockfile siguen igual), `prisma generate` y `next typegen`.
+
+### Archivos
+
+| Task | Archivo | Cambio |
+|---|---|---|
+| T1 | `lib/modules/identity/domain/roles.ts` | `ROLE_ACONDICIONAMIENTO` y su fila al final de `SEED_ROLES`; la cabecera pasa a cinco literales (el nuevo, sin comillas simples, para que el literal entre comillas siga apareciendo una sola vez en `lib/`) |
+| T1 | `lib/modules/identity/index.ts` | reexporta `ROLE_ACONDICIONAMIENTO` |
+| T2 | `lib/modules/identity/domain/permissions.ts` | entrada `acondicionamiento.modificar` al final; párrafo de enmienda (4 líneas, texto de `design.md > 2`); clave del rol nuevo en `SEED_ROLE_PERMISSIONS` con su frase; código al final de `ADMIN_EXCLUDED_PERMISSIONS` con su frase; import multilínea de `./roles` |
+| T3 | `tests/unit/identity/permissions.test.ts` | listas a mano nombran el código/módulo/rol (`CODIGOS_DEL_REQUISITO`, `MODULOS`, `MODULOS_SOLO_ESCRITURA`, las tres colas de catálogo, claves del seed, R9 de QC-161, `PERMISOS_POSTERIORES`, `ADMIN_EXCLUDED_PERMISSIONS` exacto). `EJECUTAR` y `PERMISOS_POSTERIORES` suben a nivel de módulo para reutilizarlos en R5. Bloque nuevo QC-216: R4, R5, R6 (+ simétrico sintético con `(QC-216)`), R8, R9, R10 |
+| T3 | `tests/unit/navegacion/qc75-convenciones.test.ts` | `CODIGOS_QC74` suma el código; módulos esperados suman `acondicionamiento` y el comentario lo nombra como no-carpeta y solo escritura |
+| T3 | `tests/unit/asignaciones/schema/order-assignments-migration.test.ts` | `CODIGOS_DE_FICHAS_POSTERIORES` suma el código |
+| T3 | `tests/unit/identity/roles/maestro-rol.test.ts` | orden exacto de `SEED_ROLES` suma el rol; título ajustado |
+| T3 | `tests/unit/identity/roles/empacador-rol.test.ts` | ídem |
+
+Las líneas de `design.md > 5` coincidían con el código (sin relocalización).
+
+### Verificación
+
+- `pnpm run typecheck`: verde.
+- `pnpm run lint`: 0 errores, 8 warnings preexistentes ajenos a los archivos tocados.
+- Los cinco tests de T3: `5 passed`, `151 passed | 3 skipped`.
+- `pnpm exec vitest run guard`: `51 passed`, `692 passed | 11 skipped`.
+- `vitest related` de los tres archivos de producción (= `test:rapido`): `7 failed | 583 passed`
+  archivos; `10 failed | 8868 passed | 27 skipped` tests. Rojos:
+  - Baseline (`tests/baseline-rojos.json`): `recetas/module-contract`, `configuracion-ui/unidades-viewport`,
+    `configuracion-ui/usuarios-viewport`, `inventario/product-page`, `navegacion/pantallas-exigen-permiso`,
+    `recetas-ui/recipe-page`.
+  - **No baseline**: `tests/integration/identity/identity-seed.int.test.ts`, dos casos (QC-142 R13 y
+    QC-201 R3/R4 de la doble corrida): la base de test sale de las migraciones, que aún no traen el
+    rol ni el permiso (T4), así que el seed los crea de más. Se espera que se vuelva verde con T4;
+    a verificar en T4/T12.
+- `./init.sh --rapido`: corta en el paso de `feature_list.json` («falta QC-216»): la copia del
+  worktree no tiene la ficha; es archivo del leader y no se toca. Typecheck, lint, `test:rapido` y
+  guardias se corrieron a mano (arriba).

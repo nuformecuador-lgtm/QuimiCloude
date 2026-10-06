@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  ROLE_ACONDICIONAMIENTO,
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_MAESTRO,
@@ -141,12 +142,13 @@ describe('R2 — el rol Maestro nace en SEED_ROLES, los otros tres quedan intact
     );
   });
 
-  it('R2: el Maestro va al final y los tres roles de antes conservan su orden', () => {
+  it('R2: el Maestro va detras de los tres roles de antes, que conservan su orden, y solo le sigue el Administrador de acondicionamiento', () => {
     expect(SEED_ROLES.map((rol) => rol.name)).toEqual([
       ROLE_ADMINISTRADOR,
       ROLE_OPERADOR,
       ROLE_EMPACADOR,
       ROLE_MAESTRO,
+      ROLE_ACONDICIONAMIENTO,
     ]);
   });
 });
