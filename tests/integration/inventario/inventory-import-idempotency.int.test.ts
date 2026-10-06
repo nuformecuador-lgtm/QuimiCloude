@@ -6,6 +6,8 @@
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { inventario } from '@/lib/composition';
+import { UnauthorizedError } from '@/lib/modules/inventario/domain/errors';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { borrarEmpresa, sembrarEmpresa, sembrarUnidad, token } from './inventory-import-fixture';
@@ -87,5 +89,31 @@ describe('idempotencia y registro de la importacion', () => {
     expect(registro.fileSha256).toMatch(/^[0-9a-f]{64}$/u);
     expect(registro.createdAt.toISOString()).toBe(result.importedAt);
     expect(registro.finishedAt).not.toBeNull();
+  });
+
+  it('R1 R31 la composicion real ata vista previa y confirmacion: previsualiza sin escribir, confirma una vez y responde ya hecha a la misma clave', async () => {
+    const { empresa, archivo } = await escenario();
+    const importKey = crypto.randomUUID();
+
+    const vista = await inventario.previewInventoryImport(archivo, actorOf(empresa));
+    expect(vista.kind).toBe('preview');
+    expect(await prisma.productBatch.count({ where: { companyId: empresa.companyId } })).toBe(0);
+
+    const primera = (await inventario.confirmInventoryImport({ ...archivo, importKey }, actorOf(empresa))) as InventoryImportResult;
+    expect(primera.rows.map((row) => row.status)).toEqual(['created', 'created', 'error']);
+    expect(await prisma.productBatch.count({ where: { companyId: empresa.companyId } })).toBe(2);
+
+    const segunda = await inventario.confirmInventoryImport({ ...archivo, importKey }, actorOf(empresa));
+    expect(segunda).toEqual({ kind: 'already_imported', importId: primera.importId, importedAt: primera.importedAt });
+  });
+
+  it('R1 la composicion real rechaza sin inventario.modificar', async () => {
+    const { empresa, archivo } = await escenario();
+    const sinPermiso = { ...actorOf(empresa), permissions: [] };
+
+    await expect(inventario.previewInventoryImport(archivo, sinPermiso)).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(
+      inventario.confirmInventoryImport({ ...archivo, importKey: crypto.randomUUID() }, sinPermiso),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 });
