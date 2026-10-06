@@ -10,6 +10,7 @@ import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, errorMessage, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   InventarioError,
+  requirePermission,
   type Actor,
   type InventoryImportConfirmOutcome,
   type InventoryImportPreviewOutcome,
@@ -51,6 +52,7 @@ async function currentActor(): Promise<Actor | null> {
   };
 }
 
+// El caso de uso vuelve a exigir el permiso; aqui se adelanta para no leer el archivo de quien no lo tiene.
 async function readFile(file: File): Promise<{ fileName: string; bytes: Uint8Array }> {
   return { fileName: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
 }
@@ -62,6 +64,7 @@ export async function previewInventoryImportAction(formData: FormData): Promise<
   const actor = await currentActor();
 
   try {
+    requirePermission(actor, 'inventario.modificar');
     const data = await inventario.previewInventoryImport(await readFile(parsed.data.file), actor);
     return { status: 'success', data };
   } catch (error) {
@@ -79,6 +82,7 @@ export async function confirmInventoryImportAction(formData: FormData): Promise<
   const actor = await currentActor();
 
   try {
+    requirePermission(actor, 'inventario.modificar');
     const file = await readFile(parsed.data.file);
     const data = await inventario.confirmInventoryImport({ ...file, importKey: parsed.data.importKey }, actor);
     if (data.kind === 'imported') revalidatePath(INVENTORY_ROUTE);

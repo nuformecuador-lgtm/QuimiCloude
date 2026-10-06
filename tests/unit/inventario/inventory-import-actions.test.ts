@@ -161,13 +161,29 @@ describe('previewInventoryImportAction', () => {
     await expect(previewInventoryImportAction(form({ file: xlsx() }))).resolves.toEqual({ status: 'success', data: rejected });
   });
 
-  it('R1 sin sesion el caso de uso recibe actor null y su rechazo sale como unauthorized', async () => {
+  it('R1 sin sesion sale unauthorized sin llegar al caso de uso', async () => {
     getSessionUserMock.mockResolvedValue(null);
     getSessionContextMock.mockResolvedValue(null);
+
+    await expect(previewInventoryImportAction(form({ file: xlsx() }))).resolves.toEqual(UNAUTHORIZED);
+    expect(previewMock).not.toHaveBeenCalled();
+  });
+
+  it('R1 sin permiso la vista previa no lee los bytes del archivo', async () => {
+    getSessionUserMock.mockResolvedValue({ ...SESSION_USER, permissions: ['inventario.consultar'] });
+    const file = xlsx();
+    const arrayBuffer = vi.spyOn(file, 'arrayBuffer');
+
+    await expect(previewInventoryImportAction(form({ file }))).resolves.toEqual(UNAUTHORIZED);
+    expect(arrayBuffer).toHaveBeenCalledTimes(0);
+    expect(previewMock).not.toHaveBeenCalled();
+  });
+
+  it('R1 el caso de uso conserva su propio rechazo por permiso', async () => {
     previewMock.mockRejectedValue(new UnauthorizedError());
 
     await expect(previewInventoryImportAction(form({ file: xlsx() }))).resolves.toEqual(UNAUTHORIZED);
-    expect(previewMock.mock.calls[0]![1]).toBeNull();
+    expect(previewMock).toHaveBeenCalledTimes(1);
   });
 
   it('R32 un fallo ajeno sale como unexpected con la referencia de la peticion', async () => {
@@ -270,10 +286,35 @@ describe('confirmInventoryImportAction', () => {
 
   it('R1 sin inventario.modificar sale unauthorized y no revalida', async () => {
     getSessionUserMock.mockResolvedValue({ ...SESSION_USER, permissions: [] });
+
+    await expect(confirmInventoryImportAction(form({ file: xlsx(), importKey: IMPORT_KEY }))).resolves.toEqual(UNAUTHORIZED);
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('R1 sin permiso la confirmacion no lee los bytes del archivo', async () => {
+    getSessionUserMock.mockResolvedValue({ ...SESSION_USER, permissions: ['inventario.consultar'] });
+    const file = xlsx();
+    const arrayBuffer = vi.spyOn(file, 'arrayBuffer');
+
+    await expect(confirmInventoryImportAction(form({ file, importKey: IMPORT_KEY }))).resolves.toEqual(UNAUTHORIZED);
+    expect(arrayBuffer).toHaveBeenCalledTimes(0);
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it('R1 sin sesion la confirmacion sale unauthorized sin llegar al caso de uso', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    getSessionContextMock.mockResolvedValue(null);
+
+    await expect(confirmInventoryImportAction(form({ file: xlsx(), importKey: IMPORT_KEY }))).resolves.toEqual(UNAUTHORIZED);
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  it('R1 la confirmacion conserva el rechazo por permiso del caso de uso', async () => {
     confirmMock.mockRejectedValue(new UnauthorizedError());
 
     await expect(confirmInventoryImportAction(form({ file: xlsx(), importKey: IMPORT_KEY }))).resolves.toEqual(UNAUTHORIZED);
-    expect(confirmMock.mock.calls[0]![1]).toEqual({ ...ACTOR, permissions: [] });
+    expect(confirmMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
