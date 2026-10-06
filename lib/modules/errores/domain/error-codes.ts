@@ -65,6 +65,10 @@ export const ERROR_CODES = [
   'work_group_member_exists_inactive',
   'work_group_member_exists_blocked',
   'work_group_member_not_found',
+  // Distinto de los `work_group_member_exists_*`: la persona no pertenece y no puede entrar.
+  'work_group_member_not_active',
+  // Distinto de `self_operation`: el texto nombra el grupo, y esa regla es de grupos.
+  'work_group_member_self',
   'order_delivered_frozen',
   'order_cancelled_not_assignable',
   'order_assignment_not_found',

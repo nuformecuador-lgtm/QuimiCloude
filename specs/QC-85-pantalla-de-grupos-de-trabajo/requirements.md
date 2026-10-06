@@ -204,6 +204,19 @@ escribirlos a mano y NO DEBE construir una consulta propia a base de datos. CUAN
 a una persona, el sistema DEBE invocar la operación de **meter a una persona** con ese grupo y esa
 persona, **de a una**, y NO DEBE enviar nunca un conjunto completo de miembros.
 
+> **Enmienda 2026-10-05 (decidido por el humano: el buscador solo ofrece personas activas).** Los
+> candidatos de R28 salen ahora de `listWorkGroupCandidatesAction`, la consulta de candidatos de
+> grupo que publica `identity`: solo devuelve personas con estado efectivo activo y excluye al
+> actor. Sigue buscando en el servidor, paginada, y la pantalla no filtra nada por su cuenta. Queda
+> enmendada también la entrada «Consulta de personas» del glosario, que fijaba `listUsersAction`:
+> para R28 la consulta es `listWorkGroupCandidatesAction`; `listUsersAction` sigue siendo la de la
+> pestaña de personas. Tests: en `tests/unit/configuracion-ui/grupos/work-group-form.test.tsx`,
+> «consulta la accion de candidatos de grupo, no el listado de usuarios, y pinta lo que devuelve»
+> y «si al crear el grupo una pendiente ya no esta activa, el aviso trae el motivo del catalogo»;
+> en `tests/unit/configuracion-ui/grupos/work-group-members.test.tsx`, «aparece aunque no se
+> escriba nada en el buscador: trae la primera pagina de candidatos» y «busca en el servidor sobre
+> el conjunto entero, con rebote».
+
 **R29** — SI meter a una persona se rechaza, ENTONCES el sistema DEBE distinguir el caso por su
 **código estable** y nunca por el texto del mensaje, DEBE presentar el error dentro del panel y DEBE
 mantenerlo abierto; y DEBE distinguir, **como cuatro casos separados**, «ya pertenece y se ve»,
@@ -325,6 +338,14 @@ Dos. **Ninguna bloquea la implementación**: las dos tienen una respuesta por de
    persona para que ese resultado no sorprenda? Por defecto: **no** se muestra —R25 y R31 mantienen
    la lista tal cual la devuelve el módulo, y R30 impide afirmar lo contrario—, y se revisa si
    molesta en uso.
+
+> **Enmienda 2026-10-05 (decidido por el humano): las dos preguntas quedan resueltas.**
+> 1. El actor no puede meterse a sí mismo en un grupo: el buscador no lo ofrece y, si se intenta
+>    por otra vía, el servidor lo rechaza con `work_group_member_self`. No hace falta otra vía.
+> 2. Una persona no activa no entra en el grupo: el buscador solo ofrece personas activas (ver la
+>    enmienda de R28) y el servidor rechaza a cualquier otra con `work_group_member_not_active`, sin
+>    crear fila. Ya no hay persona que entre y no aparezca, así que no hace falta mostrar el estado
+>    de cuenta en el buscador.
 
 ## Decisiones cerradas (no reabrir)
 

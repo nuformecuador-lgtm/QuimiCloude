@@ -500,7 +500,7 @@ const ADAPTADORES_DRIVING = [
   '@/lib/modules/identity/adapters/driving/user-actions',
 ] as const;
 
-/** Las siete operaciones de grupos de QC-84 mas la consulta de personas de QC-66 (R36). */
+/** Las operaciones de QC-84 que consume la pantalla, mas la consulta de personas de QC-66. */
 const OPERACIONES_CONSUMIDAS = [
   'createWorkGroupAction',
   'renameWorkGroupAction',
@@ -509,6 +509,7 @@ const OPERACIONES_CONSUMIDAS = [
   'removeWorkGroupMemberAction',
   'listWorkGroupsAction',
   'listWorkGroupMembersAction',
+  'listWorkGroupCandidatesAction',
   'listUsersAction',
 ] as const;
 
@@ -561,7 +562,7 @@ describe('toda escritura y toda lectura pasan por operaciones YA publicadas (R36
     // ruidosamente, no pasa en verde; dentro de ella mide exactamente lo mismo que antes.
     baseDeEstaRama(ctx);
 
-    // Se miran DOS cosas: que ninguna de las ocho operaciones entre por otra puerta, y que el
+    // Se miran DOS cosas: que ninguna de las operaciones entre por otra puerta, y que el
     // barrel publico del modulo no aporte NINGUN simbolo terminado en `Action`. Lo segundo es lo
     // que cierra la puerta al `import { listWorkGroupsAction } from '@/lib/modules/identity'` que
     // R36 prohibe. `AlertDialogAction` —el boton de confirmar del primitivo— tambien acaba en
@@ -578,7 +579,7 @@ describe('toda escritura y toda lectura pasan por operaciones YA publicadas (R36
     ).toEqual([]);
   });
 
-  it('y las ocho operaciones consumidas SE importan de verdad: el detector no mira al vacio', (ctx) => {
+  it('y las operaciones consumidas SE importan de verdad: el detector no mira al vacio', (ctx) => {
     // Este caso mide el DIFF, aunque no lo parezca: `archivosDeLaPantalla()` deriva su lista de lo
     // que la rama APORTA bajo la carpeta de la pantalla. Fuera de la rama de QC-85 esa lista esta
     // vacia —sobre `dev` sus archivos ya no los aporta nadie— y el caso no tiene nada que escanear.

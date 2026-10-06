@@ -30,12 +30,12 @@ import {
   normalizeWorkGroupName,
   renameWorkGroupSchema,
   type Page,
-  type UserRow,
+  type WorkGroupCandidateRow,
 } from '@/lib/modules/identity';
-import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
 import {
   addWorkGroupMemberAction,
   createWorkGroupAction,
+  listWorkGroupCandidatesAction,
   renameWorkGroupAction,
   type CreateWorkGroupFormState,
   type WorkGroupMutationFormState,
@@ -103,8 +103,8 @@ import {
  * reutilicen sin crear un ciclo de imports: `work-group-members.tsx` ya importa `WORK_GROUP_ID_FIELD`
  * de aqui, asi que si este archivo necesitara algo de vuelta de alla, los dos se importarian
  * mutuamente. Es autosuficiente —trae su propio `DataTableParams` local y su propio termino de
- * busqueda— y, a diferencia del buscador antiguo, **consulta `listUsersAction` SIEMPRE**: con el
- * termino vacio trae la primera pagina de TODAS las personas, no solo cuando hay busqueda. Quien lo
+ * busqueda— y **consulta `listWorkGroupCandidatesAction` SIEMPRE**: con el termino vacio trae la
+ * primera pagina de las personas activas, no solo cuando hay busqueda. Quien lo
  * monta decide que hacer con la persona elegida —anadirla de inmediato (`work-group-members.tsx`,
  * edicion) o guardarla en una lista pendiente (este archivo, alta)—; el picker solo entrega el
  * candidato ENTERO por `onAdd`, nunca solo su identificador, porque la lista de pendientes del alta
@@ -265,7 +265,7 @@ function pendingMembersFailureMessage(fallidas: number): string {
 async function submit(
   workGroupId: string | undefined,
   formData: FormData,
-  pendingMembers: readonly UserRow[],
+  pendingMembers: readonly WorkGroupCandidateRow[],
 ): Promise<{ status: 'success' } | ErrorState> {
   if (workGroupId === undefined) {
     const idle: CreateWorkGroupFormState = { status: 'idle' };
@@ -276,16 +276,26 @@ async function submit(
     if (result.status === 'idle') return { status: 'success' };
 
     let fallidas = 0;
+    // Sin el motivo, el aviso no deja distinguir, p. ej., a quien dejo de estar activo entre
+    // elegirlo y crear el grupo.
+    const motivos = new Set<string>();
     for (const member of pendingMembers) {
       const memberData = new FormData();
       memberData.set(WORK_GROUP_ID_FIELD, result.id);
       memberData.set(WORK_GROUP_MEMBER_ID_FIELD, member.id);
       const idleMember: WorkGroupMutationFormState = { status: 'idle' };
       const memberResult = await addWorkGroupMemberAction(idleMember, memberData);
-      if (memberResult.status === 'error') fallidas += 1;
+      if (memberResult.status === 'error') {
+        fallidas += 1;
+        motivos.add(memberResult.message);
+      }
     }
 
-    if (fallidas > 0) toast.error(pendingMembersFailureMessage(fallidas));
+    if (fallidas > 0) {
+      toast.error(pendingMembersFailureMessage(fallidas), {
+        description: [...motivos].join(' '),
+      });
+    }
 
     return { status: 'success' };
   }
@@ -325,7 +335,7 @@ export function WorkGroupForm({ group, onSaved, children }: WorkGroupFormProps) 
   /** Hasta que no se escribe, no se rine: el campo del alta nace vacio a proposito. */
   const [touched, setTouched] = useState(false);
   /** SOLO tiene efecto en el alta: en la edicion no se pinta nada con este estado (ver mas abajo). */
-  const [pendingMembers, setPendingMembers] = useState<readonly UserRow[]>([]);
+  const [pendingMembers, setPendingMembers] = useState<readonly WorkGroupCandidateRow[]>([]);
 
   async function save(
     _previous: WorkGroupFormState,
@@ -517,7 +527,7 @@ function PendingMembersList({
   members,
   onRemove,
 }: {
-  readonly members: readonly UserRow[];
+  readonly members: readonly WorkGroupCandidateRow[];
   readonly onRemove: (id: string) => void;
 }) {
   if (members.length === 0) return null;
@@ -553,7 +563,7 @@ function PendingMembersList({
 type CandidatesState =
   | { status: 'loading' }
   | { status: 'error'; key: string; error: ErrorState }
-  | { status: 'ready'; key: string; data: Page<UserRow> };
+  | { status: 'ready'; key: string; data: Page<WorkGroupCandidateRow> };
 
 export type WorkGroupMemberPickerProps = {
   readonly busy: boolean;
@@ -562,7 +572,7 @@ export type WorkGroupMemberPickerProps = {
   readonly selectedIds: readonly string[];
   /** Entrega el CANDIDATO ENTERO, no solo el id: el alta necesita `displayName` para su lista
    *  de pendientes antes de que el grupo exista (no hay a quien preguntarle el nombre despues). */
-  readonly onAdd: (candidate: UserRow) => void;
+  readonly onAdd: (candidate: WorkGroupCandidateRow) => void;
 };
 
 /**
@@ -576,8 +586,9 @@ export type WorkGroupMemberPickerProps = {
  * region de error de siempre (R29): `status` es SIEMPRE `'idle'` y la tabla solo se monta cuando
  * la consulta ya resolvio en `'ready'`.
  *
- * **Consulta `listUsersAction` SIEMPRE**, con `search: params.search` —cadena vacia si no se ha
- * escrito nada—: con el termino vacio trae la primera pagina de TODAS las personas. `DataTable` ya
+ * **Consulta `listWorkGroupCandidatesAction` SIEMPRE**, con `search: params.search` —cadena vacia
+ * si no se ha escrito nada—: solo devuelve personas con la cuenta activa, porque el servidor
+ * rechaza meter en un grupo a cualquier otra. `DataTable` ya
  * reboza su propio buscador (`SEARCH_DEBOUNCE_MS`) antes de llamar a `onParamsChange`, asi que este
  * archivo no reboza una segunda vez. Mismo patron de «la respuesta solo vale si es la de la clave
  * vigente» que usa el resto del modulo para que una respuesta tardia de otra pagina o de otro
@@ -593,15 +604,17 @@ export function WorkGroupMemberPicker({ busy, selectedIds, onAdd }: WorkGroupMem
   useEffect(() => {
     let cancelled = false;
 
-    // La consulta de personas de QC-66, tal cual la publica el modulo (R28).
-    void listUsersAction({ page, pageSize, sort: null, filters: {}, search }).then((result) => {
-      if (cancelled) return;
-      setCandidates(
-        result.status === 'error'
-          ? { status: 'error', key, error: result }
-          : { status: 'ready', key, data: result.data },
-      );
-    });
+    // Solo personas activas: el servidor rechaza meter a cualquier otra en un grupo.
+    void listWorkGroupCandidatesAction({ page, pageSize, sort: null, filters: {}, search }).then(
+      (result) => {
+        if (cancelled) return;
+        setCandidates(
+          result.status === 'error'
+            ? { status: 'error', key, error: result }
+            : { status: 'ready', key, data: result.data },
+        );
+      },
+    );
 
     return () => {
       cancelled = true;
@@ -612,7 +625,7 @@ export function WorkGroupMemberPicker({ busy, selectedIds, onAdd }: WorkGroupMem
   const shown: CandidatesState =
     candidates.status !== 'loading' && candidates.key === key ? candidates : { status: 'loading' };
 
-  const columns = useMemo<readonly DataTableColumn<UserRow>[]>(
+  const columns = useMemo<readonly DataTableColumn<WorkGroupCandidateRow>[]>(
     () => [
       {
         id: 'displayName',

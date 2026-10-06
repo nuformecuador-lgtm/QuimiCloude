@@ -204,6 +204,19 @@ reabrirla.
 de cuenta de esa persona** —`pending`, `active`, `inactive` o `blocked`—, y la pertenencia NO DEBE
 depender de ese estado.
 
+> **Enmienda 2026-10-05 (decidido por el humano: solo entran personas con estado efectivo activo).**
+> R28 queda sustituido en su efecto: meter en un grupo a una persona cuyo estado **efectivo**
+> (`effectiveAccountStatus` en el instante de la llamada) no es activo se rechaza con
+> `work_group_member_not_active` y NO se crea ninguna fila. Cuenta como no activa la `pending`, la
+> `inactive`, la `blocked` sin plazo y la que tiene un plazo de bloqueo vigente aunque la columna diga
+> `active`; la `blocked` con el plazo ya vencido SÍ entra. Si la persona ya pertenecía, siguen
+> respondiendo los códigos de R30/R31. El buscador de candidatos ofrece solo personas efectivamente
+> activas (`listWorkGroupCandidatesAction`). El texto original de R28 se conserva arriba como registro.
+>
+> **Enmienda 2026-10-05 (decidido por el humano: nadie puede meterse a sí mismo en un grupo).** Si
+> el `userId` es el del propio actor, la operación se rechaza con `work_group_member_self` después del
+> permiso y de la validación y antes de tocar la base. El buscador de candidatos tampoco ofrece al actor.
+
 **R29.** SI la persona indicada no existe, está **dada de baja** o es de **otra empresa**, ENTONCES el
 sistema DEBE responder «persona no encontrada» —tratándola como inexistente— y NO DEBE crear ninguna
 fila ni revelar que existe.
@@ -384,6 +397,8 @@ miembros cuya cuenta no está activa? Esta ficha decide qué se **muestra**; a q
 | 2026-09-11 | ¿Dónde se comprueba el permiso? | **En el service, primera línea de cada operación, fallando cerrado**, con el actor por parámetro y la sesión desde `identity.getSessionUser()`. `consultar` para leer, `modificar` para escribir, **sin implicación entre ellos**. La RLS no cuenta como frontera. Heredado de **QC-66 dec. 15** y **QC-74** |
 | 2026-09-11 | Al pedir los miembros de «Turno noche», ¿quién sale? | **Solo las cuentas con estado `active`** (y no dadas de baja). **Dos precios, escritos a propósito**: (a) una persona recién dada de alta nace **`pending`** (QC-66 dec. 7) y **no aparecerá en sus grupos** hasta que entre y cambie la contraseña; (b) una cuenta bloqueada por intentos fallidos **desaparece del grupo y vuelve sola** al desbloquearse. La pertenencia **no se toca** en ninguno de los dos casos: esto es un filtro de **lectura**, que es exactamente el encargo que **QC-83 dec. 2** dejó a esta ficha |
 | 2026-09-11 | ¿A quién se puede meter en un grupo? | **A cualquier persona viva de la empresa, sea cual sea su estado de cuenta.** La pertenencia no depende del estado (**QC-83 dec. 2**). A una persona **dada de baja no se la puede meter**: las operaciones la tratan como inexistente (**QC-66 dec. 5**) |
+| 2026-10-05 | **Enmienda de la decisión anterior** («¿A quién se puede meter en un grupo?») | **Decidido por el humano: solo entran personas con estado efectivo activo.** Quien tenga estado efectivo `pending`, `inactive` o `blocked` (incluido el bloqueo con plazo vigente y columna `active`) se rechaza con `work_group_member_not_active` sin crear fila; la bloqueada con plazo vencido entra. El buscador de candidatos solo ofrece activas. La fila de 2026-09-11 se conserva como registro; manda esta |
+| 2026-10-05 | ¿Puede alguien meterse a sí mismo en un grupo? | **Decidido por el humano: nadie puede meterse a sí mismo en un grupo.** Se rechaza con `work_group_member_self`, y el buscador de candidatos no ofrece al propio actor |
 | 2026-09-11 | Si alguien intenta meter a una persona que ya está dentro pero el filtro oculta, ¿qué pasa? | **Se rechaza con un error que dice que ya pertenece Y por qué no se ve** («ya pertenece a Turno noche; su cuenta está bloqueada»). Sin eso, el operador lee «ya existe» sobre una lista donde esa persona no aparece y no tiene forma de entenderlo. **Es el caso que esta ficha tiene que cubrir con test** |
 | 2026-09-11 | ¿Meter y sacar personas es parte de editar el grupo? | **No: son operaciones propias, de a una**, independientes de cambiar el nombre. Dos encargados pueden trabajar a la vez sin pisarse y el error dice **quién** falló. Se descartó mandar el conjunto completo al editar: si dos personas editan a la vez, la segunda **borra en silencio** lo que hizo la primera |
 | 2026-09-11 | Al sacar a alguien de un grupo, ¿qué se borra? | **Solo la fila de pertenencia, y de verdad** (excepción al borrado lógico, **QC-83 dec. 4**). **No borra ni desactiva a la persona**: sigue siendo usuario y sigue en sus otros grupos |

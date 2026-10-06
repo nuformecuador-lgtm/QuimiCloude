@@ -72,3 +72,13 @@ export const WORK_GROUP_MEMBER_QUERYABLE: ListQueryable = {
   filterable: {},
   searchable: false,
 };
+
+/**
+ * Los candidatos a grupo. Orden fijo (apellidos, nombres, id) y sin filtros: el estado efectivo lo
+ * aplica siempre el caso de uso, no quien llama. Solo se busca.
+ */
+export const WORK_GROUP_CANDIDATE_QUERYABLE: ListQueryable = {
+  sortable: [],
+  filterable: {},
+  searchable: true,
+};

@@ -23,9 +23,9 @@ import {
   WorkGroupSheet,
 } from '@/app/(private)/configuracion/usuarios/components';
 import type { WorkGroupRow } from '@/lib/modules/identity';
-import type { UserListResult } from '@/lib/modules/identity/adapters/driving/user-actions';
 import type {
   CreateWorkGroupFormState,
+  WorkGroupCandidateListResult,
   WorkGroupMemberListResult,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { setupUser } from '../../../helpers/user-event';
@@ -34,7 +34,7 @@ const {
   routerMock,
   createWorkGroupActionMock,
   listWorkGroupMembersActionMock,
-  listUsersActionMock,
+  listWorkGroupCandidatesActionMock,
 } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -48,7 +48,8 @@ const {
     vi.fn<(prev: CreateWorkGroupFormState, data: FormData) => Promise<CreateWorkGroupFormState>>(),
   listWorkGroupMembersActionMock:
     vi.fn<(workGroupId: string, query: unknown) => Promise<WorkGroupMemberListResult>>(),
-  listUsersActionMock: vi.fn<(query: unknown) => Promise<UserListResult>>(),
+  listWorkGroupCandidatesActionMock:
+    vi.fn<(query: unknown) => Promise<WorkGroupCandidateListResult>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -68,6 +69,9 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
     removeWorkGroupMemberAction: vi.fn(noDebeInvocarse('removeWorkGroupMemberAction')),
     listWorkGroupsAction: vi.fn(noDebeInvocarse('listWorkGroupsAction')),
     listWorkGroupMembersAction: listWorkGroupMembersActionMock,
+    // El ALTA monta el picker de miembros iniciales (`WorkGroupMemberPicker`), que SI consulta
+    // esta action siempre (QC-85 ampliacion).
+    listWorkGroupCandidatesAction: listWorkGroupCandidatesActionMock,
   };
 });
 
@@ -76,9 +80,7 @@ vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => {
     throw new Error(`${nombre} no debe invocarse al abrir el panel`);
   };
   return {
-    // El ALTA monta el picker de miembros iniciales (`WorkGroupMemberPicker`), que SI consulta
-    // esta action siempre (QC-85 ampliacion); las otras cinco siguen sin tener nada que hacer aqui.
-    listUsersAction: listUsersActionMock,
+    listUsersAction: vi.fn(noDebeInvocarse('listUsersAction')),
     getUserAction: vi.fn(noDebeInvocarse('getUserAction')),
     createUserAction: vi.fn(noDebeInvocarse('createUserAction')),
     updateUserAction: vi.fn(noDebeInvocarse('updateUserAction')),
@@ -150,7 +152,7 @@ beforeEach(() => {
     status: 'success',
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
   });
-  listUsersActionMock.mockResolvedValue({
+  listWorkGroupCandidatesActionMock.mockResolvedValue({
     status: 'success',
     data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
   });

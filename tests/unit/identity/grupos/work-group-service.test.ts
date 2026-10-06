@@ -577,7 +577,7 @@ describe('QC-84 T12 — los siete casos de uso contra dobles del puerto', () => 
   });
 
   describe('meter a una persona (R28, R29, R30, R32, R33)', () => {
-    it('R28 — la pertenencia se crea sin consultar el estado de cuenta: UNA sola llamada al puerto', async () => {
+    it('R28 (enmienda 2026-10-05) — UNA sola llamada al puerto, con el predicado de admision', async () => {
       const d = dobles({ addMemberAliveInCompany: { kind: 'created' } });
 
       await expect(
@@ -593,6 +593,7 @@ describe('QC-84 T12 — los siete casos de uso contra dobles del puerto', () => 
         GROUP_ID,
         USER_ID,
         NOW,
+        expect.any(Function),
       );
 
       // Y no hay ninguna lectura previa de los miembros para «ver si esta»: la garantia es la

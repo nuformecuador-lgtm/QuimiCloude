@@ -330,6 +330,7 @@ import {
   createAddWorkGroupMember,
   createCreateWorkGroup,
   createDeleteWorkGroup,
+  createListWorkGroupCandidates,
   createListWorkGroupMembers,
   createListWorkGroups,
   createRemoveWorkGroupMember,
@@ -344,6 +345,8 @@ import {
   renameAliveInCompany,
   softDeleteAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/work-group-prisma';
+import { listCandidatesAliveInCompany } from '@/lib/modules/identity/adapters/driven/persistence/work-group-candidates-prisma';
+import type { WorkGroupCandidateReader } from '@/lib/modules/identity/ports/work-group-candidate-reader';
 import type { PaginationPolicy } from '@/lib/modules/identity';
 import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-group-repository';
 // QC-87 T11 (`design.md > 2.3`) — asignar responsables a un pedido. Las CUATRO factories salen del
@@ -657,6 +660,8 @@ const workGroupRepository: WorkGroupRepository = {
  */
 const workGroupMemberPagination: PaginationPolicy = { toOffsetLimit, buildPage };
 
+const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAliveInCompany };
+
 /** Fachada del modulo `identity` ya cableada. Es lo que consumen acciones, rutas y layouts. */
 export const identity = {
   // La clave conserva nombre y firma: por eso `login-action.ts` no cambia (R16).
@@ -754,6 +759,11 @@ export const identity = {
   // no tiene reloj propio ni puede importar `lib/shared/**`.
   listWorkGroupMembers: createListWorkGroupMembers({
     workGroups: workGroupRepository,
+    pagination: workGroupMemberPagination,
+    log: identityListQueryLog,
+  }),
+  listWorkGroupCandidates: createListWorkGroupCandidates({
+    candidates: workGroupCandidateReader,
     pagination: workGroupMemberPagination,
     log: identityListQueryLog,
   }),
