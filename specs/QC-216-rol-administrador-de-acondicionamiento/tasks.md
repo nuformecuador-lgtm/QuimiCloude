@@ -76,7 +76,7 @@ producción salvo que QC-215 toque `permissions.ts`; si lo hace, que mergee desp
 
 ## T4–T6 — La migración
 
-- [ ] **T4.** `pnpm run db:migrate:create` con nombre `conditioning_role`; `migration.sql` con las
+- [x] **T4.** `pnpm run db:migrate:create` con nombre `conditioning_role`; `migration.sql` con las
       tres sentencias de `design.md > 3.1` y cabecera (solo datos, por qué no nombra a ningún otro
       rol, idempotencia, literales duplicados). Si Prisma genera DDL por drift, borrarlo y decirlo
       en la cabecera.
@@ -84,12 +84,12 @@ producción salvo que QC-215 toque `permissions.ts`; si lo hace, que mergee desp
       `'Operador'`, `'Empacador'`, `'Maestro'` en líneas ejecutables, y `pnpm run db:migrate` la
       aplica sobre la base local. Depende de: T2.
 
-- [ ] **T5.** `down.sql` con los cuatro `DELETE` de `design.md > 3.2`, en ese orden, con cabecera.
+- [x] **T5.** `down.sql` con los cuatro `DELETE` de `design.md > 3.2`, en ese orden, con cabecera.
       **Hecho cuando:** `pnpm run db:rollback` (sin usuarios con el rol) devuelve la base al estado
       previo, `pnpm run db:migrate` la reaplica y un segundo `pnpm run db:seed` no crea nada.
       Depende de: T4.
 
-- [ ] **T6. [P]** `tests/unit/identity/schema/conditioning-role-migration.test.ts` (plantilla
+- [x] **T6. [P]** `tests/unit/identity/schema/conditioning-role-migration.test.ts` (plantilla
       `packer-role-migration.test.ts`), contenido de `design.md > 6`, con casos de sensibilidad.
       **Hecho cuando:** verde, y cada caso de sensibilidad falla si se revierte su mutación. Cubre
       R7, R21, R22, R24, R25 (estático). Depende de: T5.
@@ -121,19 +121,19 @@ producción salvo que QC-215 toque `permissions.ts`; si lo hace, que mergee desp
 
 ## T11–T14 — Integración (base real)
 
-- [ ] **T11. [P]** `tests/integration/identity/conditioning-role-migration.int.test.ts` (plantilla
+- [x] **T11. [P]** `tests/integration/identity/conditioning-role-migration.int.test.ts` (plantilla
       `packer-role-migration.int.test.ts`): R21, R22, R25 con el SQL leído de los archivos.
       **Hecho cuando:** verde contra Postgres local. Depende de: T5.
 
-- [ ] **T12. [P]** `identity-seed.int.test.ts`: R23 y R26 con el rol nuevo nombrado; el bucle de
+- [x] **T12. [P]** `identity-seed.int.test.ts`: R23 y R26 con el rol nuevo nombrado; el bucle de
       roles sin `empresas.*` incluye el rol; R3 (una sola fila).
       **Hecho cuando:** verde. Depende de: T2.
 
-- [ ] **T13. [P]** `role-catalog.int.test.ts` (R18) y `user-crud.int.test.ts` (R19, R3: dos
+- [x] **T13. [P]** `role-catalog.int.test.ts` (R18) y `user-crud.int.test.ts` (R19, R3: dos
       empresas distintas con el rol).
       **Hecho cuando:** verde. Depende de: T2.
 
-- [ ] **T14. [P]** `session-user.int.test.ts`: R20 (sesión con exactamente los dos permisos).
+- [x] **T14. [P]** `session-user.int.test.ts`: R20 (sesión con exactamente los dos permisos).
       **Hecho cuando:** verde. Depende de: T2.
 
 ## T15 — Cierre
