@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BatchHistory, movementKindLabel, movementReasonLabel } from '@/app/(private)/inventario/components';
 import type { BatchHistoryEntry } from '@/lib/modules/inventario';
+import {
+  ADJUSTMENT_WITH_COUNT,
+  LEGACY_ADJUSTMENT,
+  historyEntry,
+} from '../../fixtures/adjust-batch-stock';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 /**
@@ -205,6 +210,87 @@ describe('BatchHistory', () => {
     for (const etiqueta of etiquetas) {
       expect(etiqueta.length).toBeGreaterThan(0);
     }
+  });
+
+  it('R26 — un ajuste con existencia anterior y total contado guardados los muestra junto a la cantidad', async () => {
+    listBatchMovementsActionMock.mockResolvedValue({
+      status: 'success',
+      data: [historyEntry({ id: 'conteo-1', quantity: '-2.5000', previousStock: '12.3456', countedStock: '9.8456' })],
+    });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId('batch-history-entry-conteo-1');
+    const anterior = within(fila).getByTestId('batch-history-entry-previous-stock');
+    const contado = within(fila).getByTestId('batch-history-entry-counted-stock');
+
+    expect(anterior).toHaveTextContent('12.35');
+    expect(anterior).toHaveAttribute('title', '12.3456');
+    expect(anterior).toHaveAttribute('aria-label', '12.3456');
+    expect(contado).toHaveTextContent('9.85');
+    expect(contado).toHaveAttribute('title', '9.8456');
+    expect(contado).toHaveAttribute('aria-label', '9.8456');
+    expect(within(fila).getByText('Existencia anterior')).toBeVisible();
+    expect(within(fila).getByText('Total contado')).toBeVisible();
+    expect(within(fila).getByTestId('batch-history-entry-quantity')).toHaveTextContent('-2.5');
+  });
+
+  it('R26 — la fixture de ajuste con conteo pinta sus dos valores sin ceros de relleno', async () => {
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [ADJUSTMENT_WITH_COUNT] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId(`batch-history-entry-${ADJUSTMENT_WITH_COUNT.id}`);
+    const anterior = within(fila).getByTestId('batch-history-entry-previous-stock');
+    const contado = within(fila).getByTestId('batch-history-entry-counted-stock');
+    expect(anterior).toHaveTextContent('10');
+    expect(anterior).not.toHaveAttribute('title');
+    expect(contado).toHaveTextContent('7');
+    expect(contado).not.toHaveAttribute('title');
+  });
+
+  it('R27 — un ajuste sin existencia anterior ni total contado se pinta como antes, sin esos campos ni sustituto', async () => {
+    listBatchMovementsActionMock.mockResolvedValue({
+      status: 'success',
+      data: [ADJUSTMENT_WITH_COUNT, LEGACY_ADJUSTMENT],
+    });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId(`batch-history-entry-${LEGACY_ADJUSTMENT.id}`);
+    expect(within(fila).queryByTestId('batch-history-entry-previous-stock')).toBeNull();
+    expect(within(fila).queryByTestId('batch-history-entry-counted-stock')).toBeNull();
+    expect(within(fila).queryByText('Existencia anterior')).toBeNull();
+    expect(within(fila).queryByText('Total contado')).toBeNull();
+    expect(fila.textContent).toBe(
+      'TipoAjusteCantidad-3MotivoMermaAutorCarla DuarteFecha2026-10-06 08:15',
+    );
+    expect(within(fila).getByTestId('batch-history-entry-quantity')).toHaveAttribute(
+      'aria-label',
+      '-3',
+    );
+  });
+
+  it('R27 — los asientos que no son ajustes tampoco muestran los dos campos', async () => {
+    const alta = historyEntry({ id: 'alta-2', kind: 'opening', quantity: '20.0000', reason: null });
+    const apartado = historyEntry({
+      id: 'apartado-2',
+      kind: 'reserve',
+      quantity: '5.0000',
+      reason: null,
+      orderNumberText: 'PED-0042',
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [apartado, alta] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    await screen.findByTestId('batch-history-list');
+    expect(screen.queryByTestId('batch-history-entry-previous-stock')).toBeNull();
+    expect(screen.queryByTestId('batch-history-entry-counted-stock')).toBeNull();
   });
 
   it('R38 — cada fila lleva el data-testid del id de su propio asiento, sea de libro fisico o de reserva', async () => {

@@ -164,7 +164,7 @@ Archivos:
 texto; el diálogo no importa ninguna lista de motivos propia (usa `reasonsFor`); `./init.sh --rapido`
 en verde.
 
-### F2 [P] — Historial con existencia anterior y total contado
+### [x] F2 [P] — Historial con existencia anterior y total contado
 Depende de: T0. En paralelo con F1 y con el bloque B.
 
 Archivos:
