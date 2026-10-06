@@ -40,7 +40,7 @@ import {
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
-import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
+import { findMassVolumeBridge, findPackageUnitId, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -212,7 +212,8 @@ function asignacionesActorDe(fixture: Fixture): AsignacionesActor {
   };
 }
 
-async function crearFixture(content: string | null = '1.0000'): Promise<Fixture> {
+/** `baseUnitId`: la unidad de la fixture deriva de esa base con factor 1. */
+async function crearFixture(content: string | null = '1.0000', baseUnitId: string | null = null): Promise<Fixture> {
   const marca = token();
   const documentType = await prisma.documentType.create({
     data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
@@ -244,7 +245,12 @@ async function crearFixture(content: string | null = '1.0000'): Promise<Fixture>
     select: { id: true },
   });
   const unit = await prisma.unit.create({
-    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
+    data: {
+      name: `Unidad ${marca}`,
+      nameNormalized: `unidad${marca}`,
+      symbol: `kg${marca}`,
+      ...(baseUnitId === null ? {} : { baseUnitId, factor: '1' }),
+    },
     select: { id: true },
   });
   const presentation = await prisma.presentation.create({
@@ -1217,9 +1223,15 @@ describe('QC-195 — un envase que es tambien ingrediente no se consume dos vece
    * Receta al 50 % materia prima y 50 % el envase de la fixture -como una receta de antes de que
    * el envase dejara de ser ingrediente, escrita directo en la base- y un pedido de 10 en 10
    * envases ya en POR_EMPACAR. El envase tiene un segundo lote para ver que nadie lo toca.
+   * La materia prima se anota en `productIds` nada mas crearse, para que la limpieza la borre
+   * aunque el alta del pedido falle despues.
    */
-  async function sembrar(fixture: Fixture): Promise<{ readonly productId: string; readonly recipeId: string; readonly orderId: string }> {
+  async function sembrar(
+    fixture: Fixture,
+    productIds: string[],
+  ): Promise<{ readonly productId: string; readonly recipeId: string; readonly orderId: string }> {
     const { productId } = await crearProductoConLote(fixture, '100');
+    productIds.push(productId);
     await addBatchToAlive(
       fixture.packagingProductId,
       { presentationId: null, stock: '50', unitCost: '0.7000', lot: null, purchaseDate: '2026-09-02', expiryDate: null, createdBy: fixture.actorId },
@@ -1239,12 +1251,18 @@ describe('QC-195 — un envase que es tambien ingrediente no se consume dos vece
     return { productId, recipeId, orderId: creado.id };
   }
 
+  /** La unidad del pedido deriva de la de envases: la linea del envase se convierte sin aproximar. */
+  async function crearFixtureEnEnvases(): Promise<Fixture> {
+    const packageUnitId = await findPackageUnitId();
+    if (packageUnitId === null) throw new Error('falta la unidad de sistema de envases');
+    return crearFixture('1.0000', packageUnitId);
+  }
+
   it('R43: POR_EMPACAR consume lo apartado del envase como ingrediente; Terminar no consume nada mas de el, no baja su disponible ni otros lotes y deja el pedido ENTREGADO', async () => {
-    const fixture = await crearFixture('1.0000');
+    const fixture = await crearFixtureEnEnvases();
     const productIds: string[] = [];
     try {
-      const { productId, orderId, recipeId } = await sembrar(fixture);
-      productIds.push(productId);
+      const { orderId, recipeId } = await sembrar(fixture, productIds);
       expect(await apartadoNeto(orderId, fixture.packagingProductId)).toBe('0.0000');
       expect(await existenciaDe(fixture.packagingProductId)).toBe('1035.0000');
       const lotesAntes = await lotesDe(fixture.packagingProductId);
@@ -1265,11 +1283,10 @@ describe('QC-195 — un envase que es tambien ingrediente no se consume dos vece
   });
 
   it('R43: si en POR_EMPACAR se edito el reparto y quedo algo apartado del envase, Terminar consume exactamente eso', async () => {
-    const fixture = await crearFixture('1.0000');
+    const fixture = await crearFixtureEnEnvases();
     const productIds: string[] = [];
     try {
-      const { productId, orderId } = await sembrar(fixture);
-      productIds.push(productId);
+      const { orderId } = await sembrar(fixture, productIds);
 
       const editado = await updateDistribution(orderId, actorDe(fixture), {
         unitId: fixture.unitId,
