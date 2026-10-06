@@ -131,7 +131,7 @@
   `R8 la peticion lleva unitId`; `R8 cambiar la unidad pide una cotizacion nueva`;
   `R19 sin unidad no se cotiza y queda el guion`.
   *Hecho:* verde.
-- [ ] **T13 — Marcas y avisos en pantalla.** `order-ingredients-table.tsx` (props `orderUnitId`,
+- [x] **T13 — Marcas y avisos en pantalla.** `order-ingredients-table.tsx` (props `orderUnitId`,
   `bridge`), `order-cost-quote.tsx` (`approximate`), `order-form.tsx` (cálculo de `approximate`,
   bajar `bridge` desde `page.tsx` por `OrderSheet`/`OrderListSection`), `order-execution-lines.tsx`.
   **Copy de la opción a** (Pregunta 2 cerrada): texto «aprox.» y línea bajo el importe. Depende de T3, T4, T11, T12.

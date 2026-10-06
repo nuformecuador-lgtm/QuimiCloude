@@ -1,9 +1,9 @@
-# QC-204 — impl (parcial, PARADO tras Bloque C por conflicto con QC-195 R43)
+# QC-204 — impl (en curso)
 
 ## Estado
-- Cerradas: T1–T8, T10.
-- Abierta: T9. Su código y sus tests están hechos y en verde, pero rompe 2 casos de QC-195 (ver «Bloqueo T9»).
-- Pendientes: T11–T15.
+- Cerradas: T1–T12.
+- En curso: T13. Pendientes: T14, T15.
+- Bloqueo T9: resuelto por el humano con la opción (a) (commit e81db6c7). Se cambió solo el dato de prueba de los casos R43.
 - Bloqueo T4: resuelto por el humano (opción 2; design 4.1 enmendado en 70e32f00).
 
 ## Commits
@@ -20,6 +20,12 @@
 - 06fdfc85 T7 scope transaccional con products/units sobre el mismo tx
 - ea4eecda T8+T9 (un solo commit: los tests de costo y de reserva comparten archivos)
 - 1c201406 T10 cotización con unitId obligatorio
+- 3c19e49f chore: marca T7, T8, T10 (parado por QC-195 R43)
+- e81db6c7 docs: el envase como ingrediente no tiene excepción (decisión humana)
+- d8f066f5 T9 (cierre): R43 de QC-195 en una unidad convertible; la limpieza ya no deja una FK colgada
+- 4e4fd8eb T12 la cotización viaja con unitId y se pide de nuevo al cambiar la unidad
+- e19f9932 T11 la ejecución da la cantidad convertida y el campo need
+- d7e00346 chore: marca T9, T11, T12
 
 ## Archivos
 Creados: lib/modules/unidades/domain/convert-with-approximation.ts, lib/modules/unidades/domain/get-mass-volume-bridge.ts,
@@ -40,6 +46,15 @@ errores: error-codes.ts, error-catalog.ts. lib/composition/index.ts.
 Tests de apoyo: tests/helpers/order-unit-of-work-double.ts, tests/helpers/order-scope-readers.ts (nuevo); dobles de
 scope y de UnitCatalog en unos 40 archivos; fixtures de unidad del insumo derivadas con factor 1 de la del pedido
 (los importes esperados no cambian); catalogo.test.ts pasa de 67 a 68 códigos.
+T9 (cierre): tests/integration/pedidos/finish-with-finished-goods.int.test.ts. crearFixture admite un baseUnitId opcional
+y los casos R43 usan crearFixtureEnEnvases(), con la unidad derivada de «envase» y factor 1. sembrar() registra el
+producto en cuanto lo crea, así la limpieza lo borra aunque el alta falle.
+T11: lib/modules/asignaciones/domain/get-assigned-order-execution.ts y assigned-order-execution-view.ts
+(quantity: string | null, need). Ajuste de tipos en app/(private)/asignacion/[id]/components/order-execution-lines.tsx.
+Fixtures de tests/unit/asignaciones-ui/order-execution-{lines,screen}.test.tsx con need.
+T12: app/(private)/pedidos/components/use-order-cost-quote.ts y order-form.tsx. Tests: tests/unit/pedidos-ui/use-order-cost-quote.test.ts
+(nuevo, con docblock jsdom), order-cost-quote.test.tsx y order-form-quote.test.tsx (unitId en las expectativas; la unidad se
+elige antes que la receta).
 
 ## Mapa R<n> -> test (hasta ahora)
 - R2: convert-with-approximation.test.ts > `R2 1000 g a kg da 1 exacto`, `R2 500 ml a l da 0.5 exacto`
@@ -63,7 +78,12 @@ scope y de UnitCatalog en unos 40 archivos; fixtures de unidad del insumo deriva
 - R21: order-line-need.test.ts > `R21 insumo sin unidad da la cifra sin convertir`; order-requirement.test.ts > `R21 insumo sin unidad pasa la cifra sin convertir`
 - R22: order-unit-conversion.int.test.ts > `R22 un pedido guardado antes del cambio conserva su costo y lo apartado al leerlo`
 - R23: quote-order-cost.test.ts > `R23 sin pedidos.modificar se rechaza antes de validar y sin leer catalogos`
-- Pendientes: R13 (tabla), R14–R19 (T11–T13), R24–R25 (T14), R26 (T15).
+- R8 (cliente): tests/unit/pedidos-ui/use-order-cost-quote.test.ts > `R8 la peticion lleva unitId`, `R8 cambiar la unidad pide una cotizacion nueva`
+- R16: tests/unit/asignaciones/get-assigned-order-execution.test.ts > `R16 la cantidad de la linea sale convertida a la unidad del insumo`
+- R17 (servidor): get-assigned-order-execution.test.ts > `R17 una linea aproximada sale con need approximate`, `R17 una linea no convertible sale sin cantidad`
+- R19 (cotización): use-order-cost-quote.test.ts > `R19 sin unidad no se cotiza y queda el guion`
+- R20 (ejecución): get-assigned-order-execution.test.ts > `R20 un pedido sin unidad sale como antes`
+- Pendientes: R13 (tabla), R14, R15, R17 (pantalla), R18, R19 (tabla), R21 (pantalla) en T13; R24–R25 en T14; R26 en T15.
 
 ## Salida de tests
 - T1 8/8, T2 2/2 (base efimera de scripts/test-db.ts), T3 3/3.
@@ -84,7 +104,13 @@ scope y de UnitCatalog en unos 40 archivos; fixtures de unidad del insumo deriva
       unitId. Es lo esperado hasta T12.
   (c) unidades-viewport y usuarios-viewport: están en el baseline.
 
-## Bloqueo T9 — conflicto con QC-195 R43 (abierto)
+- ./init.sh --rapido (tras T9 + T11 + T12): typecheck OK, lint OK; Test Files 6 failed | 603 passed (609);
+  Tests 8 failed | 8959 passed | 30 skipped. Los 6 archivos están en el baseline (los 5 de antes y
+  recetas/module-contract). Desaparecen los rojos (a) y (b) de arriba.
+  Subagentes: tests/integration/pedidos + inventario/company-scope 346/346; tests/integration/asignaciones 102/102;
+  tests/unit/pedidos-ui 582 pasan y 3 se saltan; asignaciones + asignaciones-ui 288/288; guardias 681.
+
+## Bloqueo T9 — conflicto con QC-195 R43 (resuelto: opción a)
 Los dos casos R43 de QC-195 siembran una receta antigua con el envase como ingrediente. El envase está en la unidad de
 sistema «envase» y el pedido en una unidad propia sin base común con ella. Según R4/R12 de QC-204, esa línea no es
 convertible y el alta se rechaza con order_unit_not_convertible. Ni N3 ni R21 contemplan este caso. Opciones:
