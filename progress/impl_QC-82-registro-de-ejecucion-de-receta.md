@@ -83,3 +83,57 @@ contrario. Opciones:
   `db:rollback` + `db:migrate`; T2 con el control «acción normal con `NULL`, aceptada».
 - **(b)** mantener la igualdad y enmendar R5 (toda acción no de empaque lleva posición), confirmando
   que ninguna receta sin pasos llega a ejecutarse; arrastra T10 y `## 3.3`.
+
+## Decisiones del humano tras la tanda 1 (2026-10-06, vía leader)
+
+- **Excepción de baseline para QC-82: sí**, la misma de QC-209. Una tanda cierra si `--rapido` falla
+  solo por archivos de `tests/baseline-rojos.json` y no sale ningún rojo nuevo; se anotan en cada
+  tanda. Un rojo nuevo para.
+- **Tercer `CHECK`: opción (a), implicación.** Enmienda en `design.md > 2.1` (`ff464ee6`).
+- **Para el reviewer:** el desvío de T26 (`startPackingAliveOrder` delega en la privada
+  `lockAndStartPackingAlive`, no en `createOrderPackingRepository(tx).startPackingAlive`) queda
+  anotado arriba; motivo: `guard-ambito-empresa-pedidos` no sigue el ámbito a través de un método
+  del objeto devuelto.
+
+## Tanda 2 (2026-10-06) — T1 (corrección), T2, T6, T7
+
+| Task | Commit | Archivos |
+| --- | --- | --- |
+| T1 | `f29a6ee3` | `migration.sql` (tercer `CHECK` = `"action"::text NOT IN ('PACK_START','PACK_FINISH') OR "step_position" IS NULL`), test de esquema (17 casos) |
+| T2 | `039e6a2f` | `tests/integration/asignaciones/order-execution-entries-constraints.int.test.ts` (14 casos, `transaccion` con `SAVEPOINT`), `tests/integration/aislamiento.json` (+1 línea) |
+| T6 | `ab0e05a8` | `asignaciones/domain/execution-entry.ts` (`EXECUTION_ACTIONS`, `ExecutionAction`, `NewExecutionEntry` de tres ramas, `ExecutionAbortedError`, `isExecutionSuccess`), `ports/execution-log-repository.ts`, `ports/execution-transaction.ts`, `domain/errors.ts` (`NotCancellableError`), `tests/unit/asignaciones/execution-log-repository.test.ts` (40) |
+| T7 | `d881189b` | `adapters/driven/persistence/execution-log-prisma.ts` (`createExecutionLogRepository`, `EXECUTION_ACTION_TO_PRISMA`), `execution-transaction-prisma.ts` (`withExecutionTransaction`), `tests/unit/asignaciones/execution-log-prisma.test.ts` (19) |
+
+### Base `QuimiCloude_QC82` tras la corrección de T1
+
+`.env` comprobado (solo `QuimiCloude_QC82`). `db:rollback` (0) → `db:migrate` reaplica
+`20261006180000_order_execution_entries` (0) → `prisma generate` v6.19.3 (0, sin `EPERM`). Salida
+completa: la primera vuelta `migrate → rollback → migrate` es la de la tanda 1, misma carpeta:
+
+```
+db:rollback: aplicando down.sql de 20261006180000_order_execution_entries y borrando su fila de _prisma_migrations
+db:rollback: 20261006180000_order_execution_entries revertida.
+71 migrations found in prisma/migrations
+Applying migration `20261006180000_order_execution_entries`
+All migrations have been successfully applied.
+```
+
+### Mutaciones
+
+- T1 (corrección): volver a la igualdad ⇒ rojo el caso R5bis (1 rojo / 16 verdes); quitar el `NOT` ⇒ igual.
+- T2: cada rechazo con su control positivo (R1 `PAUSE` 22P02; R8 23514; R5 posición 0 23514 y
+  **`START` con `NULL` aceptado**; R5bis 23514 / `NULL` aceptado; R6/R7 23503; R32 con control `NO FORCE`).
+- T6: `reason?` en cancel, `reason` en pasos, posición numérica en empaque ⇒ `TS2578` en sus
+  `@ts-expect-error`; predicado sin objeto / con `already_mine` ⇒ rojo R24; quitar `pack_finish` ⇒ 3 rojos R1;
+  `update` en el puerto ⇒ 2 rojos R31 + tsc.
+- T7: quitar un par del mapa ⇒ tsc (`satisfies`) + 4 rojos; `deleteMany`/`updateMany` ⇒ 2 rojos R31;
+  `timeout` 5_000 ⇒ rojo R24; sin desempate por `id` ⇒ rojo R14; sin `occurredAt` ⇒ 2 rojos R8.
+
+### Tests (subagentes, solo sus archivos)
+
+- T1+T2: 5 archivos / 56 casos (con `guard-rls-force`, `guard-aislamiento-integracion`, `guard-empresa-en-esquema`).
+- T6+T7: 5 archivos / 188 casos (con `asignaciones/module-contract`, `guard-arquitectura-modulos`, `guard-catalogo-de-errores`).
+- typecheck limpio en las dos.
+
+El gate `--rapido` de esta tanda se corre junto con la tanda 3 (T8–T11, T25 rompen el tipado de los
+consumidores hasta T12/T13).

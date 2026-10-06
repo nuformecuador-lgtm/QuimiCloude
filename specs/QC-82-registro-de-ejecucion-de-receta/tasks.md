@@ -53,7 +53,7 @@
 
 ## Bloque A — La tabla
 
-### T1 [ ] — Modelo, migración y `down.sql`
+### T1 [x] — Modelo, migración y `down.sql`
 **Toca:** `db/schema.prisma`,
 `db/migrations/<AAAAMMDDhhmmss>_order_execution_entries/migration.sql`,
 `db/migrations/<AAAAMMDDhhmmss>_order_execution_entries/down.sql`,
@@ -81,7 +81,7 @@ con la salida pegada en `progress/impl_QC-82-registro-de-ejecucion-de-receta.md`
 `guard-rls-force`, `guard-empresa-en-esquema` y `guard-arquitectura-modulos` verdes.
 **Depende de:** nada, y de que el humano haya respondido P1 y P2.
 
-### T2 [ ] — Las restricciones, contra Postgres
+### T2 [x] — Las restricciones, contra Postgres
 **Toca:** `tests/integration/asignaciones/order-execution-entries-constraints.int.test.ts`,
 `tests/integration/aislamiento.json`
 **Hacer:** test en modo `transaccion` que inserte con SQL crudo y compruebe cada rechazo. Contra
@@ -150,7 +150,7 @@ restaura desde copia y las mutaciones quedan en `progress/impl_…`.
 
 ## Bloque C — `asignaciones`: dominio, puertos y adaptadores
 
-### T6 [ ] [P] — Tipos, puertos y errores
+### T6 [x] [P] — Tipos, puertos y errores
 **Toca:** `lib/modules/asignaciones/domain/execution-entry.ts`,
 `lib/modules/asignaciones/ports/execution-log-repository.ts`,
 `lib/modules/asignaciones/ports/execution-transaction.ts`,
@@ -173,7 +173,7 @@ cualquier otro literal, un caso por forma (R24); `guard-catalogo-de-errores` ver
 **Depende de:** T3 (el tipo `OrderCancellation`). _[2026-10-06] Ya no depende de T25: el tipo del
 empaque es un `Pick` de `OrderCatalog`, que existe._
 
-### T7 [ ] — Los dos adaptadores driven
+### T7 [x] — Los dos adaptadores driven
 **Toca:** `lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma.ts`,
 `lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma.ts`
 **Hacer:** `createExecutionLogRepository(db = prisma)` con `append` (mapa total `ExecutionAction →` enum
