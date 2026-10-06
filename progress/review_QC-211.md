@@ -50,3 +50,36 @@ No se corrieron `./init.sh` completo ni E2E (los corre el leader).
 ### Veredicto
 
 **RECHAZADO** por B1. Es el único bloqueante y se arregla con un cambio de comentario de una línea, sin tocar la lógica. En la vuelta 2 basta revisar el rango del arreglo.
+
+## Vuelta 2 (acotada a f28dcc36..HEAD)
+
+Commits: `5c4bdd5f` (arreglos), `da75c71b` (E2E de empaque), `e135eb09` (bitácora y log del E2E).
+
+### Checklist
+
+- [x] Typecheck (`tsc --noEmit`): verde.
+- [x] Lint de los 6 archivos tocados: sin avisos.
+- [x] `vitest related` del diff: 434/436. Los 2 rojos (`tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`, `tests/unit/recetas-ui/recipe-page.test.tsx`) están en `tests/baseline-rojos.json` y el rango no los toca, así que no cuentan como hallazgo.
+- [x] Guardias (`tests/guards`): 44/44 archivos, 612 en verde y 5 omitidos.
+- [x] E2E: leí `progress/e2e_QC-211_vuelta2.log`, que da `16 passed`. No lo volví a correr: lo corre el leader.
+- [x] Comentarios añadidos o modificados en producción: ninguno cita `R<n>`, `QC-<n>`, `design.md` ni «decisión cerrada».
+
+### Hallazgos de la vuelta 1
+
+- **B1: cerrado.** `recipe-form-state.ts:308` ya no cita `(R32, R38 del esquema)`. Se queda el motivo de `root`.
+- **m1: cerrado.** `packing-order-screen.tsx:249` usa `finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL`. Lo cubre el test nuevo de `tests/unit/asignaciones-ui/packing-order-screen.test.tsx` («mientras termina, el ultimo boton dice «Terminando…»»), que comprueba el texto, `disabled` y `aria-busy` y resuelve la promesa en `finally`. Esto encaja con R21 y P2, que piden «el mismo texto que el botón Terminar de hoy», y ese botón ya cambia a «Terminando…» mientras termina.
+- **m2: cerrado, se acepta.** El `?? []` se queda. Lo pide la nota de aprobación («al editar, `packingSteps` ausente = lista vacía») y lo comprueba el test R9 de `recipe-form-packing-steps.test.tsx`. El comentario ya no da el motivo falso («lecturas anteriores a la columna»): ahora dice que es una defensa a propósito frente al tipo. Es aceptable.
+- **m3: cerrado.** El `<h3>` de `recipe-version-form.tsx` cabe en una línea, igual que su vecino.
+
+### Arreglo del E2E pedido por el humano (`da75c71b`)
+
+- El commit solo toca `e2e/empaque.spec.ts` (+2/-2). No cambia código de producción.
+- Mantiene la intención. Por el precondicionado del caso, el pedido nace `EN_CURSO`, y desde `6ef2b6e9` `assigned-order-enter-trigger.tsx:57` pinta «Entrar» como enlace directo para `EN_CURSO`, sin la confirmación de comenzar. El test cambia `clickAndConfirm(..., ASSIGNED_ORDER_START_CONFIRM_TESTID)` por `click()`. Sigue esperando la ruta de ejecución y el título, y luego finaliza con su confirmación (`ORDER_EXECUTION_FINISH_CONFIRM_TESTID`). El recorrido completo (POR_EMPACAR, pestaña, Pedidos, Empacador y Terminados) sigue igual. Se quita el import que ya no se usa.
+
+### Hallazgos nuevos
+
+Ninguno. El rango no trae regresiones.
+
+### Veredicto
+
+**OK**
