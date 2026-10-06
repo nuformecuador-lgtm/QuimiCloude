@@ -35,6 +35,9 @@ export const LOGIN_ROUTE_SESSION_ENDED = `${LOGIN_ROUTE}?${SESSION_ENDED_PARAM}=
  */
 export const INVENTORY_ROUTE = '/inventario';
 
+/** Cuelga de `INVENTORY_ROUTE`, así que su prefijo privado ya la cubre. */
+export const INVENTORY_IMPORT_ROUTE = '/inventario/importar';
+
 /**
  * Pantalla de recetas de produccion (QC-26, R3).
  *

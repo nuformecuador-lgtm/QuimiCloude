@@ -113,7 +113,11 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // ponga el primer archivo sin la directiva `'use server'` en la primera linea util, esta
     // asercion cae. Es la misma tecnica que usa `identity` para sus propias Server Actions.
     const drivingDir = join(repoRoot, 'lib', 'modules', 'inventario', 'adapters', 'driving')
+    // Los datos fijos de las acciones de importacion no son una accion ni un route handler, y un
+    // 'use server' solo puede exportar funciones async. Se borran al integrar la importacion.
+    const exentos = ['inventory-import-fixtures.ts']
     for (const file of typescriptFilesIn(drivingDir)) {
+      if (exentos.some((nombre) => file.endsWith(nombre))) continue
       const source = readFileSync(file, 'utf8').trimStart()
       expect(source, `${file} debe declarar 'use server' en la primera linea`).toMatch(
         /^(['"])use server\1/,
