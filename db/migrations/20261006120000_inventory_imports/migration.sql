@@ -19,7 +19,7 @@ CREATE TABLE "inventory_imports" (
     "error_count" INTEGER,
     "created_by" UUID NOT NULL,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "finished_at" TIMESTAMPTZ(6),
+    "completed_at" TIMESTAMPTZ(6),
 
     CONSTRAINT "inventory_imports_pkey" PRIMARY KEY ("id")
 );
@@ -45,8 +45,8 @@ ALTER TABLE "inventory_imports" ADD CONSTRAINT "inventory_imports_counts_non_neg
 );
 
 -- Una importacion cerrada siempre deja sus cuentas.
-ALTER TABLE "inventory_imports" ADD CONSTRAINT "inventory_imports_finished_has_totals"
-  CHECK ("finished_at" IS NULL OR "rows_total" IS NOT NULL);
+ALTER TABLE "inventory_imports" ADD CONSTRAINT "inventory_imports_completed_has_totals"
+  CHECK ("completed_at" IS NULL OR "rows_total" IS NOT NULL);
 
 -- Sin policies: Prisma se conecta como dueno y solo FORCE hace que la RLS le aplique.
 ALTER TABLE "inventory_imports" ENABLE ROW LEVEL SECURITY;

@@ -159,7 +159,7 @@ export async function finishImport(
       batchAddedCount: totals.batchAdded,
       duplicateCount: totals.duplicate,
       errorCount: totals.error,
-      finishedAt: now,
+      completedAt: now,
     },
   });
   if (count !== 1) {

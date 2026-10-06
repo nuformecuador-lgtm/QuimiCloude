@@ -88,7 +88,7 @@ describe('idempotencia y registro de la importacion', () => {
     });
     expect(registro.fileSha256).toMatch(/^[0-9a-f]{64}$/u);
     expect(registro.createdAt.toISOString()).toBe(result.importedAt);
-    expect(registro.finishedAt).not.toBeNull();
+    expect(registro.completedAt).not.toBeNull();
   });
 
   it('R24 sin filas validas devuelve nothing_imported, no escribe nada y la misma clave sirve despues', async () => {

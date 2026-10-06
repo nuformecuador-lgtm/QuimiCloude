@@ -112,7 +112,7 @@ describe('R31: el adaptador de importacion no ve ni escribe en otra empresa', ()
     await expect(finishImport(reservada.importId, totales, new Date(), ambito(B))).rejects.toThrow(/no existe en la empresa/u);
 
     const fila = await prisma.inventoryImport.findUniqueOrThrow({ where: { id: reservada.importId } });
-    expect(fila.finishedAt).toBeNull();
+    expect(fila.completedAt).toBeNull();
     expect(fila.rowsTotal).toBeNull();
   });
 

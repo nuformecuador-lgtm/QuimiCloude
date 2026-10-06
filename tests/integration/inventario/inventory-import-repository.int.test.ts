@@ -214,7 +214,7 @@ describe('claimImport y finishImport — R29, R30: una importacion por clave', (
     if (reservada.kind !== 'claimed') throw new Error('debia reservarse');
 
     const abierta = await prisma.inventoryImport.findUniqueOrThrow({ where: { id: reservada.importId } });
-    expect(abierta).toMatchObject({ finishedAt: null, rowsTotal: null });
+    expect(abierta).toMatchObject({ completedAt: null, rowsTotal: null });
 
     await finishImport(reservada.importId, totales, new Date('2026-10-06T09:01:00Z'), ambito(empresa));
 
@@ -226,7 +226,7 @@ describe('claimImport y finishImport — R29, R30: una importacion por clave', (
       fileSha256: 'c'.repeat(64),
       createdBy: empresa.userId,
       createdAt: new Date('2026-10-06T09:00:00Z'),
-      finishedAt: new Date('2026-10-06T09:01:00Z'),
+      completedAt: new Date('2026-10-06T09:01:00Z'),
       rowsTotal: 5,
       createdCount: 2,
       batchAddedCount: 1,
@@ -248,8 +248,8 @@ describe('claimImport y finishImport — R29, R30: una importacion por clave', (
       prisma.inventoryImport.create({ data: { ...base, importKey: randomUUID(), rowsTotal: -1 } }),
     ).rejects.toThrow(/inventory_imports_counts_non_negative/u);
     await expect(
-      prisma.inventoryImport.create({ data: { ...base, importKey: randomUUID(), finishedAt: new Date() } }),
-    ).rejects.toThrow(/inventory_imports_finished_has_totals/u);
+      prisma.inventoryImport.create({ data: { ...base, importKey: randomUUID(), completedAt: new Date() } }),
+    ).rejects.toThrow(/inventory_imports_completed_has_totals/u);
   });
 });
 

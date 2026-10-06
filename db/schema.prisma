@@ -441,7 +441,7 @@ model InventoryImport {
   errorCount      Int?      @map("error_count")
   createdBy       String    @map("created_by") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  finishedAt      DateTime? @map("finished_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
 
   @@unique([companyId, importKey], map: "inventory_imports_company_key_unique")
   @@index([companyId, createdAt], map: "inventory_imports_company_created_idx")
