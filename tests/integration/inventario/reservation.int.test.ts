@@ -22,12 +22,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
   addBatchToAlive,
-  adjustBatchStock,
   consumeBatchStock,
   createWithFirstBatch,
   findBatchesOfAliveProduct,
   listAliveProducts,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -918,7 +918,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
       expect(await reservationMovementsOf(orderId)).toEqual([{ batchId: batchIdViejo, kind: 'reserve', quantity: '8.0000' }]);
 
       // Merma: el lote viejo pierde 5 -queda sobre-reservado, con solo 5 de verdad para los 8 apartados-.
-      await adjustBatchStock(batchIdViejo, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      await adjustByDelta(batchIdViejo, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
       expect(await batchStockOf(batchIdViejo)).toBe('5.0000');
 
       const resultado = await reservations.consumeForOrder({
@@ -969,7 +969,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
       });
 
       // Merma total: el UNICO lote se queda sin nada, y no hay ningun otro lote del producto.
-      await adjustBatchStock(batchId, '-10', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      await adjustByDelta(batchId, '-10', 'merma', fixture.actorId, new Date(), ambito(fixture));
       expect(await batchStockOf(batchId)).toBe('0.0000');
 
       const movimientosAntes = await reservationMovementsOf(orderId);
@@ -1019,8 +1019,8 @@ describe('R33 — un ajuste que deja el apartado por encima de la existencia se 
         now: new Date(),
       });
 
-      const ajuste = await adjustBatchStock(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
-      expect(ajuste).toEqual({ stock: '5.0000', reserved: '8.0000', overReserved: true });
+      const ajuste = await adjustByDelta(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      expect(ajuste).toMatchObject({ kind: 'adjusted', stock: '5.0000', reserved: '8.0000', overReserved: true });
     } finally {
       await dropFixture(fixture, [productId], [orderId]);
     }
@@ -1049,7 +1049,7 @@ describe('R34, R37 — el lote sobre-reservado se marca, con su apartado y su di
       ]);
 
       // La merma deja el apartado (8) por encima de la existencia nueva (5): sobre-reservado.
-      await adjustBatchStock(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      await adjustByDelta(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
 
       const sobreReservado = await findBatchesOfAliveProduct(productId, ambito(fixture));
       expect(sobreReservado).toEqual([
@@ -1099,7 +1099,7 @@ describe('R36 — por producto: total, reservado y disponible, incluido el caso 
         actorId: fixture.actorId,
         now: new Date(),
       });
-      await adjustBatchStock(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      await adjustByDelta(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
 
       const pagina = await listAliveProducts(listQueryOf(), ambito(fixture));
       const vista = pagina.items.find((item) => item.id === productId);
@@ -1126,7 +1126,7 @@ describe('R38 — el historial de un lote une los dos libros, del mas reciente a
         actorId: fixture.actorId,
         now: new Date(),
       });
-      await adjustBatchStock(batchId, '-1', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      await adjustByDelta(batchId, '-1', 'merma', fixture.actorId, new Date(), ambito(fixture));
       await reservations.releaseForOrder({
         orderId,
         companyId: fixture.companyId,

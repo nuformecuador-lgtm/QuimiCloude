@@ -28,9 +28,9 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import {
   addBatchToAlive,
-  adjustBatchStock,
   createWithFirstBatch,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { LEDGER_START } from '@/lib/modules/inventario/domain/movement-ledger';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -267,14 +267,14 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       const creado = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: '20' }), new Date(), ambito(fixture));
       productIds.push(creado.id);
 
-      const sumado = await adjustBatchStock(creado.batchId, '6', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture));
-      if (sumado === null || sumado === 'increase_not_allowed') {
+      const sumado = await adjustByDelta(creado.batchId, '6', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture));
+      if (sumado.kind !== 'adjusted') {
         throw new Error('el lote deberia existir');
       }
       expect(sumado.stock).toBe('26.0000');
 
-      const restado = await adjustBatchStock(creado.batchId, '-9', 'merma', fixture.actorId, new Date(), ambito(fixture));
-      if (restado === null || restado === 'increase_not_allowed') {
+      const restado = await adjustByDelta(creado.batchId, '-9', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      if (restado.kind !== 'adjusted') {
         throw new Error('el lote deberia existir');
       }
       expect(restado.stock).toBe('17.0000');

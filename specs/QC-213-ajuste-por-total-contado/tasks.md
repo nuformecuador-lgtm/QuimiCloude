@@ -65,7 +65,7 @@ Archivos:
 terminan sin error y `prisma migrate status` queda limpio; el cliente Prisma regenerado compila;
 `./init.sh --rapido` en verde.
 
-### B2 — Cambio atómico de puerto, adaptador y caso de uso
+### [x] B2 — Cambio atómico de puerto, adaptador y caso de uso
 Depende de: B1. Es una sola task porque cambiar la firma del puerto rompe el typecheck de todos sus
 llamadores a la vez.
 

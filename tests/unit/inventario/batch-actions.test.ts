@@ -181,8 +181,8 @@ describe('adjustBatchStockAction', () => {
     });
   });
 
-  it('un total contado menor que la existencia vista llega al caso de uso como diferencia negativa', async () => {
-    adjustBatchStockMock.mockResolvedValue({ stock: 3 });
+  it('el total contado y la existencia vista llegan al caso de uso tal cual, sin diferencia calculada', async () => {
+    adjustBatchStockMock.mockResolvedValue({ stock: '3.0000', reserved: '0.0000', overReserved: false });
 
     await adjustBatchStockAction(
       INITIAL,
@@ -190,7 +190,7 @@ describe('adjustBatchStockAction', () => {
     );
 
     const [candidato] = adjustBatchStockMock.mock.calls[0] as [Record<string, unknown>];
-    expect(candidato).toEqual({ batchId: BATCH_ID, delta: '-7.0000', reason: 'merma' });
+    expect(candidato).toEqual({ batchId: BATCH_ID, countedStock: '3', seenStock: '10', reason: 'merma' });
   });
 
   it.each(['1e3', 'doce', '-3', '12.'])(

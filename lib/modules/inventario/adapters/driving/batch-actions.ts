@@ -5,7 +5,6 @@ import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/error
 import {
   BatchStockChangedError,
   InventarioError,
-  describeAdjustment,
   type Actor,
   type BatchHistoryEntry,
   type ProductBatchView,
@@ -39,27 +38,6 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
   const value = formData.get(name);
   if (typeof value !== 'string' || value.trim() === '') return undefined;
   return value;
-}
-
-/**
- * Puente mientras el caso de uso siga pidiendo la diferencia en vez del total contado. Una lectura
- * sin diferencia valida deja el campo ausente, y el caso de uso la rechaza despues del permiso.
- */
-function toDeltaCandidate(candidate: {
-  batchId: string | undefined;
-  countedStock: string | undefined;
-  seenStock: string | undefined;
-  reason: string | undefined;
-}): { batchId: string | undefined; delta: string | undefined; reason: string | undefined } {
-  const reading =
-    candidate.countedStock === undefined || candidate.seenStock === undefined
-      ? 'invalid'
-      : describeAdjustment(candidate.seenStock.trim(), candidate.countedStock.trim());
-  return {
-    batchId: candidate.batchId,
-    delta: typeof reading === 'string' ? undefined : reading.difference,
-    reason: candidate.reason,
-  };
 }
 
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
@@ -100,10 +78,7 @@ export async function adjustBatchStockAction(
   const actor = await currentActor();
 
   try {
-    const { stock, reserved, overReserved } = await inventario.adjustBatchStock(
-      toDeltaCandidate(candidate),
-      actor,
-    );
+    const { stock, reserved, overReserved } = await inventario.adjustBatchStock(candidate, actor);
     return { status: 'success', stock, reserved, overReserved };
   } catch (error) {
     // `toErrorState` arma el estado campo a campo y perderia `currentStock`.

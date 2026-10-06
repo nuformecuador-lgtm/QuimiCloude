@@ -3,8 +3,8 @@
 // Cubre R1, R2, R3, R8, R13, R18, R20, R21 y R23. El barrido de autorizacion de los DOCE casos de
 // uso del modulo vive en `authorization.test.ts`; aqui se mide el comportamiento propio de cada
 // uno: que el permiso rechaza SIN tocar el repositorio, que la entrada invalida muere antes del
-// puerto, que el delta viaja con su signo y sin ninguna lectura previa del stock, y que el autor
-// del asiento se resuelve contra el directorio de personas.
+// puerto, que el total contado y la existencia vista viajan tal cual, y que el autor del asiento
+// se resuelve contra el directorio de personas.
 
 import type { PeopleDirectory } from '@/lib/modules/identity';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
@@ -21,7 +21,10 @@ import { createListProductBatches } from '@/lib/modules/inventario/domain/list-p
 import { MOVEMENT_REASONS } from '@/lib/modules/inventario/domain/movement-reason';
 import type { ProductBatchView } from '@/lib/modules/inventario/domain/product-batch-view';
 import type { BatchHistoryEntry, OrderNumberDirectory } from '@/lib/modules/inventario/domain/reservation';
+import type { AdjustBatchStockOutcome } from '@/lib/modules/inventario/domain/stock-adjustment';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
+
+import { adjustedOutcome } from '../../fixtures/adjust-batch-stock';
 
 const LOTE = '11111111-1111-4111-8111-111111111111';
 const AHORA = new Date('2026-09-18T10:00:00.000Z');
@@ -47,7 +50,7 @@ type Dobles = {
  * puerto, el doble no lo tiene y el test explota, que es justo lo que se quiere ver (R2).
  */
 function montarDobles(): Dobles {
-  const adjustBatchStock = vi.fn(async (): Promise<{ stock: number } | null> => ({ stock: 7 }));
+  const adjustBatchStock = vi.fn(async (): Promise<AdjustBatchStockOutcome> => adjustedOutcome());
   const findBatchesOfAliveProduct = vi.fn(
     async (): Promise<readonly ProductBatchView[]> => [],
   );
@@ -81,7 +84,13 @@ function directorioDePedidosVacio(): OrderNumberDirectory {
   return { findNumberTexts: vi.fn(async () => new Map()) };
 }
 
-const ENTRADA_VALIDA = { batchId: LOTE, delta: '-3', reason: 'merma' };
+/** Una disminucion de 10 a 7: admite cualquiera de los cuatro motivos. */
+const ENTRADA_VALIDA = { batchId: LOTE, countedStock: '7', seenStock: '10', reason: 'merma' };
+
+/** Un aumento de 10 a 12 con un motivo que lo admite. */
+const AUMENTO_VALIDO = { batchId: LOTE, countedStock: '12', seenStock: '10', reason: 'conteo_fisico' };
+
+const RESULTADO_POR_DEFECTO = { stock: '7.0000', reserved: '0.0000', overReserved: false };
 
 describe('QC-92 R20 — el permiso se exige en la primera linea del ajuste', () => {
   const sinPermiso: ReadonlyArray<{ etiqueta: string; actor: Actor | null | undefined }> = [
@@ -114,16 +123,12 @@ describe('QC-92 R20 — el permiso se exige en la primera linea del ajuste', () 
 
 describe('QC-92 R4 — la cantidad decimal del ajuste', () => {
   const entradasInvalidas: ReadonlyArray<{ etiqueta: string; entrada: unknown }> = [
-    { etiqueta: 'delta cero', entrada: { batchId: LOTE, delta: '0', reason: 'merma' } },
-    { etiqueta: 'delta cero con decimales', entrada: { batchId: LOTE, delta: '-0.0000', reason: 'merma' } },
-    { etiqueta: 'delta de mas de cuatro decimales', entrada: { batchId: LOTE, delta: '1.00001', reason: 'merma' } },
-    { etiqueta: 'delta en notacion cientifica', entrada: { batchId: LOTE, delta: '1e3', reason: 'merma' } },
-    { etiqueta: 'delta numerico, no cadena', entrada: { batchId: LOTE, delta: 1.5, reason: 'merma' } },
-    { etiqueta: 'delta ausente', entrada: { batchId: LOTE, reason: 'merma' } },
-    {
-      etiqueta: 'batchId que no es uuid',
-      entrada: { batchId: 'lote-1', delta: '2', reason: 'merma' },
-    },
+    { etiqueta: 'total de mas de cuatro decimales', entrada: { ...ENTRADA_VALIDA, countedStock: '1.00001' } },
+    { etiqueta: 'total en notacion cientifica', entrada: { ...ENTRADA_VALIDA, countedStock: '1e3' } },
+    { etiqueta: 'total numerico, no cadena', entrada: { ...ENTRADA_VALIDA, countedStock: 1.5 } },
+    { etiqueta: 'total ausente', entrada: { batchId: LOTE, seenStock: '10', reason: 'merma' } },
+    { etiqueta: 'existencia vista ausente', entrada: { batchId: LOTE, countedStock: '7', reason: 'merma' } },
+    { etiqueta: 'batchId que no es uuid', entrada: { ...ENTRADA_VALIDA, batchId: 'lote-1' } },
   ];
 
   for (const { etiqueta, entrada } of entradasInvalidas) {
@@ -136,27 +141,27 @@ describe('QC-92 R4 — la cantidad decimal del ajuste', () => {
     });
   }
 
-  it('R4: acepta un delta con hasta cuatro decimales', async () => {
+  it('R4: acepta un total con hasta cuatro decimales', async () => {
     const dobles = montarDobles();
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
     await expect(
-      ajustar({ batchId: LOTE, delta: '1.5', reason: 'merma' }, ADMINISTRADOR),
-    ).resolves.toEqual({ stock: 7 });
-    expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, '1.5', 'merma', 'actor-1', AHORA, {
-      companyId: 'company-a',
-    });
+      ajustar({ ...ENTRADA_VALIDA, countedStock: '8.5' }, ADMINISTRADOR),
+    ).resolves.toEqual(RESULTADO_POR_DEFECTO);
+    expect(dobles.adjustBatchStock).toHaveBeenCalledWith(
+      { batchId: LOTE, countedStock: '8.5', seenStock: '10', reason: 'merma' },
+      'actor-1',
+      AHORA,
+      { companyId: 'company-a' },
+    );
   });
 });
 
 describe('QC-92 R8 — el motivo del conjunto cerrado', () => {
   const motivosInvalidos: ReadonlyArray<{ etiqueta: string; entrada: unknown }> = [
-    { etiqueta: 'motivo ausente', entrada: { batchId: LOTE, delta: 2 } },
-    {
-      etiqueta: 'motivo fuera del conjunto',
-      entrada: { batchId: LOTE, delta: 2, reason: 'porque si' },
-    },
-    { etiqueta: 'motivo vacio', entrada: { batchId: LOTE, delta: 2, reason: '' } },
+    { etiqueta: 'motivo ausente', entrada: { batchId: LOTE, countedStock: '7', seenStock: '10' } },
+    { etiqueta: 'motivo fuera del conjunto', entrada: { ...ENTRADA_VALIDA, reason: 'porque si' } },
+    { etiqueta: 'motivo vacio', entrada: { ...ENTRADA_VALIDA, reason: '' } },
   ];
 
   for (const { etiqueta, entrada } of motivosInvalidos) {
@@ -169,34 +174,36 @@ describe('QC-92 R8 — el motivo del conjunto cerrado', () => {
     });
   }
 
-  it('R8: los cuatro motivos del conjunto pasan y llegan tal cual al puerto', async () => {
+  it('R8: en una disminucion los cuatro motivos del conjunto pasan y llegan tal cual al puerto', async () => {
     expect(MOVEMENT_REASONS).toHaveLength(4);
 
     for (const reason of MOVEMENT_REASONS) {
       const dobles = montarDobles();
       const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
-      await expect(ajustar({ batchId: LOTE, delta: '2', reason }, ADMINISTRADOR)).resolves.toEqual({
-        stock: 7,
-      });
-      expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, '2', reason, 'actor-1', AHORA, {
-        companyId: 'company-a',
-      });
+      await expect(ajustar({ ...ENTRADA_VALIDA, reason }, ADMINISTRADOR)).resolves.toEqual(
+        RESULTADO_POR_DEFECTO,
+      );
+      expect(dobles.adjustBatchStock).toHaveBeenCalledWith(
+        { batchId: LOTE, countedStock: '7', seenStock: '10', reason },
+        'actor-1',
+        AHORA,
+        { companyId: 'company-a' },
+      );
     }
   });
 });
 
-describe('QC-92 R1/R2 — el delta viaja con signo y nadie lee el stock previo', () => {
-  it('R2: un delta negativo llega al puerto tal cual, con su signo', async () => {
+describe('QC-92 R1/R2 — el total y la vista viajan tal cual y nadie lee el stock previo', () => {
+  it('R2: el total contado y la existencia vista llegan al puerto tal cual, sin diferencia', async () => {
     const dobles = montarDobles();
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
-    await expect(
-      ajustar({ batchId: LOTE, delta: '-5', reason: 'rotura' }, ADMINISTRADOR),
-    ).resolves.toEqual({ stock: 7 });
-    expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, '-5', 'rotura', 'actor-1', AHORA, {
-      companyId: 'company-a',
-    });
+    await ajustar({ ...ENTRADA_VALIDA, countedStock: '5', reason: 'rotura' }, ADMINISTRADOR);
+
+    const [ajuste] = dobles.adjustBatchStock.mock.calls[0] as [Record<string, unknown>];
+    expect(ajuste).toEqual({ batchId: LOTE, countedStock: '5', seenStock: '10', reason: 'rotura' });
+    expect(ajuste).not.toHaveProperty('delta');
   });
 
   it('R2: el caso de uso NO lee ningun stock previo: el puerto solo recibe adjustBatchStock', async () => {
@@ -214,17 +221,21 @@ describe('QC-92 R1/R2 — el delta viaja con signo y nadie lee el stock previo',
 
   it('R1: el total lo devuelve el puerto y el caso de uso lo propaga sin recalcular', async () => {
     const dobles = montarDobles();
-    dobles.adjustBatchStock.mockResolvedValue({ stock: 42 });
+    dobles.adjustBatchStock.mockResolvedValue(adjustedOutcome({ stock: '42.0000', reserved: '1.0000' }));
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
-    await expect(ajustar(ENTRADA_VALIDA, ADMINISTRADOR)).resolves.toEqual({ stock: 42 });
+    await expect(ajustar(ENTRADA_VALIDA, ADMINISTRADOR)).resolves.toEqual({
+      stock: '42.0000',
+      reserved: '1.0000',
+      overReserved: false,
+    });
   });
 });
 
 describe('QC-92 R18 — el lote ajeno y el inexistente salen por el mismo camino', () => {
-  it('R18: el puerto devuelve null y el caso de uso lanza BatchNotFoundError', async () => {
+  it('R18: el puerto devuelve batch_not_found y el caso de uso lanza BatchNotFoundError', async () => {
     const dobles = montarDobles();
-    dobles.adjustBatchStock.mockResolvedValue(null);
+    dobles.adjustBatchStock.mockResolvedValue({ kind: 'batch_not_found' });
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
     await expect(ajustar(ENTRADA_VALIDA, ADMINISTRADOR)).rejects.toBeInstanceOf(BatchNotFoundError);
@@ -238,24 +249,22 @@ describe('QC-92 R18 — el lote ajeno y el inexistente salen por el mismo camino
 describe('R31 — un ajuste que suma sobre un producto terminado se rechaza', () => {
   it("R31: el puerto devuelve 'increase_not_allowed' y el caso de uso lanza ActionNotAllowedError", async () => {
     const dobles = montarDobles();
-    dobles.adjustBatchStock.mockResolvedValue('increase_not_allowed');
+    dobles.adjustBatchStock.mockResolvedValue({ kind: 'increase_not_allowed' });
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
-    await expect(
-      ajustar({ batchId: LOTE, delta: '1', reason: 'merma' }, ADMINISTRADOR),
-    ).rejects.toBeInstanceOf(ActionNotAllowedError);
+    await expect(ajustar(AUMENTO_VALIDO, ADMINISTRADOR)).rejects.toBeInstanceOf(ActionNotAllowedError);
   });
 });
 
 describe('R32 — un ajuste que resta sobre un producto terminado sigue las reglas de cualquier lote', () => {
-  it('R32: con delta negativo el puerto no devuelve el sentinela y el resultado se propaga', async () => {
+  it('R32: en una disminucion el puerto no devuelve el sentinela y el resultado se propaga', async () => {
     const dobles = montarDobles();
-    dobles.adjustBatchStock.mockResolvedValue({ stock: 4 });
+    dobles.adjustBatchStock.mockResolvedValue(adjustedOutcome({ stock: '4.0000' }));
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
     await expect(
-      ajustar({ batchId: LOTE, delta: '-1', reason: 'merma' }, ADMINISTRADOR),
-    ).resolves.toEqual({ stock: 4 });
+      ajustar({ ...ENTRADA_VALIDA, countedStock: '4' }, ADMINISTRADOR),
+    ).resolves.toEqual({ stock: '4.0000', reserved: '0.0000', overReserved: false });
   });
 });
 
@@ -268,10 +277,10 @@ describe('QC-92 R18 — el ambito sale del actor', () => {
     await ajustar(ENTRADA_VALIDA, actorCon(['inventario.modificar'], 'company-b', 'actor-b'));
 
     // Falsable: una empresa cableada dentro del caso de uso daria lo mismo con los dos actores.
-    expect(dobles.adjustBatchStock.mock.calls[0]?.[5]).toEqual({ companyId: 'company-a' });
-    expect(dobles.adjustBatchStock.mock.calls[1]?.[5]).toEqual({ companyId: 'company-b' });
-    expect(dobles.adjustBatchStock.mock.calls[0]?.[3]).toBe('actor-a');
-    expect(dobles.adjustBatchStock.mock.calls[1]?.[3]).toBe('actor-b');
+    expect(dobles.adjustBatchStock.mock.calls[0]?.[3]).toEqual({ companyId: 'company-a' });
+    expect(dobles.adjustBatchStock.mock.calls[1]?.[3]).toEqual({ companyId: 'company-b' });
+    expect(dobles.adjustBatchStock.mock.calls[0]?.[1]).toBe('actor-a');
+    expect(dobles.adjustBatchStock.mock.calls[1]?.[1]).toBe('actor-b');
   });
 
   it('R13: el `now` inyectado es el que llega al puerto, sin reloj escondido', async () => {
@@ -281,7 +290,7 @@ describe('QC-92 R18 — el ambito sale del actor', () => {
 
     await ajustar(ENTRADA_VALIDA, ADMINISTRADOR);
 
-    expect(dobles.adjustBatchStock.mock.calls[0]?.[4]).toBe(otroInstante);
+    expect(dobles.adjustBatchStock.mock.calls[0]?.[2]).toBe(otroInstante);
   });
 });
 
@@ -531,11 +540,11 @@ describe('QC-138 — el ajuste positivo avisa de la entrada de material (R13, R1
     const o = oyente();
     dobles.adjustBatchStock.mockImplementation(async () => {
       o.orden.push('adjustBatchStock');
-      return { stock: 7 };
+      return adjustedOutcome({ difference: '2.5000', stock: '12.5000' });
     });
     const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
 
-    await ajustar({ batchId: LOTE, delta: '2.5', reason: 'conteo_fisico' }, ADMINISTRADOR);
+    await ajustar({ ...AUMENTO_VALIDO, countedStock: '12.5' }, ADMINISTRADOR);
 
     expect(o.orden).toEqual(['adjustBatchStock', 'onStockIncreased']);
     expect(o.onStockIncreased).toHaveBeenCalledTimes(1);
@@ -547,27 +556,32 @@ describe('QC-138 — el ajuste positivo avisa de la entrada de material (R13, R1
     const o = oyente();
     const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
 
-    await ajustar({ batchId: LOTE, delta: '-3', reason: 'merma' }, ADMINISTRADOR);
+    await ajustar(ENTRADA_VALIDA, ADMINISTRADOR);
 
     expect(o.onStockIncreased).not.toHaveBeenCalled();
   });
 
   it('R20: un ajuste rechazado no avisa: lote inexistente o producto terminado', async () => {
-    for (const respuesta of [null, 'increase_not_allowed'] as const) {
+    for (const respuesta of [{ kind: 'batch_not_found' }, { kind: 'increase_not_allowed' }] as const) {
       const dobles = montarDobles();
       const o = oyente();
       dobles.adjustBatchStock.mockResolvedValue(respuesta);
       const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
 
-      await expect(ajustar({ batchId: LOTE, delta: '1', reason: 'merma' }, ADMINISTRADOR)).rejects.toBeDefined();
-      expect(o.onStockIncreased, String(respuesta)).not.toHaveBeenCalled();
+      await expect(ajustar(AUMENTO_VALIDO, ADMINISTRADOR)).rejects.toBeDefined();
+      expect(o.onStockIncreased, respuesta.kind).not.toHaveBeenCalled();
     }
   });
 
   it('R13: sin oyente cableado el ajuste positivo funciona igual', async () => {
     const dobles = montarDobles();
+    dobles.adjustBatchStock.mockResolvedValue(adjustedOutcome({ difference: '2.0000', stock: '12.0000' }));
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
-    await expect(ajustar({ batchId: LOTE, delta: '1', reason: 'merma' }, ADMINISTRADOR)).resolves.toEqual({ stock: 7 });
+    await expect(ajustar(AUMENTO_VALIDO, ADMINISTRADOR)).resolves.toEqual({
+      stock: '12.0000',
+      reserved: '0.0000',
+      overReserved: false,
+    });
   });
 });
