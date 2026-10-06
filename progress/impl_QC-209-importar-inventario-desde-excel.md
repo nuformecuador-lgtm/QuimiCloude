@@ -872,3 +872,25 @@ Verificacion: los 5 archivos -> `Test Files  1 failed | 4 passed (5)`, `Tests  1
 2 skipped (97)` (el rojo es el 5). `pnpm run typecheck` verde; `pnpm run lint` 0 errores, 8 warnings en
 archivos no tocados; `pnpm exec vitest run guard` -> `Test Files  51 passed (51)`,
 `Tests  692 passed | 11 skipped (703)`.
+
+**Item 5 resuelto con la opcion A (humano, 2026-10-06; design 5.1 enmendado en af486af4).** La
+columna del registro pasa a `inventory_imports.completed_at` / `completedAt` y el CHECK a
+`inventory_imports_completed_has_totals` (`completed_at IS NULL OR rows_total IS NOT NULL`). Se edito
+la migracion `20261006120000_inventory_imports` en sitio (no ha salido del worktree); `down.sql` no
+cambia (solo `DROP TABLE`). Tocados: `migration.sql`, `db/schema.prisma`, `finishImport` en
+`inventory-import-prisma.ts` y los tres `inventory-import-{idempotency,isolation,repository}.int.test.ts`.
+Puerto, composicion y kits no nombraban el campo. `prisma generate` corrido.
+
+Base `QuimiCloude_QC209` (comprobado antes: `DATABASE_URL`/`DIRECT_URL` del `.env` del worktree y
+`current_database()`; la tabla tenia 0 filas y la migracion era la ultima aplicada):
+`pnpm run db:rollback` -> `20261006120000_inventory_imports revertida.`; `pnpm run db:migrate` ->
+`All migrations have been successfully applied.` Despues: `_prisma_migrations` con la fila
+`20261006120000_inventory_imports` terminada y sin `rolled_back_at`; columnas `created_at`,
+`completed_at`; CHECK `inventory_imports_completed_has_totals`; RLS y FORCE activos. La base
+compartida `QuimiCloude` no se toco.
+
+Verificacion tras el cambio: los 5 archivos -> `Test Files  5 passed (5)`, `Tests  95 passed |
+2 skipped (97)`; `pnpm run typecheck` verde; `pnpm run lint` `0 errors, 8 warnings`;
+`pnpm exec vitest run guard` -> `Test Files  51 passed (51)`, `Tests  692 passed | 11 skipped (703)`;
+integracion `inventory-import-{idempotency,isolation,repository}` -> `Test Files  3 passed (3)`,
+`Tests  25 passed (25)`.
