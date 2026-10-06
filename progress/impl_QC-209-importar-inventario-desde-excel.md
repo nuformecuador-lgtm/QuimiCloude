@@ -1,6 +1,16 @@
 # impl QC-209 — importar-inventario-desde-excel
 
-## Estado (2026-10-06)
+## Estado final (2026-10-06) — léase primero
+
+- **Todas las tasks cerradas** (T0, B1-B10, F1-F6, TI, TZ). Review: OK con 4 menores
+  (`progress/review_QC-209-importar-inventario-desde-excel.md`), arreglados antes del PR.
+- **Gate completo** (medido por el leader): `./init.sh` en verde con 8 rojos, los 8 en
+  `tests/baseline-rojos.json`. **E2E R33**: 2/2 (chromium y webkit) contra `QuimiCloude_QC209`.
+- Enmiendas F2.1 del spec: R24 `nothing_imported` (sin registro), DS-8 comparación normalizada,
+  `completed_at` (5.1), desvíos de implementación en `design.md > 9.2`.
+- Las secciones de abajo son la historia en orden; lo que quedó superado está marcado como tal.
+
+## Estado al empezar (histórico)
 
 - Rama al día con `origin/dev` (merge 215dc36f, 47 commits de QC-204 y otros) antes de T0.
 - **T0 cerrada**: commit 717dfcd5 `feat(QC-209): T0 contrato de la importacion`.
@@ -571,9 +581,9 @@ por formato; `formulas.findAliveOriginalByName` = `findAliveRecipeByNormalizedNa
    que crea el mismo archivo, en la unidad de su presentación → `finished_product_homonym`.
 7. Confirmación: si la fila que debía crear el producto falló, la siguiente que le sumaba lote sale
    `created` (es la que lo crea de verdad).
-8. **R24 frente a R30, para revisión**: sin ninguna fila válida, la confirmación no escribe lotes,
-   productos ni asientos, pero **sí** reserva y cierra el registro en `inventory_imports` (R30, y el
-   contrato exige `importId`). Si «no escribir nada» de R24 incluye el registro, hay que decidirlo.
+8. ~~R24 frente a R30: con 0 filas válidas se reservaba y cerraba el registro~~ **Superado** por la
+   R24 enmendada (humano, 2026-10-06): con 0 filas válidas la confirmación devuelve `nothing_imported`
+   antes de reservar la clave y no escribe nada, tampoco en `inventory_imports` (f9549727; ver TZ).
 9. `BatchDuplicateLotError` al escribir → se mira de quién es el lote (`findBatchesByLots`): del
    producto destino → `duplicate`; de otro → `lot_used_by_other_product`. `ActionNotAllowedError` →
    `presentation_mismatch` (envase) o `finished_product_homonym`; cualquier otro → `write_failed`.
@@ -811,7 +821,7 @@ Veredicto: E2E de R33 escrito, compila y se lista en los dos proyectos; pendient
 | R29, R30 | tests/integration/inventario/inventory-import-idempotency.int.test.ts, inventory-import-repository.int.test.ts |
 | R31 | tests/integration/inventario/inventory-import-isolation.int.test.ts |
 | R32 | tests/unit/inventario/inventory-import-contract.test-d.ts (typecheck), inventory-import-actions.test.ts |
-| R33 | e2e/inventario-importar.spec.ts (escrito y listado; sin correr, F2.4) |
+| R33 | e2e/inventario-importar.spec.ts — 2/2 verde (chromium y webkit), corrido por el leader en F2.4 |
 
 Comprobado: cada R1..R33 aparece como prefijo de al menos un caso en los tests del diff de la rama.
 
@@ -820,10 +830,11 @@ Fixture .xlsx: mixto.xlsx producido con Excel 16 por COM (sección Pista B lectu
 
 ### Gate completo
 
-`./init.sh` (completo) lanzado tras 5a6dc1a9: en verde hasta lint (base `QuimiCloude_QC209` al día,
-70 migraciones; typecheck y lint pasan). **Claude Code paró la corrida en `pnpm run test:json`
-porque el sistema se quedó sin memoria**; no hay veredicto de la suite. No se relanzó por instrucción
-del entorno: hay que volver a lanzarla cuando haya memoria. Hasta entonces TZ y TI no están cerradas.
+~~Primera corrida tras 5a6dc1a9: parada por falta de memoria en `pnpm run test:json`, sin veredicto.~~
+Superado. El leader relanzó `./init.sh` completo: primero salieron 5 rojos nuevos (listas cerradas y
+`qc145-estado-solo-planta`), arreglados en a9e4b2e0 y 8f8cdca9 (ver «Rojos del gate completo»). En la
+corrida final, **`./init.sh` completo verde: 8 rojos, los 8 en `tests/baseline-rojos.json`**, y el
+**E2E R33 2/2** (chromium y webkit). TI y TZ cerradas.
 
 ### Pendientes para el leader / reviewer
 
@@ -863,10 +874,10 @@ afloja: cuatro son listas cerradas que crecen con la ficha, con su nota fechada 
 4. `tests/unit/shared/data-table-alcance.test.ts`: de veintisiete a veintiocho E2E con
    `e2e/inventario-importar.spec.ts` (la vista previa monta la tabla compartida; busca lo importado
    por `data-table-cell-name`).
-5. `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`: SIGUE ROJO, sin tocar. El bloque marcado es
-   `finishImport` en `inventory-import-prisma.ts`, que escribe `finishedAt` del REGISTRO de importacion
-   (`inventory_imports.finished_at`, design 5.1), no de un lote ni de un pedido. No se puede mover sin
-   cambiar el modelo de datos: pendiente de decision (opciones en el informe al leader).
+5. `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`: **RESUELTO** (8f8cdca9, opción A del
+   humano, 2026-10-06). El bloque marcado era `finishImport` en `inventory-import-prisma.ts`, que
+   escribía `finishedAt` del REGISTRO de importación; la columna pasó a `completed_at` / `completedAt`
+   (design 5.1 enmendado en af486af4). La guardia no se tocó y está en verde.
 
 Verificacion: los 5 archivos -> `Test Files  1 failed | 4 passed (5)`, `Tests  1 failed | 94 passed |
 2 skipped (97)` (el rojo es el 5). `pnpm run typecheck` verde; `pnpm run lint` 0 errores, 8 warnings en

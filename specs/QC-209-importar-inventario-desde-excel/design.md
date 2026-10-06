@@ -721,6 +721,24 @@ Filas para `docs/dependencias.md` (las añade quien instale, en B1/B3):
 `@types/papaparse` entra como `devDependency` junto a `papaparse` (tipos de la misma librería, no
 es código que se ejecute).
 
+### 9.2 Enmiendas de cierre F2.1 (2026-10-06)
+
+Recogen cómo quedó la implementación revisada (`progress/review_QC-209-importar-inventario-desde-excel.md`,
+menor 1). No reabren ninguna decisión: documentan desvíos ya aprobados por el leader o el humano, o
+aceptados por el reviewer. Donde chocan con el texto de arriba, manda esta sección.
+
+| Sección | Dice arriba | Queda así | Por qué |
+| --- | --- | --- | --- |
+| 4.1 | `csv-reader.ts` con `skipEmptyLines: 'greedy'` | `skipEmptyLines: false`; las filas en blanco las descarta `import-sheet.ts` | Así `rowNumber` sigue siendo el número de fila que el usuario ve en Excel; las filas vacías siguen sin contar (R6). |
+| 5.1 | migración con «la policy por empresa» | `ENABLE` + `FORCE ROW LEVEL SECURITY`, **sin policy**, igual que el resto de tablas del repo | Ninguna migración del repo crea policies; la frontera es el service con `scope` (la RLS es defensa en profundidad). |
+| 5 / 5.2 | los ayudantes de `product-prisma.ts` «se exportan sin cambiar su cuerpo» | se exportan `resolveLot` y `toBatchCreateData` (`writeMovement` ya estaba exportado en `batch-movement-prisma.ts`), y se añade `addImportedFinishedGoodsBatch(tx, productId, batch, packageContent, now, scope)` en `product-prisma.ts`, que escribe el lote de terminado, su asiento `opening` y el recálculo | `guard-libro-de-inventario` exige que toda escritura en `product_batches` sea una función nombrada de `product-prisma.ts` que llame a `writeMovement(`. |
+| 5.2 | el puerto no tiene `findImport` | `findImport(importKey, scope)` (lectura) en `InventoryImportRepository`; `claimImport` la reutiliza | Con 0 filas válidas la confirmación no reserva la clave (R24 enmendada); sin esta lectura, reenviar una clave ya confirmada devolvería `nothing_imported` en lugar de `already_imported` (R29). Solo se consulta con 0 filas válidas. |
+| 3.3 / 5.1 | `fileSha256` calculado en el dominio | puerto `FileDigest` (`ports/file-digest.ts`) con adaptador `node:crypto` (`adapters/driven/spreadsheet/file-digest.ts`); la confirmación lo recibe como `digest` | `guard-firma-sesion-unica` no admite `crypto.subtle` en el dominio. |
+| 6 | `import-upload-field.tsx` reutiliza `components/shared/file-field.tsx` | `<input type="file">` propio con botón visible, como `components/shared/document-upload` | `file-field.tsx` filtra por tipo MIME (no tiene el de .xlsx y en Windows un .csv llega como `application/vnd.ms-excel`) y rechaza por tamaño en vez de avisar; adaptarlo tocaba `components/shared/`. Un archivo por encima del tope se avisa y no se envía: Next cortaría el cuerpo a 1 MB con un error genérico. |
+| 6 | el contrato de ruta de `/inventario` cubre toda la carpeta | `product-route-contract.test.ts` excluye la subruta `importar/`; sus reglas aplicables viven en `tests/unit/inventario/importar/importar-route-contract.test.ts` | Decisión humana 2026-10-06: tres reglas del contrato de `/inventario` chocaban con esta pantalla (permiso en la página, filtro por estado, subcarpeta). |
+| 1.6 / 3 | el permiso lo comprueba el caso de uso «antes de leer bytes»; la acción lee el `File` antes de llamarlo | en las dos acciones: zod en el borde (`invalid_input`, sin leer sesión) → `currentActor()` (una lectura de sesión) → `requirePermission(actor, 'inventario.modificar')` → `file.arrayBuffer()` → caso de uso, que **vuelve** a comprobar el permiso → `revalidatePath` solo en la confirmación con `imported`. Sin permiso, `unauthorized` sin leer los bytes. | R1 dice «sin leer el archivo»; el reviewer vio que la acción leía los bytes antes que el caso de uso comprobara el permiso (menor 3). El caso de uso conserva su comprobación como defensa en profundidad. |
+| 11 | tests de integración `tests/integration/inventario/*.test.ts` | sufijo `.int.test.ts` (`inventory-import-repository`, `-isolation`, `-confirm`, `-finished-goods`, `-idempotency`), censados en `tests/integration/aislamiento.json`; `xlsx-reader.test.ts` mantiene su nombre | La guardia del censo de aislamiento solo reconoce `.int.test.ts`. |
+
 ## 10. Alternativas descartadas
 
 1. **Guardar el archivo leído entre vista previa y confirmación** (tabla de borrador o Storage,
