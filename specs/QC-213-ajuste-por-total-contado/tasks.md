@@ -127,7 +127,7 @@ con el mensaje del catálogo (lo rechaza el caso de uso); `adjustment_reason_not
 
 **Hecho cuando:** archivo en verde; `./init.sh --rapido` en verde.
 
-### B5 [P] — Lectura de las columnas en el historial
+### [x] B5 [P] — Lectura de las columnas en el historial
 Depende de: B1. Puede empezar en paralelo con B2 (no comparten archivo); se cierra después de B2.
 
 Archivos:

@@ -52,6 +52,8 @@ const MOVEMENT_SELECT = {
   orderId: true,
   createdBy: true,
   createdAt: true,
+  stockBefore: true,
+  countedStock: true,
 } satisfies Prisma.InventoryMovementSelect;
 
 type MovementRow = Prisma.InventoryMovementGetPayload<{ select: typeof MOVEMENT_SELECT }>;
@@ -83,8 +85,8 @@ function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
     orderNumberText: row.orderId,
     authorName: row.createdBy,
     createdAt: row.createdAt.toISOString(),
-    previousStock: null,
-    countedStock: null,
+    previousStock: row.stockBefore === null ? null : row.stockBefore.toFixed(4),
+    countedStock: row.countedStock === null ? null : row.countedStock.toFixed(4),
   };
 }
 

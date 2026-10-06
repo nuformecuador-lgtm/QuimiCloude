@@ -122,6 +122,32 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
       expect.objectContaining({ data: expect.objectContaining({ orderPresentationLineId: 'linea-1' }) }),
     );
   });
+
+  it('R24: un ajuste por total escribe la existencia de antes en stockBefore y el total en countedStock', async () => {
+    const create = vi.fn().mockResolvedValue({ id: 'movimiento-4' });
+    const tx = { inventoryMovement: { create } } as unknown as Parameters<typeof writeMovement>[0];
+
+    await writeMovement(
+      tx,
+      {
+        batchId: LOTE_ID,
+        kind: 'adjustment',
+        quantity: '-2.0000',
+        reason: 'merma',
+        orderId: null,
+        orderPresentationLineId: null,
+        createdBy: ACTOR_ID,
+        previousStock: '12.0000',
+        countedStock: '10',
+      },
+      AHORA,
+      AMBITO,
+    );
+
+    const data = (create.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    expect(data).toMatchObject({ stockBefore: '12.0000', countedStock: '10' });
+    expect(data).not.toHaveProperty('previousStock');
+  });
 });
 
 describe('findBatchMovements (R18) — null cuando el lote no existe o es de otra empresa', () => {
@@ -144,6 +170,8 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         orderId: null,
         createdBy: ACTOR_ID,
         createdAt: new Date('2026-09-17T14:00:00.000Z'),
+        stockBefore: null,
+        countedStock: null,
       },
       {
         id: 'movimiento-1',
@@ -153,6 +181,8 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         orderId: null,
         createdBy: ACTOR_ID,
         createdAt: AHORA,
+        stockBefore: null,
+        countedStock: null,
       },
     ]);
 
@@ -204,6 +234,8 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         orderId: null,
         createdBy: ACTOR_ID,
         createdAt: new Date('2026-09-17T10:00:00.000Z'),
+        stockBefore: null,
+        countedStock: null,
       },
     ]);
     doble.reservationMovementFindMany.mockResolvedValue([
@@ -241,6 +273,69 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         countedStock: null,
       },
     ]);
+  });
+
+  it('R26: un ajuste con existencia de antes y total contado los devuelve a cuatro decimales', async () => {
+    doble.productBatchFindFirst.mockResolvedValue({ id: LOTE_ID });
+    doble.movementFindMany.mockResolvedValue([
+      {
+        id: 'movimiento-2',
+        kind: 'adjustment',
+        quantity: new Prisma.Decimal('-2.5'),
+        reason: 'merma',
+        orderId: null,
+        createdBy: ACTOR_ID,
+        createdAt: new Date('2026-09-17T14:00:00.000Z'),
+        stockBefore: new Prisma.Decimal(12),
+        countedStock: new Prisma.Decimal('9.5'),
+      },
+    ]);
+
+    const historial = await findBatchMovements(LOTE_ID, AMBITO);
+
+    expect(historial?.[0]).toMatchObject({ previousStock: '12.0000', countedStock: '9.5000' });
+    const llamada = doble.movementFindMany.mock.calls[0]?.[0] as { select: Record<string, unknown> };
+    expect(llamada.select).toMatchObject({ stockBefore: true, countedStock: true });
+  });
+
+  it('R27: un ajuste sin las dos columnas (anterior a ellas) las devuelve null', async () => {
+    doble.productBatchFindFirst.mockResolvedValue({ id: LOTE_ID });
+    doble.movementFindMany.mockResolvedValue([
+      {
+        id: 'movimiento-viejo',
+        kind: 'adjustment',
+        quantity: new Prisma.Decimal(-3),
+        reason: 'merma',
+        orderId: null,
+        createdBy: ACTOR_ID,
+        createdAt: AHORA,
+        stockBefore: null,
+        countedStock: null,
+      },
+    ]);
+
+    const historial = await findBatchMovements(LOTE_ID, AMBITO);
+
+    expect(historial?.[0]).toMatchObject({ quantity: '-3.0000', previousStock: null, countedStock: null });
+  });
+
+  it('R26: un asiento de reserva nunca trae existencia de antes ni total contado', async () => {
+    doble.productBatchFindFirst.mockResolvedValue({ id: LOTE_ID });
+    doble.movementFindMany.mockResolvedValue([]);
+    doble.reservationMovementFindMany.mockResolvedValue([
+      {
+        id: 'reserva-1',
+        kind: 'reserve',
+        quantity: new Prisma.Decimal(4),
+        orderId: 'pedido-1',
+        createdBy: ACTOR_ID,
+        createdAt: AHORA,
+      },
+    ]);
+
+    const historial = await findBatchMovements(LOTE_ID, AMBITO);
+
+    expect(historial?.[0]).toMatchObject({ kind: 'reserve', previousStock: null, countedStock: null });
   });
 
   it('un lote vivo sin ningun asiento devuelve un array vacio, no null', async () => {
