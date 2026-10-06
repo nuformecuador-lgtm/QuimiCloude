@@ -1,3 +1,5 @@
+import Papa from 'papaparse';
+
 import {
   INVENTORY_IMPORT_COLUMNS,
   type ImportCells,
@@ -38,7 +40,11 @@ export const IMPORT_EXAMPLE_ROW: ImportCells = {
 };
 
 function toCsv(lines: readonly (readonly string[])[]): string {
-  return BOM + lines.map((cells) => cells.join(SEPARATOR)).join(LINE_BREAK) + LINE_BREAK;
+  const body = Papa.unparse(
+    lines.map((cells) => [...cells]),
+    { delimiter: SEPARATOR, newline: LINE_BREAK },
+  );
+  return BOM + body + LINE_BREAK;
 }
 
 function rowCells(cells: ImportCells): string[] {
@@ -60,7 +66,6 @@ function errorFileName(sourceFileName: string): string {
   return `${base}-errores.csv`;
 }
 
-// Todavía no escapa comillas ni separadores dentro de una celda.
 export function buildInventoryImportErrorFile(
   rows: readonly (ImportPreviewRow | ImportResultRow)[],
   sourceFileName: string,
