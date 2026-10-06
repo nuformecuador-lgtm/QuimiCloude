@@ -805,7 +805,8 @@ Veredicto: E2E de R33 escrito, compila y se lista en los dos proyectos; pendient
 | R16 (escritura) | tests/integration/inventario/inventory-import-finished-goods.int.test.ts |
 | R21, R22 | tests/unit/inventario/importar/import-missing-catalog.test.tsx |
 | R23 | tests/unit/inventario/importar/inventory-import-screen.test.tsx |
-| R24-R27 | tests/unit/inventario/confirm-inventory-import.test.ts; tests/integration/inventario/inventory-import-confirm.int.test.ts |
+| R24 | tests/unit/inventario/confirm-inventory-import.test.ts «R24 con 0 filas validas devuelve nothing_imported sin reclamar la clave», «R24 R29 un reenvio de una clave ya confirmada…», «R24 escribe solo las filas crear o sumar lote…»; tests/integration/inventario/inventory-import-idempotency.int.test.ts «R24 sin filas validas devuelve nothing_imported, no escribe nada y la misma clave sirve despues», «R24 R29 reenviar una clave ya confirmada…»; inventory-import-actions.test.ts «R24 sin filas validas es un exito con nothing_imported y no revalida nada»; inventory-import-contract.test-d.ts (unión de 4) |
+| R25-R27 | tests/unit/inventario/confirm-inventory-import.test.ts; tests/integration/inventario/inventory-import-confirm.int.test.ts |
 | R28 | tests/unit/inventario/inventory-import-downloads.test.ts; importar/import-preview.test.tsx |
 | R29, R30 | tests/integration/inventario/inventory-import-idempotency.int.test.ts, inventory-import-repository.int.test.ts |
 | R31 | tests/integration/inventario/inventory-import-isolation.int.test.ts |
@@ -826,9 +827,15 @@ del entorno: hay que volver a lanzarla cuando haya memoria. Hasta entonces TZ y 
 
 ### Pendientes para el leader / reviewer
 
-- R24 frente a R30: con 0 filas válidas la confirmación no escribe productos, lotes ni movimientos,
-  pero sí el registro de `inventory_imports` (R30 y el `importId` del contrato lo piden). Decidir si
-  «no escribir nada» incluye la auditoría.
+- ~~R24 frente a R30~~ **Resuelto** (opción b, humano, 2026-10-06; enmienda F2.1): con 0 filas
+  válidas la confirmación devuelve `nothing_imported` (sin `importId`) y no escribe nada, tampoco
+  `inventory_imports`; la misma `importKey` se puede reutilizar. Commits `31a28295` (contrato) y el
+  `fix(QC-209): R24 sin filas validas no escribe nada`. Para no romper R29, si todas las filas salen
+  duplicadas/error y la clave ya estaba confirmada, se responde `already_imported` (puerto nuevo
+  `InventoryImportRepository.findImport`, solo lectura; se consulta solo en ese caso). Tests que
+  asumían el comportamiento viejo y se ajustaron: unit «R25 vuelve a validar contra la base del
+  momento…» e integración «R25 R18 la confirmacion revalida…» (ahora esperan `nothing_imported`);
+  el unit «R24 sin ninguna fila valida no escribe ningun lote…» se reemplazó por el nuevo R24.
 - Desvíos: test de ruta separado (decisión humana); `FileDigest` puerto nuevo (guard-firma-sesion-unica);
   `addImportedFinishedGoodsBatch` nueva en product-prisma.ts (guard-libro-de-inventario); F no reusa
   file-field.tsx y no envía > 1 MB; CSV con `skipEmptyLines: false`; integración `.int.test.ts`;
