@@ -632,3 +632,92 @@ por formato; `formulas.findAliveOriginalByName` = `findAliveRecipeByNormalizedNa
   usuarios-viewport, product-page, pantallas-exigen-permiso, recipe-page); salen por el barrel.
 
 Veredicto: B8 hecha; la medida cabe (42,5 s en local) y falta cablearla en B10.
+
+## B10 y TI backend
+
+backend_dev, 2026-10-06. Commits: a12b417c (B10), 80eb3e86 (TI acciones) y el de esta bitácora.
+
+### Archivos
+
+- `lib/composition/index.ts` (B10): `inventoryImportRepository: InventoryImportRepository` (los seis
+  métodos de `inventory-import-prisma.ts`), `spreadsheetReader` (`readCsv`/`readXlsx` por formato),
+  `importFormulaLookup` (`findAliveOriginalByName` = `findAliveRecipeByNormalizedName`, el mismo
+  adaptador que `recipeCatalog.findAliveByNormalizedName`), `inventoryImportReadDeps`, y en la
+  fachada `inventario.previewInventoryImport` / `inventario.confirmInventoryImport` (con `digest:
+  fileDigest`, `stockIncreases: stockIncreaseListener`). `createProduct` se saca a la constante
+  `createProductUseCase` para que la fachada y la confirmación usen **la misma instancia**.
+  `units`/`presentations` se pasan con los adaptadores (`listVisibleUnitRefs`,
+  `findPresentationRefs`, `findPresentationsByNormalizedNames`), no con `unitCatalog` /
+  `presentationCatalog`: esas constantes se declaran más abajo que la fachada (mismo criterio que
+  `listProductFormUnits`).
+- `tests/guards/guard-ambito-empresa-inventario.test.ts`: entrada `InventoryImportRepository` en
+  `PUERTOS` (forma real: `nombre`, `port`, `constante`, `adaptadores`); el `describe` dice «de los
+  puertos» en vez de «de los dos puertos». Se añaden 7 casos (1 de cableado + 6 métodos).
+- `tests/integration/inventario/inventory-import-idempotency.int.test.ts`: dos casos contra la
+  composición real (`inventario` de `@/lib/composition`).
+- `lib/modules/inventario/adapters/driving/inventory-import-actions.ts` (TI): cuerpo real. Borde zod
+  sin cambios (antes de leer la sesión), `currentActor()` con `runInRequestScope`, `File` →
+  `Uint8Array` (`arrayBuffer`), caso de uso de la composición, `revalidatePath(INVENTORY_ROUTE)` solo
+  con `kind: 'imported'`, traductor `createErrorStateTranslator(InventarioError,
+  observabilidad.readRequestIdHeader)`. Firmas y tipos exportados sin cambios.
+- `lib/modules/inventario/adapters/driving/inventory-import-fixtures.ts`: **borrado**.
+- `tests/unit/inventario/scope.test.ts`: fuera la exención de `inventory-import-fixtures.ts`.
+- `tests/unit/inventario/inventory-import-actions.test.ts`: de stub a acción real con
+  `@/lib/composition` y `next/cache` simulados. El test de forma
+  (`inventory-import-contract.test-d.ts`) **no se tocó**.
+- `tests/unit/identity/session-once-per-request-actions.test.ts` (conteo de QC-104): filas
+  `previewInventoryImportAction` y `confirmInventoryImportAction` (con `File` válido e `importKey`
+  uuid, para que lleguen a `currentActor()`).
+
+### Mapa R -> test (B10 y TI)
+
+| R | Test |
+| --- | --- |
+| R1 | `inventory-import-idempotency.int.test.ts` «R1 la composicion real rechaza sin inventario.modificar»; `inventory-import-actions.test.ts` «R1 sin sesion el caso de uso recibe actor null…», «R1 sin inventario.modificar sale unauthorized y no revalida» |
+| R31 | `inventory-import-idempotency.int.test.ts` «R1 R31 la composicion real ata vista previa y confirmacion…»; guardia `guard-ambito-empresa-inventario` «InventoryImportRepository.<metodo> declara `scope: InventoryScope`…» (6) |
+| R24, R29 | `inventory-import-actions.test.ts` «R24 R29 pasa archivo, clave y actor, devuelve el resultado y revalida el inventario», «R29 ya importada es un exito y no revalida nada», «R29 R32 con importKey que no es uuid…» |
+| R32 | `inventory-import-actions.test.ts` invalid_input (5), archivo rechazado (2), unexpected con `reference` (2), descargas (2); `inventory-import-contract.test-d.ts` sin cambios |
+
+### Base del E2E (decisión humana 2026-10-06)
+
+Mismo procedimiento que QC-81/QC-141 (`progress/current.md`: la base por worktree sale con
+`CREATE DATABASE "QuimiCloude_QC<n>" TEMPLATE "qct_tpl_<huella>"`). En la máquina no hay `psql`; el DDL
+se lanzó con el `pg` del repo contra la base de mantenimiento `postgres`, como hace
+`tests/helpers/test-database.ts`. **`QuimiCloude` no se tocó** (ni migrate, ni seed, ni escrituras).
+
+1. `cp .env .env.bak-QuimiCloude` (en el worktree).
+2. Con `pg` contra `postgres` (URL del `.env.bak-QuimiCloude`, base cambiada a `postgres`):
+   `CREATE DATABASE "QuimiCloude_QC209" TEMPLATE "qct_tpl_79d9c897501e"` -> `creada QuimiCloude_QC209
+   desde qct_tpl_79d9c897501e`. La plantilla es la de la integración, ya migrada hasta
+   `20261006120000_inventory_imports` y sembrada con `db:seed` (`tests/helpers/test-database.ts`).
+3. En `.env`, solo la base de `DATABASE_URL` y `DIRECT_URL`: `…/QuimiCloude?…` -> `…/QuimiCloude_QC209?…`.
+4. `pnpm exec prisma migrate status` -> `Datasource "db": PostgreSQL database "QuimiCloude_QC209"` /
+   `Database schema is up to date!`; `pnpm run db:migrate` -> `No pending migrations to apply.`;
+   `pnpm run db:seed` -> `db:seed: nada que crear`.
+5. Comprobación (`pg`): última migración `20261006120000_inventory_imports` (70 aplicadas, ninguna
+   revertida), tabla `inventory_imports` presente, usuario `admin` con rol `Administrador` vivo, una
+   empresa.
+
+`.env` y `.env.bak-QuimiCloude` los ignora `.gitignore:38` (`.env*`); no se commitean. La integración
+sigue usando bases efímeras (`qct_qc209_*`): su DDL va contra `postgres`, así que el cambio de `.env`
+no le afecta (comprobado, abajo). Al cerrar la ficha: borrar `QuimiCloude_QC209` y restaurar
+`.env.bak-QuimiCloude`.
+
+### Salida real
+
+- `pnpm run typecheck` -> `tsc --noEmit`, sin errores.
+- `pnpm run lint` -> `✖ 8 problems (0 errors, 8 warnings)` (los 8 preexistentes).
+- `pnpm exec vitest run tests/unit/inventario/inventory-import-actions.test.ts
+  tests/unit/identity/session-once-per-request-actions.test.ts tests/unit/inventario/scope.test.ts
+  tests/unit/inventario/importar/` -> `Test Files  9 passed (9)` / `Tests  158 passed (158)`.
+- `pnpm exec vitest related --run --project node --project ui inventory-import-actions.ts
+  lib/composition/index.ts` -> `Test Files  5 failed | 234 passed (239)` / `Tests  7 failed | 3612
+  passed | 1 skipped (3620)`. Los 5 rojos (unidades-viewport, usuarios-viewport, product-page,
+  pantallas-exigen-permiso, recipe-page) están en `tests/baseline-rojos.json`.
+- `pnpm exec vitest run --project integration` de los cinco `inventory-import-*.int.test.ts` ->
+  `Test Files  5 passed (5)` / `Tests  30 passed | 1 skipped (31)` (antes y después de cambiar `.env`).
+- `pnpm exec vitest run guard` -> `Test Files  51 passed (51)` / `Tests  691 passed | 11 skipped (702)`.
+
+No se corrieron `pnpm test`, `./init.sh` ni el E2E (fuera del encargo).
+
+Veredicto: B10 y la parte backend de TI hechas; base `QuimiCloude_QC209` lista para el E2E.
