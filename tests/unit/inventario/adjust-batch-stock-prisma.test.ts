@@ -45,7 +45,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({
 const { adjustBatchStock, createWithFirstBatch } = await import(
   '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 );
-const { BatchStockNegativeError } = await import('@/lib/modules/inventario/domain/errors');
+const { BatchStockNegativeError, ValidationError } = await import('@/lib/modules/inventario/domain/errors');
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { MovementReason } from '@/lib/modules/inventario/domain/movement-reason';
@@ -368,5 +368,126 @@ describe('adjustBatchStock — producto terminado (R31, R32)', () => {
     await expect(adjustBatchStock(ajuste('0', 'merma'), ACTOR_ID, AHORA, AMBITO)).rejects.toBeInstanceOf(
       BatchStockNegativeError,
     );
+  });
+});
+
+describe('adjustBatchStock — el total contado frente a la existencia bloqueada', () => {
+  it('R12: la diferencia es el total menos la existencia bloqueada, y es la que mueve el lote y el asiento', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, batchStock: '10.2500' });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal('12.75') });
+
+    await expect(adjustBatchStock(ajuste('12.75', 'conteo_fisico', '10.25'), ACTOR_ID, AHORA, AMBITO)).resolves.toMatchObject({
+      kind: 'adjusted',
+      previousStock: '10.2500',
+      difference: '2.5000',
+      stock: '12.7500',
+    });
+
+    expect(doble.batchUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ stock: { increment: new Prisma.Decimal('2.5') } }),
+      }),
+    );
+    expect(doble.movementCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ quantity: '2.5000' }) }),
+    );
+  });
+
+  it('R13: con una existencia bloqueada distinta de la vista devuelve stock_changed sin update, asiento ni recalculo', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, batchStock: '9.0000' });
+
+    await expect(adjustBatchStock(ajuste('12'), ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      kind: 'stock_changed',
+      currentStock: '9.0000',
+    });
+
+    expect(doble.batchUpdate).not.toHaveBeenCalled();
+    expect(doble.movementCreate).not.toHaveBeenCalled();
+    expect(doble.executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('R13: la comparacion con la vista es decimal, no de cadenas', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, batchStock: '10.0000' });
+    doble.batchUpdate.mockResolvedValue({ stock: new Prisma.Decimal(12) });
+
+    for (const seenStock of ['10', '10.0', '10.0000']) {
+      await expect(
+        adjustBatchStock(ajuste('12', 'conteo_fisico', seenStock), ACTOR_ID, AHORA, AMBITO),
+        seenStock,
+      ).resolves.toMatchObject({ kind: 'adjusted' });
+    }
+  });
+
+  it('R13: la existencia cambiada se mira antes que la regla de producto terminado', async () => {
+    // Con la vista (10) el total 11 seria un aumento; con la existencia real (12) es una
+    // disminucion. Lo que manda es que la vista ya no vale.
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, type: 'FINISHED_PRODUCT', batchStock: '12.0000' });
+
+    await expect(adjustBatchStock(ajuste('11'), ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      kind: 'stock_changed',
+      currentStock: '12.0000',
+    });
+  });
+
+  it('R17: un aumento sobre un producto terminado devuelve increase_not_allowed sin escribir', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, type: 'FINISHED_PRODUCT' });
+
+    await expect(adjustBatchStock(ajuste('10.0001'), ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      kind: 'increase_not_allowed',
+    });
+
+    expect(doble.batchUpdate).not.toHaveBeenCalled();
+    expect(doble.movementCreate).not.toHaveBeenCalled();
+  });
+
+  it('R18: un envase con presentacion fija y un total no entero lanza ValidationError sin escribir', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, type: 'PACKAGING', presentationId: 'presentacion-fija' });
+
+    await expect(adjustBatchStock(ajuste('12.5'), ACTOR_ID, AHORA, AMBITO)).rejects.toBeInstanceOf(ValidationError);
+
+    expect(doble.batchUpdate).not.toHaveBeenCalled();
+    expect(doble.movementCreate).not.toHaveBeenCalled();
+  });
+
+  it('R18: un envase con presentacion fija y un total entero se aplica', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, type: 'PACKAGING', presentationId: 'presentacion-fija' });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(12) });
+
+    await expect(adjustBatchStock(ajuste('12'), ACTOR_ID, AHORA, AMBITO)).resolves.toMatchObject({
+      kind: 'adjusted',
+      stock: '12.0000',
+    });
+  });
+
+  it('R19: la violacion del CHECK de existencia negativa se traduce a BatchStockNegativeError', async () => {
+    doble.batchUpdate.mockRejectedValueOnce(violacionDeCheck('product_batches_stock_non_negative'));
+
+    await expect(adjustBatchStock(ajuste('0', 'merma'), ACTOR_ID, AHORA, AMBITO)).rejects.toBeInstanceOf(
+      BatchStockNegativeError,
+    );
+    expect(doble.movementCreate).not.toHaveBeenCalled();
+  });
+
+  it('R24: writeMovement recibe la existencia bloqueada como previousStock y el total contado', async () => {
+    doblarLecturaDelProducto({ id: PRODUCTO_ID, batchStock: '10.0000' });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal('7.5') });
+
+    await adjustBatchStock(ajuste('7.5', 'rotura'), ACTOR_ID, AHORA, AMBITO);
+
+    expect(doble.movementCreate).toHaveBeenCalledWith({
+      data: {
+        batchId: LOTE_ID,
+        kind: 'adjustment',
+        quantity: '-2.5000',
+        reason: 'rotura',
+        orderId: null,
+        orderPresentationLineId: null,
+        stockBefore: '10.0000',
+        countedStock: '7.5',
+        createdBy: ACTOR_ID,
+        companyId: EMPRESA,
+        createdAt: AHORA,
+      },
+    });
   });
 });

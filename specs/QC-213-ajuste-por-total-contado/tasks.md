@@ -89,7 +89,7 @@ Archivos:
 los tests de integración migrados en verde contra Postgres (`pnpm test` sobre esos archivos, base
 de `pnpm run db:test`).
 
-### B3 [P] — Tests nuevos del servidor
+### [x] B3 [P] — Tests nuevos del servidor
 Depende de: B2 (y de B5 para el caso `R26` de integración). En paralelo con B4 y B5.
 
 Archivos:

@@ -11,7 +11,9 @@ import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createAdjustBatchStock } from '@/lib/modules/inventario/domain/adjust-batch-stock';
 import {
   ActionNotAllowedError,
+  AdjustmentReasonNotAllowedError,
   BatchNotFoundError,
+  BatchStockChangedError,
   ProductNotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -583,5 +585,141 @@ describe('QC-138 — el ajuste positivo avisa de la entrada de material (R13, R1
       reserved: '0.0000',
       overReserved: false,
     });
+  });
+});
+
+describe('QC-213 — el ajuste por total contado en el caso de uso', () => {
+  function oyente() {
+    const onStockIncreased = vi.fn(async (input: { companyId: string; now: Date }) => {
+      void input;
+    });
+    return { stockIncreases: { onStockIncreased }, onStockIncreased };
+  }
+
+  for (const reason of ['merma', 'rotura'] as const) {
+    it(`R15: un aumento con el motivo de disminucion ${reason} lanza AdjustmentReasonNotAllowedError sin tocar el puerto`, async () => {
+      const dobles = montarDobles();
+      const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+      const rechazo = ajustar({ ...AUMENTO_VALIDO, reason }, ADMINISTRADOR);
+
+      await expect(rechazo).rejects.toBeInstanceOf(AdjustmentReasonNotAllowedError);
+      await expect(rechazo).rejects.toMatchObject({ code: 'adjustment_reason_not_allowed' });
+      expect(dobles.adjustBatchStock).not.toHaveBeenCalled();
+    });
+  }
+
+  it('R15: los dos motivos de aumento si pasan en un aumento', async () => {
+    for (const reason of ['conteo_fisico', 'error_de_carga'] as const) {
+      const dobles = montarDobles();
+      const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+      await ajustar({ ...AUMENTO_VALIDO, reason }, ADMINISTRADOR);
+
+      expect(dobles.adjustBatchStock, reason).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  const iguales: ReadonlyArray<{ countedStock: string; seenStock: string }> = [
+    { countedStock: '12', seenStock: '12' },
+    { countedStock: '12.0000', seenStock: '12' },
+    { countedStock: '12', seenStock: '12.0000' },
+  ];
+  for (const { countedStock, seenStock } of iguales) {
+    it(`R16: un total ${countedStock} igual a la existencia vista ${seenStock} es invalid_input sin tocar el puerto`, async () => {
+      const dobles = montarDobles();
+      const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+      const rechazo = ajustar({ ...ENTRADA_VALIDA, countedStock, seenStock }, ADMINISTRADOR);
+
+      await expect(rechazo).rejects.toBeInstanceOf(ValidationError);
+      await expect(rechazo).rejects.toMatchObject({ code: 'invalid_input' });
+      expect(dobles.adjustBatchStock).not.toHaveBeenCalled();
+    });
+  }
+
+  const malformadas: ReadonlyArray<{ etiqueta: string; entrada: unknown }> = [
+    { etiqueta: 'un total con signo menos', entrada: { ...ENTRADA_VALIDA, countedStock: '-1' } },
+    { etiqueta: 'un total con signo mas', entrada: { ...ENTRADA_VALIDA, countedStock: '+1' } },
+    { etiqueta: 'una existencia vista con signo', entrada: { ...ENTRADA_VALIDA, seenStock: '-10' } },
+    { etiqueta: 'un total con once enteros', entrada: { ...ENTRADA_VALIDA, countedStock: '12345678901' } },
+    { etiqueta: 'un total con cinco decimales', entrada: { ...ENTRADA_VALIDA, countedStock: '7.12345' } },
+    { etiqueta: 'un campo delta de mas', entrada: { ...ENTRADA_VALIDA, delta: '-3' } },
+  ];
+  for (const { etiqueta, entrada } of malformadas) {
+    it(`R19: ${etiqueta} es invalid_input sin tocar el puerto`, async () => {
+      const dobles = montarDobles();
+      const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+      await expect(ajustar(entrada, ADMINISTRADOR)).rejects.toBeInstanceOf(ValidationError);
+      expect(dobles.adjustBatchStock).not.toHaveBeenCalled();
+    });
+  }
+
+  it('R19: diez enteros y cuatro decimales es el limite que si pasa', async () => {
+    const dobles = montarDobles();
+    const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+    await ajustar({ ...AUMENTO_VALIDO, countedStock: '1234567890.1234' }, ADMINISTRADOR);
+
+    expect(dobles.adjustBatchStock).toHaveBeenCalledTimes(1);
+  });
+
+  it('R13: el puerto devuelve stock_changed y el caso de uso lanza BatchStockChangedError con la existencia actual', async () => {
+    const dobles = montarDobles();
+    dobles.adjustBatchStock.mockResolvedValue({ kind: 'stock_changed', currentStock: '9.0000' });
+    const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+    const rechazo = ajustar(ENTRADA_VALIDA, ADMINISTRADOR);
+
+    await expect(rechazo).rejects.toBeInstanceOf(BatchStockChangedError);
+    await expect(rechazo).rejects.toMatchObject({ code: 'batch_stock_changed', currentStock: '9.0000' });
+  });
+
+  it('R22: el puerto devuelve batch_not_found y el caso de uso lanza BatchNotFoundError', async () => {
+    const dobles = montarDobles();
+    dobles.adjustBatchStock.mockResolvedValue({ kind: 'batch_not_found' });
+    const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+    await expect(ajustar(AUMENTO_VALIDO, ADMINISTRADOR)).rejects.toBeInstanceOf(BatchNotFoundError);
+  });
+
+  it('R23: un aumento aplicado avisa una vez', async () => {
+    const dobles = montarDobles();
+    dobles.adjustBatchStock.mockResolvedValue(adjustedOutcome({ difference: '2.0000', stock: '12.0000' }));
+    const o = oyente();
+    const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+    await ajustar(AUMENTO_VALIDO, ADMINISTRADOR);
+
+    expect(o.onStockIncreased).toHaveBeenCalledTimes(1);
+    expect(o.onStockIncreased).toHaveBeenCalledWith({ companyId: 'company-a', now: AHORA });
+  });
+
+  it('R23: una disminucion aplicada no avisa', async () => {
+    const dobles = montarDobles();
+    const o = oyente();
+    const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+    await ajustar(ENTRADA_VALIDA, ADMINISTRADOR);
+
+    expect(o.onStockIncreased).not.toHaveBeenCalled();
+  });
+
+  it('R23: un aumento rechazado no avisa, sea por la existencia cambiada, el producto terminado o el motivo', async () => {
+    const rechazos: ReadonlyArray<{ etiqueta: string; respuesta: AdjustBatchStockOutcome; reason: string }> = [
+      { etiqueta: 'existencia cambiada', respuesta: { kind: 'stock_changed', currentStock: '11.0000' }, reason: 'conteo_fisico' },
+      { etiqueta: 'producto terminado', respuesta: { kind: 'increase_not_allowed' }, reason: 'conteo_fisico' },
+      { etiqueta: 'motivo no valido', respuesta: adjustedOutcome(), reason: 'merma' },
+    ];
+    for (const { etiqueta, respuesta, reason } of rechazos) {
+      const dobles = montarDobles();
+      dobles.adjustBatchStock.mockResolvedValue(respuesta);
+      const o = oyente();
+      const ajustar = createAdjustBatchStock({ products: dobles.products, stockIncreases: o.stockIncreases, now: () => AHORA });
+
+      await expect(ajustar({ ...AUMENTO_VALIDO, reason }, ADMINISTRADOR), etiqueta).rejects.toBeDefined();
+      expect(o.onStockIncreased, etiqueta).not.toHaveBeenCalled();
+    }
   });
 });
