@@ -56,10 +56,9 @@ export function ProductSheet({
 }: {
   readonly product?: ProductView;
   /**
-   * Catalogo de unidades para el alta rapida de presentacion que vive dentro del selector
-   * (QC-80 R11). Solo hace falta en el ALTA: la EDICION no pinta el selector de presentacion,
-   * asi que la tabla monta sus paneles de edicion sin pasar nada. Baja por props desde la pagina,
-   * que lo pide una sola vez (QC-44 R46).
+   * Catalogo de unidades: en el alta, para el alta rapida de presentacion del selector; en la
+   * edicion, para nombrar la unidad de la alerta de cantidad. Baja por props desde la pagina,
+   * que lo pide una sola vez.
    */
   readonly units?: readonly UnitRef[];
   /** Unidades del selector «Unidad» del alta de insumo. La edicion no las usa. */
