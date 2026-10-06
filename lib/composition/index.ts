@@ -61,6 +61,7 @@ import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/s
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
   createAdjustBatchStock,
+  createConfirmInventoryImport,
   createCreatePresentation,
   createCreateProduct,
   createCreateRawMaterial,
@@ -74,6 +75,7 @@ import {
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
+  createPreviewInventoryImport,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
@@ -119,6 +121,21 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
+import {
+  claimImport,
+  findAliveFinishedProducts,
+  findAliveProductsByNormalizedNames,
+  findBatchesByLots,
+  findImport,
+  finishImport,
+  receiveImportedFinishedGoods,
+} from '@/lib/modules/inventario/adapters/driven/persistence/inventory-import-prisma';
+import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
+import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
+import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
+import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
+import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
+import type { SpreadsheetReader } from '@/lib/modules/inventario/ports/spreadsheet-reader';
 import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
@@ -877,13 +894,42 @@ const stockIncreaseListener: StockIncreaseListener = {
  * `{ id, roleName }` con lo que devuelve `SessionUser`. `lib/composition` no conoce
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
+const createProductUseCase = createCreateProduct({
+  products: productRepository,
+  stockIncreases: stockIncreaseListener,
+  packageUnit: { findPackageUnitId },
+  units: { findRefs: findUnitRefs },
+});
+
+const inventoryImportRepository: InventoryImportRepository = {
+  findAliveProductsByNormalizedNames,
+  findAliveFinishedProducts,
+  findBatchesByLots,
+  findImport,
+  claimImport,
+  finishImport,
+  receiveImportedFinishedGoods,
+};
+
+const spreadsheetReader: SpreadsheetReader = {
+  read: async (bytes, format) => (format === 'csv' ? readCsv(bytes) : readXlsx(bytes)),
+};
+
+const importFormulaLookup: ImportFormulaLookup = {
+  findAliveOriginalByName: findAliveRecipeByNormalizedName,
+};
+
+// Los adaptadores y no `unitCatalog` ni `presentationCatalog`, que se declaran mas abajo.
+const inventoryImportReadDeps = {
+  reader: spreadsheetReader,
+  imports: inventoryImportRepository,
+  units: { listVisibleRefs: listVisibleUnitRefs },
+  presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+  formulas: importFormulaLookup,
+};
+
 export const inventario = {
-  createProduct: createCreateProduct({
-    products: productRepository,
-    stockIncreases: stockIncreaseListener,
-    packageUnit: { findPackageUnitId },
-    units: { findRefs: findUnitRefs },
-  }),
+  createProduct: createProductUseCase,
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
@@ -919,6 +965,13 @@ export const inventario = {
   }),
   // El adaptador y no `unitCatalog`, que se declara mas abajo.
   listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
+  previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
+  confirmInventoryImport: createConfirmInventoryImport({
+    ...inventoryImportReadDeps,
+    createProduct: createProductUseCase,
+    stockIncreases: stockIncreaseListener,
+    digest: fileDigest,
+  }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`

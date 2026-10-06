@@ -429,6 +429,30 @@ model ReservationMovement {
   @@map("reservation_movements")
 }
 
+/// Una confirmacion de importacion de inventario. `importKey` es la clave de idempotencia que manda
+/// la pantalla. `companyId` y `createdBy` no llevan `@relation`: `Company` y `User` son de otro
+/// modulo; sus FK estan escritas a mano y son drift. Sin `deletedAt` ni borrado: es auditoria.
+/// @module inventario
+model InventoryImport {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  importKey       String    @map("import_key") @db.Uuid
+  fileName        String    @map("file_name")
+  fileSha256      String    @map("file_sha256")
+  rowsTotal       Int?      @map("rows_total")
+  createdCount    Int?      @map("created_count")
+  batchAddedCount Int?      @map("batch_added_count")
+  duplicateCount  Int?      @map("duplicate_count")
+  errorCount      Int?      @map("error_count")
+  createdBy       String    @map("created_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  @@unique([companyId, importKey], map: "inventory_imports_company_key_unique")
+  @@index([companyId, createdAt], map: "inventory_imports_company_created_idx")
+  @@map("inventory_imports")
+}
+
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
 /// guardia de modulos lo vea. Sus FK estan escritas a mano. NULL = no la creo una persona.
 /// `companyId` tampoco lleva `@relation`, por el mismo motivo pero hacia `companies`: su FK

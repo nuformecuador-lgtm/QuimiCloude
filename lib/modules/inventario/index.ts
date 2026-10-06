@@ -175,6 +175,53 @@ export type {
   BatchHistoryEntry,
 } from './domain/reservation';
 export { planReservation } from './domain/plan-reservation';
+export {
+  INVENTORY_IMPORT_MAX_ROWS,
+  INVENTORY_IMPORT_MAX_FILE_BYTES,
+  INVENTORY_IMPORT_ACCEPT,
+  IMPORT_TYPE_LABELS,
+  INVENTORY_IMPORT_COLUMNS,
+  IMPORT_ROW_ISSUE_CODES,
+  type InventoryImportFormat,
+  type ImportRowType,
+  type ImportColumnRule,
+  type ImportColumnKey,
+  type ImportCells,
+  type ImportRowIssueCode,
+  type ImportRowIssue,
+  type ImportBatchTarget,
+  type ImportPreviewRow,
+  type ImportPreviewStatus,
+  type ImportMissingEntry,
+  type ImportPreviewTotals,
+  type InventoryImportPreview,
+  type ImportFileRejection,
+  type ImportFileRejected,
+  type InventoryImportPreviewOutcome,
+  type ImportResultRow,
+  type ImportResultTotals,
+  type InventoryImportResult,
+  type ImportAlreadyDone,
+  type ImportNothingImported,
+  type InventoryImportConfirmOutcome,
+  type InventoryImportFile,
+  type PreviewInventoryImport,
+  type ConfirmInventoryImport,
+} from './domain/inventory-import-contract';
+export {
+  IMPORT_EXAMPLE_ROW,
+  buildInventoryImportTemplate,
+  buildInventoryImportErrorFile,
+  type ImportDownload,
+} from './domain/inventory-import-downloads';
+export {
+  createPreviewInventoryImport,
+  type PreviewInventoryImportDeps,
+} from './domain/preview-inventory-import';
+export {
+  createConfirmInventoryImport,
+  type ConfirmInventoryImportDeps,
+} from './domain/confirm-inventory-import';
 export type {
   ReservationCandidateBatch,
   PlanReservationInput,

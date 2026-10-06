@@ -399,6 +399,30 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         documentFileId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
       }),
   },
+  {
+    // Entrada valida para el borde: sin `file` la accion rechaza antes de `currentActor()`.
+    archivo: 'lib/modules/inventario/adapters/driving/inventory-import-actions.ts',
+    nombre: 'previewInventoryImportAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.append('file', new File(['Tipo;Nombre'], 'inventario.csv'));
+      return (
+        await import('@/lib/modules/inventario/adapters/driving/inventory-import-actions')
+      ).previewInventoryImportAction(formData);
+    },
+  },
+  {
+    archivo: 'lib/modules/inventario/adapters/driving/inventory-import-actions.ts',
+    nombre: 'confirmInventoryImportAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.append('file', new File(['Tipo;Nombre'], 'inventario.csv'));
+      formData.append('importKey', '9b2f7c1e-4a3d-4e5f-8a6b-1c2d3e4f5a6b');
+      return (
+        await import('@/lib/modules/inventario/adapters/driving/inventory-import-actions')
+      ).confirmInventoryImportAction(formData);
+    },
+  },
 ];
 
 /**
