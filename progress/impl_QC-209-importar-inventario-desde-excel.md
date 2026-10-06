@@ -721,3 +721,66 @@ no le afecta (comprobado, abajo). Al cerrar la ficha: borrar `QuimiCloude_QC209`
 No se corrieron `pnpm test`, `./init.sh` ni el E2E (fuera del encargo).
 
 Veredicto: B10 y la parte backend de TI hechas; base `QuimiCloude_QC209` lista para el E2E.
+
+## TI E2E
+
+frontend_dev, 2026-10-06. Commit 97d04ac2 (spec, fixture y alta en la guardia) y el de esta bitácora.
+
+### Archivos
+
+- `e2e/fixtures/inventario-importar-mixto.csv`: plantilla del .csv mixto (UTF-8 con BOM, `;`,
+  cabecera de la plantilla). Lleva `{{RUN}}` donde van los nombres y lotes; el spec lo cambia por
+  el `RUN_ID` del worker y sube el resultado como `inventario-importar-mixto.csv` (buffer, sin
+  archivo temporal). Filas de la hoja: 2 insumo nuevo (kg, costo `3,50`), 3 insumo homónimo
+  existente (suma lote), 4 envase con presentación existente, 5 instrumento, 6 producto terminado
+  (fórmula + presentación con contenido 1), 7 lote ya existente del homónimo (duplicado), 8 error
+  de campo («Alerta de cantidad» vacía en insumo), 9 y 10 la misma unidad inexistente (la 10 es el
+  mismo insumo: tras crear la unidad, crea y suma lote de fila).
+- `e2e/inventario-importar.spec.ts`: un test «R33 …». Siembra por Prisma (patrón de
+  `insumo-por-unidad.spec.ts` / `producto-terminado.spec.ts`): empresa `qc209_e2e_<run>_empresa`,
+  Administrador propio, el insumo homónimo en kg con su lote `…_L00` y asiento `opening`, la
+  presentación (litro, contenido 1) y la fórmula original. Limpieza por empresa en `afterAll` y de
+  huérfanos por prefijo y edad (movimientos, lotes, productos, receta, presentación, unidades,
+  `inventory_imports`, usuario, empresa). Testids y textos importados de `import-texts.ts`.
+- `tests/guards/guard-identificador-de-request.test.ts`: alta del spec en la lista cerrada de E2E
+  (mismo motivo que los demás; no toca el identificador de petición). Sin ella la guardia es roja.
+
+### Qué cubre
+
+1. Sube el .csv, vista previa: totales 9 / 4 crear / 1 suma / 1 duplicada / 3 error; estado por
+   fila; la 8 con `value_required` en `qtyAlert`; la 9 y la 10 con `unit_not_found`; la unidad
+   faltante aparece una vez con «Filas 9, 10».
+2. Crea la unidad desde la vista previa (diálogo con el nombre del archivo) y espera la vista previa
+   revalidada: sin sección de faltantes, 5 / 2 / 1 / 1; la 9 `create` y la 10 `add_batch`; la
+   unidad existe en la empresa.
+3. Confirma «Importar 7 filas válidas»; resultado 5 creadas / 2 lotes sumados / 1 duplicada / 1 error.
+4. Descarga el archivo de errores desde el resultado: nombre `inventario-importar-mixto-errores.csv`,
+   BOM, una sola fila de datos (fila 8, su nombre y lote) y «Motivo» igual al texto del motivo de
+   la vista previa.
+5. `/inventario?q=<token>`: existencia de insumo nuevo (25 kg), homónimo (10 + 5 = 15 kg), envase
+   (40), instrumento (2) e insumo con la unidad nueva (10 + la unidad); la fila con error no aparece.
+   Pestaña de terminado (`type=FINISHED_PRODUCT`): el terminado «Sin pedido» con 12.
+6. Postgres: los 7 lotes importados con su existencia y un asiento cada uno por esa cantidad; el lote
+   del duplicado sigue en 10; la fila con error no deja lote; un `inventory_imports` con 9/5/2/1/1.
+
+### Salida real
+
+- `pnpm exec playwright test e2e/inventario-importar.spec.ts --list` ->
+  `[chromium] › inventario-importar.spec.ts:349:7 › importar inventario desde un archivo › R33 el
+  Administrador sube un .csv mixto, crea la unidad que falta desde la vista previa, confirma, ve los
+  lotes en Inventario y descarga solo la fila con error y su motivo` / la misma en `[webkit]` /
+  `Total: 2 tests in 1 file`.
+- `pnpm run typecheck` -> `tsc --noEmit`, sin errores.
+- `pnpm run lint` -> `✖ 8 problems (0 errors, 8 warnings)` (los 8 preexistentes).
+- `pnpm exec vitest run guard` -> `Tests  691 passed | 11 skipped (702)` (antes del alta en la
+  guardia: 1 rojo, `guard-identificador-de-request` «no hay ningun archivo nuevo en e2e/…»).
+
+El E2E **no se corrió** (lo corre el leader en F2.4).
+
+### Cómo correrlo
+
+Con el `.env` del worktree apuntando a `QuimiCloude_QC209` (migrada y sembrada):
+`pnpm exec playwright test e2e/inventario-importar.spec.ts` (los dos proyectos, chromium y webkit).
+No usa el usuario `admin` del seed: crea su propio Administrador en su propia empresa.
+
+Veredicto: E2E de R33 escrito, compila y se lista en los dos proyectos; pendiente de correr.
