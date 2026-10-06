@@ -243,3 +243,32 @@ export function dialogFieldTestId(field: string): string {
 export function dialogFieldErrorTestId(field: string): string {
   return `inventory-import-dialog-error-${field}`;
 }
+
+export const REVIEW_BUTTON_LABEL = 'Revisar archivo';
+export const REVIEWING_NOTICE = 'Revisando el archivo…';
+export const PREVIEW_TITLE = 'Vista previa';
+export const PREVIEW_DESCRIPTION = 'Todavía no se ha importado nada. Revisa las filas y confirma.';
+export const RESULT_TITLE = 'Importación terminada';
+export const RESTART_LABEL = 'Importar otro archivo';
+
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat('es', { dateStyle: 'long', timeStyle: 'short' });
+
+export function formatImportedAt(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? iso : DATE_TIME_FORMAT.format(date);
+}
+
+export function resultDescription(fileName: string, importedAt: string): string {
+  return `«${fileName}» se importó el ${formatImportedAt(importedAt)}. Las filas duplicadas o con error no se importaron.`;
+}
+
+export function alreadyImportedMessage(importedAt: string): string {
+  return `Esta importación ya se había confirmado el ${formatImportedAt(importedAt)}. No se ha vuelto a escribir nada.`;
+}
+
+export const REVIEW_BUTTON_TESTID = 'inventory-import-review';
+export const REVIEWING_TESTID = 'inventory-import-reviewing';
+export const SCREEN_ERROR_TESTID = 'inventory-import-error';
+export const RESULT_TESTID = 'inventory-import-result';
+export const ALREADY_IMPORTED_TESTID = 'inventory-import-already-imported';
+export const RESTART_TESTID = 'inventory-import-restart';

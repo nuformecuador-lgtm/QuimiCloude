@@ -28,6 +28,12 @@ export {
   type ImportStatusOption,
   type ImportStatusPresentation,
 } from './import-preview-table';
+export {
+  ImportAlreadyDoneNotice,
+  ImportResultSummary,
+  RESULT_TABLE_ID,
+  type ImportResultSummaryProps,
+} from './import-result-summary';
 export { ImportTemplateButton } from './import-template-button';
 export * from './import-texts';
 export {
