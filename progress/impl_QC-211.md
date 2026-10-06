@@ -143,4 +143,29 @@ solo pinta para un pedido `PENDIENTE`. Lo rompió 6ef2b6e9 (confirmación antes 
 
 - **T15**: cargar el añadido de `design.md > 6.2` en `FORMULA_PROMPT` (`.env` local y Vercel, en cada
   entorno). No bloquea el merge: el código tolera la ausencia de `packingSteps` (R15).
-- `e2e/empaque.spec.ts` rojo en `dev` (ver arriba): deuda ajena, para otra ficha o un arreglo en `dev`.
+- ~~`e2e/empaque.spec.ts` rojo en `dev`~~: arreglado en esta rama en la vuelta 2, por decisión humana del 2026-10-05.
+
+## Vuelta 2 (arreglos de `progress/review_QC-211.md`)
+
+Commits: `5c4bdd5f` fix(QC-211), `da75c71b` test(e2e).
+
+- **B1, arreglado.** `recipe-form-state.ts`: se quita `(R32, R38 del esquema)` del docblock de `extractStepErrors` y se mantiene la explicación. Se buscó en `git diff origin/dev...HEAD` sobre `app/ lib/ components/ hooks/ db/ middleware.ts` si alguna otra línea de comentario añadida cita `R<n>`, `D<n>` o `QC-<n>`, y no hay ninguna.
+- **m1, arreglado.** `packing-order-screen.tsx` pasa `finishLabel={finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}` a `StepReader`, y `step-reader.tsx` no cambia. Test nuevo en `tests/unit/asignaciones-ui/packing-order-screen.test.tsx`: «R21: mientras termina, el ultimo boton dice «Terminando…» como el boton de hoy». Comprueba el texto, `disabled` y `aria-busy`, y falla sin el arreglo.
+- **m2, comentario corregido y fallback mantenido.** No es cierto que haya «lecturas anteriores a la columna»: el adaptador siempre rellena el campo y la columna es NOT NULL. El `?? []` se queda porque lo exige `recipe-form-packing-steps.test.tsx` («R9: una lectura sin la clave… abre la sección vacía») y la nota de aprobación («al editar, packingSteps ausente = lista vacía»). Solo cambia el comentario, por uno con un motivo verdadero. El comportamiento no cambia.
+- **m3, arreglado.** El `<h3>` de `recipe-version-form.tsx` queda en una línea.
+- **`e2e/empaque.spec.ts`, arreglado en el test.** El spec mantiene la siembra `EN_CURSO`, que comprueba a propósito, y entra por el enlace Entrar, sin diálogo, como hace hoy dev para `EN_CURSO`. Se quita el import de `ASSIGNED_ORDER_START_CONFIRM_TESTID`, que ya no se usaba. Finalizar del operador, y Comenzar y Terminar del empacador, ya pasaban por `clickAndConfirm` con sus diálogos. El código de producción no cambia.
+
+`git merge origin/dev`: «Already up to date». No hay migraciones nuevas.
+
+`./init.sh --rapido`: typecheck y lint verdes. `test:rapido` dio 7 archivos y 9 tests rojos, sobre 369 archivos y 5764 tests. Los 7 archivos están en `tests/baseline-rojos.json`: `recetas/module-contract`, `recetas/scope`, `configuracion-ui/unidades-viewport`, `configuracion-ui/usuarios-viewport`, `inventario/product-page`, `navegacion/pantallas-exigen-permiso` y `recetas-ui/recipe-page`. El modo rápido no consulta esa lista.
+
+`./init.sh` completo: `== init OK ==`.
+
+```
+ Test Files  8 failed | 882 passed (890)
+      Tests  10 failed | 12597 passed | 128 skipped (12735)
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (8 rojos, todos en el baseline de 8)
+```
+
+E2E (`progress/e2e_QC-211_vuelta2.log`), contra `QuimiCloude_QC211`, en chromium y webkit: `empaque`, `pasos-de-envasado`, `ejecucion-receta`, `recetas-pasos`, `formula-desde-pdf` y `versiones-de-receta`. Resultado: `16 passed (2.7m)`, 0 rojos.
