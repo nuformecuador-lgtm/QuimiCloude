@@ -288,3 +288,122 @@ genérico en vez del rechazo `file_too_large`. El servidor sigue mandando.
   `<a download>` en WebView embebido (declarado en design 6); `accept=".xlsx,.csv"` por extensión en
   el selector de Archivos de iOS; `crypto.randomUUID` exige contexto seguro (HTTPS o localhost) y
   Safari iOS ≥ 15.4.
+
+## Pista B lectura (backend_dev, 2026-10-06)
+
+### Commits
+
+- B1 `96e35cbc` · B2 `6544501c` · B3 `db259ae6` · B5 `6c3a27d5` · B9 `af7c599a` · B4 (el commit de
+  esta bitácora).
+
+### Archivos por task
+
+- **B1**: `package.json`, `pnpm-lock.yaml`, `docs/dependencias.md` (filas `papaparse` y
+  `read-excel-file` de design 9.1, y `@types/papaparse` como dev), `docs/architecture.md` (Dominio y
+  tabla de la regla de dependencias: «`zod`, `papaparse`»), `tests/guards/guard-arquitectura-modulos.test.ts`
+  (`PURE_PACKAGES = ['zod', 'papaparse']`).
+- **B2**: `lib/modules/inventario/domain/import-cell-parsing.ts`, `tests/unit/inventario/import-cell-parsing.test.ts`.
+- **B3**: `lib/modules/inventario/ports/spreadsheet-reader.ts`, `lib/modules/inventario/domain/import-file-format.ts`,
+  `lib/modules/inventario/adapters/driven/spreadsheet/csv-reader.ts`, `tests/unit/inventario/spreadsheet-format.test.ts`,
+  `tests/unit/inventario/csv-reader.test.ts`.
+- **B5**: `lib/modules/inventario/domain/import-sheet.ts`, `tests/unit/inventario/import-header.test.ts`,
+  `tests/unit/inventario/import-sheet-limits.test.ts`.
+- **B9**: `lib/modules/inventario/domain/inventory-import-downloads.ts` (contrato de 1.5 intacto;
+  `IMPORT_EXAMPLE_ROW` sin tocar), `tests/unit/inventario/inventory-import-downloads.test.ts`.
+- **B4**: `lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader.ts`,
+  `tests/fixtures/inventario-importar/mixto.xlsx`, `tests/integration/inventario/xlsx-reader.test.ts`.
+
+### Versiones instaladas
+
+`read-excel-file` **9.3.10** y `papaparse` **5.7.0** (dependencias; rango `~` en `package.json`),
+`@types/papaparse` **5.5.2** (dev). Coinciden con las medidas en design 9.1.
+
+### Mapa R → test (pista B lectura)
+
+| R | Test |
+| --- | --- |
+| R3 | `tests/unit/inventario/inventory-import-downloads.test.ts` («R3 es un .csv con BOM…», «R3 trae exactamente las columnas…», «R3 R8 la plantilla sin tocar…») |
+| R4 | `tests/unit/inventario/spreadsheet-format.test.ts` (extensión, firma ZIP, UTF-8, renombrados en los dos sentidos); `tests/unit/inventario/csv-reader.test.ts` (comillas, escapadas, salto entre comillas, CRLF, BOM, separador, comilla sin cerrar); `tests/integration/inventario/xlsx-reader.test.ts` (fixture real: primera hoja, números y fechas nativos, ZIP corrupto o truncado → `unreadable`) |
+| R5 | `tests/unit/inventario/import-header.test.ts` (falta, sobra o repetida con nombres; sin tildes ni mayúsculas; «Fila» y «Motivo») |
+| R6 | `tests/unit/inventario/import-sheet-limits.test.ts` (2.000 sí, 2.001 no, en blanco no cuentan, vacío); `spreadsheet-format.test.ts` (tope de bytes y archivo de 0 bytes) |
+| R8 | `tests/unit/inventario/import-sheet-limits.test.ts` (seis casos «R8 …») |
+| R12 | `tests/unit/inventario/import-cell-parsing.test.ts` (`1.234,5`, `1,234.5`, coma o punto, nativo > 4 decimales); `xlsx-reader.test.ts` (1.23456 nativo → `number_format_invalid`) |
+| R13 | `tests/unit/inventario/import-cell-parsing.test.ts` (`2026-02-30`, `31/12/2026`, mes primero rechazado, compra vacía = hoy, futura); `xlsx-reader.test.ts` (fecha nativa y fecha texto) |
+| R28 | `tests/unit/inventario/inventory-import-downloads.test.ts` (columnas, motivos unidos por « \| », solo `error`, escapado, filas del resultado, se vuelve a leer con `readCsv` + `parseImportSheet` sin rechazo y con los mismos valores) |
+
+### Salida real
+
+- Los 7 archivos de la pista con `pnpm exec vitest run`: `Test Files  7 passed (7)` / `Tests  131 passed (131)`.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 8 problems (0 errors, 8 warnings)` (los 8 preexistentes).
+- `guard-dependencias-aprobadas` + `guard-arquitectura-modulos`: `Test Files  2 passed (2)` / `Tests  64 passed (64)`.
+- `pnpm exec vitest run guard` (todas): `Test Files  3 failed | 48 passed (51)` /
+  `Tests  4 failed | 679 passed | 11 skipped (694)`. Ver «Rojos de guardia».
+
+### Cómo se produjo `mixto.xlsx` (DS-13)
+
+Con **Excel 16 por COM** desde Windows PowerShell 5.1 (`New-Object -ComObject Excel.Application`),
+con un script que queda fuera del repo (scratchpad de la sesión). No sale del .csv del E2E (todavía no
+existe, es de TI): se escribió celda a celda.
+
+- Hoja 1 «Inventario»: cabecera de la plantilla (los 12 textos de `INVENTORY_IMPORT_COLUMNS`).
+  - Fila 2: Insumo «Sal fina», kg, existencia 25 (número), costo unitario 3.5 (número), lote `L-001`,
+    fecha de compra **nativa** 15/01/2026 (formato `dd/mm/yyyy`), vencimiento **texto** `31/12/2026`
+    (celda con formato `@`), alerta 5.
+  - Fila 3: Insumo «Ácido cítrico», existencia **1.23456** (número con 5 decimales), costo 0.0001,
+    lote texto `007`, compra **texto** `2026-02-01`, vencimiento **nativo** 30/06/2027, alerta 2.
+  - Fila 4: en blanco.
+  - Fila 5: Envase «Bidón», presentación «Bidón 20 L», existencia 1234567, costo total 100.25, alerta 10.
+- Hoja 2 «Ignorar»: «NO LEER» y otra línea; el test comprueba que no se lee.
+- `SaveAs(<ruta>, 51)` (xlOpenXMLWorkbook).
+
+### Decisiones de forma (sin cambio de contrato), para revisión y para B8
+
+1. **`ParsedImportSheet`** (`import-sheet.ts`): `{ rows: ParsedImportRow[]; exampleRowIgnored }`; cada
+   fila `{ rowNumber, cells: ImportCells, origins: Record<ImportColumnKey, 'text' | 'number' | 'date'> }`.
+   `parseImportSheet` devuelve `{ ok: true, sheet } | { ok: false, rejection: ImportFileRejection }`.
+   `origins` existe porque el puerto pasa texto + origen, y la regla «número nativo con > 4 decimales →
+   `number_format_invalid`» necesita el origen: B8 debe llamar `parseImportDecimal(text, origin)`. Un
+   texto de .csv con > 4 decimales NO es `number_format_invalid` (el catálogo lo reserva a miles o doble
+   separador): sale como valor y lo rechaza el esquema manual (`stock_invalid`, etc.).
+2. **Numeración de filas**: el lector .csv usa `skipEmptyLines: false` (design 4.1 decía `'greedy'`);
+   las filas en blanco las quita `import-sheet.ts` conservando el número de la hoja. Con `'greedy'`, una
+   línea en blanco en medio corría todos los `rowNumber` siguientes respecto a Excel.
+3. **Texto de números .xlsx**: hasta 4 decimales sin ceros de relleno (`25`, `3.5`) en vez de
+   `toFixed(4)` (`25.0000`), para que el valor que ve el usuario y la comparación con la fila de ejemplo
+   no cambien; con más de 4 decimales reales se escriben todos para que la lectura los rechace.
+4. **`detectImportFileFormat(fileName, bytes)`** (`import-file-format.ts`) resuelve también el tope de
+   bytes (`file_too_large`) y el archivo de 0 bytes (`empty`), antes de mirar extensión y firma.
+5. **Cabecera**: orden de rechazo `missing_columns` → `unknown_columns` → `duplicate_columns`. Una
+   columna con datos y sin cabecera (o datos más allá de la última cabecera) se rechaza como
+   `unknown_columns` con el nombre `Columna <n>`; sin datos se ignora.
+6. **Plantilla sin tocar** (solo la fila de ejemplo) → `empty`. La fila de ejemplo no cuenta para el
+   tope de 2.000.
+7. **Fechas `D/M/AAAA`**: se aceptan día y mes de 1 o 2 dígitos (siempre día primero).
+8. **`esDiaDeCalendario`** es privada en `product-input.ts` y `product-batch-input.ts`;
+   `import-cell-parsing.ts` lleva su copia (`isCalendarDay`) para no tocar archivos fuera de la pista.
+9. **Lectores**: `readCsv(bytes)` y `readXlsx(bytes)` son funciones; el `SpreadsheetReader` que elige
+   uno según el formato lo arma B10 en `lib/composition/index.ts`. `readXlsx` traduce a `unreadable`
+   solo los errores propios de la librería (`InvalidInputError`, `InvalidSpreadsheetError`,
+   `SheetNotFoundError`); cualquier otro se propaga.
+10. **Archivo de errores**: `Papa.unparse` sin `escapeFormulae` (devuelve al mismo usuario sus propios
+    valores, y el escapado los alteraría al volver a subirlos).
+11. `xlsx-reader.test.ts` vive en `tests/integration/` con el nombre de tasks.md (no `.int.test.ts`):
+    no entra en el censo de `aislamiento.json` y no toca la base.
+
+### Abierto
+
+- **R8 con .xlsx**: la comparación con la fila de ejemplo es literal (recortada), como dice design 1.5.
+  Si la plantilla .csv se abre en Excel y se guarda como .xlsx, «3,50» pasa a número 3.5 → texto `3.5`
+  y la fila deja de reconocerse como ejemplo. Falta decidir si las columnas numéricas y de fecha se
+  comparan en forma canónica.
+
+### Rojos de guardia
+
+- **Causado por B1, en un archivo fuera de mi lista (no lo toqué)**:
+  `tests/guards/guard-identificador-de-request.test.ts` › «package.json no gana ninguna dependencia…
+  (R20)»: `DEPENDENCIAS_ESPERADAS = 39` y `DEV_DEPENDENCIAS_ESPERADAS = 20` tienen que pasar a **41** y
+  **21** (la guardia dice que la ficha que añade dependencias actualiza la cifra). El otro caso de esa
+  guardia («db/ no gana ni una migracion…») cae por `20261006120000_inventory_imports` (B6).
+- Ajenos a esta pista: `guard-libro-de-inventario` (camino de escritura nuevo en
+  `inventory-import-prisma.ts`, B7) y `guard-pantallas-exigen-permiso` (`/inventario/importar`, pista F).
