@@ -113,11 +113,15 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
     // o de menos la pone roja igual que antes.
     const ARCHIVOS_ESPERADOS = [
       'adapters/driven/persistence/company-scope.ts',
+      // QC-156: el adaptador del servicio que `clientes` ofrece a otros modulos.
+      'adapters/driven/persistence/customer-catalog-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',
       'domain/actor.ts',
       'domain/create-customer.ts',
+      // QC-156: el contrato de ese servicio.
+      'domain/customer-catalog.ts',
       'domain/customer-id.ts',
       'domain/customer-input.ts',
       'domain/customer-queryable.ts',
@@ -550,12 +554,18 @@ describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombr
 // R40 — clientes no nombra pedidos, ni pedidos nombra clientes
 // ---------------------------------------------------------------------------------------------
 
-describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => {
+describe('R40 — clientes no nombra pedidos, y pedidos solo usa clientes por su contrato (QC-156 R36)', () => {
   const PEDIDOS_DIR = join(repoRoot, 'lib', 'modules', 'pedidos')
 
   /** Especificador de import de otro modulo, sea barrel o ruta profunda: `@/lib/modules/<x>`. */
   function importaModulo(fuente: string, modulo: string): boolean {
     return new RegExp(`@/lib/modules/${modulo}\\b`).test(fuente)
+  }
+
+  /** Solo la ruta profunda: `@/lib/modules/<x>/` seguido de algo. Desde QC-156 `pedidos` puede
+   *  importar el barrel de `clientes`, nunca lo que hay detras de el. */
+  function importaModuloEnProfundidad(fuente: string, modulo: string): boolean {
+    return new RegExp(`@/lib/modules/${modulo}/[^'"\\s]`).test(fuente)
   }
 
   /** El modelo de Prisma (`prisma.<modelo>`) o el nombre de tabla de la otra entidad, sin pasar
@@ -577,16 +587,43 @@ describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => 
     }
     for (const archivo of filesIn(pedidosDir, /\.tsx?$/)) {
       const fuente = leer(archivo)
-      if (importaModulo(fuente, 'clientes') || nombraModeloOTabla(fuente, 'customer', 'customers')) {
+      if (importaModuloEnProfundidad(fuente, 'clientes') || nombraModeloOTabla(fuente, 'customer', 'customers')) {
         hallazgos.push(archivo)
       }
     }
     return hallazgos
   }
 
-  it('ningun archivo de clientes importa pedidos, y ninguno de pedidos importa clientes', () => {
+  it('ningun archivo de clientes importa pedidos, y ninguno de pedidos importa clientes por ruta profunda', () => {
     const hallazgos = hallazgosDeAcoplamiento()
     expect(hallazgos, `acoplamiento entre clientes y pedidos: ${hallazgos.join(', ')}`).toEqual([])
+  })
+
+  it('QC-156 R36 — un import del barrel de clientes desde pedidos no dispara', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc156-scope-'))
+    try {
+      const rutaFabricada = join(raiz, 'domain', '__sensibilidad_barrel__.ts')
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "import type { CustomerRef } from '@/lib/modules/clientes'\nexport type { CustomerRef }\n")
+      expect(hallazgosDeAcoplamiento(moduloDir, raiz)).not.toContain(rutaFabricada)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
+
+  it('QC-156 R36 — un import por ruta profunda de clientes desde pedidos si dispara', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc156-scope-'))
+    try {
+      const rutaFabricada = join(raiz, 'domain', '__sensibilidad_profundo__.ts')
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(
+        rutaFabricada,
+        "import type { CustomerRef } from '@/lib/modules/clientes/domain/customer-catalog'\nexport type { CustomerRef }\n",
+      )
+      expect(hallazgosDeAcoplamiento(moduloDir, raiz)).toContain(rutaFabricada)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
   })
 
   it('el detector dispara con un import fabricado de pedidos desde clientes', () => {

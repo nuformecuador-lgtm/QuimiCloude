@@ -75,6 +75,7 @@ function filaCreada(): OrderRow {
     updatedBy: ACTOR_A.id,
     presentationLines: [],
     unitId: null,
+    customerId: null,
   };
 }
 

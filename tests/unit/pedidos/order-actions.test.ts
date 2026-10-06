@@ -588,14 +588,15 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // Server Action, incluidas `listOrderCoverageAction`, `quoteOrderCostAction`,
     // `quoteOrderPresentationAvailabilityAction` (T11) y `updateOrderDistributionAction`
     // (T25)- devuelven `toErrorState`, que o traduce el error de dominio o registra el ajeno y
-    // devuelve el codigo generico. Ninguno se lo traga sin dejar rastro.
+    // devuelve el codigo generico. Ninguno se lo traga sin dejar rastro. QC-156 suma las tres del
+    // cliente del pedido.
     const source = readActionsSource()
     const catches = source.match(/catch\s*\(/g) ?? []
     const traducciones = source.match(/return toErrorState\(error\)/g) ?? []
     expect(catches.length).toBeGreaterThan(0)
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
-    expect(catches.length).toBe(10)
+    expect(catches.length).toBe(13)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -882,8 +883,8 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
   })
 })
 
-describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14, QC-151 T7 y QC-170 T11/T25', () => {
-  it('el modulo exporta exactamente las diez actions, con su aridad de siempre', () => {
+describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14, QC-151 T7, QC-170 T11/T25 y QC-156 T0', () => {
+  it('el modulo exporta exactamente las trece actions, con su aridad de siempre', () => {
     const exportadas = Object.entries(orderActions)
       .filter(([, valor]) => typeof valor === 'function')
       .map(([nombre, valor]) => [nombre, (valor as (...args: never[]) => unknown).length] as const)
@@ -894,12 +895,18 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       ['createOrderAction', 2],
       ['deleteOrderAction', 2],
       ['getOrderAction', 1],
+      // QC-156: el cliente que trae la direccion del filtro.
+      ['getOrderCustomerFilterOptionAction', 1],
       // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
       ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
       ['quoteOrderCostAction', 1],
       // T11: el disponible de solo lectura, argumento ya tipado.
       ['quoteOrderPresentationAvailabilityAction', 1],
+      // QC-156: opciones del selector, consulta + proposito.
+      ['searchOrderCustomersAction', 2],
+      // QC-156: cambio de cliente, `id` + argumento ya tipado.
+      ['setOrderCustomerAction', 2],
       // T25: la edicion acotada, `id` + argumento ya tipado, ningun `FormData`.
       ['updateOrderAction', 3],
       ['updateOrderDistributionAction', 2],
@@ -919,6 +926,9 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       quoteOrderCostAction: 'input: unknown',
       quoteOrderPresentationAvailabilityAction: 'input: unknown',
       updateOrderDistributionAction: 'id: string, input: unknown',
+      setOrderCustomerAction: 'id: string, input: unknown',
+      searchOrderCustomersAction: 'query: unknown, purpose: OrderCustomerSearchPurpose',
+      getOrderCustomerFilterOptionAction: 'id: string',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {
       const desde = source.indexOf(`export async function ${nombre}(`)

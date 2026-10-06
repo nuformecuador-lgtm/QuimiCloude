@@ -84,6 +84,7 @@ function filaConEmpresa(): OrderRow {
     companyId: EMPRESA,
     presentationLines: [],
     unitId: null,
+    customerId: null,
   }
   return row as OrderRow
 }

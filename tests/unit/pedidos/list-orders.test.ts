@@ -80,6 +80,7 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
     ...overrides,
   }
 }

@@ -116,6 +116,7 @@ export function toOrderView(
     // `null` si el pedido esta sin unidad; la FK con RESTRICT hace imposible el caso
     // «tiene id pero no vuelve del catalogo».
     unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,
+    customer: null,
   };
 }
 

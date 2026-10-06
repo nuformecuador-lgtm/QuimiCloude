@@ -97,7 +97,7 @@ export function isCustomerIdShape(id: string): boolean;
 /** Sin forma de uuid -> CustomerNotFoundError SIN consultar; si no, findAliveRefById o
  *  CustomerNotFoundError. Unico sitio que decide `customer_not_found` (alta, edicion, cambio). */
 export function requireAliveCustomer(
-  customers: Pick<CustomerCatalog, 'findAliveRefById'>, id: string, companyId: string,
+  customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>, id: string, companyId: string,
 ): Promise<CustomerRef>;
 ```
 
@@ -285,7 +285,7 @@ Los tests de `clientes` que cambian están en § 9.
 - `create-order.ts`: con `data.customerId !== null`, antes de abrir la transacción (mismo sitio que
   la comprobación de la receta, línea 111):
   1. si no tiene forma de uuid → `CustomerNotFoundError`, **sin** llamar al catálogo;
-  2. `deps.customers.findAliveRefById(id, actor.companyId)`; si devuelve `null` →
+  2. `deps.customerCatalog.findAliveRefById(id, actor.companyId)`; si devuelve `null` →
      `CustomerNotFoundError`.
 
   `NewOrder.customerId` viaja hasta `transaction.orders.create`.
@@ -294,7 +294,7 @@ Los tests de `clientes` que cambian están en § 9.
   de baja (R12). `OrderEdit.customerId` viaja a `updateAlive`. Cuando la edición cambia algo más
   que el cliente, o no cambia nada, el resto (coste, reservas, transición) **no cambia**. Cuando
   cambia **solo** el cliente, toma el atajo de § 4.1.1 (P6, R13).
-- `CreateOrderDeps` y `UpdateOrderDeps` ganan `customers: Pick<CustomerCatalog, 'findAliveRefById'>`.
+- `CreateOrderDeps` y `UpdateOrderDeps` ganan `customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>`.
 
 ### 4.1.1 Edición que solo cambia el cliente (P6 (b), R13)
 
@@ -304,7 +304,7 @@ y **antes** de la consulta de recetas (línea 103) y de `resolveStoredOrderCost`
 ```ts
 const effectiveId = data.recipeVersionId ?? data.recipeId;
 if (data.customerId !== row.customerId && isCustomerOnlyEdit(row, { ...data, recipeId: effectiveId })) {
-  if (data.customerId !== null) await requireAliveCustomer(deps.customers, data.customerId, actor.companyId);
+  if (data.customerId !== null) await requireAliveCustomer(deps.customerCatalog, data.customerId, actor.companyId);
   await deps.unitOfWork.run(async (tx) => {
     const r = await tx.orders.setCustomerAlive(id, data.customerId, actor.id, now(), scope);
     if (r === 'not_found') throw new OrderNotFoundError();
@@ -386,13 +386,13 @@ proteger. Si un pedido se borra entre el paso 3 y el 7, el `UPDATE` condicional 
 dado de baja, que es exactamente el estado que la decisión 6 admite cuando la baja ocurre después.
 
 **Dependencias:** `orders: OrderRepository`,
-`customers: Pick<CustomerCatalog, 'findAliveRefById'>`, `unitOfWork: OrderUnitOfWork`,
+`customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>`, `unitOfWork: OrderUnitOfWork`,
 `now?: () => Date`. **No** recibe catálogos de recetas, inventario ni unidades. Que no los tenga es
 la prueba estructural de R15: no puede tocar coste ni reservas.
 
 ### 4.3 Búsqueda de opciones y opción de filtro (R27–R29)
 
-`domain/search-order-customers.ts`:
+`domain/search-order-customer-options.ts`:
 
 - El permiso depende del propósito: `'assign'` pide `pedidos.modificar` y `'filter'` pide
   `pedidos.consultar` (R6, R7). Un `purpose` fuera de esos dos valores es `invalid_input`, y lo
@@ -400,7 +400,7 @@ la prueba estructural de R15: no puede tocar coste ni reservas.
   (falla cerrado).
 - Esquema: `{ search: string ≤ 120 (default ''), page: int ≥ 1 (default 1), pageSize?: int ≥ 1 }`.
   `strictObject`, como `createListQuerySchema`.
-- `deps.customers.searchRefs({ search, includeDeleted: purpose === 'filter', page, pageSize },
+- `deps.customerCatalog.searchRefs({ search, includeDeleted: purpose === 'filter', page, pageSize },
   actor.companyId)`. El resultado se mapea con `toOrderCustomer`.
 
 `domain/get-order-customer-filter-option.ts`:
@@ -426,7 +426,7 @@ Incluye los dados de baja por coherencia con R27.
     filtro desaparece.
   - Después de `listAlive`, los `customerId` no nulos de la página se recogen sin repetir. Con la
     lista vacía no se consulta. Si no, se hace **una** llamada a
-    `deps.customers.findRefsIncludingDeleted` (R21).
+    `deps.customerCatalog.findRefsIncludingDeleted` (R21).
   - `toOrderView` recibe un `Map<id, OrderCustomer>`. Un id que no vuelve del catálogo (borrado
     físico por consola, que la FK `RESTRICT` hace casi imposible) se pinta como `customer: null`.
     Así la fila sigue apareciendo, como hace `recipeName`.
@@ -435,7 +435,7 @@ Incluye los dados de baja por coherencia con R27.
 - La **búsqueda** sigue resolviendo a ids de receta (`findIdsMatchingName`) y nada más (R25). No se
   toca.
 - `ListOrdersDeps` y `GetOrderDeps` ganan
-  `customers: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>`.
+  `customerCatalog: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>`.
 
 ### 4.4.1 Cómo se expresa «Sin cliente» (P2)
 
@@ -520,7 +520,7 @@ const customerCatalog: CustomerCatalog = {
 
 Después, en el bloque de `pedidos`:
 
-- `customers: customerCatalog` entra en las dependencias de `createOrder`, `updateOrder`,
+- `customerCatalog: customerCatalog` entra en las dependencias de `createOrder`, `updateOrder`,
   `getOrder` y `listOrders`;
 - se añaden `setOrderCustomer`, `searchOrderCustomers` y `getOrderCustomerFilterOption` a la fachada
   `pedidos`.
@@ -587,6 +587,15 @@ filtro usan `Button` y `AsyncAutocomplete` con `min-h-11`, igual que `TOUCH_TARG
 
 ## 9. Guardias y tests existentes que cambian
 
+> **Enmienda F2.1 (2026-10-06): renombres por la guardia R40; sin cambio de comportamiento.**
+> `nombraModeloOTabla(fuente, 'customer', 'customers')` busca `\bcustomers\b` en todo el texto de
+> `lib/modules/pedidos/`, y no se toca (decisión del humano, opción b). Para que siga verde, nada en
+> `pedidos` contiene `customers` como palabra suelta: la clave de las `*Deps` pasa de `customers` a
+> `customerCatalog` (§ 4.1, § 4.2, § 4.3, § 6), el primer parámetro de `requireAliveCustomer` también
+> se llama `customerCatalog` (§ 1.2), y `search-order-customers.ts` pasa a
+> `search-order-customer-options.ts` (y su test, `search-order-customer-options.test.ts`). Los
+> requisitos R1–R40 no cambian.
+
 | Archivo | Cambio | Por qué |
 | --- | --- | --- |
 | `tests/unit/pedidos/schema/pedidos-schema.test.ts:229` | Se reescribe a R5 | decisión 7 |
@@ -622,7 +631,7 @@ prohibiendo.
 | R23, R24 | `list-orders-customer.test.ts` (poda y log de `customerId` sin forma y de `customerPresence` distinto de `'none'`) + `tests/unit/pedidos/order-customer-filter-where.test.ts` (la tabla de § 4.4.1: los tres casos y el `OR` dentro de su propio término) + `order-customer.int.test.ts` (filtro por cliente, «sin cliente» y los dos a la vez como unión; total; combinación con estado y búsqueda; un pedido sin cliente de otra empresa no aparece) | unit + int |
 | R25 | `list-orders-customer.test.ts`: con un término que solo casa con el cliente, el catálogo de recetas recibe el término y el de clientes no | unit |
 | R26 | caso nuevo en `tests/unit/pedidos/list-orders-customer.test.ts`: `ORDER_QUERYABLE.sortable` no contiene `customer*`, y pedir `sort: customerId` se omite y se anota. Además, `order-view.test.ts:119` sigue fijando `sortable` y `filterable` exactos (§ 9). | unit |
-| R27, R28, R29 | `tests/unit/pedidos/search-order-customers.test.ts` (la respuesta nunca trae «Sin cliente») + `tests/integration/clientes/customer-catalog.int.test.ts` (empresa, bajas, orden, búsqueda sin acentos, 10/25) + `tests/unit/pedidos-ui/order-customer-filter.test.tsx` + `order-list-section.test.tsx` (con `customer=none` no llama a la action de opción) | unit + int |
+| R27, R28, R29 | `tests/unit/pedidos/search-order-customer-options.test.ts` (la respuesta nunca trae «Sin cliente») + `tests/integration/clientes/customer-catalog.int.test.ts` (empresa, bajas, orden, búsqueda sin acentos, 10/25) + `tests/unit/pedidos-ui/order-customer-filter.test.tsx` + `order-list-section.test.tsx` (con `customer=none` no llama a la action de opción) | unit + int |
 | R30 | `tests/unit/pedidos-ui/order-columns.test.tsx` | unit (RTL) |
 | R31 | `tests/unit/pedidos-ui/order-form-customer.test.tsx` + `tests/unit/async-autocomplete.test.tsx` (prop nueva) | unit (RTL) |
 | R32, R33 | `tests/unit/pedidos-ui/order-customer-dialog.test.tsx` + `order-row-actions.test.tsx` (siete estados × `canEditCustomer`) | unit (RTL) |

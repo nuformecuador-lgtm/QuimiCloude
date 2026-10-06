@@ -255,7 +255,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
       // Lo que la formula anterior guardaba: 1000 g al 10 % leidos como 100 kg, a 3.0000.
       const orderId = await withOrderTransaction(async (tx) => {
         const order = await createOrderWriteRepository(tx).create(
-          { recipeId, quantity: '1000', priority: 'BAJA', unitId: fixture.gramoId, status: 'PENDIENTE', presentationLines: [] },
+          { recipeId, quantity: '1000', priority: 'BAJA', unitId: fixture.gramoId, status: 'PENDIENTE', presentationLines: [], customerId: null },
           instante.getUTCFullYear(),
           fixture.actorId,
           instante,

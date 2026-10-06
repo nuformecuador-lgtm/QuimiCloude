@@ -91,6 +91,7 @@ function filaExistente(): OrderRow {
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
   }
 }
 

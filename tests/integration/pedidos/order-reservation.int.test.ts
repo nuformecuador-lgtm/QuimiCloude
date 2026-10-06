@@ -256,7 +256,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
 }
 
 function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): NewOrder {
-  return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
+  return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [], customerId: null };
 }
 
 type ReservaResumen = { readonly kind: string; readonly quantity: string; readonly createdBy: string | null };

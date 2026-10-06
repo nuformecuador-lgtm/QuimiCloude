@@ -250,6 +250,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     ],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    customer: null,
     ...overrides,
   };
 }

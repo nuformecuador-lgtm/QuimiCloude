@@ -112,6 +112,7 @@ function fila(id: string): OrderRow {
     updatedBy: 'u-0',
     presentationLines: [],
     unitId: UNIDAD,
+    customerId: null,
   }
 }
 

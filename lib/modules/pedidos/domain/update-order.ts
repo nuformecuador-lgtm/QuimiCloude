@@ -174,6 +174,7 @@ export function createUpdateOrder(
           priority: data.priority,
           unitId: data.unitId,
           presentationLines: distribution.lines,
+          customerId: null,
         },
         actor.id,
         instant,

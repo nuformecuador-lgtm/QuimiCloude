@@ -122,6 +122,7 @@ function pedido(status: OrderStatus): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
   };
 }
 

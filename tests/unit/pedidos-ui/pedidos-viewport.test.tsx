@@ -324,6 +324,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     ],
     unitId: null,
     unitLabel: null,
+    customer: null,
     ...overrides,
   };
 }

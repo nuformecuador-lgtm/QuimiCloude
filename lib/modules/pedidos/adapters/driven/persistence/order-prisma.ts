@@ -122,6 +122,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
     unitId: row.unitId,
+    customerId: null,
     presentationLines: row.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
@@ -722,6 +723,7 @@ async function insertAliveOrder(
     createdBy: actorId,
     updatedBy: actorId,
     unitId: data.unitId,
+    customerId: null,
     presentationLines: data.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
@@ -804,6 +806,23 @@ async function setOrderReservedAt(
   `);
 }
 
+async function setAliveOrderCustomer(
+  id: string,
+  customerId: string | null,
+  actorId: string,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<'ok' | 'not_found'> {
+  void id;
+  void customerId;
+  void actorId;
+  void now;
+  void scope;
+  void tx;
+  throw new Error('setCustomerAlive: sin implementar');
+}
+
 /** `findBlockedIds`: el filtro y el orden coinciden con el indice parcial
  *  `orders_blocked_company_created_idx`. */
 export async function findBlockedOrderIds(scope: OrderScope): Promise<readonly string[]> {
@@ -881,6 +900,8 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
     setIngredientsCost: (id, cost, actorId, now, scope) => setAliveOrderIngredientsCost(id, cost, actorId, now, scope, tx),
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
+    setCustomerAlive: (id, customerId, actorId, now, scope) =>
+      setAliveOrderCustomer(id, customerId, actorId, now, scope, tx),
     updatePresentationLinesAlive: (id, unitId, lines, actorId, now, scope) =>
       updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),
     finishPackingAlive: (id, packerId, now, scope) => finishPackingAliveOrder(id, packerId, now, scope, tx),

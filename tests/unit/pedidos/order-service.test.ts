@@ -80,6 +80,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedBy: 'admin-0',
     presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null }],
     unitId: UNIT_ID,
+    customerId: null,
     ...overrides,
   }
 }
@@ -210,6 +211,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       status: 'PENDIENTE',
       unitId: UNIT_ID,
       presentationLines: [],
+      customerId: null,
     })
   })
 
@@ -248,6 +250,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     const [data, , actorId] = d.create.mock.calls[0] as [Record<string, unknown>, number, string]
     expect(actorId).toBe(ADMIN.id)
     expect(Object.keys(data).sort()).toEqual([
+      'customerId',
       'presentationLines',
       'priority',
       'quantity',
@@ -334,6 +337,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
       unitId: UNIT_ID,
       unitLabel: 'L',
+      customer: null,
     })
   })
 
@@ -478,6 +482,7 @@ describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', (
       priority: 'ALTA',
       unitId: UNIT_ID,
       presentationLines: [],
+      customerId: null,
     })
     expect(actorId).toBe(ADMIN.id)
     expect(instante).toBe(AHORA)

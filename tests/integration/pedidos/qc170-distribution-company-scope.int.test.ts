@@ -446,6 +446,7 @@ describe('R29 — aislamiento: la edicion general (cantidad, unidad y reparto) n
           quantity: '80.0000',
           priority: 'BAJA',
           unitId: b.unitId,
+          customerId: null,
           presentationLines: [{ presentationId: b.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
         },
         b.actorId,

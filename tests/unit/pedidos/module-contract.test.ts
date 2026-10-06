@@ -730,8 +730,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // no declara `'use server'` y el `.toEqual` de mas abajo lo sigue dejando fuera.
     const ACTIONS = 'lib/modules/pedidos/adapters/driving/order-actions.ts'
     const CRON_ROUTE = 'lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts'
+    // QC-156 T0: datos fijos de las acciones del cliente del pedido, sin `'use server'` -solo
+    // exporta datos-. Se borra al integrar (TI) y esta linea con el.
+    const CUSTOMER_FIXTURES = 'lib/modules/pedidos/adapters/driving/order-customer-fixtures.ts'
     const driving = join(pedidosDir, 'adapters', 'driving')
-    expect(sourcesIn(driving).map(etiqueta).sort()).toEqual([ACTIONS, CRON_ROUTE].sort())
+    expect(sourcesIn(driving).map(etiqueta).sort()).toEqual([ACTIONS, CRON_ROUTE, CUSTOMER_FIXTURES].sort())
     expect(readdirSync(driving), 'driving/ conserva un .gitkeep con codigo dentro').not.toContain(
       '.gitkeep',
     )

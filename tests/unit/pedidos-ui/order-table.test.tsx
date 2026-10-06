@@ -113,6 +113,7 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
     ...overrides,
   };
 }

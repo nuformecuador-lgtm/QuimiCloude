@@ -38,6 +38,8 @@
 
 ## T0 — Publicar el contrato en código (secuencial; bloquea todo)
 
+**Estado:** [x] hecha (commit T0)
+
 **Agente:** `backend_dev` · **R:** R37 (forma), R9 (lista de sesión), R36 (frontera), R11 (`requireAliveCustomer`)
 
 Archivos:
@@ -58,7 +60,7 @@ Archivos:
 - `lib/modules/pedidos/domain/order-view.ts` (modifica): `customerId` en `OrderRow`, `NewOrder` y
   `OrderEdit`; `customer` en `OrderView`.
 - `lib/modules/pedidos/domain/errors.ts` (modifica): `CustomerNotFoundError` (`'customer_not_found'`).
-- `lib/modules/pedidos/domain/set-order-customer.ts`, `search-order-customers.ts` y
+- `lib/modules/pedidos/domain/set-order-customer.ts`, `search-order-customer-options.ts` y
   `get-order-customer-filter-option.ts` (nuevos, **stub**): factorías con la firma de
   `design.md > 1.3` y su tipo `*Deps`. El cuerpo lanza «sin implementar».
 - `lib/modules/pedidos/index.ts` (modifica): reexporta lo anterior. **Es la única vez que la feature
@@ -183,7 +185,7 @@ tests de `order-distribution` siguen en verde sin editarlos.
 
 ### B4 [P] — Cambio de cliente y búsqueda de opciones · depende de: T0 · R6, R7, R8, R14–R18, R27, R28, R29
 
-- `set-order-customer.ts`, `search-order-customers.ts` y `get-order-customer-filter-option.ts`,
+- `set-order-customer.ts`, `search-order-customer-options.ts` y `get-order-customer-filter-option.ts`,
   reales (`design.md > 4.2`, `> 4.3`).
 - `tests/unit/pedidos/set-order-customer.test.ts` (nuevo):
   - los **siete** estados aceptan el cambio;
@@ -193,7 +195,7 @@ tests de `order-distribution` siguen en verde sin editarlos.
   - claves extra sin efecto;
   - el `unitOfWork` solo recibe `setCustomerAlive`, con `(id, customerId, actor.id, now, scope)`;
   - las dependencias no incluyen catálogos de recetas, inventario ni unidades.
-- `tests/unit/pedidos/search-order-customers.test.ts` (nuevo): `includeDeleted` según `purpose`, un
+- `tests/unit/pedidos/search-order-customer-options.test.ts` (nuevo): `includeDeleted` según `purpose`, un
   `purpose` desconocido falla cerrado, la respuesta nunca trae una opción «Sin cliente» (R27), y la
   opción de filtro con un id sin forma devuelve `null` sin consultar.
 - `tests/unit/pedidos/order-customer-authorization.test.ts` (nuevo): la matriz de
@@ -392,14 +394,14 @@ lo prohibido.
 - `lib/modules/clientes/domain/customer-catalog.ts`
 - `lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma.ts`
 - `lib/modules/pedidos/domain/order-customer.ts`, `set-order-customer.ts`,
-  `search-order-customers.ts`, `get-order-customer-filter-option.ts`, `order-edit-change.ts`
+  `search-order-customer-options.ts`, `get-order-customer-filter-option.ts`, `order-edit-change.ts`
 - `lib/modules/pedidos/adapters/driving/order-customer-fixtures.ts` (temporal, se borra en TI)
 - `app/(private)/pedidos/components/order-customer-label.ts`, `order-customer-picker.tsx`,
   `order-customer-dialog.tsx`, `order-customer-filter.tsx`
 - `e2e/pedido-con-cliente.spec.ts`
 - Tests:
   - `tests/unit/pedidos/order-customer-contract.test-d.ts`, `order-customer-write.test.ts`,
-    `set-order-customer.test.ts`, `search-order-customers.test.ts`,
+    `set-order-customer.test.ts`, `search-order-customer-options.test.ts`,
     `order-customer-authorization.test.ts`, `list-orders-customer.test.ts`,
     `order-customer-boundaries.test.ts`, `order-actions-customer.test.ts`,
     `order-customer.test.ts`, `order-edit-change.test.ts`, `order-customer-filter-where.test.ts`
