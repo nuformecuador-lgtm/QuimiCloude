@@ -33,6 +33,10 @@ export async function writeMovement(
       reason: movement.reason,
       orderId: movement.orderId,
       orderPresentationLineId: movement.orderPresentationLineId,
+      // Sin ellos la columna queda NULL por omision: solo un ajuste los escribe.
+      ...(movement.previousStock != null || movement.countedStock != null
+        ? { stockBefore: movement.previousStock ?? null, countedStock: movement.countedStock ?? null }
+        : {}),
       createdBy: movement.createdBy,
       ...companyScopeColumns(scope),
       createdAt: now,

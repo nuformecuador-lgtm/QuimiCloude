@@ -49,7 +49,7 @@ dentro del puente; commit `feat(QC-213): publica el contrato del ajuste por tota
 
 ## Bloque B — backend (`backend_dev`)
 
-### B1 — Migración y escritura de las columnas nuevas
+### [x] B1 — Migración y escritura de las columnas nuevas
 Depende de: T0.
 
 Archivos:
@@ -187,7 +187,7 @@ Archivos:
   motivos.
 - `e2e/ajuste-de-inventario.spec.ts`: sustituye el ajuste con signo y el caso de negativo por
   `R29` — aumento (total > existencia, motivo `conteo_fisico`; en Postgres: lote, asiento con
-  cantidad, `previous_stock` y `counted_stock`; en el historial se ven los dos campos); disminución
+  cantidad, `stock_before` y `counted_stock`; en el historial se ven los dos campos); disminución
   (total < existencia, motivo `merma`); existencia cambiada (con el diálogo abierto, el test cambia la
   existencia del lote con Prisma; al confirmar se ve `adjust-batch-stock-changed`, la existencia
   nueva y la diferencia recalculada, y en Postgres no hay asiento nuevo; al confirmar de nuevo se

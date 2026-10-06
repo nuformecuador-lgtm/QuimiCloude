@@ -299,30 +299,39 @@ que no choque con otra rama: QC-209 corre en paralelo y también puede migrar).
 `migration.sql`:
 
 ```sql
-ALTER TABLE "inventory_movements" ADD COLUMN "previous_stock" DECIMAL(14,4);
-ALTER TABLE "inventory_movements" ADD COLUMN "counted_stock"  DECIMAL(14,4);
+ALTER TABLE "inventory_movements" ADD COLUMN "stock_before"  DECIMAL(14,4);
+ALTER TABLE "inventory_movements" ADD COLUMN "counted_stock" DECIMAL(14,4);
 
 -- o los dos o ninguno
 ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_count_pair"
-  CHECK (("previous_stock" IS NULL) = ("counted_stock" IS NULL));
+  CHECK (("stock_before" IS NULL) = ("counted_stock" IS NULL));
 
 -- solo un ajuste los lleva
 ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_count_only_adjustment"
-  CHECK ("previous_stock" IS NULL OR "kind" = 'adjustment');
+  CHECK ("stock_before" IS NULL OR "kind"::text = 'adjustment');
 
--- el asiento cuadra: total = anterior + cantidad, y ninguno es negativo
+-- el asiento cuadra: total = existencia de antes + cantidad, y ninguno es negativo
 ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_count_balances"
   CHECK ("counted_stock" IS NULL
-         OR ("counted_stock" = "previous_stock" + "quantity"
-             AND "previous_stock" >= 0 AND "counted_stock" >= 0));
+         OR ("counted_stock" = "stock_before" + "quantity"
+             AND "stock_before" >= 0 AND "counted_stock" >= 0));
 ```
 
 `down.sql`, orden inverso: `DROP CONSTRAINT` de los tres y `DROP COLUMN` de las dos.
 
 `db/schema.prisma`, modelo `InventoryMovement`:
-`previousStock Decimal? @map("previous_stock") @db.Decimal(14, 4)` y
+`stockBefore Decimal? @map("stock_before") @db.Decimal(14, 4)` y
 `countedStock Decimal? @map("counted_stock") @db.Decimal(14, 4)`. Los tres `CHECK` son drift para
 Prisma, como los que ya tiene la tabla.
+
+Enmienda (humano, 2026-10-06):
+- **`stock_before` / `stockBefore`, no `previous_stock`.** La guardia de identidad
+  (`credential-policy-contract.test.ts`) prohíbe «previous» en lo declarado del esquema. El
+  contrato del §1 conserva `previousStock` (`BatchHistoryEntry`, `NewInventoryMovement`,
+  `AdjustBatchStockOutcome`); el adaptador traduce `previousStock` ↔ `stockBefore`.
+- **`"kind"::text`.** `proveedores/company-scope.int.test.ts` reproduce `down.sql` viejos que
+  recrean el enum `InventoryMovementKind`; sin el cast, el `CHECK` falla con
+  `42883 text = "InventoryMovementKind"`.
 
 Sin RLS nueva: el acceso sigue el patrón del repo (`docs/architecture.md > Acceso a datos y
 autorizacion`), con el ámbito de empresa en cada consulta. Columnas anulables, sin valor por
@@ -359,8 +368,8 @@ del primero, lee la existencia ya comprometida, no coincide con su vista y sale 
 mismo bloqueo del producto que hoy serializa ajuste/alta/consumo sigue siendo el primero que se toma,
 así que no aparece un orden de bloqueo nuevo.
 
-`writeMovement` (`batch-movement-prisma.ts:22`) escribe `previousStock` y `countedStock` cuando
-llegan, y `null` cuando no.
+`writeMovement` (`batch-movement-prisma.ts:22`) escribe `previousStock` (columna `stock_before`) y
+`countedStock` cuando llegan, y `null` cuando no.
 
 ## 4. Diálogo — R1–R11
 
