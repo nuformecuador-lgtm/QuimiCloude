@@ -541,7 +541,7 @@ type BatchLotTopRow = { readonly top: string | null };
  * toma su instantanea al empezar, y dentro de la misma sentencia leeria el maximo anterior al
  * commit de la otra sesion. El lock solo evita choques; la garantia es el indice unico.
  */
-async function resolveLot(
+export async function resolveLot(
   tx: Prisma.TransactionClient,
   batch: NewProductBatch,
   scope: InventoryScope,
@@ -575,7 +575,7 @@ async function resolveLot(
  * «que lo genere el backend» en una columna NOT NULL. `createdBy`/`updatedBy` van como escalares:
  * la FK a `users` solo existe en la migracion, para que el cliente no pueda atravesar a `identity`.
  */
-function toBatchCreateData(
+export function toBatchCreateData(
   productId: string,
   batch: NewProductBatch,
   lot: string,
@@ -1267,6 +1267,46 @@ export async function receiveFinishedGoods(
   await recalculateProductStock(tx, product.id, scope);
 
   return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
+}
+
+/** Lote de producto terminado que entra por importacion: asiento `opening`, no `production`,
+ *  porque no sale de ningun pedido. El producto ya debe existir y estar fijado en `tx`. */
+export async function addImportedFinishedGoodsBatch(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  batch: NewProductBatch,
+  packageContent: string,
+  now: Date,
+  scope: InventoryScope,
+): Promise<{ batchId: string; lot: string }> {
+  const lot = await resolveLot(tx, batch, scope);
+
+  const createdBatch = await tx.productBatch.create({
+    data: {
+      ...toBatchCreateData(productId, batch, lot, now, scope),
+      packageContent: new Prisma.Decimal(packageContent),
+    },
+    select: { id: true },
+  });
+
+  await writeMovement(
+    tx,
+    {
+      batchId: createdBatch.id,
+      kind: 'opening',
+      quantity: batch.stock,
+      reason: null,
+      orderId: null,
+      orderPresentationLineId: null,
+      createdBy: batch.createdBy,
+    },
+    now,
+    scope,
+  );
+
+  await recalculateProductStock(tx, productId, scope);
+
+  return { batchId: createdBatch.id, lot };
 }
 
 /** `quantity / packageContent`, como entero: `receiveFinishedGoods` siempre escribe la cantidad

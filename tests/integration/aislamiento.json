@@ -482,6 +482,31 @@
       "archivo": "unidades/unit-catalog-visible.int.test.ts",
       "motivo": "Unidades visibles para una empresa: ejercita 'listVisibleUnitRefs' (unit-catalog-prisma.ts), que lee con el cliente Prisma GLOBAL y no veria filas de una transaccion del test. El caso fabrica dos empresas efimeras con randomUUID y una unidad propia en cada una, y las borra en un 'finally' (unidades -> empresas). Las unidades de sistema solo se leen. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-05"
+    },
+    {
+      "archivo": "inventario/inventory-import-repository.int.test.ts",
+      "motivo": "Importacion de inventario: ejercita 'inventory-import-prisma.ts', que lee y escribe con el cliente Prisma GLOBAL y cuyo 'receiveImportedFinishedGoods' abre su PROPIA 'prisma.$transaction': una transaccion del test con ROLLBACK no los envolveria. La doble reserva simultanea de la clave necesita dos conexiones reales que confirmen para que choque el indice unico 'inventory_imports_company_key_unique'. Cada caso fabrica su empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentaciones, recetas, productos y lotes) y 'afterAll' la borra entera por 'company_id' en orden de FK (asientos -> lotes -> productos -> importaciones -> presentaciones -> recetas -> unidades -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
+    },
+    {
+      "archivo": "inventario/inventory-import-isolation.int.test.ts",
+      "motivo": "Aislamiento por empresa de 'inventory-import-prisma.ts': sus lecturas y escrituras usan el cliente Prisma GLOBAL y 'receiveImportedFinishedGoods' abre su PROPIA 'prisma.$transaction', asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y 'afterAll' las borra enteras por 'company_id' en orden de FK (asientos -> lotes -> productos -> importaciones -> presentaciones -> recetas -> unidades -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
+    },
+    {
+      "archivo": "inventario/inventory-import-confirm.int.test.ts",
+      "motivo": "Vista previa y confirmacion de la importacion con los adaptadores reales: el alta manual ('createWithFirstBatch', 'addBatchToAlive'), la reserva y el cierre de la importacion usan el cliente Prisma GLOBAL y cada fila abre su PROPIA transaccion, que es justo lo que se prueba (una fila que falla no deshace las demas). Una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica su empresa efimera con randomUUID y 'afterAll' la borra entera por 'company_id' en orden de FK (asientos -> lotes -> productos -> importaciones -> presentaciones -> recetas -> unidades -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
+    },
+    {
+      "archivo": "inventario/inventory-import-finished-goods.int.test.ts",
+      "motivo": "Producto terminado importado: 'receiveImportedFinishedGoods' abre su PROPIA 'prisma.$transaction' con el cliente GLOBAL, asi que una transaccion del test no la envolveria. Cada caso fabrica su empresa efimera con randomUUID (unidad, presentaciones, recetas) y 'afterAll' la borra entera por 'company_id' en orden de FK (asientos -> lotes -> productos -> importaciones -> presentaciones -> recetas -> unidades -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
+    },
+    {
+      "archivo": "inventario/inventory-import-idempotency.int.test.ts",
+      "motivo": "Doble confirmacion con la misma clave: la reserva tiene que quedar CONFIRMADA en 'inventory_imports' para que la segunda choque con 'inventory_imports_company_key_unique', y cada fila escribe con el cliente Prisma GLOBAL en su propia transaccion. Cada caso fabrica su empresa efimera con randomUUID y 'afterAll' la borra entera por 'company_id' en orden de FK (asientos -> lotes -> productos -> importaciones -> presentaciones -> recetas -> unidades -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
     }
   ]
 }

@@ -1305,6 +1305,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
+        // La pantalla de importar inventario: cuelga de /inventario, no del asistente de lectura.
+        'INVENTORY_IMPORT_ROUTE',
         'INVENTORY_ROUTE',
         'LOGIN_ROUTE',
         // No es una pantalla: el destino del login tras un corte de sesion, derivado de LOGIN_ROUTE.

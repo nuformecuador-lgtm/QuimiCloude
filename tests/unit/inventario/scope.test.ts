@@ -363,11 +363,19 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // la pestaña «Producto terminado» de Inventario -el alta del catalogo la sigue cubriendo
     // `inventario.spec.ts` y esta ficha no la toca-. La guardia no se afloja; se le añade un
     // renglon.
+    // ACTUALIZADO 2026-10-06 (QC-209, importar-inventario-desde-excel): entran dos nombres mas,
+    // en el orden que el matcher devuelve (alfabetico): `inventario-importar.spec.ts` y su dato,
+    // `fixtures/inventario-importar-mixto.csv`. Casan por la palabra «inventario». No son una
+    // segunda pantalla del catalogo: ejercitan la pantalla de importacion bajo
+    // `inventario/importar` -el alta del catalogo la sigue cubriendo `inventario.spec.ts` y esta
+    // ficha no la toca-. La guardia no se afloja; se le añaden dos renglones.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
       E2E_DE_AISLAMIENTO,
       'ajuste-de-inventario.spec.ts',
+      'fixtures/inventario-importar-mixto.csv',
+      'inventario-importar.spec.ts',
       'inventario.spec.ts',
       'producto-terminado.spec.ts',
     ])
