@@ -366,6 +366,8 @@ lo prohibido.
 
 ## TI — Integración (secuencial; depende de: B6, F7)
 
+**Estado:** [x] hecha (actions reales `63533f45`, E2E `3c76ef26`)
+
 **Agente:** `backend_dev` para las actions y `frontend_dev` para el E2E, en este orden.
 
 - `order-actions.ts`: las tres actions llaman a `pedidos.*` de verdad, y `buildCreateCandidate` lee
@@ -389,6 +391,8 @@ lo prohibido.
 ---
 
 ## TZ — Cierre (depende de: TI)
+
+**Estado:** [ ] parcial — mapa R→test, CHECKPOINTS revisado y `--rapido` hechos; falta `./init.sh` completo (F2.4)
 
 - `progress/impl_QC-156-pedido-con-cliente.md`: el mapa **R1–R40 → test**, archivo y nombre del
   caso (`design.md > 10` como guía, contrastado con lo escrito de verdad).

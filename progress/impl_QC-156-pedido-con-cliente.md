@@ -191,4 +191,99 @@ Veredicto: B6 implementado y en verde salvo 31 casos de integracion rojos por el
 `createOrder`/`updateOrder`, por el cambio mecánico de T0 sobre `NewOrder`. Se mantiene design § 4.1
 (`customerId: z.string().optional()`, sin aceptar `null`) y se corrigen las entradas de test
 (`Omit<NewOrder, 'customerId'>`); sin cambio de lógica ni de aserciones. Resultado: 16/16 archivos,
-185/185 casos de integración en verde.
+185/185 casos de integración en verde. Decisión aceptada por el leader.
+
+`./init.sh --rapido` tras B6 (tip `840b9bdc`): typecheck y lint en verde; 365 archivos de test, 360
+pasan; 5667 casos pasan, 7 fallan, 2 omitidos. Los 7 rojos (5 archivos) están todos en
+`tests/baseline-rojos.json`: `configuracion-ui/unidades-viewport` (2), `configuracion-ui/usuarios-viewport`
+(2), `navegacion/pantallas-exigen-permiso` ('/pedidos'), `inventario/product-page` (R18),
+`recetas-ui/recipe-page` (R21). El modo rápido no consulta esa lista, así que el exit es 1.
+
+## Mapa consolidado R1–R40 → test (implementer, TZ)
+
+Construido a partir de los nombres reales de los casos **añadidos o reescritos por esta feature**
+(`git diff de33dd8e..HEAD -- tests e2e`, casos `it/test/describe` que citan el R), y contrastado con
+`design.md > 10`. El número entre paréntesis es la cantidad de casos que citan ese R en el archivo. Las
+rutas son relativas a `tests/`, salvo `e2e/`.
+
+| R | Tests |
+| --- | --- |
+| R1 | `unit/pedidos/schema/orders-customer-migration.test.ts` (2) · `integration/pedidos/orders-customer-constraints.int.test.ts` (1) · `unit/pedidos/schema/pedidos-schema.test.ts` (`ORDER_COLUMNS`) |
+| R2 | `orders-customer-migration.test.ts` (3) · `orders-customer-constraints.int.test.ts` (1) |
+| R3 | `orders-customer-migration.test.ts` (3) · `orders-customer-constraints.int.test.ts` (2: 23503 con otra empresa) |
+| R4 | `orders-customer-migration.test.ts` (4) · `orders-customer-constraints.int.test.ts` (1: DOWN y UP) · `integration/clientes/customers-migration.int.test.ts` (baja de las posteriores) |
+| R5 | `unit/pedidos/schema/pedidos-schema.test.ts` «QC-156 R5: Order declara una sola referencia a cliente…» |
+| R6 | `unit/pedidos/order-customer-authorization.test.ts` · `order-actions-customer.test.ts` · `search-order-customer-options.test.ts` · `e2e/pedido-con-cliente.spec.ts` R40(d) |
+| R7 | `order-customer-authorization.test.ts` · `order-actions-customer.test.ts` |
+| R8 | `order-customer-authorization.test.ts` (3) · `unit/pedidos-ui/order-columns.test.tsx` |
+| R9 | `unit/pedidos/order-actions-customer.test.ts` (8: una lectura de sesión, actor, sin permiso repetido) · `unit/identity/session-once-per-request-actions.test.ts` (tres filas) |
+| R10 | `order-customer-write.test.ts` (5) · `order-actions-customer.test.ts` (2) · `order-customer.test.ts` |
+| R11 | `order-customer-write.test.ts` (7: cuatro causas, cero llamadas sin forma de uuid) · `order-customer.test.ts` (3) · `set-order-customer.test.ts` (2) · `order-actions-customer.test.ts` (2) |
+| R12 | `order-customer-write.test.ts` (2) · `set-order-customer.test.ts` (2) |
+| R13 | `order-edit-change.test.ts` (13) · `order-customer-write.test.ts` (11: atajo con dobles que fallan) · `integration/pedidos/order-customer.int.test.ts` «R13: no recalcula ni toca lo apartado…» · `order-actions-customer.test.ts` |
+| R14 | `set-order-customer.test.ts` (siete estados) · `order-customer.int.test.ts` · `pedidos-ui/order-customer-dialog.test.tsx` (3) · `e2e` R40(c) |
+| R15 | `set-order-customer.test.ts` (3) · `order-customer-write.test.ts` · `order-customer.int.test.ts` (2) |
+| R16 | `set-order-customer.test.ts` (4) |
+| R17 | `set-order-customer.test.ts` (3) |
+| R18 | `set-order-customer.test.ts` (6: tres causas de `order_not_found`) · `order-actions-customer.test.ts` |
+| R19 | `list-orders-customer.test.ts` (4) · `get-order.test.ts` (2) · `order-customer.int.test.ts` · `order-customer.test.ts` |
+| R20 | `list-orders-customer.test.ts` (2) · `get-order.test.ts` · `order-customer.int.test.ts` · `pedidos-ui/order-columns.test.tsx` (2) · `pedidos-ui/order-customer-picker.test.tsx` |
+| R21 | `list-orders-customer.test.ts` (4) · `get-order.test.ts` |
+| R22 | `unit/pedidos/order-customer-boundaries.test.ts` (4) |
+| R23 | `order-customer-filter-where.test.ts` (3) · `list-orders-customer.test.ts` (2) · `order-view.test.ts` · `order-customer.int.test.ts` · `e2e` R40(b) |
+| R24 | `order-customer-filter-where.test.ts` (7) · `list-orders-customer.test.ts` (5) · `order-view.test.ts` · `order-customer.int.test.ts` · `pedidos-ui/order-list-params.test.ts` |
+| R25 | `list-orders-customer.test.ts` (2) |
+| R26 | `list-orders-customer.test.ts` (2) · `order-view.test.ts` · `pedidos-ui/order-columns.test.tsx` |
+| R27 | `search-order-customer-options.test.ts` (5) · `unit/clientes/customer-catalog.test.ts` (3) · `integration/clientes/customer-catalog.int.test.ts` (3) · `pedidos-ui/order-customer-filter.test.tsx` · `order-customer-picker.test.tsx` · `order-actions-customer.test.ts` |
+| R28 | `customer-catalog.test.ts` (5) · `customer-catalog.int.test.ts` (3) · `search-order-customer-options.test.ts` (2) · `order-customer-picker.test.tsx` |
+| R29 | `search-order-customer-options.test.ts` (4) · `pedidos-ui/order-list-section.test.tsx` (3) · `order-customer-filter.test.tsx` (2) · `order-table.test.tsx` · `order-actions-customer.test.ts` |
+| R30 | `pedidos-ui/order-columns.test.tsx` (4) · `e2e` R40(a) |
+| R31 | `pedidos-ui/order-form-customer.test.tsx` (6) · `order-customer-picker.test.tsx` (4) · `order-customer-dialog.test.tsx` · `unit/async-autocomplete.test.tsx` (2) |
+| R32 | `pedidos-ui/order-row-actions.test.tsx` (4: siete estados × `canEditCustomer`) · `order-customer-dialog.test.tsx` · `order-list-section.test.tsx` · `e2e` R40(c), R40(d) |
+| R33 | `pedidos-ui/order-customer-dialog.test.tsx` (2) · `e2e` R40(c) |
+| R34 | `order-list-params.test.ts` (5) · `order-customer-picker.test.tsx` (5) · `order-customer-filter.test.tsx` (5) · `order-table.test.tsx` · `e2e` R40(b) |
+| R35 | `order-customer-dialog.test.tsx` · `order-customer-filter.test.tsx` · `order-customer-picker.test.tsx` · `order-columns.test.tsx` · `pedidos-viewport.test.tsx` (columnas 11 → 12) |
+| R36 | `unit/clientes/scope.test.ts` (3: R40 de QC-154 reescrito, barrel no dispara, ruta profunda sí) · `guards/guard-arquitectura-modulos.test.ts` |
+| R37 | `unit/clientes/customer-catalog.test.ts` (4) · `integration/clientes/customer-catalog.int.test.ts` · `unit/pedidos/order-customer-contract.test-d.ts` (forma de `CustomerRef`) · tests de `clientes` de QC-153/154/155 en verde |
+| R38 | `guards/guard-catalogo-de-errores.test.ts` + `unit/errores/catalogo.test.ts` (sin cambios, en verde): guardia, sin caso nuevo, según design § 10 |
+| R39 | `guards/guard-dependencias-aprobadas.test.ts` (sin cambios, en verde; `package.json` y `pnpm-lock.yaml` sin diff frente a `de33dd8e`): guardia, según design § 10 |
+| R40 | `e2e/pedido-con-cliente.spec.ts`: R40(a) alta con cliente y columna; R40(b) filtro; R40(c) cambio en `CANCELADO` sin cambio de estado; R40(d) solo `pedidos.consultar`: sin «Cliente» y `unauthorized` en el servidor |
+
+## E2E (TI, 2026-10-06, contra `QuimiCloude_QC156`, puerto 3117)
+
+`pnpm exec playwright test e2e/pedido-con-cliente.spec.ts`: **8 passed (1.2m)**.
+
+| Caso | Chromium | WebKit |
+| --- | --- | --- |
+| R40(a) crea un pedido con cliente y ve su nombre en la columna «Cliente» (R30) | 49.0s | 1.0m |
+| R40(b) filtra la lista por el cliente y ve solo sus pedidos (R23, R34) | 41.5s | 46.4s |
+| R40(c) cambia el cliente de un pedido CANCELADO sin que cambie su estado (R14, R32, R33) | 45.0s | 23.1s |
+| R40(d) con solo pedidos.consultar no ve «Cliente» y el servidor rechaza con unauthorized (R6, R32) | 34.0s | 10.7s |
+
+Primera corrida: 6/8 en rojo por un selector del test (`input:not([type="hidden"])` también casaba con
+el input oculto de base-ui). Se cambió a `getByRole('combobox')`, sin tocar producción.
+
+`pnpm exec playwright test e2e/pedidos.spec.ts` (regresión): **4 passed (35.3s)**.
+
+Supuestos del E2E: no había ningún E2E que llamara a una Server Action directamente. R40(d) saca el id de
+`setOrderCustomerAction` del JS servido, hace `POST` con la cabecera `Next-Action` y comprueba
+`"code":"unauthorized"` y que la base no cambió. Los datos efímeros llevan el prefijo del worker y se
+crean en `beforeAll` (empresa, admin, rol `qc156_e2e_<RUN_ID>_rol_consulta` con solo
+`pedidos.consultar`, receta, clientes, pedidos); se borran en `afterAll`.
+
+## CHECKPOINTS (revisión del implementer; el veredicto es del reviewer)
+
+- Especificación: existen los tres archivos; tasks T0, B1–B6, F1–F7 y TI marcadas `[x]`. TZ queda
+  **parcial** hasta el `./init.sh` completo de F2.4.
+- Trazabilidad: R1–R40 mapeados arriba; R38 y R39 por guardia, como dice design § 10.
+- Calidad: typecheck y lint en verde; E2E del flujo de permisos (R40 d) en Chromium y WebKit.
+  `pnpm test` completo: pendiente de F2.4.
+- Dependencias: ninguna nueva.
+- Datos: `orders.customer_id` vive en una tabla que ya tiene `company_id`, con FK compuesta
+  `(company_id, customer_id)`. La migración tiene `down.sql`; `db:migrate` → `db:rollback` → `db:migrate`
+  limpio sobre `QuimiCloude_QC156` (B1). Sin cliente de Supabase ni secretos.
+- Módulos: `pedidos` importa `clientes` solo por el barrel (guardia R40 de `clientes/scope.test.ts`);
+  la composición cablea `customerCatalog`; `guard-arquitectura-modulos` en verde.
+- Stubs: `grep "sin implementar|order-customer-fixtures"` sobre `lib app tests e2e` da 0 resultados.
+- Pendiente fuera de esta fase: `progress/review_*.md`, `history.md`, desmontar el worktree, borrar
+  `QuimiCloude_QC156` y restaurar `.env` desde `.env.bak-QuimiCloude` al cerrar la feature.
