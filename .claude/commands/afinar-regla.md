@@ -100,14 +100,16 @@ Devuelve, en este orden:
      (`↓`), baja primero con `./scripts/arnes-sync.sh --aplicar`: asi tu mejora parte de la ultima
      version y no choca.
   2. Aplica el parche en el proyecto y corre `./init.sh` en verde.
-  3. Commit en una rama del proyecto (`chore/arnes-<slug>`) y PR al proyecto como cualquier cambio.
+  3. Commit en una rama del proyecto (`chore/arnes-<slug>`).
   4. **`./scripts/arnes-sync.sh --subir -m "<titulo de la mejora>"`**: crea la rama
-     `mejora/<proyecto>-<slug>-<fecha>` en la plantilla con los archivos del arnes que cambiaste y
-     abre el PR alli. Devuelve la URL: daselas al humano. Si sale «conflicto», la plantilla
-     cambio esos mismos archivos: baja, integra a mano, `--aplicar --resuelto <archivo>` y repite.
-  5. Cuando el humano mergee el PR de la plantilla (si cambia el contrato, con `arnes_version` y
-     `CHANGELOG.md` al dia), `./scripts/arnes-sync.sh --aplicar` en el proyecto pone el lock al
-     dia y el aviso del gate desaparece. Los demas proyectos la reciben con su propio sync.
+     `mejora/<proyecto>-<slug>-<fecha>` en la plantilla con los archivos del arnes que cambiaste,
+     abre el PR alli y **actualiza `arnes.lock.json`**. Si sale «conflicto», la plantilla cambio
+     esos mismos archivos: baja, integra a mano, `--aplicar --resuelto <archivo>` y repite.
+  5. Commit de `arnes.lock.json` en la MISMA rama, push y PR al proyecto. Da al humano las dos
+     URLs: la del PR de la plantilla y la del proyecto. Cuando se mergeen los dos, el proyecto ya
+     queda «al dia»: **no hace falta un `--aplicar` ni un PR extra**. Si cambia el contrato, el
+     PR de la plantilla lleva `arnes_version` y `CHANGELOG.md` al dia. Los demas proyectos la
+     reciben con su propio sync.
 - Si `--subir` no puede (sin red, sin `gh`), la mejora queda en el proyecto y el gate la sigue
   avisando como «sin subir»: no se pierde. Dilo y anotalo en `progress/deudas.md`.
 
