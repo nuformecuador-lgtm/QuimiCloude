@@ -358,7 +358,7 @@ fuente de QC-64, el caso R18 de QC-63 y **`tests/unit/asignaciones-ui/packing-or
 siguen verdes sin tocarlos (R37).
 **Depende de:** nada.
 
-### T16 [ ] — La pantalla anota los pasos
+### T16 [x] — La pantalla anota los pasos
 **Toca:** `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`,
 `tests/unit/asignaciones-ui/order-execution-step-log.test.tsx`,
 `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` (solo el mock y el fixture)
@@ -372,7 +372,7 @@ siguen verdes sin tocarlos (R37).
 N» (R13); Finalizar envía la posición del último paso (R21). El test existente de la pantalla, verde.
 **Depende de:** T14, T15.
 
-### T17 [ ] — El diálogo de cancelar
+### T17 [x] — El diálogo de cancelar
 **Toca:** `app/(private)/asignacion/[id]/components/order-cancel-dialog.tsx`,
 `app/(private)/asignacion/[id]/components/index.ts`,
 `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`,
@@ -403,7 +403,7 @@ las pestañas de vista (`design.md > 6.4`). La constante entra en la lista exact
 
 ## Bloque F — Pruebas de extremo a extremo y cierre
 
-### T19 [ ] — Atomicidad y carrera, contra Postgres
+### T19 [x] — Atomicidad y carrera, contra Postgres
 **Toca:** `tests/integration/asignaciones/execution-atomicity.int.test.ts`,
 `tests/integration/aislamiento.json`
 **Hacer:** con la composición real (o los adaptadores reales cableados igual, incluida
@@ -488,7 +488,7 @@ corriendo**, y la lista de las confirmadas, añadidas y descartadas queda en `pr
 **Depende de:** T13, T16, T25 (sin las anotaciones del empaque, la limpieza de las dos nuevas no
 falla y no se puede ver).
 
-### T24 [ ] — La migración sigue siendo la última
+### T24 [x] — La migración sigue siendo la última
 _2026-10-06: hoy la última de `dev` es `20261006120000_inventory_imports`._
 **Toca:** la carpeta de la migración (solo su nombre, si hace falta)
 **Hacer:** justo antes del PR, contra `origin/dev`: si `dev` trajo una migración con timestamp mayor,
@@ -546,7 +546,7 @@ pasan **sin tocarlos**; caso nuevo: la fábrica sobre un `tx` abierto por el tes
 verde.
 **Depende de:** nada; la P5 respondida.
 
-### T22 [ ] — Cierre
+### T22 [x] — Cierre
 **Toca:** `progress/impl_QC-82-registro-de-ejecucion-de-receta.md`
 **Hacer:** el mapa `R1…R44 → test` completo (⚑ `R5bis`, `R41`–`R43` y **`R44`** incluidos), tomado del
 mapa de `design.md > 14.2` (rehecho el 2026-10-06 por archivo de test); las mutaciones de T1, T3, T5,

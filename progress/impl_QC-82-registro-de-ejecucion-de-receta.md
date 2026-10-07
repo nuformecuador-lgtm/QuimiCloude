@@ -261,3 +261,141 @@ era nuestro**: `tests/unit/shared/data-table-alcance.test.ts`, lista cerrada de 
 `data-table`; T20 la amplía. Arreglado en `d98a7885` con alta y nota fechada (28 → 29), verde 14/14.
 `packing-limits.test.ts` y el R16 de T19 **no** entraron en el grafo de `test:rapido` (barrido de fuente
 e integración no relacionada), pero siguen rojos según los subagentes: son los bloqueos 1 y 3.
+
+## Decisiones del humano tras la tanda 4 (2026-10-06, vía leader)
+
+1. `packing-limits.test.ts`: enmendarlo (opción a).
+2. T16: la aserción R18 de `order-execution-screen.test.tsx` espera `[orderId, stepPosition]`
+   (opción a; el leader enmienda `design.md > 7`, `1d7d4ae9`).
+3. Carrera de R16: opción B (`startAssignedOrder` trata como `'stale'` el `OrderNotFoundError` de esa
+   carrera y relee).
+
+## Tanda 5 (2026-10-06) — desbloqueos, T16, T17, T19, T24, T22
+
+| Qué | Commit | Archivos |
+| --- | --- | --- |
+| T16 | `d0dfcce6` | `order-execution-screen.tsx`, `[id]/components/index.ts`, `order-execution-screen.test.tsx` (mock, fixture y la aserción R18 con nota fechada), `order-execution-tools.test.tsx` (solo tipo del fixture), `order-execution-step-log.test.tsx` (8) |
+| packing-limits | `38539229` | `tests/unit/asignaciones/packing-limits.test.ts` |
+| T17 | `39df10c8` | `order-cancel-dialog.tsx` (nuevo), `[id]/components/index.ts`, `order-execution-screen.tsx`, `order-cancel-dialog.test.tsx` (11) |
+| R16 | `c1a22c11` | `start-assigned-order.ts`, `start-assigned-order.test.ts` (43) |
+
+### Desvíos para el reviewer (de esta tanda)
+
+- **`packing-limits.test.ts` (QC-168), enmendado por decisión humana.** R44 «puerto de registro de
+  ejecución»: en `start-packing.ts` y `finish-packing.ts` se admiten solo dos líneas exactas (el
+  `import type { ExecutionLogRepository }` y `readonly log: ExecutionLogRepository;`); cualquier otra
+  mención allí, o cualquiera en `list-packing-orders.ts`, `get-packing-order.ts`,
+  `packing-order-view.ts` u `order-packing.ts`, sigue roja (5 mutaciones, las 5 rojas). R44 de
+  migraciones, sin cambios. **R45: el bloque desaparece entero** (sus dos casos solo barrían
+  `specs/QC-82-*`), con nota fechada; R45 de QC-168 queda sin test y
+  `progress/impl_QC-168-estado-por-empacar.md:103` todavía lo mapea a ese archivo.
+- **T16**: `design.md > 7` decía que en `order-execution-screen.test.tsx` solo cambiaban mock y
+  fixture; cambió además la aserción del caso R18, por decisión humana. El leader enmienda el spec.
+- **T17**: el confirmar no se deshabilita con motivo vacío, para que el rechazo se vea como texto
+  (`role="alert"` en el DOM). Etiqueta del campo: «Motivo de la cancelación»; cerrar: «Volver».
+- **R16 (opción B)**: en la rama `PENDIENTE`, la lectura de la vista va en un `try` que atiende solo
+  `OrderNotFoundError` y una sola vez (`viewRaceRetried`). Relee con `findAliveById(orderId,
+  actor.companyId)`: si no existe, sigue `PENDIENTE` o ya no está asignado al actor, relanza el error
+  original; si no, vuelve al bucle (`EN_CURSO` anota `resume`, como pide R16; `BLOQUEADO` da
+  `order_blocked`). `get-assigned-order-execution.ts` no se tocó. Mutaciones: sin la comprobación de
+  `PENDIENTE`, 1 rojo; sin la de asignación, 1; tragar todo `OrderNotFoundError`, 3; sin el arreglo, 4.
+
+### T19: integración, 30 corridas seguidas tras `c1a22c11`
+
+`execution-atomicity.int.test.ts`: **30 verdes, 0 rojos** (base efímera desde la plantilla de
+`QuimiCloude_QC82`). La carrera no es determinista, así que no consta cuántas corridas entraron en
+ella; el camino de la carrera lo fijan los unitarios de R16. Antes del arreglo: 4 rojos de unas 17.
+
+### T24: la migración sigue siendo la última
+
+`git fetch origin dev` el 2026-10-06: la última de `origin/dev` es
+`20261006140000_inventory_movements_adjustment_count`, anterior a
+`20261006180000_order_execution_entries`. No hace falta renombrar. `origin/dev` va 28 commits por
+delante de la rama: el merge lo decide el leader, y al mergear se repite T24.
+
+### T20 y T23
+
+Escritas (`e28e33a0`, `557d6a85`) y **no ejecutadas**: su «Hecho cuando» exige Playwright contra
+`QuimiCloude_QC82`, una sola E2E a la vez. Las lanza el leader; quedan sin marcar hasta entonces.
+
+## T22: cierre, mapa `R<n> -> test`
+
+Abreviaturas: `mig` = `tests/unit/asignaciones/schema/order-execution-entries-migration.test.ts`;
+`cons` = `tests/integration/asignaciones/order-execution-entries-constraints.int.test.ts`; `atom` =
+`tests/integration/asignaciones/execution-atomicity.int.test.ts`; `ua/` = `tests/unit/asignaciones/`;
+`ui/` = `tests/unit/asignaciones-ui/`.
+
+| R | Test |
+|---|---|
+| R1 | `mig` ocho valores; `cons` `PAUSE` rechazado y las ocho aceptadas; `ua/execution-log-repository.test.ts` (una por valor); `ua/execution-log-prisma.test.ts` mapa de ocho pares |
+| R2 | `mig` lista exacta de columnas; `ua/execution-log-repository.test.ts` tipos |
+| R3 | `mig` una sola columna de tiempo |
+| R4 | `mig` sin texto ni id del paso |
+| R5 | `mig` y `cons` posición >= 1 y `START` con `NULL` aceptado; `ua/start-assigned-order.test.ts` receta sin pasos da `null` |
+| R5bis | `mig` tercer `CHECK` (implicación); `cons`; `ua/execution-log-repository.test.ts` `@ts-expect-error`; `ua/start-packing.test.ts`, `ua/finish-packing.test.ts`; `atom` control `PACK_START`/`PACK_FINISH` con `NULL` |
+| R6 | `cons` pedido inexistente; `mig` FK |
+| R7 | `cons` empresa cruzada (pedido y persona); `mig` FK compuestas |
+| R8 | `mig`; `cons`; `ua/execution-log-repository.test.ts`; `ua/execution-log-prisma.test.ts` |
+| R9 | `ua/cancel-assigned-order.test.ts`; `ui/order-cancel-dialog.test.tsx` |
+| R10 | `ua/cancel-assigned-order.test.ts` tope 500/501 frente a `cancelOrderSchema` |
+| R11 | `ui/order-cancel-dialog.test.tsx` retroceder sin diálogo; `ui/order-execution-step-log.test.tsx` |
+| R12 | `ua/start-assigned-order.test.ts`; `atom` arrancar con `append` fallido |
+| R13 | `ua/start-assigned-order.test.ts`; `tests/unit/recetas-ui/step-reader.test.tsx`; `ui/order-execution-step-log.test.tsx`; `e2e/registro-ejecucion.spec.ts` (sin correr) |
+| R14 | `ua/start-assigned-order.test.ts`; `step-reader.test.tsx` recorte; `ua/execution-log-prisma.test.ts` desempate por `id`; `ui/order-execution-step-log.test.tsx` |
+| R15 | `ua/start-assigned-order.test.ts` |
+| R16 | `ua/start-assigned-order.test.ts` (incluida la carrera); `atom` carrera (30/30) |
+| R17 | `ua/record-step-move.test.ts`; `step-reader.test.tsx`; `ui/order-execution-step-log.test.tsx` |
+| R18 | `ua/record-step-move.test.ts`; `step-reader.test.tsx`; `ui/order-execution-step-log.test.tsx` |
+| R19 | `ui/order-execution-step-log.test.tsx` (tres casos) |
+| R20 | `ua/record-step-move.test.ts` (incluido `BLOQUEADO`); `atom` sobre `ENTREGADO` |
+| R21 | `ua/finish-assigned-order.test.ts` destino `POR_EMPACAR`; `ui/order-execution-step-log.test.tsx` |
+| R22 | `ua/cancel-assigned-order.test.ts`; `ui/order-cancel-dialog.test.tsx` |
+| R23 | `ua/cancel-assigned-order.test.ts`; `atom`; `ui/order-cancel-dialog.test.tsx` |
+| R24 | `ua/start-assigned-order.test.ts`; `ua/finish-assigned-order.test.ts` (compensación); `ua/cancel-assigned-order.test.ts`; `ua/start-packing.test.ts`; `ua/finish-packing.test.ts`; `ua/execution-log-repository.test.ts` predicado; `ua/execution-log-prisma.test.ts` `timeout`; `atom` (ocho gestos); `tests/integration/pedidos/order-packing.int.test.ts` fábrica sobre `tx`; `ui/order-cancel-dialog.test.tsx` error pintado |
+| R25 | `ui/assigned-orders-cancelled-notice.test.tsx`; `ua/order-execution-actions.test.ts` redirección; `e2e/registro-ejecucion.spec.ts` (sin correr) |
+| R26 | `ua/record-step-move.test.ts`; `ua/cancel-assigned-order.test.ts`; `ua/start-assigned-order.test.ts`; `ua/finish-assigned-order.test.ts`; `ua/start-packing.test.ts`; `ua/finish-packing.test.ts`; `ua/module-contract.test.ts`; `tests/unit/composition/asignaciones-facade.test.ts` |
+| R27 | `ua/record-step-move.test.ts`; `ua/cancel-assigned-order.test.ts` (Empacador rechazado) |
+| R28 | `ua/record-step-move.test.ts`; `ua/cancel-assigned-order.test.ts` |
+| R29 | `tests/unit/pedidos/order-cancellation.test.ts` (siete estados, una definición); `ua/cancel-assigned-order.test.ts`; `atom` liberación |
+| R30 | `ua/cancel-assigned-order.test.ts` sin `pedidos.modificar` ni `asignaciones.modificar`; `mig` sin `INSERT` de permisos |
+| R31 | `ua/execution-log-repository.test.ts` forma del puerto; `ua/execution-log-prisma.test.ts` fuente sin `update`/`upsert`/`delete` |
+| R32 | `mig` RLS al final; `cons` `relforcerowsecurity` |
+| R33 | `mig` identificadores |
+| R34 | `mig` `down.sql`; salida de `db:rollback` arriba |
+| R35 | `tests/guards/guard-dependencias-aprobadas.test.ts`; `package.json`, `pnpm-lock.yaml` y `docs/dependencias.md` fuera del diff (comprobado) |
+| R36 | `ui/order-cancel-dialog.test.tsx` (dos casos) |
+| R37 | `step-reader.test.tsx`; `ui/packing-order-screen.test.tsx` sin tocar; caso R18 de lista cerrada de `ui/order-execution-screen.test.tsx` sin tocar |
+| R38 | `ua/start-assigned-order.test.ts` (R9 de QC-63 tensado); nota de T21 |
+| R39 | `e2e/registro-ejecucion.spec.ts` (a), sin correr |
+| R40 | `e2e/registro-ejecucion.spec.ts` (b), sin correr |
+| R41 | `ua/start-packing.test.ts`; `ua/finish-packing.test.ts`; `atom` (a), (b), (b2) y (c) |
+| R42 | `ua/start-packing.test.ts`; `ua/finish-packing.test.ts`; `ua/module-contract.test.ts`; `tests/guards/guard-ambito-empresa-pedidos.test.ts` (T5) |
+| R43 | (a) `ua/record-step-move.test.ts`; (b) `tests/unit/pedidos/order-cancellation.test.ts` y `ua/cancel-assigned-order.test.ts`; (c) limpieza de `e2e/empaque.spec.ts` (T23, sin correr) |
+| R44 | `ua/start-assigned-order.test.ts` `BLOQUEADO` y `stale` que relee `BLOQUEADO`; `atom` cero filas |
+
+**45 de 45** con test. R13 y R25 en parte, y R39, R40 y R43(c) del todo, dependen de E2E que no se han
+ejecutado.
+
+### Comprobaciones de cierre (T22)
+
+- `tests/guards/` frente a la base común con `origin/dev`: solo adiciones
+  (`guard-ambito-empresa-pedidos` +228, `guard-identificador-de-request` +6). Ninguna guardia más
+  laxa. Fuera de `tests/guards/` se ampliaron listas cerradas con nota fechada (`data-table-alcance`,
+  `recipe-route-contract`, `asignaciones/module-contract`, `asignaciones-facade`) y se enmendó
+  `packing-limits` por decisión humana.
+- Fuera del diff: `order-catalog-prisma.ts`, `order-catalog.ts`, `order-packing.ts`,
+  `order-packing-repository.ts`, `order-state.ts`, `package.json`, `docs/dependencias.md`. De
+  `order-prisma.ts`, solo la fábrica de T26 y su función privada.
+- `./init.sh` completo y E2E: los lanza el leader.
+
+### Gate `./init.sh --rapido` de la tanda 5 (implementer, 2026-10-06, sobre `c1a22c11`)
+
+typecheck verde; lint 0 errores. `test:rapido`: **393 archivos, 7 rojos / 386 verdes; 6086 tests,
+9 rojos / 6032 verdes / 45 omitidos**. Los 7 rojos son **todos** del baseline y no hay ninguno nuevo:
+`recetas/scope`, `recetas/module-contract`, `configuracion-ui/unidades-viewport`,
+`configuracion-ui/usuarios-viewport`, `navegacion/pantallas-exigen-permiso`, `recetas-ui/recipe-page`,
+`inventario/product-page`. Con la excepción del baseline que dio el humano, **la tanda cierra**.
+
+Explícitos, porque `--rapido` no los incluye: `pnpm exec vitest run
+tests/unit/asignaciones/packing-limits.test.ts tests/integration/asignaciones/execution-atomicity.int.test.ts`
+⇒ **2 archivos, 17/17 verdes**.
