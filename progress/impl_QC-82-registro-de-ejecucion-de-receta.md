@@ -236,3 +236,16 @@ Permiso de la primera línea: `asignaciones.ejecutar` en T8–T11 (P3); `empaque
    implementada **sin commit** en el worktree (pantalla, `components/index.ts`, mock/fixture, fixture de
    `order-execution-tools.test.tsx` por tipado, `order-execution-step-log.test.tsx` 8/8); ese caso queda
    rojo (35/36). T17 no empezó.
+3. **T19 (`90eb4275`): R16 intermitente por una carrera en producción** (4 de ~17 corridas). El que
+   pierde lanza `OrderNotFoundError` en `get-assigned-order-execution.ts:67`, llamado desde la rama
+   `PENDIENTE` de `start-assigned-order.ts:83`: la vista lee `PENDIENTE` y luego pide
+   `listAliveSummariesByIds(..., ['PENDIENTE'])`; si el otro confirma `EN_CURSO` entre las dos lecturas,
+   el resumen sale vacío y solo queda un `START`. La ventana la abre T10, que ahora lee la vista
+   **antes** de transicionar. El resto de T19 (13 casos: arrancar/finalizar/cancelar/comenzar/terminar
+   con `append` fallido, R44, material y envases insuficientes, `already_mine`, R20, R23/R29 y el
+   control `PACK_START`/`PACK_FINISH` con `NULL`) verde en todas las corridas. El fallo de `append` se
+   fuerza envolviendo con `vi.mock` el `createExecutionLogRepository(tx)` de la composición real para
+   que escriba `stepPosition: 0` (lo rechaza el `CHECK` dentro de la misma transacción). Opciones del
+   subagente: **A** la vista pide el resumen con `['PENDIENTE','EN_CURSO']` cuando el estado leído es uno
+   de los dos; **B** `startAssignedOrder` trata ese `OrderNotFoundError` como `'stale'` y relee;
+   **C** `skip` de R16 (no recomendado). T19 queda sin marcar.
