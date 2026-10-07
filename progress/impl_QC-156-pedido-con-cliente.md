@@ -293,6 +293,22 @@ estaban previstos en design § 9:
    § 10. La lista sigue cerrada. El nombre del archivo y el import del barrel de `clientes` se quedan
    como están.
 
+Aplicadas en `de4858b7`. Las dos guardias quedan en verde: 51/51 en
+`guard-identificador-de-request` + `clientes/scope`, con un caso de sensibilidad nuevo («la excepción es
+exacta»).
+
+## `--rapido` tras las guardias (tip `de4858b7`)
+
+typecheck y lint en verde; 366 archivos, 360 pasan; 5692 casos pasan, 9 fallan, 2 omitidos.
+- 7 rojos son los del baseline (`unidades-viewport` ×2, `usuarios-viewport` ×2, `product-page`,
+  `pantallas-exigen-permiso`, `recipe-page`).
+- 2 rojos en `tests/integration/pedidos/qc170-distribution-concurrency.int.test.ts` (R37 de QC-170):
+  **`Test timed out in 20000ms`**, no una aserción. Corrido aislado justo después: **9/9 en verde dos
+  veces** (24,6 s y 10,1 s). También pasó en el `--rapido` tras B6 y en la verificación de B6 (16/16). Es
+  un timeout por carga bajo la corrida paralela (cada caso da 8 vueltas de guardados simultáneos), no un
+  efecto de QC-156: la feature solo añadió `customerCatalog` a sus deps. Queda señalado para el
+  `./init.sh` completo de F2.4.
+
 ## CHECKPOINTS (revisión del implementer; el veredicto es del reviewer)
 
 - Especificación: existen los tres archivos; tasks T0, B1–B6, F1–F7 y TI marcadas `[x]`. TZ queda
