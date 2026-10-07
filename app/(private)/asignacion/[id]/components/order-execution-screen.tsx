@@ -8,9 +8,10 @@ import { StepReader } from '@/components/shared/step-reader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
+import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 import {
   finishAssignedOrderAction,
+  recordStepMoveAction,
   type FinishAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
@@ -33,6 +34,7 @@ export const ORDER_EXECUTION_SCREEN_TESTID = 'order-execution-screen';
 export const ORDER_EXECUTION_FINISH_ERROR_TESTID = 'order-execution-finish-error';
 export const ORDER_EXECUTION_FINISH_FORM_TESTID = 'order-execution-finish-form';
 export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
+export const ORDER_EXECUTION_STEP_POSITION_FIELD = 'stepPosition';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
 export const ORDER_EXECUTION_RECIPE_MISSING_TESTID = 'order-execution-recipe-missing';
 export const ORDER_EXECUTION_MATERIALS_TESTID = 'order-execution-materials';
@@ -60,24 +62,47 @@ const INITIAL_STATE: FinishFormState = { status: 'idle' };
  *  del tipo que espera sirve para adaptar el estado local, que ademas admite `'idle'`. */
 const IGNORED_PREV_STATE: FinishAssignedOrderResult = { status: 'success' };
 
+type StepChange = { readonly direction: 'advance' | 'go_back'; readonly position: number };
+
+/** Igual que el recorte de `StepReader`: una receta sin pasos no tiene posicion. */
+function entryStepPosition(resume: number | null, total: number): number | null {
+  if (total === 0) return null;
+  return Math.min(Math.max(resume ?? 1, 1), total);
+}
+
 /** Con la receta dada de baja el titulo queda solo con el numero: el aviso va aparte. */
 export function formatOrderExecutionTitle(numberText: string, recipeName: string | null): string {
   return recipeName === null ? numberText : `${numberText} - ${recipeName}`;
 }
 
 export type OrderExecutionScreenProps = {
-  readonly execution: AssignedOrderExecutionView;
+  readonly execution: StartedOrderExecution;
 };
 
 export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [stepPosition, setStepPosition] = useState(() =>
+    entryStepPosition(execution.resumeStepPosition, execution.steps.length),
+  );
+  // Encadenadas para que lleguen en el orden de los clics; un fallo se pierde sin avisar.
+  const stepMoves = useRef<Promise<void>>(Promise.resolve());
   const [state, formAction] = useActionState<FinishFormState, FormData>(
     (_previous, formData) => finishAssignedOrderAction(IGNORED_PREV_STATE, formData),
     INITIAL_STATE,
   );
 
   const error = state.status === 'error' ? state : undefined;
+
+  function handleStepChange({ direction, position }: StepChange) {
+    setStepPosition(position);
+    stepMoves.current = stepMoves.current
+      .then(() => recordStepMoveAction({ orderId: execution.orderId, direction, stepPosition: position }))
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+  }
   const title = formatOrderExecutionTitle(execution.numberText, execution.recipeName);
 
   return (
@@ -126,6 +151,8 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
           onFinish={() => setConfirmOpen(true)}
           minStepSeconds={MIN_STEP_SECONDS}
           mode="ejecucion"
+          initialStepPosition={execution.resumeStepPosition ?? 1}
+          onStepChange={handleStepChange}
         />
       </div>
 
@@ -134,6 +161,11 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
           type="hidden"
           name={ORDER_EXECUTION_ORDER_ID_FIELD}
           defaultValue={execution.orderId}
+        />
+        <input
+          type="hidden"
+          name={ORDER_EXECUTION_STEP_POSITION_FIELD}
+          value={stepPosition ?? ''}
         />
       </form>
 
