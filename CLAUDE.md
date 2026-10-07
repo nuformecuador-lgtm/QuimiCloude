@@ -29,7 +29,8 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
    `./init.sh` lo valida. Si el board incumple la regla, **gana la regla**: el leader deja fuera
    la feature sobrante y lo dice.
 2. **SDD obligatorio** para toda feature con `"sdd": true`: requirements (EARS) → design →
-   tasks → código. Nunca saltes directo a código.
+   tasks → código. Nunca saltes directo a código. Antes de afinar o especificar, busca si
+   ya existe (`docs/specs.md > Antes de especificar: lo que ya existe`); si existe, para y pregunta.
 3. **Estado en disco, no en el chat.** Cada subagente escribe su resultado en `specs/` o
    `progress/` y solo devuelve una referencia corta.
    - El board de Jira es la *entrada humana*: ahí nacen las features y ahí aprueba el humano.

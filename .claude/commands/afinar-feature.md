@@ -54,6 +54,9 @@ Lee lo necesario para saber qué está ya decidido. No asumas:
   en inglés.
   Lo que ya se decidió una vez **no se vuelve a preguntar**: se propone como heredado, citando de
   qué feature viene, y solo se pregunta si esta feature tiene un motivo concreto para apartarse.
+- **Lo que ya existe.** Busca en el board, en `specs/` y en el código, como manda
+  `docs/specs.md > Antes de especificar: lo que ya existe`. **Si aparece algo, es la primera
+  pregunta del paso 3** y es bloqueante: no se siembra hasta que el humano decida.
 
 ## Paso 2 — Checklist de ejes de ambigüedad
 
@@ -148,6 +151,8 @@ ninguna aplica, salta al paso 6.
 Para cualquiera de las tres: redacta el valor nuevo, muéstralo, y **con un sí explícito
 escríbelo en el issue** con las herramientas MCP de `atlassian`. Recién entonces siembras.
 
+- **Antes de crear una ficha, búscala** en el board con la JQL de `docs/specs.md > Antes de
+  especificar: lo que ya existe`. Si ya existe, no se crea: «Lo que NO entra» cita la existente.
 - **Una ficha nueva se crea completa o no se crea:** en el proyecto que declara
   `arnes.config.json > jira.project` —no en uno elegido por contexto—, tipo `Tarea`, sin
   assignee,

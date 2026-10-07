@@ -20,6 +20,8 @@ Verifica:
    lo verifica (no un test vacío). Si falta uno, es bloqueante.
 2. **Tasks:** todas en `tasks.md` marcadas `[x]`.
 3. **Checkpoints:** recorre `CHECKPOINTS.md` y `docs/checkpoints-proyecto.md` punto por punto.
+   Incluye `design.md > ## Lo que ya existe`: si falta, está vacía o el diff re-crea algo de
+   esa lista, es BLOQUEANTE.
 4. **Verificacion ejecutable:** corre lo que necesites para verificar tus hallazgos
    (typecheck, lint, los tests relacionados con el diff, guardias, los de integracion
    afectados; en este proyecto: `docs/perfil-agentes.md > reviewer`). No corras la suite
