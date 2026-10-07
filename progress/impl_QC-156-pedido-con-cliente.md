@@ -271,6 +271,20 @@ Supuestos del E2E: no había ningún E2E que llamara a una Server Action directa
 crean en `beforeAll` (empresa, admin, rol `qc156_e2e_<RUN_ID>_rol_consulta` con solo
 `pedidos.consultar`, receta, clientes, pedidos); se borran en `afterAll`.
 
+## `--rapido` final (tip `47e4c8c8`) — BLOQUEADO
+
+typecheck y lint en verde; 366 archivos, 359 pasan; 5691 casos pasan, 9 fallan, 2 omitidos. 7 de los 9
+son los del baseline (los mismos 5 archivos de arriba). **Los otros 2 los provoca el E2E nuevo** y no
+estaban previstos en design § 9:
+
+1. `tests/guards/guard-identificador-de-request.test.ts:854` (R21 de QC-71): `E2E_ESPERADOS` es una
+   lista cerrada y `pedido-con-cliente.spec.ts` no está en ella.
+2. `tests/unit/clientes/scope.test.ts:291` (R28 de QC-154: «el ÚNICO E2E que nombra clientes es
+   `e2e/clientes.spec.ts`»): el archivo casa por nombre (`/cliente/i`, el nombre lo fija tasks.md) y por
+   contenido (`import … from '@/lib/modules/clientes'` casa con `/clientes\b`).
+
+Pendiente de la decisión del leader.
+
 ## CHECKPOINTS (revisión del implementer; el veredicto es del reviewer)
 
 - Especificación: existen los tres archivos; tasks T0, B1–B6, F1–F7 y TI marcadas `[x]`. TZ queda
