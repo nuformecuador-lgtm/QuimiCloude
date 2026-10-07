@@ -2,7 +2,7 @@
 
 Referencias: `specs/QC-8-sesion-actual-y-logout/requirements.md`,
 `specs/QC-7-login-usuario-y-contrasena/design.md` (secciones 1, 5.1, 5.2, 5.4, 5.7 y 6.2),
-`docs/architecture.md > Modulos y arquitectura hexagonal`, `CHECKPOINTS.md > Modulos
+`docs/architecture.md > Modulos y arquitectura hexagonal`, `docs/checkpoints-proyecto.md > Modulos
 hexagonales`, `tests/guards/guard-arquitectura-modulos.test.ts`.
 
 **Esta feature hereda casi todo.** QC-7 congelo el formato del valor, los atributos de la cookie,
@@ -62,7 +62,7 @@ firma del puerto tiene que admitir «no hay sesion», que es lo que pide la desc
 
 ## 2. Forma de la solucion: que es dominio, que es puerto, que es adaptador
 
-`CHECKPOINTS.md > Modulos hexagonales` avisa de que **un caso de uso que solo delega pasa las
+`docs/checkpoints-proyecto.md > Modulos hexagonales` avisa de que **un caso de uso que solo delega pasa las
 guardias y esta mal**. Por eso el reparto se justifica pieza a pieza, y por eso el logout **no**
 tiene caso de uso.
 
@@ -287,7 +287,7 @@ RLS con `FORCE ROW LEVEL SECURITY` desde QC-4 y aqui no se altera nada.
 
 La autorizacion real —«solo tiene sesion un usuario **activo** cuyo token esta firmado y no ha
 caducado»— se decide en el dominio y tiene su test, no en una policy
-(`docs/architecture.md > Acceso a datos y autorizacion`, `CHECKPOINTS.md > Datos y seguridad`).
+(`docs/architecture.md > Acceso a datos y autorizacion`, `docs/checkpoints-proyecto.md > Datos y seguridad`).
 Prisma se conecta como dueño de las tablas, asi que una policy no filtraria nada de esto.
 
 Ningun borrado fisico: lo unico que se «borra» es una cookie del navegador.
@@ -302,7 +302,7 @@ Es lo mas corto: `cookies().get('qc_session')`, un `createHmac`, un `JSON.parse`
 Prisma, todo en el layout. Se descarta por tres cosas, en orden de gravedad:
 
 1. **Deja la definicion de «sesion valida» en la UI.** Es el anti-patron literal de
-   `CHECKPOINTS.md > Modulos hexagonales` («la logica de negocio esta en `domain/`, no en la
+   `docs/checkpoints-proyecto.md > Modulos hexagonales` («la logica de negocio esta en `domain/`, no en la
    Server Action»), aqui en su version de layout.
 2. **La guardia lo rechaza igualmente**: `app/**` no puede importar el cliente Prisma (bloque 11,
    R17 de QC-15).

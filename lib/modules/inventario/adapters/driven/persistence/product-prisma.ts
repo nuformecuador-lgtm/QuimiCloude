@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import { compareQuantities } from '../../../domain/decimal-quantity';
+import { compareQuantities, subtractQuantities } from '../../../domain/decimal-quantity';
 import {
   ActionNotAllowedError,
   BatchDuplicateLotError,
@@ -36,10 +36,10 @@ import {
 import type { FinishedGoodsOutcome } from '../../../domain/finished-goods';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
-import type { MovementReason } from '../../../domain/movement-reason';
 import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
+import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../../../domain/stock-adjustment';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
@@ -1009,70 +1009,82 @@ function isBatchNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
 
-type AdjustProductRow = { readonly id: string; readonly type: string; readonly presentationId: string | null };
+type AdjustProductRow = {
+  readonly id: string;
+  readonly type: string;
+  readonly presentationId: string | null;
+  readonly batchStock: string;
+};
 
 /**
- * `stock: { increment: delta } }` es un `UPDATE ... SET stock = stock + $delta` relativo: dos
- * ajustes concurrentes suman sobre lo que la base tenga en ese instante, nunca sobre un total
- * leido antes. `productBatch.update` es la UNICA funcion del repositorio que escribe sobre una
- * fila de lote ya existente -el `where` combina el identificador unico con la empresa, y sin fila
- * que lo cumpla Prisma lanza `P2025` en vez de tocar una fila ajena-. El asiento y el recalculo
- * de `products.stock` quedan en la MISMA transaccion que el ajuste.
+ * Producto y lote se bloquean en una sola sentencia, el producto primero -mismo orden que
+ * `addBatchToAlive`-, para que el ajuste se serialice con el alta y el consumo sin abrir un orden
+ * de bloqueo nuevo. Con el lote ya bloqueado, la existencia leida es la que habra al escribir: si
+ * no es la que vio el usuario, se devuelve `stock_changed` sin tocar nada, y dos ajustes simultaneos
+ * con la misma vista no pueden aplicarse los dos.
  *
- * El bloqueo del PRODUCTO va primero -mismo orden que `addBatchToAlive`-, para que dos ajustes
- * sobre lotes distintos del mismo producto se serialicen ahi en vez de abrazarse con un camino
- * futuro que tambien parta del producto. Sin fila que bloquear -lote inexistente o de otra
- * empresa- se devuelve `null` sin llegar a `productBatch.update`.
+ * `stock: { increment: difference }` sigue siendo un `UPDATE` relativo, y `productBatch.update` es
+ * la UNICA funcion del repositorio que escribe sobre una fila de lote ya existente -el `where`
+ * combina el identificador con la empresa, y sin fila Prisma lanza `P2025` en vez de tocar una
+ * ajena-. El asiento y el recalculo de `products.stock` quedan en la MISMA transaccion.
  */
 export async function adjustBatchStock(
-  batchId: string,
-  delta: string,
-  reason: MovementReason,
+  adjustment: BatchStockAdjustment,
   actorId: string,
   now: Date,
   scope: InventoryScope,
-): Promise<{ stock: string; reserved: string; overReserved: boolean } | null | 'increase_not_allowed'> {
+): Promise<AdjustBatchStockOutcome> {
   const { companyId } = companyScopeColumns(scope);
+  const { batchId, countedStock, seenStock, reason } = adjustment;
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx): Promise<AdjustBatchStockOutcome> => {
       const rows = await tx.$queryRaw<ReadonlyArray<AdjustProductRow>>(Prisma.sql`
-        SELECT p."id", p."type", p."presentation_id" AS "presentationId"
+        SELECT p."id", p."type", p."presentation_id" AS "presentationId", b."stock"::text AS "batchStock"
           FROM "products" p
           JOIN "product_batches" b ON b."product_id" = p."id"
          WHERE b."id" = ${batchId}::uuid
            AND b."company_id" = ${companyId}::uuid
-         FOR NO KEY UPDATE OF p
+         FOR NO KEY UPDATE OF p, b
       `);
       const product = rows[0];
-      if (product === undefined) return null;
+      if (product === undefined) return { kind: 'batch_not_found' };
 
-      // Un ajuste que suma sobre un producto terminado se rechaza aqui, con la fila ya
-      // bloqueada, antes de tocar el lote o el libro.
-      if (product.type === PRODUCT_TYPES.FINISHED_PRODUCT && compareQuantities(delta, '0') > 0) {
-        return 'increase_not_allowed';
+      // Antes que las reglas de terminado y envase: con otra existencia el sentido puede ser otro.
+      if (compareQuantities(product.batchStock, seenStock) !== 0) {
+        return { kind: 'stock_changed', currentStock: new Prisma.Decimal(product.batchStock).toFixed(4) };
       }
 
-      if (product.type === PRODUCT_TYPES.PACKAGING && product.presentationId !== null && !isWholeQuantity(delta)) {
-        throw new ValidationError('delta: un envase se ajusta en envases enteros');
+      const difference = subtractQuantities(countedStock, product.batchStock);
+
+      if (product.type === PRODUCT_TYPES.FINISHED_PRODUCT && compareQuantities(difference, '0') > 0) {
+        return { kind: 'increase_not_allowed' };
+      }
+
+      if (product.type === PRODUCT_TYPES.PACKAGING && product.presentationId !== null && !isWholeQuantity(countedStock)) {
+        throw new ValidationError('countedStock: un envase se cuenta en envases enteros');
       }
 
       const updated = await tx.productBatch.update({
         where: { id: batchId, companyId },
-        data: { stock: { increment: new Prisma.Decimal(delta) }, updatedBy: actorId, updatedAt: now },
+        data: { stock: { increment: new Prisma.Decimal(difference) }, updatedBy: actorId, updatedAt: now },
         select: { stock: true },
       });
+
+      const previousStock = new Prisma.Decimal(product.batchStock).toFixed(4);
 
       await writeMovement(
         tx,
         {
           batchId,
           kind: 'adjustment',
-          quantity: delta,
+          quantity: difference,
           reason,
           orderId: null,
           orderPresentationLineId: null,
           createdBy: actorId,
+          previousStock,
+          countedStock,
         },
         now,
         scope,
@@ -1092,10 +1104,17 @@ export async function adjustBatchStock(
       );
       const stock = updated.stock.toFixed(4);
 
-      return { stock, reserved, overReserved: compareQuantities(reserved, stock) > 0 };
+      return {
+        kind: 'adjusted',
+        previousStock,
+        difference,
+        stock,
+        reserved,
+        overReserved: compareQuantities(reserved, stock) > 0,
+      };
     });
   } catch (error) {
-    if (isBatchNotFound(error)) return null;
+    if (isBatchNotFound(error)) return { kind: 'batch_not_found' };
     if (isBatchStockNegativeViolation(error)) throw new BatchStockNegativeError();
     throw error;
   }

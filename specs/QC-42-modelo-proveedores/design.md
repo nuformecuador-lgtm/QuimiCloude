@@ -269,7 +269,7 @@ normalmente se estorban:
 1. **Integridad referencial real.** Una línea que apunte a un producto inexistente es basura en un
    ERP; un proveedor cuyo autor no existe, también. Solo lo garantiza una FK de verdad (R24, R31).
 2. **Frontera de módulo.** `proveedores` no puede leer `products` ni `users`
-   (`CHECKPOINTS.md > Modulos hexagonales`, QC-15). Si la FK se declarase con `@relation`, el
+   (`docs/checkpoints-proyecto.md > Modulos hexagonales`, QC-15). Si la FK se declarase con `@relation`, el
    cliente generado ofrecería
    `prisma.supplierCatalogLine.findMany({ include: { product: true } })`: la frontera se cruzaría
    con **una línea de código que ninguna guardia detecta**, porque
@@ -528,7 +528,7 @@ esquema.
 **Integraciones externas:** ninguna.
 
 **Permisos:** ninguno se decide aquí (decisión 20). No hay service que autorizar, y
-`CHECKPOINTS.md > Permisos` no aplica a una ficha sin caso de uso. Los fija QC-43 con su test en
+`docs/checkpoints-proyecto.md > Permisos` no aplica a una ficha sin caso de uso. Los fija QC-43 con su test en
 el service, que es la frontera real (`docs/architecture.md > Acceso a datos y autorizacion`).
 
 ---
@@ -651,7 +651,7 @@ Qué se espera y qué no:
 Por eso `tasks.md` ordena que la sincronización con `dev` (T13) se haga **antes** de dar por buena
 la migración, y que el gate que se corre después sea `./init.sh` **completo**, no `--rapido`: lo
 que esta feature acopla es SQL, nombres de archivo y forma del árbol de módulos, y el grafo de
-imports no lo ve (`docs/verification.md > Lo que --rapido NO cubre`).
+imports no lo ve (`docs/gate.md > Lo que --rapido NO cubre`).
 
 ---
 

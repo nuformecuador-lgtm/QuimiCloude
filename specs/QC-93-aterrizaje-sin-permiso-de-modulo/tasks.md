@@ -109,7 +109,7 @@ constante. Excepciones nombradas **con motivo escrito** para `session.spec.ts` y
 
 **Hecho cuando:** (a) pasa sobre el arbol ya migrado; (b) **se prueba que muerde**: se reintroduce a
 mano el patron en un spec, la guardia sale roja nombrando el archivo, se restaura **desde una copia**
-(`cp`, no `git checkout` — `docs/verification.md > Probar que muerde`).
+(`cp`, no `git checkout` — `docs/gate.md > Probar que muerde`).
 
 ## [x] T10 — Auditoria del diff prohibido  ·  R19, R20, R21, R22
 

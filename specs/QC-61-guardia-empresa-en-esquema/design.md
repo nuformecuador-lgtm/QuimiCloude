@@ -112,7 +112,7 @@ disco: un modelo añadido sin regenerar pasaría. R1 exige no depender del clien
 
 ## 7. Autocomprobación de la guardia (falsabilidad)
 
-Regla del repo (`docs/verification.md > Probar que muerde, no que pasa`, y el patrón de fixtures en
+Regla del repo (`docs/gate.md > Probar que muerde, no que pasa`, y el patrón de fixtures en
 memoria del bloque 10 de la guardia de módulos): cada regla se demuestra con un fuente sintético que
 la viola **y** su simétrico que no.
 

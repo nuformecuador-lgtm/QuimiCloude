@@ -1381,7 +1381,7 @@ Lo que quedaba sin probar era el camino de **ESCRITURA**: `tx.productBatch.updat
 companyId } })`. `companyId` **no es columna única**, así que que Prisma lo honre dentro del `where`
 de un `update` depende de su semántica, no de un `AND` que se lea en el SQL. Un mock demuestra que
 el código **pasa** la empresa, no que Postgres la **respete**. Sin ese filtro, **un ajuste
-escribiría en el lote de otra empresa**: `CHECKPOINTS.md > Datos y seguridad` y
+escribiría en el lote de otra empresa**: `docs/checkpoints-proyecto.md > Datos y seguridad` y
 `docs/architecture.md > Dominio` n.º 1.
 
 **Seis casos nuevos**, con el patrón de sus vecinos de R16 —no uno inventado— y control positivo en

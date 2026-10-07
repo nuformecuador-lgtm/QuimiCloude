@@ -13,8 +13,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   addBatchToAlive,
-  adjustBatchStock,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
@@ -223,7 +223,7 @@ describe('R31 — un ajuste que suma sobre un producto terminado no escribe nada
       const antes = await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId } });
       const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId } });
 
-      const resultado = await adjustBatchStock(
+      const resultado = await adjustByDelta(
         batchId,
         '1',
         'conteo_fisico',
@@ -232,7 +232,7 @@ describe('R31 — un ajuste que suma sobre un producto terminado no escribe nada
         ambito(fixture.companyId),
       );
 
-      expect(resultado).toBe('increase_not_allowed');
+      expect(resultado).toEqual({ kind: 'increase_not_allowed' });
       const despues = await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId } });
       expect(despues.stock.toFixed(4)).toBe(antes.stock.toFixed(4));
       expect(despues.updatedAt.toISOString()).toBe(antes.updatedAt.toISOString());
@@ -248,7 +248,7 @@ describe('R32 — un ajuste que resta sobre un producto terminado sigue las regl
     const fixture = await crearFixtureTerminado('10');
     const batchId = await crearLote(fixture, '10');
     try {
-      const resultado = await adjustBatchStock(
+      const resultado = await adjustByDelta(
         batchId,
         '-3',
         'merma',
@@ -257,7 +257,7 @@ describe('R32 — un ajuste que resta sobre un producto terminado sigue las regl
         ambito(fixture.companyId),
       );
 
-      expect(resultado).toEqual({ stock: '7.0000', reserved: '0.0000', overReserved: false });
+      expect(resultado).toMatchObject({ kind: 'adjusted', stock: '7.0000', reserved: '0.0000', overReserved: false });
       const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId } });
       expect(fila.stock.toFixed(4)).toBe('7.0000');
       expect(await prisma.inventoryMovement.count({ where: { batchId, kind: 'adjustment' } })).toBe(
@@ -273,7 +273,7 @@ describe('R32 — un ajuste que resta sobre un producto terminado sigue las regl
     const batchId = await crearLote(fixture, '10');
     try {
       await expect(
-        adjustBatchStock(batchId, '-11', 'merma', fixture.userId, new Date(), ambito(fixture.companyId)),
+        adjustByDelta(batchId, '-11', 'merma', fixture.userId, new Date(), ambito(fixture.companyId)),
       ).rejects.toMatchObject({ code: 'batch_stock_negative' });
 
       const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId } });

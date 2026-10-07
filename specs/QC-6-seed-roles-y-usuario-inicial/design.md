@@ -297,7 +297,7 @@ cumpliria. Un `&&` en el build da la misma automatizacion con cero superficie de
 **B. `postinstall` de npm/pnpm — DESCARTADA.** Corre tambien en `pnpm install` local y en CI,
 donde no hay base ni variables, asi que o rompe el flujo de todos los dias o se llena de `if`
 que lo apagan; y un check que se salta solo es exactamente el anti-patron de
-`docs/verification.md > La validacion opcional`.
+`docs/gate.md > El anti-patrón: la validación opcional`.
 
 **C. `prisma db seed` (bloque `prisma.seed` en `package.json`) — DESCARTADA como enganche**,
 aunque es el mecanismo «oficial». Solo lo invocan `prisma migrate reset` y `prisma db seed` a

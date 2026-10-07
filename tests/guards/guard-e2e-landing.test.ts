@@ -12,7 +12,7 @@
 //       `login-submit`.
 //
 // Vive en `tests/guards/` porque `init.sh` no corre Playwright y ningun grafo de imports llega a un
-// `.spec.ts` desde Vitest: fuera de las guardias nadie la ejecutaria (`docs/verification.md > Las
+// `.spec.ts` desde Vitest: fuera de las guardias nadie la ejecutaria (`docs/gate.md > Las
 // guardias van SIEMPRE`).
 //
 // LIMITE HONESTO (`specs/QC-93-.../design.md > 3`): comprueba LA FORMA DEL TEXTO, no que el

@@ -453,6 +453,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261005120000_recipe_packing_steps',
   // El registro de importaciones de inventario; no toca el identificador.
   '20261006120000_inventory_imports',
+  // La existencia de antes y el total contado del asiento de ajuste; no toca el identificador.
+  '20261006140000_inventory_movements_adjustment_count',
   // El registro de ejecucion de los pedidos; no toca el identificador.
   '20261006180000_order_execution_entries',
 ] as const

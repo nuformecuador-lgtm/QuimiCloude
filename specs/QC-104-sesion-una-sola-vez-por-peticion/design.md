@@ -329,7 +329,7 @@ Casos:
 Antes de dar T5 y T6 por hechas, se quita a mano `requestScoped` del cableado y se comprueba que los
 dos tests de conteo se ponen rojos. Despues se quita `runInRequestScope` de un `currentActor` y se
 comprueba que su caso se pone rojo. Se restaura. La salida se pega en `progress/impl_...`
-(`docs/verification.md > Probar que muerde, no que pasa`).
+(`docs/gate.md > Probar que muerde, no que pasa`).
 
 ### 5.5 Lo que ya existe y sigue igual
 

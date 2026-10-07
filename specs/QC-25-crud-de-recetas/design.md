@@ -143,7 +143,7 @@ export function requireAdmin(actor: Actor | null | undefined): asserts actor is 
 - **Listar y ver el detalle también pasan por aquí** (D1): el Operador ni siquiera consulta.
 - La RLS de QC-24 sigue activa y forzada y **no autoriza nada** (Prisma se conecta como dueño de
   las tablas). Es defensa en profundidad; el requisito lo cierra el test de servicio
-  (`CHECKPOINTS.md > Datos y seguridad`).
+  (`docs/checkpoints-proyecto.md > Datos y seguridad`).
 
 ---
 
@@ -549,7 +549,7 @@ exige `CHECKPOINTS.md > Calidad de codigo`.
 
 - **Solo el sub-paquete.** No entra `@supabase/supabase-js`. El motivo lo dio el humano y es
   estructural, no de disciplina: sin cliente de datos en el repo, el anti-patrón de
-  `CHECKPOINTS.md > Datos y seguridad` —leer o escribir datos de negocio con Supabase en vez de por
+  `docs/checkpoints-proyecto.md > Datos y seguridad` —leer o escribir datos de negocio con Supabase en vez de por
   Prisma— es **imposible**, no una promesa que alguien tenga que recordar. Mismo criterio con el que
   QC-19 instaló solo el diccionario y no `zxcvbn` entero.
 - **La fila de `docs/dependencias.md` la escribe el leader en F1.4**, y la instalación va después de

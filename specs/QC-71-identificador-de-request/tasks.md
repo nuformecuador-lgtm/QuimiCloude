@@ -91,7 +91,7 @@
   migración nueva, `package.json` sin dependencias nuevas, y ninguna mención al identificador en
   `lib/modules/*/domain/**` ni `*/ports/**`.
 - **Hecho:** R3, R9, R19, R20, R21. Cada validación nueva probada **con su caso rojo**, no solo con
-  el verde (`docs/verification.md > Probar que muerde`).
+  el verde (`docs/gate.md > Probar que muerde`).
 
 ---
 

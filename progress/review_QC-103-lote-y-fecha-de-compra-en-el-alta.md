@@ -291,7 +291,7 @@ pantalla y base.
 
 **Lo que esta bien y lo confirmo:**
 - `lib/shared/ui/date-civil.ts` **no importa nada**: es hoja del grafo, como `lib/shared/**`
-  exige (`CHECKPOINTS.md > Modulos hexagonales`).
+  exige (`docs/checkpoints-proyecto.md > Modulos hexagonales`).
 - Es el sitio **correcto** segun `docs/architecture.md > La regla de dependencias` (tabla, fila
   de `components/**`, `hooks/**` y archivos cliente): esos archivos pueden importar
   `lib/shared/ui/**` pero no `lib/shared/**` en general. El mensaje del commit lo razona bien.

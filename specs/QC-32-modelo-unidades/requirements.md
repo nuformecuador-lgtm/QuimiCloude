@@ -264,6 +264,6 @@ de aplicación son de QC-38).
 | 2026-09-02 | RLS | **Activada y forzada** (`FORCE ROW LEVEL SECURITY`). Heredado de **QC-4 R19**. No sustituye a la autorización en el service |
 | 2026-09-02 | Migración | `migration.sql` (UP) más `down.sql` (DOWN) obligatorio, y revertirla deja el esquema exactamente como estaba. Heredado de **QC-4 R20** |
 | 2026-09-02 | Idioma de los identificadores de la DB | **Inglés** (`units`, `unit_id`, …). Heredado de **QC-4** |
-| 2026-09-02 | Permisos | **Aquí no se deciden**: no hay service. Los fija **QC-38**, con su test (`CHECKPOINTS.md > Permisos`) |
+| 2026-09-02 | Permisos | **Aquí no se deciden**: no hay service. Los fija **QC-38**, con su test (`docs/checkpoints-proyecto.md > Permisos`) |
 | 2026-09-02 | E2E | **Diferido con motivo**: no hay pantalla ni flujo navegable, es esquema, seed y migración. Lo decide **QC-39**. Mismo criterio que QC-14 y QC-24 |
 | 2026-09-02 | Librería nueva | **Ninguna.** Es esquema Prisma, migración, seed y el armazón del módulo. Regla 7 de `CLAUDE.md` sin propuesta que abrir |

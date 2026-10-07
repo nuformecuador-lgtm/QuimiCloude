@@ -34,7 +34,7 @@
 // manual que nadie repite.
 //
 // Los tres casos del diff no se pueden ver leyendo un archivo: son propiedades del **cambio**. Y,
-// como en QC-44 y siguiendo `docs/verification.md > Rojos heredados`, cuando el rango
+// como en QC-44 y siguiendo `docs/gate.md > Rojos heredados`, cuando el rango
 // `origin/dev..HEAD` no esta disponible el caso se **salta** en vez de ponerse rojo: un rango
 // inexistente no es una violacion, es la ausencia de la comprobacion.
 

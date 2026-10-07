@@ -61,7 +61,7 @@ reescribe esas dos lineas para meter el `null` de `cid` y arrastra dentro las ci
  * o un `sid` ausente, vacio, que no es texto o sin forma de UUID (QC-23 R6). No lanza en
 ```
 
-`docs/conventions.md > Comentarios` y el punto 9 del reviewer: en lineas que el diff anade o
+`docs/conventions.md > Comentarios` y el punto 9 del reviewer (`docs/perfil-agentes.md > reviewer`): en lineas que el diff anade o
 modifica en produccion, citar `QC-<n>` o `R<n>` es bloqueante («al tocar un archivo se limpian los
 comentarios de las lineas que toca la rama»). Arreglo: quitar `(QC-9 R28)` y `(QC-23 R6)` de esas dos
 lineas. Es el unico caso: barrido de las lineas `+` de `git diff -U0 origin/dev...HEAD` sobre

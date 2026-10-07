@@ -58,7 +58,7 @@ crea que existe un helper y no lo encuentre.
 Nada bajo `app/`, `lib/`, `components/`, `db/` ni `e2e/`. Los 23 archivos de la decision 3 **no se
 tocan** (R22).
 
-**Por que la libreria vive en `tests/helpers/` y no en `lib/`.** `CHECKPOINTS.md > Modulos
+**Por que la libreria vive en `tests/helpers/` y no en `lib/`.** `docs/checkpoints-proyecto.md > Modulos
 hexagonales` exige que en la raiz de `lib/` solo haya `modules/`, `shared/`, `composition/` y
 `utils.ts`, y esto no es codigo de negocio. `tests/helpers/` ya existe con ese papel
 (`tests/helpers/user-event.ts`, QC-58 T2). La CLI de `scripts/` la importa con ruta **relativa**
@@ -297,7 +297,7 @@ o, cuando va atrasada:
 
 - **Avisa, no falla** (decision 6, R15): el `exit` del gate no cambia. Bloquear un PR por el
   estado de una base local seria un gate que se ignora.
-- **Lo que si es `fail`: que falte el script.** `docs/verification.md > El anti-patron: la
+- **Lo que si es `fail`: que falte el script.** `docs/gate.md > El anti-patron: la
   validacion opcional` es explicito — una validacion colgada de `[ -f <script> ]` con un `warn` en
   el `else` no es una validacion. Que `scripts/test-db.ts` no exista es una rotura del arnes, no
   una circunstancia; que la base este atrasada es la circunstancia que este bloque vino a contar.

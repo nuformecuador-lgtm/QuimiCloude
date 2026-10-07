@@ -291,7 +291,7 @@ sin commitear — el momento exacto en que R29 se violaria sin que el diff de co
 
 ### Las tres guardias se probaron por mutacion, no solo por su caso verde
 
-`docs/verification.md > Probar que muerde, no que pasa`. Cada mutacion se restauro con `cp` desde
+`docs/gate.md > Probar que muerde, no que pasa`. Cada mutacion se restauro con `cp` desde
 una copia, **nunca con `git checkout`** (hay cambios sin commitear de otras sesiones).
 
 | Que se rompio | Caso que cayo | Mensaje |
@@ -463,7 +463,7 @@ los del caso.
 | R20 | `product-batch-write.int.test.ts` :: «elige el de creacion mas antigua y desempata por identificador ascendente»; `create-product.test.ts` :: «R20 — usa el identificador que el puerto devuelve, sea cual sea» |
 | R21 | `product-batch-write.int.test.ts` :: «un fallo del lote no deja ningun producto escrito»; `create-product.test.ts` :: «…en una sola operacion del puerto» |
 | R22 | `create-product.test.ts` :: «R22 — escribe el identificador del actor de la sesion en el lote» y «tambien por el camino del producto que ya existe»; `product-batch-write.int.test.ts` :: «escribe created_by y updated_by con el identificador del actor» |
-| R23 | `create-product.test.ts` :: «R23 — rechaza a un actor %s sin una sola llamada al repositorio» (4 actores × 8 metodos) y «rechaza por permiso ANTES que por entrada invalida»; refuerzo en `authorization.test.ts`. **Es el test que `CHECKPOINTS.md > Permisos` exige: el permiso se valida en el SERVICE y se comprueba que el repositorio no recibe una sola llamada.** |
+| R23 | `create-product.test.ts` :: «R23 — rechaza a un actor %s sin una sola llamada al repositorio» (4 actores × 8 metodos) y «rechaza por permiso ANTES que por entrada invalida»; refuerzo en `authorization.test.ts`. **Es el test que `docs/checkpoints-proyecto.md > Permisos` exige: el permiso se valida en el SERVICE y se comprueba que el repositorio no recibe una sola llamada.** |
 | R24 | `product-batch-input.test.ts` :: «rechaza un campo desconocido en vez de ignorarlo en silencio»; `create-product.test.ts` :: bloque «R24 — la entrada invalida se rechaza sin tocar el puerto» |
 | R25 | `product-actions.test.ts` :: «hace llegar los cinco campos del lote al caso de uso, tal cual, como cadenas (R25)»; `product-page.test.tsx` :: «el alta hace viajar los CINCO campos del primer lote en el FormData» |
 | R26 | `product-actions.test.ts` :: «la edicion no envia ningun campo de lote aunque el FormData los traiga (R26)»; `product-page.test.tsx` :: «la edicion no envia ningun campo del lote» y «la edicion no pide nada del lote: ni presentacion, ni costos, ni caducidad» |

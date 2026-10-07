@@ -83,7 +83,7 @@ tests/unit/configuracion-ui/usuarios-*.test.ts(x)
 migraciones**. Las tablas que consume (`users`, `roles`) son de `identity`, están exentas de columna
 de empresa por `docs/architecture.md > Dominio` n.º 1 (`users` lleva `company_id` como columna de su
 ficha desde QC-47) y ya tienen su RLS y su `FORCE ROW LEVEL SECURITY` desde QC-66. La sección
-correspondiente de `CHECKPOINTS.md > Datos y seguridad` se cumple por vacío: no hay tabla nueva.
+correspondiente de `docs/checkpoints-proyecto.md > Datos y seguridad` se cumple por vacío: no hay tabla nueva.
 
 El **aislamiento por empresa** ya lo aplica el puerto de QC-66 (toda consulta está acotada a la
 empresa del actor) y por eso `companyId` no viaja en `UserRow` ni en `UserDetail`. Esta pantalla **no

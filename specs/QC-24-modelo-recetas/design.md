@@ -246,7 +246,7 @@ queremos a la vez y que normalmente se estorban:
    un ERP; una receta cuyo autor no existe, también. Eso solo lo garantiza una FK de verdad en
    la base (R16, R21).
 2. **Frontera de módulo.** `recetas` no puede leer `products` ni `users`
-   (`CHECKPOINTS.md > Modulos hexagonales`, QC-15). Si la FK se declarase con `@relation` de
+   (`docs/checkpoints-proyecto.md > Modulos hexagonales`, QC-15). Si la FK se declarase con `@relation` de
    Prisma, el cliente generado ofrecería `prisma.recipeLine.findMany({ include: { product: true } })`
    y `prisma.recipe.findMany({ include: { createdByUser: true } })`: la frontera se cruzaría con
    una línea de código que **ninguna guardia detecta**, porque no es un import —la guardia de

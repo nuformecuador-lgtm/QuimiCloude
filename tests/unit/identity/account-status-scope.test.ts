@@ -450,7 +450,7 @@ export function infraccionesDeAlcance(tocados: readonly string[]): readonly stri
  *
  * Fuera de su rama quedan MUDOS (`skipped`), nunca verdes: un verde diria «he revisado el diff y
  * no cruza ninguna frontera» sin haber mirado nada, que es el anti-patron de la «validacion
- * opcional» de `docs/verification.md`.
+ * opcional» de `docs/gate.md`.
  */
 function tocadosOMudo(ctx: Pick<TestContext, 'skip'>): readonly string[] {
   const tocados = archivosTocados();

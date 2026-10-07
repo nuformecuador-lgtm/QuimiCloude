@@ -133,7 +133,7 @@ se cae el `null` de R18.» **T15 no lo demuestra**, y nadie volvió sobre ello: 
 tanda 6 («desviaciones: ninguna») ni el mapa de T17 lo anotan. El riesgo se declaró, se le asignó un
 dueño y el dueño no lo cubrió.
 
-Incumple `CHECKPOINTS.md > Datos y seguridad` («toda consulta suya filtra por la empresa de quien
+Incumple `docs/checkpoints-proyecto.md > Datos y seguridad` («toda consulta suya filtra por la empresa de quien
 pide, **con test del rechazo cruzado**») y `docs/architecture.md > Dominio` n.º 1. R18 queda mapeado
 a tests que lo **rozan** en su mitad más cara.
 

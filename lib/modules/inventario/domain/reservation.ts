@@ -92,4 +92,8 @@ export type BatchHistoryEntry = {
   /** `null` cuando lo hizo el sistema: caducidad, la migracion que aparta los pedidos vivos. */
   readonly authorName: string | null;
   readonly createdAt: string;
+  /** Solo en los ajustes que la guardaron; `null` en el resto y en los ajustes anteriores a la columna. */
+  readonly previousStock: string | null;
+  /** Mismo criterio que `previousStock`: o vienen los dos o ninguno. */
+  readonly countedStock: string | null;
 };

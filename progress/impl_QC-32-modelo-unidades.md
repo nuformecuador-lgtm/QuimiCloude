@@ -268,7 +268,7 @@ que era donde la task avisaba del riesgo.
 
 Gate completo, **sin flags**: el modo rapido no vale aqui porque lo que esta feature acopla es SQL,
 nombres de archivo y la forma del arbol de modulos, y el grafo de imports no lo ve
-(`docs/verification.md > Lo que --rapido NO cubre`).
+(`docs/gate.md > Lo que --rapido NO cubre`).
 
 ```
 $ ./init.sh

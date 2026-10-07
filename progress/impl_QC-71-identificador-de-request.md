@@ -124,7 +124,7 @@ sube de version.
 Se sustituyo el cuerpo del camino `allow` por el **error clasico** —`NextResponse.next()` +
 `response.headers.set('x-request-id', ...)`— y `route-guard-request-id.test.ts` paso a
 **7 rojos de 9**, incluido el de R6. Revertido despues. La guardia nueva trae ademas su caso rojo
-sintetico por cada comprobacion (`docs/verification.md > Probar que muerde`).
+sintetico por cada comprobacion (`docs/gate.md > Probar que muerde`).
 
 ### Mapa `R<n>` -> test de esta tanda
 

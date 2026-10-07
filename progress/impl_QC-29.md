@@ -139,7 +139,7 @@ pnpm exec vitest run tests/unit/theme tests/ui --maxWorkers=2
 Queda anotado para el leader: si `./init.sh` completo vuelve a mostrar esos errores de pool, es
 el mismo sintoma de entorno, no la feature.
 
-### Pruebas de mordida (`docs/verification.md > Probar que muerde`)
+### Pruebas de mordida (`docs/gate.md > Probar que muerde`)
 
 | Que se rompio a proposito | Que test mordio |
 | --- | --- |
