@@ -94,14 +94,22 @@ Devuelve, en este orden:
 - **Mejora del perfil del proyecto** (eje 10: solo sirve aqui) → aplica el parche en el
   proyecto, en `arnes.config.json` o en el doc del perfil, y actualiza su marcador
   `<!-- perfil: revisado=AAAA-MM-DD por=<nombre> -->`.
-- **Mejora generica del arnes** → **primero en la plantilla**, el repo `singularis-co/harness_config`:
-  aplica alli el parche, y el humano lo integra y lo publica como version nueva de la
-  plantilla (sube `arnes_version` si cambia el contrato). Despues traelo al proyecto con
-  `./scripts/arnes-sync.sh` (dry-run) y `./scripts/arnes-sync.sh --aplicar`, y revisa el diff.
-  **No edites en el proyecto un archivo de `arnes.manifest`**: el siguiente sync lo pisa
-  (regla 8 de `CLAUDE.md`).
-- Si no tienes acceso a la plantilla desde esta sesion, no lo apliques en el proyecto "mientras
-  tanto": deja el parche propuesto por escrito en `progress/deudas.md` y dilo.
+- **Mejora generica del arnes** (archivos de `arnes.manifest`) → se aplica aqui y **se sube a la
+  plantilla** (`singularis-co/harness_config`) por el camino mecanico, nunca a mano:
+  1. Antes de tocar nada: `./scripts/arnes-sync.sh` (dry-run). Si la plantilla trae cambios
+     (`↓`), baja primero con `./scripts/arnes-sync.sh --aplicar`: asi tu mejora parte de la ultima
+     version y no choca.
+  2. Aplica el parche en el proyecto y corre `./init.sh` en verde.
+  3. Commit en una rama del proyecto (`chore/arnes-<slug>`) y PR al proyecto como cualquier cambio.
+  4. **`./scripts/arnes-sync.sh --subir -m "<titulo de la mejora>"`**: crea la rama
+     `mejora/<proyecto>-<slug>-<fecha>` en la plantilla con los archivos del arnes que cambiaste y
+     abre el PR alli. Devuelve la URL: daselas al humano. Si sale «conflicto», la plantilla
+     cambio esos mismos archivos: baja, integra a mano, `--aplicar --resuelto <archivo>` y repite.
+  5. Cuando el humano mergee el PR de la plantilla (si cambia el contrato, con `arnes_version` y
+     `CHANGELOG.md` al dia), `./scripts/arnes-sync.sh --aplicar` en el proyecto pone el lock al
+     dia y el aviso del gate desaparece. Los demas proyectos la reciben con su propio sync.
+- Si `--subir` no puede (sin red, sin `gh`), la mejora queda en el proyecto y el gate la sigue
+  avisando como «sin subir»: no se pierde. Dilo y anotalo en `progress/deudas.md`.
 
 Termina con `./init.sh` en verde (en el proyecto, tras el sync o tras el parche del perfil) y
 listando los archivos modificados, y en que repo.

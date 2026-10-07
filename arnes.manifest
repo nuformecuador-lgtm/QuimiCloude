@@ -28,6 +28,7 @@ scripts/comparar-baseline-rojos.mjs
 scripts/check-perfil.mjs
 scripts/archivos-en-vuelo.mjs
 scripts/arnes-sync.sh
+scripts/arnes-sync.mjs
 progress/README.md
 progress/features/_plantilla.md
 progress/sesion.local.example.md

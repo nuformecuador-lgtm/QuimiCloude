@@ -86,6 +86,18 @@ echo "$PERFIL" | while IFS= read -r linea; do
   esac
 done
 
+# 4.c El arnes frente a la plantilla (sin red: compara contra `arnes.lock.json`). `warn` si hay
+#     archivos del arnes cambiados aqui y sin subir: una mejora que no se sube se pierde para los
+#     demas proyectos. Se sube con /afinar-regla o `./scripts/arnes-sync.sh --subir`.
+if [ -f scripts/arnes-sync.mjs ]; then
+  ARNES=$(node scripts/arnes-sync.mjs --estado 2>&1) || true
+  case "$ARNES" in
+    AVISO:*) warn "${ARNES#AVISO: }" ;;
+    "") ;;
+    *) ok "$ARNES" ;;
+  esac
+fi
+
 # 5. Worktrees acumulados. Es `warn`, NO `fail`, a proposito: poner el gate en rojo por
 #    tareas domesticas bloquearia trabajo real y la respuesta previsible seria ignorar el
 #    gate — justo lo que la regla 5 del CLAUDE.md intenta evitar. Pero tampoco puede ser
