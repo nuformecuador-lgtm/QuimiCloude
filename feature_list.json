@@ -2917,6 +2917,90 @@
       "branch": "feature/QC-214-evidencia-por-paso",
       "depends_on": [],
       "spec_path": "specs/QC-214-evidencia-por-paso"
+    },
+    {
+      "key": "QC-215",
+      "id": 215,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "estados-de-acondicionamiento",
+      "description": "El pedido gana dos estados entre EN_EMPAQUE y ENTREGADO: **POR_ACONDICIONAR** y **EN_ACONDICIONAMIENTO**.\n\n* **Flujo:** PENDIENTE → EN_CURSO → POR_EMPACAR → EN_EMPAQUE → **POR_ACONDICIONAR** (el Empacador termina el empaque) → **EN_ACONDICIONAMIENTO** (el Administrador de acondicionamiento comienza) → ENTREGADO (el mismo termina).\n* **Enmienda QC-168:** hoy terminar el empaque deja el pedido ENTREGADO; pasa a dejarlo POR_ACONDICIONAR. El producto terminado sigue entrando al terminar el empaque (QC-170).\n* `finished_at` se sigue escribiendo **al entregar** (fin del acondicionamiento).\n* **No se cancela** ni Por acondicionar ni En acondicionamiento, como Por empacar y En empaque (QC-168).\n* «Todos» (QC-145) muestra los estados nuevos y los incluye en su filtro.\n* Estados en castellano y mayúsculas, como los existentes. **Sin migración de datos:** los ENTREGADO no cambian; los EN_EMPAQUE pasan a Por acondicionar al terminarse.\n\n**NO ENTRA:** el rol y su permiso (QC-216), la pestaña (QC-217), la acción Acondicionar (QC-218) y los datos de lote (QC-219).\n\n--- Acotada por `/afinar-feature` el 2026-10-06. Las decisiones estan en `specs/QC-215-estados-de-acondicionamiento/requirements.md`. ---",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-215-estados-de-acondicionamiento",
+      "depends_on": [
+        "QC-216"
+      ],
+      "spec_path": "specs/QC-215-estados-de-acondicionamiento"
+    },
+    {
+      "key": "QC-216",
+      "id": 216,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "rol-administrador-de-acondicionamiento",
+      "description": "Nace un rol de semilla, **Administrador de acondicionamiento**, con **un permiso nuevo de acondicionamiento** (enmienda al catálogo cerrado de QC-74, por migración y seed). El código lo fija `spec_author` con la forma `<modulo>.<accion>`; el recuento del catálogo se fija contra `dev` al implementar.\n\n* Recibe **solo** el permiso nuevo y lo mínimo para entrar a `/asignacion`. Sin inventario, sin `asignaciones.ejecutar` (QC-201), sin `asignaciones.modificar`, sin el permiso de empaque (QC-168).\n* **El Administrador no recibe el permiso nuevo:** supervisa desde «Todos» (QC-145). Operador, Empacador y Maestro no cambian.\n* La diferencia se hace **por permiso, nunca por nombre de rol** (QC-86/87).\n* El rol es global y aparece en el selector de usuarios sin tocar la UI (QC-94/QC-67).\n* E2E diferida a QC-217, que tiene la pantalla.\n\n**NO ENTRA:** los estados (QC-215), ninguna pantalla nueva.\n\n--- Acotada por `/afinar-feature` el 2026-10-06. Las decisiones estan en `specs/QC-216-rol-administrador-de-acondicionamiento/requirements.md`. ---",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "backend",
+      "branch": "feature/QC-216-rol-administrador-de-acondicionamiento",
+      "depends_on": [],
+      "spec_path": "specs/QC-216-rol-administrador-de-acondicionamiento"
+    },
+    {
+      "key": "QC-217",
+      "id": 217,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "pestana-por-acondicionar",
+      "description": "Dentro de `/asignacion`, dos vistas para quien tiene el permiso de acondicionamiento (QC-216):\n\n* **«Por acondicionar»:** los pedidos POR_ACONDICIONAR y EN_ACONDICIONAMIENTO de su empresa, sin asignación, con la tabla compartida (QC-55). Columnas: número, receta, envases, estado y quién acondiciona.\n* **«Terminados»:** solo los pedidos que acondicionó **él**, como el Empacador (QC-201). Desde ahí reabre un entregado para corregir sus datos de lote (QC-219).\n* Cada fila abre la **pantalla de detalle** del pedido para el acondicionador.\n* El rol no ve «Mis asignados» ni «Por empacar».\n* **E2E sí**; recoge la E2E diferida desde QC-216.\n\n**NO ENTRA:** la acción Acondicionar (QC-218) ni los datos de lote (QC-219). El detalle queda en solo lectura.\n\n--- Acotada por `/afinar-feature` el 2026-10-06. Las decisiones estan en `specs/QC-217-pestana-por-acondicionar/requirements.md`. ---",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-217-pestana-por-acondicionar",
+      "depends_on": [
+        "QC-215",
+        "QC-216"
+      ],
+      "spec_path": "specs/QC-217-pestana-por-acondicionar"
+    },
+    {
+      "key": "QC-218",
+      "id": 218,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "acondicionar-con-equipo",
+      "description": "En las acciones del detalle de un pedido por acondicionar aparece **Acondicionar**, que abre un modal para **comenzar**. Después, en el mismo detalle, **Terminar**.\n\n* **Quién:** cualquier Administrador de acondicionamiento de la empresa toma cualquier pedido Por acondicionar. **El primero que lo comienza se lo queda y solo él lo termina** (como QC-168).\n* **Equipo:** se elige al comenzar, **al menos una persona**: personas sueltas, grupos o ambas, como QC-86 (del grupo se guardan las personas de ese momento). Cualquier usuario de la empresa **salvo los Administradores**; el Maestro no tiene empresa (QC-161).\n* **El equipo es solo constancia:** sus personas no reciben el pedido ni actúan sobre él.\n* **Bloqueo de 5 s:** en el modal de comenzar y en el de terminar, el botón está deshabilitado con cuenta regresiva de 5 s (`CountdownTimer`, QC-125).\n* **Antes de terminar**, modal de confirmación. Al confirmar, el pedido pasa a ENTREGADO.\n* **E2E sí.**\n\n**NO ENTRA:** los datos de lote y la regla de que Terminar los exige (QC-219). El log de ejecución (QC-82).\n\n--- Acotada por `/afinar-feature` el 2026-10-06. Las decisiones estan en `specs/QC-218-acondicionar-con-equipo/requirements.md`. ---",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-218-acondicionar-con-equipo",
+      "depends_on": [
+        "QC-217"
+      ],
+      "spec_path": "specs/QC-218-acondicionar-con-equipo"
+    },
+    {
+      "key": "QC-219",
+      "id": 219,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "datos-de-lote-en-acondicionamiento",
+      "description": "En el detalle de un pedido en acondicionamiento se definen, **por cada línea de presentación** (QC-170), tres datos:\n\n* **Lote del producto:** texto. **Reemplaza el lote automático** del producto terminado (QC-150/QC-170) y pasa a ser el lote real del inventario. **Único dentro de la empresa** (QC-81).\n* **Fecha de vencimiento:** **posterior a hoy**. Se guarda en el lote del inventario.\n* **Día de producción:** **hoy o antes**.\n\nReglas:\n\n* **Solo después de Comenzar**, y solo los escribe **quien comenzó**.\n* **Terminar se bloquea** mientras falte cualquier dato en cualquier línea (enmienda QC-218).\n* **Se corrigen después de entregado**, por quien lo terminó, desde su «Terminados» (QC-217). Mismas validaciones.\n* **E2E sí.**\n\nToca la pregunta abierta del dominio sobre lote y vencimiento: el vencimiento gana su primer escritor.\n\n**NO ENTRA:** reservar o consumir por vencimiento (QC-196), el lote real que usa el operador (QC-197).\n\n--- Acotada por `/afinar-feature` el 2026-10-06. Las decisiones estan en `specs/QC-219-datos-de-lote-en-acondicionamiento/requirements.md`. ---",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-219-datos-de-lote-en-acondicionamiento",
+      "depends_on": [
+        "QC-218"
+      ],
+      "spec_path": "specs/QC-219-datos-de-lote-en-acondicionamiento"
     }
   ]
 }
