@@ -249,3 +249,15 @@ Permiso de la primera línea: `asignaciones.ejecutar` en T8–T11 (P3); `empaque
    subagente: **A** la vista pide el resumen con `['PENDIENTE','EN_CURSO']` cuando el estado leído es uno
    de los dos; **B** `startAssignedOrder` trata ese `OrderNotFoundError` como `'stale'` y relee;
    **C** `skip` de R16 (no recomendado). T19 queda sin marcar.
+
+### Gate `./init.sh --rapido` de la tanda 4 (implementer, 2026-10-06)
+
+Corrido sobre lo commiteado hasta `506bdcc9`+bloqueo R16 (la T16 sin commit se apartó con un stash
+etiquetado y se restauró después). typecheck verde; lint 0 errores. `test:rapido`: **390 archivos, 8
+rojos; 6058 tests, 10 rojos**. Siete son los del baseline (`recetas/scope`, `recetas/module-contract`,
+`configuracion-ui/unidades-viewport`, `configuracion-ui/usuarios-viewport`,
+`navegacion/pantallas-exigen-permiso`, `recetas-ui/recipe-page`, `inventario/product-page`). **El octavo
+era nuestro**: `tests/unit/shared/data-table-alcance.test.ts`, lista cerrada de E2E que referencian
+`data-table`; T20 la amplía. Arreglado en `d98a7885` con alta y nota fechada (28 → 29), verde 14/14.
+`packing-limits.test.ts` y el R16 de T19 **no** entraron en el grafo de `test:rapido` (barrido de fuente
+e integración no relacionada), pero siguen rojos según los subagentes: son los bloqueos 1 y 3.
