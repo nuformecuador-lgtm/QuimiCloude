@@ -2,7 +2,13 @@
 // (R8, R9). Hermano exacto de `./roles`: dominio puro, sin Prisma, sin `next/*`, sin `lib/shared`.
 // Vive centralizado en `identity` a proposito (`design.md > 2`): repartirlo por modulo crearia un
 // ciclo entre barriles (`identity -> inventario -> identity`) con constantes en `undefined`.
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO } from './roles';
+import {
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  ROLE_ACONDICIONAMIENTO,
+} from './roles';
 
 /**
  * El catalogo cerrado: el codigo tiene la forma `<modulo>.<accion>`, con modulo y accion en
@@ -56,6 +62,11 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO } from 
  * `asignaciones.ejecutar` es la unica accion que no es `consultar` ni `modificar`: separa ver los
  * pedidos asignados de entrar a ejecutarlos, para que quien solo empaca los vea sin ejecutarlos.
  * Lo reciben el Administrador y el Operador.
+ *
+ * **Otra enmienda al catalogo cerrado**: suma `acondicionamiento.modificar`, comenzar y terminar el
+ * acondicionamiento y registrar sus datos de lote. Como `empaque`, su modulo no es una carpeta de
+ * `lib/modules/` y solo escribe. Lo recibe unicamente el Administrador de acondicionamiento: el
+ * Administrador no.
  *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
@@ -205,6 +216,13 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Dar de alta, editar y dar de baja empresas de la plataforma.',
   },
+  {
+    code: 'acondicionamiento.modificar',
+    module: 'acondicionamiento',
+    action: 'modificar',
+    description:
+      'Comenzar y terminar el acondicionamiento de los pedidos de la empresa y registrar sus datos de lote.',
+  },
 ] as const;
 
 /**
@@ -226,6 +244,9 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
  *
  * El Maestro nace con exactamente `empresas.consultar` y `empresas.modificar`, y ningun rol de
  * empresa recibe ninguno de los dos.
+ *
+ * El Administrador de acondicionamiento nace con exactamente `asignaciones.consultar` y
+ * `acondicionamiento.modificar`.
  */
 export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionCode[]>> = {
   [ROLE_ADMINISTRADOR]: [
@@ -254,6 +275,7 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
   [ROLE_MAESTRO]: ['empresas.consultar', 'empresas.modificar'],
+  [ROLE_ACONDICIONAMIENTO]: ['asignaciones.consultar', 'acondicionamiento.modificar'],
 };
 
 /**
@@ -261,9 +283,13 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
  * declare: el empaque es tarea del Empacador y las empresas son cosa de la plataforma, no de una
  * empresa. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
  * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
+ *
+ * El acondicionamiento es tarea del Administrador de acondicionamiento; el Administrador lo
+ * supervisa desde «Todos».
  */
 export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = [
   'empaque.modificar',
   'empresas.consultar',
   'empresas.modificar',
+  'acondicionamiento.modificar',
 ];

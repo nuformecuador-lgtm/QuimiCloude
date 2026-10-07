@@ -13,6 +13,7 @@ import {
   ROLE_OPERADOR,
   ROLE_EMPACADOR,
   ROLE_MAESTRO,
+  ROLE_ACONDICIONAMIENTO,
   SEED_ROLE_PERMISSIONS,
   ADMIN_EXCLUDED_PERMISSIONS,
 } from '@/lib/modules/identity'
@@ -44,10 +45,13 @@ const CODIGOS_DEL_REQUISITO = [
   'empaque.modificar',
   'empresas.consultar',
   'empresas.modificar',
+  'acondicionamiento.modificar',
 ] as const
 
 /** Los dos codigos de la plataforma: solo los recibe el Maestro. */
 const CODIGOS_DE_EMPRESAS = ['empresas.consultar', 'empresas.modificar'] as const
+
+const ACONDICIONAMIENTO = 'acondicionamiento.modificar'
 
 const esDeEmpresas = (codigo: string): boolean => codigo.startsWith('empresas.')
 
@@ -188,6 +192,7 @@ const MODULOS = [
   'documentos',
   'empaque',
   'empresas',
+  'acondicionamiento',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
@@ -206,7 +211,7 @@ const MODULOS_CON_ESCRITURA = [
 const MODULOS_SIN_ESCRITURA = ['dashboard', 'terminados']
 /** Modulos que solo escriben, sin consulta propia (R34): quien tiene el permiso ya ve el pedido
  *  por otra via. */
-const MODULOS_SOLO_ESCRITURA = ['empaque']
+const MODULOS_SOLO_ESCRITURA = ['empaque', 'acondicionamiento']
 
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
 
@@ -268,6 +273,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
         codigo !== 'documentos.consultar' &&
         codigo !== 'documentos.modificar' &&
         codigo !== 'empaque.modificar' &&
+        codigo !== ACONDICIONAMIENTO &&
         !esDeEmpresas(codigo),
     )
 
@@ -277,6 +283,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
       'documentos.modificar',
       'empaque.modificar',
       ...CODIGOS_DE_EMPRESAS,
+      ACONDICIONAMIENTO,
     ])
     expect(codigos.filter((codigo) => codigo.startsWith('documentos.'))).toEqual([
       'documentos.consultar',
@@ -359,6 +366,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
         codigo !== 'documentos.consultar' &&
         codigo !== 'documentos.modificar' &&
         codigo !== 'empaque.modificar' &&
+        codigo !== ACONDICIONAMIENTO &&
         !esDeEmpresas(codigo),
     )
 
@@ -370,6 +378,7 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
       'documentos.modificar',
       'empaque.modificar',
       ...CODIGOS_DE_EMPRESAS,
+      ACONDICIONAMIENTO,
     ])
   })
 
@@ -392,10 +401,16 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
 
   it('R35: el catalogo es el previo mas empaque.modificar en su posicion, con solo los empresas.* detras, ningun otro codigo cambia', () => {
     const catalogoPrevio = CODIGOS_DEL_REQUISITO.filter(
-      (codigo) => codigo !== 'empaque.modificar' && !esDeEmpresas(codigo),
+      (codigo) =>
+        codigo !== 'empaque.modificar' && codigo !== ACONDICIONAMIENTO && !esDeEmpresas(codigo),
     )
 
-    expect(codigos).toEqual([...catalogoPrevio, 'empaque.modificar', ...CODIGOS_DE_EMPRESAS])
+    expect(codigos).toEqual([
+      ...catalogoPrevio,
+      'empaque.modificar',
+      ...CODIGOS_DE_EMPRESAS,
+      ACONDICIONAMIENTO,
+    ])
   })
 
   it('R6: la enmienda de terminados.consultar en el fuente no cita ficha ni requisito', () => {
@@ -609,7 +624,7 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
 
   it('R6: el seed asigna permisos SOLO a roles, sin ninguna clave de empresa', () => {
     expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
-      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO].sort(),
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO].sort(),
     )
     for (const asignados of Object.values(SEED_ROLE_PERMISSIONS)) {
       for (const codigo of asignados) {
@@ -733,7 +748,10 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
     expect((SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(esDeEmpresas)).toEqual([])
     expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual(expect.arrayContaining([...CODIGOS_DE_EMPRESAS]))
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
-      CODIGOS_DEL_REQUISITO.filter((codigo) => !esDeEmpresas(codigo) && codigo !== 'empaque.modificar'),
+      CODIGOS_DEL_REQUISITO.filter(
+        (codigo) =>
+          !esDeEmpresas(codigo) && codigo !== 'empaque.modificar' && codigo !== ACONDICIONAMIENTO,
+      ),
     )
   })
 
@@ -750,48 +768,55 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
   })
 })
 
+const EJECUTAR = {
+  code: 'asignaciones.ejecutar',
+  module: 'asignaciones',
+  action: 'ejecutar',
+  description: 'Entrar, comenzar y terminar la ejecución de los pedidos asignados.',
+} as const
+
+/** Las entradas posteriores a `PERMISOS_PREVIOS`, copiadas a mano con sus tres campos. */
+const PERMISOS_POSTERIORES = [
+  {
+    code: 'documentos.consultar',
+    module: 'documentos',
+    action: 'consultar',
+    description: 'Consultar los documentos de la empresa y el estado de su procesamiento.',
+  },
+  {
+    code: 'documentos.modificar',
+    module: 'documentos',
+    action: 'modificar',
+    description: 'Subir documentos PDF y encolar su procesamiento.',
+  },
+  {
+    code: 'empaque.modificar',
+    module: 'empaque',
+    action: 'modificar',
+    description: 'Comenzar y terminar el empaque de los pedidos de la empresa.',
+  },
+  {
+    code: 'empresas.consultar',
+    module: 'empresas',
+    action: 'consultar',
+    description: 'Consultar las empresas de la plataforma.',
+  },
+  {
+    code: 'empresas.modificar',
+    module: 'empresas',
+    action: 'modificar',
+    description: 'Dar de alta, editar y dar de baja empresas de la plataforma.',
+  },
+  {
+    code: 'acondicionamiento.modificar',
+    module: 'acondicionamiento',
+    action: 'modificar',
+    description:
+      'Comenzar y terminar el acondicionamiento de los pedidos de la empresa y registrar sus datos de lote.',
+  },
+] as const
+
 describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', () => {
-  const EJECUTAR = {
-    code: 'asignaciones.ejecutar',
-    module: 'asignaciones',
-    action: 'ejecutar',
-    description: 'Entrar, comenzar y terminar la ejecución de los pedidos asignados.',
-  } as const
-
-  /** Las entradas posteriores a `PERMISOS_PREVIOS`, copiadas a mano con sus tres campos. */
-  const PERMISOS_POSTERIORES = [
-    {
-      code: 'documentos.consultar',
-      module: 'documentos',
-      action: 'consultar',
-      description: 'Consultar los documentos de la empresa y el estado de su procesamiento.',
-    },
-    {
-      code: 'documentos.modificar',
-      module: 'documentos',
-      action: 'modificar',
-      description: 'Subir documentos PDF y encolar su procesamiento.',
-    },
-    {
-      code: 'empaque.modificar',
-      module: 'empaque',
-      action: 'modificar',
-      description: 'Comenzar y terminar el empaque de los pedidos de la empresa.',
-    },
-    {
-      code: 'empresas.consultar',
-      module: 'empresas',
-      action: 'consultar',
-      description: 'Consultar las empresas de la plataforma.',
-    },
-    {
-      code: 'empresas.modificar',
-      module: 'empresas',
-      action: 'modificar',
-      description: 'Dar de alta, editar y dar de baja empresas de la plataforma.',
-    },
-  ] as const
-
   it('R1: el catalogo contiene asignaciones.ejecutar con su modulo, accion y descripcion exactos, una sola vez', () => {
     expect(PERMISSIONS).toContainEqual(EJECUTAR)
     expect(codigos.indexOf('asignaciones.ejecutar')).toBe(codigos.lastIndexOf('asignaciones.ejecutar'))
@@ -905,6 +930,165 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
       'empaque.modificar',
       'empresas.consultar',
       'empresas.modificar',
+      'acondicionamiento.modificar',
     ])
+  })
+})
+
+describe('QC-216 — el permiso acondicionamiento.modificar y el Administrador de acondicionamiento', () => {
+  const citaFichaORequisito = /QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i
+
+  const ENTRADA_DE_ACONDICIONAMIENTO = {
+    code: 'acondicionamiento.modificar',
+    module: 'acondicionamiento',
+    action: 'modificar',
+    description:
+      'Comenzar y terminar el acondicionamiento de los pedidos de la empresa y registrar sus datos de lote.',
+  } as const
+
+  /** Lo que el Administrador tenia antes de esta ficha, escrito a mano. */
+  const PERMISOS_DEL_ADMINISTRADOR_PREVIOS = [
+    'dashboard.consultar',
+    'inventario.consultar',
+    'inventario.modificar',
+    'recetas.consultar',
+    'recetas.modificar',
+    'unidades.consultar',
+    'unidades.modificar',
+    'proveedores.consultar',
+    'proveedores.modificar',
+    'pedidos.consultar',
+    'pedidos.modificar',
+    'usuarios.consultar',
+    'usuarios.modificar',
+    'asignaciones.consultar',
+    'asignaciones.modificar',
+    'asignaciones.ejecutar',
+    'terminados.consultar',
+    'clientes.consultar',
+    'clientes.modificar',
+    'documentos.consultar',
+    'documentos.modificar',
+  ] as const
+
+  function parrafosDelCatalogo(): string[] {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .filter(Boolean)
+  }
+
+  function esLaEnmiendaDeAcondicionamiento(parrafo: string): boolean {
+    return (
+      parrafo.split('\n').length <= 5 &&
+      /enmienda/i.test(parrafo) &&
+      parrafo.includes(ACONDICIONAMIENTO) &&
+      parrafo.includes('lib/modules/') &&
+      !citaFichaORequisito.test(parrafo)
+    )
+  }
+
+  it('R4: el catalogo contiene acondicionamiento.modificar con su modulo, accion y descripcion exactos, y ningun otro acondicionamiento.*', () => {
+    expect(PERMISSIONS).toContainEqual(ENTRADA_DE_ACONDICIONAMIENTO)
+    expect(ENTRADA_DE_ACONDICIONAMIENTO.description.trim()).not.toBe('')
+    expect(
+      PERMISSIONS.filter((permiso) => permiso.module === 'acondicionamiento').map((p) => p.code),
+    ).toEqual([ACONDICIONAMIENTO])
+    expect(codigos.filter((codigo) => codigo.startsWith('acondicionamiento.'))).toEqual([
+      ACONDICIONAMIENTO,
+    ])
+  })
+
+  it('R5: el catalogo es el previo, en el mismo orden y con los mismos campos, mas acondicionamiento.modificar al final', () => {
+    const indice = PERMISOS_PREVIOS.findIndex((p) => p.code === 'asignaciones.modificar')
+    const catalogoPrevio = [
+      ...PERMISOS_PREVIOS.slice(0, indice + 1),
+      EJECUTAR,
+      ...PERMISOS_PREVIOS.slice(indice + 1),
+      ...PERMISOS_POSTERIORES.filter((p) => p.code !== ACONDICIONAMIENTO),
+    ]
+
+    expect(PERMISSIONS.slice(0, -1)).toEqual(catalogoPrevio)
+    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_ACONDICIONAMIENTO)
+    expect(codigos).toEqual([
+      ...CODIGOS_DEL_REQUISITO.filter((codigo) => codigo !== ACONDICIONAMIENTO),
+      ACONDICIONAMIENTO,
+    ])
+  })
+
+  it('R6: el JSDoc del catalogo tiene el parrafo de la enmienda de acondicionamiento, corto y sin citas', () => {
+    const parrafos = parrafosDelCatalogo()
+    const enmienda = parrafos.find((parrafo) => parrafo.includes(ACONDICIONAMIENTO))
+
+    expect(enmienda).toBeDefined()
+    expect(esLaEnmiendaDeAcondicionamiento(enmienda!)).toBe(true)
+    const primeraFrase = (parrafos[0] ?? '').split('.')[0] ?? ''
+    expect(primeraFrase).not.toMatch(citaFichaORequisito)
+  })
+
+  it('R6: el caso simetrico: el detector rechaza un parrafo sintetico que cita la ficha', () => {
+    const bueno =
+      '* **Otra enmienda al catalogo cerrado**: suma `acondicionamiento.modificar`; su modulo no\n' +
+      '* es una carpeta de `lib/modules/`.'
+
+    expect(esLaEnmiendaDeAcondicionamiento(bueno)).toBe(true)
+    expect(esLaEnmiendaDeAcondicionamiento(bueno.replace('cerrado**', 'cerrado** (QC-216)'))).toBe(
+      false,
+    )
+    expect(esLaEnmiendaDeAcondicionamiento(`${bueno} Lo pide R6.`)).toBe(false)
+    expect(esLaEnmiendaDeAcondicionamiento(bueno.replace('`lib/modules/`', 'una carpeta'))).toBe(
+      false,
+    )
+    expect(esLaEnmiendaDeAcondicionamiento(`${bueno}\n* a\n* b\n* c\n* d`)).toBe(false)
+  })
+
+  it('R8: el Administrador de acondicionamiento recibe exactamente asignaciones.consultar y acondicionamiento.modificar, escritos uno a uno', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([
+      'asignaciones.consultar',
+      'acondicionamiento.modificar',
+    ])
+    for (const prohibido of [
+      'inventario.consultar',
+      'inventario.modificar',
+      'asignaciones.ejecutar',
+      'asignaciones.modificar',
+      'empaque.modificar',
+      'terminados.consultar',
+      'pedidos.consultar',
+    ]) {
+      expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO], prohibido).not.toContain(prohibido)
+    }
+  })
+
+  it('R9: el Administrador no recibe acondicionamiento.modificar, que figura entre sus excluidos, y conserva exactamente su conjunto', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).not.toContain(ACONDICIONAMIENTO)
+    expect(ADMIN_EXCLUDED_PERMISSIONS).toContain(ACONDICIONAMIENTO)
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...PERMISOS_DEL_ADMINISTRADOR_PREVIOS])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
+      CODIGOS_DEL_REQUISITO.filter((codigo) => !ADMIN_EXCLUDED_PERMISSIONS.includes(codigo)),
+    )
+  })
+
+  it('R10: Operador, Empacador y Maestro conservan exactamente sus permisos y ninguno tiene acondicionamiento.modificar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+      'asignaciones.ejecutar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+      'empaque.modificar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
+    for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO]) {
+      expect(SEED_ROLE_PERMISSIONS[rol], rol).not.toContain(ACONDICIONAMIENTO)
+    }
   })
 })
