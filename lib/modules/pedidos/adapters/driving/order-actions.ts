@@ -37,8 +37,6 @@ import {
 } from '@/lib/modules/pedidos';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
-import { orderCustomerFixtureById, orderCustomerFixturePage } from './order-customer-fixtures';
-
 // Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
 // existe.
 import type { OrderCoverage } from '@/lib/modules/inventario';
@@ -220,6 +218,7 @@ function buildCreateCandidate(formData: FormData): unknown {
     // Solo la cadena exacta confirma: cualquier otro valor, o la ausencia, es no confirmar.
     confirmBlocked: formData.get('confirmBlocked') === 'true',
     recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
+    customerId: readOptionalFormString(formData, 'customerId'),
   };
 }
 
@@ -490,8 +489,7 @@ export async function updateOrderDistributionAction(
 }
 
 // ---------------------------------------------------------------------------------------------
-// El cliente del pedido. Hasta que los casos de uso esten cableados, las tres devuelven datos
-// fijos con la forma real.
+// El cliente del pedido.
 // ---------------------------------------------------------------------------------------------
 
 export type OrderCustomerOptionsResult = { status: 'success'; data: Page<OrderCustomer> } | ErrorState;
@@ -504,9 +502,7 @@ export async function setOrderCustomerAction(id: string, input: unknown): Promis
   const actor = await currentActor();
 
   try {
-    void actor;
-    void id;
-    void input;
+    await pedidos.setOrderCustomer(id, input, actor);
     return { status: 'success' };
   } catch (error) {
     return toErrorState(error);
@@ -522,11 +518,8 @@ export async function searchOrderCustomersAction(
   const actor = await currentActor();
 
   try {
-    void actor;
-    const fields = typeof query === 'object' && query !== null ? (query as Record<string, unknown>) : {};
-    const search = typeof fields.search === 'string' ? fields.search : '';
-    const page = typeof fields.page === 'number' ? fields.page : 1;
-    return { status: 'success', data: orderCustomerFixturePage(search, page, purpose) };
+    const data = await pedidos.searchOrderCustomers(query, purpose, actor);
+    return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }
@@ -537,8 +530,8 @@ export async function getOrderCustomerFilterOptionAction(id: string): Promise<Or
   const actor = await currentActor();
 
   try {
-    void actor;
-    return { status: 'success', data: orderCustomerFixtureById(id) };
+    const data = await pedidos.getOrderCustomerFilterOption(id, actor);
+    return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }
